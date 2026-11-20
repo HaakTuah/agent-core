@@ -1,5 +1,5 @@
 // A rule's reasons in one step (#756, point 2): given a rule of the floor, the modules or AGENTS.md, by its file and
-// bold lead as holders.json, beside this file, names it (or a part of that, any case), it prints the core archive's
+// bold lead as the entries of scripts/holders/, beside this file, name it (or a part of that, any case), it prints the core archive's
 // items listed behind it under "behind", each with its date, its issues and its reasoning, and the items behind its
 // file's text as a whole; each later item that changed one of them, by its mark "Changed by:" (archive.mjs, #756,
 // point 3), followed to the newest; the issues' addresses, to read with them; and the outcome its number stands for
@@ -60,7 +60,7 @@ export function lines(found, root = ROOT, cwd = process.cwd()) {
   const later = found.later ?? [], issues = [...new Set([...found.items, ...found.fileItems, ...later].flatMap(it => it.issues ?? []))].sort((a, b) => a - b);
   return [
     found.rule,
-    found.number ? `Its number: ${found.number}.` : "Its number: none named in holders.json yet.",
+    found.number ? `Its number: ${found.number}.` : "Its number: none named in scripts/holders/ yet.",
     found.items.length ? `Behind it, ${found.items.length} item${found.items.length === 1 ? "" : "s"} of the core's archive:` : "Behind it: no item of the archive is listed yet.",
     ...each(found.items),
     ...(found.fileItems.length ? [`Behind ${found.file}'s text as a whole:`, ...each(found.fileItems)] : []),

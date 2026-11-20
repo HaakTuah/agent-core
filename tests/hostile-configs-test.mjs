@@ -92,6 +92,15 @@ for (const f of ["../outside/x", "/etc/passwd", "C:\\x", "<script>x</script>"]) 
   ok(fails(r) && r.out.includes("is no tracked file"), `reading-size.mjs: refuses with its mend a file read named ${f}, never counting it`);
 }
 ok(fails(sizes(marks({ past: { "../outside/x": 1 } }))), "reading-size.mjs: refuses with its mend a file past the split mark named outside the project");
+// (a line of "past" as { "mark", "why" } (#469): a mark out of range or missing, a why of the wrong type, each refused;
+// a why too long or of markup is text, printed by no failure, and the line is read as any other)
+for (const [line, what] of [[{ mark: 0, why: "x" }, "a mark of 0"], [{ mark: -1, why: "x" }, "a mark of -1"], [{ mark: 1.5, why: "x" }, "a mark of 1.5"], [{ why: "x" }, "no mark"],
+  [{ mark: "20000", why: "x" }, "a mark as a string"], [{ mark: 1, why: 7 }, "a why of a number"], [{ mark: 1, why: ["x"] }, "a why of a list"], [{ mark: 1, why: null }, "a why of null"], [[1, "x"], "a list"]])
+  ok(fails(sizes(marks({ past: { "a.md": line } }))), `reading-size.mjs: refuses with its mend a line of "past" with ${what}`);
+for (const why of ["w".repeat(1 << 20), "<script>alert(1)</script>\n::error::forged"]) {
+  r = sizes(marks({ past: { "../outside/x": { mark: 1, why } } }));
+  ok(fails(r) && !r.out.includes("<script>") && !r.out.includes("::error::forged") && r.out.length < 100000, "reading-size.mjs: a why too long or of markup is read as text and never printed");
+}
 // (a tracked file that is a link to a pipe, which never ends, or a folder, is refused before it is read: #446. A pipe,
 // not a device: where a fault the mutation tool puts in lets it be read, the read waits until the tool stops it, where
 // an endless device would fill the machine's memory)

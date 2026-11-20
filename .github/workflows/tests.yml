@@ -182,6 +182,9 @@ jobs:
       - name: The NuGet check's fetch before the restore, against each package's content hash
         if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-fetch-test.mjs ')) }}
         run: node tests/nuget-fetch-test.mjs
+      - name: The code scan of a private project, its engine fetched by its digest (#546)
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-test.mjs ')) }}
+        run: node tests/code-scan-test.mjs
       - name: The hand-written readers, against SPDX's own parser and an XML parser (on Linux, where tar unpacks them)
         if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/readers-test.mjs ')) }}
         run: node tests/readers-test.mjs
@@ -287,6 +290,9 @@ jobs:
       - name: The description check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-test.mjs ')) }}
         run: node tests/pr-description-test.mjs
+      - name: The tests a pull request edits, which the description names
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/weakened-test.mjs ')) }}
+        run: node tests/weakened-test.mjs
       - name: How done will be judged
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/done-when-test.mjs ')) }}
         run: node tests/done-when-test.mjs
@@ -302,9 +308,15 @@ jobs:
       - name: The proof that an update from main is the merge git makes, and the review statuses' run on one
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/clean-merges-test.mjs ')) }}
         run: node tests/clean-merges-test.mjs
+      - name: The proof that a pull request changes only the progress file's lines, each for an issue it may name
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-only-test.mjs ')) }}
+        run: node tests/queue-only-test.mjs
       - name: The workflow check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/workflows-test.mjs ')) }}
         run: node tests/workflows-test.mjs
+      - name: The release jobs' install of every package
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/release-install-test.mjs ')) }}
+        run: node tests/release-install-test.mjs
       - name: The core-moved check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-moved-test.mjs ')) }}
         run: node tests/core-moved-test.mjs
@@ -375,6 +387,12 @@ jobs:
       - name: The proof that a change to what runs by itself is only comments and steps' names
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/comment-only-test.mjs ')) }}
         run: node tests/comment-only-test.mjs
+      - name: The proof that a change to the floor or the review guidelines only follows files the pull request moves
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/path-only-test.mjs ')) }}
+        run: node tests/path-only-test.mjs
+      - name: The design check's word that a change to the floor or the review guidelines keeps its meaning
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/meaning-kept-test.mjs ')) }}
+        run: node tests/meaning-kept-test.mjs
       - name: Whether a script was started by itself
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/started-test.mjs ')) }}
         run: node tests/started-test.mjs
@@ -441,6 +459,9 @@ jobs:
       - name: The tools reader
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/tools-read-test.mjs ')) }}
         run: node tests/tools-read-test.mjs
+      - name: The order of a pull request's checks and reviews
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/stage-order-test.mjs ')) }}
+        run: node tests/stage-order-test.mjs
       - name: The entry-files check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/entry-files-test.mjs ')) }}
         run: node tests/entry-files-test.mjs
@@ -456,6 +477,9 @@ jobs:
       - name: The reading script, by role and by task
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/reading-test.mjs ')) }}
         run: node tests/reading-test.mjs
+      - name: The total read
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/read-total-test.mjs ')) }}
+        run: node tests/read-total-test.mjs
       - name: Every module and role of the core says when it is read, in words the reading script matches
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/reading.mjs --check

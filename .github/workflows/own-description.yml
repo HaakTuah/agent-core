@@ -39,6 +39,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
+          package-manager-cache: false # (no cache restored over the checkout before the check: the proof of path-only.mjs runs main's code)
       - name: The core's packages, installed from its lock file for the core's description check (#654)
         run: node scripts/install.mjs
       - name: The description has its parts, and where the rules change, what holds the change and what it asks

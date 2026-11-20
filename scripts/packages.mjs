@@ -11,6 +11,8 @@
 //   import { load, loadSync } from "./packages.mjs";   const { Lexer } = await load("yaml");
 //                                                     loadSync("yaml"): the same, at once, for a package of CommonJS,
 //                                                     so a script loads it only where it is used, never on import
+//   pypiFile("semgrep/bin/semgrep-core"): a file of a PyPI package, installed by `install.mjs pypi` into the core's
+//                                                     .packages/pypi/ alone (code-scan.mjs's engine; #546)
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -217,6 +219,32 @@ function unlisted(name) {
   const lists = Object.values(INSTALLS).map(f => `${f}/package.json`).join(", ");
   console.error(`FAIL: the check did not run: the package ${name} is not installed: no package list of the core's names it (${lists}). Mend: in a project, take the core's copy back as the core holds it (node core/scripts/sync.mjs); in the core, add the package to the package list and lock file the script's install reads (${lists}), as npm's own install there writes them, then run node scripts/install.mjs and the check again`);
   process.exit(1);
+}
+
+// The path of a file of a PyPI package in the core's own .packages/pypi/, which `install.mjs pypi` installs from
+// .packages/requirements.txt, or null where it is not there or leads out of that folder.
+function pypiAt(rel) {
+  try {
+    const own = fs.realpathSync(path.join(root, ".packages", "pypi")) + path.sep;
+    const at = fs.realpathSync(path.join(root, ".packages", "pypi", rel));
+    return at.startsWith(own) && fs.statSync(at).isFile() ? at : null;
+  } catch { return null; }
+}
+
+// That file; where it is not there, the same failure as a package's, with the command that installs it.
+export function pypiFile(rel) {
+  const file = pypiAt(rel);
+  if (!file) {
+    console.error(`FAIL: the check did not run: ${rel} is not installed in ${path.relative(process.cwd(), path.join(root, ".packages", "pypi"))}. Mend: run node ${path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"))} pypi, which installs it from the core's .packages/requirements.txt with Python's pip, then run the check again`);
+    process.exit(1);
+  }
+  return file;
+}
+
+// Whether that file could not be installed because the registry did not answer, in a project's pull request, as
+// unreached() says of a package.
+export function pypiUnreached(rel) {
+  return process.env.CORE_PACKAGES_UNREACHED === "1" && !pypiAt(rel);
 }
 
 // The package's entry file; where it is not installed, the failure, which never passes: in a job of a workflow, the

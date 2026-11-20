@@ -1,0 +1,10 @@
+# The PyPI packages of other publishers the core's scripts run, each at one exact version and the SHA-256 of each of its
+# wheels, installed by scripts/install.mjs pypi into .packages/pypi/, which git does not track (#654): Semgrep's engine,
+# which the code scan runs (scripts/code-scan.mjs; #546), installed only in the scan's own step.
+semgrep==1.185.0 \
+    --hash=sha256:0eb6aaadad5b957af96d1300487e10af1dc8016e8ef53072effb48cd4906c02b \
+    --hash=sha256:8cffbaf80abb8e39abc6d7a86588dcf94b7ddc1f40e8e16e555a1116347be3ef \
+    --hash=sha256:f030c391af948b493ae2220a1b64372df5f18adf8e2dd909ab62035364c51890 \
+    --hash=sha256:99fde53fda44c25d8ab27424f421947b0a0186d86ce888c593a6da62b811d783 \
+    --hash=sha256:d54c7dc22f6f360e0f9f850b1ecdfe00ec755600f9cf2ec6be3928b42818f1b4 \
+    --hash=sha256:91812ac0856cfe5b6135a4dffde3052a04c36a46e4e82e78793e3a07e51d7894

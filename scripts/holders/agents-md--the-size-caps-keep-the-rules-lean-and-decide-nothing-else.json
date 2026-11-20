@@ -1,0 +1,5 @@
+{
+  "rule": "AGENTS.md: The size caps keep the rules lean and decide nothing else",
+  "behind": [179, 181, 182, 201, 234, "#750.6"],
+  "number": "check fires; outcome: fast"
+}

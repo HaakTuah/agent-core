@@ -1,9 +1,9 @@
 # Cleaning, and the audit of how code is put together
 
-Read by a builder that takes a cleaning task, by the session that takes an audit's task or the state report and by its
-reader, by the orchestrator when it hands out lanes, and by whoever writes an issue that asks something of every or all
-of a kind, or builds what it asks (#593): the kinds `cleaning`, `audit` and `sweep`. What the code is held to:
-`tasks/code-shape.md`.
+Read by a builder that takes a cleaning task or cuts or joins files, by the session that takes an audit's task or the
+state report and by its reader, by the orchestrator when it hands out lanes, and by whoever writes an issue that asks
+something of every or all of a kind, or builds what it asks (#593): the kinds `cleaning`, `audit` and `sweep`. What the
+code is held to: `tasks/code-shape.md`.
 
 - **The state of a codebase sets the dose.** By default a codebase is in one of three states, which
   `core/scripts/dose.mjs` reads from the shape check's baseline: the share of the functions and imports the check
@@ -56,7 +56,7 @@ of a kind, or builds what it asks (#593): the kinds `cleaning`, `audit` and `swe
   last one's, and records the audit in the baseline (`core/scripts/dose.mjs --audited`), in one pull request.
   - **The brief:** the reader reads, and changes nothing. It answers for the project's owner and for the cleaning
     lane: where the code resists change, what to clean up first, and what no check sees.
-  - **Nine questions, the same at every audit,** each answered with its evidence (a file, a count, a pull request)
+  - **Ten questions, the same at every audit,** each answered with its evidence (a file, a count, a pull request)
     and on one scale, so that two audits can be set side by side: 0, nothing found; 1, found, and it costs no work
     yet; 2, it costs work today; 3, it stops a lane or makes work *one at a time*.
     1. Can what each system offers be said in a sentence, and do the others use only that?
@@ -71,6 +71,14 @@ of a kind, or builds what it asks (#593): the kinds `cleaning`, `audit` and `swe
     9. Which of the project's *descriptions* (its README, its design notes, what it tells a user, the pointers in its
        rule files) no longer say what the code does, each by its document and line and the file or behaviour it no
        longer matches? Each it finds is a task of the cleaning lane, taken at the dose (#563).
+    10. What here is a version built by hand of something maintained, free to use, that does its job (a package, a
+       tool, a standard), each with what would replace it? Each it finds is an ordinary task of the project's, taken at
+       the dose, and a move among them is built in steps or capped and passes the same gates, as `tasks/choices.md`
+       says of any move (#534). In the core's own repository the inventory (`INVENTORY.md`) is that answer, and the
+       reader names only what it lacks.
+  - **In the core's own repository** the reader is also given what `scripts/read-total.mjs --candidates` prints: the
+    files several kinds of task open, most read first. It says of each whether a part is all most of its readers need,
+    as "A cut or a join lowers the total read" asks.
   - **A limit on its own proposals:** it proposes a new check only where a finding came up at two audits or costs
     work today.
   - The tests are audited by the same reader. Where the project names a *mutation tool*, the session that takes the
@@ -83,15 +91,18 @@ of a kind, or builds what it asks (#593): the kinds `cleaning`, `audit` and `swe
 
   It does not mean that the reader mends what it finds, nor that an audit made before these questions stood is made
   again: what it left unanswered is answered at the next. Nor does it mean that a dated record is brought up to date
-  (`roles/shared/how-to-work.md`, "No description left untrue"), or that a job is added for the ninth. Reason: what
-  was measured was fixed and what was judged had no standard, so two audits could not be compared; checks piled on make
-  code harder to change; and a description a change missed stays untrue until someone happens to read it. Held by the
+  (`roles/shared/how-to-work.md`, "No description left untrue"), or that a job is added for the ninth. Nor does the
+  tenth rewrite anything or turn anything red, put a project's code on the core's inventory, or ask the project's owner,
+  whose dose it is to change. Reason: what was measured was fixed and what was judged had no standard, so two audits
+  could not be compared; checks piled on make code harder to change; a description a change missed stays untrue until
+  someone happens to read it; and code written before "A job a maintained package does is done by it"
+  (`tasks/code-shape.md`) was asked by nothing whether something maintained does its job. Held by the
   scheduled look, whose issue for an audit says this brief, and by the reviews of the pull request that holds the
   report, which read that each question is answered on the scale.
 - **A sweep's scope is read, not listed** (#593). By default an issue names what it covers. The one condition that
   changes it: an issue asks something of every or all of a kind (an inventory, an audit, a sorting, a check of each
   file), a *sweep*. The trigger is such an issue written: whoever writes it names the source a script counts that kind
-  from (the tracked files, a workflow's steps, the manifest's rows, `core/scripts/holders.json`), and whoever builds the
+  from (the tracked files, a workflow's steps, the manifest's rows, `core/scripts/holders/`), and whoever builds the
   check that holds the sweep has it read its coverage from that source: each thing the source holds has its line in the
   sweep, or lies under a path the sweep marks as left out, with the reason, and the check fails each that has neither,
   saying the mend. It does not mean a sweep may leave nothing out: what it leaves out is said. Reason: a scope written
@@ -121,3 +132,45 @@ of a kind, or builds what it asks (#593): the kinds `cleaning`, `audit` and `swe
   property of the code keeps a baseline that may not get worse (`tasks/code-shape.md`). It does not mean a session may
   not read them. Reason: a number made a goal stops measuring what it stood for. Held by no check: none reads a target
   set in prose without guessing; the brief's rule (`tasks/helpers.md`) and the reviews carry it.
+- **Size asks; a reader who reads less answers** (#469). By default a file past the *size marks*' split mark (about 20
+  KB where they name none) sets whoever changes it one question: in what ways could it be split so that someone reads
+  less? That builder lists the ways found in the pull request, each with the reader who would read
+  less, a role or a kind of task. Where there is one, the file is split along it, in a pull request of its own with
+  behaviour proven unchanged; where none, it stays whole, its line in the marks' baseline (`"past"`) giving the reason
+  or the split's issue, and the question is not asked again until it has grown by a quarter or a new kind of reader
+  comes. A split leaves no reader reading more: where whoever reads one part needs the other every time, it is no
+  split. A dated record (the reports) is cut by month where it is cut at all, those that stand kept as they are. It
+  does not mean a file is cut to meet a number, nor that the caps on what a role reads at its start go, where size is
+  the cost itself (the core's `AGENTS.md`, on its size caps), nor that a line of `"past"` that stood is written again
+  before its file is next changed. Reason: a mark on size is a weak sign that a file holds two things, and files were
+  cut where nothing was gained. Held by the reading-size check (`core/scripts/reading-size.mjs`), which fails a file
+  past its mark that a pull request changes with no line in `"past"`, one whose new line names neither a split's issue
+  nor why it stays whole, and one grown a quarter past its line's mark, or past a mark alone that stood; a mark a pull
+  request raises on a line that stood it notes, for the reviews to read that its why still holds.
+- **A cut or a join lowers the total read** (#469). By default what a change to how the core's rule files are cut
+  brings down is the sum of what the core's tasks read, each file opened counted as a cost of its own, never one file's
+  size: `core/scripts/read-total.mjs` works it out from what the reading script gives each role and kind of task and
+  from the last 30 merged pull requests, each read as the kinds of task its changed paths make it. A cut or a join is
+  a file the reading script names added with text the base's files held, or taken out with its text standing in
+  another; a file of new rules, one taken out whose rules go and a rename are none. Whoever cuts or joins such files
+  runs it on the base and on the branch (`--compare`) and shows both in the pull request, which passes three
+  conditions: the sum goes down; no role or kind of task reads more, its extra opens counted; and none loses a file it
+  read before, unless the pull request says why it never needed it, on a line `Never needed:`. It goes both ways: two
+  files the same readers always open together are joined where the sum goes down by it, and a file of any size that
+  several kinds of task open is a candidate, the core's audit's reader being shown those most read first (`--candidates`).
+  It does not mean reading is cut by keeping a session from what its task calls for, nor anything in a project, whose
+  copy of the core changes only by a sync and whose own files "Size asks" holds. Reason: the lowest total has an
+  optimum, since each file opened is a call and one more file a session can miss. Held by `read-total.mjs --compare` in
+  the core's size workflow, which fails a cut or a join where a condition fails, and any pull request whose tree's
+  path patterns run past the total read's budget of steps, and by the state report, which gives the sum beside the
+  last one's.
+- **A role's start holds what any of its tasks can break** (#469). By default a line of a file a role reads at its
+  start, as `scripts/reading.mjs` gives it, stays there only where any task of that role can break it, the test the
+  floor's own file keeps; a line only some kinds of task can break moves to a module read when a task calls for it.
+  Whoever cuts or joins a file read at a start puts the test to each line it moves or leaves; a line of the review
+  guidelines moves so under the owner's agreement of 18 November 2026, relayed into its pull request (floor rule 3).
+  It does not mean a size to reach, nor that a line any task can break leaves the start to make room, nor a rewrite of
+  the files that stand, nor anything in a project, whose start files are the core's copy. Reason: what stands at the
+  start is paid at every task, and one study of rule files found that they raise what a task costs without raising
+  how often it succeeds. Held by no check yet: which tasks can break a line is a reading; `scripts/read-total.mjs`
+  shows what a move saves.

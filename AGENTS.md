@@ -30,10 +30,10 @@ which its entry file pulls in.
 
 Read when a task calls for it, each saying when in its opening line: the files of `floor/topics/`,
 `floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
-`tasks/tools.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`, `tools/antigravity.md`,
-`tasks/github-calls.md`, `tasks/hosts.md`, `tasks/repositories.md`, `roles/shared/teams.md`, `roles/orchestrator.md`,
-`tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md`, `tasks/done-when.md`,
-`tasks/planning.md` and `roles/shared/records.md`.
+`tasks/tools.md`, `tasks/ways.md`, `tools/claude-sessions.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`,
+`tools/antigravity.md`, `tasks/github-calls.md`, `tasks/hosts.md`, `tasks/repositories.md`, `roles/shared/teams.md`,
+`roles/orchestrator.md`, `tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`,
+`tasks/cleaning.md`, `tasks/done-when.md`, `tasks/planning.md` and `roles/shared/records.md`.
 
 Not taken, each for its reason:
 
@@ -49,7 +49,7 @@ those written before 12 November 2026, and the staged cases' record); the *audit
 `CHOICES.md`; the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
 the *mutation tool*: `node scripts/stryker.mjs --tool tests/mutation --report {report} {lines}`, Stryker at the version
 `tests/mutation/`'s lock file pins (#581), in `tests.yml`;
-the archive is `archive/instructions.md`, the items behind each rule listed in `scripts/holders.json`; the *settling references* and the *descriptions*:
+the archive is `archive/instructions.md`, the items behind each rule listed in `scripts/holders/`; the *settling references* and the *descriptions*:
 `README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
 `tests.yml`, its baseline empty (#259); the *owner's account*: `HaakTuah`; the *users get*:
 `releases`, its users taking the core from a release or, following `main`, from its newest commit whose checks all
@@ -59,7 +59,8 @@ queue's order; the
 *design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
 issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`tasks/roles.md`,
 `roles/orchestrator.md`); the *hard work*: a new or changed rule; the *size marks*: the caps of
-`scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*:
+`scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, and the split mark, 20 KB, with its `"past"`
+list, in `.github/sizes.json`, which `scripts/reading-size.mjs` reads as a project's; the *major version checks*:
 the suites of `.github/workflows/tests.yml`; *planning design*: none; the *quick check*: `node scripts/holders.mjs && node scripts/size.mjs && node scripts/reading.mjs --check && node tests/holders-test.mjs && node tests/manifest-reads-test.mjs && node tests/general-test.mjs`; the *other builders' checks*: those suites, which any tool's
 session here runs before it finishes, every file here being protected (`SECURITY.md`).
 
@@ -72,17 +73,20 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **An idea is built only from a line, and a line joins in a PR of its own.** A new or changed rule
   joins only where that PR relays the owner's yes to its issue, as the chat session records it ("Whose words an issue
   holds"): that PR is the gate, so no verdict of the stand-in's queues one here, a difference from `roles/shared/inbox.md`.
-  A test, a check for a rule that already stands, a task the scheduled look opens (#248) and a small finding of an
-  audit (#259) join without the owner's word. A bug waits for no line, as that module says. A line does not leave in
-  the PR that closes its issue: the readers of the file skip the line of a closed issue, and the next PR that changes
-  the file takes such lines out together (`node scripts/queue.mjs --clear`; #750, point 1), as that module says, since
-  PRs merging side by side collided on it. Held here by `own-description.yml`, which fails a ready PR that changes the
+  A test, a check for a rule that already stands, a task the scheduled look opens (#248), a small finding of an
+  audit (#259) and a change to a rule that keeps its meaning (#886, point 2) join without the owner's word: the design
+  check of the PR that builds such a change states it, as `roles/shared/review-guidelines.md` says of the floor ("A
+  change that keeps the meaning is stated so"), and where it does not, that PR waits for the owner's yes, held for the
+  floor and the guidelines by `scripts/meaning-kept.mjs` and for any other rule by nothing yet. A bug waits for no
+  line, as that module says. A line does not leave in the PR that closes its issue: the readers of the file skip the
+  line of a closed issue, and the next PR that changes the file takes such lines out together (`node scripts/queue.mjs
+  --clear`; #750, point 1), as that module says, since PRs merging side by side collided on it. Held here by `own-description.yml`, which fails a ready PR that changes the
   file and leaves one.
 - **Queued means wanted: nothing queued waits for a second word.** Where the floor asks the owner's
-  yes in a PR (floor rule 3: a change to the floor or the review guidelines), the yes the owner gave when its issue was
-  queued is that yes: the builder relays it into the PR word for word as it was recorded (floor rule 3), and it covers
-  the change as the issue describes it. A PR that goes beyond its issue is not covered by it, and the design check
-  says so.
+  yes in a PR (floor rule 3: a change to the floor or the review guidelines that means something), the yes the owner
+  gave when its issue was queued is that yes: the builder relays it into the PR word for word as it was recorded
+  (floor rule 3), and it covers the change as the issue describes it. A PR that goes beyond its issue is not covered by
+  it, and the design check says so.
 - **The file holds no note.** Where a module asks for one in the *progress file* (a lane that waits), it goes in the
   description of the line's own PR, which the next builder reads with the branch, as a hand-off note does
   (`tasks/tools.md`, "A change of tool loses nothing").
@@ -150,9 +154,11 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **Whoever builds a change finishes it,** the design session and a builder alike: the branch, the draft PR and the
   push after every commit, then ready, its reviews, their findings fixed and the merge, as `roles/shared/work-flow.md`
   says ("Git and GitHub", and point 1). A PR that changes a rule says what it changes in every project.
-- **Every PR gets Codex's code and security reviews;** one that changes the floor or the review guidelines needs the
-  owner's yes in it: that of its queued issue ("Queued means wanted"), or, for one that goes beyond it, a new yes, for
-  which it waits unmerged while its builder takes the next line.
+- **Every PR gets Codex's code and security reviews,** save one of queue lines alone that `scripts/queue-only.mjs`
+  proves (floor rule 8; `tasks/reviews.md`, point 3); one that changes the floor or the review guidelines needs the
+  owner's yes in it, save one that keeps the meaning as floor rule 3 says: that of its queued issue ("Queued
+  means wanted"), or, for one that goes beyond it, a new yes, for which it waits unmerged while its builder takes the
+  next line.
 - **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`).
   By default what a role reads at its start, as its file under `roles/` names it, stays under that role's cap, so
   whoever adds a rule there replaces text. Where a fresh session has read all the rules for room and found too little,
@@ -204,8 +210,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   it did not start before, and fails a pull request that adds a copy until the mend its failure words is made; by the
   heading "What it asks of a project" below; and, for the dose, by the scheduled look (`scripts/look.mjs`), which
   reads it from the shape check's baseline (`scripts/dose.mjs`).
-- **A release says what it asks, step by step.** Whoever adds an entry to `setup/sync-notes.md`
-  gives it a step in `scripts/steps.mjs` that answers done or not done exactly, never by guessing: a check of its own
+- **A release says what it asks, step by step.** Whoever adds an entry to the sync notes (`setup/sync-notes/`)
+  gives it a step in `scripts/steps/` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
   is not done; or, where no check reads it, why, held by the staged case `steps`. Every standing entry has one. Every sync
   runs them all (`scripts/sync.mjs`) and prints, for the sync pull request's description, only the steps not done, and
@@ -332,7 +338,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `.github/workflows/core.yml`, which fails a copy that holds what `.gitattributes` keeps here; what is quoted, by what
   holds floor rule 4's "The owner's word".
 - **The archive is pointed to from the list,** not from the rule (#252). By default a rule file here (this file, the
-  floor's, the roles' and the modules') holds no "core archive N": `scripts/holders.json` names under "behind" the
+  floor's, the roles' and the modules') holds no "core archive N": `scripts/holders/` names under "behind" the
   items behind each rule, and a session that needs a rule's reason looks them up there. Whoever writes or changes a
   rule adds its items to that list in the same pull request. Nothing changes it. It does not mean a rule loses its
   one-line reason, which stays in it ("A rule is written to one pattern"), nor that a project's own rule files are
@@ -341,7 +347,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that is not in the archive.
 - **A new archive item is named by its issue** (#744). By default an item added to the archive is keyed by the issue
   that carries the owner's word and, where it records one point of several, by that point, as `#733.1`, and stands in
-  a file of its own named by its key (`archive/instructions/issue-733.1.md`; #750, point 1); `scripts/holders.json`
+  a file of its own named by its key (`archive/instructions/issue-733.1.md`; #750, point 1); `scripts/holders/`
   names it so under "behind", and a pointer to it gives that key where one to an older item gives its number. Items 1
   to 262 keep their numbers, so every "core archive N" that stands still leads where it did. Nothing changes it. It does not mean an item moves or
   is rewritten. Reason: on 19 November 2026 two pull requests merged in parallel took the same next number, and a
@@ -364,13 +370,13 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   a check that fails where it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no
   check can read its breach exactly, by a staged case, the holder of last resort, or by the scheduled audit; and where
   none holds it yet, it is listed. Whoever writes or changes a rule names its holder in that PR: in
-  `scripts/holders.json`, by the rule's file and bold lead, or in a staged case's own file; and under the PR's heading
+  `scripts/holders/`, a file by the rule's file and bold lead, or in a staged case's own file; and under the PR's heading
   "What holds it" (`.github/workflows/own-description.yml` fails one without it), for each rule it adds or widens, what
   went wrong or would without it (an incident, a review's finding, the owner's reason), its holder, or that it has
   none yet, and its number (#303): a line "Number:" with the count the rule is meant to lower (`findings`, the review
   findings that name it; `check fires`; or `correction: <kind>`, #302) and the one of the five outcomes it stands for
   (`; outcome: asked`, `fast`, `readable`, `usable` or `robust`), then `; rare harm` where it guards against rare and
-  severe harm, as `scripts/holders.json` keeps it under "numbers";
+  severe harm, as `scripts/holders/` keeps it under "number";
   "None" where it adds no rule. The rules that stood before are held the same way: `scripts/holders.mjs` lists each
   rule with no holder in the core's monthly state report, until it gains one or goes on the owner's word, and a
   review's finding seen twice moves its rule up (`tasks/reviews.md`, point 8). A line that only points elsewhere or
@@ -378,7 +384,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   with no holder fails anything or goes by itself, that a review is a holder, or that a count of a rule's citations is
   its number: a citation says a rule is applied, never that it helps. Reason: the audit of 13 November found 43 of 122
   rules held by nothing but a session reading them, and nothing listed them. Held by
-  `scripts/holders.mjs`, in `.github/workflows/tests.yml`, which fails where `holders.json` names a rule that no longer
+  `scripts/holders.mjs`, in `.github/workflows/tests.yml`, which fails where an entry names a rule that no longer
   stands, a check that is not there or a number in no form, and by the heading's check, which asks the line "Number:"
   where the heading holds more than "None".
 - **A project's own rules name what holds them** (#662). By default the rules a project writes for itself, in the
@@ -443,11 +449,31 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   keeping the thing does. Nothing changes it. It does not mean a rule names no number: its line costs a line and is asked all
   the same ("Every rule says what holds it"); what is sized is the work of proving. Reason: proof that costs more than
   what it guards against is the overhead it was meant to cut. Held by the review guidelines ("A rule file changed").
+- **A rule is written in the form a check can hold** (#887). By default a rule of the floor, the modules or this file
+  takes a form whose breach a check reads without guessing: whoever writes or changes one looks first for such a form,
+  the rule as asked or one slightly different, writes it, and names the check under "What holds it". The one condition that
+  changes it: the checkable form would change what the rule asks or protects in a way that matters a great deal; then
+  the form only a reading holds is kept, and the pull request says why. The trigger is a rule written or changed: the
+  design check reads each for it, and blocks one held by reading alone where a checkable form exists and the pull
+  request gives no such reason (`roles/shared/review-guidelines.md`, "A rule file changed"); and at each pruning ("Rules
+  are pruned by their numbers") the session that takes it proposes, for each rule with no holder, beside its other
+  proposal, a slightly different form a check could hold, or why none exists (`form` or `noForm` in
+  `reports/unheld.json`; a proposal of a check, which holds the rule as worded, or that the rule describes needs
+  neither). A project's design checks read its own rules the same way, from the release that brings it. It does not
+  mean that a rule's purpose is bent to fit a check, that a rule is turned into a line a pull request declares where
+  what it asks is what the work does, that a check that guesses is written, nor that a rule that stands and no change
+  touches is rewritten for it outside a pruning's proposal. Reason: a
+  rule a check holds need not be given to a session ahead of its work once release 7 (#692) begins, and is kept whether
+  or not it is read, while one held by reading costs every session that reads it. Held, for the pruning, by
+  `scripts/pruning.mjs`, whose test reads that the list gives each rule with no holder its checkable form or the reason
+  it has none, or says it has neither yet; for the design check, by no check, since none can tell without guessing
+  whether a form exists.
 - **A rule is written to one pattern.** Whoever writes or changes a rule of the floor, the modules or
   this file writes it in six parts: the default first, then the one condition that changes it; a trigger someone can
   observe ("a trial shows the stack misses a need stated in numbers", never `when performance matters`); one actor and
   one action, who does what; what it does not mean, where a reader could overreach; its reason, in one line; and what
-  holds it (a check, a staged case or the audit), named under "What holds it" as "Every rule says what holds it" says.
+  holds it (a check, in the form one can hold where there is one, as the rule before says; a staged case or the
+  audit), named under "What holds it" as "Every rule says what holds it" says.
   Kept out: adjectives that measure nothing (`clean`, `performant`), `should consider`, which binds no one, lists of
   preferred technologies, which date within months, and whatever a check's failure can say at the moment it matters
   (#254). A rule that stands and no change touches is the one exception: the audit of the core against itself (#259)
@@ -477,15 +503,23 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that rewords it. The owner is never "he" or "his" in new text: the same check reads each line a PR adds under
   `archive/` and `reports/` for a gendered pronoun, a line quoted with `>` (the owner's own words) and a record moved
   word for word aside, while the older records stay as they were.
-- **A record pull requests add to is a folder of one file per entry** (#750, point 1). By default each part of the
-  inventory (`INVENTORY.md`) stands in a file of its own under `inventory/`, read in the order of the files' names by
-  the scripts that read it (`scripts/inventory.mjs`), so that two pull requests that add an entry never edit the same
-  lines, as each archive item stands already ("A new archive item is named by its issue"). Whoever adds an entry adds
-  its file, named to stand between its neighbours. Nothing changes it. It does not mean that what the record holds, or
-  the order it is read in, changes. Reason: of 39 pull requests merged between 18 and 19 November 2026, 8 changed
-  `INVENTORY.md`, and under merge-on-green pull requests that add to one file merge side by side and collide. Held by
-  `tests/mend-test.mjs`, which reads the inventory whole, and fails a folder `INVENTORY.md` does not name and a part's
-  line written in `INVENTORY.md` itself.
+- **A record pull requests add to is a folder of one file per entry** (#750, point 1; #853), as `tasks/planning.md` sets
+  out for any project's busy record. By default the core's are: each part of the inventory (`INVENTORY.md`) in a file of
+  its own under `inventory/`; each entry of the sync notes (`setup/sync-notes.md`) under `setup/sync-notes/`, its step
+  in a file of the same name under `scripts/steps/` and, where the step has a check, its stage for the tests under
+  `scripts/stages/` (a stage whose mend reads what the others' mends write says `last`); and what holds each rule (its
+  holder, the items behind it and its number), each rule's entry in a file under `scripts/holders/` that `entryFile` in
+  `scripts/holders.mjs` names from the rule's key. Each is read in the order of the files' names by the script that
+  reads it (`scripts/inventory.mjs`, `scripts/sync-notes.mjs`, `scripts/steps.mjs`, `scripts/steps-stage.mjs`,
+  `scripts/holders.mjs`), as each archive item stands already ("A new archive item is named by its issue"). Whoever adds
+  an entry adds its file. Nothing changes it, and what it does not mean stands there too. Reason: of 39 pull requests
+  merged between 18 and 19 November 2026, 8 changed `INVENTORY.md`, 10 `setup/sync-notes.md`, 7 `scripts/steps.mjs` and
+  6 `scripts/holders.json`, and under merge-on-green pull requests that add to one file merge side by side and collide.
+  Held by `tests/mend-test.mjs`, which reads the inventory whole, and fails a folder `INVENTORY.md` does not name and a
+  part's line written in `INVENTORY.md` itself; by `tests/steps-test.mjs`, which reads the notes whole, and fails an
+  entry, a step or a stage without its pair of the same name and an entry written in `setup/sync-notes.md` itself; and
+  by `tests/holders-test.mjs`, which with `scripts/holders.mjs` fails a file of the list not named from its rule, and
+  two rules whose entries would share a file.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
   `tests/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its
@@ -497,5 +531,4 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 Every reviewer reads `roles/shared/review-guidelines.md` whole and judges the change by it, with the floor. Here, a rule that
 changes what any project must do without saying so in the PR is a departure from the PR's description, and blocks; so
 does one that reads true only for some of the kinds of project "Rules are written for any project" names, and a raise of
-a size cap in a PR with no "Leanness check:" comment that found too little room. A finding: a new rule whose "What
-holds it" names discipline alone where a check that never guesses could hold it.
+a size cap in a PR with no "Leanness check:" comment that found too little room.

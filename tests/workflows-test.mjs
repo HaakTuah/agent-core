@@ -11,9 +11,9 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TEMPLATES } from "../scripts/init.mjs";
 import { holds, parseYaml } from "../scripts/workflow-run.mjs";
-import { draftHoles, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
+import { draftHoles, foreignBreaks, foreignBroken, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
 import { CORE } from "../scripts/core-address.mjs";
-import { twice, uncommented } from "../scripts/yaml-keys.mjs";
+import { LONGEST, twice, uncommented } from "../scripts/yaml-keys.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -53,8 +53,8 @@ ok(dup("on: { push: {}, \"push\": {} }\n") === "push@1<1" && dup("on: {\n  push:
 ok(dup("a: {b: 1, c: {b: 2}}\nd: [a, a, {e: 1}, {e: 2}]\nf: {'g': 1, h: 'g', i}\n") === "" && dup("a: {x, x}\nb: {: 1, : 2}\n") === "x@1<1,@2<2", "while what lies in two mappings, a list's items and a value are none, and a key with no value or no name is one");
 ok(dup(`a: {'it''s': 1, "it's": 2, "q\\"": 3, 'q"': 4}\nb: {x:y: 1, x:y: 2, z: [c, d], z: {e}}\nc: {a:`) === "it's@1<1,q\"@1<1,x:y@2<2,z@2<2" && dup("{a:, a:") === "a@1<1", "a flow key quoted either way, with a colon in it, or holding a list or a mapping, and one at the text's end");
 ok(dup("a: {\n b: 1,\n\n # c: 1\n c: 2, b: 3,\n c: 4 }\n") === "b@5<2,c@6<5" && dup(`a: ${"[".repeat(20000)}\nb: 1\nb: 2\n`) === "b@3<2,null@1<null" && dup(`a: [${"{b: 1, b: 2}, ".repeat(3)}]\n`) === "b@1<1,b@1<1,b@1<1", "a blank line or a comment in a flow value keeps its lines counted, and a value nested past any mark throws nothing, the rest of the file read still and the part not read said so");
-const hostile = Date.now(), many = dup(`a: {\n${" b: 1,\n".repeat(40000)}}\n`).split(",").length;
-ok(many === 39999 && dup(`x${" ".repeat(100000)}y\n${"a".repeat(100000)}: 1\n`) === "" && Date.now() - hostile < 5000, `forty thousand keys twice in one value, and a line of a hundred thousand blanks or letters, read in a few seconds at most (${Date.now() - hostile} ms)`);
+const hostile = Date.now(), many = dup(`a: {\n${" b: 1,\n".repeat(30000)}}\n`).split(",").length;
+ok(many === 29999 && dup(`x${" ".repeat(100000)}y\n${"a".repeat(100000)}: 1\n`) === "" && Date.now() - hostile < 5000, `thirty thousand keys twice in one value, and a line of a hundred thousand blanks or letters, read in a few seconds at most (${Date.now() - hostile} ms)`);
 const nest = k => `x: ${"[".repeat(k)}{a: 1, a: 2}${"]".repeat(k)}\ny: 1\ny: 2\n`, deep = Date.now();
 ok(["? ", "[", "{", "- ", "? - "].every(form => dup(`${form.repeat(12500)}\n`) === "null@1<null" && dup(`${form.repeat(12500)}\n`) === "null@1<null") && dup(nest(125)) === "a@1<1,y@3<2" && dup(nest(126)) === "y@3<2,null@1<null" && Date.now() - deep < 5000,
   `a list or mapping nested past 128 deep, a document counted as one, is read as an empty value, the rest of the text read still and the cut said so, and twelve thousand marks of any nesting, read twice, stop nothing (#610; ${Date.now() - deep} ms)`);
@@ -62,7 +62,7 @@ ok(["? ", "[", "{", "- ", "? - "].every(form => dup(`${form.repeat(12500)}\n`) =
 // text is said to be read only in part, whether the parser gives out first, naming line 1, or the depth mark cuts it,
 // naming the cut's line (cutAt), so the case holds wherever a Node's stack ends; and the check fails it with its mend, never
 // passing it as holding no key)
-let indented = "x:\n"; for (let i = 1; i < 2500; i++) indented += `${" ".repeat(i)}k:\n`;
+let indented = "x:\n"; for (let i = 1; i < 600; i++) indented += `${" ".repeat(i)}k:\n`;
 const past = [`on: push\non: pull_request\nx:\n  ${"? ".repeat(2500)}a\nz: 1\n`, `on: push\non: pull_request\nx:\n  ${"- ".repeat(5000)}a\nz: 1\n`, `on: a\non: b\n${indented}z: 1\n`];
 // (where a Node's stack lets the parser read as far as the mark, the doubled "on" is found too: only the lines on depth
 // are counted)
@@ -70,6 +70,48 @@ const cutAt = [4, 4, 130], unreadDeep = repeated(past.map((text, i) => ({ file: 
 const nested = unreadDeep.fails.filter(l => l.includes(": the file nests "));
 ok(past.every((t, i) => [1, cutAt[i]].some(n => dup(t).endsWith(`null@${n}<null`))) && nested.length === 3 && nested.every((l, i) => [1, cutAt[i]].some(n => l.startsWith(`FAIL deep${i}.yml:${n}: `))) && nested.every(l => /^FAIL deep\d\.yml:\d+: the file nests its lists or mappings more than 128 deep, past what this check reads/.test(l)) && mended(unreadDeep.fails.join("\n")),
   "a text nested some thousands deep in block form, past what the parser can close, is read as unread, and the check fails it with its mend (#610)", unreadDeep.fails.join("\n"));
+// (a text past the length read is not given to the parser: it is said unread, naming line 1, and fails with its mend: #752)
+const huge = repeated([{ file: "huge.yml", text: `a: ${"[".repeat(LONGEST + 1)}\n` }], () => null).fails;
+ok(huge.length === 1 && huge[0].startsWith("FAIL huge.yml:1: the file is longer than 262144 characters") && mended(huge[0]) && twice(Array.from({ length: 10000 }, (_, i) => `k${i}: 1\n`).join("")).length === 0 && twice(`a: ${"[".repeat(LONGEST - 10)}\n`).every(k => !k.size) && draftHoles(`on: pull_request\n# ${"x".repeat(LONGEST)}\n`).length === 0,
+  "a text longer than the length read is said unread with its mend and never given to the parser, and one just under it still is", huge.join("\n"));
+// (a file nested too deep on the base does not hold the entry of one that has grown too long: that one is new, and fails)
+const grown = repeated([{ file: "grown.yml", text: `a: ${"x".repeat(LONGEST)}\n` }], () => `on: push\nx: ${"[".repeat(200)}1${"]".repeat(200)}\n`);
+ok(grown.fails.length === 1 && grown.notes.length === 0 && /grown\.yml:1: the file is longer/u.test(grown.fails[0]) && mended(grown.fails[0]),
+  "a file past the length read, over a base nested too deep, fails, and is not noted as held on the base", grown.fails.join("\n"));
+// (nor does a key spelt like a reason, which a base may give twice, hold the entry of one grown too long)
+const spelt = repeated([{ file: "spelt.yml", text: `a: ${"x".repeat(LONGEST)}\n` }], () => 'on: push\n"\\0long": 1\n"\\0long": 2\n');
+ok(spelt.fails.length === 1 && spelt.notes.length === 0, "a key spelt like a reason, given twice on the base, holds no part not read of the head", spelt.fails.join("\n"));
+// (a text past the length read is never given to the parser, and no count of its words shows a change to it made nothing
+// worse, so a file past it that a pull request changes fails, with its mend; one unchanged on the base, and one with no
+// base, are only noted: #752)
+const longText = changed => `on: pull_request\n# ${"x".repeat(LONGEST)}${changed}\n`, longFiles = text => [{ file: "long.yml", text }];
+const longSame = unreadied(longFiles(longText("a")), () => longText("a")), longKeys = repeated(longFiles(longText("a")), () => longText("a"));
+const longFails = [["b", "a"], ["abcd", "a"], ["a", "abcd"], ["ready_for_review", "a"], [null, "a"], ["on: push\n", "a"]].map(([was, now]) => unreadied(longFiles(longText(now)), () => (was === null || was.startsWith("on:") ? was : longText(was))).fails);
+ok(longSame.fails.length === 0 && longKeys.fails.length === 0 && longKeys.notes.length === 1 && /as it did on the base\. Mend: cut the file/u.test(longKeys.notes[0]) && unreadied(longFiles(longText("a")), null).fails.length === 0
+  && longFails.every(f => f.length === 1 && /^FAIL long\.yml: the file is longer than 262144 characters and differs from the base/u.test(f[0]) && mended(f[0])) && repeated(longFiles(longText("a")), () => longText("b")).fails.length === 1,
+  "a file past the length read that a pull request changes in any way, cut a little, grown, or added, fails with its mend; one unchanged, or read with no base, is only noted", longFails.flat().join("\n"));
+// (a line break of YAML 1.1 the package does not read hides a key given twice and a call left without ready_for_review from
+// its reader, #872: the check fails a file that is new or changed with such a break and notes one unchanged or with no base)
+const hiding = br => `on: push${br}x: 1${br}x: 2\n`;
+const brks = ["\u0085", "\u2028", "\u2029"].map(br => ({ br, found: foreignBreaks(`a\nb\n${hiding(br)}`) })), one = text => [{ file: "w.yml", text }];
+const brokenNew = foreignBroken(one(hiding("\u2028")), () => null), brokenSame = foreignBroken(one(hiding("\u2028")), () => hiding("\u2028")), brokenChanged = foreignBroken(one(hiding("\u2028")), () => `${hiding("\u2028")}# a\n`);
+ok(twice(hiding("\u2028")).length === 0 && brks.every(({ br, found }) => found.line === 3 && found.count === 2 && found.code === `U+${br.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}`) && foreignBreaks("a\r\nb\rc\n") === null && foreignBreaks("") === null
+  && brokenNew.fails.length === 1 && mended(brokenNew.fails[0]) && /^FAIL w\.yml:1: the file holds the line break U\+2028 and 1 more/u.test(brokenNew.fails[0]) && brokenChanged.fails.length === 1
+  && brokenSame.fails.length === 0 && brokenSame.notes.length === 1 && /as on the base\. Mend:/u.test(brokenSame.notes[0]) && foreignBroken(one(hiding("\u2028")), null).fails.length === 0 && foreignBroken(one(hiding("\u2028")), null).notes.length === 1 && foreignBroken(one("on: push\nx: 1\n"), () => null).fails.length === 0,
+  "a line break the package does not read hides a key given twice from its reader, and the check fails a file with one that is new or changed, with its mend, and notes one unchanged or read with no base", [brokenNew, brokenSame].flatMap(r => [...r.fails, ...r.notes]).join("\n"));
+// (Codex's case: a call of a check skipped on a draft whose ready_for_review a same-length edit moves into a comment, in a
+// file past the length read, its words counted as often as before, fails)
+const commented = types => `on:\n  pull_request:\n    types: ${types}\njobs:\n  check:\n    uses: ${CORE}/.github/workflows/copies.yml@${"a".repeat(40)}\n    if: \${{ !github.event.pull_request.draft }}\n# ${"x".repeat(LONGEST)}\n`;
+const hidden = unreadied(longFiles(commented("[opened] #ready_for_review")), () => commented("[opened, ready_for_review]"));
+ok(commented("[opened] #ready_for_review").length === commented("[opened, ready_for_review]").length && hidden.fails.length === 1 && mended(hidden.fails[0]),
+  "a file past the length read whose ready_for_review a pull request moves into a comment, its length and its count of the word kept, fails", hidden.fails.join("\n"));
+// (a base past the length read lists none of its breaches: a file cut under the length is read as one the base did not
+// hold, so a key given twice or a call left without ready_for_review in it fails, each with its mend, and one cut clean passes)
+const shrunk = { dupes: "on: pull_request\nx: 1\nx: 2\njobs:\n  c:\n    uses: someone/else/.github/workflows/copies.yml@" + "a".repeat(40) + "\n", base: `on: push\nx: 1\nx: 2\n# ${"x".repeat(LONGEST)}\n` };
+const cut = repeated([{ file: "shrunk.yml", text: shrunk.dupes }], () => shrunk.base), clean = "on: pull_request\nx: 1\n";
+ok(cut.fails.length === 1 && cut.notes.length === 0 && /^FAIL shrunk\.yml:3: the key "x" is given twice/u.test(cut.fails[0]) && mended(cut.fails[0])
+  && repeated([{ file: "shrunk.yml", text: clean }], () => shrunk.base).fails.length === 0 && unreadied([{ file: "shrunk.yml", text: clean }], () => shrunk.base).fails.length === 0,
+  "a file cut under the length read from a base past it fails for a key it gives twice, and passes cut clean", [...cut.fails, ...cut.notes].join("\n"));
 const lower = `on: push\n${Array.from({ length: 37 }, (_, i) => `k${i}: 1\n`).join("")}z: ${"[".repeat(200)}${"]".repeat(200)}\n`;
 const lowerFails = repeated([{ file: "lower.yml", text: lower }], () => null).fails;
 ok(dup(lower) === "null@39<null" && lowerFails.length === 1 && lowerFails[0].startsWith("FAIL lower.yml:39: the file nests") && mended(lowerFails[0]),
@@ -102,6 +144,9 @@ const holes = unreadied([{ file: "a.yml", text: call(TYPES, "copies.yml", NOT_DR
 ok(holes.notes.length === 1 && /^note a\.yml: .*as on the base\. Mend: add ready_for_review/.test(holes.notes[0]) && holes.fails.length === 1 && /^FAIL b\.yml: its job "check"/.test(holes.fails[0]) && mended(holes.fails[0])
   && unreadied([{ file: "b.yml", text: call(TYPES, "pr-description.yml") }], null).fails.length === 0,
   "a call the base already held so is noted, a new one fails with its mend, and with no base each is noted", JSON.stringify(holes));
+const holeOver = unreadied([{ file: "a.yml", text: call(TYPES, "copies.yml", NOT_DRAFT) }], () => shrunk.base);
+ok(holeOver.fails.length === 1 && holeOver.notes.length === 0 && /^FAIL a\.yml: its job "check"/u.test(holeOver.fails[0]) && mended(holeOver.fails[0]),
+  "a call left without ready_for_review in a file cut under the length read from a base past it fails, as the base's breaches could not be listed", [...holeOver.fails, ...holeOver.notes].join("\n"));
 
 const core = fileURLToPath(new URL("..", import.meta.url));
 const own = fs.readdirSync(`${core}.github/workflows`).filter(f => /\.ya?ml$/u.test(f));
@@ -147,13 +192,14 @@ try {
 // ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
 // Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and
 // the pull request, cancelled once a newer run starts for it; a run on main, a schedule or a start by hand is a group of
-// its own (its run id), and never cancelled. Left out, each for its reason: the security-review check, whose runs go one
-// at a time in order so the last has read the newest comments, the release, the preview's queue and the deletion of
+// its own (its run id), and never cancelled. Left out, each for its reason: the security-review check, whose runs go
+// one at a time in order so the last has read the newest comments, and the queue-only proof that feeds it, which keeps
+// no group, so that no comment's run cancels one waiting to record a review (read below), the release, the preview's queue and the deletion of
 // merged branches, which no pull request starts and which never cancel, the scheduled ones, and the core's tests, read
 // below for their own groups (#733).
 const KEY = "${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}";
 const CANCEL = "${{ github.event_name == 'pull_request' }}";
-const APART = new Set(["security-review.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml", "tests.yml"]);
+const APART = new Set(["security-review.yml", "queue-only.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml", "tests.yml"]);
 const wfDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".github", "workflows");
 const loose = [];
 // (a workflow in a form the test's reader does not know, a flow mapping say, is read for its group at the top, by its
@@ -195,8 +241,22 @@ const ownReview = parseYaml(fs.readFileSync(path.join(wfDir, "own-security-revie
 // (the template's own {{core}} and {{pin}} filled in, which init.mjs writes when it makes the project)
 const kitReview = parseYaml(fs.readFileSync(path.join(core, TEMPLATES, "workflows/security-review.yml.tmpl"), "utf8").replace(/\{\{\w+\}\}/g, "x"));
 ok(JSON.stringify(ownReview.on) === JSON.stringify(kitReview.on), `the core's own security-review check is started by what the template's is, and nothing more${JSON.stringify(ownReview.on) === JSON.stringify(kitReview.on) ? "" : `: ${JSON.stringify(ownReview.on)}`}`);
+// (its two calls: the review's, and the queue-only proof's that feeds it, #750)
 const ownCall = Object.values(ownReview.jobs ?? {});
-ok(ownCall.length === 1 && ownCall[0].uses === "./.github/workflows/security-review.yml" && ownCall[0].with?.root === "." && ownCall[0].with?.advisory === false, "and calls the core's workflow with its scripts at the root and advisory turned off");
+const callOf = (name) => ownCall.filter((job) => job.uses === `./.github/workflows/${name}`);
+ok(ownCall.length === 2 && ["security-review.yml", "queue-only.yml"].every((name) => callOf(name).length === 1 && callOf(name)[0].with?.root === ".") && callOf("security-review.yml")[0].with?.advisory === false,
+  "and calls the core's workflow, and the queue-only proof before it, with its scripts at the root and advisory turned off");
+// (no group holds a whole run of the check, nor its proof: GitHub cancels a waiting run or job once a newer one of its
+// group queues, so any comment's run would lose the one that records a review)
+const queueProof = parseYaml(fs.readFileSync(path.join(wfDir, "queue-only.yml"), "utf8"));
+ok(ownReview.concurrency === undefined && kitReview.concurrency === undefined && Object.values(queueProof.jobs).every((job) => job.concurrency === undefined),
+  "and neither caller holds its whole run in a group, nor the proof its job, so no comment's run cancels one waiting to record a review");
+// (the proof compares from the default branch's commit it checked out, whose progress file gives the form, and proves
+// only files that are those GitHub lists for the pull request, which the review job reads: the answer's base.sha can
+// stand behind where the head leaves that branch)
+const proveRun = String(queueProof.jobs.prove.steps.find((step) => step.id === "prove")?.run);
+ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.sha") && /compare\/\$base\.\.\.\$tip/u.test(proveRun) && /pulls\/\$NUMBER\/files/u.test(proveRun),
+  "and the proof compares the head from the default branch's commit it checked out, its files held to those GitHub lists for the pull request");
 
 // ---- when the core's tests run (#733, points 2 to 4 and 6) ----
 // A pull request's run starts once it is ready, never on a draft, on Linux alone; main is tested on Linux at its newest

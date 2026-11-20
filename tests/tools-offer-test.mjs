@@ -1,7 +1,7 @@
 // Tests the check of what the core offers each agent tool (scripts/tools-offer.mjs; tasks/tools.md, "What the core
 // offers one tool, it offers each"; #467): the core's own table passes, and each kind of wrong cell, a tool with no
-// column, a file no cell names, a map with no day and a part that leaves out a way a review is asked, or names the ways
-// out of order (#397), fails, saying its mend. Its tests workflow runs it on every pull
+// column, a file no cell names, a map with no day, a session of its own whose file says no day (#492) and a part that leaves out a way a review is asked, or names the ways
+// out of order (#397), fails, saying its mend; and so does a part of tasks/ways.md out of its form (#397). Its tests workflow runs it on every pull
 // request here. Node's own modules.
 //
 //   node tests/tools-offer-test.mjs
@@ -36,7 +36,7 @@ ok(says(check(cell("The orchestrator", "Kiro", "maybe later")), "in none of the 
 ok(says(check(cell("The orchestrator", "Kiro", "cannot: kiro.dev, its page on agents")), "in none of the three forms"), "a cannot with no day it was read fails");
 ok(check(cell("The orchestrator", "Kiro", "cannot: kiro.dev, its page on agents, read 18 November 2026")).wrong.length === 0, "a cannot with its page and day passes");
 const noIssue = check(cell("Its issue for what is not yet carried", "Kiro", ""));
-ok(noIssue.wrong.length === 4 && noIssue.wrong.every(w => w.includes("names no issue") && mended(`FAIL ${w}`)), "a not yet whose column names no issue fails, each such cell; one that names its own (#400) passes", noIssue.wrong.join("\n"));
+ok(noIssue.wrong.length === 3 && noIssue.wrong.every(w => w.includes("names no issue") && mended(`FAIL ${w}`)), "a not yet whose column names no issue fails, each such cell; one that names its own (#400) passes", noIssue.wrong.join("\n"));
 ok(says(check(cell("The orchestrator", "Kiro", "not yet: soon")), "in none of the three forms"), "a not yet naming no issue number fails");
 const closed = check(text, { isOpen: n => n !== 680 });
 ok(closed.wrong.length > 0 && closed.wrong.every(w => w.includes("#680, which is not open") && mended(`FAIL ${w}`)), "a not yet whose issue is closed fails, each cell that names it, where it can be read", closed.wrong.join("\n"));
@@ -48,6 +48,22 @@ const kit = check(cell("The entry file", "Kiro", "carried: it reads `AGENTS.md` 
 ok(kit.wrong.length === 2 && kit.wrong[0].startsWith("setup/template/kiro-steering.md.tmpl is a file of a tool's own") && kit.wrong[1].startsWith(".kiro/steering/core.md is a file") && kit.wrong.every(w => mended(`FAIL ${w}`)),
   "a template of the starter kit for a tool that no cell names fails, and so does the core's own file it writes, which counts as named where its template is", kit.wrong.join("\n"));
 ok(says(check(cell("The map of the tiers to its models", "Codex", "carried: `tools/other-builders.md`")), "says no day its documentation was read"), "a map whose part says no day its documentation was read fails");
+// (the row of a session of its own, its file read through `read` with its line written anew: #492)
+const startsRow = "Starts a session of its own, for the adviser (`roles/adviser.md`)";
+const sessions = fs.readFileSync(path.join(root, "tools/claude-sessions.md"), "utf8");
+ok(/^- \*Starts a session:\*/mu.test(sessions) && check(text).wrong.length === 0, "Claude Code's file of a session of its own holds the line with its day, and passes");
+ok(says(check(cell(startsRow, "Codex", "carried: `tools/other-builders.md`")), "holds no line *Starts a session:*"), "a carried cell of that row whose file holds no such line fails, saying its mend");
+const withSessions = to => check(text, { read: f => (f === "tools/claude-sessions.md" ? to : fs.readFileSync(path.join(root, f), "utf8")) });
+ok(says(withSessions("- *Starts a session:* yes, by its command.\n\n- Another item, read on 20 November 2026.\n"), "holds no line *Starts a session:*")
+  && says(withSessions("- *Starts a session:* yes, by its command.\n- Another item, read on 20 November 2026.\n"), "holds no line *Starts a session:*"),
+  "a line that says no day before its item ends fails, a day in a later item or paragraph not counting for it");
+ok(says(withSessions("A note that names *Starts a session:* in its prose, read on 20 November 2026.\n"), "holds no line *Starts a session:*"),
+  "a mention of the label in prose, not at a line's or an item's start, does not count as the line");
+ok(says(withSessions("A note that names, as its prose wraps,\n*Starts a session:* in a line of its own, read on 20 November 2026.\n"), "holds no line *Starts a session:*")
+  && says(withSessions("- *Starts a session:* yes, by its command.\n## A heading\nread on 20 November 2026.\n"), "holds no line *Starts a session:*")
+  && withSessions("A paragraph.\n\n*Starts a session:* yes, read on 20 November 2026.\n").wrong.length === 0
+  && withSessions("- *Starts a session:* yes, as\n  #492 asks; read on 20 November 2026.\n").wrong.length === 0,
+  "the label counts only as a list item's lead or at a paragraph's start, and its item ends at a heading, not at a line that opens with an issue's number");
 // (Kiro's part as it stands, read through `read`, with its ways' lines written anew)
 const kiro = fs.readFileSync(path.join(root, "tools/kiro.md"), "utf8");
 const withKiro = to => check(text, { read: f => (f === "tools/kiro.md" ? to : fs.readFileSync(path.join(root, f), "utf8")) });
@@ -57,6 +73,15 @@ const swapped = kiro.replace("*Side by side:*", "\u0000").replace("*On the host:
 ok(says(withKiro(swapped), "out of order"), "a part that names the ways out of order fails, saying its mend");
 const heading = to => text.replace("Kiro (`tools/kiro.md`)", `Kiro (\`${to}\`)`);
 ok(says(check(heading("tools")), "which is no file in the repository") && says(check(heading("../outside.md")), "which is no file in the repository"), "a heading that names a folder, or a file outside the repository, as a part fails, saying its mend");
+// (tasks/ways.md as it stands, read through `read`, with a part written anew: tasks/ways.md, "A way of running sessions
+// has a part of its own")
+const waysText = fs.readFileSync(path.join(root, "tasks/ways.md"), "utf8");
+const withWays = to => check(text, { read: f => (f === "tasks/ways.md" ? to : fs.readFileSync(path.join(root, f), "utf8")) });
+ok(withWays(waysText).wrong.length === 0 && (waysText.match(/^## /gmu) ?? []).length === 3, "each way's part holds its labels in order, and passes");
+ok(says(withWays(waysText.replace("- *Floor:*", "-")), "the part `cloud` holds *Task:*, *State:*, *Review:*, *Installs:*, where each part holds"), "a part that leaves out a label fails, naming it and saying its mend");
+ok(says(withWays(waysText.replace("- *Task:* the owner starts", "- *Statex:* x\n- *Task:* the owner starts").replace("- *State:* none given", "- *Task:* none given")), "the part `terminal` holds"), "a part with a label twice or out of order fails");
+ok(says(withWays(waysText.replace("## A plain terminal: `terminal`", "## A plain terminal")), "names no way") && says(withWays(waysText.replace("`terminal`", "`cloud`")), "has two parts"), "a heading that names no way, or a way named twice, fails");
+ok(says(withWays(waysText.replace("- *Installs:* none: a terminal", "- *Installs:* a terminal")), "line *Installs:* is in no form read here"), "a line *Installs:* in no form read fails");
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);

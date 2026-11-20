@@ -4,8 +4,8 @@ Read at the start of every task.
 
 1. **Review in the background.**
    - When the work is done, read the task's spec again: build what changed, or queue it if large.
-   - Mark the draft PR ready and ask for its reviews (`tasks/reviews.md`). Fix every review's findings together.
-   - Once every review asked for has answered on the head commit with no finding open, turn on auto-merge
+   - Ask its reviews and mark it ready in `tasks/reviews.md`'s order (point 10). Fix all findings together.
+   - Once every review the order names has answered on the head commit with no finding open, turn on auto-merge
      (`tasks/github-calls.md`; a sync PR is merged by hand: floor rule 8) and go on: GitHub merges when the checks are
      green and, where asked, the branch is up to date. Where it refuses, the PR already `clean` or `unstable`, merge it
      yourself as floor rule 12 says. A check that then fails on `main` is yours while you run (`tasks/tests.md`).
@@ -44,7 +44,13 @@ owner creates from any device to stop its agents and deletes to let them go on.
 - A session runs the *quick check* before its first change; a failure there is a bug outside its task ("Bugs don't
   wait"), and the task goes on with what does not hang on it. It does not mean the whole suite. Reason: one that
   starts on a broken `main` cannot tell its own faults from those it inherited.
-- A session that stops mid-task commits and writes its hand-off note (`tasks/tools.md`).
+- **A builder hands over by its context** (#750, point 7). By default a builder carries its task to its merge in one
+  session; once its context passes about 250,000 tokens (a first guess), as `core/scripts/session-cost.mjs --context`
+  prints it, it stops at its next passed gate (checks green, a review answered) with its hand-off note in its pull
+  request's description, as any session that stops mid-task commits and writes it (`tasks/tools.md`), and the
+  orchestrator starts a fresh one from that note. It does not mean it stops mid-step, nor where the script prints
+  nothing, nor that one no orchestrator started stops. Reason: each step costs more as a context grows; one builder
+  ran to 553,000. Held by no check; that reading shows it.
 - A builder session that no orchestrator started, and the orchestrator on every wake, first checks whether the core
   has moved (`core/scripts/core-moved.mjs --dry`) and syncs it if so (`core/scripts/sync.mjs`, then each step and
   difference it reports), between tasks, a floor change at once (`tasks/planning.md`); where checks cost money, not on a day a sync PR was already opened. Then both read what reviews left after a merge (`tasks/reviews.md`, point 2), and take up a check failed on `main`'s newest commit that no running session owns (`tasks/tests.md`).

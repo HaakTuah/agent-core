@@ -108,6 +108,7 @@ The index, and how an item is written: `archive/instructions.md`.
      sorting was done at once: the owner, asking how far the core's rules are enforced, learned that 189 of its 310
      rules were held by being read alone, the kind a study found followed at more cost with no gain. It stands behind
      the order of the pruning's list and `reports/unheld.json`.
+     Changed by: #887.
 
 255. **16 November 2026**, #486, points 6 to 8 and 11. A job a maintained package does is done by it, in all code, a job
      on a format or language someone else defines first; a session searches before it writes more than about 50 lines

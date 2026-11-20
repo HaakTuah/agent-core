@@ -1,7 +1,8 @@
 // What every staged case stands on (staged.mjs; AGENTS.md, "Staged cases hold what no check reads"; #235): a scratch
 // project in a folder of its own, written by the core's starter kit from a commit of the core, with a small program in
 // it, its origin a bare repository beside it, and a stand-in for GitHub (gh.cjs, beside this file) answering from a file
-// beside it: `<dir>/project`, `<dir>/origin.git`, `<dir>/bin/gh` and `<dir>/github.json`. And the readers each case
+// beside it: `<dir>/project`, `<dir>/origin.git`, `<dir>/bin/gh` and `<dir>/github.json`, with a stand-in for starting a
+// session of one's own (session.cjs, as `<dir>/bin/session`) that records into that file. And the readers each case
 // reads the outcome with: what the session pushed, what it left in the project, and what it wrote to GitHub; never what
 // it says of itself. The names are invented (floor rule 11) and every key is built from pieces when a case is set
 // (floor rule 8). Git and Node's own modules only.
@@ -246,8 +247,10 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
   for (const [name, change] of Object.entries(branches)) pushBranch(project, name, change);
   writeAll(project, loose);
   fs.mkdirSync(bin);
-  fs.copyFileSync(path.join(CORE_ROOT, "scripts", "staged", "gh.cjs"), path.join(bin, "gh"));
-  fs.chmodSync(path.join(bin, "gh"), 0o755);
+  for (const [from, to] of [["gh.cjs", "gh"], ["session.cjs", "session"]]) {
+    fs.copyFileSync(path.join(CORE_ROOT, "scripts", "staged", from), path.join(bin, to));
+    fs.chmodSync(path.join(bin, to), 0o755);
+  }
   fs.writeFileSync(path.join(dir, "github.json"), `${JSON.stringify(stateOf(issues, comments, github), null, 2)}\n`);
   return { dir, project, origin, bin };
 }
@@ -463,6 +466,10 @@ export function onGitHub(dir, text) {
 
 // The pull requests the session opened.
 export const pulls = dir => github(dir).pulls;
+
+// The words a call carried: every string in its body, however deep, read as the words themselves, never as the JSON
+// that carried them, whose escapes hide a quote.
+export const words = v => (typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(words) : []);
 
 // The comments the session wrote (the owner's login: every session posts as the owner), and the issues it opened.
 export const written = dir => { const g = github(dir); return { comments: g.comments.filter(c => c.user.login === OWNER && c.created_at > "2026-11-01T09:00:00Z"), issues: g.issues.filter(i => !i.pull && i.created_at > "2026-11-01T09:00:00Z") }; };

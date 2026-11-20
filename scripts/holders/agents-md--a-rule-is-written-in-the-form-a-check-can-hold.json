@@ -1,0 +1,5 @@
+{
+  "rule": "AGENTS.md: A rule is written in the form a check can hold",
+  "behind": ["#887"],
+  "number": "findings; outcome: fast"
+}

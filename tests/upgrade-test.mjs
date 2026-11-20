@@ -45,6 +45,7 @@ import { scratchEnv } from "../scripts/scratch-core.mjs";
 import { where } from "../scripts/shape.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { STEPS, callers, leads, notDone, project as read, report } from "../scripts/steps.mjs";
+import { FOLDER, NOTICE, notesAt } from "../scripts/sync-notes.mjs";
 import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
 
 const STEP_LEADS = STEPS.map(s => s.lead);
@@ -252,20 +253,27 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
       for (const r of runWorkflow(git(p.dir, "show", `${sha}:.github/workflows/${file}`), { github, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp })) out.push([`${file}/${r.job}`, { ...r, own: true }]);
       continue;
     }
+    // (each call's outputs, as its workflow's `workflow_call` names them from its jobs' own, empty where a job was
+    // skipped, for the calls that need it: the security review is handed the queue-only proof's head, #750)
+    const needs = {};
     for (const [id, job] of Object.entries(wf.jobs ?? {})) {
       const call = new RegExp(`^${CORE.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&")}/\\.github/workflows/([\\w.-]+)@([0-9a-f]{40})$`, "i").exec(job.uses ?? "");
       if (!call) { out.push([`${file}/${id}`, { job: id, ran: true, passed: true, steps: [], own: true }]); continue; }
       // (a call whose own condition is false starts no job, as a call skipped on a draft: #375)
-      if (job.if !== undefined && !evaluate(String(job.if).trim().replace(/^\$\{\{|\}\}$/g, ""), { github, inputs: {}, secrets: {}, vars: {} })) { out.push([`${file}/${id}`, { job: id, ran: false, passed: true, steps: [] }]); continue; }
+      if (job.if !== undefined && !evaluate(String(job.if).trim().replace(/^\$\{\{|\}\}$/g, ""), { github, inputs: {}, secrets: {}, vars: {}, needs })) { out.push([`${file}/${id}`, { job: id, ran: false, passed: true, steps: [] }]); continue; }
       // (the NuGet check as a step of core.yml's one job, #376: its input left out where there is no SDK, and said so)
       if (call[1] === "core.yml" && !sdk && job.with?.nuget) { job.with = { ...job.with }; delete job.with.nuget; console.log(`note ${p.name}: no .NET SDK here, so core.yml's NuGet step is not run`); }
       if (call[1] === "nuget.yml" && !sdk) { out.push([`${file}/${id}`, { job: id, ran: true, passed: true, steps: [] }]); console.log(`note ${p.name}: no .NET SDK here, so the NuGet check is not run`); continue; }
       const text = git(theCore, "show", `${call[2]}:.github/workflows/${call[1]}`);
-      const callerCtx = { github, inputs: {}, secrets: { PERSONAL_TERMS: terms }, vars: {} };
+      const callerCtx = { github, inputs: {}, secrets: { PERSONAL_TERMS: terms }, vars: {}, needs };
       const inputs = Object.fromEntries(Object.entries(job.with ?? {}).map(([k, v]) => [k, typeof v === "string" && v.includes("${{") ? evaluate(v.replace(/^\$\{\{|\}\}$/g, ""), callerCtx) : v]));
       const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, evaluate(String(v).replace(/^\$\{\{|\}\}$/g, ""), callerCtx)]));
       const caller = { ...github, workflow_ref: `${p.repo}/.github/workflows/${file}@${github.ref}` };
-      for (const r of runWorkflow(text, { inputs, secrets, github: caller, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp })) out.push([`${file}/${id}/${r.job}`, r]);
+      const called = parseYaml(text), ran = runWorkflow(text, { inputs, secrets, github: caller, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp });
+      for (const r of ran) out.push([`${file}/${id}/${r.job}`, r]);
+      const jobs = Object.fromEntries(ran.map(r => [r.job, { outputs: Object.fromEntries(Object.entries(called.jobs?.[r.job]?.outputs ?? {})
+        .map(([k, v]) => [k, evaluate(String(v).trim().replace(/^\$\{\{|\}\}$/g, ""), { steps: r.outputs ?? {} }) ?? ""])) }]));
+      needs[id] = { outputs: Object.fromEntries(Object.entries(called.on?.workflow_call?.outputs ?? {}).map(([k, o]) => [k, evaluate(String(o.value).trim().replace(/^\$\{\{|\}\}$/g, ""), { jobs }) ?? ""])) };
     }
   }
   return out;
@@ -288,8 +296,12 @@ function upgrade(p, from, ownChanges, expect) {
 
   // the sync, as the project's own copy of the release's sync.mjs makes it
   git(p.dir, "checkout", "-q", "-B", "sync", main0);
+  const hadFolder = fs.existsSync(path.join(p.dir, "core", FOLDER));
   const s = node(p.dir, "core/scripts/sync.mjs");
   ok(s.status === 0 && s.out.includes(carrying), `${p.name}: its own sync script takes the release that carries the change, ${carrying}`, s.out);
+  // (a copy that held no folder of the notes reads its asks from their file alone: across the move it prints the notice,
+  // which sends the session to the folder; #750, point 1)
+  ok(hadFolder || s.out.includes(NOTICE), `${p.name}: its own sync script, which reads the notes' file alone, prints the notice that sends the session to the notes' folder`, s.out);
   git(p.dir, "add", "-A");
   git(p.dir, "commit", "-q", "-m", `Sync the core to ${carrying}`);
   git(p.dir, "push", "-q", "origin", "sync");
@@ -378,7 +390,7 @@ function upgrade(p, from, ownChanges, expect) {
   const steps = () => node(p.dir, "core/scripts/steps.mjs");
   const reported = out => out.split("\n").filter(l => l.startsWith("- ")).map(l => STEP_LEADS.find(lead => l.startsWith(`- ${lead}:`) || l.startsWith(`- ${lead} (`))).filter(Boolean);
   const clean = () => { git(p.dir, "reset", "-q", "--hard"); git(p.dir, "clean", "-qfd"); };
-  const before = leads(git(theCore, "show", `${from.sha}:setup/sync-notes.md`));
+  const before = leads(notesAt(from.sha, args => git(theCore, ...args))); // (in the file, or in its folder: #750, point 1)
   const added = STEP_LEADS.filter(lead => !before.includes(lead) && STAGES[lead]);
   // (a step the commit under test adds that asks something of every project, a check's own list to write, the sync
   // alone does not do: it is reported, it alone, and its mend as written, merged as the project's own pull request
@@ -443,8 +455,8 @@ function parserUnnamed(p) {
   const shapeOut = results => results.flatMap(([, r]) => r.steps.map(x => x.out ?? "")).join("\n");
   const unnamed = pr(main0, "its own job that runs the shape check", dir => { STAGES[PARSER_LEAD].stage(dir); write(dir, "src/App/More.cs", "class More { void M(bool x) { if (x) { } } }\r\n"); });
   const warned = checks(p, "pull_request", unnamed, { baseSha: main0, only: "shape-staged.yml", ownToo: true });
-  ok(!failures(warned) && warned.some(([, r]) => r.ran) && /^::warning::The shape check did not read (?:JavaScript and TypeScript, their functions by the parser \(the reader javascript-tree\), )?C#, its functions by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone.*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(shapeOut(warned)),
-    `${p.name}: its own job that runs the shape check after the first install alone passes, reading no function of C# and saying so as a warning with the mend`, `${failures(warned)}\n${shapeOut(warned).slice(-1500)}`);
+  ok(!failures(warned) && warned.some(([, r]) => r.ran) && /^::warning::The shape check did not read (?:JavaScript and TypeScript, their functions by the parser \(the reader javascript-tree\), )?C#, by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone.*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(shapeOut(warned)),
+    `${p.name}: its own job that runs the shape check after the first install alone passes, reading nothing of C# and saying so as a warning with the mend`, `${failures(warned)}\n${shapeOut(warned).slice(-1500)}`);
   const mended = pr(unnamed, "the mend as the warning words it", dir => STAGES[PARSER_LEAD].mend(dir));
   const read = checks(p, "pull_request", mended, { baseSha: main0, only: "shape-staged.yml", ownToo: true });
   ok(!failures(read) && read.some(([, r]) => r.ran) && !/::warning::The shape check did not read/u.test(shapeOut(read)),

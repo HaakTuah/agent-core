@@ -42,7 +42,6 @@ const read = (dir, f) => fs.readFileSync(path.join(dir, f), "utf8");
 fs.cpSync(root, theCore, { recursive: true, filter: src => !["/.git", "/node_modules"].some(x => slash(src).endsWith(x)) });
 git(theCore, "init", "-q", "-b", "main");
 const NOTE_LINE = "- **13 November 2026, a note for the test.** Done when nothing: an entry that B gains over A.\n";
-const notes = read(theCore, "setup/sync-notes.md");
 const terms = read(theCore, ".github/workflows/personal-terms.yml");
 const commit = (message) => { git(theCore, "add", "-A"); git(theCore, "commit", "-q", "--allow-empty", "-m", message); return git(theCore, "rev-parse", "HEAD"); };
 write(theCore, "z.md", "only in Z\n");
@@ -52,7 +51,7 @@ fs.rmSync(path.join(theCore, "z.md"));
 write(theCore, ".github/workflows/personal-terms.yml", `${terms}# A\n`);
 const A = commit("A");
 write(theCore, ".github/workflows/personal-terms.yml", terms);
-write(theCore, "setup/sync-notes.md", `${notes}${NOTE_LINE}`);
+write(theCore, "setup/sync-notes/999-a-note-for-the-test.md", NOTE_LINE); // (an entry is a file of the folder: #750, point 1)
 const B = commit("B");
 const SIDE = git(theCore, "commit-tree", `${B}^{tree}`, "-p", B, "-m", "off main");
 const SHA = sha => sha.slice(0, 7);
@@ -219,7 +218,7 @@ ok(atOne.status === 0 && atOne.out.includes("release-1") && git(p, "status", "--
 git(theCore, "tag", "release-2", B);
 const atTwo = node(p, "core/scripts/sync.mjs");
 ok(atTwo.status === 0 && atTwo.out.includes(`${SHA(A)} -> ${SHA(B)} (release-2)`) && read(p, "core-manifest.md") === manifest("someone-else", B), "and once a newer release is cut, it takes that release", atTwo.out);
-git(p, "commit", "-q", "-am", "to release-2");
+git(p, "add", "-A"); git(p, "commit", "-q", "-m", "to release-2"); // (with what the sync added: a new entry is a file)
 const released = pure();
 ok(released.status === 0 && released.out.includes("a pure sync"), "  a sync to a release, in a project that follows the releases, is pure", released.out);
 // (it takes a commit of main that is no release only through review: the sync is made, and is no pure sync; core archive 201)
@@ -227,7 +226,7 @@ write(theCore, "c.md", "only in C\n");
 const C = commit("C");
 git(p, "checkout", "-q", "-B", "unreleased", other);
 const toC = node(p, "core/scripts/sync.mjs", C);
-git(p, "commit", "-q", "-am", "to C");
+git(p, "add", "-A"); git(p, "commit", "-q", "-m", "to C");
 const unreleased = pure();
 ok(toC.status === 0 && read(p, "core-manifest.md") === manifest("someone-else", C) && unreleased.status === 1 && unreleased.out.includes(`${C} is no release of the core: the sync is reviewed like any PR`) && unreleased.out.includes(`node core/scripts/sync.mjs ${B}\` (release-2, the newest)`),
   "a sync to a commit that is no release, in a project that follows the releases, is made, and is no pure sync: it is reviewed like any PR, or made again with the newest release's full SHA, which the refusal names", `${toC.out}\n${unreleased.out}`);
@@ -238,7 +237,7 @@ write(p, "core-manifest.md", `${manifest("someone-else")}| *follows* | \`main\` 
 git(p, "commit", "-q", "-am", "two rows");
 git(p, "push", "-q", "-f", "origin", "HEAD:main");
 const toCAgain = node(p, "core/scripts/sync.mjs", C);
-git(p, "commit", "-q", "-am", "to C");
+git(p, "add", "-A"); git(p, "commit", "-q", "-m", "to C");
 const unclear = pure();
 ok(unclear.status === 1 && unclear.out.includes(`does not say what it follows, and ${C} is no release of the core`), "a sync to a commit that is no release, in a project whose manifest does not say what it follows, is no pure sync either", `${toCAgain.out}\n${unclear.out}`);
 

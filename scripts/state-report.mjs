@@ -30,6 +30,7 @@ import { baselineOf } from "./strength.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
 import { report as holdersReport } from "./holders.mjs";
 import { said as pruningSaid } from "./pruning.mjs";
+import { tasks as readTasks, total as readTotal, tree as readTree } from "./read-total.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { rules } from "./rules.mjs";
 import { started } from "./started.mjs";
@@ -103,14 +104,24 @@ const pct = (a, b) => (b ? `${Math.round((100 * a) / b)}%` : "none merged");
 
 // The rules of the floor and the modules by what holds them, as holders.mjs reads them now; null where it cannot.
 const heldNow = () => { try { return holdersReport(); } catch { return null; } };
+// The total read (read-total.mjs, beside this file; #469), in KB, as it stands now; null where it cannot be read.
+const totalNow = () => { try { return Math.round(readTotal(readTree(), readTasks()).sum / 1024); } catch { return null; } };
+// The total read's lines: now, and the last report's beside it.
+const TOTAL = "The total read";
+function totalRead(now, previous) {
+  const last = /^- Now: (\d+) KB\b/mu.exec(String(previous ?? "").split(`**${TOTAL}**`)[1] ?? "")?.[1];
+  return [`**${TOTAL}**`, now === null ? "- Not read: `scripts/read-total.mjs` could not read it." : `- Now: ${now} KB, each role's start, each kind of task and the last 30 merged pull requests read by their builders and reviewers, each file opened counted as a KB (\`scripts/read-total.mjs\`).`,
+    `- The last report's: ${last === undefined ? "none" : `${last} KB`}.`];
+}
 
 // The report's text. `core`: whether this is the core's own repository; `previous`: the last report's text, or null;
 // `overdue`: [{ number, title, since }]; `counts` (a project): { pin, behind, steps, merged } as readCounts gives them;
 // `holders`: the lines holders.mjs gives, in the core the rules of the floor and the modules by what holds them, read
 // here where left out, and in a project its own rules (--own; #662), and null where they could not be read; `cited`: the lines cited.mjs gives for the month before,
 // null where they were not counted; `outcomes`: the lines outcomes-read.mjs gives for the month before, which the report
-// leads with (#302), null where they were not read; `pruning` (the core): the lines pruning.mjs gives for `month`.
-export function body({ core, month, measures, shape: shaped = null, wait = null, previous, overdue, counts = null, holders = core ? heldNow() : null, cited = null, outcomes = null, pruning = core ? pruningSaid({ month }) : null, scripts }) {
+// leads with (#302), null where they were not read; `pruning` (the core): the lines pruning.mjs gives for `month`;
+// `read` (the core): the total read in KB, null where it could not be read.
+export function body({ core, month, measures, shape: shaped = null, wait = null, previous, overdue, counts = null, holders = core ? heldNow() : null, cited = null, outcomes = null, pruning = core ? pruningSaid({ month }) : null, read = core ? totalNow() : null, scripts }) {
   const lines = [
     `The state of ${core ? "the core" : "this project"} for ${month}, as the scheduled look reads it on its first run of the month (\`${scripts}/state-report.mjs\`). It reports and asks nothing: whatever is due already has its task. A session that reads it files as a task anything it shows that has none, and closes it.`,
     "",
@@ -124,6 +135,7 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
     ...(holders ?? [core ? "- Not read: `scripts/holders.mjs` could not read them, so the report leaves them out rather than guess."
       : `- Not read: \`${scripts}/holders.mjs --own\` could not read this project's own rules, so the report leaves them out rather than guess.`]),
     ...(pruning ? ["", "**The pruning of the rules**", ...pruning] : []),
+    ...(core ? ["", ...totalRead(read, previous)] : []),
     "",
     `**${CITED}**`,
     ...(cited ?? [`- Not counted: \`${scripts}/cited.mjs\` was not run for ${before(month)}.`]),
@@ -131,6 +143,8 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
     "**What is overdue**",
     ...(overdue.length ? overdue.map(o => `- #${o.number} ${o.title}: open since ${o.since.slice(0, 10)}.`) : ["- Nothing: no task the look keeps has stood open past a week."]),
   ];
+  if (core) lines.push("", `**Changes to the floor and the review guidelines merged in ${before(month)}, and whether each quoted the owner's yes**`,
+    `- Not read by GitHub's job. The session that takes this report adds, as a note, what \`node scripts/meaning-kept.mjs --month ${before(month)}\` prints, so the owner can look them over (#886, point 2).`);
   if (core) lines.push("", "**The projects that take the core**",
     "- Not read by GitHub's job, whose token reaches this repository alone. A session where gh answers for the owner's account runs `node scripts/state-report.mjs --projects` and adds what it prints here as a note; where its tool cannot reach a project, a session started in that project reads it and passes back counts and conclusions alone.");
   lines.push("", "**What the reviews found twice**",

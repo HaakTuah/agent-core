@@ -9,16 +9,20 @@
 // empty value, the rest of the text read still, since Node stops by itself where the package builds one some 800 deep
 // (#610); a text whose lists or mappings nest some thousands deep in block form, past what the package's parser can
 // close, whose keys past that point it reads as none; and text that is no YAML past where the package can read it. A
-// text where either cut was made is said so, an entry whose key is null, for the check to fail with its mend, since a
-// key given twice in the part not read would go unseen. It holds
+// text where either cut was made, or that is longer than LONGEST and not read at all, is said so, an entry whose key is
+// null, for the check to fail with its mend, since a key given twice in the part not read would go unseen. It holds
 // one document's tokens at a time, so a text of many documents takes no more memory than reading them did.
 import { loadSync } from "./packages.mjs";
 
 export const DEEPEST = 128;
+// The longest text it reads, in characters, far past a workflow's: the package's parser builds a token for each mark
+// before anything here runs, so a text of three million `[` ran Node out of heap (#752). A longer text is read as not
+// read, an entry whose key is null and whose `size` is true.
+export const LONGEST = 256 * 1024;
 
 // A text's tokens with each list or mapping nested past DEEPEST, a document counted as one, made an empty value, read
 // without recursion so that a text nested past any stack is read; the offsets of those made so, which hold no key.
-function pruned(tokens) {
+export function pruned(tokens) {
   const nests = new Set(["document", "block-map", "block-seq", "flow-collection"]), cut = new Set(), todo = [[tokens, 0]];
   while (todo.length) {
     const [holder, depth] = todo.pop();
@@ -48,8 +52,10 @@ export function uncommented(line) {
 // The keys given twice in one mapping of a YAML text, each as { line, key, first }: the line of the second, the key as
 // YAML reads it and the line of the first, numbered from 1, in the order of the seconds in the text; and, where part of
 // the text was not read (nested past DEEPEST, or past what the parser closes), { line, key: null, first: null } after
-// them, on the line of the first part cut, or line 1 where the parser gave out with nothing cut.
+// them, on the line of the first part cut, or line 1 where the parser gave out with nothing cut; a text longer than
+// LONGEST is only that entry, with `size` true.
 export function twice(text) {
+  if (String(text).length > LONGEST) return [{ line: 1, key: null, first: null, size: true }];
   // (the package, loaded here alone: a script that imports this file for `uncommented` needs nothing installed)
   const { Composer, LineCounter, Parser, isScalar, visit } = loadSync("yaml");
   const found = [], lines = new LineCounter(), cut = new Set();
