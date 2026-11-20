@@ -10,7 +10,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { checksOf, DIRECT, due, firedOf, generation, list, open, rare, readUnheld, said, stepsAt, stepsOf, without } from "../scripts/pruning.mjs";
+import { checksOf, list, rare, readUnheld, stepsOf, without } from "../scripts/pruning-list.mjs";
+import { firedOf, stepsAt } from "../scripts/pruning-read.mjs";
+import { DIRECT, due, generation, open, said } from "../scripts/pruning-record.mjs";
 import { rulesOf } from "../scripts/rules.mjs";
 
 let failed = 0, count = 0;
