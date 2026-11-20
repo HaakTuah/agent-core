@@ -78,8 +78,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version # the one exact Node, as the cut's
-      - name: The core's packages, installed from its lock file before the upgrade test on Windows (#654)
-        run: node scripts/install.mjs
+      - name: The core's packages, installed from their lock files before the upgrade test on Windows, the parser's among them (#654, #719)
+        run: node scripts/install.mjs all # (the steps the test reads run the shape check, which reads on the parser; as tests.yml installs them)
       - name: A project of each of the last two releases, or of the one this job's part names, synced to this commit, passes every check unchanged
         env:
           PART: ${{ matrix.part }}
@@ -103,8 +103,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
-      - name: The core's packages, installed from its lock file for the release (#654)
-        run: node scripts/install.mjs
+      - name: The core's packages, installed from their lock files for the release, the parser's among them (#654, #719)
+        run: node scripts/install.mjs all # (the release reads the sync notes' steps, whose checks read on the parser)
       - name: The release, cut where the upgrade test on Windows, every check on main's newest commit and the newest of its hourly or hand-started runs of the tests have passed, none of them unfinished
         env:
           GH_TOKEN: ${{ github.token }}
