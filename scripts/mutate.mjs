@@ -12,7 +12,7 @@
 // its own (a git worktree of HEAD, with the files that differ from it copied in), several side by side, so the
 // project's own files are never changed; a fault whose tests run past their time is caught (a timeout, as Stryker
 // counts it). Past the budget, the faults left are written as not run ("Pending"). What the project installed (its
-// node_modules) is shared with the working copies by links, not copied, so a test that writes there writes to it; a
+// node_modules) is shared with the working copies by links, not copied, so a test that writes or removes there does so in it; a
 // workspace's own package is linked to the copy's.
 //
 //   node core/scripts/mutate.mjs --report <file> [--budget <seconds>] [--every] [<file>[:<first>-<last>],...]
@@ -199,41 +199,38 @@ export function copyOf(dir) {
 
 // A copy's node_modules: where no link in it leads into the project's own files, one link to the project's whole folder,
 // a junction on Windows, so that a package's real path lies in the node_modules a script reads it from, as packages.mjs
-// asks of the core's own install (#984). Otherwise a folder of its own whose every entry (and every entry of a @scope
-// folder) reaches the project's: a folder by a link and a file by a copy, which needs no right to make. A link that leads
-// into the project's own files, a workspace's package, leads to the same place in the copy, so that its faults are the
-// copy's; one that leads into a node_modules (pnpm's store) or outside, to where it led; a dangling one is left out.
+// asks of the core's own install (#984); a test that writes or removes there does so in the project's (as the header says).
+// Otherwise a folder of its own whose every entry (and every entry of a @scope folder) reaches the project's: a folder by
+// a link and a file by a copy, which needs no right to make. A link that leads into the project's own files, a workspace's
+// package, leads to the same place in the copy, so that its faults are the copy's; one that leads into a node_modules
+// (pnpm's store) or outside, to where it led; a dangling one is left out.
 function linkInstalled(installed, to, dir) {
-  const root = fs.realpathSync("."), copyOf = from => {
+  const root = fs.realpathSync("."), inCopy = from => {
     try {
       const inside = path.relative(root, fs.realpathSync(from));
       return inside && !inside.startsWith("..") && !path.isAbsolute(inside) && !inside.split(path.sep).includes("node_modules") ? path.join(path.resolve(dir), inside) : null;
     } catch { return null; }
-  }, entries = fs.readdirSync(installed, { withFileTypes: true }).flatMap(e => {
-    const from = path.join(installed, e.name);
-    return e.name.startsWith("@") && e.isDirectory() ? fs.readdirSync(from).map(i => path.join(from, i)) : [from];
-  });
-  if (!entries.some(from => fs.lstatSync(from).isSymbolicLink() && copyOf(from))) {
+  }, entries = []; // each entry of the folder, and of a @scope folder in it, with its place in the copy
+  for (const entry of fs.readdirSync(installed, { withFileTypes: true })) {
+    const from = path.join(installed, entry.name);
+    if (!entry.name.startsWith("@") || !entry.isDirectory()) entries.push([from, path.join(to, entry.name)]);
+    else for (const inner of fs.readdirSync(from)) entries.push([path.join(from, inner), path.join(to, entry.name, inner)]);
+  }
+  if (!entries.some(([from]) => fs.lstatSync(from).isSymbolicLink() && inCopy(from))) {
     fs.symlinkSync(path.resolve(installed), to, "junction");
     linked.push(to);
     return;
   }
-  const one = (from, at) => {
+  for (const [from, at] of entries) {
     let target = path.resolve(from);
     if (fs.lstatSync(from).isSymbolicLink()) {
-      try { target = fs.realpathSync(from); } catch { return; }
-      target = copyOf(from) ?? target;
+      try { target = fs.realpathSync(from); } catch { continue; }
+      target = inCopy(from) ?? target;
     }
-    if (!fs.statSync(path.resolve(from)).isDirectory()) { fs.copyFileSync(from, at); return; }
+    fs.mkdirSync(path.dirname(at), { recursive: true });
+    if (!fs.statSync(path.resolve(from)).isDirectory()) { fs.copyFileSync(from, at); continue; }
     fs.symlinkSync(target, at, "junction");
     linked.push(at);
-  };
-  fs.mkdirSync(to, { recursive: true });
-  for (const entry of fs.readdirSync(installed, { withFileTypes: true })) {
-    const from = path.join(installed, entry.name), at = path.join(to, entry.name);
-    if (!entry.name.startsWith("@") || !entry.isDirectory()) { one(from, at); continue; }
-    fs.mkdirSync(at);
-    for (const inner of fs.readdirSync(from)) one(path.join(from, inner), path.join(at, inner));
   }
 }
 

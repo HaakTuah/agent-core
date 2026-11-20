@@ -136,8 +136,8 @@
       "why": "One workflow's cases (security-review.yml run as GitHub runs it) on the one scratch repository and stand-ins for GitHub's API they share; split, each file would set them up again, adding to the suite's time (tasks/tests.md)."
     },
     "scripts/mutate.mjs": {
-      "mark": 21430,
-      "why": "#984, a bug fix kept to its lines: a session that changes the working copies reads the faults and the run beside them, and a split goes in a pull request of its own that proves its behaviour unchanged."
+      "mark": 21409,
+      "why": "Its faults, working copies and run are read together by whoever changes one, and #815 retires the file for Stryker, so a split would be work on a file that goes."
     },
     "scripts/shape.mjs": {
       "mark": 84826,
