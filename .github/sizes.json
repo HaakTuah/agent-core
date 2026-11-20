@@ -121,27 +121,27 @@
     },
     "tests/outcomes-test.mjs": {
       "mark": 25803,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/packages-test.mjs": {
       "mark": 68081,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/pointers-test.mjs": {
       "mark": 23333,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/pure-sync-test.mjs": {
       "mark": 23363,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/strength-test.mjs": {
       "mark": 33014,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/work-saved-test.mjs": {
       "mark": 26522,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/nuget-gate-test.mjs": {
       "mark": 20574,
@@ -217,43 +217,43 @@
     },
     "tests/code-review-wait-test.mjs": {
       "mark": 33431,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/comment-only-test.mjs": {
       "mark": 32403,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/core-yml-test.mjs": {
       "mark": 22488,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/hostile-build-files-test.mjs": {
       "mark": 29868,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/hostile-github-test.mjs": {
       "mark": 22575,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/hostile-pr-comments-test.mjs": {
       "mark": 22109,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/licence-scan-test.mjs": {
       "mark": 46036,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/licences-test.mjs": {
       "mark": 24020,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/lookup-test.mjs": {
       "mark": 63511,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/merge-line-test.mjs": {
       "mark": 23054,
-      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/size-test.mjs": {
       "mark": 28199,
