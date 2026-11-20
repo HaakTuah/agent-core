@@ -54,6 +54,12 @@ try {
     r = read({ repo: "o/n", dir, manifest: rel, gh: host(false) });
     ok(w.unlisted && w.unread.includes(dir) && r.where === "self-hosted" && /workflows not read: /.test(r.said.join("\n")) && /could not be listed/.test(r.said[0]), `${what}: not read, said so, and taken as the owner's own, never as no jobs`, r.said.join(" | "));
   }
+  // (hostile: the path is one a pull request writes; a link to itself or to a plain file is no folder either)
+  fs.mkdirSync(at("hostile", ".github"), { recursive: true }); fs.writeFileSync(at("plain"), "on: push\n");
+  for (const target of [at("hostile", ".github", "workflows"), at("plain")]) {
+    fs.rmSync(at("hostile", ".github", "workflows"), { force: true }); fs.symlinkSync(target, at("hostile", ".github", "workflows"));
+    ok(workflowsIn(at("hostile", ".github", "workflows")).unlisted === true, "a workflows path that is a link to itself, or to a plain file, is not read, never read as no jobs");
+  }
   if (process.platform !== "win32" && process.getuid?.() !== 0) {
     const shut = at("shut", ".github", "workflows");
     fs.mkdirSync(shut, { recursive: true }); fs.chmodSync(shut, 0);
