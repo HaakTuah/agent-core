@@ -42,8 +42,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      million steps of each tree's tries, past which it fails with its mend; and of each file of code the selection
      reads through the shape check's readers (`scripts/shape-readers.mjs`), 500,000 characters of JavaScript,
      TypeScript or Python and 200,000 of C#, past which the parser reads none of it (of Python and C#, neither
-     functions, imports nor tokens; of JavaScript and TypeScript, no functions, their imports read without it), and 2 s
-     for the parser on each (`scripts/tree-walk.mjs`); hostile tests:
+     functions, imports nor tokens; of JavaScript and TypeScript, no functions, their imports read without it), 2 s
+     for the parser on each and 250,000 nodes in the tree it gives, past which the parser reads none of it either
+     (`scripts/tree-walk.mjs`); hostile tests:
      `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
@@ -76,9 +77,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`), the sync and its steps
-     (`scripts/sync.mjs`, `scripts/steps.mjs`) and the scheduled look (`scripts/look.mjs`); limits: 64 MB of a file
-     the steps read, past which it is reported unread, and none of their own in count, since a project's config is its
-     own; hostile tests: `tests/hostile-configs-test.mjs`.
+     (`scripts/sync.mjs`, `scripts/steps.mjs`), the reader of the checks that read nothing (`scripts/read-nothing.mjs`,
+     from the steps and the state report, listing files by the shape check's own lister) and the scheduled look
+     (`scripts/look.mjs`); limits: 64 MB of a file the steps read, past which it is reported unread, and none of their
+     own in count, since a project's config is its own; hostile tests: `tests/hostile-configs-test.mjs`.
    - the files an agent tool takes its instructions from (`GEMINI.md`, an entry file, each file of a tool's folders), as
      the work tree and a pull request's base hold them: read by the copies and pointer checks (`scripts/copies.mjs`,
      `scripts/pointers.mjs`, through `scripts/rule-files.mjs`); limits: 1 MB of a file, past which it is not read, 40
@@ -92,15 +94,18 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      said unread with its mend, never given to the parser, and `parseYaml` throws it with its mend; such a file
      unchanged from the base is only noted, its own keys given twice and calls left without ready_for_review unread, and
      one a pull request changes fails, and is read as new once cut under it), 60 s for git's filters, 64 MB of a
-     workflow for the move of the pins, past which it is reported unread, and none on a file for the reader of where the
-     tests run, a project's own, read whole, whose walk of a job's labels stops at 500 and 8 deep, lists and mappings
-     nested 128 deep at most for the workflow check's two readers of a workflow (what is nested past it is said with its
-     mend, and no list or mapping used as a key is read), no line break of YAML 1.1 beyond LF, CR and CRLF for the same
-     two readers (U+0085, U+2028 and U+2029, which the package does not read as one, fail a file that is new or changed,
+     workflow for the move of the pins, past which it is reported unread, and 256 KB of a workflow for the reader of
+     where the tests run, past which, through a link that leads out of the checkout, or where it is no file of bytes, it
+     is said unread and never read as no jobs, its folder not read through a link, and whose walk of a job's labels
+     stops at 500 and 8 deep, lists and mappings nested 128 deep at most for the workflow check's two readers of a
+     workflow (what is nested past it is said with its mend, and no list or mapping used as a key is read), no line
+     break of YAML 1.1 beyond LF, CR and CRLF for the same two readers (U+0085, U+2028 and U+2029, which the package
+     does not read as one, fail a file that is new or changed,
      with their mend, and are only noted in one unchanged from the base or where a project's run is told no base, so a
      key given twice or a call left without ready_for_review behind such a break in an unchanged file goes unseen until
      the file is changed; in the core's own run each fails), and NuGet's lock file version 2, a newer refused (npm's
-     lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`.
+     lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`, and for the
+     reader of where the tests run `tests/runners-test.mjs`.
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
