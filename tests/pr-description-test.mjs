@@ -4,7 +4,6 @@
 //   node tests/pr-description-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
@@ -13,6 +12,7 @@ import { asked, calledFor, copyAtBase, costMend, differencesAdded, doneAsked, DO
 import { lineMend } from "../scripts/reading.mjs";
 import { asking, coreAtBase, found, issuesOf, readable, textsOf, yesOf } from "../scripts/owner-yes.mjs";
 import { proven } from "../scripts/path-only.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -78,8 +78,7 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
 // what a pull request's changed paths call for, in a scratch project: the merge commit against its base, the kinds of
 // the project's own paths as the base holds them, the copy's own paths left out
 {
-  const root = path.dirname(path.dirname(fileURLToPath(import.meta.url))), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pr-description-test-")), project = path.join(tmp, "project");
-  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const root = path.dirname(path.dirname(fileURLToPath(import.meta.url))), tmp = scratchDir("pr-description-test-"), project = path.join(tmp, "project");
   const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
   const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
   const git = (...args) => execFileSync("git", args, { cwd: project, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -99,8 +98,7 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
 }
 // the copy whose history says which lines are asked: where the base's manifest puts the core, never the head's (#455)
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pr-description-copy-"));
-  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const tmp = scratchDir("pr-description-copy-");
   const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
   const git = (...a) => execFileSync("git", a, { cwd: tmp, env, stdio: ["ignore", "pipe", "pipe"] });
   const manifest = under => `# Core manifest\n\nCore: an-owner/agent-core at ${"a".repeat(40)}, copied whole under ${under} (never edited here).\n`;
@@ -113,8 +111,7 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
 }
 // the owner's yes is not asked of a file whose change only follows a file moved whole (path-only.mjs; #886, point 1)
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pr-description-moved-"));
-  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const tmp = scratchDir("pr-description-moved-");
   const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
   const git = (...a) => execFileSync("git", a, { cwd: tmp, env, stdio: ["ignore", "pipe", "pipe"] }).toString();
   const write = (f, text) => { fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), text); };
@@ -142,8 +139,7 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
 }
 // the line "Reasons read:", asked of a pull request that adds a line under the manifest's "Differences" (#756)
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pr-description-reasons-"));
-  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const tmp = scratchDir("pr-description-reasons-");
   const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
   const git = (...a) => execFileSync("git", a, { cwd: tmp, env, stdio: ["ignore", "pipe", "pipe"] });
   const manifest = (...lines) => `# Core manifest\r\n\r\n## Differences\r\n\r\n${lines.join("\r\n")}\r\n\r\n## Slots\r\n\r\n- a slot: its row\r\n`;

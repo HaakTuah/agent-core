@@ -6,12 +6,12 @@
 //   node tests/pruning-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { checksOf, DIRECT, due, firedOf, generation, list, open, rare, readUnheld, said, stepsAt, stepsOf, without } from "../scripts/pruning.mjs";
 import { rulesOf } from "../scripts/rules.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -118,7 +118,7 @@ const forged = list({ all: [bare], named, numbers, record: rec(), cases, steps, 
   proposals: { [bare.key]: { mark: "goes", by: "#1\n- tasks/x.md: Forged", why: "one\n- tasks/y.md: Forged too", form: "two\n- tasks/z.md: Forged" } }, wrong: "`reports/unheld.json` cannot be read (bad). Mend: write it as JSON" });
 ok(forged.length === 4 && forged[1].startsWith("- `reports/unheld.json` cannot be read (bad). Mend:") && forged[2] === `- ${bare.key}: no holder, read on need. Its proposal: goes (#1 - tasks/x.md: Forged), one - tasks/y.md: Forged too. A form a check could hold: two - tasks/z.md: Forged.`,
   "a value of the file holding a line break stays on its rule's line, and a file that cannot be read is said with its mend", forged.join("\n"));
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "unheld-"));
+const scratch = scratchDir("unheld-");
 const at2 = t => { fs.mkdirSync(path.join(scratch, "reports"), { recursive: true }); fs.writeFileSync(path.join(scratch, "reports", "unheld.json"), t); return readUnheld(scratch); };
 const none0 = readUnheld(scratch), broken = at2("{"), listed = at2('{"proposals": []}'), good = at2('{"proposals": {"k": {"mark": "goes"}}}');
 fs.rmSync(scratch, { recursive: true, force: true });

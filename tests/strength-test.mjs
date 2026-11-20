@@ -12,6 +12,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { again, baselineOf, changedLines, counted, faultsOf, idOf, joinedUnsaid, kindOf, linesArg, lowered, needed, toolOf, undercut, unlisted, unsure, verdict, watched } from "../scripts/strength.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -156,7 +157,7 @@ const grew = verdict({ faults: [], baseline: b({ "survivor: x": { count: 2 } }),
 ok(grew.fails && mended(grew.lines.join("\n")), "an entry that joined with no reason fails, with its mend", grew.lines.join("\n"));
 
 // ---- whole runs, in a scratch repository ----
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "strength-test-"));
+const dir = scratchDir("strength-test-");
 const sh = (...args) => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const write = (f, t) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), t); };
 const run = (args = [], env = {}) => spawnSync(process.execPath, [SCRIPT, ...args], { cwd: dir, encoding: "utf8", env: { ...process.env, GITHUB_STEP_SUMMARY: "", ...env } });

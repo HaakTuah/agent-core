@@ -10,13 +10,12 @@
 //   node tests/rules-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { RECORD, due, main, record, said } from "../scripts/core-reading.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { ROOT, rulesAt, takenRules, rules } from "../scripts/rules.mjs";
-import { tally } from "../scripts/scratch-core.mjs";
+import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
 const ID = n => String(n).repeat(40);
@@ -100,7 +99,7 @@ const commits = {
 }
 // the rules a project takes, and what a reading against the core finds due
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-reading-"));
+  const tmp = scratchDir("core-reading-");
   const write = (f, t) => { fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), t); };
   write("floor/security.md", "**1. Nothing secret.** None.\n");
   write("tasks/a.md", "- **Rule one.** Its text.\n");
@@ -125,7 +124,7 @@ const commits = {
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 {
-  const here = fs.mkdtempSync(path.join(os.tmpdir(), "core-reading-cli-"));
+  const here = scratchDir("core-reading-cli-");
   ok(/takes no copy/.test(main([], here)), "where no manifest stands, as in the core's own repository, nothing is read");
   fs.writeFileSync(path.join(here, "core-manifest.md"), "Modules: all\n");
   ok(/A whole reading of the project against the core is due/.test(main([], here)), "a project with no record is asked a whole reading");

@@ -7,7 +7,6 @@
 //   node tests/outcomes-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
@@ -15,6 +14,7 @@ import { FIRST, HEADING, KINDS, LABEL, LEAST, MEASURES, MONTHS, OUTCOMES, correc
 import { CALLS, firstOf, gather, read, report as monthly, spending } from "../scripts/outcomes-read.mjs";
 import { body, countsFrom } from "../scripts/state-report.mjs";
 import { COUNT, LINES, TITLE as BLIND_TITLE, answersOf, bodyOf, draw, drawOf, earlierOf, laidOut, line as blindLine, reader as blindReader, shareOf } from "../scripts/blind-sample.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
@@ -160,7 +160,7 @@ ok(/^- Not read: the pull requests and issues of the months to 2026-10 took more
 const spend = spending(() => "[]", { calls: 2, ms: 60e3 });
 spend(); spend();
 ok(!spend.left() && (() => { try { spend(); return false; } catch (e) { return e instanceof RangeError; } })() && CALLS <= 200, "the budget refuses the call past it");
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "outcomes-"));
+const tmp = scratchDir("outcomes-");
 fs.mkdirSync(path.join(tmp, "reports"));
 fs.writeFileSync(path.join(tmp, FIRST), "[".repeat(20000) + "]".repeat(20000));
 const deep = firstOf("o/r", tmp);

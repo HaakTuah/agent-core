@@ -6,7 +6,6 @@
 //   node tests/releases-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
@@ -14,6 +13,7 @@ import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/r
 import { STEPS } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, POINTER, entries, notesAt } from "../scripts/sync-notes.mjs";
 import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, jumped, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -46,7 +46,7 @@ ok(followsOf(BARE, { login: OWNER, type: "User" }) === "main" && followsOf(BARE,
   ok(ownerOf(BARE, hostSaid(l => none.push(l), () => null)) === null && /nothing/.test(none[0]) && /an account of the type x%0Ay/.test((() => { const l = []; hostSaid(x => l.push(x), () => ({ login: "a", type: "x\ny" }))(); return l[0]; })()), "nothing read is said so, and a type of no form is only quoted");
 }
 { // the host's account: from the workflow's event, else from gh, else nothing
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "host-account-")), event = path.join(dir, "event.json"), asked = [];
+  const dir = scratchDir("host-account-"), event = path.join(dir, "event.json"), asked = [];
   try {
     fs.writeFileSync(event, JSON.stringify({ repository: { owner: { login: "someone", type: "User", id: 1 } } }));
     const gh = text => args => { asked.push(args.join(" ")); return text; };
@@ -63,8 +63,7 @@ ok(followsOf(BARE, { login: OWNER, type: "User" }) === "main" && followsOf(BARE,
 ok(RELEASE.test("release-1") && RELEASE.test("release-120") && !RELEASE.test("release-0") && !RELEASE.test("release-01") && !RELEASE.test("release-1a") && !RELEASE.test("v1") && !RELEASE.test("release-1\n"), "a release's name is the word and a whole number above zero");
 
 // a scratch core: main with four commits, a side branch, and tags
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "releases-test-"));
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("releases-test-");
 // (git's own variables that point at a repository are left out, so every call lands in the scratch one)
 for (const name of Object.keys(process.env)) if (elsewhere.test(name)) delete process.env[name];
 // (and git finds no bare repository by itself, as Git 3.0 has it by default: the scripts name each one they make)

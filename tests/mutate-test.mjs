@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { faults, report, testsOf } from "../scripts/mutate.mjs";
-import { OWNER } from "../scripts/scratch-core.mjs";
+import { OWNER, scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -37,7 +37,7 @@ const r = report({ "a.js": "x === 1;\n" }, [{ file: "a.js", text: "x === 1;\n", 
 ok(r.schemaVersion === "1" && same(r.files["a.js"].mutants[0].location, { start: { line: 1, column: 3 }, end: { line: 1, column: 6 } }) && r.files["a.js"].source === "x === 1;\n", "the report is in the mutation-testing-elements schema, its places counted from 1 and its end past the fault");
 
 // ---- a run, in a scratch repository ----
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mutate-test-"));
+const dir = scratchDir("mutate-test-");
 const git = (...args) => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const write = (f, t) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), t); };
 const SOURCE = "export const big = x => x > 10;\nexport const same = (a, b) => a === b || false;\n";
@@ -141,13 +141,27 @@ try {
   ok(fs.existsSync(running.dir), "the scratch folder of a test still running is left where it is", running.dir);
   ok(!fs.existsSync(next.dir), "a test that ends takes away its own scratch folder as before");
   // (a folder another machine's process made, over a temporary folder shared between machines, is no business of this one's)
-  const foreign = fs.mkdtempSync(path.join(os.tmpdir(), "stopped-test-"));
+  const foreign = scratchDir("stopped-test-");
   fs.writeFileSync(path.join(foreign, OWNER), `${os.hostname()}-elsewhere:999999999`);
   await ended((await start("end")).child);
   ok(fs.existsSync(foreign), "the scratch folder of a process on another machine is left where it is", foreign);
   running.child.kill("SIGKILL");
   await ended(running.child);
   for (const dir of [running.dir, stopped.dir, foreign]) fs.rmSync(dir, { recursive: true, force: true });
+}
+
+// ---- no test makes its own folder under the temporary one (#965) ----
+// A folder a test makes with mkdtemp there, removed only by its process's exit event, stays where the run was stopped;
+// scratchDir (scripts/scratch-core.mjs) records its owner, so the next test takes it away. A folder made inside one
+// scratchDir makes goes with it, and is no leak. Read from the text of each test and of scripts/hostile.mjs, a line at a time.
+{
+  const leaks = text => text.split("\n").filter(line => !/^\s*\/\//.test(line) && /\bmkdtemp(?:Sync)?\(.*(?:tmpdir\(|TMPDIR|RUNNER_TEMP)/.test(line));
+  const made = ["fs.mkdtemp", "Sync(path.join(os.tmp", "dir(), 'x-'))"].join(""), bare = ["mkdtemp", "Sync(join(tmp", "dir(), 'x-'))"].join(""), inside = ["fs.mkdtemp", "Sync(path.join(tmp, 'x-'))"].join("");
+  ok(leaks(`const a = ${made};`).length === 1 && leaks(`  const b = ${bare};`).length === 1 && leaks(`const c = ${inside};\n// ${made}\nconst d = scratchDir("x-");`).length === 0, "a line that makes a folder under the temporary one with mkdtemp is a leak, one inside a scratch folder, a comment and scratchDir are not");
+  const root = path.join(path.dirname(SCRIPT), "..");
+  const files = [...fs.readdirSync(path.join(root, "tests")).filter(f => f.endsWith(".mjs")).map(f => `tests/${f}`), "scripts/hostile.mjs"];
+  const found = files.flatMap(f => leaks(fs.readFileSync(path.join(root, f), "utf8")).map(line => `${f}: ${line.trim().slice(0, 100)}`));
+  ok(found.length === 0, "no test, and not scripts/hostile.mjs, makes a folder under the temporary one with mkdtemp: they use scratchDir", `${found.slice(0, 5).join("\n")}\nMend: replace the call with scratchDir(prefix) from scripts/scratch-core.mjs, which removes the folder at the process's exit or, if the run was stopped, at the next test's start, and delete the exit handler that removed it.`);
 }
 
 console.log(`\n${count - failed} of ${count} passed`);

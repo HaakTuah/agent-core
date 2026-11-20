@@ -4,10 +4,10 @@
 //
 //   node tests/queue-test.mjs
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
 import { LARGEST, cleared, closedAt, command, fileAt, linesOf, read, statesOf, unplaced } from "../scripts/queue.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -137,7 +137,7 @@ linesOf(big);
 ok(linesOf(big).length === 20001, "a long file is read line by line, its text split once");
 
 // a queue that leads outside through a link: in the core, the mend names the core's own file, not a manifest it lacks
-const here = process.cwd(), scratch = fs.mkdtempSync(path.join(os.tmpdir(), "queue-"));
+const here = process.cwd(), scratch = scratchDir("queue-");
 fs.writeFileSync(path.join(scratch, "elsewhere.md"), "| #1 | builder | |\n");
 fs.mkdirSync(path.join(scratch, "repo"));
 fs.symlinkSync(path.join(scratch, "elsewhere.md"), path.join(scratch, "repo", "QUEUE.md"));
