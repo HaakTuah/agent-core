@@ -17,6 +17,7 @@
       "tests/licence-fetch-other-test.mjs",
       "tests/licence-fetch-pages-test.mjs",
       "scripts/agent-tools.mjs",
+      "scripts/agent-tools-pins.mjs",
       "tests/agent-tools-test.mjs",
       "scripts/npm-once.mjs"
     ]

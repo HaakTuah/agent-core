@@ -271,10 +271,6 @@
       "mark": 40791,
       "why": "#919: the reading of a workflow's runs apart from the reading of each check's config; the steps' readers, which import it, move first."
     },
-    "scripts/agent-tools.mjs": {
-      "mark": 94262,
-      "why": "#919: the readers of each agent tool's configuration apart from the check that lists them."
-    },
     "tests/agent-tools-test.mjs": {
       "mark": 114595,
       "why": "#919: split with agent-tools.mjs, a file of cases for each tool's configuration."

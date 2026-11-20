@@ -4,7 +4,7 @@
 // writes. Read by licences.mjs (its lock and config readers), exact-versions.mjs, nuget.mjs (its lock and config
 // readers; its build files' XML has its own hostile block in nuget-test.mjs, "const hostile", near line 223, not
 // repeated here; its project readers' links out of the project), workflows.mjs with yaml-keys.mjs, workflow-run.mjs (parseYaml, #864), sync.mjs (the move
-// of the pins in the workflows), runners.mjs (#733), and agent-tools.mjs (its links out of the checkout:
+// of the pins in the workflows), runners.mjs (#733), and agent-tools-links.mjs (its links out of the checkout:
 // agent-tools-test.mjs, near line 119). Each case is refused: nothing of it is taken as a pass or a value, and a failure
 // says its mend. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
@@ -13,7 +13,8 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { configured, listed } from "../scripts/agent-tools.mjs";
+import { configured } from "../scripts/agent-tools-configured.mjs";
+import { listed } from "../scripts/agent-tools-entries.mjs";
 import { check as exactCheck, exact } from "../scripts/exact-versions.mjs";
 import { check as licenceCheck, licenceOk, loadConfig, lockPathOk, workspacesIn } from "../scripts/licences.mjs";
 import { quick, said, scratch } from "../scripts/hostile.mjs";
