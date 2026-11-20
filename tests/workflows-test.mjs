@@ -148,7 +148,7 @@ ok(zz.length === 1 && zz[0].line === 7 && zz[0].what === "High\0${{ github.event
   "zizmor's finding is read at its primary location's line, one it marks ignored left out; actionlint's by its line, a runner label it does not know let pass; output that is no JSON is no answer", JSON.stringify([zz, al]));
  // (a workflow zizmor could not load is said by zizmor where actionlint said nothing of it, and left to actionlint where it did)
 if (process.platform !== "win32") {
-  const fake = fs.mkdtempSync(path.join(os.tmpdir(), "workflow-tools-")), tool = (name, body) => { fs.writeFileSync(path.join(fake, name), `#!/bin/sh\n${body}\n`, { mode: 0o755 }); return path.join(fake, name); };
+  const fake = scratchDir("workflow-tools-"), tool = (name, body) => { fs.writeFileSync(path.join(fake, name), `#!/bin/sh\n${body}\n`, { mode: 0o755 }); return path.join(fake, name); };
   try {
     const z = tool("zizmor", "exit 3"), quiet = tool("quiet", "echo '[]'"), loud = tool("loud", `echo '[{"kind":"syntax-check","message":"key \\"on\\" is duplicated","line":2}]'; exit 1`), other = tool("other", `echo '[{"kind":"expression","message":"x","line":2}]'; exit 1`);
     const alone = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: quiet }).found, both = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: loud }).found, unfetched = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: "" }).found, beside = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: other }).found;
