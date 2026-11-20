@@ -61,6 +61,17 @@ let link = true;
   write("CHOICES.md", whole);
   ok(folderFaults("CHOICES.md", dir).length === 0, "a records file that names no folder, as a project's stands, is asked nothing");
   fs.rmSync(path.join(dir, "choices/050-two.md")); fs.rmSync(path.join(dir, "choices/Notes.md")); fs.rmSync(path.join(dir, "choices/sub"), { recursive: true });
+  // a folder named twice is one folder, an overflow is said once, and a folder that cannot be listed is worded as that (#992)
+  write("CHOICES.md", `${head}${pointer}\n\n${pointer}\n`); write("choices/060-half.md", `${rec("g")}${"x".repeat(Math.floor(MOST * 0.6))}\n`);
+  ok(folderFaults("CHOICES.md", dir).length === 0, "a folder two lines of the file name is counted once against the size the readers read", folderFaults("CHOICES.md", dir).join("\n"));
+  write("CHOICES.md", `${head}${pointer}\n`); fs.rmSync(path.join(dir, "choices/060-half.md"));
+  write("choices/060-big.md", `${rec("g")}${"x".repeat(MOST)}\n`); write("choices/070-big.md", `${rec("h")}${"x".repeat(MOST)}\n`);
+  ok(folderFaults("CHOICES.md", dir).length === 1 && /060-big\.md` takes/.test(folderFaults("CHOICES.md", dir)[0]), "a size past what the readers read is one fault, not one for each later file");
+  fs.rmSync(path.join(dir, "choices/060-big.md")); fs.rmSync(path.join(dir, "choices/070-big.md"));
+  const listDir = fs.readdirSync;
+  fs.readdirSync = (p, ...rest) => { if (String(p).endsWith("choices")) throw Object.assign(new Error("EACCES"), { code: "EACCES" }); return listDir(p, ...rest); };
+  const unlisted = (() => { try { return folderFaults("CHOICES.md", dir); } finally { fs.readdirSync = listDir; } })();
+  ok(unlisted.length === 1 && /cannot be listed/.test(unlisted[0]) && !/is no folder here/.test(unlisted[0]) && !/make the folder/.test(unlisted[0]) && mended(unlisted[0]), "a folder that is there and cannot be listed is said so, with its own mend", unlisted.join("\n"));
   // the folder at the base: a change that moves the records into it reads what stood in the file, and one that adds to it is checked as an addition
   g("init", "-q", "-b", "main"); write("CHOICES.md", whole); fs.rmSync(path.join(dir, "choices"), { recursive: true }); write("AGENTS.md", rules); g("add", "-A"); g("commit", "-q", "-m", "whole");
   const whole0 = g("rev-parse", "HEAD").trim();
