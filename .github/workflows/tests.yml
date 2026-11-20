@@ -247,6 +247,12 @@ jobs:
       - name: The lookup of a new package, on recorded answers
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-test.mjs ')) }}
         run: node tests/lookup-test.mjs
+      - name: The lookup of a new package, run on a project
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-run-test.mjs ')) }}
+        run: node tests/lookup-run-test.mjs
+      - name: The sync's step that asks a lookup beside each check of exact versions
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-step-test.mjs ')) }}
+        run: node tests/lookup-step-test.mjs
       - name: The lookup again of what a project holds, on recorded answers
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/held-test.mjs ')) }}
         run: node tests/held-test.mjs
@@ -349,6 +355,12 @@ jobs:
       - name: The choice records
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-test.mjs ')) }}
         run: node tests/choices-test.mjs
+      - name: The records' check a pull request runs
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-check-test.mjs ')) }}
+        run: node tests/choices-check-test.mjs
+      - name: The scheduled look's readers of the choice records
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-look-test.mjs ')) }}
+        run: node tests/choices-look-test.mjs
       - name: The choice records that stand a file each in a folder
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-folder-test.mjs ')) }}
         run: node tests/choices-folder-test.mjs

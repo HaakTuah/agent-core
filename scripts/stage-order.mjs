@@ -8,7 +8,7 @@
 //   that is no real folder), with the costliest such runner's rate, a Linux minute 1, a Windows one
 //   2, a macOS one 10, which is printed and weighed against no allowance;
 // - which agent tools built the last 30 merged pull requests and which reviewed them (tools-read.mjs: the owner's own
-//   pull requests and the closing attribution line, a bot's review named by its login), a tool that builds counting as short for reviewing too, its
+//   pull requests and the closing attribution line, a tool's own bot's pull request by its login, a bot's review named by its login), a tool that builds counting as short for reviewing too, its
 //   allowance being the one the owner works from; a name is taken only where it is a tool the core knows
 //   (staged-tools.json) or a bot's login of the plain form, and any other is passed over as not read;
 // - which reviews start by themselves: a bot's review on a pull request where no comment asked one by mention;

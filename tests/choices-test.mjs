@@ -1,17 +1,12 @@
-// Tests of the records of the choices that are hard to undo (choices.mjs): where a project keeps them, what a record
-// holds, when their pass is due, a sign written in a measure, and the scheduled look's readers of them. git and Node's
-// own modules.
+// Tests of the records of the choices that are hard to undo as every reader reads them (choices-records.mjs, with the
+// script choices.mjs that runs them; #912): where a project keeps them, what a record holds and the conditions a line
+// "Trips when:" names. git and Node's own modules.
 //
 //   node tests/choices-test.mjs
-import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ARGUED, UNREAD, DAYS, KIT, LINK, LISTED, MEASURES, MOST, TITLE, TRIPPED, argued, atCommit, baseRecords, checkOf, due, look, parse, records, report, signs, tripped, trippedBody, where } from "../scripts/choices.mjs";
-import { CORE } from "../scripts/core-address.mjs";
-import { DUE } from "../scripts/look.mjs";
-import { mended } from "../scripts/mend.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { KIT, parse, where } from "../scripts/choices-records.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -26,7 +21,6 @@ ok(where("| *choice records* | `../elsewhere.md` |") === null && where("| *choic
 ok(where(fs.readFileSync(path.join(here, "..", "AGENTS.md"), "utf8")) === "CHOICES.md", "the core names its own records");
 
 // ---- what a record holds ----
-const at = day => `${day}T12:00:00Z`;
 const file = day => `# Choices that are hard to undo\n\nRead whole: ${day}\n\n## Choice: one language\n\n- Chosen for: x.\n- Reopens it: a test takes over a minute.\n\n## Choice: where data is kept\r\n\r\n- Chosen for: y.\r\n\r\n## Notes\n\nReopens it: not this record's.\n`;
 const found = parse(file("2026-11-15"));
 ok(found.records.length === 2 && found.records[0].name === "one language" && found.records[0].sign && !found.records[1].sign,
@@ -36,72 +30,6 @@ ok(parse("## Choice: a\nReopens it:\n").records[0].sign === false, "an empty sig
 ok(parse("Read whole: FILL IN: today\n## Choice: a\nReopens it: FILL IN: the sign\n").open === 2 && parse("Read whole: soon\n").read === null && parse("Read whole: 2026-13-45\n").read === null,
   "a line still to fill in is counted, and a day that is no day is none");
 ok(parse("## Choice: a\u0007b\n").records[0].name === "a b" && parse("## Choice: a\u202eb\u200bc\n").records[0].name === "a b c", "a name is printed with no control characters, nor any that reorder or hide text");
-const kitText = fs.readFileSync(path.join(here, "..", "setup", "template", "choices.md.tmpl"), "utf8");
-ok(parse(kitText).records.length === 0 && parse(kitText).open > 0 && due(parse(kitText), at("2030-01-01")) === null,
-  "the starter kit's file, its record still to fill in, holds no record yet, so no pass is due in a new project");
-
-// ---- when the pass is due ----
-ok(due(parse("Read whole: 2020-01-01\n"), at("2026-11-15")) === null, "with no record, no pass is due");
-ok(due(found, at("2027-05-15")) === null, `${DAYS - 1} days after the last pass, it is not due`);
-ok(/2026-11-15, 182 days before 2027-05-16/.test(due(found, at("2027-05-16")) ?? ""), "182 days after the last pass, it is due, and says why");
-ok(/holds no day/.test(due(parse("## Choice: a\n"), at("2026-11-15")) ?? ""), "records whose pass has no day are due");
-
-// ---- the look's reader ----
-const tmp = scratchDir("choices-");
-const project = (name, files) => {
-  const dir = path.join(tmp, name);
-  for (const [f, t] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), t); }
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
-};
-ok(DUE.includes(look), "the scheduled look reads it");
-const none = look({ manifest: "", at: at("2027-06-01"), root: project("none", {}) });
-ok(none.title === TITLE && none.body === null && !none.unread, "with no records file, nothing is due, so an issue the look keeps for it closes");
-const kit = project("kit", { "docs/choices.md": file("2026-11-15") });
-ok(look({ manifest: "", at: at("2027-01-01"), root: kit }).body === null, "records read less than half a year ago: nothing due");
-const body = look({ manifest: "", at: at("2027-06-01"), root: kit }).body ?? "";
-ok(/`docs\/choices\.md` holds 2 records/.test(body) && /1 of them name no sign/.test(body) && /`node core\/scripts\/choices\.mjs`/.test(body) && /core\/tasks\/choices\.md/.test(body) && /needs-owner/.test(body),
-  "once due in a project, its issue names the file, the records, those with no sign, the rule and the script", body);
-const named = project("named", { "design.md": file("2026-01-01") });
-ok(/`design\.md` holds 2/.test(look({ manifest: "| *choice records* | `design.md` |", at: at("2027-06-01"), root: named }).body ?? ""), "the file the manifest names is read");
-const core = project("core", { "AGENTS.md": "the *choice records*: `CHOICES.md`;", "CHOICES.md": file("2026-01-01") });
-const ofCore = look({ manifest: null, at: at("2027-06-01"), root: core }).body ?? "";
-ok(/`CHOICES\.md`/.test(ofCore) && /`node scripts\/choices\.mjs`/.test(ofCore) && /`tasks\/choices\.md`/.test(ofCore), "in the core, its AGENTS.md names the file and the paths are the core's own", ofCore);
-ok(!/INVENTORY\.md/.test(ofCore) && !/INVENTORY\.md/.test(body), "where no inventory stands, the pass asks nothing of one");
-fs.writeFileSync(path.join(kit, "INVENTORY.md"), "# A project's own list\n");
-ok(!/INVENTORY\.md/.test(look({ manifest: "", at: at("2027-06-01"), root: kit }).body ?? ""), "a project with a file of that name is asked nothing of it: the question is the core's own");
-fs.writeFileSync(path.join(core, "INVENTORY.md"), "# The core's parts\n\nWeighed whole: 2026-11-17\n");
-const withInventory = look({ manifest: null, at: at("2027-06-01"), root: core }).body ?? "";
-ok(/`INVENTORY\.md` marks keep or try/.test(withInventory) && /"Weighed whole:"/.test(withInventory) && /A part is asked again/.test(withInventory),
-  "in the core, where its inventory stands, the pass asks of each part kept or tried whether something maintained now does it");
-const linked = project("linked", { "real.md": file("2020-01-01") });
-fs.mkdirSync(path.join(linked, "docs"), { recursive: true });
-let link = true;
-try { fs.symlinkSync(path.join(linked, "real.md"), path.join(linked, "docs", "choices.md")); } catch { link = false; }
-if (link) {
-  const r = look({ manifest: "", at: at("2027-06-01"), root: linked });
-  ok(r.body === null && /no regular file/.test(r.unread ?? ""), "a link is not followed: the look leaves its issue as it stands", JSON.stringify(r));
-  const folder = project("folder", { "elsewhere/choices.md": file("2020-01-01") });
-  fs.symlinkSync(path.join(folder, "elsewhere"), path.join(folder, "docs"));
-  const f = look({ manifest: "", at: at("2027-06-01"), root: folder });
-  ok(f.body === null && /a link stands on its way/.test(f.unread ?? ""), "nor is a link at a folder on the file's way", JSON.stringify(f));
-} else console.log("note no link can be made here, so a link's case is not run");
-const outside = look({ manifest: "| *choice records* | `../kit/docs/choices.md` |", at: at("2027-06-01"), root: kit });
-ok(outside.body === null && /no plain path/.test(outside.unread ?? ""), "a name outside the project is not read");
-ok(records("", path.join(tmp, "none")).text === null, "a missing file reads as none, not as unread");
-const large = project("large", { "docs/choices.md": `${file("2020-01-01")}${"x".repeat(MOST)}` });
-ok(/past \d+ bytes/.test(records("", large).unread ?? ""), "a file past the most it reads is not read");
-
-// ---- the script ----
-const run = dir => spawnSync(process.execPath, [path.join(here, "choices.mjs")], { cwd: dir, encoding: "utf8" });
-let r = run(kit);
-ok(r.status === 0 && /`docs\/choices\.md`: 2 records, read whole on 2026-11-15/.test(r.stdout) && /- where data is kept: names no sign/.test(r.stdout), "it lists the records from a project's root", r.stdout + r.stderr);
-fs.writeFileSync(path.join(kit, "core-manifest.md"), "| *choice records* | `../x.md` |\n");
-r = run(kit);
-ok(r.status === 1 && /Mend: name a regular file inside the project/.test(r.stderr), "where the records cannot be read, it fails and says the mend", r.stderr);
-r = run(path.join(here, ".."));
-ok(r.status === 0 && /`CHOICES\.md`: \d+ records, read whole on \d{4}-\d\d-\d\d/.test(r.stdout) && !/names no sign/.test(r.stdout), "the core's own records each name their sign and the day of their pass", r.stdout + r.stderr);
-
 // ---- a sign written in a measure ----
 const lines = parse("## Choice: a\n- Reopens it: past 150 files.\n- Trips when: `files > 150`, `cycles>=1`, `constructor > 1`, `rm -rf /`, `files > 1e9`\n## Choice: b\nTrips when: when it feels slow\n## Choice: c\n").records;
 ok(JSON.stringify(lines[0].conditions) === JSON.stringify([{ measure: "files", op: ">", limit: 150 }, { measure: "cycles", op: ">=", limit: 1 }])
@@ -109,181 +37,6 @@ ok(JSON.stringify(lines[0].conditions) === JSON.stringify([{ measure: "files", o
   "a line \"Trips when:\" gives each condition in backticks that names a measure, an operator and a number; anything else is only quoted back, never run", JSON.stringify(lines[0]));
 ok(lines[1].conditions.length === 0 && lines[1].unknown.join() === "when it feels slow" && lines[2].conditions.length === 0 && lines[2].unknown.length === 0,
   "a line with no condition in backticks is quoted back as naming none, and a record with no such line names none");
-const reads = { listed: 4, read: 200, found: { read: { files: 151, functions: 150, imports: 50, unnamed: 0 }, entries: new Map([["cycle: a.js -> b.js", true], ["function: a.js#f", {}]]) } };
-ok(JSON.stringify(Object.fromEntries(Object.entries(MEASURES).map(([k, [, of]]) => [k, of(reads)]))) === JSON.stringify({ files: 151, functions: 150, imports: 50, listed: 4, debt: 2, cycles: 1, unnamed: 0 }),
-  "each measure is read from what the shape check reads");
-const thin = { ...reads, listed: 1, read: 3000 };
-ok(MEASURES.debt[1](thin) > 0 && tripped(parse("## Choice: a\nTrips when: `debt > 0`\n"), thin).length === 1 && /reads 0\.033 the share/.test(trippedBody("d.md", tripped(parse("## Choice: a\nTrips when: `debt > 0`\n"), thin), parse(""), "")),
-  "a share is compared exact, and only shown rounded: one breach in 3000 trips debt > 0");
-ok(JSON.stringify(tripped(parse("## Choice: a\nTrips when: `files > 150`, `files > 151`, `debt <= 2`\n"), reads).map(c => `${c.measure}${c.op}${c.limit}=${c.value}`)) === JSON.stringify(["files>150=151", "debt<=2=2"]),
-  "a condition trips where the number read holds it, and only then");
-const measuredProject = scratchDir("choices-measured-");
-const g = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: measuredProject, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-const putIn = (f, t) => { fs.mkdirSync(path.dirname(path.join(measuredProject, f)), { recursive: true }); fs.writeFileSync(path.join(measuredProject, f), t); };
-const sign = cond => `Read whole: 2026-11-15\n\n## Choice: one \`folder\` @someone\n\n- Reopens it: the folder grows.\n- Trips when: ${cond}\n`;
-g("init", "-q", "-b", "main");
-putIn("src/a.js", "import { b } from \"./b.js\";\nexport const a = () => b;\n");
-putIn("src/b.js", "export const b = 1;\n");
-putIn("docs/choices.md", sign("`files > 1`, `unknown > 2`"));
-const pendingSigns = signs({ manifest: "", root: measuredProject });
-ok(pendingSigns.title === TRIPPED && pendingSigns.body === null && /no config here/.test(pendingSigns.unread ?? ""), "with no config of the shape check, a measure cannot be read: the look leaves its issue as it stands", JSON.stringify(pendingSigns));
-putIn("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"] }));
-spawnSync(process.execPath, [path.join(here, "shape.mjs"), "checks/shape.json", "--first"], { cwd: measuredProject, encoding: "utf8" });
-g("add", "-A"); g("commit", "-q", "-m", "a project");
-const trip = signs({ manifest: "", root: measuredProject });
-ok(/`docs\/choices\.md`/.test(trip.body ?? "") && /- `one 'folder' @someone`: `files > 1`, and it reads 2 files of code the shape check reads\./.test(trip.body) && /`unknown > 2`/.test(trip.body)
-  && /needs-owner in place of queued/.test(trip.body) && /`core\/tasks\/choices\.md`/.test(trip.body) && /`node core\/scripts\/choices\.mjs`/.test(trip.body) && trip.owner === undefined,
-  "where a condition holds, the look keeps an issue naming the choice in a code span, the condition, the number read, what names no measure, and what its session does; its labels are the session's to change", trip.body);
-putIn("docs/choices.md", sign("`files > 2`"));
-ok(signs({ manifest: "", root: measuredProject }).body === null && !signs({ manifest: "", root: measuredProject }).unread, "once no condition holds (the sign written anew), the look closes the issue");
-putIn("docs/choices.md", sign("`cycles > 0`"));
-putIn("src/b.js", "import { a } from \"./a.js\";\nexport const b = 1;\nexport const c = () => a;\n");
-ok(/`cycles > 0`, and it reads 2 imports that lie on a cycle/.test(signs({ manifest: "", root: measuredProject }).body ?? ""), "a cycle the code holds now trips a sign that names cycles");
-ok(/trips when: cycles > 0 \(2 now: it holds\)/.test(report(records("", measuredProject), at("2026-11-16"), { ...reads, found: { ...reads.found, entries: new Map([["cycle: x", true], ["cycle: y", true]]) } })),
-  "the script prints each condition with the number it reads, and whether it holds");
-putIn("docs/choices.md", sign("`fiels > 150`"));
-const typo = signs({ manifest: "", root: measuredProject });
-ok(/names what is no measure the look reads/.test(typo.body ?? "") && /`fiels > 150`/.test(typo.body) && /mended in a pull request/.test(typo.body) && !/fresh record/.test(typo.body),
-  "a line \"Trips when:\" that names no measure keeps the issue open the day it stands, with its mend, so a typo is never a sign silently unread", typo.body);
-putIn("docs/choices.md", sign("`cycles > 0`"));
-putIn("checks/shape.json", "{");
-ok(signs({ manifest: "", root: measuredProject }).body === null && /the shape check could not be read/.test(signs({ manifest: "", root: measuredProject }).unread ?? ""), "a config that cannot be read leaves the issue as it stands");
-putIn("docs/choices.md", "## Choice: a\n- Reopens it: x.\n");
-ok(signs({ manifest: "", root: measuredProject }).body === null && !signs({ manifest: "", root: measuredProject }).unread, "records that name no measure are not read against the shape check at all");
-putIn("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["lib"] }));
-putIn("docs/choices.md", sign("`files > 0`"));
-ok(signs({ manifest: "", root: measuredProject }).body === null && /reads no file of code here/.test(signs({ manifest: "", root: measuredProject }).unread ?? ""),
-  "where the shape check reads no file of code (a project in another language), a measure is said unread, never a sign that silently cannot trip");
-fs.rmSync(measuredProject, { recursive: true, force: true });
-const many = parse(Array.from({ length: 5000 }, (_, i) => `## Choice: c${i}\nTrips when: \`files > 1\`, \`nothing > 1\`\n`).join(""));
-const long = trippedBody("docs/choices.md", tripped(many, reads), many, "core/");
-ok(long.length < 20000 && long.split("\n").filter(l => l.startsWith("- `c")).length === 2 * LISTED && /- and 4970 more: `node core\/scripts\/choices\.mjs` lists them/.test(long),
-  "however many a file holds, the issue lists a few of each and counts the rest, far under GitHub's limit on a body", `${long.length}`);
-const wide = parse(Array.from({ length: 40 }, (_, i) => `## Choice: ${"n".repeat(118)}${i}\nTrips when: \`files > 1\`, ${Array.from({ length: 40 }, () => `\`${"x".repeat(118)}\``).join(", ")}\n`).join(""));
-const widest = trippedBody("docs/choices.md", tripped(wide, reads), wide, "core/");
-ok(widest.length < 30000 && /, and 37 more/.test(widest), "nor does a file of long names and long lines of what names no measure take the body past it", `${widest.length}`);
-ok(DUE.includes(signs), "the scheduled look reads the signs too");
-const ownSigns = signs({ manifest: null, root: path.join(here, "..") });
-const ownRecords = parse(records(fs.readFileSync(path.join(here, "..", "AGENTS.md"), "utf8"), path.join(here, "..")).text ?? ""); // (the core's records, from the file its AGENTS.md names and the folder that file names)
-ok(!ownSigns.unread && ownRecords.records.some(rec => rec.conditions.length) && ownRecords.records.every(rec => !rec.unknown.length),
-  "the core's own records name a measure the look reads, and every condition they write reads (whether one holds is the look's to say, never a test's: a sign that trips fails no pull request)", JSON.stringify(ownSigns));
-
-// ---- argued on its lines (#515) ----
-const full = "## Choice: full\n- Looked for: none found, in the registry and the web.\n- **The blind pick:** the same.\nThe judgment: it stands.\n- Reopens it: x.\n";
-const half = "## Choice: half\n- The blind pick: another.\n- Looked for:\n- Reopens it: x.\n";
-ok(parse(full).records[0].lacks.length === 0 && parse(half).records[0].lacks.join() === "Looked for:,The judgment:" && parse("## Choice: n\n").records[0].lacks.join() === ARGUED.join(),
-  "a record is read for each line it is argued on, as a list item, bold or plain, and an empty line is none", JSON.stringify(parse(half).records));
-const longHead = `## Choice: ${"the project's foundations, ".repeat(5)}judged again as if written today\n- The suggestion: #3\n`;
-ok(parse(longHead).records[0].today && parse(longHead).records[0].name.length <= 120 && !parse("## Choice: judged again as if written today, not\n").records[0].today,
-  "a heading past the printed length is still read whole for its ending, and one that does not end so is not");
-const emptyBold = parse("## Choice: e\n- **Looked for:**\n- **The blind pick:**  \n- **The judgment:** *none found*\n- **The suggestion:** #4\n").records[0];
-ok(emptyBold.lacks.join() === "Looked for:,The blind pick:" && emptyBold.suggestion === "#4", "a bold label with nothing after it is no line, and one with content is, its content opening with an asterisk too", JSON.stringify(emptyBold));
-ok(parse("## Choice: q\nSee: The judgment: elsewhere.\n## Choice: r\nThe judgment: x\n").records[0].lacks.includes("The judgment:"), "a line is read only where it opens so, and under its own record");
-const old = `## Choice: old\n- Reopens it: x.\n\n${full}`;
-const both = argued(`${old}\n${half}`, old);
-ok(both.failed.map(r => r.name).join() === "half" && both.listed.map(r => r.name).join() === "old", "a record the change adds that lacks a line fails; one that stood before is listed, never failed", JSON.stringify(both));
-const made = "## Choice: made\n- Stood before: chosen at the start, in 2025.\n- Reopens it: x.\n";
-ok(argued(`${old}\n${made}`, old).failed.length === 0 && argued(`${old}\n${made}`, old).listed.map(r => r.name).join() === "old,made", "a record of a choice already made is listed, never failed");
-ok(argued(`${old}\n${half}`, null).failed.length === 2 && argued(full, null).failed.length === 0, "where the base held no records, each record is the change's own");
-// the check from the command line, on a project's history
-const hist = scratchDir("choices-argued-");
-const h = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: hist, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-const put = text => { fs.mkdirSync(path.join(hist, "docs"), { recursive: true }); fs.writeFileSync(path.join(hist, "docs/choices.md"), text); h("add", "-A"); h("commit", "-q", "-m", "records"); return h("rev-parse", "HEAD").trim(); };
-h("init", "-q", "-b", "main");
-fs.writeFileSync(path.join(hist, "README.md"), "# p\n"); h("add", "-A"); h("commit", "-q", "-m", "start");
-const empty = h("rev-parse", "HEAD").trim();
-const base = put(old);
-const check = (b, cwd = hist) => { const r = spawnSync(process.execPath, [path.join(here, "choices.mjs")], { cwd, encoding: "utf8", env: { ...process.env, CHOICES_BASE: b } }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
-let c = check(base);
-ok(c.status === 0 && /listed, not failed: "old"/.test(c.out) && !/FAIL/.test(c.out), "the records as they stood pass, an old one lacking its lines listed", c.out);
-put(`${old}\n${half}`);
-c = check(base);
-ok(c.status === 1 && /FAIL: `docs\/choices\.md`: the record "half", which this change adds, is argued on no line that opens "Looked for:", "The judgment:"/.test(c.out) && mended(c.out), "a record a change adds without its lines fails, saying its mend", c.out);
-c = check(empty);
-ok(c.status === 1 && (c.out.match(/^FAIL/gm) ?? []).length === 2, "a base with no records file: each record lacking a line is the change's own", c.out);
-c = check("");
-ok(c.status === 0 && /No base to compare with/.test(c.out) && /listed, not failed: "half"/.test(c.out), "with no base, as on a push to main, nothing fails and each is listed", c.out);
-c = check("no-such-commit");
-ok(c.status === 0 && /no-such-commit is no commit here/.test(c.out), "a base that is no commit here fails nothing of this check's (the copies part fails the base itself)", c.out);
-ok(atCommit(base, "docs/choices.md", hist) === old && atCommit(empty, "docs/choices.md", hist) === null && atCommit("nowhere", "docs/choices.md", hist) === undefined && atCommit("--output=x", "docs/choices.md", hist) === undefined,
-  "a file is read at a commit, as none where the commit lacks it, and as nothing where there is no such commit");
-ok(checkOf({ file: "docs/choices.md", unread: "a link" }, base, hist)[1] === true && mended(checkOf({ file: "docs/choices.md", unread: "a link" }, base, hist)[0].join("\n"))
-  && checkOf({ file: "docs/choices.md", unread: "a link" }, empty, hist)[1] === false && checkOf({ file: "docs/choices.md", text: null }, base, hist)[1] === false,
-  "records the change makes unreadable fail, saying the mend; ones unreadable at the base as well, or none at all, fail nothing");
-// records moved with the slot that names them, in one change: the base's records are read where the base's rules put them
-fs.writeFileSync(path.join(hist, "core-manifest.md"), "| *choice records* | `docs/choices.md` |\n"); h("add", "-A"); h("commit", "-q", "-m", "a manifest");
-const slotted = h("rev-parse", "HEAD").trim();
-fs.renameSync(path.join(hist, "docs/choices.md"), path.join(hist, "records.md"));
-fs.writeFileSync(path.join(hist, "core-manifest.md"), "| *choice records* | `records.md` |\n");
-c = check(slotted);
-ok(c.status === 0 && /listed, not failed: "old"/.test(c.out) && /listed, not failed: "half"/.test(c.out) && !/FAIL/.test(c.out), "records moved to the path the change names are read at the base where the base named them, and stay listed", c.out);
-ok(baseRecords(slotted, hist) === `${old}\n${half}` && baseRecords(empty, hist) === null && baseRecords("nowhere", hist) === undefined, "the base's records are its own slot's, none where it held none, and nothing where there is no such commit");
-// a records file that was a link at the base stays unread there, so nothing in it fails
-fs.writeFileSync(path.join(hist, "target.md"), half); fs.rmSync(path.join(hist, "records.md")); fs.symlinkSync("target.md", path.join(hist, "records.md"));
-h("add", "-A"); h("commit", "-q", "-m", "a link"); const linkedAt = h("rev-parse", "HEAD").trim();
-ok(atCommit(linkedAt, "records.md", hist) === LINK && atCommit(linkedAt, "target.md", hist) === half && baseRecords(linkedAt, hist) === LINK, "a file that is a link at a commit is not read there, and reads as a link, apart from no commit, and a file is read (#541)");
-const madeFile = checkOf({ file: "records.md", text: half }, linkedAt, hist);
-ok(checkOf({ file: "records.md", unread: "a link" }, linkedAt, hist)[1] === false && madeFile[1] === false && /^The base held the records as a link, which is not read, so no record/.test(madeFile[0][0]) && !/no commit here/.test(madeFile[0].join("\n")) && /listed, not failed: "half"/.test(madeFile[0].join("\n")),
-  "records that were a link at the base fail nothing, still a link or made a file, each listed, and the line says the base held a link", madeFile[0].join("\n"));
-// the manifest a link at the base: where it put the records is not read, so they read as a link too
-fs.renameSync(path.join(hist, "core-manifest.md"), path.join(hist, "manifest-target.md")); fs.symlinkSync("manifest-target.md", path.join(hist, "core-manifest.md"));
-h("add", "-A"); h("commit", "-q", "-m", "a linked manifest"); const manifestLinked = h("rev-parse", "HEAD").trim();
-ok(baseRecords(manifestLinked, hist) === LINK && /^The base held the records as a link/.test(checkOf({ file: "records.md", text: half }, manifestLinked, hist)[0][0]), "and so do records named by a manifest that was a link at the base");
-fs.rmSync(hist, { recursive: true, force: true });
-// the two cases a link must not reach (#541's review): an AGENTS.md that is a link, where no manifest names the records,
-// still has them read at the kit's path, so an unargued record the change adds fails; and records under a folder that
-// was a link at the base read as a link, so the records that stood there are listed, not failed
-const repo = (files, links = {}) => {
-  const dir = scratchDir("choices-link-");
-  const g = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-  g("init", "-q", "-b", "main");
-  for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
-  for (const [f, to] of Object.entries(links)) fs.symlinkSync(to, path.join(dir, f));
-  g("add", "-A"); g("commit", "-q", "-m", "base");
-  return { dir, at: g("rev-parse", "HEAD").trim() };
-};
-if (link) {
-  const agents = repo({ "CLAUDE.md": "# rules\n", "docs/choices.md": old }, { "AGENTS.md": "CLAUDE.md" });
-  const added = checkOf({ file: "docs/choices.md", text: `${old}\n${half}` }, agents.at, agents.dir);
-  ok(baseRecords(agents.at, agents.dir) === old && added[1] === true && /FAIL: `docs\/choices\.md`: the record "half", which this change adds/.test(added[0].join("\n")),
-    "an AGENTS.md that is a link at the base, with no manifest, leaves the records read at the kit's path, and an unargued record the change adds fails", added[0].join("\n"));
-  const folder = repo({ "real/choices.md": old }, { docs: "real" });
-  const moved = checkOf({ file: "docs/choices.md", text: old }, folder.at, folder.dir);
-  ok(atCommit(folder.at, "docs/choices.md", folder.dir) === LINK && moved[1] === false && /^The base held the records as a link/.test(moved[0][0]) && /listed, not failed: "old"/.test(moved[0].join("\n")),
-    "records under a folder that was a link at the base read as a link, and those that stood there are listed, not failed", moved[0].join("\n"));
-  for (const r of [agents, folder]) fs.rmSync(r.dir, { recursive: true, force: true });
-}
-
-fs.rmSync(tmp, { recursive: true, force: true });
-{
-  // (in a history of its own, so the cases above keep theirs)
-  const hist2 = scratchDir("choices-stack-");
-  const h2 = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: hist2, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-  const put2 = text => { fs.mkdirSync(path.join(hist2, "docs"), { recursive: true }); fs.writeFileSync(path.join(hist2, "docs/choices.md"), text); h2("add", "-A"); h2("commit", "-q", "-m", "records"); return h2("rev-parse", "HEAD").trim(); };
-  h2("init", "-q", "-b", "main");
-  const base2 = put2(old);
-  const check2 = b => check(b, hist2);
-  // (a stack's record the change adds closes with what the core cannot read in it, each gap's issue named, or "none";
-  // one that stood is no task; #486)
-  const stack = full.replace(/^## Choice: [^\n]*/mu, "## Choice: the project's stack, Rust and Bevy");
-  const fails = (text, why) => { put2(text); const r = check2(base2); ok(r.status === 1 && new RegExp(`a choice of stack this change adds, does not close with a line that opens "${UNREAD}" and names an issue or says "none"`).test(r.out) && mended(r.out), why, r.out); };
-  const passes = (text, why) => { put2(text); const r = check2(base2); ok(r.status === 0, why, r.out); };
-  fails(`${old}\n${stack}`, "a stack's record a change adds without what the core cannot read in it fails, saying its mend");
-  fails(`${old}\n${stack}\n- ${UNREAD} the shape check and the copies check read no Rust yet.\n`, "and so does one whose line names no issue for its gaps");
-  fails(`${old}\n${stack}\n- ${UNREAD} none.\n\nA last paragraph.\n`, "and one whose line is not its last");
-  passes(`${old}\n${stack}\n- ${UNREAD} the shape check and the copies check read no Rust yet: ${CORE}#900, ${CORE}#901.\n`, "with its line naming each gap's issue, it passes");
-  passes(`${old}\n${stack}\n- **${UNREAD}** https://github.com/${CORE}/issues/900\n`, "and so with an issue's address");
-  passes(`${old}\n${stack}\n- ${UNREAD} "none".\n`, "and with \"none\" where the core reads the stack whole");
-  const stood = `${old}\n${stack}`, stoodAt = put2(stood);
-  put2(`${stood}\n`);
-  ok(check2(stoodAt).status === 0 && argued(stood, stood).gapless.length === 0, "a stack's record that stood before is never failed for the line");
-  ok(argued(`${old}\n${full}`, old).gapless.length === 0, "a record of another choice is asked nothing of the line");
-  const recorded = `## Choice: the project's stack\n\nStood before: 2020-01-01\n`;
-  ok(argued(recorded, "").gapless.length === 1, "a stack's record of a choice already made, as a first audit writes it, is asked the line all the same");
-  fails(`${old}\n${recorded}`, "and the check fails it without the line, saying its mend");
-  passes(`${old}\n${recorded}- ${UNREAD} none.\n`, "and passes it with the line");
-  fs.rmSync(hist2, { recursive: true, force: true });
-}
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;
