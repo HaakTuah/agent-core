@@ -5,17 +5,16 @@
 //   node tests/work-saved-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
 const command = mode => `bash -c 'f=$(git -C "\${CLAUDE_PROJECT_DIR:-.}" --no-replace-objects show refs/remotes/origin/main:core/scripts/work-saved.sh 2>/dev/null) || exit 0; bash -c "$f" work-saved ${mode}'`;
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "work-saved-test-"));
+const tmp = scratchDir("work-saved-test-");
 const project = path.join(tmp, "project"), remote = path.join(tmp, "remote.git"), bare = path.join(tmp, "bare");
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 // (git's own variables that point at a repository are left out, so every call here lands in the scratch project,
 // whatever the run was started from)
 const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));

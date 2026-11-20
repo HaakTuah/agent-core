@@ -8,12 +8,12 @@
 //   node tests/wait-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { body, countsFrom, pushWait } from "../scripts/state-report.mjs";
 import { billed, billedLine, latest, line, measure, median, selfHosted, waited } from "../scripts/wait.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -61,7 +61,7 @@ ok(billed([job(0, 2), secs(0, 61), secs(0, 0), job(0, 9, "success", "github-adva
 // (every attempt counts toward the bill, while the wait reads each check's latest)
 const again = [{ ...job(0, 4), name: "suite" }, { ...job(5, 7), name: "suite" }];
 ok(billed(again) === 6 && latest(again).length === 1 && latest(again)[0].started_at === again[1].started_at && waited(latest(again)) === 120, "a check run again is billed for both attempts, and the wait reads its latest", JSON.stringify(latest(again)));
-const tmpHost = fs.mkdtempSync(path.join(os.tmpdir(), "wait-test-"));
+const tmpHost = scratchDir("wait-test-");
 fs.mkdirSync(path.join(tmpHost, ".github", "workflows"), { recursive: true });
 fs.writeFileSync(path.join(tmpHost, ".github", "workflows", "a.yml"), "jobs:\n  a:\n    runs-on: ubuntu-latest\n");
 const plain = selfHosted(tmpHost);

@@ -5,11 +5,11 @@
 //   node tests/pointers-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { markdownReader } from "../scripts/markdown.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -27,7 +27,7 @@ const FILES = {
   "docs/developing.md": "# Developing\n\n## Running it\n\nAs \"Where things are\" in `AGENTS.md` says.\n",
 };
 function run(files, { installed = true } = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pointers-test-"));
+  const dir = scratchDir("pointers-test-");
   try {
     for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
     carry(path.join(dir, "core"));
@@ -83,7 +83,7 @@ r = run({ ...cites("As `core/modules/git.md`, \"Push once\", says, with `core/mo
 ok(r.code === 1 && /"push once" is no heading or bold lead-in/i.test(r.out) && /point 3: no such numbered point/.test(r.out) && /point 9: no such numbered point/.test(r.out), "and one that stands in neither place still fails, named");
 // an agent tool's files (#405): a broken pointer the pull request's base held there is noted and fails nothing, one it
 // did not hold fails, and with no base each is noted
-const tools = fs.mkdtempSync(path.join(os.tmpdir(), "pointers-test-tools-"));
+const tools = scratchDir("pointers-test-tools-");
 try {
   const put = (f, body) => { fs.mkdirSync(path.join(tools, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(tools, f), body); };
   const g = (...args) => execFileSync("git", args, { cwd: tools, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -129,7 +129,7 @@ try {
   ok(t.status === 0 && /own\.md:5/.test(t.out), "and once those lead somewhere, it passes, the old one noted", t.out);
   // (a file under a tool's folder whose link leads out of the project is not read: its pointers are no rule's)
   if (process.platform !== "win32") {
-    const away = fs.mkdtempSync(path.join(os.tmpdir(), "pointers-test-away-"));
+    const away = scratchDir("pointers-test-away-");
     fs.writeFileSync(path.join(away, "out.md"), "# Out\n\nAs `docs/nowhere.md` says.\n");
     fs.symlinkSync(path.join(away, "out.md"), path.join(tools, ".kiro/steering/out.md"));
     g("add", "-A");
@@ -150,7 +150,7 @@ try {
   }
 } finally { fs.rmSync(tools, { recursive: true, force: true }); }
 // the core's own run: there it fails
-const coreDir = fs.mkdtempSync(path.join(os.tmpdir(), "pointers-test-core-"));
+const coreDir = scratchDir("pointers-test-core-");
 try {
   const put = (f, text) => { fs.mkdirSync(path.join(coreDir, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(coreDir, f), text); };
   put("floor/security.md", "# The floor\n\n**1. Nothing secret.** As rule 1 says, and rule 10 (core archive 1).\n");

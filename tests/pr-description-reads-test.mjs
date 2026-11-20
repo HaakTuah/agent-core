@@ -3,11 +3,11 @@
 //   node tests/pr-description-reads-test.mjs
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { calledFor } from "../scripts/pr-reads.mjs";
 import { lineMend } from "../scripts/reading.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -15,8 +15,7 @@ const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); i
 // what a pull request's changed paths call for, in a scratch project: the merge commit against its base, the kinds of
 // the project's own paths as the base holds them, the copy's own paths left out
 {
-  const root = path.dirname(path.dirname(fileURLToPath(import.meta.url))), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pr-description-test-")), project = path.join(tmp, "project");
-  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const root = path.dirname(path.dirname(fileURLToPath(import.meta.url))), tmp = scratchDir("pr-description-test-"), project = path.join(tmp, "project");
   const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
   const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
   const git = (...args) => execFileSync("git", args, { cwd: project, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });

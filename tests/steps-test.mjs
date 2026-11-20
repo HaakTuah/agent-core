@@ -23,12 +23,12 @@ import { parseYaml, pathsLetThrough } from "../scripts/workflow-run.mjs";
 import { toolFilesRead, toolFilesState } from "../scripts/step-checks.mjs";
 import { COST, MOVED_GLOB, NEW_GLOBS, STEPS, Unread, configs, leads, moved, notDone, plain, project, report, runsOwn } from "../scripts/steps.mjs";
 import { READ_MOST } from "../scripts/own-files.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "steps-test-"));
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("steps-test-");
 const PIN = "a".repeat(40);
 // (a test that reads one step's answer asks for that step alone: the others' checks, the agent tools' files among them, which run
 // the copies and pointers checks on the whole project, answer nothing it reads, and a Windows runner pays for each)

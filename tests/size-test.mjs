@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { ghStandIn } from "../scripts/scratch-core.mjs";
+import { ghStandIn, scratchDir } from "../scripts/scratch-core.mjs";
 import { onPath, parseYaml } from "../scripts/workflow-run.mjs";
 import { CAPS, DUE_TITLE, QUEUE, answered, capsAt, capsOf, counted, due, judged, raised as raisedWith, rolesAt, whoseOf } from "../scripts/size.mjs";
 
@@ -85,14 +85,13 @@ ok(judged(past, { builder: 110 }, { builder: 120 }).fail.length === 1 && /which 
 { const lowered = [{ what: QUEUE.file, said: QUEUE.file, total: 6000, cap: 5 * 1024, kind: "queue" }], f = judged(lowered, { [QUEUE.file]: 6000 }, { [QUEUE.file]: 6 * 1024 }).fail[0];
   ok(mended(`FAIL: ${f}`) && /over its mark, which this change lowers from 6 KB to 5 KB\. Mend: set it back to 6 \* 1024, the base's mark/.test(f) && eq(Object.keys(capsAt("HEAD")).sort(), [...Object.keys(CAPS), QUEUE.file].sort()) && Object.values(capsAt("HEAD")).every(b => b > 0 && b % 1024 === 0) && eq(capsAt("--output=x"), {}), "the queue's mark lowered below what stands fails with its mend, and capsAt reads a cap for each role and the mark a revision sets, in whole KB, whatever the working tree holds, and nothing from a revision it refuses (the fallback reviewer's check of 94d700d)"); }
 ok(due({ manifest: "a project's manifest" }) === null, "the scheduled look keeps no such issue in a project");
-const here = process.cwd(), empty = fs.mkdtempSync(path.join(os.tmpdir(), "size-empty-"));
+const here = process.cwd(), empty = scratchDir("size-empty-");
 try { process.chdir(empty); ok(due({ manifest: null }) === null, "nor where no roles/ or queue stands to count"); } finally { process.chdir(here); fs.rmSync(empty, { recursive: true, force: true }); }
 const kept = due({ manifest: null });
 ok(kept.title === DUE_TITLE && (kept.body === null || /^- what the role \S+ reads at its start is \d+ bytes over its cap\.$/m.test(kept.body) || /^- QUEUE\.md is/m.test(kept.body)), "in the core it keeps the issue while a start or the queue stands past its cap, and closes it once none does", JSON.stringify(kept));
 
 // the script itself
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "size-test-"));
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("size-test-");
 const put = (name, text) => { const to = path.join(tmp, name); fs.writeFileSync(to, text); return to; };
 const run = (...args) => { const r = spawnSync(process.execPath, [file, ...args], { cwd: root, encoding: "utf8", env: { ...process.env, OWNER: "someone" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 const kb = Object.fromEntries(Object.entries(CAPS).map(([r, n]) => [r, n / 1024]));

@@ -3,20 +3,19 @@
 //   node tests/pr-description-yes-test.mjs
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { asking, coreAtBase, found, issuesOf, readable, textsOf, yesOf } from "../scripts/owner-yes.mjs";
 import { proven } from "../scripts/path-only.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
 
 // the owner's yes is not asked of a file whose change only follows a file moved whole (path-only.mjs; #886, point 1)
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pr-description-moved-"));
-  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const tmp = scratchDir("pr-description-moved-");
   const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
   const git = (...a) => execFileSync("git", a, { cwd: tmp, env, stdio: ["ignore", "pipe", "pipe"] }).toString();
   const write = (f, text) => { fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), text); };

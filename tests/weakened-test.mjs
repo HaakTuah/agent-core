@@ -6,10 +6,10 @@
 //   node tests/weakened-test.mjs
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
 import { ASSERT, LINE, SKIP, baseOf, changedMend, testsChanged, weakened } from "../scripts/weakened.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -70,8 +70,7 @@ ok(!mend.includes("test/stricter.test.mjs"), "an assertion only changed asks not
 ok(changedMend("", [{ file: "test/a\u001b[2J\u202e.mjs", asserts: ["x"], skips: [], weaker: true }]).includes("`test/a?[2J?.mjs`"), "a file's name is printed with no control or bidirectional character");
 
 // ---- a merge commit against its base, in a scratch repository ----
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "weakened-test-"));
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("weakened-test-");
 const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
 const git = (...a) => execFileSync("git", a, { cwd: tmp, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const put = (f, t) => { fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), t); };

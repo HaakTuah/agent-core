@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TESTS, fullRun } from "../scripts/release.mjs";
 import { FULL, NARROWED, WORKFLOW, fullLists, pick, run } from "../scripts/tests-parts.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -67,7 +68,7 @@ ok(/kitt/.test(refusals[2].refused) && /windows/.test(refusals[2].refused) && /f
   "a refusal names the word it could not use and what it may name");
 
 // ---- the script, as the workflow runs it (its command line, called beneath the process) ----
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tests-parts-"));
+const tmp = scratchDir("tests-parts-");
 try {
   const out = path.join(tmp, "output");
   fs.writeFileSync(out, "before=1\n");
