@@ -11,8 +11,8 @@
 // a changed file is no code the readers read and no test, a file that is gone, C# (whose types are reached by their
 // full names too, with no using directive), a script of the global space, or anything the config does not name
 // under "select.none" (the files no test reads), the whole suite runs, and so it does where no base is told (on main, on
-// a schedule, before a release), where the shape check's config cannot be read and where the files the change holds are
-// more than the readers take in time (hurry.mjs). A fault the whole suite finds that
+// a schedule, before a release), where the shape check's config cannot be read and where the files the change holds, or
+// the project's files all together, are more than the readers take in time (hurry.mjs). A fault the whole suite finds that
 // the selection left out is a fault of this map, mended at once.
 //
 // The config is the shape check's (shape.mjs, where()): its "code", "tests", "aliases" and "select" ({ "proof",
@@ -293,8 +293,8 @@ async function askHost(sha, check) {
   } catch (e) { return `the host could not be asked: ${String(e?.message ?? e).slice(0, 80)}`; }
 }
 
-// What the change from `from` selects, or the whole suite where the files it changes are too many or too slow to read
-// within the time rule 5 of SECURITY.md allows (hurry.mjs; #881).
+// What the change from `from` selects, or the whole suite where the files it changes, or the project's files all
+// together, are too many or too slow to read within the time rule 5 of SECURITY.md allows (hurry.mjs; #881, #962).
 function selectedFrom(from, { now, config, failed }) {
   const changed = changedSince(from), watch = hurry({ files: new Set(changed) });
   try { return selection({ changed, texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests, watch)), unread: unreadConftests(now.texts), failed, config, watch }); }

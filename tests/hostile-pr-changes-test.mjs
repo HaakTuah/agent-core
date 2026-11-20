@@ -237,6 +237,34 @@ together("long-name", "a file with a name of 254 characters and one of 3.8 milli
 together("csharp-three", "three files of C# at the largest its reader takes", Object.fromEntries([1, 2, 3].map(n => [`src/call${n}.cs`, SLOWEST["src/call.cs"](LARGEST.csharp)])));
 together("every-kind", "the densest file of each kind, all at once", Object.fromEntries(Object.entries(SLOWEST).map(([file, made]) => [file, made(largestOf(file))])));
 together("js-huge", "one file of JavaScript of 20 million characters", { "src/huge.js": SLOWEST["src/list.js"](20_000_000) });
+// (the project's own files, which a pull request leaves as they were, are read too, so a project's size is held as the
+// changed files are: one of 8.6 million characters of JavaScript still selects within 5 s, as the selection reads no
+// functions; one of 5.8 million of Python, whose imports only its parser reads, answers the whole suite at the whole run's
+// budget; each took past 5 s before; #962)
+const large = (key, what, files, change, said1) => {
+  git(p, "checkout", "-q", "-B", `sel-${key}-base`, MAIN);
+  for (const [file, text] of Object.entries(files)) write(file, text);
+  git(p, "add", "-A");
+  git(p, "commit", "-q", "-m", key);
+  const base = git(p, "rev-parse", "HEAD");
+  branch(`sel-${key}`, () => {});
+  git(p, "reset", "-q", "--hard", base);
+  change();
+  git(p, "commit", "-q", "-am", `${key}: the change`);
+  fs.writeFileSync(envFile, "");
+  const from = Date.now(), timed = spawnSync(process.execPath, [path.join(root, "scripts", "select.mjs"), "--env", "RUN"], { cwd: p, env: { ...env, SELECT_BASE: base, GITHUB_ENV: envFile }, encoding: "utf8", maxBuffer: 1 << 28, timeout: 5000 });
+  console.log(`     ${key}: ${Date.now() - from} ms`);
+  ok(timed.status === 0 && !raw(`${timed.stdout}${timed.stderr}`) && said() === said1, `select: ${what}, within 5 s`, `${timed.signal ?? ""}${timed.stderr}${said()}`);
+};
+const jsUnit = (i, j) => `export function f${i}x${j}(a, b) { return a > b ? [a, b].map(x => x * ${j}) : { a, b }; }\n`;
+large("own-js", "a project of 400 files of JavaScript, 8.6 million characters, one changed, selects the test that reaches it",
+  { ...Object.fromEntries(Array.from({ length: 400 }, (_, i) => [`src/big/f${i}.mjs`, Array.from({ length: 250 }, (_, j) => jsUnit(i, j)).join("")])), "test/big.test.mjs": 'import { f0x0 } from "../src/big/f0.mjs";\nconsole.log(f0x0(1, 2));\n' },
+  () => fs.appendFileSync(path.join(p, "src/big/f0.mjs"), "export const more = 1;\n"), "RUN= test/big.test.mjs \n");
+const pyUnit = j => `def f${j}(a, b=None):\n    if a > b:\n        return [x * ${j} for x in range(a)]\n    return {"a": a, "b": b}\n\n`;
+large("own-py", "a project of 500 files of Python, 5.8 million characters, one changed, past what can be read in time, runs the whole suite",
+  Object.fromEntries(Array.from({ length: 500 }, (_, i) => [`src/py/m${i}.py`, `import os\n\n${Array.from({ length: 110 }, (_, j) => pyUnit(j)).join("")}`])),
+  () => fs.appendFileSync(path.join(p, "src/py/m0.py"), "MORE = 1\n"), "RUN=all\n");
+branch("sel-after-large", () => {});
 // (one character more and the reader gives its grammar nothing: no functions told, so the shape check counts it lost)
 const past = { "src/list.py": t => readPython(t).functions, "src/list.js": t => javascriptFunctions("src/list.js", t), "src/nested.cs": t => readCsharp(t).functions };
 for (const [file, functions] of Object.entries(past)) {

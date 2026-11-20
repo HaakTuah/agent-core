@@ -436,13 +436,17 @@ function wrappedOnce(ctx) {
 // share the global space, which import nothing, and `unsure`, the files with an import whose target the readers cannot
 // follow, or whose imports they could not read (select.mjs). `tests` is the
 // set of the files that are tests: read for their imports, not held to the marks nor to the shared space. `watch`, where
-// given, is hurry.mjs's: it fails the reading of the files a pull request changes where they are too many to read in time.
+// given, is hurry.mjs's, the selection's: it fails the reading where the files a pull request changes, or the project's
+// files all together, are too many to read in time; the changed files are read first, and of JavaScript no functions,
+// which the selection does not use (#962), so the marks on functions are not held in what it finds.
 export function survey(texts, config, tests = new Set(), watch = null) {
   const code = Object.keys(texts).filter(isCode).sort();
   watch?.size(texts);
   const read = { files: code.length, functions: 0, imports: 0, jsx: 0, nowhere: 0, unnamed: 0, systems: Object.keys(config.systems).length, noEntrance: Object.values(config.systems).filter(s => !s.entrance).length };
   const timed = (file, read) => (watch ? watch.timed(file, read) : read());
-  const readings = code.map(file => { const r = timed(file, () => reading(file, texts[file])); r.marks = marksOf(config, r.comments); delete r.comments; return [file, r]; });
+  const readOne = file => { const r = reading(file, texts[file], { functions: !watch }); r.marks = marksOf(config, r.comments); delete r.comments; return r; };
+  const byFile = new Map((watch ? watch.first(code) : code).map(file => [file, timed(file, () => readOne(file))]));
+  const readings = code.map(file => [file, byFile.get(file)]);
   const idx = index(readings, texts), js = manifests(texts);
   const ctx = { config, tests, texts, unsure: new Set(), files: new Set(Object.keys(texts)), idx, packages: js.packages, ships: new Set([...js.ships, ...idx.ships]), declared: new Set([...js.declared, ...idx.declared]),
     entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map(), reached: new Map() };

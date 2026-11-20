@@ -168,7 +168,7 @@
       "why": "#943: the selection's rules apart from those of the suites' time and of the run of a tree that passed."
     },
     "tests/select-test.mjs": {
-      "mark": 29583,
+      "mark": 38574,
       "why": "#943: split as its script is: the matcher's cases, the host question's cases and the selection's."
     },
     "scripts/step-checks.mjs": {

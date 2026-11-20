@@ -13,7 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { Late, hurry } from "../scripts/hurry.mjs";
+import { ALL_MS, Late, hurry } from "../scripts/hurry.mjs";
 import { WORDS, mentioned, nameTrie } from "../scripts/name-trie.mjs";
 import { links, matcher, passedWhole, reached, selection } from "../scripts/select.mjs";
 import { parseConfig, survey } from "../scripts/shape.mjs";
@@ -73,8 +73,18 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
   const watch = () => hurry({ files: new Set(["src/rules.js", "src/view.js"]), ms: 100, characters: 50, now: () => clock });
   const slow = at => () => { clock += at; return "read"; };
   let w = watch();
-  ok(w.timed("src/rules.js", slow(60)) === "read" && w.timed("src/view.js", slow(40)) === "read" && w.timed("src/tool.js", slow(5000)) === "read",
-    "files read within the budget together, and a file the pull request leaves as it was, are read unwatched");
+  ok(w.timed("src/rules.js", slow(60)) === "read" && w.timed("src/view.js", slow(40)) === "read" && w.timed("src/tool.js", slow(3000)) === "read",
+    "files read within the budget together are read, and a file the pull request leaves as it was counts for none of the changed files' budget");
+  // (the project's own files count for the whole run's budget, from the watch's start: a project whose size alone is
+  // more than can be read in time runs the whole suite, as the linking does; #962)
+  w = watch();
+  ok(w.timed("src/tool.js", slow(ALL_MS)) === "read" && /project's files of code.*took 3501 ms, past the 3500 ms.*cannot be told in time/u.test(lateness(() => w.timed("src/other.js", slow(1)))),
+    "the project's own files, which the pull request leaves as they were, are read within the whole run's budget and stop the reading past it, saying why");
+  w = watch();
+  const whole = w.pace(1e9);
+  clock += ALL_MS + 1;
+  ok(/took 3501 ms, past the 3500 ms/u.test(lateness(whole)), "the linking stops too where the whole run, from the watch's start, has taken past its budget, though its own time is not spent");
+  ok(same(watch().first(["src/a.js", "src/rules.js", "src/b.js", "src/view.js"]), ["src/rules.js", "src/view.js", "src/a.js", "src/b.js"]), "the changed files are given first, each part in the order given");
   w = watch();
   w.timed("src/rules.js", slow(60));
   ok(/took 120 ms, past the 100 ms.*cannot be told in time/u.test(lateness(() => w.timed("src/view.js", slow(60)))), "changed files that take past the budget together stop the reading, saying why");
@@ -97,6 +107,21 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
     "reached asks its pace once a test and every 256 files taken off a queue, and reaches as it did where none is given", `${asked} asks`);
   const late = lateness(() => survey(texts, config, tests, hurry({ files: new Set(Object.keys(texts)), ms: -1 })));
   ok(late && /took \d+ ms, past the -1 ms/u.test(late), "the shape check's survey reads each changed file under the watch and fails where it is past", late);
+  const own = lateness(() => survey(texts, config, tests, hurry({ files: new Set(), all: -1 })));
+  ok(own && /project's files of code.*past the -1 ms/u.test(own), "the shape check's survey reads the project's own files under the whole run's budget and fails where it is past", own);
+  // (the selection reads the changed files first, so that one slow to read is read before the project's own spend the
+  // time, and of JavaScript no functions, its parser's work, which it does not use; what it reaches is the same)
+  const order = [], spy = { ...hurry({ files: new Set(["src/view.js", "test/view.test.js"]) }) };
+  const timedBy = spy.timed;
+  spy.timed = (file, read) => { order.push(file); return timedBy(file, read); };
+  const watched = survey({ ...texts, "src/tall.js": `export function tall() {\n${"  a();\n".repeat(80)}}\n` }, config, tests, spy);
+  const plain = survey({ ...texts, "src/tall.js": `export function tall() {\n${"  a();\n".repeat(80)}}\n` }, config, tests);
+  const asLists = m => JSON.stringify([...m].map(([f, to]) => [f, [...to].sort()]).sort());
+  const count = Object.keys(texts).filter(f => f.endsWith(".js")).length + 1, read = order.slice(0, count);
+  ok(same(read.slice(0, 2), ["src/view.js", "test/view.test.js"]) && new Set(read).size === count, "the survey under the watch reads the changed files first, then the project's own, each once", order.join(" "));
+  ok(asLists(watched.reach) === asLists(plain.reach) && same([...watched.unsure].sort(), [...plain.unsure].sort()) && same([...watched.scripts].sort(), [...plain.scripts].sort())
+    && [...plain.entries.keys()].some(id => id.startsWith("function: src/tall.js")) && ![...watched.entries.keys()].some(id => id.startsWith("function: ")) && watched.read.functions === 0,
+    "the survey under the watch reads no functions of JavaScript, and finds the same reach, unsure files and scripts as without it", [...plain.entries.keys()].join(" "));
 }
 
 {
