@@ -17,7 +17,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #772 | builder; `tests.yml` | #770 |
 | #629 | builder | #624 |
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
-| #579 | builder | |
 | #580 | builder | |
 | #582 | builder | |
 | #584 | rule builder | |
