@@ -11,8 +11,9 @@ export const CHARACTERS = 4_000_000;
 /** The most time, in milliseconds, the readers take over the changed files together: a file read after the budget is
  *  passed can take about 3 s more, so this keeps the readers within about 4.5 s, and the run stops there (`Late`). */
 export const SPENT_MS = 1500;
-/** The most time, in milliseconds, the selection takes to link each file to the files whose names it holds, after the
- *  readers: it grows with the files' count times their characters, about 0.7 s on the core's own 375 files. */
+/** The most time, in milliseconds, the selection takes to link each file to the files whose names it holds and to follow
+ *  those links from each test, after the readers: it grows with the files' count times their characters (and with the
+ *  tests' count times the links), about 0.7 s on the core's own 375 files. */
 export const LINKS_MS = 1500;
 
 /** Raised where the changed files are more than the selection allows to read; `message` says why the whole suite runs. */
@@ -24,10 +25,10 @@ export class Late extends Error {}
 export function hurry({ files, ms = SPENT_MS, characters = CHARACTERS, now = Date.now }) {
   let spent = 0;
   return {
-    // A check, called as each file is linked, that fails once the linking has taken past `ms` since this was asked.
+    // A check, called as the files are linked and the links followed, that fails once that has taken past `ms` since this was asked.
     pace(ms = LINKS_MS) {
       const from = now();
-      return () => { const took = now() - from; if (took > ms) throw new Late(`linking the files to the tests that reach them took ${took} ms, past the ${ms} ms the selection allows, so what each reaches cannot be told in time`); };
+      return () => { const took = now() - from; if (took > ms) throw new Late(`linking the files and following the links from the tests took ${took} ms, past the ${ms} ms the selection allows, so what each reaches cannot be told in time`); };
     },
     size(texts) {
       const n = Object.entries(texts).reduce((sum, [file, text]) => sum + (files.has(file) ? text.length : 0), 0);

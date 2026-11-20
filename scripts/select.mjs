@@ -146,12 +146,15 @@ export function links(texts, tests, reach, pace = () => {}) {
   return out;
 }
 
-// The files each test reaches, the test itself among them.
-export function reached(tests, linked) {
+// The files each test reaches, the test itself among them; `pace` is asked as the search goes (every 256 files taken off a
+// test's queue, so that many tests over many links take only the time the watch allows).
+export function reached(tests, linked, pace = () => {}) {
   const out = new Map();
+  let steps = 0;
   for (const t of tests) {
+    pace();
     const seen = new Set([t]), queue = [t];
-    while (queue.length) for (const next of linked.get(queue.pop()) ?? []) if (!seen.has(next)) { seen.add(next); queue.push(next); }
+    while (queue.length) { if (++steps % 256 === 0) pace(); for (const next of linked.get(queue.pop()) ?? []) if (!seen.has(next)) { seen.add(next); queue.push(next); } }
     out.set(t, seen);
   }
   return out;
@@ -163,7 +166,8 @@ export function reached(tests, linked) {
 export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), unread = [], failed = [], config, watch = null }) {
   const proof = matcher(config.select.proof), m = { whole: matcher(config.select.whole), none: matcher(config.select.none), isTest: matcher(config.tests) };
   const by = new Map(), add = (t, why) => { if (tests.has(t) && !by.has(t)) by.set(t, why); };
-  const reaches = reached(tests, links(texts, tests, reach, watch?.pace()));
+  const pace = watch?.pace(); // (one budget for the linking and the search from each test)
+  const reaches = reached(tests, links(texts, tests, reach, pace), pace);
   // (a test that reaches an import the readers cannot follow may reach any file: it runs as one that reaches every file)
   // (and, where pytest runs a conftest.py the config does not read, each test of Python, whose fixtures may come from it)
   const blind = new Set([...reaches].filter(([t, files]) => [...files].some(f => unsure.has(f)) || (t.endsWith(".py") && unread.some(c => c.endsWith("conftest.py")))).map(([t]) => t));

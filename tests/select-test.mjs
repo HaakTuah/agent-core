@@ -83,7 +83,17 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
   const pace = w.pace(50);
   clock += 40;
   ok(lateness(pace) === null && /took 60 ms, past the 50 ms/u.test(lateness(() => { clock += 20; pace(); })), "the linking of files is held to a time of its own, from when it is asked, and stops saying why");
-  ok(/past the 50 ms/u.test(lateness(() => { const slowPace = hurry({ files: new Set(), now: () => clock }).pace(50), t = clock; clock += 51; slowPace(); })) && links(texts, tests, reach, () => {}).size === Object.keys(texts).length, "links takes a pace, and links as it did where none is given");
+  // (the pace is asked inside the loops: once for each of 64 names and of 256 files taken off a queue, not once a file)
+  let asked = 0;
+  const many = Object.fromEntries(Array.from({ length: 200 }, (_, n) => [`src/m${n}.js`, `export const v = ${n};\n`])), manyTests = new Set(Object.keys(many).slice(0, 3));
+  const linkedMany = links(many, manyTests, new Map(), () => asked++);
+  ok(asked >= 200 + 200 * 3 && linkedMany.size === 200 && same([...links(texts, tests, reach)].map(([f, to]) => [f, [...to]]), [...links(texts, tests, reach, () => {})].map(([f, to]) => [f, [...to]])),
+    "links asks its pace once a file and every 64 names, and links as it did where no pace is given", `${asked} asks`);
+  asked = 0;
+  const chain = new Map(Array.from({ length: 1000 }, (_, n) => [`f${n}`, new Set([`f${n + 1}`])]));
+  reached(new Set(["f0", "f500"]), chain, () => asked++);
+  ok(asked >= 2 + 1500 / 256 - 1 && same([...reached(tests, linked)].map(([t, f]) => [t, [...f]]), [...reached(tests, linked, () => {})].map(([t, f]) => [t, [...f]])),
+    "reached asks its pace once a test and every 256 files taken off a queue, and reaches as it did where none is given", `${asked} asks`);
   const late = lateness(() => survey(texts, config, tests, hurry({ files: new Set(Object.keys(texts)), ms: -1 })));
   ok(late && /took \d+ ms, past the -1 ms/u.test(late), "the shape check's survey reads each changed file under the watch and fails where it is past", late);
 }
