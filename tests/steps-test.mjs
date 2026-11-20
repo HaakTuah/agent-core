@@ -141,7 +141,33 @@ function roundTrip(name, given, dir) {
   ok(!moduleNotes.length, `${name}: its manifest takes or leaves out each module, so the manifest check gives no note`, moduleNotes.join("\n"));
 }
 // (the same projects with the copy at another path, and the starter kit's own folder names read from it: #628)
-for (const [name, o, at] of [["a-vendored-npm-project", { packages: "." }, "vendor/core/"], ["a-vendored-dotnet-game", { nuget: "src", game: true }, "third_party/the-core/"]]) kit(name, o, { at });
+const vendored = {};
+for (const [name, o, at] of [["a-vendored-npm-project", { packages: "." }, "vendor/core/"], ["a-vendored-dotnet-game", { nuget: "src", game: true }, "third_party/the-core/"]]) vendored[name] = kit(name, o, { at });
+// (the steps that read a project's own run of the core's scripts read it at the copy's path: a mutation tool's strength
+// check, and the selection of the tests a change can reach with the name of the check that gates a tree that passed)
+{
+  const dir = vendored["a-vendored-npm-project"], manifest = path.join(dir, "core-manifest.md"), was = fs.readFileSync(manifest, "utf8");
+  const strong = STEPS.find(s => s.lead === "16 November 2026, how strong the tests are"), passed = STEPS.find(s => s.lead.endsWith("a tree that passed is not run again"));
+  const flow = path.join(dir, ".github/workflows/strength.yml"), select = path.join(dir, ".github/workflows/select.yml");
+  fs.writeFileSync(manifest, was.replace(/^\| \*mutation tool\* \|.*$/m, "| *mutation tool* | `node vendor/core/scripts/mutate.mjs --report {report} {lines}` |"));
+  const said = body => { fs.writeFileSync(flow, `name: strength\non:\n  pull_request:\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n${body}`); return notDone(dir, [strong])[0]?.mend ?? null; };
+  const bare = said("      - run: node vendor/core/scripts/strength.mjs\n"), runs = said("      - run: node vendor/core/scripts/strength.mjs\n        env:\n          STRENGTH_BASE: origin/main\n");
+  ok(runs === null && bare?.includes("`node vendor/core/scripts/strength.mjs`"), "a workflow that runs the strength check at the copy's path with its base reads done, and the mend asks for the step at that path", `${bare}\n${runs}`);
+  fs.writeFileSync(select, "name: select\non:\n  push:\n  pull_request:\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node vendor/core/scripts/select.mjs --env RUN\n");
+  const selected = notDone(dir, [passed])[0]?.mend ?? null;
+  ok(selected?.includes(".github/workflows/select.yml") && selected.includes("its job `t`"), "a selection run at the copy's path, with no check named that a tree passed, is found", selected);
+  fs.writeFileSync(manifest, was); fs.rmSync(flow); fs.rmSync(select);
+}
+// (a submodule of the project that carries no core is none of its own files: a project with one reads as it did)
+{
+  const dir = kit("a-project-with-another-submodule", { packages: "." }, { held: false }), other = path.join(dir, "third");
+  fs.mkdirSync(other);
+  fs.writeFileSync(path.join(other, "App.csproj"), "<Project />\n");
+  const g = (cwd, ...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "-c", "protocol.file.allow=always", ...args], { cwd, stdio: "ignore" });
+  g(other, "init", "-q", "-b", "main"); g(other, "add", "-A"); g(other, "commit", "-q", "-m", "other");
+  g(dir, "submodule", "add", "-q", `${other.replace(/\\/g, "/")}-origin.git`, "third");
+  ok(!project(dir).files.some(f => f.startsWith("third/")) && !notDone(dir).length, "the files of a submodule that carries no core are not the project's own, and no step reads it", report(notDone(dir)));
+}
 // (a core a library carries, its files committed in the project: the library's own manifest pins it, and the floor's own
 // copy stands beside it until every tool has passed the staged cases)
 kit("a-library-carried-project", { packages: "." }, { at: "lib/core/", library: "lib/" });
@@ -1062,10 +1088,11 @@ ok(toolsMend.includes("runs `node core/scripts/agent-tools.mjs config/licences.j
   put("core-manifest.md", `# Core manifest\n\nCore: ${CORE} at ${PIN}, copied whole under vendor/core/ (never edited here).\nPaths: in the core's files, one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under vendor/core/; any other is ours.\n`);
   put("AGENTS.md", "# A project\n\n@vendor/core/modules/work-flow.md\n");
   put("config/copies.json", `{\n  "prose": [\n    "vendor/core/floor/*.md",\n    "vendor/core/modules/*.md"\n  ]\n}\n`);
+  put("core/notes.md", "A file of the project's own, which names vendor/core/modules/how-to-work.md.\n");
   execFileSync("git", ["init", "-q"], { cwd: dir });
   const said = notDone(dir, [step])[0]?.mend ?? "";
-  ok(said.includes("`vendor/core/modules/work-flow.md` is now `vendor/core/roles/shared/work-flow.md` (in `AGENTS.md`)") && said.includes('after the pattern "vendor/core/modules/*.md" add the patterns "vendor/core/floor/topics/*.md", "vendor/core/roles/*.md"') && !/(?<![\w/-])core\//.test(said),
-    "where the copy stands at another path, the step reads a copies config's patterns at it and names the files and patterns by it", said);
+  ok(said.includes("`vendor/core/modules/work-flow.md` is now `vendor/core/roles/shared/work-flow.md` (in `AGENTS.md`)") && said.includes('after the pattern "vendor/core/modules/*.md" add the patterns "vendor/core/floor/topics/*.md", "vendor/core/roles/*.md"') && said.includes("`core/notes.md`") && !/(?<![\w/-])core\//.test(said.replace("`core/notes.md`", "")),
+    "where the copy stands at another path, the step reads a copies config's patterns at it and names the files and patterns by it, and a file of the project's own that stands at core/ by its own name", said);
 }
 // the files that point from the paths the rules left: each names a file or a folder the core holds, and what one says
 // stands elsewhere than the rest of it stands there

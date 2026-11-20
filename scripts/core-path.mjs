@@ -64,12 +64,24 @@ export function manifestText(file) {
 
 /** A text of the starter kit's or of the sync notes' as the project holds it, whose copy of the core stands at `copy`
  *  (corePath's, a path ending in "/"): the kit and the notes write the copy as core/, so each core/ that begins a path
- *  (not agent-core/, and not one already behind the copy's own folders, as vendor/core/ is) is the copy's path (#628). */
+ *  (not agent-core/, and not one that is part of the copy's own path already, as vendor/core/ is) is the copy's path
+ *  (#628), and a second pass changes nothing. Of a mend, which names the project's own paths too: mendAt. */
 export const atCopy = (text, copy) => {
   if (copy === "core/") return text;
-  const before = copy.endsWith("/core/") ? copy.slice(0, -"core/".length) : null;
-  return text.replace(/(?<![\w-])core\//gu, (hit, at) => before && text.slice(0, at).endsWith(before) ? hit : copy);
+  // (a core/ that is part of the copy's own path, wherever in it, is left, so that a second pass changes nothing)
+  const inside = [...copy.matchAll(/core\//gu)].map(m => m.index);
+  return text.replace(/(?<![\w-])core\//gu, (hit, at) => inside.some(i => at - i >= 0 && text.startsWith(copy, at - i)) ? hit : copy);
 };
+/** A mend as the project reads it: the core's own words in it (a step's wording, the notes' file names) name the copy as
+ *  core/, and the project's own paths, which the mend names too, are left as they are. A core/ is the copy's where it
+ *  stands at the start of a path (no letter, digit, dot, dash or slash before it, so a path already at the copy's
+ *  place, or one of the project's own like src/core/, is passed over), and a file or folder of the core follows it
+ *  (scripts/, floor/, README.md...) or nothing does; the project's own core/notes.md is its own (#628). A second pass
+ *  changes nothing. */
+// (and modules/, which the core's files left and the entries of the notes still name)
+const TOP = new Set([...fs.readdirSync(new URL("..", import.meta.url)).filter(n => n !== ".git"), "modules"]);
+export const mendAt = (text, copy) => copy === "core/" ? text
+  : text.replace(/(?<![\w./-])core\/([\w.-]*)/gu, (hit, name) => !name || TOP.has(name) ? copy + hit.slice("core/".length) : hit);
 /** The copy's path as the pattern of a regular expression. */
 export const inCopy = copy => copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&");
 

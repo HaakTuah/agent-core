@@ -4,6 +4,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { MANIFEST, manifestText, readCore } from "./core-path.mjs";
 
 // The most a file read so may hold: past any rule file, config, workflow, audit or baseline a project writes.
 export const READ_MOST = 64 << 20;
@@ -14,13 +15,14 @@ export const READ_MOST = 64 << 20;
 export function ownFiles(root) {
   const listed = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 })
     .split("\0").filter(f => f && fs.existsSync(path.join(root, f)));
-  // (a checked-out submodule's files too, at their paths from here, as git lists them with --recurse-submodules, which it
-  // gives for the committed files alone: a library that carries the core brings its copy so (core-path.mjs), and
-  // without this git lists the library by its commit only; #628)
-  if (fs.existsSync(path.join(root, ".gitmodules"))) {
+  // (the files of the library that carries the core, where the manifest's line says it is a submodule, at their paths from
+  // here, as git lists them with --recurse-submodules, which it gives for the committed files alone: that library brings
+  // the copy (core-path.mjs), and without this git lists it by its commit only. No other submodule is read; #628)
+  const text = manifestText(path.join(root, MANIFEST)), core = text === null ? null : readCore(text);
+  if (core?.form === "carried" && fs.existsSync(path.join(root, ".gitmodules"))) {
     try {
       const have = new Set(listed);
-      for (const f of execFileSync("git", ["ls-files", "--cached", "--recurse-submodules", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] }).split("\0"))
+      for (const f of execFileSync("git", ["ls-files", "--cached", "--recurse-submodules", "-z", "--", core.library], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] }).split("\0"))
         if (f && !have.has(f) && fs.existsSync(path.join(root, f))) listed.push(f);
     } catch { /* (a submodule that is not checked out is listed by its commit alone) */ }
   }

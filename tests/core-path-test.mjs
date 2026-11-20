@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
-import { atCopy, carriedAt, corePath, floorCopy, floorCopyIn, hookCommands, manifestText, projectAt, readCore } from "../scripts/core-path.mjs";
+import { atCopy, carriedAt, corePath, floorCopy, floorCopyIn, hookCommands, manifestText, mendAt, projectAt, readCore } from "../scripts/core-path.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { pathIn } from "../scripts/reading.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
@@ -130,6 +130,12 @@ if (process.platform !== "win32") {
 // The starter kit's and the notes' words for the copy, in the project's own (#628): each core/ that begins a path
 ok(atCopy("read core/tasks/x.md", "core/") === "read core/tasks/x.md" && atCopy("core/a ../../core/b `core/c` agent-core/d", "vendor/core/") === "vendor/core/a ../../vendor/core/b `vendor/core/c` agent-core/d",
   "a bare core/ is the copy's path, and agent-core/ is not");
+ok(["vendor/core/", "packages/core/agent/", "packages/core/core/", "a.core/"].every(c => { const once = atCopy("x core/a ../../core/b `core/c`", c); return once === atCopy(once, c); }), "a second pass over a text changes nothing, whatever core/ the copy's own path holds");
+{
+  const mend = "see `core/scripts/x.mjs`, core/notes.md, src/core/a, vendor/core/b, `core/` and core/modules/x (in `core/notes.md`)";
+  ok(mendAt(mend, "vendor/core/") === "see `vendor/core/scripts/x.mjs`, core/notes.md, src/core/a, vendor/core/b, `vendor/core/` and vendor/core/modules/x (in `core/notes.md`)" && mendAt(mend, "core/") === mend && mendAt(mendAt(mend, "packages/core/agent/"), "packages/core/agent/") === mendAt(mend, "packages/core/agent/"),
+    "in a mend the core's own files are the copy's, and the project's own paths, core/notes.md and src/core/ among them, are not");
+}
 ok(atCopy("refs/remotes/origin/main:vendor/core/a core/b", "vendor/core/") === "refs/remotes/origin/main:vendor/core/a vendor/core/b" && atCopy("core/a", "lib/the-core/") === "lib/the-core/a",
   "one already behind the copy's own folders is left as it stands");
 

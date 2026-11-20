@@ -24,7 +24,7 @@ import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./workflow-run.mjs";
 import { copyAt } from "./check-configs.mjs";
-import { atCopy, plain, shown } from "./step-checks.mjs";
+import { mendAt, plain, shown } from "./step-checks.mjs";
 
 // What a step reads a project with, and the words of an error with no path of the machine's in them: step-checks.mjs,
 // beside this file.
@@ -71,7 +71,7 @@ export function notDone(root, steps = STEPS) {
     try { mend = step.check(p); } catch (e) { mend = `Its check could not read the project (${plain(e.message, root)}): read its entry in \`core/${NOTES_FOLDER}/\` against it.`; }
     // (the entries and the checks say core/, the starter kit's path for the copy; a project that keeps it elsewhere is
     // told its own: #628)
-    if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend: atCopy(mend, copy) });
+    if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend: mendAt(mend, copy) });
   }
   out.unread = p.unread;
   out.copy = copy;

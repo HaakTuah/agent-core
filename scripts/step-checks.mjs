@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { atCopy, corePath, inCopy } from "./core-path.mjs";
+import { atCopy, inCopy, mendAt } from "./core-path.mjs";
 import { installed } from "./packages.mjs";
 import { leadsOut } from "./guards.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
@@ -27,10 +27,10 @@ import { npmPackages, offRegistry } from "./lookup.mjs";
 
 export const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-// Roughly what a step costs a project where it is not done yet (a step done costs nothing).
-// (`atCopy` and `inCopy` of core-path.mjs: the starter kit's and the notes' words for the copy, in the project's own)
-export { atCopy, inCopy };
+// (`atCopy`, `mendAt` and `inCopy` of core-path.mjs: the starter kit's and the notes' words for the copy, in the project's own)
+export { atCopy, inCopy, mendAt };
 
+// Roughly what a step costs a project where it is not done yet (a step done costs nothing).
 export const COST = {
   check: "nothing while its check passes; else what the failure says, in the pull request it fails",
   line: "a line or two of a protected file: one small pull request of a builder's",
@@ -60,12 +60,13 @@ function testsStand(p) {
   let config;
   try { config = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)); } catch { return false; }
   if (!config.tests.length) return false;
-  return execFileSync("git", ["ls-files", "-z", "--", ...config.tests], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith(corePath(p.root) || "core/"));
+  return execFileSync("git", ["ls-files", "-z", "--", ...config.tests], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith(copyAt(p)));
 }
 
 // Whether a workflow that runs on pull requests has a step that runs the strength check, with STRENGTH_BASE set on the
 // step, its job or the workflow: a mention in a comment, or a step with no base, which measures nothing, is none.
-const STRENGTH_RUN = /(^|[\s;&|])node\s+core\/scripts\/strength\.mjs(?=\s*($|[;&|]))/mu;
+// (at the copy's own path, which the manifest names: #628)
+const strengthRunOf = copy => new RegExp(`(^|[\\s;&|])node\\s+${inCopy(copy)}scripts/strength\\.mjs(?=\\s*($|[;&|]))`, "mu");
 // Whether a workflow runs on every push to an open pull request: the event pull_request with no "types" that leaves out
 // its opening or a push, and no "paths" or "branches" filter that could leave out the change a lookup reads.
 const everyPush = on => {
@@ -79,6 +80,7 @@ const onPullRequests = on => (typeof on === "string" ? on === "pull_request" : A
 const based = (...envs) => envs.some(e => typeof e?.STRENGTH_BASE === "string" && e.STRENGTH_BASE.trim() !== "");
 function strengthRuns(p) {
   readable(p, text => text.includes("strength.mjs"));
+  const STRENGTH_RUN = strengthRunOf(copyAt(p));
   return Object.values(p.workflows).some(({ yaml }) => onPullRequests(yaml?.on) && Object.values(yaml.jobs ?? {})
     .some(job => (job?.steps ?? []).some(step => typeof step?.run === "string" && STRENGTH_RUN.test(step.run) && based(step.env, job.env, yaml.env))));
 }
@@ -102,7 +104,7 @@ export function strengthNamed(p) {
 export function keysOnce(p) {
   // (with the core's packages not installed, as after a sync made by a copy from before #654, this step cannot be read:
   // it says so, with the install, and every other step is still told)
-  if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`node ${corePath(p.root) || "core/"}scripts/install.mjs\`, then \`node ${corePath(p.root) || "core/"}scripts/steps.mjs\` again.`;
+  if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`node ${copyAt(p)}scripts/install.mjs\`, then \`node ${copyAt(p)}scripts/steps.mjs\` again.`;
   const read = reads(p.files).map(f => [f, twice(p.read(f) ?? "")]);
   const found = read.flatMap(([f, keys]) => keys.filter(k => k.key !== null).map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
   const unread = by => read.filter(([, keys]) => keys.some(k => k.key === null && Boolean(k.size) === by)).map(([f]) => `\`${f}\``), deep = unread(false), long = unread(true);
@@ -146,7 +148,7 @@ export function toolFilesListed(p) {
 }
 function toolFilesRead(p, config) {
   const run = (script, args, env) => {
-    const at = path.join(p.root, corePath(p.root) || "core/", "scripts", script);
+    const at = path.join(p.root, copyAt(p), "scripts", script);
     if (!fs.existsSync(at)) throw new Unread(`no copy of ${script} to run`);
     const r = spawnSync(process.execPath, [at, ...args], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28, env: { ...process.env, ...env } });
     return { status: r.status, out: `${r.stdout}`, err: `${r.stderr}`, error: r.error };
@@ -168,16 +170,17 @@ function toolFilesRead(p, config) {
 function testsTracked(p) {
   let specs;
   try { specs = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)).tests; } catch { specs = JSON.parse(fs.readFileSync(path.join(HERE, "setup/template/shape.json.tmpl"), "utf8")).tests; }
-  return specs.length > 0 && execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith(corePath(p.root) || "core/"));
+  return specs.length > 0 && execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith(copyAt(p)));
 }
 
 // Whether a workflow that runs on pull requests has a step that runs the selection, with SELECT_BASE set on the step,
 // its job or the workflow (core/tasks/tests.md, "A pull request runs the tests its change can reach"); null where it
 // does or the project has no tests yet; else the mend.
-const SELECT_RUN = /(^|[\s;&|])node\s+core\/scripts\/select\.mjs(?=\s|$)/mu;
+const selectRunOf = copy => new RegExp(`(^|[\\s;&|])node\\s+${inCopy(copy)}scripts/select\\.mjs(?=\\s|$)`, "mu");
 export function selectionRuns(p) {
   if (!testsTracked(p)) return null;
   readable(p, text => text.includes("select.mjs"));
+  const SELECT_RUN = selectRunOf(copyAt(p));
   const selects = Object.values(p.workflows).some(({ yaml }) => onPullRequests(yaml?.on) && Object.values(yaml.jobs ?? {})
     .some(job => (job?.steps ?? []).some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run) && [step.env, job.env, yaml.env].some(e => typeof e?.SELECT_BASE === "string" && e.SELECT_BASE.trim() !== ""))));
   return selects ? null : "No workflow on pull requests runs the selection of the tests a change can reach: in the job that runs the project's tests, add a step before them `node core/scripts/select.mjs --env RUN`, with `SELECT_BASE` set to the pull request's base (`origin/<its base branch>`, fetched first, or `HEAD^1` with `fetch-depth: 2`), and have the job run only the test files `RUN` names, each between spaces, or its whole suite where it says `all` (`if [ \"$RUN\" = all ]; then <the whole suite>; else <the runner> $RUN; fi`); name the project's proof, never selected out, under \"select\" and \"proof\" in the shape check's config. Where the record's numbers (`node core/scripts/test-record.mjs`) show the suite needed whole, name every test under \"select\" and \"whole\" instead, citing them in that pull request.";
@@ -191,7 +194,7 @@ export function selectionRuns(p) {
 // false on "none" count, any other is reported: an `if:` whose parts joined by && at its top hold RUN in one part
 // alone, that part nothing but `env.RUN == 'all'` and `contains(env.RUN, ' <file> ')` joined by ||, each false for
 // "none"; or a run that is the line the mend gives, `if [ "$RUN" = all ]; then …; elif [ "$RUN" != none ]; then … $RUN; fi`)
-const passes = job => (job?.steps ?? []).some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run) && /(?<![\w-])--passed(?![\w-])/u.test(step.run));
+const passes = (job, SELECT_RUN) => (job?.steps ?? []).some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run) && /(?<![\w-])--passed(?![\w-])/u.test(step.run));
 const RUN_IN_RUN = /\$\{?RUN\}?(?![\w])/u, RUN_IN_IF = /\benv\.RUN\b/u;
 const SAFE_TERM = /^(env\.RUN\s*==\s*'all'|contains\(\s*env\.RUN\s*,\s*' [^' ]+ '\s*\))$/u;
 const RUN_LINE = /^if \[ "\$RUN" = all \]; then [^;\n]+; elif \[ "\$RUN" != none \]; then [^;\n]+ \$RUN; fi$/u;
@@ -221,7 +224,7 @@ const keepsNone = step => {
   if (typeof step?.if === "string" && RUN_IN_IF.test(step.if)) return ifKeepsNone(step.if);
   return typeof step?.run !== "string" || !RUN_IN_RUN.test(step.run) || RUN_LINE.test(step.run.trim());
 };
-const honoursNone = job => {
+const honoursNone = (job, SELECT_RUN) => {
   const after = (job?.steps ?? []).filter(step => !(typeof step?.run === "string" && SELECT_RUN.test(step.run)));
   const reads = after.filter(step => (typeof step?.if === "string" && RUN_IN_IF.test(step.if)) || (typeof step?.run === "string" && RUN_IN_RUN.test(step.run)));
   return reads.length > 0 && reads.every(keepsNone);
@@ -229,9 +232,10 @@ const honoursNone = job => {
 const onPush = on => (typeof on === "string" ? on === "push" : Array.isArray(on) ? on.includes("push") : !!on && "push" in on);
 export function passedRuns(p) {
   readable(p, text => text.includes("select.mjs"));
+  const SELECT_RUN = selectRunOf(copyAt(p));
   // (only a workflow a pull request runs too: a job that runs on a push alone ran nowhere else, and is never skipped)
   const missing = Object.entries(p.workflows).filter(([, { yaml }]) => onPush(yaml?.on) && onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => Object.entries(yaml.jobs ?? {})
-    .filter(([, job]) => (job?.steps ?? []).some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run)) && !(passes(job) && honoursNone(job)))
+    .filter(([, job]) => (job?.steps ?? []).some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run)) && !(passes(job, SELECT_RUN) && honoursNone(job, SELECT_RUN)))
     .map(([name]) => `\`.github/workflows/${file}\`, its job \`${name}\``));
   return missing.length ? `The selection runs on a push with nothing to say whether the merged tree passed already (${missing.join("; ")}): give its step \`--passed <the check that gates the tests>\` on a push's first run alone (the job's own check, such as \`tests\`, as a ruleset requires it; in bash, \`\${SELECT_PASSED:+--passed "$SELECT_PASSED"}\` with \`SELECT_PASSED\` set so on a push and empty otherwise), \`GH_TOKEN: \${{ github.token }}\` on that step on a push alone, and \`checks: read\` beside \`contents: read\` in the job's permissions; and have every step that reads \`RUN\` run nothing where it says \`none\` (\`if [ \"$RUN\" = all ]; then <the whole suite>; elif [ \"$RUN\" != none ]; then <the runner> $RUN; fi\`, or an \`if:\` whose parts joined by \`&&\` hold \`RUN\` in one part alone, nothing but \`env.RUN == 'all'\` and \`contains(env.RUN, ' <file> ')\` joined by \`||\`), since a runner given no file runs every test, and one given \`none\` fails; then a push that merges a pull request's head whose tree it holds, whose run selected the whole suite and passed that check, runs no test again. Leave it off any job, or entry of a job's matrix, that a pull request does not run, whose suite ran nowhere else, and any whose tests read what no tree holds (a release's tag, the day). Nothing fails meanwhile: the whole suite runs on a push as before.` : null;
 }
@@ -384,7 +388,7 @@ export function suitesOnPins(p) {
 // (the reading both install steps share: the copy's scripts and install; whether a step runs a file, a command as
 // check-configs.mjs reads it, its words; and whether it installs, naming one of `named` where it is given)
 function installReading(p) {
-  const copy = corePath(p.root) || "core/", script = `${copy}scripts/`, install = `${copy}scripts/install.mjs`;
+  const copy = copyAt(p), script = `${copy}scripts/`, install = `${copy}scripts/install.mjs`;
   const bare = t => t.replace(/^\.\//u, "");
   const runs = (st, file) => st.cmds.some(c => c.some(w => file(bare(w.text))));
   const installs = (st, named) => st.unconditioned && st.cmds.some(c => {
@@ -424,7 +428,7 @@ export function nugetPathsHold(p) {
   const filtered = Object.entries(p.workflows).filter(([, w]) => Array.isArray(w.yaml?.on?.pull_request?.paths) && Object.values(w.yaml?.jobs ?? {})
     .some(job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/.github/workflows/nuget.yml@`.toLowerCase())));
   if (!filtered.length) return null;
-  const at = corePath(p.root) || "core/", own = p.files.filter(f => !f.startsWith(at)), byContent = projectFilesByContent(p.root, own);
+  const at = copyAt(p), own = p.files.filter(f => !f.startsWith(at)), byContent = projectFilesByContent(p.root, own);
   const read = [...new Set([...byContent, ...importsOf(own, f => readBuildFile(p.root, f), byContent).brought.keys()])];
   const wrong = filtered.map(([f, w]) => [f, read.filter(r => !pathsLetThrough(w.yaml.on.pull_request.paths, [r]))]).filter(([, missed]) => missed.length);
   // (each as a pattern that matches only itself, its glob characters taken as themselves, and quoted as YAML quotes it;
@@ -558,7 +562,7 @@ const dated = f => /\.(md|txt)$/u.test(f) && (/(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.t
 function namers(p) {
   let rules = [];
   try { rules = ruleFiles(p.read, dir => p.files.filter(f => f.startsWith(`${dir}/`)), { tools: true }); } catch { /* (no list of rule files yet: the files of text alone) */ }
-  return p.files.filter(f => !f.startsWith(corePath(p.root) || "core/") && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
+  return p.files.filter(f => !f.startsWith(copyAt(p)) && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
 }
 // Of those, the files that name each old path: Map(old path -> [file]).
 function namedStill(p, map) {
@@ -581,7 +585,7 @@ export function movedPaths(p) {
   const map = moved(), found = Object.keys(map).length > 0 ? namedStill(p, map) : new Map(), said = files => files.map(f => `\`${shown(f)}\``).join(", ");
   const apart = from => (moved.apart()[from] ?? []).map(a => `, but its "${a.lead}" is now in \`core/${a.to}\``).join("");
   const wrong = [...found].map(([from, files]) => `\`core/${from}\` is now \`core/${map[from]}\`${map[from].endsWith("/") ? ", a file a topic: name the topic's own file" : ""}${apart(from)} (in ${said(files)})`).concat(once(found, map));
-  const globs = Object.keys(map).length > 0 ? namers(p).filter(f => readsOldAlone(p, f, corePath(p.root) || "core/")) : [];
+  const globs = Object.keys(map).length > 0 ? namers(p).filter(f => readsOldAlone(p, f, copyAt(p))) : [];
   if (globs.length) wrong.push(`after the pattern ${MOVED_GLOB} add the patterns ${MOVED_GLOBS}, leaving it where it is, since a copies config may read more and never less (in ${said(globs)})`);
   if (!/^Paths:.*\btasks\/.*\btools\//mu.test(p.manifest)) wrong.push('the "Paths:" line of `core-manifest.md` reads "one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/"');
   return wrong.length ? `${first(found)} one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.` : null;
@@ -784,7 +788,7 @@ const offAsks = (p, config) => strings(config.lockfiles).flatMap(f => {
 function pinAsks(p, config) {
   if (!config.scan || typeof config.audit !== "string") return [];
   const listed = jsonAt(p, config.audit)?.entries, entries = Array.isArray(listed) ? listed.filter(e => e && typeof e === "object") : [];
-  const copy = corePath(p.root) || "core/", skip = strings(config.scan.skip);
+  const copy = copyAt(p), skip = strings(config.scan.skip);
   const skipped = f => f.startsWith(copy) || skip.some(s => s === f || (s.endsWith("/") && f.startsWith(s)));
   return p.files.filter(f => !skipped(f) && entries.some(e => covers(e, f))).flatMap(f => {
     const text = p.read(f);

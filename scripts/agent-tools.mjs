@@ -490,9 +490,11 @@ export function kitHooks(template = kitTemplate, core = null) {
     const text = read(f);
     if (f !== ".claude/settings.json" || text === null || copy === "core/") return text;
     const settings = JSON.parse(text), commands = hookCommands(core);
-    settings.hooks.SessionStart[0].hooks[0].command = commands.start;
-    settings.hooks.PreToolUse[0].hooks[0].command = commands.helper;
-    settings.hooks.Stop[0].hooks[0].command = commands.stop;
+    // (a template without one of the three, as an older kit's, keeps its own)
+    for (const [event, command] of [["SessionStart", commands.start], ["PreToolUse", commands.helper], ["Stop", commands.stop]]) {
+      const hook = settings.hooks?.[event]?.[0]?.hooks?.[0];
+      if (hook) hook.command = command;
+    }
     return JSON.stringify(settings);
   };
   const files = dir => Object.keys(KITS).filter(f => path.posix.dirname(f) === dir).map(f => path.posix.basename(f));

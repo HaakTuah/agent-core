@@ -544,7 +544,7 @@ export function copiesConfig(p) {
   if (found !== undefined) return found;
   notElsewhere(p, ["copies.mjs"]);
   const cell = /^\|\s*\*copies check\*\s*\|([^|\n]*)/m.exec(p.manifest)?.[1].match(/`[^`]+`/g) ?? [];
-  const named = cell.map(v => v.slice(1, -1)).find(v => !/\s/.test(v) && !/^(\.\/)?core\//.test(v));
+  const named = cell.map(v => v.slice(1, -1)).find(v => !/\s/.test(v) && !v.startsWith(copyAt(p)) && !v.startsWith(`./${copyAt(p)}`));
   return named === undefined ? KIT_CONFIGS.copies : inside(named, "the manifest's *copies check* slot");
 }
 // The size marks: what the calls to the core's copies.yml (or core.yml) pass as `sizes` and the project's own runs of the
