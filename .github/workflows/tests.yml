@@ -209,6 +209,15 @@ jobs:
       - name: The licence check on a whole project, and its scan
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-test.mjs ')) }}
         run: node tests/licence-scan-test.mjs
+      - name: The licence check's owner's yes, on the staged project
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-yes-test.mjs ')) }}
+        run: node tests/licence-yes-test.mjs
+      - name: What the licence scan reads: its paths held to the project, JSON of any depth
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-limits-test.mjs ')) }}
+        run: node tests/licence-scan-limits-test.mjs
+      - name: The licence scan on the programs a file downloads, pinned by version and checksum
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-pins-test.mjs ')) }}
+        run: node tests/licence-scan-pins-test.mjs
       - name: The licence scan on the forms of an npm command
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-test.mjs ')) }}
         run: node tests/licence-fetch-test.mjs
