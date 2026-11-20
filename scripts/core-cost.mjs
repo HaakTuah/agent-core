@@ -1,6 +1,7 @@
 // What the core costs a project and what the project gets done beside it (AGENTS.md of the core, "The core is measured
 // as a feature is"): run in a project's clone, it reads every pull request merged into the default branch (the merge
-// commits on its first-parent line; a pull request merged any other way is not seen) and sorts each by what it
+// commits on its first-parent line; a pull request merged any other way is not seen; a shallow clone that cannot show every merge is refused, with its
+// mend, #1027) and sorts each by what it
 // changed:
 //   sync     only the copy of the core, the manifest and workflows, the copy among them: what a sync PR holds
 //   upkeep   only the copy, the manifest, the rule files (rule-files.mjs), .github/ and .claude/: rules and checks
@@ -21,6 +22,7 @@
 //
 //   node core/scripts/core-cost.mjs [--since YYYY-MM-DD] [--split YYYY-MM-DD] [--cost] [--cap] [--pulls <n,n,...>]
 import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
@@ -191,12 +193,28 @@ export function repoOf() {
 export const EVERY = { includes: () => true };
 export const rulesFor = (repo, read = ruleFiles) => (repo === CORE ? EVERY : read());
 
+// Why the merges cannot all be read from this clone, or null where they can: a shallow clone holds no merge older than
+// its boundary, and a count from it would pass a part for the whole (#1027). It is shallow and `since` is no day after
+// its newest boundary commit (the clone then holds every merge from `since` on), or none is given. The mend is the
+// words of the failure; the clone is never deepened here, since a reader changes nothing.
+export function shallowGap(since = null) {
+  if (git(["rev-parse", "--is-shallow-repository"]).trim() !== "true") return null;
+  const file = git(["rev-parse", "--git-path", "shallow"]).trim();
+  const days = (existsSync(file) ? readFileSync(file, "utf8").split("\n").filter(Boolean) : [])
+    .map(sha => dayOf(git(["log", "-1", "--format=%cI", sha]).trim()));
+  const newest = days.sort().at(-1);
+  if (since && newest && since > newest) return null;
+  return `the clone is shallow, so it holds no merge older than its boundary${newest ? ` (${newest})` : ""}${since ? ` and --since ${since} reaches before it` : ""}, and a count from it would pass a part for the whole. Mend: run git fetch --unshallow in this clone, then run the command again`;
+}
+
 // The pull requests merged into the default branch from `since` (a day, or none), as { number, when, kind, lines },
 // and the repository ({ repo, merged }): read from the clone the process runs in, whose root is its directory. It
 // throws where the clone knows no default branch. Without a repository no branch counts as Dependabot's, which it says.
 export function mergedPulls(rules, since = null) {
   const ref = defaultRef(name => { try { git(["rev-parse", "--verify", "--quiet", `${name}^{commit}`]); return true; } catch { return false; } });
   if (!ref) throw new Error("the clone knows no default branch: neither origin's, nor a main of origin's or of its own");
+  const gap = shallowGap(since);
+  if (gap) throw new Error(gap);
   const log = git(["log", "--first-parent", "--merges", "--format=%H%x09%cI%x09%s", ...(since ? [`--since=${since}T00:00:00Z`] : []), ref]);
   const repo = repoOf();
   // (said, never passed over: without it no branch counts as Dependabot's, and its merges count by what they changed)
