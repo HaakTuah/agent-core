@@ -22,3 +22,18 @@ cd "$W"; rm -rf c2; git clone -q "$W/c" c2
 echo "clone local path (hardlinks) of that: ok"
 cd "$W"; rm -rf d; cp -r "$W/w" d
 echo "cp -r checkout (1300 files): $(t cp -r "$W/w" "$W/d2") ms"
+
+echo "--- where: default temp (C:) vs runner temp (D:)"
+for base in "$RUNNER_TEMP" "$(cygpath -u "$LOCALAPPDATA")/Temp"; do
+  echo "base $base"
+  cd "$base"; rm -rf bb; mkdir bb; cd bb
+  git clone -q --bare --no-hardlinks "$GITHUB_WORKSPACE" b.git
+  U="file:///$(cygpath -m "$PWD")/b.git"; P="$(cygpath -m "$PWD")/b.git"
+  echo " clone --no-checkout file:// : $(t git clone -q --no-checkout "$U" w1) ms"
+  echo " clone --no-checkout path   : $(t git clone -q --no-checkout "$P" w2) ms"
+  echo " clone --no-checkout --shared: $(t git clone -q --no-checkout --shared "$P" w3) ms"
+  echo " checkout w1: $(t git -C w1 checkout -q --detach HEAD) ms"
+  echo " checkout w2: $(t git -C w2 checkout -q --detach HEAD) ms"
+  echo " bare --no-hardlinks of w1: $(t git clone -q --bare --no-hardlinks "$(cygpath -m "$PWD")/w1" bw) ms"
+  echo " add -A in w1: $(t git -C w1 add -A) ms"
+done

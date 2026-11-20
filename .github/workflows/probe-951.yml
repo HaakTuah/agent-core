@@ -6,6 +6,11 @@ permissions:
   contents: read
 jobs:
   probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        where: [runner-temp]
+    name: probe (${{ matrix.where }})
     runs-on: windows-latest
     timeout-minutes: 25
     defaults:
@@ -23,6 +28,8 @@ jobs:
         env:
           PROF_LOG: ${{ runner.temp }}/prof.log
         run: |
+          export TEMP=$(cygpath -w "$RUNNER_TEMP") TMP=$(cygpath -w "$RUNNER_TEMP")
+          node -e "console.log('tmpdir', require('os').tmpdir())"
           start=$(date +%s)
           NODE_OPTIONS="--import file:///$(cygpath -m "$PWD")/probe/prof.mjs" node tests/check-test.mjs > "$RUNNER_TEMP/out.txt" 2>&1 || true
           echo "check-test took $(( $(date +%s) - start )) s"; tail -2 "$RUNNER_TEMP/out.txt"
