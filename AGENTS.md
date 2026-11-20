@@ -429,8 +429,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   rules by what holds them. The session that takes it gives, on its line "rules held by a check", how many of the
   project's own rules a check holds whole and how many of the core's it takes, as the core's list maps them, counting
   none whose every check read nothing there ("A check that read nothing says so"); the core's report of the projects
-  carries it as numbers alone, and the core's own report gives the same of the core's own rules, those of this file,
-  beside the floor's and the modules'. Nothing changes it. It does not mean the share is a target, nor that a check the
+  carries it as numbers alone, and the core's own report gives the floor's and the modules' and says whether its own,
+  those of this file, are counted. Nothing changes it. It does not mean the share is a target, nor that a check the
   core's list names (a ruleset of the host's) is read as set up in the project. Reason: the owner sees how much of what
   binds a project a check holds there, which a count of the core alone hides. Held by `tests/look-test.mjs` and
   `tests/holders-test.mjs`.

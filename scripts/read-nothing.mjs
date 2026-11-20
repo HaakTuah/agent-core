@@ -26,7 +26,7 @@ function rulesHeldBy(out) {
 }
 
 // How many files a lister gives, or null where git refuses its pathspecs (one that leaves the project): the check then
-// fails with its own mend, and is no check that passes on nothing.
+// fails, as no check that passes on nothing (that its failure says no mend yet is #924).
 const count = list => { try { return list().length; } catch { return null; } };
 
 // Each check that read nothing in the project at `root` (its manifest's text `manifest`, a file read by `read`, null
