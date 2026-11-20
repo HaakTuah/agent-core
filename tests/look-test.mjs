@@ -285,7 +285,9 @@ ok(stale(0, "Packages the project holds that have gone stale\n\n- a\n").what ===
 }
 
 // ---- the names look.mjs exported before its split (#1033)
-ok(["BOT", "DUE", "FAILED", "LABELS", "LATE_DAYS", "LATE_PAGES", "LATE_PULLS", "MISSED", "NOTICE_LOGINS", "OWNERS", "RECORD", "SOON", "TITLES", "checksOf", "dueNow", "idleBody", "inboxFile", "lastRun", "lateFinding", "mine", "noticesOf", "plan", "redBody", "relabelled", "reopening", "slug", "staleFinding", "stillFinding", "text", "updating"].every(n => n in facade), "look.mjs still exports each name it exported before its split");
+const exportedBefore = ["BOT", "DUE", "FAILED", "LABELS", "LATE_DAYS", "LATE_PAGES", "LATE_PULLS", "MISSED", "NOTICE_LOGINS", "OWNERS", "RECORD", "SOON", "TITLES", "checksOf", "dueNow", "idleBody", "inboxFile", "lastRun", "lateFinding", "mine", "noticesOf", "plan", "redBody", "relabelled", "reopening", "slug", "staleFinding", "stillFinding", "text", "updating"];
+const missing = exportedBefore.filter(n => !(n in facade));
+ok(missing.length === 0, "look.mjs still exports each name it exported before its split", `missing: ${missing.join(", ")}`);
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);
