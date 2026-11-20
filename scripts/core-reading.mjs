@@ -1,7 +1,9 @@
 // A project read against the core (tasks/cleaning.md, "A project is read against the core once, then for what each
 // release changes"; #464): the rules the project takes, the floor's and its modules' as rules.mjs reads them from its
-// copy, against RECORD, the record of the readings made: the day of the last and a mark of each rule a reading
-// covered, made from its key and its text, so that a rule a release adds or changes is no longer covered. What is due:
+// copy, against RECORD, the record of the readings made: the day of the last and a mark of each rule of the copy at
+// that reading, made from its key and its text, so that a rule a release adds or changes is no longer covered. Every
+// rule of the copy is marked, not only those taken, so that a module the project takes later is read for what a
+// release changes in it, as the rest are, and taking it in asks nothing by itself. What is due:
 // a whole reading where no record stands or it cannot be read, else the rules no reading covered, each by its key.
 // The sync's step (steps/, beside this file) reads it, and so the scheduled look's issue of steps not done; it fails
 // nothing (AGENTS.md of the core, "Nothing locks a project"). The core's own repository takes no copy: there it reads
@@ -9,8 +11,8 @@
 //
 //   node core/scripts/core-reading.mjs             from a project's root: what is due, each rule to read by its key
 //   node core/scripts/core-reading.mjs --rules     every rule the project takes, by its key: what a whole reading reads
-//   node core/scripts/core-reading.mjs --recorded  record the reading made today, covering every rule the project
-//                                                  takes now: the session that took the reading's task runs it in
+//   node core/scripts/core-reading.mjs --recorded  record the reading made today, marking every rule of the copy
+//                                                  as it stands: the session that took the reading's task runs it in
 //                                                  the pull request that holds the reading's report
 import fs from "node:fs";
 import path from "node:path";
@@ -50,9 +52,9 @@ export function said(d, copy = "core/") {
   return `${d.keys.length === 1 ? "A rule" : `${d.keys.length} rules`} the project takes ${d.keys.length === 1 ? "was" : "were"} added or changed since the reading of ${d.day}, which no reading has covered: ${d.keys.map(k => `\`${k}\``).join("; ")}. Read the project against ${d.keys.length === 1 ? "it" : "them"}: ${how}.`;
 }
 
-// The reading recorded: every rule the project takes now, marked, with the day.
-export function record(manifest, day, root = ROOT) {
-  const marks = [...new Set(takenRules(rules(root), manifest).map(markOf))].sort();
+// The reading recorded: every rule of the copy as it stands, marked, with the day.
+export function record(day, root = ROOT) {
+  const marks = [...new Set(rules(root).map(markOf))].sort();
   return `${JSON.stringify({ day, read: marks }, null, 2)}\n`;
 }
 
@@ -63,8 +65,8 @@ export function main(args, cwd = process.cwd()) {
   if (manifest === null) return "No core-manifest.md here: the core's own repository takes no copy, so it is read against nothing (#259 is its reading); run this from a project's root.";
   if (args[0] === "--recorded") {
     fs.mkdirSync(path.join(cwd, path.dirname(RECORD)), { recursive: true });
-    fs.writeFileSync(path.join(cwd, RECORD), record(manifest, new Date().toISOString().slice(0, 10)));
-    return `${RECORD}: the reading of today is recorded, covering every rule the project takes.`;
+    fs.writeFileSync(path.join(cwd, RECORD), record(new Date().toISOString().slice(0, 10)));
+    return `${RECORD}: the reading of today is recorded, marking every rule of the copy.`;
   }
   if (args[0] === "--rules") return takenRules(rules(), manifest).map(r => r.key).join("\n");
   return said(due(manifest, read(RECORD)), copyOf(cwd)) ?? "No reading of the project against the core is due: every rule it takes is covered by one.";

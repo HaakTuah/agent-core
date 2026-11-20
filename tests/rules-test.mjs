@@ -110,13 +110,16 @@ const commits = {
     "a project takes the floor's rules and those of the modules its manifest does not leave out");
   const whole = due(manifest, null, tmp), unreadable = due(manifest, "{\"day\": \"today\"}", tmp);
   ok(whole.whole && /no reading/.test(whole.why) && unreadable.whole && /cannot be read/.test(unreadable.why), "with no record, or one in no form it reads, a whole reading is due");
-  const recorded = record(manifest, "2026-11-20", tmp);
+  const recorded = record("2026-11-20", tmp);
   ok(due(manifest, recorded, tmp) === null && said(null) === null, "once recorded, nothing is due");
   write("tasks/a.md", "- **Rule one.** Its text, changed.\n- **Rule three.** New.\n");
   write("tasks/b.md", "- **Rule two.** Left out, and changed.\n");
   const after = due(manifest, recorded, tmp);
   ok(!after.whole && after.day === "2026-11-20" && after.keys.join("|") === "tasks/a.md: Rule one|tasks/a.md: Rule three",
     "after a release, each rule it takes that was added or changed is due, by its key, and none it leaves out", JSON.stringify(after));
+  write("tasks/a.md", "- **Rule one.** Its text.\n");
+  write("tasks/b.md", "- **Rule two.** Left out.\n");
+  ok(due("Modules: all\n", recorded, tmp) === null, "a module taken after the reading asks nothing by itself: its rules stood in the copy then, and are read for what a release changes in them");
   ok(/^2 rules the project takes were added or changed since the reading of 2026-11-20/.test(said(after)) && said(after).includes("`tasks/a.md: Rule three`") && said(after).includes("core-reading.mjs --recorded") && said(whole, "lib/core/").includes("lib/core/roles/auditor.md"),
     "what is due is said with each rule and the command that records the reading, in the copy's own path", said(after));
   fs.rmSync(tmp, { recursive: true, force: true });

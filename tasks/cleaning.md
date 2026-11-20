@@ -103,9 +103,9 @@ code is held to: `tasks/code-shape.md`.
   which the scheduled look's issue of steps not done keeps: `core/scripts/core-reading.mjs` reads the record
   `checks/core-reading.json`, a mark of each rule a reading covered, and asks a whole reading where it stands nowhere,
   else names each rule the project takes (the floor's and its modules', `--rules`) that no reading covered. The session
-  that takes the task starts an auditor (`roles/auditor.md`), writes its answers as a report in the *audits*, named by
-  its day, files each gap as a task the project's agents take at the dose, a step only the owner can take labelled
-  `needs-owner`, and records the reading (`--recorded`), in one pull request.
+  that takes the task starts an auditor (`roles/auditor.md`) and, in one pull request, puts its answers in the
+  *audits* as an audit's report is put there, files each gap as a task the project's agents take at the dose, a step
+  only the owner can take labelled `needs-owner`, and records the reading (`--recorded`).
   - **Its question, for each rule it is given:** met, partly, not met or not applicable, with its evidence and what
     holds it in the project: a check, a test, the review, or nothing.
 
