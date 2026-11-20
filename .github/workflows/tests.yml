@@ -219,6 +219,15 @@ jobs:
       - name: The licence check on a whole project, and its scan
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-test.mjs ')) }}
         run: node tests/licence-scan-test.mjs
+      - name: The licence check's owner's yes, on the staged project
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-yes-test.mjs ')) }}
+        run: node tests/licence-yes-test.mjs
+      - name: What the licence scan reads, its paths held to the project and JSON of any depth
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-limits-test.mjs ')) }}
+        run: node tests/licence-scan-limits-test.mjs
+      - name: The licence scan on the programs a file downloads, pinned by version and checksum
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-pins-test.mjs ')) }}
+        run: node tests/licence-scan-pins-test.mjs
       - name: The licence scan on the forms of an npm command
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-test.mjs ')) }}
         run: node tests/licence-fetch-test.mjs
@@ -264,9 +273,30 @@ jobs:
       - name: The core's packages, from its lock file alone
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/packages-test.mjs ')) }}
         run: node tests/packages-test.mjs
-      - name: The agent-tools check
+      - name: The agent-tools check, the kit's hooks and a project with no list
         if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-test.mjs ')) }}
         run: node tests/agent-tools-test.mjs
+      - name: The agent-tools check's list, what a way installs and the sync note's step
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-list-test.mjs ')) }}
+        run: node tests/agent-tools-list-test.mjs
+      - name: The agent-tools check's links where a tool reads its files
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-links-test.mjs ')) }}
+        run: node tests/agent-tools-links-test.mjs
+      - name: The agent-tools check's pin a tool's own configuration gives
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-pins-test.mjs ')) }}
+        run: node tests/agent-tools-pins-test.mjs
+      - name: The agent-tools check's reading of what Kiro and Codex configure
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-kiro-codex-test.mjs ')) }}
+        run: node tests/agent-tools-kiro-codex-test.mjs
+      - name: The agent-tools check's source of each hook's command
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-source-test.mjs ')) }}
+        run: node tests/agent-tools-source-test.mjs
+      - name: The agent-tools check's reading of what git shows at the fetched path
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-tree-test.mjs ')) }}
+        run: node tests/agent-tools-tree-test.mjs
+      - name: The agent-tools check's tool files in another letter case
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-case-test.mjs ')) }}
+        run: node tests/agent-tools-case-test.mjs
       - name: The agent-tools check's reader of a commit's objects
         if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/git-objects-test.mjs ')) }}
         run: node tests/git-objects-test.mjs
@@ -327,6 +357,12 @@ jobs:
       - name: The strength check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/strength-test.mjs ')) }}
         run: node tests/strength-test.mjs
+      - name: The strength check's report read
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/strength-report-test.mjs ')) }}
+        run: node tests/strength-report-test.mjs
+      - name: The strength check's verdict
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/strength-verdict-test.mjs ')) }}
+        run: node tests/strength-verdict-test.mjs
       - name: The core's own mutation tool
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/mutate-test.mjs ')) }}
         run: node tests/mutate-test.mjs
@@ -541,6 +577,30 @@ jobs:
       - name: What a release asks of a project, step by step, and a project beside a fresh start
         if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-test.mjs ')) }}
         run: node tests/steps-test.mjs
+      - name: The steps on a project whose slots, triggers and marks stand otherwise than the kit writes them
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-slots-test.mjs ')) }}
+        run: node tests/steps-slots-test.mjs
+      - name: A project beside a fresh start, and what the steps read of the files it holds
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-fresh-test.mjs ')) }}
+        run: node tests/steps-fresh-test.mjs
+      - name: The steps on a project whose copy of the core stands at a path of its own or in a library
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-vendored-test.mjs ')) }}
+        run: node tests/steps-vendored-test.mjs
+      - name: The configs a project's own workflows give its checks, as the steps and the fresh start read them
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-own-configs-test.mjs ')) }}
+        run: node tests/steps-own-configs-test.mjs
+      - name: The reading of a run's configs, from its script, its argument and every source of a config
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-configs-test.mjs ')) }}
+        run: node tests/steps-run-configs-test.mjs
+      - name: The reading of a run behind a shell, a wrapper, a here-document or a subshell
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-wrappers-test.mjs ')) }}
+        run: node tests/steps-run-wrappers-test.mjs
+      - name: The reading of the words of a run, what names the script and what runs it
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-words-test.mjs ')) }}
+        run: node tests/steps-run-words-test.mjs
+      - name: The reading of a run's environment and of texts that try it, and the bash grammar
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-hostile-test.mjs ')) }}
+        run: node tests/steps-run-hostile-test.mjs
       - name: The readers of when and how the checks run, which the steps read
         if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-checks-run-test.mjs ')) }}
         run: node tests/steps-checks-run-test.mjs

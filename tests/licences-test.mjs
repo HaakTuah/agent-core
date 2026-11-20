@@ -2,7 +2,7 @@
 // expression is read, which list allows what, a package known by its registry address, npm's settings; and, of the
 // core's own files, that its audit's entry for Node names the version the core pins (#592); and that the config's
 // schema and the check's own checks of its form, its fallback where ajv is not installed, read it alike (#530). The
-// check on a whole project, and its scan, are checked by licence-scan-test.mjs. Run by the core's tests workflow
+// check on a whole project, and its scan, are checked by licence-scan-test.mjs and the licence-scan and licence-yes tests beside it. Run by the core's tests workflow
 // (.github/workflows/tests.yml).
 //
 //   node tests/licences-test.mjs

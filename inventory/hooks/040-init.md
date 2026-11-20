@@ -3,10 +3,14 @@
   `scripts/step-checks-workflow-text.mjs`, `scripts/step-checks-jobs.mjs`, `scripts/step-checks-lookup.mjs`,
   `scripts/step-checks-hostile.mjs`, `scripts/step-checks-moved.mjs`, `scripts/step-checks-packages.mjs`,
   `scripts/steps/`, `scripts/sync-notes.mjs`, `scripts/sync.mjs`, `scripts/fresh.mjs`, `scripts/check-configs.mjs`,
+  `scripts/workflow-calls.mjs`, `scripts/step-paths.mjs`, `scripts/step-commands.mjs`, `scripts/own-runs.mjs`,
   `scripts/steps-stage.mjs`, `scripts/stage-helpers.mjs`, `scripts/stages/`, `scripts/bash-commands.mjs`,
   `scripts/own-files.mjs`, `scripts/runners.mjs`, `scripts/read-nothing.mjs`, `scripts/core-reading.mjs`,
   `setup/sync-notes.md`, `setup/sync-notes/`, `tests/init-dotnet-test.mjs`, `scripts/steps-kit.mjs`,
-  `tests/steps-checks-run-test.mjs`, `tests/steps-files-test.mjs`, `tests/steps-tool-files-test.mjs`: the starter kit
+  `tests/steps-checks-run-test.mjs`, `tests/steps-files-test.mjs`, `tests/steps-tool-files-test.mjs`,
+  `tests/steps-slots-test.mjs`, `tests/steps-fresh-test.mjs`, `tests/steps-vendored-test.mjs`,
+  `tests/steps-own-configs-test.mjs`, `tests/steps-run-configs-test.mjs`, `tests/steps-run-wrappers-test.mjs`,
+  `tests/steps-run-words-test.mjs`, `tests/steps-run-hostile-test.mjs`: the starter kit
   writes a new project's files; the sync writes the copy at a newer commit and moves the pins; each step of the sync
   notes reads done or not, the sync's report names each check that read nothing there (#459), and the step of a reading
   against the core names the rules no reading covered (#464). *Runs:* any session, in the project. *Else:* Copier and

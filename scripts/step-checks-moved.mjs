@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { atCopy } from "./core-path.mjs";
 import { ruleFiles } from "./rule-files.mjs";
-import { copyAt } from "./check-configs.mjs";
+import { copyAt } from "./workflow-calls.mjs";
 import { HERE, shown } from "./step-checks.mjs";
 
 // The core's files that moved to folders that say who reads them or when (#304, point 8), old path to new, as the

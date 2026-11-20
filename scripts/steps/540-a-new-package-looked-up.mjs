@@ -1,6 +1,6 @@
 // The step of setup/sync-notes/540-a-new-package-looked-up.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { copyAt } from "../check-configs.mjs";
+import { copyAt } from "../workflow-calls.mjs";
 import { COST, shown } from "../step-checks.mjs";
 import { INLINED_MOST, jobsOf } from "../step-checks-jobs.mjs";
 import { placed, lookupOf, FIRST, running, configOf, looksUp } from "../step-checks-lookup.mjs";

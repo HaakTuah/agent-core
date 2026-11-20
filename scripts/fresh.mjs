@@ -30,7 +30,8 @@ import { ownerOf } from "./releases.mjs";
 import { KIT as SHAPE, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
-import { KIT_CONFIGS, Unread, copyAt, folded, packagesFolder } from "./check-configs.mjs";
+import { KIT_CONFIGS, packagesFolder } from "./check-configs.mjs";
+import { Unread, copyAt, folded } from "./workflow-calls.mjs";
 import { atCopy } from "./step-checks.mjs";
 import { call as callOf, configs, plain, project } from "./steps.mjs";
 

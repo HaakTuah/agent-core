@@ -5,7 +5,7 @@
 import { CORE } from "./core-address.mjs";
 import { installed } from "./packages.mjs";
 import { projectFilesByContent } from "./nuget.mjs";
-import { copyAt, readable } from "./check-configs.mjs";
+import { copyAt, readable } from "./workflow-calls.mjs";
 import { pathsLetThrough } from "./workflow-run.mjs";
 import { foreignBreaks, keysTwice, reads } from "./workflows.mjs";
 import { DEEPEST, LONGEST } from "./yaml-keys.mjs";
