@@ -242,6 +242,9 @@ jobs:
       - name: The agent-tools check
         if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-test.mjs ')) }}
         run: node tests/agent-tools-test.mjs
+      - name: The agent-tools check's reader of a commit's objects
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/git-objects-test.mjs ')) }}
+        run: node tests/git-objects-test.mjs
       - name: The helper hook
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/helper-call-test.mjs ')) }}
         run: node tests/helper-call-test.mjs
