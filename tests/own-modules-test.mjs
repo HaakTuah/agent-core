@@ -3,10 +3,10 @@
 // Node's own modules.
 //
 //   node tests/own-modules-test.mjs
-import { execFileSync } from "node:child_process";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { faults, SECTION } from "../scripts/own-modules.mjs";
+import { faults, report, SECTION } from "../scripts/own-modules.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what) => { count++; if (!cond) { failed++; console.error(`FAIL: ${what}`); } };
@@ -45,13 +45,11 @@ const every = [
 ].flat();
 ok(every.length >= 6 && mended(every.map(f => `FAIL: ${f}`).join("\n")), `each fault says its mend: ${every.join("; ")}`);
 
-// the core's own AGENTS.md and modules
-try {
-  execFileSync(process.execPath, [fileURLToPath(new URL("../scripts/own-modules.mjs", import.meta.url))], { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
-  ok(true, "");
-} catch (e) {
-  ok(false, `the core's own AGENTS.md: ${e.stderr}`);
-}
+// the core's own AGENTS.md and modules, and where they cannot be read
+const own = report();
+ok(own.status === 0 && own.err.length === 0 && /^each of the \d+ modules is taken here/u.test(own.out.join("\n")), `the core's own AGENTS.md: ${own.err.join("; ")}`);
+const missing = report(path.join(fileURLToPath(new URL("..", import.meta.url)), "no-such-folder"));
+ok(missing.status === 1 && missing.out.length === 0 && mended(missing.err.join("\n")) && missing.err[0].includes("could not be read"), "where AGENTS.md cannot be read it fails, saying its mend");
 
 console.log(`${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

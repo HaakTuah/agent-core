@@ -2,7 +2,6 @@
 // scratch folder, and run on the core's own. Its tests workflow runs it on every pull request here. Node's own modules.
 //
 //   node tests/reasons-test.mjs
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -10,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { entryFile } from "../scripts/holders.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { lines, reasonsOf } from "../scripts/reasons.mjs";
+import { lines, reasonsOf, report } from "../scripts/reasons.mjs";
 
 let failed = 0;
 const ok = (cond, what, detail = "") => { if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
@@ -50,12 +49,13 @@ ok(none.includes("no item of the archive is listed yet") && none.includes("Its n
 ok(reasonsOf(tmp, "rule").matches.length === 4 && reasonsOf(tmp, "no such").matches.length === 0 && reasonsOf(tmp, "").matches.length === 0, "a query that names several rules, or none, gives what it matched");
 ok(reasonsOf(tmp, "tasks/x.md").rule === "tasks/x.md" && reasonsOf(tmp, "tasks/x.md").fileItems.length === 0, "a rule file named whole gives the items behind its text");
 
-// run, on the core's own: a rule's reasons, and each failure saying its mend
-const run = (...args) => spawnSync(process.execPath, [path.join(root, "scripts/reasons.mjs"), ...args], { cwd: root, encoding: "utf8" });
+// the command's report, on the core's own: a rule's reasons, and each failure saying its mend
+const run = query => { const r = report(query, root, root); return { status: r.status, stdout: r.out }; };
 const own = run("The archive is pointed to from the list");
-ok(own.status === 0 && own.stdout.startsWith("AGENTS.md: The archive is pointed to from the list\n") && /- Core archive \S+, .*\(archive\/instructions\//u.test(own.stdout) && own.stdout.includes(`https://github.com/${CORE}/issues/252`), "run on the core's own rule, it prints its items and issues", own.stdout + own.stderr);
+ok(own.status === 0 && own.stdout.startsWith("AGENTS.md: The archive is pointed to from the list\n") && /- Core archive \S+, .*\(archive\/instructions\//u.test(own.stdout) && own.stdout.includes(`https://github.com/${CORE}/issues/252`), "run on the core's own rule, it prints its items and issues", own.stdout);
 const several = run("builder"), nothing = run("no rule is named so");
 ok(several.status === 1 && mended(several.stdout) && several.stdout.includes("roles/builder.md: Read by task, twice"), "run with a part that names several rules, it fails, listing them, with the mend", several.stdout);
-ok(nothing.status === 1 && mended(nothing.stdout), "run with a part that names none, it fails with the mend", nothing.stdout);
+ok(nothing.status === 1 && mended(nothing.stdout) && nothing.stdout.includes('as `node scripts/reasons.mjs "security.md: 3. The protected files"`'), "run with a part that names none, it fails with the mend, naming the command as seen from where it is run", nothing.stdout);
+ok(report("no rule is named so", root, path.join(root, "scripts")).out.includes("`node reasons.mjs "), "the command named in the mend is the path from the folder it is run in");
 
 process.exit(failed ? 1 : 0);

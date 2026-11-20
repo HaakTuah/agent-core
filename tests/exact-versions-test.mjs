@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 // Tests of exact-versions.mjs: each case a made-up project in memory (a lock file and its package lists), never a real
 // one. Run: node tests/exact-versions-test.mjs
-import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { check } from "../scripts/exact-versions.mjs";
+import { check, report } from "../scripts/exact-versions.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0;
@@ -120,7 +118,8 @@ function run(spec, lockfile = "tools/package-lock.json") {
     writeFileSync(join(dir, "licences.json"), JSON.stringify({ lockfiles: [lockfile] }));
     writeFileSync(join(dir, "tools", "package.json"), JSON.stringify({ devDependencies: { a: spec } }));
     writeFileSync(join(dir, "tools", "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/a": { version: "1.2.3" } } }));
-    try { execFileSync(process.execPath, [fileURLToPath(new URL("../scripts/exact-versions.mjs", import.meta.url)), "licences.json"], { cwd: dir, stdio: "pipe" }); return 0; } catch (e) { return mended(String(e.stderr)) ? e.status : "a failure without its mend"; }
+    const r = report("licences.json", dir);
+    return r.status === 0 || mended(r.err.join("\n")) ? r.status : "a failure without its mend";
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 if (run("1.2.3") !== 0) { failed++; console.error("FAIL run from a project's root: an exact version does not pass"); }

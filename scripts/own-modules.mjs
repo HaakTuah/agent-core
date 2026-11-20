@@ -79,21 +79,26 @@ export function faults(agents, modules) {
   return found;
 }
 
-function main() {
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// What the check prints and exits with, read from the core's own AGENTS.md and modules where `root` stands:
+// { status, out, err } (the lines for stdout and stderr).
+export function report(root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")) {
   let agents, modules;
   try {
     agents = fs.readFileSync(path.join(root, "AGENTS.md"), "utf8");
     modules = MODULES.flatMap(d => fs.readdirSync(path.join(root, d)).filter(f => f.endsWith(".md")).map(f => `${d}/${f}`));
   } catch (e) {
-    console.error(`FAIL: AGENTS.md or a folder of the modules could not be read (${e.message}). Mend: run it from a clone of the core, where both stand`);
-    return 1;
+    return { status: 1, out: [], err: [`FAIL: AGENTS.md or a folder of the modules could not be read (${e.message}). Mend: run it from a clone of the core, where both stand`] };
   }
   const found = faults(agents, modules);
-  for (const f of found) console.error(`FAIL: ${f}`);
-  if (found.length) return 1;
-  console.log(`each of the ${modules.length} modules is taken here, or given its reason`);
-  return 0;
+  if (found.length) return { status: 1, out: [], err: found.map(f => `FAIL: ${f}`) };
+  return { status: 0, out: [`each of the ${modules.length} modules is taken here, or given its reason`], err: [] };
+}
+
+function main() {
+  const { status, out, err } = report();
+  for (const line of err) console.error(line);
+  for (const line of out) console.log(line);
+  return status;
 }
 
 if (started(import.meta.url)) process.exitCode = main();
