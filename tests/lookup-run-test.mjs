@@ -1,0 +1,82 @@
+#!/usr/bin/env node
+// Tests of lookup.mjs run as the check runs on a project: in a scratch git repository with a lock file, a licence config and
+// a workflow, each answer of a registry recorded (lookup-stage.mjs) and handed to it in place of the network (floor rule 8:
+// no live call, no real package). The lookup's own readers and answers are lookup-test.mjs's. Run: node tests/lookup-run-test.mjs
+import { execFileSync } from "node:child_process";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
+import { run } from "../scripts/lookup.mjs";
+import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
+import { INVENTED_SUM, NOW, asked, get, tgz } from "../scripts/lookup-stage.mjs";
+
+let failed = 0, r;
+const ok = (cond, what) => { if (!cond) { failed++; console.error(`FAIL ${what}`); } };
+
+// ---- The check on a project
+const tmp = scratchDir("lookup-test-");
+const git = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: tmp, encoding: "utf8" }).trim();
+try {
+  git("init", "-q");
+  writeFileSync(join(tmp, "licences.json"), JSON.stringify({ lockfiles: ["package-lock.json"], ships: [] }));
+  writeFileSync(join(tmp, "package.json"), "{}");
+  // (each entry with an integrity value, as npm writes one, unless the test says otherwise)
+  const write = (packages) => writeFileSync(join(tmp, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, ...Object.fromEntries(Object.entries(packages).map(([k, e]) => [k, { integrity: INVENTED_SUM, ...e }])) } }));
+  write({ "node_modules/tidy-moss-format": { version: "1.1.0", resolved: tgz("tidy-moss-format") } });
+  mkdirSync(join(tmp, "fixtures"), { recursive: true });
+  writeFileSync(join(tmp, "fixtures/package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/never-published-moss": { version: "1.0.0", resolved: tgz("never-published-moss", "1.0.0"), integrity: INVENTED_SUM } } }));
+  git("add", "-A"); git("commit", "-qm", "base");
+  const base = git("rev-parse", "HEAD");
+  const config = join(tmp, "licences.json");
+  r = await run(config, { root: tmp, base: null, get, now: NOW, event: "push" });
+  ok(r.code === 0 && /nothing looked up/u.test(r.lines.join("\n")), "with no base, as on a push, nothing is new and nothing is asked");
+  r = await run(config, { root: tmp, base: null, get, now: NOW, event: "pull_request" });
+  ok(r.code === 1 && mended(r.lines.join("\n")) && /fetch-depth: 2/u.test(r.lines[0]), `with no base on a pull request, it fails, saying the mend (${r.lines})`);
+  asked.length = 0;
+  r = await run(config, { root: tmp, base, get, now: NOW });
+  ok(r.code === 0 && asked.length === 0 && /ok {3}0 new packages/u.test(r.lines.join("\n")), `what the base held is not looked up (${r.lines})`);
+  write({ "node_modules/tidy-moss-format": { version: "1.2.0", resolved: tgz("tidy-moss-format", "1.2.0") }, "node_modules/never-published-moss": { version: "1.0.0", resolved: tgz("never-published-moss", "1.0.0") } });
+  r = await run(config, { root: tmp, base, get, now: NOW });
+  const out = r.lines.join("\n");
+  ok(r.code === 1 && mended(out) && /^FAIL: package-lock\.json: never-published-moss@1\.0\.0/mu.test(out) && !/tidy-moss-format/u.test(out) && /1 of 1 new package fail/u.test(out), `an update passes unlooked, and a new name the registry lacks fails, saying the mend, though a lock file the config does not name held it (${r.lines})`);
+  // A lock file merged as data, which the pull request then names in the config: its names are new, not held.
+  writeFileSync(join(tmp, "licences.json"), JSON.stringify({ lockfiles: ["package-lock.json", "fixtures/package-lock.json"], ships: [] }));
+  write({ "node_modules/tidy-moss-format": { version: "1.1.0", resolved: tgz("tidy-moss-format") }, "node_modules/never-published-moss": { version: "1.0.0", resolved: tgz("never-published-moss", "1.0.0") } });
+  r = await run(config, { root: tmp, base, get, now: NOW });
+  ok(r.code === 1 && /^FAIL: package-lock\.json: never-published-moss@1\.0\.0/mu.test(r.lines.join("\n")), `a lock file the pull request newly names in the config makes no name held (${r.lines})`);
+  writeFileSync(join(tmp, "licences.json"), JSON.stringify({ lockfiles: ["package-lock.json"], ships: [] }));
+  // A lock file the pull request makes a link to a file outside the project: refused, and nothing of the file printed.
+  const outside = scratchDir("lookup-outside-");
+  writeFileSync(join(outside, "secret.txt"), "invented-secret-text-not-json");
+  rmSync(join(tmp, "package-lock.json"));
+  symlinkSync(join(outside, "secret.txt"), join(tmp, "package-lock.json"));
+  r = await run(config, { root: tmp, base, get, now: NOW });
+  ok(r.code === 1 && mended(r.lines.join("\n")) && /leads out of the project/u.test(r.lines.join("\n")) && !/invented-secret/u.test(r.lines.join("\n")), `a lock file that links out of the project is refused, unread (${r.lines})`);
+  // The config itself, made a link out of the project: refused before it is opened, under either flag.
+  symlinkSync(join(outside, "secret.txt"), join(tmp, "linked.json"));
+  for (const nuget of [false, true]) {
+    r = await run(join(tmp, "linked.json"), { root: tmp, base, nuget, get, now: NOW });
+    ok(r.code === 1 && mended(r.lines.join("\n")) && /leads out of the project/u.test(r.lines.join("\n")) && !/invented-secret/u.test(r.lines.join("\n")), `a config that links out of the project is refused, unread${nuget ? ", for NuGet too" : ""} (${r.lines})`);
+  }
+  // Run from the folder above the project, a config that links out of the project into that folder is refused too.
+  writeFileSync(join(tmp, "..", `${basename(tmp)}-beside.json`), JSON.stringify({ "invented-outside-key": 1 }));
+  rmSync(join(tmp, "linked.json"));
+  symlinkSync(join(tmp, "..", `${basename(tmp)}-beside.json`), join(tmp, "linked.json"));
+  const here = process.cwd();
+  process.chdir(join(tmp, ".."));
+  try { r = await run(join(basename(tmp), "linked.json"), { root: tmp, base, get, now: NOW }); } finally { process.chdir(here); }
+  ok(r.code === 1 && /leads out of the project/u.test(r.lines.join("\n")) && !/invented-outside-key/u.test(r.lines.join("\n")), `run from the folder above, a config that links into it is refused, unread (${r.lines})`);
+  rmSync(join(tmp, "..", `${basename(tmp)}-beside.json`));
+  rmSync(join(tmp, "linked.json"));
+  writeFileSync(join(tmp, "broken.json"), "{ invented-config-text");
+  r = await run(join(tmp, "broken.json"), { root: tmp, base, nuget: true, get, now: NOW });
+  ok(r.code === 1 && mended(r.lines.join("\n")) && !/invented-config-text/u.test(r.lines.join("\n")), `a NuGet config that is no JSON fails, quoting none of it (${r.lines})`);
+  rmSync(join(tmp, "broken.json"));
+  rmSync(join(tmp, "package-lock.json")); rmSync(outside, { recursive: true, force: true });
+  writeFileSync(join(tmp, "package-lock.json"), "{ not json");
+  r = await run(config, { root: tmp, base, get, now: NOW });
+  ok(r.code === 1 && mended(r.lines.join("\n")) && !/not json/u.test(r.lines.join("\n")), `a lock file that cannot be read fails, saying the mend and quoting none of it (${r.lines})`);
+} finally { rmSync(tmp, { recursive: true, force: true }); }
+
+console.log(failed ? `${failed} failing` : "ok   lookup.mjs on a project");
+process.exit(failed ? 1 : 0);

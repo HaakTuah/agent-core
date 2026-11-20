@@ -1,6 +1,6 @@
 // The step of setup/sync-notes/580-what-the-project-would-be-built-on-today.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { parse as parseChoices, where as choicesAt, inFolder, wholeOf } from "../choices.mjs";
+import { parse as parseChoices, where as choicesAt, inFolder, wholeOf } from "../choices-records.mjs";
 import { Unread } from "../check-configs.mjs";
 import { COST } from "../step-checks.mjs";
 
@@ -12,7 +12,7 @@ export default { lead: "17 November 2026, what the project would be built on tod
   check: p => {
     const file = choicesAt(p.manifest);
     if (!file) throw new Unread("the *choice records* the manifest names is no plain path inside the project");
-    // (the records of a folder a line of the file names, as choices.mjs reads them: a file each, in the order of their names)
+    // (the records of a folder a line of the file names, as choices-records.mjs reads them: a file each, in the order of their names)
     const inDir = folder => inFolder(p.files.filter(f => f.startsWith(`${folder}/`) && !f.slice(folder.length + 1).includes("/")), p.read);
     const found = parseChoices(wholeOf(p.read(file) ?? "", inDir));
     if (found.records.some(r => r.today && r.suggestion)) return null;
