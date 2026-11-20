@@ -84,8 +84,8 @@ const TOP = new Set([...fs.readdirSync(new URL("..", import.meta.url)).filter(n 
 // which is then its own whatever its name: a project that keeps the copy elsewhere often has its own core/ folder.
 export const mendAt = (text, copy, own = () => false) => copy === "core/" ? text
   : text.replace(/(?<![\w./-])core\/([\w.-]*)([\w./-]*)/gu, (hit, name, rest) => {
-    const at = `core/${name}${rest}`.replace(/[.:,;)]+$/u, "").replace(/\/$/u, "");
-    return (!name || TOP.has(name)) && !(at !== "core" && own(at)) ? copy + hit.slice("core/".length) : hit;
+    const at = `core/${name}${rest}`.replace(/\.+$/u, "").replace(/\/$/u, "");
+    return (!name || TOP.has(name.replace(/\.+$/u, ""))) && !(at !== "core" && own(at)) ? copy + hit.slice("core/".length) : hit;
   });
 /** The copy's path as the pattern of a regular expression. */
 export const inCopy = copy => copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&");
@@ -151,7 +151,7 @@ export function hookCommands(core) {
     const own = `git -C ${dir} --no-replace-objects show refs/remotes/origin/main:${core.path}scripts/${script} 2>/dev/null`;
     if (core.form !== "carried") return own;
     const lib = core.library.slice(0, -1), rest = core.path.slice(core.library.length);
-    return `${own} || { s=$(git -C ${dir} --no-replace-objects rev-parse refs/remotes/origin/main:${lib} 2>/dev/null) && git -c safe.bareRepository=explicit -C ${dir}/${lib} --no-replace-objects show "$s:${rest}scripts/${script}" 2>/dev/null; }`;
+    return `${own} || { s=$(git -C ${dir} --no-replace-objects rev-parse refs/remotes/origin/main:${lib} 2>/dev/null) && git --git-dir=${dir}/${lib}/.git --no-replace-objects show "$s:${rest}scripts/${script}" 2>/dev/null; }`;
   };
   const stop = `echo "STOP: the floor cannot be read at ${core.path}floor/security.md, where core-manifest.md says the core stands. Do nothing else in this session until it is mended. Mend: bring the files of the core into the checkout (git submodule update --init, where a submodule carries them), or, where that cannot be done here, say so to the owner and stop."`;
   return {

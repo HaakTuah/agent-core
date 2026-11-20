@@ -115,7 +115,7 @@ passes(run(project()), "a project as the starter kit writes it, with no list, pa
   const forms = [line, `Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n`].flatMap(l => Object.values(hookCommands(readCore(l))));
   ok(forms.length === 6 && forms.every(kitForm), "the commands for a copy at another path, and for a core a library carries, are in the kit's form", forms.filter(c => !kitForm(c)).join("\n"));
   const start = hookCommands(readCore(`Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n`)).stop;
-  ok(![start.replace('-C "${CLAUDE_PROJECT_DIR:-.}"/lib --no-replace-objects show "$s:', '-C "${CLAUDE_PROJECT_DIR:-.}"/other --no-replace-objects show "$s:'), start.replace(" 2>/dev/null; }) || exit 0", "; }) || exit 0; rm -rf x"), start.replace("refs/remotes/origin/main:lib", "HEAD:lib"), start.replace("-c safe.bareRepository=explicit ", "")].some(kitForm),
+  ok(![start.replace('--git-dir="${CLAUDE_PROJECT_DIR:-.}"/lib/.git', '--git-dir="${CLAUDE_PROJECT_DIR:-.}"/other/.git'), start.replace(" 2>/dev/null; }) || exit 0", "; }) || exit 0; rm -rf x"), start.replace("refs/remotes/origin/main:lib", "HEAD:lib"), start.replace('--git-dir="${CLAUDE_PROJECT_DIR:-.}"/lib/.git', '-C "${CLAUDE_PROJECT_DIR:-.}"/lib')].some(kitForm),
     "and a variation of them that reads the library's file from another folder or from the working tree, runs more, or lets git find a bare repository a branch committed in the library's place, is not");
   // (a core a library carries: the same)
   const carried = `Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n`, forCarried = JSON.parse(KIT), commandsFor = hookCommands(readCore(carried));

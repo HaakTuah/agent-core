@@ -128,12 +128,12 @@
       "why": "#919: split by step, beside the readers it holds."
     },
     "tests/agent-tools-test.mjs": {
-      "mark": 114587,
+      "mark": 114595,
       "why": "#919: split with agent-tools.mjs, a file of cases for each tool's configuration."
     },
     "tests/core-path-test.mjs": {
-      "mark": 25370,
-      "why": "#919: past the mark by a few lines only; its cases for a core a library carries move to a file of their own."
+      "mark": 25409,
+      "why": "#919: its cases for a core a library carries, and for the commands its hooks run, move to a file of their own."
     }
   }
 }

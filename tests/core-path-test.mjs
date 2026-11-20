@@ -222,7 +222,7 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
   }
   // (a branch that commits, where the library stands, files that form a bare repository: its tree object under the genuine
   // name holds another script. The commands read the library's commit main pins, from the repository named, never one git
-  // finds in the working tree; without safe.bareRepository=explicit the forged script runs)
+  // finds in the working tree: run in the folder the forged script runs, and the commands name the submodule's .git instead)
   {
     const evil = path.join(tmp, "a-forged-project"), bare = path.join(tmp, "the-library.git"), origin3 = path.join(tmp, "a-forged-project.git");
     git(tmp, "init", "-q", "-b", "main", evil);
@@ -239,9 +239,9 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
     git(evil, "checkout", "-q", "-b", "forged"); git(evil, "rm", "-q", "-f", "lib");
     fs.cpSync(bare, path.join(evil, "lib"), { recursive: true });
     git(evil, "add", "-A", "-f"); git(evil, "commit", "-q", "-m", "a bare repository where the library stood");
-    const stop = hookCommands(readCore(carried())).stop, at = command => spawnSync("sh", ["-c", command], { input: "{}", encoding: "utf8", env: { ...env, CLAUDE_PROJECT_DIR: evil } }).stdout;
-    ok(/FORGED/.test(at(stop.replace("-c safe.bareRepository=explicit ", ""))) && !/FORGED/.test(at(stop)),
-      "a bare repository a branch commits where the library stands is not read by the commands for a carried core, though git reads it without safe.bareRepository=explicit", `${at(stop.replace("-c safe.bareRepository=explicit ", ""))}|${at(stop)}`);
+    const stop = hookCommands(readCore(carried())).stop, inFolder = stop.replace('--git-dir="${CLAUDE_PROJECT_DIR:-.}"/lib/.git', '-C "${CLAUDE_PROJECT_DIR:-.}"/lib'), at = command => spawnSync("sh", ["-c", command], { input: "{}", encoding: "utf8", env: { ...env, CLAUDE_PROJECT_DIR: evil } }).stdout;
+    ok(/FORGED/.test(at(inFolder)) && !/FORGED/.test(at(stop)),
+      "a bare repository a branch commits where the library stands is not read by the commands for a carried core, though git, run in the folder, reads it", `${at(inFolder)}|${at(stop)}`);
   }
   git(project, "submodule", "deinit", "-q", "-f", "lib");
   said = run(hooks.start);
