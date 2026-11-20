@@ -159,8 +159,10 @@ jobs:
           SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}
           GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}
         run: node scripts/select.mjs .github/shape.json --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}
-      - name: Scratch folders on the runner's own drive, where git writes a tree three times faster than under the system's temp folder (#951)
-        if: ${{ runner.os == 'Windows' }}
+      # (only the part projects: the system's temp folder, a short name under the home folder on another drive than the
+      # checkout, is what the other Windows parts still test their scripts against; #882)
+      - name: Scratch folders of the part projects on the runner's own drive, where git writes a tree three times faster than under the system's temp folder (#951)
+        if: ${{ runner.os == 'Windows' && contains(matrix.parts, 'projects') }}
         run: echo "TEMP=$RUNNER_TEMP" >> "$GITHUB_ENV" && echo "TMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: The second the suites start at, for their time mark
         run: echo "SUITES_START=$(date +%s)" >> "$GITHUB_ENV"
