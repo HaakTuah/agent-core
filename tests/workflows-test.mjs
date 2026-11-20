@@ -240,9 +240,9 @@ ok(own.length > 0 && own.every(f => !fails(fs.readFileSync(`${core}.github/workf
 
 // ---- a workflow the core's reader cannot read as YAML fails, with its line and the mend (#994) ----
 const broken = `jobs:\n  a:\n    steps:\n      - name: The description check: the line "Read for it:"\n        run: x\n`;
-const noYaml = unparsed([{ file: "a.yml", text: broken }, { file: "b.yml", text: "jobs:\n  a:\n    steps:\n      - name: \"The description check: the line\"\n        run: x\n" }, { file: "c.yml", text: "a: 1\na: 2\n" }, { file: "d.yml", text: "a: \"x\n" }]);
-ok(noYaml.fails.length === 2 && /^FAIL a\.yml:4:\d+: not valid YAML.*BLOCK_AS_IMPLICIT_KEY.*Mend: put the whole value in quotes/u.test(noYaml.fails[0]) && /^FAIL d\.yml:\d+:\d+: /u.test(noYaml.fails[1]) && noYaml.fails.every(l => mended(l)),
-  "a file the core's reader throws on fails with its file, line and column and a mend (a \": \" in an unquoted step name says to quote it), a quoted name, which parses, does not, and a key given twice is left to repeated(), which says it", noYaml.fails.join("\n"));
+const noYaml = unparsed([{ file: "a.yml", text: broken }, { file: "b.yml", text: "jobs:\n  a:\n    steps:\n      - name: \"The description check: the line\"\n        run: x\n" }, { file: "c.yml", text: "a: 1\na: 2\n" }, { file: "d.yml", text: "a: \"x\n" }, { file: "e.yml", text: "on: push\njobs:\n  a:\n    env:\n      true: a\n      True: b\n" }, { file: "f.yml", text: "a: 1\n---\nb: 2\n" }]);
+ok(noYaml.fails.length === 4 && /^FAIL a\.yml:4:\d+: the core's reader cannot read it as YAML.*BLOCK_AS_IMPLICIT_KEY.*Mend: put the whole value in quotes/u.test(noYaml.fails[0]) && /^FAIL d\.yml:\d+:\d+: /u.test(noYaml.fails[1]) && /^FAIL e\.yml:6:.*Mend: two keys/u.test(noYaml.fails[2]) && /^FAIL f\.yml:.*Mend: take out the "---"/u.test(noYaml.fails[3]) && noYaml.fails.every(l => mended(l)),
+  "a file the core's reader throws on fails with its file, line and column and a mend (a \": \" in an unquoted step name says to quote it), a quoted name, which parses, does not, and a key given twice is left to repeated(), which says it, but two keys the package reads as one (true and True) are failed here", noYaml.fails.join("\n"));
 ok(unparsed([]).fails.length === 0 && own.every(f => unparsed([{ file: f, text: fs.readFileSync(`${core}.github/workflows/${f}`, "utf8") }]).fails.length === 0), "the core's own workflows each parse");
 
 // run on a scratch project: each failure says its mend
@@ -275,7 +275,7 @@ try {
   fs.writeFileSync(path.join(tmp, ".github/workflows/f.yml"), broken);
   execFileSync("git", ["add", ".github/workflows/f.yml"], { cwd: tmp, stdio: "ignore" });
   const bCore = keyRun(["--core"]), bOut = bCore.stdout + bCore.stderr, bProject = keyRun([]);
-  ok(bCore.status === 1 && /^FAIL \.github\/workflows\/f\.yml:4:\d+: not valid YAML.*Mend: put the whole value in quotes/mu.test(bOut) && mended(bOut) && !/f\.yml.*not valid YAML/u.test(bProject.stdout), `run in the core's own repository, a workflow that is no YAML fails with its mend; a project's, which the core's reader may read otherwise than GitHub does, is not failed${bCore.status === 1 ? "" : `:\n${bOut}`}`);
+  ok(bCore.status === 1 && /^FAIL \.github\/workflows\/f\.yml:4:\d+: the core's reader cannot read it as YAML.*Mend: put the whole value in quotes/mu.test(bOut) && mended(bOut) && !/f\.yml.*the core's reader cannot read it as YAML/u.test(bProject.stdout), `run in the core's own repository, a workflow that is no YAML fails with its mend; a project's, which the core's reader may read otherwise than GitHub does, is not failed${bCore.status === 1 ? "" : `:\n${bOut}`}`);
   fs.rmSync(path.join(tmp, ".github/workflows/f.yml"));
   execFileSync("git", ["rm", "-q", "--cached", ".github/workflows/f.yml"], { cwd: tmp, stdio: "ignore" });
   // (where the job's install could not reach the registry, the keys given twice and the calls a draft skips did not run,
@@ -286,7 +286,7 @@ try {
   execFileSync("git", ["add", ".github/workflows/d.yml", ".github/workflows/e.yml"], { cwd: tmp, stdio: "ignore" });
   fs.rmSync(path.join(tmp, "core/.packages/node_modules"), { recursive: true, force: true });
   const u = keyRun([], { CORE_PACKAGES_UNREACHED: "1" }), uOut = u.stdout + u.stderr;
-  ok(u.status === 1 && /^::warning::The check for a key given twice did not run, nor the one for a call a draft skips/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && !/e\.yml|is not installed/.test(uOut) && mended(uOut), `where the install could not reach the registry, the keys given twice and the calls a draft skips did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
+  ok(u.status === 1 && /^::warning::The check for a key given twice did not run, nor the one for a file that is no YAML, nor the one for a call a draft skips/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && !/e\.yml|is not installed/.test(uOut) && mended(uOut), `where the install could not reach the registry, the keys given twice and the calls a draft skips did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 // ---- a copy of the core at the path the manifest names (#918): the check leaves it out, and reads the project's own core/ ----
 const vend = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-vendored-"));

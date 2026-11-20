@@ -385,11 +385,13 @@ export function unparsed(files) {
   const fails = [];
   for (const { file, text } of files) {
     try { parseYaml(text); } catch (e) {
-      if (e?.code === "DUPLICATE_KEY") continue; // (repeated() below says it, with the first line's number)
+      if (e?.code === "DUPLICATE_KEY" && keysTwice(text).some(k => k.key !== null)) continue; // (repeated() says it, with the first line's number; the package also joins keys that read alike, true and True, 1 and 01, null and ~, which it does not)
       const at = e?.linePos?.[0], first = String(e?.message ?? e).split("\n")[0].replace(/ at line \d+, column \d+:?$/u, "");
-      const mend = e?.code === "BLOCK_AS_IMPLICIT_KEY" ? "put the whole value in quotes, since a \": \" inside an unquoted value starts a mapping (name: \"The check: the line\")"
+      const mend = e?.code === "DUPLICATE_KEY" ? "two keys of that mapping read as one value (true and True, 1 and 01, null and ~): rename one, or quote both"
+        : e?.code === "MULTIPLE_DOCS" ? "take out the \"---\" and the second document, since a workflow is one document"
+        : e?.code === "BLOCK_AS_IMPLICIT_KEY" ? "put the whole value in quotes, since a \": \" inside an unquoted value starts a mapping (name: \"The check: the line\")"
         : e?.linePos ? "correct the YAML at that place as the line says (a tab, a bad indent, an unclosed quote), then run `node scripts/workflows.mjs --core` again" : "";
-      fails.push(`FAIL ${file}${at ? `:${at.line}:${at.col}` : ""}: not valid YAML, so GitHub runs none of it and every reader of workflows sees it with no steps (${e?.code ? `${e.code}: ` : ""}${first})${/Mend:/u.test(first) ? "" : `. Mend: ${mend || "make the file readable as the line says, then run `node scripts/workflows.mjs --core` again"}`}`);
+      fails.push(`FAIL ${file}${at ? `:${at.line}:${at.col}` : ""}: the core's reader cannot read it as YAML, so every reader of workflows sees it with no steps (${e?.code ? `${e.code}: ` : ""}${first})${/Mend:/u.test(first) ? "" : `. Mend: ${mend || "make the file readable as the line says, then run `node scripts/workflows.mjs --core` again"}`}`);
     }
   }
   return { fails };
@@ -423,7 +425,7 @@ if (started(import.meta.url)) {
   // calls a draft skips, which the YAML package reads, did not run, said as a warning; every failure above still fails:
   // #654, point 4)
   const skipped = unreached("yaml");
-  if (skipped) console.log("::warning::The check for a key given twice did not run, nor the one for a call a draft skips: the package yaml could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault");
+  if (skipped) console.log("::warning::The check for a key given twice did not run, nor the one for a file that is no YAML, nor the one for a call a draft skips: the package yaml could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault");
   const against = core ? () => null : base ? show : null;
   const keys = skipped ? { fails: [], notes: [] } : repeated(texts, against), ready = skipped ? { fails: [], notes: [] } : unreadied(texts, against);
   const bad = core && !skipped ? unparsed(texts) : { fails: [] }; // (the core's own files alone: a project's unreadable file is noted by the checks that cannot read it)
