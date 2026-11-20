@@ -67,7 +67,7 @@ const project = (holdersJson, extra = {}) => {
   if (typeof holdersJson === "string") { fs.mkdirSync(path.join(dir, "scripts", "holders")); fs.writeFileSync(path.join(dir, "scripts", "holders", "broken.json"), holdersJson); }
   else writeList(dir, { holders: holdersJson, behind: extra.behind, numbers: extra.numbers });
   delete extra.behind; delete extra.numbers;
-  for (const [f, t] of Object.entries(extra)) fs.writeFileSync(path.join(dir, f), t);
+  for (const [f, t] of Object.entries(extra)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), t); }
   return dir;
 };
 const aCase = { name: "a-case", holds: ["tasks/x.md: The second numbered", "tasks/x.md: A last item"], inPart: ["tasks/x.md: A last item"] };
@@ -218,9 +218,20 @@ ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`) && /^::warning::The 
     "the core's rules a check holds in a project leave out those whose every check read nothing there, and count only the modules it takes, the floor's always", JSON.stringify({ all, shape, floorOnly }));
   ok(shareLine({ all: 7, check: 2 }, { held: 9, all: 40 }) === "- rules held by a check: the project's own 2 of 7, the core's 9 of 40.", "the share's line holds the counts alone");
   const coreLine = report(root).find(l => l.startsWith("- rules held by a check: the floor's")) ?? "";
-  const ownCount = rules(root, { agents: true }).filter(r => r.file === "AGENTS.md").length, cc = counts(holders(root));
-  ok(ownCount > 0 && coreLine.startsWith(`- rules held by a check: the floor's and the modules' ${cc.check} of ${cc.all}; the core's own ${ownCount},`) && coreLine.includes("not counted") && !/own \d+ of /u.test(coreLine),
-    "the core's own report gives its share of the floor's and the modules' rules, and says its own rules are not counted, with no number of them held", coreLine);
+  const h = holders(root), ownCount = rules(root, { agents: true }).filter(r => r.file === "AGENTS.md").length, cc = counts(h), oc = counts(h.own);
+  ok(ownCount > 0 && oc.all === ownCount && oc.check > 0 && cc.all === h.rules.length && !h.rules.some(r => r.file === "AGENTS.md")
+    && coreLine === `- rules held by a check: the floor's and the modules' ${cc.check} of ${cc.all}; the core's own ${oc.check} of ${ownCount}, those of \`AGENTS.md\`.`,
+    "the core's own report gives its share of the floor's and the modules' rules and, counted apart, of its own AGENTS.md's (#925)", coreLine);
+  // (a scratch core whose AGENTS.md holds two rules: the count of its own held by a check rises once an entry names one,
+  // the floor's and the modules' unchanged; one held in part, or by a check that is not there, does not raise it)
+  const own = (h2, extra = {}) => holders(project(h2, { "AGENTS.md": "# A core\n\n- **An own rule.** a.\n- **Another.** b.\n", ...extra }), []);
+  const before = own({}), after = own({ "AGENTS.md: An own rule": "check: tests/a-test.mjs" }, { "tests/a-test.mjs": "" });
+  const partly = own({ "AGENTS.md: An own rule": "check: scripts/a-check.mjs, in part" }), gone = own({ "AGENTS.md: An own rule": "check: tests/gone-test.mjs" });
+  ok(!before.wrong.length && !after.wrong.length && counts(before.own).check === 0 && counts(after.own).check === 1 && counts(after.own).all === 2
+    && counts(after).check === counts(before).check && counts(after).all === counts(before).all && counts(partly.own).check === 0 && counts(partly.own).part === 1
+    && counts(gone.own).check === 0 && gone.wrong.some(w => /"AGENTS\.md: An own rule" is held by "tests\/gone-test\.mjs", which is not there\. Mend: /u.test(w)),
+    "an entry of AGENTS.md that names a check raises the core's own count, apart from the floor's and the modules'; one in part counts in part, and a check not there fails with its mend",
+    JSON.stringify({ before: counts(before.own), after: counts(after.own), gone: gone.wrong }));
 }
 
 // (the share read in a project as the monthly report reads it (state-report.mjs, heldHere): one with no shape config and no mutation tool, whose

@@ -1,14 +1,14 @@
-// What holds each rule of the floor and the modules (AGENTS.md, "Every rule says what holds it"; #235, part D): one of
-// three, a check that fails where the rule is broken, a staged case (staged.mjs, beside this file), or the scheduled
-// audit. The list is a folder, scripts/holders/, of one file for each rule (#750, point 1; #853), read in the order of
-// the files' names and named from the rule's key (entryFile): {"rule": its file and bold lead as rules.mjs names it, or
-// a rule file alone for its text outside any rule; "holder": one holder or a list of them; "behind": the keys of the
-// core archive's items behind it ("a rule file names no item itself": AGENTS.md, "The archive is pointed to from the
-// list"; a number up to 262, or "#N" or "#N.P" for one keyed by its issue); "number": "<findings | check fires |
-// correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count it is meant to lower and the
-// outcome it stands for, which pruning.mjs reads}, each but "rule" only where the rule has one. A holder is "check:
-// <the script, workflow or hook that fails a pull request or a step where the rule is broken, or opens an issue by
-// itself; or GitHub's setting that refuses it>", "audit" (the scheduled audit reads it) or "describes" (it only points
+// What holds each rule of the floor and the modules (AGENTS.md, "Every rule says what holds it"; #235, part D), and of
+// the core's own AGENTS.md, counted apart (#925): one of three, a check that fails where the rule is broken, a staged
+// case (staged.mjs, beside this file), or the scheduled audit. The list is a folder, scripts/holders/, of one file for
+// each rule (#750, point 1; #853), read in the order of the files' names and named from the rule's key (entryFile):
+// {"rule": its file and bold lead as rules.mjs names it, or a rule file alone for its text outside any rule; "holder":
+// one holder or a list of them; "behind": the keys of the core archive's items behind it ("a rule file names no item
+// itself": AGENTS.md, "The archive is pointed to from the list"; a number up to 262, or "#N" or "#N.P" for one keyed by
+// its issue); "number": "<findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable |
+// robust>", the count it is meant to lower and the outcome it stands for, which pruning.mjs reads}, each but "rule"
+// only where the rule has one. A holder is "check: <the script, test, workflow or hook that fails a pull request or a
+// step where the rule is broken, or opens an issue by itself; or GitHub's setting that refuses it>", "audit" (the scheduled audit reads it) or "describes" (it only points
 // elsewhere or says what is protected, and binds no one), each with ", in part" where it holds some of the rule and
 // the rest has none. A rule with no entry has no holder. Each staged case names the rules it holds in its own file. A rule with none is listed, in the core's monthly state report
 // (state-report.mjs), until it gains one or goes on the owner's word. A hook (HOOKS) holds no rule alone: one whose
@@ -64,7 +64,7 @@ const hook = x => x.kind === "check" && HOOKS.has(x.by);
 // names it wrong where it meets one). `file` and `paths`: the list it stands in, and the names of a check that are
 // paths to read as there or not. `show`: how a key or value is written into a line, which a project's list writes as a
 // code span on one line.
-function holderOf(key, value, root, file = FILE, paths = /^(?:scripts|\.github|setup|floor|roles|tasks|tools)\//u, show = t => `"${t}"`) {
+function holderOf(key, value, root, file = FILE, paths = /^(?:scripts|tests|\.github|setup|floor|roles|tasks|tools)\//u, show = t => `"${t}"`) {
   if (typeof value !== "string" || !value) return null;
   const m = FORM.exec(value);
   if (!m) return `${file}: ${show(key)} has the holder ${show(value)}, in no form it reads. Mend: write "check: <its script, workflow or GitHub's setting>", "audit" or "describes", each with ", in part" where it holds only some of the rule${file === FILE ? "; a staged case names its rules in its own file" : ', or "none" where nothing holds it'}`;
@@ -160,21 +160,24 @@ function sharedFiles(all) {
   return [...files].filter(([, ks]) => ks.length > 1).map(([f, ks]) => `${FILE}/${f} would be the entry of ${ks.map(k => `"${k}"`).join(" and ")}. Mend: reword the lead of one of them so that their file names differ`);
 }
 
-// Each rule with its holders ([{ kind, by, part }]), and what is wrong with the entries, each a line with its mend.
+// Each rule of the floor and the modules with its holders ([{ kind, by, part }]), and what is wrong with the entries,
+// each a line with its mend; `own`, the core's own rules, those of its AGENTS.md, the same way ({ rules, by }), counted
+// apart (#925).
 export function holders(root = ROOT, cases = CASES) {
-  const all = rules(root), keys = new Set(all.map(r => r.key)), read = named(root), wrong = read.wrong ? [read.wrong] : [...read.faults];
+  const every = rules(root, { agents: true }), all = every.filter(r => r.file !== "AGENTS.md"), mine = every.filter(r => r.file === "AGENTS.md");
+  const read = named(root), wrong = read.wrong ? [read.wrong] : [...read.faults];
   if (!read.wrong) wrong.push(...(shapeFaults("holders", read.json, "", FILE) ?? []));
-  const by = new Map(all.map(r => [r.key, []]));
+  const by = new Map(all.map(r => [r.key, []])), ownBy = new Map(mine.map(r => [r.key, []])), mapOf = key => by.get(key) ?? ownBy.get(key);
   for (const [key, value] of Object.entries(read.named)) {
-    if (!keys.has(key)) { wrong.push(`${FILE}/${entryFile(key)} names "${key}", which is no rule of the floor or the modules as they stand. Mend: write the key as the rule's file and bold lead now read ("floor/security.md: 1. Nothing secret in the repository"), or take it out where the rule has gone`); continue; }
+    if (!mapOf(key)) { wrong.push(`${FILE}/${entryFile(key)} names "${key}", which is no rule of the floor, the modules or AGENTS.md as they stand. Mend: write the key as the rule's file and bold lead now read ("floor/security.md: 1. Nothing secret in the repository"), or take it out where the rule has gone`); continue; }
     for (const h of (Array.isArray(value) ? value : [value]).map(v => holderOf(key, v, root))) {
-      if (typeof h === "string") wrong.push(h); else if (h) by.get(key).push(h);
+      if (typeof h === "string") wrong.push(h); else if (h) mapOf(key).push(h);
     }
   }
-  for (const c of cases) for (const key of c.holds) if (by.has(key)) by.get(key).push({ kind: "case", by: c.name, part: c.inPart.includes(key) });
-  wrong.push(...sharedFiles(rules(root, { agents: true })));
+  for (const c of cases) for (const key of c.holds) mapOf(key)?.push({ kind: "case", by: c.name, part: c.inPart.includes(key) });
+  wrong.push(...sharedFiles(every));
   if (!read.wrong) wrong.push(...behindWrong(root, read.behind), ...numbersWrong(root, read.numbers));
-  return { rules: all, by, wrong };
+  return { rules: all, by, wrong, own: { rules: mine, by: ownBy } };
 }
 
 // The counts: rules held whole, in part, described only, and with no holder; and the rules with none.
@@ -194,22 +197,17 @@ export function counts({ rules: all, by }) {
 
 // The lines the state report carries.
 export function report(root = ROOT) {
-  const c = counts(holders(root));
+  const h = holders(root), c = counts(h);
   return [
     `- Of ${c.all} rules of the floor and the modules: ${c.check} held whole by a check, ${c.case} by a staged case, ${c.audit} by the audit, ${c.part} in part; ${c.describes} describe and bind no one; ${c.none.length} have no holder${c.hooked.length ? `, ${c.hooked.length} of them held by a hook alone, which a session of another tool never runs` : ""} (\`scripts/holders.mjs\`).`,
-    coreShare(root, c),
+    coreShare(c, counts(h.own)),
     ...(c.none.length ? [`- No holder, each until it gains one or goes on the owner's word: ${c.none.join("; ")}.`] : []),
   ];
 }
 
-// The core's own share (#459, point 3), as a project's report gives its own: the floor's and the modules' rules held
-// whole by a check (`c`, as counts() gives them); the core's own rules, those of its AGENTS.md, are said not to be
-// counted, since each names its holder in its own text and their entries under scripts/holders/ carry none: a departure
-// from AGENTS.md's "The share a check holds is reported" until #925 lets the list carry them.
-function coreShare(root, c) {
-  const own = rules(root, { agents: true }).filter(r => r.file === "AGENTS.md").length;
-  return `- rules held by a check: the floor's and the modules' ${c.check} of ${c.all}; the core's own ${own}, those of \`AGENTS.md\`, not counted, each naming its holder in its own text and its entry under \`${FILE}/\` none (#925).`;
-}
+// The core's share (#459, point 3), as a project's report gives its own: the rules held whole by a check, of the floor
+// and the modules (`c`) and of the core's own, those of its AGENTS.md (`own`; #925), each as counts() gives them.
+const coreShare = (c, own) => `- rules held by a check: the floor's and the modules' ${c.check} of ${c.all}; the core's own ${own.check} of ${own.all}, those of \`AGENTS.md\`.`;
 
 // Of the core's rules a project takes (the floor's always, a module's unless its manifest leaves it out: `out`, by the
 // file's name), how many a check holds whole there, by the core's own list: { held, all }, none counted whose every
