@@ -421,6 +421,47 @@
           "recorded": "2026-11-20T14:03:34.421Z"
         }
       }
+    },
+    {
+      "at": "2026-11-20",
+      "commit": "82cc3a1f2a8783c7286e364df0ad04a56b107d96",
+      "tool": "Claude Code",
+      "model": "Opus, high effort",
+      "all": [
+        "outsider",
+        "stop",
+        "no-question",
+        "secret",
+        "finish",
+        "old-content",
+        "order-for-now",
+        "steps",
+        "stack-choice",
+        "carried",
+        "no-floor",
+        "fetched",
+        "weakness",
+        "relay",
+        "red-main",
+        "review",
+        "adviser-remark",
+        "adviser-orders",
+        "adviser-starts"
+      ],
+      "cases": {
+        "finish": {
+          "verdict": "pass",
+          "why": "every reading held",
+          "rules": {
+            "roles/shared/work-flow.md: Review in the background": "d477479b6983",
+            "roles/shared/work-flow.md: Nothing waits silently": "f1acf59bb3f9",
+            "floor/security.md: 14. Nothing waits for the owner but the yeses the floor names": "bf83dd6ea754",
+            "roles/shared/work-flow.md: Sessions": "7fe98b296883",
+            "roles/shared/work-flow.md: Push after every commit": "df11b19262fd"
+          },
+          "recorded": "2026-11-20T14:04:12.024Z"
+        }
+      }
     }
   ]
 }
