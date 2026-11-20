@@ -23,6 +23,10 @@
       "mark": 74465,
       "why": "Past the large file mark, it is read by the section a task needs, found by searching, never whole (roles/shared/how-to-work.md, \"Read little\"), so no split lets a session read less; GitHub shows it whole as the repository's front page, to people."
     },
+    "tests/pruning-test.mjs": {
+      "mark": 23922,
+      "why": "#895: its section on the rules with no holder moves to a test of its own."
+    },
     "scripts/csharp-tree.mjs": {
       "mark": 25832,
       "why": "#884: the text the parser reads (the preprocessor, C# 14's extension headers) apart from the reading of the tree."
