@@ -5,10 +5,10 @@
 //   node tests/session-cost-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { context, cost, keep, keptIn, line, ownRecord, records, tallyOf } from "../scripts/session-cost.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -26,8 +26,7 @@ ok(c.families.join() === "Haiku,Opus", "models by family alone, a model of no kn
 ok(line(c) === "Session so far: 4 answers (Haiku, Opus); tokens in 13, cache written 120, cache read 3,000, out 11.", "the line", line(c));
 ok(line(cost([])) === "" && line(cost(["{}\n"])) === "", "nothing to say where there is no answer");
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "session-cost-test-"));
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("session-cost-test-");
 const session = "01234567-89ab-cdef-0123-456789abcdef", other = "11111111-2222-3333-4444-555555555555";
 const project = path.join(tmp, "projects", "-some-folder");
 fs.mkdirSync(path.join(project, session, "subagents"), { recursive: true });

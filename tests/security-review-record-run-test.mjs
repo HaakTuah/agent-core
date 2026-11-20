@@ -4,13 +4,13 @@
 //
 //   node tests/security-review-record-run-test.mjs
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { compareRights, recordings } from "../scripts/security-review-host.mjs";
 import { chosen, fetchPull, main, recordOf, unreadOf, why, writeRights } from "../scripts/security-review-record.mjs";
 import { HEAD, OTHER, answer, cleared, found, host, posted, record, refusal, review, same, summary } from "./security-review-host-test.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -59,7 +59,7 @@ ok(same(chosen(pagesAsked.call, 8), []) && pagesAsked.calls.filter((c) => c.star
 const twice = host({ ...candidates, ...list([...full.slice(0, 98), { number: 5, merged_at: "2026-11-11T00:00:00Z" }, { number: 3, merged_at: "2026-11-10T00:00:00Z" }], [{ number: 5, merged_at: "2026-11-11T00:00:00Z" }, { number: 2, merged_at: "2026-11-09T00:00:00Z" }]) });
 ok(same(chosen(twice.call, 8), [5, 3, 2]) && twice.calls.filter((c) => c.startsWith(`${at}/pulls?`)).length === 2, "a pull request listed again on a later page is chosen once, and a page of fewer than a hundred is the last");
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "security-review-host-"));
+const dir = scratchDir("security-review-host-");
 try {
   const said = [];
   const say = (line) => said.push(line);

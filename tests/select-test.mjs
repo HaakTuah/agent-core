@@ -9,7 +9,6 @@
 //   node tests/select-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
@@ -17,6 +16,7 @@ import { ALL_MS, Late, hurry } from "../scripts/hurry.mjs";
 import { WORDS, mentioned, nameTrie } from "../scripts/name-trie.mjs";
 import { links, reached, selection } from "../scripts/select.mjs";
 import { parseConfig, survey } from "../scripts/shape.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -231,8 +231,7 @@ for (const [changed, what] of [[["package.json"], "a file of no code the readers
 }
 
 // ---- whole runs, in a scratch repository ----
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "select-test-"));
-process.on("exit", () => fs.rmSync(dir, { recursive: true, force: true }));
+const dir = scratchDir("select-test-");
 const git = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const put = (file, text) => { fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.writeFileSync(path.join(dir, file), text); };
 const run = (args, env = {}) => { const r = spawnSync(process.execPath, [script, ...args], { cwd: dir, encoding: "utf8", env: { ...process.env, SELECT_BASE: "", GITHUB_ENV: "", GITHUB_STEP_SUMMARY: "", ...env } }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };

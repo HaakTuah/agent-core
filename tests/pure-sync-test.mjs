@@ -17,19 +17,17 @@
 //   node tests/pure-sync-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { copyTree, entries } from "../scripts/copy-tree.mjs";
-import { checkoutStandIn, ghStandIn, scratchEnv } from "../scripts/scratch-core.mjs";
+import { checkoutStandIn, ghStandIn, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200).replace(/\n/g, "\n     ")}`}`); } };
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pure-sync-test-"));
-process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+const tmp = scratchDir("pure-sync-test-");
 const slash = p => p.replace(/\\/g, "/");
 const theCore = path.join(tmp, "the-core"), coreRepo = path.join(theCore, ".git"); // (copy-tree.mjs takes the git folder)
 const env = scratchEnv(theCore, tmp);

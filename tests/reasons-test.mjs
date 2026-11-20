@@ -2,21 +2,19 @@
 // scratch folder, and run on the core's own. Its tests workflow runs it on every pull request here. Node's own modules.
 //
 //   node tests/reasons-test.mjs
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { entryFile } from "../scripts/holders.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { lines, reasonsOf } from "../scripts/reasons.mjs";
+import { lines, reasonsOf, report } from "../scripts/reasons.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what, detail = "") => { if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "reasons-test-"));
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("reasons-test-");
 const write = (f, text) => { fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), text); };
 
 write("AGENTS.md", "# A core\n\n**An own rule.** Said here.\n");
@@ -50,12 +48,22 @@ ok(none.includes("no item of the archive is listed yet") && none.includes("Its n
 ok(reasonsOf(tmp, "rule").matches.length === 4 && reasonsOf(tmp, "no such").matches.length === 0 && reasonsOf(tmp, "").matches.length === 0, "a query that names several rules, or none, gives what it matched");
 ok(reasonsOf(tmp, "tasks/x.md").rule === "tasks/x.md" && reasonsOf(tmp, "tasks/x.md").fileItems.length === 0, "a rule file named whole gives the items behind its text");
 
-// run, on the core's own: a rule's reasons, and each failure saying its mend
-const run = (...args) => spawnSync(process.execPath, [path.join(root, "scripts/reasons.mjs"), ...args], { cwd: root, encoding: "utf8" });
+// the command's report, on the core's own: a rule's reasons, and each failure saying its mend
+const run = query => { const r = report(query, root, root); return { status: r.status, stdout: r.out }; };
 const own = run("The archive is pointed to from the list");
-ok(own.status === 0 && own.stdout.startsWith("AGENTS.md: The archive is pointed to from the list\n") && /- Core archive \S+, .*\(archive\/instructions\//u.test(own.stdout) && own.stdout.includes(`https://github.com/${CORE}/issues/252`), "run on the core's own rule, it prints its items and issues", own.stdout + own.stderr);
+ok(own.status === 0 && own.stdout.startsWith("AGENTS.md: The archive is pointed to from the list\n") && /- Core archive \S+, .*\(archive\/instructions\//u.test(own.stdout) && own.stdout.includes(`https://github.com/${CORE}/issues/252`), "run on the core's own rule, it prints its items and issues", own.stdout);
 const several = run("builder"), nothing = run("no rule is named so");
 ok(several.status === 1 && mended(several.stdout) && several.stdout.includes("roles/builder.md: Read by task, twice"), "run with a part that names several rules, it fails, listing them, with the mend", several.stdout);
-ok(nothing.status === 1 && mended(nothing.stdout), "run with a part that names none, it fails with the mend", nothing.stdout);
+ok(nothing.status === 1 && mended(nothing.stdout) && nothing.stdout.includes('as `node scripts/reasons.mjs "security.md: 3. The protected files"`'), "run with a part that names none, it fails with the mend, naming the command as seen from where it is run", nothing.stdout);
+ok(report("no rule is named so", root, path.join(root, "scripts")).out.includes("`node reasons.mjs "), "the command named in the mend is the path from the folder it is run in");
+
+const listed = report("rule", tmp, tmp).out.split("\n");
+ok(listed.length === 5 && listed.slice(1).every(k => k.startsWith("  ") && !k.startsWith("   ")) && listed[1] === "  AGENTS.md: An own rule", "a part that names several rules lists each on a line of its own, set in", listed.join("|"));
+ok(report("a first rule", tmp, tmp).status === 0 && report("a first rule", tmp, tmp).out === lines(first, tmp, tmp).join("\n"), "the report of one rule is the lines it gives, joined");
+const bare = path.join(tmp, "bare");
+fs.mkdirSync(path.join(bare, "tasks"), { recursive: true });
+fs.writeFileSync(path.join(bare, "tasks", "x.md"), "# A module\n\n**A lone rule.** Said.\n");
+const wrong = report("a lone rule", bare, bare);
+ok(wrong.status === 0 && wrong.out.startsWith("FAIL ") && wrong.out.includes("Mend:") && wrong.out.split("\n")[1] === "tasks/x.md: A lone rule", "where the list cannot be read it says so first, with its mend, and the rule's lines follow", wrong.out);
 
 process.exit(failed ? 1 : 0);

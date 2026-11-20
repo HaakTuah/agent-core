@@ -8,11 +8,11 @@
 //   node tests/test-record-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { alone, fromJobs, fromJunit, record, saysWhatItGuards, stepsOf, table } from "../scripts/test-record.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -93,8 +93,7 @@ const short = (test, seconds, clock) => ({ test, runs: 1, seconds, real: 0, last
 ok(/1 reach a real clock, 1 s of it \(60%\)/.test(table([short("a", 0.6, true), short("b", 0.4, false)]).join("\n")), "a share is taken from the times as they stand, rounded only as it is shown", table([short("a", 0.6, true), short("b", 0.4, false)]).join("\n"));
 
 // ---- a whole run, on JUnit reports in a scratch folder ----
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "test-record-test-"));
-process.on("exit", () => fs.rmSync(dir, { recursive: true, force: true }));
+const dir = scratchDir("test-record-test-");
 const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
 execFileSync("git", ["init", "-q"], { cwd: dir });
 put("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src", "test"], tests: ["test/"], screens: ["playwright"] }));

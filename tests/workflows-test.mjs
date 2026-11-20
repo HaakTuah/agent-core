@@ -5,7 +5,6 @@
 //   node tests/workflows-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
@@ -17,6 +16,7 @@ import { readyOnlyHolds } from "../scripts/step-checks-ready.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { keysOnce } from "../scripts/step-checks-workflow-text.mjs";
 import { LONGEST, twice, uncommented } from "../scripts/yaml-keys.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -246,7 +246,7 @@ ok(noYaml.fails.length === 4 && /^FAIL a\.yml:4:\d+: the core's reader cannot re
 ok(unparsed([]).fails.length === 0 && own.every(f => unparsed([{ file: f, text: fs.readFileSync(`${core}.github/workflows/${f}`, "utf8") }]).fails.length === 0), "the core's own workflows each parse");
 
 // run on a scratch project: each failure says its mend
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-test-"));
+const tmp = scratchDir("workflows-test-");
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
   for (const f of ["workflows.mjs", "workflow-run.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
@@ -289,7 +289,7 @@ try {
   ok(u.status === 1 && /^::warning::The check for a key given twice did not run, nor the one for a file that is no YAML, nor the one for a call a draft skips/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && !/e\.yml|is not installed/.test(uOut) && mended(uOut), `where the install could not reach the registry, the keys given twice and the calls a draft skips did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 // ---- a copy of the core at the path the manifest names (#918): the check leaves it out, and reads the project's own core/ ----
-const vend = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-vendored-"));
+const vend = scratchDir("workflows-vendored-");
 try {
   const at = "vendor/core/", put = (f, text) => { fs.mkdirSync(path.dirname(path.join(vend, f)), { recursive: true }); fs.writeFileSync(path.join(vend, f), text); };
   fs.mkdirSync(path.join(vend, at, "scripts"), { recursive: true });

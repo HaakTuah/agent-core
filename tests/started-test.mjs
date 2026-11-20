@@ -5,14 +5,14 @@
 //   node tests/started-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
 const here = fileURLToPath(new URL("../scripts/", import.meta.url));
-const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "started-test-")));
+const tmp = fs.realpathSync(scratchDir("started-test-"));
 try {
   const real = path.join(tmp, "real"), link = path.join(tmp, "link");
   fs.mkdirSync(real);
