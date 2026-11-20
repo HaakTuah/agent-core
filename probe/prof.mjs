@@ -1,4 +1,4 @@
-import cp, { syncBuiltinESMExports } from "node:child_process";
+import cp from "node:child_process";
 import fs from "node:fs";
 import { syncBuiltinESMExports as sync } from "node:module";
 const log = process.env.PROF_LOG;
