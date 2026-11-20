@@ -19,7 +19,6 @@ import { CORE } from "../scripts/core-address.mjs";
 import { rules } from "../scripts/rules.mjs";
 import { scratch } from "../scripts/scratch-core.mjs";
 import { CASES, MONTHS, TOOL, brief, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, lost, setCase, toolNamed, tools, toolsSaid, unplaced, wayNames, wellFormed } from "../scripts/staged.mjs";
-// (scratch.mjs is the entrance of scratch-setup.mjs, scratch-reader.mjs and scratch-outcome.mjs, which these cases run: #938)
 import { BUG, LABELS, LIMITS, OWNER, PROGRAM, REPO, Unreadable, branchesOf, keepKits, originGit as readOrigin, changed, folderFit, inCommits, memoOf, testPasses, touched } from "../scripts/staged/scratch.mjs";
 import { PLANTED, UNPLANTED } from "../scripts/staged/steps.mjs";
 import { tells } from "../scripts/staged/weakness.mjs";
