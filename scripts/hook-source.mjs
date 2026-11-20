@@ -15,9 +15,17 @@ const KIT_PATH = "[\\w.-]+(?:/[\\w.-]+)*", KIT_ARGS = "((?: [\\w.-]+)*)";
 // (the path fetched from main, written one way alone: each name starting with a letter, a digit, "_" or "-", so no "."
 // or "..", which git reads from the folder it runs in, and no other spelling of the same file)
 const FETCHED = "[\\w-][\\w.-]*(?:/[\\w-][\\w.-]*)*";
-const kitFetch = dir => `f=\\$\\(git -C "${dir}" --no-replace-objects show refs/remotes/origin/main:(?<fetched>${FETCHED}) 2>/dev/null\\)`;
+const kitFetch = (dir, library = "") => `f=\\$\\(git -C "${dir}" --no-replace-objects show refs/remotes/origin/main:(?<fetched>${FETCHED}) 2>/dev/null${library}\\)`;
+// What core-path.mjs's hookCommands writes for a copy at another path than core/: the start's first test that the floor
+// can be read there, which stops a session that cannot, and, where a library carries the core, the script read from the
+// library's commit that main pins when main's own tree holds the library as a commit alone (never the working tree's: a
+// branch can commit files that form a bare repository where the library stands, which git, run in that folder, finds there
+// and reads objects and a config from; the command names the submodule's repository, its .git, which a branch cannot
+// commit, so the one git has there is the only one it opens, on every version of git).
+const FLOOR_TEST = `\\[ -f "\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}"/${KIT_PATH} \\] \\|\\| \\{ echo "[^"'$\`\\\\]*"; exit 0; \\}; `;
+const PIN_FALLBACK = ` \\|\\| \\{ s=\\$\\(git -C "\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}" --no-replace-objects rev-parse refs/remotes/origin/main:(?<library>${FETCHED}) 2>/dev/null\\) && git --git-dir="\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}"/\\k<library>/\\.git --no-replace-objects show "\\$s:${FETCHED}" 2>/dev/null; \\}`;
 const KIT_FORMS = [
-  new RegExp(`^bash -c '${kitFetch("\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}")} \\|\\| (?:exit 0|\\{ echo "[^"'$\`\\\\]*"; exit 0; \\}); (?:bash -c "\\$f"${KIT_ARGS}|node --input-type=module -e "\\$f"())'$`, "u"),
+  new RegExp(`^bash -c '(?:${FLOOR_TEST})?${kitFetch("\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}", `(?:${PIN_FALLBACK})?`)} \\|\\| (?:exit 0|\\{ echo "[^"'$\`\\\\]*"; exit 0; \\}); (?:bash -c "\\$f"${KIT_ARGS}|node --input-type=module -e "\\$f"())'$`, "u"),
   new RegExp(`^bash -c 'r=\\$\\(git rev-parse --show-toplevel 2>/dev/null\\) \\|\\| exit 0; (?:\\[ (?:! )?-f "\\$r/${KIT_PATH}" \\] \\|\\| exit 0; )+${kitFetch("\\$r")} \\|\\| exit 0; CLAUDE_PROJECT_DIR="\\$r" bash -c "\\$f"${KIT_ARGS}'$`, "u"),
 ];
 
