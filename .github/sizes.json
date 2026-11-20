@@ -75,7 +75,6 @@
       "mark": 25832,
       "why": "#884: the text the parser reads (the preprocessor, C# 14's extension headers) apart from the reading of the tree."
     },
-    },
     "tasks/game-design.md": {
       "mark": 25119,
       "why": "#441: the game rules split into a base and a file for each kind (#484, points 6 and 7)."
