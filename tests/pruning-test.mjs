@@ -87,26 +87,36 @@ ok(list({ all: [still], named, numbers, record: rec(), cases, steps, starts: new
 
 // ---- the rules with no holder lead the list (#545) ----
 const bare = R("tasks/e.md", "Bare"), early = R("roles/shared/e.md", "At start"), floorBare = R("floor/security.md", "3. Bare"), unproposed = R("tasks/e.md", "Unproposed");
-const proposals = { [bare.key]: { mark: "goes", why: "no breach recorded" }, [early.key]: { mark: "check", by: "#9", why: "a script reads it" },
-  [floorBare.key]: { mark: "goes", why: "it costs much" }, [loud.key]: { mark: "move", why: "held now" }, "tasks/gone.md: Gone": { mark: "case", why: "gone" } };
+const proposals = { [bare.key]: { mark: "goes", why: "no breach recorded", noForm: "its breach is in what a session says" }, [early.key]: { mark: "check", by: "#9", why: "a script reads it" },
+  [floorBare.key]: { mark: "goes", why: "it costs much", form: "a script reads the file" }, [loud.key]: { mark: "move", why: "held now" }, "tasks/gone.md: Gone": { mark: "case", why: "gone" } };
 const led = list({ all: [still, bare, early, floorBare, unproposed, loud], named, numbers, record: rec(...p), cases, steps, starts: new Set([still.key, early.key]), joined: () => 40,
   none: [bare.key, early.key, floorBare.key, unproposed.key], proposals });
 const at = k => led.findIndex(l => l.startsWith(`- ${k}:`));
 ok(/^- No holder: 4 rules \(`scripts\/holders\.mjs`\), worst first, each with its proposal \(`reports\/unheld\.json`\)\./u.test(led[0])
   && at(early.key) === 1 && at(bare.key) > at(early.key) && at(bare.key) < led.findIndex(l => l.startsWith("- Read:")),
   "the rules with no holder lead the list, ahead of what the pruning read, one read at a role's start first", led.slice(0, 7).join("\n"));
-ok(led[at(early.key)] === `- ${early.key}: no holder, read at a role's start. Its proposal: check (#9), a script reads it.` && led[at(bare.key)] === `- ${bare.key}: no holder, read on need. Its proposal: goes, no breach recorded.`,
+ok(led[at(early.key)] === `- ${early.key}: no holder, read at a role's start. Its proposal: check (#9), a script reads it.` && led[at(bare.key)] === `- ${bare.key}: no holder, read on need. Its proposal: goes, no breach recorded. No form a check could hold: its breach is in what a session says.`,
   "each says where it is read and its proposal, a check with the issue that builds it", `${led[at(early.key)]}\n${led[at(bare.key)]}`);
-ok(/^- floor\/security\.md: 3\. Bare: no holder, read on need\. Its proposal: goes, it costs much\. It guards against rare and severe harm, so it is proposed a holder, a check or a staged case, and nothing else\.$/u.test(led[at(floorBare.key)])
+ok(/^- floor\/security\.md: 3\. Bare: no holder, read on need\. Its proposal: goes, it costs much\. A form a check could hold: a script reads the file\. It guards against rare and severe harm, so it is proposed a holder, a check or a staged case, and nothing else\.$/u.test(led[at(floorBare.key)])
   && /No proposal yet: the session that takes the pruning gives it one in `reports\/unheld\.json`/u.test(led[at(unproposed.key)]),
   "a floor rule proposed to go is said to need a holder instead, and a rule with no proposal is said to need one");
+// ---- beside each proposal, a form a check could hold, or why none (#887) ----
+const forms = list({ all: [bare, early, floorBare, unproposed, loud], named, numbers, record: rec(), cases, steps, starts: new Set(), joined: () => 40, none: [bare.key, early.key, floorBare.key, unproposed.key, loud.key],
+  proposals: { [bare.key]: { mark: "move", why: "read rarely" }, [early.key]: { mark: "check", why: "a script reads it" }, [floorBare.key]: { mark: "case", why: "a session's act", noForm: "only what a session does shows it" },
+    [unproposed.key]: { mark: "describes", why: "binds no one" }, [loud.key]: { mark: "goes", why: "unused", form: "a script reads the line" } } });
+const formOf = k => forms.find(l => l.startsWith(`- ${k}:`)) ?? "";
+ok(formOf(bare.key).endsWith(" No form proposed yet: the session that takes the pruning gives a form of the rule a check could hold (`form`), or why none exists (`noForm`).")
+  && formOf(floorBare.key).endsWith(" No form a check could hold: only what a session does shows it.") && formOf(loud.key).endsWith(" A form a check could hold: a script reads the line.")
+  && !/form/iu.test(formOf(early.key)) && !/form/iu.test(formOf(unproposed.key))
+  && forms.filter(l => / no holder, /u.test(l) && !/check \(|check, |describes, /u.test(l)).every(l => /(A form a check could hold|No form a check could hold|No form proposed yet|a form of the rule a check could hold)/u.test(l)),
+  "each rule with no holder carries a form a check could hold or why none exists, or is said to have neither yet; a check, which holds it as it stands, and a rule that describes need neither", forms.join("\n"));
 const tool = R("tools/x.md", "Its own"), floorNone = R("floor/topics/y.md", "Unproposed");
 const tooled = list({ all: [bare, tool, floorNone], named, numbers, record: rec(), cases, steps, starts: new Set(), toolStarts: new Set([tool.key]), joined: () => 40, none: [bare.key, tool.key, floorNone.key], proposals });
-ok(tooled[1].startsWith(`- ${tool.key}: no holder, read at its tool's start.`) && /^- floor\/topics\/y\.md: Unproposed: no holder, read on need\. No proposal yet: .*a check or staged case that could hold it, since it guards against rare and severe harm\.$/u.test(tooled.find(l => l.startsWith(`- ${floorNone.key}:`)) ?? ""),
+ok(tooled[1].startsWith(`- ${tool.key}: no holder, read at its tool's start.`) && /^- floor\/topics\/y\.md: Unproposed: no holder, read on need\. No proposal yet: .*a check or staged case that could hold it, since it guards against rare and severe harm, and a form of the rule a check could hold \(`form`\), or why none exists \(`noForm`\)\.$/u.test(tooled.find(l => l.startsWith(`- ${floorNone.key}:`)) ?? ""),
   "a rule of a tool's part, read at its tool's start, comes first, and a floor rule with no proposal is offered only a holder", tooled.join("\n"));
 const forged = list({ all: [bare], named, numbers, record: rec(), cases, steps, starts: new Set(), joined: () => 40, none: [bare.key],
-  proposals: { [bare.key]: { mark: "goes", by: "#1\n- tasks/x.md: Forged", why: "one\n- tasks/y.md: Forged too" } }, wrong: "`reports/unheld.json` cannot be read (bad). Mend: write it as JSON" });
-ok(forged.length === 4 && forged[1].startsWith("- `reports/unheld.json` cannot be read (bad). Mend:") && forged[2] === `- ${bare.key}: no holder, read on need. Its proposal: goes (#1 - tasks/x.md: Forged), one - tasks/y.md: Forged too.`,
+  proposals: { [bare.key]: { mark: "goes", by: "#1\n- tasks/x.md: Forged", why: "one\n- tasks/y.md: Forged too", form: "two\n- tasks/z.md: Forged" } }, wrong: "`reports/unheld.json` cannot be read (bad). Mend: write it as JSON" });
+ok(forged.length === 4 && forged[1].startsWith("- `reports/unheld.json` cannot be read (bad). Mend:") && forged[2] === `- ${bare.key}: no holder, read on need. Its proposal: goes (#1 - tasks/x.md: Forged), one - tasks/y.md: Forged too. A form a check could hold: two - tasks/z.md: Forged.`,
   "a value of the file holding a line break stays on its rule's line, and a file that cannot be read is said with its mend", forged.join("\n"));
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "unheld-"));
 const at2 = t => { fs.mkdirSync(path.join(scratch, "reports"), { recursive: true }); fs.writeFileSync(path.join(scratch, "reports", "unheld.json"), t); return readUnheld(scratch); };

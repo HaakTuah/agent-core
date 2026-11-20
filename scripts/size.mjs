@@ -82,12 +82,15 @@ import { started } from "./started.mjs";
 // guidelines and 20 in the inbox, for 143 over in the adviser's and 140 in the reviewer's once the clause took its
 // reviewed words; the floor's and the guidelines' are changes the owner's yes on #886 does not cover, the inbox's cuts
 // the name of another rule ("Bugs don't wait"), so none was made, and neither start would fit all the same.
+// The reviewer's, raised one step on 20 November 2026 for #887, the review guidelines' point on a rule held by reading
+// alone where a form a check can hold exists: an eleventh fresh leanness check read the reviewer's start whole and
+// found no valid trim, for 298 over.
 export const CAPS = {
   builder: 32 * 1024,
   design: 33 * 1024,
   orchestrator: 49 * 1024,
   adviser: 34 * 1024,
-  reviewer: 27 * 1024,
+  reviewer: 28 * 1024,
   "stand-in": 20 * 1024,
 };
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a
