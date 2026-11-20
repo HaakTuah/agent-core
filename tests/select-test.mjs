@@ -73,17 +73,23 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
   const watch = () => hurry({ files: new Set(["src/rules.js", "src/view.js"]), ms: 100, characters: 50, now: () => clock });
   const slow = at => () => { clock += at; return "read"; };
   let w = watch();
-  ok(w.timed("src/rules.js", slow(60)) === "read" && w.timed("src/view.js", slow(40)) === "read" && w.timed("src/tool.js", slow(3000)) === "read",
+  ok(w.timed("src/rules.js", slow(60)) === "read" && w.timed("src/view.js", slow(40)) === "read" && w.timed("src/tool.js", slow(ALL_MS - 200)) === "read",
     "files read within the budget together are read, and a file the pull request leaves as it was counts for none of the changed files' budget");
   // (the project's own files count for the whole run's budget, from the watch's start: a project whose size alone is
   // more than can be read in time runs the whole suite, as the linking does; #962)
   w = watch();
-  ok(w.timed("src/tool.js", slow(ALL_MS)) === "read" && /project's files of code.*took 3501 ms, past the 3500 ms.*cannot be told in time/u.test(lateness(() => w.timed("src/other.js", slow(1)))),
+  ok(w.timed("src/tool.js", slow(ALL_MS)) === "read" && new RegExp(`project's files of code.*took ${ALL_MS + 1} ms, past the ${ALL_MS} ms.*cannot be told in time`, "u").test(lateness(() => w.timed("src/other.js", slow(1)))),
     "the project's own files, which the pull request leaves as they were, are read within the whole run's budget and stop the reading past it, saying why");
   w = watch();
   const whole = w.pace(1e9);
   clock += ALL_MS + 1;
-  ok(/took 3501 ms, past the 3500 ms/u.test(lateness(whole)), "the linking stops too where the whole run, from the watch's start, has taken past its budget, though its own time is not spent");
+  ok(new RegExp(`took ${ALL_MS + 1} ms, past the ${ALL_MS} ms`, "u").test(lateness(whole)), "the linking stops too where the whole run, from the watch's start, has taken past its budget, though its own time is not spent");
+  // (one file of code the pull request leaves as it was is held to the characters the changed files share, so that no
+  // one read of the project's own carries the run far past the whole run's budget)
+  const own = { "src/rules.js": "x", "src/tool.js": "x".repeat(51), "docs/data.json": "x".repeat(99) };
+  ok(lateness(() => watch().size(own, ["src/rules.js"])) === null && lateness(() => watch().size({ ...own, "src/tool.js": "x".repeat(50) }, ["src/rules.js", "src/tool.js"])) === null
+    && /src\/tool\.js, a file of code the pull request leaves as it was, holds 51 characters, past the 50/u.test(lateness(() => watch().size(own, ["src/rules.js", "src/tool.js"]))),
+    "a file of code the pull request leaves as it was, past the characters on its own, stops the reading before any is read, saying which; one that is no code counts for none");
   ok(same(watch().first(["src/a.js", "src/rules.js", "src/b.js", "src/view.js"]), ["src/rules.js", "src/view.js", "src/a.js", "src/b.js"]), "the changed files are given first, each part in the order given");
   w = watch();
   w.timed("src/rules.js", slow(60));
@@ -107,8 +113,10 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
     "reached asks its pace once a test and every 256 files taken off a queue, and reaches as it did where none is given", `${asked} asks`);
   const late = lateness(() => survey(texts, config, tests, hurry({ files: new Set(Object.keys(texts)), ms: -1 })));
   ok(late && /took \d+ ms, past the -1 ms/u.test(late), "the shape check's survey reads each changed file under the watch and fails where it is past", late);
-  const own = lateness(() => survey(texts, config, tests, hurry({ files: new Set(), all: -1 })));
-  ok(own && /project's files of code.*past the -1 ms/u.test(own), "the shape check's survey reads the project's own files under the whole run's budget and fails where it is past", own);
+  const owned = lateness(() => survey(texts, config, tests, hurry({ files: new Set(), all: -1 })));
+  ok(owned && /project's files of code.*past the -1 ms/u.test(owned), "the shape check's survey reads the project's own files under the whole run's budget and fails where it is past", owned);
+  const one = lateness(() => survey(texts, config, tests, hurry({ files: new Set(), characters: 40 })));
+  ok(one && /src\/lazy\.js, a file of code the pull request leaves as it was, holds 49 characters, past the 40/u.test(one), "the shape check's survey gives the watch its files of code, so one of the project's own past the characters stops it", one);
   // (the selection reads the changed files first, so that one slow to read is read before the project's own spend the
   // time, and of JavaScript no functions, its parser's work, which it does not use; what it reaches is the same)
   const order = [], spy = { ...hurry({ files: new Set(["src/view.js", "test/view.test.js"]) }) };
