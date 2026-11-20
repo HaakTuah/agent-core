@@ -314,6 +314,9 @@ jobs:
       - name: The workflow check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/workflows-test.mjs ')) }}
         run: node tests/workflows-test.mjs
+      - name: The release jobs' install of every package
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/release-install-test.mjs ')) }}
+        run: node tests/release-install-test.mjs
       - name: The core-moved check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-moved-test.mjs ')) }}
         run: node tests/core-moved-test.mjs
