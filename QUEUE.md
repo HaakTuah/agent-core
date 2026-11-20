@@ -88,8 +88,10 @@ They read and change no rule.
 | #685 | builder | |
 | #937 | builder | |
 | #958 | builder | |
-| #1009 | builder; a split, its meaning kept | #920 |
 | #1008 | builder; splits, each its meaning kept, one PR a file or a few | |
+| #1017 | builder; a split, its meaning kept | |
+| #1033 | builder; a split, its meaning kept | |
+| #1012 | builder; a check for a rule that stands (`tools/claude-auto-mode.md`), in the staged case `steps` | |
 | #919 | builder | #917 |
 
 ## Not taken up
