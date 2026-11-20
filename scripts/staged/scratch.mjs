@@ -202,7 +202,7 @@ export function carry(project, { submodule = false } = {}) {
     fs.writeFileSync(path.join(project, "lib", "core-manifest.md"), manifest);
   }
   const line = `Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).`;
-  // (the kit's files, which it staged, and the program's, which it did not; the copy's own, moved, left out)
+  // (the kit's files and the program's, staged or not; the copy's own, moved, left out)
   for (const f of git(project, "ls-files", "--cached", "--others", "--exclude-standard").split("\n").filter(f => f && !f.startsWith("lib/") && !f.startsWith("core/"))) {
     const file = path.join(project, f), text = fs.readFileSync(file, "utf8");
     const moved = text.replace(/^Core: .*$/mu, m => (f === "core-manifest.md" ? line : m)).replace(/(^|[\s`'"(@:<[])core\//gmu, "$1lib/core/");
