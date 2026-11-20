@@ -4,9 +4,10 @@
 //
 //   node tests/tools-read-test.mjs
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { NONE, ownerFor, readPulls, said, tally } from "../scripts/tools-read.mjs";
+import { botTool, NONE, ownerFor, readPulls, said, tally } from "../scripts/tools-read.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, more = "") => { count++; if (!cond) { failed++; console.error(`FAIL: ${what}${more ? `\n${more}` : ""}`); } };
@@ -38,6 +39,24 @@ const theirs = tally([{ ...outsider, number: 5, body: `x${sig("Their Tool")}`, r
 ok(theirs.others === 1 && JSON.stringify(theirs.builders) === JSON.stringify([["Claude Code", 1]]) && JSON.stringify(theirs.reviewers) === JSON.stringify([["Another Tool", 1]]), "a pull request another account opened is passed over and counted so; another person's review or comment names no tool; the owner's account is matched in any case", JSON.stringify(theirs));
 const unread = tally([{ ...own, number: 7, body: `x${sig("Claude Code")}`, reviews: [bot("a-reviewer[bot]")], comments: [] }]);
 ok(unread.others === 1 && !unread.builders.length && !unread.reviewers.length && tally([{ login: "x[bot]", type: "Bot", number: 8, body: "", reviews: [bot("r[bot]")] }]).reviewers[0][0] === "r[bot]", "with no owner's account read, only bots count");
+
+// a tool's own bot (#901): its pull request counts as built by that tool, matched by its login against the list beside
+// the script, in any case; any other bot's, and an account of no bot's type with such a login, by none named
+{
+  const here = new URL("../scripts/", import.meta.url);
+  const bots = JSON.parse(fs.readFileSync(new URL("tool-bots.json", here), "utf8")).bots;
+  const tools = JSON.parse(fs.readFileSync(new URL("staged-tools.json", here), "utf8")).tools;
+  ok(Object.keys(bots).every(t => tools.includes(t)) && Object.values(bots).every(l => Array.isArray(l) && l.length && l.every(x => typeof x === "string" && /^[A-Za-z0-9][A-Za-z0-9-]*(?:\[bot\])?$/u.test(x))), "each tool of the list of bots is a tool the core knows (staged-tools.json), each with logins of GitHub's form", JSON.stringify(bots));
+  const all = Object.values(bots).flat();
+  ok(new Set(all.map(l => l.toLowerCase())).size === all.length, "no login stands for two tools, nor twice");
+  const [tool, logins] = Object.entries(bots)[0];
+  const its = tally([{ login: logins[0].toUpperCase(), type: "Bot", number: 1, body: `x${sig("Another Tool")}`, reviews: [], comments: [] },
+    { login: "a-bot[bot]", type: "Bot", number: 2, body: `x${sig(tool)}`, reviews: [], comments: [] },
+    { login: logins[0], type: "User", number: 3, body: `x${sig(tool)}`, reviews: [], comments: [] }], OWNER);
+  ok(JSON.stringify(its.builders) === JSON.stringify([[NONE, 1], [tool, 1]].sort(([a], [b]) => a.localeCompare(b))) && its.others === 1,
+    "a known tool's bot builds as that tool whatever its body names, in any case; another bot's body names none; a person's account with such a login is another account's", JSON.stringify(its));
+  ok(botTool(logins[0]) === tool && botTool("a-bot[bot]") === null && botTool(undefined) === null && botTool({ toString: () => logins[0] }) === tool, "botTool names a tool by a login alone");
+}
 
 // read through a stand-in for gh
 const asked = [];
