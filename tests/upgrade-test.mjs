@@ -25,7 +25,8 @@
 // start none on a push to a draft and each once it is marked ready (#375); then that a release changing only the
 // core's own files (a test, its queue, a workflow no project calls) asks no sync, and the next one syncs all the same.
 // Where its issues answer as switched off, the owner's inbox is the folder inbox.mjs names, and a task given,
-// queued, built and closed there passes every check on each pull request. And a copy older than the first release,
+// queued, built and closed there passes every check on each pull request. Each project, synced, is read on a clone by
+// the readers of its set-up against git, bash and the .NET SDK (upgrade-readers.mjs, beside this file; #629). And a copy older than the first release,
 // written by hand since no starter kit stood then, takes the release as the sync notes say (preRelease, below). It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the
 // .NET SDK too, which takes nothing from the network for a project with no package, while npm takes one small package
 // from the registry. On Linux and on Windows. Git, tar, bash, npm, the .NET SDK where there is one, and Node's own
@@ -47,6 +48,7 @@ import { STAGES } from "../scripts/steps-stage.mjs";
 import { STEPS, callers, leads, notDone, project as read, report } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, notesAt } from "../scripts/sync-notes.mjs";
 import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
+import { readersAgainstTools } from "./upgrade-readers.mjs";
 
 const STEP_LEADS = STEPS.map(s => s.lead);
 let failed = 0, count = 0;
@@ -654,6 +656,7 @@ for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newe
     ["touches its package list", dir => write(dir, "package.json", fs.readFileSync(path.join(dir, "package.json"), "utf8").replace('"private": true,', '"private": true,\n  "description": "a project",'))]],
   (results, what) => [[jobRan(results, "security-review.yml"), "a public repository's security-review check runs as before"],
     [ran(results, "signatures.yml", "Install from the lock file, from the registry alone, running no package's install script") === what.includes("package"), "the signature check installs only where the package list changed"]]);
+  readersAgainstTools(npmProject, { tmp, env, ok, sdk, sdkEnv }); // (the readers of its set-up against git and bash: #629)
 
   // the .NET project, private, held as Windows holds it
   const dotnetProject = project(`a-dotnet-project-from-${tag}`, from, { owner: "someone-else", kit: ["--nuget", ".", "--private"], isPrivate: true, windows: true, as: ownersName, files: dir => {
@@ -672,6 +675,7 @@ for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newe
     ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
   (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
     ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
+  readersAgainstTools(dotnetProject, { tmp, env, ok, sdk, sdkEnv }); // (and against the .NET SDK, held as Windows holds it)
   nugetInPrivate(dotnetProject);
   parserUnnamed(dotnetProject);
   if (tag === starts.at(-1)) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); } // (the kit's calls are the same from either release)

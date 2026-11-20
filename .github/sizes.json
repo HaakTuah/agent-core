@@ -87,6 +87,10 @@
       "mark": 138318,
       "why": "#916: a file for each reader its sections test."
     },
+    "tests/upgrade-test.mjs": {
+      "mark": 84526,
+      "why": "One flow over the projects it builds: each case takes a project as the one before left it (written, synced, merged, its own pull requests after), so a file of its own would build them again; a case that takes a synced project and leaves it as it was stands in a file of its own beside it, as upgrade-readers.mjs does (#629)."
+    },
     "scripts/strength.mjs": {
       "mark": 39011,
       "why": "#920: the verdict on a run apart from the run on a project."
