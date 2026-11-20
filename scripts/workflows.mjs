@@ -114,10 +114,17 @@ export function asLF(text) {
 }
 
 // The keys given twice in a text (yaml-keys.mjs, twice()) read as a YAML 1.1 reader reads its line breaks, each on the line an
-// editor counts (#876).
+// editor counts, and never fewer than the package reads in the text as it stands: of each key, whichever reading finds more
+// (a break inside a quoted string, folded, may change what the package can read of the rest; #876).
 export function keysTwice(text) {
+  if (!/[\u0085\u2028\u2029]/u.test(String(text))) return twice(text);
   const { text: folded, line } = asLF(text);
-  return twice(folded).map(found => ({ ...found, line: line(found.line), first: found.first === null ? null : line(found.first) }));
+  const as = twice(folded).map(found => ({ ...found, line: line(found.line), first: found.first === null ? null : line(found.first) }));
+  const plain = twice(text), id = k => (k.key === null ? `${Boolean(k.size)}` : `k:${k.key}`);
+  return [...new Set([...as, ...plain].map(id))].flatMap(key => {
+    const a = as.filter(k => id(k) === key), b = plain.filter(k => id(k) === key);
+    return a.length >= b.length ? a : b;
+  }).sort((x, y) => x.line - y.line);
 }
 
 // The files, each { file, text }, that hold such a break, as { fails, notes } (as repeated() gives them): `before` gives
