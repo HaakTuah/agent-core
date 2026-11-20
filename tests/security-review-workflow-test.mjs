@@ -66,9 +66,10 @@ console.log(JSON.stringify(a.includes("--slurp") ? [v] : v));
 
 // ---- one run of the workflow ----
 // `files` and `commits` are the pull request's, as GitHub lists them; `comments` follow Codex's summary of `reviewed`;
-// `data` adds routes; `inputs` the call's; `missing` the scripts the default branch's core lacks; `action` the event's.
+// `data` adds routes; `inputs` the call's; `missing` the scripts the default branch's core lacks; `action` the event's;
+// `copyAt` the folder the default branch's manifest names for the copy of the core (a manifest is written, #918).
 function runCase(fx, env, tmp, { files = [{ filename: "notes.txt" }], cut = 0, commits = [{ sha: SEEN, parents: [{ sha: BASE }] }, { sha: HEAD, parents: [{ sha: SEEN }] }],
-  reviewed = SEEN, comments = [], data = {}, inputs = { advisory: false, root: "." }, missing = [], action = "synchronize", base = {} } = {}) {
+  reviewed = SEEN, comments = [], data = {}, inputs = { advisory: false, root: "." }, missing = [], action = "synchronize", base = {}, copyAt = null } = {}) {
   const dir = fs.mkdtempSync(path.join(tmp, "case-"));
   const ghData = path.join(dir, "data.json"), ghLog = path.join(dir, "log");
   const repoOf = { full_name: "someone/project" };
@@ -82,10 +83,11 @@ function runCase(fx, env, tmp, { files = [{ filename: "notes.txt" }], cut = 0, c
   // (a copy, its history with it, where a script is taken out of the working tree; otherwise the one repository, which
   // the shell writes nothing into)
   const workspace = () => {
-    if (!missing.length) return fx.repo;
+    if (!missing.length && copyAt === null) return fx.repo;
     const ws = fs.mkdtempSync(path.join(tmp, "ws-"));
     fs.cpSync(fx.repo, ws, { recursive: true });
     for (const p of missing) fs.rmSync(path.join(ws, p));
+    if (copyAt !== null) fs.writeFileSync(path.join(ws, "core-manifest.md"), `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${copyAt} (never edited here).\n`);
     return ws;
   };
   let nodeFile;
@@ -156,6 +158,12 @@ const renamed = run({ files: [{ filename: "notes.txt" }, { filename: "scripts/re
 const cut = run({ cut: 1, data: history });
 ok([changed, renamed, cut].every((r) => held(r) && !r.gets.some((g) => g.includes("contents/scripts/security-review.mjs"))),
   "  and one that changes the script, renames it away, or whose list of files is cut short, without reading the head's copy", [changed, renamed, cut].map(show).join("\n"));
+
+// ---- the copy of the core where the default branch's manifest names it (#918): a change in it asks no second review ----
+const insideCopy = { filename: "vendor/core/.github/workflows/ci.yml", status: "modified", patch: "@@ -1 +1 @@\n-      - run: a\n+      - run: b" };
+const atVendor = run({ files: [insideCopy], copyAt: "vendor/core/", reviewed: HEAD }), atOther = run({ files: [insideCopy], copyAt: "elsewhere/core/", reviewed: HEAD }), unmanifested = run({ files: [insideCopy], reviewed: HEAD });
+ok(atVendor.passed && atVendor.security?.state === "success" && !/floor rule 3/u.test(atVendor.security.description) && [atOther, unmanifested].every((r) => r.passed && /floor rule 3/u.test(r.security?.description ?? "")),
+  "a change inside the copy at the path the manifest on the default branch names asks no second review; at another path, or with no manifest, it is the project's own file", [atVendor, atOther, unmanifested].map(show).join("\n"));
 
 // ---- the sync-shape filter (P5) ----
 const manifest = (p) => ({ filename: "core-manifest.md", patch: p ? `@@ -3 +3 @@\n-Core: ${CORE} at ${sha("a")}, copied whole under ${p} by a sync\n+Core: ${CORE} at ${sha("b")}, copied whole under ${p} by a sync` : "" });

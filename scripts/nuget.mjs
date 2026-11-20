@@ -457,7 +457,7 @@ const AMPERSAND = /&(?!(?:amp|lt|gt|quot|apos|#[0-9]{1,7}|#x[0-9A-Fa-f]{1,6});)/
 const shown = oneLine;
 
 /** The config's "nuget", checked: { ships, tools, accepted, sources }. A key or a shape it does not know would check less. */
-export function nugetConfig(config) {
+export function nugetConfig(config, copy = "core/") {
   const nuget = config?.nuget;
   if (!nuget || typeof nuget !== "object" || Array.isArray(nuget)) throw new Error('the config has no "nuget". Mend: add "nuget": { "ships": [...], "tools": [...] }, each list naming lock files');
   const odd = Object.keys(nuget).filter((k) => !["ships", "tools", "accepted", "sources"].includes(k));
@@ -473,7 +473,7 @@ export function nugetConfig(config) {
   if (twice.length) throw new Error(`the config's "nuget" names a lock file twice: ${[...new Set(twice)].join(", ")}. Mend: name each once, in "ships" or in "tools"`);
   const accepted = acceptedList(nuget.accepted, "nuget.accepted", /^[^@\s]+@[^@\s]+$/u, "<Id>@<version>", { same: (name) => name.toLowerCase() });
   const sources = nuget.sources ?? [];
-  const source = (s) => typeof s === "string" && s.length <= 300 && (SOURCE_ADDRESS.test(s) || (SOURCE_FOLDER.test(s) && !s.toLowerCase().startsWith("core/")));
+  const source = (s) => typeof s === "string" && s.length <= 300 && (SOURCE_ADDRESS.test(s) || (SOURCE_FOLDER.test(s) && !s.toLowerCase().startsWith(copy.toLowerCase())));
   if (!Array.isArray(sources) || !sources.every(source)) throw new Error('the config\'s "nuget.sources" is not a list of sources: each an https address of a named host, with no sign-in or question in it, or a folder of the project\'s own, as git lists it, ending in "/". Mend: write each so, or take it out');
   const same = sources.map((s) => s.toLowerCase().replace(/\/$/u, ""));
   if (same.some((s, i) => same.indexOf(s) !== i || s === REGISTRY.toLowerCase())) throw new Error(`the config's "nuget.sources" names a source twice, or NuGet's own registry, which every restore takes from already. Mend: name each source once, and NuGet's registry not at all`);
@@ -482,7 +482,7 @@ export function nugetConfig(config) {
 
 /** Where a restore takes packages from, in order: NuGet's own registry, then the sources the config names, a folder
  *  by its whole path under `root`, so that a restore reads it from wherever it is started. */
-export const sourcesOf = (config, root) => [REGISTRY, ...nugetConfig(config).sources.map((s) => (s.startsWith("https://") ? s : resolve(root, s)))];
+export const sourcesOf = (config, root) => [REGISTRY, ...nugetConfig(config, copyOf(root)).sources.map((s) => (s.startsWith("https://") ? s : resolve(root, s)))];
 
 /** A path as one spelling of the place it names: whole, with links and Windows' short names resolved, as the system
  *  spells them, up to the nearest folder of it that is there (the rest as it is written), and in one case where the
@@ -693,11 +693,11 @@ function restoredPackages(packagesDir) {
  * { failures, summary }.
  */
 export function check(config, root, packagesDir, tracked, env = process.env, { base = null, baseConfig = null, fetched = false } = {}) {
-  const { ships, tools, accepted, sources } = nugetConfig(config);
+  const copy = copyOf(root), { ships, tools, accepted, sources } = nugetConfig(config, copy);
   const lists = policy(config), { allowedFor } = lists;
   const failures = [], reports = [];
   // (the check's own state, which the parts below read and add to)
-  const c = { config, root, base, packagesDir, fetched, lists, allowedFor, ships, failures, reports, ...baseLists(base, baseConfig, sources), heldIn: new Map(), tree: null, then: null };
+  const c = { config, root, base, packagesDir, fetched, lists, allowedFor, ships, failures, reports, ...baseLists(base, baseConfig, sources, copy), heldIn: new Map(), tree: null, then: null };
   const own = tracked.filter((f) => !f.startsWith(copyOf(root)));
   const locks = new Set(own.filter((f) => posix.basename(f) === LOCK));
   layoutFaults(c, tracked, own, locks);
@@ -744,12 +744,12 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
 // read, as licences.mjs reads it, it is reported and passes too)
 // (where the base held no config at this one's path, or one this cannot read, nothing shipped there, and no tool is
 // the base's; nor is one where the pull request changed the sources it may come from)
-function baseLists(base, baseConfig, sources) {
+function baseLists(base, baseConfig, sources, copy) {
   let shippedThen = [], listedThen = [], sameSources = !base;
   try {
     if (baseConfig) {
       // (letter for letter: a folder's name, or an address's path, in another case may be another source)
-      const then = nugetConfig(baseConfig), list = (l) => [...l].sort().join("\n");
+      const then = nugetConfig(baseConfig, copy), list = (l) => [...l].sort().join("\n");
       shippedThen = then.ships; listedThen = [...then.ships, ...then.tools];
       sameSources = sameSources || list(then.sources) === list(sources);
     }

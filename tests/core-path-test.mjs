@@ -55,11 +55,11 @@ ok(floorCopyIn(carried()) === "floor-copy/" && floorCopyIn(copied()) === null &&
 // the reading script's own reading of the path, held to this one's
 for (const text of [copied(), copied("vendor/the-core/"), carried(), carried("libs/shared/", "libs/shared/core/")]) ok(pathIn(text) === readCore(text).path, `the reading script reads the path ${readCore(text).path} alike`);
 ok(pathIn("# Core manifest\n") === "core/", "where the line names none, the reading script takes the usual path");
-// the sed of the workflows' first step and of the work-saved hook, run on the same lines: each reads the path readCore
+// the sed of the workflows' first step (the personal-terms check's too, which reads the base's manifest) and of the work-saved hook, run on the same lines: each reads the path readCore
 // reads, and nothing where readCore reads it as wrong, so no check runs a script from a folder core.yml never compared
 {
   const hook = fs.readFileSync(fileURLToPath(new URL("../scripts/work-saved.sh", import.meta.url)), "utf8");
-  const seds = [...CALLED.map(f => [f, /sed -n -E ('[^']+')/u.exec(fs.readFileSync(fileURLToPath(new URL(`../.github/workflows/${f}`, import.meta.url)), "utf8"))?.[1] ?? "'no sed'", out => out.split(" ")[0]]),
+  const seds = [...[...CALLED, "personal-terms.yml"].map(f => [f, /sed -n -E ('[^']+')/u.exec(fs.readFileSync(fileURLToPath(new URL(`../.github/workflows/${f}`, import.meta.url)), "utf8"))?.[1] ?? "'no sed'", out => out.split(" ")[0]]),
     ["the hook", /sed -n -E ('s#\^Core: [^']+')/u.exec(hook)[1], out => out]];
   for (const text of [copied(), copied("vendor/the-core/"), carried(), copied("core/../evil/"), carried("lib/../x/", "lib/../x/core/"), copied("core/..x/"), `${copied().trimEnd()} trailing words\n`]) {
     const want = readCore(text).path ?? "";
