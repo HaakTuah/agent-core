@@ -31,7 +31,7 @@
 // three is read as an LF, as the sync step's mend leaves it (an escape inside a double-quoted string, a line feed
 // elsewhere) and as it stands, whichever finds most, so a key given twice or a call left without ready_for_review
 // behind one is found, noted where the base held it, and told on the line an editor counts (keysTwice() below; #876).
-// Where the base's breaks leave it no YAML to the package in either reading (a break inside a single-quoted string), what
+// Where the base's breaks leave it no YAML to the package in either reading (such as a break inside a single-quoted string whose next line is under-indented), what
 // it held cannot be told, and what the changed file shows is noted, never failed (baseOf() below).
 // What it does not chase: a value given as binary (a YAML tag) holds a word no search can see, and a tag can itself be
 // spelled in more ways than a search can follow. GitHub's own workflow reader refuses a binary value where a trigger
@@ -121,7 +121,7 @@ export function asLF(text) {
 // cut it exactly (#876).
 export function asMended(text) {
   text = String(text);
-  if (text.length > LONGEST || !/[\u0085\u2028\u2029]/u.test(text)) return { text, line: n => n };
+  if (text.length > LONGEST || !FOREIGN.test(text)) return { text, line: n => n };
   const norm = text.replace(/\r\n?/gu, "\n");
   try {
     const { Lexer } = loadSync("yaml");
@@ -130,14 +130,26 @@ export function asMended(text) {
     for (const token of new Lexer().lex(norm)) {
       if (token.length === 1 && token < " " && token !== "\n" && token !== "\t") continue; // (the lexer's own marks, not the text)
       joined += token;
-      for (const ch of token) {
-        if (ch === "\n") { out += ch; at.push(++editor); }
-        else if (/[\u0085\u2028\u2029]/u.test(ch)) { if (token[0] === '"') out += `\\u${ch.codePointAt(0).toString(16).padStart(4, "0")}`; else { out += "\n"; at.push(editor); } }
-        else out += ch;
-      }
+      const mended = mendedToken(token);
+      out += mended.out;
+      for (const ends of mended.ends) at.push(ends ? ++editor : editor);
     }
     return joined === norm ? { text: out, line: n => at[n] ?? n } : asLF(text);
   } catch { return asLF(text); }
+}
+
+// One token of the package's lexer as the mend leaves it: its text, and for each line feed of it whether it ends a line as an
+// editor counts (a line feed the text held) or stands for a break an editor does not (#876).
+function mendedToken(token) {
+  let out = "";
+  const ends = [];
+  for (const ch of token) {
+    if (ch === "\n") { out += ch; ends.push(true); }
+    else if (!FOREIGN.test(ch)) out += ch;
+    else if (token[0] === '"') out += `\\u${ch.codePointAt(0).toString(16).padStart(4, "0")}`;
+    else { out += "\n"; ends.push(false); }
+  }
+  return { out, ends };
 }
 
 // A text with a break the package does not read, read each way a YAML 1.1 reader may: as line feeds, as the mend leaves it,
@@ -221,16 +233,21 @@ export function repeated(files, before) {
   for (const { file, text } of files) {
     const held = new Map(), base = baseOf(before, file, text);
     for (const found of base.read === null ? [] : keysTwice(base.read)) held.set(heldAs(found), (held.get(heldAs(found)) ?? 0) + 1);
-    for (const { line, key, first, size } of keysTwice(text)) {
-      const id = heldAs({ key, size }), old = !before || base.same || base.unknown || held.get(id) > 0;
+    for (const found of keysTwice(text)) {
+      const id = heldAs(found), old = !before || base.same || base.unknown || held.get(id) > 0;
       held.set(id, (held.get(id) ?? 0) - 1);
-      const was = old ? (base.unknown ? UNKNOWN : before ? ", as it did on the base" : "") : "";
-      (old ? notes : fails).push(key === null
-        ? `${old ? "note" : "FAIL"} ${file}:${line}: ${NOT_READ[+Boolean(size)].said}${was}. Mend: ${NOT_READ[+Boolean(size)].mend}`
-        : `${old ? "note" : "FAIL"} ${file}:${line}: the key ${JSON.stringify(key)} is given twice in one mapping (first on line ${first}), so GitHub refuses the whole file and runs none of its jobs${was}. Mend: keep one of the two keys, with what both said in it (two if: conditions joined by &&, two env: mappings as one)`);
+      (old ? notes : fails).push(keyLine(file, found, old, old ? (base.unknown ? UNKNOWN : before ? ", as it did on the base" : "") : ""));
     }
   }
   return { fails, notes };
+}
+
+// The line repeated() says of one key given twice (or of a part not read), `was` what it adds of the base.
+function keyLine(file, { line, key, first, size }, old, was) {
+  const lead = `${old ? "note" : "FAIL"} ${file}:${line}: `;
+  return key === null
+    ? `${lead}${NOT_READ[+Boolean(size)].said}${was}. Mend: ${NOT_READ[+Boolean(size)].mend}`
+    : `${lead}the key ${JSON.stringify(key)} is given twice in one mapping (first on line ${first}), so GitHub refuses the whole file and runs none of its jobs${was}. Mend: keep one of the two keys, with what both said in it (two if: conditions joined by &&, two env: mappings as one)`;
 }
 
 // The core's pull-request checks whose call may be skipped on a draft, and the two that skip a draft by themselves.

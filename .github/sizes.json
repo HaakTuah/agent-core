@@ -176,7 +176,7 @@
       "why": "#937: split into the three parts it already runs in, with the shared set-up in a module of its own."
     },
     "scripts/workflows.mjs": {
-      "mark": 26187,
+      "mark": 26775,
       "why": "One check's readers (the word, the keys given twice, the calls a draft skips, the line breaks) that all read the same texts against the same base through the one baseOf(); a task that changes one reads how the others count against the base, so a split would make it open each part."
     },
     "tests/workflows-test.mjs": {

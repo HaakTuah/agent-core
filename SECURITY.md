@@ -105,7 +105,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      stands behind such a break being read as a YAML 1.1 reader reads it (as line feeds, as the sync's mend leaves it and
      as it stands, whichever finds most), a key given twice or a call left without ready_for_review there found and
      failed or noted as any other, and each file that holds one named at a sync; where a base's breaks, read so, leave
-     it no YAML to the package (a break inside a single-quoted string), what it held behind them cannot be told, and
+     it no YAML to the package (such as a break inside a single-quoted string whose next line is under-indented), what it held behind them cannot be told, and
      what the changed file then shows is noted, not failed; in the core's own run each fails), and NuGet's lock file version 2, a newer refused (npm's
      lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`, and for the
      reader of where the tests run `tests/runners-test.mjs`.
