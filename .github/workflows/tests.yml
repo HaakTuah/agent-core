@@ -557,6 +557,9 @@ jobs:
       - name: The outcomes the state report leads with, and how a correction is counted
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/outcomes-test.mjs ')) }}
         run: node tests/outcomes-test.mjs
+      - name: The blind sample the state report asks the owner to answer
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/blind-sample-test.mjs ')) }}
+        run: node tests/blind-sample-test.mjs
       - name: The check that the core takes each module or gives its reason
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/own-modules-test.mjs ')) }}
         run: node tests/own-modules-test.mjs

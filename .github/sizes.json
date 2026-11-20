@@ -123,10 +123,6 @@
       "mark": 27143,
       "why": "The NuGet fetch before the restore: the sources, the base's lists, each package's content hash and the tools' lock files, read through the one fetchAll(); a task that changes one reads how the others count against the base, so a split would make it open each part."
     },
-    "tests/outcomes-test.mjs": {
-      "mark": 25803,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
-    },
     "tests/packages-test.mjs": {
       "mark": 68081,
       "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
