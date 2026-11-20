@@ -12,7 +12,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { changedTogether, cycles, globals, imports, isModule, jsxIn, measure, tokens } from "../scripts/code-shape.mjs";
 import { javascriptFunctions } from "../scripts/javascript-functions.mjs";
-import { LARGEST } from "../scripts/tree-walk.mjs";
+import { LARGEST, MOST_NODES } from "../scripts/tree-walk.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -60,6 +60,11 @@ ok(unclosed === null && slashed === null, "a large file that is no JavaScript is
 const words = n => `export const WORDS = [${Array.from({ length: n }, (_, k) => `"w${k}"`).join(", ")}];\nfunction f() {\n  return 1;\n}\n`;
 ok(words(LARGEST.javascript / 12).length <= LARGEST.javascript && same(fn(words(LARGEST.javascript / 12), "a.mjs"), ["f:2:3:0"]) && words(LARGEST.javascript / 8).length > LARGEST.javascript && functions(words(LARGEST.javascript / 8)) === null,
   "a file past the largest the grammar is given is lost unread, and one under it is read whole");
+// (and one within the largest whose tree holds more than MOST_NODES, lost unread as well: the walks after the parse,
+// which no budget stops, grow with the nodes, not the characters; #880)
+const nodes = n => `const A = [${"a,".repeat(n)}];\nfunction f() {\n  return 1;\n}\n`;
+ok(nodes(MOST_NODES / 2 + 100).length <= LARGEST.javascript && functions(nodes(MOST_NODES / 2 + 100)) === null && same(fn(nodes(MOST_NODES / 4), "a.mjs"), ["f:2:3:0"]),
+  "a file within the largest size whose tree holds more nodes than the most a reader walks is lost unread, and one under it is read whole");
 const many = functions(`function f(a) {\n${"  if (a) { a = a ?? 1; }\n".repeat(10000)}}\n`);
 ok(same(many?.map(f => `${f.name}:${f.lines}:${f.depth}:${f.branches}`), ["f:10002:1:20000"]), "a large file that is JavaScript is read whole", JSON.stringify(many));
 const branching = [

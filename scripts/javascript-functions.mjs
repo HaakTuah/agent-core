@@ -23,7 +23,7 @@
 // the shape check counts it and says so (shape.mjs, "lost").
 import path from "node:path";
 import { inParser } from "./parser.mjs";
-import { LARGEST, budgetOf, walkFunctions } from "./tree-walk.mjs";
+import { LARGEST, budgetOf, parseWithin, walkFunctions } from "./tree-walk.mjs";
 
 // The grammar each file is read with, by its extension: TypeScript's own (where <T>x is a cast), TypeScript with JSX,
 // and JavaScript, whose grammar reads JSX wherever it stands.
@@ -46,7 +46,7 @@ export function javascriptFunctions(file, src) {
 
 /** The functions of `src`, read with the parser's `parse` and the grammar named (in its thread: javascriptFunctions). */
 export function read(parse, grammar, src) {
-  const tree = parse(grammar, src, budgetOf(src));
+  const tree = parseWithin(parse, grammar, src, budgetOf(src));
   if (!tree) return null;
   try { return tree.rootNode.hasError && !wordsAlone(tree.rootNode) ? null : walkFunctions(tree.rootNode, { functionBody, nameOf, branches, isControl }); } finally { tree.delete(); }
 }
