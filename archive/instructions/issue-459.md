@@ -10,6 +10,7 @@ The index, and how an item is written: `archive/instructions.md`.
      of the 75 of the core's rules that applied there, and nothing told its owner which. The owner agreed to it with
      the other points read from an evaluation's counts, on the test of taking what is good for every development cycle
      and no brake that would slow the owner's own projects; point 1, the list of a project's own rules, was built
-     under #662. It stands behind "A check that read nothing says so" and, for the question, "A project's own rules
-     name what holds them" in the core's `AGENTS.md`, and "A rule of a game's kind moves to the core once a second game
-     needs it" in `tasks/game-design.md`.
+     under #662. It stands behind "A check that read nothing says so", "The share a check holds is reported" and,
+     for the question, "A project's own rules name what holds them" and "A rule of a game's kind moves to the core once
+     a second game needs it" in the core's `AGENTS.md`, and "A game's copy of a rule of its kind goes at the sync that
+     brings it" in `tasks/game-design.md`.

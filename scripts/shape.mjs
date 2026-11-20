@@ -544,6 +544,9 @@ const SAFE = ["-c", "core.fsmonitor=false"];
 const git = (args, opts = {}) => execFileSync("git", [...SAFE, ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["pipe", "pipe", "ignore"], ...opts });
 const lsFiles = (specs, root) => (specs.length ? git(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...specs], { cwd: root }).split("\0").filter(Boolean) : []);
 const readable = f => isCode(f) || isPackageFile(f);
+// The files of code its readers know that the check reads under the config's "code" and "tests", in the working folder
+// (read-nothing.mjs counts them, so that the two lists cannot drift; #459).
+export const codeListed = (config, root = ".") => lsFiles([...config.code, ...config.tests], root).filter(isCode);
 
 // The project's files as they stand in the working folder: { texts, tests }, never through a link.
 export function standing(config, root = ".") {

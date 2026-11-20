@@ -72,14 +72,14 @@ export function notDone(root, steps = STEPS) {
     if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend });
   }
   out.unread = p.unread;
-  try { out.nothing = readNothing(p.root, p.manifest, p.read); } catch { out.nothing = []; }
+  try { out.nothing = readNothing(p.root, p.manifest, p.read); } catch (e) { out.nothing = null; out.nothingWhy = plain(e.message, root); }
   return out;
 }
 
 // The report a sync prints for its pull request's description: the steps not done, and nothing where all are; and the
 // checks that read nothing here (read-nothing.mjs; #459, point 2).
 export function report(missed) {
-  const said = saidOf(missed.nothing ?? []);
+  const said = saidOf(missed.nothing === undefined ? [] : missed.nothing, undefined, missed.nothingWhy);
   return [steps(missed), ...(said.length ? ["", ...said] : [])].join("\n");
 }
 function steps(missed) {

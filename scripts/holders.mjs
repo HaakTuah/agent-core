@@ -202,10 +202,12 @@ export function report(root = ROOT) {
 }
 
 // Of the core's rules a project takes (the floor's always, a module's unless its manifest leaves it out: `out`, by the
-// file's name), how many a check holds whole there: { held, all }, none counted whose every check read nothing there
-// (`nothing`, the checks read-nothing.mjs names, by their path as the project calls them; #459, point 3).
+// file's name), how many a check holds whole there, by the core's own list: { held, all }, none counted whose every
+// check read nothing there (`nothing`, the scripts read-nothing.mjs names, by their path in the core, scripts/shape.mjs;
+// #459, point 3). A check the core's list names that a project may not have set up (a ruleset of the host's) counts as
+// the list names it: the count is the core's map less what read nothing, which the share's line says.
 export function heldThere(root, nothing, out = new Set()) {
-  const h = holders(root), gone = new Set(nothing.map(n => n.replace(/^.*?(?=scripts\/)/u, "")));
+  const h = holders(root), gone = new Set(nothing);
   const taken = h.rules.filter(r => r.file.startsWith("floor/") || !out.has(path.posix.basename(r.file)));
   const held = taken.filter(r => (h.by.get(r.key) ?? []).some(x => x.kind === "check" && !x.part && !hook(x) && !gone.has(x.by))).length;
   return { held, all: taken.length };
@@ -222,6 +224,9 @@ export const OWN = "checks/holders.json";
 const span = t => `\`${oneLine(t).replace(/`/gu, "'")}\``;
 // (a check's name that is a path of the project: a file name with its extension, or one with a folder)
 const OWN_PATHS = /^(?:[\w.@-]+\/)+[\w.@-]+$|^[\w-]+\.\w+$/u;
+// Whom a rule of the project's own is about (#484, point 9), as the list's "about" names it, keyed as "holders" is.
+const ABOUT = /^(?:this project|every project|its kind: (\S.{0,79}))$/u;
+const ABOUT_FORMS = '"this project", "its kind: <the kind>" or "every project"';
 
 // The project's own rule files under `root`: [{ file, start }], `start` where a session reads it at its start (its
 // AGENTS.md and CLAUDE.md, and the files they pull in by an "@" line); and `read`, a file's text or null.
@@ -260,7 +265,22 @@ export function ownHolders(root = process.cwd()) {
       else if (typeof h === "string") wrong.push(h); else by.get(key).push(h);
     }
   }
-  return { rules: all, by, wrong, start, list: text !== null };
+  return { rules: all, by, wrong, start, list: text !== null, about: answersOf(text, by, wrong) };
+}
+
+// The list's answers of whom each rule is about (#484, point 9), by the rule's key, those in no form pushed to `wrong`
+// with their mend; none where the list is not there or cannot be read (said with its holders).
+function answersOf(text, by, wrong) {
+  const about = new Map();
+  let answers = {};
+  try { answers = text === null ? {} : JSON.parse(text).about ?? {}; } catch { return about; }
+  if (typeof answers !== "object" || answers === null || Array.isArray(answers)) { wrong.push(`${OWN}: its "about" is no object. Mend: write it as an object keyed by each rule's file and lead, as "holders" is, each value ${ABOUT_FORMS}`); return about; }
+  for (const [key, value] of Object.entries(answers)) {
+    if (!by.has(key)) wrong.push(`${OWN}'s "about" names ${span(key)}, which is no rule of the project's own rule files as they stand. Mend: write the key as the rule's file and bold lead now read, or take it out where the rule has gone`);
+    else if (typeof value !== "string" || !ABOUT.test(value)) wrong.push(`${OWN}: ${span(key)} is said to be about ${span(String(value))}. Mend: write ${ABOUT_FORMS}`);
+    else about.set(key, value);
+  }
+  return about;
 }
 
 // The lines a project's state report carries: its own rules by what holds them, those with none worst first (read at a
@@ -269,11 +289,13 @@ export function ownReport(root = process.cwd(), scripts = "core/scripts") {
   const h = ownHolders(root), c = counts(h), files = [...new Set(h.rules.map(r => r.file))];
   if (!h.rules.length) return ["- The project's own rule files hold no rule with a bold lead, so none is counted."];
   const none = [...c.none.filter(k => h.start.has(k)), ...c.none.filter(k => !h.start.has(k))];
+  const unanswered = h.rules.map(r => r.key).filter(k => !h.about.has(k)), wider = [...h.about].filter(([, v]) => v !== "this project");
   return [
     `- Of ${c.all} rules of the project's own (${files.map(span).join(", ")}): ${c.check} held whole by a check, ${c.audit} by the audit, ${c.part} in part; ${c.describes} describe and bind no one; ${c.none.length} have no holder (\`node ${scripts}/holders.mjs --own\`, its list \`${OWN}\`${h.list ? "" : ", not written yet"}).`,
     ...(none.length ? [`- No holder, worst first (read at a session's start, then on need): the session that takes this report files each as a task at the project's pace, a check where one can read its breach exactly, named in \`${OWN}\`; a move to where it is read on need; or a proposal that it goes, which is the owner's to decide. Where its file is a copy made from elsewhere, the change goes to whoever writes that source. Nothing fails meanwhile: ${none.map(span).join("; ")}.`] : []),
-    // (#484, point 9, as #459's note adds it)
-    `- Of each rule listed, the session that takes this report asks whether it is about this project, its kind or every project, and files each of the last two to the core as an idea where none is filed yet, written for the kind and holding nothing of the project (\`${scripts.replace(/scripts\/?$/u, "")}README.md\`, "Reporting to the core").`,
+    // (whom each rule is about: #484, point 9, as #459's note adds it)
+    ...(unanswered.length ? [`- Whom a rule is about, ${h.about.size} of ${c.all} answered: the session that takes this report answers of each of the rest whether it is about this project, its kind or every project, in \`${OWN}\`'s "about", keyed as "holders" is, ${ABOUT_FORMS}: ${unanswered.map(span).join("; ")}.`] : []),
+    ...(wider.length ? [`- About a kind or every project: the session that takes this report files each to the core as an idea where none is filed yet (search first), naming the kind, written for the kind and holding nothing of the project (\`${scripts.replace(/scripts\/?$/u, "")}README.md\`, "Reporting to the core"): ${wider.map(([k, v]) => `${span(k)}, ${span(v)}`).join("; ")}.`] : []),
     ...h.wrong.map(w => `- ${w}.`),
   ];
 }

@@ -133,18 +133,17 @@ player can choose to use.
   several. The trigger is a game's first stage, or a change that makes another kind true of it: its builder writes
   each kind that is true of it on the *game page*, which holds them, since nothing reads a game's kinds yet (#484,
   points 6 and 11). It does not mean a list of genres, nor that a kind binds before it is true of the game. Reason: a
-  game that is two kinds at once was held to the rules of one. The design check reads the page; no check holds it yet.
-- **A rule of a game's kind moves to the core once a second game needs it** (#484). By default a rule a game writes for
-  itself stays in the game, and whether it is about this game, its kind or every game is asked by the session that
-  lists the project's own rules (the core's `AGENTS.md`, "A project's own rules name what holds them"), which files one
-  about a kind to the core as an idea. The one condition that changes it: a second game needs the same rule, one that
-  stands or one the owner has planned. The trigger is that idea's line joining the core's queue: its builder writes the
-  rule for the kind, never for the game it came from, and the session that syncs it into a game takes out that game's
-  own copy, pointing to the core's ("One fact, one place"). It does not mean a game's rule is taken from it before the
-  owner's word, nor that a kind with one game gets a part in the core. Reason: two games each held rules true of their
-  kind (on what a request to a model may imply, on how fast a computer player may react), and a new game of that kind
-  would have to find them again. Held by the state report's list of the project's own rules; the copies check, once a
-  rule stands in both places.
+  list of genres puts each game in one box, where one game is made of several kinds. The design check reads the page;
+  no check holds it yet.
+- **A game's copy of a rule of its kind goes at the sync that brings it** (#484, point 10). By default a game keeps
+  the rules it writes for itself, and whom each is about, this game, its kind or every game, is answered as the
+  project's own rules are listed (the core's `AGENTS.md`, "A project's own rules name what holds them"). The one
+  condition that changes it: a sync brings the core's rule for the kind, written from a game's own once a second game
+  needed it, as the core's `AGENTS.md` says. Then the session that syncs takes out the game's own copy at that sync, in
+  a pull request of its own beside the sync's, which stays pure, and points to the core's rule ("One fact, one place").
+  It does not mean the copy goes before the core's rule has reached the game, nor that what the game's rule held beyond
+  the core's is dropped: that part stays the game's own. Reason: a rule kept in two places drifts apart. Held by the
+  copies check, once a rule stands in both places, in part.
 - **Every stage is a game.** A game built in stages ends each stage in one someone can play from
   start to finish and enjoy; a feature that makes sense only once later ones exist waits for them.
 - **The first stage is the loop alone.** By default a game built in stages has as its first stage

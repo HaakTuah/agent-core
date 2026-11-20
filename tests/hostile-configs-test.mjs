@@ -4,7 +4,8 @@
 // project, a number out of range, and nothing at all; each fails with its mend or reads the input as not there, and
 // reads and writes nothing outside the project. The readers: copies.mjs and reading-size.mjs, run from a scratch
 // project's copy of the core; shape.mjs's parseConfig and where; size.mjs's capsOf, answered and --raise;
-// manifest-reads.mjs's notes; licences.mjs's loadConfig; steps.mjs's notDone with the step for rule 5's inputs; and
+// manifest-reads.mjs's notes; licences.mjs's loadConfig; steps.mjs's notDone with the step for rule 5's inputs;
+// read-nothing.mjs's readNothing (#459); and
 // sync.mjs and look.mjs, run from the copy, on a manifest that is a link out of the project. Test
 // data is made up. Run by the core's tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
 //
@@ -21,6 +22,7 @@ import { answered, capsOf, whoseOf } from "../scripts/size.mjs";
 // (the size check counts an answer from the repository's owner, "someone" here, with no right read)
 const owner = whoseOf("someone", []), me = { login: "someone", type: "User" };
 import { STEPS, notDone } from "../scripts/steps.mjs";
+import { readNothing } from "../scripts/read-nothing.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
 import { shapeFaults } from "../scripts/schemas.mjs";
 
@@ -238,6 +240,31 @@ ok(unread(notDone(p, inputs)), "steps.mjs: a project with no SECURITY.md is repo
 fs.mkdirSync(path.join(p, "SECURITY.md"));
 ok(unread(notDone(p, inputs)), "steps.mjs: SECURITY.md that is a folder, the wrong type, is reported as not read");
 // (rule 5 is found by its number at a line's start: no number in it is read as a value, so none is out of range)
+
+// ---- read-nothing.mjs: the shape config and the manifest, read for the checks that read nothing (#459) ----
+// (a config whose pathspecs leave the project, reach its whole tree or run long, one of the wrong type, and a manifest
+// that names a config with markup or a path out: each is read in time as the shape check reads it, a config the check
+// cannot read naming no check, a config not there naming it with that why, and no file outside the project listed)
+{
+  const shapeAt = "checks/shape.json", readP = f => { try { return fs.readFileSync(path.join(p, f), "utf8"); } catch { return null; } };
+  const named = (config, manifest = "") => { if (config === null) fs.rmSync(path.join(p, shapeAt), { force: true }); else write(shapeAt, typeof config === "string" ? config : JSON.stringify(config)); return readNothing(p, manifest, readP); };
+  const shapeSaid = l => l.find(n => n.script === "scripts/shape.mjs");
+  for (const [c, what] of [[{ ...SHAPE, code: ["../outside/"] }, "a path that leaves the project"], [{ ...SHAPE, code: [outside] }, "an absolute path outside"], [{ ...SHAPE, code: [":(top)../"] }, "a magic pathspec"],
+    [{ ...SHAPE, code: "src/" }, "code that is no list"], ["<b>", "markup"], ["", "nothing at all"]]) {
+    let thrownBy = null, said = null;
+    try { said = named(c); } catch (e) { thrownBy = e; }
+    ok(thrownBy === null && !(shapeSaid(said)?.why ?? "").includes("outside"), `read-nothing.mjs: a shape config with ${what} is read as the check reads it, no file outside the project listed and nothing thrown`);
+  }
+  [said, ms] = timed(() => named({ ...SHAPE, code: Array.from({ length: BIG }, (_, i) => `src/d${i}/`) }));
+  ok(ms < 5000, `read-nothing.mjs: a shape config of ${BIG} pathspecs is read in ${ms} ms`);
+  ok(/holds no `checks\/shape\.json`/u.test(shapeSaid(named(null))?.why ?? ""), "read-nothing.mjs: a project with no shape config is said to have none, never to name nothing");
+  for (const m of ["| *shape check* | `<img src=x>.json` |", "| *shape check* | `../outside/x.json` |"]) {
+    let thrownBy = null;
+    try { named(SHAPE, m); } catch (e) { thrownBy = e; }
+    ok(thrownBy === null, `read-nothing.mjs: a manifest that names the shape config as ${m.split("`")[1]} is read with nothing thrown and nothing outside read`);
+  }
+  fs.rmSync(path.join(p, shapeAt), { force: true });
+}
 
 // ---- nothing written outside the project ----
 ok(fs.readdirSync(outside).join() === "tests,x" && fs.readdirSync(tmp).sort().join() === "outside,project,size-base.mjs,comments.json".split(",").sort().join(), "nothing was written outside the project");

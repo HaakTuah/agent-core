@@ -160,7 +160,7 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
     `- steps not done: ${counts.steps ?? "not read"}.`,
     counts.merged ? `- merged in ${before(month)}: ${counts.merged.all}, the core's share ${pct(counts.merged.sync + counts.merged.upkeep, counts.merged.all)} (sync ${counts.merged.sync}, upkeep ${counts.merged.upkeep}, update ${counts.merged.update}, own ${counts.merged.own}).`
       : `- merged in ${before(month)}: not read (the token here may not read pull requests).`,
-    counts.held ? shareLine(counts.held.own, counts.held.there) : "- rules held by a check: not read.");
+    heldLine(counts.held));
   return lines.join("\n");
 }
 
@@ -180,11 +180,14 @@ export function readCounts({ repo, manifest, month, steps, gh = ghApi }) {
   return { pin, behind, steps, merged, held: heldHere(manifest) };
 }
 
+// The share's line, or that it was not read.
+const heldLine = held => (held ? shareLine(held.own, held.there) : "- rules held by a check: not read.");
+
 // Of the project's rules, those a check holds whole (#459, point 3): its own, by its list (holders.mjs --own), and the
 // core's it takes, none counted whose every check read nothing here (read-nothing.mjs); null where they cannot be read.
 function heldHere(manifest) {
   try {
-    const nothing = readNothing(process.cwd(), manifest ?? "", readHere).map(n => n.check);
+    const nothing = readNothing(process.cwd(), manifest ?? "", readHere).map(n => n.script);
     return { own: holderCounts(ownHolders(process.cwd())), there: heldThere(ROOT, nothing, leftOut(manifest ?? "")) };
   } catch { return null; }
 }

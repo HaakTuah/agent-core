@@ -63,9 +63,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   (`scripts/holders/`, an entry for each rule, which names too the archive's items behind it); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
   A project's own rules are read the same way, against its list `checks/holders.json`, and those with none listed in
   its own monthly state report, failing nothing (`node core/scripts/holders.mjs --own`; `AGENTS.md`, "A project's own
-  rules name what holds them"). A check of the core's that read no file of a project's says so in the sync's report,
-  and a project's state report gives how many of its own rules, and of the core's it takes, a check holds there
-  (`scripts/read-nothing.mjs`; `AGENTS.md`, "A check that read nothing says so").
+  rules name what holds them"), where the session that takes that report also answers whom each rule is about, in the
+  list's "about", and files those about a kind or every project here. A check of the core's that read no file of a
+  project's says so in the sync's report (`scripts/read-nothing.mjs`; `AGENTS.md`, "A check that read nothing says
+  so"), and a project's state report gives how many of its own rules, and of the core's it takes, a check holds there
+  (`AGENTS.md`, "The share a check holds is reported").
   A staged case (`scripts/staged/`, run by `scripts/staged.mjs`) gives a fresh session, in a scratch project, a task
   in which one rule is easy to break, and reads what the session did. The cases run in the core alone, once a month and
   when a rule they hold changes; their record is `reports/staged-cases.json` (`AGENTS.md`, "Staged cases hold what no
@@ -509,7 +511,7 @@ for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit
 | *accessibility floor* | the numbers of the accessibility floor where the project tightens one (`tasks/screens.md`, point 9) | choice: left out, the module's own |
 | *desktop platforms* | the desktop platforms a program of the project's is made for (`tasks/screens.md`, point 15) | cannot be read: the build files that say it (a .NET project's target frameworks and runtime identifiers, a desktop shell's config) are read once the parser #486's record picked arrives (#501); left out, none |
 | *screen checks* | the config of the screen checks the project has turned on, in backticks, for `scripts/screens.mjs`, with the commands of its own tool that takes the pictures and runs each (`tasks/screens.md`, "What holds it") | choice: left out, `checks/screens.json` where it stands, and otherwise every check off |
-| *game page* | the page that says what a game of the project's is for (`tasks/game-design.md`, "Every game says what it is for, on one page"), and, where a game has them, the setting that lets its computer players know who is a person, where its given rules come from and its mode for the show: one for each game, or one with a section for each | choice: left out, `docs/game.md` |
+| *game page* | the page that says what a game of the project's is for (`tasks/game-design.md`, "Every game says what it is for, on one page"), and, where a game has them, the setting that lets its computer players know who is a person, where its given rules come from and its mode for the show, and the kinds it takes (`tasks/game-design.md`, "A game takes each kind that is true of it"): one for each game, or one with a section for each | choice: left out, `docs/game.md` |
 | *computer players*, *measured players*, *what they are shown*, *use-against-ignore measurement*, *where the numbers go*, *where rules are taught* | a game's names for what `game-design.md` speaks of | cannot be read: they name parts of a game's own code, which no script reads by meaning; left out, the module's own words, each found in the game's code by the session that needs it |
 
 ## The manifest's format

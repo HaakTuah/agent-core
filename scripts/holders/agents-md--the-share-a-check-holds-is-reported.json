@@ -1,0 +1,5 @@
+{
+  "rule": "AGENTS.md: The share a check holds is reported",
+  "behind": ["#459"],
+  "number": "findings; outcome: robust"
+}
