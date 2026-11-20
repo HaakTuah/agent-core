@@ -22,7 +22,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      pull request's, by the scheduled look's reader of late review findings (`scripts/look.mjs` through
      `scripts/review-marks.mjs`), which puts a replier's login in a request's route; limits: 64 MB of an answer (256 MB
      for the look's), 20 pages of 100 for the tools reader and 50 for the look's, every page for the review checks,
-     whose jobs stop at 6 and 5 minutes; hostile tests: `tests/hostile-pr-comments-test.mjs`, for the closing attribution
+     whose jobs stop at 6 and 5 minutes; hostile tests: `tests/hostile-pr-comments-test.mjs`; for the closing attribution
      line, `tests/tools-read-test.mjs`; and for the order's own reading of names and asks, `tests/stage-order-test.mjs`.
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
