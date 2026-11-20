@@ -238,9 +238,9 @@ export function report(got, at, r = "the measures were not read") {
 export function argued(head, base) {
   const before = new Set(parse(base ?? "").records.map(r => r.name)), recs = parse(head ?? "").records;
   const lacking = recs.filter(r => r.lacks.length), old = r => before.has(r.name) || r.stood;
-  // (a stack's record this change adds that does not say what the core cannot read in it; one that stood, or records a
-  // choice already made, is no task)
-  return { failed: lacking.filter(r => !old(r)), listed: lacking.filter(old), gapless: recs.filter(r => !r.gaps && !old(r)) };
+  // (a stack's record this change adds that does not say what the core cannot read in it; one that stood is no task,
+  // but a first audit's record of a choice already made is asked the line, which it can write, unlike the argued lines)
+  return { failed: lacking.filter(r => !old(r)), listed: lacking.filter(old), gapless: recs.filter(r => !r.gaps && !before.has(r.name)) };
 }
 
 // What the base reads as where it held a file as a link (#541): a case of its own, apart from no commit (undefined)

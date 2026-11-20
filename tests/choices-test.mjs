@@ -278,8 +278,9 @@ fs.rmSync(tmp, { recursive: true, force: true });
   ok(check2(stoodAt).status === 0 && argued(stood, stood).gapless.length === 0, "a stack's record that stood before is never failed for the line");
   ok(argued(`${old}\n${full}`, old).gapless.length === 0, "a record of another choice is asked nothing of the line");
   const recorded = `## Choice: the project's stack\n\nStood before: 2020-01-01\n`;
-  ok(argued(recorded, "").gapless.length === 0, "a stack's record of a choice already made, as a first audit writes it, is never failed for the line");
-  passes(`${old}\n${recorded}`, "and the check passes it");
+  ok(argued(recorded, "").gapless.length === 1, "a stack's record of a choice already made, as a first audit writes it, is asked the line all the same");
+  fails(`${old}\n${recorded}`, "and the check fails it without the line, saying its mend");
+  passes(`${old}\n${recorded}- ${UNREAD} none.\n`, "and passes it with the line");
   fs.rmSync(hist2, { recursive: true, force: true });
 }
 console.log(`\n${count - failed} of ${count} passed`);
