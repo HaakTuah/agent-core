@@ -1,5 +1,5 @@
 // Whether a hook's command runs its copy on `main` (floor rule 3: what an agent tool starts by itself runs from its copy
-// on `main`; agent-tools.mjs): only the starter kit's own two forms (KIT_FORMS) show it, whole, each fetching its script
+// on `main`; agent-tools-read.mjs): only the starter kit's own two forms (KIT_FORMS) show it, whole, each fetching its script
 // from the remote's `main` (`git show refs/remotes/origin/main:<path>`), which a session's branch cannot change, and
 // running it, perhaps with plain words after it, which that script, main's, reads. Nothing else is read: no other
 // command shows where what it runs comes from, so none passes for it. Node's own modules only.

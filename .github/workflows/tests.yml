@@ -322,6 +322,12 @@ jobs:
       - name: The strength check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/strength-test.mjs ')) }}
         run: node tests/strength-test.mjs
+      - name: The strength check's report read
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/strength-report-test.mjs ')) }}
+        run: node tests/strength-report-test.mjs
+      - name: The strength check's verdict
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/strength-verdict-test.mjs ')) }}
+        run: node tests/strength-verdict-test.mjs
       - name: The core's own mutation tool
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/mutate-test.mjs ')) }}
         run: node tests/mutate-test.mjs
@@ -491,6 +497,9 @@ jobs:
       - name: The proof that a change to what runs by itself is only comments and steps' names
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/comment-only-test.mjs ')) }}
         run: node tests/comment-only-test.mjs
+      - name: The proof that a change to what runs by itself is only comments and steps' names, the script run end to end
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/comment-only-run-test.mjs ')) }}
+        run: node tests/comment-only-run-test.mjs
       - name: The proof that a change to the floor or the review guidelines only follows files the pull request moves
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/path-only-test.mjs ')) }}
         run: node tests/path-only-test.mjs
@@ -557,6 +566,9 @@ jobs:
       - name: The outcomes the state report leads with, and how a correction is counted
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/outcomes-test.mjs ')) }}
         run: node tests/outcomes-test.mjs
+      - name: The blind sample the state report asks the owner to answer
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/blind-sample-test.mjs ')) }}
+        run: node tests/blind-sample-test.mjs
       - name: The check that the core takes each module or gives its reason
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/own-modules-test.mjs ')) }}
         run: node tests/own-modules-test.mjs

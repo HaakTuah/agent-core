@@ -87,10 +87,6 @@
       "mark": 115750,
       "why": "#916: a file for each reader its sections test."
     },
-    "tests/strength-test.mjs": {
-      "mark": 33179,
-      "why": "#1009: the verdict's cases apart from the run's, along the seam #920 split the script on."
-    },
     "tests/upgrade-test.mjs": {
       "mark": 98773,
       "why": "One flow over the projects it builds: each case takes a project as the one before left it (written, synced, merged, its own pull requests after), so a file of its own would build them again; and tests/ holds test files alone (#614), so no module beside it can hold a part. A session reads the case it changes, found by its section's heading."
@@ -122,10 +118,6 @@
     "scripts/nuget-fetch.mjs": {
       "mark": 27143,
       "why": "The NuGet fetch before the restore: the sources, the base's lists, each package's content hash and the tools' lock files, read through the one fetchAll(); a task that changes one reads how the others count against the base, so a split would make it open each part."
-    },
-    "tests/outcomes-test.mjs": {
-      "mark": 25803,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/packages-test.mjs": {
       "mark": 68081,
@@ -219,10 +211,6 @@
       "mark": 33431,
       "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
-    "tests/comment-only-test.mjs": {
-      "mark": 32403,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
-    },
     "tests/core-yml-test.mjs": {
       "mark": 22488,
       "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
@@ -270,10 +258,6 @@
     "tests/select-test.mjs": {
       "mark": 32013,
       "why": "#943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
-    },
-    "scripts/agent-tools.mjs": {
-      "mark": 94262,
-      "why": "#919: the readers of each agent tool's configuration apart from the check that lists them."
     },
     "tests/agent-tools-test.mjs": {
       "mark": 114595,
