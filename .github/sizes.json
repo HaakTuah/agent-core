@@ -249,7 +249,7 @@
     },
     ".github/shape-baseline.json": {
       "mark": 21237,
-      "why": "A list of old breaches, each one line of a key and its reason, which the shape check reads whole and a session reads by the key of the one it mends or adds; the 'grown' and 'listed' parts hold the same keys, so a split along them would make two files to keep in step, and none along who reads it exists."
+      "why": "A baseline the shape check reads and writes whole (--write), in the form every project's baseline takes; 'grown' gives the reason for some of the keys 'listed' holds, so a split along the two parts would make two files to keep in step, and none along who reads it was found."
     },
     "tests/staged-test.mjs": {
       "mark": 125729,
