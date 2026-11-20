@@ -57,7 +57,7 @@ const PIN = git(theCore, "rev-parse", "HEAD");
 git(tmp, "init", "-q", "--bare", "-b", "main", origin);
 git(tmp, "init", "-q", "-b", "main", p);
 // (git for Windows stops at a path of 260 characters unless told otherwise, and the case "long-name" holds a file name of 254 characters,
-// the longest a name can be, which with this folder's own path passes it: the name stays at what the case proves, and git takes long paths here; #1038)
+// one short of the longest a name can be (255), which with this folder's own path passes it: the name stays at what the case proves, and git takes long paths here; #1038)
 git(p, "config", "core.longpaths", "true");
 git(p, "remote", "add", "origin", origin);
 fs.cpSync(theCore, path.join(p, "core"), { recursive: true, filter: s => path.basename(s) !== ".git" });
