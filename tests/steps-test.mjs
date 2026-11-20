@@ -1254,21 +1254,35 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
     ok(staged.every(Boolean) && state() === base && said() === words, "nor does the same change staged, and the checks run again say what they said", `${staged}`);
     const reads = ["AGENTS.md", "core-manifest.md", "docs/PROGRESS.md", "core/scripts/guards.mjs", "checks/copies.json", "checks/copies-baseline.json", ".kiro/steering/core.md"];
     ok(reads.every(f => changed(f)), "a change to a rule file, a Markdown file, a file of the copy of the core, the config or its baseline asks a new run", reads.filter(f => !changed(f)).join(", "));
-    // (what the config's "code" names is read, and what it leaves out is not)
-    const config = original("checks/copies.json"), spec = JSON.parse(config);
-    put("app/a.txt", "a\n"); put("app/b.txt", "b\n"); put("checks/copies.json", `${JSON.stringify({ ...spec, code: ["app/a.txt"] })}\n`);
-    ["app/a.txt", "app/b.txt"].forEach(stage); stage("checks/copies.json");
-    const named = state();
-    put("app/b.txt", "b\nb\n"); const leftOut = state() === named; put("app/b.txt", "b\n");
-    put("app/a.txt", "a\na\n"); const read = state() !== named; put("app/a.txt", "a\n");
-    const again = said() === words;
-    ["app/a.txt", "app/b.txt"].forEach(unstage); fs.rmSync(path.join(d, "app"), { recursive: true }); put("checks/copies.json", config); stage("checks/copies.json");
-    ok(leftOut && read && again, "a file the config's code names is read, one it does not name is not, and the checks say what they said", `${leftOut} ${read} ${again}`);
+    // (what the config names, what SECURITY.md lists and what a tool's folder holds is read, and what they leave out is not:
+    // each scene adds its files, changes the config or SECURITY.md, and says which of its files moves the state)
+    const config = original("checks/copies.json"), spec = JSON.parse(config), security = original("SECURITY.md");
+    const listed = (...more) => security.replace("`docs/threat-model.md`;", `\`docs/threat-model.md\`${more.map(f => `, \`${f}\``).join("")};`);
+    // (a glob among the rule files is no tracked file, which the pointer check fails on without a verdict: such scenes run no check)
+    const scene = (files, { config: change = {}, security: more = [], run: runs = true } = {}) => {
+      Object.keys(files).forEach(f => put(f, files[f]));
+      put("checks/copies.json", `${JSON.stringify({ ...spec, ...change })}\n`); put("SECURITY.md", listed(...more));
+      [...Object.keys(files), "checks/copies.json", "SECURITY.md"].forEach(stage);
+      const named = state(), moves = Object.keys(files).filter(f => { put(f, `${files[f]}${files[f]}`); const now = state(); put(f, files[f]); return now !== named; });
+      const run = runs ? said() : words;
+      Object.keys(files).forEach(f => { unstage(f); fs.rmSync(path.join(d, f)); });
+      put("checks/copies.json", config); put("SECURITY.md", security); stage("checks/copies.json"); stage("SECURITY.md");
+      return { moves: moves.join(","), run };
+    };
+    const code = scene({ "app/a.txt": "a\n", "app/b.txt": "b\n" }, { config: { code: ["app/a.txt"] } });
+    const prose = scene({ "notes/p.txt": "p\n", "notes/q.dat": "q\n" }, { config: { prose: [...spec.prose, "notes/*.txt"] } });
+    const named = scene({ "data/r.txt": "r\n", "data/s.dat": "s\n" }, { security: ["data/*.txt"], run: false });
+    const unlisted = scene({ "data/r.txt": "r\n" }, { config: { proseFromSecurity: false }, security: ["data/*.txt"], run: false });
+    const literal = scene({ "checks/rule.dat": "r\n" }, { config: { proseFromSecurity: false }, security: ["checks/rule.dat"] });
+    const tools = scene({ ".kiro/agents/x.json": "{}\n", ".agent/rules": "r\n", ".kiro/other.json": "{}\n" });
+    ok(code.moves === "app/a.txt" && prose.moves === "notes/p.txt" && named.moves === "data/r.txt" && unlisted.moves === "" && literal.moves === "checks/rule.dat" && tools.moves === ".kiro/agents/x.json,.agent/rules",
+      "a file the config's code or prose names, one SECURITY.md lists (a glob only where the config reads its list as prose), a rule file it names and a file in an agent tool's folder is read, and a file they leave out is not",
+      JSON.stringify([code, prose, named, unlisted, literal, tools].map(x => x.moves)));
+    ok([code, prose, named, unlisted, literal, tools].every(x => x.run === words), "and the checks, run again with such files held, say what they said", [code, prose, named, unlisted, literal, tools].map(x => x.run).join("\n"));
     // (git's own files that change what a check lists)
     const git = [".gitattributes", ".gitmodules"].map(f => { put(f, "\n"); stage(f); const was = state(); put(f, "# x\n"); const now = state(); unstage(f); fs.rmSync(path.join(d, f)); return was !== now; });
     ok(git.every(Boolean), "a change to .gitattributes or .gitmodules asks a new run", `${git}`);
     // (where the rule files cannot be read, no file is left out)
-    const security = original("SECURITY.md");
     put("SECURITY.md", security.replace(/\*\*the rule files:\*\*/u, "**the files of rules:**"));
     const whole = state(), flow = `.github/workflows/${flows[0]}`;
     put(flow, `${original(flow)}\n`); const every = state() !== whole;

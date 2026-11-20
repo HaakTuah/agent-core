@@ -138,21 +138,22 @@ export function toolFilesState(p) {
   const git = args => execFileSync("git", args, { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28 });
   let baseline = null;
   try { baseline = JSON.parse(p.read(config) ?? "")?.baseline; } catch { /* (its own run says what of the config it cannot read) */ }
-  const index = git(["ls-files", "-s", "-z"]), entries = index.split("\0").filter(Boolean), at = e => e.slice(e.indexOf("\t") + 1);
+  const entries = git(["ls-files", "-s", "-z"]).split("\0").filter(Boolean), at = e => e.slice(e.indexOf("\t") + 1);
   const read = filesRead(p, config, entries.map(at), git);
   // (a plain file the checks do not read counts by its name and mode alone; a link, a submodule, and a file they may read, by what it holds)
   const state = crypto.createHash("sha256").update(entries.map(e => !read || read.has(at(e)) || !/^100(644|755) /.test(e) ? e : `${e.slice(0, 6)}\t${at(e)}`).join("\0"));
-  for (const f of [...git(["ls-files", "-m", "-z"]).split("\0").filter(f => f && (!read || read.has(f))), config, typeof baseline === "string" ? baseline : null]) if (f) state.update(`\0${f}\0${p.read(f) ?? ""}`);
-  // (what a tracked link leads to, a file git does not track among them, as the checks read it through the link: only
-  // where they would, a regular file of at most READ_MOST bytes inside the project; anything else, a device, a pipe, a
-  // folder or a file outside, is never opened, and counts as nothing)
-  for (const f of entries.filter(e => e.startsWith("120000 ")).map(e => at(e))) {
-    const to = path.join(p.root, f);
-    let text = "";
-    try { if (!leadsOut(p.root, to)) { const stat = fs.statSync(to); if (stat.isFile() && stat.size <= READ_MOST) text = fs.readFileSync(to, "utf8"); } } catch { /* (a link to nothing) */ }
-    state.update(`\0${f}\0${text}`);
-  }
+  const changed = git(["ls-files", "-m", "-z"]).split("\0").filter(f => f && (!read || read.has(f)));
+  for (const f of [...changed, config, typeof baseline === "string" ? baseline : null]) if (f) state.update(`\0${f}\0${p.read(f) ?? ""}`);
+  for (const f of entries.filter(e => e.startsWith("120000 ")).map(at)) state.update(`\0${f}\0${leadsTo(p, f)}`);
   return { config, key: `${p.root}\0${state.digest("hex")}` };
+}
+// What a tracked link leads to, a file git does not track among them, as the checks read it through the link: only where
+// they would, a regular file of at most READ_MOST bytes inside the project; anything else, a device, a pipe, a folder or
+// a file outside, is never opened, and counts as nothing.
+function leadsTo(p, f) {
+  const to = path.join(p.root, f);
+  try { if (!leadsOut(p.root, to)) { const stat = fs.statSync(to); if (stat.isFile() && stat.size <= READ_MOST) return fs.readFileSync(to, "utf8"); } } catch { /* (a link to nothing) */ }
+  return "";
 }
 // The tracked files the two checks can read, as a set of paths; null where that cannot be told, which counts every file as read.
 // The copies check reads the files the config's "code" and "prose" name, the project's rule files and its agent tools'
