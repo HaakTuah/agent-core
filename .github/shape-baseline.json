@@ -29,7 +29,8 @@
     "process: tests/reasons-test.mjs -> node:child_process": "Its last three tests run the script as a command, since what they guard is the command itself: its exit code and the failure line with its mend that a session reads (#756).",
     "process: tests/copy-left-out-test.mjs -> node:child_process": "It runs each check from a staged project's copy as the project's workflow runs it, and reads whether that run fails: the command's exit code, with the copy and git as they stand, is what the README's list says and the test guards (#661).",
     "process: tests/weakened-test.mjs -> node:child_process": "Its cases of testsChanged build git repositories and read what git gives for a merge commit against its first parent (a rename, a deletion, a file the base does not hold), which is what the description check reads (#307); git's own output is what the test guards, and no code of the core's stands beneath that process to call instead.",
-    "process: tests/queue-only-test.mjs -> node:child_process": "The test guards the command's own exit code and usage line (no files named: status 2, \"usage:\" on stderr), which only starting scripts/queue-only.mjs as a process shows."
+    "process: tests/queue-only-test.mjs -> node:child_process": "The test guards the command's own exit code and usage line (no files named: status 2, \"usage:\" on stderr), which only starting scripts/queue-only.mjs as a process shows.",
+    "process: tests/security-review-workflow-test.mjs -> node:child_process": "It runs the security-review workflow's own shell in bash, as GitHub runs it, with a stand-in gh, and the case whose host answers slowly in a run of its own beside the rest, since what it guards is that shell's branches, its exit and what it posts (#625)."
   },
   "listed": {
     "function: scripts/licence-commands.mjs#atCommand": {
@@ -131,6 +132,7 @@
     "process: tests/releases-test.mjs -> node:child_process": true,
     "process: tests/screens-test.mjs -> node:child_process": true,
     "process: tests/security-review-test.mjs -> node:child_process": true,
+    "process: tests/security-review-workflow-test.mjs -> node:child_process": true,
     "process: tests/select-test.mjs -> node:child_process": true,
     "process: tests/session-cost-test.mjs -> node:child_process": true,
     "process: tests/shape-test.mjs -> node:child_process": true,
