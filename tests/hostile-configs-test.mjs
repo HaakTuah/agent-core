@@ -144,6 +144,9 @@ const surveyed = survey({ "src/a.js": `${lines400}\n// a line that says (a|a)*b 
 ok(Date.now() - t0 < 5000 && surveyed.entries.get('change: src/a.js: "(a|a)*b"')?.n.count === 1, "shape.mjs: a project's marks are found as text, in time, whatever a comment holds", `${Date.now() - t0} ms`);
 for (const b of ["../x.json", "/etc/x.json", "C:\\x.json", "a/../../x.json", "<b>x</b>.json"]) ok(mended(shape({ ...SHAPE, baseline: b })), `shape.mjs: parseConfig refuses with its mend a baseline at ${b}`);
 ok(mended(shape({ ...SHAPE, aliases: { "@/": "../src/" } })) && mended(shape({ ...SHAPE, systems: { a: { paths: ["/etc/"] } } })), "shape.mjs: parseConfig refuses with its mend an alias or a system's path that leaves the project");
+// (a pathspec of "code" or "tests" that leaves the project, #924: git would refuse it with its own error and no mend)
+for (const key of ["code", "tests"]) for (const spec of ["../outside/", "/etc/", ":(top)../", "src/../../x", ":!../x", ":(exclude)/etc/", ":/../x", "C:\\x", "src\\..\\..\\x", ".."]) ok(mended(shape({ ...SHAPE, [key]: [spec] })), `shape.mjs: parseConfig refuses with its mend a pathspec of "${key}" that leaves the project: ${spec}`);
+ok(["src/", "src/../lib/", ":!src/gen/", ":(glob)**/*.test.*", ":/src/", ":(top,exclude)core/", ".", "..foo/"].every(spec => shape({ ...SHAPE, code: [spec], tests: [spec] }) === ""), "shape.mjs: parseConfig takes a pathspec that stays inside the project, magic and a \"..\" that climbs back in included");
 ok(mended(shape({ ...SHAPE, systems: { "<script>": { paths: ["src/"] } } })), "shape.mjs: parseConfig refuses with its mend a system named with markup");
 for (const [k, v] of [["marks", '{"lines":-1}'], ["marks", '{"depth":1e309}'], ["marks", '{"branches":1.5}'], ["long", "1e309"], ["wait", "-3"], ["suites", '{"x":0}']])
   ok(mended(shape(`{"baseline":"b.json","code":["src/"],"${k}":${v}}`)), `shape.mjs: parseConfig refuses with its mend "${k}" of ${v}, out of range`);
