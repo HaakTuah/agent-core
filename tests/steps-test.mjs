@@ -1253,7 +1253,13 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
     unread.forEach((f, i) => { put(f, copies[i]); stage(f); });
     ok(staged.every(Boolean) && state() === base && said() === words, "nor does the same change staged, and the checks run again say what they said", `${staged}`);
     const reads = ["AGENTS.md", "core-manifest.md", "docs/PROGRESS.md", "core/scripts/guards.mjs", "checks/copies.json", "checks/copies-baseline.json", ".kiro/steering/core.md"];
-    ok(reads.every(f => changed(f)), "a change to a rule file, a Markdown file, a file of the copy of the core, the config or its baseline asks a new run", reads.filter(f => !changed(f)).join(", "));
+    const restaged = f => {
+      const [mode, sha] = execFileSync("git", ["ls-files", "-s", "--", f], { cwd: d, encoding: "utf8" }).split(/\s/u), was = original(f);
+      put(f, `${was}\n`); stage(f); const now = state(); put(f, was);
+      execFileSync("git", ["update-index", "--cacheinfo", `${mode},${sha},${f}`], { cwd: d });
+      return now !== base;
+    };
+    ok(reads.every(f => changed(f)) && reads.every(restaged), "a change to a rule file, a Markdown file, a file of the copy of the core, the config or its baseline asks a new run, in the work tree or staged", reads.filter(f => !changed(f) || !restaged(f)).join(", "));
     // (what the config names, what SECURITY.md lists and what a tool's folder holds is read, and what they leave out is not:
     // each scene adds its files, changes the config or SECURITY.md, and says which of its files moves the state)
     const config = original("checks/copies.json"), spec = JSON.parse(config), security = original("SECURITY.md");
