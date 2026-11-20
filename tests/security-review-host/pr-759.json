@@ -1,0 +1,1020 @@
+{
+ "pull": {
+  "number": 759,
+  "state": "closed",
+  "draft": false,
+  "merged_at": "2026-11-19T21:28:32Z",
+  "created_at": "2026-11-19T11:43:48Z",
+  "commits": 33,
+  "changed_files": 31,
+  "user": {
+   "login": "HaakTuah",
+   "type": "User"
+  },
+  "head": {
+   "sha": "55efe7010d5bb2a61e93683ed3e929e74af5aff3",
+   "repo": {
+    "full_name": "HaakTuah/agent-core"
+   }
+  },
+  "base": {
+   "repo": {
+    "full_name": "HaakTuah/agent-core",
+    "owner": {
+     "login": "HaakTuah",
+     "type": "User"
+    }
+   }
+  }
+ },
+ "comments": [
+  {
+   "id": 7016873925,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "author_association": "NONE",
+   "created_at": "2026-11-19T17:32:43Z",
+   "updated_at": "2026-11-19T21:15:54Z",
+   "body": "<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 {\"code_review\":{\"commit_sha\":\"c579299b6af7896ddfa2e127003c94b344c7154a\",\"has_any_findings\":false,\"has_unresolved_findings\":false,\"status\":\"completed\"},\"security_review\":{\"commit_sha\":\"64361aacf10bb69af7eb2d877ac81f27fcddbc44\",\"has_any_findings\":true,\"has_unresolved_findings\":true,\"status\":\"completed\"}} -->\n<!-- codex-security-review:v1 {\"blockingSeverityThreshold\":\"P0\",\"headSha\":\"64361aacf10bb69af7eb2d877ac81f27fcddbc44\",\"mergeGateEnabled\":false,\"pullRequestNumber\":759,\"repository\":\"HaakTuah/agent-core\",\"status\":\"completed\"} -->\n<details>\n<summary><strong>Codex Review Summary</strong>: ✅ Completed</summary>\n\nThis comment shows the latest Codex review activity on this pull request.\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ✅ **Completed** <relative-time datetime=\"2026-11-19T21:15:53.633834Z\">2026-11-19T21:15:53.633834Z</relative-time> | `c579299` | Manual request |\n| 🔒 **Security Review** | ✅ **Completed** <relative-time datetime=\"2026-11-19T17:42:14.381560Z\">2026-11-19T17:42:14.381560Z</relative-time> | `64361aa` | Draft marked ready |\n\n### Security findings\n\n#### Advisory findings (1)\n\n- 🟡 [Bind queue exemptions to immutable owner approval](https://github.com/HaakTuah/agent-core/pull/759#discussion_r4632720115) · **Medium**\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\" or \"@codex security review\".\n\nCodex reacts with 👀 while any review is running, comments if it has suggestions, and reacts with 👍 once all reviews finish with no findings.\n\n</details>\n\n</details>"
+  },
+  {
+   "id": 7017021247,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T17:38:41Z",
+   "updated_at": "2026-11-19T17:38:41Z",
+   "body": "Security review: 64361aacf10bb69af7eb2d877ac81f27fcddbc44"
+  },
+  {
+   "id": 7018260206,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T18:30:44Z",
+   "updated_at": "2026-11-19T18:30:44Z",
+   "body": "Security review: 5b9ff63131e494ea65643b9bcfd607360f670fdf"
+  },
+  {
+   "id": 7019047738,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T18:59:24Z",
+   "updated_at": "2026-11-19T18:59:24Z",
+   "body": "Security review: 78e9a15b835a114e3541b71d6c9d1821fb54448c"
+  },
+  {
+   "id": 7020232669,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T19:42:54Z",
+   "updated_at": "2026-11-19T19:42:54Z",
+   "body": "Security review: 2bca68b8d2d17e6d73f0d77dcc7165f245c73309"
+  },
+  {
+   "id": 7021069058,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T20:17:18Z",
+   "updated_at": "2026-11-19T20:17:18Z",
+   "body": "Security review: 5a37ec86ddab8070f38c567c070bcef2fdd006df"
+  },
+  {
+   "id": 7022499211,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T21:18:43Z",
+   "updated_at": "2026-11-19T21:18:43Z",
+   "body": "Security review: c579299b6af7896ddfa2e127003c94b344c7154a"
+  },
+  {
+   "id": 7022588443,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T21:22:48Z",
+   "updated_at": "2026-11-19T21:22:48Z",
+   "body": "Security review: 55efe7010d5bb2a61e93683ed3e929e74af5aff3"
+  }
+ ],
+ "findings": [
+  {
+   "id": 4632720115,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "author_association": "NONE",
+   "created_at": "2026-11-19T17:42:12Z",
+   "updated_at": "2026-11-19T17:42:12Z",
+   "body": "<!-- codex-security-review-finding:v1 -->"
+  }
+ ],
+ "commits": [
+  {
+   "sha": "b4818e0213a2c9119e1e799ce9970e96b3e7ec28",
+   "parents": [
+    {
+     "sha": "474e3cf71b6d8f3b096bc66e0452310606ea1c4f"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "a585bc5b5d09f4688479eb12dc7f698624d78ea7",
+   "parents": [
+    {
+     "sha": "b4818e0213a2c9119e1e799ce9970e96b3e7ec28"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "07384b2ce43fd8d5989f5d12159e616d7869b74e",
+   "parents": [
+    {
+     "sha": "a585bc5b5d09f4688479eb12dc7f698624d78ea7"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "b12cb19fa675dbf8cbf7150e96b6afbb12d18313",
+   "parents": [
+    {
+     "sha": "07384b2ce43fd8d5989f5d12159e616d7869b74e"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "8b94adae992bb1690d6a20775b69198ff41f4868",
+   "parents": [
+    {
+     "sha": "b12cb19fa675dbf8cbf7150e96b6afbb12d18313"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "73737245310ff67d4750a2ed7fd66d780d1bcb85",
+   "parents": [
+    {
+     "sha": "8b94adae992bb1690d6a20775b69198ff41f4868"
+    },
+    {
+     "sha": "8f8233c5046bebda94e016f49d274431e497b0e9"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "2663ac2aa4e0b3158ae9e4043abf5cade8532dc6",
+   "parents": [
+    {
+     "sha": "73737245310ff67d4750a2ed7fd66d780d1bcb85"
+    },
+    {
+     "sha": "ec70532baac088e52612d83ebe644dd6fdb17f96"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "cadea604b48ff12eb28b918b34806bde63371b40",
+   "parents": [
+    {
+     "sha": "2663ac2aa4e0b3158ae9e4043abf5cade8532dc6"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "b3fd40eaa478af3d3ccc837cc2ed0c21a0533070",
+   "parents": [
+    {
+     "sha": "cadea604b48ff12eb28b918b34806bde63371b40"
+    },
+    {
+     "sha": "5cef92c07b7a0cb63d548f489b6116ed98664b16"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "7c2fde5cef5ef8274403baf6a9be4a61072963f1",
+   "parents": [
+    {
+     "sha": "b3fd40eaa478af3d3ccc837cc2ed0c21a0533070"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "64361aacf10bb69af7eb2d877ac81f27fcddbc44",
+   "parents": [
+    {
+     "sha": "7c2fde5cef5ef8274403baf6a9be4a61072963f1"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "d82c309264b6ca1e4953681199d22e8ed162e196",
+   "parents": [
+    {
+     "sha": "64361aacf10bb69af7eb2d877ac81f27fcddbc44"
+    },
+    {
+     "sha": "0b96a76271f0eaa2e62414c2ea7cd43c0d254246"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "d6dafafca7e6082cf6a4e247314cff4a7b3eac27",
+   "parents": [
+    {
+     "sha": "d82c309264b6ca1e4953681199d22e8ed162e196"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "f57138b6ff0bc3b80cfb63259c5921d262dc460e",
+   "parents": [
+    {
+     "sha": "d6dafafca7e6082cf6a4e247314cff4a7b3eac27"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "317ff87a861d54552f1172d6fdd10140f64ce883",
+   "parents": [
+    {
+     "sha": "f57138b6ff0bc3b80cfb63259c5921d262dc460e"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "fbcf993d5de332b9e13148bcb47fe1fa0975823f",
+   "parents": [
+    {
+     "sha": "317ff87a861d54552f1172d6fdd10140f64ce883"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "e22a8695398e90e24a993b0d08a06b423ce2b34e",
+   "parents": [
+    {
+     "sha": "fbcf993d5de332b9e13148bcb47fe1fa0975823f"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "66755e8e67c9fb7da0e397778031e9e57c84c33f",
+   "parents": [
+    {
+     "sha": "e22a8695398e90e24a993b0d08a06b423ce2b34e"
+    },
+    {
+     "sha": "913f9b80c9b4c3f0fb645946fa03a93bb1124ac7"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "5b9ff63131e494ea65643b9bcfd607360f670fdf",
+   "parents": [
+    {
+     "sha": "66755e8e67c9fb7da0e397778031e9e57c84c33f"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "b34bafdd53ba53f4d4608d87146685e6df900ac4",
+   "parents": [
+    {
+     "sha": "5b9ff63131e494ea65643b9bcfd607360f670fdf"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "aa76c9be736df587576d390dd18325e9b06d2416",
+   "parents": [
+    {
+     "sha": "b34bafdd53ba53f4d4608d87146685e6df900ac4"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "a5deded59f9031415dc8d5626de846a1285678c8",
+   "parents": [
+    {
+     "sha": "aa76c9be736df587576d390dd18325e9b06d2416"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "78e9a15b835a114e3541b71d6c9d1821fb54448c",
+   "parents": [
+    {
+     "sha": "a5deded59f9031415dc8d5626de846a1285678c8"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "2a1e3e7f50eb74dfb981ef9189d8c078d517ad01",
+   "parents": [
+    {
+     "sha": "78e9a15b835a114e3541b71d6c9d1821fb54448c"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "2f3af6a0d93d77c5b44c05abb1d4607e0450627b",
+   "parents": [
+    {
+     "sha": "2a1e3e7f50eb74dfb981ef9189d8c078d517ad01"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "2bca68b8d2d17e6d73f0d77dcc7165f245c73309",
+   "parents": [
+    {
+     "sha": "2f3af6a0d93d77c5b44c05abb1d4607e0450627b"
+    },
+    {
+     "sha": "dcb01c87b674aa69256ab121484dc3f8e872de4d"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "0a52650d16724cbcb08f19d3b6450bb99572db31",
+   "parents": [
+    {
+     "sha": "2bca68b8d2d17e6d73f0d77dcc7165f245c73309"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "5d338e742e16bde3c265f0ecf971f8f4c442fcf9",
+   "parents": [
+    {
+     "sha": "0a52650d16724cbcb08f19d3b6450bb99572db31"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "5a37ec86ddab8070f38c567c070bcef2fdd006df",
+   "parents": [
+    {
+     "sha": "5d338e742e16bde3c265f0ecf971f8f4c442fcf9"
+    },
+    {
+     "sha": "f9266728f70b669afbf6dfb02eb2f70116c0641b"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "9ec3dd4ca7c88f6b0ec2554c254497f393da9f1b",
+   "parents": [
+    {
+     "sha": "5a37ec86ddab8070f38c567c070bcef2fdd006df"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "4cf4d2fb63e350806a8d5e0c425c131993cb01ea",
+   "parents": [
+    {
+     "sha": "9ec3dd4ca7c88f6b0ec2554c254497f393da9f1b"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "c579299b6af7896ddfa2e127003c94b344c7154a",
+   "parents": [
+    {
+     "sha": "4cf4d2fb63e350806a8d5e0c425c131993cb01ea"
+    },
+    {
+     "sha": "64ec8045c20caa2b518713cfe2638c3c915b5576"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "55efe7010d5bb2a61e93683ed3e929e74af5aff3",
+   "parents": [
+    {
+     "sha": "c579299b6af7896ddfa2e127003c94b344c7154a"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  }
+ ],
+ "files": [
+  {
+   "filename": ".github/shape-baseline.json",
+   "status": "modified",
+   "patch": "@@ -27,7 +27,8 @@\n     \"process: tests/mend-test.mjs -> node:child_process\": \"The inventory's check reads its coverage from the files git tracks (#593, point 2: a sweep reads its scope from a source a script counts it from), so what `git ls-files` prints is what the test guards; no code of the core's stands beneath that process to call instead.\",\n     \"process: tests/reasons-test.mjs -> node:child_process\": \"Its last three tests run the script as a command, since what they guard is the command itself: its exit code and the failure line with its mend that a session reads (#756).\",\n     \"process: tests/copy-left-out-test.mjs -> node:child_process\": \"It runs each check from a staged project's copy as the project's workflow runs it, and reads whether that run fails: the command's exit code, with the copy and git as they stand, is what the README's list says and the test guards (#661).\",\n-    \"process: tests/weakened-test.mjs -> node:child_process\": \"Its cases of testsChanged build git repositories and read what git gives for a merge commit against its first parent (a rename, a deletion, a file the base does not hold), which is what the description check reads (#307); git's own output is what the test guards, and no code of the core's stands beneath that process to call instead.\"\n+    \"process: tests/weakened-test.mjs -> node:child_process\": \"Its cases of testsChanged build git repositories and read what git gives for a merge commit against its first parent (a rename, a deletion, a file the base does not hold), which is what the description check reads (#307); git's own output is what the test guards, and no code of the core's stands beneath that process to call instead.\",\n+    \"process: tests/queue-only-test.mjs -> node:child_process\": \"The test guards the command's own exit code and usage line (no files named: status 2, \\\"usage:\\\" on stderr), which only starting scripts/queue-only.mjs as a process shows.\"\n   },\n   \"listed\": {\n     \"function: scripts/licence-commands.mjs#atCommand\": {\n@@ -122,6 +123,7 @@\n     \"process: tests/pr-description-test.mjs -> node:child_process\": true,\n     \"process: tests/pruning-test.mjs -> node:child_process\": true,\n     \"process: tests/pure-sync-test.mjs -> node:child_process\": true,\n+    \"process: tests/queue-only-test.mjs -> node:child_process\": true,\n     \"process: tests/reading-test.mjs -> node:child_process\": true,\n     \"process: tests/reasons-test.mjs -> node:child_process\": true,\n     \"process: tests/releases-test.mjs -> node:child_process\": true,"
+  },
+  {
+   "filename": ".github/workflows/own-security-review.yml",
+   "status": "modified",
+   "patch": "@@ -5,6 +5,9 @@\n # safe is in that workflow's header: it reads, and writes one commit status, with no secret. Not advisory here: the\n # status waits until the review has run, so that the core's ruleset can require it, the core first (#99); a project's\n # stays advisory until its owner turns that off and requires it.\n+# Before it, the core's queue-only.yml proves a pull request queue-only (floor rule 8; #750), in a job of its own whose\n+# token may read issues, which the shared workflow's may not, and hands the head it proved to that workflow (its input\n+# \"queue\"), as a project's caller does (setup/template/workflows/security-review.yml.tmpl).\n name: own-security-review\n \n on:\n@@ -18,9 +21,24 @@ permissions:\n   pull-requests: read\n   statuses: write\n \n+# (the run as a whole joins no group, since every comment's run would join it before any job's condition is read, and\n+# GitHub cancels a waiting run once a newer one queues, so anyone's comment could lose a run that records a review;\n+# each run's proof feeds only its own review job, which honours it only where it names the head that job reads itself)\n jobs:\n+  queue:\n+    permissions:\n+      contents: read\n+      pull-requests: read\n+      issues: read\n+    uses: ./.github/workflows/queue-only.yml\n+    with:\n+      root: .\n+\n   security-review:\n+    needs: queue\n+    if: ${{ !cancelled() }}\n     uses: ./.github/workflows/security-review.yml\n     with:\n       root: .\n       advisory: false\n+      queue: ${{ needs.queue.outputs.head }}"
+  },
+  {
+   "filename": ".github/workflows/queue-only.yml",
+   "status": "added",
+   "patch": "@@ -0,0 +1,95 @@\n+# The proof that a pull request is queue-only (floor rule 8; #750, point 2), for every project that takes the core and\n+# for the core itself: the default branch's scripts/queue-only.mjs reads the one file the pull request changes, which\n+# must be the *progress file* its manifest names, and the issues its lines name, with a token that may read issues,\n+# which the security-review workflow's may not (a caller that grants it no such right would stop it starting). Its\n+# output \"head\" is the head it proved, or empty, which the caller hands to security-review.yml (its input \"queue\"); that\n+# workflow honours it only where the pull request's files are one Markdown file and nothing that runs by itself, so a\n+# caller changed in the pull request itself waves through nothing more. It runs where the security-review job runs, and\n+# on a pull request only where it changes one file; in a private repository, where each run is a billed job, only where\n+# the caller passes \"private\", the owner's choice, so it adds no billed job to a project that changes nothing (AGENTS.md,\n+# \"Nothing locks a project\"), whose queue-only pull requests are then reviewed as any other. It checks out the default\n+# branch, never the pull request, reads only, and writes nothing. No secret: untrusted text (the pull request's, its\n+# issues') reaches the script only as files and env, never a run line (floor rule 2). Its files are read from the\n+# comparison of the default branch's commit it checked out with the head the pull request's answer names, so they are\n+# that head's files whatever is pushed meanwhile, and proved only where they are the files GitHub lists for the pull\n+# request.\n+name: queue-only\n+\n+on:\n+  workflow_call:\n+    inputs:\n+      root:\n+        description: The folder that holds the core's scripts/ and .node-version. Left out, core.\n+        required: false\n+        type: string\n+        default: core\n+      private:\n+        description: Whether it runs in a private repository, where each run is a billed job. Left out, it does not, and such a pull request is reviewed as any other.\n+        required: false\n+        type: boolean\n+        default: false\n+    outputs:\n+      head:\n+        description: The head queue-only.mjs proved queue-only, or empty.\n+        value: ${{ jobs.prove.outputs.head }}\n+\n+permissions:\n+  contents: read\n+  pull-requests: read\n+  issues: read\n+\n+jobs:\n+  prove:\n+    # (wherever security-review.yml's job can run, so that its answer is there when that job reads it: in a private\n+    # repository only where the caller passes \"private\"; of a pull request's events only one that changes one file; of\n+    # its comments any from Codex or from an account that can write, since which of them starts a review is said once,\n+    # in that job's own condition, and a proof that job never reads costs a job of three minutes at most)\n+    if: >-\n+      ${{ (!github.event.repository.private || inputs.private)\n+      && ((github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.pull_request.changed_files == 1\n+      && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')\n+      || (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.issue.state == 'open'\n+      && (github.event.comment.user.login == 'chatgpt-codex-connector[bot]'\n+      || contains(fromJSON('[\"OWNER\",\"MEMBER\",\"COLLABORATOR\"]'), github.event.comment.author_association)))) }}\n+    # (the job joins no group, since GitHub cancels a waiting job once a newer one of its group queues, which would lose\n+    # the run of the review it feeds; each proof feeds only its own run's review job, which honours it only for the head\n+    # it reads)\n+    runs-on: ubuntu-latest\n+    timeout-minutes: 3\n+    outputs:\n+      head: ${{ steps.prove.outputs.head }}\n+    steps:\n+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n+        with:\n+          ref: ${{ github.event.repository.default_branch }} # the default branch's script, never the pull request's\n+          persist-credentials: false\n+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n+        with:\n+          node-version-file: ${{ inputs.root }}/.node-version # the one exact Node (\"Node\" in tasks/updates.md)\n+      - name: Is the pull request queue-only?\n+        id: prove\n+        env:\n+          GH_TOKEN: ${{ github.token }}\n+          REPO: ${{ github.repository }}\n+          NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}\n+          ROOT: ${{ inputs.root }}\n+        run: |\n+          set -uo pipefail\n+          # (any answer that cannot be read proves nothing: the pull request is reviewed as any other)\n+          d=$(mktemp -d)\n+          [ -f \"$ROOT/scripts/queue-only.mjs\" ] || { echo \"The default branch holds no queue-only.mjs yet.\"; exit 0; }\n+          gh api \"repos/$REPO/pulls/$NUMBER\" > \"$d/pull.json\" || exit 0\n+          [ \"$(jq '.changed_files' \"$d/pull.json\")\" = 1 ] || { echo \"It changes more than one file: not queue-only.\"; exit 0; }\n+          # (from the default branch's commit checked out here, whose progress file the form is read from, as GitHub lists\n+          # the pull request's files from where its head leaves that branch: the answer's base.sha can stand behind it)\n+          base=$(git rev-parse HEAD) tip=$(jq -r '.head.sha' \"$d/pull.json\")\n+          [[ \"$base\" =~ ^[0-9a-f]{40}$ && \"$tip\" =~ ^[0-9a-f]{40}$ ]] || { echo \"The pull request names no head commit.\"; exit 0; }\n+          # (the files of exactly the head the pull request's answer names, read by its SHA, never by the branch's name)\n+          gh api \"repos/$REPO/compare/$base...$tip\" --jq '.files' > \"$d/files.json\" || exit 0\n+          # (and the one file the comparison gives is the one GitHub lists for the pull request, whose list the review job reads)\n+          listed=$(gh api \"repos/$REPO/pulls/$NUMBER/files\" --jq '[.[].filename] | join(\"/\")') || exit 0\n+          [ \"$listed\" = \"$(jq -r '[.[].filename] | join(\"/\")' \"$d/files.json\")\" ] || { echo \"Its files are not those it was compared to: not proved.\"; exit 0; }\n+          if head=$(timeout 90 node \"$ROOT/scripts/queue-only.mjs\" \"$d/pull.json\" \"$d/files.json\") && [[ \"$head\" =~ ^[0-9a-f]{40}$ ]]; then\n+            echo \"Queue-only, as queue-only.mjs proves: $head\"\n+            echo \"head=$head\" >> \"$GITHUB_OUTPUT\"\n+          else echo \"$head\"; fi"
+  },
+  {
+   "filename": ".github/workflows/security-review.yml",
+   "status": "modified",
+   "patch": "@@ -22,7 +22,9 @@\n # posted after Codex's summary last changed and, where one is to be found, after its newest finding; nothing else\n # counts. A pure sync needs none where no review starts by itself (floor rule 8): the job runs the default branch's\n # scripts/pure-sync.mjs on the head itself, and one it proves passes with no review and no note\n-# (scripts/security-review.mjs, whose header says what it does not hold). Where the pull request's files show a change\n+# (scripts/security-review.mjs, whose header says what it does not hold). So does one the caller proved queue-only (the\n+# input \"queue\": the head a job of the caller's proved with the default branch's scripts/queue-only.mjs, whose token may\n+# read issues, which this job's may not; #750), where its files are one Markdown file and nothing that runs by itself. Where the pull request's files show a change\n # to what runs by itself beyond its pins, it asks floor rule 3's two security reviews (the same script says\n # which count, and when one is enough); of a pull request that leaves the check's scripts alone, whose head does\n # not hold them as the default branch does and that the host says was opened before the script first came to the default branch,\n@@ -80,6 +82,11 @@ on:\n         required: false\n         type: boolean\n         default: false\n+      queue:\n+        description: The head a job of the caller's proved queue-only with the default branch's scripts/queue-only.mjs, which needs no review (floor rule 8). Left out, none.\n+        required: false\n+        type: string\n+        default: \"\"\n       reviewers:\n         description: The accounts, besides the repository's owner and the people GitHub lets write to it, whose posted \"Security review:\", \"Code review:\" or \"Design check:\" counts, by login, separated by spaces. Left out, none.\n         required: false\n@@ -129,6 +136,7 @@ jobs:\n           ROOT: ${{ inputs.root }}\n           ADVISORY: ${{ inputs.advisory }}\n           REVIEWERS: ${{ inputs.reviewers }}\n+          QUEUE: ${{ inputs.queue }}\n           SERVER: ${{ github.server_url }}\n           DEFAULT: ${{ github.event.repository.default_branch }}\n           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+  },
+  {
+   "filename": ".github/workflows/tests.yml",
+   "status": "modified",
+   "patch": "@@ -308,6 +308,9 @@ jobs:\n       - name: The proof that an update from main is the merge git makes, and the review statuses' run on one\n         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/clean-merges-test.mjs ')) }}\n         run: node tests/clean-merges-test.mjs\n+      - name: The proof that a pull request changes only the progress file's lines, each for an issue it may name\n+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-only-test.mjs ')) }}\n+        run: node tests/queue-only-test.mjs\n       - name: The workflow check\n         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/workflows-test.mjs ')) }}\n         run: node tests/workflows-test.mjs"
+  },
+  {
+   "filename": "AGENTS.md",
+   "status": "modified"
+  },
+  {
+   "filename": "README.md",
+   "status": "modified"
+  },
+  {
+   "filename": "SECURITY.md",
+   "status": "modified"
+  },
+  {
+   "filename": "archive/instructions/issue-750.2.md",
+   "status": "added"
+  },
+  {
+   "filename": "floor/security.md",
+   "status": "modified"
+  },
+  {
+   "filename": "inventory/checks/210-security-review.md",
+   "status": "modified"
+  },
+  {
+   "filename": "scripts/code-review-wait.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "scripts/done-when.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "scripts/holders.json",
+   "status": "modified"
+  },
+  {
+   "filename": "scripts/queue-only.mjs",
+   "status": "added"
+  },
+  {
+   "filename": "scripts/security-review.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "scripts/stages/750-a-pull-request-of-the-progress-file-alone-proved.mjs",
+   "status": "added"
+  },
+  {
+   "filename": "scripts/step-checks.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "scripts/steps/750-a-pull-request-of-the-progress-file-alone-proved.mjs",
+   "status": "added"
+  },
+  {
+   "filename": "setup/sync-notes/750-a-pull-request-of-the-progress-file-alone-proved.md",
+   "status": "added"
+  },
+  {
+   "filename": "setup/template/workflows/security-review.yml.tmpl",
+   "status": "modified"
+  },
+  {
+   "filename": "tasks/reviews.md",
+   "status": "modified"
+  },
+  {
+   "filename": "tests/code-review-wait-test.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "tests/copy-left-out-test.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "tests/init-test.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "tests/mend-test.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "tests/queue-only-test.mjs",
+   "status": "added"
+  },
+  {
+   "filename": "tests/security-review-test.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "tests/steps-test.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "tests/upgrade-test.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "tests/workflows-test.mjs",
+   "status": "modified"
+  }
+ ],
+ "reviews": [
+  {
+   "id": 5980161198,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "commit_id": "64361aacf10bb69af7eb2d877ac81f27fcddbc44",
+   "submitted_at": "2026-11-19T17:36:24Z",
+   "body": "<!-- codex-review-receipt:v1 -->\n\n\n### 💡 Codex Review"
+  },
+  {
+   "id": 5980263535,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "commit_id": "64361aacf10bb69af7eb2d877ac81f27fcddbc44",
+   "submitted_at": "2026-11-19T17:42:12Z",
+   "body": "<!-- codex-review-receipt:v1 -->\n\n\n### 🛡️ Codex Security Review · _Automatically triggered_"
+  }
+ ],
+ "threads": [
+  {
+   "resolved": true,
+   "first": 4632641671
+  },
+  {
+   "resolved": false,
+   "first": 4632720115
+  },
+  {
+   "resolved": true,
+   "first": 4633534819
+  }
+ ],
+ "rights": []
+}

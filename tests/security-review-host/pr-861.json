@@ -1,0 +1,445 @@
+{
+ "pull": {
+  "number": 861,
+  "state": "closed",
+  "draft": false,
+  "merged_at": "2026-11-19T20:52:33Z",
+  "created_at": "2026-11-19T19:59:32Z",
+  "commits": 10,
+  "changed_files": 7,
+  "user": {
+   "login": "HaakTuah",
+   "type": "User"
+  },
+  "head": {
+   "sha": "1c6071e7db0a19a93605237b732fef6a8d16eebb",
+   "repo": {
+    "full_name": "HaakTuah/agent-core"
+   }
+  },
+  "base": {
+   "repo": {
+    "full_name": "HaakTuah/agent-core",
+    "owner": {
+     "login": "HaakTuah",
+     "type": "User"
+    }
+   }
+  }
+ },
+ "comments": [
+  {
+   "id": 7020645063,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "author_association": "NONE",
+   "created_at": "2026-11-19T19:59:56Z",
+   "updated_at": "2026-11-19T20:46:54Z",
+   "body": "<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 {\"code_review\":{\"commit_sha\":\"1c6071e7db0a19a93605237b732fef6a8d16eebb\",\"has_any_findings\":true,\"has_unresolved_findings\":true,\"status\":\"completed\"},\"security_review\":{\"commit_sha\":\"a3a06fb1a40661305f1837511c89b21b7e30bd38\",\"has_any_findings\":true,\"has_unresolved_findings\":true,\"status\":\"completed\"}} -->\n<!-- codex-security-review:v1 {\"blockingSeverityThreshold\":\"P0\",\"headSha\":\"a3a06fb1a40661305f1837511c89b21b7e30bd38\",\"mergeGateEnabled\":false,\"pullRequestNumber\":861,\"repository\":\"HaakTuah/agent-core\",\"status\":\"completed\"} -->\n<details>\n<summary><strong>Codex Review Summary</strong>: ✅ Completed</summary>\n\nThis comment shows the latest Codex review activity on this pull request.\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ✅ **Completed** <relative-time datetime=\"2026-11-19T20:46:52.959608Z\">2026-11-19T20:46:52.959608Z</relative-time> | `1c6071e` | Manual request |\n| 🔒 **Security Review** | ✅ **Completed** <relative-time datetime=\"2026-11-19T20:06:38.801301Z\">2026-11-19T20:06:38.801301Z</relative-time> | `a3a06fb` | Draft marked ready |\n\n### Security findings\n\n#### Advisory findings (1)\n\n- 🟡 [Keep oversized workflow validation fail-closed](https://github.com/HaakTuah/agent-core/pull/861#discussion_r4634405016) · **Medium**\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\" or \"@codex security review\".\n\nCodex reacts with 👀 while any review is running, comments if it has suggestions, and reacts with 👍 once all reviews finish with no findings.\n\n</details>\n\n</details>"
+  },
+  {
+   "id": 7020852512,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T20:08:14Z",
+   "updated_at": "2026-11-19T20:08:14Z",
+   "body": "Security review: b944835ad4137ddcde447b03e068d36f0062b7d4"
+  },
+  {
+   "id": 7020915790,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T20:10:45Z",
+   "updated_at": "2026-11-19T20:10:45Z",
+   "body": "Security review: 34db8178c09c12c6e9eb8c4c3f9d0564d152aa4e"
+  },
+  {
+   "id": 7021263078,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T20:25:39Z",
+   "updated_at": "2026-11-19T20:25:39Z",
+   "body": "Security review: f94343c9220820e151e642946ba95a7f9dd7d746"
+  },
+  {
+   "id": 7021666089,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T20:42:12Z",
+   "updated_at": "2026-11-19T20:42:12Z",
+   "body": "Security review: b510af1f0b304d3ea4b7a5777f155bc65a890ab0"
+  },
+  {
+   "id": 7021902537,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T20:51:58Z",
+   "updated_at": "2026-11-19T20:51:58Z",
+   "body": "Security review: 1c6071e7db0a19a93605237b732fef6a8d16eebb"
+  }
+ ],
+ "findings": [
+  {
+   "id": 4634405016,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "author_association": "NONE",
+   "created_at": "2026-11-19T20:06:36Z",
+   "updated_at": "2026-11-19T20:06:36Z",
+   "body": "<!-- codex-security-review-finding:v1 -->"
+  }
+ ],
+ "commits": [
+  {
+   "sha": "a3a06fb1a40661305f1837511c89b21b7e30bd38",
+   "parents": [
+    {
+     "sha": "f7705a3109b2e4c8f13fad27409ba38684679016"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "b944835ad4137ddcde447b03e068d36f0062b7d4",
+   "parents": [
+    {
+     "sha": "a3a06fb1a40661305f1837511c89b21b7e30bd38"
+    },
+    {
+     "sha": "5cf31888c79f690c6728661a5120d6b126032f8b"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "34db8178c09c12c6e9eb8c4c3f9d0564d152aa4e",
+   "parents": [
+    {
+     "sha": "b944835ad4137ddcde447b03e068d36f0062b7d4"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "637c23dd1b83fad82852301a5b58203c37e4aa68",
+   "parents": [
+    {
+     "sha": "34db8178c09c12c6e9eb8c4c3f9d0564d152aa4e"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "f94343c9220820e151e642946ba95a7f9dd7d746",
+   "parents": [
+    {
+     "sha": "637c23dd1b83fad82852301a5b58203c37e4aa68"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "ab3f718a52c81449d1cf0b3e2446ca1bae6167df",
+   "parents": [
+    {
+     "sha": "f94343c9220820e151e642946ba95a7f9dd7d746"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "ef76b7d1b9ae687f1da5e672c0fa5d08fe02b9ed",
+   "parents": [
+    {
+     "sha": "ab3f718a52c81449d1cf0b3e2446ca1bae6167df"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "a1b4920ad2d1b1cc9bab121f656c1ee47baea7eb",
+   "parents": [
+    {
+     "sha": "ef76b7d1b9ae687f1da5e672c0fa5d08fe02b9ed"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "b510af1f0b304d3ea4b7a5777f155bc65a890ab0",
+   "parents": [
+    {
+     "sha": "a1b4920ad2d1b1cc9bab121f656c1ee47baea7eb"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "1c6071e7db0a19a93605237b732fef6a8d16eebb",
+   "parents": [
+    {
+     "sha": "b510af1f0b304d3ea4b7a5777f155bc65a890ab0"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  }
+ ],
+ "files": [
+  {
+   "filename": "SECURITY.md",
+   "status": "modified"
+  },
+  {
+   "filename": "scripts/step-checks.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "scripts/workflows.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "scripts/yaml-keys.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "tests/hostile-build-files-test.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "tests/steps-test.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "tests/workflows-test.mjs",
+   "status": "modified"
+  }
+ ],
+ "reviews": [
+  {
+   "id": 5982381692,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "commit_id": "a3a06fb1a40661305f1837511c89b21b7e30bd38",
+   "submitted_at": "2026-11-19T20:02:10Z",
+   "body": "<!-- codex-review-receipt:v1 -->\n\n\n### 💡 Codex Review"
+  },
+  {
+   "id": 5982455662,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "commit_id": "a3a06fb1a40661305f1837511c89b21b7e30bd38",
+   "submitted_at": "2026-11-19T20:06:35Z",
+   "body": "<!-- codex-review-receipt:v1 -->\n\n\n### 🛡️ Codex Security Review · _Automatically triggered_"
+  },
+  {
+   "id": 5982675465,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "commit_id": "637c23dd1b83fad82852301a5b58203c37e4aa68",
+   "submitted_at": "2026-11-19T20:19:55Z",
+   "body": "<!-- codex-review-receipt:v1 -->\n\n\n### 💡 Codex Review"
+  },
+  {
+   "id": 5982729015,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "commit_id": "f94343c9220820e151e642946ba95a7f9dd7d746",
+   "submitted_at": "2026-11-19T20:22:47Z",
+   "body": "<!-- codex-review-receipt:v1 -->\n\n\n### 💡 Codex Review"
+  },
+  {
+   "id": 5982811991,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "commit_id": "ef76b7d1b9ae687f1da5e672c0fa5d08fe02b9ed",
+   "submitted_at": "2026-11-19T20:27:45Z",
+   "body": "<!-- codex-review-receipt:v1 -->\n\n\n### 💡 Codex Review"
+  },
+  {
+   "id": 5982843504,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "commit_id": "a1b4920ad2d1b1cc9bab121f656c1ee47baea7eb",
+   "submitted_at": "2026-11-19T20:29:47Z",
+   "body": "<!-- codex-review-receipt:v1 -->\n\n\n### 💡 Codex Review"
+  }
+ ],
+ "threads": [
+  {
+   "resolved": false,
+   "first": 4634352811
+  },
+  {
+   "resolved": false,
+   "first": 4634405016
+  },
+  {
+   "resolved": false,
+   "first": 4634569168
+  },
+  {
+   "resolved": false,
+   "first": 4634612091
+  },
+  {
+   "resolved": false,
+   "first": 4634671921
+  },
+  {
+   "resolved": false,
+   "first": 4634695454
+  }
+ ],
+ "rights": []
+}

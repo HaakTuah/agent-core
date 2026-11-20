@@ -1,0 +1,749 @@
+{
+ "pull": {
+  "number": 781,
+  "state": "closed",
+  "draft": false,
+  "merged_at": "2026-11-19T17:07:20Z",
+  "created_at": "2026-11-19T13:58:58Z",
+  "commits": 20,
+  "changed_files": 21,
+  "user": {
+   "login": "HaakTuah",
+   "type": "User"
+  },
+  "head": {
+   "sha": "edaa06c6fb9f7ac446f2dc867351b32b72982ab6",
+   "repo": {
+    "full_name": "HaakTuah/agent-core"
+   }
+  },
+  "base": {
+   "repo": {
+    "full_name": "HaakTuah/agent-core",
+    "owner": {
+     "login": "HaakTuah",
+     "type": "User"
+    }
+   }
+  }
+ },
+ "comments": [
+  {
+   "id": 7011629233,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T14:14:23Z",
+   "updated_at": "2026-11-19T14:14:23Z",
+   "body": "Security review: Claude Code, the fallback reviewer, of commit 5698c021586442e1fb505db6eef77a179f7f99fb, read against `main` at febd643 (the branch's diff: 19 files). Read whole: `roles/shared/review-guidelines.md`, `floor/security.md` as changed, `floor/threat-model.md`, `SECURITY.md`, `AGENTS.md`'s \"Review guidelines\", and #492's current text, whose quoted words are the reference. Score: 6/10, four blocking."
+  },
+  {
+   "id": 7011843760,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T14:22:26Z",
+   "updated_at": "2026-11-19T14:22:26Z",
+   "body": "Security review: Claude Code, a later round on commit 2202aede75cbb57a4e65d5d831ad2b7eda27b1b6. It covers only the diff from 5698c02 (`git diff 5698c021586442e1fb505db6eef77a179f7f99fb 2202aede75cbb57a4e65d5d831ad2b7eda27b1b6`: 9f58d7e and 2202aed, 11 files). I read it against the security review of 5698c02, the builder's answers, #492's current text (points 7 and 16 above all), and `floor/security.md` and `roles/shared/review-guidelines.md` whole. Score: 7/10, two blocking."
+  },
+  {
+   "id": 7012238581,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T14:36:21Z",
+   "updated_at": "2026-11-19T14:36:21Z",
+   "body": "Security review: Claude Code, a later round on commit 6f6be7c412d44188e214c7d57308ae743347a291. This round covers only the diff from 2202aed (`git diff 2202aede75cbb57a4e65d5d831ad2b7eda27b1b6 6f6be7c412d44188e214c7d57308ae743347a291`: c2f460b and 6f6be7c, 7 files). I read it against the security review of 2202aed, the builder's answers to it, and #492's current text, points 7, 9 and 16 above all. I read `floor/security.md` and `roles/shared/review-guidelines.md` whole. Score: 8/10, one blocking."
+  },
+  {
+   "id": 7013003058,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T15:06:15Z",
+   "updated_at": "2026-11-19T15:06:15Z",
+   "body": "Security review: Claude Code, a fresh fallback reviewer session, on commit 9fd087d2e710ebc99f35b4848fc50c7d93a18af3."
+  },
+  {
+   "id": 7013027215,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "author_association": "NONE",
+   "created_at": "2026-11-19T15:07:09Z",
+   "updated_at": "2026-11-19T16:00:33Z",
+   "body": "<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 {\"code_review\":{\"commit_sha\":\"c052aa8fa0afadd5853d0ff94b530ff7dfbd7dae\",\"has_any_findings\":false,\"has_unresolved_findings\":false,\"status\":\"completed\"},\"security_review\":{\"commit_sha\":\"9fd087d2e710ebc99f35b4848fc50c7d93a18af3\",\"has_any_findings\":true,\"has_unresolved_findings\":true,\"status\":\"completed\"}} -->\n<!-- codex-security-review:v1 {\"blockingSeverityThreshold\":\"P0\",\"headSha\":\"9fd087d2e710ebc99f35b4848fc50c7d93a18af3\",\"mergeGateEnabled\":false,\"pullRequestNumber\":781,\"repository\":\"HaakTuah/agent-core\",\"status\":\"completed\"} -->\n<details>\n<summary><strong>Codex Review Summary</strong>: ✅ Completed</summary>\n\nThis comment shows the latest Codex review activity on this pull request.\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ✅ **Completed** <relative-time datetime=\"2026-11-19T16:00:32.251121Z\">2026-11-19T16:00:32.251121Z</relative-time> | `c052aa8` | Manual request |\n| 🔒 **Security Review** | ✅ **Completed** <relative-time datetime=\"2026-11-19T15:13:10.279548Z\">2026-11-19T15:13:10.279548Z</relative-time> | `9fd087d` | Draft marked ready |\n\n### Security findings\n\n#### Advisory findings (1)\n\n- 🟡 [Scope each adviser session to one repository](https://github.com/HaakTuah/agent-core/pull/781#discussion_r4630718905) · **Medium**\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\" or \"@codex security review\".\n\nCodex reacts with 👀 while any review is running, comments if it has suggestions, and reacts with 👍 once all reviews finish with no findings.\n\n</details>\n\n</details>"
+  },
+  {
+   "id": 7013314592,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T15:18:01Z",
+   "updated_at": "2026-11-19T15:18:01Z",
+   "body": "Security review:\nTool: Claude Code. Commit read: 079e34f2eb28921fdfe4833f585eb7b41c5beedc. This review covers 079e34f alone (floor rule 8, \"Nothing is reviewed twice\"): its change to `roles/adviser.md`, \"It is the owner's, across every project\", and the README's owner's part, read against Codex's finding on 9fd087d (one adviser holding every repository's reach, a fork's PR text injecting it, private data written into a public repository). The review's and the issue's texts were read as data."
+  },
+  {
+   "id": 7013375279,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T15:20:23Z",
+   "updated_at": "2026-11-19T15:20:23Z",
+   "body": "Security review:\nTool: Claude Code. Head: 8b31d91d694e8d6c3f02edde56b3ebb23142698b. This is a later round. It covers e576cd4 (`roles/adviser.md`, `README.md`) and glances at 8b31d91's trims and caps. 92d073f, a merge of main, is not reviewed here. Earlier findings are checked against the fix; anything new is raised only if it blocks."
+  },
+  {
+   "id": 7013388075,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T15:20:53Z",
+   "updated_at": "2026-11-19T15:20:53Z",
+   "body": "Security review:\nTool: Claude Code. Commit read: 513957202720f430334d5c2b19db8ee3907a8692. This review covers 5139572 alone (\"Nothing is reviewed twice\"), a later round on my earlier point 1."
+  },
+  {
+   "id": 7014001876,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T15:42:37Z",
+   "updated_at": "2026-11-19T15:42:37Z",
+   "body": "Security review: none needed, on 01967e944aa4796f6a87630897f325d1a8c69f8b.\nSince 513957202720f430334d5c2b19db8ee3907a8692, which the fallback reviewer's security review covers, the one commit changes a test's expected count alone (`tests/tools-offer-test.mjs`, line 39: the Kiro column's bare `not yet` cells, now four with the adviser's row), touching no way in."
+  },
+  {
+   "id": 7014485457,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T16:00:37Z",
+   "updated_at": "2026-11-19T16:00:37Z",
+   "body": "Security review:\nClaude Code, Opus at high effort. Covers commit c052aa8fa0afadd5853d0ff94b530ff7dfbd7dae alone (earlier commits already reviewed). Stance: regular."
+  },
+  {
+   "id": 7014508944,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T16:01:32Z",
+   "updated_at": "2026-11-19T16:01:32Z",
+   "body": "Security review:\nClaude Code, Opus at high effort. Covers commit f70acf0b3145fbc09df955b74cbf5b6cb1b1a9d9 alone (c052aa8 reviewed earlier). Stance: regular."
+  },
+  {
+   "id": 7014523930,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T16:02:06Z",
+   "updated_at": "2026-11-19T16:02:06Z",
+   "body": "Security review:\nClaude Code, Opus at high effort. This covers commit 784d8e13591e2287c865013661fe3a3ccf55b52e alone, which was reviewed after f70acf0. Stance: regular."
+  },
+  {
+   "id": 7015886774,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T16:53:19Z",
+   "updated_at": "2026-11-19T16:53:19Z",
+   "body": "Security review:\nTool: Claude Code. Head read: 21d5f8896b600cf8d9806b200a6ccf424ac346bb. Stance: regular. Covers the merge 21d5f88's conflict resolution alone (`git show --cc 21d5f88 -- AGENTS.md roles/orchestrator.md`), since `AGENTS.md` and `roles/orchestrator.md` are protected rule files (floor rule 3); the pull request's own commits were reviewed before."
+  },
+  {
+   "id": 7015905766,
+   "user": {
+    "login": "HaakTuah",
+    "type": "User"
+   },
+   "author_association": "OWNER",
+   "created_at": "2026-11-19T16:54:04Z",
+   "updated_at": "2026-11-19T16:54:04Z",
+   "body": "Security review:\nTool: Claude Code. Commit read: edaa06c6fb9f7ac446f2dc867351b32b72982ab6, alone. Stance: regular."
+  }
+ ],
+ "findings": [
+  {
+   "id": 4630718905,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "author_association": "NONE",
+   "created_at": "2026-11-19T15:13:08Z",
+   "updated_at": "2026-11-19T15:13:08Z",
+   "body": "<!-- codex-security-review-finding:v1 -->"
+  }
+ ],
+ "commits": [
+  {
+   "sha": "726a29f36070b23e52f2d0e2aa4ba75b4774bf04",
+   "parents": [
+    {
+     "sha": "5fbbe32244c041de3d992ce1e74beb9d0007e340"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "5698c021586442e1fb505db6eef77a179f7f99fb",
+   "parents": [
+    {
+     "sha": "726a29f36070b23e52f2d0e2aa4ba75b4774bf04"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "9f58d7e91cc639d97979dee92ff5d4c3da42e634",
+   "parents": [
+    {
+     "sha": "5698c021586442e1fb505db6eef77a179f7f99fb"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "2202aede75cbb57a4e65d5d831ad2b7eda27b1b6",
+   "parents": [
+    {
+     "sha": "9f58d7e91cc639d97979dee92ff5d4c3da42e634"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "c2f460b2ccbddda2de85970ddcb18a5eaf1e59e3",
+   "parents": [
+    {
+     "sha": "2202aede75cbb57a4e65d5d831ad2b7eda27b1b6"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "6f6be7c412d44188e214c7d57308ae743347a291",
+   "parents": [
+    {
+     "sha": "c2f460b2ccbddda2de85970ddcb18a5eaf1e59e3"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "9e5e84dbfbbe593f423bd9e9589ba6d5cffa490c",
+   "parents": [
+    {
+     "sha": "6f6be7c412d44188e214c7d57308ae743347a291"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "eaaf27dcc2037091097949d47b4c04bfc0627cb9",
+   "parents": [
+    {
+     "sha": "9e5e84dbfbbe593f423bd9e9589ba6d5cffa490c"
+    },
+    {
+     "sha": "5c4a9db717cc7a9eb273e6d42f67a2ba2e883e78"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "9fd087d2e710ebc99f35b4848fc50c7d93a18af3",
+   "parents": [
+    {
+     "sha": "eaaf27dcc2037091097949d47b4c04bfc0627cb9"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "079e34f2eb28921fdfe4833f585eb7b41c5beedc",
+   "parents": [
+    {
+     "sha": "9fd087d2e710ebc99f35b4848fc50c7d93a18af3"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "92d073f20647fa61231495940ba2695f6a92f63a",
+   "parents": [
+    {
+     "sha": "079e34f2eb28921fdfe4833f585eb7b41c5beedc"
+    },
+    {
+     "sha": "203f19f74750770bbacba2aed23ebe5541ea892b"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "e576cd400fb6b73b89db5b5eedecba2104db63e4",
+   "parents": [
+    {
+     "sha": "92d073f20647fa61231495940ba2695f6a92f63a"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "8b31d91d694e8d6c3f02edde56b3ebb23142698b",
+   "parents": [
+    {
+     "sha": "e576cd400fb6b73b89db5b5eedecba2104db63e4"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "513957202720f430334d5c2b19db8ee3907a8692",
+   "parents": [
+    {
+     "sha": "8b31d91d694e8d6c3f02edde56b3ebb23142698b"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "01967e944aa4796f6a87630897f325d1a8c69f8b",
+   "parents": [
+    {
+     "sha": "513957202720f430334d5c2b19db8ee3907a8692"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "c052aa8fa0afadd5853d0ff94b530ff7dfbd7dae",
+   "parents": [
+    {
+     "sha": "01967e944aa4796f6a87630897f325d1a8c69f8b"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "f70acf0b3145fbc09df955b74cbf5b6cb1b1a9d9",
+   "parents": [
+    {
+     "sha": "c052aa8fa0afadd5853d0ff94b530ff7dfbd7dae"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "784d8e13591e2287c865013661fe3a3ccf55b52e",
+   "parents": [
+    {
+     "sha": "f70acf0b3145fbc09df955b74cbf5b6cb1b1a9d9"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "21d5f8896b600cf8d9806b200a6ccf424ac346bb",
+   "parents": [
+    {
+     "sha": "784d8e13591e2287c865013661fe3a3ccf55b52e"
+    },
+    {
+     "sha": "7f1c816d84cba312578641aa8eb51196f05f8825"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  },
+  {
+   "sha": "edaa06c6fb9f7ac446f2dc867351b32b72982ab6",
+   "parents": [
+    {
+     "sha": "21d5f8896b600cf8d9806b200a6ccf424ac346bb"
+    }
+   ],
+   "author": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "committer": {
+    "login": "someone-1",
+    "type": "User"
+   },
+   "commit": {
+    "verification": {
+     "verified": true
+    }
+   }
+  }
+ ],
+ "files": [
+  {
+   "filename": "AGENTS.md",
+   "status": "modified"
+  },
+  {
+   "filename": "README.md",
+   "status": "modified"
+  },
+  {
+   "filename": "SECURITY.md",
+   "status": "modified"
+  },
+  {
+   "filename": "archive/instructions/issue-492.md",
+   "status": "added"
+  },
+  {
+   "filename": "floor/security.md",
+   "status": "modified"
+  },
+  {
+   "filename": "roles/adviser.md",
+   "status": "added"
+  },
+  {
+   "filename": "roles/builder.md",
+   "status": "modified"
+  },
+  {
+   "filename": "roles/design.md",
+   "status": "modified"
+  },
+  {
+   "filename": "roles/orchestrator.md",
+   "status": "modified"
+  },
+  {
+   "filename": "roles/shared/how-to-work.md",
+   "status": "modified"
+  },
+  {
+   "filename": "roles/shared/inbox.md",
+   "status": "modified"
+  },
+  {
+   "filename": "roles/shared/records.md",
+   "status": "added"
+  },
+  {
+   "filename": "scripts/holders.json",
+   "status": "modified"
+  },
+  {
+   "filename": "scripts/size.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "scripts/staged/order-for-now.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "tasks/helpers.md",
+   "status": "modified"
+  },
+  {
+   "filename": "tasks/roles.md",
+   "status": "modified"
+  },
+  {
+   "filename": "tasks/tools.md",
+   "status": "modified"
+  },
+  {
+   "filename": "tests/reading-test.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "tests/tools-offer-test.mjs",
+   "status": "modified"
+  },
+  {
+   "filename": "tools/claude.md",
+   "status": "modified"
+  }
+ ],
+ "reviews": [
+  {
+   "id": 5977681745,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "commit_id": "9fd087d2e710ebc99f35b4848fc50c7d93a18af3",
+   "submitted_at": "2026-11-19T15:13:08Z",
+   "body": "<!-- codex-review-receipt:v1 -->\n\n\n### 🛡️ Codex Security Review · _Automatically triggered_"
+  },
+  {
+   "id": 5978264355,
+   "user": {
+    "login": "chatgpt-codex-connector[bot]",
+    "type": "Bot"
+   },
+   "commit_id": "01967e944aa4796f6a87630897f325d1a8c69f8b",
+   "submitted_at": "2026-11-19T15:44:48Z",
+   "body": "<!-- codex-review-receipt:v1 -->\n\n\n### 💡 Codex Review"
+  }
+ ],
+ "threads": [
+  {
+   "resolved": false,
+   "first": 4630718905
+  },
+  {
+   "resolved": false,
+   "first": 4631146972
+  }
+ ],
+ "rights": []
+}
