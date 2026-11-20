@@ -36,7 +36,8 @@ ok(says(check(cell("The orchestrator", "Kiro", "maybe later")), "in none of the 
 ok(says(check(cell("The orchestrator", "Kiro", "cannot: kiro.dev, its page on agents")), "in none of the three forms"), "a cannot with no day it was read fails");
 ok(check(cell("The orchestrator", "Kiro", "cannot: kiro.dev, its page on agents, read 18 November 2026")).wrong.length === 0, "a cannot with its page and day passes");
 const noIssue = check(cell("Its issue for what is not yet carried", "Kiro", ""));
-ok(noIssue.wrong.length === 3 && noIssue.wrong.every(w => w.includes("names no issue") && mended(`FAIL ${w}`)), "a not yet whose column names no issue fails, each such cell; one that names its own (#400) passes", noIssue.wrong.join("\n"));
+const kiroNotYet = table(text).rows.filter(r => r.cells[table(text).tools.findIndex(t => t.name === "Kiro")] === "not yet").length;
+ok(kiroNotYet > 0 && noIssue.wrong.length === kiroNotYet && noIssue.wrong.every(w => w.includes("names no issue") && mended(`FAIL ${w}`)), "a not yet whose column names no issue fails, each such cell; one that names its own (#400) passes", noIssue.wrong.join("\n"));
 ok(says(check(cell("The orchestrator", "Kiro", "not yet: soon")), "in none of the three forms"), "a not yet naming no issue number fails");
 const closed = check(text, { isOpen: n => n !== 680 });
 ok(closed.wrong.length > 0 && closed.wrong.every(w => w.includes("#680, which is not open") && mended(`FAIL ${w}`)), "a not yet whose issue is closed fails, each cell that names it, where it can be read", closed.wrong.join("\n"));

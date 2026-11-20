@@ -30,7 +30,7 @@ which its entry file pulls in.
 
 Read when a task calls for it, each saying when in its opening line: the files of `floor/topics/`,
 `floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
-`tasks/tools.md`, `tasks/ways.md`, `tools/claude-sessions.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`,
+`tasks/tools.md`, `tasks/ways.md`, `tools/claude-sessions.md`, `tools/claude-auto-mode.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`,
 `tools/antigravity.md`, `tasks/github-calls.md`, `tasks/hosts.md`, `tasks/repositories.md`, `roles/shared/teams.md`,
 `roles/orchestrator.md`, `roles/auditor.md`, `tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`,
 `tasks/cleaning.md`, `tasks/done-when.md`, `tasks/planning.md` and `roles/shared/records.md`.

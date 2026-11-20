@@ -1,0 +1,4 @@
+{
+  "rule": "tools/claude-auto-mode.md: Auto mode may refuse",
+  "number": "correction: rule missing; outcome: robust"
+}
