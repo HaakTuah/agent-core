@@ -1,7 +1,7 @@
 // The stage of scripts/steps/580-what-the-project-would-be-built-on-today.mjs: how a project that missed that step holds it, and its mend as the step words it.
 // scripts/steps-stage.mjs loads it, in the order of the names.
 import fs from "node:fs";
-import { where } from "../choices.mjs";
+import { where } from "../choices-records.mjs";
 import { at, read, write } from "../stage-helpers.mjs";
 
 export default {
