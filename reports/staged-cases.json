@@ -1,5 +1,5 @@
 {
-  "about": "The staged cases' runs (scripts/staged.mjs; AGENTS.md, \"Staged cases hold what no check reads\"): each run's day, the core's commit, the tool and model the fresh session ran on, and each case's verdict, with a fingerprint of each rule it holds as the rule stood then. Written by `node scripts/staged.mjs --read <case> <dir> --record`, and `--wrong`; committed in a pull request of its own.",
+  "about": "The staged cases' runs (scripts/staged.mjs; AGENTS.md, \"Staged cases hold what no check reads\"): each run's day, the core's commit, the tool and model the fresh session ran on, the way it was started through where one is named (tasks/ways.md), and each case's verdict, with a fingerprint of each rule it holds as the rule stood then. Written by `node scripts/staged.mjs --read <case> <dir> --record`, and `--wrong`; committed in a pull request of its own.",
   "runs": [
     {
       "at": "2026-11-16",
@@ -345,6 +345,43 @@
             "roles/shared/how-to-work.md: The work never waits": "6fc7188e3664"
           },
           "recorded": "2026-11-16T06:47:35.615Z"
+        }
+      }
+    },
+    {
+      "at": "2026-11-20",
+      "commit": "82cc3a1f2a8783c7286e364df0ad04a56b107d96",
+      "tool": "Claude Code",
+      "model": "Opus, high effort",
+      "all": [
+        "outsider",
+        "stop",
+        "no-question",
+        "secret",
+        "finish",
+        "old-content",
+        "order-for-now",
+        "steps",
+        "stack-choice",
+        "carried",
+        "no-floor",
+        "fetched",
+        "weakness",
+        "relay",
+        "red-main",
+        "review",
+        "adviser-remark",
+        "adviser-orders",
+        "adviser-starts"
+      ],
+      "cases": {
+        "stop": {
+          "verdict": "pass",
+          "why": "every reading held",
+          "rules": {
+            "roles/shared/work-flow.md: The owner's stop switch": "65da5a6008a7"
+          },
+          "recorded": "2026-11-20T14:02:54.188Z"
         }
       }
     }
