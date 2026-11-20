@@ -27,7 +27,9 @@ export function zizmorFindings(stdout, file) {
   return all.filter(f => f && !f.ignored).map(f => {
     const at = (f.locations ?? []).find(l => l?.symbolic?.kind === "Primary") ?? f.locations?.[0];
     const note = at?.symbolic?.annotation ? ` (${at.symbolic.annotation})` : "";
-    return { file, line: (at?.concrete?.location?.start_point?.row ?? 0) + 1, tool: "zizmor", rule: String(f.ident), said: `${f.desc}${note}`, url: String(f.url || ZIZMOR_DOCS) };
+    // (`what`: its severity and the text it flags, which compared() reads so that a finding is not swapped for a worse one of the same words)
+    return { file, line: (at?.concrete?.location?.start_point?.row ?? 0) + 1, tool: "zizmor", rule: String(f.ident), said: `${f.desc}${note}`, url: String(f.url || ZIZMOR_DOCS),
+      what: `${f.determinations?.severity ?? ""}\0${at?.concrete?.feature ?? ""}` };
   });
 }
 
@@ -56,19 +58,23 @@ export function run(root, files, tools) {
     if (!tools[name]) unrun.push(name);
     else for (const f of read) found.push(...each(tools[name], root, f));
   }
-  return { found, unrun };
+  // (a workflow zizmor could not load is left to actionlint's word on why, where actionlint ran and said something of it;
+  // otherwise zizmor's own word stands, so that no file passes unread by it)
+  const said = new Set(found.filter(f => f.tool === "actionlint").map(f => f.file));
+  return { found: found.filter(f => !f.quiet || !said.has(f.file)).map(({ quiet, ...f }) => f), unrun };
 }
 const go = (program, root, args) => spawnSync(program, args, { cwd: root, encoding: "utf8", maxBuffer: 1 << 28, timeout: TIMEOUT, windowsHide: true });
 
 // zizmor on one file: its findings, or the word that it could not read it. Status 3 is zizmor's "no inputs collected":
-// it could not load the file as a workflow or an action. For a workflow actionlint says why, so it is not said twice;
-// for an action it is said here, since nothing else reads it.
+// it could not load the file as a workflow or an action. For a workflow it is marked `quiet`, and run() keeps it only
+// where actionlint said nothing of the file, so that it is not said twice; for an action it is said, since nothing else reads it.
 function zizmorOn(program, root, f) {
   const r = go(program, root, ["--offline", "--no-progress", "--format", "json-v1", "--no-exit-codes", "--config", path.join(HERE, "zizmor.yml"), "--", f]);
   const got = r.status === 0 ? zizmorFindings(r.stdout ?? "", f) : null;
   if (got) return got;
   if (r.status !== 3 || r.error || r.signal) return [unread(f, "zizmor", why(r))];
-  return isWorkflow(f) ? [] : [unread(f, "zizmor", "it is no action GitHub could run: a key given twice, a part GitHub asks for missing, or no YAML")];
+  return isWorkflow(f) ? [{ ...unread(f, "zizmor", "it is no workflow it could load: a key given twice, a part GitHub asks for missing, or no YAML"), quiet: true }]
+    : [unread(f, "zizmor", "it is no action GitHub could run: a key given twice, a part GitHub asks for missing, or no YAML")];
 }
 
 // actionlint on one file: its findings (status 1 where it found some), or the word that it could not read it.
@@ -85,12 +91,12 @@ export const line = (f, lead, was = "") => `${lead} ${f.file}:${f.line}: ${f.too
   : `mend it as the line says (actionlint's checks: ${f.url})`}`;
 
 // The findings of the head against the base's, as { fails, notes } of lines: of each kind in each file (the file, the
-// tool, its rule and what it said, its line aside, and any position written into what it said, as actionlint's
-// "previously defined at line:2,col:3", so that a finding moved is no new finding), as many as the base held are noted
+// tool, its rule and what it said, with zizmor's severity and the text it flags, its line aside, and any position written
+// into what it said, as actionlint's "previously defined at line:2,col:3", so that a finding moved is no new finding), as many as the base held are noted
 // and the rest fail; with no base (`base` null), each is a note.
 const placeless = said => said.replace(/\b(line|col|column|row)(:\s*|\s+)\d+/giu, "$1$2#");
 export function compared(head, base) {
-  const key = f => `${f.file}\0${f.tool}\0${f.rule}\0${placeless(f.said)}`, held = new Map();
+  const key = f => `${f.file}\0${f.tool}\0${f.rule}\0${placeless(f.said)}\0${f.what ?? ""}`, held = new Map();
   for (const f of base ?? []) held.set(key(f), (held.get(key(f)) ?? 0) + 1);
   const fails = [], notes = [];
   for (const f of head) {

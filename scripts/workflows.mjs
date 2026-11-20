@@ -356,6 +356,17 @@ export function unparsed(files) {
   return { fails };
 }
 
+// The keys given twice in the core's own workflows and actions, as { fails }, where actionlint did not run (#580): the
+// core's own reading (keysTwice()) stands in for it there, so that a key given twice never passes the core for want of a
+// fetch. Run on the core's own files alone (`--core`); a project's are left to actionlint, which decides there.
+export function twiceUnfetched(files) {
+  const fails = [];
+  for (const { file, text } of files) for (const k of keysTwice(text)) fails.push(k.key === null
+    ? `FAIL ${file}:${k.line}: a part is nested deeper than the core's reader reads, so a key given twice in it cannot be seen. Mend: write the part flatter, plain YAML nested no deeper than it needs`
+    : `FAIL ${file}:${k.line}: the key ${JSON.stringify(k.key)} is given twice in one mapping${k.first ? `, first on line ${k.first}` : ""}, and GitHub refuses the workflow or reads one value alone. Mend: rename one of the two keys, or take one out`);
+  return { fails };
+}
+
 if (started(import.meta.url)) {
   const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
@@ -401,10 +412,10 @@ if (started(import.meta.url)) {
       held = run(dir, there, tools).found;
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   }
-  const found = compared(head.found, held);
+  const found = compared(head.found, held), twice = core && !skipped && head.unrun.includes("actionlint") ? twiceUnfetched(texts) : { fails: [] };
   for (const name of head.unrun) console.log(`::warning::The workflow check did not run ${name}: it was not fetched here, which only the job's set-up step does (core/scripts/workflow-tools.sh), so its findings decide nothing in this run. Mend: none in a session; the pull request's checks run it`);
-  for (const line of [...ready.notes, ...odd.notes, ...found.notes, ...bad.fails, ...ready.fails, ...odd.fails, ...found.fails]) console.log(logged(line));
-  failed += bad.fails.length + ready.fails.length + odd.fails.length + found.fails.length;
+  for (const line of [...ready.notes, ...odd.notes, ...found.notes, ...bad.fails, ...ready.fails, ...odd.fails, ...found.fails, ...twice.fails]) console.log(logged(line));
+  failed += bad.fails.length + ready.fails.length + odd.fails.length + found.fails.length + twice.fails.length;
   const noted = ready.notes.length + odd.notes.length + found.notes.length;
   console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} failing${noted ? `, ${noted} noted` : ""}${failed ? ". Mend: mend each line above as it says" : ""}`);
   process.exit(failed ? 1 : 0);

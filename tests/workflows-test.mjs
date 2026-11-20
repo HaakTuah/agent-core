@@ -5,12 +5,13 @@
 //   node tests/workflows-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TEMPLATES } from "../scripts/init.mjs";
 import { holds, parseYaml } from "../scripts/workflow-run.mjs";
-import { draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, unlinked, unparsed, unreadied } from "../scripts/workflows.mjs";
+import { draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, twiceUnfetched, unlinked, unparsed, unreadied } from "../scripts/workflows.mjs";
 import { Unread } from "../scripts/check-configs.mjs";
 import { readyOnlyHolds } from "../scripts/step-checks.mjs";
 import { CORE } from "../scripts/core-address.mjs";
@@ -134,13 +135,30 @@ const dupKey = (line, first) => finding("a.yml", line, "syntax-check", `key "pus
 const moved = compared([dupKey(5, 4)], [dupKey(3, 2)]), another = compared([dupKey(5, 4), dupKey(6, 4)], [dupKey(3, 2)]);
 ok(moved.fails.length === 0 && moved.notes.length === 1 && /previously defined at line:4,col:3, as on the base\./u.test(moved.notes[0]) && another.fails.length === 1,
   "a key given twice moved down the file, the place actionlint names for its first one with it, is noted, and said as the head says it; a second such finding fails", [...moved.fails, ...moved.notes, ...another.fails].join("\n"));
+// (zizmor's severity and the text it flags are of the kind: a finding swapped for another of the same words is new)
+const swapped = compared([{ ...finding("a.yml", 4, "template-injection", "code injection"), what: "High\0${{ github.event.issue.title }}" }], [{ ...finding("a.yml", 4, "template-injection", "code injection"), what: "Low\0${{ github.event.issue.number }}" }]);
+const kept = compared([{ ...finding("a.yml", 9, "template-injection", "code injection"), what: "High\0x" }], [{ ...finding("a.yml", 4, "template-injection", "code injection"), what: "High\0x" }]);
+ok(swapped.fails.length === 1 && kept.fails.length === 0, "a zizmor finding the base held, swapped for one of the same words on other text or at another severity, fails; the same one moved is noted", [...swapped.fails, ...kept.fails].join("\n"));
 const noBase = compared([finding("a.yml", 4)], null), fresh = compared([finding("a.yml", 4)], []);
 ok(noBase.fails.length === 0 && noBase.notes.length === 1 && !noBase.notes[0].includes("base") && fresh.fails.length === 1, "with no base each is noted and none fails, and where nothing stood before (the core's own) each fails");
-const zz = zizmorFindings(JSON.stringify([{ ident: "template-injection", desc: "code injection via template expansion", url: "https://docs.zizmor.sh/audits/#template-injection", ignored: false, locations: [{ symbolic: { kind: "Related", annotation: "x" }, concrete: { location: { start_point: { row: 2 } } } }, { symbolic: { kind: "Primary", annotation: "may expand into attacker-controllable code" }, concrete: { location: { start_point: { row: 6 } } } }] }, { ident: "artipacked", desc: "d", ignored: true, locations: [] }]), "w.yml");
+const zz = zizmorFindings(JSON.stringify([{ ident: "template-injection", desc: "code injection via template expansion", url: "https://docs.zizmor.sh/audits/#template-injection", ignored: false, determinations: { severity: "High" }, locations: [{ symbolic: { kind: "Related", annotation: "x" }, concrete: { location: { start_point: { row: 2 } } } }, { symbolic: { kind: "Primary", annotation: "may expand into attacker-controllable code" }, concrete: { location: { start_point: { row: 6 } }, feature: "${{ github.event.issue.title }}" } }] }, { ident: "artipacked", desc: "d", ignored: true, locations: [] }]), "w.yml");
 const al = actionlintFindings(JSON.stringify([{ kind: "syntax-check", message: "key \"if\" is duplicated", filepath: "w.yml", line: 9 }, { kind: "runner-label", message: "label \"mine\" is unknown", filepath: "w.yml", line: 4 }]), "w.yml");
-ok(zz.length === 1 && zz[0].line === 7 && zz[0].rule === "template-injection" && /\(may expand into attacker-controllable code\)$/u.test(zz[0].said) && zizmorFindings("not json", "w.yml") === null
+ok(zz.length === 1 && zz[0].line === 7 && zz[0].what === "High\0${{ github.event.issue.title }}" && zz[0].rule === "template-injection" && /\(may expand into attacker-controllable code\)$/u.test(zz[0].said) && zizmorFindings("not json", "w.yml") === null
   && al.length === 1 && al[0].line === 9 && al[0].rule === "syntax-check" && actionlintFindings("", "w.yml").length === 0 && actionlintFindings("{", "w.yml") === null,
   "zizmor's finding is read at its primary location's line, one it marks ignored left out; actionlint's by its line, a runner label it does not know let pass; output that is no JSON is no answer", JSON.stringify([zz, al]));
+ // (a workflow zizmor could not load is said by zizmor where actionlint said nothing of it, and left to actionlint where it did)
+if (process.platform !== "win32") {
+  const fake = fs.mkdtempSync(path.join(os.tmpdir(), "workflow-tools-")), tool = (name, body) => { fs.writeFileSync(path.join(fake, name), `#!/bin/sh\n${body}\n`, { mode: 0o755 }); return path.join(fake, name); };
+  try {
+    const z = tool("zizmor", "exit 3"), quiet = tool("quiet", "echo '[]'"), loud = tool("loud", `echo '[{"kind":"syntax-check","message":"key \\"on\\" is duplicated","line":2}]'; exit 1`);
+    const alone = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: quiet }).found, both = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: loud }).found, unfetched = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: "" }).found;
+    ok(alone.length === 1 && alone[0].tool === "zizmor" && alone[0].rule === "unread" && !("quiet" in alone[0]) && both.length === 1 && both[0].tool === "actionlint" && unfetched.length === 1 && unfetched[0].rule === "unread",
+      "a workflow zizmor could not load is said by zizmor where actionlint said nothing of it or did not run, and left to actionlint where it said why", JSON.stringify({ alone, both, unfetched }));
+  } finally { fs.rmSync(fake, { recursive: true, force: true }); }
+}
+// (where actionlint did not run, the core's own reading of a key given twice stands in for it in the core's own files)
+const tw = twiceUnfetched([{ file: "a.yml", text: "on:\n  push:\n  push:\n" }, { file: "b.yml", text: "on: push\n" }]).fails;
+ok(tw.length === 1 && /^FAIL a\.yml:3: the key "push" is given twice in one mapping, first on line 2/u.test(tw[0]) && mended(tw[0]), "where actionlint did not run, a key given twice in the core's own file fails by the core's own reading, with its mend", tw.join("\n"));
 const unrun = run(".", [".github/workflows/a.yml", "tools/action.yml", ".github/actions/x/steps.yml"], { zizmor: "", actionlint: "" });
 ok(unrun.found.length === 0 && unrun.unrun.join() === "zizmor,actionlint" && run(".", [".github/actions/x/steps.yml"], {}).unrun.length === 0 && isWorkflow(".github/workflows/a.YML") && !isWorkflow("tools/action.yml") && isAction("tools/action.yml"),
   "a tool not fetched is said not run, and finds nothing; none is said not run where it had no file to read");
@@ -271,6 +289,9 @@ try {
   const bare = keyRun([], { WORKFLOWS_BASE: "HEAD", ZIZMOR: "", ACTIONLINT: "" }), bareOut = bare.stdout + bare.stderr;
   ok(bare.status === 0 && /^::warning::The workflow check did not run zizmor: it was not fetched here/m.test(bareOut) && /^::warning::The workflow check did not run actionlint/m.test(bareOut) && !/[cg]\.yml|action\.yml/u.test(bareOut),
     `with neither tool fetched, as in a session, it says it did not run them, and decides nothing by them${bare.status === 0 ? "" : `:\n${bareOut}`}`);
+  const bareCore = keyRun(["--core"], { ZIZMOR: "", ACTIONLINT: "" }), bareCoreOut = bareCore.stdout + bareCore.stderr;
+  ok(bareCore.status === 1 && /^FAIL \.github\/workflows\/a\.yml:3: the key "push" is given twice/m.test(bareCoreOut) && mended(bareCoreOut),
+    `in the core's own repository with actionlint not fetched, a key given twice still fails, by the core's own reading${bareCore.status === 1 ? "" : `:\n${bareCoreOut}`}`);
   if (process.env.ZIZMOR && process.env.ACTIONLINT) {
     const k = keyRun([], { WORKFLOWS_BASE: "HEAD" }), kOut = k.stdout + k.stderr;
     const kGood = k.status === 1 && /^note \.github\/workflows\/a\.yml:3: actionlint's syntax-check: key "push" is duplicated.*, as on the base\. Mend:/m.test(kOut) && /^FAIL \.github\/workflows\/c\.yml:9: actionlint's syntax-check: key "if" is duplicated/m.test(kOut)
