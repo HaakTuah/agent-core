@@ -100,8 +100,8 @@
       "why": "The start hook runs it from git with no file beside it, so it stands alone (its opening says so): no part can be moved to a file of its own."
     },
     "scripts/size.mjs": {
-      "mark": 26144,
-      "why": "#892: the record of its caps' raises apart from the caps and the measure."
+      "mark": 22030,
+      "why": "#892: the record of its caps' raises stands apart in scripts/size-raises.md; what stands is the measure of each role's start, the check of a raise and the look's due, which call each other's readers (capsOf, counted, sizesAt), and the raise check runs from the base's own copy of this one file, so a split of it would put the check's text in a file the base's copy has not."
     },
     "scripts/security-review.mjs": {
       "mark": 39696,
