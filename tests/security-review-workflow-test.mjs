@@ -127,10 +127,12 @@ const since = (script, at = ".") => `path=${encodeURIComponent(slash(path.join(a
 
 // ---- held(), which sets BOUND (P11) ----
 // a later commit with no review: held, it waits; not held, it asks when the script came, and, opened before that, is told
-const came = (script) => ({ [`commits\\?${since(script).replace(/[%.]/gu, "\\$&")}`]: [{ sha: FIRST }], [`commits/${FIRST}/pulls`]: [{ merged_at: CAME, base: { ref: "main" }, merge_commit_sha: MERGE }],
+// (a text matched as itself in the stand-in's patterns)
+const literal = (text) => text.replace(/[\\^$.*+?()[\]{}|/]/gu, "\\$&");
+const came = (script) => ({ [`commits\\?${literal(since(script))}`]: [{ sha: FIRST }], [`commits/${FIRST}/pulls`]: [{ merged_at: CAME, base: { ref: "main" }, merge_commit_sha: MERGE }],
   [`commits/${MERGE}$`]: { sha: MERGE, parents: [{ sha: BEFORE }, { sha: FIRST }] } });
 const history = { ...came("security-review.mjs"), ...came("code-review-wait.mjs") };
-const theirs = (answer, script = "security-review.mjs") => ({ [`contents/scripts/${script.replace(".", "\\.")}\\?ref=${HEAD}`]: answer });
+const theirs = (answer, script = "security-review.mjs") => ({ [`contents/${literal(`scripts/${script}`)}\\?ref=${HEAD}`]: answer });
 const told = (r) => r.passed && r.security?.state === "success" && r.security.description.includes("before this check came") && r.gets.some((g) => g.includes(since("security-review.mjs")));
 const held = (r) => r.passed && r.security?.state === "pending" && !r.security.description.includes("before this check came") && !r.gets.some((g) => g.includes(since("security-review.mjs")));
 const other = run({ data: { ...history, ...theirs({ sha: sha("9") }) } });
