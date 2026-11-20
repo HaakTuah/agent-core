@@ -150,6 +150,10 @@
     "tests/select-test.mjs": {
       "mark": 29583,
       "why": "#943: split as its script is: the matcher's cases, the host question's cases and the selection's."
+    },
+    "tests/staged-test.mjs": {
+      "mark": 125729,
+      "why": "#937: split into the three parts it already runs in, with the shared set-up in a module of its own."
     }
   }
 }
