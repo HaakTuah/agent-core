@@ -2,7 +2,7 @@
   `scripts/inbox.mjs`, `scripts/state-report.mjs`, `scripts/pruning.mjs`, `scripts/pruning-list.mjs`, `scripts/pruning-read.mjs`, `scripts/pruning-record.mjs`, `scripts/cited.mjs`, `scripts/outcomes.mjs`,
   `scripts/outcomes-read.mjs`, `scripts/stand-in-record.mjs`, `scripts/review-record.mjs`, `scripts/review-comments.mjs`, `scripts/review-rounds.mjs`, `scripts/review-checks.mjs`,
   `scripts/core-cost.mjs`, `scripts/builder-trial.mjs`, `scripts/fixes.mjs`, `scripts/test-record.mjs`,
-  `scripts/tools-read.mjs`, `scripts/stage-order.mjs`, `scripts/merge-line.mjs`, `scripts/reasons.mjs`), a part the
+  `scripts/tools-read.mjs`, `scripts/tool-bots.json`, `scripts/stage-order.mjs`, `scripts/merge-line.mjs`, `scripts/reasons.mjs`), a part the
   inventory did not list, found by the challenge: `scripts/session-cost.mjs` (the cost line a pull request ends with),
   `scripts/labels.mjs` (the labels and openers), `scripts/state-report.mjs`, `scripts/pruning.mjs`, and the records
   (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`, `scripts/core-cost.mjs`, and `scripts/builder-trial.mjs`,

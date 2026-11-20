@@ -77,12 +77,12 @@ try {
   fs.mkdirSync(flows);
   fs.writeFileSync(path.join(flows, "ci.yml"), "on: [pull_request]\njobs:\n  test:\n    runs-on: macos-14\n    steps:\n      - run: node core/scripts/shape.mjs checks/shape.json --suite unit -- node --test\n");
   const sig = tool => `\n\n🤖 Generated with [${tool}](https://example.invalid/x)`;
-  const gh = priv => args => {
+  const gh = (priv, author = { login: "o", type: "User" }) => args => {
     const r = args.find(a => /^repos\//.test(a)) ?? "";
     if (args.includes("--jq")) return JSON.stringify({ login: "o", type: "User" });
     if (/contents\/core-manifest\.md$/.test(r)) throw new Error("404");
     if (/^repos\/o\/r$/.test(r)) { if (priv === null) throw new Error("HTTP 403"); return JSON.stringify({ private: priv, owner: { login: "o", type: "User" } }); }
-    if (/pulls\?state=closed/.test(r)) return JSON.stringify(/page=1\b/.test(r) ? [{ user: { login: "o", type: "User" }, number: 4, merged_at: "2026-11-01T00:00:00Z", body: `x${sig("Claude Code")}` }] : []);
+    if (/pulls\?state=closed/.test(r)) return JSON.stringify(/page=1\b/.test(r) ? [{ user: author, number: 4, merged_at: "2026-11-01T00:00:00Z", body: `x${sig("Claude Code")}` }] : []);
     if (/pulls\/4\/reviews/.test(r)) return JSON.stringify(/page=1\b/.test(r) ? [{ user: { login: "codex-app[bot]", type: "Bot" }, body: "" }] : []);
     if (/issues\/4\/comments/.test(r)) return "[]";
     throw new Error(`no answer for ${r}`);
@@ -90,6 +90,9 @@ try {
   let r = read({ repo: "o/r", dir: flows, ask: gh(true), local: false });
   ok(r.priv === true && r.billed === true && r.rate === 10 && r.builders[0][0] === "Claude Code" && r.reviewers.join() === "codex-app[bot]" && r.themselves.join() === "codex-app[bot]",
     "it reads the host's word that the repository is private, the macOS runner a suite takes, who built and reviewed the last merged pull request, and the review that started by itself", JSON.stringify(r));
+  const copilot = read({ repo: "o/r", dir: flows, ask: gh(false, { login: "Copilot", type: "Bot" }), local: false });
+  ok(JSON.stringify(copilot.builders) === JSON.stringify([["GitHub Copilot", 1]]) && order(copilot).short.some(s => s.kind === "review" && s.tools.join() === "GitHub Copilot"),
+    "a pull request a tool's own bot opened is built by that tool, whose allowance is then short (#901)", JSON.stringify(copilot));
   let out = said("o/r", r);
   ok(/the proof: billed, .*10× a Linux minute/.test(out) && /built by Claude Code 1; reviewed by codex-app\[bot\]; starting by themselves: codex-app\[bot\]/.test(out) && /usage warning: not said/.test(out) && /short, most first: the billed proof, at 10× a Linux minute; the allowance of Claude Code, which builds/.test(out) && /4\. last, once: the pull request marked ready/.test(out) && /overrides it/.test(out),
     "it prints what it read, what is short and the order, and that the owner's word overrides it", out);
