@@ -110,6 +110,10 @@
     "tests/size-test.mjs": {
       "mark": 28199,
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
+    },
+    "tests/steps-test.mjs": {
+      "mark": 133538,
+      "why": "#922: along the part of the steps each case tests (each step taken out, the steps with a case of their own, the sync notes' readers, a project beside a fresh start)."
     }
   }
 }
