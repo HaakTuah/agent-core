@@ -5,19 +5,17 @@
 // tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/tests-parts-test.mjs
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TESTS, fullRun } from "../scripts/release.mjs";
-import { NARROWED, WORKFLOW, fullLists, pick } from "../scripts/tests-parts.mjs";
+import { NARROWED, WORKFLOW, fullLists, pick, run } from "../scripts/tests-parts.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const script = path.join(root, "scripts/tests-parts.mjs");
 const text = fs.readFileSync(path.join(root, WORKFLOW), "utf8");
 const key = x => JSON.stringify(x);
 const same = (a, b) => key([...a].map(key).sort()) === key([...b].map(key).sort());
@@ -63,20 +61,21 @@ ok(refusals.every(r => r.refused && mended(`FAIL: ${r.refused}`)), "no word, a w
 ok(/kitt/.test(refusals[2].refused) && /windows/.test(refusals[2].refused) && /faults/.test(refusals[2].refused) && /picks no job/.test(refusals[3].refused) && /;/.test(refusals[4].refused),
   "a refusal names the word it could not use and what it may name");
 
-// ---- the script, as the workflow runs it ----
+// ---- the script, as the workflow runs it (its command line, called beneath the process) ----
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tests-parts-"));
 try {
   const out = path.join(tmp, "output");
   fs.writeFileSync(out, "before=1\n");
-  const run = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
-  const r = run("windows faults", "--output", out);
+  const said = (argv, given = text) => { const lines = []; const status = run(argv, given, { log: l => lines.push(l), err: l => lines.push(l) }); return { status, out: lines.join("\n") }; };
+  const r = said(["windows faults", "--output", out]);
   const written = Object.fromEntries(fs.readFileSync(out, "utf8").trim().split("\n").map(l => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
   const suites = JSON.parse(written.suites ?? "null"), upgrade = JSON.parse(written.upgrade ?? "null");
   ok(r.status === 0 && written.before === "1" && Array.isArray(suites) && suites.length === 2 && suites.every(x => x.os === "windows-latest" && x.parts === "core faults") && key(upgrade) === "[]"
-    && /core faults/.test(r.stdout) && r.stdout.includes(`${NARROWED}windows faults`),
-    "it adds the jobs picked to the step's outputs, one line for each job, the lines before kept, and prints them", `${r.stdout}${r.stderr}${JSON.stringify(written)}`);
-  const refused = [run("windows bogus", "--output", out), run(), run("a", "b"), run("kit", "--output")];
-  ok(refused.every(x => x.status === 1 && mended(`${x.stdout}${x.stderr}`)), "it fails a word it cannot use, and no words or two, each saying the mend", refused.map(x => x.stderr).join(" | "));
+    && /core faults/.test(r.out) && r.out.includes(`${NARROWED}windows faults`),
+    "it adds the jobs picked to the step's outputs, one line for each job, the lines before kept, and prints them", `${r.out}${JSON.stringify(written)}`);
+  const refused = [said(["windows bogus", "--output", out]), said([]), said(["a", "b"]), said(["kit", "--output"]), said(["kit"], "name: tests\n")];
+  ok(refused.every(x => x.status === 1 && mended(x.out)) && fs.readFileSync(out, "utf8").split("\n").length === 4,
+    "it fails a word it cannot use, no words or two, and a workflow it cannot read, each saying the mend and writing no output", refused.map(x => x.out).join(" | "));
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 
 // ---- a narrowed run is no full run, for the release ----

@@ -56,22 +56,27 @@ export function pick(lists, only) {
   return out;
 }
 
-function main(argv) {
-  const fail = msg => { console.error(`FAIL: ${msg}`); process.exitCode = 1; };
+// The command line: its words, as the workflow hands them in, read against the workflow's text; what it prints, each
+// line, to `log` and `err`; 0 where it picked, 1 where it failed, saying its mend.
+export function run(argv, text, { log = console.log, err = console.error } = {}) {
+  const fail = msg => { err(`FAIL: ${msg}`); return 1; };
   const at = argv.indexOf("--output"), output = at >= 0 ? argv[at + 1] : null;
   const rest = argv.filter((_, i) => at < 0 || (i !== at && i !== at + 1));
   if ((at >= 0 && !output) || rest.length !== 1) return fail(`give the words as one argument. Mend: run node scripts/tests-parts.mjs "<words>" [--output <file>], as ${WORKFLOW} does`);
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  let text;
-  try { text = fs.readFileSync(path.join(root, WORKFLOW), "utf8"); } catch { text = ""; }
   const lists = fullLists(text);
   if (!lists) return fail(`${WORKFLOW}: the jobs of a full run could not be read from the matrices of its jobs suites and upgrade. Mend: keep each job's matrix one line "include: \${{ fromJSON(... || '<the full run's list>') }}", its last list the full run's`);
   const got = pick(lists, rest[0]);
   if (got.refused) return fail(got.refused);
-  console.log(`the run "${NARROWED}${rest[0].trim()}" runs these jobs alone, on both Nodes where the full run does:`);
-  for (const x of got.suites) console.log(`  suites (${x.os}, ${x.parts}${x.node === ".node-least" ? ", the least Node" : ""})`);
-  for (const x of got.upgrade) console.log(`  ${wordsOf("upgrade", x)[0]} (${x.os}, ${x.part})`);
+  log(`the run "${NARROWED}${rest[0].trim()}" runs these jobs alone, on both Nodes where the full run does:`);
+  for (const x of got.suites) log(`  suites (${x.os}, ${x.parts}${x.node === ".node-least" ? ", the least Node" : ""})`);
+  for (const x of got.upgrade) log(`  ${wordsOf("upgrade", x)[0]} (${x.os}, ${x.part})`);
   if (output) fs.appendFileSync(output, `suites=${JSON.stringify(got.suites)}\nupgrade=${JSON.stringify(got.upgrade)}\n`);
+  return 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main(process.argv.slice(2));
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  let text;
+  try { text = fs.readFileSync(path.join(root, WORKFLOW), "utf8"); } catch { text = ""; }
+  process.exitCode = run(process.argv.slice(2), text);
+}
