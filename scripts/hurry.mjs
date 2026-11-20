@@ -12,8 +12,9 @@ export const CHARACTERS = 4_000_000;
  *  passed can take about 3 s more, so this keeps the readers within about 4.5 s, and the run stops there (`Late`). */
 export const SPENT_MS = 1500;
 /** The most time, in milliseconds, the selection takes to link each file to the files whose names it holds and to follow
- *  those links from each test, after the readers: it grows with the files' count times their characters (and with the
- *  tests' count times the links), about 0.7 s on the core's own 375 files. */
+ *  those links from each test, after the readers: about 0.2 s on the core's own 383 files, and in step with the files'
+ *  characters (name-trie.mjs), so that a project's size alone never takes it near this; what does is a pull request's own
+ *  files, as many tests each naming many others. */
 export const LINKS_MS = 1500;
 
 /** Raised where the changed files are more than the selection allows to read; `message` says why the whole suite runs. */

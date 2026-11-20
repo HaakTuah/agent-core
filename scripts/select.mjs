@@ -40,6 +40,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE } from "./code-shape.mjs";
 import { logged } from "./guards.mjs";
+import { WORDS, mentioned, nameTrie } from "./name-trie.mjs";
 import { Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { isCode } from "./shape-readers.mjs";
@@ -49,7 +50,6 @@ class Refused extends Error {}
 const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
 const git = args => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
 const PLAIN = /^[\w@+.,=-][\w@+./,=-]*$/u;
-const escaped = s => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 // A pattern as a list of steps, matched by walking every step a path could stand at at once, so a match takes time in
 // proportion to the path's length times the pattern's, whatever runs of wildcards it holds: each step is a character
@@ -132,13 +132,19 @@ const above = (name, file, texts) => ["", ...file.split("/").slice(0, -1).map((_
 // A file of Python by its dotted name too ("pkg.rules"; a package's own for __init__.py and __main__.py).
 const dotted = f => f.replace(/\.py$/u, "").replace(/\/(__init__|__main__)$/u, "").split("/").join(".");
 export function links(texts, tests, reach, pace = () => {}) {
-  const named = Object.keys(texts).map(f => [f, new RegExp(`(^|[^\\w-])${escaped(path.posix.basename(f))}(?![\\w-])${f.endsWith(".py") && dotted(f).includes(".") ? `|(^|[^\\w.])${escaped(dotted(f))}(?![\\w])` : ""}`, "u")]);
+  // (each name tried on each text took time in step with the count of names times the count of texts: the names are held in
+  // a trie, walked once over each text, name-trie.mjs)
+  const byName = nameTrie(Object.keys(texts).map(f => [path.posix.basename(f), f]));
+  const byDotted = nameTrie(Object.keys(texts).filter(f => f.endsWith(".py") && dotted(f).includes(".")).map(f => [dotted(f), f]));
   const out = new Map();
   for (const [file, text] of Object.entries(texts)) {
     pace();
     const to = new Set(reach.get(file) ?? []), py = file.endsWith(".py");
-    // (the pace is checked every 64 names, as one long text against many names takes seconds)
-    if (py || CODE.includes(path.posix.extname(file))) { const plain = uncommented(text, py); let k = 0; for (const [f, re] of named) { if (++k % 64 === 0) pace(); if (f !== file && re.test(plain)) to.add(f); } }
+    if (py || CODE.includes(path.posix.extname(file))) {
+      const plain = uncommented(text, py), named = mentioned(byName, plain, WORDS.name);
+      if (py) for (const f of mentioned(byDotted, plain, WORDS.dotted)) named.add(f);
+      for (const f of named) if (f !== file) to.add(f);
+    }
     // (Python runs a package's __init__.py on each import under it, and pytest a folder's conftest.py with no import)
     if (py) for (const run of [...above("__init__.py", file, texts), ...above("conftest.py", file, texts)]) to.add(run);
     out.set(file, to);

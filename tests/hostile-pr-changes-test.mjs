@@ -221,17 +221,18 @@ for (const [file, made] of Object.entries(SLOWEST)) {
 }
 // (the count is no limit of its own: several files each at the largest its reader takes, and one file past it that the
 // lexer alone reads, together take the selection past 5 s unless it stops reading and runs the whole suite; #881)
-const together = (key, what, files) => {
+const together = (key, what, files, whole = true) => {
   branch(`sel-${key}`, () => { for (const [file, text] of Object.entries(files)) write(file, text); });
   fs.writeFileSync(envFile, "");
   const from = Date.now(), timed = spawnSync(process.execPath, [path.join(root, "scripts", "select.mjs"), "--env", "RUN"], { cwd: p, env: { ...env, SELECT_BASE: MAIN, GITHUB_ENV: envFile }, encoding: "utf8", maxBuffer: 1 << 28, timeout: 5000 });
   console.log(`     ${key}: ${Date.now() - from} ms`);
-  ok(timed.status === 0 && !raw(`${timed.stdout}${timed.stderr}`) && said() === "RUN=all\n", `select: ${what} are read within 5 s, and the whole suite runs`, `${timed.signal ?? ""}${timed.stderr}${said()}`);
+  ok(timed.status === 0 && !raw(`${timed.stdout}${timed.stderr}`) && (whole ? said() === "RUN=all\n" : /^RUN=/u.test(said())), `select: ${what} are read within 5 s${whole ? ", and the whole suite runs" : " and select"}`, `${timed.signal ?? ""}${timed.stderr}${said()}`);
 };
-// (and the linking of each file to the files whose names it holds, which grows with the count of files times their text)
-together("many-mid", "2300 files of 1,500 characters, under the limit in characters", Object.fromEntries(Array.from({ length: 2300 }, (_, n) => [`src/f${n}.js`, `export const v = "${" f1.j".repeat(300)}";\n`])));
-together("one-long", "4000 small files and one of 3.8 million characters", { ...Object.fromEntries(Array.from({ length: 4000 }, (_, n) => [`src/g${n}.js`, `export const v = ${n};\n`])), "src/long.js": `export const v = "${"a ".repeat(1_900_000)}";\n` });
-together("tests-naming", "700 test files that each name the 699 others", Object.fromEntries(Array.from({ length: 700 }, (_, n) => [`test/t${n}.js`, `export const v = "${Array.from({ length: 700 }, (_, k) => `t${k}.js`).join(" ")}";\n`])));
+// (and the linking of each file to the files whose names it holds, which took time in step with the count of files times their
+// text, and the search from each test: the answer is the whole suite where the pace is passed, else the tests it selects)
+together("many-mid", "2300 files of 1,500 characters, under the limit in characters", Object.fromEntries(Array.from({ length: 2300 }, (_, n) => [`src/f${n}.js`, `export const v = "${" f1.j".repeat(300)}";\n`])), false);
+together("one-long", "4000 small files and one of 3.8 million characters", { ...Object.fromEntries(Array.from({ length: 4000 }, (_, n) => [`src/g${n}.js`, `export const v = ${n};\n`])), "src/long.js": `export const v = "${"a ".repeat(1_900_000)}";\n` }, false);
+together("tests-naming", "700 test files that each name the 699 others", Object.fromEntries(Array.from({ length: 700 }, (_, n) => [`test/t${n}.js`, `export const v = "${Array.from({ length: 700 }, (_, k) => `t${k}.js`).join(" ")}";\n`])), false);
 together("csharp-three", "three files of C# at the largest its reader takes", Object.fromEntries([1, 2, 3].map(n => [`src/call${n}.cs`, SLOWEST["src/call.cs"](LARGEST.csharp)])));
 together("every-kind", "the densest file of each kind, all at once", Object.fromEntries(Object.entries(SLOWEST).map(([file, made]) => [file, made(largestOf(file))])));
 together("js-huge", "one file of JavaScript of 20 million characters", { "src/huge.js": SLOWEST["src/list.js"](20_000_000) });

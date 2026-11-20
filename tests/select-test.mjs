@@ -14,6 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { Late, hurry } from "../scripts/hurry.mjs";
+import { WORDS, mentioned, nameTrie } from "../scripts/name-trie.mjs";
 import { links, matcher, passedWhole, reached, selection } from "../scripts/select.mjs";
 import { parseConfig, survey } from "../scripts/shape.mjs";
 
@@ -83,12 +84,12 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
   const pace = w.pace(50);
   clock += 40;
   ok(lateness(pace) === null && /took 60 ms, past the 50 ms/u.test(lateness(() => { clock += 20; pace(); })), "the linking of files is held to a time of its own, from when it is asked, and stops saying why");
-  // (the pace is asked inside the loops: once for each of 64 names and of 256 files taken off a queue, not once a file)
+  // (the pace is asked inside the loops: once for each file linked, and once for each test and 256 files taken off a queue)
   let asked = 0;
   const many = Object.fromEntries(Array.from({ length: 200 }, (_, n) => [`src/m${n}.js`, `export const v = ${n};\n`])), manyTests = new Set(Object.keys(many).slice(0, 3));
   const linkedMany = links(many, manyTests, new Map(), () => asked++);
-  ok(asked >= 200 + 200 * 3 && linkedMany.size === 200 && same([...links(texts, tests, reach)].map(([f, to]) => [f, [...to]]), [...links(texts, tests, reach, () => {})].map(([f, to]) => [f, [...to]])),
-    "links asks its pace once a file and every 64 names, and links as it did where no pace is given", `${asked} asks`);
+  ok(asked >= 200 && linkedMany.size === 200 && same([...links(texts, tests, reach)].map(([f, to]) => [f, [...to]]), [...links(texts, tests, reach, () => {})].map(([f, to]) => [f, [...to]])),
+    "links asks its pace once a file, and links as it did where no pace is given", `${asked} asks`);
   asked = 0;
   const chain = new Map(Array.from({ length: 1000 }, (_, n) => [`f${n}`, new Set([`f${n + 1}`])]));
   reached(new Set(["f0", "f500"]), chain, () => asked++);
@@ -109,6 +110,32 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
   const all = { ...code, ...suite }, many = new Set(Object.keys(suite)), from = Date.now();
   const picked = selection({ changed: Object.keys(code), texts: all, tests: many, reach: new Map(), config: cfg });
   ok(!picked.all && picked.tests.length === 0 && Date.now() - from < 3000, `500 changed files over 600 tests and 10 globs of "select.whole" select in ${Date.now() - from} ms, none of those tests reaching every file`, JSON.stringify(picked.tests.slice(0, 3)));
+}
+
+// ---- the files whose names a text holds, in one pass (name-trie.mjs; #881) ----
+{
+  // (the same files as the regular expression of each name that it replaced, over names and texts made to be hard)
+  const esc = x => x.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const oracle = (entries, text, kind) => new Set(entries.filter(([n]) => n && new RegExp(kind === "name" ? `(^|[^\\w-])${esc(n)}(?![\\w-])` : `(^|[^\\w.])${esc(n)}(?![\\w])`, "u").test(text)).map(([, f]) => f));
+  let seed = 20261120;
+  const roll = n => { seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff; return (seed >>> 8) % n; };
+  const bits = ["a", "b", "ab", ".", "-", "_", " ", "\n", "/", "é", "😀", "x1", ".js", "a.b", "'", "9"], made = n => Array.from({ length: n }, () => bits[roll(bits.length)]).join("");
+  for (const kind of ["name", "dotted"]) {
+    let hit = 0, bad = null;
+    for (let round = 0; round < 3000 && !bad; round++) {
+      const entries = Array.from({ length: 1 + roll(8) }, (_, k) => [made(1 + roll(4)), `f${k}`]), text = made(roll(40));
+      const got = [...mentioned(nameTrie(entries), text, WORDS[kind])].sort().join(), want = [...oracle(entries, text, kind)].sort().join();
+      if (want) hit++;
+      if (got !== want) bad = JSON.stringify({ entries, text, got, want });
+    }
+    ok(!bad && hit >= 40, `${kind}: 3000 random names and texts, ${hit} of them holding a name, give the files the regular expression of each name gave`, bad);
+  }
+  const trie = nameTrie([["select.mjs", "s"], ["a.js", "x/a.js"], ["a.js", "y/a.js"], ["b", "b"], ["ab", "ab"]]), holds = text => [...mentioned(trie, text, WORDS.name)].sort().join(" ");
+  ok(holds("node scripts/select.mjs") === "s" && holds("xselect.mjs") === "" && holds("select.mjsx") === "" && holds("my-select.mjs") === "" && holds("a.jsx a.js") === "x/a.js y/a.js" && holds("ab b") === "ab b" && holds("a b") === "b" && holds("b-") === "" && holds("a.js-x") === "" && holds("-b") === "" && holds("") === "",
+    "a name is held between characters that are no part of a word, files that share one together, and one that another holds by its end");
+  const text = "export const v = f1.js file ".repeat(150000), from = Date.now();
+  const found = mentioned(nameTrie(Array.from({ length: 20000 }, (_, k) => [`file${k}.js`, `src/file${k}.js`])), text, WORDS.name);
+  ok(found.size === 0 && Date.now() - from < 3000, `20,000 names over ${text.length.toLocaleString("en")} characters are told in ${Date.now() - from} ms`);
 }
 
 // ---- what a pull request runs ----
