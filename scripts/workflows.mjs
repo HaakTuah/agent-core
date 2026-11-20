@@ -93,8 +93,8 @@ export const readable = text => !/[\0\ufffd]/u.test(text);
 // many there are in all; null where there is none (#872).
 export function foreignBreaks(text) {
   let line = 1, first = null, count = 0;
-  for (const m of String(text).matchAll(/\n|[\u0085\u2028\u2029]/gu)) {
-    if (m[0] === "\n") { line++; continue; }
+  for (const m of String(text).matchAll(/\r\n?|\n|[\u0085\u2028\u2029]/gu)) {
+    if (m[0].length > 1 || /[\r\n]/u.test(m[0])) { line++; continue; }
     count++;
     first ??= { line, code: `U+${m[0].codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}` };
   }
@@ -102,13 +102,14 @@ export function foreignBreaks(text) {
 }
 
 // A text as a YAML 1.1 reader reads it: each of the three breaks an LF, as { text, line }, with `line` telling a line of
-// that text as the line an editor counts, which the three do not end (#876). A text with none is itself.
+// that text as the line an editor counts (CR and CRLF end one, the three do not) (#876). A text with none is itself.
 export function asLF(text) {
   text = String(text);
   if (text.length > LONGEST || !/[\u0085\u2028\u2029]/u.test(text)) return { text, line: n => n }; // (a text past the length read is not read: yaml-keys.mjs)
+  text = text.replace(/\r\n?/gu, "\n"); // (as twice() does, a CR before a break its own line end, as YAML 1.1 reads them)
   const at = [0, 1];
   let editor = 1;
-  for (const m of text.matchAll(/\r\n?|\n|[\u0085\u2028\u2029]/gu)) { if (!/^[\u0085\u2028\u2029]$/u.test(m[0])) editor++; at.push(editor); }
+  for (const m of text.matchAll(/\n|[\u0085\u2028\u2029]/gu)) { if (m[0] === "\n") editor++; at.push(editor); }
   return { text: text.replace(/[\u0085\u2028\u2029]/gu, "\n"), line: n => at[n] ?? n };
 }
 

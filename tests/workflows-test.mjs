@@ -12,6 +12,7 @@ import { mended } from "../scripts/mend.mjs";
 import { TEMPLATES } from "../scripts/init.mjs";
 import { holds, parseYaml } from "../scripts/workflow-run.mjs";
 import { draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
+import { readyOnlyHolds } from "../scripts/step-checks.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { LONGEST, twice, uncommented } from "../scripts/yaml-keys.mjs";
 
@@ -108,6 +109,7 @@ const behind = ["\u0085", "\u2028", "\u2029"].map(br => {
 ok(behind.every(({ keys, same, grown, none, found }) => keys.fails.length === 1 && /^FAIL w\.yml:3: the key "x" is given twice in one mapping \(first on line 2\)/u.test(keys.fails[0]) && mended(keys.fails[0])
   && same.fails.length === 0 && same.notes.length === 1 && grown.fails.length === 0 && none.fails.length === 0 && none.notes.length === 1 && found.length === 1 && found[0].line === 3 && found[0].first === 2)
   && keysTwice("a: 1\r\n# c\u2028x: 1\rx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && keysTwice(hiding("\u2028")).map(k => `${k.line}<${k.first}`).join() === "1<1"
+  && keysTwice("a: 1\r\u2028x: 1\nx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && foreignBreaks("a\rb\r\u2028c\n")?.line === 3
   && keysTwice("a: 1\nb: 2\n").length === 0 && keysTwice(`a: ${"\u2028".repeat(LONGEST)}\n`).map(k => `${k.line}:${k.size}`).join() === "1:true",
   "a key given twice behind a line break the package does not read is found, a new one failing, the base's own noted, and told on the line an editor counts", behind.flatMap(r => [...r.keys.fails, ...r.same.notes]).join("\n"));
 // (Codex's case: a call of a check skipped on a draft whose ready_for_review a same-length edit moves into a comment, in a
@@ -148,6 +150,9 @@ const skipping = br => `# c${br}${call(TYPES, "copies.yml", NOT_DRAFT)}`;
 const readied = ["\u0085", "\u2028", "\u2029"].map(br => ({ yes: draftHoles(skipping(br)), fresh: unreadied(one(skipping(br)), () => null), same: unreadied(one(skipping(br)), () => skipping(br)) }));
 ok(readied.every(({ yes, fresh, same }) => yes.join() === "check" && fresh.fails.length === 1 && mended(fresh.fails[0]) && same.fails.length === 0 && same.notes.length === 1) && draftHoles(`# c\n${call(TYPES, "copies.yml", NOT_DRAFT)}`).join() === "check",
   "a call skipped on a draft without ready_for_review behind such a break is found, a new one failing and the base's own noted", readied.flatMap(r => [...r.fresh.fails, ...r.same.notes]).join("\n"));
+// (the sync's step for such a call names it behind a break too, reading the workflow's text, not the YAML the package gave)
+const stepOf = text => readyOnlyHolds({ root: ".", files: [], workflows: { "a.yml": { text, yaml: (() => { try { return parseYaml(text); } catch { return null; } })() } } });
+ok(["\u0085", "\u2028", "\u2029"].every(br => /workflows\/a\.yml`/u.test(stepOf(skipping(br)) ?? "")) && stepOf(`# c\n${call(FULL, "copies.yml", NOT_DRAFT)}`) === null, "the step that names a call a draft skips names one behind such a break too", String(stepOf(skipping("\u2028"))));
 ok(draftHoles(call(TYPES, "copies.yml", NOT_DRAFT)).join() === "check" && draftHoles(call("  pull_request:\n", "personal-terms.yml", NOT_DRAFT)).length === 1
   && draftHoles(call(TYPES, "pr-description.yml")).length === 1 && draftHoles(call(TYPES, "core.yml", "    with:\n      description: true\n")).length === 1,
   "a call skipped on a draft, by its if: or by a check that skips one itself, whose trigger leaves out ready_for_review is found");

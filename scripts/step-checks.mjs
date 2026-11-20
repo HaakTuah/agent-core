@@ -444,8 +444,11 @@ export function nugetPathsHold(p) {
 // ready (#375, #502): without that, the check a draft skipped never runs on that head, and a ruleset counts the skip as
 // passed. Each workflow where a call does so is named, as the workflow check reads it (workflows.mjs, draftHoles).
 export function readyOnlyHolds(p) {
-  readable(p, text => /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget|pr-description)\.yml@/i.test(text));
-  const wrong = Object.entries(p.workflows).filter(([, w]) => w.yaml && draftHoles(w.yaml).length);
+  // (a workflow with a line break the YAML package does not read is read from its text, as a YAML 1.1 reader reads it, never from the
+  // YAML the package gave, which may be none: #876)
+  const odd = text => foreignBreaks(text ?? "") !== null;
+  readable(p, text => !odd(text) && /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget|pr-description)\.yml@/i.test(text));
+  const wrong = Object.entries(p.workflows).filter(([, w]) => draftHoles(odd(w.text) ? w.text : w.yaml).length);
   return wrong.length ? `A call to the core's checks whose job is skipped on a draft never runs once the pull request is marked ready, since its trigger leaves that out: add \`ready_for_review\` to the \`types:\` under \`pull_request:\` (where it lists none, \`types: [opened, reopened, synchronize, ready_for_review]\`) in ${wrong.map(([f]) => `\`.github/workflows/${shown(f)}\``).join(", ")}.` : null;
 }
 
