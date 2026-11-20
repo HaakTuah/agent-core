@@ -175,10 +175,6 @@
       "mark": 37770,
       "why": "Split into the look's tests and the state report's in #852."
     },
-    "tests/pr-description-test.mjs": {
-      "mark": 32011,
-      "why": "#888: its cases split with the script, each line's check's cases beside it."
-    },
     "tests/reading-test.mjs": {
       "mark": 31106,
       "why": "Split by the part of reading.mjs each case tests in #852."
