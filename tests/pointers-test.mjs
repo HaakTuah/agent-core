@@ -54,10 +54,13 @@ const deepList = n => Array.from({ length: n }, (_, k) => `${"  ".repeat(k)}- x`
 const read = await markdownReader();
 let refused = "";
 try { read(deepList(2000)); } catch (e) { refused = e.message; }
-ok(/line 102 nests lists or quotes more than 100 levels deep/.test(refused), "the reader refuses a list nested 2000 deep before parsing it (the lexer would run out of memory), naming the line");
+ok(/line 101 nests lists or quotes deeper than the reader follows/.test(refused), "the reader refuses a list nested 2000 deep before parsing it (the lexer would run out of memory), naming the line");
+const inline = n => Array.from({ length: n }, (_, k) => `${"- ".repeat(k)}x`).join("\n");
+const refuses = text => { try { read(text); return false; } catch { return true; } };
+ok([inline(2100), Array.from({ length: 250 }, (_, k) => `${"1. ".repeat(k)}x`).join("\n"), Array.from({ length: 250 }, (_, k) => `${"> - ".repeat(k)}x`).join("\n"), Array.from({ length: 60 }, (_, k) => `${"\t".repeat(k)}- x`).join("\n")].every(refuses) && !refuses(inline(90)) && !refuses(`${" ".repeat(300)}\n`), "markers written inline, numbered, mixed with quotes, and tabs are refused past the bound too, and a line of blanks nests nothing");
 ok(read(deepList(90)).blocks.length === 90, "a list nested 90 deep is still read");
 r = run({ ...FILES, "docs/developing.md": `${FILES["docs/developing.md"]}\n${deepList(2000)}\n` });
-ok(r.code === 1 && mended(r.out) && /docs\/developing\.md could not be read as Markdown \(line \d+ nests lists or quotes more than 100 levels deep\)/.test(r.out), "a rule file whose lists nest 2000 deep fails the pointer check, naming the file and line, with its mend");
+ok(r.code === 1 && mended(r.out) && /docs\/developing\.md could not be read as Markdown \(line \d+ nests lists or quotes deeper than the reader follows/.test(r.out), "a rule file whose lists nest 2000 deep fails the pointer check, naming the file and line, with its mend");
 r = run(crlf(FILES));
 ok(r.code === 0 && /^ok /m.test(r.out), "the same files with a Windows checkout's line endings pass");
 for (const [files, ending] of [[broken, "either"], [crlf(broken), "a Windows"]]) {

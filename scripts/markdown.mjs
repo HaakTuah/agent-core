@@ -25,17 +25,34 @@ const breaks = s => (s.match(/\n/gu) || []).length;
 const rows = raw => { const lines = raw.split("\n"); while (lines.length && lines.at(-1) === "") lines.pop(); return lines; };
 const joined = lines => lines.map(l => ` ${l.trim()}`).join("");
 const item = /^\s*(?:[-*+]|\d+[.)])\s/u;
-// A line's nesting, from what leads it: a space is 1, a tab 4, a quote's ">" 2, so a list indented two spaces a level
-// or a quote reaches MAX_NESTING at 100 levels. The lexer's time and memory grow far faster than the file as nesting
-// deepens (1000 levels took 8.5 s, 2000 ran out of memory, which no `try` catches; #1032), so a file is refused here.
+// A line's nesting, from the run that leads it: a space is 1, a tab 4, a quote's ">" 2 and a list marker (a bullet or a
+// number with its "." or ")", then a space) 2, so a list indented two spaces a level, a quote or markers written inline
+// reach MAX_NESTING at about 100 levels. The lexer's time and memory grow far faster than the file as nesting deepens
+// (1000 levels took 8.5 s, 2000 ran out of memory, which no `try` catches; #1032), so a file is refused here.
 export const MAX_NESTING = 200;
-const nesting = line => { let w = 0; for (const c of line) { if (c === " ") w += 1; else if (c === "\t") w += 4; else if (c === ">") w += 2; else break; } return w; };
+const nesting = line => {
+  let w = 0, i = 0;
+  while (i < line.length) {
+    const c = line[i];
+    if (c === " ") w += 1; else if (c === "\t") w += 4; else if (c === ">") w += 2;
+    else {
+      let j = i;
+      if ("-*+".includes(c)) j = i + 1;
+      else if (c >= "0" && c <= "9") { while (line[j] >= "0" && line[j] <= "9") j++; if (j < line.length && (line[j] === "." || line[j] === ")")) j++; else break; }
+      else break;
+      if (line[j] !== " " && line[j] !== "\t") break;
+      w += 2; i = j;
+    }
+    i++;
+  }
+  return w;
+};
 
 function read(text, Lexer) {
   // (lines end as the lexer ends them: at a line feed, a carriage return, or both)
   let src = String(text).replace(/\r\n?/gu, "\n");
-  const deep = src.split("\n").findIndex(l => nesting(l) > MAX_NESTING);
-  if (deep >= 0) throw new Error(`line ${deep + 1} nests lists or quotes more than ${MAX_NESTING / 2} levels deep`);
+  const deep = src.split("\n").findIndex(l => l.trim() && nesting(l) > MAX_NESTING);
+  if (deep >= 0) throw new Error(`line ${deep + 1} nests lists or quotes deeper than the reader follows (about ${MAX_NESTING / 2} levels)`);
   const out = { heads: [], bolds: [], blocks: [] }, front = /^---\n(?:.*\n)*?---(?:\n|$)/u.exec(src);
   let line = 0;
   if (front) {
