@@ -11,8 +11,8 @@
 // files all moved so: the old path stands no more at the head, the new one stood nowhere at the base, and the new one
 // holds what the old held. A file that asks the yes (owner-yes.mjs's asks) is proven where it is changed in place, a
 // regular file on both sides, and its two versions are the same text but where a path of such a move stands in the old
-// and that move's new path in the same place in the new, the old path having stood in the commit that last wrote its
-// line (git blame on the base, so a file planted under a rule's words later moves nothing); a path stands where no letter, digit, "_", ".", "/" or "-"
+// and that move's new path in the same place in the new, the old path having stood in each commit that added or took
+// out its spelling in the file (git's pickaxe on the base, so a file planted under a rule's words later moves nothing); a path stands where no letter, digit, "_", ".", "/" or "-"
 // comes before it and no letter, digit, "_" or "-", nor "." or "/" before one, comes after. It refuses, never guessing,
 // a file that asks the yes and is added, deleted or moved itself, a move into or out of such a path, every other change
 // of a word, and every file where the pull request changes this script, the description check, its workflow, what that
@@ -98,8 +98,8 @@ export function tokens(text, names) {
 const near = (one, other) => { let i = 0; while (i < one.length && one[i] === other[i]) i++; return one.slice(Math.max(0, i - 20), i + 20).replace(/\s+/gu, " "); };
 
 // Why `after` is not `before` with paths of `pairs` (spellings) followed, or null where it is.
-// `stood(at, path)`: whether `path` stood in the commit that last changed the line of `before` at offset `at`, so that
-// the rule named a file that was there when it was written, not one planted under its words later; true where unasked.
+// `stood(at, path)`: whether `path`, at offset `at` of `before`, stood whenever the file's history wrote it, so that the
+// rule named a file that was there when it was written, not one planted under its words later; true where unasked.
 export function follows(before, after, pairs, stood = () => true) {
   const names = [...new Set([...pairs.keys(), ...pairs.values()])];
   const a = tokens(before, names), b = tokens(after, names);
@@ -108,7 +108,7 @@ export function follows(before, after, pairs, stood = () => true) {
     if (a[i] === b[i]) continue;
     if (i % 2 === 0) return `it changes words that are no path of a move: "${near(a[i], b[i])}" becomes "${near(b[i], a[i])}"`;
     if (pairs.get(a[i]) !== b[i]) return `the path ${a[i]} becomes ${b[i]}, which is not where the pull request moves it`;
-    if (!stood(at, a[i].replace(/^`|`$/gu, "").replace(/\/$/u, ""))) return `the path ${a[i]} is not shown to have stood in the commit that last wrote its line (git blame on the base, which needs the whole history), so the rule may name something else, and a file planted under its words moves nothing`;
+    if (!stood(at, a[i].replace(/^`|`$/gu, "").replace(/\/$/u, ""))) return `the path ${a[i]} is not shown to have stood in each commit that wrote or took out its spelling in the file (git log -S on the base, which needs the whole history), so the rule may name something else, and a file planted under its words moves nothing`;
   }
   return null;
 }
@@ -171,27 +171,24 @@ function fileOf(cwd, base, head, status, path) {
   // (read as bytes and refused where they are no UTF-8, which would decode two different bytes the same)
   const text = at => { if (status !== "M") return null; const r = spawnSync("git", ["show", `${at}:${path}`], { cwd, maxBuffer: 1 << 26 }); try { return r.status === 0 ? UTF8.decode(r.stdout) : null; } catch { return INVALID; } };
   const before = text(base);
-  return { path, status, modes: [mode(base), mode(head)], before, after: text(head), stood: typeof before === "string" ? stoodIn(cwd, base, path, before) : undefined };
+  return { path, status, modes: [mode(base), mode(head)], before, after: text(head), stood: typeof before === "string" ? stoodIn(cwd, base, path) : undefined };
 }
 
-// For a file of the base, stood(at, path) as follows takes it: the commit `git blame` gives the line holds `path`. A
-// line blame cannot give, or gives at a shallow clone's cut or another boundary, holds none.
-function stoodIn(cwd, base, file, text) {
-  const lines = [], seen = new Map();
-  // (a shallow clone's cut, which git lists, stands for the history it lacks, as a root commit does not: --root)
-  const shallow = run(cwd, ["rev-parse", "--git-path", "shallow"])?.trim(), boundary = new Set();
-  try { for (const c of fs.readFileSync(path.resolve(cwd, shallow ?? ""), "utf8").split("\n")) if (c) boundary.add(c); } catch { /* not shallow */ }
-  const out = run(cwd, ["blame", "--porcelain", "--root", base, "--", file]);
-  let sha = null;
-  for (const l of (out ?? "").split("\n")) {
-    const head = /^([0-9a-f]{40,64}) \d+ (\d+)/u.exec(l);
-    if (head) { sha = head[1]; lines[Number(head[2]) - 1] = sha; } else if (l === "boundary" && sha) boundary.add(sha);
-  }
+// For a file of the base, stood(at, path) as follows takes it: `path` stood in each commit up to the base that added
+// or took out a spelling of it in the file (git's pickaxe, -S), so that a later commit that only rewrote the line around
+// it, a move followed among them, counts for nothing. Where git lists none, or a shallow clone's cut, which stands for
+// the history it lacks, nothing stood.
+function stoodIn(cwd, base, file) {
+  const seen = new Map();
+  const shallow = run(cwd, ["rev-parse", "--git-path", "shallow"])?.trim(), cut = new Set();
+  try { for (const c of fs.readFileSync(path.resolve(cwd, shallow ?? ""), "utf8").split("\n")) if (c) cut.add(c); } catch { /* not shallow */ }
   return (at, p) => {
-    const c = lines[(text.slice(0, at).match(/\n/gu) ?? []).length];
-    if (!c || boundary.has(c)) return false;
-    if (!seen.has(`${c}:${p}`)) seen.set(`${c}:${p}`, run(cwd, ["cat-file", "-e", `${c}:${p}`]) !== null);
-    return seen.get(`${c}:${p}`);
+    if (!seen.has(p)) {
+      const listed = run(cwd, ["log", "--format=%H", `-S${p}`, base, "--", file]);
+      const commits = (listed ?? "").split("\n").filter(Boolean);
+      seen.set(p, listed !== null && commits.length > 0 && commits.every(c => !cut.has(c) && run(cwd, ["cat-file", "-e", `${c}:${p}`]) !== null));
+    }
+    return seen.get(p);
   };
 }
 
