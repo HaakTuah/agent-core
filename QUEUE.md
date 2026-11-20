@@ -14,8 +14,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #704 | builder; `tests.yml` | #715 |
 | #770 | builder; `tests.yml` | #704 |
 | #772 | builder; `tests.yml` | #770 |
-| #530, step 5 | builder; licence readers | |
-| #534, point 12 | rule builder; it changes `tasks/cleaning.md` | |
 | #625 | builder | #624 |
 | #626 | builder | #624 |
 | #627 | builder | #624 |
@@ -65,6 +63,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #896 | builder; a check for #887's rule: `scripts/pr-description.mjs`, `scripts/pruning.mjs` | |
 | #899 | builder; `tasks/tests.md`, a change that keeps the meaning, its design check stating it | |
 | #907 | rule builder; each other tool's part under `tools/`, completing #492's point 14 | |
+| #913 | builder; a split of `tasks/choices.md`, its meaning kept | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
@@ -86,6 +85,8 @@ They read and change no rule.
 | #895 | builder; a test split; `tests.yml` names the suite | #715 |
 | #900 | builder; `scripts/review-record.mjs` | |
 | #901 | builder; `scripts/tools-read.mjs` | |
+| #912 | builder; a split of `scripts/choices.mjs` and its test | |
+| #919 | builder; a split of the step readers and their tests | #917 |
 
 ## Not taken up
 
