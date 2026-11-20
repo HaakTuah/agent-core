@@ -6,7 +6,8 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { LINK, MOST, PART, POINTER, baseRecords, checkOf, folderFaults, look, parse, records, wholeOf } from "../scripts/choices.mjs";
+import { LINK, MOST, POINTER, baseRecords, checkOf, look, parse, records, wholeOf } from "../scripts/choices.mjs";
+import { PART, folderFaults } from "../scripts/choices-folder.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 

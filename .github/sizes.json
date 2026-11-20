@@ -159,6 +159,10 @@
       "mark": 21768,
       "why": "One workflow's cases (security-review.yml run as GitHub runs it) on the one scratch repository and stand-ins for GitHub's API they share; split, each file would set them up again, adding to the suite's time (tasks/tests.md)."
     },
+    "scripts/mutate.mjs": {
+      "mark": 21409,
+      "why": "Its faults, working copies and run are read together by whoever changes one, and #815 retires the file for Stryker, so a split would be work on a file that goes."
+    },
     "scripts/shape.mjs": {
       "mark": 84826,
       "why": "#884: along its sections, the survey apart from the baseline and the verdict."
@@ -286,10 +290,6 @@
     "tests/core-path-test.mjs": {
       "mark": 25409,
       "why": "#919: its cases for a core a library carries, and for the commands its hooks run, move to a file of their own."
-    },
-    "scripts/staged/scratch.mjs": {
-      "mark": 43378,
-      "why": "#938: the sealed reader of what a session left apart from the set-up of a case and the readers' helpers."
     },
     "tests/staged-test.mjs": {
       "mark": 125729,
