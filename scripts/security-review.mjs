@@ -82,7 +82,7 @@ const DEPENDABOT = "dependabot[bot]";
 // as they are; one written as &#123; or &#125;, as a delivery may show it, is read as one too)
 const SUMMARY = /^<!-- codex-pull-request-review-summary -->\r?\n<!-- codex-review-state:v1 ([^\r\n]{1,4000}) -->\r?\n/u;
 export const WRITERS = ["OWNER", "MEMBER", "COLLABORATOR"]; // GitHub's own word for who wrote a comment, not the comment's
-export const POSTED = /^(?:\*\*)?Security review:/u;
+const POSTED = /^(?:\*\*)?Security review:/u;
 export const FINDING = /^<!-- codex-security-review-finding:v1 -->/u; // how a finding of Codex's security review opens
 const SHA = /^[0-9a-f]{40}$/u;
 // who posts the review a waiting status asks for, and when, the actor first, since a commit status shows only a short
