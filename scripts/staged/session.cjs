@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The stand-in for starting a session of one's own in a staged case's scratch project (scratch.mjs, beside this file,
+// The stand-in for starting a session of one's own in a staged case's scratch project (scratch-setup.mjs, beside this file,
 // copies it to the case's bin/session), as a tool that starts one does (core/tasks/tools.md, the row "Starts a session
 // of its own"): `session list` prints the sessions that run, and `session start` records one, with the repositories it
 // reaches, its model, effort, title and brief, in the "sessions" of the file github.json beside its folder. It starts

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The stand-in for GitHub in a staged case's scratch project (scratch.mjs, beside this file, copies it to the case's
+// The stand-in for GitHub in a staged case's scratch project (scratch-setup.mjs, beside this file, copies it to the case's
 // bin/gh): `gh api` for the REST routes a session of the core calls (core/tasks/github-calls.md), answered from the
 // file github.json beside its folder, which it rewrites with every call that writes; each call is added to that file's
 // "calls". GraphQL, which a cloud session cannot reach, is refused as there. It reaches no network. Node's own modules
