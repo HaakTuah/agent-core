@@ -22,10 +22,12 @@ export const SPENT_MS = 1500;
 export const LINKS_MS = 1500;
 /** The most time, in milliseconds, from the watch's start, the selection takes to read every file of code, the project's
  *  own that the pull request leaves as they were among them, and to link them and follow the links (#962): one file of
- *  the project's own read past it takes at most about 1.2 s (`CHARACTERS`; a dense file of Python or C# its parser reads
- *  took 0.9 s), so with the process's start, its reading of the tree and git's answer before the watch (about 0.3 s),
- *  the run stays within about 4.5 s; where a changed file is the one read past its own budget, about 4.8 s, as
- *  `SPENT_MS` says. The selection reads only imports, no functions, so JavaScript and TypeScript take about 0.15 s for
+ *  JavaScript or TypeScript of the project's own read past it takes at most about 1.2 s (`CHARACTERS`), and ordinary C#
+ *  or Python at the largest its parser takes about 0.6 s, so with the process's start, its reading of the tree and
+ *  git's answer before the watch (about 0.3 s), the run stays within about 4.5 s; where a changed file is the one read
+ *  past its own budget, about 4.8 s, as `SPENT_MS` says. A file of C# or Python its parser takes its whole 2 s on (about
+ *  3 s with the rest of its reading, tree-walk.mjs) carries the run to about 6 s: only a file already merged can, since
+ *  one the pull request changes is read first and held by `SPENT_MS`. The selection reads only imports, no functions, so JavaScript and TypeScript take about 0.15 s for
  *  each million characters all told and the core's own 383 files about 0.9 s, and a project of about 20 million
  *  characters runs the whole suite on its size alone; Python and C#, whose imports only their parser reads, take about
  *  1.2 s and 1.9 s for each million, so for them it is about 2.3 million characters of Python, or 1.4 million of C#. */
