@@ -171,7 +171,9 @@ export function selection({ changed, texts, tests, reach, scripts = new Set(), u
   // (a test that reaches an import the readers cannot follow may reach any file: it runs as one that reaches every file)
   // (and, where pytest runs a conftest.py the config does not read, each test of Python, whose fixtures may come from it)
   const blind = new Set([...reaches].filter(([t, files]) => [...files].some(f => unsure.has(f)) || (t.endsWith(".py") && unread.some(c => c.endsWith("conftest.py")))).map(([t]) => t));
-  const ctx = { texts, tests, scripts, add, reaches, ...m, whole: t => m.whole(t) || blind.has(t) };
+  // (the tests that reach every file, told once: the config's pathspecs are tried on each test, never on each changed file's account)
+  let every = null;
+  const ctx = { texts, tests, scripts, add, reaches, ...m, wholes: () => (every ??= [...tests].filter(t => m.whole(t) || blind.has(t))) };
   for (const t of tests) if (proof(t)) add(t, "never selected out: the project's proof that behaviour was kept");
   for (const t of failed) add(t, "failed last time");
   for (const f of changed) {
@@ -182,7 +184,7 @@ export function selection({ changed, texts, tests, reach, scripts = new Set(), u
 }
 
 // What one changed file selects, through `ctx.add`; the reason the whole suite runs where its reach cannot be told.
-function oneChange(f, { texts, tests, scripts, add, reaches, whole, none, isTest }) {
+function oneChange(f, { texts, tests, scripts, add, reaches, wholes, none, isTest }) {
   if (none(f)) return null;
   if (isTest(f) && tests.has(f)) add(f, "added or changed"); // (and, a helper among the tests, what imports it)
   // (a file gone, a helper among the tests too, leaves no import to follow; a package's manifest, read beside the code,
@@ -191,7 +193,7 @@ function oneChange(f, { texts, tests, scripts, add, reaches, whole, none, isTest
   // (C# reaches a type by its full name with no using directive, and a script of the global space by no import at all)
   if (f.endsWith(".cs") || f.endsWith(".d.ts") || scripts.has(f)) return `${f} is C#, a declaration of types, or a script of the global space, whose users no import names, so what reaches it cannot be told`;
   for (const [t, files] of reaches) if (files.has(f)) add(t, `reaches ${f}`);
-  if (!isTest(f)) for (const t of tests) if (whole(t)) add(t, `reaches every file (${f})`); // (a test's own file is no file of the project's a whole run tests)
+  if (!isTest(f)) for (const t of wholes()) add(t, `reaches every file (${f})`); // (a test's own file is no file of the project's a whole run tests)
   return null;
 }
 
