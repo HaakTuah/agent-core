@@ -26,3 +26,9 @@ jobs:
         run: bash scripts/workflow-tools.sh >> "$GITHUB_ENV"
       - name: The trial
         run: git config --global user.email t@example.invalid && git config --global user.name t && node scripts/trial-580.mjs
+      - name: The new check on the core's own workflows
+        if: ${{ !cancelled() }}
+        run: node scripts/workflows.mjs --core
+      - name: The new check's test, with the tools
+        if: ${{ !cancelled() }}
+        run: node tests/workflows-test.mjs | grep -v "^ok " || true

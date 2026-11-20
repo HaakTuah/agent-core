@@ -336,6 +336,14 @@ jobs:
         env:
           COPIES: ${{ inputs.copies }}
         run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then if [ -n "$COPIES" ] && [ -f "${CORE_AT}.packages/parser/package.json" ]; then node "${CORE_AT}scripts/install.mjs" all; else node "${CORE_AT}scripts/install.mjs"; fi; fi
+      # (the two tools the workflow check runs, fetched at their pins into the runner's temporary folder, outside the
+      # repository, as their own programs: zizmor by pip from PyPI by the sums the copy's .packages/requirements.txt names,
+      # actionlint from its maker's releases by the sums its script holds; where one cannot be fetched, the check says it
+      # did not run it and decides nothing by it; #580)
+      - name: zizmor and actionlint, which the workflow check runs, fetched at their pins (the core's scripts/workflow-tools.sh)
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.copies != '' }}
+        timeout-minutes: 5
+        run: if [ -f "${CORE_AT}scripts/workflow-tools.sh" ]; then bash "${CORE_AT}scripts/workflow-tools.sh" >> "$GITHUB_ENV"; fi
       - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.copies != '' }}
         timeout-minutes: 5

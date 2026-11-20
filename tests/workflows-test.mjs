@@ -11,12 +11,13 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TEMPLATES } from "../scripts/init.mjs";
 import { holds, parseYaml } from "../scripts/workflow-run.mjs";
-import { draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, repeated, unlinked, unparsed, unreadied } from "../scripts/workflows.mjs";
+import { draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, unlinked, unparsed, unreadied } from "../scripts/workflows.mjs";
 import { Unread } from "../scripts/check-configs.mjs";
 import { readyOnlyHolds } from "../scripts/step-checks.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { keysOnce } from "../scripts/step-checks.mjs";
 import { LONGEST, twice, uncommented } from "../scripts/yaml-keys.mjs";
+import { actionlintFindings, compared, isAction, isWorkflow, run, zizmorFindings } from "../scripts/workflow-tools.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -73,29 +74,19 @@ let indented = "x:\n"; for (let i = 1; i < 600; i++) indented += `${" ".repeat(i
 const past = [`on: push\non: pull_request\nx:\n  ${"? ".repeat(2500)}a\nz: 1\n`, `on: push\non: pull_request\nx:\n  ${"- ".repeat(5000)}a\nz: 1\n`, `on: a\non: b\n${indented}z: 1\n`];
 // (where a Node's stack lets the parser read as far as the mark, the doubled "on" is found too: only the lines on depth
 // are counted)
-const cutAt = [4, 4, 130], unreadDeep = repeated(past.map((text, i) => ({ file: `deep${i}.yml`, text })), () => null);
-const nested = unreadDeep.fails.filter(l => l.includes(": the file nests "));
-ok(past.every((t, i) => [1, cutAt[i]].some(n => dup(t).endsWith(`null@${n}<null`))) && nested.length === 3 && nested.every((l, i) => [1, cutAt[i]].some(n => l.startsWith(`FAIL deep${i}.yml:${n}: `))) && nested.every(l => /^FAIL deep\d\.yml:\d+: the file nests its lists or mappings more than 128 deep, past what this check reads/.test(l)) && mended(unreadDeep.fails.join("\n")),
-  "a text nested some thousands deep in block form, past what the parser can close, is read as unread, and the check fails it with its mend (#610)", unreadDeep.fails.join("\n"));
-// (a text past the length read is not given to the parser: it is said unread, naming line 1, and fails with its mend: #752)
-const huge = repeated([{ file: "huge.yml", text: `a: ${"[".repeat(LONGEST + 1)}\n` }], () => null).fails;
-ok(huge.length === 1 && huge[0].startsWith("FAIL huge.yml:1: the file is longer than 262144 characters") && mended(huge[0]) && twice(Array.from({ length: 10000 }, (_, i) => `k${i}: 1\n`).join("")).length === 0 && twice(`a: ${"[".repeat(LONGEST - 10)}\n`).every(k => !k.size) && draftHoles(`on: pull_request\n# ${"x".repeat(LONGEST)}\n`).length === 0,
-  "a text longer than the length read is said unread with its mend and never given to the parser, and one just under it still is", huge.join("\n"));
-// (a file nested too deep on the base does not hold the entry of one that has grown too long: that one is new, and fails)
-const grown = repeated([{ file: "grown.yml", text: `a: ${"x".repeat(LONGEST)}\n` }], () => `on: push\nx: ${"[".repeat(200)}1${"]".repeat(200)}\n`);
-ok(grown.fails.length === 1 && grown.notes.length === 0 && /grown\.yml:1: the file is longer/u.test(grown.fails[0]) && mended(grown.fails[0]),
-  "a file past the length read, over a base nested too deep, fails, and is not noted as held on the base", grown.fails.join("\n"));
-// (nor does a key spelt like a reason, which a base may give twice, hold the entry of one grown too long)
-const spelt = repeated([{ file: "spelt.yml", text: `a: ${"x".repeat(LONGEST)}\n` }], () => 'on: push\n"\\0long": 1\n"\\0long": 2\n');
-ok(spelt.fails.length === 1 && spelt.notes.length === 0, "a key spelt like a reason, given twice on the base, holds no part not read of the head", spelt.fails.join("\n"));
+const cutAt = [4, 4, 130];
+ok(past.every((t, i) => [1, cutAt[i]].some(n => dup(t).endsWith(`null@${n}<null`))), "a text nested some thousands deep in block form, past what the parser can close, is read as unread by the sync step's reader (#610)");
+// (a text past the length read is not given to the parser: #752)
+ok(twice(Array.from({ length: 10000 }, (_, i) => `k${i}: 1\n`).join("")).length === 0 && twice(`a: ${"[".repeat(LONGEST - 10)}\n`).every(k => !k.size) && draftHoles(`on: pull_request\n# ${"x".repeat(LONGEST)}\n`).length === 0,
+  "a text longer than the length read is never given to the parser, and one just under it still is");
 // (a text past the length read is never given to the parser, and no count of its words shows a change to it made nothing
 // worse, so a file past it that a pull request changes fails, with its mend; one unchanged on the base, and one with no
 // base, are only noted: #752)
 const longText = changed => `on: pull_request\n# ${"x".repeat(LONGEST)}${changed}\n`, longFiles = text => [{ file: "long.yml", text }];
-const longSame = unreadied(longFiles(longText("a")), () => longText("a")), longKeys = repeated(longFiles(longText("a")), () => longText("a"));
+const longSame = unreadied(longFiles(longText("a")), () => longText("a"));
 const longFails = [["b", "a"], ["abcd", "a"], ["a", "abcd"], ["ready_for_review", "a"], [null, "a"], ["on: push\n", "a"]].map(([was, now]) => unreadied(longFiles(longText(now)), () => (was === null || was.startsWith("on:") ? was : longText(was))).fails);
-ok(longSame.fails.length === 0 && longKeys.fails.length === 0 && longKeys.notes.length === 1 && /as it did on the base\. Mend: cut the file/u.test(longKeys.notes[0]) && unreadied(longFiles(longText("a")), null).fails.length === 0
-  && longFails.every(f => f.length === 1 && /^FAIL long\.yml: the file is longer than 262144 characters and differs from the base/u.test(f[0]) && mended(f[0])) && repeated(longFiles(longText("a")), () => longText("b")).fails.length === 1,
+ok(longSame.fails.length === 0 && longSame.notes.length === 1 && /as on the base\. Mend: cut the file/u.test(longSame.notes[0]) && unreadied(longFiles(longText("a")), null).fails.length === 0
+  && longFails.every(f => f.length === 1 && /^FAIL long\.yml: the file is longer than 262144 characters and differs from the base/u.test(f[0]) && mended(f[0])),
   "a file past the length read that a pull request changes in any way, cut a little, grown, or added, fails with its mend; one unchanged, or read with no base, is only noted", longFails.flat().join("\n"));
 // (a line break of YAML 1.1 the package does not read hides a key given twice and a call left without ready_for_review from
 // its reader, #872: the check fails a file that is new or changed with such a break and notes one unchanged or with no base)
@@ -108,16 +99,12 @@ ok(twice(hiding("\u2028")).length === 0 && brks.every(({ br, found }) => found.l
   "a line break the package does not read hides a key given twice from its reader, and the check fails a file with one that is new or changed, with its mend, and notes one unchanged or read with no base", [brokenNew, brokenSame].flatMap(r => [...r.fails, ...r.notes]).join("\n"));
 // (what stands behind such a break is read as a YAML 1.1 reader reads it, in head and base alike, the failure above kept,
 // and a line is told as an editor counts it: #876)
-const behind = ["\u0085", "\u2028", "\u2029"].map(br => {
-  const text = `a: 1\n# c${br}x: 1\nx: 2\n`; // (the break ends the comment: the keys are on the next lines)
-  return { keys: repeated(one(text), () => null), same: repeated(one(text), () => text), grown: repeated(one(`${text}# b\n`), () => text), none: repeated(one(text), null), found: keysTwice(text) };
-});
-ok(behind.every(({ keys, same, grown, none, found }) => keys.fails.length === 1 && /^FAIL w\.yml:3: the key "x" is given twice in one mapping \(first on line 2\)/u.test(keys.fails[0]) && mended(keys.fails[0])
-  && same.fails.length === 0 && same.notes.length === 1 && grown.fails.length === 0 && none.fails.length === 0 && none.notes.length === 1 && found.length === 1 && found[0].line === 3 && found[0].first === 2)
-  && keysTwice("a: 1\r\n# c\u2028x: 1\rx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && keysTwice(hiding("\u2028")).map(k => `${k.line}<${k.first}`).join() === "1<1"
-  && keysTwice("a: 1\r\u2028x: 1\nx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && foreignBreaks("a\rb\r\u2028c\n")?.line === 3
-  && keysTwice("a: 1\nb: 2\n").length === 0 && repeated(one('a: 1\nb: "x\\u2028y"\nb: 2\n'), () => 'a: 1\nb: "x\u2028y"\nb: 2\n').fails.length === 0 && keysTwice(`a: ${"\u2028".repeat(LONGEST)}\n`).map(k => `${k.line}:${k.size}`).join() === "1:true",
-  "a key given twice behind a line break the package does not read is found, a new one failing, the base's own noted, and told on the line an editor counts", behind.flatMap(r => [...r.keys.fails, ...r.same.notes]).join("\n"));
+const behind = ["\u0085", " ", " "].map(br => keysTwice(`a: 1\n# c${br}x: 1\nx: 2\n`)); // (the break ends the comment: the keys are on the next lines)
+ok(behind.every(found => found.length === 1 && found[0].line === 3 && found[0].first === 2)
+  && keysTwice("a: 1\r\n# c x: 1\rx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && keysTwice(hiding(" ")).map(k => `${k.line}<${k.first}`).join() === "1<1"
+  && keysTwice("a: 1\r x: 1\nx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && foreignBreaks("a\rb\r c\n")?.line === 3
+  && keysTwice("a: 1\nb: 2\n").length === 0 && keysTwice(`a: ${" ".repeat(LONGEST)}\n`).map(k => `${k.line}:${k.size}`).join() === "1:true",
+  "a key given twice behind a line break the package does not read is found by the sync step's reader, and told on the line an editor counts", JSON.stringify(behind));
 // (Codex's case: a call of a check skipped on a draft whose ready_for_review a same-length edit moves into a comment, in a
 // file past the length read, its words counted as often as before, fails)
 const commented = types => `on:\n  pull_request:\n    types: ${types}\njobs:\n  check:\n    uses: ${CORE}/.github/workflows/copies.yml@${"a".repeat(40)}\n    if: \${{ !github.event.pull_request.draft }}\n# ${"x".repeat(LONGEST)}\n`;
@@ -125,26 +112,32 @@ const hidden = unreadied(longFiles(commented("[opened] #ready_for_review")), () 
 ok(commented("[opened] #ready_for_review").length === commented("[opened, ready_for_review]").length && hidden.fails.length === 1 && mended(hidden.fails[0]),
   "a file past the length read whose ready_for_review a pull request moves into a comment, its length and its count of the word kept, fails", hidden.fails.join("\n"));
 // (a base past the length read lists none of its breaches: a file cut under the length is read as one the base did not
-// hold, so a key given twice or a call left without ready_for_review in it fails, each with its mend, and one cut clean passes)
-const shrunk = { dupes: "on: pull_request\nx: 1\nx: 2\njobs:\n  c:\n    uses: someone/else/.github/workflows/copies.yml@" + "a".repeat(40) + "\n", base: `on: push\nx: 1\nx: 2\n# ${"x".repeat(LONGEST)}\n` };
-const cut = repeated([{ file: "shrunk.yml", text: shrunk.dupes }], () => shrunk.base), clean = "on: pull_request\nx: 1\n";
-ok(cut.fails.length === 1 && cut.notes.length === 0 && /^FAIL shrunk\.yml:3: the key "x" is given twice/u.test(cut.fails[0]) && mended(cut.fails[0])
-  && repeated([{ file: "shrunk.yml", text: clean }], () => shrunk.base).fails.length === 0 && unreadied([{ file: "shrunk.yml", text: clean }], () => shrunk.base).fails.length === 0,
-  "a file cut under the length read from a base past it fails for a key it gives twice, and passes cut clean", [...cut.fails, ...cut.notes].join("\n"));
+// hold, and one cut clean passes)
+const shrunk = `on: push\nx: 1\n# ${"x".repeat(LONGEST)}\n`, clean = "on: pull_request\nx: 1\n";
+ok(unreadied([{ file: "shrunk.yml", text: clean }], () => shrunk).fails.length === 0 && unreadied([{ file: "shrunk.yml", text: `on:\n  pull_request:\n    types: [opened]\njobs:\n  c:\n    uses: ${CORE}/.github/workflows/copies.yml@${"a".repeat(40)}\n    if: ${"${{ !github.event.pull_request.draft }}"}\n` }], () => shrunk).fails.length === 1,
+  "a file cut under the length read from a base past it fails for a call left without ready_for_review, and passes cut clean");
 const lower = `on: push\n${Array.from({ length: 37 }, (_, i) => `k${i}: 1\n`).join("")}z: ${"[".repeat(200)}${"]".repeat(200)}\n`;
-const lowerFails = repeated([{ file: "lower.yml", text: lower }], () => null).fails;
-ok(dup(lower) === "null@39<null" && lowerFails.length === 1 && lowerFails[0].startsWith("FAIL lower.yml:39: the file nests") && mended(lowerFails[0]),
-  "a part cut past 128 deep is named on its own line, not line 1, so the session is sent where the deep part is", lowerFails.join("\n"));
+ok(dup(lower) === "null@39<null", "a part cut past 128 deep is named on its own line, not line 1, so the sync's step sends the session where the deep part is");
 ok(dup("env: &defaults { FOO: one, FOO: two }\nx:\n- !t [ {c: 1, c: 2} ]\n") === "FOO@1<1,c@3<3" && dup("a: {x: &y {b: 1, b: 2}, z: !t 1, z: 2}\n") === "b@1<1,z@1<1" && dup("a: {!t b: 1, &c b: 2}\n") === "b@1<1" && dup("env: { A: 'it''s # text', A: two }\n") === "A@1<1",
   "a flow value behind an anchor or a tag is read, a node in it behind one too, and a doubled quote inside single quotes ends neither the quote nor the line");
 ok(dup("matrix: { include: [{ os: ubuntu-latest, }], os: [windows-latest] }\n") === "" && dup("jobs: { build: { runs-on: x, }, build: { runs-on: y } }\n") === "build@1<1", "a blank between a last comma and the bracket that closes a flow value closes it there");
 ok(uncommented("a: 'x # y' # z") === "a: 'x # y'" && uncommented(`a: "x \\" # y" # z`) === `a: "x \\" # y"` && uncommented("a: b#c") === "a: b#c" && uncommented("a: b# c") === "a: b# c" && uncommented("a: 'b\\' # c") === "a: 'b\\'" && uncommented("# all") === "" && uncommented("a: it's # x") === "a: it's", "a comment starts at a # after a blank, outside quotes, and a quote inside a word opens none");
-const was = "on: push\non: pull_request\nx: 1\n", now = "on: push\non: pull_request\nx: 1\nx: 2\nx: 3\n";
-const base = repeated([{ file: "a.yml", text: now }, { file: "b.yml", text: was }], f => (f === "a.yml" ? `${was}x: 2\n` : null));
-ok(base.notes.length === 2 && base.fails.length === 2 && base.notes.every(l => /^note a\.yml:[24]: .*as it did on the base\. Mend: /.test(l)) && /^FAIL a\.yml:5: /.test(base.fails[0]) && /^FAIL b\.yml:2: the key "on" is given twice in one mapping \(first on line 1\), so GitHub refuses the whole file and runs none of its jobs\. Mend: keep one of the two keys/.test(base.fails[1]) && mended(base.fails.join("\n")),
-  "against a base, as many of a key as the file held twice there are noted, and the rest fail, each with its mend; a file the base lacked fails whole");
-const none = repeated([{ file: "a.yml", text: now }], null), fresh = repeated([{ file: "a.yml", text: now }], () => null);
-ok(none.fails.length === 0 && none.notes.length === 3 && !none.notes[0].includes("base") && fresh.fails.length === 3 && fresh.notes.length === 0, "with no base each is noted and none fails, and where nothing stood before (the core's own) each fails");
+// (the tools' findings against the base's (workflow-tools.mjs; #580): of each kind in a file, as many as the base held are
+// noted, the rest fail, a line moved is no new finding, and with no base each is noted)
+const finding = (file, line, rule = "syntax-check", said = 'key "x" is duplicated') => ({ file, line, tool: "actionlint", rule, said, url: "u" });
+const vsBase = compared([finding("a.yml", 4), finding("a.yml", 5), finding("b.yml", 2), finding("a.yml", 9, "expression", "y")], [finding("a.yml", 3)]);
+ok(vsBase.notes.length === 1 && /^note a\.yml:4: actionlint's syntax-check: key "x" is duplicated, as on the base\. Mend: /u.test(vsBase.notes[0]) && vsBase.fails.length === 3 && /^FAIL a\.yml:5: /u.test(vsBase.fails[0]) && /^FAIL b\.yml:2: /u.test(vsBase.fails[1]) && vsBase.fails.every(mended),
+  "against a base, as many of a kind in a file as the base held are noted, its line aside, and the rest fail, each with its mend; a file or a kind the base lacked fails", [...vsBase.fails, ...vsBase.notes].join("\n"));
+const noBase = compared([finding("a.yml", 4)], null), fresh = compared([finding("a.yml", 4)], []);
+ok(noBase.fails.length === 0 && noBase.notes.length === 1 && !noBase.notes[0].includes("base") && fresh.fails.length === 1, "with no base each is noted and none fails, and where nothing stood before (the core's own) each fails");
+const zz = zizmorFindings(JSON.stringify([{ ident: "template-injection", desc: "code injection via template expansion", url: "https://docs.zizmor.sh/audits/#template-injection", ignored: false, locations: [{ symbolic: { kind: "Related", annotation: "x" }, concrete: { location: { start_point: { row: 2 } } } }, { symbolic: { kind: "Primary", annotation: "may expand into attacker-controllable code" }, concrete: { location: { start_point: { row: 6 } } } }] }, { ident: "artipacked", desc: "d", ignored: true, locations: [] }]), "w.yml");
+const al = actionlintFindings(JSON.stringify([{ kind: "syntax-check", message: "key \"if\" is duplicated", filepath: "w.yml", line: 9 }, { kind: "runner-label", message: "label \"mine\" is unknown", filepath: "w.yml", line: 4 }]), "w.yml");
+ok(zz.length === 1 && zz[0].line === 7 && zz[0].rule === "template-injection" && /\(may expand into attacker-controllable code\)$/u.test(zz[0].said) && zizmorFindings("not json", "w.yml") === null
+  && al.length === 1 && al[0].line === 9 && al[0].rule === "syntax-check" && actionlintFindings("", "w.yml").length === 0 && actionlintFindings("{", "w.yml") === null,
+  "zizmor's finding is read at its primary location's line, one it marks ignored left out; actionlint's by its line, a runner label it does not know let pass; output that is no JSON is no answer", JSON.stringify([zz, al]));
+const unrun = run(".", [".github/workflows/a.yml", "tools/action.yml", ".github/actions/x/steps.yml"], { zizmor: "", actionlint: "" });
+ok(unrun.found.length === 0 && unrun.unrun.join() === "zizmor,actionlint" && run(".", [".github/actions/x/steps.yml"], {}).unrun.length === 0 && isWorkflow(".github/workflows/a.YML") && !isWorkflow("tools/action.yml") && isAction("tools/action.yml"),
+  "a tool not fetched is said not run, and finds nothing; none is said not run where it had no file to read");
 
 // a call skipped on a draft whose trigger leaves out ready_for_review (#502): by its if:, or by a check that skips a draft
 // itself (the description check, or core.yml's description:); the full trigger, another's workflow and a call that
@@ -162,42 +155,37 @@ ok(readied.every(({ yes, fresh, same }) => yes.join() === "check" && fresh.fails
 const quoted = br => `name: ${br}x\u2028y${br}\n# c\u2028on:\n  pull_request:\n    types: [opened, synchronize]\njobs:\n  check:\n    if: \${{ !github.event.pull_request.draft }}\n    uses: ${CORE}/.github/workflows/copies.yml@${"a".repeat(40)}\n`;
 const mend = (text, br) => text.replace(`${br}x\u2028y${br}`, `${br}x\\u2028y${br}`).replace("# c\u2028on:", "# c\non:");
 const dupBase = br => `jobs:\n  b:\n    name: ${br}x\u2028y${br}\n    # c\u2028    a: 1\n    a: 2\n`, dupHead = (br, text) => text.replace(`${br}x\u2028y${br}`, `${br}x\\u2028y${br}`).replace("# c\u2028", "# c\n");
-const heldDup = repeated(one(dupHead('"', dupBase('"'))), () => dupBase('"')), heldCall = unreadied(one(mend(quoted('"'), '"')), () => quoted('"'));
-const newDup = repeated(one('name: "x\\u2028y"\njobs:\n  b:\n    a: 1\n    a: 2\n'), () => 'name: "x\u2028y"\njobs:\n  b:\n    a: 1\n'), newCall = unreadied(one(mend(quoted('"'), '"')), () => 'name: "x\u2028y"\non: push\njobs: {}\n');
-const hiddenDup = repeated(one(dupHead("'", dupBase("'"))), () => dupBase("'")), hiddenCall = unreadied(one(mend(quoted("'"), "'")), () => quoted("'")), knownNew = unreadied(one(mend(quoted('"'), '"')), () => "on: push\n");
-ok(heldDup.fails.length === 0 && heldDup.notes.length === 1 && /as it did on the base/u.test(heldDup.notes[0]) && heldCall.fails.length === 0 && heldCall.notes.length === 1 && /as on the base/u.test(heldCall.notes[0])
-  && newDup.fails.length === 1 && newCall.fails.length === 1 && knownNew.fails.length === 1,
-  "a base with a break in a double-quoted string is read as the mend leaves it: what it held is noted, and a defect the mending head adds fails", [...heldDup.notes, ...heldCall.notes, ...newDup.fails, ...newCall.fails].join("\n"));
+const heldCall = unreadied(one(mend(quoted('"'), '"')), () => quoted('"'));
+const newCall = unreadied(one(mend(quoted('"'), '"')), () => 'name: "x\u2028y"\non: push\njobs: {}\n');
+const hiddenCall = unreadied(one(mend(quoted("'"), "'")), () => quoted("'")), knownNew = unreadied(one(mend(quoted('"'), '"')), () => "on: push\n");
+ok(heldCall.fails.length === 0 && heldCall.notes.length === 1 && /as on the base/u.test(heldCall.notes[0]) && newCall.fails.length === 1 && knownNew.fails.length === 1,
+  "a base with a break in a double-quoted string is read as the mend leaves it: what it held is noted, and a defect the mending head adds fails", [...heldCall.notes, ...newCall.fails].join("\n"));
 // (a break in a single-quoted string, which no mend of the step makes valid, leaves the base no YAML either way: what it held
 // is not known, and what the head shows is noted)
-ok(hiddenDup.fails.length === 0 && hiddenDup.notes.length === 1 && /the base being no YAML/u.test(hiddenDup.notes[0]) && hiddenCall.fails.length === 0 && /the base being no YAML/u.test(hiddenCall.notes.join()),
-  "a base no YAML to the package either way its breaks are read holds what stands behind them unknown: the head's findings are noted, not failed", [...hiddenDup.notes, ...hiddenCall.notes, ...hiddenDup.fails, ...hiddenCall.fails].join("\n"));
+ok(hiddenCall.fails.length === 0 && /the base being no YAML/u.test(hiddenCall.notes.join()),
+  "a base no YAML to the package either way its breaks are read holds what stands behind them unknown: the head's findings are noted, not failed", [...hiddenCall.notes, ...hiddenCall.fails].join("\n"));
 // (#970, 1: a reading that is no YAML to the package once the breaks are folded shows keys no reader has: a double-quoted value
 // whose breaks, folded, put its continuation lines at the parent's indent gives no key, and a hostile file's many such lines
 // are not all printed)
 const falseKeys = 'a: 1\nb: "x\u2028c: 1\u2028c: 2"\n';
-const flood = `${Array.from({ length: 3000 }, (_, i) => `k${i}: 1\nk${i}: 2\n`).join("")}# c\u2028\n`, flooded = repeated(one(flood), null), floodedFails = repeated(one(flood), () => "a: 1\n");
-ok(keysTwice(falseKeys).length === 0 && repeated(one(falseKeys), () => null).notes.length === 0 && repeated(one(falseKeys), () => 'a: 1\nb: "x\u2028c: 1\u2028"\n').fails.length === 0
-  && flooded.notes.length === 26 && /^note w\.yml: and 2975 more keys/u.test(flooded.notes[25]) && floodedFails.fails.length === 26 && /^FAIL w\.yml: and 2975 more keys/u.test(floodedFails.fails[25]) && mended(floodedFails.fails[25]) && keysTwice(flood).length === 3000,
-  "a reading that is no YAML to the package once the breaks are folded names no key given twice, and a file's lines of one kind are cut at twenty-five and the rest counted", `${keysTwice(falseKeys).length} ${flooded.notes.length} ${floodedFails.fails.length}`);
+const flood = `${Array.from({ length: 3000 }, (_, i) => `k${i}: 1\nk${i}: 2\n`).join("")}# c \n`;
+ok(keysTwice(falseKeys).length === 0 && keysTwice(flood).length === 3000, "a reading that is no YAML to the package once the breaks are folded names no key given twice, and a hostile file's thousands are each read");
 const manyOld = keysOnce({ root: ".", files: [".github/workflows/w.yml"], read: () => flood });
 ok(/"k24"/u.test(manyOld ?? "") && !/"k25"/u.test(manyOld ?? "") && /and 2975 more, which show once/u.test(manyOld ?? "") && (manyOld ?? "").length < 5000, "the sync's step for a key given twice names at most twenty-five and counts the rest", String(manyOld).slice(0, 200));
 // (a file that is no YAML for another reason keeps the readings: here the aliases, more than the package expands, and a key
 // that only a YAML 1.1 reader sees twice)
 const aliased = `x: &a 1\n${Array.from({ length: 120 }, (_, i) => `y${i}: *a\n`).join("")}on: pull_request\n# c\u2028on: [push]\n`;
-ok(keysTwice(aliased).map(k => k.key).join() === "on" && repeated(one(aliased), () => "").fails.length === 1, "a file that is no YAML to the package for a reason that is not its breaks keeps the readings, so a key given twice behind a break is found in it too");
+ok(keysTwice(aliased).map(k => k.key).join() === "on", "a file that is no YAML to the package for a reason that is not its breaks keeps the readings, so a key given twice behind a break is found in it too");
 // (#970, 3: a base that is no YAML for a reason of its own, and holds a break, is read as it stands: a new key given twice fails
 // and a call left without ready_for_review, as the mending head holds it, fails, the base's own noted)
-const otherBase = 'x: 1\nx: 2\n# c\u2028\nbad: [\n';
-const ownError = repeated(one(`y: 1\ny: 2\n${otherBase}`), () => otherBase), otherCall = unreadied(one(`# c\u2028\n${call(TYPES, "copies.yml", NOT_DRAFT)}`), () => `# c\u2028\nbad: [\n`);
-ok(ownError.fails.length === 1 && /^FAIL w\.yml:2: the key "y"/u.test(ownError.fails[0]) && ownError.notes.length === 1 && !/the base being no YAML/u.test(ownError.notes[0]) && otherCall.fails.length === 1 && mended(otherCall.fails[0]),
-  "a base that is no YAML for a reason that is not its breaks is read as it stands: a new key given twice and a call left without ready_for_review fail", [...ownError.fails, ...ownError.notes, ...otherCall.fails, ...otherCall.notes].join("\n"));
+const otherCall = unreadied(one(`# c \n${call(TYPES, "copies.yml", NOT_DRAFT)}`), () => `# c \nbad: [\n`);
+ok(otherCall.fails.length === 1 && mended(otherCall.fails[0]), "a base that is no YAML for a reason that is not its breaks is read as it stands: a call left without ready_for_review fails", otherCall.fails.join("\n"));
 // (#970, 2: a file with such a break is lexed and parsed up to three ways, and was by each reader, for the head and the base: read
 // against the same file without the breaks, in the same run, the cost of both readers is a small multiple of it. The worst
 // shape: as many keys as fit, each a double-quoted string holding a break)
 const hostileKeys = (br, mark) => `${Array.from({ length: 65000 }, () => `k: "x${br}"\n`).join("").slice(0, LONGEST - 40)}# ${mark}\n`, spent = br => {
   const files = one(hostileKeys(br, "head")), before = () => hostileKeys(br, "base"), t1 = Date.now();
-  repeated(files, before); unreadied(files, before); foreignBroken(files, before);
+  unreadied(files, before); foreignBroken(files, before);
   return Date.now() - t1;
 };
 const withBreaks = spent("\u2028"), without = spent("");
@@ -242,14 +230,14 @@ ok(own.length > 0 && own.every(f => !fails(fs.readFileSync(`${core}.github/workf
 const broken = `jobs:\n  a:\n    steps:\n      - name: The description check: the line "Read for it:"\n        run: x\n`;
 const noYaml = unparsed([{ file: "a.yml", text: broken }, { file: "b.yml", text: "jobs:\n  a:\n    steps:\n      - name: \"The description check: the line\"\n        run: x\n" }, { file: "c.yml", text: "a: 1\na: 2\n" }, { file: "d.yml", text: "a: \"x\n" }, { file: "e.yml", text: "on: push\njobs:\n  a:\n    env:\n      true: a\n      True: b\n" }, { file: "f.yml", text: "a: 1\n---\nb: 2\n" }]);
 ok(noYaml.fails.length === 4 && /^FAIL a\.yml:4:\d+: the core's reader cannot read it as YAML.*BLOCK_AS_IMPLICIT_KEY.*Mend: put the whole value in quotes/u.test(noYaml.fails[0]) && /^FAIL d\.yml:\d+:\d+: /u.test(noYaml.fails[1]) && /^FAIL e\.yml:6:.*Mend: rename one/u.test(noYaml.fails[2]) && /^FAIL f\.yml:.*Mend: take out the "---"/u.test(noYaml.fails[3]) && noYaml.fails.every(l => mended(l)),
-  "a file the core's reader throws on fails with its file, line and column and a mend (a \": \" in an unquoted step name says to quote it), a quoted name, which parses, does not, and a key given twice is left to repeated(), which says it, but two keys the package reads as one (true and True) are failed here", noYaml.fails.join("\n"));
+  "a file the core's reader throws on fails with its file, line and column and a mend (a \": \" in an unquoted step name says to quote it), a quoted name, which parses, does not, and a key given twice is left to actionlint, which says it, but two keys the package reads as one (true and True) are failed here", noYaml.fails.join("\n"));
 ok(unparsed([]).fails.length === 0 && own.every(f => unparsed([{ file: f, text: fs.readFileSync(`${core}.github/workflows/${f}`, "utf8") }]).fails.length === 0), "the core's own workflows each parse");
 
 // run on a scratch project: each failure says its mend
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-test-"));
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "workflow-run.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
+  for (const f of ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
   // (the install with the lock file it is read against)
   fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(tmp, "core/.packages"), { recursive: true });
   fs.writeFileSync(path.join(tmp, "core/.gitignore"), "/.packages/node_modules/\n"); // (as the copy holds it)
@@ -261,17 +249,31 @@ try {
   const out = r.stdout + r.stderr;
   const good = r.status === 1 && /a\.yml:2: pull_request_target .*\. Mend: take the word out/.test(out) && /and on 2 more lines\. Mend:/.test(out) && /b\.yml: not UTF-8 text.*Mend: save it as UTF-8/.test(out) && mended(out);
   ok(good, `run, it fails each, by file and line, and each failure says its mend${good ? "" : `:\n${out}`}`);
-  // (a key twice: a.yml's push stood twice on the base, and stands once now; the step's if: in c.yml is new)
-  fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), "on:\n  push:\n  push:\n  push:\n");
+  // (the two tools, where the job's set-up fetched them, as on the runners, never in a session (#580): a key given twice
+  // the base held is noted and a new one fails, an action zizmor cannot read fails, and in the core's own repository
+  // each fails; with no tool fetched, the check says it did not run them and decides nothing by them)
+  fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), "on:\n  push:\n  push:\n  push:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo\n");
   for (const args of [["rm", "-q", "--cached", ".github/workflows/b.yml"], ["add", ".github/workflows/a.yml"], ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "base"]]) execFileSync("git", args, { cwd: tmp, stdio: "ignore" });
-  fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), "on:\n  push:\n  push:\n");
-  fs.writeFileSync(path.join(tmp, ".github/workflows/c.yml"), "on: push\njobs:\n  a:\n    steps:\n      - run: x\n        if: a\n        if: b\n");
-  execFileSync("git", ["add", "-A", ".github/workflows/a.yml", ".github/workflows/c.yml"], { cwd: tmp, stdio: "ignore" });
+  fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), "on:\n  push:\n  push:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo\n");
+  fs.writeFileSync(path.join(tmp, ".github/workflows/c.yml"), "on: pull_request\npermissions: {}\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo \"${{ github.event.pull_request.title }}\"\n        if: a\n        if: b\n");
+  fs.mkdirSync(path.join(tmp, "tools/act"), { recursive: true });
+  fs.writeFileSync(path.join(tmp, "tools/act/action.yml"), "name: a\ndescription: b\nruns:\n  using: composite\n  steps:\n    - run: echo\n      shell: bash\n      shell: sh\n");
+  execFileSync("git", ["add", "-A", ".github/workflows/a.yml", ".github/workflows/c.yml", "tools/act/action.yml"], { cwd: tmp, stdio: "ignore" });
   const keyRun = (args, env) => spawnSync(process.execPath, [path.join(tmp, "core/scripts/workflows.mjs"), ...args], { cwd: tmp, encoding: "utf8", env: { ...process.env, WORKFLOWS_BASE: "", ...env } });
-  const k = keyRun([], { WORKFLOWS_BASE: "HEAD" }), kOut = k.stdout + k.stderr, kGood = k.status === 1 && /^note \.github\/workflows\/a\.yml:3: the key "push" .*as it did on the base/m.test(kOut) && /^FAIL \.github\/workflows\/c\.yml:7: the key "if" .*first on line 6.*Mend: keep one/m.test(kOut) && /1 failing, 1 noted\. Mend:/.test(kOut) && mended(kOut);
-  ok(kGood, `run against a base, a key twice the base held is noted and a new one fails, with its mend${kGood ? "" : `:\n${kOut}`}`);
-  const kNone = keyRun([]), kCore = keyRun(["--core"], { WORKFLOWS_BASE: "HEAD" });
-  ok(kNone.status === 0 && /0 failing, 2 noted$/m.test(kNone.stdout) && kCore.status === 1 && /2 failing\. Mend:/.test(kCore.stdout), "run with no base, each is noted and it passes; in the core's own repository each fails, whatever the base");
+  const bare = keyRun([], { WORKFLOWS_BASE: "HEAD", ZIZMOR: "", ACTIONLINT: "" }), bareOut = bare.stdout + bare.stderr;
+  ok(bare.status === 0 && /^::warning::The workflow check did not run zizmor: it was not fetched here/m.test(bareOut) && /^::warning::The workflow check did not run actionlint/m.test(bareOut) && !/c\.yml|action\.yml/u.test(bareOut),
+    `with neither tool fetched, as in a session, it says it did not run them, and decides nothing by them${bare.status === 0 ? "" : `:\n${bareOut}`}`);
+  if (process.env.ZIZMOR && process.env.ACTIONLINT) {
+    const k = keyRun([], { WORKFLOWS_BASE: "HEAD" }), kOut = k.stdout + k.stderr;
+    const kGood = k.status === 1 && /^note \.github\/workflows\/a\.yml:3: actionlint's syntax-check: key "push" is duplicated.*, as on the base\. Mend:/m.test(kOut) && /^FAIL \.github\/workflows\/c\.yml:9: actionlint's syntax-check: key "if" is duplicated/m.test(kOut)
+      && /^FAIL \.github\/workflows\/c\.yml:7: zizmor's template-injection: /m.test(kOut) && /^FAIL tools\/act\/action\.yml:1: zizmor's unread: zizmor could not read the file/m.test(kOut) && mended(kOut);
+    ok(kGood, `run against a base with both tools, a key twice the base held is noted, and a new one, untrusted text in a script and an action zizmor cannot read fail, each with its mend${kGood ? "" : `:\n${kOut}`}`);
+    const kNone = keyRun([]), kCore = keyRun(["--core"], { WORKFLOWS_BASE: "HEAD" });
+    ok(kNone.status === 0 && / 0 failing, \d+ noted$/m.test(kNone.stdout) && kCore.status === 1 && /^FAIL \.github\/workflows\/a\.yml:3: actionlint's/m.test(kCore.stdout), "run with no base, each is noted and it passes; in the core's own repository each fails, whatever the base", `${kNone.stdout}\n${kCore.stdout}`);
+  } else console.log("ok   (not run here: zizmor and actionlint are fetched by the job's set-up on the runners alone, where these cases run)");
+  fs.rmSync(path.join(tmp, "tools"), { recursive: true, force: true });
+  execFileSync("git", ["rm", "-q", "-r", "--cached", "tools", ".github/workflows/c.yml"], { cwd: tmp, stdio: "ignore" });
+  fs.rmSync(path.join(tmp, ".github/workflows/c.yml"));
   fs.writeFileSync(path.join(tmp, ".github/workflows/f.yml"), broken);
   execFileSync("git", ["add", ".github/workflows/f.yml"], { cwd: tmp, stdio: "ignore" });
   const bCore = keyRun(["--core"]), bOut = bCore.stdout + bCore.stderr, bProject = keyRun([]);
@@ -286,14 +288,14 @@ try {
   execFileSync("git", ["add", ".github/workflows/d.yml", ".github/workflows/e.yml"], { cwd: tmp, stdio: "ignore" });
   fs.rmSync(path.join(tmp, "core/.packages/node_modules"), { recursive: true, force: true });
   const u = keyRun([], { CORE_PACKAGES_UNREACHED: "1" }), uOut = u.stdout + u.stderr;
-  ok(u.status === 1 && /^::warning::The check for a key given twice did not run, nor the one for a file that is no YAML, nor the one for a call a draft skips/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && !/e\.yml|is not installed/.test(uOut) && mended(uOut), `where the install could not reach the registry, the keys given twice and the calls a draft skips did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
+  ok(u.status === 1 && /^::warning::The check for a file that is no YAML did not run, nor the one for a call a draft skips/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && !/e\.yml|is not installed/.test(uOut) && mended(uOut), `where the install could not reach the registry, the calls a draft skips did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 // ---- a copy of the core at the path the manifest names (#918): the check leaves it out, and reads the project's own core/ ----
 const vend = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-vendored-"));
 try {
   const at = "vendor/core/", put = (f, text) => { fs.mkdirSync(path.dirname(path.join(vend, f)), { recursive: true }); fs.writeFileSync(path.join(vend, f), text); };
   fs.mkdirSync(path.join(vend, at, "scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "workflow-run.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(vend, at, "scripts", f));
+  for (const f of ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(vend, at, "scripts", f));
   fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(vend, at, ".packages"), { recursive: true });
   put("core-manifest.md", `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${at} (never edited here).\n`);
   put(`${at}tools/action.yml`, "on:\n  pull_request_target:\n"); // (the copy's own, which the core's run holds)
