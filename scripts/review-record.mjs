@@ -37,8 +37,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { DAY, grid, mergedPulls, repoOf, rulesFor } from "./core-cost.mjs";
 import { broughtBy, perPull, reviewEvents, ruleOf, rulesNamed } from "./review-comments.mjs";
-import { checksLines, checksOn } from "./review-checks.mjs";
-import { LAST, roundsLines, roundsOf, wanted } from "./review-rounds.mjs";
+import { checksLines, checksRead } from "./review-checks.mjs";
+import { roundsLines, roundsOf, wanted } from "./review-rounds.mjs";
 import { started } from "./started.mjs";
 import { ROOT, rules, rulesOf } from "./rules.mjs";
 import { pages } from "./stand-in-record.mjs";
@@ -198,10 +198,9 @@ function main(args) {
   console.log(print(repo, since, pulls, t, bug, twice, standing()));
   const want = wanted(merged, all, since);
   const commits = new Map(all.filter(m => want.has(m.number)).map(m => [m.number, commitsOf(m.number)]));
-  const rounds = new Map([...commits].map(([n, cs]) => [n, cs && roundsOf(reviewEvents(...of(all.find(m => m.number === n))), cs)]));
+  const rounds = new Map(all.filter(m => want.has(m.number)).map(m => [m.number, commits.get(m.number) && roundsOf(reviewEvents(...of(m)), commits.get(m.number))]));
   console.log(`\n${roundsLines(merged, all, since, rounds)}`);
-  // (the host's checks are read for the last LAST pull requests counted alone: each commit of each is a call to GitHub)
-  console.log(checksLines(merged.slice(0, LAST).map(m => ({ kind: m.kind, checks: checksOn(commits.get(m.number), runsOf) })), KINDS));
+  console.log(checksLines(checksRead(merged, commits, runsOf), KINDS));
 }
 
 if (started(import.meta.url)) main(process.argv.slice(2));

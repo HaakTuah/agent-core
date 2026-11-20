@@ -5,7 +5,8 @@
 //
 //   node tests/review-checks-test.mjs
 import { KINDS } from "../scripts/review-record.mjs";
-import { checksLines, checksOn, failedOn, headOf, tally } from "../scripts/review-checks.mjs";
+import { LAST } from "../scripts/review-rounds.mjs";
+import { checksLines, checksOn, checksRead, failedOn, headOf, tally } from "../scripts/review-checks.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -37,6 +38,12 @@ ok(same(checksOn(COMMITS, runsBy({ a: [run("failure")], b: [run("failure")] })),
 ok(same(checksOn([commit("a", "0")], () => { throw new Error("read"); }), { heads: 0, failed: 0 }), "a pull request of one commit has no head that was changed");
 ok(checksOn(null, runsBy({})) === null && checksOn(COMMITS, s => (s === sha("b") ? null : [run("success")])) === null,
   "a pull request whose commits cannot be read, or one commit's check runs, is not read, never none");
+
+// the pull requests read: the last LAST counted, newest first, each with its commits from a Map, its kind kept
+const counted = Array.from({ length: LAST + 5 }, (_, i) => ({ number: 100 - i, kind: i % 2 ? "sync" : "own" }));
+const read = checksRead(counted, new Map([[100, COMMITS], [99, null], [98, COMMITS]]), runsBy({ a: [run("failure")] }));
+ok(read.length === LAST && read[0].kind === "own" && read[1].kind === "sync" && same(read[0].checks, { heads: 2, failed: 1 }) && read[1].checks === null && same(read[2].checks, { heads: 2, failed: 1 }) && read[3].checks === null,
+  "the last LAST pull requests counted are read, each by its own commits and kind, and one with no commits read is not read");
 
 const pulls = [
   { kind: "own", checks: { heads: 3, failed: 1 } }, { kind: "own", checks: { heads: 1, failed: 0 } }, { kind: "own", checks: null },

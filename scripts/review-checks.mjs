@@ -9,6 +9,7 @@
 // workflow that runs a review is counted like any other. It is a count, read at the reviews of the core the owner asks for and at the pruning of the rules:
 // nothing fails or waits for it. Node's own modules.
 import { grid } from "./core-cost.mjs";
+import { LAST } from "./review-rounds.mjs";
 
 const FAILED = new Set(["failure", "timed_out", "startup_failure"]);
 
@@ -40,6 +41,11 @@ export function checksOn(commits, runsOf) {
   }
   return { heads, failed };
 }
+
+// The pull requests whose checks are read, as tally takes them: the last LAST of `merged` (the pull requests counted,
+// newest first, as { number, kind }) alone, since each commit of each is a call to GitHub; `commits`: a Map of a pull
+// request's number to its commits (null where they cannot be read).
+export const checksRead = (merged, commits, runsOf) => merged.slice(0, LAST).map(m => ({ kind: m.kind, checks: checksOn(commits.get(m.number), runsOf) }));
 
 // The counts by kind of pull request, from `pulls` as { kind, checks } (checksOn's answer): the pull requests read, the
 // heads their checks ran on, the heads that failed and were then changed, the pull requests with one such head (sent
