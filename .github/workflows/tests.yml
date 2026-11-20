@@ -311,6 +311,12 @@ jobs:
       - name: The strength check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/strength-test.mjs ')) }}
         run: node tests/strength-test.mjs
+      - name: The strength check's report read
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/strength-report-test.mjs ')) }}
+        run: node tests/strength-report-test.mjs
+      - name: The strength check's verdict
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/strength-verdict-test.mjs ')) }}
+        run: node tests/strength-verdict-test.mjs
       - name: The core's own mutation tool
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/mutate-test.mjs ')) }}
         run: node tests/mutate-test.mjs
