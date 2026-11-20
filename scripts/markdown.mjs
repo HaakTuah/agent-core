@@ -26,7 +26,7 @@ const rows = raw => { const lines = raw.split("\n"); while (lines.length && line
 const joined = lines => lines.map(l => ` ${l.trim()}`).join("");
 const item = /^\s*(?:[-*+]|\d+[.)])\s/u;
 // A line's nesting, from the run that leads it: a space is 1, a tab 4, a quote's ">" 2 and a list marker (a bullet or a
-// number with its "." or ")", then a space) 2, so a list indented two spaces a level, a quote or markers written inline
+// number with its "." or ")", then a space or tab) 2, so a list indented two spaces a level, a quote or markers written inline
 // reach MAX_NESTING at about 100 levels. The lexer's time and memory grow far faster than the file as nesting deepens
 // (1000 levels took 8.5 s, 2000 ran out of memory, which no `try` catches; #1032), so a file is refused here.
 export const MAX_NESTING = 200;
