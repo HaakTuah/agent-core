@@ -256,24 +256,26 @@ try {
   for (const args of [["rm", "-q", "--cached", ".github/workflows/b.yml"], ["add", ".github/workflows/a.yml"], ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "base"]]) execFileSync("git", args, { cwd: tmp, stdio: "ignore" });
   fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), "on:\n  push:\n  push:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo\n");
   fs.writeFileSync(path.join(tmp, ".github/workflows/c.yml"), "on: pull_request\npermissions: {}\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo \"${{ github.event.pull_request.title }}\"\n        if: a\n        if: b\n");
+  // (zizmor loads no file that holds a key given twice, so its finding on untrusted text stands in a file of its own)
+  fs.writeFileSync(path.join(tmp, ".github/workflows/g.yml"), "on: pull_request\npermissions: {}\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo \"${{ github.event.pull_request.title }}\"\n");
   fs.mkdirSync(path.join(tmp, "tools/act"), { recursive: true });
   fs.writeFileSync(path.join(tmp, "tools/act/action.yml"), "name: a\ndescription: b\nruns:\n  using: composite\n  steps:\n    - run: echo\n      shell: bash\n      shell: sh\n");
-  execFileSync("git", ["add", "-A", ".github/workflows/a.yml", ".github/workflows/c.yml", "tools/act/action.yml"], { cwd: tmp, stdio: "ignore" });
+  execFileSync("git", ["add", "-A", ".github/workflows/a.yml", ".github/workflows/c.yml", ".github/workflows/g.yml", "tools/act/action.yml"], { cwd: tmp, stdio: "ignore" });
   const keyRun = (args, env) => spawnSync(process.execPath, [path.join(tmp, "core/scripts/workflows.mjs"), ...args], { cwd: tmp, encoding: "utf8", env: { ...process.env, WORKFLOWS_BASE: "", ...env } });
   const bare = keyRun([], { WORKFLOWS_BASE: "HEAD", ZIZMOR: "", ACTIONLINT: "" }), bareOut = bare.stdout + bare.stderr;
-  ok(bare.status === 0 && /^::warning::The workflow check did not run zizmor: it was not fetched here/m.test(bareOut) && /^::warning::The workflow check did not run actionlint/m.test(bareOut) && !/c\.yml|action\.yml/u.test(bareOut),
+  ok(bare.status === 0 && /^::warning::The workflow check did not run zizmor: it was not fetched here/m.test(bareOut) && /^::warning::The workflow check did not run actionlint/m.test(bareOut) && !/[cg]\.yml|action\.yml/u.test(bareOut),
     `with neither tool fetched, as in a session, it says it did not run them, and decides nothing by them${bare.status === 0 ? "" : `:\n${bareOut}`}`);
   if (process.env.ZIZMOR && process.env.ACTIONLINT) {
     const k = keyRun([], { WORKFLOWS_BASE: "HEAD" }), kOut = k.stdout + k.stderr;
     const kGood = k.status === 1 && /^note \.github\/workflows\/a\.yml:3: actionlint's syntax-check: key "push" is duplicated.*, as on the base\. Mend:/m.test(kOut) && /^FAIL \.github\/workflows\/c\.yml:9: actionlint's syntax-check: key "if" is duplicated/m.test(kOut)
-      && /^FAIL \.github\/workflows\/c\.yml:7: zizmor's template-injection: /m.test(kOut) && /^FAIL tools\/act\/action\.yml:1: zizmor's unread: zizmor could not read the file/m.test(kOut) && mended(kOut);
+      && /^FAIL \.github\/workflows\/g\.yml:7: zizmor's template-injection: /m.test(kOut) && /^FAIL tools\/act\/action\.yml:1: zizmor's unread: zizmor could not read the file/m.test(kOut) && mended(kOut);
     ok(kGood, `run against a base with both tools, a key twice the base held is noted, and a new one, untrusted text in a script and an action zizmor cannot read fail, each with its mend${kGood ? "" : `:\n${kOut}`}`);
     const kNone = keyRun([]), kCore = keyRun(["--core"], { WORKFLOWS_BASE: "HEAD" });
     ok(kNone.status === 0 && / 0 failing, \d+ noted$/m.test(kNone.stdout) && kCore.status === 1 && /^FAIL \.github\/workflows\/a\.yml:3: actionlint's/m.test(kCore.stdout), "run with no base, each is noted and it passes; in the core's own repository each fails, whatever the base", `${kNone.stdout}\n${kCore.stdout}`);
   } else console.log("ok   (not run here: zizmor and actionlint are fetched by the job's set-up on the runners alone, where these cases run)");
   fs.rmSync(path.join(tmp, "tools"), { recursive: true, force: true });
-  execFileSync("git", ["rm", "-q", "-r", "--cached", "tools", ".github/workflows/c.yml"], { cwd: tmp, stdio: "ignore" });
-  fs.rmSync(path.join(tmp, ".github/workflows/c.yml"));
+  execFileSync("git", ["rm", "-q", "-r", "--cached", "tools", ".github/workflows/c.yml", ".github/workflows/g.yml"], { cwd: tmp, stdio: "ignore" });
+  for (const f of ["c.yml", "g.yml"]) fs.rmSync(path.join(tmp, ".github/workflows", f));
   fs.writeFileSync(path.join(tmp, ".github/workflows/f.yml"), broken);
   execFileSync("git", ["add", ".github/workflows/f.yml"], { cwd: tmp, stdio: "ignore" });
   const bCore = keyRun(["--core"]), bOut = bCore.stdout + bCore.stderr, bProject = keyRun([]);
