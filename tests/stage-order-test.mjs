@@ -20,6 +20,8 @@ ok(rateOf(["ubuntu-latest", "macos-14"]) === 10 && rateOf(["windows-2022", "ubun
 const w = runners => ({ testRunners: runners });
 ok(billedOf(false, w(["hosted"])) === false && billedOf(null, w(["hosted"])) === null && billedOf(true, w(["hosted", "own"])) === true && billedOf(true, w(["own"])) === false && billedOf(true, w([])) === false && billedOf(true, w([null])) === null,
   "the proof is billed where the repository is private and a suite runs on the host's runners; not where it is public, or runs on the owner's runner or nowhere on the host; not read where the host did not say or a runner could not be read");
+ok(billedOf(true, { testRunners: [], unknown: true, unread: [] }) === null && billedOf(true, { testRunners: ["own"], unknown: false, unread: ["ci.yml"] }) === null && billedOf(true, { testRunners: ["hosted"], unknown: true, unread: ["ci.yml"] }) === true && billedOf(false, { testRunners: [], unknown: true, unread: [] }) === false,
+  "with no suite read on the host's runners, a workflow a job calls that is not read, or a file not read, leaves a private repository's proof not read, never not billed (Codex's finding on #898)");
 ok(isTool("chatgpt-codex-connector[bot]", "Codex") && isTool("Claude Code", "claude code") && !isTool("chatgpt-codex-connector[bot]", "Claude Code") && !isTool("code-helper[bot]", "Claude Code") && !isTool("Codex", "Codex Cloud") && !isTool("a-codex-fan", "Codex"),
   "a reviewer is a tool by the same name, or a bot whose login holds the tool's first word as a word of its own; a person's login, or another word of the name, matches nothing");
 const bot = (login, body = "") => ({ login, type: "Bot", body }), person = (body, login = "o") => ({ login, type: "User", body });
@@ -74,6 +76,18 @@ try {
   ok(/the proof: not read: the host did not say/.test(out) && /the merged pull requests: not read/.test(out) && /every review together, as before/.test(out), "where the host answers nothing, it says so, and every stage starts together", out);
   out = said("o/r", read({ repo: "o/r", dir: flows, ask: gh(false), local: false, warning: "Claude\n::error::x" }));
   ok(/not billed, the repository being public/.test(out) && /shown, for Claude/.test(out) && !out.includes("\n::"), "a public repository's proof is not billed, and the session's word on its warning is printed, never starting a line of the log", out);
+  r = read({ repo: "o/r", dir: null, ask: gh(true), local: false });
+  out = said("o/r", r);
+  ok(r.billed === null && r.elsewhere && /the proof: not read: the workflows are read only from the repository's own checkout/.test(out) && !/not billed/.test(out),
+    "another repository's proof is not read from the checkout's workflows, and says so (Codex's finding on #898)", out);
+  fs.writeFileSync(path.join(flows, "call.yml"), "on: [pull_request]\njobs:\n  call:\n    uses: someone/else/.github/workflows/t.yml@v1\n");
+  fs.writeFileSync(path.join(flows, "ci.yml"), "on: [pull_request]\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo lint\n");
+  out = said("o/r", read({ repo: "o/r", dir: flows, ask: gh(true), local: false }));
+  ok(/the proof: not read: a job's runner, a workflow a job calls/.test(out), "a private repository whose suite runs through a workflow of another repository is not read as unbilled", out);
+  const printed = [];
+  main(["--repo", "X/Y"], { say: l => printed.push(l), here: "o/r", ask: a => { if (a.join(" ") === "api repos/X/Y") return JSON.stringify({ private: true }); throw new Error("no gh"); } });
+  main(["--repo", "O/R"], { say: l => printed.push(l), here: "o/r", ask: a => { if (a.join(" ") === "api repos/O/R") return JSON.stringify({ private: true }); throw new Error("no gh"); } });
+  ok(/read only from the repository's own checkout/.test(printed[0]) && !/own checkout/.test(printed[1]), "main takes the checkout's workflows for its own repository alone, in any case of its name, never for another's", printed.join("\n"));
   const lines = [];
   ok(main(["--repo", "../x"], { say: l => lines.push(l), here: "o/r" }) === 0 && /nothing was read/.test(lines[0]) && main(["--repo", "o/r", "--last", "0"], { say: l => lines.push(l) }) === 0 && /nothing was read/.test(lines[1]),
     "a repository or a count of no form is said, and fails nothing");

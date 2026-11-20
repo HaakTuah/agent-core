@@ -2,8 +2,9 @@
 // out from what can be read exactly and never asked (the core's AGENTS.md, "What can be read is never asked or
 // declared"); nothing of it is written in the repository, and no manifest row is read. It reads:
 // - whether the host bills the proof: the repository is private (the host says) and a job that starts a suite runs on
-//   the host's runners (the workflows, as runners.mjs reads them), weighed by the costliest such runner's rate, a Linux
-//   minute 1, a Windows one 2, a macOS one 10;
+//   the host's runners (the checkout's workflows, as runners.mjs reads them, and none for another repository; with no
+//   suite read there, a runner, called workflow or file not read leaves it not read), weighed by the costliest such
+//   runner's rate, a Linux minute 1, a Windows one 2, a macOS one 10;
 // - which agent tools built the last 30 merged pull requests and which reviewed them (tools-read.mjs), a tool that
 //   builds counting as short for reviewing too, its allowance being the one the owner works from;
 // - which reviews start by themselves: a bot's review on a pull request where no comment asked one by mention;
@@ -36,13 +37,17 @@ export function rateOf(labels) {
 }
 
 /** Whether the proof is billed: true, false, or null where it was not read, from whether the repository is private
- *  (`priv`, null where the host did not answer) and the workflows read (`w`, workflowsIn's). */
+ *  (`priv`, null where the host did not answer) and the workflows read (`w`, workflowsIn's, or ELSEWHERE's): a suite on
+ *  the host's runners is billed; with none, a runner, a called workflow or a file not read leaves it not read. */
 export function billedOf(priv, w) {
   if (priv === false) return false;
   if (priv !== true) return null;
   if (w.testRunners.includes("hosted")) return true;
-  return w.testRunners.includes(null) ? null : false;
+  return w.testRunners.includes(null) || w.unknown || w.unread?.length ? null : false;
 }
+
+// (the workflows of a repository other than the checkout, which are not read: only the checkout's own are)
+const ELSEWHERE = Object.freeze({ testRunners: [], testLabels: [], unknown: true, unread: [], elsewhere: true });
 
 /** Whether a reviewer, a tool by its attribution line's name or a bot by its login, is the tool `tool`: the same name in
  *  any case, or a login one of whose words is the tool's first word ("codex" of "Codex" in "chatgpt-codex-connector"). */
@@ -100,16 +105,17 @@ export function order(r) {
   return { short, stages: [FIRST, ...lastOf(short[0], r.reviewers ?? [], r.themselves ?? [])] };
 }
 
-/** What it read, from the host through `ask` (gh's arguments, its output back) and from the workflows in `dir`. */
+/** What it read, from the host through `ask` (gh's arguments, its output back) and from the workflows in `dir`, the
+ *  checkout's own, or none (null) where `repo` is another repository's. */
 export function read({ repo, last = LAST, warning = null, dir = ".github/workflows", ask, local = true, parse }) {
   let priv = null;
   try { const v = JSON.parse(ask(["api", `repos/${repo}`]))?.private; priv = typeof v === "boolean" ? v : null; } catch { /* (not read) */ }
-  const w = workflowsIn(dir, parse);
+  const w = dir === null ? ELSEWHERE : workflowsIn(dir, parse);
   const billed = billedOf(priv, w), rate = billed ? rateOf(w.testLabels) : null;
   let pulls = null, owner = null;
   try { pulls = readPulls(repo, last, ask); owner = ownerFor(repo, local, ask, () => {}); } catch { pulls = null; }
   const t = pulls ? tally(pulls, owner) : null;
-  return { priv, billed, rate, pulls, builders: t?.builders ?? null, reviewers: t ? t.reviewers.map(([name]) => name) : null, themselves: pulls ? byThemselves(pulls, owner) : [], warning, unread: w.unread };
+  return { priv, billed, rate, pulls, builders: t?.builders ?? null, reviewers: t ? t.reviewers.map(([name]) => name) : null, themselves: pulls ? byThemselves(pulls, owner) : [], warning, unread: w.unread, elsewhere: !!w.elsewhere };
 }
 
 /** The lines it prints: what was read, what is short, the order. */
@@ -117,7 +123,9 @@ export function said(repo, r) {
   const o = order(r), list = l => (l.length ? l.map(([n, k]) => `${logged(n)} ${k}`).join(", ") : "none");
   const proof = r.billed === true ? `billed, the repository being private and a job that starts a suite running on the host's runners${r.rate ? `, its costliest at ${r.rate}× a Linux minute` : ""}`
     : r.billed === false ? (r.priv === false ? "not billed, the repository being public" : "not billed, no job that starts a suite running on the host's runners")
-    : r.priv === null ? "not read: the host did not say whether the repository is private" : "not read: a job's runner could not be read";
+    : r.priv === null ? "not read: the host did not say whether the repository is private"
+    : r.elsewhere ? "not read: the workflows are read only from the repository's own checkout, so run it there"
+    : "not read: a job's runner, a workflow a job calls or a workflow file could not be read";
   const record = r.pulls ? `the last ${r.pulls.length} merged pull requests${r.pulls.length ? ` (#${r.pulls.at(-1).number} to #${r.pulls[0].number})` : ""}: built by ${list(r.builders)}; reviewed by ${r.reviewers.length ? r.reviewers.map(logged).join(", ") : "none"}; starting by themselves: ${r.themselves.length ? r.themselves.map(logged).join(", ") : "none"}`
     : "the merged pull requests: not read";
   return [`what a run is short of, read for ${repo}:`, `  the proof: ${proof}${r.unread?.length ? ` (workflows not read: ${r.unread.map(logged).join(", ")})` : ""}`, `  ${record}`,
@@ -132,7 +140,8 @@ export function main(argv, { ask = a => execFileSync("gh", a, { encoding: "utf8"
   const repo = at("--repo") ?? here, last = Number(at("--last") ?? LAST), warning = at("--warning") ?? null;
   // (nothing read is said so, and every stage starts together: it fails nothing)
   if (!aRepository(repo) || !(Number.isInteger(last) && last > 0 && last <= 100)) { say("note nothing was read: give --repo <owner/name> and --last a whole number up to 100; every stage starts together when the pull request is ready (core/tasks/reviews.md, point 10)"); return 0; }
-  say(said(repo, read({ repo, last, warning, ask, local: repo === here })));
+  const local = String(repo).toLowerCase() === String(here ?? "").toLowerCase();
+  say(said(repo, read({ repo, last, warning, ask, local, dir: local ? ".github/workflows" : null })));
   return 0;
 }
 
