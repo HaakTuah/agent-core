@@ -4,14 +4,14 @@
 //
 //   node tests/versions-test.mjs
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { current, newest, issue, npmView, pypiTimes } from "../scripts/versions.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "versions-test-"));
+const root = scratchDir("versions-test-");
 fs.writeFileSync(path.join(root, "pin.txt"), "loads mossgrip@1.5.4 here\n");
 const throws = f => { try { f(); return false; } catch { return true; } };
 
@@ -19,7 +19,7 @@ const entry = { name: "mossgrip", file: "pin.txt", pattern: "mossgrip@(\\d+\\.\\
 const [e] = current([entry], root);
 ok(e.version === "1.5.4", "an entry finds the one version in its file");
 ok(throws(() => current([{ ...entry, pattern: "barkbite@(\\d+\\.\\d+\\.\\d+)" }], root)), "an entry whose pattern finds no version fails, so a moved version is never silently skipped");
-const outside = fs.mkdtempSync(path.join(os.tmpdir(), "versions-outside-"));
+const outside = scratchDir("versions-outside-");
 fs.writeFileSync(path.join(outside, "pin.txt"), "loads mossgrip@1.5.4 here\n");
 ok(throws(() => current([{ ...entry, file: path.relative(root, path.join(outside, "pin.txt")) }], root)), "an entry's file outside the project fails");
 fs.writeFileSync(path.join(root, "..pin.txt"), "loads mossgrip@1.5.4 here\n");

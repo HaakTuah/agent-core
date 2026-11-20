@@ -4,8 +4,7 @@
 //
 //   node tests/security-review-test.mjs
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
@@ -13,6 +12,7 @@ import { mended } from "../scripts/mend.mjs";
 import { CONTEXT, EDITED, NEW_LINE, UNREAD, boundOf, commentsAlone, form, judge, named, pinsAlone, reviewersOf, status } from "../scripts/security-review.mjs";
 import { blockingOf, otherOf, postedKind } from "../scripts/review-record.mjs";
 import { judge as codeReview } from "../scripts/code-review-wait.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -329,7 +329,7 @@ ok(queueProof("vendor/core/")?.done === true && /queue-only/u.test(queueProof("v
 ok(is(queued([summary(running)], [lineOf]), false, "no security review") && is(queued([summary(done)], [lineOf]), true, "has run"), "a review that began by itself is waited for, as of a pure sync");
 
 // From the command line, as the workflow runs it.
-const dir = mkdtempSync(join(tmpdir(), "security-review-"));
+const dir = scratchDir("security-review-");
 try {
   const script = fileURLToPath(new URL("../scripts/security-review.mjs", import.meta.url));
   const run = (p, c, env = {}, r = undefined, k = undefined, f = undefined) => {

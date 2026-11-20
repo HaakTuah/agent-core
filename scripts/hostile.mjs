@@ -1,16 +1,16 @@
 // What the hostile tests of the core's own inputs share (SECURITY.md, rule 5; #359): a scratch folder that is removed
 // when the test ends, a project written into it, a check's failures read for their mend, and a read timed against the
-// few seconds a hostile input may take. Node's own modules and mend.mjs, beside this file.
+// few seconds a hostile input may take. Node's own modules, mend.mjs and scratch-core.mjs, beside this file.
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { mended } from "./mend.mjs";
+import { scratchDir } from "./scratch-core.mjs";
 
-// A scratch folder under the temporary one, removed on exit, and `fresh(files)`, a new project in it holding `files`
+// A scratch folder under the temporary one (`scratchDir`: removed on exit, or by the next test's start where this one
+// was stopped), and `fresh(files)`, a new project in it holding `files`
 // ({ path: text }); the folder is `tmp`.
 export function scratch(name) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `${name}-`));
-  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const tmp = scratchDir(`${name}-`);
   let n = 0;
   const fresh = (files = {}) => {
     const dir = path.join(tmp, `p${++n}`);

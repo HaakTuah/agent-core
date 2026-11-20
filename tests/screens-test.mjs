@@ -9,11 +9,11 @@
 //   node tests/screens-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { lowered, parseConfig, parseFound, rewritten, verdict, where } from "../scripts/screens.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -97,7 +97,7 @@ const kept = rewritten({ listed: new Map([["values: home: raw red", true]]), gro
 ok(kept.listed.has("values: home: raw red"), "--write keeps the entries of a check switched off, whose findings the run does not read");
 
 // ---- whole runs ----
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "screens-test-"));
+const dir = scratchDir("screens-test-");
 try {
   const git = (...a) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...a], { cwd: dir, stdio: "pipe" });
   const run = (args, env = {}) => { const r = spawnSync(process.execPath, [script, ...args], { cwd: dir, encoding: "utf8", env: { ...process.env, SCREENS_BASE: "", ...env } }); return { code: r.status, out: `${r.stdout}${r.stderr}` }; };

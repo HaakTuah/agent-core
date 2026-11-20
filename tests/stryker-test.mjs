@@ -8,20 +8,20 @@
 //   node tests/stryker-test.mjs [--tool <folder>]
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { limitOf } from "../scripts/mutate.mjs";
 import { coreReporter, named, progress, strykerPlugins } from "../scripts/stryker-plugin.mjs";
 import { asItStands, counted, dispatch, optionsOf, stopTests, testsFor, word } from "../scripts/stryker.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const SCRIPT = fileURLToPath(new URL("../scripts/stryker.mjs", import.meta.url));
 const at = process.argv.indexOf("--tool"), TOOL = at >= 0 ? path.resolve(process.argv[at + 1]) : null;
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "stryker-test-"));
+const scratch = scratchDir("stryker-test-");
 
 try {
   // ---- the report, as the run goes ----

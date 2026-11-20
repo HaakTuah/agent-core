@@ -8,13 +8,13 @@
 //   node tests/shape-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { fileOf, groupOf, LONG, MARKS, notLinked, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
 import { READERS } from "../scripts/shape-readers.mjs";
 import { LARGEST } from "../scripts/tree-walk.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -480,8 +480,7 @@ v = judge({ now: csBig, baseline: JSON.stringify({ reads: ["javascript"], listed
 ok(mended(said(v)) && /no longer names 11 readers that origin\/main's names: jsx, javascript-tree, csharp, csharp-tree, python, python-tree, scripts, screens, clocks, processes, changes/.test(said(v)), "a baseline that drops a reader its base named fails, so that what it lists cannot go unlisted while it stands", said(v));
 
 // ---- whole runs, in a scratch repository ----
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shape-test-"));
-process.on("exit", () => { try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+const dir = scratchDir("shape-test-");
 const git = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const put = (file, text) => { fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.writeFileSync(path.join(dir, file), text); };
 const run = (args, env = {}) => { const r = spawnSync(process.execPath, [script, ...args], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "", ...env } }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
@@ -624,8 +623,7 @@ if (process.platform !== "win32") { // (a link is made without a privilege only 
 // (an entry an earlier pull request mended and left listed lists nothing in its place, --write told the base: #751's
 // fifth round)
 {
-  const at = fs.mkdtempSync(path.join(os.tmpdir(), "shape-test-"));
-  process.on("exit", () => { try { fs.rmSync(at, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+  const at = scratchDir("shape-test-");
   const there = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", ...args], { cwd: at, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   const write = (file, text) => { fs.mkdirSync(path.dirname(path.join(at, file)), { recursive: true }); fs.writeFileSync(path.join(at, file), text); };
   const check = (args, base) => { const x = spawnSync(process.execPath, [script, "checks/shape.json", ...args], { cwd: at, encoding: "utf8", env: { ...process.env, SHAPE_BASE: base } }); return { status: x.status, out: `${x.stdout}${x.stderr}` }; };
@@ -701,7 +699,7 @@ ok(["../shape.json", "checks/../../shape.json", "/etc/shape.json", "C:/shape.jso
 // none, the config's shape goes unchecked: what the check reads is taken where it holds its form, its defaults else, the
 // check says so as a warning, and a config that names no baseline or no code still fails with its mend)
 {
-  const bare = fs.mkdtempSync(path.join(os.tmpdir(), "shape-bare-"));
+  const bare = scratchDir("shape-bare-");
   fs.cpSync(path.join(path.dirname(script), "."), path.join(bare, "core/scripts"), { recursive: true });
   fs.cpSync(path.join(path.dirname(script), "../setup/template"), path.join(bare, "core/setup/template"), { recursive: true });
   const parse = text => spawnSync(process.execPath, ["--input-type=module", "-e", `import { parseConfig } from "./core/scripts/shape.mjs"; try { console.log(JSON.stringify(parseConfig(process.argv[1], "checks/shape.json"))); } catch (e) { console.log("FAIL: " + e.message); }`, text], { cwd: bare, encoding: "utf8" }).stdout;

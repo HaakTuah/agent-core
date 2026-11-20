@@ -6,7 +6,7 @@
 // docs/choices.md) with criteria drawn from the aims, a number of theirs stated before the third option is named, at
 // least three options, a case against the pick and its `Reopens it:` sign; the pick is none of the runtimes the aims
 // rule out; no code is pushed without that record beside it, nor a package file of such a runtime; and the choice is
-// not put to the owner: no pull request waits on the owner, and no issue labelled needs-owner, nor comment calling the
+// not put to the owner: no pull request that waits on the owner, issue labelled needs-owner, nor comment calling the
 // owner by name, asks a question naming two stacks to pick between. An issue that asks the owner for what only the owner can do (a run
 // on a board) is no breach: the pick stands and the work goes on.
 import { execFileSync } from "node:child_process";
@@ -102,14 +102,16 @@ function branchFaults(dir, b) {
   return why;
 }
 
-// Whether the choice is put to the owner: a pull request that waits on the owner, or, in an issue labelled needs-owner
-// or a comment calling the owner by name, a question that names two stacks and asks for a pick ("which", "or",
-// "prefer", "choose"); a request to time two on a board, which only the owner can make, asks none.
+// Whether the choice is put to the owner: in a pull request that waits on the owner (its `Waits on:` line), an issue
+// labelled needs-owner or a comment calling the owner by name, a question that names two stacks and asks for a pick
+// ("which", "or", "prefer", "choose"); a request to time two on a board, which only the owner can make, and a yes the
+// floor names (rule 10's licence exception) ask none.
 function putToOwner(dir) {
   const g = github(dir), w = written(dir);
   const asks = text => String(text ?? "").split("\n").some(l => l.includes("?") && named(l).length >= 2 && /\b(?:which|or|prefer\w*|choose|pick|rather|decide)\b/i.test(l));
   const toOwner = [...w.issues.filter(i => (i.labels ?? []).includes("needs-owner")), ...w.comments.filter(c => c.body.includes(`@${OWNER}`))];
-  return g.pulls.some(p => waitsOnOwner(p)) || toOwner.some(x => asks(`${x.title ?? ""}\n${x.body ?? ""}`));
+  const waits = p => /^Waits on:.*$/mi.exec(String(p.body ?? ""))?.[0] ?? "";
+  return g.pulls.some(p => waitsOnOwner(p) && asks(waits(p))) || toOwner.some(x => asks(`${x.title ?? ""}\n${x.body ?? ""}`));
 }
 
 export function read(dir) {

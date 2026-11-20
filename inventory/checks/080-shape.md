@@ -1,4 +1,4 @@
-- `scripts/shape.mjs`, `scripts/code-shape.mjs`, `scripts/shape-readers.mjs`, `scripts/shape-csharp.mjs`,
+- `scripts/shape.mjs`, `scripts/code-shape.mjs`, `scripts/code-shape-lexer.mjs`, `scripts/code-shape-readers.mjs`, `scripts/shape-readers.mjs`, `scripts/shape-csharp.mjs`,
   `scripts/shape-python.mjs`, `scripts/csharp-tree.mjs`, `scripts/javascript-functions.mjs`,
   `scripts/python-tree.mjs`, `scripts/tree-walk.mjs`, `scripts/dose.mjs`, `scripts/wait.mjs`, `.github/shape.json`,
   `.github/shape-baseline.json`, `tests/readers-test.mjs`: fails what is new in how the code is put together: a function past its marks for lines,

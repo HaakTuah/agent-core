@@ -5,18 +5,18 @@
 //
 //   node tests/runners-test.mjs
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { main, read, runnersRow, workflowsIn } from "../scripts/runners.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
 
 // A project's workflows, each { name: text }, in a folder of its own; a host that says whether the repository is
 // private (null: it does not answer).
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "runners-test-"));
+const scratch = scratchDir("runners-test-");
 let n = 0;
 const flows = files => { const dir = path.join(scratch, String(n++)); fs.mkdirSync(dir); for (const [f, t] of Object.entries(files)) fs.writeFileSync(path.join(dir, f), t); return dir; };
 const host = priv => () => { if (priv === null) throw new Error("HTTP 403"); return JSON.stringify({ private: priv }); };
