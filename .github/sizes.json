@@ -79,10 +79,6 @@
       "mark": 27425,
       "why": "#888: each line's check in a file of its own beside a short reader."
     },
-    "scripts/pruning.mjs": {
-      "mark": 33545,
-      "why": "#888: the list it prints apart from what it reads from the host and its record."
-    },
     "tasks/game-design.md": {
       "mark": 25119,
       "why": "#441: the game rules split into a base and a file for each kind (#484, points 6 and 7)."
