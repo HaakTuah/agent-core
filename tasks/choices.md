@@ -75,7 +75,8 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
   the comparison: the stack is picked for the product, and the core follows; nor that the project's first code waits on
   a reader. Reason: a project in a stack the core could not read found it out months later, from an evaluation. Held by
   the records' check (`core/scripts/choices.mjs`), which fails a stack's record a pull request adds whose last line is
-  not that line, naming an issue or saying "none".
+  not that line, naming an issue or saying "none"; that each gap has its own issue, by the review, since no check reads
+  where one gap ends.
 - **The choices a project already made are recorded too.** At its first audit (in a project that stood before this rule,
   as the step its sync asks: `setup/sync-notes.md`), a project's auditing session records each standing choice that is
   hard to undo, a stated feature of its design that works as one included ("no build step"), each with what it was
