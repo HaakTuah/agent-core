@@ -12,3 +12,11 @@
   both. *Bugs:* 1. **Replace** the matching with gitleaks or its successor, which also brings the scan for secrets that
   floor rule 1 has no check for in a private project (the host's own is paid there); **keep** what is read (each
   commit's names and addresses, the title, the description, the branch) and the exception for commits the host made.
+  *Tried:* Betterleaks 1.10.1, the successor, as the matching (#579): built by Go from its source, on one pull request of
+  the core's own, the whole history a checkout held (69 merged pull requests, 574 commits), five terms that stand in its
+  files and commits, the old and the new check failed alike, naming the same 238 lines of files and the same commits
+  (492 by their message, 574 by their author, 63 by a line they add, 45 by a file's name they write), in 42.2 s against
+  49.6 s; then taken as the release its maker publishes, fetched at set-up and run by the pull request's checks on
+  GitHub's runners alone, on the owner's word that no session runs it, where every case of
+  `tests/personal-terms-test.mjs` passed, the 81 that stood before among them. *Replayed:* #261 read (its fix's cases, a
+  term inside a session link's id and beside one, each as before).
