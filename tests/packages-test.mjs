@@ -9,10 +9,10 @@
 //   node tests/packages-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 let failed = 0;
@@ -174,7 +174,7 @@ if (failed) { console.log(`FAIL ${failed} of the lock file's checks above failed
 }
 
 // ---- with nothing installed, a script that loads a package says it did not run, and how to install ----
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "packages-test-"));
+const tmp = scratchDir("packages-test-");
 try {
   // (a project whose own node_modules holds a package of the name, at another version, beside a copy with none)
   const project = path.join(tmp, "project"), copy = path.join(project, "core"), pk = path.join(copy, ".packages");

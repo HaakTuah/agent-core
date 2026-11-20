@@ -4,11 +4,11 @@
 //
 //   node tests/own-modules-test.mjs
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { faults, report, SECTION } from "../scripts/own-modules.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what) => { count++; if (!cond) { failed++; console.error(`FAIL: ${what}`); } };
@@ -54,7 +54,7 @@ const missing = report(path.join(fileURLToPath(new URL("..", import.meta.url)), 
 ok(missing.status === 1 && missing.out.length === 0 && mended(missing.err.join("\n")) && missing.err[0].includes("could not be read"), "where AGENTS.md cannot be read it fails, saying its mend");
 
 // a made root: its modules counted, and a fault of its AGENTS.md reported as a failure, saying its mend
-const made = fs.mkdtempSync(path.join(os.tmpdir(), "own-modules-test-"));
+const made = scratchDir("own-modules-test-");
 try {
   const stand = (folder, ...files) => { fs.mkdirSync(path.join(made, folder), { recursive: true }); for (const f of files) fs.writeFileSync(path.join(made, folder, f), "x\n"); };
   stand("tasks", "a.md", "b.txt"); stand("roles/shared", "c.md"); stand("tools");

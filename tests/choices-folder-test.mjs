@@ -4,23 +4,23 @@
 //   node tests/choices-folder-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LINK, MOST, POINTER, baseRecords, checkOf, look, parse, records, wholeOf } from "../scripts/choices.mjs";
 import { PART, folderFaults } from "../scripts/choices-folder.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
 const here = fileURLToPath(new URL("../scripts", import.meta.url)); // (the scripts this tests, beside the folder tests/)
 const at = day => `${day}T12:00:00Z`;
 let link = true;
-{ const t = fs.mkdtempSync(path.join(os.tmpdir(), "choices-ln-")); try { fs.writeFileSync(path.join(t, "a"), ""); fs.symlinkSync("a", path.join(t, "b")); } catch { link = false; } fs.rmSync(t, { recursive: true, force: true }); }
+{ const t = scratchDir("choices-ln-"); try { fs.writeFileSync(path.join(t, "a"), ""); fs.symlinkSync("a", path.join(t, "b")); } catch { link = false; } fs.rmSync(t, { recursive: true, force: true }); }
 
 // ---- records that stand in a folder, a file each (#870) ----
 {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "choices-folder-"));
+  const dir = scratchDir("choices-folder-");
   const g = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   const write = (f, t) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), t); };
   const pointer = "Its records stand in `choices/`, a file each, read in the order of their names.";

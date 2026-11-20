@@ -15,6 +15,7 @@ import { fetchAll } from "../scripts/nuget-fetch.mjs";
 import { packagesOf } from "../scripts/lookup.mjs";
 import { mended, unmended } from "../scripts/mend.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 // (each failure the check gives in this test, read as it prints it, for its mend; the last assertion says which did not
 // say one)
@@ -40,8 +41,8 @@ ok(nugetConfig({ nuget: { accepted: [yes, { ...yes, package: "Other.Pkg@2.0.0", 
 ok(sourcesOf({ nuget: {} }, "/project").join() === REGISTRY && sourcesOf({ nuget: { sources: ["https://pkgs.example.com/feed/v3/index.json", "vendor/packages/"] } }, path.resolve("/project")).join() === `${REGISTRY},https://pkgs.example.com/feed/v3/index.json,${path.resolve("/project", "vendor/packages")}`,
   "a restore takes packages from NuGet's own registry, and from what the config names beside it: an address, a folder of the project's by its whole path");
 // (the copy of the core where the manifest names it, #918: its folder is no source, and the project's own core/ is one)
-const manifestAt = (place) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-copy-")); fs.writeFileSync(path.join(dir, "core-manifest.md"), `Core: ${CORE} at ${"a".repeat(40)}, copied whole under ${place} (never edited here).\n`); return dir; };
-const vendorRoot = manifestAt("vendor/core/"), bareRoot = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-copy-"));
+const manifestAt = (place) => { const dir = scratchDir("nuget-copy-"); fs.writeFileSync(path.join(dir, "core-manifest.md"), `Core: ${CORE} at ${"a".repeat(40)}, copied whole under ${place} (never edited here).\n`); return dir; };
+const vendorRoot = manifestAt("vendor/core/"), bareRoot = scratchDir("nuget-copy-");
 try {
   ok(throws(() => nugetConfig({ nuget: { sources: ["vendor/core/packages/"] } }, "vendor/core/")) && throws(() => nugetConfig({ nuget: { sources: ["Vendor/Core/"] } }, "vendor/core/"))
     && nugetConfig({ nuget: { sources: ["core/packages/"] } }, "vendor/core/").sources.length === 1 && nugetConfig({ nuget: { sources: ["vendor/core/packages/"] } }).sources.length === 1 && throws(() => nugetConfig({ nuget: { sources: ["core/packages/"] } })),
@@ -53,7 +54,7 @@ try {
   const mixed = { nuget: { ships: ["src/App/packages.lock.json"], tools: [], sources: ["core/feed/"] } };
   fs.mkdirSync(path.join(vendorRoot, "src/App"), { recursive: true });
   fs.writeFileSync(path.join(vendorRoot, "src/App/packages.lock.json"), '{ "version": 1, "dependencies": {} }\n');
-  const bareFetch = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-copy-"));
+  const bareFetch = scratchDir("nuget-copy-");
   try {
     const got = await fetchAll(mixed, vendorRoot, ["src/App/packages.lock.json"], bareFetch, [], {}).then(() => "read", (e) => e.message);
     ok(got === "read" && packagesOf(mixed, vendorRoot, null, true).head.length === 1, "the fetch before the restore and the lookup of a new package read a source of the project's own named core/ as the check does, the copy being elsewhere", String(got));
@@ -116,8 +117,7 @@ ok([nuspec(`<license type="expression">MIT</license>`).replace("</metadata>", ""
   "a manifest that is not well formed gives none");
 
 // the check whole, on a scratch project
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-test-"));
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("nuget-test-");
 const put = (to, text) => { fs.mkdirSync(path.dirname(path.join(tmp, to)), { recursive: true }); fs.writeFileSync(path.join(tmp, to), text); return to; };
 // (what each made-up package's manifest names; a restore's folder holds those a project's lock files install)
 const MANIFESTS = {
@@ -368,7 +368,7 @@ ok([null, "", "not json", "{}", JSON.stringify({ version: 2, source: "" }), JSON
 const elsewhere = check({ ships: [], nuget: { ships: [L] } }, tmp, restore("Newtonsoft.Json@13.0.3", ["Some.Pack@8.0.0", "https://pkgs.example.com/v3/index.json"]), only).failures.join("\n");
 ok(/some\.pack@8\.0\.0 \(brought by the restore, and named in no lock file read here\): the restore took it from https:\/\/pkgs\.example\.com/.test(elsewhere), "a package the restore brought that no lock file names, for a project of another kind say, is held to the same sources", elsewhere);
 // (the runner's own SDK stands outside the project, as on a runner)
-const sdk = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-test-sdk-")); process.on("exit", () => fs.rmSync(sdk, { recursive: true, force: true }));
+const sdk = scratchDir("nuget-test-sdk-");
 for (const name of ["dotnet", "dotnet.exe"]) fs.writeFileSync(path.join(sdk, name), "");
 const onPath = { env: { PATH: [path.join(tmp, "nowhere"), sdk].join(path.delimiter) } };
 ok(takenFrom(path.join(sdk, "library-packs"), {}, only, onPath) === "" && /the restore took it from .*library-packs/.test(takenFrom(path.join(tmp, "elsewhere", "library-packs"), {}, only, onPath)) && /the restore took it from .*library-packs/.test(takenFrom(path.join(sdk, "library-packs"))),
@@ -377,7 +377,7 @@ put("tools/dotnet", "");
 const relative = path.relative(process.cwd(), path.join(tmp, "tools")), local = (dir) => takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { PATH: dir } });
 ok(/the restore took it from .*library-packs/.test(local(relative)) && /the restore took it from .*library-packs/.test(local(path.join(tmp, "tools"))) && /the restore took it from .*library-packs/.test(takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { DOTNET_ROOT: path.join(tmp, "tools") } })),
   "a dotnet the PATH or DOTNET_ROOT names by a path that is not whole, or one inside the project, brings no folder of packages: it would be one the pull request brought");
-const outside = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-test-path-")); process.on("exit", () => fs.rmSync(outside, { recursive: true, force: true }));
+const outside = scratchDir("nuget-test-path-");
 fs.symlinkSync(path.join(tmp, "tools", "dotnet"), path.join(outside, "dotnet"));
 ok(/the restore took it from .*library-packs/.test(takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { PATH: outside } })), "nor one whose link, outside the project, leads into it", takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { PATH: outside } }));
 put("vendor/packages/Bought.1.0.0.nupkg", "");

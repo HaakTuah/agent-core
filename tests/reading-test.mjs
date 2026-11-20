@@ -6,11 +6,11 @@
 //   node tests/reading-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { FLOOR, FLOOR_WHEN, KINDS_BY_PATH, MAKE, PAST, READ_LINE, START, TRY, asked, budget, calledByPaths, coreAt, faults, gather, hookLine, kindsOf, leftOut, library, lineMend, listed, matches as matchesIn, opening, ownOf, ownPaths, reading, readsOf, taken, whenOf } from "../scripts/reading.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 // (each case its own reading, with a budget of its own, where it gives none)
 const matches = (pattern, file, within = budget()) => matchesIn(pattern, file, within);
 
@@ -173,8 +173,7 @@ ok(r.status === 1 && mended(r.out) && /is no role the core has a file for/.test(
 ok(run(root, "--kinds").status === 0 && /^screen +tasks\/game-design\.md, tasks\/screens\.md$/m.test(run(root, "--kinds").out) && /^workflow +tasks\/tests\.md, floor\/topics\/workflows\.md$/m.test(run(root, "--kinds").out), "--kinds lists each kind with its files");
 
 // a scratch project that holds the core's copy
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "reading-test-")), project = path.join(tmp, "project");
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("reading-test-"), project = path.join(tmp, "project");
 const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
 const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
 const git = (...args) => execFileSync("git", args, { cwd: project, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
