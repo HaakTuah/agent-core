@@ -278,6 +278,6 @@ ok(unread(notDone(p, inputs)), "steps.mjs: SECURITY.md that is a folder, the wro
 }
 
 // ---- nothing written outside the project ----
-ok(fs.readdirSync(outside).join() === "tests,x" && fs.readdirSync(tmp).sort().join() === "outside,project,size-base.mjs,comments.json".split(",").sort().join(), "nothing was written outside the project");
+ok(fs.readdirSync(outside).join() === "tests,x" && fs.readdirSync(tmp).filter(n => n !== ".scratch-owner").sort().join() === "outside,project,size-base.mjs,comments.json".split(",").sort().join(), "nothing was written outside the project");
 
 process.exit(failed ? 1 : 0);

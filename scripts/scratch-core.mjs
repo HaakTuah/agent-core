@@ -40,7 +40,7 @@ const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { re
 
 /** The scratch folders in the temporary folder whose process is gone (a test the mutation tool or a time-out stopped
  *  with SIGKILL, which no handler sees) taken away; one whose process still runs is left, and so is anything that is
- *  no real folder of this user's with the owner file of `scratchDir`. Done once for a process, as its first scratch
+ *  no real folder of this user's, with a plain owner file of `scratchDir` of this user's. Done once for a process, as its first scratch
  *  folder is made. */
 let swept = false;
 function sweep() {
@@ -54,6 +54,8 @@ function sweep() {
     try {
       const st = fs.lstatSync(dir);
       if (!st.isDirectory() || (me !== undefined && st.uid !== me)) continue;
+      const mark = fs.lstatSync(path.join(dir, OWNER));
+      if (!mark.isFile() || mark.size > 20 || (me !== undefined && mark.uid !== me)) continue;
       const pid = Number(fs.readFileSync(path.join(dir, OWNER), "utf8"));
       if (!Number.isInteger(pid) || pid <= 0 || alive(pid)) continue;
       fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
