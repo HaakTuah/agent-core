@@ -197,19 +197,32 @@ export function copyOf(dir) {
   return dir;
 }
 
-// A copy's node_modules: a folder of its own whose every entry (and every entry of a @scope folder) reaches the
-// project's: a folder by a link, a junction on Windows, and a file by a copy, which needs no right to make. A link that
-// leads into the project's own files, a workspace's package, leads to the same place in the copy, so that its faults
-// are the copy's; one that leads into a node_modules (pnpm's store) or outside, to where it led; a dangling one is left
-// out.
+// A copy's node_modules: where no link in it leads into the project's own files, one link to the project's whole folder,
+// a junction on Windows, so that a package's real path lies in the node_modules a script reads it from, as packages.mjs
+// asks of the core's own install (#984). Otherwise a folder of its own whose every entry (and every entry of a @scope
+// folder) reaches the project's: a folder by a link and a file by a copy, which needs no right to make. A link that leads
+// into the project's own files, a workspace's package, leads to the same place in the copy, so that its faults are the
+// copy's; one that leads into a node_modules (pnpm's store) or outside, to where it led; a dangling one is left out.
 function linkInstalled(installed, to, dir) {
-  const root = fs.realpathSync("."), one = (from, at) => {
+  const root = fs.realpathSync("."), copyOf = from => {
+    try {
+      const inside = path.relative(root, fs.realpathSync(from));
+      return inside && !inside.startsWith("..") && !path.isAbsolute(inside) && !inside.split(path.sep).includes("node_modules") ? path.join(path.resolve(dir), inside) : null;
+    } catch { return null; }
+  }, entries = fs.readdirSync(installed, { withFileTypes: true }).flatMap(e => {
+    const from = path.join(installed, e.name);
+    return e.name.startsWith("@") && e.isDirectory() ? fs.readdirSync(from).map(i => path.join(from, i)) : [from];
+  });
+  if (!entries.some(from => fs.lstatSync(from).isSymbolicLink() && copyOf(from))) {
+    fs.symlinkSync(path.resolve(installed), to, "junction");
+    linked.push(to);
+    return;
+  }
+  const one = (from, at) => {
     let target = path.resolve(from);
     if (fs.lstatSync(from).isSymbolicLink()) {
       try { target = fs.realpathSync(from); } catch { return; }
-      const inside = path.relative(root, target);
-      const own = inside && !inside.startsWith("..") && !path.isAbsolute(inside) && !inside.split(path.sep).includes("node_modules");
-      if (own) target = path.join(path.resolve(dir), inside);
+      target = copyOf(from) ?? target;
     }
     if (!fs.statSync(path.resolve(from)).isDirectory()) { fs.copyFileSync(from, at); return; }
     fs.symlinkSync(target, at, "junction");

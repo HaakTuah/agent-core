@@ -81,11 +81,12 @@ try {
   write("package.json", "{}\n"); write(".gitignore", "node_modules/\n"); write("node_modules/limit/index.js", "module.exports = 20;\n");
   write("node_modules/.package-lock.json", "{}\n"); // (a file of node_modules is copied, needing no right to make a link)
   if (process.platform !== "win32") fs.symlinkSync(path.join(dir, "gone"), path.join(dir, "node_modules", "dangling")); // (left out)
-  write("test/c-test.mjs", "import limit from 'limit';\nimport { big } from '../src/a.mjs';\nif (!big(limit)) process.exit(1);\n");
+  // (and the package's real path lies in the copy's own node_modules, as scripts/packages.mjs asks of the core's installs; #984)
+  write("test/c-test.mjs", "import fs from 'node:fs';\nimport path from 'node:path';\nimport limit from 'limit';\nimport { big } from '../src/a.mjs';\nif (!fs.realpathSync('node_modules/limit/index.js').startsWith(fs.realpathSync('node_modules') + path.sep) || !big(limit)) process.exit(1);\n");
   git("add", "package.json", ".gitignore", "test/c-test.mjs");
   const installed = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8" });
   const strict = JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].mutants.find(m => m.replacement === ">=");
-  ok(installed.status === 0 && !installed.stdout.includes("test/c-test.mjs") && strict?.status !== "NoCoverage" && fs.existsSync(path.join(dir, "node_modules/limit/index.js")), "a test that imports an installed package runs in the working copies, as it does in the project, and what was installed stands after them", installed.stdout + installed.stderr + JSON.stringify(strict));
+  ok(installed.status === 0 && !installed.stdout.includes("test/c-test.mjs") && strict?.status !== "NoCoverage" && fs.existsSync(path.join(dir, "node_modules/limit/index.js")), "a test that imports an installed package, which lies in its node_modules by its real path, runs in the working copies, as it does in the project, and what was installed stands after them", installed.stdout + installed.stderr + JSON.stringify(strict));
   // (a workspace's own package, linked from node_modules into the project, is reached in each copy as the copy's own)
   write("src/ws/index.mjs", "export const flag = () => true;\n");
   fs.symlinkSync(path.join("..", "src", "ws"), path.join(dir, "node_modules", "ws"), "junction");
