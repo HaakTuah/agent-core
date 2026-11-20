@@ -738,19 +738,29 @@ const notFile = (l, at) => l.linked.has(at) || l.dirs.has(at) || l.others.has(at
 // are not read, as the kit's form reads none; git asked once a path a commit, and a path it holds nothing at is no
 // script either way.
 const shown = new Map();
+// (git asked in a process, in the repository at `gitDir` where it is given, replace objects left unread; "" where it fails)
+const askGit = (root, gitDir, args, input = "") => { try { return execFileSync("git", [...(gitDir ? ["--git-dir", gitDir] : []), "--no-replace-objects", ...args], { cwd: root, encoding: "utf8", input, stdio: ["pipe", "pipe", "ignore"] }); } catch { return ""; } };
+// The entry's mode and object `git ls-tree` names for this path alone: read from the commit's own listing, which git gave
+// once for all, where the path is one git takes as written and that listing is whole; else asked for this path.
+function entryAt(root, rev, at, gitDir) {
+  const whole = gitDir || !exactPath(at) ? null : listing(root, rev);
+  if (whole && !whole.failed) return whole.first.get(at) ?? ["", ""];
+  const [mode = "", , oid = ""] = askGit(root, gitDir, ["ls-tree", "-z", rev, "--", at]).split("\0")[0].split("\t")[0].split(" ");
+  return [mode, oid];
+}
+// The object git show resolves at `rev:at` and its kind, by the long-lived `cat-file --batch-check` where it can be asked,
+// else in a process: "<object> <kind> <size>", or "<name> missing" (nothing); a path that holds a line's end could not be
+// asked so, and is no plain file either.
+function objectKindAt(root, rev, at, gitDir) {
+  if (/[\r\n]/u.test(at)) return ["?", "?"];
+  const held = objectIn(root, rev, at, { gitDir });
+  if (held !== undefined) return held ? [held.oid, held.type] : [];
+  return /^([0-9a-f]{40,64}) (\w+) \d+$/u.exec(askGit(root, gitDir, ["cat-file", "--batch-check"], `${rev}:${at}\n`).trim())?.slice(1) ?? [];
+}
 function shownNotBlob(root, rev, at, gitDir = null) {
   const key = `${root}\0${rev}\0${at}\0${gitDir}`;
   if (!shown.has(key)) {
-    const ask = (args, input = "") => { try { return execFileSync("git", [...(gitDir ? ["--git-dir", gitDir] : []), "--no-replace-objects", ...args], { cwd: root, encoding: "utf8", input, stdio: ["pipe", "pipe", "ignore"] }); } catch { return ""; } };
-    // (the entry's mode and object `git ls-tree` names for this path alone: read from the commit's own listing, which git
-    // gave once for all, where the path is one git takes as written and that listing is whole; else asked for this path)
-    const whole = gitDir || !exactPath(at) ? null : listing(root, rev);
-    const [mode = "", oid = ""] = whole && !whole.failed ? whole.first.get(at) ?? [] : [(([m = "", , o = ""]) => [m, o])(ask(["ls-tree", "-z", rev, "--", at]).split("\0")[0].split("\t")[0].split(" "))][0];
-    // (the object git show resolves and its kind, by the long-lived `cat-file --batch-check` where it can be asked, else
-    // in a process: "<object> <kind> <size>", or "<name> missing"; a path that holds a line's end could not be asked so,
-    // and is no plain file either)
-    const held = /[\r\n]/u.test(at) ? undefined : objectIn(root, rev, at, { gitDir });
-    const [resolved = "", type = ""] = /[\r\n]/u.test(at) ? ["?", "?"] : held ? [held.oid, held.type] : held === null ? [] : /^([0-9a-f]{40,64}) (\w+) \d+$/u.exec(ask(["cat-file", "--batch-check"], `${rev}:${at}\n`).trim())?.slice(1) ?? [];
+    const [mode, oid] = entryAt(root, rev, at, gitDir), [resolved = "", type = ""] = objectKindAt(root, rev, at, gitDir);
     // (and the entry named must be the object git show resolves: where a tree git would refuse holds two of a name, or
     // out of order, the two can differ, and then nothing shows what is run)
     shown.set(key, resolved !== oid || (mode !== "" && mode !== "100644" && mode !== "100755") || (type !== "" && type !== "blob"));
