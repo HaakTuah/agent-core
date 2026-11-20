@@ -125,15 +125,15 @@
     },
     "scripts/select.mjs": {
       "mark": 23258,
-      "why": "#943: the pathspec matcher and the question of whether a tree passed whole apart from the selection; its test and the tests module split likewise."
+      "why": "#943: the pathspec matcher, and the question of whether a tree passed whole, each in a file of its own apart from what a change selects."
     },
     "tasks/tests.md": {
       "mark": 25951,
-      "why": "#943: the pathspec matcher and the question of whether a tree passed whole apart from the selection; its test and the tests module split likewise."
+      "why": "#943: the selection's rules apart from those of the suites' time and of the run of a tree that passed."
     },
     "tests/select-test.mjs": {
       "mark": 29583,
-      "why": "#943: the pathspec matcher and the question of whether a tree passed whole apart from the selection; its test and the tests module split likewise."
+      "why": "#943: split as its script is: the matcher's cases, the host question's cases and the selection's."
     }
   }
 }

@@ -228,6 +228,9 @@ const together = (key, what, files) => {
   console.log(`     ${key}: ${Date.now() - from} ms`);
   ok(timed.status === 0 && !raw(`${timed.stdout}${timed.stderr}`) && said() === "RUN=all\n", `select: ${what} are read within 5 s, and the whole suite runs`, `${timed.signal ?? ""}${timed.stderr}${said()}`);
 };
+// (and the linking of each file to the files whose names it holds, which grows with the count of files times their text)
+together("many-mid", "2300 files of 1,500 characters, under the limit in characters", Object.fromEntries(Array.from({ length: 2300 }, (_, n) => [`src/f${n}.js`, `export const v = "${" f1.j".repeat(300)}";\n`])));
+together("one-long", "2000 small files and one of 3.9 million characters", { ...Object.fromEntries(Array.from({ length: 2000 }, (_, n) => [`src/g${n}.js`, `export const v = ${n};\n`])), "src/long.js": `export const v = "${"a ".repeat(1_950_000)}";\n` });
 together("csharp-three", "three files of C# at the largest its reader takes", Object.fromEntries([1, 2, 3].map(n => [`src/call${n}.cs`, SLOWEST["src/call.cs"](LARGEST.csharp)])));
 together("every-kind", "the densest file of each kind, all at once", Object.fromEntries(Object.entries(SLOWEST).map(([file, made]) => [file, made(largestOf(file))])));
 together("js-huge", "one file of JavaScript of 20 million characters", { "src/huge.js": SLOWEST["src/list.js"](20_000_000) });

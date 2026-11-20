@@ -8,22 +8,30 @@
 /** The most characters of changed code, all files together, the readers take; the lexer alone reads a file the parser
  *  is not given (past `LARGEST` in tree-walk.mjs) at about 0.3 s for each million, so 4 million stay within about 1.5 s. */
 export const CHARACTERS = 4_000_000;
-/** The most time, in milliseconds, the readers take over the changed files together: one more file of the densest
- *  text found takes about 3 s, and process, project and the rest of the selection a second, so this leaves each in 5 s. */
+/** The most time, in milliseconds, the readers take over the changed files together: a file read after the budget is
+ *  passed can take about 3 s more, so this keeps the readers within about 4.5 s, and the run stops there (`Late`). */
 export const SPENT_MS = 1500;
+/** The most time, in milliseconds, the selection takes to link each file to the files whose names it holds, after the
+ *  readers: it grows with the files' count times their characters, about 0.7 s on the core's own 375 files. */
+export const LINKS_MS = 1500;
 
 /** Raised where the changed files are more than the selection allows to read; `message` says why the whole suite runs. */
 export class Late extends Error {}
 
 /** A watch over one run's reading: `files` the paths the pull request changes. `size(texts)` fails at once where the
- *  changed files of code, as `texts` holds them, are past `characters`; `timed(file, read)` runs `read` and, where the
+ *  changed files (of code, and the package files read beside it), as `texts` holds them, are past `characters`; `timed(file, read)` runs `read` and, where the
  *  files read so far have taken past `ms`, fails; a file that is not a changed one is read unwatched. */
 export function hurry({ files, ms = SPENT_MS, characters = CHARACTERS, now = Date.now }) {
   let spent = 0;
   return {
+    // A check, called as each file is linked, that fails once the linking has taken past `ms` since this was asked.
+    pace(ms = LINKS_MS) {
+      const from = now();
+      return () => { const took = now() - from; if (took > ms) throw new Late(`linking the files to the tests that reach them took ${took} ms, past the ${ms} ms the selection allows, so what each reaches cannot be told in time`); };
+    },
     size(texts) {
       const n = Object.entries(texts).reduce((sum, [file, text]) => sum + (files.has(file) ? text.length : 0), 0);
-      if (n > characters) throw new Late(`the changed files of code hold ${n.toLocaleString("en")} characters, past the ${characters.toLocaleString("en")} the selection reads, so what each reaches cannot be told in time`);
+      if (n > characters) throw new Late(`the changed files hold ${n.toLocaleString("en")} characters, past the ${characters.toLocaleString("en")} the selection reads, so what each reaches cannot be told in time`);
     },
     timed(file, read) {
       if (!files.has(file)) return read();

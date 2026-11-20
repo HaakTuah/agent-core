@@ -79,7 +79,11 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
   ok(/took 120 ms, past the 100 ms.*cannot be told in time/u.test(lateness(() => w.timed("src/view.js", slow(60)))), "changed files that take past the budget together stop the reading, saying why");
   ok(lateness(() => watch().size({ "src/rules.js": "x".repeat(30), "src/view.js": "x".repeat(20), "src/tool.js": "x".repeat(9999) })) === null
     && /hold 51 characters, past the 50/u.test(lateness(() => watch().size({ "src/rules.js": "x".repeat(30), "src/view.js": "x".repeat(21) }))), "changed files of more characters than the limit stop the reading before any is read; one the pull request leaves as it was counts for none");
-  clock = 0;
+  w = hurry({ files: new Set(), ms: 100, now: () => clock });
+  const pace = w.pace(50);
+  clock += 40;
+  ok(lateness(pace) === null && /took 60 ms, past the 50 ms/u.test(lateness(() => { clock += 20; pace(); })), "the linking of files is held to a time of its own, from when it is asked, and stops saying why");
+  ok(/past the 50 ms/u.test(lateness(() => { const slowPace = hurry({ files: new Set(), now: () => clock }).pace(50), t = clock; clock += 51; slowPace(); })) && links(texts, tests, reach, () => {}).size === Object.keys(texts).length, "links takes a pace, and links as it did where none is given");
   const late = lateness(() => survey(texts, config, tests, hurry({ files: new Set(Object.keys(texts)), ms: -1 })));
   ok(late && /took \d+ ms, past the -1 ms/u.test(late), "the shape check's survey reads each changed file under the watch and fails where it is past", late);
 }

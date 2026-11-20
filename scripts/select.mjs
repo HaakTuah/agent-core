@@ -131,12 +131,14 @@ const uncommented = (text, py) => text.split("\n").filter(l => !(py ? /^\s*#/u :
 const above = (name, file, texts) => ["", ...file.split("/").slice(0, -1).map((_, k, dirs) => `${dirs.slice(0, k + 1).join("/")}/`)].map(d => `${d}${name}`).filter(f => f !== file && f in texts);
 // A file of Python by its dotted name too ("pkg.rules"; a package's own for __init__.py and __main__.py).
 const dotted = f => f.replace(/\.py$/u, "").replace(/\/(__init__|__main__)$/u, "").split("/").join(".");
-export function links(texts, tests, reach) {
+export function links(texts, tests, reach, pace = () => {}) {
   const named = Object.keys(texts).map(f => [f, new RegExp(`(^|[^\\w-])${escaped(path.posix.basename(f))}(?![\\w-])${f.endsWith(".py") && dotted(f).includes(".") ? `|(^|[^\\w.])${escaped(dotted(f))}(?![\\w])` : ""}`, "u")]);
   const out = new Map();
   for (const [file, text] of Object.entries(texts)) {
+    pace();
     const to = new Set(reach.get(file) ?? []), py = file.endsWith(".py");
-    if (py || CODE.includes(path.posix.extname(file))) { const plain = uncommented(text, py); for (const [f, re] of named) if (f !== file && re.test(plain)) to.add(f); }
+    // (the pace is checked every 64 names, as one long text against many names takes seconds)
+    if (py || CODE.includes(path.posix.extname(file))) { const plain = uncommented(text, py); let k = 0; for (const [f, re] of named) { if (++k % 64 === 0) pace(); if (f !== file && re.test(plain)) to.add(f); } }
     // (Python runs a package's __init__.py on each import under it, and pytest a folder's conftest.py with no import)
     if (py) for (const run of [...above("__init__.py", file, texts), ...above("conftest.py", file, texts)]) to.add(run);
     out.set(file, to);
@@ -158,10 +160,10 @@ export function reached(tests, linked) {
 // What a pull request runs: { all, why, tests }, `why` the reason for the whole suite, or for each test selected.
 // `changed` the paths it changes (gone ones among them), `texts` and `tests` the project as the shape check reads it,
 // `reach` its imports, `failed` the tests that failed last time, `config` the shape check's.
-export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), unread = [], failed = [], config }) {
+export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), unread = [], failed = [], config, watch = null }) {
   const proof = matcher(config.select.proof), m = { whole: matcher(config.select.whole), none: matcher(config.select.none), isTest: matcher(config.tests) };
   const by = new Map(), add = (t, why) => { if (tests.has(t) && !by.has(t)) by.set(t, why); };
-  const reaches = reached(tests, links(texts, tests, reach));
+  const reaches = reached(tests, links(texts, tests, reach, watch?.pace()));
   // (a test that reaches an import the readers cannot follow may reach any file: it runs as one that reaches every file)
   // (and, where pytest runs a conftest.py the config does not read, each test of Python, whose fixtures may come from it)
   const blind = new Set([...reaches].filter(([t, files]) => [...files].some(f => unsure.has(f)) || (t.endsWith(".py") && unread.some(c => c.endsWith("conftest.py")))).map(([t]) => t));
@@ -281,8 +283,8 @@ async function askHost(sha, check) {
 // What the change from `from` selects, or the whole suite where the files it changes are too many or too slow to read
 // within the time rule 5 of SECURITY.md allows (hurry.mjs; #881).
 function selectedFrom(from, { now, config, failed }) {
-  const changed = changedSince(from);
-  try { return selection({ changed, texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests, hurry({ files: new Set(changed) }))), unread: unreadConftests(now.texts), failed, config }); }
+  const changed = changedSince(from), watch = hurry({ files: new Set(changed) });
+  try { return selection({ changed, texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests, watch)), unread: unreadConftests(now.texts), failed, config, watch }); }
   catch (e) { if (e instanceof Late) return { all: true, why: e.message, tests: [...now.tests].sort() }; throw e; }
 }
 
