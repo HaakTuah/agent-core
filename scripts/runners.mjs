@@ -198,16 +198,21 @@ function saidOf(s, priv, unread) {
     ...unread.length ? [`workflows not read: ${unread.map(f => oneLine(f).slice(0, 60)).join(", ")}`] : []];
 }
 
+// The floor rule 18 advice for a public repository whose jobs may run on a runner of the owner's own, or null.
+function adviceOf(w, priv) {
+  const notListed = w.unlisted && !w.selfHosted && !w.unknown, job = notListed ? "any such job" : "that job";
+  return (w.selfHosted || w.unknown || w.unlisted) && priv === false
+    ? `A public repository ${notListed ? "whose workflows folder could not be listed may run a job on a runner of the owner's own (run this from the project's root first, so that the folder is read)" : `runs a job on ${w.selfHosted ? "a runner of the owner's own" : "a runner that could not be read, perhaps the owner's own"}`}, where a stranger's pull request would run its code (floor rule 18): keep pull requests from forks off ${job} at once (an \`if:\` that its head repository is this one), and, where no open issue names it, file one for the owner, labelled needs-owner, to move ${job} to the host's runners or have every outside contributor's run approved first; nothing else waits on it.`
+    : null;
+}
+
 // Where the tests run, who pays and how often the slow suites run: { where, billed, cadence, said, when, advice }.
 export function read({ repo, dir = ".github/workflows", manifest = null, gh = ghApi, parse }) {
   const w = workflowsIn(dir, parse), priv = privateOf(repo, gh), s = settled(w, priv, manifest);
   // (where every merge goes live, each merge is a release: the slow suites run before it, on its pull request)
   const users = override(manifest, "users get", ["merges", "releases"]) ?? "merges";
   const cadence = users === "merges" ? "merge" : s.where === "local" ? "release" : s.where === "self-hosted" || s.billed ? "nightly" : "hourly";
-  const notListed = w.unlisted && !w.selfHosted && !w.unknown, job = notListed ? "any such job" : "that job";
-  const advice = (w.selfHosted || w.unknown || w.unlisted) && priv === false
-    ? `A public repository ${notListed ? "whose workflows folder could not be listed may run a job on a runner of the owner's own (run this from the project's root first, so that the folder is read)" : `runs a job on ${w.selfHosted ? "a runner of the owner's own" : "a runner that could not be read, perhaps the owner's own"}`}, where a stranger's pull request would run its code (floor rule 18): keep pull requests from forks off ${job} at once (an \`if:\` that its head repository is this one), and, where no open issue names it, file one for the owner, labelled needs-owner, to move ${job} to the host's runners or have every outside contributor's run approved first; nothing else waits on it.`
-    : null;
+  const advice = adviceOf(w, priv);
   const usersSaid = `its users get: ${users === "releases" ? "a release" : "each merge"}${override(manifest, "users get", ["merges", "releases"]) ? ", as the manifest's row *users get* says" : ", as no row *users get* says otherwise (it cannot be read)"}`;
   return { where: s.where, billed: s.billed, cadence, said: [...saidOf(s, priv, w.unread), usersSaid], when: WHEN[cadence], advice };
 }
