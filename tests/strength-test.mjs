@@ -1,4 +1,4 @@
-// Tests the strength check run on a project (scripts/strength.mjs; its report and verdict are tests/strength-verdict-test.mjs):
+// Tests the strength check run on a project (scripts/strength.mjs; its report is tests/strength-report-test.mjs, its verdict tests/strength-verdict-test.mjs):
 // the row that names the tool, the lines a pull request changes and how the tool is told them, and whole runs in a
 // scratch repository with a tool of its own: reported only before the baseline, a survivor failed with its mend once it
 // stands, one listed passing, a tool that cannot run, `none`, and the whole run writing the baseline, and a cleaning
