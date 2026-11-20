@@ -120,9 +120,14 @@ export function keysTwice(text) {
   if (!/[\u0085\u2028\u2029]/u.test(String(text))) return twice(text);
   const { text: folded, line } = asLF(text);
   const as = twice(folded).map(found => ({ ...found, line: line(found.line), first: found.first === null ? null : line(found.first) }));
-  const plain = twice(text), id = k => (k.key === null ? `${Boolean(k.size)}` : `k:${k.key}`);
-  return [...new Set([...as, ...plain].map(id))].flatMap(key => {
-    const a = as.filter(k => id(k) === key), b = plain.filter(k => id(k) === key);
+  const by = list => {
+    const groups = new Map();
+    for (const k of list) { const id = k.key === null ? `${Boolean(k.size)}` : `k:${k.key}`; (groups.get(id) ?? groups.set(id, []).get(id)).push(k); }
+    return groups;
+  };
+  const folds = by(as), plains = by(twice(text));
+  return [...new Set([...folds.keys(), ...plains.keys()])].flatMap(id => {
+    const a = folds.get(id) ?? [], b = plains.get(id) ?? [];
     return a.length >= b.length ? a : b;
   }).sort((x, y) => x.line - y.line);
 }

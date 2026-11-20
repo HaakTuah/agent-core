@@ -111,7 +111,7 @@ ok(behind.every(({ keys, same, grown, none, found }) => keys.fails.length === 1 
   && same.fails.length === 0 && same.notes.length === 1 && grown.fails.length === 0 && none.fails.length === 0 && none.notes.length === 1 && found.length === 1 && found[0].line === 3 && found[0].first === 2)
   && keysTwice("a: 1\r\n# c\u2028x: 1\rx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && keysTwice(hiding("\u2028")).map(k => `${k.line}<${k.first}`).join() === "1<1"
   && keysTwice("a: 1\r\u2028x: 1\nx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && foreignBreaks("a\rb\r\u2028c\n")?.line === 3
-  && keysTwice("a: 1\nb: 2\n").length === 0 && repeated(one('a: 1\nb: "x\\u2028y"\nb: 2\n'), () => 'a: 1\nb: "x\u2028y"\nb: 2\n').fails.length === 0 && keysTwice(`a: ${"\u2028".repeat(LONGEST)}\n`).map(k => `${k.line}:${k.size}`).join() === "1:true",
+  && keysTwice("a: 1\nb: 2\n").length === 0 && (() => { const t = Date.now(); const many = keysTwice(`${Array.from({ length: 10000 }, (_, i) => `k${i}: 1\nk${i}: 2\n`).join("")}# c\u2028\n`).length; return many === 10000 && Date.now() - t < 10000; })() && repeated(one('a: 1\nb: "x\\u2028y"\nb: 2\n'), () => 'a: 1\nb: "x\u2028y"\nb: 2\n').fails.length === 0 && keysTwice(`a: ${"\u2028".repeat(LONGEST)}\n`).map(k => `${k.line}:${k.size}`).join() === "1:true",
   "a key given twice behind a line break the package does not read is found, a new one failing, the base's own noted, and told on the line an editor counts", behind.flatMap(r => [...r.keys.fails, ...r.same.notes]).join("\n"));
 // (Codex's case: a call of a check skipped on a draft whose ready_for_review a same-length edit moves into a comment, in a
 // file past the length read, its words counted as often as before, fails)
