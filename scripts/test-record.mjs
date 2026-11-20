@@ -151,7 +151,8 @@ export const saysWhatItGuards = text => {
 // The tests that guard a rule the project states: each test file whose path stands in its rule files or its holders'
 // list, or whose opening line names a rule file or an issue.
 function guarding(tests, texts) {
-  const rules = ["AGENTS.md", "SECURITY.md", "core-manifest.md", "scripts/holders.json"].filter(f => fs.existsSync(f)).map(f => fs.readFileSync(f, "utf8")).join("\n");
+  const entries = fs.existsSync("scripts/holders") ? fs.readdirSync("scripts/holders").map(f => `scripts/holders/${f}`) : [];
+  const rules = ["AGENTS.md", "SECURITY.md", "core-manifest.md", ...entries].filter(f => fs.existsSync(f)).map(f => fs.readFileSync(f, "utf8")).join("\n");
   return new Set([...tests].filter(t => rules.includes(t) || saysWhatItGuards(texts[t] ?? "")));
 }
 

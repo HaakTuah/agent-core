@@ -25,8 +25,10 @@ might attack: `floor/threat-model.md`.
   own copy, and any other file a tool takes its instructions from, wherever it lies: an `AGENTS.md` or `CLAUDE.md` in
   any folder, a GEMINI.md or REVIEW.md, a folder .agents or .agent); and the checks on the
   work (the copies and licence checks and their configs).
-- **The owner's yes in the PR** is needed only for a change to the floor or the review guidelines: the owner's word
-  that asked for the change, quoted there, is that yes for the change as asked; one beyond it waits for a new yes.
+- **The owner's yes in the PR** is needed only for a change to the floor or the review guidelines that alters what a
+  session must or may do, what protects the owner or who decides (one that keeps the meaning, stated by a reviewer who
+  did not write it: `roles/shared/review-guidelines.md`): the owner's word that asked for it, quoted there, is that yes
+  for the change as asked; one beyond it waits for a new yes.
   Reason: the yes keeps a session from widening its own mandate, a floor change made to get some other task through
   above all; it is never a second question about what the owner asked for.
 - A change to what runs by itself or with credentials passes two security reviews instead, the security reviewer's and
@@ -66,12 +68,13 @@ saved data; a weakened check).
 - A PR that touches one merges only after its security review has run, and none with a blocking security finding open.
   - Dependabot's own: rule 17.
 - One that changes a protected file also gets a code review.
-- A security review that starts by itself when a PR opens or is marked ready is waited for and read on every PR, a pure
-  sync's too (how long: `tasks/reviews.md`, point 3).
-- A pure sync PR needs no review of its own, nor rule 3's two: both passed its code in the core's own PR.
-  - A pure sync: its diff only the core's copy, its pin and the pins of calls to the core's workflows, moved forward to
-    one commit of the core's `main`, as the core's `scripts/pure-sync.mjs`, run from the core's `main`, proves.
-  - Its merger merges only the head it checked.
+- A security review that starts by itself when a PR opens or is marked ready is waited for and read on every PR
+  (how long: `tasks/reviews.md`, point 3).
+- A PR that `scripts/pure-sync.mjs` or `queue-only.mjs`, run from the core's `main`, proves one of these, merged
+  only at the head checked, needs no review of its own, nor rule 3's two:
+  - a pure sync, reviewed in the core's PR: its diff only the core's copy, its pin and the pins of calls to the
+    core's workflows, moved forward to one commit of the core's `main`;
+  - the *progress file* alone.
 - **Nothing is reviewed twice:** a later commit is reviewed only for what it changes.
 - **Nothing runs on the owner's computer unless the owner starts it:** no poller, scheduled task or service of an
   agent's making.

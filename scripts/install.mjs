@@ -11,7 +11,8 @@
 // is named. One a check needs alone (a large engine, say) is named by that check's job: `install.mjs <name>`. The
 // parser's (parser.mjs), whose grammars' packages carry far more than a reader runs, is so: in .packages/parser/, named
 // by the jobs that read another language on the parser (#719); `all` names every one, as the sync and the starter kit
-// install them.
+// install them. PyPI's, the code scan's engine alone (#546), is named by the scan's own step and never by `all`: from
+// .packages/requirements.txt into .packages/pypi/.
 //
 //   node core/scripts/install.mjs [<name> ... | all]      (in the core's own repository: node scripts/install.mjs)
 import { spawnSync } from "node:child_process";
@@ -37,14 +38,20 @@ const npmCi = cwd => spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "
 // (and, in the core's own repository alone, the install of its own mutation tool, Stryker, in tests/mutation/, which no
 // copy carries (.gitattributes) and `all` leaves out: only the job of the strength check names it (#581, #654))
 const OWN_ONLY = own ? { mutation: "tests/mutation" } : {};
-export const REGISTRIES = Object.fromEntries(Object.entries({ ...INSTALLS, ...OWN_ONLY }).map(([name, folder]) =>
-  [name, { folder, lock: `${folder}/package-lock.json`, into: `${folder}/node_modules/`, run: () => npmCi(path.join(root, folder)) }]));
+export const REGISTRIES = {
+  ...Object.fromEntries(Object.entries({ ...INSTALLS, ...OWN_ONLY }).map(([name, folder]) =>
+    [name, { folder, lock: `${folder}/package-lock.json`, into: `${folder}/node_modules/`, run: () => npmCi(path.join(root, folder)) }])),
+  // (the code scan's engine alone, #546: pip takes each wheel at the hash requirements.txt names, binaries only, none
+  // of their dependencies and none of their code run, into .packages/pypi/; Python 3.10 or later, as every GitHub
+  // runner holds)
+  pypi: { folder: ".packages", pip: true, lock: ".packages/requirements.txt", into: ".packages/pypi/", run: () => spawnSync("python3", ["-I", "-m", "pip", "install", "--require-hashes", "--no-deps", "--only-binary=:all:", "--no-compile", "--no-input", "--disable-pip-version-check", "--upgrade", "--target", path.join(packages, "pypi"), "-r", path.join(packages, "requirements.txt")], { cwd: packages, encoding: "utf8" }) },
+};
 
 // What keeps an install from running where it could reach past the core's own files: for an npm install, a shrinkwrap
 // beside the lock file, which its program reads first; any other file in its folder; an .npmrc with any line but the core's own two settings; and an
 // install folder that is a link, or stands in one (.packages/, or its own folder), or holds what git tracks, which the install would empty.
 // Each as the failure's words with its mend; null where none stands.
-const PACKAGE_FILES = new Set(["package.json", "package-lock.json", ".npmrc", "node_modules"]);
+const PACKAGE_FILES = new Set(["package.json", "package-lock.json", ".npmrc", "node_modules", "requirements.txt", "pypi"]);
 // A file in an install's folder beside the core's own (in .packages/, the nested installs' folders too): a shrinkwrap,
 // which npm reads first, or any other, such as one npm would read as its own settings where a command names the folder.
 // The failure's words with its mend; null where none stands.
@@ -59,6 +66,11 @@ function refusal(name) {
   const folder = path.join(root, into.replace(/\/$/u, "")); // (no "/" after it, which would read the link's target)
   // (a link first, before anything is read through it: .packages/, the install's own folder, and its node_modules/)
   for (const f of [...new Set([packages, dir]), folder]) if (fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()) return `${f} is a link, which the install would write through, or empty. Mend: remove the link, then run this again`;
+  // (and files git tracks in the install's folder, which it would replace, for every install, PyPI's too)
+  let tracked = "";
+  try { tracked = spawnSync("git", ["ls-files", "--", into], { cwd: root, encoding: "utf8" }).stdout ?? ""; } catch { /* (no git: nothing tracked) */ }
+  if (tracked.trim()) return `${folder} holds files git tracks, which the install would replace. Mend: take them out of git (git rm -r --cached ${into}), then run this again`;
+  if (REGISTRIES[name].pip) return null; // (what follows is npm's: pip reads the hashes in its lock file alone)
   // (what the package list and lock file hold, read before npm runs: the npm that comes with the least Node fetches
   // whatever source a spec names, and runs its prepare script, whatever setting says otherwise)
   let faults;
@@ -71,20 +83,37 @@ function refusal(name) {
   try { npmrc = fs.readFileSync(at(".npmrc"), "utf8"); } catch { /* (none: npm's own registry) */ }
   const others = npmrcOthers(npmrc);
   if (others.length) return `${at(".npmrc")} holds ${others.length === 1 ? "a line" : `${others.length} lines`} beside the core's own two settings (the first: ${JSON.stringify(others[0].slice(0, 80))}), which npm would read: a registry, a host's token, a proxy or a certificate would send the install elsewhere. Mend: take ${others.length === 1 ? "that line" : "those lines"} out; the core's .npmrc holds ignore-scripts=true and min-release-age alone`;
-  let tracked = "";
-  try { tracked = spawnSync("git", ["ls-files", "--", into], { cwd: root, encoding: "utf8" }).stdout ?? ""; } catch { /* (no git: nothing tracked) */ }
-  if (tracked.trim()) return `${folder} holds files git tracks, which the install would replace. Mend: take them out of git (git rm -r --cached ${into}), then run this again`;
   return null;
 }
 
 // Whether the install's failure is a registry that did not answer: a network error, or a server's own error, never another
-// (a lock file npm cannot read, an integrity that does not match), which a pull request could bring about.
-const unanswered = text => /\b(?:ETIMEDOUT|ESOCKETTIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|E5\d\d)\b/u.test(String(text ?? ""));
+// (a lock file npm cannot read, an integrity that does not match), which a pull request could bring about. Read from
+// the program's own line alone, never from a message that echoes what the lock file holds (a version, an integrity),
+// which could name such an error (#714): npm's line "npm error code <code>" ("npm ERR!" before npm 10), and pip's
+// retry, in Python's words, of a connection it could not make or a read that timed out, where pip refused no wheel for
+// its hash, since a retry that later got through ends in another failure.
+const NPM_UNANSWERED = /^npm (?:ERR!|error) code (?:ETIMEDOUT|ESOCKETTIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|E5\d\d)$/mu;
+const PIP_UNANSWERED = /^WARNING: Retrying \(Retry\([^)]*\)\) after connection broken by '(?:NewConnectionError|ConnectTimeoutError|ReadTimeoutError|ProtocolError)\(/mu;
+const PIP_REFUSED = /^ERROR: THESE PACKAGES DO NOT MATCH THE HASHES/mu;
+const unanswered = text => NPM_UNANSWERED.test(String(text ?? "")) || (PIP_UNANSWERED.test(String(text ?? "")) && !PIP_REFUSED.test(String(text ?? "")));
+
+// Whether an npm lock file names no package, neither as an entry nor in its root's lists, which refusal() holds to the
+// package list's, so that it has nothing to install and npm is not started for it: the parser's, until its packages move
+// in, which every job that names `all` would otherwise pay a run of npm for; a lock whose root names a package it holds
+// no entry for goes to npm, which refuses it (#719). PyPI's lock file names its packages in pip's own form.
+function namesNothing(name) {
+  const { lock, folder, pip } = REGISTRIES[name];
+  if (pip) return false;
+  const { packages: entries = {} } = JSON.parse(fs.readFileSync(path.join(root, lock), "utf8"));
+  const list = JSON.parse(fs.readFileSync(path.join(root, folder, "package.json"), "utf8"));
+  return Object.keys(entries).every(k => !k) && !Object.keys({ ...list.dependencies, ...list.devDependencies, ...entries[""]?.dependencies, ...entries[""]?.devDependencies }).length;
+}
 
 const named = [...new Set(process.argv.slice(2).flatMap(n => (n === "all" ? Object.keys(INSTALLS) : [n])))];
 const unknown = named.filter(n => !Object.hasOwn(REGISTRIES, n));
+const notAll = Object.keys(REGISTRIES).filter(n => !Object.hasOwn(INSTALLS, n)); // (what `all` leaves out: mutation, pypi)
 if (unknown.length) {
-  console.error(`FAIL: install.mjs knows no install ${unknown.join(", ")}. Mend: name one of ${Object.keys(REGISTRIES).join(", ")}, all for every one${own ? " but mutation" : ""}, or none for the first`);
+  console.error(`FAIL: install.mjs knows no install ${unknown.join(", ")}. Mend: name one of ${Object.keys(REGISTRIES).join(", ")}, all for every one${notAll.length ? ` but ${notAll.join(" and ")}` : ""}, or none for the first`);
   process.exit(1);
 }
 const first = Object.keys(REGISTRIES)[0]; // (npm's, where none is named)
@@ -93,13 +122,7 @@ for (const name of named.length ? named : [first]) {
   if (!fs.existsSync(path.join(root, lock))) continue; // (a copy whose core holds no lock file of this registry)
   const refused = refusal(name);
   if (refused) { console.error(`FAIL: the core's packages were not installed: ${refused}`); process.exit(1); }
-  // (a lock file that names no package, neither as an entry nor in its root's lists, which refusal() holds to the package
-  // list's, has nothing to install, and npm is not started for it: the parser's, until its packages move in, which
-  // every job that names `all` would otherwise pay a run of npm for; a lock whose root names a package it holds no entry
-  // for goes to npm, which refuses it; #719)
-  const { packages: entries = {} } = JSON.parse(fs.readFileSync(path.join(root, lock), "utf8"));
-  const list = JSON.parse(fs.readFileSync(path.join(root, REGISTRIES[name].folder, "package.json"), "utf8"));
-  if (Object.keys(entries).every(k => !k) && !Object.keys({ ...list.dependencies, ...list.devDependencies, ...entries[""]?.dependencies, ...entries[""]?.devDependencies }).length) { console.log(`ok   ${lock} names no package: nothing to install`); continue; }
+  if (namesNothing(name)) { console.log(`ok   ${lock} names no package: nothing to install`); continue; }
   const began = Date.now();
   let r = run();
   if (r.status !== 0) {

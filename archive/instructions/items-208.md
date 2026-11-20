@@ -115,6 +115,7 @@ The index, and how an item is written: `archive/instructions.md`.
      Behind: "A rule is written to one pattern" in `AGENTS.md`, its point under "A rule file changed" in
      `modules/review-guidelines.md`, and the list "phrases" of `scripts/general.json`, which `scripts/general.mjs`
      reads.
+     Changed by: #887.
 
 215. **14 November 2026** (the core; chat with a session the owner had asked to look through the core, not the design
      session, as recorded on issue #247, in its text and five notes, the last of which, "What this issue asks to be

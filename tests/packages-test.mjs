@@ -29,6 +29,9 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   const entries = Object.entries(lock.packages ?? {}).filter(([k]) => k);
   ok(lock.lockfileVersion === 3 && wanted.every(([n, v]) => lock.packages?.[`node_modules/${n}`]?.version === v), "package-lock.json is npm's own, and holds each package at the version package.json names", JSON.stringify(Object.keys(lock.packages ?? {})));
   ok(entries.every(([, e]) => /^https:\/\/registry\.npmjs\.org\//u.test(e.resolved ?? "") && /^sha512-/u.test(e.integrity ?? "")), "each entry comes from npm's registry, held to its sha512", entries.filter(([, e]) => !/^sha512-/u.test(e.integrity ?? "")).map(([k]) => k).join(", "));
+  // (PyPI's lock form, the code scan's engine alone, installed only where its step names it: #546)
+  const reqs = fs.readFileSync(path.join(root, ".packages/requirements.txt"), "utf8").replace(/\\\r?\n/gu, " ").split(/\r?\n/u).filter(l => l.trim() && !l.startsWith("#"));
+  ok(reqs.length > 0 && reqs.every(l => /^[A-Za-z0-9][\w.-]*==\d+(?:\.\d+)+\s/u.test(l) && /--hash=sha256:[0-9a-f]{64}/u.test(l)), ".packages/requirements.txt names each PyPI package at one exact version, each with the SHA-256 of its wheels, so that what is installed is held to those hashes", reqs.join("\n"));
   // (what the package list and lock file hold, as install.mjs reads them before npm runs: their own fields, registry
   // entries alone, and every spec a version, range or tag of npm's registry)
   const { lockFaults, ENTRY_FIELDS } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href);
@@ -158,10 +161,10 @@ if (failed) { console.log(`FAIL ${failed} of the lock file's checks above failed
 // ---- nothing of another publisher's tracked: no node_modules/, no carried folder ----
 {
   const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
-  const theirs = f => /(?:^|\/)node_modules(?:\/|$)/u.test(f) || f.startsWith("third-party/");
+  const theirs = f => /(?:^|\/)node_modules(?:\/|$)/u.test(f) || /^\.packages\/pypi(?:\/|$)/u.test(f) || f.startsWith("third-party/");
   ok(!tracked.some(theirs), "no file of another publisher's is tracked in the core, nor a link in its install's place: its packages are installed, never carried", tracked.filter(theirs).slice(0, 5).join(", "));
   const ignore = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
-  ok(/^\/\.packages\/node_modules$/mu.test(ignore) && /^\/\.packages\/parser\/node_modules$/mu.test(ignore) && ["/.packages/", "/.packages/.npmrc", "/.packages/package.json", "/.packages/package-lock.json", "/.packages/parser/", "/.packages/parser/.npmrc", "/.packages/parser/package.json", "/.packages/parser/package-lock.json"].every(f => ignore.split("\n").includes(`!${f}`)), "the core's .gitignore, which travels to the copy's root, keeps the install out of git, a link in its place too, and the copy's package list, lock file and .npmrc in it");
+  ok(/^\/\.packages\/node_modules$/mu.test(ignore) && /^\/\.packages\/parser\/node_modules$/mu.test(ignore) && /^\/\.packages\/pypi$/mu.test(ignore) && ["/.packages/", "/.packages/.npmrc", "/.packages/package.json", "/.packages/package-lock.json", "/.packages/requirements.txt", "/.packages/parser/", "/.packages/parser/.npmrc", "/.packages/parser/package.json", "/.packages/parser/package-lock.json"].every(f => ignore.split("\n").includes(`!${f}`)), "the core's .gitignore, which travels to the copy's root, keeps the install out of git, a link in its place too, and the copy's package list, lock file and .npmrc in it");
   // (the .npmrc the copy carries holds the core's own two settings alone, which install.mjs holds it to too)
   const { npmrcOthers } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href), npmrc = fs.readFileSync(path.join(root, ".packages/.npmrc"), "utf8");
   ok(npmrcOthers(npmrc).length === 0, "the core's .npmrc holds nothing but its own two settings, so the install and the signatures' check ask npm's own registry, with no token, proxy or certificate of another's", npmrcOthers(npmrc).join(" | "));
@@ -182,7 +185,7 @@ try {
   // no such pattern takes in, and install on their own all the same)
   fs.writeFileSync(path.join(project, "package.json"), JSON.stringify({ name: "project", private: true, workspaces: ["*", "**"] }));
   fs.cpSync(path.join(root, "scripts"), path.join(copy, "scripts"), { recursive: true });
-  for (const f of [".packages/package.json", ".packages/package-lock.json", ".gitignore", ".packages/.npmrc", ".packages/parser/package.json", ".packages/parser/package-lock.json", ".packages/parser/.npmrc"]) fs.cpSync(path.join(root, f), path.join(copy, f));
+  for (const f of [".packages/package.json", ".packages/package-lock.json", ".packages/requirements.txt", ".gitignore", ".packages/.npmrc", ".packages/parser/package.json", ".packages/parser/package-lock.json", ".packages/parser/.npmrc"]) fs.cpSync(path.join(root, f), path.join(copy, f));
   // (the parser's install holding one package, a small one of the registry's, so that what installs it, and what does
   // not, is seen whatever the core's parser's lock holds today: #719)
   // (is-number 7.0.0, of 2018, as npm's registry gives it, which no other lock file of the core's names)
@@ -209,6 +212,19 @@ try {
     const r = call(f, callOf(f)), out = `${r.stdout}${r.stderr}`;
     ok(r.status === 1 && /did not run: the package \S+ is not installed/u.test(out) && /install\.mjs/u.test(out) && mended(out), `${f}, with nothing installed beside the copy, says it did not run and how to install, and does not take the project's own package of the name`, out);
   }
+  // (the code scan, with its engine not installed, on a change it would read: it did not run, and says how to install)
+  const g = (...a) => execFileSync("git", a, { cwd: project, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
+  g("init", "-q"); fs.writeFileSync(path.join(project, "a.py"), "x = 1\n"); g("add", "a.py"); g("commit", "-q", "-m", "code");
+  const scanned = spawnSync(process.execPath, [path.join(copy, "scripts/code-scan.mjs")], { cwd: project, encoding: "utf8", timeout: 60000 }), scanOut = `${scanned.stdout}${scanned.stderr}`;
+  ok(scanned.status === 1 && /did not run: semgrep\/bin\/semgrep-core(?:\.exe)? is not installed/u.test(scanOut) && /install\.mjs pypi/u.test(scanOut) && mended(scanOut), "the code scan, with no engine installed beside the copy, says it did not run and how to install it, never passing", scanOut);
+  const scanSkipped = spawnSync(process.execPath, [path.join(copy, "scripts/code-scan.mjs")], { cwd: project, encoding: "utf8", timeout: 60000, env: { ...env, CORE_PACKAGES_UNREACHED: "1" } });
+  ok(scanSkipped.status === 0 && /^::warning::The code scan did not run: .*Mend: run this job again/mu.test(scanSkipped.stdout), "and where the job's install could not reach the registry, it says as a warning that it did not run, failing nothing (#654, point 4)", `${scanSkipped.status} ${scanSkipped.stdout}${scanSkipped.stderr}`);
+  fs.mkdirSync(path.join(copy, ".packages/pypi"), { recursive: true }); fs.writeFileSync(path.join(tmp, "outside"), "not the engine");
+  try { fs.symlinkSync(path.join(tmp, "outside"), path.join(copy, ".packages/pypi", "leads-out")); } catch { /* (no links here: the case is not run) */ }
+  if (fs.existsSync(path.join(copy, ".packages/pypi", "leads-out"))) {
+    const out = call("packages.mjs", `m.pypiFile("leads-out")`);
+    ok(out.status === 1 && /did not run: leads-out is not installed/u.test(`${out.stdout}${out.stderr}`), "a file under .packages/pypi/ that leads out of it is no file of the install", `${out.stdout}${out.stderr}`);
+  }
   // (a script that imports one of them for what needs no package runs with nothing installed: the copies check)
   const plain = call("yaml-keys.mjs", `m.uncommented("a: 1 # b")`);
   ok(plain.status === 0 && plain.stdout.trim() === JSON.stringify("a: 1"), "what needs no package runs with nothing installed, so a project's own workflow that runs the copies check is not stopped", `${plain.stdout}${plain.stderr}`);
@@ -230,7 +246,7 @@ try {
   fs.rmSync(path.join(project, ".codex"), { recursive: true, force: true });
   fs.rmSync(path.join(project, "licences.json"));
   // (the shape check's reader of C#, which reads on the parser's files (installedFile), with nothing installed: it did
-  // not run, saying the mend; where the job's install could not reach the registry, it reads no function of C#, says so
+  // not run, saying the mend; where the job's install could not reach the registry, it reads nothing of C#, says so
   // as a warning and fails nothing by that alone, and writes no baseline then (#654, point 4))
   {
     const cs = path.join(tmp, "cs");
@@ -249,13 +265,14 @@ try {
     ok(refusedWrite.status === 1 && /cannot be read and a baseline written now would leave out/u.test(refusedOut) && !fs.existsSync(path.join(cs, "shape-baseline.json")) && mended(refusedOut), "where the registry did not answer, it writes no baseline, saying the mend", refusedOut);
     fs.writeFileSync(path.join(cs, "shape-baseline.json"), JSON.stringify({ reads: ["javascript", "jsx", "csharp", "csharp-tree", "python", "scripts", "screens"], listed: { "function: Program.cs#A.M": { lines: 99 }, "lost: Bad.cs": true } }));
     const skipped = shape([], { CORE_PACKAGES_UNREACHED: "1" }), skippedOut = `${skipped.stdout}${skipped.stderr}`;
-    ok(skipped.status === 0 && /^::warning::The shape check did not read C#, its functions by the parser \(the reader csharp-tree\): the core's packages could not be installed, the registry not answering, .*the 2 entries its baseline lists there \(functions, and files the grammar cannot read\) are kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut), "and where it did not answer, the check reads no function of C#, says which reader it skipped and why as a warning, and fails nothing by that alone, its baseline's function and its file the grammar cannot read kept as listed", skippedOut);
-    // (what the reader of C# finds without the parser, here a cycle of using directives, still fails under the flag)
+    ok(skipped.status === 0 && /^::warning::The shape check did not read C#, by the parser \(the reader csharp-tree\): the core's packages could not be installed, the registry not answering, .*the 2 entries its baseline lists there \(functions, files the grammar cannot read, and all of a file of C# or Python\) are kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut), "and where it did not answer, the check reads nothing of C#, says which reader it skipped and why as a warning, and fails nothing by that alone, its baseline's function and its file the grammar cannot read kept as listed", skippedOut);
+    // (and a cycle of using directives, which only the parser reads now that C# is read on it whole (#530, item 6), is
+    // reported, never failed, as Python's is below)
     fs.writeFileSync(path.join(cs, "X.cs"), "using B;\nnamespace A { class X { } }\n");
     fs.writeFileSync(path.join(cs, "Y.cs"), "using A;\nnamespace B { class Y { } }\n");
     execFileSync("git", ["add", "-A"], { cwd: cs });
     const cycle = shape([], { CORE_PACKAGES_UNREACHED: "1" }), cycleOut = `${cycle.stdout}${cycle.stderr}`;
-    ok(cycle.status === 1 && /FAIL: 2 imports lie on a cycle/u.test(cycleOut) && mended(cycleOut), "and what the reader of C# finds without the parser, a cycle of its using directives, fails all the same", cycleOut);
+    ok(cycle.status === 0 && !/FAIL/u.test(cycleOut), "and a cycle of C#'s using directives, which only the parser reads, is reported, never failed", cycleOut);
   }
   {
     // (and so of JavaScript's functions, read on the parser too: where the registry did not answer, none is read, a
@@ -270,13 +287,48 @@ try {
     execFileSync("git", ["add", "-A"], { cwd: js });
     const shape = () => spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json"], { cwd: js, encoding: "utf8", timeout: 120000, env: { ...env, SHAPE_BASE: "", CORE_PACKAGES_UNREACHED: "1" } });
     const skipped = shape(), skippedOut = `${skipped.stdout}${skipped.stderr}`;
-    ok(skipped.status === 0 && /^::warning::The shape check did not read JavaScript and TypeScript, their functions by the parser \(the reader javascript-tree\): the core's packages could not be installed, .*1 entry its baseline lists there \(functions, and files the grammar cannot read\) is kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut),
+    ok(skipped.status === 0 && /^::warning::The shape check did not read JavaScript and TypeScript, their functions by the parser \(the reader javascript-tree\): the core's packages could not be installed, .*1 entry its baseline lists there \(functions, files the grammar cannot read, and all of a file of C# or Python\) is kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut),
       "where the registry did not answer, the check reads no function of JavaScript, says so as a warning naming the reader, and keeps its baseline's function", skippedOut);
     fs.writeFileSync(path.join(js, "b.mjs"), "import './c.mjs';\n");
     fs.writeFileSync(path.join(js, "c.mjs"), "import './b.mjs';\n");
     execFileSync("git", ["add", "-A"], { cwd: js });
     const cycle = shape(), cycleOut = `${cycle.stdout}${cycle.stderr}`;
     ok(cycle.status === 1 && /FAIL: 2 imports lie on a cycle/u.test(cycleOut) && mended(cycleOut), "and what the readers of JavaScript find without the parser, a cycle of its imports, fails all the same", cycleOut);
+  }
+  {
+    // (and of Python, whose functions, imports and tokens are all read on the parser (#530, item 6): where the registry
+    // did not answer, nothing of a file of Python is read, a warning names the reader, each entry its baseline lists
+    // there is kept as listed, a cycle it would find is reported and never failed, and the selection runs each test of
+    // Python whose imports it could not read as one that reaches every file)
+    const py = path.join(tmp, "py");
+    fs.mkdirSync(path.join(py, "tests"), { recursive: true });
+    fs.cpSync(copy, path.join(py, "core"), { recursive: true });
+    fs.writeFileSync(path.join(py, "shape.json"), JSON.stringify({ baseline: "shape-baseline.json", code: [".", ":!core/"], tests: ["tests/"], systems: {} }));
+    fs.writeFileSync(path.join(py, "a.py"), "# Changed: x\nfrom b import x\n");
+    fs.writeFileSync(path.join(py, "b.py"), "import a\nx = 1\n");
+    fs.writeFileSync(path.join(py, "c.py"), "y = 2\n");
+    fs.writeFileSync(path.join(py, "tests/test_c.py"), "import c\n");
+    fs.writeFileSync(path.join(py, "shape-baseline.json"), JSON.stringify({ reads: ["javascript", "jsx", "javascript-tree", "csharp", "csharp-tree", "python", "python-tree", "scripts", "screens", "clocks", "processes", "changes"], listed: { "cycle: a.py -> b.py": true, "cycle: b.py -> a.py": true, "change: a.py: a change's heading": { count: 1 } } }));
+    const git = (...a) => execFileSync("git", a, { cwd: py, encoding: "utf8" });
+    git("init", "-q");
+    git("add", "-A");
+    git("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "base");
+    const unreachedEnv = { ...env, SHAPE_BASE: "", CORE_PACKAGES_UNREACHED: "1" };
+    const shape = () => spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json"], { cwd: py, encoding: "utf8", timeout: 120000, env: unreachedEnv });
+    const skipped = shape(), skippedOut = `${skipped.stdout}${skipped.stderr}`;
+    ok(skipped.status === 0 && /^::warning::The shape check did not read Python, by the parser \(the reader python-tree\): the core's packages could not be installed, .*the 3 entries its baseline lists there \(functions, files the grammar cannot read, and all of a file of C# or Python\) are kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut),
+      "where the registry did not answer, the check reads nothing of Python, says so as a warning naming the reader, and keeps its baseline's cycle and its comment that marks a change", skippedOut);
+    fs.writeFileSync(path.join(py, "d.py"), "# Changed: y\nimport e\n");
+    fs.writeFileSync(path.join(py, "e.py"), "import d\n");
+    git("add", "-A");
+    const cycle = shape(), cycleOut = `${cycle.stdout}${cycle.stderr}`;
+    ok(cycle.status === 0 && !/FAIL/u.test(cycleOut), "and a cycle of Python's imports and a comment that marks a change, which only the parser reads, are reported, never failed", cycleOut);
+    fs.writeFileSync(path.join(py, "c.py"), "y = 3\n");
+    git("add", "-A");
+    git("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "change");
+    const select = spawnSync(process.execPath, ["core/scripts/select.mjs", "shape.json"], { cwd: py, encoding: "utf8", timeout: 120000, env: { ...unreachedEnv, SELECT_BASE: "HEAD^1", GITHUB_ENV: "", GITHUB_STEP_SUMMARY: "" } }), selectOut = `${select.stdout}${select.stderr}`;
+    ok(select.status === 0 && /tests\/test_c\.py: reaches every file \(c\.py\)/u.test(selectOut),
+      "and the selection runs a test of Python whose imports it could not read as one that reaches every file", selectOut);
   }
   // (and the install puts each package where the scripts load it from, untracked)
   // (a project whose own .gitignore leaves out an .npmrc, a lock file and every dot folder still tracks the copy's)
@@ -344,7 +396,7 @@ try {
     "in a copy whose job installed the first install alone, a package of the parser's reads as unreached, so its reader warns and fails nothing; in the core, never", `${asked.stdout}${asked.stderr}${askedInCore.stdout}${askedInCore.stderr}`);
   {
     // (the shape check in such a job, its copy's parser list naming the parser's own packages, as the core's does: it
-    // reads no function of C#, and its warning names the install step's mend, not a run again)
+    // reads nothing of C#, and its warning names the install step's mend, not a run again)
     const cs = path.join(tmp, "cs-unnamed");
     fs.mkdirSync(cs);
     fs.cpSync(copy, path.join(cs, "core"), { recursive: true });
@@ -355,8 +407,8 @@ try {
     execFileSync("git", ["init", "-q"], { cwd: cs });
     execFileSync("git", ["add", "-A"], { cwd: cs });
     const r = spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json"], { cwd: cs, encoding: "utf8", timeout: 120000, env: { ...env, SHAPE_BASE: "" } }), out = `${r.stdout}${r.stderr}`;
-    ok(r.status === 0 && /^::warning::The shape check did not read C#, its functions by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone, .*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(out),
-      "and the shape check there reads no function of C#, failing nothing, and its warning says to name every install in the job's install step", out);
+    ok(r.status === 0 && /^::warning::The shape check did not read C#, by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone, .*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(out),
+      "and the shape check there reads nothing of C#, failing nothing, and its warning says to name every install in the job's install step", out);
   }
   const parser = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
   const named = loadParser();
@@ -426,10 +478,32 @@ try {
   const inPr = { ...env, GITHUB_EVENT_NAME: "pull_request", GITHUB_ENV: jobEnv };
   const mismatched = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: inPr });
   ok(mismatched.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "in a project's pull request an install that fails for anything but the registry not answering fails, and tells the job nothing", `${mismatched.status} ${mismatched.stdout}${mismatched.stderr}`);
+  // (nor where npm's message echoes a network error's name from what the lock file holds, a version here: #714)
+  const echoing = JSON.parse(fs.readFileSync(path.join(root, ".packages/package-lock.json"), "utf8")), y = echoing.packages["node_modules/yaml"];
+  const odd = `${y.version}-${["ETIME", "DOUT"].join("")}`;
+  Object.assign(y, { version: odd, resolved: `https://registry.npmjs.org/yaml/-/yaml-${odd}.tgz` });
+  fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify(echoing, null, 2));
+  fs.writeFileSync(jobEnv, "");
+  const echoed = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: inPr });
+  ok(echoed.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "and one whose message names a network error only as it echoes the lock file fails too, the job told nothing", `${echoed.status} ${echoed.stdout}${echoed.stderr}`);
   // (a registry that does not answer, in a project's pull request, fails nothing: the job is told, and each check after it says it did not run)
   fs.copyFileSync(path.join(root, ".packages/package-lock.json"), path.join(pk, "package-lock.json"));
   const warned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...inPr, [["npm_config_regi", "stry"].join("")]: "http://127.0.0.1:9/", npm_config_fetch_retries: "0", npm_config_cache: path.join(tmp, "empty-cache") } });
   ok(warned.status === 0 && /^::warning::The core's packages could not be installed .*twice/mu.test(warned.stdout) && /Mend: run this job again/u.test(warned.stdout) && /^CORE_PACKAGES_UNREACHED=1$/mu.test(fs.readFileSync(jobEnv, "utf8")), "in a project's pull request a registry that does not answer twice is a warning, and tells the job's later checks", `${warned.status} ${warned.stdout}${warned.stderr}`);
+  // (and PyPI's, for the code scan's engine: pip says in Python's words that it could not connect)
+  fs.writeFileSync(jobEnv, "");
+  const pipWarned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "pypi"], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...inPr, [["PIP_INDEX", "_URL"].join("")]: "http://127.0.0.1:9/simple", PIP_TIMEOUT: "2", PIP_RETRIES: "1", PIP_NO_CACHE_DIR: "1" } });
+  ok(pipWarned.status === 0 && /^::warning::The core's packages could not be installed from \.packages\/requirements\.txt, twice/mu.test(pipWarned.stdout) && /^CORE_PACKAGES_UNREACHED=1$/mu.test(fs.readFileSync(jobEnv, "utf8")), "and so is PyPI's, for the code scan's engine", `${pipWarned.status} ${pipWarned.stdout}${pipWarned.stderr}`);
+  // (but not where pip, once a retry got through, refused a wheel for its hash: a python3 that prints both, on a system
+  // that runs a shell script by its name)
+  if (process.platform !== "win32") {
+    const bin = path.join(tmp, "fake-bin");
+    fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(bin, "python3"), "#!/bin/sh\necho \"WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ProtocolError('Connection aborted.')': /x\" >&2\necho 'ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE.' >&2\nexit 1\n", { mode: 0o755 });
+    fs.writeFileSync(jobEnv, "");
+    const refusedHash = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "pypi"], { cwd: project, encoding: "utf8", timeout: 60000, env: { ...inPr, PATH: `${bin}${path.delimiter}${process.env.PATH}` } });
+    ok(refusedHash.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "and a wheel pip refused for its hash after a retry fails, the job told nothing, though a connection broke on the way", `${refusedHash.status} ${refusedHash.stdout}${refusedHash.stderr}`);
+  }
   // (what would reach past the core's own files: a shrinkwrap npm reads first, another registry, a link in the install's place)
   const refuses = (what, plant, unplant, said, names = []) => {
     plant();

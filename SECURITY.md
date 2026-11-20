@@ -12,22 +12,39 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    most, as its hostile tests time it (`scripts/hostile.mjs`), and each JSON it parses is nested 200 deep at most
    (`scripts/guards.mjs`); its limits name what it reads beyond that.
    - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the line
-     "Read for it:" by `scripts/reading.mjs`); limits: none of its own on the text, which GitHub holds to 65,536
-     characters; 100 commits, one page; 8 s for the reading list's calls; hostile tests: `tests/hostile-pr-text-test.mjs`.
-   - the comments and reviews on a pull request, their bodies and authors: read by the security-review check and
-     the code-review wait (`scripts/security-review.mjs`, `scripts/code-review-wait.mjs`) and the size check's reader
-     of a "Leanness check:" answer (`scripts/size.mjs`), with the descriptions of merged pull requests by the tools
-     reader (`scripts/tools-read.mjs`), and, of any pull request's, by the scheduled look's reader of late review
-     findings (`scripts/look.mjs` through `scripts/review-marks.mjs`), which puts a replier's login in a request's
-     route; limits: 64 MB of an answer (256 MB for the look's), 20 pages of 100 for the tools reader and 50 for the
-     look's, every page for the review checks, whose jobs stop at 6 and 5 minutes; hostile tests:
-     `tests/hostile-pr-comments-test.mjs`.
+     "Read for it:" by `scripts/reading.mjs`, and the line "Never needed:" by `scripts/read-total.mjs`, line by line);
+     limits: none of its own on the text, which GitHub holds to 65,536 characters; 100 commits, one page; 8 s for the
+     reading list's calls; hostile tests: `tests/hostile-pr-text-test.mjs`.
+   - the comments and reviews on a pull request, their bodies and authors: read by the security-review check and the
+     code-review wait (`scripts/security-review.mjs`, `scripts/code-review-wait.mjs`) and the size check's reader of a
+     "Leanness check:" answer (`scripts/size.mjs`), with the descriptions of merged pull requests by the tools reader
+     (`scripts/tools-read.mjs`) and the order of checks and reviews through it (`scripts/stage-order.mjs`), and, of any
+     pull request's, by the scheduled look's reader of late review findings (`scripts/look.mjs` through
+     `scripts/review-marks.mjs`), which puts a replier's login in a request's route; limits: 64 MB of an answer (256 MB
+     for the look's), 20 pages of 100 for the tools reader and 50 for the look's, every page for the review checks,
+     whose jobs stop at 6 and 5 minutes; hostile tests: `tests/hostile-pr-comments-test.mjs`; for the closing attribution
+     line, `tests/tools-read-test.mjs`; and for the order's own reading of names and asks, `tests/stage-order-test.mjs`.
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
-     a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`); limits: 64 MB of git's
-     answer (256 MB for the comments proof and the selection, 16 MB for the manifest, past which it is reported
-     unread), and none in count, since every changed path is read; hostile tests: `tests/hostile-pr-changes-test.mjs`.
+     a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`), the rule files a checkout
+     holds, the manifest too (`scripts/reading.mjs`, and `scripts/rules.mjs` for the rules in them, which read only
+     regular files in real folders of the checkout's own, a pipe or device as no file and a link at any depth refused
+     with its mend, and the first tries the changed paths on the path patterns within 16 million steps for each
+     reading, a run of it or a pull request's description, each with a budget of its own, past which every pattern
+     left matches), and the rule
+     files the total read sums and reads for a cut or a join (`scripts/read-total.mjs`, which prints each name with its
+     control characters written out, and reads a link, what is no regular file of the checkout's own, and a name a rule
+     file gives that is absolute or holds a ".." segment as no file); limits: 64 MB of git's answer (256 MB for the
+     comments proof, the selection and the total read, 16 MB for the manifest, past which it is reported unread), and
+     none in count, since every changed path is read, save the total read's 1 MB of a file's text, past which its size
+     alone is counted, and 8 MB of all their text, 200 rule files, 100 kinds of task, 300 names they give and 16
+     million steps of each tree's tries, past which it fails with its mend; and of each file of code the selection
+     reads through the shape check's readers (`scripts/shape-readers.mjs`), 500,000 characters of JavaScript,
+     TypeScript or Python and 200,000 of C#, past which the parser reads none of it (of Python and C#, neither
+     functions, imports nor tokens; of JavaScript and TypeScript, no functions, their imports read without it), and 2 s
+     for the parser on each (`scripts/tree-walk.mjs`); hostile tests:
+     `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
      of the work standing still (`scripts/look.mjs`, through `queue.mjs`'s placing and reading), with the open issues
@@ -44,14 +61,18 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository (the
      workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`, `scripts/releases.mjs`,
      `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`, `scripts/clean-merges.mjs`,
-     `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs`, `scripts/tools-offer.mjs` and the
-     scheduled look's reader of the default branch's newest commit, read as a time alone (`scripts/look.mjs`), and
+     `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs`, `scripts/stage-order.mjs`,
+     `scripts/tools-offer.mjs` and the scheduled look's reader of the default branch's newest commit, read as a time alone (`scripts/look.mjs`), and
      an account's rights by the code-review wait (`scripts/code-review-wait.mjs`), the scheduled look
      (`scripts/look.mjs`) and the size check (`scripts/size.mjs`, from `size.yml`) through `security-review.mjs`'s
-     reader; limits: 1 MB of an answer to `core-moved.mjs`, `releases.mjs` and `tools-offer.mjs`, 64 MB or 256 MB to the
-     others, 30 commits and 30 s each for the green main of `releases.mjs`, 30 merged pull requests for the wait, 50
-     pages for the stalled look, 200 for the cost, 10 for the merge line, 20 s for the tools' offer, 30 s for the host's
-     account; hostile tests: `tests/hostile-github-test.mjs`.
+     reader, and a pull request's one file and the issues its lines name, by `scripts/queue-only.mjs`; limits: 1 MB of
+     an answer to `core-moved.mjs`, `releases.mjs` and `tools-offer.mjs`, 64 MB or 256 MB to the others, 30 commits and
+     30 s each for the green main of `releases.mjs`, 30 merged pull requests for the wait, 50 pages for the stalled
+     look, 200 for the cost, 10 for the merge line, 20 s for the tools' offer, 30 s for the host's account, and for
+     `queue-only.mjs` 16 MB of an issue's answer and 3 pages of its notes, 12 issues, the pull request's answer, the
+     first page of its files and the comparison that gives them read whole, at GitHub's own size (its count of one
+     file read first), 1 MB of the progress file, 240 characters of a line it adds, 90 s and a job of 3 minutes;
+     hostile tests: `tests/hostile-github-test.mjs`, and for the last `tests/queue-only-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`), the sync and its steps
@@ -64,28 +85,50 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      links followed from one path; hostile tests: `tests/copies-tools-test.mjs`.
    - a project's build, package and workflow files: read by the licence, exact-versions, NuGet, workflow and agent-tools
      checks and the reader of where the tests run (`scripts/licences.mjs`, `scripts/exact-versions.mjs`,
-     `scripts/nuget.mjs`, `scripts/workflows.mjs`, `scripts/agent-tools.mjs`, `scripts/runners.mjs`) and the sync's move
-     of the pins (`scripts/sync.mjs`); limits: 64 MB of a file for the licence check (256 MB for NuGet's), 1 MB of an
-     action and 5,000 steps of a workflow, 60 s for git's filters, 64 MB of a workflow for the move of the pins, past
-     which it is reported unread, and none on a file for the reader of where the tests run, a project's own, read whole,
-     whose walk of a job's labels stops at 500 and 8 deep, and NuGet's lock file version 2, a newer refused (npm's lock
-     file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`.
+     `scripts/nuget.mjs`, `scripts/workflows.mjs`, `scripts/agent-tools.mjs`, `scripts/runners.mjs`), the reader of a
+     project's own workflows (`scripts/workflow-run.mjs`, for `check.mjs`, `check-configs.mjs` and `steps.mjs`) and the
+     sync's move of the pins (`scripts/sync.mjs`); limits: 64 MB of a file for the licence check (256 MB for NuGet's), 1
+     MB of an action and 5,000 steps of a workflow, 256 K characters of a workflow for the readers of its YAML (past it,
+     said unread with its mend, never given to the parser, and `parseYaml` throws it with its mend; such a file
+     unchanged from the base is only noted, its own keys given twice and calls left without ready_for_review unread, and
+     one a pull request changes fails, and is read as new once cut under it), 60 s for git's filters, 64 MB of a
+     workflow for the move of the pins, past which it is reported unread, and none on a file for the reader of where the
+     tests run, a project's own, read whole, whose walk of a job's labels stops at 500 and 8 deep, lists and mappings
+     nested 128 deep at most for the workflow check's two readers of a workflow (what is nested past it is said with its
+     mend, and no list or mapping used as a key is read), no line break of YAML 1.1 beyond LF, CR and CRLF for the same
+     two readers (U+0085, U+2028 and U+2029, which the package does not read as one, fail a file that is new or changed,
+     with their mend, and are only noted in one unchanged from the base or where a project's run is told no base, so a
+     key given twice or a call left without ready_for_review behind such a break in an unchanged file goes unseen until
+     the file is changed; in the core's own run each fails), and NuGet's lock file version 2, a newer refused (npm's
+     lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`.
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
      lookup (`scripts/lookup.mjs`) and its lookup again of what a project holds (`scripts/held.mjs`, through the
-     lookup's readers); Node itself is checked against its SHA-256 by `scripts/node.sh`; limits: 16 MB of a NuGet
-     package's manifest, 100 pages of NuGet's registry, 20 lookups on GitHub in a run, 30 s for an answer (60 s for a
-     NuGet package), 120 s for the whole look again; hostile tests: `tests/hostile-packages-test.mjs`.
+     lookup's readers); Node itself is checked against its SHA-256 by `scripts/node.sh`, and the code scan's wheel by
+     its own, which pip checks against `.packages/requirements.txt` (`scripts/install.mjs pypi`); limits: 16 MB of a
+     NuGet package's manifest, 100 pages of NuGet's registry, 20 lookups on GitHub in a run, 30 s for an answer (60 s
+     for a NuGet package), 120 s for the whole look again; hostile tests: `tests/hostile-packages-test.mjs`, and for the
+     scan `tests/code-scan-test.mjs`.
+   - the code a pull request adds or alters, and its description's lines "Scan false alarm:" and "Scan unread:": read
+     by the code scan (`scripts/code-scan.mjs`), which hands the files by name to Semgrep's engine, installed from its
+     wheel's pinned hash, with no variable that holds a token, fails a file it could not read, and silences no finding a
+     comment in the code asks it to; limits: no size of a file, a file the engine did not scan or stopped on failing
+     and one it parsed in part passing, said as read in part, 200 files to a run of the engine, 30 s for a rule on a
+     file, 900 s for a run, 256 MB of git's diff of a file, 1 GB of the engine's answer, and the description whole as
+     the host gives it, at most 65,536 characters; hostile tests: `tests/code-scan-test.mjs`.
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
    (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are
    tools that only run, each with its licence in its audit (`.github/licences-audit.json`). Among them is Node
    (`node-linux-<arch>` at the exact version in `.node-version`), which `scripts/node.sh` fetches for a project's cloud
    machine whose own Node is below the least long-term line in `.node-least`, or that has none, with
    `npm pack --ignore-scripts`, or with no npm by curl from the registry's own address over HTTPS, never installing it,
-   and checks against its SHA-256 before it runs.
-17. **Dependabot** updates only the workflows' GitHub actions (`.github/dependabot.yml`); this repository names no
-    manifest or lock file, so no other PR of Dependabot's meets it.
+   and checks against its SHA-256 before it runs; and Semgrep's engine (`semgrep-core` from the `semgrep` wheel on PyPI
+   at the version and hashes in `.packages/requirements.txt`), which `scripts/install.mjs pypi` installs with pip in the code
+   scan's own step for a project the host's CodeQL does not scan, the wheel checked by its SHA-256, no dependency
+   taken and none of its code run, and which the scan runs with no Python.
+17. **Dependabot** updates the workflows' GitHub actions and the packages of the core's lock files, `package-lock.json`
+    and `.packages/requirements.txt` (`.github/dependabot.yml`), each a week after its release.
 
 The threat model's part: the core has no users of its own; what an attacker would want of it is a rule loosened here
 that every project then takes, so a change reaches a project only through a sync PR there: a pure sync gets no review

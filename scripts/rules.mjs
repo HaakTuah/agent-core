@@ -2,14 +2,14 @@
 // part D): each paragraph or item of a list in the floor's files, the roles' and the modules' whose text opens with a bold lead is a rule,
 // named by its file and that lead ("floor/security.md: 1. Nothing secret in the repository"). Its text runs to the next
 // rule at its own depth or above, a heading, or a line that leaves its item, so an item's own items are part of it as
-// well as rules of their own. What holds each is named in holders.json, beside this file (holders.mjs); a staged case
-// names the rules it holds (staged/, staged.mjs). Node's own modules only.
+// well as rules of their own. What holds each is named in scripts/holders/, beside this file (holders.mjs); a staged case
+// names the rules it holds (staged/, staged.mjs). Node's own modules, and reading.mjs beside it for the files.
 //
 //   import { rules, ruleKey } from "./rules.mjs";
 import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
+import { realFiles, regular } from "./reading.mjs";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -57,12 +57,10 @@ export function rulesOf(file, text) {
 // rules in its AGENTS.md as well, which a staged case may hold.
 export function rules(root = ROOT, { agents = false } = {}) {
   const out = [];
-  if (agents && fs.existsSync(path.join(root, "AGENTS.md"))) out.push(...rulesOf("AGENTS.md", fs.readFileSync(path.join(root, "AGENTS.md"), "utf8")));
-  for (const folder of FOLDERS) {
-    const dir = path.join(root, folder);
-    if (!fs.existsSync(dir)) continue;
-    for (const f of fs.readdirSync(dir).filter(f => f.endsWith(".md")).sort()) out.push(...rulesOf(`${folder}/${f}`, fs.readFileSync(path.join(dir, f), "utf8")));
-  }
+  // (only real folders and files are read, a link at any depth read as nothing, as reading.mjs reads them; #848)
+  const own = agents ? regular(root, "AGENTS.md") : null;
+  if (own !== null) out.push(...rulesOf("AGENTS.md", own));
+  for (const folder of FOLDERS) for (const f of realFiles(root, folder, new Set())) out.push(...rulesOf(`${folder}/${f}`, regular(root, `${folder}/${f}`) ?? ""));
   return out;
 }
 

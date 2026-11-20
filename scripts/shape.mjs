@@ -83,8 +83,9 @@ import { CODE, append, cycles, lyingUnder, nameTree, resolve } from "./code-shap
 import { inProject, logged } from "./guards.mjs";
 import { installed, unreached } from "./packages.mjs";
 import { shapeFaults } from "./schemas.mjs";
-import { CHANGE_MARKS, FIRST_READS, PACKAGE_FILES, REACH, READERS, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
+import { CHANGE_MARKS, FIRST_READS, PACKAGE_FILES, REACH, READERS, WHOLE_ON_PARSER, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
+import { LARGEST } from "./tree-walk.mjs";
 
 export const KIT = "checks/shape.json";
 const TEMPLATE = fileURLToPath(new URL("../setup/template/shape.json.tmpl", import.meta.url));
@@ -373,6 +374,11 @@ function computed(r, text) {
     || (tok.v === "import" && after(t, k, ".", "meta", ".", "glob")) || (tok.v === "require" && after(t, k, ".", "context"))));
 }
 
+// Whether a file's imports are as ones the readers cannot follow: a reader could not read them, its parser not installed
+// or the file past it; and in C# and Python, read on the parser alone, those of a file the grammar could not read whole,
+// which may stand in the part it lost.
+const unfollowed = r => !r.imports || (!r.functions && ["csharp", "python"].includes(r.lang));
+
 function oneFile(ctx, file, r) {
   const system = systemOf(ctx.config, file), domain = system ? ctx.config.systems[system].domain ?? null : null, from = { file, system, domain };
   if (computed(r, ctx.texts[file] ?? "")) ctx.unsure.add(file);
@@ -383,7 +389,8 @@ function oneFile(ctx, file, r) {
   if (domain === "rules") ownClock(ctx, file, r);
   changeMarks(ctx, file, r.marks);
   testReach(ctx, file, r);
-  for (const imp of r.imports) { if (r.lang === "javascript") oneImport(ctx, from, imp); else foreign(ctx, from, imp, r); }
+  if (unfollowed(r)) ctx.unsure.add(file);
+  for (const imp of r.imports ?? []) { if (r.lang === "javascript") oneImport(ctx, from, imp); else foreign(ctx, from, imp, r); }
   const names = ctx.tests.has(file) ? null : shared(file, r, ctx.idx);
   if (names) ctx.scripts.set(file, names);
 }
@@ -418,7 +425,7 @@ function wrappedOnce(ctx) {
 // `unnamed`, the files of code in no system; `readers`, the reader of each file (shape-readers.mjs); and `reach`, each
 // file's imports of the project's own files, dynamic ones and those of types among them, and `scripts`, the files that
 // share the global space, which import nothing, and `unsure`, the files with an import whose target the readers cannot
-// follow (select.mjs). `tests` is the
+// follow, or whose imports they could not read (select.mjs). `tests` is the
 // set of the files that are tests: read for their imports, not held to the marks nor to the shared space.
 export function survey(texts, config, tests = new Set()) {
   const code = Object.keys(texts).filter(isCode).sort();
@@ -435,7 +442,7 @@ export function survey(texts, config, tests = new Set()) {
   read.unnamed = ctx.unnamed.length;
   read.tests = tests.size;
   for (const [k, kind] of [["screens", "screen"], ["timed", "timed"], ["processes", "process"]]) read[k] = new Set([...ctx.entries.keys()].filter(id => id.startsWith(`${kind}: `)).map(fileOf)).size;
-  return { entries: ctx.entries, read, unnamed: ctx.unnamed, readers: ctx.readers, reach: ctx.reach, scripts: new Set(ctx.scripts.keys()), unsure: ctx.unsure };
+  return { entries: ctx.entries, read, unnamed: ctx.unnamed, readers: ctx.readers, reach: ctx.reach, scripts: new Set(ctx.scripts.keys()), unsure: ctx.unsure, texts };
 }
 
 // ---- the baseline ----
@@ -600,8 +607,8 @@ const SAID = {
   cycle: n => [`${plural(n, "import lies", "imports lie")} on a cycle between files that did not stand before`, "turn one import of the cycle round: move what both files need into a file that imports neither, or pass it in"],
   platform: n => [`${plural(n, "import binds", "imports bind")} code to one platform outside the system declared for that`, "move the code that needs it into the system of the domain \"platform\", and have the rest call what that system offers, so that the rest builds and tests wherever the project's checks run"],
   package: n => [`${plural(n, "import takes", "imports take")} a package the project ships with outside the one system that wraps it`, "import it in one system alone, named under that system's \"wraps\" in the config, and have the others use what that system offers"],
-  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (JavaScript, TypeScript, C# or Python the grammar the core installs cannot read whole, or within its time, a file of them past 2 MB, or C# or Python nested more than 200 levels deep), so ${n === 1 ? "its" : "their"} functions are not held`,
-    "write it so that the reader can follow it: close each element of JSX, write a } or > in JSX's text as {'}'} or {'>'}, and nest less deep; where a script wrote it as data past 2 MB, leave it out of the config's \"code\" (\"!\" before its pathspec); where it is code that builds, newer than the grammar reads, list the entry under \"grown\" with that reason, by its id, and tell the core which construct it is, never the project's code (the core's README.md, \"Reporting to the core\"); the check's failure on the file then names what it holds"],
+  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (JavaScript, TypeScript, C# or Python the grammar the core installs cannot read whole, or within its time, a file of them past the largest its reader takes, ${LARGEST.javascript.toLocaleString("en")} characters of JavaScript or TypeScript, ${LARGEST.python.toLocaleString("en")} of Python and ${LARGEST.csharp.toLocaleString("en")} of C#, or C# or Python nested more than 200 levels deep), so ${n === 1 ? "its" : "their"} functions are not held`,
+    "write it so that the reader can follow it: close each element of JSX, write a } or > in JSX's text as {'}'} or {'>'}, and nest less deep; where a script wrote it as data past that size, leave it out of the config's \"code\" (\"!\" before its pathspec); where it is code that builds, newer than the grammar reads, list the entry under \"grown\" with that reason, by its id, and tell the core which construct it is, never the project's code (the core's README.md, \"Reporting to the core\"); the check's failure on the file then names what it holds"],
   global: n => [`${plural(n, "name joins", "names join")} the global space that scripts with no import or export share: a second name of one file there, or a name another such file declares too`,
     "make the file a module that imports what it uses and exports what it offers; where the page cannot load it so, put what it adds under the one name the file declares there already (an object of its functions), and give a name that two files declare one home"],
   screen: n => [`${plural(n, "test imports", "tests import")} what opens a screen, a window or a device, where no test of ${n === 1 ? "its" : "their"} file did before`,
@@ -624,17 +631,33 @@ const SAID = {
 // breach's place that covers itself. Of a reader the baseline does not list (`unread`), one the base held, or any where
 // no base is told, is `later`: reported, never failed, until --write lists it. The rest are new, each kind with its mend.
 function fresh({ config, at, self, found, current, base, news, unread }) {
-  const later = base ? [] : news.filter(unread);
-  if (!base) news = news.filter(id => !unread(id));
+  // (a file the readers cannot follow that the base held, its text as the base holds it, or any where no base is told,
+  // is said, never failed: a reader that comes to take less, a file past a smaller size or one a newer grammar reads
+  // otherwise, turns nothing that stood red, and only one a pull request adds or changes fails: tasks/code-shape.md,
+  // "What the check reads"; AGENTS.md, "Nothing locks a project". Its text is compared, since whether a file is lost can
+  // hang on the parser's time: a base read past its budget on one run excuses nothing a change brings to the file)
+  const lost = id => groupOf(id).kind === "lost" && !unread(id);
+  const unchanged = id => base.standing().texts[fileOf(id)] === found.texts[fileOf(id)];
+  const later = base ? [] : news.filter(unread), unfollowed = base ? [] : news.filter(lost);
+  if (!base) news = news.filter(id => !unread(id) && !lost(id));
   const fail = [];
   if (base && news.length) {
     const left = new Set(unclaimedOf(news, current, base.stood(), config.marks));
-    const readMore = news.filter(id => !left.has(id) && !unread(id));
+    const excused = id => lost(id) && unchanged(id);
+    unfollowed.push(...news.filter(id => !left.has(id) && excused(id)));
+    const readMore = news.filter(id => !left.has(id) && !unread(id) && !excused(id));
     later.push(...news.filter(id => !left.has(id) && unread(id)));
     news = news.filter(id => left.has(id));
     if (readMore.length) fail.push([`FAIL: ${plural(readMore.length, "breach", "breaches")} that ${base.name} held already ${readMore.length === 1 ? "is" : "are"} not in ${config.baseline}: the config reads more than it did, the baseline was lowered past what stands, or the entry is listed under another id, where a breach stands now. Mend: list them where they stand with SHAPE_BASE=${base.name} node ${self} ${at} --write, and commit the baseline`, ...some(readMore, current)]);
   }
-  return { fail: [...fail, ...byKind(news, found, current, config)], later };
+  return { fail: [...fail, ...byKind(news, found, current, config)], later, unfollowed };
+}
+
+// The files lost that stood before, said, never failed (fresh, above).
+function unfollowedNote({ config, at, self, base, unfollowed }) {
+  if (!unfollowed.length) return [];
+  const n = unfollowed.length, it = n === 1 ? "it" : "them";
+  return [`${SAID.lost(n, config)[0]}, and ${config.baseline} does not list ${it}: ${base ? `${base.name} held ${it} already` : "no base is told"}, so nothing fails over ${it}; SHAPE_BASE=${base?.name ?? "<the base branch>"} node ${self} ${at} --write lists ${it}: ${unfollowed.join("; ")}`];
 }
 
 // The failures of new breaches, one for each kind, with its mend and the breaches under it.
@@ -759,21 +782,23 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   // (what a reader finds on the parser, where it could not run, its packages not installed for the registry not
   // answering: its functions are read as a reader's the baseline does not name, so that none fails, and a file its
   // baseline lists as lost, which only the parser tells, is kept, never gone; what the same reader finds without the
-  // parser, its imports, cycles and clock, and a file new to the baseline, are held as ever: #654, point 4)
+  // parser, the imports, cycles and clock of JavaScript, and a file new to the baseline, are held as ever; of a file the
+  // parser reads whole (C#'s and Python's), each entry is so: #654, point 4; #530, item 6)
   const reads = new Set(baseline.reads), skipped = unreachedReaders();
-  const unread = id => { const r = readerOf(id, found.readers); return r !== null && (!reads.has(r) || (skipped.includes(r) && groupOf(id).kind === "function")); };
-  const kept = id => !current.has(id) && skipped.includes(readerOf(id, found.readers)) && ["function", "lost"].includes(groupOf(id).kind);
+  const wholly = id => { const r = found.readers.get(fileOf(id)); return skipped.includes(r) && WHOLE_ON_PARSER.includes(r); };
+  const unread = id => { const r = readerOf(id, found.readers); return r !== null && (!reads.has(r) || (skipped.includes(r) && groupOf(id).kind === "function") || wholly(id)); };
+  const kept = id => !current.has(id) && ((skipped.includes(readerOf(id, found.readers)) && ["function", "lost"].includes(groupOf(id).kind)) || wholly(id));
   const gone = id => !current.has(id) && !unread(id) && !kept(id);
   // (against the base, a listed entry covers what the base's code still holds of it, wherever it stands now: #750, point 5)
   // (what a reader the baseline does not name finds claims after every other, so that it leaves no other without)
   const told = base ? thenOf(readAt(base, config), baseline, baselineText, config) : null;
   const news = unclaimed(new Map([...current].sort(([a], [b]) => unread(a) - unread(b))), told?.covers ?? baseline.listed, config.marks);
-  const { fail, later } = fresh({ config, at, self, found, current, base, news, unread });
+  const { fail, later, unfollowed } = fresh({ config, at, self, found, current, base, news, unread });
   const lowered = staleOf({ config, at, self, baseline, wrote: told?.wrote, gone });
   fail.push(...lowered.fail);
   if (told) fail.push(...againstBase({ config, at, self, baseline, base, found, ...told }));
   const reread = [...baseline.listed.keys()].filter(id => !current.has(id) && unread(id) && !kept(id)).length;
-  return { fail, notes: [...notesOf(found.read), ...lowered.notes, ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read, kept: [...baseline.listed.keys()].filter(kept).length };
+  return { fail, notes: [...notesOf(found.read), ...lowered.notes, ...unfollowedNote({ config, at, self, base, unfollowed }), ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read, kept: [...baseline.listed.keys()].filter(kept).length };
 }
 
 // The entries a baseline lists that are gone or moved now (`gone`): { fail, notes }. One that only shrank passes as it
@@ -882,7 +907,7 @@ const aFile = at => {
 // baseline, so that from the sync that brings the check nothing gets worse and nothing that stood before fails.
 function unwritten(self, base) {
   const config = parseConfig(fs.readFileSync(TEMPLATE, "utf8"), "the starter kit's config");
-  const yet = `the project has not written its config of the shape check yet (${KIT}; core/setup/sync-notes.md, "how code is put together")`;
+  const yet = `the project has not written its config of the shape check yet (${KIT}; core/setup/sync-notes/, "how code is put together")`;
   if (!base) { console.log(`ok   ${yet}, and there is no base to compare with: nothing was held`); return 0; }
   const now = standing(config), found = survey(now.texts, config, now.tests);
   const current = new Map([...found.entries].map(([id, e]) => [id, e.n]));
@@ -918,7 +943,7 @@ function check(config, at, self, found, base, named) {
   const unnamed = skipped.length && unnamedReaders().length, install = path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)));
   const why = unnamed ? "the parser's packages are not installed, this job's install step naming the core's first install alone" : "the core's packages could not be installed, the registry not answering";
   const mend = unnamed ? `make this job's install step node ${install} all, which installs the parser's packages too` : "run this job again before the pull request merges; if it fails again, file it as a fault";
-  if (skipped.length) console.log(`::warning::The shape check did not read ${skipped.map(r => `${READERS[r]} (the reader ${r})`).join(", ")}: ${why}, so what it would find there on the parser is reported, never failed${v.kept ? `, and the ${plural(v.kept, "entry", "entries")} its baseline lists there (functions, and files the grammar cannot read) ${v.kept === 1 ? "is" : "are"} kept as listed, never failed as gone` : ""}; what it reads without the parser is held as ever. Mend: ${mend}`);
+  if (skipped.length) console.log(`::warning::The shape check did not read ${skipped.map(r => `${READERS[r]} (the reader ${r})`).join(", ")}: ${why}, so what it would find there on the parser is reported, never failed${v.kept ? `, and the ${plural(v.kept, "entry", "entries")} its baseline lists there (functions, files the grammar cannot read, and all of a file of C# or Python) ${v.kept === 1 ? "is" : "are"} kept as listed, never failed as gone` : ""}; what it reads without the parser is held as ever. Mend: ${mend}`);
   if (!base) console.log("note no base to compare with (set SHAPE_BASE to the branch the work started from), so the baseline was not checked for what joined it, and what the config newly reads is not told from what is new");
   for (const line of v.fail.flat()) console.error(logged(line));
   if (v.fail.length) return 1;

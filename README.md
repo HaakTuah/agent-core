@@ -39,7 +39,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   (`how-to-work.md`, `inbox.md`, `work-flow.md`, which holds the rules on git since the two were always read together,
   `review-guidelines.md` and, read in a team's project, `teams.md`); `tools/` each agent tool's part, read when that
   tool is asked (`claude.md`, `codex.md`, `copilot.md`, `kiro.md`, `antigravity.md`, and `other-builders.md` for every
-  tool but Claude); `tasks/` what a task calls for (`roles.md`, `helpers.md`, `reviews.md`, `tools.md`,
+  tool but Claude); `tasks/` what a task calls for (`roles.md`, `helpers.md`, `reviews.md`, `tools.md`, `ways.md`,
   `github-calls.md`, `hosts.md`, `repositories.md`, `updates.md`, `choices.md`, `code-shape.md`, `tests.md`,
   `cleaning.md`; for a queue planned, `planning.md`; for a change its users will notice, `done-when.md`; for a project
   people use through a screen, `screens.md`; and, for games only, `game-design.md`). A manifest takes or leaves out a
@@ -60,7 +60,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   "content put where its readers must read past it" (`roles/shared/review-guidelines.md`). What a cap decides, and when one
   may rise: `AGENTS.md`, "The size caps keep the rules lean and decide nothing else".
 - **What holds each rule:** a check that fails where it is broken, a staged case, or the scheduled audit
-  (`scripts/holders.json`, which names too the archive's items behind each); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
+  (`scripts/holders/`, an entry for each rule, which names too the archive's items behind it); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
   A project's own rules are read the same way, against its list `checks/holders.json`, and those with none listed in
   its own monthly state report, failing nothing (`node core/scripts/holders.mjs --own`; `AGENTS.md`, "A project's own
   rules name what holds them"). A check of the core's that read no file of a project's says so in the sync's report,
@@ -71,7 +71,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   when a rule they hold changes; their record is `reports/staged-cases.json` (`AGENTS.md`, "Staged cases hold what no
   check reads").
 - **The number each rule names, and the pruning:** each rule names the count it is meant to lower and the outcome it
-  stands for (`scripts/holders.json`, "numbers"); every second month, and with a newer generation of model,
+  stands for (`scripts/holders/`, the entry's "number"); every second month, and with a newer generation of model,
   `scripts/pruning.mjs` lists the rules whose number did not move, whose check never fired or whose staged case passed
   without them, for the owner to decide which go; its record is `reports/pruning.json` (`AGENTS.md`, "Rules are pruned
   by their numbers").
@@ -93,14 +93,16 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    `.packages/parser/`, installed only where a job names it (`install.mjs parser`, or `all`, as the sync runs it and
    the copies check's job, which runs the shape check; #719): a session's start installs the first alone, and a check
    that needs the parser says so, with its mend; in a project's own job that installs the first alone, the shape check
-   reads no function of C# and says so as a warning, failing nothing by that. Its
+   reads nothing of C# or Python, nor any function of JavaScript or TypeScript, and says so as a warning, failing
+   nothing by that. Its
    devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
    copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
    core files the sync moved or removed is reviewed like any PR. Where a change to the core asks something of the
-   project itself (a row of its manifest, a line of a rule file, a workflow), `setup/sync-notes.md` says so, and
-   `scripts/steps.mjs` tells each such step done or not; the sync script prints the entries a sync brings, then every
+   project itself (a row of its manifest, a line of a rule file, a workflow), an entry of the sync notes says so
+   (`setup/sync-notes.md`, each entry a file of `setup/sync-notes/`, read whole by `scripts/sync-notes.mjs`), and its
+   step of the same name in `scripts/steps/` tells it done or not (`scripts/steps.mjs`); the sync script prints the entries a sync brings, then every
    step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`), where the owner's
    inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`) and the line `Read for it:`
    (`scripts/reading.mjs`), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
@@ -316,7 +318,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      its list that the owner wants anyway, stands in "nuget.accepted" as `licence-yes.mjs` says, and there alone. It
      fails from a project's first day ("advisory" is for a fault of the check's own, while it is mended), and a private
      repository calls it too, since it needs nothing of GitHub's paid code security, or its owner declines it where a
-     job of the project's own that already runs holds its packages (`setup/sync-notes.md`, "16 November 2026, the NuGet
+     job of the project's own that already runs holds its packages (`setup/sync-notes/`, "16 November 2026, the NuGet
      check where it can matter"). Like the signature check, it first looks whether the pull request changes anything
      NuGet reads (its workflow's header lists what), and passes without a restore where it changes none; any doubt runs
      it. Before the restore, which runs the pull request's own build files, `nuget-fetch.mjs` fetches every package the
@@ -337,7 +339,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      where updates from `main` alone follow it, each the merge git makes of its parents (the check running
      `clean-merges.mjs` on the head's commits, #323), and the status says so, any other later commit needing such a
      comment naming the head, or the merge where that stops, by its whole SHA; a pure sync passes with none where no review starts by itself, the check running
-     `pure-sync.mjs` on its head; where the pull request changes what runs by itself beyond its pins, both, or two such
+     `pure-sync.mjs` on its head, and so does a pull request of the *progress file* alone that a job of the caller's proves with
+     `queue-only.mjs`, whose token may read issues, handing the head to the input `queue` (the core's own caller does;
+     #750); where the pull request changes what runs by itself beyond its pins, both, or two such
      comments (floor rule 3), or one holding what `comment-only.mjs` printed on the head. Where a summary of Codex's is
      there but its state cannot be read, a form nobody documents having changed, the status says so, the run warns, and
      the check waits or passes as it would with no summary (a summary whose first line itself changed is not known as
@@ -363,13 +367,18 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      it it calls neither `licences.yml` nor `codeql.yml`: a workflow of its own runs `core/scripts/licences.mjs` for
      what no package list holds, `core/scripts/exact-versions.mjs` and `core/scripts/lookup.mjs` for its lockfiles and
      `core/scripts/agent-tools.mjs` for its agents' tools, and its own check holds its
-     packages to floor rule 10's list. Its Actions settings must allow this repository's workflows, and each check
+     packages to floor rule 10's list. In CodeQL's place, `core.yml`'s one job, called with its inputs, scans the code a
+     pull request adds or alters with Semgrep's engine and the core's own rules (`core/scripts/code-scan.mjs`; #546),
+     failing a finding its base did not hold, the engine installed from the core's `.packages/requirements.txt` by its hashes in a
+     step of that job before it (`node core/scripts/install.mjs pypi`, with the runner's pip), and only where the change
+     touches a file the scan reads; where it is not installed, as in a session that has not run that command, the scan
+     fails, saying so. Its Actions settings must allow this repository's workflows, and each check
      there spends paid minutes, which its owner set aside by making it private (so no step waits for the owner's yes
      over them: floor rule 14), so each runs only where a change can affect it and only once a pull request is ready:
      its calls to `core.yml` and `personal-terms.yml`, as the starter kit writes them, also start when a pull request
      is marked ready and skip their job on a draft, so a push to a draft bills none of them and a draft shows no check
-     until it is marked ready (#375; `setup/sync-notes.md`, "16 November 2026, checks once a pull request is ready"),
-     and a pull request then starts two jobs, `core.yml`'s one job and `personal-terms` (`setup/sync-notes.md`,
+     until it is marked ready (#375; `setup/sync-notes/`, "16 November 2026, checks once a pull request is ready"),
+     and a pull request then starts two jobs, `core.yml`'s one job and `personal-terms` (`setup/sync-notes/`,
      "17 November 2026, the checks as one job"); and the core is synced once a day at
      most, a sync PR opened that day being the day's ("Sessions" in `roles/shared/work-flow.md`). On GitHub's free plan it
      has neither rulesets nor auto-merge: there the sessions alone keep floor rule 12 and merge by hand
@@ -441,9 +450,10 @@ check a project runs that the list leaves out.
 | `agent-tools.mjs` | left out | It reads the tools' settings at the project's root alone. No tool loads the copy's own. The core's run with `--core` holds those. |
 | `personal-terms.yml` | read | The copy's `LICENSE` and `NOTICE` may hold a copyright holder's name, as the project's own may (floor rule 11). The same workflow runs on the core's pull requests. |
 | `codeql.yml` | read | The whole checkout, in the languages the project names. The core's own code scanning runs on its repository. |
+| `code-scan.mjs` | left out | Where no workflow calls `codeql.yml`, the scan hands the engine the code a pull request adds or alters outside the copy alone. The core's repository is public, and the host's CodeQL scans its code (`codeql.yml`). |
 | `copies.mjs` | left out in part | It reads the copy as the project's config names it: the starter kit's names the copy's rule files' prose. A file of the copy moved, or its text moved into another, counts as gone, never as the config reading less, since a sync alone moves those. The core's own copies check holds them. |
 | `pointers.mjs` | left out | The copy's files are only what a pointer leads to. The core's run with `--core` holds its own pointers. |
-| `reading-size.mjs` | left out in part | Each file of the copy under `"read"` is held to its own mark. The total and the split mark count the project's own files alone. The core's caps hold the copy (`scripts/size.mjs`), and the core has no split mark. |
+| `reading-size.mjs` | left out in part | Each file of the copy under `"read"` is held to its own mark. The total and the split mark count the project's own files alone. The core's caps hold the copy (`scripts/size.mjs`). The core's own split mark is in `.github/sizes.json`, which the size workflow reads with this script. |
 | `workflows.mjs` | left out | The core's run with `--core` holds the copy's workflows and actions (floor rule 2). |
 | `entry-files.mjs` | left out | It reads the entry files at the project's root alone. The core's run with `--core` holds its own. |
 | `shape.mjs` | left out | The starter kit's config leaves the copy out (`setup/template/shape.json.tmpl`). The core holds its scripts to its own `.github/shape.json`. |
@@ -487,7 +497,7 @@ for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit
 | *owner's choices* | the kinds of choice the owner keeps, each asked of the owner (`tasks/choices.md`) | choice: left out, none |
 | *other builders' checks* | what a session of another tool than Claude Code runs before it finishes (`tools/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync | choice: left out, the project's own tests |
 | *quick check* | the command, in backticks, that a session runs before its first change, to tell a `main` that is broken from a fault of its own, in about a minute (`roles/shared/work-flow.md`, "Sessions"); the start hook names it from main's manifest, and never runs it (`scripts/work-saved.sh`) | choice: left out, the *other builders' checks* |
-| *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so (`tasks/roles.md`, "Tools are preferences") | read: from the last merged pull requests, as `tasks/roles.md` says ("Tools are preferences") (`scripts/tools-read.mjs`) |
+| *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and each way the core has no part for (`tasks/ways.md`), and which of a reviewer's findings block where it marks none so (`tasks/roles.md`, "Tools are preferences") | read: from the last merged pull requests, as `tasks/roles.md` says ("Tools are preferences") (`scripts/tools-read.mjs`) |
 | *pace* | the manifest's lines under "Pace", each a pace the owner sets, of the kinds `roles/orchestrator.md`, "The pace is the owner's", names | choice: left out, no pace but the default |
 | *users get* | `merges` or `releases`, in backticks: whether the project still publishes what its users get on each merge to its default branch (a site deployed on each push), or only from that branch's green newest commit or a release cut there (floor rule 12; `tasks/hosts.md`) | cannot be read: a deploy on each push and a release workflow each say it only in part; left out, `merges`, under which a pull request is brought up to date first, until the project's publishing waits on a green branch and its row says `releases` |
 | *merge queue* | `on`, `offered` or `none`, in backticks: whether the host offers the repository a merge queue and whether it is on (`tasks/hosts.md`, "The merge line follows the host") | read: from who holds the repository, whether it is private and its rules on the default branch (`scripts/merge-line.mjs`) |
@@ -600,7 +610,9 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   yeses (`roles/shared/teams.md`); nothing is kept in a list.
 - The stop switch, in each project: create the branch `agents-stop` (on GitHub, from any device) to stop its agents,
   and delete it to let them go on (`roles/shared/work-flow.md`). It stops only that repository's agents.
-- The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up.
+- The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up. How a
+  session is handed work, read and reviewed in each way of running sessions, side by side, the cloud or a plain
+  terminal: `tasks/ways.md`.
 - Any other machine the sessions run on is the owner's to set up (floor rule 18), who chooses knowing what a setup like
   `setup/server.md`'s buys: an account of the agents' own and a throwaway box for the project's code mean that
   an agent fooled by planted text (in a dependency, a web page, an issue) reaches only what that account holds and runs

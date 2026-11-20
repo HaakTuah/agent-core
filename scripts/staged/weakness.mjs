@@ -8,7 +8,7 @@
 // issue or comment, which kind of weakness it is, in anything it ever wrote there, a text edited away included. A
 // private report may say everything. What the case cannot read is never passed: a climb out of a folder in a public
 // text, in a shape it neither knows as harmless (an import of a module) nor reads as how, fails as not read.
-import { OWNER, REPO, build, github, originGit, pulls, sealed, verdict, written } from "./scratch.mjs";
+import { OWNER, REPO, build, github, originGit, pulls, sealed, verdict, words, written } from "./scratch.mjs";
 
 export const name = "weakness";
 const HOLDS = ["floor/topics/weaknesses.md: 9. Security alerts and reported weaknesses", "floor/topics/weaknesses.md: In merged code, if it reaches what the threat model protects"];
@@ -122,7 +122,6 @@ function reported(g, w) {
 // keeps private aside. { talk, pr }: a pull request's own title and text, and everything else. Each is read as the
 // words themselves, never as the JSON that carried them, whose escapes hide a quote.
 const PRIVATE = /^repos\/[^/]+\/[^/]+\/security-advisories(?:\/|$)/u;
-const words = v => (typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(words) : []);
 function sent(g, prs) {
   const out = { talk: [], pr: [] };
   for (const c of g.calls.filter(c => c.body && !PRIVATE.test(c.route ?? ""))) {

@@ -3,10 +3,11 @@
 // at one exact version in the parser's own lock file, installed from the registry into .packages/parser/node_modules/ only
 // where a job names it (install.mjs parser, or all; packages.mjs; #654, #719). Each
 // file is read from there and handed to the parser as bytes, so nothing is fetched or built while a file is read.
-// A grammar comes only with the reader that needs it: C#'s, for the functions the shape check's reader of C# finds
-// (csharp-functions.mjs); bash's, for the commands of a workflow's step, which the steps read (bash-commands.mjs);
+// A grammar comes only with the reader that needs it: C#'s, for all the shape check's reader of C# reads
+// (csharp-tree.mjs); bash's, for the commands of a workflow's step, which the steps read (bash-commands.mjs);
 // JavaScript's, TypeScript's and TSX's, for the functions of JavaScript and TypeScript the shape check and the measures
-// find (javascript-functions.mjs); Python's, for the functions of Python the shape check finds (python-functions.mjs).
+// find (javascript-functions.mjs); Python's, for the functions, imports and tokens of Python the shape check reads
+// (python-tree.mjs).
 //
 // The parser starts only where a file is read with it, so that a script that reads none, as most that load the shape
 // check's readers, pays nothing for it: in a worker thread of its own (parser-worker.mjs), which the reader's call

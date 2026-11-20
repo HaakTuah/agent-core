@@ -217,7 +217,7 @@ const fromFile = run(["--private", "--terms-file", file], { env: {} });
 ok(fromFile.status === 0 && fromFile.out.includes(`changed: ${issue.html_url}`), "--terms-file reads the list from a file", fromFile.out);
 const inside = path.join(tmp, "inside.txt");
 fs.writeFileSync(inside, TERMS);
-const inTree = run(["--private", "--terms-file", inside], { env: {}, top: fs.realpathSync(tmp) });
+const inTree = run(["--private", "--terms-file", inside], { env: {}, top: fs.realpathSync.native(tmp) });
 ok(inTree.status === 1 && mended(inTree.out) && !inTree.out.includes(tmp) && inTree.asked.length === 0, "a terms file inside the repository's work tree is refused, naming no path", inTree.out);
 const noFile = run(["--terms-file", path.join(tmp, "none")], { env: {} });
 ok(noFile.status === 1 && mended(noFile.out) && !noFile.out.includes(tmp), "a file that cannot be read fails, says the mend, and names no path", noFile.out);

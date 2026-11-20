@@ -186,15 +186,21 @@ ok(run("--raise").status === 1 && run("--raise", same).status === 1 && run("--ra
   fs.writeFileSync(ghLog, "");
   const runner = fs.mkdtempSync(path.join(tmp, "runner-"));
   // (in bash as GitHub runs a step, found as the workflow runner finds it: on Windows, Git for Windows' own)
+  // (the step runs on ubuntu, where tar knows a path by its slashes; Git for Windows' tar takes "C:" for a host, so the path is given as that bash writes it)
+  const msys = p => (process.platform === "win32" ? p.replace(/^([A-Za-z]):/u, (_, l) => `/${l.toLowerCase()}`).replaceAll("\\", "/") : p);
   const script = path.join(runner, "step.sh");
-  fs.writeFileSync(script, step.run);
-  const r = spawnSync(onPath("bash", env), ["-e", script], { cwd: repo, encoding: "utf8", env: { ...env, ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}), GH_TOKEN: "not-a-token", NUMBER: "1", OWNER: "someone", RUNNER_TEMP: runner, GITHUB_REPOSITORY: "someone/project" } });
+  // (jq for Windows ends its lines with CR, which the step, written for ubuntu, never meets in a login it reads; here the runner's bash is given jq with the lines the step expects)
+  const jqLf = "jq() { local o s; o=$(command jq \"$@\"); s=$?; if [ -n \"$o\" ]; then printf '%s\\n' \"${o//$'\\r'/}\"; fi; return $s; }\n";
+  fs.writeFileSync(script, (process.platform === "win32" ? jqLf : "") + step.run);
+  const r = spawnSync(onPath("bash", env), ["-e", script], { cwd: repo, encoding: "utf8", env: { ...env, ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}), GH_TOKEN: "not-a-token", NUMBER: "1", OWNER: "someone", RUNNER_TEMP: msys(runner), GITHUB_REPOSITORY: "someone/project" } });
   if (r.status !== 0) console.error(r.stdout + r.stderr);
   const rights = JSON.parse(fs.readFileSync(path.join(runner, "raise", "rights.json"), "utf8")), whose = whoseOf("someone", rights);
   ok(r.status === 0 && rights.length === 2 && whose({ login: "writer", type: "User" }) && !whose({ login: "reader", type: "User" }) && !whose({ login: "silent", type: "User" }) && whose({ login: "SomeOne", type: "User" })
     && r.stdout.includes("The host's rights of silent could not be read") && !/outsider|bad;name|someone\b/iu.test(r.stdout),
     "size.yml reads the rights of those who answered: a writer's counts, a reader's and one not answered do not, and the owner, an outsider and a login of any other form are not asked for", r.stdout + r.stderr);
-  ok(fs.readFileSync(path.join(runner, "raise", "head.mjs"), "utf8") === own && fs.readFileSync(path.join(runner, "raise", "base", "scripts", "size.mjs"), "utf8") === own,
+  // (git keeps a text file with LF where a Windows checkout has CRLF, so the two are read by their lines)
+  const lf = t => t.replaceAll("\r\n", "\n");
+  ok(lf(fs.readFileSync(path.join(runner, "raise", "head.mjs"), "utf8")) === lf(own) && lf(fs.readFileSync(path.join(runner, "raise", "base", "scripts", "size.mjs"), "utf8")) === lf(own),
     "  and puts by the head's script as text and the base's own scripts, for the base's to judge the raise");
 }
 

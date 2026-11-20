@@ -119,7 +119,7 @@ export function found(line, texts) {
 export function yesOf({ paths, body, texts, read = true }) {
   if (!paths.length) return { note: "the owner's yes is not asked here: the change touches neither the floor nor the review guidelines" };
   const lines = quoted(body), issues = issuesOf(body), named = `${paths.slice(0, 3).join(", ")}${paths.length > 3 ? ", …" : ""}`;
-  const how = `quote under a heading "## ${WORD}", in lines that open with ">", the owner's words word for word from the issue's text (its description or a comment) written by an account the host gives maintain or admin, whole words in their order, one piece of ${WORDS} or more, details floor rule 11 keeps out written "[…]"; correct nothing in the quote: only a session the owner works with corrects the owner's words, in its record on the issue (AGENTS.md, "Whose words an issue holds"), so where the issue holds them uncorrected, quote them as they stand there, and never write that record yourself`;
+  const how = `quote under a heading "## ${WORD}", in lines that open with ">", the owner's words word for word from the issue's text (its description or a comment) written by an account the host gives maintain or admin, whole words in their order, one piece of ${WORDS} or more, details floor rule 11 keeps out written "[…]"; correct nothing in the quote: only a session the owner works with corrects the owner's words, in its record on the issue (AGENTS.md, "Whose words an issue holds"), so where the issue holds them uncorrected, quote them as they stand there, and never write that record yourself; or, where the change only keeps the meaning (a path, a spelling, text moved unchanged, a name), ask a reviewer who did not write it for a "Design check:" naming the head that states it on a line "Meaning unchanged: <the paths>" (meaning-kept.mjs), then edit the description so this check runs again`;
   if (!issues.length) return { mend: `this pull request changes ${named}, which asks the owner's yes (floor rule 3), and names no issue. Mend: name the issue that holds the owner's yes ("Fixes #n" or "Part of #n"), and ${how}` };
   if (!lines.length) return { mend: `this pull request changes ${named}, which asks the owner's yes (floor rule 3), and quotes nothing under "${WORD}". Mend: ${how}; where the issue holds no yes for this change, file one asking the owner and leave this pull request unmerged meanwhile` };
   if (lines.some(l => found(l, texts))) return { note: `the owner's yes is quoted, found word for word on ${issues.map(n => `#${n}`).join(", ")}` };
@@ -131,7 +131,7 @@ export function yesOf({ paths, body, texts, read = true }) {
 // the host refuses past), whether it was edited and by whom: the host gives every editor, the first 100 of them.
 export const editsQuery = ids => `query { nodes(ids: [${ids.map(id => JSON.stringify(id)).join(", ")}]) { id ... on UserContentEditable { lastEditedAt userContentEdits(first: 100) { totalCount nodes { editor { login } } } } } }`;
 const NODE = /^[A-Za-z0-9_=-]{1,100}$/u, BATCH = 100;
-const ghCall = (route, query) => { const r = spawnSync("gh", query === undefined ? ["api", route] : ["api", "graphql", "-f", `query=${query}`], { encoding: "utf8", maxBuffer: 1 << 24 }); return r.status === 0 ? JSON.parse(r.stdout) : null; };
+export const ghCall = (route, query) => { const r = spawnSync("gh", query === undefined ? ["api", route] : ["api", "graphql", "-f", `query=${query}`], { encoding: "utf8", maxBuffer: 1 << 24 }); return r.status === 0 ? JSON.parse(r.stdout) : null; };
 
 // The texts of the issues `issues` of `repo`, through gh: { notes: [{ login, body, id }], read }, read false where an
 // issue or a page of its comments was not given, or the comments ran past MOST_PAGES.
@@ -141,11 +141,11 @@ function notesOf(repo, issues, gh) {
   for (const n of issues) {
     const issue = gh(`repos/${repo}/issues/${n}`);
     if (!issue) { read = false; continue; }
-    notes.push({ login: String(issue.user?.login ?? ""), body: issue.body, id: issue.node_id });
+    notes.push({ login: String(issue.user?.login ?? ""), body: issue.body, id: issue.node_id, comment: false });
     for (let page = 1; page <= MOST_PAGES; page++) {
       const one = gh(`repos/${repo}/issues/${n}/comments?per_page=100&page=${page}`);
       if (!Array.isArray(one)) { read = false; break; }
-      notes.push(...one.map(c => ({ login: String(c.user?.login ?? ""), body: c.body, id: c.node_id })));
+      notes.push(...one.map(c => ({ login: String(c.user?.login ?? ""), body: c.body, id: c.node_id, comment: true })));
       // (a last page still full: comments past it were not read)
       if (one.length === 100 && page === MOST_PAGES) read = false;
       if (one.length < 100) break;
@@ -174,11 +174,12 @@ function counts(node, higher) {
   return edits.nodes.every(edit => higher(String(edit?.editor?.login ?? ""))) ? "yes" : "no";
 }
 
-// Of the issues `issues` of `repo`, the texts written by an account the host gives the higher right, and edited, where
-// at all, by such accounts alone, each readable(), through gh (a REST route, or "graphql" with its query): { texts, read },
-// read false where an issue, a page of its comments, an account's right or a text's editors could not be read, or the
-// comments ran past MOST_PAGES (the texts read so far are kept, so a quote found among them still passes).
-export function textsOf(repo, issues, gh = ghCall) {
+// Of the issues `issues` of `repo` (a pull request is one), the texts written by an account the host gives the higher
+// right, and edited, where at all, by such accounts alone, through gh (a REST route, or "graphql" with its query):
+// { notes: [{ body, comment }], read }, in the host's order (the issue's description, then its comments, oldest first;
+// `comment` false for the description), read false where an issue, a page of its comments, an account's right or a
+// text's editors could not be read, or the comments ran past MOST_PAGES (the texts read so far are kept).
+export function countedOf(repo, issues, gh = ghCall) {
   const rights = new Map();
   let read = true;
   // (a login of no account's form, a bot's among them, is no owner; one the host does not answer on is unread)
@@ -196,6 +197,12 @@ export function textsOf(repo, issues, gh = ghCall) {
     const by = editsOf(kept.map(note => note.id).filter(id => typeof id === "string" && NODE.test(id)), gh);
     const verdicts = kept.map(note => [note, counts(by.get(note.id), higher)]);
     if (verdicts.some(([, v]) => v === "unread")) read = false;
-    return { texts: verdicts.filter(([, v]) => v === "yes").map(([note]) => readable(note.body)), read };
-  } catch { return { texts: [], read: false }; }
+    return { notes: verdicts.filter(([, v]) => v === "yes").map(([note]) => ({ body: String(note.body ?? ""), comment: note.comment })), read };
+  } catch { return { notes: [], read: false }; }
+}
+
+// The texts of countedOf, each readable(), for the quotes: { texts, read }, so a quote found among those read passes.
+export function textsOf(repo, issues, gh = ghCall) {
+  const { notes, read } = countedOf(repo, issues, gh);
+  return { texts: notes.map(note => readable(note.body)), read };
 }

@@ -23,7 +23,7 @@
 // the shape check counts it and says so (shape.mjs, "lost").
 import path from "node:path";
 import { inParser } from "./parser.mjs";
-import { LARGEST, walkFunctions } from "./tree-walk.mjs";
+import { LARGEST, budgetOf, walkFunctions } from "./tree-walk.mjs";
 
 // The grammar each file is read with, by its extension: TypeScript's own (where <T>x is a cast), TypeScript with JSX,
 // and JavaScript, whose grammar reads JSX wherever it stands.
@@ -33,7 +33,7 @@ export const grammarOf = file => GRAMMAR[path.posix.extname(file)] ?? "javascrip
 /** The functions of `src`, the text of `file`: [{ name, line, lines, depth, branches }], in the order their bodies
  *  open; null where they cannot be told. Read in the parser's thread (read, below). */
 export function javascriptFunctions(file, src) {
-  if (src.length > LARGEST) return null;
+  if (src.length > LARGEST.javascript) return null;
   try { return inParser(import.meta.url, "read", grammarOf(file), src); } catch (e) {
     if (e?.kind === "read") return null;
     // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step: #719; tested apart
@@ -43,12 +43,6 @@ export function javascriptFunctions(file, src) {
     throw e;
   }
 }
-
-// (how long the grammar may take on one file, in milliseconds, a second and 4 more for each thousand characters: it
-// reads JavaScript in time in step with its size, about 1 ms for each thousand characters, and the core's largest file
-// in a few; its recovery from text that is no JavaScript grows faster than the text, a line of 300,000 "/[" past two
-// minutes. A file it cannot read within it has no functions told)
-const budgetOf = src => 1000 + src.length / 250;
 
 /** The functions of `src`, read with the parser's `parse` and the grammar named (in its thread: javascriptFunctions). */
 export function read(parse, grammar, src) {

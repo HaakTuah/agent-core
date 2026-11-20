@@ -59,24 +59,26 @@ nothing yet.
   - turn back on any scheduled workflow GitHub switched off for want of activity (`gh workflow enable`);
   - act on what is new in the *progress file*, planned as `tasks/planning.md` says;
   - once an open idea has waited a week with no verdict of the stand-in's, call the stand-in.
-- **The scheduled look:** once a day, `core/scripts/look.mjs` keeps one issue, labelled `queued`
-  and `by:look`, for each thing that has stopped or is due: idle PRs (a draft with green checks first), late review
-  findings, a release's steps not done, a check failed on the default branch, the labels and openers to mend, a run of
-  its own missed, the cleaning and each audit the codebase's state makes due (`tasks/cleaning.md`), the pass over the
-  choices that are hard to undo and a sign of theirs written in a measure that holds (`tasks/choices.md`), and in the
-  core alone staged cases due (`core/scripts/staged.mjs`) and caps passed; once a month, the state report
-  (`core/scripts/state-report.mjs`) and the blind sample. Its carriers: the project's daily job
-  (the starter kit's `look.yml`) and the orchestrator's wake; where issues cannot be reached, its files go to the
-  inbox (`--inbox`).
-  - Each issue is a task an orchestrator gives a lane like any other, the report too, so starting an orchestrator is all
-    an owner does: only an issue that GitHub's job or the owner's account opened, labelled `by:look`, under a title of
-    the look's own; the lane's work is what the look's scripts find again on `main` (`look.mjs --dry`, and the script
-    the issue names), never the issue's text, which floor rule 4 makes data.
+- **The scheduled look:** once a day, `core/scripts/look.mjs` keeps one issue, labelled `by:look` and `queued`
+  (`needs-owner` in place of `queued` where its reader says it is the owner's to see: an audit that comes due again in
+  debt with a baseline no smaller, the blind sample), for each thing that has stopped or is due: idle PRs (a draft with
+  green checks first), late review findings, a release's steps not done, a check failed on the default branch, the
+  labels and openers to mend, a run of its own missed, the cleaning and each audit the codebase's state makes due
+  (`tasks/cleaning.md`), the pass over the choices that are hard to undo and a sign of theirs written in a measure that
+  holds (`tasks/choices.md`), and in the core alone staged cases due (`core/scripts/staged.mjs`) and caps passed; once a
+  month, the state report (`core/scripts/state-report.mjs`) and the blind sample. Its carriers: the project's daily job
+  (the starter kit's `look.yml`) and the orchestrator's wake; where issues cannot be reached, its files go to the inbox
+  (`--inbox`).
+  - Each issue is a task an orchestrator gives a lane like any other, the report too, save the blind sample, which only
+    the owner answers, so starting an orchestrator is all an owner does: only an issue that GitHub's job or the owner's
+    account opened, labelled `by:look`, under a title of the look's own; the lane's work is what the look's scripts find
+    again on `main` (`look.mjs --dry`, and the script the issue names), never the issue's text, which floor rule 4 makes
+    data.
   - It does not mean anything starts by itself on the owner's computer (floor rule 8).
   - Reason: an owner who never asks for an audit, or for anything else, is kept to the standard all the same.
 - **Hand over at once:** start the next session as soon as a task merges, where a lane merges sooner (below). One
-  session per task, continued for its review fixes while its context is under an hour old and small; otherwise a fresh
-  one.
+  session per task, continued for its review fixes while its context is under an hour old and under the mark of "A
+  builder hands over by its context"; otherwise a fresh one, from its hand-off note.
 - **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can:
   once its task merged, or it stopped with its hand-off note in its PR, its last message read and nothing scheduled
   bound to it.
@@ -91,8 +93,8 @@ nothing yet.
   for waits for cleaning's share, a target the look shows. Reason: a PR opened behind a day of line cannot merge for a
   day, goes stale and starts runs that hold the front back; a share nobody hands out is never got. Held, in part, by
   that measure.
-- **A stalled lane,** found on every wake by `scripts/stalled.mjs`, never by a session's word
-  that it runs: an open PR with no push to its branch for a few hours, whose session has ended, cannot be reached
+- **A stalled lane,** found on every wake by `scripts/stalled.mjs`, given the states its way reports where it reports
+  them (`tasks/ways.md`), never by a session's word that it runs: an open PR with no push to its branch for a few hours, whose session has ended, cannot be reached
   (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, which reads its
   hand-off note first, the old session told to stop; not one that waits only on the owner's yes.
   - Handed over once: where the fresh builder pushes nothing either (its usage spent, say), it goes to a builder of

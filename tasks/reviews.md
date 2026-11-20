@@ -1,8 +1,8 @@
 # Reviews
 
-Read when a PR is reviewed, by its builder before it is marked ready (`roles/builder.md`), and by the session that takes
-the monthly state report, for point 8: the kind `review`. What
-reviewers judge by: `roles/shared/review-guidelines.md`.
+Read when a PR is reviewed, by its builder before it is marked ready (`roles/builder.md`), by the session that takes
+the monthly state report, for point 8, and by the one that runs the staged cases, for point 9: the kind `review`; the
+path `scripts/stage-order.mjs`. What reviewers judge by: `roles/shared/review-guidelines.md`.
 
 **Which:**
 - Floor rule 8's security review (point 3).
@@ -81,6 +81,21 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      in part, by the `security-review` status through `scripts/clean-merges.mjs` and its test, by which the `code-review`
      status carries a code review over the same way; the status waits where the rule is broken, in the core, and holds
      the merge once a ruleset requires it (#320).
+   - **A pull request of the *progress file* alone needs no review of its own** (#750). By default every pull request
+     gets its reviews. Where `scripts/queue-only.mjs`, run from the default branch on the head, proves that it changes
+     the *progress file* alone, from a branch of the repository's own into the default branch, each line it adds in a
+     form the file's lines already take and naming an open, queued issue of the *owner's account* that needs no word (a
+     bug, a task of the scheduled look) or holds the owner's word as the owner typed it (`by:owner`, no agent's mark in
+     it), and each line it removes a closed one (what it reads, and what it leaves to the reviews: the script's header),
+     it merges on its checks as a pure sync does: the `security-review` and `code-review` statuses pass with no review,
+     a review that starts by itself still waited for, and its builder asks none. It does not mean a line joins without
+     the owner's word where one is needed, that any other file rides along, nor that a line the script cannot read (a
+     test, a check for a rule that stands, an audit's small finding, words new to the file, the owner's word as a
+     session recorded it, `by:chat` or `by:design`, whose text no script reads for it) is refused: that pull request is
+     reviewed as any other, and what a review passed joins what later lines may say. Reason: 4 of 39 merges only added
+     queue lines, each through Codex's two reviews, a fallback's review and the full tests, where what a review would
+     read is exactly what a script can read. Held by `scripts/queue-only.mjs`, which the core's own caller of the
+     `security-review` workflow runs, and its test.
    - **What a posted review declares** (#299): by default a review posted in a comment that opens "Security review:",
      "Code review:" or "Design check:" covers one kind of review, and declares what it found on two lines of their own:
      "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other finding.", and its score
@@ -135,3 +150,38 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    check says it at the moment it matters, to any tool. Held by `core/scripts/review-record.mjs`, which lists exactly
    the rules two pull requests' findings name, and by the monthly state report the scheduled look opens; no check
    reads that the issues are filed.
+9. **The reviewers are tested** (#307). By default each reviewer in the order (`tasks/roles.md`, "Tools are
+   preferences") is given a staged pull request with a fault of each blocking kind planted in it, the staged case
+   `review`, with the staged cases each month, and again once the review guidelines change or a reviewer's model does.
+   The trigger is a verdict of that case that fails: the session that records it adds to the guidelines' worked
+   examples one drawn from each fault the reviewer missed, in a pull request that relays the owner's agreement on #307
+   as floor rule 3's yes; where the same reviewer misses the same kind again, it files the issue that moves that
+   reviewer down the order. It does not mean that a pull request waits for a case to pass, nor that a reviewer leaves
+   the order. Reason: every pull request rests on its reviews, and a judge no one tests leans kind. Held by the staged
+   case `review` and the look's issue "Staged cases to run", which `scripts/staged.mjs` keeps due on any change to the
+   guidelines; a model's change, and the kinds no case plants yet, by no check.
+10. **The order follows cost** (#397). By default every stage of a pull request's proof and review (the host's checks,
+    and each review, asked or starting by itself) starts together once it is marked ready. The one condition that
+    changes it: `core/scripts/stage-order.mjs` reads that the run is short of something, from what it can read exactly
+    (its header): the proof billed (a private repository whose suites run on the host's runners, their rate printed),
+    the allowance of a tool that builds, or that of the session's own tool while the session sees its usage warning,
+    which it tells the script. Then a stage goes early where it spends little of what is short and often sends the work
+    back (the script reads what is short, never how often a stage sends the work back, which the review record shows),
+    one that spends a thing ranked less short before one ranked more (the script's header ranks them), and the
+    stage that spends most goes last, once, on settled code: where it is the proof, the reviews are asked on the draft and their blocking findings mended before
+    it is marked ready; where it is a tool's reviews, they are asked once the host's checks passed and the reviews
+    before hold nothing blocking on that head. The builder runs the script at its task's start or, at the latest, before it asks its first
+    review, and follows the order it prints; the owner's word, said in person, for now or as the pace, overrides it. It
+    does not mean that a review that starts by itself is not waited for and read (floor rule 8), that a stage is left
+    out, that the host's run stops being the proof floor rule 12 gates on (it runs once, when the pull request is ready:
+    `tasks/tests.md`, "No test run on a draft"), that what is short is written in the repository, nor that an owner is
+    asked it. Reason: one project runs in many set-ups, and an order fixed in its repository, or waiting for its owner
+    to say what is short, is wrong for all but one. Held, in part, by `core/scripts/stage-order.mjs` and its test, each
+    input read from a set-up made for it; that a builder follows the order, by nothing yet, the review record's counts
+    of what each review blocked and of the rounds a pull request took showing it at the reviews of the core.
+    - **The session's own run comes first** (#397). By default, before it asks any review or marks its pull request
+      ready, the builder runs once, where it works, the tests its change can reach (`core/scripts/select.mjs`, with
+      `SELECT_BASE` the default branch), and mends what fails. Nothing changes it. It does not mean a run before every
+      push, which the owner declined (#417), nor that the session's run is the proof: the host's run is. Reason: a
+      review of code whose tests fail is a round spent, and the session's run is the cheapest stage that sends work
+      back. Held by nothing yet: no check can read whether a session ran its tests before it asked.

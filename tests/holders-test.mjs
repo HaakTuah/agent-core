@@ -11,11 +11,16 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { inStep as inStepAt, itemsIn, KEY, LAST_NUMBERED } from "../scripts/archive.mjs";
-import { OWN, counts, heldThere, holders, ownHolders, ownReport, report, shareLine } from "../scripts/holders.mjs";
+import { OWN, counts, entryFile, heldThere, holders, named, ownHolders, ownReport, report, shareLine } from "../scripts/holders.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { fingerprint, rules, rulesOf } from "../scripts/rules.mjs";
+import { installed } from "../scripts/packages.mjs";
 import { shapeFaults } from "../scripts/schemas.mjs";
+
+// (the file's form is read by ajv, which the core's install brings; without it the cases that read the form could only
+// fail on a message they never get, among the lines of the cases that ran, so the test stops and says what it lacks, #905)
+if (!installed("ajv")) { console.error("FAIL: the core's packages are not installed, so the form of scripts/holders/ cannot be read (ajv). Mend: run `node scripts/install.mjs` first, then run this again"); process.exit(1); }
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
@@ -45,12 +50,20 @@ ok(mine.length > 100 && new Set(mine.map(x => x.key)).size === mine.length, `the
 ok(rules(root, { agents: true }).some(x => x.key === "AGENTS.md: Nothing locks a project"), "with agents, the core's own AGENTS.md is read too");
 
 // ---- what holds each, and what fails ----
+// (the list as its entries stand: a file for each rule, named as entryFile names it)
+const writeList = (dir, { holders: h = {}, behind: b = {}, numbers: n = {} }) => {
+  fs.mkdirSync(path.join(dir, "scripts", "holders"), { recursive: true });
+  for (const key of new Set([...Object.keys(h), ...Object.keys(b), ...Object.keys(n)])) {
+    fs.writeFileSync(path.join(dir, "scripts", "holders", entryFile(key)), JSON.stringify({ rule: key, ...(key in h ? { holder: h[key] } : {}), ...(key in b ? { behind: b[key] } : {}), ...(key in n ? { number: n[key] } : {}) }));
+  }
+};
 const project = (holdersJson, extra = {}) => {
   const dir = fs.mkdtempSync(path.join(tmp, "p-"));
   fs.mkdirSync(path.join(dir, "tasks")); fs.mkdirSync(path.join(dir, "scripts"));
   fs.writeFileSync(path.join(dir, "tasks", "x.md"), text);
   fs.writeFileSync(path.join(dir, "scripts", "a-check.mjs"), "");
-  fs.writeFileSync(path.join(dir, "scripts", "holders.json"), typeof holdersJson === "string" ? holdersJson : JSON.stringify({ holders: holdersJson, ...(extra.behind ? { behind: extra.behind } : {}), ...(extra.numbers ? { numbers: extra.numbers } : {}) }));
+  if (typeof holdersJson === "string") { fs.mkdirSync(path.join(dir, "scripts", "holders")); fs.writeFileSync(path.join(dir, "scripts", "holders", "broken.json"), holdersJson); }
+  else writeList(dir, { holders: holdersJson, behind: extra.behind, numbers: extra.numbers });
   delete extra.behind; delete extra.numbers;
   for (const [f, t] of Object.entries(extra)) fs.writeFileSync(path.join(dir, f), t);
   return dir;
@@ -65,7 +78,7 @@ ok(JSON.stringify(hooked.hooked) === JSON.stringify(["tasks/x.md: 1. A rule of a
   "a rule whose only holders are hooks is listed as held by none, and one a check holds beside a hook is counted by the check (tasks/tools.md)", JSON.stringify(hooked));
 const bad = holders(project({ "tasks/x.md: Gone": "check: scripts/a-check.mjs", "tasks/x.md: Numbered": "check: scripts/missing.mjs", "tasks/x.md: A last item": "case: a-case", "tasks/x.md: The second numbered": "reviews" }), []);
 ok(bad.wrong.length === 4 && bad.wrong.every(w => /Mend: /.test(w)), "a key that names no rule, a check not there, a staged case named here and a holder in no form each fail, saying the mend", bad.wrong.join("\n"));
-ok(holders(project("{ not json"), []).wrong.length === 1, "holders.json that cannot be read fails");
+ok(holders(project("{ not json"), []).wrong.length === 1, "an entry that cannot be read fails");
 ok(report(root).length >= 1 && /^- Of \d+ rules/.test(report(root)[0]), "the state report's lines begin with the counts");
 
 // ---- the archive's items behind each rule, and its two forms ----
@@ -142,20 +155,40 @@ ok([/items-001\.md:5: item #9 stands outside archive\/instructions\/issue-9\.md,
   /item 263 is keyed by a running number, a key that names no issue, .* Mend: key it "#N"/, /words\/issue-12\.1\.md: item #12\.1 adds the owner's words here/].every(re => keyedBad.some(w => re.test(w))) && keyedBad.every(w => /Mend: /.test(w)),
   "a keyed item in another file, two items in one file, a key used twice, a number past the last and a keyed item in the words each fail, saying the mend", keyedBad.join("\n"));
 const keysAt = archive({ "items-001.md": r1, "issue-9.md": "#9. **19 Nov**: h.\n", "issue-9.2.md": "#9.2. **19 Nov**: i.\n" });
-fs.writeFileSync(path.join(keysAt, "scripts", "holders.json"), JSON.stringify({ holders: {}, behind: { "tasks/x.md: Numbered": [1, "#9", "#9.2"], "tasks/x.md: Its own item": ["9", "#x", 7.5], "tasks/x.md: A last item": ["#10"] } }));
+writeList(keysAt, { behind: { "tasks/x.md: Numbered": [1, "#9", "#9.2"], "tasks/x.md: Its own item": ["9", "#x", 7.5], "tasks/x.md: A last item": ["#10"] } });
 fs.writeFileSync(path.join(keysAt, "tasks", "y.md"), "# Y\n\n- **A rule** (core archive #9).\n");
 const behindKeys = holders(keysAt, []);
 ok([...[0, 1, 2].map(i => `"tasks/x.md: Its own item", item ${i} `), "core archive #10 is no item", "tasks/y.md:3 points to the archive"].every(w => behindKeys.wrong.some(x => x.includes(w))) && behindKeys.wrong.filter(x => x.includes("Its own item")).every(x => x.includes("Mend: write an item's key as the archive keys it")) && !behindKeys.wrong.some(x => x.includes("\"tasks/x.md: Numbered\"")) && behindKeys.wrong.every(w => /Mend: /.test(w)),
   "behind: a number and keys by an issue that stand pass; a key that names no issue, one not in the archive and a keyed pointer in a rule file each fail, saying the mend", behindKeys.wrong.join("\n"));
 
-// ---- the file's form, its schema's (#530) ----
-const formOf = j => shapeFaults("holders", j, "", "scripts/holders.json");
+// ---- each rule's entry stands in a file of its own, named from the rule (#750, point 1; #853) ----
+{
+  const dir = project({ "tasks/x.md: Numbered": "describes" }), at = f => path.join(dir, "scripts", "holders", f);
+  fs.writeFileSync(at("a-misnamed.json"), JSON.stringify({ rule: "tasks/x.md: Its own item", holder: "audit" }));
+  fs.writeFileSync(at("not-an-object.json"), "[]");
+  fs.writeFileSync(at(entryFile("tasks/x.md: A last item")), JSON.stringify({ rule: "tasks/x.md: A last item", holders: "audit" }));
+  fs.writeFileSync(at("notes.txt"), "no");
+  const faults = named(dir).faults;
+  ok(faults.length === 4 && faults.every(f => /Mend: /.test(f)) && faults.some(f => f.includes(`rename the file to ${entryFile("tasks/x.md: Its own item")}`)) && faults.some(f => /no object with a "rule"/.test(f)) && faults.some(f => /has "holders", which an entry does not read/.test(f)) && faults.some(f => f.includes("notes.txt")),
+    "an entry in a file not named from its rule, one that is no object with a rule, one with a part it does not read and a file that is no entry each fail, saying the mend", faults.join("\n"));
+  ok(holders(dir, []).wrong.length === 4, "and they fail the check once each", holders(dir, []).wrong.join("\n"));
+  const twin = holders(project({}, { "tasks/z.md": "# Z\n\nRead when needed.\n\n**A rule.** a.\n\n**A rule!** b.\n" }), []).wrong;
+  ok(twin.some(w => /would be the entry of "tasks\/z\.md: A rule" and "tasks\/z\.md: A rule!"\. Mend: reword the lead/.test(w)), "two rules whose entries would share a file fail, saying the mend", twin.join("\n"));
+  const twinOwn = holders(project({}, { "AGENTS.md": "# A core\n\n**An own rule.** a.\n\n**An own rule!** b.\n" }), []).wrong;
+  ok(twinOwn.some(w => /would be the entry of "AGENTS\.md: An own rule" and "AGENTS\.md: An own rule!"\. Mend: /.test(w)), "and so do two rules of the core's own AGENTS.md", twinOwn.join("\n"));
+  const all = rules(root, { agents: true }), seen = new Map();
+  for (const r of all) seen.set(entryFile(r.key), [...(seen.get(entryFile(r.key)) ?? []), r.key]);
+  ok([...seen.values()].every(k => k.length === 1), "no two rules of the core share the file name their entry would stand in", [...seen.values()].filter(k => k.length > 1).join("\n"));
+}
+
+// ---- the list's form, its schema's (#530) ----
+const formOf = j => shapeFaults("holders", j, "", "scripts/holders");
 const shapes = [null, [], { holders: [] }, { behind: "a" }, { numbers: 3 }, { holders: { a: 5 } }, { holders: { a: "" } }, { holders: { a: ["audit", ""] } }, { holders: { a: [4] } },
   { behind: { a: [] } }, { behind: { a: [0] } }, { behind: { a: [LAST_NUMBERED + 1] } }, { behind: { a: ["#"] } }, { behind: { a: ["#9.x"] } }, { behind: { a: [null] } }, { numbers: { a: "" } }, { numbers: { a: 3 } }];
 const refused = shapes.map(j => formOf(j));
-ok(refused.every(f => f.length === 1 && /^scripts\/holders\.json.* Mend: \S/u.test(f[0])), "each part in no form the file holds is refused once, said of the file and where in it, with its mend",
+ok(refused.every(f => f.length === 1 && /^scripts\/holders.* Mend: \S/u.test(f[0])), "each part in no form the file holds is refused once, said of the file and where in it, with its mend",
   refused.map((f, i) => `${JSON.stringify(shapes[i])}: ${JSON.stringify(f)}`).join("\n"));
-ok(JSON.stringify(formOf(JSON.parse(fs.readFileSync(path.join(root, "scripts", "holders.json"), "utf8")))) === "[]" && JSON.stringify(formOf({ holders: { a: [] }, behind: { a: [1, LAST_NUMBERED, "#9", "#9.2"] }, numbers: { a: "x" }, other: 1 })) === "[]",
+ok(JSON.stringify(formOf(named(root).json)) === "[]" && JSON.stringify(formOf({ holders: { a: [] }, behind: { a: [1, LAST_NUMBERED, "#9", "#9.2"] }, numbers: { a: "x" }, other: 1 })) === "[]",
   "the core's own file holds its form, as do a number up to the last numbered item and keys by an issue or one point of it; a key the file does not name is let be, as the script let it");
 const keyRule = JSON.parse(fs.readFileSync(path.join(root, "scripts", "schemas", "holders.json"), "utf8")).properties.behind.additionalProperties.items;
 ok(keyRule.pattern === KEY.source && keyRule.maximum === LAST_NUMBERED && keyRule.mend.includes(`up to ${LAST_NUMBERED} `), "the schema's form of a key is the archive's own (archive.mjs's KEY and LAST_NUMBERED), its mend naming the last numbered item", JSON.stringify(keyRule));
@@ -163,18 +196,18 @@ ok(keyRule.pattern === KEY.source && keyRule.maximum === LAST_NUMBERED && keyRul
 // ---- the core's own, and the script as a check ----
 const own = spawnSync(process.execPath, [path.join(root, "scripts", "holders.mjs")], { encoding: "utf8" });
 const numbersBad = holders(project({}, { numbers: { "tasks/x.md: Gone": "findings; outcome: robust", "tasks/x.md: Numbered": "findings", "tasks/x.md: Its own item": "check fires; outcome: fast" } }), []);
-ok(numbersBad.wrong.length === 2 && numbersBad.wrong.some(w => w.includes("\"numbers\", names \"tasks/x.md: Gone\"")) && numbersBad.wrong.some(w => w.includes("\"tasks/x.md: Numbered\": \"findings\" is in no form")) && numbersBad.wrong.every(w => /Mend: /.test(w)),
+ok(numbersBad.wrong.length === 2 && numbersBad.wrong.some(w => w.includes("(\"number\") names \"tasks/x.md: Gone\"")) && numbersBad.wrong.some(w => w.includes("tasks-x-md--numbered.json (\"number\"): \"findings\" is in no form")) && numbersBad.wrong.every(w => /Mend: /.test(w)),
   "numbers: a key that is no rule, and a number with no outcome, each fail, saying the mend; one in its form passes", numbersBad.wrong.join("\n"));
-ok(own.status === 0 && !own.stderr, "the core's own holders.json names only rules that stand, and checks that are there", own.stderr);
+ok(own.status === 0 && !own.stderr, "the core's own entries in scripts/holders/ name only rules that stand, and checks that are there", own.stderr);
 const failing = project({ "tasks/x.md: Gone": "audit" });
 fs.mkdirSync(path.join(failing, "scripts", "staged"));
 fs.mkdirSync(path.join(failing, "scripts", "schemas"));
-for (const f of ["archive.mjs", "core-address.mjs", "core-path.mjs", "guards.mjs", "holders.mjs", "packages.mjs", "rule-files.mjs", "rules.mjs", "schemas.mjs", "schemas/holders.json", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
+for (const f of ["archive.mjs", "core-address.mjs", "core-path.mjs", "guards.mjs", "holders.mjs", "packages.mjs", "reading.mjs", "rule-files.mjs", "rules.mjs", "schemas.mjs", "schemas/holders.json", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
 fs.writeFileSync(path.join(failing, "scripts", "staged.mjs"), "export const CASES = [];\n");
 fs.writeFileSync(path.join(failing, "scripts", "outcomes.mjs"), "export const NUMBER = /^$/u;\n");
 const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.mjs")], { encoding: "utf8" });
-ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`) && /^::warning::The form of scripts\/holders\.json was not checked: the package ajv is not installed\. Mend: run node scripts\/install\.mjs/mu.test(run.stdout),
-  "where holders.json is wrong the check fails, each failure saying its mend; on a copy with no packages its form goes unchecked, said as a warning with its mend, and the rest is read as ever", `${run.stdout}${run.stderr}`);
+ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`) && /^::warning::The form of scripts\/holders\/ was not checked: the package ajv is not installed\. Mend: run node scripts\/install\.mjs/mu.test(run.stdout),
+  "where an entry is wrong the check fails, each failure saying its mend; on a copy with no packages its form goes unchecked, said as a warning with its mend, and the rest is read as ever", `${run.stdout}${run.stderr}`);
 
 // ---- the share a check holds in a project (#459, point 3) ----
 {
