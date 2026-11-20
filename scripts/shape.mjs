@@ -106,6 +106,11 @@ const isObject = v => !!v && typeof v === "object" && !Array.isArray(v);
 const strings = v => Array.isArray(v) && v.every(s => typeof s === "string" && s.length > 0);
 const optional = (v, test) => v === undefined || test(v);
 const plainPath = s => typeof s === "string" && /^[\w@.-][\w@. -]*(\/[\w@.-][\w@. -]*)*\/?$/u.test(s) && !s.split("/").includes("..");
+// Where a git pathspec points once its magic is taken off (":!", ":^", ":/", ":(top,glob)"): "outside" where it is
+// absolute, a drive's or a share's, or climbs above the project's root (git itself refuses such a pathspec, in words
+// that name no mend).
+const OUTSIDE = /^(?:\/|[A-Za-z]:)|^\.\.(?:\/|$)/u;
+const leavesProject = spec => OUTSIDE.test(path.posix.normalize(spec.replace(/^:(?:\([^)]*\)|[!^/]*:?)/u, "").replaceAll("\\", "/")));
 // A mark of a change the project adds ("changes"): plain text, found anywhere in a comment line's first 400 characters,
 // so that no mark a config holds can make the check slow (a pattern of its own could backtrack past any bound a count
 // of its quantifiers sets); at most 120 characters, no control character, at most 20 of them (the schema's, which a
@@ -128,6 +133,10 @@ function readShape(c, at) {
   if (faults?.length) throw new Refused(faults[0]);
   if (faults === null && !(typeof c.baseline === "string" && strings(c.code) && c.code.length)) refuse(`${at} names no "baseline" and "code" the check can read`, KIT_FORM);
   if (!plainPath(c.baseline) || c.baseline.endsWith("/")) refuse(`${at} names no "baseline" that is a plain path inside the project`, "name the baseline's path in \"baseline\", as the starter kit writes it (checks/shape-baseline.json)");
+  for (const key of ["code", "tests"]) {
+    const out = formed(c[key], strings, []).find(leavesProject);
+    if (out !== undefined) refuse(`"${key}" in ${at} names the pathspec ${JSON.stringify(out)}, which leaves the project`, `name only paths inside the project in "${key}", as git pathspecs from its root (":!" leaves one out), as the starter kit writes them (core/setup/template/shape.json.tmpl)`);
+  }
   const aliases = formed(c.aliases, isObject, {});
   if (!Object.values(aliases).every(plainPath)) refuse(`"aliases" in ${at} is not in the form the check reads`, "give each prefix an import may start with (\"@/\") the path inside the project it stands for (\"src/\")");
 }
@@ -544,12 +553,18 @@ const SAFE = ["-c", "core.fsmonitor=false"];
 const git = (args, opts = {}) => execFileSync("git", [...SAFE, ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["pipe", "pipe", "ignore"], ...opts });
 const lsFiles = (specs, root) => (specs.length ? git(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...specs], { cwd: root }).split("\0").filter(Boolean) : []);
 const readable = f => isCode(f) || isPackageFile(f);
+// A file the check reads in the working folder: a regular file on disk, never a link or a folder (a submodule, a nested
+// repository), as standing() reads it.
+const onDisk = (f, root) => { try { return fs.lstatSync(path.join(root, f)).isFile(); } catch { return false; } };
+// The files of code its readers know that the check reads under the config's "code" and "tests", in the working folder
+// (read-nothing.mjs counts them, so that the two lists cannot drift; #459).
+export const codeListed = (config, root = ".") => lsFiles([...config.code, ...config.tests], root).filter(f => isCode(f) && onDisk(f, root));
 
 // The project's files as they stand in the working folder: { texts, tests }, never through a link.
 export function standing(config, root = ".") {
   const texts = {};
   for (const f of new Set([...lsFiles([...config.code, ...config.tests], root), ...lsFiles(PACKAGE_FILES, root)].filter(readable))) {
-    try { if (!fs.lstatSync(path.join(root, f)).isSymbolicLink()) texts[f] = fs.readFileSync(path.join(root, f), "utf8"); } catch { /* listed, not on disk */ }
+    try { if (onDisk(f, root)) texts[f] = fs.readFileSync(path.join(root, f), "utf8"); } catch { /* listed, not on disk */ }
   }
   return { texts, tests: new Set(lsFiles(config.tests, root)) };
 }

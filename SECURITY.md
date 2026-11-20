@@ -76,9 +76,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`), the sync and its steps
-     (`scripts/sync.mjs`, `scripts/steps.mjs`) and the scheduled look (`scripts/look.mjs`); limits: 64 MB of a file
-     the steps read, past which it is reported unread, and none of their own in count, since a project's config is its
-     own; hostile tests: `tests/hostile-configs-test.mjs`.
+     (`scripts/sync.mjs`, `scripts/steps.mjs`), the reader of the checks that read nothing (`scripts/read-nothing.mjs`,
+     from the steps and the state report, listing files by the shape check's own lister) and the scheduled look
+     (`scripts/look.mjs`); limits: 64 MB of a file the steps read, past which it is reported unread, and none of their
+     own in count, since a project's config is its own; hostile tests: `tests/hostile-configs-test.mjs`.
    - the files an agent tool takes its instructions from (`GEMINI.md`, an entry file, each file of a tool's folders), as
      the work tree and a pull request's base hold them: read by the copies and pointer checks (`scripts/copies.mjs`,
      `scripts/pointers.mjs`, through `scripts/rule-files.mjs`); limits: 1 MB of a file, past which it is not read, 40

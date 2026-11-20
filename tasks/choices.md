@@ -71,12 +71,13 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
 - **A choice of stack ends with what the core cannot read in it** (#486). By default the record of a choice of stack,
   its heading naming the stack, closes with one line that opens `The core cannot read:`, naming each of the core's
   checks that cannot yet read the stack picked with the issue the session that writes the record files to the core for
-  it then ("Reporting to the core" in its README), or "none". It does not mean that what the core can read weighs in
-  the comparison: the stack is picked for the product, and the core follows; nor that the project's first code waits on
-  a reader. Reason: a project in a stack the core could not read found it out months later, from an evaluation. Held by
-  the records' check (`core/scripts/choices.mjs`), which fails a stack's record a pull request adds whose last line is
-  not that line, naming an issue or saying "none"; that each gap has its own issue, by the review, since no check reads
-  where one gap ends.
+  it then ("Reporting to the core" in its README), or "none". It does not mean that what the core can read weighs in the
+  comparison: the stack is picked for the product, and the core follows; nor that the project's first code waits on a
+  reader: until one is built, the sync's report names the rules that nothing holds there
+  (`core/scripts/read-nothing.mjs`; #459, point 2). Reason: a project in a stack the core could not read found it out
+  months later, from an evaluation. Held by the records' check (`core/scripts/choices.mjs`), which fails a stack's
+  record a pull request adds whose last line is not that line, naming an issue or saying "none"; that each gap has its
+  own issue, by the review, since no check reads where one gap ends.
 - **The choices a project already made are recorded too.** At its first audit (in a project that stood before this rule,
   as the step its sync asks: `setup/sync-notes.md`), a project's auditing session records each standing choice that is
   hard to undo, a stated feature of its design that works as one included ("no build step"), each with what it was

@@ -55,6 +55,18 @@
       "mark": 33545,
       "why": "#888: the list it prints apart from what it reads from the host and its record."
     },
+    "tasks/game-design.md": {
+      "mark": 25119,
+      "why": "#441: the game rules split into a base and a file for each kind (#484, points 6 and 7)."
+    },
+    "tests/steps-test.mjs": {
+      "mark": 138318,
+      "why": "#916: a file for each reader its sections test."
+    },
+    "scripts/strength.mjs": {
+      "mark": 39011,
+      "why": "#920: the verdict on a run apart from the run on a project."
+    },
     "scripts/read-total.mjs": {
       "mark": 20690,
       "why": "Whoever changes how the total is counted reads its tree reader, its readers, its cut and its conditions together, each calling the others; split, that session opens more files and reads no less, and no other task reads it."
@@ -66,6 +78,10 @@
     "scripts/size.mjs": {
       "mark": 26144,
       "why": "#892: the record of its caps' raises apart from the caps and the measure."
+    },
+    "scripts/security-review.mjs": {
+      "mark": 39696,
+      "why": "#931: along what it reads, Codex's summary, who counts as a reviewer, what a review stands for, floor rule 3's count and the status posted."
     },
     "scripts/shape.mjs": {
       "mark": 84826,
@@ -80,8 +96,8 @@
       "why": "#884: the measures of code-shape.mjs apart from the JavaScript functions read on the parser."
     },
     "tests/holders-test.mjs": {
-      "mark": 30947,
-      "why": "Split by the reader each case tests in #852: its archive cases apart from the rest."
+      "mark": 39601,
+      "why": "Split by the reader each case tests in #852: its archive cases apart from the rest, and a project's own rules and share apart from the core's."
     },
     "tests/hostile-configs-test.mjs": {
       "mark": 24643,
