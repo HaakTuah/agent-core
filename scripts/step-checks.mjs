@@ -15,7 +15,7 @@ import { importsOf, projectFilesByContent, readProject as readBuildFile } from "
 import { READ_MOST } from "./own-files.mjs";
 import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
-import { ruleFiles } from "./rule-files.mjs";
+import { FOLDERS, TOOL_FILES, ruleFiles } from "./rule-files.mjs";
 import { toolOf } from "./strength.mjs";
 import { Unread, calls, commands, copyAt, uncommented, copiesConfig, folded, given, licenceConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
@@ -132,7 +132,7 @@ export function lineBreaksMended(p) {
 // Both checks read only the files git tracks, as the work tree holds them (a tracked link, what it leads to), and the
 // copies check its config and baseline besides: where none of the files they read changed since the last reading in
 // this process, that reading's answer stands, so the two runs are made once for each state of the project (a sync reads
-// it once; a test, many times). A tracked file the checks do not read is in the state by its name alone, so a change to
+// it once; a test, many times). A tracked file the checks do not read is in the state by its name and mode alone, so a change to
 // a workflow, a config of another check or a file of the project's code that neither check reads asks no new run.
 const listedBefore = new Map();
 export function toolFilesListed(p) {
@@ -151,7 +151,8 @@ export function toolFilesState(p) {
   const read = filesRead(p, config, entries.map(at), git);
   // (a plain file the checks do not read counts by its name and mode alone; a link, a submodule, and a file they may read, by what it holds)
   const state = crypto.createHash("sha256").update(entries.map(e => !read || read.has(at(e)) || !/^100(644|755) /.test(e) ? e : `${e.slice(0, 6)}\t${at(e)}`).join("\0"));
-  const changed = git(["ls-files", "-m", "-z"]).split("\0").filter(f => f && (!read || read.has(f)));
+  const linked = new Set(entries.filter(e => e.startsWith("160000 ")).map(at)); // (a submodule's own changes, as the key held them before)
+  const changed = git(["ls-files", "-m", "-z"]).split("\0").filter(f => f && (!read || read.has(f) || linked.has(f)));
   for (const f of [...changed, config, typeof baseline === "string" ? baseline : null]) if (f) state.update(`\0${f}\0${p.read(f) ?? ""}`);
   for (const f of entries.filter(e => e.startsWith("120000 ")).map(at)) state.update(`\0${f}\0${leadsTo(p, f)}`);
   return { config, key: `${p.root}\0${state.digest("hex")}` };
@@ -172,9 +173,11 @@ function leadsTo(p, f) {
 function filesRead(p, config, tracked, git) {
   try {
     const parsed = JSON.parse(p.read(config) ?? ""), names = v => (Array.isArray(v) ? v.filter(x => typeof x === "string" && x) : []);
+    // (each list as copies.mjs lists it, by itself: a ":!" leaves out only what its own list read)
+    const ls = specs => (specs.length ? git(["ls-files", "-z", "--", ...specs]).split("\0") : []);
     const rules = ruleFiles(p.read, dir => tracked.filter(f => (f === dir || f.startsWith(`${dir}/`)) && !leadsOut(p.root, path.join(p.root, f))), { tools: true });
-    const specs = [...names(parsed.code), ...names(parsed.prose), ...(parsed.proseFromSecurity === true ? rules : [])];
-    const named = new Set([config, parsed.baseline, ...rules, ...(specs.length ? git(["ls-files", "-z", "--", ...specs]).split("\0") : [])]);
+    const tools = tracked.filter(f => TOOL_FILES.includes(f) || FOLDERS.some(dir => f === dir || f.startsWith(`${dir}/`)));
+    const named = new Set([config, parsed.baseline, ...rules, ...tools, ...ls(names(parsed.code)), ...ls([...names(parsed.prose), ...(parsed.proseFromSecurity === true ? rules : [])])]);
     return new Set(tracked.filter(f => named.has(f) || f.startsWith(copyAt(p)) || /\.md$/iu.test(f) || /(^|\/)(core-manifest\.md|\.gitattributes|\.gitmodules)$/u.test(f)));
   } catch { return null; }
 }

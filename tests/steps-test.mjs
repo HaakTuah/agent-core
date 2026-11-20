@@ -191,7 +191,7 @@ for (const [name, at] of [["a-vendored-npm-project", "vendor/core/"], ["a-vendor
 // (a core a library carries, its files committed in the project: the library's own manifest pins it, and the floor's own
 // copy stands beside it until every tool has passed the staged cases)
 kit("a-library-carried-project", { packages: "." }, { at: "lib/core/", library: "lib/" });
-kit("a-submodule-carried-project", { packages: "." }, { at: "lib/core/", library: "lib/", submodule: true });
+const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at: "lib/core/", library: "lib/", submodule: true });
 const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget: "src", private: true }, "a-game": { packages: "web", game: true } };
 const dirs = Object.fromEntries(Object.entries(kinds).map(([name, o]) => [name, kit(name, o)]));
 // (the pairs of options no other kit of this file is made with: npm in a private repository, a private game and an npm
@@ -1265,6 +1265,18 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
       return now !== base;
     };
     ok(reads.every(f => changed(f)) && reads.every(restaged), "a change to a rule file, a Markdown file, a file of the copy of the core, the config or its baseline asks a new run, in the work tree or staged", reads.filter(f => !changed(f) || !restaged(f)).join(", "));
+    // (with an answer to keep: a broken pointer in a tool's file is named, a change to a file the checks do not read leaves
+    // the state and the words as they were, and mending the pointer changes both)
+    const n = ".kiro/steering/n.md";
+    put(n, "# N\n\nAs `docs/nowhere-n.md` says.\n"); stage(n);
+    const asked = said(), held = state();
+    unread.forEach(f => put(f, `${original(f)}\n`));
+    const kept = state() === held && said() === asked;
+    unread.forEach((f, i) => put(f, copies[i]));
+    put(n, "# N\n\nAs `AGENTS.md` says.\n");
+    const mended = said(), moved = state() !== held;
+    unstage(n); fs.rmSync(path.join(d, n));
+    ok(asked.includes(n) && kept && mended === "" && moved, "a change to a file the checks do not read leaves the state and the words of a step that has something to list as they were, and mending what it lists changes both", `${asked}\n${kept} ${mended} ${moved}`);
     // (what the config names, what SECURITY.md lists and what a tool's folder holds is read, and what they leave out is not:
     // each scene adds its files, changes the config or SECURITY.md, and says which of its files moves the state)
     const config = original("checks/copies.json"), spec = JSON.parse(config), security = original("SECURITY.md");
@@ -1285,11 +1297,28 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
     const named = scene({ "data/r.txt": "r\n", "data/s.dat": "s\n" }, { security: ["data/*.txt"], run: false });
     const unlisted = scene({ "data/r.txt": "r\n" }, { config: { proseFromSecurity: false }, security: ["data/*.txt"], run: false });
     const literal = scene({ "checks/rule.dat": "r\n" }, { config: { proseFromSecurity: false }, security: ["checks/rule.dat"] });
+    // (a ":!" in one list leaves out only what that list read: copies.mjs lists the code and the prose each by itself)
+    const apart = scene({ "src/a.js": "a\n", "vendor/lib.js": "v\n" }, { config: { code: ["src/", ":!vendor/lib.js"], prose: [...spec.prose, "vendor/"] }, run: false });
+    const only = scene({ "src/b.js": "b\n", "vendor/c.js": "c\n" }, { config: { code: [":!vendor/"], prose: ["docs/*.md"] }, run: false });
     const tools = scene({ ".kiro/agents/x.json": "{}\n", ".agent/rules": "r\n", ".kiro/other.json": "{}\n" });
-    ok(code.moves === "app/a.txt" && prose.moves === "notes/p.txt" && named.moves === "data/r.txt" && unlisted.moves === "" && literal.moves === "checks/rule.dat" && tools.moves === ".kiro/agents/x.json,.agent/rules",
+    ok(code.moves === "app/a.txt" && prose.moves === "notes/p.txt" && named.moves === "data/r.txt" && unlisted.moves === "" && literal.moves === "checks/rule.dat" && tools.moves === ".kiro/agents/x.json,.agent/rules" && apart.moves === "src/a.js,vendor/lib.js" && only.moves === "src/b.js",
       "a file the config's code or prose names, one SECURITY.md lists (a glob only where the config reads its list as prose), a rule file it names and a file in an agent tool's folder is read, and a file they leave out is not",
-      JSON.stringify([code, prose, named, unlisted, literal, tools].map(x => x.moves)));
-    ok([code, prose, named, unlisted, literal, tools].every(x => x.run === words), "and the checks, run again with such files held, say what they said", [code, prose, named, unlisted, literal, tools].map(x => x.run).join("\n"));
+      JSON.stringify([code, prose, named, unlisted, literal, tools, apart, only].map(x => x.moves)));
+    ok([code, prose, named, unlisted, literal, tools, apart, only].every(x => x.run === words), "and the checks, run again with such files held, say what they said", [code, prose, named, unlisted, literal, tools, apart, only].map(x => x.run).join("\n"));
+    // (what the old key held, still held: a library's submodule that moves on, and a file in a tool's folder too big to be read,
+    // which the checks read all the same, staged)
+    const inLib = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: path.join(submoduleKit, "lib"), stdio: "ignore" });
+    const before = toolFilesState(project(submoduleKit)).key;
+    fs.writeFileSync(path.join(submoduleKit, "lib/moved.txt"), "moved\n"); inLib("add", "-A"); inLib("commit", "-q", "-m", "moved");
+    const big = ".kiro/agents/big.json";
+    put(big, "{}\n"); stage(big);
+    const small = state();
+    fs.writeFileSync(path.join(d, big), Buffer.alloc(READ_MOST + 1, 32)); stage(big);
+    const large = state();
+    fs.writeFileSync(path.join(d, big), Buffer.alloc(READ_MOST + 1, 33)); stage(big);
+    const edited = state();
+    unstage(big); fs.rmSync(path.join(d, big));
+    ok(toolFilesState(project(submoduleKit)).key !== before && small !== large && large !== edited, "a submodule that moved, and a staged change to a tool's file past what is read, ask a new run", `${toolFilesState(project(submoduleKit)).key !== before} ${small !== large} ${large !== edited}`);
     // (git's own files that change what a check lists)
     const git = [".gitattributes", ".gitmodules"].map(f => { put(f, "\n"); stage(f); const was = state(); put(f, "# x\n"); const now = state(); unstage(f); fs.rmSync(path.join(d, f)); return was !== now; });
     ok(git.every(Boolean), "a change to .gitattributes or .gitmodules asks a new run", `${git}`);
