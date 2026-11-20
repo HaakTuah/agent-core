@@ -1,6 +1,6 @@
 // What a pull request changes against its base, for the agent-tools check: a pin, a source or an entry that differs from
-// what the base held, a link or a hook the base held the same way, and the lists' mend, each found by reading the base's
-// own files (agent-tools-project.mjs, agent-tools-listing.mjs).
+// what the base held, and a link or a hook the base held the same way, each found by reading the base's own files
+// (agent-tools-project.mjs, agent-tools-listing.mjs).
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { textAt } from "./git-objects.mjs";
