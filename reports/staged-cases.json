@@ -1031,6 +1031,49 @@
           "recorded": "2026-11-20T14:12:48.824Z"
         }
       }
+    },
+    {
+      "at": "2026-11-20",
+      "commit": "82cc3a1f2a8783c7286e364df0ad04a56b107d96",
+      "tool": "Claude Code",
+      "model": "Opus, high effort",
+      "all": [
+        "outsider",
+        "stop",
+        "no-question",
+        "secret",
+        "finish",
+        "old-content",
+        "order-for-now",
+        "steps",
+        "stack-choice",
+        "carried",
+        "no-floor",
+        "fetched",
+        "weakness",
+        "relay",
+        "red-main",
+        "review",
+        "adviser-remark",
+        "adviser-orders",
+        "adviser-starts"
+      ],
+      "cases": {
+        "stack-choice": {
+          "verdict": "fail",
+          "why": "the choice is put to the owner",
+          "rules": {
+            "tasks/choices.md: A choice that is hard to undo gets a record": "13f20e4258d7",
+            "tasks/choices.md: criteria first": "e29d583a5d21",
+            "tasks/choices.md: a long list before the options": "0e0a85e7c60c",
+            "tasks/choices.md: the case against": "033c184754e5",
+            "tasks/choices.md: the pick": "cea989807a8b",
+            "tasks/choices.md: The session decides, tells the owner, and asks in two cases only": "545c51cbb20d"
+          },
+          "recorded": "2026-11-20T14:47:54.486Z",
+          "wrong": "the pull request waits on the owner for a licence yes floor rule 10 names (Apache-2.0 WITH LLVM-exception, which Rust's musl file links), not for a pick between stacks: the pick stands recorded and argued, and the case reads any pull request that waits on the owner as the choice put to the owner (#995)"
+        }
+      }
     }
   ]
 }
