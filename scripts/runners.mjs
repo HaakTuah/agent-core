@@ -91,7 +91,7 @@ const startsSuite = job => (Array.isArray(job?.steps) ? job.steps : []).some(st 
 // job's runner, "own", "hosted" or null where it cannot be read), selfHosted (any job on a pull request or a push takes
 // a runner of the owner's own), unknown (one whose runner cannot be read), unread (the files that could not be read) }.
 export function workflowsIn(dir, parse = loadSync("yaml").parse) {
-  const out = { onHost: false, testRunners: [], selfHosted: false, unknown: false, unread: [] };
+  const out = { onHost: false, testRunners: [], testLabels: [], selfHosted: false, unknown: false, unread: [] };
   let files = [];
   try { files = fs.readdirSync(dir).filter(f => /\.ya?ml$/u.test(f)); } catch { return out; }
   const read = {};
@@ -111,7 +111,7 @@ export function workflowsIn(dir, parse = loadSync("yaml").parse) {
         const runner = runnerOf(job);
         out.selfHosted ||= runner === "own";
         out.unknown ||= runner === null;
-        if (startsSuite(job)) { out.onHost = true; out.testRunners.push(runner); }
+        if (startsSuite(job)) { out.onHost = true; out.testRunners.push(runner); out.testLabels.push(...labelsOf(job).labels); }
       }
     }
   } catch { out.unread.push(...[...seen].filter(f => !out.unread.includes(f))); }
