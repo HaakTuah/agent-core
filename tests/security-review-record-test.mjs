@@ -11,7 +11,7 @@ import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { compareRights, recordings, verdictOf } from "../scripts/security-review-host.mjs";
 import { chosen, fetchPull, keep, main, recordOf, standIns, why, writeRights } from "../scripts/security-review-record.mjs";
-import { CODEX, HEAD, ME, OTHER, SEEN, BASE, answer, cleared, commit, finding, found, host, posted, record, refusal, review, same, summary } from "./security-review-cases.mjs";
+import { CODEX, HEAD, ME, OTHER, SEEN, BASE, answer, cleared, commit, finding, found, host, posted, record, refusal, review, same, summary } from "./security-review-host-test.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };

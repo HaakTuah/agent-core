@@ -1,7 +1,7 @@
 // The security-review status against the host's own record (#626; #593, point 9): the host is the authority on who
 // may write and on what a pull request's reviews are, so the status is compared with what the host records of the core's
 // own merged pull requests that had a Codex security review. scripts/security-review-record.mjs records it, one file per
-// pull request under tests/security-review-host/ and the rights in rights.json there; tests/security-review-host-test.mjs
+// pull request under reports/security-review-host/ and the rights in rights.json there; tests/security-review-host-test.mjs
 // reads them offline, with no token, and fails where a comparison finds a difference.
 //
 // The comparisons, each a kind of the pass recorded on #624 (reports/2026-11-18-the-security-review-status-read-whole.md):
@@ -18,7 +18,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { FINDING, codexState, codexs, counted, judge, writersOf } from "./security-review.mjs";
 
-export const FOLDER = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "tests", "security-review-host");
+export const FOLDER = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "reports", "security-review-host");
 // how a security review of Codex's opens in the host's list of reviews, its kind given by the heading after the receipt
 export const SECURITY = /^<!-- codex-review-receipt:v1 -->\s*### 🛡️ Codex Security Review/u;
 // the roles GitHub defines; any other is a custom role (W6)

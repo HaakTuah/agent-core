@@ -1,7 +1,7 @@
 // The recorder of the host's own record of the security review (#626; #593, point 9): for the core's own merged pull
 // requests that had a Codex security review in the host's list of reviews, it records what the host says of them, for
 // the comparisons of scripts/security-review-host.mjs. Run by hand, or by the session that takes the core's monthly state report, in a clone of the core where gh
-// answers for the owner's account; it writes one file per pull request under tests/security-review-host/ and the
+// answers for the owner's account; it writes one file per pull request under reports/security-review-host/ and the
 // rights in rights.json there, then prints the comparison, which tests/security-review-host-test.mjs runs offline.
 //
 // What it records of each pull request: the five inputs security-review.yml fetches (the pull request, its comments,
