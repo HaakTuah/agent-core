@@ -1,4 +1,4 @@
-// The cost line a description carries, or the mark that the script printed none (split from pr-description.mjs, #888; "Each PR has the headings" in roles/shared/work-flow.md). pr-description.mjs,
+// The cost line a description carries, or the mark that the script printed none (split from pr-description.mjs, #888; "An exemption leaves a mark" in roles/shared/work-flow.md; #302). pr-description.mjs,
 // beside this file, says what the check asks as a whole, runs this one and exports what it holds.
 
 export const NO_COST = "No cost line: the script printed none.";

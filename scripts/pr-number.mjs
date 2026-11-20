@@ -1,4 +1,4 @@
-// The number of each rule the part "What holds it" names (split from pr-description.mjs, #888; "Each PR has the headings" in roles/shared/work-flow.md). pr-description.mjs,
+// The number of each rule the part "What holds it" names (split from pr-description.mjs, #888; "Every rule says what holds it" in the core's AGENTS.md; #303). pr-description.mjs,
 // beside this file, says what the check asks as a whole, runs this one and exports what it holds.
 import { NUMBER } from "./outcomes.mjs";
 import { isPart } from "./milestones.mjs";
@@ -20,4 +20,3 @@ export function numberMend(body) {
   if (named.some(n => NUMBER_FIRST.test(n))) return null;
   return `the part "${HOLDS}" names no rule's number${named.length ? ` in its form (it reads "${named[0]}")` : ""}. Mend: under it, for each rule this pull request adds or widens, add a line "Number: <findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for, with "; rare harm" at its end where the rule guards against rare and severe harm, as the rule's entry in scripts/holders/ keeps it under "number"; or write "None" alone under the heading where it adds no rule`;
 }
-

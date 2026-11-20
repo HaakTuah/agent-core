@@ -11,7 +11,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    shape and refuse where it fails, as floor topic 5 asks, its hostile tests trying each case. Each answers in 5 s at
    most, as its hostile tests time it (`scripts/hostile.mjs`), and each JSON it parses is nested 200 deep at most
    (`scripts/guards.mjs`); its limits name what it reads beyond that.
-   - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the line
+   - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the lines it asks in `scripts/pr-waits.mjs`, `scripts/pr-cost.mjs`, `scripts/pr-number.mjs` and `scripts/pr-reasons.mjs`, and the line
      "Read for it:" by `scripts/reading.mjs`, and the line "Never needed:" by `scripts/read-total.mjs`, line by line);
      limits: none of its own on the text, which GitHub holds to 65,536 characters; 100 commits, one page; 8 s for the
      reading list's calls; hostile tests: `tests/hostile-pr-text-test.mjs`.
@@ -27,7 +27,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
-     a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`), the rule files a checkout
+     a pull request adds under its manifest's "Differences" (`scripts/pr-reasons.mjs`), the rule files a checkout
      holds, the manifest too (`scripts/reading.mjs`, and `scripts/rules.mjs` for the rules in them, which read only
      regular files in real folders of the checkout's own, a pipe or device as no file and a link at any depth refused
      with its mend, and the first tries the changed paths on the path patterns within 16 million steps for each

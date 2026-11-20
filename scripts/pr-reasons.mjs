@@ -1,4 +1,4 @@
-// The line "Reasons read:" a pull request that adds a difference carries (split from pr-description.mjs, #888; "Each PR has the headings" in roles/shared/work-flow.md). pr-description.mjs,
+// The line "Reasons read:" a pull request that adds a difference carries (split from pr-description.mjs, #888; tasks/updates.md, "A question or difference about a rule of the core starts from its reasons"; #756). pr-description.mjs,
 // beside this file, says what the check asks as a whole, runs this one and exports what it holds.
 import { spawnSync } from "node:child_process";
 import { differencesOf } from "./manifest-reads.mjs";
@@ -40,4 +40,3 @@ export function reasonsMend(body, added, at = "core/") {
   if (textOf(body).split(/\r\n|\r|\n/u).some(l => l.trim().startsWith(REASONS) && l.trim().slice(REASONS.length).replace(/[\s\p{Cf}]/gu, ""))) return null;
   return `it adds ${added.length === 1 ? "a line" : `${added.length} lines`} under the manifest's "Differences" ("${added[0].replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, " ").slice(0, 80)}"), and the description has no line "${REASONS}". Mend: for each rule of the core it departs from, run \`node ${at}scripts/reasons.mjs "<the rule's file and lead>"\`, read the archive items and the issues it prints, and add a line "${REASONS} <those items and issues>, and which of their reasons does not hold for this project, and why"; where a line departs from no rule of the core (a step of the sync notes, a file the starter kit writes), say so on that line`;
 }
-
