@@ -128,6 +128,12 @@ const finding = (file, line, rule = "syntax-check", said = 'key "x" is duplicate
 const vsBase = compared([finding("a.yml", 4), finding("a.yml", 5), finding("b.yml", 2), finding("a.yml", 9, "expression", "y")], [finding("a.yml", 3)]);
 ok(vsBase.notes.length === 1 && /^note a\.yml:4: actionlint's syntax-check: key "x" is duplicated, as on the base\. Mend: /u.test(vsBase.notes[0]) && vsBase.fails.length === 3 && /^FAIL a\.yml:5: /u.test(vsBase.fails[0]) && /^FAIL b\.yml:2: /u.test(vsBase.fails[1]) && vsBase.fails.every(mended),
   "against a base, as many of a kind in a file as the base held are noted, its line aside, and the rest fail, each with its mend; a file or a kind the base lacked fails", [...vsBase.fails, ...vsBase.notes].join("\n"));
+// (actionlint writes where a key was first given into what it says: a finding moved down the file, its first one too,
+// is the same finding)
+const dupKey = (line, first) => finding("a.yml", line, "syntax-check", `key "push" is duplicated in "on" section. previously defined at line:${first},col:3`);
+const moved = compared([dupKey(5, 4)], [dupKey(3, 2)]), another = compared([dupKey(5, 4), dupKey(6, 4)], [dupKey(3, 2)]);
+ok(moved.fails.length === 0 && moved.notes.length === 1 && /previously defined at line:4,col:3, as on the base\./u.test(moved.notes[0]) && another.fails.length === 1,
+  "a key given twice moved down the file, the place actionlint names for its first one with it, is noted, and said as the head says it; a second such finding fails", [...moved.fails, ...moved.notes, ...another.fails].join("\n"));
 const noBase = compared([finding("a.yml", 4)], null), fresh = compared([finding("a.yml", 4)], []);
 ok(noBase.fails.length === 0 && noBase.notes.length === 1 && !noBase.notes[0].includes("base") && fresh.fails.length === 1, "with no base each is noted and none fails, and where nothing stood before (the core's own) each fails");
 const zz = zizmorFindings(JSON.stringify([{ ident: "template-injection", desc: "code injection via template expansion", url: "https://docs.zizmor.sh/audits/#template-injection", ignored: false, locations: [{ symbolic: { kind: "Related", annotation: "x" }, concrete: { location: { start_point: { row: 2 } } } }, { symbolic: { kind: "Primary", annotation: "may expand into attacker-controllable code" }, concrete: { location: { start_point: { row: 6 } } } }] }, { ident: "artipacked", desc: "d", ignored: true, locations: [] }]), "w.yml");

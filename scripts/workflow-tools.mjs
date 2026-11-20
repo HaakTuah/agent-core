@@ -85,10 +85,12 @@ export const line = (f, lead, was = "") => `${lead} ${f.file}:${f.line}: ${f.too
   : `mend it as the line says (actionlint's checks: ${f.url})`}`;
 
 // The findings of the head against the base's, as { fails, notes } of lines: of each kind in each file (the file, the
-// tool, its rule and what it said, its line aside, so that a line moved is no new finding), as many as the base held
-// are noted and the rest fail; with no base (`base` null), each is a note.
+// tool, its rule and what it said, its line aside, and any position written into what it said, as actionlint's
+// "previously defined at line:2,col:3", so that a finding moved is no new finding), as many as the base held are noted
+// and the rest fail; with no base (`base` null), each is a note.
+const placeless = said => said.replace(/\b(line|col|column|row)(:\s*|\s+)\d+/giu, "$1$2#");
 export function compared(head, base) {
-  const key = f => `${f.file}\0${f.tool}\0${f.rule}\0${f.said}`, held = new Map();
+  const key = f => `${f.file}\0${f.tool}\0${f.rule}\0${placeless(f.said)}`, held = new Map();
   for (const f of base ?? []) held.set(key(f), (held.get(key(f)) ?? 0) + 1);
   const fails = [], notes = [];
   for (const f of head) {
