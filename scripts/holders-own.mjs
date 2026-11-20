@@ -1,5 +1,5 @@
 // A project's own rules and what holds them (#662; split from holders.mjs, #888): the reader of a project's list,
-// checks/holders.json, which holders.mjs's own list of the core's rules apart from it.
+// checks/holders.json, which holders.mjs keeps apart from its own list of the core's rules.
 // In a project, --own reads the project's own rules the same way as holders.mjs reads the core's: those of the rule
 // files its sessions read, as the project's own files name them (floor rule 3's, the files an agent tool takes its
 // instructions from, what its SECURITY.md adds, and the files its AGENTS.md and CLAUDE.md pull in by an "@" line, none
@@ -8,19 +8,16 @@
 // project's monthly state report lists each rule with no holder, those read at a session's start first, and its sessions
 // work them down as tasks.
 //
-//   node core/scripts/holders.mjs --own          from a project's root: its own rules' counts, and each with no holder
-//   node core/scripts/holders.mjs --own --write  the same, after writing OWN: each rule it does not name added as "none"
-//   (holders.mjs hands --own to ownMain() here)
+//   (node core/scripts/holders.mjs --own [--write] hands it to ownMain() here; holders.mjs gives the usage)
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { copyOf } from "./core-path.mjs";
-import { counts, holderOf } from "./holder-form.mjs";
 import { inProject, leadsOut, oneLine } from "./guards.mjs";
+import { counts, holderOf } from "./holder-form.mjs";
 import { FLOOR, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { rulesOf } from "./rules.mjs";
 
-// ---- a project's own rules (#662) ----
 export const OWN = "checks/holders.json";
 // (text from a project's files as the report and the log carry it: on one line, in a code span, so that no line break,
 // workflow command or mention in it acts: floor rule 5)
