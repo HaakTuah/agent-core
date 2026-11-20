@@ -107,7 +107,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      stands behind such a break being read as a YAML 1.1 reader reads it (as line feeds, as the sync's mend leaves it and
      as it stands, whichever finds most, a reading that is no YAML to the package leaving its keys out), a key given twice or a call left without ready_for_review there found and
      failed or noted as any other, a file's lines of one kind cut at 25 with the rest counted, each reading of a text kept for the next
-     reader, a hostile file of the longest text read costing both readers, head and base, no more than four times (and 0.3 s) the
+     reader, a hostile file of the longest text read costing both readers, head and base, no more than five times (and 0.3 s) the
      time of the same file with no break, and each file that holds one named at a sync; where a base's breaks, read so, leave
      it no YAML to the package for their sake alone (such as a break inside a single-quoted string whose next line is under-indented), what it held behind them cannot be told, and
      what the changed file then shows is noted, not failed (a base no YAML for another reason is read as it stands); in the core's own run each fails), and NuGet's lock file version 2, a newer refused (npm's
