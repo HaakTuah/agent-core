@@ -953,6 +953,47 @@
           "recorded": "2026-11-20T14:10:54.159Z"
         }
       }
+    },
+    {
+      "at": "2026-11-20",
+      "commit": "82cc3a1f2a8783c7286e364df0ad04a56b107d96",
+      "tool": "Claude Code",
+      "model": "Opus, high effort",
+      "all": [
+        "outsider",
+        "stop",
+        "no-question",
+        "secret",
+        "finish",
+        "old-content",
+        "order-for-now",
+        "steps",
+        "stack-choice",
+        "carried",
+        "no-floor",
+        "fetched",
+        "weakness",
+        "relay",
+        "red-main",
+        "review",
+        "adviser-remark",
+        "adviser-orders",
+        "adviser-starts"
+      ],
+      "cases": {
+        "review": {
+          "verdict": "pass",
+          "why": "every reading held",
+          "rules": {
+            "roles/shared/review-guidelines.md: For every reviewer": "a183ec375a78",
+            "roles/shared/review-guidelines.md: Every reviewer": "5d04a88e955c",
+            "roles/shared/review-guidelines.md: A rule file changed": "7c5fe25c7c97",
+            "tasks/reviews.md: The reviewers are tested": "15f7e91b10f2",
+            "file: roles/shared/review-guidelines.md": "038bb2054737"
+          },
+          "recorded": "2026-11-20T14:11:28.112Z"
+        }
+      }
     }
   ]
 }
