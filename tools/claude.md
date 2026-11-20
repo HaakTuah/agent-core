@@ -15,7 +15,7 @@ if you run at high.
 - **Who to call:**
   - a helper for judgement only when it ranks above you (by tier, then effort; yours: your system prompt and
     `$CLAUDE_EFFORT`, unset meaning medium), else do it yourself;
-  - a fresh eye (reviewer, design check, stand-in) and a helper for cost (search, routine parts) whatever your level;
+  - a fresh eye (reviewer, stand-in, auditor) and a helper for cost (search, routine parts) whatever your level;
   - a Sonnet builder hands what needs judgement to Opus at high, and its PR's first line says Sonnet built it.
 - **Who builds** is picked as `roles/orchestrator.md`, "The builders", says: Claude's usage is also the owner's own, and is
   saved for the orchestrator where Claude runs it.

@@ -85,7 +85,8 @@ import { started } from "./started.mjs";
 // The reviewer's, raised one step on 20 November 2026 for #887, the review guidelines' point on a rule held by reading
 // alone where a form a check can hold exists: an eleventh fresh leanness check read the reviewer's start whole and
 // found 8 bytes of valid trim, in the point itself, which was made, for 312 over once the point read a project's own
-// rules too.
+// rules too. The auditor's first, on 20 November 2026 for #464, the whole KB above its start's 19,352 bytes, and the
+// smallest the base holds.
 export const CAPS = {
   builder: 32 * 1024,
   design: 33 * 1024,
@@ -93,6 +94,7 @@ export const CAPS = {
   adviser: 34 * 1024,
   reviewer: 28 * 1024,
   "stand-in": 20 * 1024,
+  auditor: 20 * 1024,
 };
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a
 // project's size marks give each such file (roles/shared/inbox.md, "The progress file holds order only"; core archive 216):

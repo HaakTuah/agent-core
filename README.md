@@ -46,7 +46,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   module by its file's name, which stands once across the three folders. Until the second release after 16 November 2026
   a file at each path the rules left (`modules/`, `floor/topics.md`) points to where they stand.
 - **The roles** (`roles/`; core archive 234): one file for each role (the builder, the orchestrator, a reviewer, the
-  stand-in, the design session), read at that role's start with the shared files it names: `tasks/roles.md`, "A file
+  stand-in, the auditor, the design session), read at that role's start with the shared files it names: `tasks/roles.md`, "A file
   for each role".
 - **Reading by role and by task:** `scripts/reading.mjs` (under `core/` in a project) prints the files a session of a
   given role reads for a given task, for any agent tool that can run a command, and names what a pull request's changed
@@ -439,7 +439,8 @@ same byte for byte. What a check leaves out of the copy in a project was held in
 merge, by what the last column names. No check leaves another publisher's code out for anyone (#654).
 
 Each row is for a copy at `core/`. Where the manifest names another path, the rows of `security-review.mjs`,
-`personal-terms.yml`, `workflows.mjs`, `shape.mjs` and `nuget.mjs` still read `core/` (#628). `tests/copy-left-out-test.mjs`
+`personal-terms.yml`, `workflows.mjs` and `nuget.mjs` read the copy at that path (#628, #918), and `shape.mjs`' row is the
+project's config, which the starter kit writes for the copy's path and a sync's fresh comparison reads there. `tests/copy-left-out-test.mjs`
 holds the list to what the checks do: it stages each check's fault inside the copy and outside it. It also fails a
 check a project runs that the list leaves out.
 
@@ -678,6 +679,6 @@ address, until the core's owner types another name there by hand (floor rule 11)
 ## This repository
 
 How it takes its own core, and how changes are made here: `AGENTS.md`; the order of its own work: `QUEUE.md`; its
-choices that are hard to undo: `CHOICES.md`; its parts, and what else does each: `INVENTORY.md`, each part a file of `inventory/` (`node scripts/inventory.mjs` reads it
+choices that are hard to undo: `CHOICES.md`, each a file of `choices/` (`node scripts/choices.mjs` reads them); its parts, and what else does each: `INVENTORY.md`, each part a file of `inventory/` (`node scripts/inventory.mjs` reads it
 whole); its security:
 `SECURITY.md`.

@@ -29,8 +29,9 @@ export const OPENERS = {
   "Design check": "reviewer",
   "Leanness check": "reviewer",
   "The stand-in's notes": "stand-in",
+  "From an auditor": "auditor",
 };
-export const ROLES = ["builder", "design", "orchestrator", "reviewer", "stand-in"];
+export const ROLES = ["builder", "design", "orchestrator", "reviewer", "stand-in", "auditor"];
 const WRITING = new Set(WRITERS);
 const MOST = 5;
 // A line that is a heading alone, or a lead in bold alone: a text's frame, which cites nothing. Only a short line is
@@ -176,8 +177,8 @@ export function citedFrom(text, known) {
     if (l.length > LINE_MAX) continue;
     let m;
     if ((m = /^- Read: the descriptions of (\d{1,7}) pull requests merged in (\d{4}-\d\d) and (\d{1,7}) comments written in it /u.exec(l))) out.push(`cited in ${m[2]}, of ${m[1]} pull requests and ${m[3]} comments`);
-    else if ((m = /^- (builder|design|orchestrator|reviewer|stand-in): no text\.$/u.exec(l))) out.push(`${m[1]} no text`);
-    else if ((m = /^- (builder|design|orchestrator|reviewer|stand-in): (\d{1,7}) texts, (\d{1,7}) citing a rule, (\d{1,5}) rules cited; of the (\d{1,5}) it reads at its start, (\d{1,5}) not cited(?:; the most cited: (.+))?\.$/u.exec(l))) {
+    else if ((m = /^- (builder|design|orchestrator|reviewer|stand-in|auditor): no text\.$/u.exec(l))) out.push(`${m[1]} no text`);
+    else if ((m = /^- (builder|design|orchestrator|reviewer|stand-in|auditor): (\d{1,7}) texts, (\d{1,7}) citing a rule, (\d{1,5}) rules cited; of the (\d{1,5}) it reads at its start, (\d{1,5}) not cited(?:; the most cited: (.+))?\.$/u.exec(l))) {
       const most = [...(m[7] ?? "").matchAll(/(.+?) \((\d{1,7})\)(?:, |$)/gu)].filter(x => known.has(x[1])).map(x => `${x[1]} (${x[2]})`);
       out.push(`${m[1]} ${m[3]} of ${m[2]} texts citing ${m[4]} rules, ${m[6]} of the ${m[5]} it reads at its start not cited${most.length ? `, the most: ${most.join(", ")}` : ""}`);
     }

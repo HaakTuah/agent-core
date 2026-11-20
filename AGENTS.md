@@ -32,7 +32,7 @@ Read when a task calls for it, each saying when in its opening line: the files o
 `floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
 `tasks/tools.md`, `tasks/ways.md`, `tools/claude-sessions.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`,
 `tools/antigravity.md`, `tasks/github-calls.md`, `tasks/hosts.md`, `tasks/repositories.md`, `roles/shared/teams.md`,
-`roles/orchestrator.md`, `tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`,
+`roles/orchestrator.md`, `roles/auditor.md`, `tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`,
 `tasks/cleaning.md`, `tasks/done-when.md`, `tasks/planning.md` and `roles/shared/records.md`.
 
 Not taken, each for its reason:
@@ -43,10 +43,10 @@ Not taken, each for its reason:
   checks has anything to act on here, and `scripts/screens.mjs` is held by its test alone.
 
 The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *milestone*: a batch and its release ("One batch,
-then one release"; #322), and of `tasks/planning.md` the point on a task's release has nothing to act on here, which
-holds no copy; the *report*: the PR's description (`reports/` keeps
+then one release"; #322), and of `tasks/planning.md` the point on a task's release and of `tasks/cleaning.md` the reading of a project
+against the core (#259 is that reading here) have nothing to act on here, which holds no copy; the *report*: the PR's description (`reports/` keeps
 those written before 12 November 2026, and the staged cases' record); the *audits*: `reports/`; the *choice records*:
-`CHOICES.md`; the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
+`CHOICES.md`, a file each in `choices/` (#870); the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
 the *mutation tool*: `node scripts/stryker.mjs --tool tests/mutation --report {report} {lines}`, Stryker at the version
 `tests/mutation/`'s lock file pins (#581), in `tests.yml`;
 the archive is `archive/instructions.md`, the items behind each rule listed in `scripts/holders/`; the *settling references* and the *descriptions*:
@@ -394,7 +394,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   the project's state report files, for each rule it lists with no holder, those read at a session's start first, a
   task at the project's pace: a check where one can read the breach exactly, the rule moved to where it is read on
   need, or a proposal that it goes, which is the owner's to decide. Of every rule of the project's own, held or not,
-  it answers whether it is about this project, its kind or every project, in the list's "about" (`this project`, `its
+  it answers, as an auditor reads (`roles/auditor.md`), whether it is about this project, its kind or every project, in the list's "about" (`this project`, `its
   kind: <the kind>` or `every project`), and files each about a kind or every project to the core as an idea where
   none is filed yet, naming the kind, written for the kind and holding nothing of the project (`README.md`,
   "Reporting to the core"; #484, point 9). The staged cases and the pruning stay the core's,
@@ -433,7 +433,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   beside the floor's and the modules'. Nothing changes it. It does not mean the share is a target, nor that a check the
   core's list names (a ruleset of the host's) is read as set up in the project. Reason: the owner sees how much of what
   binds a project a check holds there, which a count of the core alone hides. Held by `tests/look-test.mjs` and
-  `tests/holders-test.mjs`; the core's own count, by none yet (#925).
+  `tests/holders-test.mjs`, the core's own count included (#925).
 - **Staged cases hold what no check reads** (#235). By default a rule is held by a check; where none
   can read its breach exactly, since the breach lies in what a session does, a staged case holds it: a scratch project
   (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by
@@ -543,9 +543,11 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   in a file of the same name under `scripts/steps/` and, where the step has a check, its stage for the tests under
   `scripts/stages/` (a stage whose mend reads what the others' mends write says `last`); and what holds each rule (its
   holder, the items behind it and its number), each rule's entry in a file under `scripts/holders/` that `entryFile` in
-  `scripts/holders.mjs` names from the rule's key. Each is read in the order of the files' names by the script that
+  `scripts/holders.mjs` names from the rule's key; and the choice records (`CHOICES.md`), each in a file under `choices/`.
+  Each is read in the order of the files' names by the script that
   reads it (`scripts/inventory.mjs`, `scripts/sync-notes.mjs`, `scripts/steps.mjs`, `scripts/steps-stage.mjs`,
-  `scripts/holders.mjs`), as each archive item stands already ("A new archive item is named by its issue"). Whoever adds
+  `scripts/holders.mjs`, `scripts/choices.mjs`), as each archive item stands already ("A new archive item is named by
+  its issue"). Whoever adds
   an entry adds its file. Nothing changes it, and what it does not mean stands there too. Reason: of 39 pull requests
   merged between 18 and 19 November 2026, 8 changed `INVENTORY.md`, 10 `setup/sync-notes.md`, 7 `scripts/steps.mjs` and
   6 `scripts/holders.json`, and under merge-on-green pull requests that add to one file merge side by side and collide.
@@ -553,7 +555,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   part's line written in `INVENTORY.md` itself; by `tests/steps-test.mjs`, which reads the notes whole, and fails an
   entry, a step or a stage without its pair of the same name and an entry written in `setup/sync-notes.md` itself; and
   by `tests/holders-test.mjs`, which with `scripts/holders.mjs` fails a file of the list not named from its rule, and
-  two rules whose entries would share a file.
+  two rules whose entries would share a file; and by `tests/choices-folder-test.mjs`, which fails a record written in
+  `CHOICES.md` itself and a file of `choices/` that is not one record.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
   `tests/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its

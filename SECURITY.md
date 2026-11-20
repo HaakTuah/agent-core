@@ -103,9 +103,14 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      workflow (what is nested past it is said with its mend, and no list or mapping used as a key is read), no line
      break of YAML 1.1 beyond LF, CR and CRLF for the same two readers (U+0085, U+2028 and U+2029, which the package
      does not read as one, fail a file that is new or changed,
-     with their mend, and are only noted in one unchanged from the base or where a project's run is told no base, so a
-     key given twice or a call left without ready_for_review behind such a break in an unchanged file goes unseen until
-     the file is changed; in the core's own run each fails), and NuGet's lock file version 2, a newer refused (npm's
+     with their mend, and are only noted in one unchanged from the base or where a project's run is told no base, what
+     stands behind such a break being read as a YAML 1.1 reader reads it (as line feeds, as the sync's mend leaves it and
+     as it stands, whichever finds most, a reading that is no YAML to the package, where the text as it stands is, leaving its keys out), a key given twice or a call left without ready_for_review there found and
+     failed or noted as any other, a file's lines of one kind cut at 25 with the rest counted, each reading of a text kept for the next
+     reader, a hostile file of the longest text read costing both readers, head and base, no more than five times (and 0.3 s) the
+     time of the same file with no break, and each file that holds one named at a sync; where a base's breaks, read so, leave
+     it no YAML to the package for their sake alone (such as a break inside a single-quoted string whose next line is under-indented), what it held behind them cannot be told, and
+     what the changed file then shows is noted, not failed (a base no YAML for another reason is read as it stands); in the core's own run each fails), and NuGet's lock file version 2, a newer refused (npm's
      lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`, and for the
      reader of where the tests run `tests/runners-test.mjs`.
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its

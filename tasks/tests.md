@@ -91,15 +91,19 @@ reads is the *shape check*'s config.
   the manifest's rows *test runners* and *billed minutes* only override them. The trigger is a workflow that runs the
   tests on a pull request: whoever writes or changes it moves the platform suites, and any it moves for their time, to
   that schedule. In the core, the Linux suites run after every merge and the Windows suites once an hour, with the tests
-  that reach the network on both (`.github/workflows/tests.yml`). It does not mean a public repository takes a runner on
+  that reach the network on both (`.github/workflows/tests.yml`); a builder whose change needs the Windows suites before
+  its merge starts that workflow by hand naming in its input `only` the parts and system its change reaches, and a
+  run in full only where its change reaches every part, a run so narrowed never read as a full one (#954). It does not mean a public repository takes a runner on
   a machine of the owner's, where a stranger's pull request would run its code (the script prints the advice: forks kept
   off that job at once, and one issue filed for the owner, labelled `needs-owner`), nor that a suite runs less than once
   before each release, nor that a project changes its workflow for this before its builders take it up. Reason: a full
   run on the default branch after every merge holds most of the host's jobs at once and leaves the pull requests
   waiting, and a slow suite run once per change costs most where it is paid for, in money or in a machine's hours; in
   the core Windows took 69% of the pull requests' job-minutes, where about three of its bugs were found by Windows
-  alone. Held by `tests/runners-test.mjs`, for what is read, and in the core by its workflow's schedule and matrix,
-  which the workflows test reads.
+  alone, and five runs started by hand in full, each change needing one Windows part, took 38% of the runner minutes
+  over 76 minutes. Held by `tests/runners-test.mjs`, for what is read, and in the core by its workflow's schedule and matrix,
+  which the workflows test reads, and by `scripts/release.mjs` (`fullRun`), which reads no narrowed run as full; the
+  parts a builder names, by none: read from the tests a change reaches, most changes would reach every part.
 
 - **A test that reaches the network runs once per batch** (#733). By default a test is self-contained: what it fetches
   comes from a copy the test makes on the machine (a package file, a feed in a folder, a repository read by its path).

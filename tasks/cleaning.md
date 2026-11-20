@@ -1,7 +1,7 @@
 # Cleaning, and the audit of how code is put together
 
-Read by a builder that takes a cleaning task or cuts or joins files, by the session that takes an audit's task or the
-state report and by its reader, by the orchestrator when it hands out lanes, and by whoever writes an issue that asks
+Read by a builder that takes a cleaning task or cuts or joins files, by the session that takes an audit's task, a
+reading's against the core or the state report and by its auditor, by the orchestrator when it hands out lanes, and by whoever writes an issue that asks
 something of every or all of a kind, or builds what it asks (#593): the kinds `cleaning`, `audit` and `sweep`. What the
 code is held to: `tasks/code-shape.md`.
 
@@ -51,13 +51,11 @@ code is held to: `tasks/code-shape.md`.
   the long run. Held by the reviews ("a split goes in its own PR, behaviour proven unchanged",
   `roles/shared/how-to-work.md`), by the shape check, which fails a mended entry left in the baseline, and by the audit.
 - **The audit's reader has a fixed brief and fixed questions.** By default an audit is a run of the measures
-  (`core/scripts/code-shape.mjs`) read by a fresh session that built none of what it reads. The session that takes
-  the audit's task starts that reader, writes its answers as a report in the *audits*, named by its day, beside the
+  (`core/scripts/code-shape.mjs`) read by an auditor (`roles/auditor.md`). The session that takes the audit's task
+  starts that reader, writes its answers as a report in the *audits*, named by its day, beside the
   last one's, and records the audit in the baseline (`core/scripts/dose.mjs --audited`), in one pull request.
-  - **The brief:** the reader reads, and changes nothing. It answers for the project's owner and for the cleaning
-    lane: where the code resists change, what to clean up first, and what no check sees.
-  - **Ten questions, the same at every audit,** each answered with its evidence (a file, a count, a pull request)
-    and on one scale, so that two audits can be set side by side: 0, nothing found; 1, found, and it costs no work
+  - **The brief:** it answers for the project's owner and for the cleaning lane: where the code resists change, what to clean up first, and what no check sees.
+  - **Ten questions, the same at every audit,** on this scale: 0, nothing found; 1, found, and it costs no work
     yet; 2, it costs work today; 3, it stops a lane or makes work *one at a time*.
     1. Can what each system offers be said in a sentence, and do the others use only that?
     2. How many systems would each of the next three entries of the queue touch?
@@ -79,8 +77,7 @@ code is held to: `tasks/code-shape.md`.
   - **In the core's own repository** the reader is also given what `scripts/read-total.mjs --candidates` prints: the
     files several kinds of task open, most read first. It says of each whether a part is all most of its readers need,
     as "A cut or a join lowers the total read" asks.
-  - **A limit on its own proposals:** it proposes a new check only where a finding came up at two audits or costs
-    work today.
+  - **A limit on its own proposals:** beyond the auditor's, it proposes one too where a finding costs work today.
   - The tests are audited by the same reader. Where the project names a *mutation tool*, the session that takes the
     audit's task runs it on the whole codebase, outside the suite and on a machine where the project's tests may run
     (floor rule 18), with `core/scripts/strength.mjs --whole`, which writes the tests' strength baseline in the same
@@ -89,8 +86,7 @@ code is held to: `tasks/code-shape.md`.
     that names every test that caught a fault (`mutate.mjs --every`; Stryker run by `stryker.mjs` names none), and
     puts its table in the report; the reader decides on each test it proposes (`tasks/tests.md`).
 
-  It does not mean that the reader mends what it finds, nor that an audit made before these questions stood is made
-  again: what it left unanswered is answered at the next. Nor does it mean that a dated record is brought up to date
+  It does not mean that an audit made before these questions stood is made again: what it left unanswered is answered at the next. Nor does it mean that a dated record is brought up to date
   (`roles/shared/how-to-work.md`, "No description left untrue"), or that a job is added for the ninth. Nor does the
   tenth rewrite anything or turn anything red, put a project's code on the core's inventory, or ask the project's owner,
   whose dose it is to change. Reason: what was measured was fixed and what was judged had no standard, so two audits
@@ -99,6 +95,28 @@ code is held to: `tasks/code-shape.md`.
   (`tasks/code-shape.md`) was asked by nothing whether something maintained does its job. Held by the
   scheduled look, whose issue for an audit says this brief, and by the reviews of the pull request that holds the
   report, which read that each question is answered on the scale.
+- **A project is read against the core once, then for what each release changes** (#464). By default a project is
+  read against the core whole once, from when it takes the core, and after that, at each sync that brings rules
+  changed since the last reading (a release, or `main`'s newest commit for a project that follows `main`), against
+  the rules added or changed alone. The one condition that changes it: a sync that jumps from a copy
+  older than the core's last two releases; the sync says so (`core/scripts/sync.mjs`), and the session that syncs takes
+  the record out in a pull request of its own, so that the next reading is whole. The trigger is the sync's step,
+  which the scheduled look's issue of steps not done keeps: `core/scripts/core-reading.mjs` reads the record
+  of the readings that its `--recorded` writes in the project, a mark of each rule of the copy at the last reading, those of modules not taken too, and asks a whole reading where it stands nowhere,
+  else names each rule the project takes (the floor's and its modules', `--rules`) that no reading covered. The session
+  that takes the task starts an auditor (`roles/auditor.md`) and, in one pull request, puts its answers in the
+  *audits* as an audit's report is put there, files each gap as a task the project's agents take at the dose, a step
+  only the owner can take labelled `needs-owner`, and records the reading (`--recorded`).
+  - **Its question, for each rule it is given:** met, partly, not met or not applicable, with its evidence and what
+    holds it in the project: a check, a test, the review, or nothing.
+
+  It does not mean that anything fails, blocks or waits on the owner; that the reading runs at every sync; a second
+  audit of how the code is put together, a score that ranks projects, that a module taken after a reading is read
+  whole at its taking (its rules are read as they change, as the rest are), or that anything of the project's code or
+  findings leaves it: the core gets counts alone, where the manifest shares them. Reason: the core tells a project what
+  it lacks through checks and steps, each for one rule, and a reading of a whole project against the whole core found
+  what none had: rules met only in part, many held by review or habit alone. Held by the sync's step
+  (`core/scripts/steps.mjs`), read from the record; that a jump is said, by the sync's report alone.
 - **A sweep's scope is read, not listed** (#593). By default an issue names what it covers. The one condition that
   changes it: an issue asks something of every or all of a kind (an inventory, an audit, a sorting, a check of each
   file), a *sweep*. The trigger is such an issue written: whoever writes it names the source a script counts that kind

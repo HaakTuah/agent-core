@@ -132,6 +132,15 @@ export function newestRelease(pin, dir) {
   return newest ? { ...newest, moved: newest.sha !== pin && past(pin, newest.sha, dir) } : null;
 }
 
+// Whether a copy at `old` is older than the core's last two releases: a commit of main from before the second newest
+// release, so that a sync from it jumps past two at least (tasks/cleaning.md, "A project is read against the core
+// once, then for what each release changes"; #464). False where the core has cut fewer than two, or `old` is no
+// commit of main there.
+export function jumped(old, dir) {
+  const [, second] = releasesIn(dir);
+  return !!second && past(old, "refs/heads/main", dir) && !past(second.sha, old, dir);
+}
+
 // The newest commit of the core's main whose checks all passed, which a project that follows main takes (floor rule
 // 12: the core's users get a release, and main may be red until its fix merges; #733): of the last `depth` commits of
 // main's first line, newest first, the first that `held` lets stand, as the host lists the runs its push to main

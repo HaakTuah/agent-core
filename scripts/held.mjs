@@ -21,6 +21,7 @@ import path from "node:path";
 import { leadsOut, logged } from "./guards.mjs";
 import { loadConfig } from "./licences.mjs";
 import { GITHUB_MOST, archived, fetched, packagesOf, pool, registry } from "./lookup.mjs";
+import { copyOf } from "./core-path.mjs";
 import { lockPackages, nugetConfig } from "./nuget.mjs";
 import { started } from "./started.mjs";
 
@@ -41,7 +42,7 @@ export function heldPackages(root, configs) {
     if (leadsOut(root, path.resolve(root, configPath))) { unread.push(`${said(configPath)}: it leads out of the project, through a link, so it is not read`); continue; }
     try { config = loadConfig(path.resolve(root, configPath)); } catch { unread.push(`${said(configPath)}: it cannot be read as the licence check's config, which that check says why`); continue; }
     let sources = 0;
-    try { sources = nuget ? nugetConfig(config).sources.length : 0; } catch { /* (no NuGet part: no sources of its own) */ }
+    try { sources = nuget ? nugetConfig(config, copyOf(root)).sources.length : 0; } catch { /* (no NuGet part: no sources of its own) */ }
     let head = [];
     try { ({ head } = packagesOf(config, root, null, nuget)); } catch (e) { unread.push(`${said(configPath)}: ${said(e.message)}`); continue; }
     for (const [lockPath, packages] of head) for (const p of [...packages, ...(nuget ? otherVersions(root, lockPath, packages) : [])]) {

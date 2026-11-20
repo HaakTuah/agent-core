@@ -7,7 +7,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #954 | rule builder; `tests.yml` | |
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #810 | the orchestrator, for its done-when: reads `main`'s runs, then closes it | a stretch of merges landing faster than a run; at the batch's end, if none came, the orchestrator reads `main`'s runs since #813 and closes #810 on that |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | #715 |
@@ -32,7 +31,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #314 | rule builder | |
 | #457 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
-| #925 | builder; a check | |
 | #464 | rule builder | |
 | #441, with #484, points 6 and 7 | rule builder; the file stays whole where #469's measure finds no kind of task reads less | #469 |
 | #355 | builder | #530: the readers left go on the parser #529 brings |
@@ -62,6 +60,8 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #913 | builder; a split of `tasks/choices.md`, its meaning kept | |
 | #687 | builder; a trim, its design check stating the meaning kept | |
 | #870 | builder | #925 |
+| #943 | builder; a split, its meaning kept | #962 |
+| #974 | rule builder; `roles/adviser.md` | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
@@ -96,6 +96,9 @@ They read and change no rule.
 | #857 | builder | |
 | #685 | builder | |
 | #946 | builder | |
+| #937 | builder | |
+| #938 | builder | |
+| #958 | builder | |
 | #919 | builder | #917 |
 
 ## Not taken up

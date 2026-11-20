@@ -13,7 +13,7 @@ import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
 import { STEPS } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, POINTER, entries, notesAt } from "../scripts/sync-notes.mjs";
-import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
+import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, jumped, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -92,7 +92,7 @@ const c3 = commit(`${head}- **First.** Done when one.\n- **Second.** Done when t
 const fetched = () => { const dir = fs.mkdtempSync(path.join(tmp, "fetched-")); fetchCore(dir, core); return dir; };
 
 let dir = fetched();
-ok(releasesIn(dir).length === 0 && newestRelease(c1, dir) === null, "a core with no tag has no release");
+ok(releasesIn(dir).length === 0 && newestRelease(c1, dir) === null && !jumped(c1, dir), "a core with no tag has no release, and no copy is older than its last two");
 ok(next(dir).name === "release-1" && next(dir).sha === c4 && next(dir).before === null && next(dir).asks.length === 0, "the first release would stand on main's newest commit");
 ok(past(c1, c3, dir) && past(c3, c3, dir) && !past(c3, c1, dir) && !past("0".repeat(40), c3, dir) && !past("not-a-commit", c3, dir), "a commit is past the ones it came from, and itself; what is no commit there is past nothing");
 
@@ -107,6 +107,7 @@ ok(newestRelease(c1, dir).name === "release-2" && newestRelease(c1, dir).sha ===
 ok(!newestRelease(c3, dir).moved && !newestRelease(c4, dir).moved, "a pin at the newest release, or past it on main, has nothing to take");
 ok(!newestRelease(side, dir).moved && !newestRelease("f".repeat(40), dir).moved, "a pin that is no commit of main moves nowhere (core.yml fails such a project by itself)");
 ok(asksBetween(c1, c3, dir).join("|") === "- **First.** Done when one.|- **Second.** Done when two." && asksBetween(c3, c4, dir).length === 0, "a sync asks what the notes gained between the two commits");
+ok(jumped(c1, dir) && !jumped(c2, dir) && !jumped(c3, dir) && !jumped(c4, dir) && !jumped(side, dir) && !jumped("f".repeat(40), dir), "a copy from before the second newest release is older than the last two, and one at it or past it, or no commit of main, is not");
 ok(asksBetween("f".repeat(40), c3, dir) === null, "notes that cannot be read give no all-clear");
 {
   // (#750, point 1: the notes' entries move from the file into a folder, a file each; a sync across the move asks
@@ -169,8 +170,10 @@ ok(matters("tasks/b.md", taking("all")) && matters("tasks/b.md", "# Core manifes
 // release.yml among them, which runs the upgrade test on Windows (#715), outside its comments)
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
-// (a test is passed over as matters() in releases.mjs passes it over: one of scripts/ itself, never a nested one)
-const runs = [...walk(path.join(repo, "scripts")).filter(f => !/^scripts\/[^/]+-test\.mjs$/.test(path.relative(repo, f).split(path.sep).join("/"))), ...walk(path.join(repo, "setup", "template")),
+// (a test is passed over as matters() in releases.mjs passes it over: one of scripts/ itself, never a nested one; and
+// the entries of scripts/holders/, data that names the check holding each rule, a test of the core's among them
+// (#925), read as data and never run)
+const runs = [...walk(path.join(repo, "scripts")).filter(f => !/^scripts\/(?:[^/]+-test\.mjs|holders\/[^/]+\.json)$/.test(path.relative(repo, f).split(path.sep).join("/"))), ...walk(path.join(repo, "setup", "template")),
   ...fs.readdirSync(path.join(repo, ".github", "workflows")).filter(f => !OWN_FILES.includes(`.github/workflows/${f}`)).map(f => path.join(repo, ".github", "workflows", f))];
 const naming = runs.flatMap(f => fs.readFileSync(f, "utf8").split("\n").map((l, i) => [l, `${path.relative(repo, f)}:${i + 1}`]))
   .filter(([l]) => /-test\.mjs/.test(l) && !/^\s*(\/\/|#|\*)/.test(l)).map(([, at]) => at);
@@ -219,7 +222,8 @@ const run = (name, status, conclusion, path = `.github/workflows/${name}.yml`) =
 const list = (...runs) => ({ total_count: runs.length, workflow_runs: runs });
 // the core's tests in full on that commit (#733): of the tests' runs there once an hour or by hand, which hold the
 // Windows suites, none is unfinished and the newest, by when it last started (a re-run moves it), passed
-const full = (event, conclusion, id, status = "completed", at = `2026-11-19T10:${String(id).padStart(2, "0")}:00Z`) => ({ ...run("tests", status, conclusion), event, id, run_started_at: at });
+// (each bears the workflow's own name, as GitHub gives a run whose run-name is empty: tests-parts-test.mjs reads the rest)
+const full = (event, conclusion, id, status = "completed", at = `2026-11-19T10:${String(id).padStart(2, "0")}:00Z`) => ({ ...run("tests", status, conclusion), event, id, run_started_at: at, display_title: "tests" });
 ok(/have not run in full on it yet/.test(fullRun(list({ ...run("tests", "completed", "success"), event: "push" }))), "a commit whose tests ran only on its push, on Linux, has not had them in full, and the release waits, saying how to start them");
 ok(fullRun(list(full("schedule", "success", 10))) === null && fullRun(list(full("workflow_dispatch", "success", 10))) === null, "an hourly or a hand-started run that passed lets the release stand");
 ok(fullRun(list(full("workflow_dispatch", "success", 10), full("schedule", "failure", 9))) === null && /hourly run\): failure/.test(fullRun(list(full("schedule", "failure", 10), full("workflow_dispatch", "success", 9)))), "the newest of them, by when it last started, decides, in whatever order GitHub lists them: a pass started after a failure lets it stand, a failure started after a pass holds it");

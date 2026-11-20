@@ -29,7 +29,7 @@
 //                                    [--suite "<command>"]... [--json <file>]
 //
 //   <pathspec>   git pathspecs of the code to measure (":!" leaves a path out); left out, the whole repository but for
-//                a copy of the core (core/), where the script runs from that copy or measures another repository
+//                a copy of the core (core/, or where the manifest names it), where the script runs from that copy or measures another repository
 //   --repo       the repository to measure, a clone this script does not lie in (one read for an audit); left out, the
 //                one it lies in. Its suites, where --suite names them, run its own code
 //   --depth      a folder is the first n parts of a file's path (packages/engine, for 2); left out, its whole folder
@@ -41,7 +41,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { started } from "./started.mjs";
-import { projectAt } from "./core-path.mjs";
+import { copyOf, projectAt } from "./core-path.mjs";
 import { javascriptFunctions } from "./javascript-functions.mjs";
 
 export const CODE = [".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx"];
@@ -712,16 +712,17 @@ const rootOf = (repo, here) => (repo ? "" : projectAt(here).root) || execFileSyn
 
 // What is read where none is named: the whole repository, but the core's copy where this script stands in one (the path
 // from the root to it as git itself says it, since a path worked out from two folders' names can differ in spelling,
-// as a short name of Windows' does from the long one git gives; core-path.mjs), and another repository's core/.
-const specsOf = (repo, here) => {
-  const copy = repo ? "core/" : projectAt(here).prefix.replace(/scripts\/$/u, "");
+// as a short name of Windows' does from the long one git gives; core-path.mjs), and another repository's, at the path its
+// manifest names (core/ where it has none, or its line cannot be read).
+const specsOf = (repo, here, root) => {
+  const copy = repo ? copyOf(root) : projectAt(here).prefix.replace(/scripts\/$/u, "");
   return copy ? [".", `:!${copy}`] : ["."];
 };
 
 function main(argv) {
   const opts = parseArguments(argv);
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const root = rootOf(opts.repo, here), specs = opts.specs.length ? opts.specs : specsOf(opts.repo, here);
+  const root = rootOf(opts.repo, here), specs = opts.specs.length ? opts.specs : specsOf(opts.repo, here, root);
   const listed = execFileSync("git", [...SAFE, "ls-files", "-z", "--", ...specs], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
   const { texts, other } = readFiles(root, listed);
   const log = execFileSync("git", [...SAFE, "log", "--no-merges", "-n", String(opts.history), "--format=%x00", "--name-only", "--", ...specs], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });

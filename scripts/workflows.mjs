@@ -25,13 +25,22 @@
 // And a line break that YAML 1.1 reads and the YAML package does not (U+0085, U+2028, U+2029: #872): a key given twice,
 // or a call left without ready_for_review, placed after one is not found by the package's reader, while a YAML 1.1
 // reader (YamlDotNet) reads it as a line end, so such a file fails where it is new or changed, and is noted where it is
-// unchanged from the base or no base is told, as a key given twice is (foreignBreaks() below).
+// unchanged from the base or no base is told, as a key given twice is (foreignBreaks() below), and the sync's step "20
+// November 2026, no workflow holds a line break the YAML package does not read" (steps.mjs) names each file with one.
+// What stands behind such a break is read as a YAML 1.1 reader reads it, in the file and in the base alike: each of the
+// three is read as an LF, as the sync step's mend leaves it (an escape inside a double-quoted string, a line feed
+// elsewhere) and as it stands, whichever finds most, so a key given twice or a call left without ready_for_review
+// behind one is found, noted where the base held it, and told on the line an editor counts (keysTwice() below; #876).
+// A reading that is no YAML to the package leaves its keys out, each reading of a text is kept for the next reader, and a file's
+// lines of one kind are cut at 25 with the rest counted (#970). Where the base's breaks alone leave it no YAML to the package in
+// either reading (such as a break inside a single-quoted string whose next line is under-indented), what it held cannot be
+// told, and what the changed file shows is noted, never failed (baseOf() below); a base no YAML for another reason is read as it stands.
 // What it does not chase: a value given as binary (a YAML tag) holds a word no search can see, and a tag can itself be
 // spelled in more ways than a search can follow. GitHub's own workflow reader refuses a binary value where a trigger
 // belongs, so that is no way to write one; the reviews hold it, as they hold any odd tag in a workflow.
 // The rest of rule 2 is held elsewhere: that every action is pinned to a full commit SHA by GitHub's own setting, which
 // reads a workflow as GitHub runs it (README.md, "Setting up"); workflow_run, the fewest permissions and untrusted text
-// in a script by the reviews, and by CodeQL where the repository has it. The copy of the core (core/) is checked in the
+// in a script by the reviews, and by CodeQL where the repository has it. The copy of the core (core/, or where the manifest names it) is checked in the
 // core, which runs this on itself. Reads only; git, Node's own modules and the YAML package the core installs
 // (packages.mjs). It checks the project it lies in, whatever the directory it is started from. Run by the copies workflow
 // (.github/workflows/copies.yml).
@@ -45,7 +54,7 @@ import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
 import { DEEPEST, LONGEST, pruned, twice } from "./yaml-keys.mjs";
 import { loadSync, unreached } from "./packages.mjs";
-import { projectAt } from "./core-path.mjs";
+import { copyOf, projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
 
 const WORD = "pull_request_target";
@@ -89,13 +98,108 @@ export const readable = text => !/[\0\ufffd]/u.test(text);
 // many there are in all; null where there is none (#872).
 export function foreignBreaks(text) {
   let line = 1, first = null, count = 0;
-  for (const m of String(text).matchAll(/\n|[\u0085\u2028\u2029]/gu)) {
-    if (m[0] === "\n") { line++; continue; }
+  for (const m of String(text).matchAll(/\r\n?|\n|[\u0085\u2028\u2029]/gu)) {
+    if (/[\r\n]/u.test(m[0])) { line++; continue; }
     count++;
     first ??= { line, code: `U+${m[0].codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}` };
   }
   return first && { ...first, count };
 }
+
+// A text as a YAML 1.1 reader reads it: each of the three breaks an LF, as { text, line }, with `line` telling a line of
+// that text as the line an editor counts (CR and CRLF end one, the three do not) (#876). A text with none is itself.
+export function asLF(text) {
+  text = String(text);
+  if (text.length > LONGEST || !/[\u0085\u2028\u2029]/u.test(text)) return { text, line: n => n }; // (a text past the length read is not read: yaml-keys.mjs)
+  text = text.replace(/\r\n?/gu, "\n"); // (as twice() does, a CR before a break its own line end, as YAML 1.1 reads them)
+  const at = [0, 1];
+  let editor = 1;
+  for (const m of text.matchAll(/\n|[\u0085\u2028\u2029]/gu)) { if (m[0] === "\n") editor++; at.push(editor); }
+  return { text: text.replace(/[\u0085\u2028\u2029]/gu, "\n"), line: n => at[n] ?? n };
+}
+
+// What a reader gives for a text, kept for the last few: the readers of one file (the key twice, the call a draft skips, the
+// base and the head, the sync's steps) ask for the same text again, and a text with a break is lexed and parsed three ways
+// each time (#970). The results are read, never changed.
+function remember(read, keep = 8) {
+  const seen = new Map();
+  return text => {
+    text = String(text);
+    if (seen.has(text)) return seen.get(text);
+    const got = read(text);
+    if (seen.size >= keep) seen.delete(seen.keys().next().value);
+    return seen.set(text, got).get(text);
+  };
+}
+
+// A text as the mend of the sync step asks it be written: each break inside a double-quoted string its own escape (\\u2028),
+// each other one a line feed, as { text, line } like asLF(); the text as asLF() gives it where the package's lexer cannot
+// cut it exactly (#876).
+export const asMended = remember(text => {
+  text = String(text);
+  if (text.length > LONGEST || !FOREIGN.test(text)) return { text, line: n => n };
+  const norm = text.replace(/\r\n?/gu, "\n");
+  try {
+    const { Lexer } = loadSync("yaml");
+    let out = "", joined = "", editor = 1;
+    const at = [0, 1];
+    for (const token of new Lexer().lex(norm)) {
+      if (token.length === 1 && token < " " && token !== "\n" && token !== "\t") continue; // (the lexer's own marks, not the text)
+      joined += token;
+      const mended = mendedToken(token);
+      out += mended.out;
+      for (const ends of mended.ends) at.push(ends ? ++editor : editor);
+    }
+    return joined === norm && out.length <= LONGEST ? { text: out, line: n => at[n] ?? n } : asLF(text); // (an escape is longer than its break: a text it takes past the length read is read as line feeds)
+  } catch { return asLF(text); }
+});
+
+// One token of the package's lexer as the mend leaves it: its text, and for each line feed of it whether it ends a line as an
+// editor counts (a line feed the text held) or stands for a break an editor does not (#876).
+function mendedToken(token) {
+  let out = "";
+  const ends = [];
+  for (const ch of token) {
+    if (ch === "\n") { out += ch; ends.push(true); }
+    else if (!FOREIGN.test(ch)) out += ch;
+    else if (token[0] === '"') out += `\\u${ch.codePointAt(0).toString(16).padStart(4, "0")}`;
+    else { out += "\n"; ends.push(false); }
+  }
+  return { out, ends };
+}
+
+// A text with a break the package does not read, read each way a YAML 1.1 reader may: as line feeds, as the mend leaves it,
+// and as it stands (#876).
+const readings = text => [asLF(text), asMended(text), { text: String(text), line: n => n }];
+const FOREIGN = /[\u0085\u2028\u2029]/u;
+
+// The keys given twice in a text (yaml-keys.mjs, twice()) read as a YAML 1.1 reader reads its line breaks, each on the line an
+// editor counts, and never fewer than the package reads in the text as it stands: of each key, whichever reading finds most
+// (a break inside a quoted string, folded, may change what the package can read of the rest; #876). A reading that is no YAML
+// to the package, once the breaks are folded or mended, where the text as it stands is, shows keys no reader has, so its
+// entries are left out; the text as it stands is read as ever (#970). Where the text as it stands is no YAML either, every
+// reading is kept, so a key that is not there may be named in a file that is refused all the same.
+export const keysTwice = remember(text => {
+  if (!FOREIGN.test(String(text))) return Object.freeze(twice(text).map(Object.freeze)); // (shared between the readers, so none can change it)
+  const by = ({ text: read, line }) => {
+    const groups = new Map();
+    for (const found of twice(read)) {
+      const id = found.key === null ? `${Boolean(found.size)}` : `k:${found.key}`;
+      (groups.get(id) ?? groups.set(id, []).get(id)).push({ ...found, line: line(found.line), first: found.first === null ? null : line(found.first) });
+    }
+    return groups;
+  };
+  const [folded, mended, plain] = readings(text), seen = new Set([plain.text]);
+  // (only where the text as it stands is YAML, so that the breaks are what spoil the reading: a file no YAML for another reason keeps them)
+  const spoilt = r => yamlOf(plain.text) !== null && yamlOf(r.text) === null;
+  const all = [folded, mended].filter(r => !seen.has(r.text) && seen.add(r.text) && !spoilt(r)).concat(plain).map(by);
+  return Object.freeze([...new Set(all.flatMap(groups => [...groups.keys()]))].flatMap(id => all.map(groups => groups.get(id) ?? []).reduce((best, now) => (now.length > best.length ? now : best)))
+    .sort((x, y) => x.line - y.line).map(Object.freeze)); // (shared between the readers, so none can change it)
+});
+
+// Whether a text with such a break is YAML the package reads once the breaks are read as a YAML 1.1 reader reads them, as line
+// feeds or as the mend leaves them.
+export const reads11 = text => String(text).length <= LONGEST && [asLF(text), asMended(text)].some(r => yamlOf(r.text) !== null);
 
 // The files, each { file, text }, that hold such a break, as { fails, notes } (as repeated() gives them): `before` gives
 // a file's text on the base, or is null where there is no base, when each is a note; a file the same as the base's is
@@ -106,16 +210,17 @@ export function foreignBroken(files, before) {
     const found = foreignBreaks(text);
     if (!found) continue;
     const old = !before || before(file) === text;
-    (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}:${found.line}: the file holds the line break ${found.code}${found.count > 1 ? ` and ${found.count - 1} more` : ""}, which YAML 1.1 reads as a line end and the YAML package this check reads with does not, so a key given twice or a call left without ready_for_review after it would go unseen${old && before ? ", as on the base" : ""}. Mend: replace each with an ordinary line feed, or, inside a double-quoted string, with the escape of its own code (\\u0085, \\u2028 or \\u2029)`);
+    (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}:${found.line}: the file holds the line break ${found.code}${found.count > 1 ? ` and ${found.count - 1} more` : ""}, which YAML 1.1 reads as a line end and the YAML package does not, so a reader of one kind sees the file otherwise than a reader of the other${old && before ? ", as on the base" : ""}. Mend: replace each with an ordinary line feed, or, inside a double-quoted string, with the escape of its own code (\\u0085, \\u2028 or \\u2029)`);
   }
   return { fails, notes };
 }
 
-// The files the check reads, of those git tracks.
-export const reads = files => files.filter(f => !f.startsWith("core/") && !f.split("/").includes("node_modules") &&
+// The files the check reads, of those git tracks: the project's own, the copy of the core aside, where its manifest names
+// it (`copy`, core-path.mjs's copyOf; core/ where it names none).
+export const reads = (files, copy = "core/") => files.filter(f => !f.startsWith(copy) && !f.split("/").includes("node_modules") &&
   (/^\.github\/(workflows\/[^/]+|actions\/.+)\.ya?ml$/iu.test(f) || /(^|\/)action\.ya?ml$/iu.test(f)));
 // What may be no link, of those git tracks: what the check reads, and .github itself with everything in it.
-export const unlinked = files => { const read = new Set(reads(files)); return files.filter(f => read.has(f) || /^\.github(\/|$)/iu.test(f)); };
+export const unlinked = (files, copy) => { const read = new Set(reads(files, copy)); return files.filter(f => read.has(f) || /^\.github(\/|$)/iu.test(f)); };
 
 // What a file past the depth or the length read is said to hold unseen, and its mend.
 const NOT_READ = [ // (by `size`: 0 for a part nested too deep, 1 for a text too long)
@@ -136,8 +241,13 @@ const heldAs = ({ key, size }) => (key === null ? (size ? 1 : 0) : `k:${key}`);
 // then shows, in that pull request.
 const baseOf = (before, file, text) => {
   const was = before ? before(file) ?? "" : null, long = was !== null && was.length > LONGEST;
-  return { read: was === null || long ? null : was, same: long && was === text };
+  // `unknown`: the base holds a break the package does not read and is no YAML to it once the breaks are read as a YAML 1.1 reader reads them, so what it
+  // held behind them cannot be told, and what the file now shows is noted, never failed (#876); but only where the breaks are
+  // what stands in the way (breaksAlone() below). A base that is no YAML for another reason is read as it stands, as any other (#970).
+  const read = was === null || long ? null : was;
+  return { read, same: long && was === text, unknown: read !== null && read !== text && foreignBreaks(read) !== null && !reads11(read) && breaksAlone(read) };
 };
+const UNKNOWN = ", the base being no YAML to the package once its line breaks are read as YAML 1.1 reads them, so what it held is not known";
 
 // The keys given twice (yaml-keys.mjs) in files, each { file, text }, as { fails, notes }, each a line with its mend.
 // `before` gives a file's text on the base (null where it held none), or is null where there is no base to read
@@ -145,18 +255,30 @@ const baseOf = (before, file, text) => {
 export function repeated(files, before) {
   const fails = [], notes = [];
   for (const { file, text } of files) {
-    const held = new Map(), base = baseOf(before, file, text);
-    for (const found of base.read === null ? [] : twice(base.read)) held.set(heldAs(found), (held.get(heldAs(found)) ?? 0) + 1);
-    for (const { line, key, first, size } of twice(text)) {
-      const id = heldAs({ key, size }), old = !before || base.same || held.get(id) > 0;
+    const held = new Map(), base = baseOf(before, file, text), mine = { fails: [], notes: [] };
+    for (const found of base.read === null ? [] : keysTwice(base.read)) held.set(heldAs(found), (held.get(heldAs(found)) ?? 0) + 1);
+    for (const found of keysTwice(text)) {
+      const id = heldAs(found), old = !before || base.same || base.unknown || held.get(id) > 0;
       held.set(id, (held.get(id) ?? 0) - 1);
-      const was = old ? (before ? ", as it did on the base" : "") : "";
-      (old ? notes : fails).push(key === null
-        ? `${old ? "note" : "FAIL"} ${file}:${line}: ${NOT_READ[+Boolean(size)].said}${was}. Mend: ${NOT_READ[+Boolean(size)].mend}`
-        : `${old ? "note" : "FAIL"} ${file}:${line}: the key ${JSON.stringify(key)} is given twice in one mapping (first on line ${first}), so GitHub refuses the whole file and runs none of its jobs${was}. Mend: keep one of the two keys, with what both said in it (two if: conditions joined by &&, two env: mappings as one)`);
+      mine[old ? "notes" : "fails"].push(keyLine(file, found, old, old ? (base.unknown ? UNKNOWN : before ? ", as it did on the base" : "") : ""));
     }
+    fails.push(...shown(file, "FAIL", mine.fails));
+    notes.push(...shown(file, "note", mine.notes));
   }
   return { fails, notes };
+}
+// A file's lines of one kind, the first SHOWN of them and one line counting the rest (a hostile file gives a line for each of
+// tens of thousands of keys: #970).
+const shown = (file, lead, lines) => (lines.length <= SHOWN ? lines
+  : [...lines.slice(0, SHOWN), `${lead} ${file}: and ${lines.length - SHOWN} more keys or parts not read, of the same kind as the lines above. Mend: mend each of those as the lines above say; the rest show once these are mended`]);
+const SHOWN = 25; // the most lines of one kind that repeated() prints for one file
+
+// The line repeated() says of one key given twice (or of a part not read), `was` what it adds of the base.
+function keyLine(file, { line, key, first, size }, old, was) {
+  const lead = `${old ? "note" : "FAIL"} ${file}:${line}: `;
+  return key === null
+    ? `${lead}${NOT_READ[+Boolean(size)].said}${was}. Mend: ${NOT_READ[+Boolean(size)].mend}`
+    : `${lead}the key ${JSON.stringify(key)} is given twice in one mapping (first on line ${first}), so GitHub refuses the whole file and runs none of its jobs${was}. Mend: keep one of the two keys, with what both said in it (two if: conditions joined by &&, two env: mappings as one)`;
 }
 
 // The core's pull-request checks whose call may be skipped on a draft, and the two that skip a draft by themselves.
@@ -170,7 +292,7 @@ const typesOf = on => typeof on === "string" || Array.isArray(on) ? ([].concat(o
 // GitHub's own reader refuses all the same. A pair whose key is a list or a mapping is left out before the read, since
 // `toJS` writes such a key out as text, which takes ever longer the deeper it nests (a few hundred `? ` marks ran for
 // minutes: #837), and the keys read here are plain words.
-function yamlOf(text) {
+const yamlOf = remember(text => {
   const { Composer, Parser, isScalar, visit } = loadSync("yaml");
   try {
     const composer = new Composer({ schema: "failsafe", uniqueKeys: false, prettyErrors: false }), docs = [];
@@ -184,13 +306,41 @@ function yamlOf(text) {
     visit(docs[0], { Pair: (_, pair) => (isScalar(pair.key) ? undefined : visit.REMOVE) });
     return docs[0].toJS({ maxAliasCount: 100 });
   } catch { return null; }
+});
+
+// Whether the breaks alone stand in the way of a text with one that is no YAML as a YAML 1.1 reader reads it: the package reads it
+// as it stands or with each break a blank, or every error it finds once they are line feeds stands on a line a break ends or
+// begins, such as a single-quoted string a break ends before a line less indented than its key (#970). An error anywhere else
+// is the text's own, and the text is read as it stands.
+function breaksAlone(text) {
+  if ([text, text.replace(/[\u0085\u2028\u2029]/gu, " ")].some(t => yamlOf(t) !== null)) return true;
+  const { Composer, Parser } = loadSync("yaml"), folded = asLF(text).text.replace(/^\ufeff/u, ""), near = new Set(), starts = [0];
+  try {
+    let line = 0;
+    for (const m of text.replace(/\r\n?/gu, "\n").matchAll(/\n|[\u0085\u2028\u2029]/gu)) { line++; if (m[0] !== "\n") { near.add(line - 1); near.add(line); } }
+    for (let at = folded.indexOf("\n"); at >= 0; at = folded.indexOf("\n", at + 1)) starts.push(at + 1);
+    const composer = new Composer({ schema: "failsafe", uniqueKeys: false, prettyErrors: false }), docs = [];
+    for (const token of new Parser().parse(folded)) { const one = [token]; pruned(one); docs.push(...composer.next(one[0])); }
+    docs.push(...composer.end());
+    const lineOf = pos => { let lo = 0, hi = starts.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid] <= pos) lo = mid; else hi = mid - 1; } return lo; };
+    return docs.length === 1 && docs[0].errors.length > 0 && docs[0].errors.every(e => near.has(lineOf(e.pos[0])));
+  } catch { return false; }
 }
 
 // The jobs of a workflow (its YAML read, `yaml`, or its text) that call one of the core's pull-request checks skipped on a
 // draft while the trigger never starts it once the pull request is marked ready: [] where none, or where the text is
 // no YAML (GitHub's own reader then refuses it).
 export function draftHoles(yaml) {
-  if (typeof yaml === "string") yaml = yaml.length > LONGEST ? null : yamlOf(yaml); // (a text past the length read is not given to the parser: #752)
+  // (a text past the length read is not given to the parser: #752; one with a break the package does not read is read as a
+  // YAML 1.1 reader reads it, as line feeds or as the mend leaves it, and as it stands, what any shows counting: #876)
+  if (typeof yaml === "string") {
+    if (yaml.length > LONGEST) return [];
+    const texts = FOREIGN.test(yaml) ? [asLF(yaml).text, asMended(yaml).text, yaml] : [yaml];
+    return [...new Set(texts.flatMap(t => holesIn(yamlOf(t))))];
+  }
+  return holesIn(yaml);
+}
+function holesIn(yaml) {
   const types = typesOf(yaml?.on);
   if (types === null || types.includes("ready_for_review")) return [];
   const prefix = `${CORE}/`.toLowerCase();
@@ -217,8 +367,8 @@ export function unreadied(files, before) {
     }
     const held = new Set(base.read === null ? [] : draftHoles(base.read));
     for (const job of draftHoles(text)) {
-      const old = !before || held.has(job);
-      (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}: its job ${JSON.stringify(job)} calls one of the core's checks that is skipped on a draft, and its pull_request trigger leaves out ready_for_review, so once a pull request is marked ready the check runs on no head and the draft's skip reads as passed${old && before ? ", as on the base" : ""}. Mend: add ready_for_review to the types: under pull_request: (where it lists none, types: [opened, reopened, synchronize, ready_for_review])`);
+      const old = !before || base.unknown || held.has(job);
+      (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}: its job ${JSON.stringify(job)} calls one of the core's checks that is skipped on a draft, and its pull_request trigger leaves out ready_for_review, so once a pull request is marked ready the check runs on no head and the draft's skip reads as passed${old && base.unknown ? UNKNOWN : old && before ? ", as on the base" : ""}. Mend: add ready_for_review to the types: under pull_request: (where it lists none, types: [opened, reopened, synchronize, ready_for_review])`);
     }
   }
   return { fails, notes };
@@ -228,13 +378,13 @@ if (started(import.meta.url)) {
   const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
   process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
-  const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean), files = reads(tracked);
+  const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean), copy = copyOf("."), files = reads(tracked, copy);
   const core = process.argv.includes("--core"), base = core ? "" : process.env.WORKFLOWS_BASE ?? "";
   // (both texts with their line ends as "\n": git may convert them on checkout, so the working tree's file and the base's
   // blob of one text must read as equal and as one length, #752)
   const plain = text => text.replace(/\r\n?/gu, "\n");
   const show = file => { try { return plain(git(["show", `${base}:${file}`])); } catch { return null; } };
-  const links = new Set(unlinked(tracked).filter(f => fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()));
+  const links = new Set(unlinked(tracked, copy).filter(f => fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()));
   let failed = links.size;
   const texts = [];
   for (const file of links) console.log(`FAIL ${logged(file)}: a link, not a file, and the check reads the project's own text only. Mend: put the file itself there in place of the link`);
