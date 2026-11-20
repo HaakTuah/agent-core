@@ -32,7 +32,7 @@
       "why": "#929: the cases of how Betterleaks reads apart from what the check reads."
     },
     ".github/workflows/tests.yml": {
-      "mark": 69417,
+      "mark": 72196,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {
@@ -78,10 +78,6 @@
     "tasks/game-design.md": {
       "mark": 25119,
       "why": "#441: the game rules split into a base and a file for each kind (#484, points 6 and 7)."
-    },
-    "tests/steps-test.mjs": {
-      "mark": 115750,
-      "why": "#916: a file for each reader its sections test."
     },
     "tests/upgrade-test.mjs": {
       "mark": 98773,
@@ -251,13 +247,9 @@
       "mark": 32013,
       "why": "#943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
     },
-    "scripts/check-configs.mjs": {
-      "mark": 40791,
-      "why": "#919: the reading of a workflow's runs apart from the reading of each check's config; the steps' readers, which import it, move first."
-    },
-    "tests/agent-tools-test.mjs": {
-      "mark": 114595,
-      "why": "#919: split with agent-tools.mjs, a file of cases for each tool's configuration."
+    ".github/shape-baseline.json": {
+      "mark": 21237,
+      "why": "A list of old breaches, each one line of a key and its reason, which the shape check reads whole and a session reads by the key of the one it mends or adds; the 'grown' and 'listed' parts hold the same keys, so a split along them would make two files to keep in step, and none along who reads it exists."
     },
     "tests/staged-test.mjs": {
       "mark": 125729,

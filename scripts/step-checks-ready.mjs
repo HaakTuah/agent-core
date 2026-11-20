@@ -5,7 +5,8 @@
 // own modules and git only.
 import { CORE } from "./core-address.mjs";
 import { installed } from "./packages.mjs";
-import { calls, folded, readable, runFiles } from "./check-configs.mjs";
+import { calls, folded, readable } from "./workflow-calls.mjs";
+import { runFiles } from "./own-runs.mjs";
 import { pathsLetThrough } from "./workflow-run.mjs";
 import { draftHoles, foreignBreaks, reads11 } from "./workflows.mjs";
 import { onPullRequests, shown } from "./step-checks.mjs";

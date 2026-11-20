@@ -1,6 +1,6 @@
 // The step of setup/sync-notes/430-a-file-for-each-role-and-the-script-that-says.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { copyAt } from "../check-configs.mjs";
+import { copyAt } from "../workflow-calls.mjs";
 import { COST, inCopy } from "../step-checks.mjs";
 
 export default { lead: "16 November 2026, a file for each role, and the script that says what to read", cost: COST.line,

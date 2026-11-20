@@ -19,6 +19,7 @@
     "changes"
   ],
   "grown": {
+    "process: tests/core-cost-test.mjs -> node:child_process": "A real shallow clone of a scratch git repository is what the test guards (#1027): that a reader counting merges from a clone git says is shallow refuses it with a mend, which only git's own clone makes.",
     "process: tests/licence-scan-pins-test.mjs -> node:child_process": "Split from tests/licence-scan-test.mjs (#1008), whose scratch project it commits through git: that a download a pull request adds or unpins is read against the base, from git, is what it guards.",
     "process: tests/comment-only-run-test.mjs -> node:child_process": "Split from tests/comment-only-test.mjs (#1008), whose scratch clone it runs the script in through git: that the script reads a pull request's branch from git and refuses what it cannot is what it guards.",
     "process: tests/lookup-run-test.mjs -> node:child_process": "Split from tests/lookup-test.mjs (#1008), whose scratch git repository it runs the check in: that a pull request's lock file is read against its base, from git, is what it guards.",
@@ -48,7 +49,15 @@
     "process: tests/steps-checks-run-test.mjs -> node:child_process": "Split from tests/steps-test.mjs (#919), whose project it builds through git, the starter kit's: the readers it tests answer from what git tracks there (a test file staged, a shape baseline the shape check's own --write mends), which only git makes.",
     "process: tests/steps-files-test.mjs -> node:child_process": "Split from tests/steps-test.mjs (#919), whose project it builds through git, the starter kit's: the readers it tests read the files git lists there (a SECURITY.md's rule 5, a project laid out for the rules' move), which only git makes.",
     "process: tests/steps-tool-files-test.mjs -> node:child_process": "Split from tests/steps-test.mjs (#919), whose project it builds through git, the starter kit's: the reader it tests keys its answer by what git tracks there (a link, a staged file, a submodule), which only git makes.",
-    "process: tests/core-path-hooks-test.mjs -> node:child_process": "Split from tests/core-path-test.mjs (#919): it builds git repositories (a library that carries the core as a submodule, a project and its remote, a forged project) and reads what the start hook, the first step of each workflow a project calls and the pointer check (which works out its root from where its script stands, in a copy a submodule carries) do with them; what git holds there, a submodule fetched or refused, is what it guards, and no code of the core's stands beneath that process to call instead."
+    "process: tests/core-path-hooks-test.mjs -> node:child_process": "Split from tests/core-path-test.mjs (#919): it builds git repositories (a library that carries the core as a submodule, a project and its remote, a forged project) and reads what the start hook, the first step of each workflow a project calls and the pointer check (which works out its root from where its script stands, in a copy a submodule carries) do with them; what git holds there, a submodule fetched or refused, is what it guards, and no code of the core's stands beneath that process to call instead.",
+    "timed: tests/agent-tools-links-test.mjs -> Date.now": "Split from tests/agent-tools-test.mjs (#919): that 1,000 links the base held below agents, each to 3,000 files, are read within a fixed 30 seconds (a reader that followed each link to its files would take far longer) is what the case guards, and only the clock shows it.",
+    "timed: tests/agent-tools-case-test.mjs -> Date.now": "Split from tests/agent-tools-test.mjs (#919): that a command a megabyte long is told from the kit's forms at once is what the case guards, and only the clock shows it.",
+    "timed: tests/agent-tools-kiro-codex-test.mjs -> Date.now": "Split from tests/agent-tools-test.mjs (#919): that an array of 200,000 tables of Codex's config is read at once is what the case guards (the TOML reader's time), and only the clock shows it.",
+    "process: tests/agent-tools-list-test.mjs -> node:child_process": "Split from tests/agent-tools-test.mjs (#919): one case runs the check as a program from a project's copy of the core (core/scripts/agent-tools.mjs), as the project's workflow runs it, after a sync that changes the kit's hooks: the copy's own script, with its exit status and output, is what the case reads.",
+    "process: tests/agent-tools-tree-test.mjs -> node:child_process": "Split from tests/agent-tools-test.mjs (#919): its cases build trees git would refuse to write (an entry out of order, an empty folder at the fetched path, a link too long to follow) with git's own plumbing (mktree, hash-object, commit-tree), and the check reads what git shows of them, which only git makes.",
+    "process: tests/steps-fresh-test.mjs -> node:child_process": "Split from tests/steps-test.mjs (#916), whose project it builds through git, the starter kit's: the reader it tests compares a project with a fresh start by what git tracks there (a file taken out, a link, a submodule), which only git makes.",
+    "process: tests/steps-own-configs-test.mjs -> node:child_process": "Split from tests/steps-test.mjs (#916), whose project it builds through git, the starter kit's: the configs it tests are found where the project's own workflows name them, among the files git tracks there, which only git makes.",
+    "process: tests/steps-vendored-test.mjs -> node:child_process": "Split from tests/steps-test.mjs (#916), whose project it builds through git, the starter kit's: it tests a core a library carries, a submodule and a copy at another path, which only git makes (a submodule is git's own)."
   },
   "listed": {
     "function: scripts/licence-commands.mjs#atCommand": {
@@ -106,6 +115,7 @@
     "process: tests/licences-test.mjs -> node:child_process": true,
     "process: tests/lookup-test.mjs -> node:child_process": true,
     "process: tests/lookup-run-test.mjs -> node:child_process": true,
+    "process: tests/core-cost-test.mjs -> node:child_process": true,
     "process: tests/lookup-step-test.mjs -> node:child_process": true,
     "process: tests/manifest-reads-test.mjs -> node:child_process": true,
     "process: tests/mend-test.mjs -> node:child_process": true,
@@ -141,8 +151,11 @@
     "process: tests/started-test.mjs -> node:child_process": true,
     "process: tests/steps-checks-run-test.mjs -> node:child_process": true,
     "process: tests/steps-files-test.mjs -> node:child_process": true,
+    "process: tests/steps-fresh-test.mjs -> node:child_process": true,
+    "process: tests/steps-own-configs-test.mjs -> node:child_process": true,
     "process: tests/steps-test.mjs -> node:child_process": true,
     "process: tests/steps-tool-files-test.mjs -> node:child_process": true,
+    "process: tests/steps-vendored-test.mjs -> node:child_process": true,
     "process: tests/strength-test.mjs -> node:child_process": true,
     "process: tests/stryker-test.mjs -> node:child_process": true,
     "process: tests/test-record-test.mjs -> node:child_process": true,
@@ -152,7 +165,6 @@
     "process: tests/weakened-test.mjs -> node:child_process": true,
     "process: tests/work-saved-test.mjs -> node:child_process": true,
     "process: tests/workflows-test.mjs -> node:child_process": true,
-    "timed: tests/agent-tools-test.mjs -> Date.now": true,
     "timed: tests/cited-test.mjs -> Date.now": true,
     "timed: tests/code-scan-test.mjs -> Date.now": true,
     "timed: tests/done-when-test.mjs -> Date.now": true,
@@ -184,6 +196,11 @@
     "timed: tests/stryker-test.mjs -> Date.now": true,
     "timed: tests/work-saved-test.mjs -> Date.now": true,
     "timed: tests/workflows-test.mjs -> Date.now": true,
-    "process: tests/core-path-hooks-test.mjs -> node:child_process": true
+    "process: tests/core-path-hooks-test.mjs -> node:child_process": true,
+    "timed: tests/agent-tools-links-test.mjs -> Date.now": true,
+    "timed: tests/agent-tools-case-test.mjs -> Date.now": true,
+    "timed: tests/agent-tools-kiro-codex-test.mjs -> Date.now": true,
+    "process: tests/agent-tools-list-test.mjs -> node:child_process": true,
+    "process: tests/agent-tools-tree-test.mjs -> node:child_process": true
   }
 }

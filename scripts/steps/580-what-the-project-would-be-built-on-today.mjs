@@ -1,7 +1,7 @@
 // The step of setup/sync-notes/580-what-the-project-would-be-built-on-today.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
 import { parse as parseChoices, where as choicesAt, inFolder, wholeOf } from "../choices-records.mjs";
-import { Unread } from "../check-configs.mjs";
+import { Unread } from "../workflow-calls.mjs";
 import { COST } from "../step-checks.mjs";
 
 export default { lead: "17 November 2026, what the project would be built on today", cost: COST.record,

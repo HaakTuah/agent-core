@@ -1,7 +1,8 @@
 // The step of setup/sync-notes/190-the-nuget-check.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
 import path from "node:path";
-import { call, folded, nugetConfig } from "../check-configs.mjs";
+import { call, folded } from "../workflow-calls.mjs";
+import { nugetConfig } from "../check-configs.mjs";
 import { COST, PROJECT_FILES } from "../step-checks.mjs";
 
 export default { lead: "13 November 2026, the NuGet check", cost: COST.workflow,

@@ -5,7 +5,7 @@
 // readers; its build files' XML has its own hostile block in nuget-test.mjs, "const hostile", near line 223, not
 // repeated here; its project readers' links out of the project), workflows.mjs with yaml-keys.mjs (the tools it runs aside, which the trial of #580 read on such files), workflow-run.mjs (parseYaml, #864), sync.mjs (the move
 // of the pins in the workflows), runners.mjs (#733), and agent-tools-links.mjs (its links out of the checkout:
-// agent-tools-test.mjs, near line 119). Each case is refused: nothing of it is taken as a pass or a value, and a failure
+// agent-tools-links-test.mjs). Each case is refused: nothing of it is taken as a pass or a value, and a failure
 // says its mend. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/hostile-build-files-test.mjs
@@ -64,7 +64,7 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   ok(quick(() => JSON.stringify(twice(`a: ${"[".repeat(3e6)}\n`)) === '[{"line":1,"key":null,"first":null,"size":true}]' && draftHoles(`a: ${"[".repeat(3e6)}\n`).length === 0), "a text of three million opening brackets is said unread at once, by both readers of a workflow, never given to the parser");
   ok(quick(() => twice("]".repeat(100000)).length === 0 && twice(`{${",".repeat(100000)}`).length === 0 && twice("!t ".repeat(50000)).length === 0), "a text of a hundred thousand closing brackets or commas, or of fifty thousand tags, each an error the package reads, is read in a few seconds");
   ok(quick(() => [`a: ${"{b: ".repeat(50000)}`, Array.from({ length: 5000 }, (_, i) => `${" ".repeat(i)}k:`).join("\n")].every(t => JSON.stringify(twice(t).map(k => k.key)) === "[null]")), "a flow value fifty thousand deep, or keys indented five thousand deep, are read without a throw, and said to be read only in part");
-  // (the same text through parseYaml, which reads a project's own workflow for check.mjs, check-configs.mjs and steps.mjs: #864;
+  // (the same text through parseYaml, which reads a project's own workflow for check.mjs, own-runs.mjs and steps.mjs: #864;
   // it runs as its own process so that a reader that gave it to the package would end in the run's timeout or an exit
   // with no mend, and no clock is read here)
   const big = spawnSync(process.execPath, ["--input-type=module", "-e", `import { parseYaml } from ${JSON.stringify(new URL("../scripts/workflow-run.mjs", import.meta.url).href)};

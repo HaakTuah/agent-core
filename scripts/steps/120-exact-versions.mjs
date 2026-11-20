@@ -1,6 +1,7 @@
 // The step of setup/sync-notes/120-exact-versions.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { calls, copyAt, runFiles } from "../check-configs.mjs";
+import { calls, copyAt } from "../workflow-calls.mjs";
+import { runFiles } from "../own-runs.mjs";
 import { COST } from "../step-checks.mjs";
 
 export default { lead: "12 November 2026, exact versions", cost: COST.workflow,
