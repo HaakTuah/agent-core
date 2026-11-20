@@ -256,11 +256,10 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
 {
   const at = dirs["a-dotnet-project"], manifest = path.join(at, "core-manifest.md"), was = fs.readFileSync(manifest, "utf8");
   const slot = row => fs.writeFileSync(manifest, was.replace("| *large file* |", `${row}\n| *large file* |`));
-  const stepOf = lead => STEPS.filter(s => s.lead === lead);
   const write = (f, text) => { fs.mkdirSync(path.dirname(path.join(at, f)), { recursive: true }); fs.writeFileSync(path.join(at, f), text); };
   // (the shape check: its config at the row's path reads done; gone from there, it is reported by that path, though the
   // kit's path still holds one)
-  const shape = stepOf("16 November 2026, how code is put together"), kitShape = fs.readFileSync(path.join(at, "checks/shape.json"), "utf8");
+  const shape = only("16 November 2026, how code is put together"), kitShape = fs.readFileSync(path.join(at, "checks/shape.json"), "utf8");
   slot("| *shape check* | `core/scripts/shape.mjs` with `config/shape.json` |");
   write("config/shape.json", kitShape);
   const shapeThere = notDone(at, shape);
@@ -269,7 +268,7 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
   ok(!shapeThere.length && shapeGone.length === 1 && shapeGone[0].mend.includes("`config/shape.json`") && !shapeGone[0].mend.includes("checks/shape.json"),
     "a *shape check* row that names a config of its own: the step reads that config, and where it is gone says so by its path, never reading the kit's", `${report(shapeThere)}\n${report(shapeGone)}`);
   // (the choice records: a record that lacks its lines is read at the row's path, and one at the kit's path is not read)
-  const today = stepOf("17 November 2026, what the project would be built on today"), lacking = "# Choices\n\n## Choice: the database\n\nWe picked one.\n";
+  const today = only("17 November 2026, what the project would be built on today"), lacking = "# Choices\n\n## Choice: the database\n\nWe picked one.\n";
   slot("| *choice records* | `docs/decisions.md` |");
   write("docs/decisions.md", lacking);
   const choicesThere = notDone(at, today);
@@ -282,7 +281,7 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
     "a *choice records* row that names a file of its own: the step reads that file and its mend names it, and the kit's path is not read", `${report(choicesThere)}\n${report(choicesAtKit)}`);
   // (the progress file: one past a quarter of the general mark, with no mark of its own, is reported by the row's path;
   // the kit's path, however long, is not read)
-  const progress = stepOf("15 November 2026, the progress file holds order only"), kitProgress = fs.readFileSync(path.join(at, "docs/PROGRESS.md"), "utf8");
+  const progress = only("15 November 2026, the progress file holds order only"), kitProgress = fs.readFileSync(path.join(at, "docs/PROGRESS.md"), "utf8");
   fs.writeFileSync(manifest, was.replace("| *progress file* | `docs/PROGRESS.md` |", "| *progress file* | `PLAN.md` |"));
   write("PLAN.md", "- #1 a line\n".repeat(1000));
   const progressThere = notDone(at, progress);
@@ -371,7 +370,7 @@ for (const [broken, what] of [["{ not json", "no JSON"], ['{"each": 1}', "the wr
 fs.writeFileSync(marksFile, marksAsKit);
 
 // ---- rule 5's inputs as SECURITY.md lists them: "None", items naming their tests, nested and wrapped lines ----
-const inputs = STEPS.filter(s => s.lead === "16 November 2026, hostile tests for every named input");
+const inputs = only("16 November 2026, hostile tests for every named input");
 const secFile = path.join(lockProject, "SECURITY.md"), secAsKit = fs.readFileSync(secFile, "utf8");
 const rule5 = body => { fs.writeFileSync(secFile, secAsKit.replace(/^(5\. .*\n)(?:(?!\d+\. |#).*\n)*/m, `$1${body}`)); return notDone(lockProject, inputs); };
 fs.mkdirSync(path.join(lockProject, "tests/hostile"), { recursive: true });
