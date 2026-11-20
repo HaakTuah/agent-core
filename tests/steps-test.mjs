@@ -963,7 +963,7 @@ ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks
   // (the strength of the tests: named where the manifest's *mutation tool* is `none`, as the kit writes it; where it
   // names a tool, named all the same where the shape check's config names no file it reads, or is not there, and the
   // shape check then said to have no config; each with the script's path in the core beside the project's)
-  const withTool = manifestOf("").replace(/^\| \*mutation tool\* \|[^\n]*$/mu, "| *mutation tool* | `npx stryker run` |");
+  const withTool = manifestOf("").replace(/^\| \*mutation tool\* \|[^\n]*$/mu, "| *mutation tool* | `node core/scripts/mutate.mjs --report {report} {lines}` |");
   const toolNoCode = readNothing(bare, withTool, readBare), noConfig = readNothing(bare, withTool, f => (f === "checks/shape.json" ? null : readBare(f)));
   const strengthOf = l => l.find(n => n.script === "scripts/strength.mjs");
   ok(/`none`/u.test(strengthOf(before.nothing)?.why ?? "") && strengthOf(before.nothing).check === "core/scripts/strength.mjs" && withTool !== manifestOf("")
