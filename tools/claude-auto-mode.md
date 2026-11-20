@@ -19,4 +19,5 @@ does not mean that the session asks the owner in its chat and waits, that it wri
 would widen its own mandate, that a refusal of any other call is filed so, or that a call the classifier let through is
 filed. Reason: in the staged case `steps` a session refused the host half of a sync step only said so, and nothing named
 the limit or what came next. Held, in part, by the staged case `steps` (#1012), which reads that
-the task was filed where the host edit did not happen, not that the call was never tried again.
+the task was filed where no call cleaned both planted texts, and that nothing the session wrote holds their links or
+text, not that the call was tried, the count of texts left or who holds their links.
