@@ -51,7 +51,8 @@ export function project(root) {
 }
 
 // Where the project's run of each check finds its config, and its calls to the core's workflows: check-configs.mjs,
-// workflow-calls.mjs and own-runs.mjs, beside this file, whose `Unread` a step throws where it cannot read what it needs.
+// workflow-calls.mjs and own-runs.mjs, beside this file; a step throws workflow-calls.mjs's `Unread` where it cannot
+// read what it needs.
 export { KIT_CONFIGS, configs } from "./check-configs.mjs";
 export { Unread, call, calls } from "./workflow-calls.mjs";
 export { runsOwn } from "./own-runs.mjs";
