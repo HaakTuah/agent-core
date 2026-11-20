@@ -35,7 +35,6 @@ export const PROGRAM = {
 const FILLS = [
   [/^FILL IN: what this project is.*$/m, "scratch: a small command-line tool that prints the sum of the numbers it is given. Node, no dependencies; its owner and a few friends use it."],
   [/^FILL IN: the commands that set the project up.*$/m, "`npm test` runs the tests (`test/sum.test.mjs`) and prints \"ok sum\"; nothing to build."],
-  [/^1\. FILL IN: the first task.*$/m, "1. #1, builder: sum() leaves out the last number."],
   [/^( *)FILL IN: who may change the protected files.*$/m, "$1as the floor has it."],
   [/^( *)FILL IN: each input anyone but the user at hand can shape[\s\S]*?project takes none\.$/m, "$1None: it reads only its own command line."],
   [/^( *)FILL IN: what reaches its users' machines[\s\S]*?need behind it \(topic 7\)\.$/m, "$1Nothing but its own source; it has no dependencies."],
@@ -99,7 +98,7 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
   const project = path.join(dir, "project"), origin = path.join(dir, "origin.git"), bin = path.join(dir, "bin");
   repos(dir, project, origin);
   starterKit(project, core, at, kit);
-  fillIn(project, fills);
+  fillIn(project, [...fills, queueLine(issues)]);
   writeAll(project, { ...PROGRAM, ...files });
   if (arrange) arrange(project);
   git(project, "add", "-A");
@@ -158,6 +157,9 @@ function repos(dir, project, origin) {
 }
 
 // The kit's FILL IN marks filled as `fills`, then FILLS, says, outside the copy of the core.
+// The queue's first line: the case's first issue, which stands as #1 on GitHub, or no line where it makes none, so the
+// queue names only issues the case makes (#988).
+export const queueLine = issues => [/^1\. FILL IN: the first task.*(?:\n|$)/m, issues.length ? `1. #1, builder: ${issues[0].title}.\n` : ""];
 function fillIn(project, fills = []) {
   for (const f of git(project, "ls-files", "--cached", "--others", "--exclude-standard").split("\n").filter(Boolean)) {
     if (f.startsWith("core/")) continue;
