@@ -6,7 +6,7 @@
 //   Codex's code review      its own account (`chatgpt-codex-connector[bot]`, a Bot): a top-level inline comment with a
 //                            P-badge and no security marker is a find; P0 and P1 block (roles/shared/review-guidelines.md),
 //                            P2 and P3 count as other points; it ran where its summary (scripts/security-review.mjs
-//                            `codexState`) says completed, or a receipt or a find of it is there
+//                            `codexState`; perPull, review-comments.mjs) says completed, or a receipt or a find of it is there
 //   Codex's security review  the same, for the finds that open with its security marker
 //   posted reviews           comments of the owner's account (--owner, else the repository's account: floor rule 4)
 //                            whose first line opens "Security review:", "Code review:" or "Design check:"; a security
@@ -18,15 +18,15 @@
 //                            without ** round it; a comment without the line, or whose lines disagree, is not read for
 //                            it, and is never counted as none. A "Security review: none needed" is a note, not a review.
 //                            A posted code review is counted again by its stance, from a line "Stance: adversarial." or
-//                            "Stance: regular." (stanceOf, below; #397), and one with neither in neither row.
+//                            "Stance: regular." (stanceOf, review-comments.mjs; #397), and one with neither in neither row.
 // A review that was not read is said so ("not read"); it is never added as a zero. It also lists the pull requests whose
 // second security review blocked where Codex's own found no blocking point, and counts the bugs that reached `main`
 // all the same: a bug counts against a pull request only where the owner's account filed it, and a line "Brought in by:
 // #N" (the bug form's last line) stands in its body or in a comment of the owner's account (the newest wins), N is a
 // pull request that was read and merged before the bug was filed; any other bug is not read, never none. No prose is
 // guessed at. It lists each rule the findings of two pull requests or more name, on their line "Rule:" (rulesNamed,
-// below). Last it counts the rounds of review each pull request took (#477; review-rounds.mjs, beside this file), from
-// the head each review was asked or posted on (reviewEvents, below) and the pull request's commits, read for those it
+// review-comments.mjs). Last it counts the rounds of review each pull request took (#477; review-rounds.mjs, beside this file), from
+// the head each review was asked or posted on (reviewEvents, review-comments.mjs) and the pull request's commits, read for those it
 // counts, the last 30 merged and, given --since, the 30 merged before it. It reads; it writes nothing and changes
 // nothing. Git, gh and Node's own modules.
 //
@@ -35,16 +35,14 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { DAY, grid, mergedPulls, repoOf, rulesFor } from "./core-cost.mjs";
-import { seen } from "./guards.mjs";
+import { broughtBy, perPull, reviewEvents, ruleOf, rulesNamed } from "./review-comments.mjs";
 import { roundsLines, roundsOf, wanted } from "./review-rounds.mjs";
-import { FINDING, codexState, codexs, named } from "./security-review.mjs";
 import { started } from "./started.mjs";
 import { ROOT, rules, rulesOf } from "./rules.mjs";
 import { pages } from "./stand-in-record.mjs";
 
-const RECEIPT = /^<!-- codex-review-receipt:v1 -->/u;
-const REVIEWED = /^\*\*Reviewed commit:\*\* `([0-9a-f]{7,40})`/mu; // (the commit a receipt of Codex's names, as its app writes it)
-const BADGE = /!\[(P[0-3]) Badge\]/u;
+// (how a comment is read as a review stands in review-comments.mjs; the names stay importable from here)
+export { blockingOf, broughtBy, codexFind, otherOf, perPull, postedKind, reviewEvents, ruleOf, rulesIn, rulesNamed, scoreOf, stanceOf } from "./review-comments.mjs";
 
 export const REVIEWS = [
   ["codexCode", "Codex's code review"], ["postedCode", "Code review posted (the next reviewer's or the fallback's)"],
@@ -53,121 +51,6 @@ export const REVIEWS = [
   ["postedDesign", "Design check posted"],
 ];
 export const KINDS = ["own", "upkeep", "sync", "update"];
-
-// A comment's text as its lines, each carriage return taken out (the web editor ends a line with one before the line feed).
-const lines = body => String(body ?? "").replaceAll("\r", "").split("\n");
-const firstLine = body => lines(body).find(l => l.trim()) ?? "";
-
-// Which posted review a comment is, from its first line unquoted: security, code, design, or none-needed (a note that
-// no security review is needed), or null where it is none.
-export function postedKind(body) {
-  const first = firstLine(body);
-  if (/^\s*>/.test(first)) return null;
-  const m = /^\s*(?:\*\*)?(Security review|Code review|Design check):\s*(.*)$/su.exec(first); // (s: a line separator left in the line still matches, so the pattern never goes back over the spaces)
-  if (!m) return null;
-  if (m[1] === "Design check") return "design";
-  if (m[1] === "Code review") return "code";
-  return /^(?:\*\*)?\s*none needed\b/iu.test(m[2]) ? "none-needed" : "security";
-}
-
-// The one count that the lines of a posted review matching `count` (its number) or `none` (zero) declare, or null where
-// none declares it or they disagree.
-function declared(body, count, none) {
-  const said = new Set();
-  for (const raw of lines(seen(body))) { // (as the reader sees it: no line in an HTML comment or a fenced block of code)
-    const line = raw.replaceAll("**", "").trim();
-    const n = count.exec(line);
-    if (n) said.add(Number(n[1]));
-    else if (none.test(line)) said.add(0);
-  }
-  return said.size === 1 ? [...said][0] : null;
-}
-
-// The blocking points, and the other points, a posted review declares, each a number or null (not read).
-export const blockingOf = body => declared(body, /^Blocking findings: (\d{1,6})\.(?:\s|$)/u, /^(?:No blocking findings?|No findings?|Nothing blocks|Blocking: none)\.(?:\s|$)/iu);
-export const otherOf = body => declared(body, /^Other findings: (\d{1,6})\.(?:\s|$)/u, /^(?:No other findings?|No findings?)\.(?:\s|$)/iu);
-// The score a posted review declares, on a line "Score: N of 10." of its own, N a whole number from 1 to 10
-// (roles/shared/review-guidelines.md, "Every reviewer"; #710), or null (not read).
-export const scoreOf = body => declared(body, /^Score: (10|[1-9]) of 10\.(?:\s|$)/u, /(?!)/u);
-
-// The stance a posted code review declares on a line of its own (tasks/reviews.md, "A review's stance follows the kind
-// of change"; #397): "adversarial", "regular", or null where no line says one or two lines disagree.
-export function stanceOf(body) {
-  const said = new Set();
-  for (const raw of lines(seen(body))) { const m = /^Stance: (adversarial|regular)\.(?:\s|$)/iu.exec(raw.replaceAll("**", "").trim()); if (m) said.add(m[1].toLowerCase()); }
-  return said.size === 1 ? [...said][0] : null;
-}
-
-// One inline comment as a find of Codex's: { review: "code" | "security", badge, blocking }, or null where it is not
-// one of Codex's, replies to another comment, or has no priority badge.
-export function codexFind(comment) {
-  if (!codexs(comment) || (comment.in_reply_to_id ?? null) !== null) return null;
-  const badge = BADGE.exec(comment.body)?.[1];
-  if (!badge) return null;
-  return { review: FINDING.test(comment.body) ? "security" : "code", badge, blocking: badge === "P0" || badge === "P1" };
-}
-
-// What the five reviews, and the posted code review by stance, did on one pull request, from its comments (issue comments and inline ones, as GitHub's API
-// gives them): each of REVIEWS' keys gives { got, blocked: null | "yes" | "no" | "unread", points, other, otherUnread },
-// otherUnread true where a posted review that ran declares no count of its other points (Codex's are read by badge).
-export function perPull(issueComments, inline, owner) {
-  const state = codexState(issueComments);
-  const finds = [...inline, ...issueComments].map(codexFind).filter(Boolean); // (a find can be an issue comment too, as security-review.mjs reads them)
-  const codex = review => {
-    const mine = finds.filter(f => f.review === review);
-    const said = state.state?.[review === "code" ? "code_review" : "security_review"];
-    const got = said?.status === "completed" || mine.length > 0 || (review === "code" && issueComments.some(c => codexs(c) && RECEIPT.test(c.body)));
-    const points = mine.filter(f => f.blocking).length;
-    // (the summary says there are finds, or cannot be read, and none of them was found: not read, never none)
-    const unread = state.unread === true || said?.has_any_findings === true && mine.length === 0;
-    return { got, blocked: !got ? null : points ? "yes" : unread ? "unread" : "no", points, other: mine.length - points, otherUnread: false };
-  };
-  const posted = (kind, stance) => {
-    const mine = issueComments.filter(c => String(c.user?.login ?? "").toLowerCase() === owner.toLowerCase() && postedKind(c.body) === kind && (!stance || stanceOf(c.body) === stance));
-    const reads = mine.map(c => blockingOf(c.body)), others = mine.map(c => otherOf(c.body));
-    return { got: mine.length > 0, blocked: !mine.length ? null : reads.some(n => n > 0) ? "yes" : reads.every(n => n === 0) ? "no" : "unread",
-      points: reads.reduce((s, n) => s + (n ?? 0), 0), other: others.reduce((s, n) => s + (n ?? 0), 0), otherUnread: others.some(n => n === null) };
-  };
-  return { codexCode: codex("code"), postedCode: posted("code"), postedAdversarial: posted("code", "adversarial"), postedRegular: posted("code", "regular"), codexSecurity: codex("security"), postedSecurity: posted("security"), postedDesign: posted("design") };
-}
-
-// What a pull request's reviews were asked or posted on, for its rounds (review-rounds.mjs): { sha, at, blocking }, sha
-// the commit the review names (a posted review's first line, the commit a receipt of Codex's names, the one a find of
-// Codex's was made on, and the one each review its summary says completed read, the newest alone, as its app keeps it)
-// and at the time it was asked or posted, read where no commit is named. A review asked is a line
-// "@codex review" alone, in a comment of the owner's account; a note that no security review is needed is none.
-export function reviewEvents(issueComments, inline, owner) {
-  const mine = c => String(c.user?.login ?? "").toLowerCase() === owner.toLowerCase();
-  const out = [];
-  for (const c of issueComments) {
-    const kind = mine(c) ? postedKind(c.body) : null;
-    if (["security", "code", "design"].includes(kind)) out.push({ sha: named(firstLine(c.body))[0], at: c.at, blocking: blockingOf(c.body) > 0 });
-    else if (mine(c) && lines(seen(c.body)).some(l => l.trim() === "@codex review")) out.push({ at: c.at, blocking: false });
-    else if (codexs(c) && RECEIPT.test(c.body)) out.push({ sha: REVIEWED.exec(c.body)?.[1], at: c.at, blocking: false });
-  }
-  const { state } = codexState(issueComments);
-  for (const review of [state?.code_review, state?.security_review]) if (review?.status === "completed" && review.commit_sha) out.push({ sha: review.commit_sha, blocking: false });
-  for (const c of [...inline, ...issueComments]) {
-    const find = codexFind(c);
-    if (find) out.push({ sha: c.original_commit_id ?? c.commit_id, at: c.at, blocking: find.blocking });
-  }
-  return out;
-}
-
-// The rules a pull request's findings name (the core's tasks/reviews.md, point 8; #254): each on a line of its own
-// that opens "Rule:", in a find of Codex's or a review posted by the owner's account, read as a key the same however it
-// is written: its backticks, bold and quotes, a closing stop, colon or comma (as rules.mjs's leadOf leaves them out of
-// a rule's own key) and a leading "core/" left out, its spaces made one, its case lowered and its control and format
-// characters taken out. A quoted line names none.
-const RULE = /^[ \t]*(?:[-*][ \t]+)?(?:\*\*)?Rule:(?:\*\*)?[ \t]+(\S.*)$/u;
-export const ruleOf = text => String(text).slice(0, 300).replace(/[\p{Cc}\p{Cf}`*"\u201c\u201d]/gu, "").replace(/\s+/gu, " ").trim()
-  .replace(/[.:,;]+$/u, "").trim().replace(/^core\//u, "").toLowerCase();
-export const rulesIn = body => lines(body).map(l => RULE.exec(l)?.[1]).filter(Boolean).map(ruleOf).filter(Boolean);
-export function rulesNamed(issueComments, inline, owner) {
-  const finds = [...inline, ...issueComments].filter(c => codexFind(c));
-  const posted = issueComments.filter(c => String(c.user?.login ?? "").toLowerCase() === owner.toLowerCase() && ["security", "code", "design"].includes(postedKind(c.body)));
-  return [...new Set([...finds, ...posted].flatMap(c => rulesIn(c.body)))].sort();
-}
 
 // The rules the findings of two pull requests or more name, from `pulls` as { number, when, rules } (rulesNamed's
 // answer), each as { rule, pulls }, the most named first: those alone that a pull request merged on or after `since`
@@ -212,9 +95,6 @@ export function tally(pulls) {
 
 // The pull requests whose second security review blocked where Codex's read no blocking point (it ran, and was read).
 export const secondFound = pulls => pulls.filter(p => p.reviews.codexSecurity.blocked === "no" && p.reviews.postedSecurity.blocked === "yes").map(p => p.number);
-
-// The pull request a bug names as the one that brought it in ("Brought in by: #N" on a line of its own), or null.
-export const broughtBy = body => { const all = [...lines(seen(body)).join("\n").matchAll(/^Brought in by: #([1-9]\d{0,8})[ \t]*$/gmu)]; return all.length ? Number(all.at(-1)[1]) : null; };
 
 // The bugs, given as { number, at, login, body } with the owner's comments on any issue as { issue, at, login, body }:
 // how many the owner's account filed, which of them are tied to a merged pull request (the newest "Brought in by" of the
