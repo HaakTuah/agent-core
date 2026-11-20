@@ -13,4 +13,5 @@ The index, and how an item is written: `archive/instructions.md`.
      under #662. It stands behind "A check that read nothing says so", "The share a check holds is reported" and,
      for the question, "A project's own rules name what holds them" and "A rule of a game's kind moves to the core once
      a second game needs it" in the core's `AGENTS.md`, and "A game's copy of a rule of its kind goes at the sync that
-     brings it" in `tasks/game-design.md`.
+     brings it" in `tasks/game-design.md`, and, for the sync's report, a clause of "A choice of stack ends with what the
+     core cannot read in it" in `tasks/choices.md`.
