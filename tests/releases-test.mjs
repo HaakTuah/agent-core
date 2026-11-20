@@ -221,7 +221,8 @@ const run = (name, status, conclusion, path = `.github/workflows/${name}.yml`) =
 const list = (...runs) => ({ total_count: runs.length, workflow_runs: runs });
 // the core's tests in full on that commit (#733): of the tests' runs there once an hour or by hand, which hold the
 // Windows suites, none is unfinished and the newest, by when it last started (a re-run moves it), passed
-const full = (event, conclusion, id, status = "completed", at = `2026-11-19T10:${String(id).padStart(2, "0")}:00Z`) => ({ ...run("tests", status, conclusion), event, id, run_started_at: at });
+// (each bears the workflow's own name, as GitHub gives a run whose run-name is empty: tests-parts-test.mjs reads the rest)
+const full = (event, conclusion, id, status = "completed", at = `2026-11-19T10:${String(id).padStart(2, "0")}:00Z`) => ({ ...run("tests", status, conclusion), event, id, run_started_at: at, display_title: "tests" });
 ok(/have not run in full on it yet/.test(fullRun(list({ ...run("tests", "completed", "success"), event: "push" }))), "a commit whose tests ran only on its push, on Linux, has not had them in full, and the release waits, saying how to start them");
 ok(fullRun(list(full("schedule", "success", 10))) === null && fullRun(list(full("workflow_dispatch", "success", 10))) === null, "an hourly or a hand-started run that passed lets the release stand");
 ok(fullRun(list(full("workflow_dispatch", "success", 10), full("schedule", "failure", 9))) === null && /hourly run\): failure/.test(fullRun(list(full("schedule", "failure", 10), full("workflow_dispatch", "success", 9)))), "the newest of them, by when it last started, decides, in whatever order GitHub lists them: a pass started after a failure lets it stand, a failure started after a pass holds it");

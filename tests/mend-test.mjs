@@ -86,6 +86,7 @@ const NOT_CHECKS = {
   "scripts/issue-terms.mjs": "runs on a schedule, takes the personal terms out of issues and comments, and fails nothing",
   "scripts/versions.mjs": "runs on a schedule, and opens issues",
   "scripts/release.mjs": "cuts a release, started by hand on main",
+  "scripts/tests-parts.mjs": "picks the jobs a start of the tests by hand that names parts runs: no pull request starts it",
   "scripts/site-publish.sh": "publishes a preview of a pull request's site",
   "scripts/nuget-look.sh": "decides whether the NuGet check restores, and fails nothing by itself: checks.mjs runs it, whose test reads its mends",
   "scripts/sync.mjs": "named in core.yml's mends, as what a session runs to mend the copy",
