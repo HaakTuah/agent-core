@@ -37,7 +37,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DAY, grid, mergedPulls, repoOf, rulesFor } from "./core-cost.mjs";
 import { broughtBy, perPull, reviewEvents, ruleOf, rulesNamed } from "./review-comments.mjs";
-import { checksLines, checksRead } from "./review-checks.mjs";
+import { checksLines, checksRead, runsReader } from "./review-checks.mjs";
 import { roundsLines, roundsOf, wanted } from "./review-rounds.mjs";
 import { started } from "./started.mjs";
 import { ROOT, rules, rulesOf } from "./rules.mjs";
@@ -179,7 +179,7 @@ export function gather(since, by, fail) {
   const issues = labelled.filter(b => !since || b.at >= `${since}T00:00:00Z`);
   const of = m => [issueComments.filter(c => c.issue === m.number), inline.filter(c => c.pull === m.number), owner];
   const commitsOf = n => { try { return pages(`repos/${repo}/pulls/${n}/commits?`, ".[] | {sha, at: .commit.committer.date, parents: [.parents[] | {sha}]} | @json"); } catch { return null; } };
-  const runsOf = sha => { try { return pages(`repos/${repo}/commits/${sha}/check-runs?filter=latest`, ".check_runs[] | {conclusion} | @json"); } catch { return null; } };
+  const runsOf = runsReader(repo, pages);
   return { repo, all, merged, owner, issueComments, inline, issues, labelled, of, commitsOf, runsOf };
 }
 

@@ -16,6 +16,12 @@ const FAILED = new Set(["failure", "timed_out", "startup_failure"]);
 // Whether any of the check runs `runs` (as GitHub gives them: { conclusion }) failed.
 export const failedOn = runs => runs.some(r => FAILED.has(r?.conclusion));
 
+// A commit's check runs as `runsOf` of checksOn takes it, read of `repo` by `pages` (stand-in-record.mjs: gh, page by page),
+// the newest run of each check, each as { conclusion }; null where GitHub does not answer.
+export const runsReader = (repo, pages) => sha => {
+  try { return pages(`repos/${repo}/commits/${sha}/check-runs?filter=latest`, ".check_runs[] | {conclusion} | @json"); } catch { return null; }
+};
+
 // The commit of a pull request that no other of its commits has as a parent, its head; the last of `commits` where that
 // leaves none or more than one. `commits`: { sha, parents: [{ sha }] }.
 export function headOf(commits) {

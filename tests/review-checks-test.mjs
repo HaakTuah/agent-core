@@ -6,7 +6,7 @@
 //   node tests/review-checks-test.mjs
 import { KINDS } from "../scripts/review-record.mjs";
 import { LAST } from "../scripts/review-rounds.mjs";
-import { checksLines, checksOn, checksRead, failedOn, headOf, tally } from "../scripts/review-checks.mjs";
+import { checksLines, checksOn, checksRead, failedOn, headOf, runsReader, tally } from "../scripts/review-checks.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -56,6 +56,13 @@ const text = checksLines(pulls, KINDS);
 ok(text.includes("| own | 4 | 3 | 1 | 6 | 3 | 2 |") || /own\s+4\s+3\s+1\s+6\s+3\s+2/.test(text), "the table gives each kind's row", text);
 ok(text.includes("Sent back by the host's checks: 3 of the 4 pull requests read (5 heads failed of 8 checked).") && /upkeep\s+-\s+-/.test(text) && text.includes("A count: nothing fails or waits for it."),
   "the totals are said, a kind with no pull request reads as dashes, and the count says nothing fails for it", text);
+const [intro, ...table] = text.split("\n").slice(1);
+ok(table[0].includes("heads checked") && table[0].includes("heads failed") && table[0].includes("sent back") && table[0].includes("not read") && table.length === 6 && intro.startsWith("The host's checks:"),
+  "the table has its columns, a header and a row for each kind, each on a line of its own", text);
+const asked = [];
+const reader = runsReader("some/repo", (path, jq) => { asked.push([path, jq]); if (path.includes("bad")) throw new Error("no answer"); return [{ conclusion: "failure" }]; });
+ok(same(reader("abc"), [{ conclusion: "failure" }]) && asked[0][0] === "repos/some/repo/commits/abc/check-runs?filter=latest" && asked[0][1].includes(".check_runs[]") && reader("bad") === null,
+  "a commit's check runs are read from the host's route for it, the newest of each check, and null where it gives none", JSON.stringify(asked));
 ok(checksLines([{ kind: "own", checks: null }], KINDS).includes("Read on no pull request.") && !checksLines([], KINDS).includes("sent back"), "where none was read, it says so and prints no table");
 
 console.log(failed ? `\n${failed} of ${count} FAILED` : `\n${count} of ${count} passed`);
