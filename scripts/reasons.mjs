@@ -69,16 +69,19 @@ export function lines(found, root = ROOT, cwd = process.cwd()) {
   ];
 }
 
-if (started(import.meta.url)) {
-  const query = process.argv.slice(2).join(" ");
-  const found = reasonsOf(ROOT, query);
+// What the command prints and exits with for a query, the paths as seen from `cwd`: { status, out }.
+export function report(query, root = ROOT, cwd = process.cwd()) {
+  const found = reasonsOf(root, query);
   if (found.matches) {
-    const run = `node ${path.relative(process.cwd(), path.join(ROOT, "scripts/reasons.mjs")).replace(/\\/gu, "/")}`;
-    if (!found.matches.length) console.log(`FAIL no rule of the floor, the modules or AGENTS.md is named "${query}". Mend: give the rule's file and bold lead as a rule file holds it, or a part of it, in quotes, as \`${run} "security.md: 3. The protected files"\``);
-    else console.log([`FAIL "${query}" names ${found.matches.length} rules. Mend: give more of the one you mean, in quotes, as one of these:`, ...found.matches.map(k => `  ${k}`)].join("\n"));
-    process.exitCode = 1;
-  } else {
-    if (found.wrong) console.log(`FAIL ${found.wrong}`);
-    console.log(lines(found).join("\n"));
+    const run = `node ${path.relative(cwd, path.join(root, "scripts/reasons.mjs")).replace(/\\/gu, "/")}`;
+    if (!found.matches.length) return { status: 1, out: `FAIL no rule of the floor, the modules or AGENTS.md is named "${query}". Mend: give the rule's file and bold lead as a rule file holds it, or a part of it, in quotes, as \`${run} "security.md: 3. The protected files"\`` };
+    return { status: 1, out: [`FAIL "${query}" names ${found.matches.length} rules. Mend: give more of the one you mean, in quotes, as one of these:`, ...found.matches.map(k => `  ${k}`)].join("\n") };
   }
+  return { status: 0, out: [...(found.wrong ? [`FAIL ${found.wrong}`] : []), ...lines(found, root, cwd)].join("\n") };
+}
+
+if (started(import.meta.url)) {
+  const { status, out } = report(process.argv.slice(2).join(" "));
+  console.log(out);
+  process.exitCode = status;
 }

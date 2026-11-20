@@ -3,14 +3,10 @@
 // the calls to git and gh are the program's own and are not made here, save that it refuses a day that is none.
 //
 //   node tests/fixes-test.mjs
-import { spawnSync } from "node:child_process";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { changedLines, fixedBy, fixesOf, parentsOf, scriptOf } from "../scripts/fixes.mjs";
+import { changedLines, fixedBy, fixesOf, NO_DAY, parentsOf, scriptOf, sinceOf } from "../scripts/fixes.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
-const here = fileURLToPath(new URL("../scripts", import.meta.url)); // (the scripts this tests, beside the folder tests/)
 
 ok(fixedBy("Fixes #12").join() === "12" && fixedBy("x\n\nfixes #3, closes #4 and Resolved #5").join() === "3,4,5" && fixedBy("Fix: #7").join() === "7",
   "a commit fixes each issue its message says it fixes, closes or resolves, in GitHub's words");
@@ -37,8 +33,10 @@ ok(fixesOf([5], [{ sha: c, parent: null, message: "Fixes #5" }]).length === 0, "
 const merge = { sha: a, parent: b, message: "Merge pull request #9\n\nFixes #5, fixes #6", brought: [{ sha: c, parent: b, message: "The mend. Fixes #5" }] };
 ok(JSON.stringify(fixesOf([5, 6], [merge])) === JSON.stringify([{ issue: 6, sha: a, parent: b }, { issue: 5, sha: c, parent: b }]),
   "a merge's word for an issue a commit it brought fixes is that one fix, counted once; one it alone names is its own", JSON.stringify(fixesOf([5, 6], [merge])));
-const r = spawnSync(process.execPath, [path.join(here, "fixes.mjs"), "--since", "soon"], { encoding: "utf8" });
-ok(r.status === 1 && /--since takes a day/.test(r.stderr), "a day that is none is refused", r.stderr);
+ok(sinceOf(["--since", "2026-11-01"]) === "2026-11-01" && sinceOf(["x", "--since", "2026-11-01", "y"]) === "2026-11-01", "a day is read after the word that asks it");
+ok(sinceOf(["--since", "soon"]) === null && sinceOf(["--since"]) === null && sinceOf([]) === null && sinceOf(["2026-11-01"]) === null && sinceOf(["--since", "2026-11-01\nx"]) === null,
+  "a day that is none, none given, or a day without the word that asks it is refused");
+ok(/^--since takes a day/.test(NO_DAY), "and the refusal says what it takes");
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;
