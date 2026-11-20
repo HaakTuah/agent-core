@@ -125,12 +125,36 @@ export function downloads(text) {
  * Others: { specs: [] }.
  */
 export function fetched(line, atCommand = false, literal = false) {
-  // (a comment after the command, and a redirection, ">log", "2> log", "&>log", "<in", with its target wherever it
-  // stands, are known by the word as written and only outside quotes: a quoted '#x', "release #1" or '>' is an
-  // argument; in a line built from an argument list, where no shell reads it, every word is one. Quotes are followed
-  // twice, a backslash escaping the next character and not, since it may belong to a string around the command
-  // ("npm i --cache \"a #c\" x" in code); a word counts as outside only where both readings say so)
-  const raw = line.trim().split(/\s+/u);
+  const words = wordsOf(line, literal);
+  // (an audited name means the npm registry's package: a command that fetches from elsewhere cannot be audited by it)
+  if (/^(npx|npm)$/u.test(words[0] ?? "") && words.some((w) => /^--?(@[^=]*:)?registry\b|^--replace-registry-host\b|^--(user|global)config\b|^npm_config_.*(registry|config)/iu.test(w)))
+    return { specs: [], unreadable: "it fetches from another registry than npm's, or reads another npm config that may name one" };
+  if (words[0] === "npx") return argSpecs(words.slice(1), { runs: true, npx: true });
+  if (words[0] !== "npm") return { specs: [] };
+  const plan = npmPlan(words, atCommand);
+  return plan.done ?? argSpecs(plan.args, plan);
+}
+
+/** The words of a command line, as the shell reads them (a comment, a redirection and the quotes of what it sits in gone). */
+function wordsOf(line, literal) {
+  const raw = line.trim().split(/\s+/u), quoted = quotedWords(raw);
+  const end = literal ? -1 : raw.findIndex((w, k) => !quoted[k] && (w.startsWith("#") || w.startsWith("//")));
+  // (then each word loses the quotes, brackets and commas of the string or call it sits in; a "+" between the pieces of
+  // a string built in code joins them: npm ' + 'install x)
+  const words = unredirected(end < 0 ? raw : raw.slice(0, end), (k) => !literal && !quoted[k] && /^\d*[<>&]/u.test(raw[k] ?? ""), raw)
+    .map((w) => w.replace(/^['"`([{]+|['"`),;\]}]+$/gu, "").replaceAll(KEPT, " ")).filter((w) => w && w !== "+");
+  if (/^(npx|npm)\.cmd$/iu.test(words[0] ?? "")) words[0] = words[0].slice(0, 3).toLowerCase(); // (Windows' spelling)
+  return words;
+}
+
+/**
+ * Which words stand inside quotes: a comment after the command, and a redirection, ">log", "2> log", "&>log", "<in",
+ * with its target wherever it stands, are known by the word as written and only outside quotes: a quoted '#x',
+ * "release #1" or '>' is an argument. Quotes are followed twice, a backslash escaping the next character and not,
+ * since it may belong to a string around the command ("npm i --cache \"a #c\" x" in code); a word counts as outside
+ * only where both readings say so.
+ */
+function quotedWords(raw) {
   const inside = (escapes) => {
     let quote = "";
     return raw.map((w) => {
@@ -142,93 +166,155 @@ export function fetched(line, atCommand = false, literal = false) {
       return was;
     });
   };
-  const escaped = inside(true), plain = inside(false), quoted = raw.map((w, k) => escaped[k] || plain[k]);
-  const end = literal ? -1 : raw.findIndex((w, k) => !quoted[k] && (w.startsWith("#") || w.startsWith("//")));
-  const operator = (k) => !literal && !quoted[k] && /^\d*[<>&]/u.test(raw[k] ?? "");
-  const kept = (end < 0 ? raw : raw.slice(0, end)).filter((w, k) => !operator(k) && !(operator(k - 1) && /^\d*[<>&]+$/u.test(raw[k - 1])));
-  // (then each word loses the quotes, brackets and commas of the string or call it sits in; a "+" between the pieces of
-  // a string built in code joins them: npm ' + 'install x)
-  const words = kept.map((w) => w.replace(/^['"`([{]+|['"`),;\]}]+$/gu, "").replaceAll(KEPT, " ")).filter((w) => w && w !== "+");
-  if (/^(npx|npm)\.cmd$/iu.test(words[0] ?? "")) words[0] = words[0].slice(0, 3).toLowerCase(); // (Windows' spelling)
-  // (an audited name means the npm registry's package: a command that fetches from elsewhere cannot be audited by it)
-  if (/^(npx|npm)$/u.test(words[0] ?? "") && words.some((w) => /^--?(@[^=]*:)?registry\b|^--replace-registry-host\b|^--(user|global)config\b|^npm_config_.*(registry|config)/iu.test(w)))
-    return { specs: [], unreadable: "it fetches from another registry than npm's, or reads another npm config that may name one" };
-  let i = 0, args = words.slice(1);
-  const options = () => { while (i < words.length && words[i].startsWith("-")) i += VALUED.has(words[i]) ? 2 : 1; };
-  let runs = false, npx = false, local = false, packs = false, linking = false;
-  if (words[0] === "npx") { runs = npx = true; i = 1; } else if (words[0] === "npm") {
-    // (after npm, its options; a word that is no command, straight after an option, is taken as that option's value)
-    const fetching = (w) => INSTALL.has(w) || RUN.has(w) || BY_OTHER_NAME.has(w) || UPDATE.has(w) || LINK.has(w);
-    i = 1;
-    let command;
-    for (let afterOption = false; i < words.length; ) {
-      const w = words[i++];
-      if (w.startsWith("-")) { if (VALUED.has(w)) i++; afterOption = !VALUED.has(w) && !w.includes("="); continue; }
-      if (fetching(w) || NO_FETCH.has(w) || !afterOption) { command = w; break; }
-      afterOption = false;
-    }
-    // (npm reads the options before its command as its config, as it reads those after: npm --diff=x diff)
-    const early = command === undefined ? [] : words.slice(1, i - 1);
-    // (npm config set registry, and the like, points every later fetch at another registry; npm audit fix installs
-    // releases the lockfile does not hold)
-    const sets = command === "set" || words.slice(i).some((w) => w === "set" || w === "edit");
-    if (CONFIG.has(command) && sets && words.slice(i).some((w) => /(^|:)registry\b|^replace-registry-host\b|^(user|global)config\b/iu.test(w)))
-      return { specs: [], unreadable: "it points npm at another registry or config, so no audited name can be trusted after it" };
-    if (command === "audit" && words.slice(i).includes("fix")) return { specs: [], unreadable: "npm audit fix installs releases the lockfile does not hold" };
-    // (npm diff --diff=<spec>, npm cache add <spec> and npm publish <spec> fetch what they name, and prepare a git
-    // package, running its scripts: each but a local folder or tarball is a package to audit)
-    if (command === "diff" || command === "cache" || command === "publish") {
-      // (a local folder or tarball: a path, never an address, https://x/y.tgz, or a git remote)
-      const localSpec = (w) => (w.includes(":") ? w.startsWith("file:") : /^(\.|\/|~)/u.test(w) || /\.(tgz|tar\.gz)$/iu.test(w));
-      const rest = command === "diff" ? [...early, ...words.slice(i)] : words.slice(i), specs = [];
-      let adding = command !== "cache";
-      for (let k = 0; k < rest.length; k++) {
-        const w = rest[k], diff = /^--diff(?:=(.*))?$/u.exec(w);
-        if (diff) { const v = diff[1] ?? rest[++k]; if (command === "diff" && v !== undefined && !localSpec(v)) specs.push(v); continue; }
-        if (w.startsWith("-")) { if (VALUED.has(w)) k++; continue; }
-        if (!adding) { if (w !== "add") break; adding = true; continue; }
-        if (command !== "diff" && !localSpec(w)) specs.push(w);
-      }
-      return { specs };
-    }
-    // (where npm stands as a command, a word after it that is no npm command cannot be read: a variable, a string
-    // built in code; elsewhere, in prose, it is only a word)
-    if (atCommand && command !== undefined && !fetching(command) && !NO_FETCH.has(command))
-      return { specs: [], unreadable: `npm ${command}: no npm command, so what it runs cannot be read` };
-    if (INSTALL.has(command) && command !== "pack" && [...early, ...words.slice(i)].some((w, k, rest) => /^--no-(package-lock|shrinkwrap)$|^--(package-lock|shrinkwrap)=false$/iu.test(w) || (/^--(package-lock|shrinkwrap)$/iu.test(w) && /^false$/iu.test(rest[k + 1] ?? ""))))
-      return { specs: [], unreadable: "it installs without the lockfile, so what it installs is not what the lockfile's check read" };
-    if (command === undefined || !fetching(command)) return { specs: [] };
-    if (UPDATE.has(command)) return { specs: [], unreadable: `npm ${command} fetches the newest release a range allows, which cannot be audited` };
-    if (RUN.has(command)) { runs = true; args = [...early, ...words.slice(i)]; } else args = words.slice(i);
-    if (LINK.has(command)) linking = true; // (npm link <package> installs it if missing; a folder is linked as it is)
-    else if (BY_OTHER_NAME.has(command)) { options(); return words[i] ? { specs: [], unreadable: `npm ${command} fetches a package by another name` } : { specs: [] }; }
-    else packs = command === "pack";
-  } else return { specs: [] };
-  // (npx reads its options up to the command it runs; npm exec reads them, --package among them, up to "--", and
-  // those before "exec" too)
-  const specs = [];
-  let command, called = false;
-  for (i = 0; i < args.length; i++) {
-    const w = args[i];
-    if (w === "--") { if (runs && !npx) { command ??= args[i + 1]; break; } continue; }
-    if (w === "-p" || w === "--package") { specs.push(args[++i] ?? ""); continue; }
-    if (w.startsWith("--package=") || w.startsWith("-p=")) { specs.push(w.slice(w.indexOf("=") + 1)); continue; }
-    // (--no-install is --yes=false; --yes, -y or --yes=<anything but false> installs; the last one given counts)
-    const yes = /^(?:--yes|-y)(?:=(.*))?$/u.exec(w), no = /^(?:--no-install|--no|--no-yes)(?:=(.*))?$/u.exec(w);
-    if (runs && yes) { local = yes[1] === "false"; continue; }
-    if (runs && no) { local = no[1] !== "false"; continue; }
-    if (runs && /^(-c|--call)(=|$)/u.test(w)) { called = true; if (!w.includes("=")) i++; continue; } // (the shell line it runs: read as a line of its own)
-    if (VALUED.has(w)) { i++; continue; }
-    if (w.startsWith("-")) continue;
-    if (!runs) { if (!(linking && /^(\.|\/|~|file:)/u.test(w))) specs.push(w); continue; }
-    command ??= w;
-    if (npx) break;
+  const escaped = inside(true), plain = inside(false);
+  return raw.map((w, k) => escaped[k] || plain[k]);
+}
+
+/** `words` without each redirection (`operator` says which of `raw` begins one) and the target it stands before. */
+function unredirected(words, operator, raw) {
+  return words.filter((w, k) => !operator(k) && !(operator(k - 1) && /^\d*[<>&]+$/u.test(raw[k - 1])));
+}
+
+/**
+ * What npm does with its command: the line's result where that is final ({ done }), else the words it takes as
+ * arguments, and whether the command runs a program (npm exec), links or packs.
+ */
+function npmPlan(words, atCommand) {
+  const { command, i, early } = npmCommand(words);
+  const rest = words.slice(i);
+  const refused = npmRefusal(command, rest);
+  if (refused) return { done: refused };
+  // (npm diff --diff=<spec>, npm cache add <spec> and npm publish <spec> fetch what they name, and prepare a git
+  // package, running its scripts: each but a local folder or tarball is a package to audit)
+  if (command === "diff" || command === "cache" || command === "publish") return { done: { specs: pathSpecs(command, command === "diff" ? [...early, ...rest] : rest) } };
+  const unread = npmUnreadable(command, atCommand, [...early, ...rest]);
+  if (unread) return { done: unread };
+  if (command === undefined || !fetching(command)) return { done: { specs: [] } };
+  if (UPDATE.has(command)) return { done: { specs: [], unreadable: `npm ${command} fetches the newest release a range allows, which cannot be audited` } };
+  if (BY_OTHER_NAME.has(command)) return { done: skipOptions(words, i) < words.length ? { specs: [], unreadable: `npm ${command} fetches a package by another name` } : { specs: [] } };
+  const runs = RUN.has(command);
+  return { args: runs ? [...early, ...rest] : rest, runs, npx: false, linking: LINK.has(command), packs: command === "pack" };
+}
+
+const fetching = (w) => INSTALL.has(w) || RUN.has(w) || BY_OTHER_NAME.has(w) || UPDATE.has(w) || LINK.has(w);
+
+/** The index past the options that start `words` at `i`. */
+function skipOptions(words, i) {
+  while (i < words.length && words[i].startsWith("-")) i += VALUED.has(words[i]) ? 2 : 1;
+  return i;
+}
+
+/** The npm command in `words`, with the index past it and the options before it. */
+function npmCommand(words) {
+  // (after npm, its options; a word that is no command, straight after an option, is taken as that option's value)
+  let i = 1, command;
+  for (let afterOption = false; i < words.length; ) {
+    const w = words[i++];
+    if (w.startsWith("-")) { if (VALUED.has(w)) i++; afterOption = !VALUED.has(w) && !w.includes("="); continue; }
+    if (fetching(w) || NO_FETCH.has(w) || !afterOption) { command = w; break; }
+    afterOption = false;
   }
+  // (npm reads the options before its command as its config, as it reads those after: npm --diff=x diff)
+  return { command, i, early: command === undefined ? [] : words.slice(1, i - 1) };
+}
+
+/** Why a command cannot be audited at all, whatever it names, or undefined. */
+function npmRefusal(command, rest) {
+  // (npm config set registry, and the like, points every later fetch at another registry; npm audit fix installs
+  // releases the lockfile does not hold)
+  const sets = command === "set" || rest.some((w) => w === "set" || w === "edit");
+  if (CONFIG.has(command) && sets && rest.some((w) => /(^|:)registry\b|^replace-registry-host\b|^(user|global)config\b/iu.test(w)))
+    return { specs: [], unreadable: "it points npm at another registry or config, so no audited name can be trusted after it" };
+  if (command === "audit" && rest.includes("fix")) return { specs: [], unreadable: "npm audit fix installs releases the lockfile does not hold" };
+  return undefined;
+}
+
+/** Why what npm is asked to fetch cannot be read, or undefined. `all` is the options and words after "npm". */
+function npmUnreadable(command, atCommand, all) {
+  // (where npm stands as a command, a word after it that is no npm command cannot be read: a variable, a string
+  // built in code; elsewhere, in prose, it is only a word)
+  if (atCommand && command !== undefined && !fetching(command) && !NO_FETCH.has(command))
+    return { specs: [], unreadable: `npm ${command}: no npm command, so what it runs cannot be read` };
+  if (INSTALL.has(command) && command !== "pack" && all.some((w, k, rest) => /^--no-(package-lock|shrinkwrap)$|^--(package-lock|shrinkwrap)=false$/iu.test(w) || (/^--(package-lock|shrinkwrap)$/iu.test(w) && /^false$/iu.test(rest[k + 1] ?? ""))))
+    return { specs: [], unreadable: "it installs without the lockfile, so what it installs is not what the lockfile's check read" };
+  return undefined;
+}
+
+/** The packages npm diff, npm cache add and npm publish name in `rest`: not a local folder or tarball. */
+function pathSpecs(command, rest) {
+  // (a local folder or tarball: a path, never an address, https://x/y.tgz, or a git remote)
+  const localSpec = (w) => (w.includes(":") ? w.startsWith("file:") : /^(\.|\/|~)/u.test(w) || /\.(tgz|tar\.gz)$/iu.test(w));
+  const specs = [];
+  let adding = command !== "cache";
+  for (let k = 0; k < rest.length; k++) {
+    const w = rest[k], diff = /^--diff(?:=(.*))?$/u.exec(w);
+    if (diff) { const v = diff[1] ?? rest[++k]; if (command === "diff" && v !== undefined && !localSpec(v)) specs.push(v); continue; }
+    if (w.startsWith("-")) { if (VALUED.has(w)) k++; continue; }
+    if (!adding) { if (w !== "add") break; adding = true; continue; }
+    if (command !== "diff" && !localSpec(w)) specs.push(w);
+  }
+  return specs;
+}
+
+/**
+ * The packages npx, npm exec, npm install (and the like) name in `args`: npx reads its options up to the command it
+ * runs; npm exec reads them, --package among them, up to "--", and those before "exec" too. `mode`: whether it runs
+ * a program (npx, npm exec) and which, and whether it links or packs.
+ */
+function argSpecs(args, mode) {
+  const found = { specs: [], command: undefined, called: false, local: false };
+  for (let i = 0; i < args.length; i++) {
+    i = argStep(args, i, mode, found);
+    if (i < 0) break;
+  }
+  const { specs, command, called, local } = found, { runs, packs = false } = mode;
   if (runs && !specs.length && command !== undefined && !local && !called) specs.push(command);
   // (npx with no package and nothing to run here takes them from elsewhere: a variable, "npx -y" + a package later)
   const asks = args.length > 0 && args.every((w) => /^(--version|-v|--help|-h)$/u.test(w)); // (npx --version)
   if (runs && !specs.length && command === undefined && !called && !asks) return { specs: [], unreadable: "it names nothing to run here, so what it runs comes from elsewhere" };
   return { specs, packs };
+}
+
+/** Reads the word at `args[i]` into `found`; the index of the last word it took, or -1 where the reading ends. */
+function argStep(args, i, { runs, npx, linking }, found) {
+  const w = args[i];
+  if (w === "--") {
+    if (!runs || npx) return i;
+    found.command ??= args[i + 1];
+    return -1;
+  }
+  const flagged = packageFlag(args, i, found.specs) ?? (runs ? execFlag(args, i, found) : undefined);
+  if (flagged !== undefined) return flagged;
+  if (VALUED.has(w)) return i + 1;
+  if (w.startsWith("-")) return i;
+  if (!runs) {
+    if (!(linking && /^(\.|\/|~|file:)/u.test(w))) found.specs.push(w);
+    return i;
+  }
+  found.command ??= w;
+  return npx ? -1 : i;
+}
+
+/** The index past a --package or -p option at `args[i]`, its package taken into `specs`; undefined if it is none. */
+function packageFlag(args, i, specs) {
+  const w = args[i];
+  if (w === "-p" || w === "--package") { specs.push(args[i + 1] ?? ""); return i + 1; }
+  if (w.startsWith("--package=") || w.startsWith("-p=")) { specs.push(w.slice(w.indexOf("=") + 1)); return i; }
+  return undefined;
+}
+
+/**
+ * The index past an option of what runs a program (--yes, --no-install, -c) at `args[i]`, what it says taken into
+ * `found`; undefined if it is none. --no-install is --yes=false; --yes, -y or --yes=<anything but false> installs; the
+ * last one given counts; -c and --call name the shell line it runs, read as a line of its own.
+ */
+function execFlag(args, i, found) {
+  const w = args[i], yes = /^(?:--yes|-y)(?:=(.*))?$/u.exec(w), no = /^(?:--no-install|--no|--no-yes)(?:=(.*))?$/u.exec(w);
+  if (yes) { found.local = yes[1] === "false"; return i; }
+  if (no) { found.local = no[1] !== "false"; return i; }
+  if (!/^(-c|--call)(=|$)/u.test(w)) return undefined;
+  found.called = true;
+  return w.includes("=") ? i : i + 1;
 }
 
 /** Whether the word at `words[k]` runs another program: a runner (by any path), npm exec, or a variable ($SUDO). */
@@ -253,27 +339,34 @@ function prefixes(words) {
  * between (concurrently -k "npm run a" "npm run b"). It reads at most 4096 characters back, and past those, counts.
  */
 function opensCommand(text, k, lineStart) {
-  for (let budget = 4096; budget > 0; ) {
+  const reach = { left: 4096 };
+  while (reach.left > 0) {
     if (lineStart(k) || "({[=:,".includes(text[k - 1])) return true;
-    const q = text[k - 1];
-    let start = k - 1;
-    if ("'\"`".includes(q)) {
-      while (start > 0 && text[start - 1] !== q && text[start - 1] !== "\n" && budget-- > 0) start--;
-      if (budget <= 0) return true; // (read no further: it counts)
-      if (start === 0 || text[start - 1] !== q) return false;
-      start--;
-    } else {
-      start = k;
-      while (!lineStart(start) && !SPACE.has(text[start - 1]) && budget-- > 0) start--;
-      if (budget <= 0) return true;
-      const w = text.slice(start, k).replace(/^.*[\/\\]/u, "");
-      if (STRING_RUNNERS.test(w)) return true;
-      if (!w.startsWith("-")) return false;
-    }
-    k = start;
-    while (!lineStart(k) && SPACE.has(text[k - 1]) && budget-- > 0) k--;
+    const before = "'\"`".includes(text[k - 1]) ? quotedBefore(text, k, reach) : wordBefore(text, k, lineStart, reach);
+    if ("opens" in before) return before.opens;
+    k = before.from;
+    while (!lineStart(k) && SPACE.has(text[k - 1]) && reach.left-- > 0) k--;
   }
   return true;
+}
+
+// (what stands before `k` for opensCommand: either its answer, { opens }, or where the walk goes on, { from }; `reach`
+// counts the characters it may still read)
+function quotedBefore(text, k, reach) {
+  const q = text[k - 1];
+  let start = k - 1;
+  while (start > 0 && text[start - 1] !== q && text[start - 1] !== "\n" && reach.left-- > 0) start--;
+  if (reach.left <= 0) return { opens: true }; // (read no further: it counts)
+  return start === 0 || text[start - 1] !== q ? { opens: false } : { from: start - 1 };
+}
+
+function wordBefore(text, k, lineStart, reach) {
+  let start = k;
+  while (!lineStart(start) && !SPACE.has(text[start - 1]) && reach.left-- > 0) start--;
+  if (reach.left <= 0) return { opens: true };
+  const w = text.slice(start, k).replace(/^.*[\/\\]/u, "");
+  if (STRING_RUNNERS.test(w)) return { opens: true };
+  return w.startsWith("-") ? { from: start } : { opens: false };
 }
 
 /**
@@ -425,17 +518,21 @@ const add = (to, list) => { for (const x of list) to.push(x); };
 const strings = (v) => (typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(strings) : []);
 export function commandLines(v) {
   if (!v || typeof v !== "object") return typeof v === "string" ? [v] : [];
-  const programs = [], args = [], out = [];
+  const programs = [], args = [], out = [], keyed = !Array.isArray(v);
   for (const [k, x] of Object.entries(v)) {
-    if (!Array.isArray(v) && PROSE.test(k)) continue;
-    const listed = Array.isArray(x) && x.every((y) => typeof y === "string");
-    if (!Array.isArray(v) && COMMAND.test(k) && typeof x === "string") programs.push(x);
-    else if (!Array.isArray(v) && COMMAND.test(k) && listed) add(args, x);
-    else if (!Array.isArray(v) && COMMAND.test(k)) add(out, strings(x)); // (package.json's "scripts": every one, a "help" too)
+    if (keyed && PROSE.test(k)) continue;
+    const command = keyed && COMMAND.test(k);
+    if (command && typeof x === "string") programs.push(x);
+    else if (command && Array.isArray(x) && x.every((y) => typeof y === "string")) add(args, x);
+    else if (command) add(out, strings(x)); // (package.json's "scripts": every one, a "help" too)
     else add(out, commandLines(x));
   }
-  // (one program with its arguments, as a task or a launch writes them; several, each its own line, as scripts are,
-  // each with any arguments beside them)
+  return withArguments(programs, args, out);
+}
+
+// (one program with its arguments, as a task or a launch writes them; several, each its own line, as scripts are,
+// each with any arguments beside them)
+function withArguments(programs, args, out) {
   // (a line built from an argument list is literal: no shell reads it, so "#" or ">" there is an argument)
   const line = (words) => (args.length ? Object.assign(new String(words.join(" ")), { literal: true }) : words.join(" "));
   // (an argument holding spaces is kept whole for the list's program, and also read as a command line of its own,
