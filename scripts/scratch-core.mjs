@@ -37,7 +37,7 @@ export function tally() {
 export const OWNER = ".scratch-owner";
 const owner = () => `${os.hostname()}:${process.pid}`;
 
-// (only "no such process" is gone: one that may not be signalled, EPERM, or a pid no process holds in this form, is alive)
+// (only "no such process" is gone: one that may not be signalled, EPERM, or a pid of no valid form, counts as alive)
 const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code !== "ESRCH"; } };
 
 let swept = false;
