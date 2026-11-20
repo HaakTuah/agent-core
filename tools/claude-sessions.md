@@ -1,7 +1,7 @@
 # Claude's part: a session of its own
 
 Read by whoever starts a session of its own in Claude Code, or asks whether one goes on once the session that started
-it is archived: the kind `way` (`tasks/tools.md`, "Each tool's part says whether it starts a session of its own").
+it is archived: the kind `way` (the rule this line answers: `tasks/tools.md`, #492).
 
 - *Starts a session:* yes. A project's conversation starts each of its threads as a session of its own, with its own
   context, usually in the cloud, which reports back to it when it finishes; and `claude --cloud "<the brief>"`, from a
