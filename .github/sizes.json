@@ -11,6 +11,14 @@
     "tests/mutation/package-lock.json"
   ],
   "past": {
+    ".github/workflows/personal-terms.yml": {
+      "mark": 32432,
+      "why": "One job that every project calls pinned, its step holding the secret: its shell stays inline so that nothing the pull request checks out runs beside the terms, and a local action or script would be the caller's checkout, not the core's. A session reads the part it changes by its comment, found by searching."
+    },
+    "tests/personal-terms-test.mjs": {
+      "mark": 38816,
+      "why": "#929: the cases of how Betterleaks reads apart from what the check reads."
+    },
     ".github/workflows/tests.yml": {
       "mark": 55491,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
@@ -55,6 +63,18 @@
       "mark": 33545,
       "why": "#888: the list it prints apart from what it reads from the host and its record."
     },
+    "tasks/game-design.md": {
+      "mark": 25119,
+      "why": "#441: the game rules split into a base and a file for each kind (#484, points 6 and 7)."
+    },
+    "tests/steps-test.mjs": {
+      "mark": 138318,
+      "why": "#916: a file for each reader its sections test."
+    },
+    "scripts/strength.mjs": {
+      "mark": 39011,
+      "why": "#920: the verdict on a run apart from the run on a project."
+    },
     "scripts/read-total.mjs": {
       "mark": 20690,
       "why": "Whoever changes how the total is counted reads its tree reader, its readers, its cut and its conditions together, each calling the others; split, that session opens more files and reads no less, and no other task reads it."
@@ -66,6 +86,10 @@
     "scripts/size.mjs": {
       "mark": 26144,
       "why": "#892: the record of its caps' raises apart from the caps and the measure."
+    },
+    "scripts/security-review.mjs": {
+      "mark": 39696,
+      "why": "#931: along what it reads, Codex's summary, who counts as a reviewer, what a review stands for, floor rule 3's count and the status posted."
     },
     "scripts/shape.mjs": {
       "mark": 84826,
@@ -80,8 +104,8 @@
       "why": "#884: the measures of code-shape.mjs apart from the JavaScript functions read on the parser."
     },
     "tests/holders-test.mjs": {
-      "mark": 30947,
-      "why": "Split by the reader each case tests in #852: its archive cases apart from the rest."
+      "mark": 39601,
+      "why": "Split by the reader each case tests in #852: its archive cases apart from the rest, and a project's own rules and share apart from the core's."
     },
     "tests/hostile-configs-test.mjs": {
       "mark": 24643,
@@ -124,8 +148,32 @@
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
     },
     "scripts/step-checks.mjs": {
-      "mark": 76074,
-      "why": "A session that changes a step reads the one check its step names, found by its name (grep, then its range), never the file whole; split by topic, the readers each check shares (the project's files, its workflows, its manifest) would be opened beside it every time, so no reader reads less."
+      "mark": 75102,
+      "why": "#919: split by step, so the session that changes one step's check opens that step's file alone."
+    },
+    "scripts/check-configs.mjs": {
+      "mark": 40791,
+      "why": "#919: the reading of a workflow's runs apart from the reading of each check's config; the steps' readers, which import it, move first."
+    },
+    "scripts/agent-tools.mjs": {
+      "mark": 94262,
+      "why": "#919: the readers of each agent tool's configuration apart from the check that lists them."
+    },
+    "tests/agent-tools-test.mjs": {
+      "mark": 114595,
+      "why": "#919: split with agent-tools.mjs, a file of cases for each tool's configuration."
+    },
+    "tests/core-path-test.mjs": {
+      "mark": 25409,
+      "why": "#919: its cases for a core a library carries, and for the commands its hooks run, move to a file of their own."
+    },
+    "scripts/staged/scratch.mjs": {
+      "mark": 43378,
+      "why": "#938: the sealed reader of what a session left apart from the set-up of a case and the readers' helpers."
+    },
+    "tests/staged-test.mjs": {
+      "mark": 125729,
+      "why": "#937: split into the three parts it already runs in, with the shared set-up in a module of its own."
     },
     "scripts/workflows.mjs": {
       "mark": 26187,

@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { READ_MOST } from "../own-files.mjs";
-import { Unread, marksConfig } from "../check-configs.mjs";
+import { Unread, copyAt, marksConfig } from "../check-configs.mjs";
 import { COST, shown } from "../step-checks.mjs";
 
 export default { lead: "14 November 2026, the size marks' total counts the project's own files", cost: COST.line,
@@ -12,7 +12,7 @@ export default { lead: "14 November 2026, the size marks' total counts the proje
   // from the project's own copy of the check, and gives its number)
   check: p => {
     const marks = marksConfig(p);
-    const script = path.join(p.root, "core", "scripts", "reading-size.mjs");
+    const script = path.join(p.root, copyAt(p), "scripts", "reading-size.mjs");
     if (!fs.existsSync(script) || p.read(marks) === null) throw new Unread(`no copy of the reading-size check, or no ${marks}, to read`);
     // (the check reads each file its marks name: one the steps' reader would not read is never handed to it; #423)
     let named = {};
