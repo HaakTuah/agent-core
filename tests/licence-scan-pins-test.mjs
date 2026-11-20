@@ -4,7 +4,8 @@
 // (.github/workflows/tests.yml).
 //
 //   node tests/licence-scan-pins-test.mjs
-import { done, entry, json, mendSaid, ok, run } from "../scripts/licence-scan-stage.mjs";
+import { done, entry, json, asOutput, ok, run } from "../scripts/licence-scan-stage.mjs";
+import { mended } from "../scripts/mend.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -40,7 +41,7 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
     fs.renameSync(path.join(dir, "moved-audit.json"), path.join(dir, "audit.json")); git("add", "-A");
     put("scripts/get.sh", `#!/usr/bin/env bash\n${GET}wget -q https://mossgrip.example/moss-extra-1.2.0.tgz\n`);
     r = licenceCheck(config, dir, "HEAD", config);
-    ok(r.failures.length === 1 && /mosstool, in audit\.json, names no version/u.test(r.failures[0]) && mendSaid(r.failures), "a download a pull request adds to an unpinned file fails, saying the mend", JSON.stringify(r));
+    ok(r.failures.length === 1 && /mosstool, in audit\.json, names no version/u.test(r.failures[0]) && mended(asOutput(r.failures)), "a download a pull request adds to an unpinned file fails, saying the mend", JSON.stringify(r));
     audit([{ name: "mosstool", licence: "MIT", ships: false, version: "1.2.0", files: ["scripts/get.sh"] }]);
     r = licenceCheck(config, dir, "HEAD", config);
     ok(r.failures.length === 1 && /holds no checksum/u.test(r.failures[0]) && /sha256sum -c/u.test(r.failures[0]), "with its version named and no checksum in the file, it fails, saying the mend", JSON.stringify(r));

@@ -6,12 +6,9 @@
 // programs a file downloads licence-scan-pins-test.mjs's. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/licence-scan-test.mjs
-import { LOCK, append, done, entry, handAudited, json, ok, run, write } from "../scripts/licence-scan-stage.mjs";
+import { LOCK, append, asOutput, done, entry, handAudited, json, ok, run, write } from "../scripts/licence-scan-stage.mjs";
 import { mended } from "../scripts/mend.mjs";
 
-// (each failure as the check prints it, one a config's fault throws too: each says its mend; the other licence-scan tests
-// have it from the staged project's module, and tests/mend-test.mjs reads this file for it, as the check's own)
-const mendSaid = (failures) => mended(failures.map((m) => `FAIL: ${m.replace(/^threw: /u, "")}`).join("\n"));
 
 const base = run();
 ok(base.length === 0, "the project as it is passes", base.join("\n"));
@@ -127,6 +124,6 @@ for (const [what, change, why] of [
   ["notices without an audit", (dir) => { LOCK("MIT")(dir); json("licences.json", (j) => { delete j.audit; delete j.scan; j.notices = "site/NOTICES.txt"; })(dir); }, /notices.*Mend: name the (?:notices file by its path, beside an "audit"|audit's file in "audit", which holds what "notices")/],
   ["notices naming no file", json("licences.json", (j) => { j.notices = "site/NOTICES.txt"; }), /"notices", site\/NOTICES\.txt, names no file/],
   ["notices naming a folder", json("licences.json", (j) => { j.notices = "site/audio"; }), /"notices", site\/audio, names no file/],
-]) { const f = run(change); ok(f.some((m) => why.test(m)) && mendSaid(f), `fails on ${what}, each failure saying its mend`, f.join("\n") || "(it passed)"); }
+]) { const f = run(change); ok(f.some((m) => why.test(m)) && mended(asOutput(f)), `fails on ${what}, each failure saying its mend`, f.join("\n") || "(it passed)"); }
 
 done();

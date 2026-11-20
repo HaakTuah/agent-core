@@ -3,7 +3,8 @@
 // Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/licence-yes-test.mjs
-import { LOCK, done, entry, json, mendSaid, ok, run, write } from "../scripts/licence-scan-stage.mjs";
+import { LOCK, done, entry, json, asOutput, ok, run, write } from "../scripts/licence-scan-stage.mjs";
+import { mended } from "../scripts/mend.mjs";
 
 // The owner's yes (licence-yes.mjs): a package or an audit entry off its list passes only by it, and never further.
 {
@@ -58,7 +59,7 @@ import { LOCK, done, entry, json, mendSaid, ok, run, write } from "../scripts/li
     ["a yes for an audit entry that says nothing of its licence or whether it ships", bought([{ entry: "Bark pack", yes: said }]), /"accepted" is not in the form it reads/],
     ["a yes for an audit entry given twice", bought([ours(), ours()]), /names one twice: entry Bark pack/],
     ["a yes for an audit entry in a config with no audit", (dir) => { LOCK("MIT")(dir); json("licences.json", (j) => { delete j.audit; delete j.scan; j.accepted = [ours()]; })(dir); }, /names an audit entry, and the config names no "audit"/],
-  ]) { const f = run(change); ok(f.some((m) => why.test(m)) && mendSaid(f), `fails on ${what}, each failure saying its mend`, f.join("\n") || "(it passed)"); }
+  ]) { const f = run(change); ok(f.some((m) => why.test(m)) && mended(asOutput(f)), `fails on ${what}, each failure saying its mend`, f.join("\n") || "(it passed)"); }
   const twice = run((dir) => { shipped("LGPL-3.0-only", [yes({ ships: false })])(dir); json("package-lock.json", (j) => { j.packages["node_modules/bark-x/node_modules/mossgrip-lib"] = { ...j.packages["node_modules/mossgrip-lib"] }; j.packages["node_modules/bark-x"] = { version: "1.0.0", resolved: "https://registry.npmjs.org/bark-x/-/bark-x-1.0.0.tgz", license: "MIT", dependencies: { "mossgrip-lib": "1.0.0" } }; j.packages[""].dependencies["bark-x"] = "1.0.0"; })(dir); write("package.json", JSON.stringify({ name: "bark", dependencies: { "mossgrip-lib": "1.0.0", "bark-x": "1.0.0" } }))(dir); });
   ok(twice.length === 1, "a package a lockfile holds twice fails once", twice.join("\n"));
 }

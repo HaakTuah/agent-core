@@ -4,7 +4,8 @@
 // (.github/workflows/tests.yml).
 //
 //   node tests/licence-scan-limits-test.mjs
-import { LOCK, done, entry, handAudited, json, mendSaid, ok, run, write } from "../scripts/licence-scan-stage.mjs";
+import { LOCK, done, entry, handAudited, json, asOutput, ok, run, write } from "../scripts/licence-scan-stage.mjs";
+import { mended } from "../scripts/mend.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -21,7 +22,7 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
       ["an audit named by a rooted path", json("licences.json", (j) => { j.audit = path.join(elsewhere, "audit.json"); })],
       ["notices named by a path above the project", json("licences.json", (j) => { j.notices = "site/../../NOTICE"; })],
       ["an .npmrc named by a rooted path", json("licences.json", (j) => { j.ignoreScriptsIn = ["/.npmrc"]; })],
-    ]) { const f = run(change); ok(f.some((m) => outside.test(m)) && mendSaid(f), `refuses ${what}, saying its mend`, f.join("\n") || "(it passed)"); }
+    ]) { const f = run(change); ok(f.some((m) => outside.test(m)) && mended(asOutput(f)), `refuses ${what}, saying its mend`, f.join("\n") || "(it passed)"); }
     // (a link to a file needs a right on Windows that is not always there: where it cannot be made, these are not tried)
     let links = true;
     try { fs.symlinkSync(path.join(elsewhere, "notice.js"), path.join(elsewhere, "probe")); } catch { links = false; }
@@ -41,7 +42,7 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
       // (a tracked link to a folder inside the project: its files are read in their own place, and the link fails with its
       // mend, never with the error a read of a folder throws; #447)
       const folder = run((dir) => { write("docs/vendor.txt", "x\n")(dir); fs.symlinkSync(path.join("..", "docs"), path.join(dir, "site", "docs-link")); });
-      ok(folder.some((m) => /^site\/docs-link is a link to no file of bytes \(a folder, a device or a pipe\)/u.test(m)) && mendSaid(folder.filter((m) => m.startsWith("site/docs-link"))) && !folder.some((m) => /EISDIR/u.test(m)),
+      ok(folder.some((m) => /^site\/docs-link is a link to no file of bytes \(a folder, a device or a pipe\)/u.test(m)) && mended(asOutput(folder.filter((m) => m.startsWith("site/docs-link")))) && !folder.some((m) => /EISDIR/u.test(m)),
         "fails a tracked link to a folder inside the project with its mend, never with EISDIR", folder.join("\n"));
     }
   } finally { fs.rmSync(elsewhere, { recursive: true, force: true }); }
@@ -52,7 +53,7 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
 {
   const deep = `${"[".repeat(20000)}"npx mossgrip-cli@1.2.3"${"]".repeat(20000)}`;
   const nested = run(write("site/tools/deep.json", deep));
-  ok(nested.some((m) => /site\/tools\/deep\.json: it nests deeper than 200/u.test(m)) && mendSaid(nested), "fails on JSON nested past the bound, saying its mend", nested.join("\n"));
+  ok(nested.some((m) => /site\/tools\/deep\.json: it nests deeper than 200/u.test(m)) && mended(asOutput(nested)), "fails on JSON nested past the bound, saying its mend", nested.join("\n"));
   const audited = run((dir) => { write("site/tools/deep.json", deep)(dir); handAudited("site/tools/deep.json")(dir); });
   ok(audited.length === 0, "passes JSON nested past the bound that an entry audits by hand", audited.join("\n"));
   const deepLock = run((dir) => { LOCK("MIT")(dir); fs.writeFileSync(path.join(dir, "package-lock.json"), `{"lockfileVersion":3,"packages":{"node_modules/mossgrip-lib":{"version":"1.0.0","license":${"[".repeat(20000)}"MIT"${"]".repeat(20000)}}}}`); });
