@@ -14,7 +14,7 @@
 //
 // Usage, from the project's root:  node core/scripts/exact-versions.mjs <the licence check's config>
 import { readFileSync } from "node:fs";
-import { join, posix } from "node:path";
+import { join, posix, resolve } from "node:path";
 import { inProject, logged, parseBounded } from "./guards.mjs";
 import { started } from "./started.mjs";
 
@@ -133,7 +133,7 @@ export function report(configPath, root = ".") {
   const failed = (message, status = 1) => ({ status, out: [], err: [message] });
   if (!configPath) return failed("usage: node core/scripts/exact-versions.mjs <the licence check's config>", 2);
   let lockfiles;
-  try { lockfiles = JSON.parse(readFileSync(join(root, configPath), "utf8")).lockfiles ?? []; } catch (e) { return failed(`FAIL: ${configPath} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`); }
+  try { lockfiles = JSON.parse(readFileSync(resolve(root, configPath), "utf8")).lockfiles ?? []; } catch (e) { return failed(`FAIL: ${configPath} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`); }
   if (!Array.isArray(lockfiles) || lockfiles.some((f) => typeof f !== "string")) return failed(`FAIL: "lockfiles" in ${configPath} is no list of paths. Mend: write it as a list of the lock files' paths`);
   const outside = lockfiles.filter((f) => !inProject(f));
   if (outside.length) return failed(`FAIL: ${logged(`"lockfiles" in ${configPath} names a path outside the project: ${outside.join(", ")}`)}. Mend: name each lock file by its path from the project's root, with no ".." that leads above it`);

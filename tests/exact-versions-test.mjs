@@ -156,6 +156,9 @@ if (run("1.2.3", "../tools/package-lock.json") !== 1 || run("1.2.3", join(tmpdir
     if (two.status !== 1 || two.out.join() !== "2 dependencies not at one exact version (floor rule 7)" || two.err.length !== 2 || !two.err.every((e) => e.startsWith("FAIL: t/package.json: ") && mended(e))) { failed++; console.error(`FAIL two ranges: ${JSON.stringify(two)}`); }
     say("c2.json", JSON.stringify({ lockfiles: ["./t/../t/package-lock.json"] }));
     if (report("c2.json", dir).status !== 1) { failed++; console.error("FAIL a path written with dots is read as the path it leads to"); }
+    say("c.json", JSON.stringify({ lockfiles: ["t/package-lock.json"] }));
+    lock({ dependencies: { a: "1.2.3" } });
+    is("a config named by its absolute path", report(join(dir, "c.json"), dir), 0, "ok   every dependency of 1 lock file is at the one exact version it installs", "");
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
