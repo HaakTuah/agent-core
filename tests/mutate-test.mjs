@@ -134,15 +134,19 @@ try {
   const stopped = await start("wait"), running = await start("wait");
   stopped.child.kill("SIGKILL");
   await ended(stopped.child);
-  ok(fs.existsSync(stopped.dir), "a test stopped with SIGKILL leaves its scratch folder, which no handler of its own could remove");
   const next = await start("end");
   await ended(next.child);
   ok(!fs.existsSync(stopped.dir), "the next test to start takes away the scratch folder of a test that was stopped", stopped.dir);
   ok(fs.existsSync(running.dir), "the scratch folder of a test still running is left where it is", running.dir);
   ok(!fs.existsSync(next.dir), "a test that ends takes away its own scratch folder as before");
+  // (a folder another machine's process made, over a temporary folder shared between machines, is no business of this one's)
+  const foreign = fs.mkdtempSync(path.join(os.tmpdir(), "stopped-test-"));
+  fs.writeFileSync(path.join(foreign, ".scratch-owner"), `${os.hostname()}-elsewhere:999999999`);
+  await ended((await start("end")).child);
+  ok(fs.existsSync(foreign), "the scratch folder of a process on another machine is left where it is", foreign);
   running.child.kill("SIGKILL");
   await ended(running.child);
-  fs.rmSync(running.dir, { recursive: true, force: true });
+  for (const dir of [running.dir, stopped.dir, foreign]) fs.rmSync(dir, { recursive: true, force: true });
 }
 
 console.log(`\n${count - failed} of ${count} passed`);
