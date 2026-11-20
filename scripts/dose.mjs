@@ -114,7 +114,7 @@ function shareGot(config, at, root) {
 // The project at `root` as the dose reads it: null where it has no config of the shape check yet; else its config,
 // what the baseline lists, what the check reads (`found`, the survey's own: its counts and what stands today), the state
 // and the last audit. It throws where the config or the baseline cannot be read, with the mend the shape check gives.
-// The measures a choice's sign may name are read from it (choices.mjs, MEASURES).
+// The measures a choice's sign may name are read from it (choices-records.mjs, MEASURES).
 export function reading(rules, root = ".") {
   const at = where(rules);
   if (!fs.existsSync(notLinked(at, root))) return null;

@@ -4,7 +4,8 @@
 //
 //   node tests/look-test.mjs
 import { BOT, checksOf, noticesOf, stillFinding, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, staleFinding, lateFinding, LATE_PAGES, LATE_PULLS, text, TITLES, updating, FAILED, redBody } from "../scripts/look.mjs";
-import { parse, signKey, tripped, trippedBody } from "../scripts/choices.mjs";
+import { parse } from "../scripts/choices-records.mjs";
+import { signKey, tripped, trippedBody } from "../scripts/choices-look.mjs";
 import { before, body, copies, countsFrom, reportOf, share, SHARES, shownAs } from "../scripts/state-report.mjs";
 import fs from "node:fs";
 import os from "node:os";
