@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { differences, fresh, kind, report as freshReport } from "../scripts/fresh.mjs";
 import { CORE } from "../scripts/core-address.mjs";
+import { hookCommands, readCore } from "../scripts/core-path.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "../scripts/init.mjs";
 import { notes as manifestNotes } from "../scripts/manifest-reads.mjs";
 import { FOLDER, NOTES, NOTICE, POINTER, entries, notes as notesWhole } from "../scripts/sync-notes.mjs";
@@ -98,6 +99,10 @@ function kit(name, o, { held = true, at = "core/", library = null, submodule = f
     fs.mkdirSync(path.join(dir, library), { recursive: true });
     fs.writeFileSync(path.join(dir, library, "core-manifest.md"), `${own.replace(`under ${at}`, `under ${at.slice(library.length)}`)}\n`);
     fs.cpSync(path.join(root, "floor"), path.join(dir, "floor-copy"), { recursive: true });
+    // (its hooks are the commands for a carried core, which stop a session whose floor cannot be read)
+    const settings = path.join(dir, ".claude/settings.json"), hooks = JSON.parse(fs.readFileSync(settings, "utf8")), commands = hookCommands(readCore(fs.readFileSync(manifest, "utf8")));
+    hooks.hooks.SessionStart[0].hooks[0].command = commands.start; hooks.hooks.PreToolUse[0].hooks[0].command = commands.helper; hooks.hooks.Stop[0].hooks[0].command = commands.stop;
+    fs.writeFileSync(settings, `${JSON.stringify(hooks, null, 2)}\n`);
   }
   fs.mkdirSync(path.join(dir, "checks"), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify(licences(o, () => false), null, 2)}\n`);

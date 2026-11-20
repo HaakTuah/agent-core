@@ -110,6 +110,11 @@ passes(run(project()), "a project as the starter kit writes it, with no list, pa
   passes(run(project({ "core-manifest.md": line, ".claude/settings.json": KIT.replaceAll("origin/main:core/", "origin/main:vendor/core/"), "checks/licences.json": empty })), "the kit's hooks with the copy's path written in, the manifest naming it, are the kit's own");
   passes(run(project({ "core-manifest.md": line, ".claude/settings.json": given, "checks/licences.json": empty })), "the commands core-path.mjs gives for the copy's path are the kit's own");
   fails(run(project({ "core-manifest.md": line, "checks/licences.json": empty })), "the kit's hooks naming core/ where the manifest names another path are not the kit's own", "is not listed");
+  // (a core a library carries: the commands for it alone, never the kit's own with the path written in)
+  const carried = `Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n`, forCarried = JSON.parse(KIT), commandsFor = hookCommands(readCore(carried));
+  forCarried.hooks.SessionStart[0].hooks[0].command = commandsFor.start; forCarried.hooks.PreToolUse[0].hooks[0].command = commandsFor.helper; forCarried.hooks.Stop[0].hooks[0].command = commandsFor.stop;
+  passes(run(project({ "core-manifest.md": carried, ".claude/settings.json": forCarried, "checks/licences.json": empty })), "for a core a library carries, the commands core-path.mjs gives for it are the kit's own");
+  fails(run(project({ "core-manifest.md": carried, ".claude/settings.json": KIT.replaceAll("origin/main:core/", "origin/main:lib/core/"), "checks/licences.json": empty })), "for a core a library carries, the kit's hooks with the path written in are not the kit's own: a session would start without the floor", "is not listed");
 }
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } })), "and with an empty list");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } }), "--core"), "in the core's own repository too");

@@ -481,7 +481,7 @@ function npxPackage(args) {
 const kitTemplate = name => { try { return fs.readFileSync(path.join(KIT_DIR, name), "utf8"); } catch { return null; } };
 // `core` is the manifest's "Core:" line as core-path.mjs reads it, or null for the usual core/: the kit writes the copy as
 // core/, and a project whose manifest names another path holds the hooks with that path, either the kit's own with it
-// written in or the commands `core-path.mjs --hooks` gives for it (#628).
+// written in or the commands `core-path.mjs --hooks` gives for it, and for a core a library carries those commands alone (#628).
 export const coreOf = text => { const core = text === null || text === undefined ? null : readCore(text); return core && !core.wrong ? core : null; };
 export function kitHooks(template = kitTemplate, core = null) {
   const copy = core?.path ?? "core/";
@@ -499,7 +499,10 @@ export function kitHooks(template = kitTemplate, core = null) {
   };
   const files = dir => Object.keys(KITS).filter(f => path.posix.dirname(f) === dir).map(f => path.posix.basename(f));
   const ids = r => [...configured(r, () => [], files).ids.values()].flatMap(set => [...set]);
-  return copy === "core/" ? ids(read) : [...new Set([...ids(read), ...ids(swapped)])];
+  // (where a library carries the core, only the commands for it are the kit's: the kit's own, with the path written in, reads
+  // the script from a path main's tree holds as a commit alone, runs nothing there and lets a session start without the
+  // floor, which the commands for a carried core stop; #628)
+  return copy === "core/" ? ids(read) : core.form === "carried" ? ids(swapped) : [...new Set([...ids(read), ...ids(swapped)])];
 }
 
 // The list a config holds: { keys, versions, from, problems }, keys the "kind name" of each well-formed entry, versions
