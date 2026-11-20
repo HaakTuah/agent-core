@@ -500,6 +500,9 @@ jobs:
       - name: The proof that a change to what runs by itself is only comments and steps' names
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/comment-only-test.mjs ')) }}
         run: node tests/comment-only-test.mjs
+      - name: The proof that a change to what runs by itself is only comments and steps' names, the script run end to end
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/comment-only-run-test.mjs ')) }}
+        run: node tests/comment-only-run-test.mjs
       - name: The proof that a change to the floor or the review guidelines only follows files the pull request moves
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/path-only-test.mjs ')) }}
         run: node tests/path-only-test.mjs
