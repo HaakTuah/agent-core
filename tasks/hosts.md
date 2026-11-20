@@ -86,3 +86,14 @@ branch's is never cancelled, and where the sign-in may not cancel, the session s
 run on a branch that will be brought up to date again is thrown away, and while it holds a slot the whole line waits.
 Held by `tests/merge-line-test.mjs`, for the runs it spares; when to cancel, by nothing yet: a queued run is no breach a
 check reads.
+
+**Where the proof is billed, an owner is told what can be done** (#397). Of a repository whose proof is billed (as
+`core/scripts/stage-order.mjs` reads it), the core sets up nothing and names two things its owner can do: run the proof
+less often, as the core does (only once a pull request is ready, in one job, and not again on a tree that passed:
+`tasks/tests.md`; #375, #376, #457), and start a runner of the owner's own, on which the host's own check runs with
+nothing billed. Such a runner is only for a repository that is not public, since a stranger's pull request would run
+code on that machine (`core/scripts/runners.mjs` advises where one does); it is started by the owner and by no session
+(floor rule 8), and runs project code only in the box the owner set up for it (floor rule 18). It does not mean a
+project is asked to have one, nor that the session's own run of the tests (`tasks/reviews.md`, "The session's own run
+comes first") is such a runner: that run is for speed and proves nothing. Reason: a private repository's bill is mostly
+the proof, and the core named no way to bring it down but running less. It describes and binds no one.

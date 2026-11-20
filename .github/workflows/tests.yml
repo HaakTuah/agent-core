@@ -459,6 +459,9 @@ jobs:
       - name: The tools reader
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/tools-read-test.mjs ')) }}
         run: node tests/tools-read-test.mjs
+      - name: The order of a pull request's checks and reviews
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/stage-order-test.mjs ')) }}
+        run: node tests/stage-order-test.mjs
       - name: The entry-files check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/entry-files-test.mjs ')) }}
         run: node tests/entry-files-test.mjs
