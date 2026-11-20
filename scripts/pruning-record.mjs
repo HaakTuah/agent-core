@@ -1,7 +1,7 @@
 // The record of the core's prunings and when one is due (split from pruning.mjs, #888; AGENTS.md, "Rules are pruned by
 // their numbers"; #303): the file RECORD and the proposals' file UNHELD, a pruning in progress (open()), whether one is
-// due (due(), said()) and the constants the list and the reader of the host both take. pruning.mjs, beside this file,
-// says what a pruning is and exports what this file and its two beside it (pruning-list.mjs, pruning-read.mjs) hold.
+// due (due(), said()) and the constants the parts share. pruning.mjs, beside this file, says what a pruning is and exports the names it
+// exported before the split, those of this file and of the two beside it (pruning-list.mjs, pruning-read.mjs).
 import fs from "node:fs";
 import path from "node:path";
 import { MEASURES } from "./outcomes.mjs";
