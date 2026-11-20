@@ -7,7 +7,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { LINK, MOST, PART, POINTER, baseRecords, checkOf, folderFaults, look, parse, records, wholeOf } from "../scripts/choices.mjs";
+import { LINK, MOST, POINTER, baseRecords, checkOf, look, parse, records, wholeOf } from "../scripts/choices.mjs";
+import { PART, folderFaults } from "../scripts/choices-folder.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0, count = 0;
