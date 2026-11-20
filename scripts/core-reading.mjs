@@ -58,14 +58,28 @@ export function record(day, root = ROOT) {
   return `${JSON.stringify({ day, read: marks }, null, 2)}\n`;
 }
 
+// The path of `file` under `cwd`, where neither it nor a folder on its way is a link: the record is read and written
+// only as a plain file of the project's own, never through a link to another file, in the project or outside it
+// (floor rule 13). It throws, with the mend, where one is.
+function plain(file, cwd) {
+  const parts = file.split("/");
+  for (let i = 1; i <= parts.length; i++) {
+    let found;
+    try { found = fs.lstatSync(path.join(cwd, ...parts.slice(0, i)), { throwIfNoEntry: false }); } catch { found = undefined; }
+    if (found?.isSymbolicLink()) throw new Error(`${file} is reached through a link (${parts.slice(0, i).join("/")}), which is read and written through by nothing here. Mend: make it a plain file of the project's own, in a plain folder, or take the link out`);
+  }
+  return path.join(cwd, file);
+}
+
 // What the command prints, run in `cwd` with `args`; it writes the record with --recorded.
 export function main(args, cwd = process.cwd()) {
-  const read = f => { const at = path.join(cwd, f); return fs.existsSync(at) ? fs.readFileSync(at, "utf8") : null; };
+  const read = f => { const at = plain(f, cwd); return fs.existsSync(at) ? fs.readFileSync(at, "utf8") : null; };
   const manifest = read("core-manifest.md");
   if (manifest === null) return "No core-manifest.md here: the core's own repository takes no copy, so it is read against nothing (#259 is its reading); run this from a project's root.";
   if (args[0] === "--recorded") {
-    fs.mkdirSync(path.join(cwd, path.dirname(RECORD)), { recursive: true });
-    fs.writeFileSync(path.join(cwd, RECORD), record(new Date().toISOString().slice(0, 10)));
+    const at = plain(RECORD, cwd);
+    fs.mkdirSync(path.dirname(at), { recursive: true });
+    fs.writeFileSync(at, record(new Date().toISOString().slice(0, 10)));
     return `${RECORD}: the reading of today is recorded, marking every rule of the copy.`;
   }
   if (args[0] === "--rules") return takenRules(rules(), manifest).map(r => r.key).join("\n");
@@ -75,5 +89,5 @@ export function main(args, cwd = process.cwd()) {
 if (started(import.meta.url)) {
   const args = process.argv.slice(2);
   if (args.length > 1 || (args[0] && !["--rules", "--recorded"].includes(args[0]))) { console.error("FAIL: the reading against the core does not know that. Mend: run it with no option, with --rules or with --recorded"); process.exitCode = 1; }
-  else try { console.log(main(args)); } catch (e) { console.error(`FAIL: what is due could not be read here (${e.message}). Mend: run it from the project's root, beside core-manifest.md`); process.exitCode = 1; }
+  else try { console.log(main(args)); } catch (e) { console.error(/Mend: /u.test(e.message) ? `FAIL: ${e.message}` : `FAIL: what is due could not be read here (${e.message}). Mend: run it from the project's root, beside core-manifest.md`); process.exitCode = 1; }
 }

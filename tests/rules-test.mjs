@@ -131,6 +131,25 @@ const commits = {
   ok(/A whole reading of the project against the core is due/.test(main([], here)), "a project with no record is asked a whole reading");
   ok(main(["--rules"], here).split("\n").includes("floor/security.md: 1. Nothing secret in the repository"), "--rules lists every rule it takes, by its key");
   ok(/recorded/.test(main(["--recorded"], here)) && fs.existsSync(path.join(here, RECORD)) && /No reading of the project against the core is due/.test(main([], here)), "--recorded writes the record, and then nothing is due");
+  // (a record, or its folder, reached through a link is never written through: #961's review)
+  const outside = path.join(here, "..", `${path.basename(here)}-outside.json`);
+  fs.writeFileSync(outside, "kept\n");
+  fs.rmSync(path.join(here, RECORD));
+  let canLink = true;
+  try { fs.symlinkSync(outside, path.join(here, RECORD)); } catch { canLink = false; }
+  if (!canLink) console.log("skip the links: this machine lets the test make none");
+  else {
+  let refused = "";
+  try { main(["--recorded"], here); } catch (e) { refused = e.message; }
+  ok(mended(`FAIL: ${refused}`) && /reached through a link/.test(refused) && fs.readFileSync(outside, "utf8") === "kept\n", "a record that is a link is refused, with its mend, and what it leads to is left as it was", refused);
+  fs.rmSync(path.join(here, "checks"), { recursive: true });
+  fs.mkdirSync(path.join(here, "elsewhere"));
+  fs.symlinkSync(path.join(here, "elsewhere"), path.join(here, "checks"), "dir");
+  refused = "";
+  try { main(["--recorded"], here); } catch (e) { refused = e.message; }
+  ok(/reached through a link \(checks\)/.test(refused) && !fs.readdirSync(path.join(here, "elsewhere")).length, "and so is one whose folder is a link, writing nothing", refused);
+  }
+  fs.rmSync(outside, { force: true });
   // (the command's own exit code and failure line, which only a process shows)
   const wrong = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/core-reading.mjs", import.meta.url)), "--all"], { cwd: here, encoding: "utf8" });
   ok(wrong.status === 1 && mended(wrong.stderr.trim()), "an option it does not know fails, with its mend", wrong.stderr);
