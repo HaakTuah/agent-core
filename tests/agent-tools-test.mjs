@@ -115,13 +115,78 @@ passes(run(project()), "a project as the starter kit writes it, with no list, pa
   const forms = [line, `Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n`].flatMap(l => Object.values(hookCommands(readCore(l))));
   ok(forms.length === 6 && forms.every(kitForm), "the commands for a copy at another path, and for a core a library carries, are in the kit's form", forms.filter(c => !kitForm(c)).join("\n"));
   const start = hookCommands(readCore(`Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n`)).stop;
-  ok(![start.replace('--git-dir="${CLAUDE_PROJECT_DIR:-.}"/lib/.git', '--git-dir="${CLAUDE_PROJECT_DIR:-.}"/other/.git'), start.replace(" 2>/dev/null; }) || exit 0", "; }) || exit 0; rm -rf x"), start.replace("refs/remotes/origin/main:lib", "HEAD:lib"), start.replace('--git-dir="${CLAUDE_PROJECT_DIR:-.}"/lib/.git', '-C "${CLAUDE_PROJECT_DIR:-.}"/lib')].some(kitForm),
-    "and a variation of them that reads the library's file from another folder or from the working tree, runs more, or lets git find a bare repository a branch committed in the library's place, is not");
+  const own = '${CLAUDE_PROJECT_DIR:-.}';
+  const variants = [start.replace("modules/lib", "modules/other"), start.replace(" 2>/dev/null; }) || exit 0", "; }) || exit 0; rm -rf x"), start.replace("refs/remotes/origin/main:lib", "HEAD:lib"), start.replace(`git -C "${own}" --git-dir="$m"`, `git -C "${own}"/lib`),
+    start.replace(`git -C "${own}" --git-dir="$m"`, `git --git-dir="${own}"/lib/.git`), start.replace('"$s:core/scripts/work-saved.sh"', '"$s:core/scripts/other.sh"'), start.replace("main:lib 2>", "main:other 2>").replace("modules/lib", "modules/other")];
+  ok(variants.every(v => v !== start) && !variants.some(kitForm),
+    "and a variation of them that reads the library's file from another folder or from the working tree, runs more, lets git find a repository a branch committed in the library's place, or shows another file of the library's commit than the one fetched first, is not");
   // (a core a library carries: the same)
   const carried = `Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n`, forCarried = JSON.parse(KIT), commandsFor = hookCommands(readCore(carried));
   forCarried.hooks.SessionStart[0].hooks[0].command = commandsFor.start; forCarried.hooks.PreToolUse[0].hooks[0].command = commandsFor.helper; forCarried.hooks.Stop[0].hooks[0].command = commandsFor.stop;
   passes(run(project({ "core-manifest.md": carried, ".claude/settings.json": forCarried, "checks/licences.json": empty })), "for a core a library carries, the commands core-path.mjs gives for it are the kit's own");
   fails(run(project({ "core-manifest.md": carried, ".claude/settings.json": KIT.replaceAll("origin/main:core/", "origin/main:lib/core/"), "checks/licences.json": empty })), "for a core a library carries, the kit's hooks with the path written in are not the kit's own either", "is not listed");
+  // (a variation of the commands that shows another file of the library's commit than the one fetched first, or git run in
+  // the library's folder: not the kit's hooks, fails, #930)
+  for (const [variant, what] of [[commandsFor.start.replace('"$s:core/scripts/work-saved.sh"', '"$s:core/scripts/other.sh"'), "a fallback that shows another file of the library's commit than the one fetched first"],
+    [commandsFor.start.replace('git -C "${CLAUDE_PROJECT_DIR:-.}" --git-dir="$m"', 'git -C "${CLAUDE_PROJECT_DIR:-.}"/lib'), "one that runs git in the library's folder"]]) {
+    const given = JSON.parse(KIT); given.hooks.SessionStart[0].hooks[0].command = variant;
+    fails(run(project({ "core-manifest.md": carried, ".claude/settings.json": given, "checks/licences.json": empty })), `${what} is not the kit's own`, "is not listed");
+  }
+  // (what the library's commit main pins holds at the script a carried core's hook reads: git prints a link's target, which
+  // bash runs as a command; the check reads it in the superproject's own module repository, as the hook does, #930)
+  const gitf = (dir, ...args) => execFileSync("git", ["-c", "protocol.file.allow=always", ...args], { cwd: dir, env, encoding: "utf8" }).trim();
+  const library = () => {
+    const lib = fs.mkdtempSync(path.join(os.tmpdir(), "agent-tools-lib-"));
+    made.push(lib);
+    git(lib, "init", "-q", "-b", "main");
+    const commit = files => { change(lib, files); git(lib, "add", "-A"); git(lib, "commit", "-q", "-m", "library"); return git(lib, "rev-parse", "HEAD"); };
+    return { lib, commit };
+  };
+  if (LINKS) {
+    const good = { "core/scripts/work-saved.sh": "echo saved\n", "core/scripts/helper-call.mjs": "// helper\n" };
+    const { lib, commit } = library();
+    commit(good);
+    const linkedScript = commit({ ...good, "core/scripts/work-saved.sh": link("../../../elsewhere.sh") });
+    const plainAgain = commit(good);
+    const carriedProject = () => {
+      const dir = project({ "core-manifest.md": carried, ".claude/settings.json": forCarried, "checks/licences.json": empty });
+      gitf(dir, "submodule", "add", "-q", lib, "lib");
+      gitf(dir, "submodule", "update", "--init", "-q");
+      git(dir, "commit", "-q", "-m", "the library, pinned at its newest commit");
+      return dir;
+    };
+    // (the library pinned at `to` by a pull request, as a bump of it: the base holds the earlier pin)
+    const bump = (dir, to, files = {}) => {
+      git(dir, "checkout", "-q", "-B", "change");
+      gitf(path.join(dir, "lib"), "checkout", "-q", to);
+      change(dir, files);
+      git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "bump");
+      git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change");
+      return dir;
+    };
+    // (the submodule's files left out of the working tree, as a checkout that brings in no submodule leaves them: the check
+    // reads the commit main pins, never the folder; its module repository stays where git keeps it)
+    const bare = dir => { for (const f of fs.readdirSync(path.join(dir, "lib"))) fs.rmSync(path.join(dir, "lib", f), { recursive: true, force: true }); return dir; };
+    const first = git(lib, "rev-parse", "HEAD~2");
+    const pinned = () => { const dir = carriedProject(); bump(dir, first); return dir; };
+    passes(run(bare(bump(pinned(), plainAgain))), "a carried core whose pinned commit holds the hooks' scripts as plain files passes");
+    const SAYS = 'reads "core/scripts/work-saved.sh" from the commit of "lib" that main pins, which holds it as no plain file';
+    fails(run(bare(bump(pinned(), linkedScript))), "a carried core whose pinned commit holds the hook's script as a link fails", SAYS, 'make "core/scripts/work-saved.sh" a plain file committed in "lib"');
+    // (a hook of the base's, held before: noted, as one that stood is; and with the library's objects not at hand: said, never failed)
+    const standing = bare(bump(bump(pinned(), linkedScript), linkedScript, { "README.md": "a change of its own\n" }));
+    const stood = run(standing);
+    ok(stood.status === 0 && stood.out.includes(SAYS), "one the base held is noted, not failed", stood.out);
+    const away = bare(bump(pinned(), linkedScript));
+    fs.rmSync(path.join(away, ".git", "modules", "lib"), { recursive: true, force: true });
+    const unread = run(away);
+    ok(unread.status === 0 && unread.out.includes("not read:") && unread.out.includes("git submodule update --init lib"), "where the submodule's repository is not at hand, the file is said not read, never failed", unread.out);
+    // (the library's folder itself a link in the branch's commit: the folder it leads to is the branch's to choose)
+    const asLink = pinned();
+    git(asLink, "checkout", "-q", "-B", "change"); git(asLink, "rm", "-q", "-f", "lib");
+    change(asLink, { lib: link("../elsewhere") });
+    git(asLink, "add", "-A", "-f"); git(asLink, "commit", "-q", "-m", "lib as a link"); git(asLink, "checkout", "-q", "main"); git(asLink, "merge", "-q", "--no-ff", "-m", "merge", "change");
+    fails(run(asLink), "a carried core whose library's folder is committed as a link fails", 'reads "core/scripts/work-saved.sh" from the library "lib", which this project commits as a link', 'commit "lib" as the submodule that carries the core');
+  }
 }
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } })), "and with an empty list");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } }), "--core"), "in the core's own repository too");

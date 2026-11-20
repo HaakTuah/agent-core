@@ -433,7 +433,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   beside the floor's and the modules'. Nothing changes it. It does not mean the share is a target, nor that a check the
   core's list names (a ruleset of the host's) is read as set up in the project. Reason: the owner sees how much of what
   binds a project a check holds there, which a count of the core alone hides. Held by `tests/look-test.mjs` and
-  `tests/holders-test.mjs`; the core's own count, by none yet (#925).
+  `tests/holders-test.mjs`, the core's own count included (#925).
 - **Staged cases hold what no check reads** (#235). By default a rule is held by a check; where none
   can read its breach exactly, since the breach lies in what a session does, a staged case holds it: a scratch project
   (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by

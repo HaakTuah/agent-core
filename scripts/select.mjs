@@ -11,7 +11,8 @@
 // a changed file is no code the readers read and no test, a file that is gone, C# (whose types are reached by their
 // full names too, with no using directive), a script of the global space, or anything the config does not name
 // under "select.none" (the files no test reads), the whole suite runs, and so it does where no base is told (on main, on
-// a schedule, before a release) and where the shape check's config cannot be read. A fault the whole suite finds that
+// a schedule, before a release), where the shape check's config cannot be read and where the files the change holds are
+// more than the readers take in time (hurry.mjs). A fault the whole suite finds that
 // the selection left out is a fault of this map, mended at once.
 //
 // The config is the shape check's (shape.mjs, where()): its "code", "tests", "aliases" and "select" ({ "proof",
@@ -39,6 +40,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE } from "./code-shape.mjs";
 import { logged } from "./guards.mjs";
+import { WORDS, mentioned, nameTrie } from "./name-trie.mjs";
+import { Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { isCode } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
@@ -47,7 +50,6 @@ class Refused extends Error {}
 const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
 const git = args => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
 const PLAIN = /^[\w@+.,=-][\w@+./,=-]*$/u;
-const escaped = s => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 // A pattern as a list of steps, matched by walking every step a path could stand at at once, so a match takes time in
 // proportion to the path's length times the pattern's, whatever runs of wildcards it holds: each step is a character
@@ -129,12 +131,21 @@ const uncommented = (text, py) => text.split("\n").filter(l => !(py ? /^\s*#/u :
 const above = (name, file, texts) => ["", ...file.split("/").slice(0, -1).map((_, k, dirs) => `${dirs.slice(0, k + 1).join("/")}/`)].map(d => `${d}${name}`).filter(f => f !== file && f in texts);
 // A file of Python by its dotted name too ("pkg.rules"; a package's own for __init__.py and __main__.py).
 const dotted = f => f.replace(/\.py$/u, "").replace(/\/(__init__|__main__)$/u, "").split("/").join(".");
-export function links(texts, tests, reach) {
-  const named = Object.keys(texts).map(f => [f, new RegExp(`(^|[^\\w-])${escaped(path.posix.basename(f))}(?![\\w-])${f.endsWith(".py") && dotted(f).includes(".") ? `|(^|[^\\w.])${escaped(dotted(f))}(?![\\w])` : ""}`, "u")]);
+export function links(texts, tests, reach, pace = () => {}) {
+  // (each name tried on each text took time in step with the count of names times the count of texts: the names are held in
+  // a trie, walked once over each text, name-trie.mjs)
+  const byName = nameTrie(Object.keys(texts).map(f => [path.posix.basename(f), f]));
+  const byDotted = nameTrie(Object.keys(texts).filter(f => f.endsWith(".py") && dotted(f).includes(".")).map(f => [dotted(f), f]));
   const out = new Map();
   for (const [file, text] of Object.entries(texts)) {
+    pace();
     const to = new Set(reach.get(file) ?? []), py = file.endsWith(".py");
-    if (py || CODE.includes(path.posix.extname(file))) { const plain = uncommented(text, py); for (const [f, re] of named) if (f !== file && re.test(plain)) to.add(f); }
+    if (py || CODE.includes(path.posix.extname(file))) {
+      // (a Python module's dotted name is looked for in every text of code, as its pattern was, JavaScript's that starts `python -m` too)
+      const plain = uncommented(text, py), named = mentioned(byName, plain, WORDS.name, pace);
+      for (const f of mentioned(byDotted, plain, WORDS.dotted, pace)) named.add(f);
+      for (const f of named) if (f !== file) to.add(f);
+    }
     // (Python runs a package's __init__.py on each import under it, and pytest a folder's conftest.py with no import)
     if (py) for (const run of [...above("__init__.py", file, texts), ...above("conftest.py", file, texts)]) to.add(run);
     out.set(file, to);
@@ -142,12 +153,15 @@ export function links(texts, tests, reach) {
   return out;
 }
 
-// The files each test reaches, the test itself among them.
-export function reached(tests, linked) {
+// The files each test reaches, the test itself among them; `pace` is asked as the search goes (every 256 files taken off a
+// test's queue, so that many tests over many links take only the time the watch allows).
+export function reached(tests, linked, pace = () => {}) {
   const out = new Map();
+  let steps = 0;
   for (const t of tests) {
+    pace();
     const seen = new Set([t]), queue = [t];
-    while (queue.length) for (const next of linked.get(queue.pop()) ?? []) if (!seen.has(next)) { seen.add(next); queue.push(next); }
+    while (queue.length) { if (++steps % 256 === 0) pace(); for (const next of linked.get(queue.pop()) ?? []) if (!seen.has(next)) { seen.add(next); queue.push(next); } }
     out.set(t, seen);
   }
   return out;
@@ -156,14 +170,17 @@ export function reached(tests, linked) {
 // What a pull request runs: { all, why, tests }, `why` the reason for the whole suite, or for each test selected.
 // `changed` the paths it changes (gone ones among them), `texts` and `tests` the project as the shape check reads it,
 // `reach` its imports, `failed` the tests that failed last time, `config` the shape check's.
-export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), unread = [], failed = [], config }) {
+export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), unread = [], failed = [], config, watch = null }) {
   const proof = matcher(config.select.proof), m = { whole: matcher(config.select.whole), none: matcher(config.select.none), isTest: matcher(config.tests) };
   const by = new Map(), add = (t, why) => { if (tests.has(t) && !by.has(t)) by.set(t, why); };
-  const reaches = reached(tests, links(texts, tests, reach));
+  const pace = watch?.pace(); // (one budget for the linking and the search from each test)
+  const reaches = reached(tests, links(texts, tests, reach, pace), pace);
   // (a test that reaches an import the readers cannot follow may reach any file: it runs as one that reaches every file)
   // (and, where pytest runs a conftest.py the config does not read, each test of Python, whose fixtures may come from it)
   const blind = new Set([...reaches].filter(([t, files]) => [...files].some(f => unsure.has(f)) || (t.endsWith(".py") && unread.some(c => c.endsWith("conftest.py")))).map(([t]) => t));
-  const ctx = { texts, tests, scripts, add, reaches, ...m, whole: t => m.whole(t) || blind.has(t) };
+  // (the tests that reach every file, told once: the config's pathspecs are tried on each test, never on each changed file's account)
+  let every = null;
+  const ctx = { texts, tests, scripts, add, reaches, ...m, wholes: () => (every ??= [...tests].filter(t => m.whole(t) || blind.has(t))) };
   for (const t of tests) if (proof(t)) add(t, "never selected out: the project's proof that behaviour was kept");
   for (const t of failed) add(t, "failed last time");
   for (const f of changed) {
@@ -174,7 +191,7 @@ export function selection({ changed, texts, tests, reach, scripts = new Set(), u
 }
 
 // What one changed file selects, through `ctx.add`; the reason the whole suite runs where its reach cannot be told.
-function oneChange(f, { texts, tests, scripts, add, reaches, whole, none, isTest }) {
+function oneChange(f, { texts, tests, scripts, add, reaches, wholes, none, isTest }) {
   if (none(f)) return null;
   if (isTest(f) && tests.has(f)) add(f, "added or changed"); // (and, a helper among the tests, what imports it)
   // (a file gone, a helper among the tests too, leaves no import to follow; a package's manifest, read beside the code,
@@ -183,7 +200,7 @@ function oneChange(f, { texts, tests, scripts, add, reaches, whole, none, isTest
   // (C# reaches a type by its full name with no using directive, and a script of the global space by no import at all)
   if (f.endsWith(".cs") || f.endsWith(".d.ts") || scripts.has(f)) return `${f} is C#, a declaration of types, or a script of the global space, whose users no import names, so what reaches it cannot be told`;
   for (const [t, files] of reaches) if (files.has(f)) add(t, `reaches ${f}`);
-  if (!isTest(f)) for (const t of tests) if (whole(t)) add(t, `reaches every file (${f})`); // (a test's own file is no file of the project's a whole run tests)
+  if (!isTest(f)) for (const t of wholes()) add(t, `reaches every file (${f})`); // (a test's own file is no file of the project's a whole run tests)
   return null;
 }
 
@@ -276,6 +293,14 @@ async function askHost(sha, check) {
   } catch (e) { return `the host could not be asked: ${String(e?.message ?? e).slice(0, 80)}`; }
 }
 
+// What the change from `from` selects, or the whole suite where the files it changes are too many or too slow to read
+// within the time rule 5 of SECURITY.md allows (hurry.mjs; #881).
+function selectedFrom(from, { now, config, failed }) {
+  const changed = changedSince(from), watch = hurry({ files: new Set(changed) });
+  try { return selection({ changed, texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests, watch)), unread: unreadConftests(now.texts), failed, config, watch }); }
+  catch (e) { if (e instanceof Late) return { all: true, why: e.message, tests: [...now.tests].sort() }; throw e; }
+}
+
 // What a run takes, { all, why, tests }: the whole suite where the config cannot be read or no base is told, what the
 // change from the base selects, or, on a push given --passed (`passed`), nothing where the merged tree passed whole.
 async function chosen({ config, at, base, passed, select }) {
@@ -293,7 +318,7 @@ async function main(argv) {
   const rules = ["core-manifest.md", "AGENTS.md"].find(f => fs.existsSync(f));
   const at = named ?? where(rules ? fs.readFileSync(rules, "utf8") : ""), base = baseOf(), config = configOf(at);
   const now = config ? standing(config) : null, failed = readFailed(opts["--failed"]);
-  const s = await chosen({ config, at, base, passed: opts["--passed"], select: from => selection({ changed: changedSince(from), texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests)), unread: unreadConftests(now.texts), failed, config }) });
+  const s = await chosen({ config, at, base, passed: opts["--passed"], select: from => selectedFrom(from, { now, config, failed }) });
   // (a name the variable cannot hold as one word, a space or a line's end in it, runs the whole suite: no file's name
   // sets another variable for the steps after it)
   if (!s.all && s.tests.some(t => !PLAIN.test(t))) Object.assign(s, { all: true, why: "a test's file name holds what a list of names cannot (a space or a line's end)" });

@@ -7,6 +7,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
+| #954 | rule builder; `tests.yml` | |
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #810 | the orchestrator, for its done-when: reads `main`'s runs, then closes it | a stretch of merges landing faster than a run; at the batch's end, if none came, the orchestrator reads `main`'s runs since #813 and closes #810 on that |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | #715 |
@@ -14,10 +15,8 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #704 | builder; `tests.yml` | #715 |
 | #770 | builder; `tests.yml` | #704 |
 | #772 | builder; `tests.yml` | #770 |
-| #628 | builder | |
 | #629 | builder | #624 |
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
-| #579 | builder | |
 | #580 | builder | |
 | #582 | builder | |
 | #584 | rule builder | |
@@ -72,7 +71,6 @@ They read and change no rule.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #732 | builder; a faster check | |
-| #711 | builder; `tests.yml` | #897 |
 | #550 | builder; a case a PR | |
 | #765 | builder | |
 | #809 | builder | |

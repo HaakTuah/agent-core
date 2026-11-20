@@ -4,6 +4,7 @@
 // staged in the project licence-scan-stage.mjs writes, and each failing for the reason it names. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/licence-fetch-test.mjs
+import { fetched } from "../scripts/licence-commands.mjs";
 import { LOCK, append, done, entry, handAudited, json, ok, run, write } from "../scripts/licence-scan-stage.mjs";
 
 for (const [what, change, why] of [
@@ -205,5 +206,24 @@ for (const [what, change, why] of [
   ["npx in a page's script left open", write("site/moss.html", "<p>moss</p>\n<script>\nexecSync('npx -y mossgrip-cli');\n"), /cannot be audited/],
   ["npx in a config with comments", write("site/jsconfig.json", "{\n  // a comment\n  \"run\": \"npx -y mossgrip-cli\"\n}\n"), /cannot be audited/],
 ]) { const f = run(change); ok(f.some((m) => why.test(m)), `fails on ${what}`, f.join("\n") || "(it passed)"); }
+
+// The command reader on its own (fetched): what a line's words are read as, past a comment, a redirection, quotes and
+// the spelling of Windows, and which words say it fetches from another registry or config than npm's.
+const ANOTHER = /another registry/;
+for (const [line, literal, specs, unreadable] of [
+  ["pnpm install --registry https://x y", false, []],
+  ["npm i --no-registry y", false, ["y"]], ["npm i -registry y", false, [], ANOTHER], ["npm i --@moss-co:registry=u y", false, [], ANOTHER],
+  ["npm i foo--replace-registry-host", false, ["foo--replace-registry-host"]], ["npm i --replace-registry-host=all y", false, [], ANOTHER],
+  ["npm i --userconfig=x y", false, [], ANOTHER], ["npm i --globalconfig x y", false, [], ANOTHER], ["npm i y --no-userconfig", false, ["y"]],
+  ["npm i y npm_config_userconfig=x", false, [], ANOTHER], ["npm i y npm_config_cache=z", false, ["y", "npm_config_cache=z"]],
+  ["npm i a # c b", false, ["a"]], ["npm i a //c b", false, ["a"]], ["npm i a #c b", true, ["a", "#c", "b"]], ["npm i 'a #c' b", false, ["a", "#c", "b"]],
+  ["npm i a > log b", false, ["a", "b"]], ["npm i a 2>log b", false, ["a", "b"]], ["npm i a &>log", false, ["a"]], ["npm i a >&2 b", false, ["a", "b"]],
+  ["npm i a <in b", false, ["a", "b"]], ["npm i a x<in b", false, ["a", "x<in", "b"]], ["npm i a >log2 b >", true, ["a", ">log2", "b", ">"]],
+  ["npm ' + 'install x", false, ["x"]], ["npm i ('a'),", false, ["a"]], ["NPM.CMD i x", false, ["x"]], ["npx.cmd -y y", false, ["y"]],
+  ["npm\ti  x", false, ["x"]], ["  npm i  x  ", false, ["x"]],
+]) {
+  const got = fetched(line, false, literal);
+  ok(JSON.stringify(got.specs) === JSON.stringify(specs) && (unreadable ? unreadable.test(got.unreadable ?? "") : got.unreadable === undefined), `fetched reads "${line}" as ${unreadable ? "unreadable" : JSON.stringify(specs)}`, JSON.stringify(got));
+}
 
 done();
