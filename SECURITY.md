@@ -91,7 +91,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      pointer check by lychee (`scripts/links.mjs`, the tool fetched at set-up by `scripts/lychee.sh`
      and run on the runners alone, offline and from an empty folder, so that no config of the project's is read), the
      file a link leads to held by the check to what git tracks in the project, one out of it failing; limits: 120 s for
-     each of its runs, past which it is said unread and the core's own reading stands in; hostile tests:
+     each of its runs, past which the head's links are said unread and the core's own reading stands in, and the base's
+     are said unread and each finding is only noted; the base is written from git's own blobs, no link followed and no
+     attribute applied, and lychee is given only Markdown files whose names hold no control character; hostile tests:
      `tests/links-test.mjs`.
    - a project's build, package and workflow files: read by the licence, exact-versions, NuGet, workflow and agent-tools
      checks and the reader of where the tests run (`scripts/licences.mjs`, `scripts/exact-versions.mjs`,

@@ -51,11 +51,12 @@ ok(compared([out("../away.md")], [out("../../x/away.md")]).fails.length === 0 &&
   "a link out of the project the base held in the same file is noted, though the base's tree stands in another folder; one in another file fails");
 
 // The pointer check end to end, with a stand-in for lychee: it lists each [text](path) of a file as lychee's --dump does,
-// and reports each "#heading" whose file holds no such heading as lychee's --include-fragments does
+// and reports each "#heading" whose file holds no such heading as lychee's --include-fragments does; in a file that is no
+// Markdown it reads no such link, as lychee reads it as plain text
 const FAKE = `import fs from "node:fs"; import path from "node:path"; import { pathToFileURL } from "node:url";
 const a = process.argv.slice(2), root = a[a.indexOf("--root-dir") + 1];
 if (process.env.FAKE_LYCHEE_FAIL) { console.error("it broke"); process.exit(1); }
-const links = file => [...fs.readFileSync(file, "utf8").matchAll(/\\]\\(([^)\\s]+)\\)/g)].map(m => m[1]).filter(l => !/^[a-z]+:/i.test(l))
+const links = file => !/\\.md$/.test(file) ? [] : [...fs.readFileSync(file, "utf8").matchAll(/\\]\\(([^)\\s]+)\\)/g)].map(m => m[1]).filter(l => !/^[a-z]+:/i.test(l))
   .map(l => { const [p, h] = l.split("#"); const at = p === "" ? file : p.startsWith("/") ? path.join(root, p) : path.resolve(path.dirname(file), p); return { href: pathToFileURL(at).href + (h ? "#" + h : ""), at, h }; });
 if (a.includes("--dump")) { for (const l of links(a.at(-1))) console.log(l.href); process.exit(0); }
 const errors = {};
