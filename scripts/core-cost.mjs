@@ -21,6 +21,7 @@
 //
 //   node core/scripts/core-cost.mjs [--since YYYY-MM-DD] [--split YYYY-MM-DD] [--cost] [--cap] [--pulls <n,n,...>]
 import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
@@ -191,12 +192,28 @@ export function repoOf() {
 export const EVERY = { includes: () => true };
 export const rulesFor = (repo, read = ruleFiles) => (repo === CORE ? EVERY : read());
 
+// Why the merges cannot all be read from this clone, or null where they can: a shallow clone holds no merge older than
+// its boundary, and a count from it would pass a part for the whole (#1027). It is shallow and `since` is no day after
+// its newest boundary commit (the clone then holds every merge from `since` on), or none is given. The mend is the
+// words of the failure; the clone is never deepened here, since a reader changes nothing.
+export function shallowGap(since = null) {
+  if (git(["rev-parse", "--is-shallow-repository"]).trim() !== "true") return null;
+  const file = git(["rev-parse", "--git-path", "shallow"]).trim();
+  const days = (existsSync(file) ? readFileSync(file, "utf8").split("\n").filter(Boolean) : [])
+    .map(sha => dayOf(git(["log", "-1", "--format=%cI", sha]).trim()));
+  const newest = days.sort().at(-1);
+  if (since && newest && since > newest) return null;
+  return `the clone is shallow, so it holds no merge older than its boundary${newest ? ` (${newest})` : ""}${since ? ` and --since ${since} reaches before it` : ""}, and a count from it would pass a part for the whole. Mend: run git fetch --unshallow in this clone, then run the command again`;
+}
+
 // The pull requests merged into the default branch from `since` (a day, or none), as { number, when, kind, lines },
 // and the repository ({ repo, merged }): read from the clone the process runs in, whose root is its directory. It
 // throws where the clone knows no default branch. Without a repository no branch counts as Dependabot's, which it says.
 export function mergedPulls(rules, since = null) {
   const ref = defaultRef(name => { try { git(["rev-parse", "--verify", "--quiet", `${name}^{commit}`]); return true; } catch { return false; } });
   if (!ref) throw new Error("the clone knows no default branch: neither origin's, nor a main of origin's or of its own");
+  const gap = shallowGap(since);
+  if (gap) throw new Error(gap);
   const log = git(["log", "--first-parent", "--merges", "--format=%H%x09%cI%x09%s", ...(since ? [`--since=${since}T00:00:00Z`] : []), ref]);
   const repo = repoOf();
   // (said, never passed over: without it no branch counts as Dependabot's, and its merges count by what they changed)

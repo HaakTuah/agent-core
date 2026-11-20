@@ -3,7 +3,12 @@
 // to git and gh are the program's own and are not made here.
 //
 //   node tests/core-cost-test.mjs
-import { CAP_DAYS, EVERY, REPO, cap, classify, pullsOf, sumOf, summed, sums, rulesFor, dayOf, defaultRef, median, priced, print, reading, readings, sessionOf, table, weekOf } from "../scripts/core-cost.mjs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { mended } from "../scripts/mend.mjs";
+import { CAP_DAYS, mergedPulls, shallowGap, EVERY, REPO, cap, classify, pullsOf, sumOf, summed, sums, rulesFor, dayOf, defaultRef, median, priced, print, reading, readings, sessionOf, table, weekOf } from "../scripts/core-cost.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { line } from "../scripts/session-cost.mjs";
 
@@ -86,6 +91,34 @@ ok(rows.length === 2 && rows[0].key === "week of 2026-11-02" && rows[1].all === 
 const text = print(rows, true).split("\n");
 ok(text.length === 3 && /\b50%/.test(text[2]) && /\b0%/.test(text[1]) && text[2].includes("30 (of 1)") && text[2].includes("80 (of 1)") && text[2].includes("3 of 4"), "the table: the core's share is its syncs and upkeep of all merged, and each median says of how many", text.join("\n     "));
 ok(!print(rows, false).includes("answers"), "without --cost the table says nothing of cost");
+
+// A shallow clone holds only the merges after its boundary: a reader says so, with its mend, never counts a part as the whole (#1027).
+{
+  const dir = mkdtempSync(join(tmpdir(), "shallow-")), here = process.cwd();
+  const run = (cwd, ...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  try {
+    const src = join(dir, "src");
+    run(dir, "init", "-q", "-b", "main", src);
+    run(src, "commit", "-q", "--allow-empty", "-m", "root");
+    for (const [n, day] of [[1, "2026-11-01"], [2, "2026-11-05"], [3, "2026-11-10"], [4, "2026-11-15"]]) {
+      const env = { ...process.env, GIT_COMMITTER_DATE: `${day}T12:00:00Z`, GIT_AUTHOR_DATE: `${day}T12:00:00Z` }, ident = ["-c", "user.name=t", "-c", "user.email=t@example.invalid"];
+      const dated = (...args) => execFileSync("git", [...ident, ...args], { cwd: src, env, stdio: "ignore" });
+      dated("switch", "-q", "-c", `b${n}`); dated("commit", "-q", "--allow-empty", "-m", `work ${n}`); dated("switch", "-q", "main");
+      dated("merge", "-q", "--no-ff", `b${n}`, "-m", `Merge pull request #${n} from o/b${n}`);
+    }
+    run(dir, "clone", "-q", `file://${src}`, "full");
+    run(dir, "clone", "-q", "--depth", "2", `file://${src}`, "shallow");
+    process.chdir(join(dir, "full"));
+    ok(shallowGap() === null && mergedPulls([]).merged.length === 4, "a full clone is read whole, with no word of a gap");
+    process.chdir(join(dir, "shallow"));
+    const gap = shallowGap(), early = shallowGap("2026-11-02"), late = shallowGap("2026-11-16");
+    ok(typeof gap === "string" && mended(`FAIL: ${gap}`) && gap.includes("git fetch --unshallow"), "a shallow clone read whole says it could not read every merge, and its mend", gap);
+    ok(typeof early === "string" && early.includes("--since 2026-11-02") && late === null, "a --since before the boundary says so, one after it is read", `${early} / ${late}`);
+    let thrown = "";
+    try { mergedPulls([]); } catch (e) { thrown = e.message; }
+    ok(thrown === gap, "mergedPulls throws it rather than count the merges the clone holds as all of them", thrown);
+  } finally { process.chdir(here); rmSync(dir, { recursive: true, force: true }); }
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the core's measurement`);
 process.exitCode = failed ? 1 : 0;
