@@ -108,7 +108,7 @@ export function textAt(root, rev, file) {
     if (at === "." || at === "./") return showAt(root, rev, file);
   }
   const reply = ask(`${dir}\0true\0text`, [`--git-dir=${dir}`, "cat-file", "--batch"], `${rev}:${at}`, true);
-  if (reply.failed || (reply.type && reply.type !== "blob") || reply.body === undefined && !reply.missing) return showAt(root, rev, file);
+  if ((reply.type && reply.type !== "blob") || (reply.body === undefined && !reply.missing)) return showAt(root, rev, file);
   return reply.missing ? null : Buffer.from(reply.body.buffer, reply.body.byteOffset, reply.body.byteLength).toString("utf8");
 }
 
