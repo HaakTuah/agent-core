@@ -3,7 +3,7 @@
 // change is refused, with its mend. Pure: it gives the proof what git would, and starts no process.
 //
 //   node tests/path-only-test.mjs
-import { INVALID, ROOTS, WORKFLOW, failure, foldersOf, follows, ownFiles, spellings, tokens, verdicts } from "../scripts/path-only.mjs";
+import { INVALID, ROOTS, SETUP, WORKFLOW, decides, failure, foldersOf, follows, ownFiles, spellings, tokens, verdicts } from "../scripts/path-only.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0, count = 0;
@@ -34,12 +34,15 @@ ok(follows("scripts/tools-old and scripts/tools.json", "scripts/kit-old and scri
 ok(tokens("a b", []).length === 1 && tokens("x scripts/kit/a.mjs y", ["scripts/kit", "scripts/kit/a.mjs"]).join("|") === "x |scripts/kit/a.mjs| y", "the longest path is read first");
 ok(JSON.stringify(foldersOf("scripts/tools/a.mjs", "scripts/kit/a.mjs")) === JSON.stringify([{ from: "scripts/tools", to: "scripts/kit" }]) && foldersOf("a.mjs", "b.mjs").length === 0 && foldersOf("x/a.mjs", "y/b.mjs").length === 0, "a file's move moves the folders whose trailing parts it shares");
 const words = [{ from: "tests", to: "opinions", folder: true }, { from: "tests/a.mjs", to: "opinions/a.mjs" }, { from: "and/or", to: "and/nor" }];
-ok(follows("tests prove it, and/or", "opinions prove it, and/nor", spellings(words)) !== null && follows("see `tests` and tests/", "see `opinions` and opinions/", spellings(words)) === null, "a word of prose is no path: a name with no \"/\", or with no extension or closing \"/\", is read only between backticks");
+ok(follows("tests prove it, and/or", "opinions prove it, and/nor", spellings(words)) !== null && follows("see `tests/` and tests/", "see `opinions/` and opinions/", spellings(words)) === null, "a word of prose is no path: a name with no \"/\", or with no extension or closing \"/\", is read only between backticks");
+const planted = [{ from: "scripts/main", to: "scripts/dev", unique: true }, { from: "main", to: "dev", folder: true }, { from: "main/a.txt", to: "dev/a.txt" }];
+ok(follows("**12. `main` is the owners'.**", "**12. `dev` is the owners'.**", spellings(planted)) !== null && follows("see `scripts/main` and `main/`", "see `scripts/dev` and `dev/`", spellings(planted)) === null, "a plain word between backticks is no path: a file or folder planted under its name and moved rewrites nothing; a folder is read only with a \"/\"");
 ok(spellings([{ from: "tests", to: "tests later, not", folder: true }, { from: "a/b.md", to: "a/b\u0301.md" }]).size === 0, "a move whose path holds a space, a comma or a letter beyond ASCII justifies no pointer");
 ok(refused(one(INVALID), /no UTF-8/u), "a side that is no UTF-8 text is refused, since two different bytes would read alike");
-const graph = { "scripts/pr-description.mjs": 'import { a } from "./owner-yes.mjs";\nimport "./whole-output.mjs";', "scripts/owner-yes.mjs": 'export { b } from "./reading.mjs";', "scripts/path-only.mjs": 'import { asks } from "./owner-yes.mjs";' };
+const graph = { "scripts/install.mjs": 'import { INSTALLS } from "./packages.mjs";', "scripts/pr-description.mjs": 'import { a } from "./owner-yes.mjs";\nimport "./whole-output.mjs";', "scripts/owner-yes.mjs": 'export { b } from "./reading.mjs";', "scripts/path-only.mjs": 'import { asks } from "./owner-yes.mjs";' };
 const own = ownFiles(p => graph[p] ?? null);
-ok(ROOTS.every(r => own.has(r)) && own.has(WORKFLOW) && ["scripts/owner-yes.mjs", "scripts/reading.mjs", "scripts/whole-output.mjs"].every(f => own.has(f)) && own.size === 6, "the code that decides the proof is the check, its workflow, the proof and all they import, at any depth");
+ok(ROOTS.every(r => own.has(r)) && own.has(WORKFLOW) && ["scripts/owner-yes.mjs", "scripts/reading.mjs", "scripts/whole-output.mjs", "scripts/packages.mjs"].every(f => own.has(f)) && own.size === 8, "the code that decides the proof is the check, the installer its job runs first, its workflow, the proof and all they import, at any depth");
+ok([".node-version", ".packages/package.json", ".packages/package-lock.json", ".packages/.npmrc"].every(p => decides(own, p)) && !decides(own, ".packagesx") && !decides(own, "tasks/x.md") && SETUP.length === 2, "what the job sets up from before the check, Node's version and the core's packages, decides the proof too");
 ok(refused(verdicts({ changed: [{ path: FLOOR, status: "M", modes: ["100644", "100644"], before, after: before.replace("old", "new") }, { path: "scripts/reading.mjs", status: "M" }], moves, self: true }), /not main.s/u), "where the pull request changes a file the check imports, nothing is proven");
 const named = [{ from: "scripts/a.mjs", to: "scripts/b.mjs", unique: true }, { from: "scripts/c.mjs", to: "scripts/d.mjs" }];
 ok(follows("see `a.mjs`", "see `b.mjs`", spellings(named)) === null && follows("see `c.mjs`", "see `d.mjs`", spellings(named)) !== null && follows("see a.mjs", "see b.mjs", spellings(named)) !== null, "a file's name alone follows its move between backticks, and only where no other file bears that name");

@@ -13,22 +13,26 @@
 // and that move's new path in the same place in the new; a path stands where no letter, digit, "_", ".", "/" or "-"
 // comes before it and no letter, digit, "_" or "-", nor "." or "/" before one, comes after. It refuses, never guessing,
 // a file that asks the yes and is added, deleted or moved itself, a move into or out of such a path, every other change
-// of a word, and every file where the pull request changes this script, the description check or its workflow,
-// or a file of the repository either script imports at any depth, as the base holds them (ownFiles), so that the code
-// that proves is always `main`'s, as floor rule 3 asks, though the description check runs the pull request's copy. Git and Node's
-// own modules; it changes nothing.
+// of a word, and every file where the pull request changes this script, the description check, its workflow, what that
+// workflow sets up before the check (the installer, .node-version, the core's packages), or a file of the repository
+// any of these scripts imports at any depth, as the base holds them (ownFiles), so that the code that proves is always
+// `main`'s, as floor rule 3 asks, though the description check runs the pull request's copy. Git and Node's own
+// modules; it changes nothing.
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { asks } from "./owner-yes.mjs";
+import { started } from "./started.mjs";
 
 export { INVALID };
 export const SELF = "scripts/path-only.mjs";
-// Where the proof starts: the check that runs it, the workflow that runs the check, and itself. The files whose code
-// decides it are these and every file of the repository they import, at any depth (ownFiles): where the pull request
-// changes one, the copy that runs is not `main`'s.
-export const ROOTS = ["scripts/pr-description.mjs", SELF];
+// Where the proof starts: the check that runs it, the installer its job runs first, and itself. The files whose code
+// decides it are these and every file of the repository they import, at any depth, with the workflow that runs the
+// check and what it sets up from (SETUP; a path ending in "/" is a folder): where the pull request changes one, the code
+// that runs is not `main`'s.
+export const ROOTS = ["scripts/pr-description.mjs", "scripts/install.mjs", SELF];
 export const WORKFLOW = ".github/workflows/own-description.yml";
+export const SETUP = [".node-version", ".packages/"];
+export const decides = (own, p) => own.has(p) || SETUP.some(s => (s.endsWith("/") ? p.startsWith(s) : p === s));
 const IMPORT = /^\s*(?:import|export)\b[^"'`]*?\bfrom\s*["'](\.{1,2}\/[^"']+)["']|^\s*import\s*["'](\.{1,2}\/[^"']+)["']/gmu;
 
 // The files `ROOTS` import at any depth, as `textOf(path)` gives each (null: not there), with the workflow.
@@ -51,20 +55,24 @@ const escape = s => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 // The spellings of each move, old to new. A path is read bare where it has a "/" and names a file by its extension or a
 // folder by its closing "/"; otherwise only between backticks, so that no word of prose ("tests", "and/or") is read as
-// one. A move is left out where either path holds anything but ASCII letters, digits, ".", "_", "-" and "/", or asks
-// the yes: such a move is refused, and justifies no pointer. A file's name alone, between backticks, follows its move
-// where the base holds no other file of that name (`unique`).
+// one; and a spelling with no "/" only where it is a file's name with its extension, so that no plain word between
+// backticks (`main`) is rewritten by moving a file or folder planted under its name. A move is left out where either
+// path holds anything but ASCII letters, digits, ".", "_", "-" and "/", or asks the yes: such a move is refused, and
+// justifies no pointer. A file's name alone, between backticks, follows its move where the base holds no other file of
+// that name (`unique`).
 const SAFE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
-const bare = p => p.includes("/") && (p.endsWith("/") || /\.[A-Za-z0-9]+$/u.test(p.split("/").at(-1)));
+const named = p => /\.[A-Za-z0-9]+$/u.test(p.split("/").at(-1));
+const bare = p => p.includes("/") && (p.endsWith("/") || named(p));
 export function spellings(moves) {
   const pairs = new Map();
-  const add = (a, b) => { pairs.set(`\`${a}\``, `\`${b}\``); if (bare(a) && bare(b)) pairs.set(a, b); };
+  const quoted = (p, folder) => p.includes("/") || (!folder && named(p));
+  const add = (a, b, folder) => { if (quoted(a, folder) && quoted(b, folder)) pairs.set(`\`${a}\``, `\`${b}\``); if (bare(a) && bare(b)) pairs.set(a, b); };
   for (const { from, to, folder, unique } of moves) {
     if (asks(from) || asks(to) || from === to || !SAFE.test(from) || !SAFE.test(to)) continue;
-    add(from, to);
-    if (folder) add(`${from}/`, `${to}/`);
+    add(from, to, folder);
+    if (folder) add(`${from}/`, `${to}/`, true);
     const [a, b] = [from, to].map(p => p.split("/").at(-1));
-    if (unique && a !== b) pairs.set(`\`${a}\``, `\`${b}\``);
+    if (unique && a !== b && named(a) && named(b)) pairs.set(`\`${a}\``, `\`${b}\``);
   }
   return pairs;
 }
@@ -165,7 +173,7 @@ export function read(cwd, base, head) {
   for (let i = 0; i + 1 < names.length; i += 2) changed.push(fileOf(cwd, base, head, names[i], names[i + 1]));
   if (changed.some(f => f.status === "M" && asks(f.path) && (f.before === null || f.after === null))) return null;
   const own = ownFiles(p => run(cwd, ["show", `${base}:${p}`]));
-  return { changed, moves, self: changed.some(f => own.has(f.path)) };
+  return { changed, moves, self: changed.some(f => decides(own, f.path)) };
 }
 
 // The paths of `asked` (the files that ask the yes) that the change from base to head proves only follow moves: [] where
@@ -196,4 +204,4 @@ function main() {
   process.exit(refused.length ? 1 : 0);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) main();
+if (started(import.meta.url)) main();
