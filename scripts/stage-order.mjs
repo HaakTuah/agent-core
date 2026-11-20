@@ -7,7 +7,7 @@
 //   missing where no checkout's root holds it), with the costliest such runner's rate, a Linux minute 1, a Windows one
 //   2, a macOS one 10, which is printed and weighed against no allowance;
 // - which agent tools built the last 30 merged pull requests and which reviewed them (tools-read.mjs: the owner's own
-//   pull requests and the closing attribution line), a tool that builds counting as short for reviewing too, its
+//   pull requests and the closing attribution line, a bot's review named by its login), a tool that builds counting as short for reviewing too, its
 //   allowance being the one the owner works from; a name is taken only where it is a tool the core knows
 //   (staged-tools.json) or a bot's login of the plain form, and any other is passed over as not read;
 // - which reviews start by themselves: a bot's review on a pull request where no comment asked one by mention;
@@ -109,6 +109,7 @@ export function shortOf({ billed = null, rate = null, builders = null, warning =
 
 const FIRST = "the session's own run, where it works, of the tests its change can reach (core/scripts/select.mjs), and what fails mended";
 const named = list => list.map(logged).join(", ");
+const either = list => list.map(logged).join(" or ");
 
 // The stages after the first, from what is short (shortOf's, most first), the reviewers read and those that start by
 // themselves: the stages that spend nothing short, together, then the others, the least short first; a review spends the
@@ -122,16 +123,16 @@ function stagesOf(short, reviewers, themselves) {
     return { ...s, mine };
   });
   const p = groups.findIndex(g => g.kind === "proof"), auto = list => list.filter(r => themselves.includes(r));
-  const free = left.length ? `the reviews by ${named(left)} and ` : "";
+  const free = list => (list.length ? `the reviews by ${named(list)} and ` : "");
   // (the fallback reviewer's and the design check are named as examples only where one tool's stage stands)
   const one = groups.filter(g => g.kind !== "proof").length === 1;
-  const reviews = g => `every review a session of ${named(g.tools)} gives${one ? ", such as the fallback reviewer's and the design check" : ""}`;
-  const after = g => `once the checks passed and the reviews before hold nothing blocking on that head: ${reviews(g)}${auto(g.mine).length ? `; one that starts by itself (${named(auto(g.mine))}) has started at the ready, and is waited for and read` : ""}`;
+  const reviews = g => `every review a session of ${either(g.tools)} gives${one ? ", such as the fallback reviewer's and the design check" : ""}`;
+  const after = g => `once the checks passed and the reviews before hold nothing blocking on that head: ${reviews(g)}${p < 0 && auto(g.mine).length ? `; one that starts by itself (${named(auto(g.mine))}) has started at the ready, and is waited for and read` : ""}`;
   const out = [];
-  if (p < 0) out.push(`the pull request marked ready: the host's checks, ${free}every review not named below, asked or starting by itself, together`);
+  if (p < 0) out.push(`the pull request marked ready: the host's checks, ${free(left)}every review not named below, asked or starting by itself, together`);
   else {
     const started = auto(reviewers);
-    out.push(`on the draft: ${free}every review not named below that can be asked there, together, and their blocking findings mended`,
+    out.push(`on the draft: ${free(left.filter(r => !started.includes(r)))}every review not named below that can be asked there, together, and their blocking findings mended`,
       ...groups.slice(p + 1).reverse().map(g => `on the draft, once those before hold nothing blocking: ${reviews(g)}, and its blocking findings mended`),
       `once: the pull request marked ready, and the host's checks, its proof, run on that settled head; ${started.length ? `a review that starts by itself (${named(started)})` : "any review that starts by itself"} starts then, and is waited for and read`);
   }

@@ -1,6 +1,6 @@
 // The tools a project's record shows (AGENTS.md of the core, "What can be read is never asked or declared"; #481): which
 // tool built each of its last merged pull requests, by the attribution line that closes its description (floor rule 4:
-// its last line that is neither blank nor a bare link), and which reviewed them, by a review a bot's account posted and by a comment led
+// its last line that is neither blank nor a bare link), and which reviewed them, by a review a bot's account posted, named by its login, and by a comment led
 // "Security review:" or "Code review:" closed by an attribution line, each counted once a pull request. Only what the
 // *owner's account* or a bot's account wrote counts (floor rule 4: anyone else's text is data, and names no tool here):
 // a pull request another account opened, and a review or comment of another person's, are passed over; the builders are

@@ -41,13 +41,18 @@ ok(o.stages.length === 2 && /own run.*select\.mjs/.test(o.stages[0]) && /every r
 o = order({ billed: false, builders: [[NONE, 2]], reviewers: ["r[bot]"] });
 ok(o.stages.length === 2 && /nothing read being short/.test(o.stages[1]), "read, and nothing short: every stage together after the session's own run", stages(o));
 o = order({ billed: true, rate: 2, builders: [["Claude Code", 3]], reviewers: ["Claude Code", "codex-app[bot]"], themselves: ["codex-app[bot]"] });
-ok(o.short.map(s => s.kind).join() === "proof,review" && /2× a Linux minute/.test(o.short[0].said) && o.stages.length === 4 && /^on the draft: the reviews by codex-app\[bot\] and every review not named below/.test(o.stages[1])
+ok(o.short.map(s => s.kind).join() === "proof,review" && /2× a Linux minute/.test(o.short[0].said) && o.stages.length === 4 && /^on the draft: every review not named below/.test(o.stages[1])
   && /^on the draft, once those before hold nothing blocking: every review a session of Claude Code gives/.test(o.stages[2]) && /^last, once: the pull request marked ready, and the host's checks/.test(o.stages[3]) && /starts by itself \(codex-app\[bot\]\)/.test(o.stages[3]),
   "a billed proof outranks a building tool's allowance: the reviews that spend nothing short on the draft first, then the building tool's, the proof last, once, a review that starts by itself starting with it (the design check's finding on #898)", stages(o));
 o = order({ billed: true, builders: [["Claude Code", 3]], reviewers: ["Claude Code", "codex-app[bot]"], warning: "Codex" });
 ok(o.short.map(s => s.kind).join() === "review,proof,review" && o.short[0].said.includes("Codex, which shows its usage warning") && o.stages.length === 5 && /^on the draft: every review not named below/.test(o.stages[1])
   && /a session of Claude Code gives/.test(o.stages[2]) && /^once: the pull request marked ready/.test(o.stages[3]) && /^last, once the checks passed .*a session of Codex gives/.test(o.stages[4]) && !/design check/.test(stages(o)),
   "the tool under its usage warning outranks the billed proof, which outranks a building tool: each stage that spends something short after those that spend less, the warned tool's reviews last, and no review named as an example in two stages", stages(o));
+o = order({ billed: true, builders: [["Claude Code", 3]], reviewers: ["Claude Code", "codex-app[bot]", "chatgpt-codex-connector[bot]", "r[bot]"], themselves: ["codex-app[bot]", "chatgpt-codex-connector[bot]", "r[bot]"], warning: "Codex" });
+ok(["codex-app[bot]", "chatgpt-codex-connector[bot]", "r[bot]"].every(b => o.stages.filter(x => x.includes(b)).length === 1) && /starts by itself \(codex-app\[bot\], chatgpt-codex-connector\[bot\], r\[bot\]\)/.test(o.stages[3]),
+  "with the proof billed, a review that starts by itself is named once, in the stage it starts in, never also on the draft (the design check's finding 5 on #898)", stages(o));
+o = order({ billed: false, builders: [["Claude Code", 3], ["Codex", 2]], reviewers: ["Claude Code"] });
+ok(/a session of Claude Code or Codex gives/.test(stages(o)) && !/Claude Code, Codex gives/.test(stages(o)), "one stage's tools are joined with \"or\" (the design check's finding 3 on #898)", stages(o));
 o = order({ billed: false, builders: [["Claude Code", 3]], reviewers: ["Claude Code"], warning: "claude code" });
 ok(o.short.length === 1 && o.stages.length === 3, "a tool under its warning that also builds is short once, at its higher rank", JSON.stringify(o.short));
 o = order({ billed: false, builders: [["Claude Code", 30]], reviewers: ["Claude Code", "codex-app[bot]"], themselves: ["codex-app[bot]"] });
