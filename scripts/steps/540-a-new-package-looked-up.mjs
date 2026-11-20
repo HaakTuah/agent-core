@@ -1,6 +1,6 @@
 // The step of setup/sync-notes/540-a-new-package-looked-up.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { corePath } from "../core-path.mjs";
+import { copyAt } from "../check-configs.mjs";
 import { COST, shown, INLINED_MOST, jobsOf, placed, lookupOf, FIRST, running, configOf, looksUp } from "../step-checks.mjs";
 
 export default { lead: "16 November 2026, a new package looked up", cost: COST.workflow,
@@ -10,7 +10,7 @@ export default { lead: "16 November 2026, a new package looked up", cost: COST.w
     // sign-in, adds the step beside them: the npm lookup where it runs the exact-versions check, the NuGet lookup
     // where it runs the NuGet check)
     const wrong = Object.entries(p.workflows).flatMap(([f, w]) => {
-      const jobs = jobsOf(w, p.read), at = `\`.github/workflows/${shown(f)}\``, copy = corePath(p.root) || "core/";
+      const jobs = jobsOf(w, p.read), at = `\`.github/workflows/${shown(f)}\``, copy = copyAt(p);
       // (a workflow this reader cannot read as YAML, whose words name a package check, is said, never taken as done)
       if (!w.yaml?.jobs && /(?:exact-versions|nuget|nuget-fetch)\.mjs/u.test(w.text ?? "")) return [`${at} cannot be read as YAML here, so where it runs its package checks and their lookups cannot be told: write it as plain YAML (quoted keys and values, no anchors)`];
       // (each config a check is given is matched by a lookup given the same config, since the lookup reads only the

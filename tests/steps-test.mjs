@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { differences, fresh, kind, report as freshReport } from "../scripts/fresh.mjs";
 import { CORE } from "../scripts/core-address.mjs";
+import { hookCommands, readCore } from "../scripts/core-path.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "../scripts/init.mjs";
 import { notes as manifestNotes } from "../scripts/manifest-reads.mjs";
 import { FOLDER, NOTES, NOTICE, POINTER, entries, notes as notesWhole } from "../scripts/sync-notes.mjs";
@@ -83,26 +84,56 @@ const stray = stageFiles.filter(f => !f.endsWith(".mjs") || !withCheck.includes(
 ok(!stray.length && stageFiles.length === Object.keys(STAGES).length, "each file of scripts/stages/ is the stage of the step of the same name in scripts/steps/, a step with a check", stray.join(", "));
 
 // ---- a project the starter kit writes: every step done, no difference from a fresh start ----
-function kit(name, o, { held = true } = {}) {
+// (`at`: where the project's copy of the core stands, as its manifest names it, "core/" the default. Its own files then
+// name that path wherever the kit wrote core/, as a project that moved its copy has them: #628. `library`: the folder of a
+// library that carries the core, its files committed here, at `at` inside it, as the manifest's line and the library's
+// own manifest say it, with the floor's own copy in floor-copy/; `submodule`: the library a submodule of the project,
+// which git lists by its commit alone)
+function kit(name, o, { held = true, at = "core/", library = null, submodule = false } = {}) {
   const dir = path.join(tmp, name);
   fs.mkdirSync(dir);
   execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
+  const there = text => at === "core/" ? text : text.replace(/(?<![\w-])core\//gu, at);
+  const readAt = f => at === "core/" ? f : f.replace(/^core\//u, at);
   for (const [to, text] of files({ owner: "someone-else", name, ...o }, PIN, modules, n => fs.readFileSync(path.join(root, TEMPLATES, n), "utf8"))) {
-    fs.mkdirSync(path.dirname(path.join(dir, to)), { recursive: true });
-    fs.writeFileSync(path.join(dir, to), text);
+    fs.mkdirSync(path.dirname(path.join(dir, there(to))), { recursive: true });
+    fs.writeFileSync(path.join(dir, there(to)), there(text));
+  }
+  if (library) {
+    const manifest = path.join(dir, "core-manifest.md"), own = /^Core: .*$/m.exec(fs.readFileSync(manifest, "utf8"))[0];
+    fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8").replace(own, `Core: ${CORE}, carried by ${library} under ${at} (never edited here).\nFloor copy: floor-copy/`));
+    fs.mkdirSync(path.join(dir, library), { recursive: true });
+    fs.writeFileSync(path.join(dir, library, "core-manifest.md"), `${own.replace(`under ${at}`, `under ${at.slice(library.length)}`)}\n`);
+    fs.cpSync(path.join(root, "floor"), path.join(dir, "floor-copy"), { recursive: true });
+  }
+  if (at !== "core/") {
+    // (its hooks are the commands core-path.mjs gives for that path, which stop a session whose floor cannot be read there)
+    const settings = path.join(dir, ".claude/settings.json"), hooks = JSON.parse(fs.readFileSync(settings, "utf8")), commands = hookCommands(readCore(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8")));
+    hooks.hooks.SessionStart[0].hooks[0].command = commands.start; hooks.hooks.PreToolUse[0].hooks[0].command = commands.helper; hooks.hooks.Stop[0].hooks[0].command = commands.stop;
+    fs.writeFileSync(settings, `${JSON.stringify(hooks, null, 2)}\n`);
   }
   fs.mkdirSync(path.join(dir, "checks"), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify(licences(o, () => false), null, 2)}\n`);
   // (the copy of the core the project holds, as far as its checks read it, its .gitignore too, which keeps the installed packages out of git as in a
   // synced project, where staging them cost a Windows runner over a minute; and the size marks the kit writes for it)
-  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", ".packages", "setup", ".gitignore"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
-  fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, f)).size]))), null, 2)}\n`);
+  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", ".packages", "setup", ".gitignore"]) fs.cpSync(path.join(root, part), path.join(dir, at, part), { recursive: true });
+  if (submodule) {
+    const lib = path.join(dir, library), git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "-c", "protocol.file.allow=always", ...args], { cwd: lib, stdio: "ignore" });
+    git("init", "-q", "-b", "main");
+    git("add", "-A");
+    git("commit", "-q", "-m", "the library");
+    execFileSync("git", ["-c", "protocol.file.allow=always", "submodule", "add", "-q", `${lib.replace(/\\/g, "/")}-origin.git`, library.replace(/\/$/, "")], { cwd: dir, stdio: "ignore" });
+  }
+  // (the files the marks name stand under the copy's path; the total counts the project's own alone, as for core/)
+  const marks = sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, readAt(f))).size])));
+  marks.read = Object.fromEntries(Object.entries(marks.read).map(([f, mark]) => [readAt(f), mark]));
+  fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(marks, null, 2)}\n`);
   execFileSync("git", ["add", "-A"], { cwd: dir });
   // (the copies check's first baseline as the starter kit writes it, its two entry files' shared sentence listed)
-  execFileSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: dir, stdio: "ignore" });
+  execFileSync(process.execPath, [`${at}scripts/copies.mjs`, "checks/copies.json", "--first"], { cwd: dir, stdio: "ignore" });
   fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), `${JSON.stringify({ reads: Object.keys(READERS), listed: {} }, null, 2)}\n`);
   // (the first list of what holds the project's own rules, as the starter kit writes it: #662)
-  execFileSync(process.execPath, ["core/scripts/holders.mjs", "--own", "--write"], { cwd: dir, stdio: "ignore" });
+  execFileSync(process.execPath, [`${at}scripts/holders.mjs`, "--own", "--write"], { cwd: dir, stdio: "ignore" });
   if (held) roundTrip(name, o, dir);
   return dir;
 }
@@ -123,6 +154,38 @@ function roundTrip(name, given, dir) {
   const moduleNotes = manifestNotes({ manifest: p.manifest, moduleTexts: { ...texts("roles/shared"), ...texts("tasks"), ...texts("tools") } });
   ok(!moduleNotes.length, `${name}: its manifest takes or leaves out each module, so the manifest check gives no note`, moduleNotes.join("\n"));
 }
+// (the same projects with the copy at another path, and the starter kit's own folder names read from it: #628)
+const vendored = {};
+for (const [name, o, at] of [["a-vendored-npm-project", { packages: "." }, "vendor/core/"], ["a-vendored-dotnet-game", { nuget: "src", game: true }, "third_party/the-core/"]]) vendored[name] = kit(name, o, { at });
+// (the steps that read a project's own run of the core's scripts read it at the copy's path: a mutation tool's strength
+// check, and the selection of the tests a change can reach with the name of the check that gates a tree that passed)
+{
+  const dir = vendored["a-vendored-npm-project"], manifest = path.join(dir, "core-manifest.md"), was = fs.readFileSync(manifest, "utf8");
+  const strong = STEPS.find(s => s.lead === "16 November 2026, how strong the tests are"), passed = STEPS.find(s => s.lead.endsWith("a tree that passed is not run again"));
+  const flow = path.join(dir, ".github/workflows/strength.yml"), select = path.join(dir, ".github/workflows/select.yml");
+  fs.writeFileSync(manifest, was.replace(/^\| \*mutation tool\* \|.*$/m, "| *mutation tool* | `node vendor/core/scripts/mutate.mjs --report {report} {lines}` |"));
+  const said = body => { fs.writeFileSync(flow, `name: strength\non:\n  pull_request:\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n${body}`); return notDone(dir, [strong])[0]?.mend ?? null; };
+  const bare = said("      - run: node vendor/core/scripts/strength.mjs\n"), runs = said("      - run: node vendor/core/scripts/strength.mjs\n        env:\n          STRENGTH_BASE: origin/main\n");
+  ok(runs === null && bare?.includes("`node vendor/core/scripts/strength.mjs`"), "a workflow that runs the strength check at the copy's path with its base reads done, and the mend asks for the step at that path", `${bare}\n${runs}`);
+  fs.writeFileSync(select, "name: select\non:\n  push:\n  pull_request:\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node vendor/core/scripts/select.mjs --env RUN\n");
+  const selected = notDone(dir, [passed])[0]?.mend ?? null;
+  ok(selected?.includes(".github/workflows/select.yml") && selected.includes("its job `t`"), "a selection run at the copy's path, with no check named that a tree passed, is found", selected);
+  fs.writeFileSync(manifest, was); fs.rmSync(flow); fs.rmSync(select);
+}
+// (a submodule of the project that carries no core is none of its own files: a project with one reads as it did)
+{
+  const dir = kit("a-project-with-another-submodule", { packages: "." }, { held: false }), other = path.join(dir, "third");
+  fs.mkdirSync(other);
+  fs.writeFileSync(path.join(other, "App.csproj"), "<Project />\n");
+  const g = (cwd, ...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "-c", "protocol.file.allow=always", ...args], { cwd, stdio: "ignore" });
+  g(other, "init", "-q", "-b", "main"); g(other, "add", "-A"); g(other, "commit", "-q", "-m", "other");
+  g(dir, "submodule", "add", "-q", `${other.replace(/\\/g, "/")}-origin.git`, "third");
+  ok(!project(dir).files.some(f => f.startsWith("third/")) && !notDone(dir).length, "the files of a submodule that carries no core are not the project's own, and no step reads it", report(notDone(dir)));
+}
+// (a core a library carries, its files committed in the project: the library's own manifest pins it, and the floor's own
+// copy stands beside it until every tool has passed the staged cases)
+kit("a-library-carried-project", { packages: "." }, { at: "lib/core/", library: "lib/" });
+kit("a-submodule-carried-project", { packages: "." }, { at: "lib/core/", library: "lib/", submodule: true });
 const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget: "src", private: true }, "a-game": { packages: "web", game: true } };
 const dirs = Object.fromEntries(Object.entries(kinds).map(([name, o]) => [name, kit(name, o)]));
 // (the pairs of options no other kit of this file is made with: npm in a private repository, a private game and an npm
@@ -1106,6 +1169,21 @@ ok(toolsMend.includes("runs `node core/scripts/agent-tools.mjs config/licences.j
   put("AGENTS.md", "# A project\n\n@core/roles/shared/work-flow.md\n"); put("config/sizes.json", `${JSON.stringify({ read: ["core/roles/shared/how-to-work.md"] })}\n`);
   put("config/copies.json", `{\n  "prose": [\n    "core/floor/*.md",\n    ${MOVED_GLOB},\n    ${NEW_GLOBS.join(",\n    ")}\n  ]\n}\n`);
   ok(step.check(project(moveDir)) === null, "and it is done once each is named by its new path and the copies config reads the new folders beside the old, however its patterns are laid out", step.check(project(moveDir)) ?? "");
+}
+// (the same where the copy stands at another path: the paths the step names, and the patterns of a copies config it reads,
+// are that path's, in what it says too: #628)
+{
+  const dir = path.join(tmp, "vendored-moved-project"), put = (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
+  const step = STEPS.find(x => x.lead === "16 November 2026, the rules in folders that say who reads them or when");
+  put("core-manifest.md", `# Core manifest\n\nCore: ${CORE} at ${PIN}, copied whole under vendor/core/ (never edited here).\nPaths: in the core's files, one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under vendor/core/; any other is ours.\n`);
+  put("AGENTS.md", "# A project\n\n@vendor/core/modules/work-flow.md\n");
+  put("config/copies.json", `{\n  "prose": [\n    "vendor/core/floor/*.md",\n    "vendor/core/modules/*.md"\n  ]\n}\n`);
+  put("core/notes.md", "A file of the project's own, which names vendor/core/modules/how-to-work.md.\n");
+  put("core/AGENTS.md", "A rule file of the project's own, which names vendor/core/modules/inbox.md.\n");
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  const said = notDone(dir, [step])[0]?.mend ?? "";
+  ok(said.includes("`vendor/core/modules/work-flow.md` is now `vendor/core/roles/shared/work-flow.md` (in `AGENTS.md`)") && said.includes('after the pattern "vendor/core/modules/*.md" add the patterns "vendor/core/floor/topics/*.md", "vendor/core/roles/*.md"') && said.includes("`core/notes.md`") && said.includes("`core/AGENTS.md`") && !/(?<![\w/-])core\//.test(said.replace("`core/notes.md`", "").replace("`core/AGENTS.md`", "")),
+    "where the copy stands at another path, the step reads a copies config's patterns at it and names the files and patterns by it, and a file of the project's own that stands at core/ by its own name", said);
 }
 // the files that point from the paths the rules left: each names a file or a folder the core holds, and what one says
 // stands elsewhere than the rest of it stands there

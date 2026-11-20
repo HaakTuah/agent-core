@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { installedBy, kitHooks, listed, printed } from "../scripts/agent-tools.mjs";
 import { CORE } from "../scripts/core-address.mjs";
+import { hookCommands, readCore } from "../scripts/core-path.mjs";
 import { kitForm } from "../scripts/hook-source.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { STEPS, notDone } from "../scripts/steps.mjs";
@@ -98,6 +99,30 @@ const slower = JSON.parse(KIT);
 slower.hooks.Stop[0].hooks[0].timeout = 600;
 fails(run(project({ ".claude/settings.json": JSON.stringify(slower), "checks/licences.json": { lockfiles: [], agentTools: [] } })), "a kit's command with another timeout is not the kit's hook", 'the hook "Stop: ');
 passes(run(project()), "a project as the starter kit writes it, with no list, passes");
+// (a copy at another path than core/, which its manifest names: the kit's hooks with that path written in, or the commands
+// core-path.mjs gives for it, are the kit's own; the kit's hooks naming core/ are not, there: #628)
+{
+  const line = `Core: ${CORE} at ${"a".repeat(40)}, copied whole under vendor/core/ (never edited here).\n`, empty = { lockfiles: [], agentTools: [] };
+  const given = JSON.parse(KIT), commands = hookCommands(readCore(line));
+  given.hooks.SessionStart[0].hooks[0].command = commands.start;
+  given.hooks.PreToolUse[0].hooks[0].command = commands.helper;
+  given.hooks.Stop[0].hooks[0].command = commands.stop;
+  fails(run(project({ "core-manifest.md": line, ".claude/settings.json": KIT.replaceAll("origin/main:core/", "origin/main:vendor/core/"), "checks/licences.json": empty })), "the kit's hooks with the copy's path written in, the manifest naming it, are not the kit's own: a session would start without the floor", "is not listed");
+  passes(run(project({ "core-manifest.md": line, ".claude/settings.json": given, "checks/licences.json": empty })), "the commands core-path.mjs gives for the copy's path are the kit's own");
+  fails(run(project({ "core-manifest.md": line, "checks/licences.json": empty })), "the kit's hooks naming core/ where the manifest names another path are not the kit's own", "is not listed");
+  // (the commands core-path.mjs gives for a path other than core/ are in the kit's form: they run main's copy, a library's at
+  // the commit main pins, and a session whose floor cannot be read is stopped first; a working tree's file is none)
+  const forms = [line, `Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n`].flatMap(l => Object.values(hookCommands(readCore(l))));
+  ok(forms.length === 6 && forms.every(kitForm), "the commands for a copy at another path, and for a core a library carries, are in the kit's form", forms.filter(c => !kitForm(c)).join("\n"));
+  const start = hookCommands(readCore(`Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n`)).stop;
+  ok(![start.replace('--git-dir="${CLAUDE_PROJECT_DIR:-.}"/lib/.git', '--git-dir="${CLAUDE_PROJECT_DIR:-.}"/other/.git'), start.replace(" 2>/dev/null; }) || exit 0", "; }) || exit 0; rm -rf x"), start.replace("refs/remotes/origin/main:lib", "HEAD:lib"), start.replace('--git-dir="${CLAUDE_PROJECT_DIR:-.}"/lib/.git', '-C "${CLAUDE_PROJECT_DIR:-.}"/lib')].some(kitForm),
+    "and a variation of them that reads the library's file from another folder or from the working tree, runs more, or lets git find a bare repository a branch committed in the library's place, is not");
+  // (a core a library carries: the same)
+  const carried = `Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n`, forCarried = JSON.parse(KIT), commandsFor = hookCommands(readCore(carried));
+  forCarried.hooks.SessionStart[0].hooks[0].command = commandsFor.start; forCarried.hooks.PreToolUse[0].hooks[0].command = commandsFor.helper; forCarried.hooks.Stop[0].hooks[0].command = commandsFor.stop;
+  passes(run(project({ "core-manifest.md": carried, ".claude/settings.json": forCarried, "checks/licences.json": empty })), "for a core a library carries, the commands core-path.mjs gives for it are the kit's own");
+  fails(run(project({ "core-manifest.md": carried, ".claude/settings.json": KIT.replaceAll("origin/main:core/", "origin/main:lib/core/"), "checks/licences.json": empty })), "for a core a library carries, the kit's hooks with the path written in are not the kit's own either", "is not listed");
+}
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } })), "and with an empty list");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } }), "--core"), "in the core's own repository too");
 // (the command prints what the check gives, and exits as it says, as the cases here read it)

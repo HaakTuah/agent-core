@@ -9,8 +9,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import zlib from "node:zlib";
 import { CORE } from "../scripts/core-address.mjs";
-import { carriedAt, corePath, floorCopy, floorCopyIn, hookCommands, manifestText, projectAt, readCore } from "../scripts/core-path.mjs";
+import { atCopy, carriedAt, corePath, floorCopy, floorCopyIn, hookCommands, manifestText, mendAt, projectAt, readCore } from "../scripts/core-path.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { pathIn } from "../scripts/reading.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
@@ -127,6 +128,23 @@ if (process.platform !== "win32") {
   ok(corePath(linked) === "core/" && floorCopy(linked) === null && r.status === 1 && mended(r.stderr), "a manifest that is a link to what is no regular file reads as empty, and the script says the mend", `${r.status} ${r.signal} ${r.stderr}`);
 }
 
+// The starter kit's and the notes' words for the copy, in the project's own (#628): each core/ that begins a path
+ok(atCopy("read core/tasks/x.md", "core/") === "read core/tasks/x.md" && atCopy("core/a ../../core/b `core/c` agent-core/d", "vendor/core/") === "vendor/core/a ../../vendor/core/b `vendor/core/c` agent-core/d",
+  "a bare core/ is the copy's path, and agent-core/ is not");
+ok(["vendor/core/", "packages/core/agent/", "packages/core/core/", "a.core/"].every(c => { const once = atCopy("x core/a ../../core/b `core/c`", c); return once === atCopy(once, c); }), "a second pass over a text changes nothing, whatever core/ the copy's own path holds");
+{
+  const mend = "see `core/scripts/x.mjs`, core/notes.md, src/core/a, vendor/core/b, `core/` and core/modules/x (in `core/notes.md`)";
+  ok(mendAt(mend, "vendor/core/") === "see `vendor/core/scripts/x.mjs`, core/notes.md, src/core/a, vendor/core/b, `vendor/core/` and vendor/core/modules/x (in `core/notes.md`)" && mendAt(mend, "core/") === mend && mendAt(mendAt(mend, "packages/core/agent/"), "packages/core/agent/") === mendAt(mend, "packages/core/agent/"),
+    "in a mend the core's own files are the copy's, and the project's own paths, core/notes.md and src/core/ among them, are not");
+  ok(mendAt("see `core/scripts/x.mjs`. And core/README.md. Then core/floor.", "vendor/core/") === "see `vendor/core/scripts/x.mjs`. And vendor/core/README.md. Then vendor/core/floor.",
+    "a core's file or folder at the end of a sentence is the copy's, its full stop kept");
+  const mine = new Set(["core/AGENTS.md", "core/tests/a.test.mjs"]), own = at => [...mine].some(f => f === at || f.startsWith(`${at}/`));
+  ok(mendAt("`core/AGENTS.md`, `core/tests/a.test.mjs`, `core/tests/`, `core/scripts/x.mjs`, `core/floor/` and `core/`.", "vendor/core/", own) === "`core/AGENTS.md`, `core/tests/a.test.mjs`, `core/tests/`, `vendor/core/scripts/x.mjs`, `vendor/core/floor/` and `vendor/core/`.",
+    "a path the project holds as its own file or folder stays its own, though the core has one of the name");
+}
+ok(atCopy("refs/remotes/origin/main:vendor/core/a core/b", "vendor/core/") === "refs/remotes/origin/main:vendor/core/a vendor/core/b" && atCopy("core/a", "lib/the-core/") === "lib/the-core/a",
+  "one already behind the copy's own folders is left as it stands");
+
 // Claude Code's hooks for a core at another path: for core/ the helper's and the stop's are the starter kit's own, and
 // where a submodule carries the core, the start reads the work-saved hook from the library's commit main pins, never
 // from the working tree, and stops a session whose floor cannot be read, which no script of the core's could say
@@ -203,6 +221,29 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
     git(consumer, "checkout", "-q", "-b", "a-note"); put(consumer, "note.txt", "a note\n");
     const said = spawnSync("sh", ["-c", hookCommands(readCore(carried())).start], { input: "{}", encoding: "utf8", env: { ...env, CLAUDE_PROJECT_DIR: consumer } }).stdout;
     ok(/calls for `lib\/core\/tasks\/notes\.md`/.test(said), "the start hook, from a core a submodule carries, names the module the branch's changed paths call for", said);
+  }
+  // (a branch that commits, where the library stands, files that form a bare repository: its tree object under the genuine
+  // name holds another script. The commands read the library's commit main pins, from the repository named, never one git
+  // finds in the working tree: run in the folder the forged script runs, and the commands name the submodule's .git instead)
+  {
+    const evil = path.join(tmp, "a-forged-project"), bare = path.join(tmp, "the-library.git"), origin3 = path.join(tmp, "a-forged-project.git");
+    git(tmp, "init", "-q", "-b", "main", evil);
+    git(evil, "submodule", "add", "-q", lib, "lib");
+    git(evil, "add", "-A"); git(evil, "commit", "-q", "-m", "a project");
+    git(tmp, "init", "-q", "--bare", "-b", "main", origin3);
+    git(evil, "remote", "add", "origin", origin3); git(evil, "push", "-q", "-u", "origin", "main");
+    git(tmp, "clone", "-q", "--bare", lib, bare);
+    const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: bare, env, input: "echo FORGED\n", encoding: "utf8" }).trim();
+    const tree = git(bare, "rev-parse", "HEAD:core/scripts").trim(), body = Buffer.concat([Buffer.from("100644 work-saved.sh\0"), Buffer.from(blob, "hex")]);
+    const loose = path.join(bare, "objects", tree.slice(0, 2), tree.slice(2));
+    fs.rmSync(loose, { force: true }); fs.mkdirSync(path.dirname(loose), { recursive: true });
+    fs.writeFileSync(loose, zlib.deflateSync(Buffer.concat([Buffer.from(`tree ${body.length}\0`), body])));
+    git(evil, "checkout", "-q", "-b", "forged"); git(evil, "rm", "-q", "-f", "lib");
+    fs.cpSync(bare, path.join(evil, "lib"), { recursive: true });
+    git(evil, "add", "-A", "-f"); git(evil, "commit", "-q", "-m", "a bare repository where the library stood");
+    const stop = hookCommands(readCore(carried())).stop, inFolder = stop.replace('--git-dir="${CLAUDE_PROJECT_DIR:-.}"/lib/.git', '-C "${CLAUDE_PROJECT_DIR:-.}"/lib'), at = command => spawnSync("sh", ["-c", command], { input: "{}", encoding: "utf8", env: { ...env, CLAUDE_PROJECT_DIR: evil } }).stdout;
+    ok(/FORGED/.test(at(inFolder)) && !/FORGED/.test(at(stop)),
+      "a bare repository a branch commits where the library stands is not read by the commands for a carried core, though git, run in the folder, reads it", `${at(inFolder)}|${at(stop)}`);
   }
   git(project, "submodule", "deinit", "-q", "-f", "lib");
   said = run(hooks.start);

@@ -62,6 +62,34 @@ export function manifestText(file) {
   try { return fs.readFileSync(file, "utf8"); } catch { return null; }
 }
 
+/** A text of the starter kit's or of the sync notes' as the project holds it, whose copy of the core stands at `copy`
+ *  (corePath's, a path ending in "/"): the kit and the notes write the copy as core/, so each core/ that begins a path
+ *  (not agent-core/, and not one that is part of the copy's own path already, as vendor/core/ is) is the copy's path
+ *  (#628), and a second pass changes nothing. Of a mend, which names the project's own paths too: mendAt. */
+export const atCopy = (text, copy) => {
+  if (copy === "core/") return text;
+  // (a core/ that is part of the copy's own path, wherever in it, is left, so that a second pass changes nothing)
+  const inside = [...copy.matchAll(/core\//gu)].map(m => m.index);
+  return text.replace(/(?<![\w-])core\//gu, (hit, at) => inside.some(i => at - i >= 0 && text.startsWith(copy, at - i)) ? hit : copy);
+};
+/** A mend as the project reads it: the core's own words in it (a step's wording, the notes' file names) name the copy as
+ *  core/, and the project's own paths, which the mend names too, are left as they are. A core/ is the copy's where it
+ *  stands at the start of a path (no letter, digit, dot, dash or slash before it, so a path already at the copy's
+ *  place, or one of the project's own like src/core/, is passed over), and a file or folder of the core follows it
+ *  (scripts/, floor/, README.md...) or nothing does, and that the project does not hold a file or folder of its own at
+ *  (`own`): its core/notes.md and its core/AGENTS.md are its own (#628). A second pass changes nothing. */
+// (and modules/, which the core's files left and the entries of the notes still name)
+const TOP = new Set([...fs.readdirSync(new URL("..", import.meta.url)).filter(n => n !== ".git"), "modules"]);
+// `own(path)` says whether the project holds a file or folder of its own at a path (steps.mjs: its files outside the copy),
+// which is then its own whatever its name: a project that keeps the copy elsewhere often has its own core/ folder.
+export const mendAt = (text, copy, own = () => false) => copy === "core/" ? text
+  : text.replace(/(?<![\w./-])core\/([\w.-]*)([\w./-]*)/gu, (hit, name, rest) => {
+    const at = `core/${name}${rest}`.replace(/\.+$/u, "").replace(/\/$/u, "");
+    return (!name || TOP.has(name.replace(/\.+$/u, ""))) && !(at !== "core" && own(at)) ? copy + hit.slice("core/".length) : hit;
+  });
+/** The copy's path as the pattern of a regular expression. */
+export const inCopy = copy => copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&");
+
 /** The core's copy as a path prefix, for a check to leave out of a project's own files: the manifest's path at `root`, or
  *  core/ where there is none to read (the core's own root, which holds no folder of that name). Read once for each root
  *  in a run, so a check may ask it for every file. */
@@ -123,7 +151,7 @@ export function hookCommands(core) {
     const own = `git -C ${dir} --no-replace-objects show refs/remotes/origin/main:${core.path}scripts/${script} 2>/dev/null`;
     if (core.form !== "carried") return own;
     const lib = core.library.slice(0, -1), rest = core.path.slice(core.library.length);
-    return `${own} || { s=$(git -C ${dir} --no-replace-objects rev-parse refs/remotes/origin/main:${lib} 2>/dev/null) && git -C ${dir}/${lib} --no-replace-objects show "$s:${rest}scripts/${script}" 2>/dev/null; }`;
+    return `${own} || { s=$(git -C ${dir} --no-replace-objects rev-parse refs/remotes/origin/main:${lib} 2>/dev/null) && git --git-dir=${dir}/${lib}/.git --no-replace-objects show "$s:${rest}scripts/${script}" 2>/dev/null; }`;
   };
   const stop = `echo "STOP: the floor cannot be read at ${core.path}floor/security.md, where core-manifest.md says the core stands. Do nothing else in this session until it is mended. Mend: bring the files of the core into the checkout (git submodule update --init, where a submodule carries them), or, where that cannot be done here, say so to the owner and stop."`;
   return {
@@ -131,6 +159,19 @@ export function hookCommands(core) {
     helper: `bash -c 'f=$(${read("helper-call.mjs")}) || exit 0; node --input-type=module -e "$f"'`,
     stop: `bash -c 'f=$(${read("work-saved.sh")}) || exit 0; bash -c "$f" work-saved stop'`,
   };
+}
+
+/** The text of Claude Code's settings as the starter kit writes it (core/), with its three hooks' commands those for the
+ *  copy at `core.path` (hookCommands), as a project whose manifest names another path holds them; unchanged where the
+ *  path is core/, where `core` is null, or where the text has no such hook (an older kit's keeps its own). */
+export function hooksAt(text, core) {
+  if (!core || core.path === "core/") return text;
+  const settings = JSON.parse(text), commands = hookCommands(core);
+  for (const [event, command] of [["SessionStart", commands.start], ["PreToolUse", commands.helper], ["Stop", commands.stop]]) {
+    const hook = settings.hooks?.[event]?.[0]?.hooks?.[0];
+    if (hook) hook.command = command;
+  }
+  return `${JSON.stringify(settings, null, 2)}\n`;
 }
 
 if (started(import.meta.url)) {
