@@ -93,10 +93,6 @@ They read and change no rule.
 | #888 | builder | #925 |
 | #884 | builder | |
 | #870 | builder | |
-| #852 | builder | |
-| #860 | builder | |
-| #857 | builder | |
-| #685 | builder | |
 | #919 | builder | #917 |
 
 ## Not taken up
