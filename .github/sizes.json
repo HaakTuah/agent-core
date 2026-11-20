@@ -176,11 +176,11 @@
       "why": "#937: split into the three parts it already runs in, with the shared set-up in a module of its own."
     },
     "scripts/workflows.mjs": {
-      "mark": 26775,
+      "mark": 26933,
       "why": "One check's readers (the word, the keys given twice, the calls a draft skips, the line breaks) that all read the same texts against the same base through the one baseOf(); a task that changes one reads how the others count against the base, so a split would make it open each part."
     },
     "tests/workflows-test.mjs": {
-      "mark": 56934,
+      "mark": 57789,
       "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."
     }
   }

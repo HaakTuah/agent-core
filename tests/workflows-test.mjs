@@ -167,6 +167,12 @@ ok(heldDup.fails.length === 0 && heldDup.notes.length === 1 && /as it did on the
 // is not known, and what the head shows is noted)
 ok(hiddenDup.fails.length === 0 && hiddenDup.notes.length === 1 && /the base being no YAML/u.test(hiddenDup.notes[0]) && hiddenCall.fails.length === 0 && /the base being no YAML/u.test(hiddenCall.notes.join()),
   "a base no YAML to the package either way its breaks are read holds what stands behind them unknown: the head's findings are noted, not failed", [...hiddenDup.notes, ...hiddenCall.notes, ...hiddenDup.fails, ...hiddenCall.fails].join("\n"));
+// (only the reading as the mend leaves it finds the key given twice here, the folded text being no YAML: it is told on the line
+// an editor counts; and a text the escapes would take past the length read is read as line feeds, never as too long)
+const onlyMended = 'jobs:\n  b:\n    name: "x\u2028y"\n    # c\u2028    a: 1\n    a: 2\n';
+const nearLong = `${"# c\n".repeat(52412)}a: "${"\u2028".repeat(3)}${"x".repeat(LONGEST - 52412 * 4 - 9)}"\n`;
+ok(keysTwice(onlyMended).map(k => `${k.key}@${k.line}<${k.first}`).join() === "a@5<4" && nearLong.length <= LONGEST && nearLong.length + 12 > LONGEST && !keysTwice(nearLong).some(k => k.size),
+  "the key given twice that only the mended reading finds is told on its editor line, and a text that only the escapes make too long is not said so", String(keysTwice(onlyMended).map(k => `${k.key}@${k.line}`)));
 const t0 = Date.now(), manyKeys = keysTwice(`${Array.from({ length: 10000 }, (_, i) => `k${i}: 1\nk${i}: 2\n`).join("")}# c\u2028\n`).length;
 ok(manyKeys === 10000 && Date.now() - t0 < 10000, "ten thousand keys given twice behind a break are read in well under ten seconds, the two readings merged in one pass", `${manyKeys} in ${Date.now() - t0} ms`);
 // (a call the package shows in a file with a break inside a quoted string, no YAML once folded, is found by the plain reading)

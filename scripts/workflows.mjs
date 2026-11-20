@@ -134,7 +134,7 @@ export function asMended(text) {
       out += mended.out;
       for (const ends of mended.ends) at.push(ends ? ++editor : editor);
     }
-    return joined === norm ? { text: out, line: n => at[n] ?? n } : asLF(text);
+    return joined === norm && out.length <= LONGEST ? { text: out, line: n => at[n] ?? n } : asLF(text); // (an escape is longer than its break: a text it takes past the length read is read as line feeds)
   } catch { return asLF(text); }
 }
 
@@ -281,8 +281,8 @@ function yamlOf(text) {
 // draft while the trigger never starts it once the pull request is marked ready: [] where none, or where the text is
 // no YAML (GitHub's own reader then refuses it).
 export function draftHoles(yaml) {
-  // (a text past the length read is not given to the parser: #752; one with a break the package does not read is read both
-  // as a YAML 1.1 reader reads it and as it stands, what either shows counting: #876)
+  // (a text past the length read is not given to the parser: #752; one with a break the package does not read is read as a
+  // YAML 1.1 reader reads it, as line feeds or as the mend leaves it, and as it stands, what any shows counting: #876)
   if (typeof yaml === "string") {
     if (yaml.length > LONGEST) return [];
     const texts = FOREIGN.test(yaml) ? [asLF(yaml).text, asMended(yaml).text, yaml] : [yaml];
