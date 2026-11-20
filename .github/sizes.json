@@ -32,7 +32,7 @@
       "why": "#929: the cases of how Betterleaks reads apart from what the check reads."
     },
     ".github/workflows/tests.yml": {
-      "mark": 71338,
+      "mark": 72196,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {
@@ -46,10 +46,6 @@
     "README.md": {
       "mark": 74465,
       "why": "Past the large file mark, it is read by the section a task needs, found by searching, never whole (roles/shared/how-to-work.md, \"Read little\"), so no split lets a session read less; GitHub shows it whole as the repository's front page, to people."
-    },
-    "tests/licence-scan-test.mjs": {
-      "mark": 46175,
-      "why": "#946: its header names the readers the scan calls, so that the mutation tool still runs it on them as before the split; a split of its cases by what each checks is a cleaning task."
     },
     "tests/hostile-packages-test.mjs": {
       "mark": 24130,
@@ -225,10 +221,6 @@
     },
     "tests/hostile-pr-comments-test.mjs": {
       "mark": 22109,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
-    },
-    "tests/licence-scan-test.mjs": {
-      "mark": 46036,
       "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/licences-test.mjs": {
