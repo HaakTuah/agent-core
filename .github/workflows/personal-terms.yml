@@ -174,15 +174,19 @@ jobs:
           back() { LC_ALL=C awk -v w=20000 -v o="$longest" -v h=33000 'NR == FNR { if ($1 != "") hit[$1] = 1; next }
             { n = length($0); k = 1; if (n > w) for (i = 1; i + w <= n; i += w - o) k++
               for (j = 0; j < k; j++) if (hit[h + at + 2 * j + 1]) { print FNR; break }; at += 2 * k }' "$1" -; }
-          scan() {
-            cat > "$work/given"
+          # (in a shell of its own with pipefail, so that a step of it that fails, a full disk among them, fails the scan
+          # rather than leave part of its input unread: the step's own shell has no pipefail, and a function called in a
+          # condition runs without -e)
+          scan() (
+            set -o pipefail
+            cat > "$work/given" || exit 1
             { head -c 33000 /dev/zero | tr '\0' '\n'; pieces < "$work/given"; } \
               | (cd "$work/none" && "$bl" stdin --config "$rules" --no-banner --no-color --log-level error \
               --redact --ignore-gitleaks-allow --max-decode-depth 0 --max-archive-depth 0 --gitleaks-ignore-path "$work/none" \
               --exit-code 0 --report-format template --report-template "$work/lines.tmpl" --report-path - > "$work/found" 2> "$work/said") \
-              || { echo "Betterleaks stopped with an error, not printed here, since it may quote a term." >&2; return 1; }
+              || { echo "Betterleaks stopped with an error, not printed here, since it may quote a term." >&2; exit 1; }
             back "$work/found" < "$work/given" | sort -n -u
-          }
+          )
           # (whether the text on its input holds a term: so too where Betterleaks fails, so that nothing goes unread)
           holds() { local out; ! out=$(scan) || [ -n "$out" ]; }
           # (a Claude Code session's id, of its one shape alone, taken out of what is read: a whole link, starting a
