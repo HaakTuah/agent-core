@@ -333,6 +333,15 @@ const keptTool = path.join(tmp, "kept"), keptDir = path.join(keptTool, "agent-co
 fs.mkdirSync(keptDir, { recursive: true });
 for (const name of ["betterleaks", "betterleaks.exe"]) fs.writeFileSync(path.join(keptDir, name), `#!/bin/sh\ntouch '${ran}'\n`, { mode: 0o755 });
 unfetched("where its release cannot be downloaded, a kept copy that differs from its sum beside it", { store: keptTool, fetchFails: true }, "could not be downloaded", () => sum && !fs.existsSync(ran));
+// (a store whose folder is a link, as another account could make at that name: nothing is written through it, and the
+// check fails, never running what stands there; the fallback security review of 20 November on #656)
+const linked = path.join(tmp, "linked"), elsewhere = path.join(tmp, "elsewhere");
+fs.mkdirSync(linked);
+fs.mkdirSync(elsewhere);
+if (process.platform !== "win32") {
+  fs.symlinkSync(elsewhere, path.join(linked, "agent-core-tools"));
+  unfetched("where the store's folder is a link", { store: linked }, "is not a folder of this user's own", () => fs.readdirSync(elsewhere).length === 0);
+}
 const tooLong = check(pull([[{ "b.md": "x\n" }]]), { terms: `${term}\n${"q".repeat(2001)}\n` });
 ok(!tooLong.passed && mended(tooLong.out) && tooLong.out.includes("longer than 2,000 bytes") && !tooLong.out.includes(term), "a term longer than the check can read whole fails, saying the mend, never hanging", tooLong.out);
 const none = check(pull([[{ "b.md": `${term}\n` }]]), { terms: "" });

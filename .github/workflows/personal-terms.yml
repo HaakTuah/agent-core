@@ -85,25 +85,30 @@ jobs:
             MINGW*/aarch64 | MINGW*/arm64 | MSYS*/aarch64 | MSYS*/arm64 | CYGWIN*/aarch64 | CYGWIN*/arm64) file=windows_arm64.zip exe=.exe archive=f93d26dfc7b939f967c74e3f908b44faec1b1cb6ffb29c75c0a1d7e713ab8f70 sum=ed9ee26a6f1a8d7f042712e524802911e23fd1b1cb0561ecb606b4faab5882d4 ;;
             *) echo "Betterleaks $version is not fetched: no pin stands in this check for $(uname -s)/$(uname -m)."; exit 0 ;;
           esac
-          digest() { { sha256sum -- "$1" 2> /dev/null || shasum -a 256 -- "$1" 2> /dev/null; } | cut -c1-64; }
-          store="${TMPDIR:-/tmp}/agent-core-tools/betterleaks-$version" bl="betterleaks$exe"
+          # (the hash read from its input, since a sum tool marks a path that holds a backslash, as Windows's do)
+          digest() { { sha256sum < "$1" || shasum -a 256 < "$1"; } 2> /dev/null | cut -c1-64; }
+          # (the store kept only in folders of this user's own, no link, so that another account's folder or link at
+          # that name takes nothing in; a new copy written to a file of its own first, never through a name made before)
+          owned() { [ -d "$1" ] && [ ! -L "$1" ] && [ -O "$1" ] || { echo "$1 is not a folder of this user's own" >&2; return 1; }; }
+          tools="${TMPDIR:-/tmp}/agent-core-tools" store="${TMPDIR:-/tmp}/agent-core-tools/betterleaks-$version" bl="betterleaks$exe" got="archive.${file#*.}"
           # (one kept from an earlier run is taken only where it holds its sum; otherwise it is fetched again, into a
           # folder of this run's own, the archive and then the program checked before it is kept)
           if [ "$(digest "$store/$bl")" != "$sum" ]; then
             dir=$(mktemp -d) || { echo "Betterleaks $version is not fetched: no temporary folder could be made."; exit 0; }
-            if (cd "$dir" && curl -fsSL --proto =https --proto-redir =https --connect-timeout 30 --max-time 300 --retry 2 -o archive \
+            if (cd "$dir" && curl -fsSL --proto =https --proto-redir =https --connect-timeout 30 --max-time 300 --retry 2 -o "$got" \
                 "https://github.com/betterleaks/betterleaks/releases/download/v$version/betterleaks_${version}_$file" \
-              && [ "$(digest archive)" = "$archive" ] \
+              && [ "$(digest "$got")" = "$archive" ] \
               && case $file in
-                   *.zip) if command -v unzip > /dev/null 2>&1; then unzip -q archive "$bl"
-                          else powershell -NoProfile -NonInteractive -Command "Expand-Archive -LiteralPath archive -DestinationPath out" && mv out/"$bl" .; fi ;;
-                   *) tar -xzf archive "$bl" ;;
+                   *.zip) if command -v unzip > /dev/null 2>&1; then unzip -q "$got" "$bl"
+                          else powershell -NoProfile -NonInteractive -Command "Expand-Archive -LiteralPath $got -DestinationPath out" && mv out/"$bl" .; fi ;;
+                   *) tar -xzf "$got" "$bl" ;;
                  esac \
               && [ "$(digest "$bl")" = "$sum" ] \
-              && mkdir -p "$store" && cp "$bl" "$store/new.$$" && chmod 755 "$store/new.$$" && mv -f "$store/new.$$" "$store/$bl") > "$dir/log" 2>&1; then :
+              && mkdir -p "$tools" && owned "$tools" && mkdir -p "$store" && owned "$store" && new=$(mktemp "$store/new.XXXXXX") \
+              && cp "$bl" "$new" && chmod 755 "$new" && mv -f "$new" "$store/$bl") > "$dir/log" 2>&1; then :
             else
-              echo "Betterleaks $version is not fetched: its release for $(uname -s)/$(uname -m) could not be downloaded, or differs from its sum here. Of the fetch:"
-              tail -n 5 "$dir/log" 2> /dev/null; echo "the archive's SHA-256: $(digest "$dir/archive")"
+              echo "Betterleaks $version is not fetched: its release for $(uname -s)/$(uname -m) could not be downloaded, differs from its sum here, or could not be kept. Of the fetch:"
+              tail -n 5 "$dir/log" 2> /dev/null; echo "the archive's SHA-256: $(digest "$dir/$got")"
               rm -rf "$dir"; exit 0
             fi
             rm -rf "$dir"
@@ -132,7 +137,7 @@ jobs:
           # (Betterleaks, as the step before fetched it: copied into this run's own folder and run only where the copy
           # holds the sum that step checked it by, so that one changed after that step never runs; where that step
           # fetched none, the check fails, since it guards what may not leak (floor rule 14))
-          digest() { { sha256sum -- "$1" 2> /dev/null || shasum -a 256 -- "$1" 2> /dev/null; } | cut -c1-64; }
+          digest() { { sha256sum < "$1" || shasum -a 256 < "$1"; } 2> /dev/null | cut -c1-64; }
           bl="$work/${BETTERLEAKS##*/}"
           if [ -z "$BETTERLEAKS" ] || [ -z "$BETTERLEAKS_SUM" ] || ! cp -- "$BETTERLEAKS" "$bl" 2> /dev/null || [ "$(digest "$bl")" != "$BETTERLEAKS_SUM" ]; then
             echo "FAIL Betterleaks, which matches the terms, was not fetched at its pin (the step \"Fetch Betterleaks\" says why), so nothing was read. Mend: run the check again; where it fails again, run it where Betterleaks' releases on github.com can be reached, on Linux, macOS or Windows, on x64 or arm64, as on GitHub's runners; the check guards what may not leak, so it never passes unread."
