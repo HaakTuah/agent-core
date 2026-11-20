@@ -247,9 +247,9 @@
       "mark": 32013,
       "why": "#943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
     },
-    "tests/core-path-test.mjs": {
-      "mark": 25409,
-      "why": "#919: its cases for a core a library carries, and for the commands its hooks run, move to a file of their own."
+    ".github/shape-baseline.json": {
+      "mark": 21237,
+      "why": "A baseline the shape check reads and writes whole (--write), in the form every project's baseline takes; 'grown' gives the reason for some of the keys 'listed' holds, so a split along the two parts would make two files to keep in step, and none along who reads it was found."
     },
     "tests/staged-test.mjs": {
       "mark": 125729,

@@ -463,6 +463,9 @@ jobs:
       - name: Where the core's copy stands, as the manifest names it
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-path-test.mjs ')) }}
         run: node tests/core-path-test.mjs
+      - name: The copy's path, for Claude Code's hooks and the workflows a project calls
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-path-hooks-test.mjs ')) }}
+        run: node tests/core-path-hooks-test.mjs
       - name: Where the owner's inbox is, issues or the folder
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/inbox-test.mjs ')) }}
         run: node tests/inbox-test.mjs
