@@ -1,6 +1,6 @@
 // The step of setup/sync-notes/230-the-core-s-scripts-started-through-bash.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { copyAt, readable } from "../check-configs.mjs";
+import { copyAt, readable } from "../workflow-calls.mjs";
 import { COST, inCopy } from "../step-checks.mjs";
 
 export default { lead: "13 November 2026, the core's scripts started through bash", cost: COST.workflow,

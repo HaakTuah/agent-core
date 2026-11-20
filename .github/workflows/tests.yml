@@ -548,6 +548,30 @@ jobs:
       - name: What a release asks of a project, step by step, and a project beside a fresh start
         if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-test.mjs ')) }}
         run: node tests/steps-test.mjs
+      - name: The steps on a project whose slots, triggers and marks stand otherwise than the kit writes them
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-slots-test.mjs ')) }}
+        run: node tests/steps-slots-test.mjs
+      - name: A project beside a fresh start, and what the steps read of the files it holds
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-fresh-test.mjs ')) }}
+        run: node tests/steps-fresh-test.mjs
+      - name: The steps on a project whose copy of the core stands at a path of its own or in a library
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-vendored-test.mjs ')) }}
+        run: node tests/steps-vendored-test.mjs
+      - name: The configs a project's own workflows give its checks, as the steps and the fresh start read them
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-own-configs-test.mjs ')) }}
+        run: node tests/steps-own-configs-test.mjs
+      - name: The reading of a run's configs, from its script, its argument and every source of a config
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-configs-test.mjs ')) }}
+        run: node tests/steps-run-configs-test.mjs
+      - name: The reading of a run behind a shell, a wrapper, a here-document or a subshell
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-wrappers-test.mjs ')) }}
+        run: node tests/steps-run-wrappers-test.mjs
+      - name: The reading of the words of a run, what names the script and what runs it
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-words-test.mjs ')) }}
+        run: node tests/steps-run-words-test.mjs
+      - name: The reading of a run's environment and of texts that try it, and the bash grammar
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-hostile-test.mjs ')) }}
+        run: node tests/steps-run-hostile-test.mjs
       - name: The readers of when and how the checks run, which the steps read
         if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-checks-run-test.mjs ')) }}
         run: node tests/steps-checks-run-test.mjs

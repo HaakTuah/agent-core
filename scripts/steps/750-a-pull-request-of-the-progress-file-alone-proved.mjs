@@ -1,6 +1,6 @@
 // The step of setup/sync-notes/750-a-pull-request-of-the-progress-file-alone-proved.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { readable } from "../check-configs.mjs";
+import { readable } from "../workflow-calls.mjs";
 import { CORE } from "../core-address.mjs";
 import { COST, shown } from "../step-checks.mjs";
 import { topLevel, unwrapped } from "../step-checks-tests.mjs";

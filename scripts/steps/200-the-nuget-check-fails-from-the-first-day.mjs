@@ -1,6 +1,6 @@
 // The step of setup/sync-notes/200-the-nuget-check-fails-from-the-first-day.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { given } from "../check-configs.mjs";
+import { given } from "../workflow-calls.mjs";
 import { COST } from "../step-checks.mjs";
 
 export default { lead: "13 November 2026, the NuGet check fails from the first day", cost: COST.workflow,

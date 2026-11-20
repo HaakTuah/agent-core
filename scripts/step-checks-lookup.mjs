@@ -3,7 +3,7 @@
 // piece takes the project as steps.mjs's `project` reads it and returns the mend, or null where the step is done; a
 // step names the ones it needs, none runs by itself. It reads only. Node's own modules and git only.
 import path from "node:path";
-import { copyAt } from "./check-configs.mjs";
+import { copyAt } from "./workflow-calls.mjs";
 import { shown } from "./step-checks.mjs";
 import { jobsOf } from "./step-checks-jobs.mjs";
 
@@ -13,7 +13,7 @@ import { jobsOf } from "./step-checks-jobs.mjs";
 // copy's install.mjs as a command's first words (after a shell's then, else or do), with no `if:` or
 // continue-on-error of its own; a command that only names the path, as echo does, installs nothing.
 // (the reading both install steps share: the copy's scripts and install; whether a step runs a file, a command as
-// check-configs.mjs reads it, its words; and whether it installs, naming one of `named` where it is given)
+// step-commands.mjs reads it, its words; and whether it installs, naming one of `named` where it is given)
 function installReading(p) {
   const copy = copyAt(p), script = `${copy}scripts/`, install = `${copy}scripts/install.mjs`;
   const bare = t => t.replace(/^\.\//u, "");
