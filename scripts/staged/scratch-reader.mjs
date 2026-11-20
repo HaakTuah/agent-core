@@ -1,7 +1,8 @@
 // The sealed reader of what a session left in a staged case (scratch.mjs, the entrance beside this file; AGENTS.md,
 // "Staged cases hold what no check reads"; #938): the git it runs, the files it reads as plain files and nothing else, its
 // own repository over the session's objects, and the seal a case keeps of itself. A security reading: what the session
-// wrote (its git config, hooks, links, attributes) is never run or followed. Node's own modules only.
+// wrote (its git config, hooks, links, attributes) is never run or followed. It takes scratch-outcome.mjs with it, which
+// runs the session's program and calls git through this file's SAFE_ and QUIET_. Node's own modules only.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";

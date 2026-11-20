@@ -7,7 +7,8 @@
 // it says of itself. This file is the one entrance of its three parts (#938), each read on its own:
 //   scratch-setup.mjs    the set-up of a case: the names, the kit's project, the origin, the stand-in's state;
 //   scratch-reader.mjs   the sealed reader of what a session left (a security reading) and the seal a case keeps;
-//   scratch-outcome.mjs  the readers a case's verdict uses, built on the sealed reader.
+//   scratch-outcome.mjs  the readers a case's verdict uses, built on the sealed reader; it runs the session's program, so a
+//                        security reading takes it too.
 export { BUG, CORE_ROOT, LABELS, OWNER, PASSER, PROGRAM, REPO, URL, build, carry, fakeKey, folderFit, git, keepKits } from "./scratch-setup.mjs";
 export { LIMITS, Unreadable, base, branchesOf, github, memo, memoOf, originGit, readGit, seal, sealOf, sealed } from "./scratch-reader.mjs";
 export { added, adds, changed, fixed, gone, heldAtBase, inCommits, onGitHub, printed, pulls, pushed, runAt, show, testPasses, touched, verdict, waitsOnOwner, words, written } from "./scratch-outcome.mjs";

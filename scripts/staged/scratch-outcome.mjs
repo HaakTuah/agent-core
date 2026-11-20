@@ -1,6 +1,8 @@
 // The readers a staged case's verdict uses (scratch.mjs, the entrance beside this file; AGENTS.md, "Staged cases hold what
 // no check reads"; #938): what the session pushed, what it left in the project and what it wrote to GitHub, read through
-// the sealed reader (scratch-reader.mjs) and never from what the session says of itself.
+// the sealed reader (scratch-reader.mjs) and never from what the session says of itself. A security reading takes this
+// file with the reader's: it runs the session's program in the bare environment (testPasses, printed), writes its files
+// out (writeSrc) and calls git through the reader's SAFE_ and QUIET_ (touched).
 import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
