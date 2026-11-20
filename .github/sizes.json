@@ -117,19 +117,19 @@
     },
     "tests/packages-test.mjs": {
       "mark": 68081,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "why": "Its checks of the lock file and the week's wait gate the install below them (where one fails, nothing is installed or loaded), and the install's cases run on a copy of the same lock files; split, the install would run on a lock file that failed, or each file would read the lock files again, so the file stays one flow (#1008)."
     },
     "tests/pointers-test.mjs": {
       "mark": 23333,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "why": "One script's cases (pointers.mjs) on the small projects they write for it (rule files with either line ending, a pointer that leads nowhere, a project with no SECURITY.md, the agent tools' files); the one section of another kind, what the check reads of Markdown, is 3 KB, too little for a split to give a reader less, and the file is 14% past the mark (#1008)."
     },
     "tests/pure-sync-test.mjs": {
       "mark": 23363,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "why": "The two programs (sync.mjs and the proof pure-sync.mjs) run end to end on one scratch copy of the core with a short history and a project made from it, the later cases taking the project as the earlier left it; split, each file would build them again, adding to the suite's time (tasks/tests.md), and the file is 14% past the mark (#1008)."
     },
     "tests/work-saved-test.mjs": {
       "mark": 26522,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "why": "One hook's cases (work-saved.sh, run as a project registers it) on the one scratch project with a remote of its own that they share; split, each file would build it again, adding to the suite's time (tasks/tests.md) (#1008)."
     },
     "tests/nuget-gate-test.mjs": {
       "mark": 20574,
@@ -205,27 +205,27 @@
     },
     "tests/code-review-wait-test.mjs": {
       "mark": 33431,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "why": "One script's cases (code-review-wait.mjs: judge() on a pull request's comments, on its commits and files, and the reviews' marks, then the command) on the fixtures they share (`pull`, `summary`, `said`, `is`); split along the script's parts, each file would write them again, and a session changing judge() reads each case (#1008)."
     },
     "tests/core-yml-test.mjs": {
       "mark": 22488,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "why": "One workflow's job (core.yml, run as GitHub runs it) on the one scratch core every case builds, already run in two parts by the part given to it (`faults`, `places`), each a step of the suite; a file for each part would build the core again, adding to the suite's time (tasks/tests.md), and the file is 10% past the mark (#1008)."
     },
     "tests/hostile-build-files-test.mjs": {
       "mark": 29868,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "why": "The sections of one input, a project's build, package and workflow files (too long, the wrong type, markup, a file path, out of range, nothing at all, and the reader of where the tests run), each trying every reader of it (licences.mjs, exact-versions.mjs, nuget.mjs, workflows.mjs, workflow-run.mjs, runners.mjs, agent-tools.mjs) on the scratch project and the helpers they share; split by section, each file would set them up again, and a reader added to the input is added to every section (#1008)."
     },
     "tests/hostile-github-test.mjs": {
       "mark": 22575,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "why": "The sections of one input, what GitHub's API answers (too long, the wrong type, markup, a file path, out of range, nothing at all), each trying every reader of it on the one scratch repository and stand-ins for git and gh they share; split by section, each file would set them up again, and a reader added to the input is added to every section (#1008)."
     },
     "tests/hostile-pr-comments-test.mjs": {
       "mark": 22109,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "why": "The sections of one input, a pull request's comments and reviews as GitHub's API gives them (too long, the wrong type, markup, a file path, out of range, nothing at all), each trying every reader of it (security-review.mjs, code-review-wait.mjs, size.mjs, tools-read.mjs, review-marks.mjs, look.mjs) on the fixtures they share; split by section, each file would write them again, and a reader added to the input is added to every section; the file is 8% past the mark (#1008)."
     },
     "tests/licences-test.mjs": {
       "mark": 24020,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "why": "One script's readers (licences.mjs: how a licence expression is read, which list allows what, a package known by its registry address, npm's settings, the config's schema) on invented names; their cases read the same lists, so whoever changes a list reads how the others count against it, and a split would make that session open each part (#1008)."
     },
     "tests/lookup-test.mjs": {
       "mark": 21844,
@@ -237,7 +237,7 @@
     },
     "tests/merge-line-test.mjs": {
       "mark": 23054,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "why": "One script's cases (merge-line.mjs: the facts read from the host for each kind of repository, where users get a release, the measure, the cancelling) through the stand-in for gh they share; split along the script's parts, each file would write it again, and the file is 13% past the mark (#1008)."
     },
     "tests/size-test.mjs": {
       "mark": 28199,
