@@ -221,9 +221,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      one.
    - **What the tests cost** (`tasks/tests.md`): `select.mjs`, a step of the same job before the tests, with
      `SELECT_BASE` the pull request's base, selects the tests the change can reach, with the project's proof, never
-     selected out, and the whole suite where a changed file's reach cannot be told or no base is told; the job runs
-     those it names. At the audit, `test-record.mjs` reads each test's time, its failures and what it alone catches;
-     each month the state report gives what a push waits on (`wait.mjs`) beside its mark, and the minutes GitHub bills a
+     selected out, and the whole suite where a changed file's reach cannot be told, the changed files are too many to
+     read in time or no base is told; the job runs those it names. At the audit, `test-record.mjs` reads each test's
+     time, its failures and what it alone catches; each month the state report gives what a push waits on (`wait.mjs`)
+     beside its mark, and the minutes GitHub bills a
      pull request, the median of the last 30 merged, each job rounded up, which the core's report carries for each
      project it reads. The shape check counts the tests that open a screen, reach a real clock or start another process,
      and the record the share of the tests' time each takes; it measures each suite against its time mark, a warning
@@ -438,7 +439,8 @@ same byte for byte. What a check leaves out of the copy in a project was held in
 merge, by what the last column names. No check leaves another publisher's code out for anyone (#654).
 
 Each row is for a copy at `core/`. Where the manifest names another path, the rows of `security-review.mjs`,
-`personal-terms.yml`, `workflows.mjs`, `shape.mjs` and `nuget.mjs` still read `core/` (#628). `tests/copy-left-out-test.mjs`
+`personal-terms.yml`, `workflows.mjs` and `nuget.mjs` read the copy at that path (#628, #918), and `shape.mjs`' row is the
+project's config, which the starter kit writes for the copy's path and a sync's fresh comparison reads there. `tests/copy-left-out-test.mjs`
 holds the list to what the checks do: it stages each check's fault inside the copy and outside it. It also fails a
 check a project runs that the list leaves out.
 

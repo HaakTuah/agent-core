@@ -159,6 +159,11 @@ function roundTrip(name, given, dir) {
 // (the same projects with the copy at another path, and the starter kit's own folder names read from it: #628)
 const vendored = {};
 for (const [name, o, at] of [["a-vendored-npm-project", { packages: "." }, "vendor/core/"], ["a-vendored-dotnet-game", { nuget: "src", game: true }, "third_party/the-core/"]]) vendored[name] = kit(name, o, { at });
+// (the configs the kit writes leave out and name the copy at the manifest's path, which the fresh comparison above reads: #918)
+for (const [name, at] of [["a-vendored-npm-project", "vendor/core/"], ["a-vendored-dotnet-game", "third_party/the-core/"]]) {
+  const shape = fs.readFileSync(path.join(vendored[name], "checks/shape.json"), "utf8"), copies = fs.readFileSync(path.join(vendored[name], "checks/copies.json"), "utf8");
+  ok(shape.includes(`":!${at}"`) && !/":!core\//u.test(shape) && copies.includes(`"${at}floor/*.md"`) && !/"core\//u.test(copies), `${name}: the starter kit's shape and copies configs leave out and name the copy where the manifest says it stands`, `${shape}\n${copies}`);
+}
 // (the steps that read a project's own run of the core's scripts read it at the copy's path: a mutation tool's strength
 // check, and the selection of the tests a change can reach with the name of the check that gates a tree that passed)
 {

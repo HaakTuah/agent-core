@@ -55,11 +55,11 @@ ok(floorCopyIn(carried()) === "floor-copy/" && floorCopyIn(copied()) === null &&
 // the reading script's own reading of the path, held to this one's
 for (const text of [copied(), copied("vendor/the-core/"), carried(), carried("libs/shared/", "libs/shared/core/")]) ok(pathIn(text) === readCore(text).path, `the reading script reads the path ${readCore(text).path} alike`);
 ok(pathIn("# Core manifest\n") === "core/", "where the line names none, the reading script takes the usual path");
-// the sed of the workflows' first step and of the work-saved hook, run on the same lines: each reads the path readCore
+// the sed of the workflows' first step (the personal-terms check's too, which reads the base's manifest) and of the work-saved hook, run on the same lines: each reads the path readCore
 // reads, and nothing where readCore reads it as wrong, so no check runs a script from a folder core.yml never compared
 {
   const hook = fs.readFileSync(fileURLToPath(new URL("../scripts/work-saved.sh", import.meta.url)), "utf8");
-  const seds = [...CALLED.map(f => [f, /sed -n -E ('[^']+')/u.exec(fs.readFileSync(fileURLToPath(new URL(`../.github/workflows/${f}`, import.meta.url)), "utf8"))?.[1] ?? "'no sed'", out => out.split(" ")[0]]),
+  const seds = [...[...CALLED, "personal-terms.yml"].map(f => [f, /sed -n -E ('[^']+')/u.exec(fs.readFileSync(fileURLToPath(new URL(`../.github/workflows/${f}`, import.meta.url)), "utf8"))?.[1] ?? "'no sed'", out => out.split(" ")[0]]),
     ["the hook", /sed -n -E ('s#\^Core: [^']+')/u.exec(hook)[1], out => out]];
   for (const text of [copied(), copied("vendor/the-core/"), carried(), copied("core/../evil/"), carried("lib/../x/", "lib/../x/core/"), copied("core/..x/"), `${copied().trimEnd()} trailing words\n`]) {
     const want = readCore(text).path ?? "";
@@ -241,9 +241,28 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
     git(evil, "checkout", "-q", "-b", "forged"); git(evil, "rm", "-q", "-f", "lib");
     fs.cpSync(bare, path.join(evil, "lib"), { recursive: true });
     git(evil, "add", "-A", "-f"); git(evil, "commit", "-q", "-m", "a bare repository where the library stood");
-    const stop = hookCommands(readCore(carried())).stop, inFolder = stop.replace('--git-dir="${CLAUDE_PROJECT_DIR:-.}"/lib/.git', '-C "${CLAUDE_PROJECT_DIR:-.}"/lib'), at = command => spawnSync("sh", ["-c", command], { input: "{}", encoding: "utf8", env: { ...env, CLAUDE_PROJECT_DIR: evil } }).stdout;
+    const stop = hookCommands(readCore(carried())).stop, inFolder = stop.replace('git -C "${CLAUDE_PROJECT_DIR:-.}" --git-dir="$m"', 'git -C "${CLAUDE_PROJECT_DIR:-.}"/lib'), at = command => spawnSync("sh", ["-c", command], { input: "{}", encoding: "utf8", env: { ...env, CLAUDE_PROJECT_DIR: evil } }).stdout;
     ok(/FORGED/.test(at(inFolder)) && !/FORGED/.test(at(stop)),
       "a bare repository a branch commits where the library stands is not read by the commands for a carried core, though git, run in the folder, reads it", `${at(inFolder)}|${at(stop)}`);
+    // (and a branch that commits the library's folder itself as a link, to a folder outside the project whose .git holds the
+    // forged repository, where git run at lib/.git finds it, #930: the commands name the superproject's own module repository,
+    // which the link does not reach, and run main's pin)
+    if (process.platform !== "win32") {
+      const linked = path.join(tmp, "a-linked-project"), outside = path.join(tmp, "a-folder-outside"), origin4 = path.join(tmp, "a-linked-project.git");
+      git(tmp, "init", "-q", "-b", "main", linked);
+      git(linked, "submodule", "add", "-q", lib, "lib");
+      git(linked, "add", "-A"); git(linked, "commit", "-q", "-m", "a project");
+      git(tmp, "init", "-q", "--bare", "-b", "main", origin4);
+      git(linked, "remote", "add", "origin", origin4); git(linked, "push", "-q", "-u", "origin", "main");
+      fs.mkdirSync(outside, { recursive: true }); fs.cpSync(bare, path.join(outside, ".git"), { recursive: true });
+      git(linked, "checkout", "-q", "-b", "linked"); git(linked, "rm", "-q", "-f", "lib");
+      fs.symlinkSync(outside, path.join(linked, "lib"));
+      git(linked, "add", "-A", "-f"); git(linked, "commit", "-q", "-m", "the library's folder as a link");
+      const stop = hookCommands(readCore(carried())).stop, oldForm = stop.replace('git -C "${CLAUDE_PROJECT_DIR:-.}" --git-dir="$m"', 'git --git-dir="${CLAUDE_PROJECT_DIR:-.}"/lib/.git');
+      const at = command => spawnSync("sh", ["-c", command], { input: "{}", encoding: "utf8", env: { ...env, CLAUDE_PROJECT_DIR: linked } }).stdout;
+      ok(/FORGED/.test(at(oldForm)) && !/FORGED/.test(at(stop)) && /the hook of main's pin ran: stop/.test(at(stop)),
+        "the library's folder a branch commits as a link is not read by the commands for a carried core: they run the pin's script from the module repository", `${at(oldForm)}|${at(stop)}`);
+    }
   }
   git(project, "submodule", "deinit", "-q", "-f", "lib");
   said = run(hooks.start);

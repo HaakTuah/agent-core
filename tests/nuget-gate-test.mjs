@@ -19,6 +19,7 @@ import path from "node:path";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 
 const { ok, done } = tally();
 const workflow = fs.readFileSync(path.join(root, ".github/workflows/nuget.yml"), "utf8");
@@ -160,6 +161,45 @@ if (sdk) {
   ok(!imported.passed && imported.ran.includes(FETCH) && imported.out.includes("build/deps.xml"), "where only an imported file changed, the first look names it, so the read before the restore runs, and the restore fails what no lock file holds", imported.out.slice(-1500));
   const stale = whole({ "src/App/App.csproj": project("") });
   ok(!stale.passed && /NU1004/.test(stale.out) && /A restore from a lock file failed .*\. Mend: /.test(stale.out) && mended(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
+}
+
+// the second look, where the copy of the core stands at another path than core/ (#918): the restore's own records are read
+// outside the copy, at the path the caller gives (CORE_AT), whatever the copy holds. A stand-in for dotnet writes one for
+// the project and, inside the copy, one that downloads a package beside a lock file, which only a look that reads the
+// copy as a project's own file reports (the SDK's own word is tried above, where there is one).
+if (process.platform === "win32") console.log("skip the copy at another path: the stand-in for dotnet is a shell script");
+else {
+  const standIn = path.join(tmp, "stand-in");
+  fs.mkdirSync(standIn);
+  fs.writeFileSync(path.join(standIn, "dotnet"), `#!/bin/sh
+for a; do last=$a; done
+dir=$(dirname "$last")
+mkdir -p "$dir/obj" "$COPY/obj"
+printf '{"project":{"restore":{"projectPath":"%s/%s"},"frameworks":{}}}' "$PWD" "\${last#./}" > "$dir/obj/project.assets.json"
+printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":{"downloadDependencies":[{"name":"Beside.Lock"}]}}}}' "$PWD" "$COPY" > "$COPY/obj/project.assets.json"
+`, { mode: 0o755 });
+  const atCopy = (copy, at) => {
+    const dir = path.join(tmp, `copy-${++n}`);
+    fs.mkdirSync(dir);
+    git(dir, "init", "-q", "-b", "main");
+    for (const [f, text] of Object.entries({ ...START, "core-manifest.md": `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${copy} (never edited here).\n` })) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
+    fs.cpSync(path.join(root, "scripts"), path.join(dir, copy, "scripts"), { recursive: true });
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "base");
+    const baseSha = git(dir, "rev-parse", "HEAD");
+    fs.writeFileSync(path.join(dir, "README.md"), "# A project\n\nMore.\n");
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "a change");
+    const output = path.join(tmp, `look-${n}`);
+    fs.writeFileSync(output, "");
+    const r = spawnSync("bash", ["-e", `${copy}scripts/nuget-look.sh`], { cwd: dir, encoding: "utf8", env: { ...env, PATH: `${standIn}${path.delimiter}${env.PATH}`, COPY: at, BASE: baseSha, CONFIG: "checks/licences.json",
+      CALLER: "someone/project/.github/workflows/restore.yml@refs/pull/1/merge", GITHUB_REPOSITORY: "someone/project", CORE_AT: copy, NUGET_PACKAGES: path.join(tmp, `look-packages-${n}`), GITHUB_OUTPUT: output } });
+    return { run: r.status === 0 ? /^run=(.*)$/m.exec(fs.readFileSync(output, "utf8"))?.[1]?.trim() : undefined, out: `${r.stdout}${r.stderr}` };
+  };
+  const vendor = atCopy("vendor/core/", "vendor/core/"), deeper = atCopy("third_party/the-core/", "third_party/the-core/"), usual = atCopy("core/", "core/");
+  ok(vendor.run === "false" && deeper.run === "false" && usual.run === "false", "the restore's records inside the copy of the core, at core/ or at the path the caller gives, are no project's own: the look says no restore", [vendor, deeper, usual].map(r => r.out).join("\n"));
+  const elsewhere = atCopy("vendor/core/", "vendor/other/");
+  ok(elsewhere.run === "true", "and a record in a folder that is not the copy still makes it run", elsewhere.out);
 }
 
 done("the NuGet check's own steps");

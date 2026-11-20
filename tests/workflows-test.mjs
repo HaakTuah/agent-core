@@ -13,6 +13,7 @@ import { TEMPLATES } from "../scripts/init.mjs";
 import { holds, parseYaml } from "../scripts/workflow-run.mjs";
 import { draftHoles, foreignBreaks, foreignBroken, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
 import { CORE } from "../scripts/core-address.mjs";
+import { keysOnce } from "../scripts/step-checks.mjs";
 import { LONGEST, twice, uncommented } from "../scripts/yaml-keys.mjs";
 
 let failed = 0;
@@ -36,6 +37,10 @@ ok(readable("on: push\n") && readable("\ufeffon: push # \u00e6\u00f8\u00e5 \u271
 const files = [".github/workflows/a.yml", ".github/workflows/b.yaml", ".github/actions/setup/action.yml", ".github/actions/setup/steps.yml", "tools/act/action.yaml", "action.yml",
   ".github/workflows/c.YML", ".github/dependabot.yml", ".github/ISSUE_TEMPLATE/config.yml", "core/.github/workflows/a.yml", "core/tools/action.yml", "tools/node_modules/a/action.yml", "docs/a.yml", "docs/reaction.yml"];
 ok(reads(files).join() === files.slice(0, 7).join(), "it reads the project's own workflows and its actions wherever they lie, whatever the case of the ending, and neither the core's copy nor an installed package's");
+const vendored = [...files, "vendor/core/.github/workflows/a.yml", "vendor/core/tools/action.yml"], atVendor = reads(vendored, "vendor/core/");
+ok(!atVendor.some(f => f.startsWith("vendor/")) && atVendor.includes("core/tools/action.yml") && files.slice(0, 7).every(f => atVendor.includes(f))
+  && reads(vendored).includes("vendor/core/tools/action.yml") && !reads(vendored).some(f => f.startsWith("core/")),
+  "where the manifest names the copy at another path, it is that path that is left out and the project's own core/ folder is read; the default stays core/ (#918)", atVendor.join());
 ok(unlinked([".github", ".GitHub/workflows", ".github/workflows", ".github/dependabot.yml", "tools/act/action.yaml", "tools/act", "docs/a.yml", ".githubs", "core/.github/workflows/a.yml"]).join() === ".github,.GitHub/workflows,.github/workflows,.github/dependabot.yml,tools/act/action.yaml", "what may be no link: what it reads, and .github itself with everything in it (a linked folder is one entry to git)");
 
 // ---- a key given twice in one mapping, which GitHub refuses (#393) ----
@@ -189,6 +194,32 @@ try {
   const u = keyRun([], { CORE_PACKAGES_UNREACHED: "1" }), uOut = u.stdout + u.stderr;
   ok(u.status === 1 && /^::warning::The check for a key given twice did not run, nor the one for a call a draft skips/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && !/e\.yml|is not installed/.test(uOut) && mended(uOut), `where the install could not reach the registry, the keys given twice and the calls a draft skips did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+// ---- a copy of the core at the path the manifest names (#918): the check leaves it out, and reads the project's own core/ ----
+const vend = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-vendored-"));
+try {
+  const at = "vendor/core/", put = (f, text) => { fs.mkdirSync(path.dirname(path.join(vend, f)), { recursive: true }); fs.writeFileSync(path.join(vend, f), text); };
+  fs.mkdirSync(path.join(vend, at, "scripts"), { recursive: true });
+  for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(vend, at, "scripts", f));
+  fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(vend, at, ".packages"), { recursive: true });
+  put("core-manifest.md", `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${at} (never edited here).\n`);
+  put(`${at}tools/action.yml`, "on:\n  pull_request_target:\n"); // (the copy's own, which the core's run holds)
+  put(".github/workflows/own.yml", "on: push\n");
+  for (const args of [["init", "-q"], ["add", "-A", "-f"]]) execFileSync("git", args, { cwd: vend, stdio: "ignore" });
+  const vRun = () => spawnSync(process.execPath, [path.join(vend, at, "scripts/workflows.mjs")], { cwd: vend, encoding: "utf8", env: { ...process.env, WORKFLOWS_BASE: "" } });
+  const inCopy = vRun();
+  // (the sync's step for a key given twice reads the same files: the copy's left out, the project's own core/ read)
+  const twiceIn = "on: push\njobs:\n  a:\n    steps:\n      - run: x\n        if: a\n        if: b\n";
+  put(`${at}tools/action.yml`, twiceIn);
+  put("core/tools/action.yml", twiceIn);
+  const stepSees = keysOnce({ root: vend, files: [`${at}tools/action.yml`, "core/tools/action.yml", ".github/workflows/own.yml"], read: f => fs.readFileSync(path.join(vend, f), "utf8") });
+  ok(typeof stepSees === "string" && stepSees.includes("`core/tools/action.yml` line 7") && !stepSees.includes("vendor/core"), "the sync's step for a key given twice leaves the copy at the manifest's path out and reads the project's own core/ folder", String(stepSees));
+  put(`${at}tools/action.yml`, "on:\n  pull_request_target:\n");
+  put("core/tools/action.yml", "on:\n  pull_request_target:\n"); // (the project's own folder of that name)
+  execFileSync("git", ["add", "-A", "-f"], { cwd: vend, stdio: "ignore" });
+  const own = vRun();
+  ok(inCopy.status === 0 && !/vendor\/core/u.test(inCopy.stdout + inCopy.stderr) && own.status === 1 && /^FAIL core\/tools\/action\.yml:2: pull_request_target/m.test(own.stdout) && !/vendor\/core\/tools/u.test(own.stdout),
+    "run in a project whose manifest names the copy at another path, an action.yml in the copy is left out and the project's own core/ is read", `${inCopy.stdout}${inCopy.stderr}\n${own.stdout}${own.stderr}`);
+} finally { fs.rmSync(vend, { recursive: true, force: true }); }
 // ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
 // Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and
 // the pull request, cancelled once a newer run starts for it; a run on main, a schedule or a start by hand is a group of

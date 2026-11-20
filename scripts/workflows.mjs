@@ -31,7 +31,7 @@
 // belongs, so that is no way to write one; the reviews hold it, as they hold any odd tag in a workflow.
 // The rest of rule 2 is held elsewhere: that every action is pinned to a full commit SHA by GitHub's own setting, which
 // reads a workflow as GitHub runs it (README.md, "Setting up"); workflow_run, the fewest permissions and untrusted text
-// in a script by the reviews, and by CodeQL where the repository has it. The copy of the core (core/) is checked in the
+// in a script by the reviews, and by CodeQL where the repository has it. The copy of the core (core/, or where the manifest names it) is checked in the
 // core, which runs this on itself. Reads only; git, Node's own modules and the YAML package the core installs
 // (packages.mjs). It checks the project it lies in, whatever the directory it is started from. Run by the copies workflow
 // (.github/workflows/copies.yml).
@@ -45,7 +45,7 @@ import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
 import { DEEPEST, LONGEST, pruned, twice } from "./yaml-keys.mjs";
 import { loadSync, unreached } from "./packages.mjs";
-import { projectAt } from "./core-path.mjs";
+import { copyOf, projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
 
 const WORD = "pull_request_target";
@@ -111,11 +111,12 @@ export function foreignBroken(files, before) {
   return { fails, notes };
 }
 
-// The files the check reads, of those git tracks.
-export const reads = files => files.filter(f => !f.startsWith("core/") && !f.split("/").includes("node_modules") &&
+// The files the check reads, of those git tracks: the project's own, the copy of the core aside, where its manifest names
+// it (`copy`, core-path.mjs's copyOf; core/ where it names none).
+export const reads = (files, copy = "core/") => files.filter(f => !f.startsWith(copy) && !f.split("/").includes("node_modules") &&
   (/^\.github\/(workflows\/[^/]+|actions\/.+)\.ya?ml$/iu.test(f) || /(^|\/)action\.ya?ml$/iu.test(f)));
 // What may be no link, of those git tracks: what the check reads, and .github itself with everything in it.
-export const unlinked = files => { const read = new Set(reads(files)); return files.filter(f => read.has(f) || /^\.github(\/|$)/iu.test(f)); };
+export const unlinked = (files, copy) => { const read = new Set(reads(files, copy)); return files.filter(f => read.has(f) || /^\.github(\/|$)/iu.test(f)); };
 
 // What a file past the depth or the length read is said to hold unseen, and its mend.
 const NOT_READ = [ // (by `size`: 0 for a part nested too deep, 1 for a text too long)
@@ -228,13 +229,13 @@ if (started(import.meta.url)) {
   const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
   process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
-  const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean), files = reads(tracked);
+  const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean), copy = copyOf("."), files = reads(tracked, copy);
   const core = process.argv.includes("--core"), base = core ? "" : process.env.WORKFLOWS_BASE ?? "";
   // (both texts with their line ends as "\n": git may convert them on checkout, so the working tree's file and the base's
   // blob of one text must read as equal and as one length, #752)
   const plain = text => text.replace(/\r\n?/gu, "\n");
   const show = file => { try { return plain(git(["show", `${base}:${file}`])); } catch { return null; } };
-  const links = new Set(unlinked(tracked).filter(f => fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()));
+  const links = new Set(unlinked(tracked, copy).filter(f => fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()));
   let failed = links.size;
   const texts = [];
   for (const file of links) console.log(`FAIL ${logged(file)}: a link, not a file, and the check reads the project's own text only. Mend: put the file itself there in place of the link`);

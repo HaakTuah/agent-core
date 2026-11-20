@@ -106,7 +106,7 @@ export function keysOnce(p) {
   // (with the core's packages not installed, as after a sync made by a copy from before #654, this step cannot be read:
   // it says so, with the install, and every other step is still told)
   if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`node ${copyAt(p)}scripts/install.mjs\`, then \`node ${copyAt(p)}scripts/steps.mjs\` again.`;
-  const read = reads(p.files).map(f => [f, twice(p.read(f) ?? "")]);
+  const read = reads(p.files, copyAt(p)).map(f => [f, twice(p.read(f) ?? "")]);
   const found = read.flatMap(([f, keys]) => keys.filter(k => k.key !== null).map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
   const unread = by => read.filter(([, keys]) => keys.some(k => k.key === null && Boolean(k.size) === by)).map(([f]) => `\`${f}\``), deep = unread(false), long = unread(true);
   const said = [

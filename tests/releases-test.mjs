@@ -170,8 +170,10 @@ ok(matters("tasks/b.md", taking("all")) && matters("tasks/b.md", "# Core manifes
 // release.yml among them, which runs the upgrade test on Windows (#715), outside its comments)
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
-// (a test is passed over as matters() in releases.mjs passes it over: one of scripts/ itself, never a nested one)
-const runs = [...walk(path.join(repo, "scripts")).filter(f => !/^scripts\/[^/]+-test\.mjs$/.test(path.relative(repo, f).split(path.sep).join("/"))), ...walk(path.join(repo, "setup", "template")),
+// (a test is passed over as matters() in releases.mjs passes it over: one of scripts/ itself, never a nested one; and
+// the entries of scripts/holders/, data that names the check holding each rule, a test of the core's among them
+// (#925), read as data and never run)
+const runs = [...walk(path.join(repo, "scripts")).filter(f => !/^scripts\/(?:[^/]+-test\.mjs|holders\/[^/]+\.json)$/.test(path.relative(repo, f).split(path.sep).join("/"))), ...walk(path.join(repo, "setup", "template")),
   ...fs.readdirSync(path.join(repo, ".github", "workflows")).filter(f => !OWN_FILES.includes(`.github/workflows/${f}`)).map(f => path.join(repo, ".github", "workflows", f))];
 const naming = runs.flatMap(f => fs.readFileSync(f, "utf8").split("\n").map((l, i) => [l, `${path.relative(repo, f)}:${i + 1}`]))
   .filter(([l]) => /-test\.mjs/.test(l) && !/^\s*(\/\/|#|\*)/.test(l)).map(([, at]) => at);

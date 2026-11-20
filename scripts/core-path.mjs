@@ -143,7 +143,8 @@ export function projectAt(from) {
 /** The commands of Claude Code's hooks (.claude/settings.json) for a core at another path than core/, as the starter
  *  kit writes them for core/ (setup/template/claude-settings.json.tmpl): { start, helper, stop }. Each reads its script
  *  from main's own tree, never the working tree's (floor rule 3); where a submodule carries the core, from the library's
- *  commit main pins. The start first stops a session whose floor cannot be read at the path (tasks/repositories.md, "A
+ *  commit main pins, read in the superproject's own module repository (`git rev-parse --git-path modules/<library>`),
+ *  never in the library's folder, which a branch can commit as it likes (#930). The start first stops a session whose floor cannot be read at the path (tasks/repositories.md, "A
  *  session that cannot read its floor does nothing else"), since there no script of the core's can run to say so. */
 export function hookCommands(core) {
   const dir = '"${CLAUDE_PROJECT_DIR:-.}"';
@@ -151,7 +152,7 @@ export function hookCommands(core) {
     const own = `git -C ${dir} --no-replace-objects show refs/remotes/origin/main:${core.path}scripts/${script} 2>/dev/null`;
     if (core.form !== "carried") return own;
     const lib = core.library.slice(0, -1), rest = core.path.slice(core.library.length);
-    return `${own} || { s=$(git -C ${dir} --no-replace-objects rev-parse refs/remotes/origin/main:${lib} 2>/dev/null) && git --git-dir=${dir}/${lib}/.git --no-replace-objects show "$s:${rest}scripts/${script}" 2>/dev/null; }`;
+    return `${own} || { s=$(git -C ${dir} --no-replace-objects rev-parse refs/remotes/origin/main:${lib} 2>/dev/null) && m=$(git -C ${dir} rev-parse --git-path modules/${lib} 2>/dev/null) && git -C ${dir} --git-dir="$m" --no-replace-objects show "$s:${rest}scripts/${script}" 2>/dev/null; }`;
   };
   const stop = `echo "STOP: the floor cannot be read at ${core.path}floor/security.md, where core-manifest.md says the core stands. Do nothing else in this session until it is mended. Mend: bring the files of the core into the checkout (git submodule update --init, where a submodule carries them), or, where that cannot be done here, say so to the owner and stop."`;
   return {
