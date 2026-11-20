@@ -8,7 +8,7 @@ import path from "node:path";
 import { inCopy } from "./core-path.mjs";
 import { parseConfig } from "./shape.mjs";
 import { toolOf } from "./strength.mjs";
-import { copyAt, readable } from "./check-configs.mjs";
+import { copyAt, readable } from "./workflow-calls.mjs";
 import { HERE, onPullRequests } from "./step-checks.mjs";
 import { where as shapeAt } from "./shape.mjs";
 

@@ -1,6 +1,6 @@
 // The step of setup/sync-notes/110-the-signature-check-on-every-pull-request.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { readable } from "../check-configs.mjs";
+import { readable } from "../workflow-calls.mjs";
 import { COST } from "../step-checks.mjs";
 
 export default { lead: "12 November 2026, the signature check on every pull request", cost: COST.workflow,

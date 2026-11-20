@@ -2,7 +2,8 @@
 // publisher's code (steps.mjs, beside this file, holds the steps, and step-checks.mjs the words they share). Each
 // piece takes the project as steps.mjs's `project` reads it and returns the mend, or null where the step is done; a
 // step names the ones it needs, none runs by itself. It reads only. Node's own modules and git only.
-import { copyAt, licenceConfig } from "./check-configs.mjs";
+import { copyAt } from "./workflow-calls.mjs";
+import { licenceConfig } from "./check-configs.mjs";
 import { releaseAge, WAIT } from "./licences.mjs";
 import { codeOf, covers, pinFault, pinRead } from "./licence-scan.mjs";
 import { npmPackages, offRegistry } from "./lookup.mjs";
