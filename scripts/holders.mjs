@@ -8,9 +8,10 @@
 // its issue); "number": "<findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable |
 // robust>", the count it is meant to lower and the outcome it stands for, which pruning.mjs reads}, each but "rule"
 // only where the rule has one. A holder is "check: <the script, test, workflow or hook that fails a pull request or a
-// step where the rule is broken, or opens an issue by itself; or GitHub's setting that refuses it>", "audit" (the scheduled audit reads it) or "describes" (it only points
-// elsewhere or says what is protected, and binds no one), each with ", in part" where it holds some of the rule and
-// the rest has none. A rule with no entry has no holder. Each staged case names the rules it holds in its own file. A rule with none is listed, in the core's monthly state report
+// step where the rule is broken, or opens an issue by itself; or GitHub's setting that refuses it>", "audit" (the
+// scheduled audit reads it) or "describes" (it only points elsewhere or says what is protected, and binds no one), each
+// with ", in part" where it holds some of the rule and the rest has none.
+// A rule with no entry has no holder. Each staged case names the rules it holds in its own file. A rule with none is listed, in the core's monthly state report
 // (state-report.mjs), until it gains one or goes on the owner's word. A hook (HOOKS) holds no rule alone: one whose
 // only holders are hooks is listed with them (tasks/tools.md, "Hooks save time; checks are the guarantee"). It fails where an entry names a rule that no
 // longer stands, a check whose file is not there, or a holder in no form it reads; a rule with no holder fails nothing.
@@ -67,7 +68,7 @@ const hook = x => x.kind === "check" && HOOKS.has(x.by);
 function holderOf(key, value, root, file = FILE, paths = /^(?:scripts|tests|\.github|setup|floor|roles|tasks|tools)\//u, show = t => `"${t}"`) {
   if (typeof value !== "string" || !value) return null;
   const m = FORM.exec(value);
-  if (!m) return `${file}: ${show(key)} has the holder ${show(value)}, in no form it reads. Mend: write "check: <its script, workflow or GitHub's setting>", "audit" or "describes", each with ", in part" where it holds only some of the rule${file === FILE ? "; a staged case names its rules in its own file" : ', or "none" where nothing holds it'}`;
+  if (!m) return `${file}: ${show(key)} has the holder ${show(value)}, in no form it reads. Mend: write "check: <its script, test, workflow or GitHub's setting>", "audit" or "describes", each with ", in part" where it holds only some of the rule${file === FILE ? "; a staged case names its rules in its own file" : ', or "none" where nothing holds it'}`;
   const kind = m[1] ?? m[3] ?? m[4], what = m[2] ?? "";
   if (kind === "check" && paths.test(what) && (!inProject(what) || !fs.existsSync(path.join(root, what)))) return `${file}: ${show(key)} is held by ${show(what)}, which is not there. Mend: name the check as it now stands, or take the holder out`;
   return { kind, by: what, part: Boolean(m[5]) };

@@ -10,11 +10,11 @@
       "additionalProperties": {
         "type": ["string", "array"],
         "minLength": 1,
-        "mend": "write the rule's holder as \"check: <its script, workflow or GitHub's setting>\", \"audit\" or \"describes\", each with \", in part\" where it holds only some of the rule, or a list of them",
+        "mend": "write the rule's holder as \"check: <its script, test, workflow or GitHub's setting>\", \"audit\" or \"describes\", each with \", in part\" where it holds only some of the rule, or a list of them",
         "items": {
           "type": "string",
           "minLength": 1,
-          "mend": "write each holder as \"check: <its script, workflow or GitHub's setting>\", \"audit\" or \"describes\", each with \", in part\" where it holds only some of the rule"
+          "mend": "write each holder as \"check: <its script, test, workflow or GitHub's setting>\", \"audit\" or \"describes\", each with \", in part\" where it holds only some of the rule"
         }
       }
     },
