@@ -278,6 +278,12 @@ jobs:
       - name: The selection of the tests a change can reach
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-test.mjs ')) }}
         run: node tests/select-test.mjs
+      - name: The pathspecs the selection matches a path against
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-matcher-test.mjs ')) }}
+        run: node tests/select-matcher-test.mjs
+      - name: A tree that passed is not run again
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-passed-test.mjs ')) }}
+        run: node tests/select-passed-test.mjs
       - name: What each test is worth, read from its runs and the faults it alone catches
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/test-record-test.mjs ')) }}
         run: node tests/test-record-test.mjs
