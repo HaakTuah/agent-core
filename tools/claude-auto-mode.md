@@ -20,4 +20,4 @@ would widen its own mandate, that a refusal of any other call is filed so, or th
 filed. Reason: in the staged case `steps` a session refused the host half of a sync step only said so, and nothing named
 the limit or what came next. Held, in part, by the staged case `steps` (#1012), which reads that
 the task was filed where a call to edit a planted text was logged and none cleaned both, and that nothing the session wrote holds their links or
-the aside, nor the task their text, not that the call was tried, the count of texts left or who holds their links.
+the aside, nor the task their text, not that the call was not tried again, the count of texts left or who holds their links.
