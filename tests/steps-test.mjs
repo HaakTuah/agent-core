@@ -20,6 +20,7 @@ import { readNothing } from "../scripts/read-nothing.mjs";
 import { holders } from "../scripts/holders.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { parseYaml, pathsLetThrough } from "../scripts/workflow-run.mjs";
+import { toolFilesRead, toolFilesState } from "../scripts/step-checks.mjs";
 import { COST, MOVED_GLOB, NEW_GLOBS, STEPS, Unread, configs, leads, moved, notDone, plain, project, report, runsOwn } from "../scripts/steps.mjs";
 import { READ_MOST } from "../scripts/own-files.mjs";
 
@@ -192,7 +193,7 @@ for (const [name, at] of [["a-vendored-npm-project", "vendor/core/"], ["a-vendor
 // (a core a library carries, its files committed in the project: the library's own manifest pins it, and the floor's own
 // copy stands beside it until every tool has passed the staged cases)
 kit("a-library-carried-project", { packages: "." }, { at: "lib/core/", library: "lib/" });
-kit("a-submodule-carried-project", { packages: "." }, { at: "lib/core/", library: "lib/", submodule: true });
+const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at: "lib/core/", library: "lib/", submodule: true });
 const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget: "src", private: true }, "a-game": { packages: "web", game: true } };
 const dirs = Object.fromEntries(Object.entries(kinds).map(([name, o]) => [name, kit(name, o)]));
 // (the pairs of options no other kit of this file is made with: npm in a private repository, a private game and an npm
@@ -1246,6 +1247,95 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
     const linked = step.check(project(d));
     execFileSync("git", ["rm", "-q", "-f", "zero", "outside.json"], { cwd: d });
     ok(linked === null, "a tracked link to a device or to a file outside the project is never opened, and the step reads on", `${linked}`);
+  }
+  // (what the step's cache is keyed by, #812: the files the two checks read, and no other; a change to a file they read asks
+  // a new run, and one to a file they do not, in the work tree or staged, leaves the state as it was and the checks' words
+  // the same, run again to see it)
+  {
+    const state = () => toolFilesState(project(d)).key, said = () => { const p = project(d), { config } = toolFilesState(p); return toolFilesRead(p, config) ?? ""; };
+    const original = f => fs.readFileSync(path.join(d, f), "utf8"), put = (f, text) => { fs.mkdirSync(path.dirname(path.join(d, f)), { recursive: true }); fs.writeFileSync(path.join(d, f), text); };
+    const stage = f => execFileSync("git", ["add", "--", f], { cwd: d }), unstage = f => execFileSync("git", ["rm", "-q", "-f", "--cached", "--", f], { cwd: d });
+    const flows = fs.readdirSync(path.join(d, ".github/workflows")).filter(f => f.endsWith(".yml"));
+    const base = state(), words = said();
+    const changed = (f, text = `${original(f)}\n`) => { const was = original(f); put(f, text); const now = state(); put(f, was); return now !== base; };
+    const unread = [".claude/settings.json", "checks/licences.json", `.github/workflows/${flows[0]}`, "checks/sizes.json"];
+    ok(flows.length > 0 && unread.every(f => !changed(f)), "a change to a workflow, a setting or a config of another check, which neither check reads, leaves the state of the project as it was", unread.filter(f => changed(f)).join(", "));
+    const copies = unread.map(original);
+    unread.forEach(f => put(f, `${original(f)}\n`));
+    const staged = unread.map(f => { stage(f); return state() === base; });
+    unread.forEach((f, i) => { put(f, copies[i]); stage(f); });
+    ok(staged.every(Boolean) && state() === base && said() === words, "nor does the same change staged, and the checks run again say what they said", `${staged}`);
+    const reads = ["AGENTS.md", "core-manifest.md", "docs/PROGRESS.md", "core/scripts/guards.mjs", "checks/copies.json", "checks/copies-baseline.json", ".kiro/steering/core.md"];
+    const restaged = f => {
+      const [mode, sha] = execFileSync("git", ["ls-files", "-s", "--", f], { cwd: d, encoding: "utf8" }).split(/\s/u), was = original(f);
+      put(f, `${was}\n`); stage(f); const now = state(); put(f, was);
+      execFileSync("git", ["update-index", "--cacheinfo", `${mode},${sha},${f}`], { cwd: d });
+      return now !== base;
+    };
+    ok(reads.every(f => changed(f)) && reads.every(restaged), "a change to a rule file, a Markdown file, a file of the copy of the core, the config or its baseline asks a new run, in the work tree or staged", reads.filter(f => !changed(f) || !restaged(f)).join(", "));
+    // (with an answer to keep: a broken pointer in a tool's file is named, a change to a file the checks do not read leaves
+    // the state and the words as they were, and mending the pointer changes both)
+    const n = ".kiro/steering/n.md";
+    put(n, "# N\n\nAs `docs/nowhere-n.md` says.\n"); stage(n);
+    const asked = said(), held = state();
+    unread.forEach(f => put(f, `${original(f)}\n`));
+    const kept = state() === held && said() === asked;
+    unread.forEach((f, i) => put(f, copies[i]));
+    put(n, "# N\n\nAs `AGENTS.md` says.\n");
+    const mended = said(), moved = state() !== held;
+    unstage(n); fs.rmSync(path.join(d, n));
+    ok(asked.includes(n) && kept && mended === "" && moved, "a change to a file the checks do not read leaves the state and the words of a step that has something to list as they were, and mending what it lists changes both", `${asked}\n${kept} ${mended} ${moved}`);
+    // (what the config names, what SECURITY.md lists and what a tool's folder holds is read, and what they leave out is not:
+    // each scene adds its files, changes the config or SECURITY.md, and says which of its files moves the state)
+    const config = original("checks/copies.json"), spec = JSON.parse(config), security = original("SECURITY.md");
+    const listed = (...more) => security.replace("`docs/threat-model.md`;", `\`docs/threat-model.md\`${more.map(f => `, \`${f}\``).join("")};`);
+    // (a glob among the rule files is no tracked file, which the pointer check fails on without a verdict: such scenes run no check)
+    const scene = (files, { config: change = {}, security: more = [], run: runs = true } = {}) => {
+      Object.keys(files).forEach(f => put(f, files[f]));
+      put("checks/copies.json", `${JSON.stringify({ ...spec, ...change })}\n`); put("SECURITY.md", listed(...more));
+      [...Object.keys(files), "checks/copies.json", "SECURITY.md"].forEach(stage);
+      const named = state(), moves = Object.keys(files).filter(f => { put(f, `${files[f]}${files[f]}`); const now = state(); put(f, files[f]); return now !== named; });
+      const run = runs ? said() : words;
+      Object.keys(files).forEach(f => { unstage(f); fs.rmSync(path.join(d, f)); });
+      put("checks/copies.json", config); put("SECURITY.md", security); stage("checks/copies.json"); stage("SECURITY.md");
+      return { moves: moves.join(","), run };
+    };
+    const code = scene({ "app/a.txt": "a\n", "app/b.txt": "b\n" }, { config: { code: ["app/a.txt"] } });
+    const prose = scene({ "notes/p.txt": "p\n", "notes/q.dat": "q\n" }, { config: { prose: [...spec.prose, "notes/*.txt"] } });
+    const named = scene({ "data/r.txt": "r\n", "data/s.dat": "s\n" }, { security: ["data/*.txt"], run: false });
+    const unlisted = scene({ "data/r.txt": "r\n" }, { config: { proseFromSecurity: false }, security: ["data/*.txt"], run: false });
+    const literal = scene({ "checks/rule.dat": "r\n" }, { config: { proseFromSecurity: false }, security: ["checks/rule.dat"] });
+    // (a ":!" in one list leaves out only what that list read: copies.mjs lists the code and the prose each by itself)
+    const apart = scene({ "src/a.js": "a\n", "vendor/lib.js": "v\n" }, { config: { code: ["src/", ":!vendor/lib.js"], prose: [...spec.prose, "vendor/"] }, run: false });
+    const only = scene({ "src/b.js": "b\n", "vendor/c.js": "c\n" }, { config: { code: [":!vendor/"], prose: ["docs/*.md"] }, run: false });
+    const tools = scene({ ".kiro/agents/x.json": "{}\n", ".agent/rules": "r\n", ".kiro/other.json": "{}\n" });
+    ok(code.moves === "app/a.txt" && prose.moves === "notes/p.txt" && named.moves === "data/r.txt" && unlisted.moves === "" && literal.moves === "checks/rule.dat" && tools.moves === ".kiro/agents/x.json,.agent/rules" && apart.moves === "src/a.js,vendor/lib.js" && only.moves === "src/b.js",
+      "a file the config's code or prose names, one SECURITY.md lists (a glob only where the config reads its list as prose), a rule file it names and a file in an agent tool's folder is read, and a file they leave out is not",
+      JSON.stringify([code, prose, named, unlisted, literal, tools, apart, only].map(x => x.moves)));
+    ok([code, prose, named, unlisted, literal, tools, apart, only].every(x => x.run === words), "and the checks, run again with such files held, say what they said", [code, prose, named, unlisted, literal, tools, apart, only].map(x => x.run).join("\n"));
+    // (what the old key held, still held: a library's submodule that moves on, and a file in a tool's folder too big to be read,
+    // which the checks read all the same, staged)
+    const inLib = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: path.join(submoduleKit, "lib"), stdio: "ignore" });
+    const before = toolFilesState(project(submoduleKit)).key;
+    fs.writeFileSync(path.join(submoduleKit, "lib/moved.txt"), "moved\n"); inLib("add", "-A"); inLib("commit", "-q", "-m", "moved");
+    const big = ".kiro/agents/big.json";
+    put(big, "{}\n"); stage(big);
+    const small = state();
+    fs.writeFileSync(path.join(d, big), Buffer.alloc(READ_MOST + 1, 32)); stage(big);
+    const large = state();
+    fs.writeFileSync(path.join(d, big), Buffer.alloc(READ_MOST + 1, 33)); stage(big);
+    const edited = state();
+    unstage(big); fs.rmSync(path.join(d, big));
+    ok(toolFilesState(project(submoduleKit)).key !== before && small !== large && large !== edited, "a submodule that moved, and a staged change to a tool's file past what is read, ask a new run", `${toolFilesState(project(submoduleKit)).key !== before} ${small !== large} ${large !== edited}`);
+    // (git's own files that change what a check lists)
+    const git = [".gitattributes", ".gitmodules"].map(f => { put(f, "\n"); stage(f); const was = state(); put(f, "# x\n"); const now = state(); unstage(f); fs.rmSync(path.join(d, f)); return was !== now; });
+    ok(git.every(Boolean), "a change to .gitattributes or .gitmodules asks a new run", `${git}`);
+    // (where the rule files cannot be read, no file is left out)
+    put("SECURITY.md", security.replace(/\*\*the rule files:\*\*/u, "**the files of rules:**"));
+    const whole = state(), flow = `.github/workflows/${flows[0]}`;
+    put(flow, `${original(flow)}\n`); const every = state() !== whole;
+    put(flow, copies[2]); put("SECURITY.md", security);
+    ok(every && state() === base, "where the project's rule files cannot be read, every file counts as read", `${every}`);
   }
 }
 
