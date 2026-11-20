@@ -18,4 +18,5 @@ permission rule the owner adds, or by saying so to the session in person, or tak
 does not mean that the session asks the owner in its chat and waits, that it writes such an entry or rule itself, which
 would widen its own mandate, that a refusal of any other call is filed so, or that a call the classifier let through is
 filed. Reason: in the staged case `steps` a session refused the host half of a sync step only said so, and nothing named
-the limit or what came next. Held by nothing yet (#1012).
+the limit or what came next. Held, in part, by the staged case `steps` (#1012), which reads that
+the task was filed where the host edit did not happen, not that the call was never tried again.
