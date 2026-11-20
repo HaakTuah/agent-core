@@ -156,6 +156,19 @@ export function hookCommands(core) {
   };
 }
 
+/** The text of Claude Code's settings as the starter kit writes it (core/), with its three hooks' commands those for the
+ *  copy at `core.path` (hookCommands), as a project whose manifest names another path holds them; unchanged where the
+ *  path is core/, where `core` is null, or where the text has no such hook (an older kit's keeps its own). */
+export function hooksAt(text, core) {
+  if (!core || core.path === "core/") return text;
+  const settings = JSON.parse(text), commands = hookCommands(core);
+  for (const [event, command] of [["SessionStart", commands.start], ["PreToolUse", commands.helper], ["Stop", commands.stop]]) {
+    const hook = settings.hooks?.[event]?.[0]?.hooks?.[0];
+    if (hook) hook.command = command;
+  }
+  return `${JSON.stringify(settings, null, 2)}\n`;
+}
+
 if (started(import.meta.url)) {
   const text = manifestText(MANIFEST); // (null: the core's own root)
   const core = text === null ? { path: "" } : readCore(text);

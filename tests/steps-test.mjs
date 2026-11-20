@@ -99,8 +99,10 @@ function kit(name, o, { held = true, at = "core/", library = null, submodule = f
     fs.mkdirSync(path.join(dir, library), { recursive: true });
     fs.writeFileSync(path.join(dir, library, "core-manifest.md"), `${own.replace(`under ${at}`, `under ${at.slice(library.length)}`)}\n`);
     fs.cpSync(path.join(root, "floor"), path.join(dir, "floor-copy"), { recursive: true });
-    // (its hooks are the commands for a carried core, which stop a session whose floor cannot be read)
-    const settings = path.join(dir, ".claude/settings.json"), hooks = JSON.parse(fs.readFileSync(settings, "utf8")), commands = hookCommands(readCore(fs.readFileSync(manifest, "utf8")));
+  }
+  if (at !== "core/") {
+    // (its hooks are the commands core-path.mjs gives for that path, which stop a session whose floor cannot be read there)
+    const settings = path.join(dir, ".claude/settings.json"), hooks = JSON.parse(fs.readFileSync(settings, "utf8")), commands = hookCommands(readCore(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8")));
     hooks.hooks.SessionStart[0].hooks[0].command = commands.start; hooks.hooks.PreToolUse[0].hooks[0].command = commands.helper; hooks.hooks.Stop[0].hooks[0].command = commands.stop;
     fs.writeFileSync(settings, `${JSON.stringify(hooks, null, 2)}\n`);
   }

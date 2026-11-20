@@ -24,7 +24,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KIT as CHOICES, where } from "./choices.mjs";
 import { FILES, TEMPLATES, files, licences, sizes } from "./init.mjs";
-import { corePath, readCore } from "./core-path.mjs";
+import { corePath, hooksAt, readCore } from "./core-path.mjs";
 import { MODULES } from "./reading.mjs";
 import { ownerOf } from "./releases.mjs";
 import { KIT as SHAPE, where as shapeAt } from "./shape.mjs";
@@ -155,10 +155,10 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     // (the kit's templates name the copy of the core core/; a project whose manifest names another path names that one in its
     // files, and a core a library carries, which the kit does not write, is the manifest's own line, with the floor's own
     // copy's line that follows it: #628)
-    const copy = copyAt(p), carried = readCore(p.manifest).form === "carried" ? /^Core: .*(?:\nFloor copy: .*)?$/m.exec(p.manifest)?.[0] : null;
+    const core = readCore(p.manifest), copy = copyAt(p), carried = core.form === "carried" ? /^Core: .*(?:\nFloor copy: .*)?$/m.exec(p.manifest)?.[0] : null;
     const withCore = text => carried ? text.replace(/^Core: .*$/m, () => carried) : text;
     const kit = built.filter(([to]) => !gone.has(to) && placed[to] !== null)
-      .map(([to, text]) => [placed[to] ?? to, atCopy(to === "core-manifest.md" ? withCore(text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences")) : text, copy)]);
+      .map(([to, text]) => [placed[to] ?? to, to === ".claude/settings.json" && !core.wrong ? hooksAt(atCopy(text, copy), core) : atCopy(to === "core-manifest.md" ? withCore(text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences")) : text, copy)]);
     if (older) return kit;
     // the configs the kit writes beside its templates, by the paths the project runs its checks with, each read by its keys
     // (sizes.json's optional "skip" and "past" left out)

@@ -68,7 +68,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { atCopy, corePath, hookCommands, manifestText, readCore } from "./core-path.mjs";
+import { atCopy, corePath, hooksAt, manifestText, readCore } from "./core-path.mjs";
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
 import { fetchedBy } from "./hook-source.mjs";
@@ -489,13 +489,7 @@ export function kitHooks(template = kitTemplate, core = null) {
   const swapped = f => {
     const text = read(f);
     if (f !== ".claude/settings.json" || text === null || copy === "core/") return text;
-    const settings = JSON.parse(text), commands = hookCommands(core);
-    // (a template without one of the three, as an older kit's, keeps its own)
-    for (const [event, command] of [["SessionStart", commands.start], ["PreToolUse", commands.helper], ["Stop", commands.stop]]) {
-      const hook = settings.hooks?.[event]?.[0]?.hooks?.[0];
-      if (hook) hook.command = command;
-    }
-    return JSON.stringify(settings);
+    return hooksAt(text, core);
   };
   const files = dir => Object.keys(KITS).filter(f => path.posix.dirname(f) === dir).map(f => path.posix.basename(f));
   const ids = r => [...configured(r, () => [], files).ids.values()].flatMap(set => [...set]);
