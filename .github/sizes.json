@@ -32,7 +32,7 @@
       "why": "#929: the cases of how Betterleaks reads apart from what the check reads."
     },
     ".github/workflows/tests.yml": {
-      "mark": 69417,
+      "mark": 72196,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {
@@ -246,10 +246,6 @@
     "tests/select-test.mjs": {
       "mark": 32013,
       "why": "#943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
-    },
-    "tests/agent-tools-test.mjs": {
-      "mark": 114595,
-      "why": "#919: split with agent-tools.mjs, a file of cases for each tool's configuration."
     },
     "tests/core-path-test.mjs": {
       "mark": 25409,

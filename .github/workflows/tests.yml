@@ -268,9 +268,30 @@ jobs:
       - name: The core's packages, from its lock file alone
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/packages-test.mjs ')) }}
         run: node tests/packages-test.mjs
-      - name: The agent-tools check
+      - name: The agent-tools check, the kit's hooks and a project with no list
         if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-test.mjs ')) }}
         run: node tests/agent-tools-test.mjs
+      - name: The agent-tools check's list, what a way installs and the sync note's step
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-list-test.mjs ')) }}
+        run: node tests/agent-tools-list-test.mjs
+      - name: The agent-tools check's links where a tool reads its files
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-links-test.mjs ')) }}
+        run: node tests/agent-tools-links-test.mjs
+      - name: The agent-tools check's pin a tool's own configuration gives
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-pins-test.mjs ')) }}
+        run: node tests/agent-tools-pins-test.mjs
+      - name: The agent-tools check's reading of what Kiro and Codex configure
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-kiro-codex-test.mjs ')) }}
+        run: node tests/agent-tools-kiro-codex-test.mjs
+      - name: The agent-tools check's source of each hook's command
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-source-test.mjs ')) }}
+        run: node tests/agent-tools-source-test.mjs
+      - name: The agent-tools check's reading of what git shows at the fetched path
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-tree-test.mjs ')) }}
+        run: node tests/agent-tools-tree-test.mjs
+      - name: The agent-tools check's tool files in another letter case
+        if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-case-test.mjs ')) }}
+        run: node tests/agent-tools-case-test.mjs
       - name: The agent-tools check's reader of a commit's objects
         if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/git-objects-test.mjs ')) }}
         run: node tests/git-objects-test.mjs
