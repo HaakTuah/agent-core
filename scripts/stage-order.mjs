@@ -3,8 +3,9 @@
 // declared"); nothing of it is written in the repository, and no manifest row is read. It reads:
 // - whether the host bills the proof: the repository is private (the host says) and a job that starts a suite runs on
 //   the host's runners (the checkout's workflows, as runners.mjs reads them, and none for another repository; with no
-//   suite read there, a runner, called workflow or file not read leaves it not read, and so does a workflows folder
-//   missing where no checkout's root holds it), with the costliest such runner's rate, a Linux minute 1, a Windows one
+//   suite read there, a runner, called workflow or file not read leaves it not read, and so does a path there that is
+//   no folder that can be listed, and a workflows folder missing where no checkout's root holds it or under a .github
+//   that is no real folder), with the costliest such runner's rate, a Linux minute 1, a Windows one
 //   2, a macOS one 10, which is printed and weighed against no allowance;
 // - which agent tools built the last 30 merged pull requests and which reviewed them (tools-read.mjs: the owner's own
 //   pull requests and the closing attribution line, a bot's review named by its login), a tool that builds counting as short for reviewing too, its
@@ -60,7 +61,8 @@ export function billedOf(priv, w) {
 }
 
 // (the workflows of a repository other than the checkout, which are not read: only the checkout's own are; and those
-// of a folder that is not there, not read where the script runs outside a checkout's root, none where it runs there)
+// at a path there that is no folder that can be listed, not read; and those of a folder not there, none only where its
+// parent is a real folder or not there either, in a checkout's root, and not read otherwise)
 const ELSEWHERE = Object.freeze({ testRunners: [], testLabels: [], unknown: true, unread: [], elsewhere: true });
 const NOWHERE = Object.freeze({ testRunners: [], testLabels: [], unknown: true, unread: [], nowhere: true });
 const NONE_HERE = Object.freeze({ testRunners: [], testLabels: [], unknown: false, unread: [] });
