@@ -101,15 +101,15 @@ ok(/^- floor\/security\.md: 3\. Bare: no holder, read on need\. Its proposal: go
   && /No proposal yet: the session that takes the pruning gives it one in `reports\/unheld\.json`/u.test(led[at(unproposed.key)]),
   "a floor rule proposed to go is said to need a holder instead, and a rule with no proposal is said to need one");
 // ---- beside each proposal, a form a check could hold, or why none (#887) ----
-const forms = list({ all: [bare, early, floorBare, unproposed, loud], named, numbers, record: rec(), cases, steps, starts: new Set(), joined: () => 40, none: [bare.key, early.key, floorBare.key, unproposed.key, loud.key],
-  proposals: { [bare.key]: { mark: "move", why: "read rarely" }, [early.key]: { mark: "check", why: "a script reads it" }, [floorBare.key]: { mark: "case", why: "a session's act", noForm: "only what a session does shows it" },
+const forms = list({ all: [bare, early, still, floorBare, unproposed, loud], named, numbers, record: rec(), cases, steps, starts: new Set(), joined: () => 40, none: [bare.key, early.key, still.key, floorBare.key, unproposed.key, loud.key],
+  proposals: { [bare.key]: { mark: "move", why: "read rarely" }, [early.key]: { mark: "check", why: "a script reads it" }, [still.key]: { mark: "check", why: "reworded", form: "the file holds the line" }, [floorBare.key]: { mark: "case", why: "a session's act", noForm: "only what a session does shows it" },
     [unproposed.key]: { mark: "describes", why: "binds no one" }, [loud.key]: { mark: "goes", why: "unused", form: "a script reads the line" } } });
 const formOf = k => forms.find(l => l.startsWith(`- ${k}:`)) ?? "";
 ok(formOf(bare.key).endsWith(" No form proposed yet: the session that takes the pruning gives a form of the rule a check could hold (`form`), or why none exists (`noForm`).")
   && formOf(floorBare.key).endsWith(" No form a check could hold: only what a session does shows it.") && formOf(loud.key).endsWith(" A form a check could hold: a script reads the line.")
-  && !/form/iu.test(formOf(early.key)) && !/form/iu.test(formOf(unproposed.key))
+  && !/form/iu.test(formOf(early.key)) && !/form/iu.test(formOf(unproposed.key)) && formOf(still.key).endsWith(" A form a check could hold: the file holds the line.")
   && forms.filter(l => / no holder, /u.test(l) && !/check \(|check, |describes, /u.test(l)).every(l => /(A form a check could hold|No form a check could hold|No form proposed yet|a form of the rule a check could hold)/u.test(l)),
-  "each rule with no holder carries a form a check could hold or why none exists, or is said to have neither yet; a check, which holds it as it stands, and a rule that describes need neither", forms.join("\n"));
+  "each rule with no holder carries a form a check could hold or why none exists, or is said to have neither yet; a check, which holds it as worded, and a rule that describes need neither, a check's rewording shown where given", forms.join("\n"));
 const tool = R("tools/x.md", "Its own"), floorNone = R("floor/topics/y.md", "Unproposed");
 const tooled = list({ all: [bare, tool, floorNone], named, numbers, record: rec(), cases, steps, starts: new Set(), toolStarts: new Set([tool.key]), joined: () => 40, none: [bare.key, tool.key, floorNone.key], proposals });
 ok(tooled[1].startsWith(`- ${tool.key}: no holder, read at its tool's start.`) && /^- floor\/topics\/y\.md: Unproposed: no holder, read on need\. No proposal yet: .*a check or staged case that could hold it, since it guards against rare and severe harm, and a form of the rule a check could hold \(`form`\), or why none exists \(`noForm`\)\.$/u.test(tooled.find(l => l.startsWith(`- ${floorNone.key}:`)) ?? ""),

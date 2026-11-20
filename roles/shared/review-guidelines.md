@@ -94,9 +94,9 @@ makes a process measure its goal (`tasks/cleaning.md`).
   the core, those `scripts/holders/` lists for it.
 - Blocking: a rule of the core (its floor, modules or `AGENTS.md`) written or changed without a part of the pattern in
   the core's `AGENTS.md`, "A rule is written to one pattern", or holding what that pattern keeps out.
-- Blocking: a rule of the core written or changed that a reading alone holds where a form of it a check reads
-  without guessing exists, and the pull request gives no reason the form would change what the rule asks or protects
-  a great deal (the core's `AGENTS.md`, "A rule is written in the form a check can hold").
+- Blocking: a rule, the core's or the project's own, written or changed that a reading alone holds where a form of it
+  a check reads without guessing exists, and the pull request gives no reason the form would change what the rule asks
+  or protects a great deal (the core's `AGENTS.md`, "A rule is written in the form a check can hold").
 - Blocking: a rule written or changed that fails the core's test for a rule (the core's `AGENTS.md`, "A rule is for
   what an agent can do"): one an agent cannot carry out, that only blocks, or that makes the product neither better nor
   sturdier, and one whose owner's word was an order for one piece of work.

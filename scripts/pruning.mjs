@@ -163,7 +163,7 @@ function closing({ all, numbers, now, early, unread }) {
   ];
 }
 
-// The proposals for the rules with no holder (UNHELD's "proposals"): { proposals: { key: { mark, by, why } }, wrong },
+// The proposals for the rules with no holder (UNHELD's "proposals"): { proposals: { key: { mark, by, why, form, noForm } }, wrong },
 // `wrong` the line of why a file that is there cannot be read, with its mend; none where there is no file.
 export function readUnheld(root = ROOT) {
   const file = path.join(root, UNHELD);
@@ -171,7 +171,7 @@ export function readUnheld(root = ROOT) {
   try {
     const p = JSON.parse(fs.readFileSync(file, "utf8"))?.proposals;
     if (p && typeof p === "object" && !Array.isArray(p)) return { proposals: p, wrong: null };
-    return { proposals: {}, wrong: `\`${UNHELD}\` holds no object "proposals". Mend: write it as an object keyed by each rule's file and bold lead, each value { mark, by, why }` };
+    return { proposals: {}, wrong: `\`${UNHELD}\` holds no object "proposals". Mend: write it as an object keyed by each rule's file and bold lead, each value { mark, by, why } and, beside a case, a move or a removal, form or noForm` };
   } catch (e) { return { proposals: {}, wrong: `\`${UNHELD}\` cannot be read (${String(e.message).split("\n")[0]}). Mend: write it as JSON, its "proposals" an object keyed by each rule` }; }
 }
 
@@ -180,10 +180,10 @@ const flat = v => String(v ?? "").replace(/\s+/gu, " ").trim();
 
 // Beside a proposal, the form a check could hold (AGENTS.md, "A rule is written in the form a check can hold"; #887):
 // its "form", a slightly different form of the rule whose breach a check reads without guessing, or its "noForm", why
-// none exists. A proposal of a check, which holds the rule as it stands, and one that it describes, which binds no one,
-// need neither.
+// none exists. A proposal of a check, which holds the rule as worded, and one that it describes, which binds no one,
+// need neither, a check's form printed where one is given, as a rewording a check would hold.
 const FORM = `a form of the rule a check could hold (\`form\`), or why none exists (\`noForm\`)`;
-const form = x => ["check", "describes"].includes(x.mark) ? "" : flat(x.form) ? ` A form a check could hold: ${flat(x.form)}.`
+const form = x => flat(x.form) ? ` A form a check could hold: ${flat(x.form)}.` : ["check", "describes"].includes(x.mark) ? ""
   : flat(x.noForm) ? ` No form a check could hold: ${flat(x.noForm)}.` : ` No form proposed yet: the session that takes the pruning gives ${FORM}.`;
 
 // The list's leading lines: each rule of `all` whose key `none` (holders.mjs's rules with no holder) names, those

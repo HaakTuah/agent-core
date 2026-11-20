@@ -458,8 +458,11 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   request gives no such reason (`roles/shared/review-guidelines.md`, "A rule file changed"); and at each pruning ("Rules
   are pruned by their numbers") the session that takes it proposes, for each rule with no holder, beside its other
   proposal, a slightly different form a check could hold, or why none exists (`form` or `noForm` in
-  `reports/unheld.json`). It does not mean that a rule's purpose is bent to fit a check, that a check that guesses is
-  written, nor that a rule that stands and no change touches is rewritten for it outside a pruning's proposal. Reason: a
+  `reports/unheld.json`; a proposal of a check, which holds the rule as worded, or that the rule describes needs
+  neither). A project's design checks read its own rules the same way, from the release that brings it. It does not
+  mean that a rule's purpose is bent to fit a check, that a rule is turned into a line a pull request declares where
+  what it asks is what the work does, that a check that guesses is written, nor that a rule that stands and no change
+  touches is rewritten for it outside a pruning's proposal. Reason: a
   rule a check holds need not be given to a session ahead of its work once release 7 (#692) begins, and is kept whether
   or not it is read, while one held by reading costs every session that reads it. Held, for the pruning, by
   `scripts/pruning.mjs`, whose test reads that the list gives each rule with no holder its checkable form or the reason
