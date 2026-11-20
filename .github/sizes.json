@@ -237,7 +237,7 @@
     },
     "tests/hostile-build-files-test.mjs": {
       "mark": 29868,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "why": "The sections of one input, a project's build, package and workflow files (too long, the wrong type, markup, a file path, out of range, nothing at all, and the reader of where the tests run), each trying every reader of it (licences.mjs, exact-versions.mjs, nuget.mjs, workflows.mjs, workflow-run.mjs, runners.mjs, agent-tools.mjs) on the scratch project and the helpers they share; split by section, each file would set them up again, and a reader added to the input is added to every section (#1008)."
     },
     "tests/hostile-github-test.mjs": {
       "mark": 22575,
@@ -245,7 +245,7 @@
     },
     "tests/hostile-pr-comments-test.mjs": {
       "mark": 22109,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "why": "The sections of one input, a pull request's comments and reviews as GitHub's API gives them (too long, the wrong type, markup, a file path, out of range, nothing at all), each trying every reader of it (security-review.mjs, code-review-wait.mjs, size.mjs, tools-read.mjs, review-marks.mjs, look.mjs) on the fixtures they share; split by section, each file would write them again, and a reader added to the input is added to every section; the file is 8% past the mark (#1008)."
     },
     "tests/licence-scan-test.mjs": {
       "mark": 46036,
