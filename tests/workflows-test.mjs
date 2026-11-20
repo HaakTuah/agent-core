@@ -11,7 +11,9 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TEMPLATES } from "../scripts/init.mjs";
 import { holds, parseYaml } from "../scripts/workflow-run.mjs";
-import { draftHoles, foreignBreaks, foreignBroken, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
+import { draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
+import { Unread } from "../scripts/check-configs.mjs";
+import { readyOnlyHolds } from "../scripts/step-checks.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { keysOnce } from "../scripts/step-checks.mjs";
 import { LONGEST, twice, uncommented } from "../scripts/yaml-keys.mjs";
@@ -104,6 +106,18 @@ ok(twice(hiding("\u2028")).length === 0 && brks.every(({ br, found }) => found.l
   && brokenNew.fails.length === 1 && mended(brokenNew.fails[0]) && /^FAIL w\.yml:1: the file holds the line break U\+2028 and 1 more/u.test(brokenNew.fails[0]) && brokenChanged.fails.length === 1
   && brokenSame.fails.length === 0 && brokenSame.notes.length === 1 && /as on the base\. Mend:/u.test(brokenSame.notes[0]) && foreignBroken(one(hiding("\u2028")), null).fails.length === 0 && foreignBroken(one(hiding("\u2028")), null).notes.length === 1 && foreignBroken(one("on: push\nx: 1\n"), () => null).fails.length === 0,
   "a line break the package does not read hides a key given twice from its reader, and the check fails a file with one that is new or changed, with its mend, and notes one unchanged or read with no base", [brokenNew, brokenSame].flatMap(r => [...r.fails, ...r.notes]).join("\n"));
+// (what stands behind such a break is read as a YAML 1.1 reader reads it, in head and base alike, the failure above kept,
+// and a line is told as an editor counts it: #876)
+const behind = ["\u0085", "\u2028", "\u2029"].map(br => {
+  const text = `a: 1\n# c${br}x: 1\nx: 2\n`; // (the break ends the comment: the keys are on the next lines)
+  return { keys: repeated(one(text), () => null), same: repeated(one(text), () => text), grown: repeated(one(`${text}# b\n`), () => text), none: repeated(one(text), null), found: keysTwice(text) };
+});
+ok(behind.every(({ keys, same, grown, none, found }) => keys.fails.length === 1 && /^FAIL w\.yml:3: the key "x" is given twice in one mapping \(first on line 2\)/u.test(keys.fails[0]) && mended(keys.fails[0])
+  && same.fails.length === 0 && same.notes.length === 1 && grown.fails.length === 0 && none.fails.length === 0 && none.notes.length === 1 && found.length === 1 && found[0].line === 3 && found[0].first === 2)
+  && keysTwice("a: 1\r\n# c\u2028x: 1\rx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && keysTwice(hiding("\u2028")).map(k => `${k.line}<${k.first}`).join() === "1<1"
+  && keysTwice("a: 1\r\u2028x: 1\nx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && foreignBreaks("a\rb\r\u2028c\n")?.line === 3
+  && keysTwice("a: 1\nb: 2\n").length === 0 && repeated(one('a: 1\nb: "x\\u2028y"\nb: 2\n'), () => 'a: 1\nb: "x\u2028y"\nb: 2\n').fails.length === 0 && keysTwice(`a: ${"\u2028".repeat(LONGEST)}\n`).map(k => `${k.line}:${k.size}`).join() === "1:true",
+  "a key given twice behind a line break the package does not read is found, a new one failing, the base's own noted, and told on the line an editor counts", behind.flatMap(r => [...r.keys.fails, ...r.same.notes]).join("\n"));
 // (Codex's case: a call of a check skipped on a draft whose ready_for_review a same-length edit moves into a comment, in a
 // file past the length read, its words counted as often as before, fails)
 const commented = types => `on:\n  pull_request:\n    types: ${types}\njobs:\n  check:\n    uses: ${CORE}/.github/workflows/copies.yml@${"a".repeat(40)}\n    if: \${{ !github.event.pull_request.draft }}\n# ${"x".repeat(LONGEST)}\n`;
@@ -138,6 +152,43 @@ ok(none.fails.length === 0 && none.notes.length === 3 && !none.notes[0].includes
 const call = (on, uses, extra = "") => `on:\n${on}\njobs:\n  check:\n    uses: ${CORE}/.github/workflows/${uses}@${"a".repeat(40)}\n${extra}`;
 const NOT_DRAFT = "    if: ${{ !github.event.pull_request.draft }}\n";
 const TYPES = "  pull_request:\n    types: [opened, synchronize]\n", FULL = "  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\n";
+const skipping = br => `# c${br}${call(TYPES, "copies.yml", NOT_DRAFT)}`;
+const readied = ["\u0085", "\u2028", "\u2029"].map(br => ({ yes: draftHoles(skipping(br)), fresh: unreadied(one(skipping(br)), () => null), same: unreadied(one(skipping(br)), () => skipping(br)) }));
+ok(readied.every(({ yes, fresh, same }) => yes.join() === "check" && fresh.fails.length === 1 && mended(fresh.fails[0]) && same.fails.length === 0 && same.notes.length === 1) && draftHoles(`# c\n${call(TYPES, "copies.yml", NOT_DRAFT)}`).join() === "check",
+  "a call skipped on a draft without ready_for_review behind such a break is found, a new one failing and the base's own noted", readied.flatMap(r => [...r.fresh.fails, ...r.same.notes]).join("\n"));
+// (a base's break inside a double-quoted string, which the sync's mend writes as an escape, is read as the mend leaves it: what
+// stands behind a later break in a comment is then held by the base, and a head that mends the breaks passes; and a new defect
+// the mending head adds, against a base with only the quoted break, still fails: #876)
+const quoted = br => `name: ${br}x\u2028y${br}\n# c\u2028on:\n  pull_request:\n    types: [opened, synchronize]\njobs:\n  check:\n    if: \${{ !github.event.pull_request.draft }}\n    uses: ${CORE}/.github/workflows/copies.yml@${"a".repeat(40)}\n`;
+const mend = (text, br) => text.replace(`${br}x\u2028y${br}`, `${br}x\\u2028y${br}`).replace("# c\u2028on:", "# c\non:");
+const dupBase = br => `jobs:\n  b:\n    name: ${br}x\u2028y${br}\n    # c\u2028    a: 1\n    a: 2\n`, dupHead = (br, text) => text.replace(`${br}x\u2028y${br}`, `${br}x\\u2028y${br}`).replace("# c\u2028", "# c\n");
+const heldDup = repeated(one(dupHead('"', dupBase('"'))), () => dupBase('"')), heldCall = unreadied(one(mend(quoted('"'), '"')), () => quoted('"'));
+const newDup = repeated(one('name: "x\\u2028y"\njobs:\n  b:\n    a: 1\n    a: 2\n'), () => 'name: "x\u2028y"\njobs:\n  b:\n    a: 1\n'), newCall = unreadied(one(mend(quoted('"'), '"')), () => 'name: "x\u2028y"\non: push\njobs: {}\n');
+const hiddenDup = repeated(one(dupHead("'", dupBase("'"))), () => dupBase("'")), hiddenCall = unreadied(one(mend(quoted("'"), "'")), () => quoted("'")), knownNew = unreadied(one(mend(quoted('"'), '"')), () => "on: push\n");
+ok(heldDup.fails.length === 0 && heldDup.notes.length === 1 && /as it did on the base/u.test(heldDup.notes[0]) && heldCall.fails.length === 0 && heldCall.notes.length === 1 && /as on the base/u.test(heldCall.notes[0])
+  && newDup.fails.length === 1 && newCall.fails.length === 1 && knownNew.fails.length === 1,
+  "a base with a break in a double-quoted string is read as the mend leaves it: what it held is noted, and a defect the mending head adds fails", [...heldDup.notes, ...heldCall.notes, ...newDup.fails, ...newCall.fails].join("\n"));
+// (a break in a single-quoted string, which no mend of the step makes valid, leaves the base no YAML either way: what it held
+// is not known, and what the head shows is noted)
+ok(hiddenDup.fails.length === 0 && hiddenDup.notes.length === 1 && /the base being no YAML/u.test(hiddenDup.notes[0]) && hiddenCall.fails.length === 0 && /the base being no YAML/u.test(hiddenCall.notes.join()),
+  "a base no YAML to the package either way its breaks are read holds what stands behind them unknown: the head's findings are noted, not failed", [...hiddenDup.notes, ...hiddenCall.notes, ...hiddenDup.fails, ...hiddenCall.fails].join("\n"));
+// (only the reading as the mend leaves it finds the key given twice here, the folded text being no YAML: it is told on the line
+// an editor counts; and a text the escapes would take past the length read is read as line feeds, never as too long)
+const onlyMended = 'jobs:\n  b:\n    name: "x\u2028y"\n    # c\u2028    a: 1\n    a: 2\n';
+const nearLong = `${"# c\n".repeat(52412)}a: "${"\u2028".repeat(3)}${"x".repeat(LONGEST - 52412 * 4 - 9)}"\n`;
+ok(keysTwice(onlyMended).map(k => `${k.key}@${k.line}<${k.first}`).join() === "a@5<4" && nearLong.length <= LONGEST && nearLong.length + 12 > LONGEST && !keysTwice(nearLong).some(k => k.size),
+  "the key given twice that only the mended reading finds is told on its editor line, and a text that only the escapes make too long is not said so", String(keysTwice(onlyMended).map(k => `${k.key}@${k.line}`)));
+const t0 = Date.now(), manyKeys = keysTwice(`${Array.from({ length: 10000 }, (_, i) => `k${i}: 1\nk${i}: 2\n`).join("")}# c\u2028\n`).length;
+ok(manyKeys === 10000 && Date.now() - t0 < 10000, "ten thousand keys given twice behind a break are read in well under ten seconds, the two readings merged in one pass", `${manyKeys} in ${Date.now() - t0} ms`);
+// (a call the package shows in a file with a break inside a quoted string, no YAML once folded, is found by the plain reading)
+ok(unreadied(one(`name: "x\u2028y"\n${call(TYPES, "copies.yml", NOT_DRAFT)}`), null).notes.length === 1 && draftHoles(`name: "x\u2028y"\n${call(TYPES, "copies.yml", NOT_DRAFT)}`).join() === "check",
+  "a call a draft skips that the package shows in a file with a break inside a quoted string, which is no YAML once folded, is still found");
+// (the sync's step for such a call names it behind a break too, reading the workflow's text, not the YAML the package gave)
+const stepOf = text => readyOnlyHolds({ root: ".", files: [], workflows: { "a.yml": { text, yaml: (() => { try { return parseYaml(text); } catch { return null; } })() } } });
+ok(["\u0085", "\u2028", "\u2029"].every(br => /workflows\/a\.yml`/u.test(stepOf(skipping(br)) ?? "")) && stepOf(`# c\n${call(FULL, "copies.yml", NOT_DRAFT)}`) === null, "the step that names a call a draft skips names one behind such a break too", String(stepOf(skipping("\u2028"))));
+// (and says it could not read a workflow with such a break that is no YAML once the breaks are line feeds, as it says of any other)
+const unread = (() => { try { return stepOf(`${skipping("\u2028")}bad: [\n`); } catch (e) { return e; } })();
+ok(unread instanceof Unread && /workflows\/a\.yml`/u.test(stepOf(`${call(TYPES, "copies.yml", NOT_DRAFT)}# c\u2028bad: [\n`)), "the step that names a call a draft skips says it could not read a workflow with such a break that is no YAML either", String(unread));
 ok(draftHoles(call(TYPES, "copies.yml", NOT_DRAFT)).join() === "check" && draftHoles(call("  pull_request:\n", "personal-terms.yml", NOT_DRAFT)).length === 1
   && draftHoles(call(TYPES, "pr-description.yml")).length === 1 && draftHoles(call(TYPES, "core.yml", "    with:\n      description: true\n")).length === 1,
   "a call skipped on a draft, by its if: or by a check that skips one itself, whose trigger leaves out ready_for_review is found");

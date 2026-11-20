@@ -119,10 +119,6 @@
       "mark": 27143,
       "why": "The NuGet fetch before the restore: the sources, the base's lists, each package's content hash and the tools' lock files, read through the one fetchAll(); a task that changes one reads how the others count against the base, so a split would make it open each part."
     },
-    "scripts/workflows.mjs": {
-      "mark": 20964,
-      "why": "One check's readers (the word, the keys given twice, the calls a draft skips) that all read the same texts against the same base through the one baseOf(); a task that changes one reads how the others count against the base, so a split would make it open each part."
-    },
     "tests/nuget-gate-test.mjs": {
       "mark": 20574,
       "why": "The cases of the NuGet check's first look and its whole job, on the one scratch project they share; split, each file would write the project again, adding to the suite's time (tasks/tests.md)."
@@ -138,10 +134,6 @@
     "tests/security-review-workflow-test.mjs": {
       "mark": 21768,
       "why": "One workflow's cases (security-review.yml run as GitHub runs it) on the one scratch repository and stand-ins for GitHub's API they share; split, each file would set them up again, adding to the suite's time (tasks/tests.md)."
-    },
-    "tests/workflows-test.mjs": {
-      "mark": 53311,
-      "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."
     },
     "scripts/shape.mjs": {
       "mark": 84826,
@@ -238,6 +230,14 @@
     "tests/staged-test.mjs": {
       "mark": 125729,
       "why": "#937: split into the three parts it already runs in, with the shared set-up in a module of its own."
+    },
+    "scripts/workflows.mjs": {
+      "mark": 26933,
+      "why": "One check's readers (the word, the keys given twice, the calls a draft skips, the line breaks) that all read the same texts against the same base through the one baseOf(); a task that changes one reads how the others count against the base, so a split would make it open each part."
+    },
+    "tests/workflows-test.mjs": {
+      "mark": 57789,
+      "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."
     }
   }
 }
