@@ -37,7 +37,7 @@
 // it cannot read in time, has none told. Proven old against new by tests/shape-readers-test.mjs, and against counts taken by hand.
 import { commentLines } from "./code-shape.mjs";
 import { inParser } from "./parser.mjs";
-import { LARGEST, budgetOf, walkFunctions } from "./tree-walk.mjs";
+import { LARGEST, budgetOf, parseWithin, walkFunctions } from "./tree-walk.mjs";
 
 /** The file `src` read: { functions: [{ name, line, lines, depth, branches }] in the order their bodies open, null
  *  where they cannot be told; usings: [{ target, static, alias }]; namespaces; types; toks: [{ t, v, line }] }; null
@@ -65,7 +65,7 @@ const WORD = /^@?[A-Za-z_\u0080-\uffff][\w\u0080-\uffff]*$/u;
 export function read(parse, src) {
   // (one budget for the file, which its parses share: the plain one, and again with the directives blanked and with the
   // headers of extension blocks read as types')
-  const until = performance.now() + budgetOf(src), parsed = text => parse("csharp", text, Math.max(until - performance.now(), 0));
+  const until = performance.now() + budgetOf(src), parsed = text => parseWithin(parse, "csharp", text, Math.max(until - performance.now(), 0));
   let tree = parsed(src), text = src;
   if (!tree) return null;
   try {
