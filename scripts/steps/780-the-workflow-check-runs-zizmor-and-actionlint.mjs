@@ -2,4 +2,4 @@
 // of their names.
 import { COST } from "../step-checks.mjs";
 
-export default { lead: "20 November 2026, the workflow check runs zizmor and actionlint", cost: COST.check, unread: "the findings that stood are read by the two tools alone, which the workflow check's job fetches and runs on the host's runners, never in a session; each run of the check, on every pull request and on main, notes each that the base held, so they are listed there" };
+export default { lead: "20 November 2026, the workflow check runs zizmor and actionlint", cost: COST.check, unread: "the findings that stood are read by the two tools alone, which the workflow check's job fetches and runs on the host's runners, never in a session, and first on the sync pull request's own run, after the steps were read; each run of the check notes each finding the base held, and the session that syncs files the task that names those of the sync pull request's run, which no file a step reads holds" };

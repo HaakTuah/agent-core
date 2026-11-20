@@ -105,7 +105,7 @@ export const UNPLANTED = {
   "17 November 2026, a team's owners read from the host": "it needs a second person's account the host lets write, and the case's scratch repository holds its owner's alone",
   "19 November 2026, a project's records one file per entry": "it needs a record that the project's merged pull requests keep adding to, and this case's scratch project has no history of merged pull requests to read one from",
   "17 November 2026, held packages looked up again": "its outcome is what npm's or NuGet's registry answers on the day of a package the project holds, which no scratch project can plant without a package of its own, and what the session puts in a sync pull request's description is no file a script reads after",
-  "20 November 2026, the workflow check runs zizmor and actionlint": "it asks nothing of a session: the two tools run on the host's runners alone, never in a session, and each run notes the findings the base held",
+  "20 November 2026, the workflow check runs zizmor and actionlint": "what it asks, a task filed from the notes of the sync pull request's own run, needs that run of the workflow check on the host's runners, where the two tools alone run, and this case's scratch project has no runner",
 };
 
 export function set(dir, opts = {}) {
