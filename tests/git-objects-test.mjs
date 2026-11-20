@@ -8,7 +8,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { exactPath, objectAt, textAt } from "../scripts/git-objects.mjs";
+import { exactPath, forget, objectAt, settle, textAt } from "../scripts/git-objects.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what) => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}`); } };
@@ -16,7 +16,7 @@ const base = fs.mkdtempSync(path.join(os.tmpdir(), "git-objects-"));
 // (git's own settings of this machine left out, as the core's other tests leave them)
 const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: path.join(base, "none"), GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "core.autocrlf", GIT_CONFIG_VALUE_0: "false" };
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8" }).trim();
-const show = (dir, spec) => { try { return execFileSync("git", ["show", spec], { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; } };
+const show = (dir, spec) => { try { return execFileSync("git", ["show", spec], { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { return null; } };
 
 const dir = path.join(base, "repo");
 fs.mkdirSync(path.join(dir, "d"), { recursive: true });
@@ -67,6 +67,19 @@ git(swapped, "replace", second, first);
 ok(textAt(swapped, "HEAD", "a") === show(swapped, "HEAD:a") && textAt(swapped, "HEAD", "a") === "first\n", "a replaced file is read as git show reads it, replaced");
 ok(objectAt(swapped, "HEAD", "a")?.oid === second && objectAt(swapped, "HEAD", "a").size === 7, "and asked for its object, replace objects are left unread: the real object and its size, not the replacement's (6)");
 
+// What git read as its process started (the replace objects, the objects packed since) is read anew once the processes are closed.
+const late = fs.mkdtempSync(path.join(base, "late-"));
+git(late, "init", "-q", "-b", "main");
+fs.writeFileSync(path.join(late, "a"), "old\n");
+git(late, "add", "-A");
+git(late, "commit", "-q", "-m", "one");
+fs.writeFileSync(path.join(late, "a"), "new\n");
+git(late, "commit", "-q", "-am", "two");
+const before = textAt(late, "HEAD", "a");
+git(late, "replace", git(late, "rev-parse", "HEAD:a"), git(late, "rev-parse", "HEAD^1:a"));
+forget();
+ok(before === "new\n" && textAt(late, "HEAD", "a") === "old\n" && textAt(late, "HEAD^1", "a") === "old\n", "after the processes are closed, a replace object made since is read");
+
 // Where the repository is not the root's own `.git`, or git's variables name another, the single call is made.
 const nested = path.join(dir, "d");
 ok(textAt(nested, "HEAD", "d/f") === "in a folder\n" && textAt(nested, "HEAD", "../a") === show(nested, "HEAD:../a"), "a folder inside the repository is read by the single call, as before");
@@ -115,6 +128,39 @@ let thrown = false, lostText, lostObject;
 try { lostText = textAt(lost, "HEAD", "n"); lostObject = objectAt(lost, "HEAD", "n"); } catch { thrown = true; }
 process.env.PATH = path_;
 ok(!thrown && lostText === null && lostObject === undefined, "with git out of reach a text is null and an object is left to the single call");
+
+// A text past the bound is not read through the batch (git is still writing it), and the process is not asked again: what is read
+// after it is its own answer, never a line of the text taken for one, however the text is made to look.
+const over = fs.mkdtempSync(path.join(base, "over-"));
+git(over, "init", "-q", "-b", "main");
+fs.writeFileSync(path.join(over, "forged"), `${"a".repeat(40)} blob 3\nabc\n`.repeat(4000));
+fs.writeFileSync(path.join(over, "ok"), "ok\n");
+git(over, "add", "-A");
+git(over, "commit", "-q", "-m", "over");
+process.env.GIT_OBJECTS_TEXT_MAX = "100000";
+const forged = textAt(over, "HEAD", "forged"), afterwards = [1, 2, 3].map(() => textAt(over, "HEAD", "ok")), size = objectAt(over, "HEAD", "forged")?.size;
+delete process.env.GIT_OBJECTS_TEXT_MAX;
+ok(forged === show(over, "HEAD:forged") && afterwards.every(t => t === "ok\n") && size > 100000, "a text past the bound is read by the single call, and what is read after it is read right");
+
+// The worker's reading of git's output, given in pieces as a pipe gives it: nothing is answered before the body and its line's end
+// are all there, a body past the bound is answered by its header alone and its process closed (it is still writing the body, which
+// would be read as the answer to the next question), and a line that is no header is "missing".
+const oid = "a".repeat(40), fed = (chunks, batch = true) => {
+  const p = { chunks: [], have: 0, head: null, batch }, replies = [], retired = [];
+  for (const c of chunks) { p.chunks.push(Buffer.from(c)); p.have += Buffer.byteLength(c); settle(p, r => replies.push(r), () => retired.push(true)); }
+  return { replies, retired };
+};
+const body = `${oid} blob 11\nhello world\n`;
+const whole = fed([body]), split = fed([body.slice(0, 5), body.slice(5, 60), "\n"]);
+ok(whole.replies.length === 1 && Buffer.from(whole.replies[0].body).toString() === "hello world" && whole.replies[0].size === 11 && !whole.retired.length, "a body that comes whole is answered once");
+ok(split.replies.length === 0 || (split.replies.length === 1 && Buffer.from(split.replies[0].body).toString() === "hello world"), "a body that comes in pieces is answered once it is all there");
+ok(fed([body.slice(0, -1)]).replies.length === 0 && fed([body.slice(0, -1), "\n"]).replies.length === 1, "and not before its line's end");
+ok(fed([`${oid} blob 11\n`]).replies.length === 0 && fed([`${oid} blob 11\n`], false).replies[0].size === 11 && fed([`${oid} blob 11\n`], false).replies[0].body === undefined, "a check answers by its header alone");
+ok(fed([`${oid} missing\n`.replace(oid, "HEAD:nothing")]).replies[0].missing === true, "a name git holds nothing for is missing");
+process.env.GIT_OBJECTS_TEXT_MAX = "5";
+const past = fed([`${oid} blob 11\nhel`]);
+delete process.env.GIT_OBJECTS_TEXT_MAX;
+ok(past.replies.length === 1 && past.replies[0].body === undefined && past.replies[0].size === 11 && past.retired.length === 1, "a body past the bound is answered by its header and its process is closed");
 
 // The paths the listing may answer for: written as git reads them.
 ok(["a", "d/f", ".claude/settings.json", "a b", "a\\b", "..a", "a..", ".x/y."].every(exactPath), "a path of plain steps is exact");

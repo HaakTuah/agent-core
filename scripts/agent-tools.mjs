@@ -73,7 +73,7 @@ import { atCopy, corePath, hooksAt, manifestText, readCore } from "./core-path.m
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
 import { fetchedBy, libraryOf } from "./hook-source.mjs";
-import { exactPath, objectAt as objectIn, textAt } from "./git-objects.mjs";
+import { exactPath, forget, objectAt as objectIn, textAt } from "./git-objects.mjs";
 import { baseOf } from "./licences.mjs";
 import { unreached } from "./packages.mjs";
 import { started } from "./started.mjs";
@@ -1085,6 +1085,7 @@ export function run(root, file, { core = false, base = baseOf(root), ways = inst
   // may be another commit's)
   listings.clear();
   shown.clear();
+  forget();
   let config;
   try { config = parseBounded(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
     return { fail: [`${file} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`], notes: [] };
