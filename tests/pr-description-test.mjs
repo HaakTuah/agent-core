@@ -118,26 +118,26 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
   const git = (...a) => execFileSync("git", a, { cwd: tmp, env, stdio: ["ignore", "pipe", "pipe"] }).toString();
   const write = (f, text) => { fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), text); };
-  write("floor/security.md", "Read `scripts/old.mjs` and scripts/kit/ first.\n"); write("scripts/old.mjs", "x\n"); write("scripts/kit/a.mjs", "a\n"); write("roles/shared/review-guidelines.md", "Read `scripts/old.mjs`.\n");
+  write("floor/security.md", "Read `scripts/old.mjs` and `scripts/kit/` first.\n"); write("scripts/old.mjs", "x\n"); write("scripts/kit/a.mjs", "a\n"); write("roles/shared/review-guidelines.md", "Read `scripts/old.mjs`.\n");
   git("init", "-q"); git("add", "-A"); git("commit", "-q", "-m", "the base");
   git("mv", "scripts/old.mjs", "scripts/new.mjs"); git("mv", "scripts/kit", "scripts/tools");
-  write("floor/security.md", "Read `scripts/new.mjs` and scripts/tools/ first.\n"); write("roles/shared/review-guidelines.md", "Read `scripts/new.mjs` now.\n");
+  write("floor/security.md", "Read `scripts/new.mjs` and `scripts/tools/` first.\n"); write("roles/shared/review-guidelines.md", "Read `scripts/new.mjs` now.\n");
   git("commit", "-qam", "the move");
   const asked = ["floor/security.md", "roles/shared/review-guidelines.md"];
   ok(JSON.stringify(proven(tmp, "HEAD^1", "HEAD", asked)) === JSON.stringify(["floor/security.md"]), "read from git, a file and a folder moved whole and followed are proven, and a file with a word changed beside them is not");
-  git("mv", "scripts/new.mjs", "scripts/newer.mjs"); write("scripts/path-only.mjs", "changed\n"); write("floor/security.md", "Read `scripts/newer.mjs` and scripts/tools/ first.\n");
+  git("mv", "scripts/new.mjs", "scripts/newer.mjs"); write("scripts/path-only.mjs", "changed\n"); write("floor/security.md", "Read `scripts/newer.mjs` and `scripts/tools/` first.\n");
   git("add", "-A"); git("commit", "-qm", "the proof changed");
   ok(proven(tmp, "HEAD^1", "HEAD", asked).length === 0, "where the pull request changes the proof, nothing is proven, however its paths follow");
-  git("rm", "-q", "scripts/path-only.mjs"); git("commit", "-qm", "the proof as it was"); git("mv", "scripts/tools", "scripts/box"); write("scripts/box/extra.mjs", "more\n"); write("floor/security.md", "Read `scripts/newer.mjs` and scripts/box/ first.\n");
+  git("rm", "-q", "scripts/path-only.mjs"); git("commit", "-qm", "the proof as it was"); git("mv", "scripts/tools", "scripts/box"); write("scripts/box/extra.mjs", "more\n"); write("floor/security.md", "Read `scripts/newer.mjs` and `scripts/box/` first.\n");
   git("add", "-A"); git("commit", "-qm", "a folder moved with a file added");
   ok(proven(tmp, "HEAD^1", "HEAD", asked).length === 0, "a folder that gains a file in its move holds more than it held, and its pointer is not proven");
-  git("reset", "-q", "--hard", "HEAD^1"); write("floor/security.md", "Read `scripts/newer.mjs`; only actions/ run.\n"); git("commit", "-qam", "a rule naming what is not here");
+  git("reset", "-q", "--hard", "HEAD^1"); write("floor/security.md", "Read `scripts/newer.mjs`; only `actions/` run.\n"); git("commit", "-qam", "a rule naming what is not here");
   write("actions/a.txt", "planted\n"); git("add", "-A"); git("commit", "-qm", "planted under its words");
-  git("mv", "actions", "some-org"); write("floor/security.md", "Read `scripts/newer.mjs`; only some-org/ run.\n"); git("commit", "-qam", "the planted folder moved");
+  git("mv", "actions", "some-org"); write("floor/security.md", "Read `scripts/newer.mjs`; only `some-org/` run.\n"); git("commit", "-qam", "the planted folder moved");
   ok(proven(tmp, "HEAD^1", "HEAD", asked).length === 0, "a path outside the core's own folders follows no move: a folder planted under a rule's words, then moved, is not proven");
-  git("reset", "-q", "--hard", "HEAD^1"); git("mv", "scripts/newer.mjs", "scripts/newest.mjs"); write("floor/security.md", "Read `scripts/newest.mjs`; only actions/ run.\n"); git("commit", "-qam", "a move that rewrites the line");
+  git("reset", "-q", "--hard", "HEAD^1"); git("mv", "scripts/newer.mjs", "scripts/newest.mjs"); write("floor/security.md", "Read `scripts/newest.mjs`; only `actions/` run.\n"); git("commit", "-qam", "a move that rewrites the line");
   const between = proven(tmp, "HEAD^1", "HEAD", asked);
-  git("mv", "actions", "some-org"); write("floor/security.md", "Read `scripts/newest.mjs`; only some-org/ run.\n"); git("commit", "-qam", "the planted folder moved after");
+  git("mv", "actions", "some-org"); write("floor/security.md", "Read `scripts/newest.mjs`; only `some-org/` run.\n"); git("commit", "-qam", "the planted folder moved after");
   ok(between.length === 1 && proven(tmp, "HEAD^1", "HEAD", asked).length === 0, "nor does a move proven between the plant and its move, which rewrote the line, make it follow: the list of the core's own folders is fixed, read from no history");
 }
 // the line "Reasons read:", asked of a pull request that adds a line under the manifest's "Differences" (#756)

@@ -7,19 +7,17 @@
 //   node <the core's main>/scripts/path-only.mjs [<the base, by default the merge base with origin/main>]
 //
 // A file the PR moves is a regular file on both sides, no link, that git finds renamed with its content whole
-// (`-M100%`), and a folder it moves one whose
-// files all moved so: the old path stands no more at the head, the new one stood nowhere at the base, and the new one
-// holds what the old held. A file that asks the yes (owner-yes.mjs's asks) is proven where it is changed in place, a
-// regular file on both sides, and its two versions are the same text but where a path of such a move stands in the old
-// and that move's new path in the same place in the new, both paths in the core's own folders (OWN, so that a path a
-// rule writes for something outside the repository, `actions/`, is never one a file planted under it moves); a path stands where no letter, digit, "_", ".", "/" or "-"
-// comes before it and no letter, digit, "_" or "-", nor "." or "/" before one, comes after. It refuses, never guessing,
-// a file that asks the yes and is added, deleted or moved itself, a move into or out of such a path, every other change
-// of a word, and every file where the pull request changes this script, the description check, its workflow, what that
-// workflow sets up before the check (the installer, .node-version, the core's packages), or a file of the repository
-// any of these scripts imports at any depth, as the base holds them (ownFiles), so that the code that proves is always
-// `main`'s, as floor rule 3 asks, though the description check runs the pull request's copy. Git and Node's own
-// modules; it changes nothing.
+// (`-M100%`), and a folder it moves one whose files all moved so: the old path stands no more at the head, the new one
+// stood nowhere at the base, and the new one holds what the old held. A file that asks the yes (owner-yes.mjs's asks)
+// is proven where it is changed in place, a regular file on both sides, and its two versions are the same text but
+// where a path of such a move stands between backticks in the old and that move's new path in the same place in the
+// new, both paths in the core's own folders (OWN: a path a rule writes for something outside the repository, `actions/`,
+// is never one a file planted under it moves). It refuses, never guessing, a file that asks the yes and is added,
+// deleted or moved itself, a move into or out of such a path, every other change of a word, and every file where the
+// pull request changes this script, the description check, its workflow, what that workflow sets up before the check
+// (the installer, .node-version, the core's packages), or a file of the repository any of these scripts imports at any
+// depth, as the base holds them (ownFiles), so that the code that proves is always `main`'s, as floor rule 3 asks,
+// though the description check runs the pull request's copy. Git and Node's own modules; it changes nothing.
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { asks } from "./owner-yes.mjs";
@@ -57,25 +55,24 @@ const UTF8 = new TextDecoder("utf-8", { fatal: true }), INVALID = Symbol("no UTF
 
 const escape = s => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
-// The spellings of each move, old to new. A path is read bare where it has a "/" and names a file by its extension or a
-// folder by its closing "/"; otherwise only between backticks, so that no word of prose ("tests", "and/or") is read as
-// one; and a spelling with no "/" never, so that neither a plain word between backticks (`main`) nor a name the floor
-// writes for a kind of file (`README.md`) is rewritten by moving a file or folder at the root that bears it. A move is left out where either
-// path holds anything but ASCII letters, digits, ".", "_", "-" and "/", or asks the yes: such a move is refused, and
-// justifies no pointer. So does a move of what a tool reads by a fixed name or place (FIXED: a dot file or folder, such
-// as .claude/settings.json or .github/, and a rule file's name): it changes what a rule holds, not a pointer. A file's
-// name alone follows nothing either.
+// The spellings of each move, old to new: each path between backticks alone, as the pointer check
+// (pointers.mjs --core, on every pull request) reads it and fails one that leads to no file, so a spelling followed
+// always named a file that stood; a folder also with its closing "/". A move justifies no pointer where either path
+// lies outside the core's own folders (OWN) or holds anything but ASCII letters, digits, ".", "_", "-" and "/", or asks
+// the yes, or is what a tool reads by a fixed name or place (FIXED: a dot file or folder, such as .claude/settings.json
+// or .github/, and a rule file's name): it changes what a rule holds, not a pointer.
 // (a path any part of which starts with ".", or whose file is named as a tool reads it)
-const FIXED = p => p.split("/").some(part => part.startsWith(".")) || /^(?:AGENTS|CLAUDE|GEMINI|REVIEW|SECURITY)\.md$|^(?:LICENSE|NOTICE)(?:\.\w+)?$/u.test(p.split("/").at(-1));
-// (the core's own top folders, a fixed list no pull request steers: a path a rule writes under one names the core's file)
-export const OWN = ["archive", "inventory", "modules", "reports", "roles", "scripts", "setup", "tasks", "tests", "tools", "words"];
+// (and, since a file system may ignore case or trailing dots, a rule file's name in any case, a part ending in ".", and a
+// name Windows keeps for a device)
+const FIXED = p => p.split("/").some(part => part.startsWith(".") || part.endsWith(".") || /^(?:con|prn|aux|nul|com\d|lpt\d)(?:\..*)?$/iu.test(part)) || /^(?:AGENTS|CLAUDE|GEMINI|REVIEW|SECURITY)\.md$|^(?:LICENSE|NOTICE)(?:\.\w+)?$/iu.test(p.split("/").at(-1));
+// (the core's own top folders that a project's copy carries, a fixed list no pull request steers: a path a rule writes
+// under one names the core's file; reports/, tests/ and words/ stay out of the copy, .gitattributes)
+export const OWN = ["archive", "inventory", "modules", "roles", "scripts", "setup", "tasks", "tools"];
 const own = p => OWN.includes(p.split("/")[0]) && p.includes("/");
 const SAFE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
-const named = p => /\.[A-Za-z0-9]+$/u.test(p.split("/").at(-1));
-const bare = p => p.includes("/") && (p.endsWith("/") || named(p));
 export function spellings(moves) {
   const pairs = new Map();
-  const add = (a, b) => { if (a.includes("/") && b.includes("/")) pairs.set(`\`${a}\``, `\`${b}\``); if (bare(a) && bare(b)) pairs.set(a, b); };
+  const add = (a, b) => pairs.set(`\`${a}\``, `\`${b}\``);
   for (const { from, to, folder } of moves) {
     if (asks(from) || asks(to) || from === to || !SAFE.test(from) || !SAFE.test(to) || FIXED(from) || FIXED(to) || !own(from) || !own(to)) continue;
     add(from, to);
@@ -140,8 +137,15 @@ export function foldersOf(from, to) {
 // Whether `to` names, but for the case of its letters, another file or folder of `files` (the head's), as one file to a
 // checkout on a file system that ignores case, where a pointer to it would open the other.
 export function collides(to, files) {
-  const low = to.toLowerCase();
-  return files.some(f => f !== to && !f.startsWith(`${to}/`) && (f.toLowerCase() === low || f.toLowerCase().startsWith(`${low}/`)));
+  const parts = to.split("/");
+  return files.some(f => {
+    const other = f.split("/");
+    for (let k = 0; k < Math.min(parts.length, other.length); k++) {
+      if (other[k].toLowerCase() !== parts[k].toLowerCase()) return false;
+      if (other[k] !== parts[k]) return true;
+    }
+    return false;
+  });
 }
 
 // Whether a line of `git diff --raw` (":<mode> <mode> <id> <id> <status>") is a regular file renamed whole.
