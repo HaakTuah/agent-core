@@ -14,7 +14,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { checkoutStandIn, root, scratchDir, scratchEnv, tally } from "../scripts/scratch-core.mjs";
-import { parseYaml, runWorkflow } from "../scripts/workflow-run.mjs";
+import { parseYaml } from "../scripts/parse-yaml.mjs";
+import { runWorkflow } from "../scripts/workflow-run.mjs";
 
 const self = fileURLToPath(import.meta.url);
 const WORKFLOW = fs.readFileSync(path.join(root, ".github/workflows/security-review.yml"), "utf8");

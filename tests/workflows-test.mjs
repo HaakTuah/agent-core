@@ -10,7 +10,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TEMPLATES } from "../scripts/init.mjs";
-import { holds, parseYaml } from "../scripts/workflow-run.mjs";
+import { parseYaml } from "../scripts/parse-yaml.mjs";
+import { holds } from "../scripts/workflow-run.mjs";
 import { baseFolder, draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, twiceUnfetched, unlinked, unparsed, unreadied } from "../scripts/workflows.mjs";
 import { Unread } from "../scripts/workflow-calls.mjs";
 import { readyOnlyHolds } from "../scripts/step-checks-ready.mjs";
@@ -269,7 +270,7 @@ ok(unparsed([]).fails.length === 0 && own.every(f => unparsed([{ file: f, text: 
 const tmp = scratchDir("workflows-test-");
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
+  for (const f of ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "parse-yaml.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
   // (the install with the lock file it is read against)
   fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(tmp, "core/.packages"), { recursive: true });
   fs.writeFileSync(path.join(tmp, "core/.gitignore"), "/.packages/node_modules/\n"); // (as the copy holds it)
@@ -332,7 +333,7 @@ const vend = scratchDir("workflows-vendored-");
 try {
   const at = "vendor/core/", put = (f, text) => { fs.mkdirSync(path.dirname(path.join(vend, f)), { recursive: true }); fs.writeFileSync(path.join(vend, f), text); };
   fs.mkdirSync(path.join(vend, at, "scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(vend, at, "scripts", f));
+  for (const f of ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "parse-yaml.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(vend, at, "scripts", f));
   fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(vend, at, ".packages"), { recursive: true });
   put("core-manifest.md", `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${at} (never edited here).\n`);
   put(`${at}tools/action.yml`, "on:\n  pull_request_target:\n"); // (the copy's own, which the core's run holds)

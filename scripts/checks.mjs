@@ -36,7 +36,7 @@ import { CORE } from "./core-address.mjs";
 import { MEND } from "./mend.mjs";
 import { installed } from "./packages.mjs";
 import { started } from "./started.mjs";
-import { parseYaml } from "./workflow-run.mjs";
+import { parseYaml } from "./parse-yaml.mjs";
 
 export const PARTS = ["copies", "description", "signatures", "nuget"];
 const OPTIONS = ["--base", "--copies", "--sizes", "--description", "--parts", "--signatures", "--nuget"];

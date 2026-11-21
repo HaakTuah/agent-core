@@ -49,7 +49,8 @@ import { copyAt } from "../scripts/workflow-calls.mjs";
 import { importsOf, projectFilesByContent, readProject } from "../scripts/nuget.mjs";
 import { STEPS, callers, leads, notDone, project as read, report } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, notesAt } from "../scripts/sync-notes.mjs";
-import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
+import { parseYaml } from "../scripts/parse-yaml.mjs";
+import { evaluate, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
 
 const STEP_LEADS = STEPS.map(s => s.lead);
 let failed = 0, count = 0;

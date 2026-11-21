@@ -7,7 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseYaml } from "../scripts/workflow-run.mjs";
+import { parseYaml } from "../scripts/parse-yaml.mjs";
 
 let failed = 0;
 const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}${!cond && detail ? `\n     ${detail}` : ""}`); if (!cond) failed++; };

@@ -23,7 +23,7 @@ import { FOLDER as NOTES_FOLDER, NOTES } from "./sync-notes.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { readNothing, saidOf } from "./read-nothing.mjs";
 import { started } from "./started.mjs";
-import { parseYaml } from "./workflow-run.mjs";
+import { parseYaml } from "./parse-yaml.mjs";
 import { copyAt } from "./workflow-calls.mjs";
 import { mendAt, plain, shown } from "./step-checks.mjs";
 

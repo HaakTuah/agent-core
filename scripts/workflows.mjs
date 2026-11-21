@@ -60,7 +60,7 @@ import { DEEPEST, LONGEST, pruned, twice } from "./yaml-keys.mjs";
 import { loadSync, unreached } from "./packages.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
-import { parseYaml } from "./workflow-run.mjs";
+import { parseYaml } from "./parse-yaml.mjs";
 import { compared, run } from "./workflow-tools.mjs";
 
 const WORD = "pull_request_target";

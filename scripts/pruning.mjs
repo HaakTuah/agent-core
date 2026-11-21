@@ -10,7 +10,7 @@
 //     readable and usable have none);
 //   - is held by a check that fired nowhere in the span: no step of a workflow that runs it failed on a pull request,
 //     read from GitHub's record of each failed run's jobs and their steps, and from the workflows' steps as the core's
-//     own reader of YAML gives them (workflow-run.mjs, beside this file); a check no step names is not judged so;
+//     own reader of YAML gives them (parse-yaml.mjs, beside this file); a check no step names is not judged so;
 //   - is held by a staged case that passed without it.
 // Ahead of those, the rules holders.mjs (beside this file) counts as having no holder, worst first, a rule read at a
 // role's start before one read on need, each with its proposal from UNHELD (#545): "check" or "case" (a check or a

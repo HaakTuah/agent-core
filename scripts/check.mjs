@@ -34,7 +34,8 @@ import { carriedAt, readCore } from "./core-path.mjs";
 import { MEND } from "./mend.mjs";
 import { hostSaid, plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
-import { evaluate, parseYaml, pathsLetThrough, runWorkflow, withAbsolutePath } from "./workflow-run.mjs";
+import { parseYaml } from "./parse-yaml.mjs";
+import { evaluate, pathsLetThrough, runWorkflow, withAbsolutePath } from "./workflow-run.mjs";
 
 // The core's workflows a project calls that only the host can run, each with why: check-test.mjs holds that every
 // workflow the starter kit calls is run here or named here.
@@ -174,7 +175,7 @@ function callers({ root, show, head, base }, tmp) {
   return kit;
 }
 
-// A workflow of the project's, read: one in a form workflow-run.mjs does not read is passed over and said so, since it
+// A workflow of the project's, read: one in a form parse-yaml.mjs does not read is passed over and said so, since it
 // is the project's own; one of those that calls the core's fails, since a check would go unrun.
 function readable(file, text) {
   try { return { file, wf: parseYaml(text) }; } catch (e) {

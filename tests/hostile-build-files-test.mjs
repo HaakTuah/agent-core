@@ -3,7 +3,7 @@
 // "nuget" and "agentTools", .github/workflows/*.yml, an agent tool's settings), which anyone who opens a pull request
 // writes. Read by licences.mjs (its lock and config readers), exact-versions.mjs, nuget.mjs (its lock and config
 // readers; its build files' XML has its own hostile block in nuget-test.mjs, "const hostile", near line 223, not
-// repeated here; its project readers' links out of the project), workflows.mjs with yaml-keys.mjs (the tools it runs aside, which the trial of #580 read on such files), workflow-run.mjs (parseYaml, #864), sync.mjs (the move
+// repeated here; its project readers' links out of the project), workflows.mjs with yaml-keys.mjs (the tools it runs aside, which the trial of #580 read on such files), parse-yaml.mjs (parseYaml, #864), sync.mjs (the move
 // of the pins in the workflows), runners.mjs (#733), and agent-tools-links.mjs (its links out of the checkout:
 // agent-tools-links-test.mjs). Each case is refused: nothing of it is taken as a pass or a value, and a failure
 // says its mend. Run by the core's tests workflow (.github/workflows/tests.yml).
@@ -67,7 +67,7 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   // (the same text through parseYaml, which reads a project's own workflow for check.mjs, own-runs.mjs and steps.mjs: #864;
   // it runs as its own process so that a reader that gave it to the package would end in the run's timeout or an exit
   // with no mend, and no clock is read here)
-  const big = spawnSync(process.execPath, ["--input-type=module", "-e", `import { parseYaml } from ${JSON.stringify(new URL("../scripts/workflow-run.mjs", import.meta.url).href)};
+  const big = spawnSync(process.execPath, ["--input-type=module", "-e", `import { parseYaml } from ${JSON.stringify(new URL("../scripts/parse-yaml.mjs", import.meta.url).href)};
     const say = (t) => { try { parseYaml(t); return "read"; } catch (e) { return "FAIL: " + e.message; } };
     console.log(say("a: " + "[".repeat(3e6) + "\\n")); console.log(say("# " + "x".repeat(262144) + "\\na: 1\\n")); console.log(say("# " + "x".repeat(262000) + "\\na: 1\\n"));`], { encoding: "utf8", timeout: 10000 });
   const [huge, past, under] = big.stdout.split("\n");

@@ -12,8 +12,20 @@
   ],
   "past": {
     "scripts/workflow-run.mjs": {
-      "mark": 24358,
-      "why": "One runner of a workflow as GitHub runs it: its YAML reader, expression evaluator and job runner, read by their headings, found by searching. The one split that lets a reader read less, the YAML reader (about 1.7 KB) into a file of its own, is the task of #1056, and the mark stands until it is built."
+      "mark": 22438,
+      "why": "One runner of a workflow as GitHub runs it: its expression evaluator and job runner, read by their headings, found by searching; its YAML reader is split out (parse-yaml.mjs, #1056), and no other part stands alone for a reader of either."
+    },
+    "scripts/check.mjs": {
+      "mark": 26892,
+      "why": "the question of a split is asked in #1064"
+    },
+    "scripts/checks.mjs": {
+      "mark": 24179,
+      "why": "the question of a split is asked in #1064"
+    },
+    "scripts/code-scan.mjs": {
+      "mark": 20998,
+      "why": "the question of a split is asked in #1064"
     },
     ".github/workflows/core.yml": {
       "mark": 32543,
@@ -221,7 +233,7 @@
     },
     "tests/hostile-build-files-test.mjs": {
       "mark": 29868,
-      "why": "The sections of one input, a project's build, package and workflow files (too long, the wrong type, markup, a file path, out of range, nothing at all, and the reader of where the tests run), each trying every reader of it (licences.mjs, exact-versions.mjs, nuget.mjs, workflows.mjs, workflow-run.mjs, runners.mjs, agent-tools.mjs) on the scratch project and the helpers they share; split by section, each file would set them up again, and a reader added to the input is added to every section (#1008)."
+      "why": "The sections of one input, a project's build, package and workflow files (too long, the wrong type, markup, a file path, out of range, nothing at all, and the reader of where the tests run), each trying every reader of it (licences.mjs, exact-versions.mjs, nuget.mjs, workflows.mjs, parse-yaml.mjs, runners.mjs, agent-tools.mjs) on the scratch project and the helpers they share; split by section, each file would set them up again, and a reader added to the input is added to every section (#1008)."
     },
     "tests/hostile-github-test.mjs": {
       "mark": 22575,
