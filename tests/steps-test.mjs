@@ -66,15 +66,23 @@ const pairs = Object.fromEntries(Object.entries({ "a-private-npm-game": { packag
   fs.writeFileSync(manifest, was);
 }
 // ---- each step taken out: exactly it is reported, with its mend; the mend as written makes it done ----
+// (each step's mend is read for its own step alone, and for every other step by the next step's reading, which reads them
+// all and is told of exactly that step: a mend that left another step undone shows there, as "after the mend of ..."; and
+// the last mend by a reading of all the steps at the end, so no reading of all of them is made twice for one step)
 const dir = dirs["a-dotnet-project"];
+let mended = null;
 for (const step of STEPS.filter(s => s.check)) {
   STAGES[step.lead].stage(dir);
   const missed = notDone(dir);
-  ok(missed.length === 1 && missed[0].lead === step.lead && missed[0].mend.length > 20 && missed[0].cost === step.cost, `taken out, "${step.lead}" is reported, alone, with its mend and cost`, report(missed));
+  ok(missed.length === 1 && missed[0].lead === step.lead && missed[0].mend.length > 20 && missed[0].cost === step.cost, `taken out, "${step.lead}" is reported, alone, with its mend and cost`, `${mended ? `(after the mend of "${mended}") ` : ""}${report(missed)}`);
   STAGES[step.lead].mend(dir);
-  ok(!notDone(dir).length, `and its mend as written makes it done`, report(notDone(dir)));
+  const left = notDone(dir, only(step.lead));
+  ok(!left.length, `and its mend as written makes it done`, report(left));
   STAGES[step.lead].after?.(dir);
+  mended = step.lead;
 }
+const left = notDone(dir);
+ok(!left.length, "and, every one taken out and mended in turn, every step reads done", `(after the mend of "${mended}") ${report(left)}`);
 // (the parser's packages installed where the selection of tests runs too, which reads through the shape check's
 // readers, all of Python on the parser: a job that selects after the first install alone reads not done; #530, item 6)
 {
@@ -130,7 +138,8 @@ for (const step of STEPS.filter(s => s.check)) {
 const lockProject = dirs["an-npm-project"];
 const some = STEPS.filter(s => s.check).filter((_, i) => i % 2 === 0).map(s => s.lead);
 for (const lead of some) STAGES[lead].stage(lockProject);
-ok(JSON.stringify(notDone(lockProject).map(m => m.lead)) === JSON.stringify(some), "several taken out at once are reported, exactly those", report(notDone(lockProject)));
+const several = notDone(lockProject);
+ok(JSON.stringify(several.map(m => m.lead)) === JSON.stringify(some), "several taken out at once are reported, exactly those", report(several));
 // (in the order steps-stage.mjs loads them: the steps', and `last` where a stage's mend reads what the others' mends write)
 for (const lead of Object.keys(STAGES).filter(l => some.includes(l))) STAGES[lead].mend(lockProject);
 ok(!notDone(lockProject).length, "and their mends make every one done");
@@ -140,7 +149,8 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
 {
   const pair = ["16 November 2026, the tests a change can reach", "18 November 2026, a tree that passed is not run again"];
   for (const lead of pair) STAGES[lead].stage(lockProject);
-  ok(pair.every(lead => notDone(lockProject, only(lead)).some(m => m.lead === lead)), "the tests a change can reach and a tree that passed, taken out together, are each reported", report(notDone(lockProject)));
+  const together = pair.map(lead => notDone(lockProject, only(lead)));
+  ok(pair.every((lead, i) => together[i].some(m => m.lead === lead)), "the tests a change can reach and a tree that passed, taken out together, are each reported", report(together.flat()));
   for (const lead of Object.keys(STAGES).filter(l => pair.includes(l))) STAGES[lead].mend(lockProject);
   for (const lead of pair) STAGES[lead].after?.(lockProject);
 }
