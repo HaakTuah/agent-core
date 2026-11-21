@@ -1,5 +1,5 @@
 - `scripts/nuget.mjs`, `scripts/nuget-fetch.mjs`, `scripts/nuget-look.sh`, `.github/workflows/nuget.yml`,
-  `tests/nuget-gate-test.mjs`: for a .NET project, every package one exact version under a licence on the list, each
+  `tests/nuget-gate-test.mjs`, `tests/nuget-gate-network-test.mjs`, `scripts/nuget-gate-scratch.mjs`: for a .NET project, every package one exact version under a licence on the list, each
   read from a package fetched before the pull request's build files run. *Runs:* any session with the .NET SDK, and the
   runners. *Else:* nuget-license (a .NET tool that holds packages to a list of licences), kept; `dotnet list package
   --include-transitive --format json`, kept, for the packages; dotnet-project-licenses, dropped on fact: its last
