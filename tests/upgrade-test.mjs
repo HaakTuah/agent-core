@@ -213,13 +213,14 @@ fs.mkdirSync(fetchedOnce.temp);
 const installedOnce = { store: new Map(), temp: path.join(tmp, "installed-once") };
 fs.mkdirSync(installedOnce.temp);
 {
+  // (a step reads its folder as `$RUNNER_TEMP/tool`, so on Windows the runner folder's own backslashes then a slash; the case expects that form, #1076)
   // (the runner's own case: the first job runs the matching step with the shared folder as its runner folder, the next takes
   // its result and its GITHUB_ENV line; a step of another text, or run with no `once`, runs in its own job's folder)
   const wf = (a, b) => `on: push\njobs:\n  j:\n    steps:\n      - run: |\n          echo ${a} >> "$COUNT"\n          echo "TOOL=$RUNNER_TEMP/tool" >> "$GITHUB_ENV"\n      - run: test "$TOOL" = "$EXPECT" && echo reads >> "$COUNT"\n      - run: echo ${b} >> "$COUNT" && exit 3\n`;
   const dir = path.join(tmp, "once-case"), count = path.join(dir, "count"), shared = path.join(dir, "shared");
   fs.mkdirSync(shared, { recursive: true });
   const once = { pattern: /fetch|break/, store: new Map(), temp: shared };
-  const go = (text, o) => runWorkflow(text, { github: { repository: "o/r", event_name: "push" }, base: { PATH: process.env.PATH, COUNT: count, EXPECT: path.join(shared, "tool") }, workspace: () => dir, uses: {}, temp: dir, ...o })[0];
+  const go = (text, o) => runWorkflow(text, { github: { repository: "o/r", event_name: "push" }, base: { PATH: process.env.PATH, COUNT: count, EXPECT: `${shared}/tool` }, workspace: () => dir, uses: {}, temp: dir, ...o })[0];
   const first = go(wf("fetch", "break"), { once }), second = go(wf("fetch", "break"), { once }), plain = go(wf("fetch", "break"), {}), other = go(wf("get", "break"), { once });
   const lines = fs.readFileSync(count, "utf8").trim().split("\n"), times = w => lines.filter(l => l === w).length;
   ok(times("fetch") === 2 && times("break") === 1 && times("reads") === 2 && !first.passed && !second.passed && second.steps[0].ran && second.steps[0].passed && second.steps[2].passed === false,
