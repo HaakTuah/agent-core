@@ -226,12 +226,13 @@ fs.mkdirSync(fetchedOnce.temp);
   fs.mkdirSync(path.join(dir, "scripts"));
   fs.writeFileSync(path.join(dir, "scripts", "f.sh"), 'echo "key $1" >> "$COUNT"\n');
   const onceF = { pattern: /f\.sh/, store: new Map(), temp: shared };
-  const runs = x => go(k(x, "v", "id: s\n        "), { once: onceF });
-  const one = runs("1"), again = runs("1"), changedEnv = runs("2");
+  const withEnv = x => go(k(x, "v", "id: s\n        "), { once: onceF });
+  const one = withEnv("1"), again = withEnv("1"), changedEnv = withEnv("2");
   fs.writeFileSync(path.join(dir, "scripts", "f.sh"), 'echo "key changed $1" >> "$COUNT"\n');
-  const changedScript = runs("1"), filled = go(k("1", "${{ github.event_name }}", "id: s\n        "), { once: onceF });
+  const changedScript = withEnv("1"), same = k("1", "${{ github.event_name }}", "id: s\n        ");
+  const filled = go(same, { once: onceF }), filledOther = go(same, { once: onceF, github: { repository: "o/r", event_name: "pull_request" } });
   const keys = fs.readFileSync(count, "utf8").trim().split("\n").filter(l => l.startsWith("key"));
-  ok(keys.join() === "key v,key v,key changed v,key changed push" && one.passed && again.passed && again.steps[1].passed && changedEnv.passed && changedScript.passed && filled.passed,
+  ok(keys.join() === "key v,key v,key changed v,key changed push,key changed pull_request" && one.passed && again.passed && again.steps[1].passed && changedEnv.passed && changedScript.passed && filled.passed && filledOther.passed,
     "a step is run again where its env, its script or its expression's value differs, and a replay hands the step after it the outputs of the first run", keys.join());
 }
 // Every workflow of the project's that one event starts, and in it each call to a workflow of the core's, as GitHub
