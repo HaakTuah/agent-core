@@ -8,7 +8,7 @@
 // the core changes in a way this cannot read fails the test, and is taught here, rather than running other than GitHub
 // would. Its runner is run by the tests, and by check.mjs, which runs the core's checks from plain git where no GitHub
 // runs them (tasks/hosts.md); no workflow of the core's runs it. Its reader of YAML is used too by the scripts that read
-// a project's workflows (steps.mjs, checks.mjs, check-configs.mjs, pruning.mjs). Node's own modules, and the YAML
+// a project's workflows (among them steps.mjs, checks.mjs, own-runs.mjs, workflows.mjs and pruning-read.mjs). Node's own modules, and the YAML
 // package.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
