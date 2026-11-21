@@ -125,7 +125,7 @@ if (sdk) {
   const built = whole({ "build/flag.txt": "yes\n" }, { "Directory.Build.props": FLAGGED, "build/flag.txt": "no\n" });
   ok(!built.passed && /NU1004/.test(built.out) && !built.ran.includes(FETCH) && built.out.includes("the licence read before the restore is left out"), "where the first look restored, the read before the restore is left out, and the restore fails what no lock file holds", built.out.slice(-1500));
   const imported = whole({ "build/deps.xml": ADDS }, { "src/App/App.csproj": bare.replace("<PropertyGroup>", '<Import Project="..\\..\\build\\deps.xml" />\n  <PropertyGroup>'), "build/deps.xml": EMPTY });
-  ok(!imported.passed && /NU1004/.test(imported.out) && imported.ran.includes(FETCH) && imported.out.includes("build/deps.xml"), "where only an imported file changed, the first look names it, so the read before the restore runs, and the restore fails what no lock file holds", imported.out.slice(-1500));
+  ok(!imported.passed && /NU1004/.test(imported.out) && imported.ran.includes(FETCH) && imported.ran.indexOf(FETCH) < imported.ran.indexOf("Restore each project file from its lock file alone") && imported.out.includes("build/deps.xml"), "where only an imported file changed, the first look names it, so the read before the restore runs, and the restore fails what no lock file holds", imported.out.slice(-1500));
   const stale = whole({ "src/App/App.csproj": project("") });
   ok(!stale.passed && /NU1004/.test(stale.out) && /A restore from a lock file failed .*\. Mend: /.test(stale.out) && mended(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
 }

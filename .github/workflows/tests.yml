@@ -222,7 +222,7 @@ jobs:
         timeout-minutes: 5
         shell: bash
         run: |
-          python3 -m pip download --require-hashes --no-deps --only-binary=:all: --no-input --disable-pip-version-check -r .packages/requirements.txt -d "$RUNNER_TEMP/wheels"
+          python3 -I -m pip download --require-hashes --no-deps --only-binary=:all: --no-input --disable-pip-version-check -r .packages/requirements.txt -d "$RUNNER_TEMP/wheels"
           echo "CORE_WHEELS=$RUNNER_TEMP/wheels" >> "$GITHUB_ENV"
       # (Betterleaks' release for GitHub's Linux runners, at the version and the SHA-256 the personal-terms check pins for
       # its Linux x64 archive, which tests/workflows-test.mjs holds the two to; fetched while the
