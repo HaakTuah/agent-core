@@ -7,12 +7,13 @@
 // caller gives for that action, or not at all, said so. A context or function it does not know throws, so a workflow
 // the core changes in a way this cannot read fails the test, and is taught here, rather than running other than GitHub
 // would. Its runner is run by the tests, and by check.mjs, which runs the core's checks from plain git where no GitHub
-// runs them (tasks/hosts.md); no workflow of the core's runs it. Node's own modules, and the YAML reader (parse-yaml.mjs).
+// runs them (tasks/hosts.md); no workflow of the core's runs it. Node's own modules, the YAML reader (parse-yaml.mjs) and the install step's copies (workflow-install.mjs).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { parseYaml } from "./parse-yaml.mjs";
+import { installKey, keepInstall, takeInstall } from "./workflow-install.mjs";
 
 // ---- GitHub's expressions ----
 
@@ -278,9 +279,14 @@ function callInputs(wf, inputs, secrets) {
 // reads by the path it puts in GITHUB_ENV) runs once for each text; every later job takes its result and its GITHUB_ENV
 // lines from `store`, a Map the caller keeps, and finds the tool in `temp`, a folder the caller makes and removes, which
 // that first run was given in place of its job's own.
-export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir(), once = null }) {
+//
+// `installed`, for the same: { store, temp }, a Map the caller keeps and a folder it makes and removes. A `run` step that
+// runs the core's install.mjs puts the packages into the workspace, so it runs once for each text, env and set of lock
+// files; every later job takes its result and a hard-linked copy of what the first one installed (each node_modules/ and
+// pypi/ below the core's .packages/), as the first run left it.
+export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir(), once = null, installed = null }) {
   const wf = parseYaml(text);
-  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp, once };
+  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp, once, installed };
   const given = callInputs(wf, inputs, secrets);
   const results = [];
   for (const [id, job] of Object.entries(wf.jobs ?? {})) {
@@ -412,12 +418,15 @@ function runScript(jr, step, name, env) {
   const kept = onceKey(rt, text, cwd, env);
   const seen = kept && rt.once.store.get(kept);
   if (seen) return replay(jr, step, name, seen);
+  const install = installKey(rt, text, cwd, env), taken = takeInstall(rt, install);
+  if (taken) return replay(jr, step, name, taken);
   const r = spawnSync(bash, shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
     ...rt.base, ...env, ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}), CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
     GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(rt.github.repository), GITHUB_EVENT_NAME: str(rt.github.event_name), RUNNER_TEMP: kept ? rt.once.temp : tmp, RUNNER_OS: ctx.runner.os } });
   const passed = r.status === 0;
   const out = `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}`, outputs = outputsOf(output);
   if (kept) rt.once.store.set(kept, { passed, out, outputs, env: readIf(path.join(tmp, "env")) });
+  keepInstall(rt, install, { passed, out, outputs, env: readIf(path.join(tmp, "env")) });
   carryEnv(path.join(tmp, "env"), ctx.env, id);
   result.steps.push({ name, ran: true, passed, out });
   outcome(ctx, step, passed, outputs);
