@@ -75,7 +75,8 @@ const plainEnv = { ...env };
 // The wait itself asks npm's registry, a check of its own (scripts/week-wait.mjs, a step of the tests workflow that
 // reaches the network); here its reading is held on answers made here, so this test runs with the network cut off (#772).
 {
-  const { tooYoung } = await import(pathToFileURL(path.join(root, "scripts/week-wait.mjs")).href);
+  const { tooYoung, failure } = await import(pathToFileURL(path.join(root, "scripts/week-wait.mjs")).href);
+  ok(mended(failure(["yaml@2.9.2: published 2026-11-17T00:00:00.000Z"])), "the week's wait fails with its mend on the failure's own line", failure(["x"]));
   // (held on a lock written by hand: a version field kept while the address names another tarball, an entry with no
   // version, an address off the registry, and a young version, against answers made here)
   const day = 86400000, now = Date.parse("2026-11-18T00:00:00Z");
@@ -444,7 +445,8 @@ try {
   // file's integrity, and a 404 for an address that echoes a network error's name; npm swaps the host of each address in
   // the lock file for the registry it is given, so no job reaches npm's own, #772)
   const registry = spawn(process.execPath, ["-e", `require("http").createServer((q, r) => { r.statusCode = /ETIMEDOUT/.test(q.url) ? 404 : 200; r.end("not a tarball"); }).listen(0, "127.0.0.1", function () { console.log(this.address().port); });`], { stdio: ["ignore", "pipe", "ignore"] });
-  const port = await new Promise(res => registry.stdout.once("data", d => res(String(d).trim())));
+  process.on("exit", () => registry.kill()); // (killed whatever ends the test)
+  const port = await new Promise((res, rej) => { registry.stdout.once("data", d => res(String(d).trim())); setTimeout(() => rej(new Error("the test's local registry did not start in 15 s")), 15000).unref(); });
   const local = { ...inPr, [["npm_config_regi", "stry"].join("")]: `http://127.0.0.1:${port}/`, npm_config_fetch_retries: "0" };
   const mismatched = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: local });
   ok(mismatched.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "in a project's pull request an install that fails for anything but the registry not answering fails, and tells the job nothing", `${mismatched.status} ${mismatched.stdout}${mismatched.stderr}`);
