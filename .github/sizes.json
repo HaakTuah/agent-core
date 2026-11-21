@@ -15,6 +15,8 @@
       "mark": 22438,
       "why": "One runner of a workflow as GitHub runs it: its expression evaluator and job runner, read by their headings, found by searching; its YAML reader is split out (parse-yaml.mjs, #1056), and no other part stands alone for a reader of either."
     },
+    "tests/check-test.mjs": { "mark": 28691, "why": "the question of a split is asked in #1073" },
+    "tests/code-scan-test.mjs": { "mark": 22506, "why": "the question of a split is asked in #1073" },
     "scripts/check.mjs": {
       "mark": 26892,
       "why": "the question of a split is asked in #1064"
@@ -150,10 +152,6 @@
     "tests/work-saved-test.mjs": {
       "mark": 26522,
       "why": "One hook's cases (work-saved.sh, run as a project registers it) on the one scratch project with a remote of its own that they share; split, each file would build it again, adding to the suite's time (tasks/tests.md) (#1008)."
-    },
-    "tests/nuget-gate-test.mjs": {
-      "mark": 20574,
-      "why": "The cases of the NuGet check's first look and its whole job, on the one scratch project they share; split, each file would write the project again, adding to the suite's time (tasks/tests.md)."
     },
     "tests/nuget-test.mjs": {
       "mark": 98920,

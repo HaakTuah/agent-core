@@ -4,7 +4,7 @@
 // and Python: every planted one found and no look-alike, by the core's own rules (code-scan.yml); then the scan of a
 // pull request in a scratch repository, failing a finding on a line it adds with its mend, passing one its description
 // lists as a false alarm, reporting one that stood before, and silenced by no comment in the code. On Linux and on
-// Windows. Git and Node's own modules; Python's pip and the network for the engine's wheel.
+// Windows. Git and Node's own modules; Python's pip, and the engine's wheel from PyPI or, where CORE_WHEELS names a folder of them, from it.
 //
 //   node tests/code-scan-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -72,10 +72,16 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
 }
 
 // the engine itself, installed from the core's .packages/requirements.txt as the scan's own step installs it
-const installed = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/install.mjs", import.meta.url)), "pypi"], { encoding: "utf8" });
+// (where the run's own set-up fetched the wheels beforehand, CORE_WHEELS names their folder and pip reads it alone, each
+// wheel still held to its SHA-256 in the lock file; so a run with the network cut off installs the engine and runs its
+// cases, never skips them: #772)
+const wheels = process.env.CORE_WHEELS ? { PIP_NO_INDEX: "1", PIP_FIND_LINKS: process.env.CORE_WHEELS } : {};
+const installed = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/install.mjs", import.meta.url)), "pypi"], { encoding: "utf8", env: { ...process.env, ...wheels } });
 const dir = fileURLToPath(new URL("../.packages/pypi/semgrep/bin/", import.meta.url));
 const engineHere = fs.existsSync(path.join(dir, `semgrep-core${process.platform === "win32" ? ".exe" : ""}`));
-if (installed.status !== 0 || !engineHere) {
+if (process.env.CORE_OFFLINE && (installed.status !== 0 || !engineHere)) {
+  ok(false, "with the network cut off, the engine installs from the wheels the run's set-up fetched, and its cases run", `${installed.stderr || installed.stdout}\nMend: run \`bash scripts/test-downloads.sh wheels\` where the network is up and name the folder it prints in CORE_WHEELS (the tests workflow's step "The code scan's engine, its wheels fetched at their pins for its test" does)`);
+} else if (installed.status !== 0 || !engineHere) {
   console.log(`skip the engine's own cases: ${(installed.stderr || installed.stdout).trim().split("\n").pop()}`);
   ok(installed.status !== 0 && /Mend: /u.test(installed.stderr), "where the engine cannot be installed, the install says why, and its mend", installed.stderr);
 } else {

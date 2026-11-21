@@ -105,6 +105,60 @@ export function scratch(prefix) {
   return { tmp, env, git, run, core, pin, script, fresh, project };
 }
 
+/** A copy, under `tmp`, of npm's cache on this machine, where it holds one, else null: what the job's own installs left
+ *  there, which a test that installs the core's packages into a scratch project reads before it asks npm's registry, so
+ *  it passes with the network cut off and reads what a copy made on the machine holds (#772). A copy, never the cache
+ *  itself, so no test writes into it, and only where the run's network is cut off (CORE_OFFLINE, which scripts/offline.sh sets):
+ *  elsewhere none, and the installs ask the registry. `env` is what npm is run with to find the cache; by default this process's. */
+export function npmCacheCopy(tmp, env = process.env) {
+  if (!process.env.CORE_OFFLINE) return null; // (the copy is made only where the network is cut off, scripts/offline.sh: elsewhere a cache may be gigabytes, and the registry answers)
+  const r = spawnSync("npm", ["config", "get", "cache"], { env, encoding: "utf8", shell: process.platform === "win32" });
+  const dir = r.status === 0 ? r.stdout.trim() : "";
+  if (!dir || !fs.existsSync(dir)) return null;
+  const copy = path.join(tmp, "npm-cache");
+  fs.cpSync(dir, copy, { recursive: true });
+  return copy;
+}
+
+/** The npm for npm-once.mjs's `real`, with the cache's copy handed in: a program of its own, in `tmp`, that runs this
+ *  machine's npm with the same arguments, its cache the copy `npmCacheCopy` makes and the registry asked only for what
+ *  that holds not (npm's prefer-offline). A test whose installs read the machine's copy reaches the registry for
+ *  nothing it already has; where the machine holds no cache, or the run's network is not cut off (npmCacheCopy), undefined, and npm-once.mjs runs the first npm on the PATH
+ *  as it did. The settings are the wrapper's, set where npm starts, so npm-once.mjs, which the licence scan passes
+ *  over, passes on the environment it was given as before (#772). */
+export function npmWithCache(tmp, env = process.env) {
+  const windows = process.platform === "win32", program = `npm${windows ? ".cmd" : ""}`, key = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
+  const real = (env[key] ?? "").split(path.delimiter).filter(d => path.isAbsolute(d)).map(d => path.join(d, program)).find(f => fs.existsSync(f));
+  const cache = real && npmCacheCopy(tmp, env);
+  if (!cache) return undefined;
+  const dir = path.join(tmp, "npm-cached"), wrapper = path.join(dir, program);
+  fs.mkdirSync(dir);
+  if (windows) fs.writeFileSync(wrapper, `@set "npm_config_cache=${cache}"\r\n@set "npm_config_prefer_offline=true"\r\n@call "${real}" %*\r\n`);
+  else fs.writeFileSync(wrapper, `#!/bin/sh\nnpm_config_cache='${cache.replace(/'/g, "'\\''")}' npm_config_prefer_offline=true exec '${real.replace(/'/g, "'\\''")}' "$@"\n`, { mode: 0o755 });
+  return wrapper;
+}
+
+/** The lines of a stand-in for curl (a shell script on a scratch PATH) that serve Betterleaks' release from a folder: where
+ *  the fetched address is one of that project's releases on github.com and CORE_ARCHIVES names a folder holding a file
+ *  of the name the address ends in, the file is copied to the one `-o` names and curl answers as it did. The run's own set-up fetches the archives while the network is up (the tests
+ *  workflow's step "Betterleaks' release"), so a test of a step that downloads a tool at its pin runs that step whole, the
+ *  archive held to its SHA-256 by the step itself, with the network cut off (#772). Else the lines do nothing. */
+export const ARCHIVE_SERVER = `out=; prev=; url=
+for a in "$@"; do [ "$prev" = -o ] && out=$a; prev=$a; url=$a; done
+case "$url" in https://github.com/betterleaks/betterleaks/releases/download/v*/*) [ -n "$CORE_ARCHIVES" ] && [ -n "$out" ] && [ -f "$CORE_ARCHIVES/\${url##*/}" ] && cp "$CORE_ARCHIVES/\${url##*/}" "$out" && exit 0 ;; esac
+`;
+
+/** Where the run's network is cut off (CORE_OFFLINE, set by scripts/offline.sh) on x64 Linux, where the tests workflow's
+ *  set-up step fetches Betterleaks' archive, and the folder CORE_ARCHIVES names holds none: the mend for a test of the
+ *  personal-terms check to fail with, naming the step; else null. A test that serves the archive from the folder asks it, so
+ *  a download that failed does not show as the check's own failure to fetch it (#772). */
+export function archivesMissing() {
+  if (!process.env.CORE_OFFLINE || process.platform !== "linux" || process.arch !== "x64") return null;
+  const dir = process.env.CORE_ARCHIVES;
+  if (dir && fs.existsSync(dir) && fs.readdirSync(dir).length > 0) return null;
+  return "Betterleaks' archive was not fetched for this run. Mend: run `bash scripts/test-downloads.sh archives` where the network is up and name the folder it prints in CORE_ARCHIVES (the tests workflow's step \"Betterleaks' release, its archive fetched at the check's pin for the tests of the personal-terms check\" does)";
+}
+
 const slash = (p) => p.replace(/\\/g, "/");
 
 /** The environment for a test whose scratch core is the repository at `theCore`, under the folder `tmp`. `findsBare`

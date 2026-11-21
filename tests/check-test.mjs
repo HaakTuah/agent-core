@@ -4,9 +4,9 @@
 // its mend; a project that calls none of the core's workflows, as on another host, is checked by the kit's calls; and
 // every workflow of the core's that the starter kit calls is run by it or named among the host's own (HOST_OWN), so a
 // new check cannot be left out of it. A scratch core reached through the core's own address by a git rewrite, so no
-// git call reaches the network; the checks it runs on the scratch project install the core's packages from npm's
-// registry, until they read a copy made on the machine (#772; tasks/tests.md, "A test that reaches the network runs
-// once per batch"). Git, tar, bash, npm and Node's own modules.
+// git call reaches the network; the checks it runs on the scratch project install the core's packages from a copy of
+// the machine's npm cache, made as the test starts, and so reach no registry (#772; tasks/tests.md, "A test that reaches
+// the network runs once per batch"). Git, tar, bash, npm and Node's own modules.
 //
 //   node tests/check-test.mjs
 import { spawnSync } from "node:child_process";
@@ -16,13 +16,14 @@ import { HOST_OWN } from "../scripts/check.mjs";
 import { onPath } from "../scripts/workflow-run.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { root, scratch, scratchEnv, tally } from "../scripts/scratch-core.mjs";
+import { npmWithCache, root, scratch, scratchEnv, tally } from "../scripts/scratch-core.mjs";
 import { npmOnce } from "../scripts/npm-once.mjs";
 
 const { ok, done } = tally();
 const { tmp, git, core, project } = scratch("check-test-");
-// (the core's packages installed by the real npm once, and linked into each job's clone after: npm-once.mjs)
-const env = npmOnce(scratchEnv(core, tmp), tmp);
+// (the core's packages installed by the real npm once, and linked into each job's clone after: npm-once.mjs; the real
+// npm reading a copy of the machine's cache first, so no job reaches the registry: scratch-core.mjs, npmWithCache, #772)
+const env = npmOnce(scratchEnv(core, tmp), tmp, { real: npmWithCache(tmp) });
 // (the licence scan passes npm-once.mjs over, so what it may run is held here: Node's own modules alone, loaded by
 // name; one process started, the real npm's; and, run against a real npm that logs what it is given, every command
 // passed on as it came, and npm ci's run with its files unchanged)

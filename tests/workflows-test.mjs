@@ -472,7 +472,7 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
   const steps = tests.jobs.suites.steps.filter(s => /contains\(matrix\.parts, 'network'\)/.test(String(s.if))).map(s => s.run).sort();
   const nets = l => l.filter(x => x.parts.split(" ").includes("network"));
   ok(suites && nets(suites[0]).length === 0 && nets(suites[1]).length === 4 && nets(suites[1]).every(x => x.suite === NETWORK && x.parts === "network") && ["ubuntu-latest", "windows-latest"].every(os => [".node-version", ".node-least"].every(n => nets(suites[1]).some(x => x.os === os && x.node === n))) && nets(suites[2]).length === 4
-    && steps.join() === ["node tests/init-dotnet-test.mjs", "node tests/nuget-fetch-test.mjs"].join(),
+    && steps.join() === ["node tests/init-dotnet-test.mjs", "node tests/nuget-fetch-test.mjs", "node tests/nuget-gate-network-test.mjs"].join(),
     "the tests that reach the network run in no pull request's run nor a push's, and once an hour and by hand in a job of their own on each system and Node (point 9)", steps.join(", "));
   // (#770: on Linux, but in the part network, each step runs with the network cut off, and those that must reach it
   // name their shell, bash, each listed here with why; the tests and the mutation run until #772 makes them
@@ -481,13 +481,10 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     "node scripts/install.mjs all": "installs the core's packages from npm's registry",
     'bash scripts/workflow-tools.sh >> "$GITHUB_ENV"': "fetches zizmor and actionlint at their pins",
     'bash scripts/lychee.sh >> "$GITHUB_ENV"': "fetches lychee at its pin",
+    'bash scripts/test-downloads.sh wheels >> "$GITHUB_ENV"': "fetches the code scan's engine's wheels at their pins, for its test",
+    'bash scripts/test-downloads.sh archives >> "$GITHUB_ENV"': "fetches Betterleaks' archive at the personal-terms check's pin, for its tests",
     'node scripts/select.mjs .github/shape.json --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}': "asks GitHub, on a push, whether the merged head passed",
     "node tests/packages-test.mjs": "#772: its week's wait reads npm's registry",
-    "node tests/check-test.mjs": "#772: its scratch project installs from npm's registry",
-    "node tests/copy-left-out-test.mjs": "#772: its personal-terms pair fetches Betterleaks from github.com",
-    "node tests/personal-terms-test.mjs": "#772: it fetches Betterleaks from github.com",
-    "node tests/nuget-gate-test.mjs": "#772: its scratch copies of the core install from npm's registry",
-    "node tests/code-scan-test.mjs": "#772: its engine's cases install it from PyPI, and are skipped without",
     "node scripts/lookup.mjs .github/licences.json": "looks each new package up in npm's registry",
     'for d in . parser; do if [ -d "$d/node_modules" ]; then (cd "$d" && npm audit signatures --prefix=.); fi; done': "reads the registry's signatures",
     'git fetch --no-tags --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"': "fetches the base from GitHub",
@@ -501,6 +498,13 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     && shells.every(s => s.shell === "bash") && online.length === Object.keys(ONLINE).length && online.every(r => r in ONLINE),
     "on Linux, but in the part network, each step of the suites runs with the network cut off, and only those listed with why name their own shell to reach it (#770)",
     JSON.stringify({ shell: tests.jobs.suites.defaults?.run?.shell, unlisted: online.filter(r => !(r in ONLINE)), missing: Object.keys(ONLINE).filter(r => !online.includes(r)) }));
+  // (the archive the tests' set-up fetches for the personal-terms check's tests is the one that check pins: its version and
+  // the SHA-256 of its Linux x64 archive, written in both, so a new pin there fails here until the script follows)
+  const pinned = fs.readFileSync(path.join(wfDir, "personal-terms.yml"), "utf8").match(/version=(\S+) exe=[\s\S]*?Linux\/x86_64\) file=linux_x64\.tar\.gz archive=([0-9a-f]{64}) /u);
+  const fetchedAt = fs.readFileSync(path.join(wfDir, "../../scripts/test-downloads.sh"), "utf8").match(/version=(\S+) sum=([0-9a-f]{64})\n/u);
+  ok(pinned && fetchedAt && pinned[1] === fetchedAt[1] && pinned[2] === fetchedAt[2],
+    "the Betterleaks archive scripts/test-downloads.sh fetches for the personal-terms check's tests is at the version and SHA-256 that check pins (#772)",
+    JSON.stringify({ pinned: pinned?.slice(1), fetched: fetchedAt?.slice(1) }) + "\nMend: write the version and the Linux x64 archive's SHA-256 of .github/workflows/personal-terms.yml in the \"archives\" case of scripts/test-downloads.sh");
   ok(tests.concurrency.group.includes("format('pr-{0}', github.event.pull_request.number)") && tests.concurrency.group.includes("(github.event_name == 'push' || github.event_name == 'schedule') && format('{0}-main', github.event_name) || github.run_id")
     && tests.concurrency["cancel-in-progress"] === "${{ github.event_name == 'pull_request' }}",
     "a pull request's run gives way to its newer push's; a run on main after a merge, the hourly runs, a start by hand and a call wait their turn and are never cancelled (point 4, as #810 changed it)");
