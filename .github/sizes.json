@@ -12,8 +12,8 @@
   ],
   "past": {
     "scripts/workflow-run.mjs": {
-      "mark": 24400,
-      "why": "One runner of a workflow as GitHub runs it: its YAML reader, its expression evaluator and its job runner share the state of one run and a context or function taught in one place, and a session that changes the runner reads its sections by the headings, found by searching; split, a reader of parseYaml alone would read 1 KB of 24, but the 32 files that import the file would each name a second one and a function taught to the evaluator could stand in neither half and go unread."
+      "mark": 24358,
+      "why": "One runner of a workflow as GitHub runs it: its YAML reader, expression evaluator and job runner, read by their headings, found by searching. The one split that lets a reader read less, the YAML reader (about 1.7 KB) into a file of its own, is the task of #1056, and the mark stands until it is built."
     },
     ".github/workflows/core.yml": {
       "mark": 32543,
