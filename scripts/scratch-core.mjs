@@ -125,11 +125,11 @@ export function npmCacheCopy(tmp, env = process.env) {
  *  as it did. The settings are the wrapper's, set where npm starts, so npm-once.mjs, which the licence scan passes
  *  over, passes on the environment it was given as before (#772). */
 export function npmWithCache(tmp, env = process.env) {
-  const windows = process.platform === "win32", key = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
-  const real = (env[key] ?? "").split(path.delimiter).filter(d => path.isAbsolute(d)).map(d => path.join(d, windows ? "npm.cmd" : "npm")).find(f => fs.existsSync(f));
+  const windows = process.platform === "win32", program = `npm${windows ? ".cmd" : ""}`, key = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
+  const real = (env[key] ?? "").split(path.delimiter).filter(d => path.isAbsolute(d)).map(d => path.join(d, program)).find(f => fs.existsSync(f));
   const cache = real && npmCacheCopy(tmp, env);
   if (!cache) return undefined;
-  const dir = path.join(tmp, "npm-cached"), wrapper = path.join(dir, windows ? "npm.cmd" : "npm");
+  const dir = path.join(tmp, "npm-cached"), wrapper = path.join(dir, program);
   fs.mkdirSync(dir);
   if (windows) fs.writeFileSync(wrapper, `@set "npm_config_cache=${cache}"\r\n@set "npm_config_prefer_offline=true"\r\n@call "${real}" %*\r\n`);
   else fs.writeFileSync(wrapper, `#!/bin/sh\nnpm_config_cache='${cache.replace(/'/g, "'\\''")}' npm_config_prefer_offline=true exec '${real.replace(/'/g, "'\\''")}' "$@"\n`, { mode: 0o755 });
