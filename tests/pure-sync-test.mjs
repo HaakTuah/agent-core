@@ -52,6 +52,8 @@ write(theCore, ".github/workflows/personal-terms.yml", terms);
 write(theCore, "setup/sync-notes/999-a-note-for-the-test.md", NOTE_LINE); // (an entry is a file of the folder: #750, point 1)
 const B = commit("B");
 const SIDE = git(theCore, "commit-tree", `${B}^{tree}`, "-p", B, "-m", "off main");
+// (packed once: every later fetch, clone and archive of the core reuses the pack, where the loose objects each time are compressed again, which was about half of a run's time in them; #812)
+git(theCore, "repack", "-adq");
 const SHA = sha => sha.slice(0, 7);
 
 // ---- a project, its first copy made from a clone of the core at A ----
@@ -110,6 +112,8 @@ const coreCheck = () => {
   return { passed: job.passed, out: job.steps.map(x => x.out).join("") };
 };
 const legit = pure();
+git(p, "push", "-q", "-f", "origin", "HEAD:refs/heads/check");
+git(p, "repack", "-adq"); git(tmp, `--git-dir=${origin}`, "repack", "-adq"); // (as the core's above: each check that follows clones these)
 ok(legit.status === 0 && legit.out.includes(`sha=${LEGIT}`), "the sync as the script makes it is pure, and the proof names the head it read", legit.out);
 ok(coreCheck().passed, "  and the core's own check of the copy passes it");
 

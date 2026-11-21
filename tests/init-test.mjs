@@ -249,6 +249,11 @@ if (p.status === 0) {
   for (const f of ["src", "checks/near.json", "checks/near-baseline.json"]) fs.rmSync(path.join(p.dir, f), { recursive: true, force: true });
   // (the core runs the same check on itself, with its own config and baseline (#339): it passes as the core stands, a
   // copy added fails, and its mend names the path a session types there, with no "core/" before it)
+  // (the core without its own tests/, which are most of the code the check reads and which no case here is about: a run
+  // costs what it reads, so each of the 23 below took about a quarter less; the check on the core whole is the pull request's
+  // own run of it, #812)
+  git(core, "rm", "-rq", "tests");
+  git(core, "commit", "-q", "-m", "without the core's tests");
   const coreRun = run(core, "scripts/copies.mjs", ".github/copies.json");
   const how = path.join(core, "roles/shared/how-to-work.md"), howWas = fs.readFileSync(how, "utf8");
   fs.appendFileSync(how, `\n${fs.readFileSync(path.join(core, "floor/security.md"), "utf8").split(/\r?\n/u).find(l => /^- It is never pushed to/u.test(l))}\n`);
@@ -259,7 +264,7 @@ if (p.status === 0) {
   git(core, "checkout", "-q", "--", ".github/copies-baseline.json");
   ok(coreRun.status === 0 && ownCopy.status === 1 && /a new copy: .*roles\/shared\/how-to-work\.md:.*\. Mend: keep it in the one place/u.test(ownCopy.out) && mended(ownCopy.out)
     && ownNone.status === 1 && /Mend: write the project's first with node scripts\/copies\.mjs \.github\/copies\.json --first/u.test(ownNone.out) && mended(ownNone.out),
-    "the core's own copies check passes on the core, and fails a copy added there, its mends naming the core's own paths", `${coreRun.out}${ownCopy.out}${ownNone.out}`);
+    "the core's own copies check passes on the core without its tests, and fails a copy added there, its mends naming the core's own paths", `${coreRun.out}${ownCopy.out}${ownNone.out}`);
   // (against the base, the config is held to the base's (#348): a baseline moved, or a file the base's config read and
   // this one does not, fails with its mend, and the mend as worded passes; a config widened passes)
   const cfgAt = path.join(core, ".github/copies.json"), cfgWas = fs.readFileSync(cfgAt, "utf8");
