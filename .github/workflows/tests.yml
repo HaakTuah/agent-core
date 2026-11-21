@@ -178,7 +178,7 @@ jobs:
     # the mutation run, which runs them; scripts/offline.sh; #770)
     defaults:
       run:
-        shell: ${{ matrix.os == 'ubuntu-latest' && matrix.parts != 'network' && 'bash scripts/offline.sh {0}' || 'bash' }}
+        shell: ${{ matrix.os == 'ubuntu-latest' && matrix.parts != 'network' && format('bash {0}/scripts/offline.sh {{0}}', github.workspace) || 'bash' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -42,9 +42,9 @@ else {
   };
   const marker = path.join(tmp, "ran");
 
-  const passes = run('[ "$CORE_OFFLINE" = 1 ]\n[ "$KEPT" = "a b\nc=d" ]\n[ "$PWD" = "$EXPECTED_PWD" ]\necho step ran\n', { KEPT: "a b\nc=d", EXPECTED_PWD: fs.realpathSync(tmp) });
+  const passes = run('[ "$CORE_OFFLINE" = 1 ]\n[ "$KEPT" = "a b\nc=d" ]\nenv | grep -qx "A-B=x"\n[ "$PWD" = "$EXPECTED_PWD" ]\necho step ran\n', { KEPT: "a b\nc=d", "A-B": "x", EXPECTED_PWD: fs.realpathSync(tmp) });
   ok(passes.status === 0 && passes.said.includes("step ran") && !/FAIL/.test(passes.said),
-    "a step's script runs with the environment and folder it was started with, CORE_OFFLINE set, and passes as it would", passes.said);
+    "a step's script runs with the environment and folder it was started with, exactly, a name bash cannot export among it, CORE_OFFLINE set, and passes as it would", passes.said);
 
   const strict = run("false | true\necho past the pipe\nfalse\necho past the failure\n");
   ok(strict.status !== 0 && !strict.said.includes("past the pipe") && !strict.said.includes("past the failure"),
@@ -53,9 +53,9 @@ else {
   const reached = run('echo "npm error request to https://registry.npmjs.org/a failed, reason: getaddrinfo EAI_AGAIN registry.npmjs.org"\nexit 3\n');
   ok(reached.status === 3 && mended(reached.said) && reached.said.includes('"EAI_AGAIN"') && /move its step to the part network/.test(reached.said),
     "a step that fails reaching the network keeps its status and says so, with what its output shows, and its mend", reached.said);
-  const others = [["git", "fatal: unable to access 'https://github.com/a/b/': Could not resolve host: github.com"], [".NET", "Resource temporarily unavailable (api.nuget.org:443)"], ["curl", "curl: (7) Failed to connect to 1.1.1.1 port 443: Network is unreachable"]];
-  const seen = others.map(([who, line]) => [who, run(`echo "${line}" >&2\nexit 1\n`)]);
-  ok(seen.every(([, r]) => r.status === 1 && mended(r.said)), "and so it is where git, .NET or curl words the fetch the cut refused", seen.filter(([, r]) => !mended(r.said)).map(([who, r]) => `${who}: ${r.said}`).join(" | "));
+  const others = [["git", "fatal: unable to access 'https://github.com/a/b/': Could not resolve host: github.com"], [".NET", "Resource temporarily unavailable (api.nuget.org:443)"], ["curl", "curl: (7) Failed to connect to 1.1.1.1 port 443: Network is unreachable"], ["Node's fetch", "TypeError: fetch failed"], ["output holding a NUL", "\\0 EAI_AGAIN"]];
+  const seen = others.map(([who, line]) => [who, run(`printf '%b\\n' "${line}" >&2\nexit 1\n`)]);
+  ok(seen.every(([, r]) => r.status === 1 && mended(r.said)), "and so it is where git, .NET, curl or Node's fetch words the fetch the cut refused, and where the output holds a byte that is no text", seen.filter(([, r]) => !mended(r.said)).map(([who, r]) => `${who}: ${r.said}`).join(" | "));
 
   const plain = run('echo "FAIL a test of its own"\nexit 2\n');
   ok(plain.status === 2 && !plain.said.includes("reached the network"), "a step that fails for any other reason keeps its status and says nothing of the network", plain.said);
@@ -78,6 +78,10 @@ else {
     const loopback = await new Promise(resolve => { const server = net.createServer(c => c.end()).listen(0, "127.0.0.1", () => { const s = net.connect(server.address().port, "127.0.0.1", () => { s.destroy(); server.close(); resolve("connected"); }); s.on("error", e => { server.close(); resolve(e.code); }); }); });
     ok(lookup !== "resolved" && outside !== "connected" && loopback === "connected",
       "under the cut no name resolves and no address outside is reached, while loopback answers", JSON.stringify({ lookup, outside, loopback }));
+    // (and the step runs as no root, with no group but its own, docker's among those dropped, and none to gain)
+    const status = fs.readFileSync("/proc/self/status", "utf8");
+    ok(process.getuid() !== 0 && process.getgroups().every(g => g === process.getgid()) && /^NoNewPrivs:\s*1$/mu.test(status),
+      "under the cut the step runs as the runner's own user, with no group but its own and no privilege to gain", JSON.stringify({ uid: process.getuid(), groups: process.getgroups(), noNewPrivs: /^NoNewPrivs:.*$/mu.exec(status)?.[0] }));
   }
 }
 

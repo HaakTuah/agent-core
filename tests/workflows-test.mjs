@@ -497,7 +497,7 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
   };
   const shells = tests.jobs.suites.steps.filter(s => "shell" in s);
   const online = shells.map(s => String(s.run).replace(/\s+#.*$/u, "").trim());
-  ok(tests.jobs.suites.defaults?.run?.shell === "${{ matrix.os == 'ubuntu-latest' && matrix.parts != 'network' && 'bash scripts/offline.sh {0}' || 'bash' }}"
+  ok(tests.jobs.suites.defaults?.run?.shell === "${{ matrix.os == 'ubuntu-latest' && matrix.parts != 'network' && format('bash {0}/scripts/offline.sh {{0}}', github.workspace) || 'bash' }}"
     && shells.every(s => s.shell === "bash") && online.length === Object.keys(ONLINE).length && online.every(r => r in ONLINE),
     "on Linux, but in the part network, each step of the suites runs with the network cut off, and only those listed with why name their own shell to reach it (#770)",
     JSON.stringify({ shell: tests.jobs.suites.defaults?.run?.shell, unlisted: online.filter(r => !(r in ONLINE)), missing: Object.keys(ONLINE).filter(r => !online.includes(r)) }));
