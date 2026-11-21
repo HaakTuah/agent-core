@@ -125,7 +125,7 @@ ok(git(outsider, "config", "--local", "core.compression") === "0", "a case's pro
 // (a case after the first links the core's installed packages to the kept kit's rather than copying them: they stay untracked, as they are
 // where copied, and the scripts that read them read the same, #812)
 const installed = path.join(outsider, "project", "core", ".packages", "parser", "node_modules");
-ok(n < 2 || (fs.lstatSync(installed).isSymbolicLink() && fs.existsSync(path.join(installed, "web-tree-sitter", "package.json")) && git(outsider, "ls-files", "--cached", "--others", "--exclude-standard").split("\n").every(f => !f.includes("node_modules"))),
+ok(fs.lstatSync(installed, { throwIfNoEntry: false })?.isSymbolicLink() && fs.existsSync(path.join(installed, "web-tree-sitter", "package.json")) && git(outsider, "ls-files", "--cached", "--others", "--exclude-standard").split("\n").every(f => !f.includes("node_modules")),
   "a case after the first links the core's installed packages to the kit's, and git leaves them untracked");
 check("outsider", outsider,
   d => { branch(d, "fix-sum", { "src/sum.mjs": FIX }); pr(d, "fix-sum"); },
@@ -646,6 +646,8 @@ ok(noGitRead === "unreadable", "a project whose .git was taken away is unreadabl
 // (what each of the copy's installs puts in its node_modules/, the kit's and a session's start's, is no work of the
 // session's; anything beside it is: #654, #719)
 const installs = fresh("stop");
+// (the installs are links to the kit's, which this case must not write into: each is made a folder of its own first)
+for (const d of ["core/.packages/node_modules", "core/.packages/parser/node_modules"]) fs.rmSync(path.join(installs, "project", d), { recursive: true, force: true });
 for (const f of ["core/.packages/node_modules/x/index.js", "core/.packages/parser/node_modules/y/index.js"]) write(installs, f, "module.exports = 1;\n");
 const installsRead = touched(installs);
 write(installs, "core/.packages/parser/stray.js", "1\n");

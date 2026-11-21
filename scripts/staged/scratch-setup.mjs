@@ -126,7 +126,7 @@ const KITS = new Map();
 let kitsAt = null;
 export function keepKits(folder) { fs.mkdirSync(folder, { recursive: true }); kitsAt = folder; }
 // (the core's installed packages, the parser's above all at about 150 MB, are never tracked, nor a link in their place
-// (the copy's .gitignore), so a case after the first links them to the kept kit's, which no case writes to, in place
+// (the copy's .gitignore), so a case after the first links them to the kept kit's, which a case must not write into, in place
 // of copying and then deleting them, about two thirds of what copying and removing a case's folders took; #812)
 const copyBut = (from, to, but, link = false) => {
   const installs = [];
@@ -135,7 +135,7 @@ const copyBut = (from, to, but, link = false) => {
     if (link && path.basename(src) === "node_modules") { installs.push(path.relative(from, src)); return false; }
     return true;
   } });
-  for (const rel of installs) fs.symlinkSync(path.join(from, rel), path.join(to, rel), "junction");
+  for (const rel of installs) fs.symlinkSync(path.resolve(from, rel), path.join(to, rel), "junction");
 };
 function starterKit(project, core, at, kit) {
   const key = kitsAt && JSON.stringify([path.resolve(core), at ?? git(core, "rev-parse", "HEAD"), kit]);
