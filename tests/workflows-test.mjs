@@ -486,6 +486,8 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     "node tests/check-test.mjs": "#772: its scratch project installs from npm's registry",
     "node tests/copy-left-out-test.mjs": "#772: its personal-terms pair fetches Betterleaks from github.com",
     "node tests/personal-terms-test.mjs": "#772: it fetches Betterleaks from github.com",
+    "node tests/nuget-gate-test.mjs": "#772: its scratch copies of the core install from npm's registry",
+    "node tests/code-scan-test.mjs": "#772: its engine's cases install it from PyPI, and are skipped without",
     "node scripts/lookup.mjs .github/licences.json": "looks each new package up in npm's registry",
     'for d in . parser; do if [ -d "$d/node_modules" ]; then (cd "$d" && npm audit signatures --prefix=.); fi; done': "reads the registry's signatures",
     'git fetch --no-tags --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"': "fetches the base from GitHub",
