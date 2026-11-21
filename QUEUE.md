@@ -59,6 +59,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1046 | rule builder; #767's third kind, `AGENTS.md` | |
 | #1051 | rule builder; each pull request records its own cost | |
 | #1052 | rule builder; `AGENTS.md`, the workflow tries its own settings | #1051 (its point 6); #1046 (`AGENTS.md`, one at a time) |
+| #1060 | rule builder; `roles/adviser.md` | #1052 (its record holds it in part); #974 (`roles/adviser.md`, one at a time) |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
