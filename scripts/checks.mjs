@@ -34,7 +34,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { MEND } from "./mend.mjs";
-import { installed, npmIgnores, npmReadsAll, npmVersion } from "./packages.mjs";
+import { installed } from "./packages.mjs";
+import { npmIgnores, npmReadsAll, npmVersion } from "./npm-reads.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 

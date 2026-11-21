@@ -19,7 +19,8 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { INSTALLS, lockFaults, npmIgnores, npmrcOthers, npmReadsAll, npmVersion } from "./packages.mjs";
+import { npmIgnores, npmReadsAll, npmVersion } from "./npm-reads.mjs";
+import { INSTALLS, lockFaults, npmrcOthers } from "./packages.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 // (the folder of the core's own package list, lock file and .npmrc, where npm runs and so reads that .npmrc alone)

@@ -1,4 +1,4 @@
-- `scripts/install.mjs`, `scripts/packages.mjs`, `scripts/parser.mjs`, `scripts/parser-worker.mjs`, `.packages/`,
+- `scripts/install.mjs`, `scripts/packages.mjs`, `scripts/npm-reads.mjs`, `scripts/parser.mjs`, `scripts/parser-worker.mjs`, `.packages/`,
   `.gitignore`: install the packages of other publishers the scripts run from the core's lock file in `.packages/` into
   `.packages/node_modules/`, and the parser's from `.packages/parser/` only where a job names it (#719), and load each
   from its own install alone, a missing one saying its mend (#654); and, named, the code scan's engine from
