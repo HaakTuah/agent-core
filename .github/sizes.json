@@ -153,10 +153,6 @@
       "mark": 26522,
       "why": "One hook's cases (work-saved.sh, run as a project registers it) on the one scratch project with a remote of its own that they share; split, each file would build it again, adding to the suite's time (tasks/tests.md) (#1008)."
     },
-    "tests/nuget-gate-test.mjs": {
-      "mark": 20574,
-      "why": "The cases of the NuGet check's first look and its whole job, on the one scratch project they share; split, each file would write the project again, adding to the suite's time (tasks/tests.md)."
-    },
     "tests/nuget-test.mjs": {
       "mark": 98920,
       "why": "One script's cases (nuget.mjs) on the helpers and config they share; split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."

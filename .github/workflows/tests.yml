@@ -285,6 +285,9 @@ jobs:
       - name: The NuGet check's fetch before the restore, against each package's content hash
         if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-fetch-test.mjs ')) }}
         run: node tests/nuget-fetch-test.mjs
+      - name: The NuGet check's whole job, where its restore must succeed (it asks NuGet's registry; #772)
+        if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-gate-network-test.mjs ')) }}
+        run: node tests/nuget-gate-network-test.mjs
       - name: The code scan of a private project, its engine fetched by its digest (#546)
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-test.mjs ')) }}
         run: node tests/code-scan-test.mjs

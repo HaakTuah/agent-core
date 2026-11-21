@@ -9,39 +9,25 @@
 // NuGet.Config that maps its packages to their sources included. No package is
 // downloaded: the step restores against an empty source. The whole job, on a project with no package: its restore and
 // its check pass, and a lock file that no longer holds what its project asks for fails the restore. Where there is no
-// .NET SDK (never on GitHub's runners) only the first look is tried. The whole job installs the core's packages from a
+// .NET SDK (never on GitHub's runners) only the first look is tried. The one case where the restore must succeed, which
+// asks NuGet's own registry, is nuget-gate-network-test.mjs's, in the part network (#772). The whole job installs the core's packages from a
 // copy of the machine's npm cache, made as the test starts, so it reaches no registry (#772). On Linux and on Windows.
 // Git, bash, jq, the .NET SDK, npm and Node's own modules.
 //
 //   node tests/nuget-gate-test.mjs
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { runWorkflow } from "../scripts/workflow-run.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { npmCacheCopy, root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { nugetScratch } from "../scripts/nuget-gate-scratch.mjs";
+import { root, tally } from "../scripts/scratch-core.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 
 const { ok, done } = tally();
-const workflow = fs.readFileSync(path.join(root, ".github/workflows/nuget.yml"), "utf8");
-const tmp = scratchDir("nuget-gate-test-");
-const home = path.join(tmp, "home");
-fs.mkdirSync(path.join(home, "AppData", "Roaming"), { recursive: true });
-const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$|NUGET_|DOTNET_CLI_HOME$)|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(name)));
-Object.assign(env, { GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid",
-  HOME: home, USERPROFILE: home, APPDATA: path.join(home, "AppData", "Roaming"), LOCALAPPDATA: path.join(home, "AppData", "Local"), DOTNET_CLI_HOME: home, NUGET_HTTP_CACHE_PATH: path.join(tmp, "http-cache"),
-  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1", MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_USE_MSBUILD_SERVER: "0" });
-// (the whole job installs the core's packages as the runner's own job did, from a copy of its npm cache made here, so it
-// reaches no registry: #772)
-const npmCache = npmCacheCopy(tmp);
-if (npmCache) Object.assign(env, { npm_config_cache: npmCache, npm_config_prefer_offline: "true" });
-const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-const version = spawnSync("dotnet", ["--version"], { env, encoding: "utf8" });
-const sdk = version.status === 0;
+const { tmp, env, git, sdk, tfm, project, whole } = nugetScratch("nuget-gate-test-");
 ok(sdk || !process.env.GITHUB_ACTIONS, "on GitHub's runners there is a .NET SDK, so NuGet's own word is asked here as there");
-const tfm = `net${sdk ? version.stdout.trim().split(".")[0] : "9"}.0`;
+ok(sdk || !process.env.GITHUB_ACTIONS, "on GitHub's runners there is a .NET SDK, so NuGet's own word is asked here as there");
 
-const project = (imports = '  <Import Project="..\\..\\build\\deps.xml" />\n') => `<Project Sdk="Microsoft.NET.Sdk">\n${imports}  <PropertyGroup>\n    <OutputType>Exe</OutputType>\n    <TargetFramework>${tfm}</TargetFramework>\n    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>\n  </PropertyGroup>\n  <ItemGroup>\n    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />\n  </ItemGroup>\n</Project>\n`;
 const LOCK = `${JSON.stringify({ version: 1, dependencies: { [tfm]: { "Newtonsoft.Json": { type: "Direct", requested: "[13.0.3, )", resolved: "13.0.3", contentHash: "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ==" } } } }, null, 2)}\n`;
 const EMPTY = "<Project>\n</Project>\n";
 // (a build file that asks for a package only where a text file it reads says so: what the first look's listing cannot
@@ -130,40 +116,16 @@ else {
 
 // the whole job, its restore and its check run as GitHub runs them, on a project that holds the core as core/
 if (sdk) {
-  const whole = (files, start = {}) => {
-    const dir = path.join(tmp, `whole-${++n}`);
-    fs.mkdirSync(dir);
-    git(dir, "init", "-q", "-b", "main");
-    fs.cpSync(root, path.join(dir, "core"), { recursive: true, filter: src => !["/.git", "/node_modules", "/reports"].some(x => src.replace(/\\/g, "/").endsWith(x)) });
-    const put = set => { for (const [f, text] of Object.entries(set)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); } };
-    put({ "src/App/App.csproj": project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, ""), "src/App/Program.cs": "System.Console.WriteLine(1);\n",
-      "src/App/packages.lock.json": `${JSON.stringify({ version: 1, dependencies: { [tfm]: {} } }, null, 2)}\n`,
-      "checks/licences.json": '{ "ships": [], "audit": "checks/licences-audit.json", "scan": { "served": [], "skip": [] }, "nuget": { "ships": ["src/App/packages.lock.json"], "tools": [] } }\n',
-      "checks/licences-audit.json": '{ "entries": [] }\n', ...start });
-    git(dir, "add", "-A");
-    git(dir, "commit", "-q", "-m", "base");
-    const baseSha = git(dir, "rev-parse", "HEAD");
-    put(files);
-    git(dir, "add", "-A");
-    git(dir, "commit", "-q", "-m", "a change");
-    const github = { event_name: "pull_request", repository: "someone/project", workflow_ref: "someone/project/.github/workflows/nuget.yml@refs/pull/1/merge", event: { pull_request: { base: { sha: baseSha } } } };
-    const [job] = runWorkflow(workflow, { inputs: { config: "checks/licences.json" }, github, base: env, workspace: () => dir, uses: { "actions/checkout": () => {}, "actions/setup-node": () => {} }, temp: tmp });
-    const out = job.steps.map(x => x.out).join("");
-    return { passed: job.passed, ran: [...out.matchAll(/^== (.+)$/gm)].map(m => m[1].trim()), out };
-  };
-  const good = whole({ "src/App/App.csproj": project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "").replace("</Project>", "  <!-- a note -->\n</Project>") });
-  ok(good.passed && good.ran.includes("Restore each project file from its lock file alone") && good.ran.includes("Every package one exact version, and under a licence on its list"), "the whole job: a project file changed, the restore runs from the lock file and the check passes", good.out.slice(-1400));
   const FETCH = "Every locked package and tool, fetched before the restore and held to its list";
-  ok(good.ran.indexOf(FETCH) >= 0 && good.ran.indexOf(FETCH) < good.ran.indexOf("Restore each project file from its lock file alone"), "and every package's licence is read before the restore, which runs the pull request's build files", good.ran.join(" | "));
   // (where the first look itself restored, the pull request's build files have run: the read before the restore is
   // left out, nothing it reads having changed from the base)
   const bare = project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "");
   // (a text file a build file reads, which only NuGet's own word sees: any project file, whatever brings it in, the first
   // look names by itself)
   const built = whole({ "build/flag.txt": "yes\n" }, { "Directory.Build.props": FLAGGED, "build/flag.txt": "no\n" });
-  ok(!built.passed && !built.ran.includes(FETCH) && built.out.includes("the licence read before the restore is left out"), "where the first look restored, the read before the restore is left out, and the restore fails what no lock file holds", built.out.slice(-1500));
+  ok(!built.passed && /NU1004/.test(built.out) && !built.ran.includes(FETCH) && built.out.includes("the licence read before the restore is left out"), "where the first look restored, the read before the restore is left out, and the restore fails what no lock file holds", built.out.slice(-1500));
   const imported = whole({ "build/deps.xml": ADDS }, { "src/App/App.csproj": bare.replace("<PropertyGroup>", '<Import Project="..\\..\\build\\deps.xml" />\n  <PropertyGroup>'), "build/deps.xml": EMPTY });
-  ok(!imported.passed && imported.ran.includes(FETCH) && imported.out.includes("build/deps.xml"), "where only an imported file changed, the first look names it, so the read before the restore runs, and the restore fails what no lock file holds", imported.out.slice(-1500));
+  ok(!imported.passed && /NU1004/.test(imported.out) && imported.ran.includes(FETCH) && imported.out.includes("build/deps.xml"), "where only an imported file changed, the first look names it, so the read before the restore runs, and the restore fails what no lock file holds", imported.out.slice(-1500));
   const stale = whole({ "src/App/App.csproj": project("") });
   ok(!stale.passed && /NU1004/.test(stale.out) && /A restore from a lock file failed .*\. Mend: /.test(stale.out) && mended(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
 }
