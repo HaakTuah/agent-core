@@ -208,6 +208,10 @@ let runs = 0;
 // key holds the script and the env, and what else they read of the copy (its tool pins) is the same in each (#812).
 const fetchedOnce = { pattern: /\b(?:workflow-tools|lychee)\.sh\b/, store: new Map(), temp: path.join(tmp, "fetched-once") };
 fs.mkdirSync(fetchedOnce.temp);
+// The core's install of its packages (install.mjs) likewise runs once for each set of lock files, the later jobs taking a
+// hard-linked copy of what it installed into their fresh clone (#812); a failed install is not kept, so runs again.
+const installedOnce = { store: new Map(), temp: path.join(tmp, "installed-once") };
+fs.mkdirSync(installedOnce.temp);
 {
   // (the runner's own case: the first job runs the matching step with the shared folder as its runner folder, the next takes
   // its result and its GITHUB_ENV line; a step of another text, or run with no `once`, runs in its own job's folder)
@@ -234,6 +238,19 @@ fs.mkdirSync(fetchedOnce.temp);
   const keys = fs.readFileSync(count, "utf8").trim().split("\n").filter(l => l.startsWith("key"));
   ok(keys.join() === "key v,key v,key changed v,key changed push,key changed pull_request" && one.passed && again.passed && again.steps[1].passed && changedEnv.passed && changedScript.passed && filled.passed && filledOther.passed,
     "a step is run again where its env, its script or its expression's value differs, and a replay hands the step after it the outputs of the first run", keys.join());
+  // (an install step: its packages go into the workspace, so a later job gets a copy of them in its own, and a changed lock file installs anew)
+  const core = path.join(dir, "core"), pkgs = path.join(core, ".packages");
+  fs.mkdirSync(path.join(core, "scripts"), { recursive: true }); fs.mkdirSync(pkgs, { recursive: true });
+  fs.writeFileSync(path.join(core, "scripts", "install.mjs"), 'import fs from "node:fs"; fs.appendFileSync(process.env.COUNT, "install\n"); fs.mkdirSync(".packages/node_modules/p", { recursive: true }); fs.writeFileSync(".packages/node_modules/p/i.js", "x");\n');
+  fs.writeFileSync(path.join(pkgs, "package-lock.json"), "1");
+  const inst = `on: push\njobs:\n  j:\n    steps:\n      - run: cd core && node scripts/install.mjs\n      - run: test -f core/.packages/node_modules/p/i.js\n`;
+  const installs = new Map();
+  const withInstall = () => { fs.rmSync(path.join(pkgs, "node_modules"), { recursive: true, force: true }); return go(inst, { installed: { store: installs, temp: shared } }); };
+  const i1 = withInstall(), i2 = withInstall();
+  fs.writeFileSync(path.join(pkgs, "package-lock.json"), "2");
+  const i3 = withInstall();
+  const ran = fs.readFileSync(count, "utf8").split("\n").filter(l => l === "install").length;
+  ok(ran === 2 && i1.passed && i2.passed && i3.passed, "an install step runs once for each set of lock files, and the job after it finds the packages in its own workspace", String(ran));
 }
 // Every workflow of the project's that one event starts, and in it each call to a workflow of the core's, as GitHub
 // would run it on the commit `sha` (a pull request: the head, against `baseSha`, pushed to, or as `action` says, a
@@ -303,7 +320,7 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
       const inputs = Object.fromEntries(Object.entries(job.with ?? {}).map(([k, v]) => [k, typeof v === "string" && v.includes("${{") ? evaluate(v.replace(/^\$\{\{|\}\}$/g, ""), callerCtx) : v]));
       const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, evaluate(String(v).replace(/^\$\{\{|\}\}$/g, ""), callerCtx)]));
       const caller = { ...github, workflow_ref: `${p.repo}/.github/workflows/${file}@${github.ref}` };
-      const called = parseYaml(text), ran = runWorkflow(text, { inputs, secrets, github: caller, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp, once: fetchedOnce });
+      const called = parseYaml(text), ran = runWorkflow(text, { inputs, secrets, github: caller, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp, once: fetchedOnce, installed: installedOnce });
       for (const r of ran) out.push([`${file}/${id}/${r.job}`, r]);
       const jobs = Object.fromEntries(ran.map(r => [r.job, { outputs: Object.fromEntries(Object.entries(called.jobs?.[r.job]?.outputs ?? {})
         .map(([k, v]) => [k, evaluate(String(v).trim().replace(/^\$\{\{|\}\}$/g, ""), { steps: r.outputs ?? {} }) ?? ""])) }]));

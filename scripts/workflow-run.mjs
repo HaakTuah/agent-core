@@ -278,9 +278,14 @@ function callInputs(wf, inputs, secrets) {
 // reads by the path it puts in GITHUB_ENV) runs once for each text; every later job takes its result and its GITHUB_ENV
 // lines from `store`, a Map the caller keeps, and finds the tool in `temp`, a folder the caller makes and removes, which
 // that first run was given in place of its job's own.
-export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir(), once = null }) {
+//
+// `installed`, for the same: { store, temp }, a Map the caller keeps and a folder it makes and removes. A `run` step that
+// runs the core's install.mjs puts the packages into the workspace, so it runs once for each text, env and set of lock
+// files; every later job takes its result and a hard-linked copy of what the first one installed (each node_modules/ and
+// pypi/ below the core's .packages/), as the first run left it.
+export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir(), once = null, installed = null }) {
   const wf = parseYaml(text);
-  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp, once };
+  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp, once, installed };
   const given = callInputs(wf, inputs, secrets);
   const results = [];
   for (const [id, job] of Object.entries(wf.jobs ?? {})) {
@@ -378,6 +383,31 @@ function onceKey(rt, text, cwd, env) {
   return JSON.stringify([text, env, programs]);
 }
 
+// What an install step is kept under (the same, with the core's lock files and its install script in place of the pinned
+// scripts), and the core's .packages/ folder it installs into; null for a step that does not run install.mjs.
+function installKey(rt, text, cwd, env) {
+  if (!rt.installed || !/\bscripts\/install\.mjs\b/u.test(text)) return null;
+  const core = path.join(cwd, env.CORE_AT ?? ""), packages = path.join(core, ".packages");
+  const read = f => { try { return fs.readFileSync(f, "utf8"); } catch { return null; } };
+  const locks = [packages, ...(fs.existsSync(packages) ? fs.readdirSync(packages, { withFileTypes: true }).filter(d => d.isDirectory() && d.name !== "node_modules" && d.name !== "pypi").map(d => path.join(packages, d.name)) : [])]
+    .map(d => [path.relative(core, d), read(path.join(d, "package-lock.json")), read(path.join(d, "package.json"))]);
+  return { key: JSON.stringify([text, env, read(path.join(core, "scripts/install.mjs")), read(path.join(packages, "requirements.txt")), locks]), packages };
+}
+
+// The folders an install left in .packages/, relative to it: node_modules/ and pypi/ of it and of each folder below.
+function installedFolders(packages) {
+  const at = d => ["node_modules", "pypi"].filter(f => fs.existsSync(path.join(d, f))).map(f => path.relative(packages, path.join(d, f)));
+  const below = fs.existsSync(packages) ? fs.readdirSync(packages, { withFileTypes: true }).filter(d => d.isDirectory() && d.name !== "node_modules" && d.name !== "pypi").flatMap(d => at(path.join(packages, d.name))) : [];
+  return [...at(packages), ...below];
+}
+
+// A folder copied with its files hard-linked where the system can, so that a copy of the parser's packages costs no bytes.
+function linkCopy(from, to) {
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  if (process.platform !== "win32" && spawnSync("cp", ["-al", from, to]).status === 0) return;
+  fs.cpSync(from, to, { recursive: true });
+}
+
 // A step's outcome as the steps context holds it, where it has an id.
 function outcome(ctx, step, passed, outputs) {
   if (step.id) ctx.steps[step.id] = { outputs, outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
@@ -412,12 +442,22 @@ function runScript(jr, step, name, env) {
   const kept = onceKey(rt, text, cwd, env);
   const seen = kept && rt.once.store.get(kept);
   if (seen) return replay(jr, step, name, seen);
+  const install = installKey(rt, text, cwd, env), taken = install && rt.installed.store.get(install.key);
+  if (taken) {
+    for (const f of taken.folders) linkCopy(path.join(taken.snapshot, f), path.join(install.packages, f));
+    return replay(jr, step, name, taken);
+  }
   const r = spawnSync(bash, shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
     ...rt.base, ...env, ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}), CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
     GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(rt.github.repository), GITHUB_EVENT_NAME: str(rt.github.event_name), RUNNER_TEMP: kept ? rt.once.temp : tmp, RUNNER_OS: ctx.runner.os } });
   const passed = r.status === 0;
   const out = `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}`, outputs = outputsOf(output);
   if (kept) rt.once.store.set(kept, { passed, out, outputs, env: readIf(path.join(tmp, "env")) });
+  if (install && passed) {
+    const folders = installedFolders(install.packages), snapshot = fs.mkdtempSync(path.join(rt.installed.temp, "installed-"));
+    for (const f of folders) linkCopy(path.join(install.packages, f), path.join(snapshot, f));
+    rt.installed.store.set(install.key, { passed, out, outputs, env: readIf(path.join(tmp, "env")), folders, snapshot });
+  }
   carryEnv(path.join(tmp, "env"), ctx.env, id);
   result.steps.push({ name, ran: true, passed, out });
   outcome(ctx, step, passed, outputs);
