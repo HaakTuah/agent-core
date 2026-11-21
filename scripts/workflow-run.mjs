@@ -408,6 +408,20 @@ function linkCopy(from, to) {
   fs.cpSync(from, to, { recursive: true });
 }
 
+// What a passed install left in the workspace, copied aside into the folder the caller made and kept with the step's
+// result; and a later job's copy of it, with that result (undefined where none was kept, or the step is no install).
+function keepInstall(rt, install, result) {
+  if (!install || !result.passed) return;
+  const folders = installedFolders(install.packages), snapshot = fs.mkdtempSync(path.join(rt.installed.temp, "installed-"));
+  for (const f of folders) linkCopy(path.join(install.packages, f), path.join(snapshot, f));
+  rt.installed.store.set(install.key, { ...result, folders, snapshot });
+}
+function takeInstall(rt, install) {
+  const kept = install && rt.installed.store.get(install.key);
+  for (const f of kept?.folders ?? []) linkCopy(path.join(kept.snapshot, f), path.join(install.packages, f));
+  return kept;
+}
+
 // A step's outcome as the steps context holds it, where it has an id.
 function outcome(ctx, step, passed, outputs) {
   if (step.id) ctx.steps[step.id] = { outputs, outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
@@ -442,22 +456,15 @@ function runScript(jr, step, name, env) {
   const kept = onceKey(rt, text, cwd, env);
   const seen = kept && rt.once.store.get(kept);
   if (seen) return replay(jr, step, name, seen);
-  const install = installKey(rt, text, cwd, env), taken = install && rt.installed.store.get(install.key);
-  if (taken) {
-    for (const f of taken.folders) linkCopy(path.join(taken.snapshot, f), path.join(install.packages, f));
-    return replay(jr, step, name, taken);
-  }
+  const install = installKey(rt, text, cwd, env), taken = takeInstall(rt, install);
+  if (taken) return replay(jr, step, name, taken);
   const r = spawnSync(bash, shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
     ...rt.base, ...env, ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}), CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
     GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(rt.github.repository), GITHUB_EVENT_NAME: str(rt.github.event_name), RUNNER_TEMP: kept ? rt.once.temp : tmp, RUNNER_OS: ctx.runner.os } });
   const passed = r.status === 0;
   const out = `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}`, outputs = outputsOf(output);
   if (kept) rt.once.store.set(kept, { passed, out, outputs, env: readIf(path.join(tmp, "env")) });
-  if (install && passed) {
-    const folders = installedFolders(install.packages), snapshot = fs.mkdtempSync(path.join(rt.installed.temp, "installed-"));
-    for (const f of folders) linkCopy(path.join(install.packages, f), path.join(snapshot, f));
-    rt.installed.store.set(install.key, { passed, out, outputs, env: readIf(path.join(tmp, "env")), folders, snapshot });
-  }
+  keepInstall(rt, install, { passed, out, outputs, env: readIf(path.join(tmp, "env")) });
   carryEnv(path.join(tmp, "env"), ctx.env, id);
   result.steps.push({ name, ran: true, passed, out });
   outcome(ctx, step, passed, outputs);
