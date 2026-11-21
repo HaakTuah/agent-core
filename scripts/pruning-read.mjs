@@ -20,7 +20,7 @@ export function joinedIn(r, root = ROOT) {
   } catch { return null; }
 }
 
-// The workflows' named steps at `root`: { path: [{ name, run }] }, read by the core's reader of YAML (workflow-run.mjs);
+// The workflows' named steps at `root`: { path: [{ name, run }] }, read by the core's reader of YAML (parse-yaml.mjs);
 // a workflow it cannot read has none.
 export async function stepsAt(root = ROOT) {
   const { parseYaml } = await import("./parse-yaml.mjs"), dir = path.join(root, ".github", "workflows"), out = {};
