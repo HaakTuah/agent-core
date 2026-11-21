@@ -89,6 +89,7 @@ They read and change no rule.
 | #937 | builder | |
 | #958 | builder | |
 | #1017 | builder; a split, its meaning kept; `tests.yml` names the new suite | |
+| #1064 | builder; splits weighed, each its meaning kept | #704 and #772 (`scripts/check.mjs`, `scripts/checks.mjs`, one at a time) |
 
 ## Not taken up
 
