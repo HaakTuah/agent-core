@@ -273,9 +273,14 @@ function callInputs(wf, inputs, secrets) {
   return given;
 }
 
-export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir() }) {
+// `once`, for a test that runs many jobs of one workflow: { pattern, store, temp }. A `run` step whose text matches
+// `pattern` and whose effect lies outside the workspace (a tool fetched into the runner's folder, which a later step
+// reads by the path it puts in GITHUB_ENV) runs once for each text; every later job takes its result and its GITHUB_ENV
+// lines from `store`, a Map the caller keeps, and finds the tool in `temp`, a folder the caller makes and removes, which
+// that first run was given in place of its job's own.
+export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir(), once = null }) {
   const wf = parseYaml(text);
-  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp };
+  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp, once };
   const given = callInputs(wf, inputs, secrets);
   const results = [];
   for (const [id, job] of Object.entries(wf.jobs ?? {})) {
@@ -378,12 +383,24 @@ function runScript(jr, step, name, env) {
   // (bash by its full path from the PATH the step is given, and, on Windows, what it starts never looked for in its folder)
   const bash = onPath("bash", { ...rt.base, ...env });
   if (!bash) throw new Error("bash is on no folder of the PATH: install Git for Windows, whose bash runs the steps, or put bash on the PATH");
+  // (the key: the text, its env and the programs it names as the project holds them, so a copy whose script differs runs it)
+  const kept = rt.once?.pattern.test(step.run) ? JSON.stringify([step.run, env, [...step.run.matchAll(/\bscripts\/[\w.-]+\.sh\b/gu)].map(([f]) => { try { return fs.readFileSync(path.join(cwd, env.CORE_AT ?? "", f), "utf8"); } catch { return null; } })]) : null;
+  const seen = kept && rt.once.store.get(kept);
+  if (seen) {
+    if (seen.env) { fs.writeFileSync(path.join(tmp, "env"), seen.env); carryEnv(path.join(tmp, "env"), ctx.env, id); }
+    result.steps.push({ name, ran: true, passed: seen.passed, out: seen.out });
+    if (step.id) ctx.steps[step.id] = { outputs: {}, outcome: seen.passed ? "success" : "failure", conclusion: seen.passed ? "success" : "failure" };
+    if (!seen.passed) failed(state, result, rt.stop, name);
+    return;
+  }
   const r = spawnSync(bash, shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
     ...rt.base, ...env, ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}), CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
-    GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(rt.github.repository), GITHUB_EVENT_NAME: str(rt.github.event_name), RUNNER_TEMP: tmp, RUNNER_OS: ctx.runner.os } });
+    GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(rt.github.repository), GITHUB_EVENT_NAME: str(rt.github.event_name), RUNNER_TEMP: kept ? rt.once.temp : tmp, RUNNER_OS: ctx.runner.os } });
   const passed = r.status === 0;
+  const out = `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}`;
+  if (kept) rt.once.store.set(kept, { passed, out, env: fs.existsSync(path.join(tmp, "env")) ? fs.readFileSync(path.join(tmp, "env"), "utf8") : "" });
   carryEnv(path.join(tmp, "env"), ctx.env, id);
-  result.steps.push({ name, ran: true, passed, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` });
+  result.steps.push({ name, ran: true, passed, out });
   if (step.id) ctx.steps[step.id] = { outputs: outputsOf(output), outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
   if (!passed) failed(state, result, rt.stop, name);
 }
