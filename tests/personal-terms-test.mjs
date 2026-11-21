@@ -35,9 +35,10 @@ import path from "node:path";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { CORE } from "../scripts/core-address.mjs";
-import { ARCHIVE_SERVER, root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { ARCHIVE_SERVER, archivesMissing, root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
+{ const missing = archivesMissing(); ok(missing === null, "with the network cut off, the archive of Betterleaks the run's set-up fetched stands in CORE_ARCHIVES", missing ?? ""); }
 const workflow = fs.readFileSync(path.join(root, ".github/workflows/personal-terms.yml"), "utf8");
 const tmp = scratchDir("personal-terms-test-");
 const [term, other, wide] = [["qz", "vk", "wy"], ["xj", "qq", "zf"], ["zç", "qñ", "x"]].map(t => t.join(""));

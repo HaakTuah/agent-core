@@ -23,11 +23,12 @@ import { run as licenceScan, write as licenceWrite } from "../scripts/licence-sc
 import { targets as scanTargets } from "../scripts/code-scan.mjs";
 import { check as nuget } from "../scripts/nuget.mjs";
 import { calledByPaths, library, ownOf } from "../scripts/reading.mjs";
-import { ARCHIVE_SERVER, root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { ARCHIVE_SERVER, archivesMissing, root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 import { reads as workflowsRead } from "../scripts/workflows.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 
 const { ok, done } = tally();
+{ const missing = archivesMissing(); ok(missing === null, "with the network cut off, the archive of Betterleaks the run's set-up fetched stands in CORE_ARCHIVES", missing ?? ""); }
 // (each assertion says, where it fails, what is wrong and then its mend)
 const held = (cond, what, wrong, mend, detail = "") => ok(cond, cond ? what : `${wrong}. Mend: ${mend}`, detail);
 const LIST = "What a project's checks leave out for the core's copy";

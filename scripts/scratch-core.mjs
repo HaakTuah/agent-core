@@ -148,6 +148,17 @@ for a in "$@"; do [ "$prev" = -o ] && out=$a; prev=$a; url=$a; done
 case "$url" in https://github.com/betterleaks/betterleaks/releases/download/v*/*) [ -n "$CORE_ARCHIVES" ] && [ -n "$out" ] && [ -f "$CORE_ARCHIVES/\${url##*/}" ] && cp "$CORE_ARCHIVES/\${url##*/}" "$out" && exit 0 ;; esac
 `;
 
+/** Where the run's network is cut off (CORE_OFFLINE, set by scripts/offline.sh) on x64 Linux, where the tests workflow's
+ *  set-up step fetches Betterleaks' archive, and the folder CORE_ARCHIVES names holds none: the mend for a test of the
+ *  personal-terms check to fail with, naming the step; else null. A test that serves the archive from the folder asks it, so
+ *  a download that failed does not show as the check's own failure to fetch it (#772). */
+export function archivesMissing() {
+  if (!process.env.CORE_OFFLINE || process.platform !== "linux" || process.arch !== "x64") return null;
+  const dir = process.env.CORE_ARCHIVES;
+  if (dir && fs.existsSync(dir) && fs.readdirSync(dir).length > 0) return null;
+  return "Betterleaks' archive was not fetched for this run. Mend: run `bash scripts/test-downloads.sh archives` where the network is up and name the folder it prints in CORE_ARCHIVES (the tests workflow's step \"Betterleaks' release, its archive fetched at the check's pin for the tests of the personal-terms check\" does)";
+}
+
 const slash = (p) => p.replace(/\\/g, "/");
 
 /** The environment for a test whose scratch core is the repository at `theCore`, under the folder `tmp`. `findsBare`
