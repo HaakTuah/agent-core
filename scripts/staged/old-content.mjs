@@ -25,7 +25,7 @@ export function set(dir, opts = {}) {
   const sync = { "core/README.md": `${readme}\n`, "core-manifest.md": manifest.replace(pin, moved) };
   // (the sync's branch, pushed as a sync makes it, and its pull request with what the sync printed)
   git(project, "checkout", "-q", "-b", "sync-core");
-  for (const [f, t] of Object.entries(sync)) fs.writeFileSync(path.join(project, f), t);
+  for (const [f, t] of Object.entries(sync)) { fs.rmSync(path.join(project, f), { force: true }); fs.writeFileSync(path.join(project, f), t); }
   git(project, "commit", "-q", "-am", "Sync the core's copy");
   git(project, "push", "-q", "origin", "sync-core");
   git(project, "checkout", "-q", "main");

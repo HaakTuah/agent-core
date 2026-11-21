@@ -128,7 +128,7 @@ export function set(dir, opts = {}) {
     github: { private: true, labels: [], securityAndAnalysis: Object.fromEntries(SCANNING.map(k => [k, { status: "disabled" }])), rulesets: [{ id: 1, name: "main", target: "branch", enforcement: "active", rules: [{ type: "pull_request" }, { type: "required_status_checks", parameters: { required_status_checks: [{ context: "core / core" }, { context: "security-review" }] } }] }] },
   });
   const read = f => fs.readFileSync(path.join(project, f), "utf8");
-  const write = (f, t) => { fs.mkdirSync(path.dirname(path.join(project, f)), { recursive: true }); fs.writeFileSync(path.join(project, f), t); };
+  const write = (f, t) => { fs.mkdirSync(path.dirname(path.join(project, f)), { recursive: true }); fs.rmSync(path.join(project, f), { force: true }); fs.writeFileSync(path.join(project, f), t); };
   write("AGENTS.md", `${read("AGENTS.md").trimEnd()}\n\n## How we work here\n\n${Object.values(RULES).join("\n")}\n`);
   let manifest = read("core-manifest.md");
   const pin = /at ([0-9a-f]{40})/.exec(manifest)[1];

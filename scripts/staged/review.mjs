@@ -94,7 +94,7 @@ export const FAULTS = [
 // The pull request's branch, from main as the kit wrote it: each fault's change, the marks and the baseline read
 // from what the kit wrote there.
 function plant(project, key) {
-  const read = f => fs.readFileSync(path.join(project, f), "utf8"), put = (f, t) => { fs.mkdirSync(path.dirname(path.join(project, f)), { recursive: true }); fs.writeFileSync(path.join(project, f), t); };
+  const read = f => fs.readFileSync(path.join(project, f), "utf8"), put = (f, t) => { fs.mkdirSync(path.dirname(path.join(project, f)), { recursive: true }); fs.rmSync(path.join(project, f), { force: true }); fs.writeFileSync(path.join(project, f), t); };
   git(project, "checkout", "-q", "-b", "mean");
   const marks = JSON.parse(read("checks/sizes.json"));
   const raise = v => (typeof v === "number" ? v + 4096 : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, raise(x)])) : v);
