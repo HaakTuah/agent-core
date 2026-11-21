@@ -4,7 +4,7 @@
 // names the ones it needs, none runs by itself. It reads only. Node's own modules and git only.
 import path from "node:path";
 import { commands, uncommented } from "./step-commands.mjs";
-import { parseYaml } from "./workflow-run.mjs";
+import { parseYaml } from "./parse-yaml.mjs";
 import { everyPush } from "./step-checks.mjs";
 
 // A job's steps with each local composite action (`uses: ./…`) read in its place, its own steps in order, so a check or

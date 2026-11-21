@@ -14,7 +14,8 @@ import { CORE, CORE_SOURCE } from "../scripts/core-address.mjs";
 import { COMMAND } from "../scripts/helper-call.mjs";
 import { FILES, files, fill, filtered, GAME_ROWS, licences, linked, modules, named, options, READ, READY_ONLY, sizes, startOf, TEMPLATES } from "../scripts/init.mjs";
 import { scratch, scratchDir } from "../scripts/scratch-core.mjs";
-import { evaluate, parseYaml } from "../scripts/workflow-run.mjs";
+import { parseYaml } from "../scripts/parse-yaml.mjs";
+import { evaluate } from "../scripts/workflow-run.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { BLOB_MAX, readBlobs } from "../scripts/blobs.mjs";
 

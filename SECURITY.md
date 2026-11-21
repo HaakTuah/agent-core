@@ -103,7 +103,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - a project's build, package and workflow files: read by the licence, exact-versions, NuGet, workflow and agent-tools
      checks and the reader of where the tests run (`scripts/licences.mjs`, `scripts/exact-versions.mjs`,
      `scripts/nuget.mjs`, `scripts/workflows.mjs`, `scripts/agent-tools.mjs`, `scripts/runners.mjs`), the reader of a
-     project's own workflows (`scripts/workflow-run.mjs`, for `check.mjs`, `own-runs.mjs` and `steps.mjs`) and the
+     project's own workflows (`scripts/parse-yaml.mjs`, for `check.mjs`, `own-runs.mjs` and `steps.mjs`) and the
      sync's move of the pins (`scripts/sync.mjs`); limits: 60 s for each of the workflow check's two tools on one file
      (zizmor and actionlint, `scripts/workflow-tools.mjs`, each file run on its own, one a tool stops on or cannot load said
      as a finding with its mend, and neither run in a session), 64 MB of a file for the licence check (256 MB for NuGet's), 1

@@ -12,8 +12,20 @@
   ],
   "past": {
     "scripts/workflow-run.mjs": {
-      "mark": 24358,
-      "why": "One runner of a workflow as GitHub runs it: its YAML reader, expression evaluator and job runner, read by their headings, found by searching. The one split that lets a reader read less, the YAML reader (about 1.7 KB) into a file of its own, is the task of #1056, and the mark stands until it is built."
+      "mark": 22438,
+      "why": "One runner of a workflow as GitHub runs it: its expression evaluator and job runner, read by their headings, found by searching; its YAML reader is split out (parse-yaml.mjs, #1056), and no other part stands alone for a reader of either."
+    },
+    "scripts/check.mjs": {
+      "mark": 26892,
+      "why": "#1056 changed only its import of the YAML reader; its own split is asked in a pull request of its own"
+    },
+    "scripts/checks.mjs": {
+      "mark": 24179,
+      "why": "#1056 changed only its import of the YAML reader; its own split is asked in a pull request of its own"
+    },
+    "scripts/code-scan.mjs": {
+      "mark": 20998,
+      "why": "#1056 changed only its import of the YAML reader; its own split is asked in a pull request of its own"
     },
     ".github/workflows/core.yml": {
       "mark": 32543,

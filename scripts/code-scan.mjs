@@ -38,7 +38,7 @@ import { leadsOut, logged } from "./guards.mjs";
 import { MEND } from "./mend.mjs";
 import { started } from "./started.mjs";
 import { pypiFile, pypiUnreached } from "./packages.mjs";
-import { parseYaml } from "./workflow-run.mjs";
+import { parseYaml } from "./parse-yaml.mjs";
 
 // The engine's version, as the core's .packages/requirements.txt names it: the one place it is written.
 const VERSION = (() => {

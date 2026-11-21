@@ -1,6 +1,6 @@
 // The steps of a project's workflows, and of the local actions they use, that run a script of the copy of the core (#366):
 // each step read once, its run read by step-commands.mjs, the project's own runs of a script named once each.
-import { parseYaml } from "./workflow-run.mjs";
+import { parseYaml } from "./parse-yaml.mjs";
 import { lineNamings, shellOf, runsIn, unaccounted } from "./step-commands.mjs";
 import { tidy, folder } from "./step-paths.mjs";
 import { readable, copyAt, Unread } from "./workflow-calls.mjs";

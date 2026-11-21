@@ -34,7 +34,8 @@ import { carriedAt, readCore } from "./core-path.mjs";
 import { MEND } from "./mend.mjs";
 import { hostSaid, plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
-import { evaluate, parseYaml, pathsLetThrough, runWorkflow, withAbsolutePath } from "./workflow-run.mjs";
+import { parseYaml } from "./parse-yaml.mjs";
+import { evaluate, pathsLetThrough, runWorkflow, withAbsolutePath } from "./workflow-run.mjs";
 
 // The core's workflows a project calls that only the host can run, each with why: check-test.mjs holds that every
 // workflow the starter kit calls is run here or named here.

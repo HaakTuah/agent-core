@@ -9,7 +9,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { ghStandIn, scratchDir } from "../scripts/scratch-core.mjs";
-import { onPath, parseYaml } from "../scripts/workflow-run.mjs";
+import { parseYaml } from "../scripts/parse-yaml.mjs";
+import { onPath } from "../scripts/workflow-run.mjs";
 import { CAPS, DUE_TITLE, QUEUE, answered, capsAt, capsOf, counted, due, judged, raised as raisedWith, rolesAt, whoseOf } from "../scripts/size.mjs";
 
 let failed = 0, count = 0;

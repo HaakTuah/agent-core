@@ -4,7 +4,7 @@
 //
 //   node tests/steps-run-hostile-test.mjs
 import { CURL, linear, inMemory, stepped, copiesOf, notRead } from "../scripts/steps-kit.mjs";
-import { parseYaml } from "../scripts/workflow-run.mjs";
+import { parseYaml } from "../scripts/parse-yaml.mjs";
 import { configs } from "../scripts/steps.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
 
