@@ -7,7 +7,7 @@
 // caller gives for that action, or not at all, said so. A context or function it does not know throws, so a workflow
 // the core changes in a way this cannot read fails the test, and is taught here, rather than running other than GitHub
 // would. Its runner is run by the tests, and by check.mjs, which runs the core's checks from plain git where no GitHub
-// runs them (tasks/hosts.md); no workflow of the core's runs it. Node's own modules, and the YAML reader (parse-yaml.mjs).
+// runs them (tasks/hosts.md); no workflow of the core's runs it. Node's own modules, the YAML reader (parse-yaml.mjs) and the install step's copies (workflow-install.mjs).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
