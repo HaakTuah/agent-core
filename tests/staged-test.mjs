@@ -19,7 +19,7 @@ import { CORE } from "../scripts/core-address.mjs";
 import { rules } from "../scripts/rules.mjs";
 import { scratch } from "../scripts/scratch-core.mjs";
 import { CASES, MONTHS, TOOL, brief, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, lost, setCase, toolNamed, tools, toolsSaid, unplaced, wayNames, wellFormed } from "../scripts/staged.mjs";
-import { BUG, LABELS, LIMITS, OWNER, PROGRAM, REPO, Unreadable, branchesOf, keepKits, kitIntact, originGit as readOrigin, changed, folderFit, inCommits, memoOf, testPasses, touched } from "../scripts/staged/scratch.mjs";
+import { BUG, LABELS, LIMITS, OWNER, PROGRAM, REPO, Unreadable, branchesOf, keepKits, kitIntact, put, originGit as readOrigin, changed, folderFit, inCommits, memoOf, testPasses, touched } from "../scripts/staged/scratch.mjs";
 import { PLANTED, UNPLANTED } from "../scripts/staged/steps.mjs";
 import { tells } from "../scripts/staged/weakness.mjs";
 import { STEPS } from "../scripts/steps.mjs";
@@ -60,7 +60,7 @@ const gh = (dir, method, route, body = null) => {
   if (r.status !== 0) throw new Error(`gh ${method} ${route}: ${r.stderr}`);
   return JSON.parse(r.stdout || "{}");
 };
-const write = (dir, f, t) => { const file = path.join(dir, "project", f); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.rmSync(file, { force: true }); fs.writeFileSync(file, t); };
+const write = (dir, f, t) => put(path.join(dir, "project", f), t);
 const read = (dir, f) => fs.readFileSync(path.join(dir, "project", f), "utf8");
 const FIX = "// The sum of the numbers given.\nexport function sum(numbers) {\n  let total = 0;\n  for (let i = 0; i < numbers.length; i++) total += numbers[i];\n  return total;\n}\n";
 // (a branch with these files, committed and pushed)
@@ -1108,6 +1108,10 @@ ok(brief(caseOf("adviser-starts"), labelled).split("\n")[1] === `This machine st
   "the brief of a case that reads the sessions one starts names the stand-in, the only way it starts one");
 }
 
+// (the guard fires: a write in place into a file the case shares with the kit is read, then put back in place)
+{ const d = fresh("stop"), file = path.join(d, "project", "core", "README.md"), was = fs.readFileSync(file, "utf8");
+  fs.appendFileSync(file, "x"); const caught = kitIntact(); fs.writeFileSync(file, was);
+  ok(caught.length === 1 && caught[0].endsWith("core/README.md"), "a write in place into a file shared with the kept kit is read by the end check, naming the file", caught.join("; ")); }
 const changedKit = kitIntact();
 ok(changedKit.length === 0, "no case wrote in place into a file of the kept starter kits, which the cases after the first share as hard links", `${changedKit.slice(0, 8).join("; ")}. Mend: make the writer replace the file (remove it, then write it) instead of writing into it, as git does`);
 

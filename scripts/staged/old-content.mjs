@@ -5,7 +5,7 @@
 // file, the term gone from it; the old copy is left for a task of its own; and the pull request waits on no owner.
 import fs from "node:fs";
 import path from "node:path";
-import { build, changed, git, github, gone, show, verdict, waitsOnOwner } from "./scratch.mjs";
+import { build, changed, git, github, gone, put, show, verdict, waitsOnOwner } from "./scratch.mjs";
 
 export const name = "old-content";
 export const holds = ["AGENTS.md: Nothing locks a project"];
@@ -25,7 +25,7 @@ export function set(dir, opts = {}) {
   const sync = { "core/README.md": `${readme}\n`, "core-manifest.md": manifest.replace(pin, moved) };
   // (the sync's branch, pushed as a sync makes it, and its pull request with what the sync printed)
   git(project, "checkout", "-q", "-b", "sync-core");
-  for (const [f, t] of Object.entries(sync)) { fs.rmSync(path.join(project, f), { force: true }); fs.writeFileSync(path.join(project, f), t); }
+  for (const [f, t] of Object.entries(sync)) put(path.join(project, f), t);
   git(project, "commit", "-q", "-am", "Sync the core's copy");
   git(project, "push", "-q", "origin", "sync-core");
   git(project, "checkout", "-q", "main");
