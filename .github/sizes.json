@@ -11,6 +11,10 @@
     "tests/mutation/package-lock.json"
   ],
   "past": {
+    "scripts/workflow-run.mjs": {
+      "mark": 24400,
+      "why": "One runner of a workflow as GitHub runs it: its YAML reader, its expression evaluator and its job runner share the state of one run and a context or function taught in one place, and a session that changes the runner reads its sections by the headings, found by searching; split, a reader of parseYaml alone would read 1 KB of 24, but the 32 files that import the file would each name a second one and a function taught to the evaluator could stand in neither half and go unread."
+    },
     ".github/workflows/core.yml": {
       "mark": 32543,
       "why": "One job that each project calls pinned, holding the core's checks that need no secret as its steps (#376, #377): GitHub reads a job as one file, and a split into a second called workflow would start a second job, which bills a whole minute on a private repository's free plan"
