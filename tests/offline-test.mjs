@@ -78,10 +78,12 @@ else {
     const loopback = await new Promise(resolve => { const server = net.createServer(c => c.end()).listen(0, "127.0.0.1", () => { const s = net.connect(server.address().port, "127.0.0.1", () => { s.destroy(); server.close(); resolve("connected"); }); s.on("error", e => { server.close(); resolve(e.code); }); }); });
     ok(lookup !== "resolved" && outside !== "connected" && loopback === "connected",
       "under the cut no name resolves and no address outside is reached, while loopback answers", JSON.stringify({ lookup, outside, loopback }));
-    // (and the step runs as no root, with no group but its own, docker's among those dropped, and none to gain)
+    // (and the step runs as no root, with no group but its own and none to gain, and cannot reach docker's daemon,
+    // whose socket would reach the network)
     const status = fs.readFileSync("/proc/self/status", "utf8");
-    ok(process.getuid() !== 0 && process.getgroups().every(g => g === process.getgid()) && /^NoNewPrivs:\s*1$/mu.test(status),
-      "under the cut the step runs as the runner's own user, with no group but its own and no privilege to gain", JSON.stringify({ uid: process.getuid(), groups: process.getgroups(), noNewPrivs: /^NoNewPrivs:.*$/mu.exec(status)?.[0] }));
+    const docker = await new Promise(resolve => { const s = net.connect("/var/run/docker.sock", () => { s.destroy(); resolve("connected"); }); s.on("error", e => resolve(e.code)); });
+    ok(process.getuid() !== 0 && process.getgroups().every(g => g === process.getgid()) && /^NoNewPrivs:\s*1$/mu.test(status) && docker !== "connected",
+      "under the cut the step runs as the runner's own user, with no group but its own and no privilege to gain, and docker's socket does not answer it", JSON.stringify({ uid: process.getuid(), gid: process.getgid(), groups: process.getgroups(), noNewPrivs: /^NoNewPrivs:.*$/mu.exec(status)?.[0], docker }));
   }
 }
 

@@ -17,7 +17,7 @@
 # script never runs with the network up.
 set -u
 if [ $# -ne 1 ]; then
-  echo "FAIL: scripts/offline.sh takes one script, the step's, and was given $#. Mend: give it as a step's shell, \"bash scripts/offline.sh {0}\"" >&2
+  echo "FAIL: scripts/offline.sh takes one script, the step's, and was given $#. Mend: give it as a step's shell by its path in the workspace, \"bash \${{ github.workspace }}/scripts/offline.sh {0}\"" >&2
   exit 1
 fi
 script=$1

@@ -172,7 +172,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     # (on Linux, but in the part network, each step runs with the network cut off, loopback still up, so a test that
-    # reaches it fails there saying its mend; a step that must reach it names its own shell, bash, and
+    # reaches it fails there, saying its mend where its output shows the fetch refused, or stalls until its time runs
+    # out; a step that must reach it names its own shell, bash, and
     # tests/workflows-test.mjs holds which those are: the installs, the tools' fetches, the selection, the registry's
     # lookups and the base's fetch, and until #772 makes them self-contained the tests that still reach the network and
     # the mutation run, which runs them; scripts/offline.sh; #770)
