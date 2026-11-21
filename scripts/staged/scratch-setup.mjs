@@ -125,11 +125,22 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
 const KITS = new Map();
 let kitsAt = null;
 export function keepKits(folder) { fs.mkdirSync(folder, { recursive: true }); kitsAt = folder; }
-const copyBut = (from, to, but) => fs.cpSync(from, to, { recursive: true, verbatimSymlinks: true, filter: src => path.resolve(src) !== path.resolve(from, but) });
+// (the core's installed packages, the parser's above all at about 150 MB, are never tracked, nor a link in their place
+// (the copy's .gitignore), so a case after the first links them to the kept kit's, which a case must not write into, in place
+// of copying and then deleting them, about two thirds of what copying and removing a case's folders took; #812)
+const copyBut = (from, to, but, link = false) => {
+  const installs = [];
+  fs.cpSync(from, to, { recursive: true, verbatimSymlinks: true, filter: src => {
+    if (path.resolve(src) === path.resolve(from, but)) return false;
+    if (link && path.basename(src) === "node_modules") { installs.push(path.relative(from, src)); return false; }
+    return true;
+  } });
+  for (const rel of installs) fs.symlinkSync(path.resolve(from, rel), path.join(to, rel), "junction");
+};
 function starterKit(project, core, at, kit) {
   const key = kitsAt && JSON.stringify([path.resolve(core), at ?? git(core, "rev-parse", "HEAD"), kit]);
   const kept = key && KITS.get(key);
-  if (kept) { copyBut(kept, project, ".git"); return; }
+  if (kept) { copyBut(kept, project, ".git", true); return; }
   const kitRun = spawnSync(process.execPath, [path.join(core, "scripts", "init.mjs"), "--owner", OWNER, "--name", REPO, ...(at ? ["--at", at] : []), ...kit], { cwd: project, encoding: "utf8", env: plainEnv() });
   if (kitRun.status !== 0) throw new Error(`the starter kit failed: ${kitRun.stdout}${kitRun.stderr}`);
   if (!key) return;
