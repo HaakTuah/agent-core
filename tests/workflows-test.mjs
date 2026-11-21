@@ -219,7 +219,7 @@ const hostileKeys = (br, mark) => `${Array.from({ length: 65000 }, () => `k: "x$
   unreadied(files, before); foreignBroken(files, before);
   return Date.now() - t1;
 };
-const withBreaks = spent("\u2028"), without = spent("");
+const withBreaks = spent("\u2028"), without = spent(""); console.log("MEASURE", withBreaks, without);
 ok(withBreaks < 10 * without + 300 && withBreaks < 60000, "a hostile file of the longest text read, a key given twice on every line behind a break in a double-quoted string, costs the two readers, head and base, a small multiple of the same file with no break", `${withBreaks} ms against ${without} ms`);
 // (only the reading as the mend leaves it finds the key given twice here, the folded text being no YAML: it is told on the line
 // an editor counts; and a text the escapes would take past the length read is read as line feeds, never as too long)
