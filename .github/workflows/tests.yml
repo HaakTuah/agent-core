@@ -175,9 +175,8 @@ jobs:
     # reaches it fails there, saying its mend where its output shows the fetch refused, or stalls until its time runs
     # out; a step that must reach it names its own shell, bash, and
     # tests/workflows-test.mjs holds which those are: the installs, the tools' fetches, the selection, the registry's
-    # lookups and the base's fetch, the fetches of the code scan's wheels and of Betterleaks' archive for their tests, and
-    # until #772 makes them self-contained the tests that still reach the network and the mutation run, which runs them;
-    # scripts/offline.sh; #770)
+    # lookups and the base's fetch, the week's wait on each new package, and the fetches of the code scan's wheels and of
+    # Betterleaks' archive for their tests; scripts/offline.sh; #770, #772)
     defaults:
       run:
         shell: ${{ matrix.os == 'ubuntu-latest' && matrix.parts != 'network' && format('bash {0}/scripts/offline.sh {{0}}', github.workspace) || 'bash' }}

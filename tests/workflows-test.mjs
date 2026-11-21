@@ -475,8 +475,7 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     && steps.join() === ["node tests/init-dotnet-test.mjs", "node tests/nuget-fetch-test.mjs", "node tests/nuget-gate-network-test.mjs"].join(),
     "the tests that reach the network run in no pull request's run nor a push's, and once an hour and by hand in a job of their own on each system and Node (point 9)", steps.join(", "));
   // (#770: on Linux, but in the part network, each step runs with the network cut off, and those that must reach it
-  // name their shell, bash, each listed here with why; the tests and the mutation run until #772 makes them
-  // self-contained)
+  // name their shell, bash, each listed here with why; #772 made the last tests self-contained)
   const ONLINE = {
     "node scripts/install.mjs all": "installs the core's packages from npm's registry",
     'bash scripts/workflow-tools.sh >> "$GITHUB_ENV"': "fetches zizmor and actionlint at their pins",

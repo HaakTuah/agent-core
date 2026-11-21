@@ -146,12 +146,12 @@ try {
   fs.writeFileSync(path.join(project, "package.json"), JSON.stringify({ name: "project", private: true, workspaces: ["*", "**"] }));
   fs.cpSync(path.join(root, "scripts"), path.join(copy, "scripts"), { recursive: true });
   for (const f of [".packages/package.json", ".packages/package-lock.json", ".packages/requirements.txt", ".gitignore", ".packages/.npmrc", ".packages/parser/package.json", ".packages/parser/package-lock.json", ".packages/parser/.npmrc"]) fs.cpSync(path.join(root, f), path.join(copy, f));
-  // (the parser's install holding one package, a small one of the registry's, so that what installs it, and what does
-  // not, is seen whatever the core's parser's lock holds today: #719)
+  // (the parser's install holding one package of its own lock, so that what installs it, and what does not, is seen: #719)
   // (node-addon-api, which the parser's own lock names and holds no dependency: a job that installed the parser has it in npm's cache, and
   // this test, with the network cut off, installs it from a copy of that cache: scratch-core.mjs, npmWithCache, #772)
   const pp = path.join(pk, "parser");
   const staged = json(".packages/parser/package-lock.json").packages["node_modules/node-addon-api"];
+  ok(staged?.integrity, "the parser's lock names node-addon-api, which this case installs from the job's cache", "Mend: stage another package of the parser's lock with no dependency in this case, and its name where the case loads it");
   const parserList = { ...JSON.parse(fs.readFileSync(path.join(pp, "package.json"), "utf8")), dependencies: { "node-addon-api": staged.version } };
   fs.writeFileSync(path.join(pp, "package.json"), JSON.stringify(parserList, null, 2));
   fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license, dependencies: parserList.dependencies }, "node_modules/node-addon-api": staged } }, null, 2));
@@ -428,26 +428,28 @@ try {
   const unreached = spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(p.unreached("yaml")); p.loadSync("yaml");`], { cwd: project, encoding: "utf8", env: { ...env, CORE_PACKAGES_UNREACHED: "1" } });
   ok(unreached.status === 1 && /^true$/mu.test(unreached.stdout) && mended(unreached.stderr), "where the job's install could not reach the registry, a script is told so, and a package it loads all the same fails, never passing (#654, points 3 and 4)", `${unreached.stdout}${unreached.stderr}`);
   fs.writeFileSync(record, kept);
-  // (a lock file whose integrity the registry's tarball does not match: twice refused, then a failure that says the mend)
-  const wrong = JSON.parse(fs.readFileSync(path.join(pk, "package-lock.json"), "utf8"));
-  const first = Object.keys(wrong.packages).find(k => k && !wrong.packages[k].dev);
-  wrong.packages[first].integrity = `sha512-${Buffer.alloc(64, 7).toString("base64")}`;
-  fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify(wrong, null, 2));
-  fs.rmSync(path.join(pk, "node_modules"), { recursive: true, force: true });
-  const refused = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env });
-  ok(refused.status === 1 && /runs again/u.test(refused.stderr) && /could not be installed .*twice/u.test(refused.stderr) && mended(refused.stderr), "an install that fails is run once more, and a second failure fails, saying the mend", refused.stderr);
   // (in a project's pull request the same failure fails all the same: a lock file the registry's tarball does not match
   // is no registry that did not answer, and a pull request can bring it about)
   const jobEnv = path.join(tmp, "github-env");
   fs.writeFileSync(jobEnv, "");
   const inPr = { ...env, GITHUB_EVENT_NAME: "pull_request", GITHUB_ENV: jobEnv };
   // (a registry of its own on loopback for the two installs that need an answer: a tarball whose bytes are not the lock
-  // file's integrity, and a 404 for an address that echoes a network error's name; npm swaps the host of each address in
+  // file's integrity, and a packument without the version an address that echoes a network error's name asks for; npm swaps the host of each address in
   // the lock file for the registry it is given, so no job reaches npm's own, #772)
-  const registry = spawn(process.execPath, ["-e", `require("http").createServer((q, r) => { r.statusCode = /ETIMEDOUT/.test(q.url) ? 404 : 200; r.end("not a tarball"); }).listen(0, "127.0.0.1", function () { console.log(this.address().port); });`], { stdio: ["ignore", "pipe", "ignore"] });
+  // (a server that does not start, or an error that ends the test, never leaves it running: it is killed on exit)
+  const registry = spawn(process.execPath, ["-e", `require("http").createServer((q, r) => { if (/\\.tgz$/.test(q.url)) { r.end("not a tarball"); } else { r.setHeader("content-type", "application/json"); r.end(JSON.stringify({ name: "yaml", "dist-tags": { latest: "2.9.1" }, versions: { "2.9.1": { name: "yaml", version: "2.9.1", dist: { tarball: "http://127.0.0.1/yaml.tgz" } } } })); } }).listen(0, "127.0.0.1", function () { console.log(this.address().port); });`], { stdio: ["ignore", "pipe", "ignore"] });
   process.on("exit", () => registry.kill()); // (killed whatever ends the test)
   const port = await new Promise((res, rej) => { registry.stdout.once("data", d => res(String(d).trim())); setTimeout(() => rej(new Error("the test's local registry did not start in 15 s")), 15000).unref(); });
-  const local = { ...inPr, [["npm_config_regi", "stry"].join("")]: `http://127.0.0.1:${port}/`, npm_config_fetch_retries: "0" };
+  const regEnv = { [["npm_config_regi", "stry"].join("")]: `http://127.0.0.1:${port}/`, npm_config_fetch_retries: "0" };
+  const local = { ...inPr, ...regEnv };
+  // (a lock file whose integrity the registry's tarball does not match: twice refused, then a failure that says the mend)
+  const wrong = JSON.parse(fs.readFileSync(path.join(pk, "package-lock.json"), "utf8"));
+  const first = Object.keys(wrong.packages).find(k => k && !wrong.packages[k].dev);
+  wrong.packages[first].integrity = `sha512-${Buffer.alloc(64, 7).toString("base64")}`;
+  fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify(wrong, null, 2));
+  fs.rmSync(path.join(pk, "node_modules"), { recursive: true, force: true });
+  const refused = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...env, ...regEnv } });
+  ok(refused.status === 1 && /EINTEGRITY|integrity/iu.test(refused.stderr) && /runs again/u.test(refused.stderr) && /could not be installed .*twice/u.test(refused.stderr) && mended(refused.stderr), "an install that fails is run once more, and a second failure fails, saying the mend", refused.stderr);
   const mismatched = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: local });
   ok(mismatched.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "in a project's pull request an install that fails for anything but the registry not answering fails, and tells the job nothing", `${mismatched.status} ${mismatched.stdout}${mismatched.stderr}`);
   // (nor where npm's message echoes a network error's name from what the lock file holds, a version here: #714)
@@ -458,7 +460,9 @@ try {
   fs.writeFileSync(jobEnv, "");
   const echoed = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: local });
   registry.kill();
-  ok(echoed.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "and one whose message names a network error only as it echoes the lock file fails too, the job told nothing", `${echoed.status} ${echoed.stdout}${echoed.stderr}`);
+  // (npm's own log, which the failure names, holds what npm printed: the case reaches the echo, and the install reads none of it as a network error)
+  const npmLog = /(\S+-debug-\d+\.log)/u.exec(echoed.stderr)?.[1];
+  ok(echoed.status === 1 && npmLog && /ETIMEDOUT/u.test(fs.readFileSync(npmLog, "utf8")) && !fs.readFileSync(jobEnv, "utf8"), "and one whose message names a network error only as it echoes the lock file fails too, the job told nothing", `${echoed.status} ${echoed.stdout}${echoed.stderr}`);
   // (a registry that does not answer, in a project's pull request, fails nothing: the job is told, and each check after it says it did not run)
   fs.copyFileSync(path.join(root, ".packages/package-lock.json"), path.join(pk, "package-lock.json"));
   const warned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...plainEnv, GITHUB_EVENT_NAME: "pull_request", GITHUB_ENV: jobEnv, [["npm_config_regi", "stry"].join("")]: "http://127.0.0.1:9/", npm_config_fetch_retries: "0", npm_config_cache: path.join(tmp, "empty-cache") } });
