@@ -123,7 +123,7 @@ export function npmCacheCopy(tmp, env = process.env) {
 /** The npm for npm-once.mjs's `real`, with the cache's copy handed in: a program of its own, in `tmp`, that runs this
  *  machine's npm with the same arguments, its cache the copy `npmCacheCopy` makes and the registry asked only for what
  *  that holds not (npm's prefer-offline). A test whose installs read the machine's copy reaches the registry for
- *  nothing it already has; where the machine holds no cache, undefined, and npm-once.mjs runs the first npm on the PATH
+ *  nothing it already has; where the machine holds no cache, or the run's network is not cut off (npmCacheCopy), undefined, and npm-once.mjs runs the first npm on the PATH
  *  as it did. The settings are the wrapper's, set where npm starts, so npm-once.mjs, which the licence scan passes
  *  over, passes on the environment it was given as before (#772). */
 export function npmWithCache(tmp, env = process.env) {

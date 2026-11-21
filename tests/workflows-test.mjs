@@ -481,8 +481,8 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     "node scripts/install.mjs all": "installs the core's packages from npm's registry",
     'bash scripts/workflow-tools.sh >> "$GITHUB_ENV"': "fetches zizmor and actionlint at their pins",
     'bash scripts/lychee.sh >> "$GITHUB_ENV"': "fetches lychee at its pin",
-    "version=1.10.1 sum=c174b42d7aa60caf58c0c3e555c0e4bed01fe6b0d99a412bce777b5af4ce913e\nmkdir -p \"$RUNNER_TEMP/archives\"\nfile=\"betterleaks_${version}_linux_x64.tar.gz\"\ncurl -fsSL --proto =https --proto-redir =https --connect-timeout 30 --max-time 300 --retry 2 -o \"$RUNNER_TEMP/archives/$file\" \"https://github.com/betterleaks/betterleaks/releases/download/v$version/$file\"\necho \"$sum  $RUNNER_TEMP/archives/$file\" | sha256sum -c -\necho \"CORE_ARCHIVES=$RUNNER_TEMP/archives\" >> \"$GITHUB_ENV\"": "fetches Betterleaks' archive at the personal-terms check's pin, for its tests",
-    'python3 -I -m pip download --require-hashes --no-deps --only-binary=:all: --no-input --disable-pip-version-check -r .packages/requirements.txt -d "$RUNNER_TEMP/wheels"\necho "CORE_WHEELS=$RUNNER_TEMP/wheels" >> "$GITHUB_ENV"': "fetches the code scan's engine's wheels at their pins, for its test",
+    'bash scripts/test-downloads.sh wheels >> "$GITHUB_ENV"': "fetches the code scan's engine's wheels at their pins, for its test",
+    'bash scripts/test-downloads.sh archives >> "$GITHUB_ENV"': "fetches Betterleaks' archive at the personal-terms check's pin, for its tests",
     'node scripts/select.mjs .github/shape.json --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}': "asks GitHub, on a push, whether the merged head passed",
     "node tests/packages-test.mjs": "#772: its week's wait reads npm's registry",
     "node scripts/lookup.mjs .github/licences.json": "looks each new package up in npm's registry",
@@ -499,12 +499,12 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     "on Linux, but in the part network, each step of the suites runs with the network cut off, and only those listed with why name their own shell to reach it (#770)",
     JSON.stringify({ shell: tests.jobs.suites.defaults?.run?.shell, unlisted: online.filter(r => !(r in ONLINE)), missing: Object.keys(ONLINE).filter(r => !online.includes(r)) }));
   // (the archive the tests' set-up fetches for the personal-terms check's tests is the one that check pins: its version and
-  // the SHA-256 of its Linux x64 archive, written in both, so a new pin there fails here until this follows)
+  // the SHA-256 of its Linux x64 archive, written in both, so a new pin there fails here until the script follows)
   const pinned = fs.readFileSync(path.join(wfDir, "personal-terms.yml"), "utf8").match(/version=(\S+) exe=[\s\S]*?Linux\/x86_64\) file=linux_x64\.tar\.gz archive=([0-9a-f]{64}) /u);
-  const fetchedAt = Object.keys(ONLINE).find(k => k.startsWith("version="))?.match(/^version=(\S+) sum=([0-9a-f]{64})\n/u);
+  const fetchedAt = fs.readFileSync(path.join(wfDir, "../../scripts/test-downloads.sh"), "utf8").match(/version=(\S+) sum=([0-9a-f]{64})\n/u);
   ok(pinned && fetchedAt && pinned[1] === fetchedAt[1] && pinned[2] === fetchedAt[2],
-    "the Betterleaks archive the tests' set-up fetches for the personal-terms check's tests is at the version and SHA-256 that check pins (#772)",
-    JSON.stringify({ pinned: pinned?.slice(1), fetched: fetchedAt?.slice(1) }) + "\nMend: write the version and the Linux x64 archive's SHA-256 of .github/workflows/personal-terms.yml in the tests workflow's step \"Betterleaks' release\", and in the key of that step's line in ONLINE");
+    "the Betterleaks archive scripts/test-downloads.sh fetches for the personal-terms check's tests is at the version and SHA-256 that check pins (#772)",
+    JSON.stringify({ pinned: pinned?.slice(1), fetched: fetchedAt?.slice(1) }) + "\nMend: write the version and the Linux x64 archive's SHA-256 of .github/workflows/personal-terms.yml in the \"archives\" case of scripts/test-downloads.sh");
   ok(tests.concurrency.group.includes("format('pr-{0}', github.event.pull_request.number)") && tests.concurrency.group.includes("(github.event_name == 'push' || github.event_name == 'schedule') && format('{0}-main', github.event_name) || github.run_id")
     && tests.concurrency["cancel-in-progress"] === "${{ github.event_name == 'pull_request' }}",
     "a pull request's run gives way to its newer push's; a run on main after a merge, the hourly runs, a start by hand and a call wait their turn and are never cancelled (point 4, as #810 changed it)");

@@ -87,6 +87,7 @@ const NOT_CHECKS = {
   "scripts/look.mjs": "runs on a schedule, and opens issues",
   "scripts/issue-terms.mjs": "runs on a schedule, takes the personal terms out of issues and comments, and fails nothing",
   "scripts/lychee.sh": "fetches the link checker the pointer check runs, at set-up, and always exits 0; the check (pointers.mjs) says where it was not fetched",
+  "scripts/test-downloads.sh": "fetches, at set-up, what the tests that run with the network cut off need, and always exits 0; the tests that need it fail saying their own mend where it was not fetched",
   "scripts/workflow-tools.sh": "fetches the two tools the workflow check runs, at set-up, and always exits 0; the check (workflows.mjs) says where one was not fetched",
   "scripts/versions.mjs": "runs on a schedule, and opens issues",
   "scripts/release.mjs": "cuts a release, started by hand on main",

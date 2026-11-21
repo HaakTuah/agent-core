@@ -66,6 +66,7 @@ held(workflows.has("core.yml") && scripts.has("copies.mjs") && scripts.has("pr-d
 // What is no check of the copy, each with why: a script or a workflow found above that is no row of the list.
 const NOT_CHECKS = {
   "lychee.sh": "it fetches the pointer check's link checker and reads no file of the tree; the check is the row pointers.mjs",
+  "test-downloads.sh": "it fetches what the core's own tests need with the network cut off and reads no file of the tree; it is no check",
   "workflow-tools.sh": "it fetches the workflow check's two tools and reads no file of the tree; the check is the row workflows.mjs",
   "checks.mjs": "it runs its parts' checks, each a row or named here; its own look before it installs is the row `checks.mjs signatures`",
   "manifest-reads.mjs": "it reports and never fails, and reads the copy only as the source of the modules and slots",
