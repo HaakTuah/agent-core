@@ -35,6 +35,7 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { MEND } from "./mend.mjs";
 import { installed } from "./packages.mjs";
+import { npmIgnores, npmReadsAll, npmVersion } from "./npm-reads.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 
@@ -190,7 +191,17 @@ const shown = { stdio: ["ignore", "inherit", "inherit"] };
 // (Windows' shell, by the path the system names, never a cmd.exe the checked-out folder holds)
 const COMSPEC = process.env.ComSpec || "cmd.exe";
 const passed = r => { if (r.error) console.log(`The package manager could not be started (${r.error.message}).`); return r.status === 0; };
-const install = cwd => passed(process.platform === "win32"
+// (only under an npm that reads each setting that keeps the install to the registry: an older one, npm 10 that Node 22
+// brings among them, ignores them without a word and would fetch any git, web or file source the lock file names; #704)
+const ALLOWS = ["allow-git", "allow-remote", "allow-file"];
+function unread(cwd) {
+  const version = npmVersion(cwd), ignored = npmIgnores(version, ALLOWS);
+  if (!ignored.length) return false;
+  const least = npmReadsAll(ALLOWS);
+  console.log(`FAIL npm ${version || "here, whose version could not be read,"} reads none of ${ignored.map(s => `--${s}`).join(", ")}, which npm reads from ${least} on, so its install would fetch any git, web or file source the lock file names, and nothing was installed. ${MEND}run this check under the core's own Node, the version in its .node-version, whose npm reads them, as the signatures job does, or update npm here to ${least} or later`);
+  return true;
+}
+const install = cwd => !unread(cwd) && passed(process.platform === "win32"
   ? spawnSync(COMSPEC, ["/d", "/s", "/c", "npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none"], { cwd, ...shown })
   : spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none"], { cwd, ...shown }));
 const signed = cwd => passed(process.platform === "win32" ? spawnSync(COMSPEC, ["/d", "/s", "/c", "npm audit signatures"], { cwd, ...shown })

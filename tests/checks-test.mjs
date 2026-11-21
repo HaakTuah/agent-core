@@ -28,7 +28,7 @@ let n = 0;
 function project(files = {}) {
   const dir = path.join(tmp, `p${++n}`);
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of ["checks.mjs", "core-address.mjs", "core-path.mjs", "mend.mjs", "started.mjs", "workflow-run.mjs", "parse-yaml.mjs", "yaml-keys.mjs", "packages.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
+  for (const f of ["checks.mjs", "core-address.mjs", "core-path.mjs", "mend.mjs", "started.mjs", "workflow-run.mjs", "parse-yaml.mjs", "yaml-keys.mjs", "packages.mjs", "npm-reads.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
   // (the YAML package its reader of workflows loads, as the core's install leaves it: the lock file, npm's record of the
   // install and the package, from the core's own install, which its tests' job runs)
   for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/yaml"]) fs.cpSync(path.join(root, ".packages", f), path.join(dir, "core/.packages", f), { recursive: true });
@@ -137,6 +137,27 @@ const run = (dir, args, extra = {}) => {
   const advised = run(dir, ["nuget", "--nuget", "checks/licences.json", "--advisory"], { BASE_SHA: base });
   ok(advised.status === 0 && /Advisory: nothing fails for it yet/.test(advised.out), "where advisory, it fails nothing", advised.out);
   fs.rmSync(path.join(dir, "fails.txt"));
+}
+// the signature check's install, under an npm that reads none of --allow-git, --allow-remote and --allow-file (npm 10,
+// which Node 22 brings, and npm 11 before 11.14.0), installs nothing and fails saying the mend, since that npm would
+// fetch any git, web or file source the lock file names; under one that reads them all, it installs (#704). A stand-in
+// npm on the PATH says the version it is given and records each install; on Linux, where it is a script of the shell's.
+if (process.platform !== "win32") {
+  const dir = project({ "web/package.json": "{}\n" });
+  const base = git(dir, "rev-parse", "HEAD");
+  fs.writeFileSync(path.join(dir, "web/package.json"), "{\"private\": true}\n");
+  git(dir, "commit", "-q", "-am", "the package list");
+  const bin = path.join(tmp, "npm-bin");
+  fs.mkdirSync(bin, { recursive: true });
+  // (its name built from pieces, so that the licence scan reads no npm command here)
+  fs.writeFileSync(path.join(bin, ["n", "pm"].join("")), '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "$NPM_STANDS_AS"; exit 0; fi\necho "ran $(basename "$0") $*"\n', { mode: 0o755 });
+  const under = version => run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base, NPM_STANDS_AS: version, PATH: `${bin}${path.delimiter}${env.PATH}` });
+  for (const v of ["10.9.9", "11.13.0", ""]) {
+    const old = under(v);
+    ok(old.status === 1 && !/^ran npm ci/m.test(old.out) && /^FAIL .*--allow-remote.*Mend: /m.test(old.out) && mended(old.out), `signatures: under npm ${v || "whose version cannot be read"} it installs nothing and fails, saying the mend`, old.out);
+  }
+  const now = under("11.14.0");
+  ok(now.status === 0 && /^ran npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none$/m.test(now.out) && /^ran npm audit signatures$/m.test(now.out), "and under npm 11.14.0, which reads them all, it installs and checks the signatures", now.out);
 }
 
 done("the one script of the core's checks");
