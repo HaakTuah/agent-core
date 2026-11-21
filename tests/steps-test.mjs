@@ -142,8 +142,8 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
 {
   const pair = ["16 November 2026, the tests a change can reach", "18 November 2026, a tree that passed is not run again"];
   for (const lead of pair) STAGES[lead].stage(lockProject);
-  const together = notDone(lockProject);
-  ok(pair.every(lead => together.some(m => m.lead === lead)), "the tests a change can reach and a tree that passed, taken out together, are each reported", report(together));
+  const together = pair.map(lead => notDone(lockProject, only(lead)));
+  ok(pair.every((lead, i) => together[i].some(m => m.lead === lead)), "the tests a change can reach and a tree that passed, taken out together, are each reported", report(together.flat()));
   for (const lead of Object.keys(STAGES).filter(l => pair.includes(l))) STAGES[lead].mend(lockProject);
   for (const lead of pair) STAGES[lead].after?.(lockProject);
 }
