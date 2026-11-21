@@ -162,13 +162,25 @@ export function kitIntact() {
 function starterKit(project, core, at, kit) {
   const key = kitsAt && JSON.stringify([path.resolve(core), at ?? git(core, "rev-parse", "HEAD"), kit]);
   const kept = key && KITS.get(key);
-  if (kept) { linkAll(kept, project, true); return; }
+  if (kept) {
+    linkAll(kept, project, true);
+    // (the kit's files already packed once: the case's add finds them in the project's objects and writes no loose one for each)
+    for (const f of fs.readdirSync(`${kept}.pack`)) fs.copyFileSync(path.join(`${kept}.pack`, f), path.join(project, ".git", "objects", "pack", f));
+    return;
+  }
   const kitRun = spawnSync(process.execPath, [path.join(core, "scripts", "init.mjs"), "--owner", OWNER, "--name", REPO, ...(at ? ["--at", at] : []), ...kit], { cwd: project, encoding: "utf8", env: plainEnv() });
   if (kitRun.status !== 0) throw new Error(`the starter kit failed: ${kitRun.stdout}${kitRun.stderr}`);
   if (!key) return;
   const to = path.join(kitsAt, `kit-${KITS.size + 1}`);
   copyBut(project, to, ".git");
   SUMS.set(to, sums(to));
+  const bare = `${to}.git`;
+  git(kitsAt, "init", "-q", "--bare", "-b", "main", bare);
+  for (const [k, v] of [["core.compression", "0"], ["core.autocrlf", "false"]]) git(bare, "config", k, v);
+  execFileSync("git", [`--git-dir=${bare}`, `--work-tree=${to}`, "add", "-A"], { env: plainEnv(), stdio: "ignore" });
+  git(bare, "repack", "-q", "-a", "-d");
+  fs.cpSync(path.join(bare, "objects", "pack"), `${to}.pack`, { recursive: true });
+  fs.rmSync(bare, { recursive: true });
   KITS.set(key, to);
 }
 
