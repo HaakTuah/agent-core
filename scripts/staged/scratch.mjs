@@ -9,6 +9,6 @@
 //   scratch-reader.mjs   the sealed reader of what a session left (a security reading) and the seal a case keeps;
 //   scratch-outcome.mjs  the readers a case's verdict uses, built on the sealed reader; it runs the session's program, so a
 //                        security reading takes it too.
-export { BUG, CORE_ROOT, LABELS, OWNER, PASSER, PROGRAM, REPO, URL, build, carry, fakeKey, folderFit, git, keepKits, queueLine } from "./scratch-setup.mjs";
+export { BUG, CORE_ROOT, LABELS, OWNER, PASSER, PROGRAM, REPO, URL, build, carry, fakeKey, folderFit, git, keepKits, kitIntact, put, queueLine } from "./scratch-setup.mjs";
 export { LIMITS, Unreadable, base, branchesOf, github, memo, memoOf, originGit, readGit, seal, sealOf, sealed } from "./scratch-reader.mjs";
 export { added, adds, changed, fixed, gone, heldAtBase, inCommits, onGitHub, printed, pulls, pushed, runAt, show, testPasses, touched, verdict, waitsOnOwner, words, written } from "./scratch-outcome.mjs";

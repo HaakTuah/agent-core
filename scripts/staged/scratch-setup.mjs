@@ -67,14 +67,14 @@ export function carry(project, { submodule = false } = {}) {
   for (const f of git(project, "ls-files", "--cached", "--others", "--exclude-standard").split("\n").filter(f => f && !f.startsWith("lib/") && !f.startsWith("core/"))) {
     const file = path.join(project, f), text = fs.readFileSync(file, "utf8");
     const moved = text.replace(/^Core: .*$/mu, m => (f === "core-manifest.md" ? line : m)).replace(/(^|[\s`'"(@:<[])core\//gmu, "$1lib/core/");
-    if (moved !== text) fs.writeFileSync(file, moved);
+    if (moved !== text) put(file, moved);
   }
   const settings = path.join(project, ".claude", "settings.json"), json = JSON.parse(fs.readFileSync(settings, "utf8"));
   const commands = hookCommands(readCore(line));
   json.hooks.SessionStart[0].hooks[0].command = commands.start;
   json.hooks.PreToolUse[0].hooks[0].command = commands.helper;
   json.hooks.Stop[0].hooks[0].command = commands.stop;
-  fs.writeFileSync(settings, `${JSON.stringify(json, null, 2)}\n`);
+  put(settings, `${JSON.stringify(json, null, 2)}\n`);
   if (submodule) {
     fs.writeFileSync(path.join(project, ".gitmodules"), `[submodule "lib"]\n\tpath = lib\n\turl = https://github.com/${OWNER}/library.git\n`);
     git(project, "update-index", "--add", "--cacheinfo", `160000,${crypto.randomBytes(20).toString("hex")},lib`);
@@ -117,7 +117,7 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
 }
 
 // The starter kit, run in `project` from the core `core` at `at` with the kit's options `kit`; or, where a caller kept
-// the kits (keepKits) and one ran for the same core, commit and options, what it wrote copied in, left for the add that
+// the kits (keepKits) and one ran for the same core, commit and options, what it wrote linked in, with its files' objects copied packed, left for the add that
 // build makes before its first commit, which stages the kit's files and the case's alike (#812; what fillIn and `arrange`
 // list, `--cached --others`, reads the same either way). The kit writes the same files for the same commit and
 // options, and its install of the core's packages is most of what setting a case costs, on Windows above all (#715); a
@@ -125,27 +125,52 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
 const KITS = new Map();
 let kitsAt = null;
 export function keepKits(folder) { fs.mkdirSync(folder, { recursive: true }); kitsAt = folder; }
-// (the core's installed packages, the parser's above all at about 150 MB, are never tracked, nor a link in their place
-// (the copy's .gitignore), so a case after the first links them to the kept kit's, which a case must not write into, in place
-// of copying and then deleting them, about two thirds of what copying and removing a case's folders took; #812)
-const copyBut = (from, to, but, link = false) => {
-  const installs = [];
-  fs.cpSync(from, to, { recursive: true, verbatimSymlinks: true, filter: src => {
-    if (path.resolve(src) === path.resolve(from, but)) return false;
-    if (link && path.basename(src) === "node_modules") { installs.push(path.relative(from, src)); return false; }
-    return true;
-  } });
-  for (const rel of installs) fs.symlinkSync(path.resolve(from, rel), path.join(to, rel), "junction");
+const copyBut = (from, to, but) => fs.cpSync(from, to, { recursive: true, verbatimSymlinks: true, filter: src => path.resolve(src) !== path.resolve(from, but) });
+// A case after the first gets the kept kit's files as hard links, not copies: about a tenth of the time of creating
+// each file anew (119 ms against 1,040 ms for the 1,173 files of a kit, on 21 November 2026; the core's installed packages, never tracked, are linked in as folders, not file by file), and what a case writes
+// in place would reach the kit and every other case, so `kitIntact` reads the kept kits' files, their mode too, again at
+// the end of the run and says which one changed (git replaces a file it changes, never writes into it). Only a caller
+// of keepKits, the core's own test, gets links: a real session's editor writes in place, unseen, so no real case is set so.
+const linkAll = (from, to, top) => {
+  fs.mkdirSync(to, { recursive: true });
+  for (const e of fs.readdirSync(from, { withFileTypes: true })) {
+    const a = path.join(from, e.name), b = path.join(to, e.name);
+    if (top && e.name === ".git") continue;
+    if (e.isDirectory()) { if (e.name === "node_modules") fs.symlinkSync(a, b, "junction"); else linkAll(a, b, false); }
+    else if (e.isSymbolicLink()) fs.symlinkSync(fs.readlinkSync(a), b);
+    else { try { fs.linkSync(a, b); } catch { fs.copyFileSync(a, b); } }
+  }
 };
+const sums = folder => { const out = {}; const walk = (d, rel) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name), r = path.posix.join(rel, e.name); if (e.isDirectory()) { if (e.name !== "node_modules") walk(f, r); } else if (e.isFile()) out[r] = `${fs.statSync(f).mode & 0o777}:${crypto.createHash("sha1").update(fs.readFileSync(f)).digest("hex")}`; } }; walk(folder, ""); return out; };
+const SUMS = new Map();
+// The kept kits' files that a case changed in place since they were kept: [] where none did.
+export function kitIntact() {
+  const bad = [];
+  for (const [folder, was] of SUMS) { const now = sums(folder); for (const f of new Set([...Object.keys(was), ...Object.keys(now)])) if (was[f] !== now[f]) bad.push(`${path.basename(folder)}/${f}`); }
+  return bad;
+}
 function starterKit(project, core, at, kit) {
   const key = kitsAt && JSON.stringify([path.resolve(core), at ?? git(core, "rev-parse", "HEAD"), kit]);
   const kept = key && KITS.get(key);
-  if (kept) { copyBut(kept, project, ".git", true); return; }
+  if (kept) {
+    linkAll(kept, project, true);
+    // (the kit's files already packed once: the case's add finds them in the project's objects and writes no loose one for each)
+    for (const f of fs.readdirSync(`${kept}.pack`)) fs.copyFileSync(path.join(`${kept}.pack`, f), path.join(project, ".git", "objects", "pack", f));
+    return;
+  }
   const kitRun = spawnSync(process.execPath, [path.join(core, "scripts", "init.mjs"), "--owner", OWNER, "--name", REPO, ...(at ? ["--at", at] : []), ...kit], { cwd: project, encoding: "utf8", env: plainEnv() });
   if (kitRun.status !== 0) throw new Error(`the starter kit failed: ${kitRun.stdout}${kitRun.stderr}`);
   if (!key) return;
   const to = path.join(kitsAt, `kit-${KITS.size + 1}`);
   copyBut(project, to, ".git");
+  SUMS.set(to, sums(to));
+  const bare = `${to}.git`;
+  git(kitsAt, "init", "-q", "--bare", "-b", "main", bare);
+  for (const [k, v] of [["core.compression", "0"], ["core.autocrlf", "false"]]) git(bare, "config", k, v);
+  execFileSync("git", [`--git-dir=${bare}`, `--work-tree=${to}`, "add", "-A"], { env: plainEnv(), stdio: "ignore" });
+  git(bare, "-c", "repack.writeBitmaps=false", "repack", "-q", "-a", "-d");
+  fs.cpSync(path.join(bare, "objects", "pack"), `${to}.pack`, { recursive: true });
+  fs.rmSync(bare, { recursive: true });
   KITS.set(key, to);
 }
 
@@ -167,6 +192,9 @@ function repos(dir, project, origin) {
   if (path.resolve(git(project, "remote", "get-url", "--push", "origin")) !== path.resolve(origin)) throw new Error("the project's pushes would not reach its own bare origin");
 }
 
+// (a file replaced, never written into: a kit's file may be a hard link shared with other cases, see linkAll)
+export const put = (file, text) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.rmSync(file, { force: true }); fs.writeFileSync(file, text); };
+
 // The kit's FILL IN marks filled as `fills`, then FILLS, says, outside the copy of the core.
 // The queue's first line: the case's first issue, which stands as #1 on GitHub, or no line where it makes none, so the
 // queue names only issues the case makes (#988).
@@ -178,7 +206,7 @@ function fillIn(project, fills = []) {
     if (!text.includes("FILL IN")) continue;
     let filled = text;
     for (const [re, to] of [...fills, ...FILLS]) filled = filled.replace(re, to);
-    fs.writeFileSync(file, filled);
+    put(file, filled);
   }
 }
 
@@ -188,7 +216,7 @@ function writeAll(project, files) {
     const file = path.join(project, f);
     if (text === null) { fs.rmSync(file, { force: true }); continue; }
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, text);
+    put(file, text);
   }
 }
 

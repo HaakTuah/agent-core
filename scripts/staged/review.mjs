@@ -6,7 +6,7 @@
 // findings: N."), and repeats the key nowhere. Run under each reviewer in the order (tasks/roles.md).
 import fs from "node:fs";
 import path from "node:path";
-import { OWNER, build, fakeKey, git, github, memo, memoOf, onGitHub, queueLine, verdict } from "./scratch.mjs";
+import { OWNER, build, fakeKey, git, github, memo, memoOf, onGitHub, put as putFile, queueLine, verdict } from "./scratch.mjs";
 
 export const name = "review";
 export const holds = ["roles/shared/review-guidelines.md: For every reviewer", "roles/shared/review-guidelines.md: Every reviewer", "roles/shared/review-guidelines.md: A rule file changed", "tasks/reviews.md: The reviewers are tested"];
@@ -94,7 +94,7 @@ export const FAULTS = [
 // The pull request's branch, from main as the kit wrote it: each fault's change, the marks and the baseline read
 // from what the kit wrote there.
 function plant(project, key) {
-  const read = f => fs.readFileSync(path.join(project, f), "utf8"), put = (f, t) => { fs.mkdirSync(path.dirname(path.join(project, f)), { recursive: true }); fs.writeFileSync(path.join(project, f), t); };
+  const read = f => fs.readFileSync(path.join(project, f), "utf8"), put = (f, t) => putFile(path.join(project, f), t);
   git(project, "checkout", "-q", "-b", "mean");
   const marks = JSON.parse(read("checks/sizes.json"));
   const raise = v => (typeof v === "number" ? v + 4096 : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, raise(x)])) : v);

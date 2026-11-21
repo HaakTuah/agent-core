@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "../core-address.mjs";
 import { entries, notes as notesWhole } from "../sync-notes.mjs";
-import { LABELS, build, git, github, originGit, pushed, show, verdict } from "./scratch.mjs";
+import { LABELS, build, git, github, originGit, pushed, put, show, verdict } from "./scratch.mjs";
 
 export const name = "steps";
 const AUTO = "tools/claude-auto-mode.md: Auto mode may refuse";
@@ -128,7 +128,7 @@ export function set(dir, opts = {}) {
     github: { private: true, labels: [], securityAndAnalysis: Object.fromEntries(SCANNING.map(k => [k, { status: "disabled" }])), rulesets: [{ id: 1, name: "main", target: "branch", enforcement: "active", rules: [{ type: "pull_request" }, { type: "required_status_checks", parameters: { required_status_checks: [{ context: "core / core" }, { context: "security-review" }] } }] }] },
   });
   const read = f => fs.readFileSync(path.join(project, f), "utf8");
-  const write = (f, t) => { fs.mkdirSync(path.dirname(path.join(project, f)), { recursive: true }); fs.writeFileSync(path.join(project, f), t); };
+  const write = (f, t) => put(path.join(project, f), t);
   write("AGENTS.md", `${read("AGENTS.md").trimEnd()}\n\n## How we work here\n\n${Object.values(RULES).join("\n")}\n`);
   let manifest = read("core-manifest.md");
   const pin = /at ([0-9a-f]{40})/.exec(manifest)[1];
