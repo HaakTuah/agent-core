@@ -9,8 +9,9 @@
 // NuGet.Config that maps its packages to their sources included. No package is
 // downloaded: the step restores against an empty source. The whole job, on a project with no package: its restore and
 // its check pass, and a lock file that no longer holds what its project asks for fails the restore. Where there is no
-// .NET SDK (never on GitHub's runners) only the first look is tried. On Linux and on Windows. Git, bash, jq, the .NET
-// SDK and Node's own modules.
+// .NET SDK (never on GitHub's runners) only the first look is tried. The whole job installs the core's packages from a
+// copy of the machine's npm cache, made as the test starts, so it reaches no registry (#772). On Linux and on Windows.
+// Git, bash, jq, the .NET SDK, npm and Node's own modules.
 //
 //   node tests/nuget-gate-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -18,7 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { npmCacheCopy, root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 
 const { ok, done } = tally();
@@ -30,6 +31,10 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/
 Object.assign(env, { GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid",
   HOME: home, USERPROFILE: home, APPDATA: path.join(home, "AppData", "Roaming"), LOCALAPPDATA: path.join(home, "AppData", "Local"), DOTNET_CLI_HOME: home, NUGET_HTTP_CACHE_PATH: path.join(tmp, "http-cache"),
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1", MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_USE_MSBUILD_SERVER: "0" });
+// (the whole job installs the core's packages as the runner's own job did, from a copy of its npm cache made here, so it
+// reaches no registry: #772)
+const npmCache = npmCacheCopy(tmp);
+if (npmCache) Object.assign(env, { npm_config_cache: npmCache, npm_config_prefer_offline: "true" });
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const version = spawnSync("dotnet", ["--version"], { env, encoding: "utf8" });
 const sdk = version.status === 0;

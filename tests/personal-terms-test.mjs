@@ -26,7 +26,7 @@
 // base64 passes, as before; and where Betterleaks was not fetched at its pin (no pin for the machine's system, a release
 // that cannot be downloaded), the check fails saying the mend, a kept copy that differs from its sum never run. The terms
 // are invented, built from pieces as the test runs, so no file holds them. On Linux and on Windows. Git, bash, curl and
-// Node's own modules, and the network to Betterleaks' releases on github.com, from which the check's own step fetches it.
+// Node's own modules, and Betterleaks' release for the machine's system, which the check's own step fetches from github.com, or, where CORE_ARCHIVES names a folder holding the archive, from it (#772).
 //
 //   node tests/personal-terms-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -35,7 +35,7 @@ import path from "node:path";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { CORE } from "../scripts/core-address.mjs";
-import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { ARCHIVE_SERVER, root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
 const workflow = fs.readFileSync(path.join(root, ".github/workflows/personal-terms.yml"), "utf8");
@@ -54,11 +54,11 @@ const bash = (script, extra = {}) => spawnSync("bash", ["-c", script], { env: { 
 const signer = path.join(tmp, "signer"), stranger = path.join(tmp, "other-signer"), stubs = path.join(tmp, "stubs");
 const keyFile = path.join(tmp, "web-flow.gpg");
 fs.mkdirSync(stubs);
-// (the stand-in serves GitHub's key alone, and hands any other fetch, Betterleaks' release, to the machine's own curl,
-// save where a case has it fail)
+// (the stand-in serves GitHub's key, and Betterleaks' release from the folder CORE_ARCHIVES names where it holds the
+// archive, and hands any other fetch to the machine's own curl, save where a case has it fail)
 const isFile = f => { try { return fs.statSync(f).isFile(); } catch { return false; } };
 const realCurl = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(Boolean).flatMap(d => ["curl", "curl.exe"].map(c => path.join(d, c))).find(isFile);
-fs.writeFileSync(path.join(stubs, "curl"), `#!/bin/sh\ncase "$*" in *web-flow.gpg*) [ -f "$STAND_IN_KEY" ] || exit 22; cat "$STAND_IN_KEY"; exit 0 ;; esac\n[ -z "$FETCH_FAILS" ] || exit 22\nexec '${(realCurl ?? "curl").replace(/\\/g, "/")}' "$@"\n`, { mode: 0o755 });
+fs.writeFileSync(path.join(stubs, "curl"), `#!/bin/sh\ncase "$*" in *web-flow.gpg*) [ -f "$STAND_IN_KEY" ] || exit 22; cat "$STAND_IN_KEY"; exit 0 ;; esac\n[ -z "$FETCH_FAILS" ] || exit 22\n${ARCHIVE_SERVER}exec '${(realCurl ?? "curl").replace(/\\/g, "/")}' "$@"\n`, { mode: 0o755 });
 const makeKey = (home, who) => { fs.mkdirSync(home, { mode: 0o700 }); return bash(`gpg -q --batch --pinentry-mode loopback --passphrase '' --quick-gen-key '${who}' ed25519 sign never`, { GNUPGHOME: home }).status === 0; };
 const signedBy = (home, key) => ({ GNUPGHOME: home, GIT_CONFIG_COUNT: "3", GIT_CONFIG_KEY_0: "commit.gpgSign", GIT_CONFIG_VALUE_0: "true", GIT_CONFIG_KEY_1: "gpg.program", GIT_CONFIG_VALUE_1: "gpg", GIT_CONFIG_KEY_2: "user.signingKey", GIT_CONFIG_VALUE_2: key });
 process.on("exit", () => { for (const home of [signer, stranger]) bash("gpgconf --kill all", { GNUPGHOME: home }); });

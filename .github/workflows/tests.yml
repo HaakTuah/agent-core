@@ -175,8 +175,9 @@ jobs:
     # reaches it fails there, saying its mend where its output shows the fetch refused, or stalls until its time runs
     # out; a step that must reach it names its own shell, bash, and
     # tests/workflows-test.mjs holds which those are: the installs, the tools' fetches, the selection, the registry's
-    # lookups and the base's fetch, and until #772 makes them self-contained the tests that still reach the network and
-    # the mutation run, which runs them; scripts/offline.sh; #770)
+    # lookups and the base's fetch, the fetches of the code scan's wheels and of Betterleaks' archive for their tests, and
+    # until #772 makes them self-contained the tests that still reach the network and the mutation run, which runs them;
+    # scripts/offline.sh; #770)
     defaults:
       run:
         shell: ${{ matrix.os == 'ubuntu-latest' && matrix.parts != 'network' && format('bash {0}/scripts/offline.sh {{0}}', github.workspace) || 'bash' }}
@@ -213,6 +214,29 @@ jobs:
           GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}
         shell: bash
         run: node scripts/select.mjs .github/shape.json --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}
+      # (the wheels of the code scan's engine, at the pins and SHA-256 of .packages/requirements.txt, fetched while the
+      # network is up, so the test of the scan, which runs with it cut off on Linux, installs the engine from them and
+      # runs its cases; #772)
+      - name: The code scan's engine, its wheels fetched at their pins for its test (Linux, where the suites run with the network cut off)
+        if: ${{ runner.os == 'Linux' && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-test.mjs ')) }}
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          python3 -m pip download --require-hashes --no-deps --only-binary=:all: --no-input --disable-pip-version-check -r .packages/requirements.txt -d "$RUNNER_TEMP/wheels"
+          echo "CORE_WHEELS=$RUNNER_TEMP/wheels" >> "$GITHUB_ENV"
+      # (Betterleaks' release for GitHub's Linux runners, the version the personal-terms check pins, fetched while the
+      # network is up, so the tests of that check, which run with it cut off, run its step that downloads Betterleaks
+      # whole, the archive held to its SHA-256 by the step itself; #772)
+      - name: Betterleaks' release, its archive fetched at the check's pin for the tests of the personal-terms check (Linux, where the suites run with the network cut off)
+        if: ${{ runner.os == 'Linux' && runner.arch == 'X64' && (contains(matrix.parts, 'terms') || contains(matrix.parts, 'projects')) && (env.RUN == 'all' || contains(env.RUN, ' tests/personal-terms-test.mjs ') || contains(env.RUN, ' tests/copy-left-out-test.mjs ')) }}
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          version=$(sed -n 's/^ *version=\([0-9.]*\) exe=.*/\1/p' .github/workflows/personal-terms.yml | head -n 1)
+          mkdir -p "$RUNNER_TEMP/archives"
+          file="betterleaks_${version}_linux_x64.tar.gz"
+          curl -fsSL --proto =https --proto-redir =https --connect-timeout 30 --max-time 300 --retry 2 -o "$RUNNER_TEMP/archives/$file" "https://github.com/betterleaks/betterleaks/releases/download/v$version/$file"
+          echo "CORE_ARCHIVES=$RUNNER_TEMP/archives" >> "$GITHUB_ENV"
       # (only the part projects: the system's temp folder, a short name under the home folder on another drive than the
       # checkout, is what the other Windows parts still test their scripts against; #882)
       - name: Scratch folders of the part projects on the runner's own drive, where git writes a tree three times faster than under the system's temp folder (#951)
@@ -261,7 +285,6 @@ jobs:
         run: node tests/nuget-fetch-test.mjs
       - name: The code scan of a private project, its engine fetched by its digest (#546)
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-test.mjs ')) }}
-        shell: bash
         run: node tests/code-scan-test.mjs
       - name: The hand-written readers, against SPDX's own parser and an XML parser (on Linux, where tar unpacks them)
         if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/readers-test.mjs ')) }}
@@ -540,11 +563,9 @@ jobs:
         run: node tests/core-yml-test.mjs --part "$PART"
       - name: The core's checks from plain git (check.mjs), on scratch projects
         if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/check-test.mjs ')) }}
-        shell: bash
         run: node tests/check-test.mjs
       - name: What a project's checks leave out for the core's copy, held to README.md's list
         if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/copy-left-out-test.mjs ')) }}
-        shell: bash
         run: node tests/copy-left-out-test.mjs
       - name: The sync, and the proof that a sync is pure, against every way a sync branch can carry more
         if: ${{ !cancelled() && contains(matrix.parts, 'sync') && (env.RUN == 'all' || contains(env.RUN, ' tests/pure-sync-test.mjs ')) }}
@@ -572,11 +593,9 @@ jobs:
         run: node tests/init-dotnet-test.mjs
       - name: The NuGet check's own steps, its first look and its whole job
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-gate-test.mjs ')) }}
-        shell: bash
         run: node tests/nuget-gate-test.mjs
       - name: The personal-terms check, its own job on scratch pull requests
         if: ${{ !cancelled() && contains(matrix.parts, 'terms') && (env.RUN == 'all' || contains(env.RUN, ' tests/personal-terms-test.mjs ')) }}
-        shell: bash
         run: node tests/personal-terms-test.mjs
       - name: The words check, the dated records' added lines too
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/general-test.mjs ')) }}

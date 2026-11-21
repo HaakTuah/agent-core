@@ -23,7 +23,7 @@ import { run as licenceScan, write as licenceWrite } from "../scripts/licence-sc
 import { targets as scanTargets } from "../scripts/code-scan.mjs";
 import { check as nuget } from "../scripts/nuget.mjs";
 import { calledByPaths, library, ownOf } from "../scripts/reading.mjs";
-import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { ARCHIVE_SERVER, root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 import { reads as workflowsRead } from "../scripts/workflows.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 
@@ -251,7 +251,8 @@ if (process.platform === "win32") console.log("note the pair of personal-terms.y
 else PAIRS["personal-terms.yml"] = ["the workflow, through workflow-run.mjs: a term in a file of the pull request", () => {
   const term = ["qz", "vk", "wy"].join(""), stubs = path.join(tmp, "stubs");
   fs.mkdirSync(stubs, { recursive: true });
-  fs.writeFileSync(path.join(stubs, "curl"), "#!/bin/sh\nexit 22\n", { mode: 0o755 });
+  // (a fetch the stand-in serves from the folder CORE_ARCHIVES names, Betterleaks' release, and fails any other)
+  fs.writeFileSync(path.join(stubs, "curl"), `#!/bin/sh\n${ARCHIVE_SERVER}exit 22\n`, { mode: 0o755 });
   const workflow = fs.readFileSync(path.join(root, ".github/workflows/personal-terms.yml"), "utf8");
   const run = (f, words = `a line with ${term} in it\n`) => {
     const dir = path.join(tmp, `terms-${++n}`);
