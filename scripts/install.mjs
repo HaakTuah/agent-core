@@ -19,7 +19,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { INSTALLS, lockFaults, npmrcOthers } from "./packages.mjs";
+import { INSTALLS, lockFaults, npmIgnores, npmrcOthers, npmReadsAll, npmVersion } from "./packages.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 // (the folder of the core's own package list, lock file and .npmrc, where npm runs and so reads that .npmrc alone)
@@ -117,6 +117,13 @@ if (unknown.length) {
   process.exit(1);
 }
 const first = Object.keys(REGISTRIES)[0]; // (npm's, where none is named)
+// (where an npm install runs under an npm that ignores a setting that keeps an install to the registry and to a release
+// a week old, a note, never a failure ("Nothing locks a project"): the core's own installs are held to their lock files
+// by refusal() above before npm runs, but a project's own install there is held by its lock file alone; #704)
+if ((named.length ? named : [first]).some(n => !REGISTRIES[n].pip && fs.existsSync(path.join(root, REGISTRIES[n].lock)))) {
+  const version = npmVersion(root), ignored = npmIgnores(version);
+  if (ignored.length) console.log(`note npm ${version || "here, whose version could not be read,"} ignores ${ignored.map(s => (s.startsWith("allow-") ? `--${s}` : `an .npmrc's ${s}`)).join(", ")}, which npm reads from ${npmReadsAll()} on: the core's packages are held to its lock files before npm runs, but a project's own install here takes any source its lock file names, and a new package at any release however new. The core's Node, the version in its .node-version, brings an npm that reads them all`);
+}
 for (const name of named.length ? named : [first]) {
   const { lock, into, run } = REGISTRIES[name];
   if (!fs.existsSync(path.join(root, lock))) continue; // (a copy whose core holds no lock file of this registry)
