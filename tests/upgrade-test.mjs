@@ -203,6 +203,38 @@ function project(name, from, { owner, kit, isPrivate, windows, files, as }) {
 const write = (dir, to, text) => { fs.mkdirSync(path.dirname(path.join(dir, to)), { recursive: true }); fs.writeFileSync(path.join(dir, to), text); };
 
 let runs = 0;
+// The two steps that fetch a tool over the network into the runner's folder (the core's workflow-tools.sh and lychee.sh,
+// each ending in a path the checks read) run once for the whole test, not in each of the dozens of jobs it starts: the
+// key holds the script and the env, and what else they read of the copy (its tool pins) is the same in each (#812).
+const fetchedOnce = { pattern: /\b(?:workflow-tools|lychee)\.sh\b/, store: new Map(), temp: path.join(tmp, "fetched-once") };
+fs.mkdirSync(fetchedOnce.temp);
+{
+  // (the runner's own case: the first job runs the matching step with the shared folder as its runner folder, the next takes
+  // its result and its GITHUB_ENV line; a step of another text, or run with no `once`, runs in its own job's folder)
+  const wf = (a, b) => `on: push\njobs:\n  j:\n    steps:\n      - run: |\n          echo ${a} >> "$COUNT"\n          echo "TOOL=$RUNNER_TEMP/tool" >> "$GITHUB_ENV"\n      - run: test "$TOOL" = "$EXPECT" && echo reads >> "$COUNT"\n      - run: echo ${b} >> "$COUNT" && exit 3\n`;
+  const dir = path.join(tmp, "once-case"), count = path.join(dir, "count"), shared = path.join(dir, "shared");
+  fs.mkdirSync(shared, { recursive: true });
+  const once = { pattern: /fetch|break/, store: new Map(), temp: shared };
+  const go = (text, o) => runWorkflow(text, { github: { repository: "o/r", event_name: "push" }, base: { PATH: process.env.PATH, COUNT: count, EXPECT: path.join(shared, "tool") }, workspace: () => dir, uses: {}, temp: dir, ...o })[0];
+  const first = go(wf("fetch", "break"), { once }), second = go(wf("fetch", "break"), { once }), plain = go(wf("fetch", "break"), {}), other = go(wf("get", "break"), { once });
+  const lines = fs.readFileSync(count, "utf8").trim().split("\n"), times = w => lines.filter(l => l === w).length;
+  ok(times("fetch") === 2 && times("break") === 1 && times("reads") === 2 && !first.passed && !second.passed && second.steps[0].ran && second.steps[0].passed && second.steps[2].passed === false,
+    "a step the runner is told to run once runs once, and each job after it takes its GITHUB_ENV line and its failure", lines.join());
+  ok(!plain.steps[1].passed && !other.steps[1].passed && other.steps[0].passed, "and the step beside it that its text does not match, or that no `once` was given for, runs in its job's own folder", `${plain.steps[1].passed} ${other.steps[1].passed}`);
+  // (what the step is kept under: its env, the script it names as the project holds it, and its expressions filled in; and its outputs go on)
+  const k = (x, v, id = "") => `on: push\njobs:\n  j:\n    env:\n      X: ${x}\n    steps:\n      - ${id}run: |\n          bash scripts/f.sh ${v}\n          echo "o=$X" >> "$GITHUB_OUTPUT"\n      - run: test "\${{ steps.s.outputs.o }}" = "${x}" || exit 4\n`;
+  fs.mkdirSync(path.join(dir, "scripts"));
+  fs.writeFileSync(path.join(dir, "scripts", "f.sh"), 'echo "key $1" >> "$COUNT"\n');
+  const onceF = { pattern: /f\.sh/, store: new Map(), temp: shared };
+  const withEnv = x => go(k(x, "v", "id: s\n        "), { once: onceF });
+  const one = withEnv("1"), again = withEnv("1"), changedEnv = withEnv("2");
+  fs.writeFileSync(path.join(dir, "scripts", "f.sh"), 'echo "key changed $1" >> "$COUNT"\n');
+  const changedScript = withEnv("1"), same = k("1", "${{ github.event_name }}", "id: s\n        ");
+  const filled = go(same, { once: onceF }), filledOther = go(same, { once: onceF, github: { repository: "o/r", event_name: "pull_request" } });
+  const keys = fs.readFileSync(count, "utf8").trim().split("\n").filter(l => l.startsWith("key"));
+  ok(keys.join() === "key v,key v,key changed v,key changed push,key changed pull_request" && one.passed && again.passed && again.steps[1].passed && changedEnv.passed && changedScript.passed && filled.passed && filledOther.passed,
+    "a step is run again where its env, its script or its expression's value differs, and a replay hands the step after it the outputs of the first run", keys.join());
+}
 // Every workflow of the project's that one event starts, and in it each call to a workflow of the core's, as GitHub
 // would run it on the commit `sha` (a pull request: the head, against `baseSha`, pushed to, or as `action` says, a
 // draft where `draft`). Each result: [file/job, result].
@@ -271,7 +303,7 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
       const inputs = Object.fromEntries(Object.entries(job.with ?? {}).map(([k, v]) => [k, typeof v === "string" && v.includes("${{") ? evaluate(v.replace(/^\$\{\{|\}\}$/g, ""), callerCtx) : v]));
       const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, evaluate(String(v).replace(/^\$\{\{|\}\}$/g, ""), callerCtx)]));
       const caller = { ...github, workflow_ref: `${p.repo}/.github/workflows/${file}@${github.ref}` };
-      const called = parseYaml(text), ran = runWorkflow(text, { inputs, secrets, github: caller, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp });
+      const called = parseYaml(text), ran = runWorkflow(text, { inputs, secrets, github: caller, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp, once: fetchedOnce });
       for (const r of ran) out.push([`${file}/${id}/${r.job}`, r]);
       const jobs = Object.fromEntries(ran.map(r => [r.job, { outputs: Object.fromEntries(Object.entries(called.jobs?.[r.job]?.outputs ?? {})
         .map(([k, v]) => [k, evaluate(String(v).trim().replace(/^\$\{\{|\}\}$/g, ""), { steps: r.outputs ?? {} }) ?? ""])) }]));
