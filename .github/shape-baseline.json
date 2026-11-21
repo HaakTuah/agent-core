@@ -19,6 +19,7 @@
     "changes"
   ],
   "grown": {
+    "process: tests/offline-test.mjs -> node:child_process": "The step's shell with the network cut off (#770) is a bash script: it is run as a step's shell is, with stand-ins for sudo, unshare, setpriv and ip, and its exit code, what it prints and whether the step's script ran are what the cases guard.",
     "process: tests/links-test.mjs -> node:child_process": "The pointer check's link checker (#582): the check is run as its job runs it, with a stand-in for lychee as the program it starts, against a base git reads in a scratch repository, and its exit code and what it prints are what the cases guard.",
     "process: tests/core-cost-test.mjs -> node:child_process": "A real shallow clone of a scratch git repository is what the test guards (#1027): that a reader counting merges from a clone git says is shallow refuses it with a mend, which only git's own clone makes.",
     "process: tests/licence-scan-pins-test.mjs -> node:child_process": "Split from tests/licence-scan-test.mjs (#1008), whose scratch project it commits through git: that a download a pull request adds or unpins is read against the base, from git, is what it guards.",
@@ -118,6 +119,7 @@
     "process: tests/lookup-run-test.mjs -> node:child_process": true,
     "process: tests/core-cost-test.mjs -> node:child_process": true,
     "process: tests/lookup-step-test.mjs -> node:child_process": true,
+    "process: tests/offline-test.mjs -> node:child_process": true,
     "process: tests/manifest-reads-test.mjs -> node:child_process": true,
     "process: tests/links-test.mjs -> node:child_process": true,
     "process: tests/mend-test.mjs -> node:child_process": true,

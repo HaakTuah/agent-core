@@ -122,8 +122,10 @@ reads is the *shape check*'s config.
   answer, and a fetch that failed on 17 November 2026 turned the default branch red (#542). Held, in the core, in part,
   by its `tests.yml`, which `tests/workflows-test.mjs` reads: the part `network` runs in no pull request's run nor a
   push's, save the mutation run on a pull request, which still runs those its change names (#772); which tests reach the
-  network, by nothing yet, since the shape check's counts read what a test imports and calls, and these reach it through
-  the programs they start (#770 would cut the network off for a pull request's run).
+  network, by `scripts/offline.sh`, under which each step of its suites on Linux but the part `network` runs with the
+  network cut off, a test that reaches it failing there, or stalling until its job's time runs out, its failure saying
+  its mend where its output shows the fetch refused, save the steps that workflows test lists with why, those #772 makes
+  self-contained among them (#770).
 
 - **A test that guards only what a release brings runs where the release is made** (#715). By default a test runs
   where its suite does. The one condition that changes it: a test whose breach reaches users only through a release
