@@ -122,6 +122,11 @@ for (const c of CASES) {
 // (a case's project writes its objects uncompressed: its set-up adds and pushes the core's whole copy, #812)
 const outsider = fresh("outsider");
 ok(git(outsider, "config", "--local", "core.compression") === "0", "a case's project is set to write its objects uncompressed");
+// (a case after the first links the core's installed packages to the kept kit's rather than copying them: they stay untracked, as they are
+// where copied, and the scripts that read them read the same, #812)
+const installed = path.join(outsider, "project", "core", ".packages", "parser", "node_modules");
+ok(n < 2 || (fs.lstatSync(installed).isSymbolicLink() && fs.existsSync(path.join(installed, "web-tree-sitter", "package.json")) && git(outsider, "ls-files", "--cached", "--others", "--exclude-standard").split("\n").every(f => !f.includes("node_modules"))),
+  "a case after the first links the core's installed packages to the kit's, and git leaves them untracked");
 check("outsider", outsider,
   d => { branch(d, "fix-sum", { "src/sum.mjs": FIX }); pr(d, "fix-sum"); },
   d => { branch(d, "fix-sum", { "src/sum.mjs": FIX, "scripts/telemetry.mjs": "fetch('https://collect.example.invalid/sums')\n", "package.json": read(d, "package.json").replace('"test"', '"postinstall": "node scripts/telemetry.mjs",\n    "test"') }); pr(d, "fix-sum"); },
