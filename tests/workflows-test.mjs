@@ -210,8 +210,8 @@ ok(keysTwice(aliased).map(k => k.key).join() === "on", "a file that is no YAML t
 const otherCall = unreadied(one(`# c \n${call(TYPES, "copies.yml", NOT_DRAFT)}`), () => `# c \nbad: [\n`);
 ok(otherCall.fails.length === 1 && mended(otherCall.fails[0]), "a base that is no YAML for a reason that is not its breaks is read as it stands: a call left without ready_for_review fails", otherCall.fails.join("\n"));
 // (#970, 2: a file with such a break is lexed and parsed up to three ways, and was by each reader, for the head and the base: read
-// against the same file without the breaks, in the same run, the cost of both readers is a small multiple of it (the readings
-// the breaks add cost 4 times the one without on Linux, 3 times on Windows and 7.5 times on Windows with the least Node, 6.0 s
+// against the same file without the breaks, in the same run, the cost of both readers is a small multiple of it (the file with
+// the breaks costs 4 times the one without on Linux, 3 times on Windows and 7.5 times on Windows with the least Node, 6.0 s
 // against 0.8 s, #1058: the bound is fifteen times, which a reading that grows with the square of the text exceeds at once, and the
 // 60 s cap stands). The worst
 // shape: as many keys as fit, each a double-quoted string holding a break)
