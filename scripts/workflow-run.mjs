@@ -370,12 +370,12 @@ export function onPath(name, env = process.env) {
   return null;
 }
 
-// What a `once` step is kept under: its text, its env and the programs it names as the project holds them, so a copy
+// What a `once` step is kept under: its text (its expressions filled in), its env and the programs it names as the project holds them, so a copy
 // whose script differs runs it; null for a step that `once` does not name.
-function onceKey(rt, step, cwd, env) {
-  if (!rt.once?.pattern.test(step.run)) return null;
-  const programs = [...step.run.matchAll(/\bscripts\/[\w.-]+\.sh\b/gu)].map(([f]) => { try { return fs.readFileSync(path.join(cwd, env.CORE_AT ?? "", f), "utf8"); } catch { return null; } });
-  return JSON.stringify([step.run, env, programs]);
+function onceKey(rt, text, cwd, env) {
+  if (!rt.once?.pattern.test(text)) return null;
+  const programs = [...text.matchAll(/\bscripts\/[\w.-]+\.sh\b/gu)].map(([f]) => { try { return fs.readFileSync(path.join(cwd, env.CORE_AT ?? "", f), "utf8"); } catch { return null; } });
+  return JSON.stringify([text, env, programs]);
 }
 
 // A step's outcome as the steps context holds it, where it has an id.
@@ -391,7 +391,7 @@ function replay(jr, step, name, seen) {
   const { rt, ctx, state, result, tmp, id } = jr;
   if (seen.env) { fs.writeFileSync(path.join(tmp, "env"), seen.env); carryEnv(path.join(tmp, "env"), ctx.env, id); }
   result.steps.push({ name, ran: true, passed: seen.passed, out: seen.out });
-  outcome(ctx, step, seen.passed, {});
+  outcome(ctx, step, seen.passed, seen.outputs);
   if (!seen.passed) failed(state, result, rt.stop, name);
 }
 
@@ -400,7 +400,8 @@ function runScript(jr, step, name, env) {
   const { rt, job, ctx, state, result, tmp, dir, id } = jr;
   const output = path.join(tmp, `output-${result.steps.length}`);
   const script = path.join(tmp, `step-${result.steps.length}.sh`);
-  fs.writeFileSync(script, fill(step.run, ctx, state));
+  const text = fill(step.run, ctx, state);
+  fs.writeFileSync(script, text);
   const cwd = step["working-directory"] ? path.join(dir, fill(str(step["working-directory"]), ctx, state)) : dir;
   // (as GitHub runs it: a step that names no shell in bash with -e alone; one whose shell is bash, by its own word or
   // the defaults', with --noprofile --norc -e -o pipefail)
@@ -408,18 +409,18 @@ function runScript(jr, step, name, env) {
   // (bash by its full path from the PATH the step is given, and, on Windows, what it starts never looked for in its folder)
   const bash = onPath("bash", { ...rt.base, ...env });
   if (!bash) throw new Error("bash is on no folder of the PATH: install Git for Windows, whose bash runs the steps, or put bash on the PATH");
-  const kept = onceKey(rt, step, cwd, env);
+  const kept = onceKey(rt, text, cwd, env);
   const seen = kept && rt.once.store.get(kept);
   if (seen) return replay(jr, step, name, seen);
   const r = spawnSync(bash, shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
     ...rt.base, ...env, ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}), CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
     GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(rt.github.repository), GITHUB_EVENT_NAME: str(rt.github.event_name), RUNNER_TEMP: kept ? rt.once.temp : tmp, RUNNER_OS: ctx.runner.os } });
   const passed = r.status === 0;
-  const out = `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}`;
-  if (kept) rt.once.store.set(kept, { passed, out, env: readIf(path.join(tmp, "env")) });
+  const out = `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}`, outputs = outputsOf(output);
+  if (kept) rt.once.store.set(kept, { passed, out, outputs, env: readIf(path.join(tmp, "env")) });
   carryEnv(path.join(tmp, "env"), ctx.env, id);
   result.steps.push({ name, ran: true, passed, out });
-  outcome(ctx, step, passed, outputsOf(output));
+  outcome(ctx, step, passed, outputs);
   if (!passed) failed(state, result, rt.stop, name);
 }
 
