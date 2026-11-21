@@ -42,8 +42,9 @@ export function npmIgnores(version, settings = Object.keys(NPM_READS)) {
 // The version of the npm the PATH finds, run in `cwd` (on Windows through its shell, by the path the system names, where
 // npm is a .cmd file), or "" where it cannot be read.
 export function npmVersion(cwd) {
-  const r = process.platform === "win32" ? spawnSync(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", "npm --version"], { cwd, encoding: "utf8" })
-    : spawnSync("npm", ["--version"], { cwd, encoding: "utf8" });
+  const opts = { cwd, encoding: "utf8" };
+  const r = process.platform === "win32" ? spawnSync(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", "npm --version"], opts)
+    : spawnSync("npm", ["--version"], opts);
   return /^\d+\.\d+\.\d+/u.exec((r.stdout ?? "").trim())?.[0] ?? "";
 }
 // For a copy of .packages/ made by a test that reads no C#: false for the parser's own node_modules/, some 70 MB it would
