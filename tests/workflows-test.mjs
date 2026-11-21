@@ -484,13 +484,12 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     'bash scripts/test-downloads.sh wheels >> "$GITHUB_ENV"': "fetches the code scan's engine's wheels at their pins, for its test",
     'bash scripts/test-downloads.sh archives >> "$GITHUB_ENV"': "fetches Betterleaks' archive at the personal-terms check's pin, for its tests",
     'node scripts/select.mjs .github/shape.json --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}': "asks GitHub, on a push, whether the merged head passed",
-    "node tests/packages-test.mjs": "#772: its week's wait reads npm's registry",
+    "node scripts/week-wait.mjs": "asks npm's registry for the date of each package a change brings",
     "node scripts/lookup.mjs .github/licences.json": "looks each new package up in npm's registry",
     'for d in . parser; do if [ -d "$d/node_modules" ]; then (cd "$d" && npm audit signatures --prefix=.); fi; done': "reads the registry's signatures",
     'git fetch --no-tags --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"': "fetches the base from GitHub",
     "node scripts/install.mjs mutation": "installs Stryker from npm's registry",
     "npm audit signatures --prefix=.": "reads the registry's signatures on Stryker's packages",
-    "node scripts/strength.mjs": "#772: the mutation run runs the tests that name a changed file, those that reach the network among them",
   };
   const shells = tests.jobs.suites.steps.filter(s => "shell" in s);
   const online = shells.map(s => String(s.run).replace(/\s+#.*$/u, "").trim());

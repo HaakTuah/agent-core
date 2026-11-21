@@ -43,6 +43,7 @@ const CHECKS = {
   "scripts/licences.mjs": "tests/licence-scan-test.mjs",
   "scripts/exact-versions.mjs": "tests/exact-versions-test.mjs",
   "scripts/lookup.mjs": "tests/lookup-test.mjs",
+  "scripts/week-wait.mjs": "tests/packages-test.mjs",
   "scripts/agent-tools.mjs": "tests/agent-tools-list-test.mjs",
   "scripts/licence-installed.mjs": "tests/licence-installed-test.mjs",
   "scripts/nuget.mjs": "tests/nuget-test.mjs",

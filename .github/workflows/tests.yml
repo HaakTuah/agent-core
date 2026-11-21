@@ -299,7 +299,6 @@ jobs:
         run: node tests/held-test.mjs
       - name: The core's packages, from its lock file alone
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/packages-test.mjs ')) }}
-        shell: bash
         run: node tests/packages-test.mjs
       - name: The agent-tools check, the kit's hooks and a project with no list
         if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-test.mjs ')) }}
@@ -722,6 +721,10 @@ jobs:
           LOOKUP_BASE: ${{ github.event.pull_request.base.sha }} # empty on a push to main, where nothing is new
         shell: bash
         run: node scripts/lookup.mjs .github/licences.json
+      - name: The week's wait on each package the lock files bring or update (floor rule 7; once, on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }}
+        shell: bash
+        run: node scripts/week-wait.mjs # (asks npm's registry for each date, which the test of the lock file's form, run with the network cut off, does not)
       - name: The registry's signature on each of the core's own installed packages (floor rule 7; once, on Linux)
         if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }} # (only where the install passed)
         working-directory: .packages
@@ -776,7 +779,6 @@ jobs:
         env:
           STRENGTH_BASE: origin/${{ github.base_ref }}
           MUTATE_BUDGET: "240"
-        shell: bash
         run: node scripts/strength.mjs
 
   # (on Linux the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the older
