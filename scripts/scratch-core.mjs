@@ -136,14 +136,14 @@ export function npmWithCache(tmp, env = process.env) {
   return wrapper;
 }
 
-/** The lines of a stand-in for curl (a shell script on a scratch PATH) that serve a release's archive from a folder: where
- *  CORE_ARCHIVES names one holding a file of the name the fetched address ends in, the file is copied to the one `-o`
- *  names and curl answers as it did. The run's own set-up fetches the archives while the network is up (the tests
+/** The lines of a stand-in for curl (a shell script on a scratch PATH) that serve Betterleaks' release from a folder: where
+ *  the fetched address is one of that project's releases on github.com and CORE_ARCHIVES names a folder holding a file
+ *  of the name the address ends in, the file is copied to the one `-o` names and curl answers as it did. The run's own set-up fetches the archives while the network is up (the tests
  *  workflow's step "Betterleaks' release"), so a test of a step that downloads a tool at its pin runs that step whole, the
  *  archive held to its SHA-256 by the step itself, with the network cut off (#772). Else the lines do nothing. */
 export const ARCHIVE_SERVER = `out=; prev=; url=
 for a in "$@"; do [ "$prev" = -o ] && out=$a; prev=$a; url=$a; done
-if [ -n "$CORE_ARCHIVES" ] && [ -n "$out" ] && [ -f "$CORE_ARCHIVES/\${url##*/}" ]; then cp "$CORE_ARCHIVES/\${url##*/}" "$out" && exit 0; fi
+case "$url" in https://github.com/betterleaks/betterleaks/releases/download/v*/*) [ -n "$CORE_ARCHIVES" ] && [ -n "$out" ] && [ -f "$CORE_ARCHIVES/\${url##*/}" ] && cp "$CORE_ARCHIVES/\${url##*/}" "$out" && exit 0 ;; esac
 `;
 
 const slash = (p) => p.replace(/\\/g, "/");

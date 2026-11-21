@@ -26,7 +26,6 @@ import { CORE } from "../scripts/core-address.mjs";
 const { ok, done } = tally();
 const { tmp, env, git, sdk, tfm, project, whole } = nugetScratch("nuget-gate-test-");
 ok(sdk || !process.env.GITHUB_ACTIONS, "on GitHub's runners there is a .NET SDK, so NuGet's own word is asked here as there");
-ok(sdk || !process.env.GITHUB_ACTIONS, "on GitHub's runners there is a .NET SDK, so NuGet's own word is asked here as there");
 
 const LOCK = `${JSON.stringify({ version: 1, dependencies: { [tfm]: { "Newtonsoft.Json": { type: "Direct", requested: "[13.0.3, )", resolved: "13.0.3", contentHash: "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ==" } } } }, null, 2)}\n`;
 const EMPTY = "<Project>\n</Project>\n";
