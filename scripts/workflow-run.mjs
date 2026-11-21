@@ -370,6 +370,31 @@ export function onPath(name, env = process.env) {
   return null;
 }
 
+// What a `once` step is kept under: its text, its env and the programs it names as the project holds them, so a copy
+// whose script differs runs it; null for a step that `once` does not name.
+function onceKey(rt, step, cwd, env) {
+  if (!rt.once?.pattern.test(step.run)) return null;
+  const programs = [...step.run.matchAll(/\bscripts\/[\w.-]+\.sh\b/gu)].map(([f]) => { try { return fs.readFileSync(path.join(cwd, env.CORE_AT ?? "", f), "utf8"); } catch { return null; } });
+  return JSON.stringify([step.run, env, programs]);
+}
+
+// A step's outcome as the steps context holds it, where it has an id.
+function outcome(ctx, step, passed, outputs) {
+  if (step.id) ctx.steps[step.id] = { outputs, outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
+}
+
+// A file's text, or "" where there is none.
+const readIf = file => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "");
+
+// A `once` step that ran before: its result and its GITHUB_ENV lines, taken as if it had run now.
+function replay(jr, step, name, seen) {
+  const { rt, ctx, state, result, tmp, id } = jr;
+  if (seen.env) { fs.writeFileSync(path.join(tmp, "env"), seen.env); carryEnv(path.join(tmp, "env"), ctx.env, id); }
+  result.steps.push({ name, ran: true, passed: seen.passed, out: seen.out });
+  outcome(ctx, step, seen.passed, {});
+  if (!seen.passed) failed(state, result, rt.stop, name);
+}
+
 // A `run` step in bash, its outputs and its GITHUB_ENV read when it ends.
 function runScript(jr, step, name, env) {
   const { rt, job, ctx, state, result, tmp, dir, id } = jr;
@@ -383,25 +408,18 @@ function runScript(jr, step, name, env) {
   // (bash by its full path from the PATH the step is given, and, on Windows, what it starts never looked for in its folder)
   const bash = onPath("bash", { ...rt.base, ...env });
   if (!bash) throw new Error("bash is on no folder of the PATH: install Git for Windows, whose bash runs the steps, or put bash on the PATH");
-  // (the key: the text, its env and the programs it names as the project holds them, so a copy whose script differs runs it)
-  const kept = rt.once?.pattern.test(step.run) ? JSON.stringify([step.run, env, [...step.run.matchAll(/\bscripts\/[\w.-]+\.sh\b/gu)].map(([f]) => { try { return fs.readFileSync(path.join(cwd, env.CORE_AT ?? "", f), "utf8"); } catch { return null; } })]) : null;
+  const kept = onceKey(rt, step, cwd, env);
   const seen = kept && rt.once.store.get(kept);
-  if (seen) {
-    if (seen.env) { fs.writeFileSync(path.join(tmp, "env"), seen.env); carryEnv(path.join(tmp, "env"), ctx.env, id); }
-    result.steps.push({ name, ran: true, passed: seen.passed, out: seen.out });
-    if (step.id) ctx.steps[step.id] = { outputs: {}, outcome: seen.passed ? "success" : "failure", conclusion: seen.passed ? "success" : "failure" };
-    if (!seen.passed) failed(state, result, rt.stop, name);
-    return;
-  }
+  if (seen) return replay(jr, step, name, seen);
   const r = spawnSync(bash, shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
     ...rt.base, ...env, ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}), CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
     GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(rt.github.repository), GITHUB_EVENT_NAME: str(rt.github.event_name), RUNNER_TEMP: kept ? rt.once.temp : tmp, RUNNER_OS: ctx.runner.os } });
   const passed = r.status === 0;
   const out = `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}`;
-  if (kept) rt.once.store.set(kept, { passed, out, env: fs.existsSync(path.join(tmp, "env")) ? fs.readFileSync(path.join(tmp, "env"), "utf8") : "" });
+  if (kept) rt.once.store.set(kept, { passed, out, env: readIf(path.join(tmp, "env")) });
   carryEnv(path.join(tmp, "env"), ctx.env, id);
   result.steps.push({ name, ran: true, passed, out });
-  if (step.id) ctx.steps[step.id] = { outputs: outputsOf(output), outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
+  outcome(ctx, step, passed, outputsOf(output));
   if (!passed) failed(state, result, rt.stop, name);
 }
 
