@@ -78,6 +78,8 @@ const CHECKS = {
   ".github/workflows/personal-terms.yml": "tests/personal-terms-test.mjs",
   // (its gate fails on a draft, saying the mend, since a required check whose job is skipped passes; #733)
   ".github/workflows/tests.yml": "tests/workflows-test.mjs",
+  // (a step's shell, which fails a step it could not cut the network off for, and says so of one that reached it; #770)
+  "scripts/offline.sh": "tests/offline-test.mjs",
 };
 // what a workflow names that fails no pull request, each with why
 const NOT_CHECKS = {

@@ -171,9 +171,14 @@ jobs:
       checks: read
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    # (on Linux, but in the part network, each step runs with the network cut off, loopback still up, so a test that
+    # reaches it fails there saying its mend; a step that must reach it names its own shell, bash, and
+    # tests/workflows-test.mjs holds which those are: the installs, the tools' fetches, the selection, the registry's
+    # lookups and the base's fetch, and until #772 makes them self-contained the tests that still reach the network and
+    # the mutation run, which runs them; scripts/offline.sh; #770)
     defaults:
       run:
-        shell: bash
+        shell: ${{ matrix.os == 'ubuntu-latest' && matrix.parts != 'network' && 'bash scripts/offline.sh {0}' || 'bash' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -184,16 +189,19 @@ jobs:
           node-version-file: ${{ matrix.node }}
       - name: The core's packages, installed from its lock files for the suites, the parser's among them (#654, #719)
         id: install
+        shell: bash
         run: node scripts/install.mjs all
       - name: zizmor and actionlint, which the workflow check and its test run, fetched at their pins outside the repository (scripts/workflow-tools.sh; #580)
         if: ${{ contains(matrix.parts, 'rest') }}
         timeout-minutes: 5
         continue-on-error: true
+        shell: bash
         run: bash scripts/workflow-tools.sh >> "$GITHUB_ENV"
       - name: lychee, which the pointer check runs, fetched at its pin outside the repository (scripts/lychee.sh; #582)
         if: ${{ contains(matrix.parts, 'rest') }}
         timeout-minutes: 5
         continue-on-error: true
+        shell: bash
         run: bash scripts/lychee.sh >> "$GITHUB_ENV"
       - name: The suites this change can reach (on main, and in a re-run, every one, but none where the merged head passed this tree whole)
         env:
@@ -202,6 +210,7 @@ jobs:
           # head, whose tree this push holds, lets the suites select nothing; #457)
           SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}
           GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}
+        shell: bash
         run: node scripts/select.mjs .github/shape.json --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}
       # (only the part projects: the system's temp folder, a short name under the home folder on another drive than the
       # checkout, is what the other Windows parts still test their scripts against; #882)
@@ -272,6 +281,7 @@ jobs:
         run: node tests/held-test.mjs
       - name: The core's packages, from its lock file alone
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/packages-test.mjs ')) }}
+        shell: bash
         run: node tests/packages-test.mjs
       - name: The agent-tools check, the kit's hooks and a project with no list
         if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-test.mjs ')) }}
@@ -456,6 +466,9 @@ jobs:
       - name: The workflow check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/workflows-test.mjs ')) }}
         run: node tests/workflows-test.mjs
+      - name: The step's shell with the network cut off, and, run under it, that the cut stands (#770)
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/offline-test.mjs ')) }}
+        run: node tests/offline-test.mjs
       - name: The release jobs' install of every package
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/release-install-test.mjs ')) }}
         run: node tests/release-install-test.mjs
@@ -525,9 +538,11 @@ jobs:
         run: node tests/core-yml-test.mjs --part "$PART"
       - name: The core's checks from plain git (check.mjs), on scratch projects
         if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/check-test.mjs ')) }}
+        shell: bash
         run: node tests/check-test.mjs
       - name: What a project's checks leave out for the core's copy, held to README.md's list
         if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/copy-left-out-test.mjs ')) }}
+        shell: bash
         run: node tests/copy-left-out-test.mjs
       - name: The sync, and the proof that a sync is pure, against every way a sync branch can carry more
         if: ${{ !cancelled() && contains(matrix.parts, 'sync') && (env.RUN == 'all' || contains(env.RUN, ' tests/pure-sync-test.mjs ')) }}
@@ -558,6 +573,7 @@ jobs:
         run: node tests/nuget-gate-test.mjs
       - name: The personal-terms check, its own job on scratch pull requests
         if: ${{ !cancelled() && contains(matrix.parts, 'terms') && (env.RUN == 'all' || contains(env.RUN, ' tests/personal-terms-test.mjs ')) }}
+        shell: bash
         run: node tests/personal-terms-test.mjs
       - name: The words check, the dated records' added lines too
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/general-test.mjs ')) }}
@@ -689,12 +705,14 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }}
         env:
           LOOKUP_BASE: ${{ github.event.pull_request.base.sha }} # empty on a push to main, where nothing is new
+        shell: bash
         run: node scripts/lookup.mjs .github/licences.json
       - name: The registry's signature on each of the core's own installed packages (floor rule 7; once, on Linux)
         if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }} # (only where the install passed)
         working-directory: .packages
         # (in each install's folder, with its own settings and every package of its lock, never a workspace root above it;
         # an install whose lock names no package has no node_modules/, and nothing to verify)
+        shell: bash
         run: for d in . parser; do if [ -d "$d/node_modules" ]; then (cd "$d" && npm audit signatures --prefix=.); fi; done # (bash -e: the first that fails fails the step)
       - name: Every tool the core's own agents load is listed (floor topic 15)
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
@@ -703,6 +721,7 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && (contains(matrix.parts, 'rest') || contains(matrix.parts, 'projects')) && github.event_name == 'pull_request' }}
         env:
           BASE: ${{ github.base_ref }}
+        shell: bash
         run: git fetch --no-tags --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
       - name: No new copy in the core's own code, rule files and descriptions, and its baseline only shrinks (once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'rest') }}
@@ -727,10 +746,12 @@ jobs:
       - name: Stryker, from its lock file, with no install scripts (once, on Linux)
         id: mutation
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
+        shell: bash
         run: node scripts/install.mjs mutation # (its lock file, package list and .npmrc refused before npm runs where they could reach past npm's registry, as each install's are)
       - name: Stryker's packages, the registry's signature on each (once, on Linux)
         if: ${{ !cancelled() && steps.mutation.outcome == 'success' && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
         working-directory: tests/mutation
+        shell: bash
         run: npm audit signatures --prefix=. # (only where the install passed, as the core's other installs' are checked, floor rule 7)
       - name: Stryker's run as a mutation tool, with Stryker itself (once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' && (env.RUN == 'all' || contains(env.RUN, ' tests/stryker-test.mjs ')) }}
@@ -740,6 +761,7 @@ jobs:
         env:
           STRENGTH_BASE: origin/${{ github.base_ref }}
           MUTATE_BUDGET: "240"
+        shell: bash
         run: node scripts/strength.mjs
 
   # (on Linux the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the older
