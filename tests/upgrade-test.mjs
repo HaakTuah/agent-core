@@ -243,7 +243,7 @@ fs.mkdirSync(installedOnce.temp);
   fs.mkdirSync(path.join(core, "scripts"), { recursive: true }); fs.mkdirSync(pkgs, { recursive: true });
   fs.writeFileSync(path.join(core, "scripts", "install.mjs"), 'import fs from "node:fs"; fs.appendFileSync(process.env.COUNT, "install\\n"); fs.mkdirSync(".packages/node_modules/p", { recursive: true }); fs.writeFileSync(".packages/node_modules/p/i.js", "x");\n');
   fs.writeFileSync(path.join(pkgs, "package-lock.json"), "1");
-  const inst = `on: push\njobs:\n  j:\n    steps:\n      - run: cd core && node scripts/install.mjs\n      - run: test -f core/.packages/node_modules/p/i.js\n`;
+  const inst = `on: push\njobs:\n  j:\n    env:\n      CORE_AT: core/\n    steps:\n      - run: cd core && node scripts/install.mjs\n      - run: test -f core/.packages/node_modules/p/i.js\n`;
   const installs = new Map();
   const withInstall = () => { fs.rmSync(path.join(pkgs, "node_modules"), { recursive: true, force: true }); return go(inst, { installed: { store: installs, temp: shared } }); };
   const i1 = withInstall(), i2 = withInstall();
