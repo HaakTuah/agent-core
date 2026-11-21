@@ -169,7 +169,7 @@ if (failed) { console.log(`FAIL ${failed} of the lock file's checks above failed
   // version list it, and the install's command names each one: #704)
   const { npmIgnores, npmReadsAll } = await import(pathToFileURL(path.join(root, "scripts/npm-reads.mjs")).href);
   ok(npmIgnores("10.9.9").length === 5 && npmIgnores("11.9.0").join() === "allow-remote,allow-file,allow-directory,min-release-age" && npmIgnores("11.13.0").join() === "allow-remote,allow-file,allow-directory"
-    && npmIgnores("11.14.0").length === 0 && npmIgnores("12.0.0").length === 0 && npmIgnores("").length === 5 && npmIgnores("11.13.9", ["allow-git"]).length === 0 && npmReadsAll() === "11.14.0" && npmReadsAll(["allow-git"]) === "11.9.0",
+    && npmIgnores("11.14.0").length === 0 && npmIgnores("12.0.0").length === 0 && npmIgnores("").length === 5 && npmIgnores("11.13.9", ["allow-git"]).length === 0 && npmIgnores("11.14.0-pre.0").length === 3 && npmIgnores("11.14.1-pre.0").length === 0 && npmIgnores("eleven").length === 5 && npmReadsAll() === "11.14.0" && npmReadsAll(["allow-git"]) === "11.9.0",
   "version 10 of npm reads none of the settings, its version 11 reads allow-git from 11.9.0, min-release-age from 11.10.0 and the others from 11.14.0, and an npm whose version cannot be read is taken to read none");
   // (the .npmrc the copy carries holds the core's own two settings alone, which install.mjs holds it to too)
   const { npmrcOthers } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href), npmrc = fs.readFileSync(path.join(root, ".packages/.npmrc"), "utf8");
@@ -353,7 +353,7 @@ try {
   // (under an npm that ignores a setting that keeps an install to the registry or a week's wait, as npm 10 that Node 22
   // brings does, it says so in a note and still installs, nothing failing for it; under one that reads them all, no note; #704)
   const { npmIgnores, npmVersion } = await import(pathToFileURL(path.join(root, "scripts/npm-reads.mjs")).href);
-  ok(/^note npm \S+ ignores --allow-git, .*min-release-age.*\.node-version/mu.test(r.stdout) === (npmIgnores(npmVersion(project)).length > 0), `and it says in a note whether the package manager here (version ${npmVersion(project)}) ignores a setting that keeps the install to the registry or a week's wait`, r.stdout);
+  ok(/^note npm \S+ ignores --allow-.*\.node-version/mu.test(r.stdout) === (npmIgnores(npmVersion(project)).length > 0), `and it says in a note whether the package manager here (version ${npmVersion(project)}) ignores a setting that keeps the install to the registry or a week's wait`, r.stdout);
   const loaded = spawnSync(process.execPath, ["--input-type=module", "-e", `const { load } = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); const m = await load("yaml"); console.log(m.project ? "project" : typeof m.Lexer);`], { cwd: project, encoding: "utf8", env });
   ok(loaded.status === 0 && loaded.stdout.trim() === "function", "and load() takes the copy's own, never the project's", `${loaded.stdout}${loaded.stderr}`);
   // (an install left from before is never loaded for a package its lock does not name as installed: where the package
