@@ -212,7 +212,7 @@ ok(otherCall.fails.length === 1 && mended(otherCall.fails[0]), "a base that is n
 // (#970, 2: a file with such a break is lexed and parsed up to three ways, and was by each reader, for the head and the base: read
 // against the same file without the breaks, in the same run, the cost of both readers is a small multiple of it (the readings
 // the breaks add cost 4 times the one without on Linux, 3 times on Windows and 7.5 times on Windows with the least Node, 6.0 s
-// against 0.8 s, #1058: the bound is fifteen times, which a reading that grows past linear in the text passes at once, and the
+// against 0.8 s, #1058: the bound is fifteen times, which a reading that grows with the square of the text exceeds at once, and the
 // 60 s cap stands). The worst
 // shape: as many keys as fit, each a double-quoted string holding a break)
 const hostileKeys = (br, mark) => `${Array.from({ length: 65000 }, () => `k: "x${br}"\n`).join("").slice(0, LONGEST - 40)}# ${mark}\n`, spent = br => {
