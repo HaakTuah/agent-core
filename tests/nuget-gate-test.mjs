@@ -152,7 +152,7 @@ if (sdk) {
     return { passed: job.passed, ran: [...out.matchAll(/^== (.+)$/gm)].map(m => m[1].trim()), out };
   };
   const good = whole({ "src/App/App.csproj": project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "").replace("</Project>", "  <!-- a note -->\n</Project>") });
-  ok(good.passed && good.ran.includes("Restore each project file from its lock file alone") && good.ran.includes("Every package one exact version, and under a licence on its list"), "the whole job: a project file changed, the restore runs from the lock file and the check passes", good.out);
+  ok(good.passed && good.ran.includes("Restore each project file from its lock file alone") && good.ran.includes("Every package one exact version, and under a licence on its list"), "the whole job: a project file changed, the restore runs from the lock file and the check passes", good.out.slice(-1400));
   const FETCH = "Every locked package and tool, fetched before the restore and held to its list";
   ok(good.ran.indexOf(FETCH) >= 0 && good.ran.indexOf(FETCH) < good.ran.indexOf("Restore each project file from its lock file alone"), "and every package's licence is read before the restore, which runs the pull request's build files", good.ran.join(" | "));
   // (where the first look itself restored, the pull request's build files have run: the read before the restore is
