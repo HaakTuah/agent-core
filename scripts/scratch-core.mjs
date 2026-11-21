@@ -122,7 +122,7 @@ export function npmCacheCopy(tmp, env = process.env) {
 
 /** The npm for npm-once.mjs's `real`, with the cache's copy handed in: a program of its own, in `tmp`, that runs this
  *  machine's npm with the same arguments, its cache the copy `npmCacheCopy` makes and the registry asked only for what
- *  that holds not (npm's prefer-offline). A test whose installs read the machine's copy reaches the registry for
+ *  that holds not (npm's prefer-offline), with no retry of a fetch the cut refuses, which a test that expects npm to fail would wait out. A test whose installs read the machine's copy reaches the registry for
  *  nothing it already has; where the machine holds no cache, or the run's network is not cut off (npmCacheCopy), undefined, and npm-once.mjs runs the first npm on the PATH
  *  as it did. The settings are the wrapper's, set where npm starts, so npm-once.mjs, which the licence scan passes
  *  over, passes on the environment it was given as before (#772). */
@@ -133,8 +133,8 @@ export function npmWithCache(tmp, env = process.env) {
   if (!cache) return undefined;
   const dir = path.join(tmp, "npm-cached"), wrapper = path.join(dir, program);
   fs.mkdirSync(dir);
-  if (windows) fs.writeFileSync(wrapper, `@set "npm_config_cache=${cache}"\r\n@set "npm_config_prefer_offline=true"\r\n@call "${real}" %*\r\n`);
-  else fs.writeFileSync(wrapper, `#!/bin/sh\nnpm_config_cache='${cache.replace(/'/g, "'\\''")}' npm_config_prefer_offline=true exec '${real.replace(/'/g, "'\\''")}' "$@"\n`, { mode: 0o755 });
+  if (windows) fs.writeFileSync(wrapper, `@set "npm_config_cache=${cache}"\r\n@set "npm_config_prefer_offline=true"\r\n@set "npm_config_fetch_retries=0"\r\n@call "${real}" %*\r\n`);
+  else fs.writeFileSync(wrapper, `#!/bin/sh\nnpm_config_cache='${cache.replace(/'/g, "'\\''")}' npm_config_prefer_offline=true npm_config_fetch_retries=0 exec '${real.replace(/'/g, "'\\''")}' "$@"\n`, { mode: 0o755 });
   return wrapper;
 }
 

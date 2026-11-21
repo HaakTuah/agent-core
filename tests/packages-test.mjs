@@ -7,12 +7,12 @@
 // own install of the same name.
 //
 //   node tests/packages-test.mjs
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { npmWithCache, scratchDir } from "../scripts/scratch-core.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 let failed = 0;
@@ -20,6 +20,7 @@ const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"}
 const json = f => JSON.parse(fs.readFileSync(path.join(root, f), "utf8"));
 // (run as outside a workflow, whatever runs this: a workflow's variables change what a failure says and where it goes)
 const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(GITHUB_|CORE_PACKAGES_)/u.test(k)));
+const plainEnv = { ...env };
 
 // ---- the lock file: npm's own form, one exact version each, from the registry, with its sha512 ----
 {
@@ -71,61 +72,11 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
 }
 
 // ---- the week's wait on each package the change brings or updates (floor rule 7) ----
-// npm ci installs a lock file as it is written, the tarball its entry's address names, so the .npmrc's wait holds only
-// what npm resolves itself. Each entry new, or other in its version, address or integrity than at the base (the merge's
-// first parent, or PACKAGES_BASE), is asked of npm's registry for the date of the version its address names, which must
-// be its version field too.
+// The wait itself asks npm's registry, a check of its own (scripts/week-wait.mjs, a step of the tests workflow that
+// reaches the network); here its reading is held on answers made here, so this test runs with the network cut off (#772).
 {
-  const WEEK = 7 * 86400000;
-  const { registryName, registryVersion } = await import(pathToFileURL(path.join(root, "scripts/licences.mjs")).href);
-  const { fetched } = await import(pathToFileURL(path.join(root, "scripts/lookup.mjs")).href);
-  // (an entry as a whole, its keys in order, so that a change of any field is seen; and the fields an entry fetched from
-  // the registry carries: one that links a folder, or is bundled in another, or carries any other field, is refused)
-  const whole = e => JSON.stringify(Object.keys(e ?? {}).sort().map(k => [k, e[k]]));
-  const same = (a, b) => Boolean(a) && whole(a) === whole(b);
-  const SAID = ["dependencies", "optionalDependencies", "peerDependencies", "peerDependenciesMeta", "license"];
-  const { ENTRY_FIELDS: FIELDS } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href);
-  // (each entry that fails, with what is wrong; `ask(name)` gives the registry's document of a package, as fetched does)
-  const tooYoung = async (packages, base, ask, now) => {
-    const out = [];
-    for (const [k, e] of Object.entries(packages ?? {})) {
-      if (!k || same(base[k], e)) continue;
-      const odd = Object.keys(e).filter(f => !FIELDS.has(f));
-      if (!/^(?:node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*\/)*node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*$/u.test(k) || odd.length) { out.push(`${k}: ${odd.length ? `its field${odd.length === 1 ? "" : "s"} ${odd.join(", ")}, which no package fetched from the registry carries` : "a key that names no installed package's folder"}`); continue; }
-      const name = registryName(e.resolved), version = registryVersion(e.resolved);
-      // (an address in its one plain form alone, a name as npm spells one: never one a URL parser reads otherwise)
-      const plainAddress = (() => { try { return new URL(e.resolved).href === e.resolved; } catch { return false; } })();
-      if (!name || !version || version !== e.version || !plainAddress || !/^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/u.test(name)) {
-        out.push(`${k}: its address names ${name ?? "no package of npm's registry"} at ${version ?? "no version"}${plainAddress ? "" : " in no plain form"}, and its version field ${e.version ?? "none"}`); continue;
-      }
-      // (the folder npm installs it in is named for the package its address fetches, so the lock file reads as it installs)
-      if (k.slice(k.lastIndexOf("node_modules/") + "node_modules/".length) !== name) { out.push(`${k}: its folder names another package than its address fetches, ${name}`); continue; }
-      // (the date read is the one of the very tarball npm ci installs: the registry's own document gives that address and
-      // that integrity for that version)
-      const doc = await ask(name).catch(err => ({ status: err.message }));
-      const dist = doc.json?.name === name ? doc.json?.versions?.[version]?.dist : undefined;
-      if (doc.status === 200 && (dist?.tarball !== e.resolved || dist?.integrity !== e.integrity)) { out.push(`${name}@${version}: the registry gives another address or integrity for it than the lock file`); continue; }
-      // (what the entry says it depends on, and its licence, are the registry's own for that version: a spec of its own
-      // could name a source npm would fetch in place of what the lock file names)
-      const meta = doc.json?.versions?.[version] ?? {};
-      const said = SAID.filter(f => (e[f] !== undefined || (f === "license" && meta[f] !== undefined)) && whole(e[f]) !== whole(meta[f]));
-      if (doc.status === 200 && said.length) { out.push(`${name}@${version}: its ${said.join(", ")} not the registry's for that version`); continue; }
-      const at = Date.parse(doc.json?.time?.[version] ?? "");
-      if (!(now - at >= WEEK)) out.push(`${name}@${version}: ${doc.status === 200 ? (Number.isNaN(at) ? "the registry gives no date" : `published ${new Date(at).toISOString()}`) : `the registry answered ${doc.status}`}`);
-    }
-    return out;
-  };
-  // (every install's lock, each entry against what any lock at the base held, so a package moved from one install to
-  // another at the same version is no new one, and one the parser's lock brings or updates is held as the first's: #719)
-  const locks = [".packages/package-lock.json", ".packages/parser/package-lock.json"];
-  const base = {};
-  for (const f of locks) try { Object.assign(base, JSON.parse(execFileSync("git", ["show", `${process.env.PACKAGES_BASE || "HEAD^1"}:${f}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })).packages ?? {}); } catch { /* (no such lock file at the base: its entries are new) */ }
-  // (the day the week is counted to, handed in: the run's own date, or PACKAGES_TODAY's; nothing else reads the clock)
-  const today = Date.parse(process.env.PACKAGES_TODAY || new Date().toISOString());
-  const young = [];
-  for (const f of locks) young.push(...await tooYoung(json(f).packages, base, name => fetched(`https://registry.npmjs.org/${name.replaceAll("/", "%2f")}`), today));
-  ok(young.length === 0, "each package the change brings or updates in the lock file is a week old or more by the registry's date (floor rule 7)",
-    `${young.join("; ")}\nMend: wait until the version is a week old and run the job again, or take the version before it, its lock entry written by npm's own install`);
+  const { tooYoung, failure } = await import(pathToFileURL(path.join(root, "scripts/week-wait.mjs")).href);
+  ok(mended(failure(["yaml@2.9.2: published 2026-11-17T00:00:00.000Z"])), "the week's wait fails with its mend on the failure's own line", failure(["x"]));
   // (held on a lock written by hand: a version field kept while the address names another tarball, an entry with no
   // version, an address off the registry, and a young version, against answers made here)
   const day = 86400000, now = Date.parse("2026-11-18T00:00:00Z");
@@ -181,6 +132,9 @@ if (failed) { console.log(`FAIL ${failed} of the lock file's checks above failed
 
 // ---- with nothing installed, a script that loads a package says it did not run, and how to install ----
 const tmp = scratchDir("packages-test-");
+// (where the run's network is cut off, the installs below read a copy of the job's npm cache, not the registry: #772)
+const cached = npmWithCache(tmp, env);
+if (cached) { const key = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH"; env[key] = `${path.dirname(cached)}${path.delimiter}${env[key] ?? ""}`; }
 try {
   // (a project whose own node_modules holds a package of the name, at another version, beside a copy with none)
   const project = path.join(tmp, "project"), copy = path.join(project, "core"), pk = path.join(copy, ".packages");
@@ -192,14 +146,15 @@ try {
   fs.writeFileSync(path.join(project, "package.json"), JSON.stringify({ name: "project", private: true, workspaces: ["*", "**"] }));
   fs.cpSync(path.join(root, "scripts"), path.join(copy, "scripts"), { recursive: true });
   for (const f of [".packages/package.json", ".packages/package-lock.json", ".packages/requirements.txt", ".gitignore", ".packages/.npmrc", ".packages/parser/package.json", ".packages/parser/package-lock.json", ".packages/parser/.npmrc"]) fs.cpSync(path.join(root, f), path.join(copy, f));
-  // (the parser's install holding one package, a small one of the registry's, so that what installs it, and what does
-  // not, is seen whatever the core's parser's lock holds today: #719)
-  // (is-number 7.0.0, of 2018, as npm's registry gives it, which no other lock file of the core's names)
+  // (the parser's install holding one package of its own lock, so that what installs it, and what does not, is seen: #719)
+  // (node-addon-api, which the parser's own lock names and holds no dependency: a job that installed the parser has it in npm's cache, and
+  // this test, with the network cut off, installs it from a copy of that cache: scratch-core.mjs, npmWithCache, #772)
   const pp = path.join(pk, "parser");
-  const staged = { version: "7.0.0", resolved: "https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz", integrity: "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==", license: "MIT", engines: { node: ">=0.12.0" } };
-  const parserList = { ...JSON.parse(fs.readFileSync(path.join(pp, "package.json"), "utf8")), dependencies: { "is-number": staged.version } };
+  const staged = json(".packages/parser/package-lock.json").packages["node_modules/node-addon-api"];
+  ok(staged?.integrity, "the parser's lock names node-addon-api, which this case installs from the job's cache", "Mend: stage another package of the parser's lock with no dependency in this case, and its name where the case loads it");
+  const parserList = { ...JSON.parse(fs.readFileSync(path.join(pp, "package.json"), "utf8")), dependencies: { "node-addon-api": staged.version } };
   fs.writeFileSync(path.join(pp, "package.json"), JSON.stringify(parserList, null, 2));
-  fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license, dependencies: parserList.dependencies }, "node_modules/is-number": staged } }, null, 2));
+  fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license, dependencies: parserList.dependencies }, "node_modules/node-addon-api": staged } }, null, 2));
   // (each script that loads a package, by the call that loads it; a script that loads one and has no case here fails)
   const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")`, "parse-yaml.mjs": `parseYaml("a: 1\\n")`, "markdown.mjs": "markdownReader()", "runners.mjs": `workflowsIn(".github/workflows")`, "toml.mjs": `parseToml("a = 1\\n")`, "schemas.mjs": `shapeFaults("copies", {})`, "workflows.mjs": `draftHoles("on: pull_request\\njobs: {}\\n")` };
   // (a reader whose caller goes on without the package, saying so as a warning: it answers null, and loads nothing)
@@ -386,18 +341,18 @@ try {
   ok(devLoad.status === 0 && devLoad.stdout.trim() === "true false", "a package the lock flags dev reads as not installed for a script, beside one it names for them", `${devLoad.stdout}${devLoad.stderr}`);
   // (the parser's install only where a job names it: with none named, its packages are not there, and a script that
   // loads one says it did not run, naming the install; `install.mjs parser` installs it, and `all` every one: #719)
-  const loadParser = () => spawnSync(process.execPath, ["--input-type=module", "-e", `const { loadSync } = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(loadSync("is-number")(7));`], { cwd: project, encoding: "utf8", env });
+  const loadParser = () => spawnSync(process.execPath, ["--input-type=module", "-e", `const { loadSync } = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(typeof loadSync("node-addon-api").include === "string");`], { cwd: project, encoding: "utf8", env });
   const notNamed = loadParser();
-  ok(!fs.existsSync(path.join(pp, "node_modules")) && notNamed.status === 1 && /did not run: the package is-number is not installed in \S*parser\S*node_modules as \.packages\/parser\/package-lock\.json names it\. Mend: run node \S*install\.mjs parser,/u.test(notNamed.stderr) && mended(notNamed.stderr),
+  ok(!fs.existsSync(path.join(pp, "node_modules")) && notNamed.status === 1 && /did not run: the package node-addon-api is not installed in \S*parser\S*node_modules as \.packages\/parser\/package-lock\.json names it\. Mend: run node \S*install\.mjs parser,/u.test(notNamed.stderr) && mended(notNamed.stderr),
     "the parser's install is not installed where no job names it, and what loads one of its packages says it did not run, naming the install", `${notNamed.stdout}${notNamed.stderr}`);
   // (a project's own job that installs the core's first install alone, written before the parser's came, has the reader
   // that needs it told so as a warning, never failed; not in the core, which holds its tests: #719)
-  const askUnnamed = () => spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(p.unreached("is-number"), p.unnamed("is-number"), p.unreached("yaml"));`], { cwd: project, encoding: "utf8", env });
+  const askUnnamed = () => spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(p.unreached("node-addon-api"), p.unnamed("node-addon-api"), p.unreached("yaml"));`], { cwd: project, encoding: "utf8", env });
   const asked = askUnnamed();
   // (a file of a package that is no module, as the parser reads its grammar, named with the same mend as a load: in a job,
   // the install step to name)
-  const fileAsked = spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); try { p.installedFile("is-number", "index.js"); } catch (e) { console.log("FAIL: " + e.message); }`], { cwd: project, encoding: "utf8", env: { ...env, GITHUB_ACTIONS: "true" } });
-  ok(/^FAIL: the check did not run: the package is-number is not installed in \S*parser\S*node_modules as \.packages\/parser\/package-lock\.json names it \(index\.js\)\. Mend: in a pull request of its own, never a sync pull request, add the step .*install\.mjs parser; fi .*name parser in it/mu.test(fileAsked.stdout) && mended(fileAsked.stdout),
+  const fileAsked = spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); try { p.installedFile("node-addon-api", "index.js"); } catch (e) { console.log("FAIL: " + e.message); }`], { cwd: project, encoding: "utf8", env: { ...env, GITHUB_ACTIONS: "true" } });
+  ok(/^FAIL: the check did not run: the package node-addon-api is not installed in \S*parser\S*node_modules as \.packages\/parser\/package-lock\.json names it \(index\.js\)\. Mend: in a pull request of its own, never a sync pull request, add the step .*install\.mjs parser; fi .*name parser in it/mu.test(fileAsked.stdout) && mended(fileAsked.stdout),
     "a file of a package not installed says it did not run, and in a job names the install step to add or name", `${fileAsked.stdout}${fileAsked.stderr}`);
   fs.mkdirSync(path.join(copy, "tests"));
   const askedInCore = askUnnamed();
@@ -461,7 +416,7 @@ try {
   fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license } } }, null, 2));
   const leftover = loadParser();
   fs.writeFileSync(path.join(pp, "package-lock.json"), keptLock);
-  ok(reinstalled.status === 0 && leftover.status === 1 && /did not run: the package is-number is not installed/u.test(leftover.stderr) && mended(leftover.stderr), "an install left from before is not loaded where the lock beside the package list names none of its packages", `${reinstalled.status} ${leftover.status} ${leftover.stdout}${leftover.stderr}`);
+  ok(reinstalled.status === 0 && leftover.status === 1 && /did not run: the package node-addon-api is not installed/u.test(leftover.stderr) && mended(leftover.stderr), "an install left from before is not loaded where the lock beside the package list names none of its packages", `${reinstalled.status} ${leftover.status} ${leftover.stdout}${leftover.stderr}`);
   // (an install npm recorded for another lock file is no install of this one: the package did not run)
   const record = path.join(pk, "node_modules/.package-lock.json"), kept = fs.readFileSync(record, "utf8");
   const other = JSON.parse(kept);
@@ -473,32 +428,44 @@ try {
   const unreached = spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(p.unreached("yaml")); p.loadSync("yaml");`], { cwd: project, encoding: "utf8", env: { ...env, CORE_PACKAGES_UNREACHED: "1" } });
   ok(unreached.status === 1 && /^true$/mu.test(unreached.stdout) && mended(unreached.stderr), "where the job's install could not reach the registry, a script is told so, and a package it loads all the same fails, never passing (#654, points 3 and 4)", `${unreached.stdout}${unreached.stderr}`);
   fs.writeFileSync(record, kept);
+  // (in a project's pull request the same failure fails all the same: a lock file the registry's tarball does not match
+  // is no registry that did not answer, and a pull request can bring it about)
+  const jobEnv = path.join(tmp, "github-env");
+  fs.writeFileSync(jobEnv, "");
+  const inPr = { ...env, GITHUB_EVENT_NAME: "pull_request", GITHUB_ENV: jobEnv };
+  // (a registry of its own on loopback for the two installs that need an answer: a tarball whose bytes are not the lock
+  // file's integrity, and a packument without the version an address that echoes a network error's name asks for; npm swaps the host of each address in
+  // the lock file for the registry it is given, so no job reaches npm's own, #772)
+  // (a server that does not start, or an error that ends the test, never leaves it running: it is killed on exit)
+  const registry = spawn(process.execPath, ["-e", `require("http").createServer((q, r) => { if (/\\.tgz$/.test(q.url)) { r.end("not a tarball"); } else { r.setHeader("content-type", "application/json"); r.end(JSON.stringify({ name: "yaml", "dist-tags": { latest: "2.9.1" }, versions: { "2.9.1": { name: "yaml", version: "2.9.1", dist: { tarball: "http://127.0.0.1/yaml.tgz" } } } })); } }).listen(0, "127.0.0.1", function () { console.log(this.address().port); });`], { stdio: ["ignore", "pipe", "ignore"] });
+  process.on("exit", () => registry.kill()); // (killed whatever ends the test)
+  const port = await new Promise((res, rej) => { registry.stdout.once("data", d => res(String(d).trim())); setTimeout(() => rej(new Error("the test's local registry did not start in 15 s")), 15000).unref(); });
+  const regEnv = { [["npm_config_regi", "stry"].join("")]: `http://127.0.0.1:${port}/`, npm_config_fetch_retries: "0" };
+  const local = { ...inPr, ...regEnv };
   // (a lock file whose integrity the registry's tarball does not match: twice refused, then a failure that says the mend)
   const wrong = JSON.parse(fs.readFileSync(path.join(pk, "package-lock.json"), "utf8"));
   const first = Object.keys(wrong.packages).find(k => k && !wrong.packages[k].dev);
   wrong.packages[first].integrity = `sha512-${Buffer.alloc(64, 7).toString("base64")}`;
   fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify(wrong, null, 2));
   fs.rmSync(path.join(pk, "node_modules"), { recursive: true, force: true });
-  const refused = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env });
-  ok(refused.status === 1 && /runs again/u.test(refused.stderr) && /could not be installed .*twice/u.test(refused.stderr) && mended(refused.stderr), "an install that fails is run once more, and a second failure fails, saying the mend", refused.stderr);
-  // (in a project's pull request the same failure fails all the same: a lock file the registry's tarball does not match
-  // is no registry that did not answer, and a pull request can bring it about)
-  const jobEnv = path.join(tmp, "github-env");
-  fs.writeFileSync(jobEnv, "");
-  const inPr = { ...env, GITHUB_EVENT_NAME: "pull_request", GITHUB_ENV: jobEnv };
-  const mismatched = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: inPr });
+  const refused = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...env, ...regEnv } });
+  ok(refused.status === 1 && /EINTEGRITY|integrity/iu.test(refused.stderr) && /runs again/u.test(refused.stderr) && /could not be installed .*twice/u.test(refused.stderr) && mended(refused.stderr), "an install that fails is run once more, and a second failure fails, saying the mend", refused.stderr);
+  const mismatched = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: local });
   ok(mismatched.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "in a project's pull request an install that fails for anything but the registry not answering fails, and tells the job nothing", `${mismatched.status} ${mismatched.stdout}${mismatched.stderr}`);
   // (nor where npm's message echoes a network error's name from what the lock file holds, a version here: #714)
   const echoing = JSON.parse(fs.readFileSync(path.join(root, ".packages/package-lock.json"), "utf8")), y = echoing.packages["node_modules/yaml"];
   const odd = `${y.version}-${["ETIME", "DOUT"].join("")}`;
-  Object.assign(y, { version: odd, resolved: `https://registry.npmjs.org/yaml/-/yaml-${odd}.tgz` });
+  Object.assign(y, { version: odd, resolved: `https://registry.npmjs.org/yaml/-/yaml-${odd}.tgz`, integrity: `sha512-${Buffer.alloc(64, 9).toString("base64")}` });
   fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify(echoing, null, 2));
   fs.writeFileSync(jobEnv, "");
-  const echoed = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: inPr });
-  ok(echoed.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "and one whose message names a network error only as it echoes the lock file fails too, the job told nothing", `${echoed.status} ${echoed.stdout}${echoed.stderr}`);
+  const echoed = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: local });
+  registry.kill();
+  // (npm's own log, which the failure names, holds what npm printed: the case reaches the echo, and the install reads none of it as a network error)
+  const npmLog = /(\S+-debug-\d+\.log)/u.exec(echoed.stderr)?.[1];
+  ok(echoed.status === 1 && npmLog && /ETIMEDOUT/u.test(fs.readFileSync(npmLog, "utf8")) && !fs.readFileSync(jobEnv, "utf8"), "and one whose message names a network error only as it echoes the lock file fails too, the job told nothing", `${echoed.status} ${echoed.stdout}${echoed.stderr}`);
   // (a registry that does not answer, in a project's pull request, fails nothing: the job is told, and each check after it says it did not run)
   fs.copyFileSync(path.join(root, ".packages/package-lock.json"), path.join(pk, "package-lock.json"));
-  const warned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...inPr, [["npm_config_regi", "stry"].join("")]: "http://127.0.0.1:9/", npm_config_fetch_retries: "0", npm_config_cache: path.join(tmp, "empty-cache") } });
+  const warned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...plainEnv, GITHUB_EVENT_NAME: "pull_request", GITHUB_ENV: jobEnv, [["npm_config_regi", "stry"].join("")]: "http://127.0.0.1:9/", npm_config_fetch_retries: "0", npm_config_cache: path.join(tmp, "empty-cache") } });
   ok(warned.status === 0 && /^::warning::The core's packages could not be installed .*twice/mu.test(warned.stdout) && /Mend: run this job again/u.test(warned.stdout) && /^CORE_PACKAGES_UNREACHED=1$/mu.test(fs.readFileSync(jobEnv, "utf8")), "in a project's pull request a registry that does not answer twice is a warning, and tells the job's later checks", `${warned.status} ${warned.stdout}${warned.stderr}`);
   // (and PyPI's, for the code scan's engine: pip says in Python's words that it could not connect)
   fs.writeFileSync(jobEnv, "");
