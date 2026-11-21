@@ -113,7 +113,7 @@ const coreCheck = () => {
 };
 const legit = pure();
 git(p, "push", "-q", "-f", "origin", "HEAD:refs/heads/check");
-git(p, "repack", "-adq"); git(tmp, `--git-dir=${origin}`, "repack", "-adq"); // (as the core's above: each check that follows clones these)
+git(p, "repack", "-adq"); git(tmp, `--git-dir=${origin}`, "repack", "-adq"); // (as the core's above: each check that follows clones these; the push before it puts what they hold into origin first, so keep it)
 ok(legit.status === 0 && legit.out.includes(`sha=${LEGIT}`), "the sync as the script makes it is pure, and the proof names the head it read", legit.out);
 ok(coreCheck().passed, "  and the core's own check of the copy passes it");
 

@@ -471,6 +471,7 @@ if (p.status === 0) {
   const again = run(p.dir, script, "--owner", "someone-else");
   ok(again.status === 1 && again.out.includes("never overwrites") && git(p.dir, "status", "--porcelain") === "", "run again, it overwrites nothing and says which files stand");
 }
+git(core, "reset", "-q", "--hard", pin); // (the copies cases are over: the projects below take the core whole again, tests/ and the pin as scratch() made them)
 const q = project("private-game", "--owner", "x", "--private", "--game", "--name", "A private game");
 ok(q.status === 0 && !fs.existsSync(path.join(q.dir, ".github/workflows/codeql.yml")) && !fs.existsSync(path.join(q.dir, ".github/workflows/licences.yml")) && !fs.existsSync(path.join(q.dir, ".github/workflows/signatures.yml")) && fs.existsSync(path.join(q.dir, "checks/licences.json")), "a private project without npm gets no call to CodeQL, the licence workflow or the signature check, and still its licence config", q.out.slice(0, 400));
 // (every kind the program writes: the core's manifest check, run in the project, gives no note on its first day, #329)
