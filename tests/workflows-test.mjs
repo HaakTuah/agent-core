@@ -21,7 +21,7 @@ import { actionlintFindings, compared, isAction, isWorkflow, run, zizmorFindings
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
-const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
+const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}${cond || !detail ? "" : `\n     ${String(detail).slice(0, 1200)}`}`); if (!cond) failed++; };
 const fails = text => lines(text).length > 0;
 
 ok(!fails("on: [pull_request, push]\non:\n  pull_request:\n  workflow_run:\n    workflows: [build]\n") && !fails("") && !fails("pull_request\n_target\npull_request target\n"), "the other triggers pass, and so does the word in two halves that nothing joins");
@@ -210,7 +210,10 @@ ok(keysTwice(aliased).map(k => k.key).join() === "on", "a file that is no YAML t
 const otherCall = unreadied(one(`# c \n${call(TYPES, "copies.yml", NOT_DRAFT)}`), () => `# c \nbad: [\n`);
 ok(otherCall.fails.length === 1 && mended(otherCall.fails[0]), "a base that is no YAML for a reason that is not its breaks is read as it stands: a call left without ready_for_review fails", otherCall.fails.join("\n"));
 // (#970, 2: a file with such a break is lexed and parsed up to three ways, and was by each reader, for the head and the base: read
-// against the same file without the breaks, in the same run, the cost of both readers is a small multiple of it. The worst
+// against the same file without the breaks, in the same run, the cost of both readers is a small multiple of it (the file with
+// the breaks costs 4 times the one without on Linux, 3 times on Windows and 7.5 times on Windows with the least Node, 6.0 s
+// against 0.8 s, #1058: the bound is fifteen times, which a reading that grows with the square of the text exceeds at once, and the
+// 60 s cap stands). The worst
 // shape: as many keys as fit, each a double-quoted string holding a break)
 const hostileKeys = (br, mark) => `${Array.from({ length: 65000 }, () => `k: "x${br}"\n`).join("").slice(0, LONGEST - 40)}# ${mark}\n`, spent = br => {
   const files = one(hostileKeys(br, "head")), before = () => hostileKeys(br, "base"), t1 = Date.now();
@@ -218,7 +221,7 @@ const hostileKeys = (br, mark) => `${Array.from({ length: 65000 }, () => `k: "x$
   return Date.now() - t1;
 };
 const withBreaks = spent("\u2028"), without = spent("");
-ok(withBreaks < 5 * without + 300 && withBreaks < 60000, "a hostile file of the longest text read, a key given twice on every line behind a break in a double-quoted string, costs the two readers, head and base, a small multiple of the same file with no break", `${withBreaks} ms against ${without} ms`);
+ok(withBreaks < 15 * without + 300 && withBreaks < 60000, "a hostile file of the longest text read, a key given twice on every line behind a break in a double-quoted string, costs the two readers, head and base, a small multiple of the same file with no break", `${withBreaks} ms against ${without} ms`);
 // (only the reading as the mend leaves it finds the key given twice here, the folded text being no YAML: it is told on the line
 // an editor counts; and a text the escapes would take past the length read is read as line feeds, never as too long)
 const onlyMended = 'jobs:\n  b:\n    name: "x\u2028y"\n    # c\u2028    a: 1\n    a: 2\n';
