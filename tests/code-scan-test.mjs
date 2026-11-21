@@ -80,7 +80,7 @@ const installed = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts
 const dir = fileURLToPath(new URL("../.packages/pypi/semgrep/bin/", import.meta.url));
 const engineHere = fs.existsSync(path.join(dir, `semgrep-core${process.platform === "win32" ? ".exe" : ""}`));
 if (process.env.CORE_OFFLINE && (installed.status !== 0 || !engineHere)) {
-  ok(false, "with the network cut off, the engine installs from the wheels the run's set-up fetched, and its cases run", `${installed.stderr || installed.stdout}\nMend: run \`python3 -m pip download --require-hashes --no-deps --only-binary=:all: -r .packages/requirements.txt -d <folder>\` where the network is up and name the folder in CORE_WHEELS (the tests workflow's step "The engine's wheels" does)`);
+  ok(false, "with the network cut off, the engine installs from the wheels the run's set-up fetched, and its cases run", `${installed.stderr || installed.stdout}\nMend: run \`python3 -m pip download --require-hashes --no-deps --only-binary=:all: -r .packages/requirements.txt -d <folder>\` where the network is up and name the folder in CORE_WHEELS (the tests workflow's step "The code scan's engine, its wheels fetched at their pins for its test" does)`);
 } else if (installed.status !== 0 || !engineHere) {
   console.log(`skip the engine's own cases: ${(installed.stderr || installed.stdout).trim().split("\n").pop()}`);
   ok(installed.status !== 0 && /Mend: /u.test(installed.stderr), "where the engine cannot be installed, the install says why, and its mend", installed.stderr);

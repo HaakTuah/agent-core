@@ -12,6 +12,7 @@ import { tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
 const { sdk, project, whole } = nugetScratch("nuget-gate-network-test-");
+ok(sdk || !process.env.GITHUB_ACTIONS, "on GitHub's runners there is a .NET SDK, so the whole job is run here as there");
 if (!sdk) console.log("skip the whole job: no .NET SDK here");
 else {
   const good = whole({ "src/App/App.csproj": project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "").replace("</Project>", "  <!-- a note -->\n</Project>") });

@@ -108,8 +108,10 @@ export function scratch(prefix) {
 /** A copy, under `tmp`, of npm's cache on this machine, where it holds one, else null: what the job's own installs left
  *  there, which a test that installs the core's packages into a scratch project reads before it asks npm's registry, so
  *  it passes with the network cut off and reads what a copy made on the machine holds (#772). A copy, never the cache
- *  itself, so no test writes into it. `env` is what npm is run with to find the cache; by default this process's. */
+ *  itself, so no test writes into it, and only where the run's network is cut off (CORE_OFFLINE, which scripts/offline.sh sets):
+ *  elsewhere none, and the installs ask the registry. `env` is what npm is run with to find the cache; by default this process's. */
 export function npmCacheCopy(tmp, env = process.env) {
+  if (!process.env.CORE_OFFLINE) return null; // (the copy is made only where the network is cut off, scripts/offline.sh: elsewhere a cache may be gigabytes, and the registry answers)
   const r = spawnSync("npm", ["config", "get", "cache"], { env, encoding: "utf8", shell: process.platform === "win32" });
   const dir = r.status === 0 ? r.stdout.trim() : "";
   if (!dir || !fs.existsSync(dir)) return null;
