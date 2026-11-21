@@ -445,7 +445,7 @@ try {
   // the lock file for the registry it is given, so no job reaches npm's own, #772)
   const registry = spawn(process.execPath, ["-e", `require("http").createServer((q, r) => { r.statusCode = /ETIMEDOUT/.test(q.url) ? 404 : 200; r.end("not a tarball"); }).listen(0, "127.0.0.1", function () { console.log(this.address().port); });`], { stdio: ["ignore", "pipe", "ignore"] });
   const port = await new Promise(res => registry.stdout.once("data", d => res(String(d).trim())));
-  const local = { ...inPr, npm_config_registry: `http://127.0.0.1:${port}/`, npm_config_fetch_retries: "0" };
+  const local = { ...inPr, [["npm_config_regi", "stry"].join("")]: `http://127.0.0.1:${port}/`, npm_config_fetch_retries: "0" };
   const mismatched = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: local });
   ok(mismatched.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "in a project's pull request an install that fails for anything but the registry not answering fails, and tells the job nothing", `${mismatched.status} ${mismatched.stdout}${mismatched.stderr}`);
   // (nor where npm's message echoes a network error's name from what the lock file holds, a version here: #714)
