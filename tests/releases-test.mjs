@@ -286,7 +286,7 @@ ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[
 // where it does not stand for the commit, or where a check passed before and failed after
 {
   const c = compared({ "a.yml/x": "passed", "a.yml/y": "failed", "a.yml/z": "passed", "a.yml/gone": "failed" }, { "a.yml/x": "passed", "a.yml/y": "failed", "a.yml/z": "failed", "b.yml/new": "failed", "b.yml/more": "passed" });
-  ok(c.passedBoth.join() === "a.yml/x,b.yml/more" && c.failedBoth.join() === "a.yml/y" && c.failedAfter.join() === "a.yml/z,b.yml/new", "each job is passed, failed both (standing before), or failed after where it passed before or did not run (the update's); one that ran before alone is not counted");
+  ok(c.passedAfter.join() === "a.yml/x,b.yml/more" && c.failedBoth.join() === "a.yml/y" && c.failedAfter.join() === "a.yml/z,b.yml/new" && c.ranBeforeAlone.join() === "a.yml/gone", "each job is passed, failed both (standing before), or failed after where it passed before or did not run (the update's); one that ran before alone is counted apart");
   const t = path.join(tmp, "trial");
   git(tmp, "init", "-q", "-b", "main", t);
   const commit = (files, msg) => { for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(t, f)), { recursive: true }); fs.writeFileSync(path.join(t, f), text); } git(t, "add", "-A"); git(t, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", msg); return git(t, "rev-parse", "HEAD"); };
@@ -296,10 +296,10 @@ ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[
   ok(/has not run for/.test(none.said) && /Mend: try the release on a copy of a project/.test(none.held ?? ""), "with no record, the release says the trial has not run, and the cut is held, saying its mend");
   const record = r => commit({ [TRIAL]: `${JSON.stringify(r)}\n` }, "the trial's record");
   const passed = trialRecord(tried, "2026-11-22", [[{ "a.yml/x": "passed", "a.yml/y": "failed" }, { "a.yml/x": "passed", "a.yml/y": "failed" }]]);
-  ok(passed.projects === 1 && passed.passedBoth === 1 && passed.failedBoth === 1 && passed.failedAfter === 0 && Object.keys(passed).join() === "commit,day,projects,passedBoth,failedBoth,failedAfter", "the record holds the commit, the day and counts alone, nothing of the project");
+  ok(passed.projects === 1 && passed.passedAfter === 1 && passed.failedBoth === 1 && passed.failedAfter === 0 && passed.ranBeforeAlone === 0 && Object.keys(passed).join() === "commit,day,projects,passedAfter,failedBoth,failedAfter,ranBeforeAlone", "the record holds the commit, the day and counts alone, nothing of the project");
   let at = record(passed);
   let r = trialAt(at, read);
-  ok(r.held === null && /in 1 project: 1 check passed, 1 failed before and after \(standing before the release\), 0 passed before and failed after/.test(r.said), "a record of the commit before, which the release changes by the record alone, stands, and one failing both does not hold the cut", r.said);
+  ok(r.held === null && /in 1 project: 1 check passed after the update, 1 failed before and after \(standing before the release\), 0 passed before and failed after/.test(r.said), "a record of the commit before, which the release changes by the record alone, stands, and one failing both does not hold the cut", r.said);
   at = commit({ "a.txt": "2\n" }, "more since");
   r = trialAt(at, read);
   ok(/changes more than the record since \(a\.txt\)/.test(r.held ?? ""), "a commit that changes more than the record since the commit tried holds the cut", r.held);
@@ -310,10 +310,19 @@ ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[
   at = record(trialRecord(later, "2026-11-23", []));
   r = trialAt(at, read);
   ok(r.held === null && /No project that takes the core allowed a trial/.test(r.said), "where no project allowed a trial, the release says so, and it is not held");
-  at = record({ commit: later, projects: "one" });
-  ok(/no form/.test(trialAt(at, read).said) && trialAt(at, read).held !== null, "a record in no form holds the cut");
+  const noForm = [{ commit: later, projects: "one" }, { ...trialRecord(later, "2026-11-23", []), failedAfter: 2 }, { ...trialRecord(later, "2026-11-23", []), day: "<b>soon</b>" }]
+    .map(bad => trialAt(record(bad), read));
+  ok(noForm.every(n => /no form/.test(n.said) && n.held !== null), "a record in no form holds the cut: a count that is no count, one of no project that counts a check, a day of no form");
+  // (a later commit that takes out a file git would read as renamed into the record is still more than the record)
+  commit({ "old.json": `${JSON.stringify({ a: 1, b: 2, c: 3, d: 4, e: 5 }, null, 2)}\n` }, "a file like the record");
+  const like = git(t, "rev-parse", "HEAD");
+  git(t, "rm", "-q", "old.json");
+  at = record({ ...trialRecord(like, "2026-11-23", []) });
+  ok(/changes more than the record since \(old\.json\)/.test(trialAt(at, read).held ?? ""), "a file taken out beside the record is no rename of it: the cut is held", trialAt(at, read).held);
   const cli = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", "abc"], { encoding: "utf8" });
   ok(cli.status === 1 && /--trial needs the full SHA/.test(cli.stderr), "--trial with no full SHA writes nothing and says what it needs", cli.stderr);
+  const inCore = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", later, path.join(path.dirname(fileURLToPath(import.meta.url)), "before.json"), path.join(tmp, "after.json")], { encoding: "utf8" });
+  ok(inCore.status === 1 && /lies in the core's own repository/.test(inCore.stderr), "--trial refuses a run's verdicts kept in the core's own repository, where a project's job names could be committed", inCore.stderr);
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the core's releases`);

@@ -19,8 +19,8 @@
 // part (tasks/hosts.md). The personal-terms list is read from the environment (PERSONAL_TERMS), never from a file, as
 // the host keeps it among its secrets, and each of its terms is printed as *** wherever a step prints it, in any case. It prints
 // each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed.
-// With --own it runs the project's own jobs too (#1084), each job of its own workflows that calls no workflow and runs
-// on this system, as the change itself holds them, after the core's and only where the copy is the core; with
+// With --own it runs the project's own jobs too (#1084), each job of its own workflows that calls no workflow and names
+// no environment, as the change itself holds them, given no secret, after the core's and only where the copy is the core; with
 // --verdicts it writes each job's verdict that ran, "passed" or "failed", by its place, to a file, so that a run before
 // an update and one after can be set side by side (release.mjs, compared).
 // Git, bash and Node's own modules, and gh where the manifest has no owner's row and no workflow's event says whose
@@ -95,6 +95,8 @@ function main() {
   for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
   const o = options();
   const p = { ...project(o), own: o.own, verdicts: o.verdicts === null ? null : path.resolve(o.verdicts) };
+  const rel = p.verdicts === null ? null : path.relative(p.root, p.verdicts);
+  if (rel !== null && !rel.startsWith("..") && !path.isAbsolute(rel)) fail(`--verdicts ${o.verdicts} lies in the project's own repository, which this check writes nothing in.`, "give a file in a scratch folder outside every repository.");
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
   const { failed, ran } = runAll(p, runner(p, tmp), calledJobs(p, tmp));
@@ -283,10 +285,15 @@ function runner(p, tmp) {
     }
   };
   // (a workflow of the project's own, its jobs that call no workflow alone, run as the calls' jobs are, its steps the
-  // change's own code; it reads the one list of secrets this script is given, as on GitHub it would read the host's)
-  byCall.own = ({ file, wf }) => {
+  // change's own code, given no secret, not even the personal-terms list the calls are given)
+  byCall.own = ({ file, wf, error }) => {
+    if (wf === null) {
+      verdicts[file] = "failed";
+      warn(`FAIL ${file}: this workflow of the project's own is written in a form this check cannot read (${error}), so none of its jobs ran. ${MEND}write it in plain YAML, or run it on the host meanwhile and report the form to the core (core/README.md, "Reporting to the core").`);
+      return { failed: 1, ran: 0 };
+    }
     try {
-      return report(file, runWorkflow(JSON.stringify(wf), { secrets: { PERSONAL_TERMS: terms }, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp }), p.event);
+      return report(file, runWorkflow(JSON.stringify(wf), { secrets: {}, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp }), p.event);
     } catch (e) {
       verdicts[file] = "failed";
       warn(`FAIL ${file}: this workflow of the project's own cannot be run from plain git here (${e.message}). ${MEND}run it on the host meanwhile, and where what it uses is GitHub's own, report it to the core (core/README.md, "Reporting to the core").`);
@@ -301,10 +308,17 @@ function runner(p, tmp) {
 function ownWorkflows(p) {
   let files;
   try { files = git(p.root, "ls-tree", "-z", "--name-only", `${p.head}:.github/workflows`).split("\0").filter(f => /\.ya?ml$/.test(f)); } catch { return []; }
-  return files.map(f => readable(f, p.show(p.head, `.github/workflows/${f}`))).filter(c => c && triggered(c.wf.on, p)).flatMap(({ file, wf }) => {
-    const jobs = Object.entries(wf.jobs ?? {}).filter(([, job]) => job && typeof job === "object" && job.uses === undefined);
-    return jobs.length ? [{ file, wf: { ...wf, jobs: Object.fromEntries(jobs) } }] : [];
-  });
+  const read = file => { try { return { file, wf: parseYaml(p.show(p.head, `.github/workflows/${file}`)) }; } catch (e) { return { file, wf: null, error: e.message }; } };
+  return files.map(read).filter(c => c.wf === null || triggered(c.wf.on, p)).flatMap(c => (c.wf === null ? [c] : ownJobs(c)));
+}
+
+// A workflow kept to its jobs that call no workflow and name no environment (a job that names one deploys, or holds
+// what the host guards: the host's own, never run here, and said so); none where none is left.
+function ownJobs({ file, wf }) {
+  const jobs = Object.entries(wf.jobs ?? {}).filter(([, job]) => job && typeof job === "object" && job.uses === undefined);
+  for (const [id] of jobs.filter(([, job]) => job.environment !== undefined)) say(`host ${file}/${id}: it names an environment, so it is the host's own, not run here`);
+  const kept = jobs.filter(([, job]) => job.environment === undefined);
+  return kept.length ? [{ file, wf: { ...wf, jobs: Object.fromEntries(kept) } }] : [];
 }
 
 // core.yml's own steps, before those it runs of the copy's scripts (which begin where it reads where the copy stands):

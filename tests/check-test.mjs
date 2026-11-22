@@ -90,7 +90,7 @@ let r = check(dir);
 ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && /ok {3}copies\.yml\/copies/.test(r.out), "a project as the kit writes it passes on a push to main, its copy and its copies checked", r.out);
 // (with --own, the project's own workflows run too, its jobs that call no workflow, after the core's; with --verdicts,
 // each job's verdict that ran is written by its place: #1084)
-fs.writeFileSync(path.join(dir, ".github/workflows/own.yml"), "name: own\non:\n  push:\n    branches: [main]\njobs:\n  fine:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo fine\n  broken:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo broken && exit 3\n  later:\n    if: github.event_name == 'pull_request'\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 4\n");
+fs.writeFileSync(path.join(dir, ".github/workflows/own.yml"), "name: own\non:\n  push:\n    branches: [main]\njobs:\n  fine:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo fine\n  broken:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo broken && exit 3\n  later:\n    if: github.event_name == 'pull_request'\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 4\n  deploy:\n    environment: production\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 5\n  secret:\n    runs-on: ubuntu-latest\n    steps:\n      - run: test -z \"${{ secrets.PERSONAL_TERMS }}\"\n");
 commit(dir, "a workflow of its own");
 const verdictsFile = path.join(tmp, "verdicts.json");
 const without = check(dir);
@@ -98,6 +98,10 @@ r = check(dir, "--own", "--verdicts", verdictsFile);
 const verdicts = JSON.parse(fs.readFileSync(verdictsFile, "utf8"));
 ok(without.status === 0 && !/own\.yml/.test(without.out) && r.status === 1 && /ok {3}own\.yml\/fine/.test(r.out) && /FAIL own\.yml\/broken: its step "echo broken && exit 3" failed/.test(r.out) && /skip own\.yml\/later/.test(r.out),
   "with --own the project's own jobs run too, a failing one failing the check, one whose condition does not hold skipped; without it, none", `${without.out}\n${r.out}`);
+ok(/host own\.yml\/deploy: it names an environment/.test(r.out) && !("own.yml/deploy" in verdicts) && verdicts["own.yml/secret"] === "passed",
+  "a job of its own that names an environment, which deploys, is the host's own and not run, and its own jobs are given no secret", r.out);
+const inside = check(dir, "--own", "--verdicts", path.join(dir, "verdicts.json"));
+ok(inside.status === 1 && mended(inside.out) && /--verdicts .* lies in the project.s own repository/.test(inside.out) && !fs.existsSync(path.join(dir, "verdicts.json")), "--verdicts in the project's own repository is refused, saying its mend, and nothing is written there", inside.out);
 ok(verdicts["own.yml/fine"] === "passed" && verdicts["own.yml/broken"] === "failed" && !("own.yml/later" in verdicts) && verdicts["core.yml/core/core"] === "passed" && Object.values(verdicts).every(v => v === "passed" || v === "failed"),
   "and --verdicts writes each job's verdict that ran, the core's and the project's own, by its place", JSON.stringify(verdicts));
 git(dir, "reset", "-q", "--hard", "HEAD~1");
