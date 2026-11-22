@@ -21,7 +21,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { copyTree, entries } from "../scripts/copy-tree.mjs";
-import { checkoutStandIn, ghStandIn, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
+import { checkoutStandIn, ghStandIn, hostSays, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 
 let failed = 0, count = 0;
@@ -61,6 +61,9 @@ const clone = path.join(tmp, "core-clone");
 git(tmp, "clone", "-q", theCore, clone);
 git(clone, "checkout", "-q", A);
 const origin = path.join(tmp, "project.git"), p = path.join(tmp, "project");
+// (the host says the project, and each clone of it, is public, the security-review job's clone by its address on GitHub)
+hostSays(origin, false);
+hostSays("https://github.com/someone/project.git", false);
 git(tmp, "init", "-q", "--bare", "-b", "main", origin);
 fs.mkdirSync(p);
 git(p, "init", "-q", "-b", "main");
@@ -93,15 +96,28 @@ const calls = read(p, ".github/workflows/core.yml");
 ok(s.status === 0 && s.out.includes(`${SHA(A)} -> ${SHA(B)}`) && read(p, "core-manifest.md") === manifest(OWNER, B), "the sync takes a project that follows main to the core's newest commit, and moves the manifest's pin", s.out);
 ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) && s.out.includes("personal-terms.yml"), "  it moves a call whose workflow changed, and leaves one whose workflow did not", calls);
 ok(s.out.includes("a note for the test"), "  and prints the sync notes the core gained between the two pins", s.out);
-ok(/For the sync PR's description[\s\S]*Steps not done[\s\S]*security review shown on every pull request[\s\S]*Beside a fresh start[\s\S]*AGENTS\.md: missing/.test(s.out),
-  "  then, from the copy it wrote, every step not done, a standing one too, and every difference from a fresh start, for the PR's description", s.out);
+ok(/The core's files and parts written[\s\S]*\.github\/workflows\/look\.yml[\s\S]*For the sync PR's description[\s\S]*Steps not done[\s\S]*Beside a fresh start/.test(s.out),
+  "  then, from the copy it wrote, what the core owns written by the one process (#1083), and every step not done, a standing one too, and every difference from a fresh start, for the PR's description", s.out);
+ok(read(p, "AGENTS.md").includes("<!-- The core's part ends. -->") && read(p, ".github/workflows/core.yml") === calls && /Left as the project's[\s\S]*\.github\/workflows\/core\.yml is not the core's/.test(s.out),
+  "  the kit's files the project lacked are written (at its first copy already), each call of the core's own files pinned to the new pin, and a workflow of its own that is no kit's is left as it stands and named", s.out);
 git(p, "add", "-A");
 git(p, "commit", "-q", "-m", "sync");
 const LEGIT = git(p, "rev-parse", "HEAD");
 ok(entries(git(p, "rev-parse", "HEAD:core"), path.join(p, ".git")) === entries(copyTree(B, coreRepo), coreRepo), "  core/ is now the core's tree at B");
 
 // the proof, from the core at B, and the core's own check of the copy, as GitHub runs core.yml
-const pure = () => node(p, path.join(theCore, "scripts", "pure-sync.mjs"));
+// (its host's answer as GitHub's job gives it, from the event, for the clone's origin by its address on GitHub, which
+// git takes to the bare repository; pure-sync.mjs honours no test's stand-in)
+const GH_ORIGIN = "https://github.com/someone/project.git", event = path.join(tmp, "event.json");
+fs.writeFileSync(event, JSON.stringify({ repository: { full_name: "someone/project", private: false } }));
+git(p, "config", `url.${slash(origin)}.insteadOf`, GH_ORIGIN);
+const pure = () => {
+  git(p, "remote", "set-url", "origin", GH_ORIGIN);
+  try {
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
+    return { status: r.status, out: `${r.stdout}${r.stderr}` };
+  } finally { git(p, "remote", "set-url", "origin", origin); }
+};
 const coreCheck = () => {
   const sha = git(p, "rev-parse", "HEAD");
   git(p, "push", "-q", "-f", "origin", "HEAD:refs/heads/check");
@@ -130,7 +146,7 @@ const reviewCheck = () => {
   fs.writeFileSync(ghData, JSON.stringify({ "pulls/1$": pull, "issues/1/comments": [], "pulls/1/comments": [], "pulls/1/commits": [{ sha, parents: [{ sha: base }] }], "pulls/1/files": files }));
   fs.writeFileSync(ghLog, "");
   const github = { event_name: "pull_request", repository: "someone/project", actor: "someone", server_url: "https://github.com", run_id: "1", token: "not-a-token",
-    event: { action: "synchronize", pull_request: pull, repository: { default_branch: "main", private: false } } };
+    event: { action: "synchronize", pull_request: pull, repository: { default_branch: "main", private: false, full_name: "someone/project" } } };
   const [job] = runWorkflow(read(theCore, ".github/workflows/security-review.yml"), { github, base: reviewEnv, temp: tmp, inputs: { advisory: false },
     workspace: () => { const ws = fs.mkdtempSync(path.join(tmp, "ws-")); git(ws, "clone", "-q", origin, "."); return ws; },
     uses: { "actions/checkout": checkoutStandIn(env, tmp), "actions/setup-node": () => {} } });
@@ -155,10 +171,13 @@ const outside = path.join(tmp, "same-outside.md");
 const tries = [
   ["a job added to a workflow", () => write(p, ".github/workflows/core.yml", calls.replace("jobs:\n", "jobs:\n  evil:\n    runs-on: ubuntu-latest\n    steps: [{run: \"echo evil\"}]\n")), "lines added or removed, not only a pin moved"],
   ["a job removed from a workflow", () => write(p, ".github/workflows/core.yml", calls.replace(/  terms:\n[^]*$/u, "")), "lines added or removed, not only a pin moved"],
-  ["a new workflow", () => write(p, ".github/workflows/new.yml", "on: push\n"), "a file created, deleted or given a new mode"],
-  ["a workflow deleted", () => fs.rmSync(path.join(p, ".github/workflows/core.yml")), "a file created, deleted or given a new mode"],
-  ["a file outside core/ edited", () => write(p, "README.md", "# A project, changed\n"), "README.md: not the core's copy, its pin or a workflow"],
-  ["a hook's settings added", () => write(p, ".claude/settings.json", "{}\n"), ".claude/settings.json: not the core's copy, its pin or a workflow"],
+  ["a new workflow", () => write(p, ".github/workflows/new.yml", "on: push\n"), ".github/workflows/new.yml: lines added or removed"],
+  ["a workflow deleted", () => fs.rmSync(path.join(p, ".github/workflows/core.yml")), "core.yml: deleted, and not a workflow of the core's whose check the one job"],
+  ["a file outside core/ edited", () => write(p, "README.md", "# A project, changed\n"), "README.md: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
+  ["a hook's settings added", () => write(p, ".claude/settings.json", "{}\n"), ".claude/settings.json: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
+  ["the core's part of a rule file written otherwise", () => write(p, "AGENTS.md", read(p, "AGENTS.md").replace("@core/roles/builder.md\n", "@core/roles/builder.md\n@evil.md\n")), "AGENTS.md: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
+  ["a word outside the core's part of a rule file changed", () => write(p, "AGENTS.md", read(p, "AGENTS.md").replace("## Commands", "## Commands, changed")), "AGENTS.md: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
+  ["a file of the core's written otherwise", () => write(p, ".github/workflows/look.yml", `${read(p, ".github/workflows/look.yml")}# more\n`), ".github/workflows/look.yml: lines added or removed"],
   ["core/ edited", () => write(p, "core/README.md", `${read(p, "core/README.md")}x\n`), NOT_COPY, DIFFERS],
   ["a file added under core/", () => write(p, "core/extra.md", "x\n"), NOT_COPY, DIFFERS],
   ["a mode change on a workflow", () => { git(p, "update-index", "--chmod=+x", ".github/workflows/core.yml"); return "staged"; }, "a file created, deleted or given a new mode"],
@@ -168,7 +187,7 @@ const tries = [
   ["the manifest and a call pinned to a commit not on the core's main", () => { write(p, "core-manifest.md", manifest(OWNER, SIDE)); write(p, ".github/workflows/core.yml", calls.replace(`personal-terms.yml@${B}`, `personal-terms.yml@${SIDE}`)); }, `${SIDE} is not a commit of the core's main`],
   ["text added beside a pin", () => write(p, ".github/workflows/core.yml", calls.replace(`personal-terms.yml@${B}`, `personal-terms.yml@${B} # ok`)), "a change beyond a pin"],
   ["every workflow line given a carriage return", () => write(p, ".github/workflows/core.yml", calls.replace(/\n/g, "\r\n")), "a changed line with no pin, or one not the new pin"],
-  ["a .gitattributes added at the root", () => write(p, ".gitattributes", "* text eol=crlf\n"), ".gitattributes: not the core's copy, its pin or a workflow"],
+  ["a .gitattributes added at the root", () => write(p, ".gitattributes", "* text eol=crlf\n"), ".gitattributes: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
   ["core/ made a submodule", () => { removeCore(); git(p, "update-index", "--add", "--cacheinfo", `160000,${B},core`); return "staged"; }, NOT_COPY, NO_FOLDER],
   ["core/ made a submodule's pointer whose id is the copy's own tree", () => { const tree = git(p, "rev-parse", "HEAD:core"); removeCore(); git(p, "update-index", "--add", "--cacheinfo", `160000,${tree},core`); return "staged"; }, NOT_COPY, NO_FOLDER],
   ...(canLink ? [["a file of core/ made a link to an identical file outside the project", () => { fs.copyFileSync(path.join(p, "core/README.md"), outside); fs.rmSync(path.join(p, "core/README.md")); fs.symlinkSync(path.relative(path.join(p, "core"), outside), path.join(p, "core/README.md")); }, NOT_COPY, DIFFERS]] : []),
@@ -183,6 +202,97 @@ for (const [what, alter, refused, coreFails] of tries) {
   git(p, "reset", "-q", "--hard", LEGIT);
   git(p, "clean", "-q", "-fd");
 }
+// a file that is the project's from its first commit (SECURITY.md), which main lacks and the sync creates as the kit
+// renders it: not pure, since floor rule 8 covers the core's own files and parts alone (#1083)
+git(p, "checkout", "-q", "-B", "main-lacking", base);
+git(p, "rm", "-q", "SECURITY.md");
+git(p, "commit", "-q", "-m", "SECURITY.md taken out");
+git(p, "push", "-q", "-f", "origin", "main-lacking:main");
+git(p, "checkout", "-q", "-B", "sync-creates");
+git(p, "checkout", "-q", LEGIT, "--", ".");
+git(p, "commit", "-q", "-m", "the sync, SECURITY.md created");
+const creates = pure();
+ok(creates.status === 1 && /NOT PURE[^\n]*SECURITY\.md: not the core's copy, its pin, a workflow's pins or what the core's process writes of the core's own files and parts/.test(creates.out) && read(p, "SECURITY.md") === git(p, "show", `${LEGIT}:SECURITY.md`) + "\n",
+  "a file that is the project's own, created by the sync where main lacks it, is not pure, though it is what the kit renders", creates.out);
+git(p, "push", "-q", "-f", "origin", `${base}:main`);
+// main marks its own workflow export-ignore (a common line of .gitattributes): the proof reads main's tree blob by blob,
+// as git holds it, so a sync that swaps that workflow for the kit's render is not pure (floor rule 3's second review)
+git(p, "checkout", "-q", "-B", "main-ignores", base);
+write(p, ".gitattributes", ".github/workflows/core.yml export-ignore\n");
+git(p, "add", "-A");
+git(p, "commit", "-q", "-m", "its own workflow kept out of exports");
+git(p, "push", "-q", "-f", "origin", "main-ignores:main");
+git(p, "checkout", "-q", "-B", "sync-swaps");
+git(p, "checkout", "-q", LEGIT, "--", ".");
+fs.rmSync(path.join(p, ".github/workflows/core.yml"));
+const rendered = node(p, "core/scripts/converge.mjs", "--write");
+git(p, "add", "-A");
+git(p, "commit", "-q", "-m", "the sync, its own workflow swapped for the kit's");
+const swaps = pure();
+ok(rendered.status === 0 && read(p, ".github/workflows/core.yml") !== calls && swaps.status === 1 && /NOT PURE[^\n]*\.github\/workflows\/core\.yml/.test(swaps.out),
+  "a workflow of the project's own that main marks export-ignore, swapped by the sync for the kit's render, is not pure", `${rendered.out}\n${swaps.out}`);
+git(p, "push", "-q", "-f", "origin", `${base}:main`);
+// main's part of AGENTS.md stale (an import of the kit's missing), and the sync writes it again as the process does:
+// pure, proved against the render, the host's answer from GitHub's event; with the test's stand-in alone answering,
+// which the proof does not honour, and gh giving none, the part is not proved and the sync is reviewed
+git(p, "checkout", "-q", "-B", "main-stale", base);
+write(p, "AGENTS.md", read(p, "AGENTS.md").replace("@core/roles/builder.md\n", ""));
+git(p, "commit", "-q", "-am", "the core's part stale");
+git(p, "push", "-q", "-f", "origin", "main-stale:main");
+git(p, "checkout", "-q", "-B", "sync-mends");
+git(p, "checkout", "-q", LEGIT, "--", ".");
+git(p, "commit", "-q", "-m", "the sync, the core's part written again");
+const mends = pure();
+ok(mends.status === 0 && read(p, "AGENTS.md").includes("@core/roles/builder.md\n"), "a sync that writes the core's part of a rule file again, as the process does, is pure, proved against the kit's render", mends.out);
+const silent = path.join(tmp, "gh-silent");
+fs.mkdirSync(silent, { recursive: true });
+fs.writeFileSync(path.join(silent, "gh"), "#!/bin/sh\necho 'gh: not signed in' >&2\nexit 1\n", { mode: 0o755 });
+git(p, "remote", "set-url", "origin", GH_ORIGIN);
+const standIn = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, CORE_HOST_ANSWERS: hostSays(), [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
+git(p, "remote", "set-url", "origin", origin);
+ok(standIn.status === 1 && /NOT PURE[^\n]*AGENTS\.md: the project's kind or values cannot be read/.test(`${standIn.stdout}${standIn.stderr}`), "  and with only the test's stand-in for the host answering, which the proof does not honour, it is not proved", `${standIn.stdout}${standIn.stderr}`);
+git(p, "push", "-q", "-f", "origin", `${base}:main`);
+git(p, "checkout", "-q", "sync");
+git(p, "reset", "-q", "--hard", LEGIT);
+git(p, "clean", "-q", "-fd");
+// a private project whose main holds the calls its earlier kit wrote that the one job of core.yml folds: the sync that
+// writes the one job and takes them out, as the process does, is pure; the same deletions with core.yml left as main
+// holds it are not, nor is one of a check the one job does not run, the licence check (#1101, point 2)
+const asHost = (isPrivate, run) => {
+  fs.writeFileSync(event, JSON.stringify({ repository: { full_name: "someone/project", private: isPrivate } }));
+  try { return run(); } finally { fs.writeFileSync(event, JSON.stringify({ repository: { full_name: "someone/project", private: false } })); }
+};
+const converged = isPrivate => asHost(isPrivate, () => {
+  git(p, "remote", "set-url", "origin", GH_ORIGIN);
+  try { const r = spawnSync(process.execPath, ["core/scripts/converge.mjs", "--write"], { cwd: p, env: { ...env, GITHUB_EVENT_PATH: event, CORE_HOST_ANSWERS: "" }, encoding: "utf8" }); return `${r.stdout}${r.stderr}`; }
+  finally { git(p, "remote", "set-url", "origin", origin); }
+});
+// (main as the kit writes a public project, its calls of their own; pushed as main for each case)
+git(p, "checkout", "-q", "-B", "main-public", base);
+for (const f of ["core", "copies", "pr-description", "signatures"]) fs.rmSync(path.join(p, `.github/workflows/${f}.yml`), { force: true });
+converged(false);
+git(p, "add", "-A");
+git(p, "commit", "-q", "-m", "the kit's calls, as a public project's");
+const publicMain = git(p, "rev-parse", "HEAD");
+const drops = (what, change, isPure, said) => {
+  git(p, "push", "-q", "-f", "origin", `${publicMain}:refs/heads/main`);
+  git(p, "checkout", "-q", "-B", "sync-drops", publicMain);
+  git(p, "checkout", "-q", LEGIT, "--", ".");
+  git(p, "checkout", "-q", publicMain, "--", ".github/workflows/");
+  const taken = converged(true);
+  change();
+  git(p, "add", "-A");
+  git(p, "commit", "-q", "-m", "the sync, as a private project's");
+  const r = asHost(true, pure);
+  ok(isPure ? r.status === 0 && /taken out: [^\n]*copies\.yml/.test(taken) : r.status === 1 && said.test(r.out), `${what}: ${isPure ? "" : "not "}pure`, `${taken}\n${r.out}`);
+  git(p, "push", "-q", "-f", "origin", `${base}:main`);
+  git(p, "checkout", "-q", "sync");
+  git(p, "reset", "-q", "--hard", LEGIT);
+  git(p, "clean", "-q", "-fd");
+};
+drops("a private project's sync that writes core.yml's one job and takes out the calls it folds", () => {}, true);
+drops("  the same deletions with core.yml left as main holds it", () => git(p, "checkout", "-q", publicMain, "--", ".github/workflows/core.yml"), false, /NOT PURE[^\n]*copies\.yml: deleted, and not a workflow of the core's whose check the one job/);
+drops("  a deletion of the licence check, which the one job does not run", () => fs.rmSync(path.join(p, ".github/workflows/licences.yml"), { force: true }), false, /NOT PURE[^\n]*licences\.yml: deleted/);
 // a file's executable bit alone: no difference to either (a copy made on Windows records none)
 git(p, "update-index", "--chmod=+x", "core/README.md");
 git(p, "update-index", "--chmod=-x", "core/scripts/work-saved.sh");

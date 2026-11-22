@@ -76,7 +76,7 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
         run: if [ -f "${CORE_AT}scripts/lychee.sh" ]; then bash "${CORE_AT}scripts/lychee.sh" >> "$GITHUB_ENV"; fi
-      - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks (each its own script's, run through scripts/checks.mjs, which holds their steps)
+      - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape, choice records' and core's files' checks (each its own script's, run through scripts/checks.mjs, which holds their steps)
         env:
           BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
           CONFIG: ${{ inputs.config }}

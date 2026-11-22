@@ -11,12 +11,14 @@ This project takes the shared rules in `core/` by `core-manifest.md`, whose slot
 builder reads these whole at the start of every task (Claude Code, Kiro and Antigravity pull them in through their
 entry files; any other tool: open each file named):
 
+<!-- The core's part: a sync writes it; write yours outside. -->
 @core-manifest.md
 @core/floor/security.md
 @core/roles/builder.md
 @core/roles/shared/how-to-work.md
 @core/roles/shared/inbox.md
 @core/roles/shared/work-flow.md
+<!-- The core's part ends. -->
 
 What else a task calls for, and what another role reads, one command prints:
 `node core/scripts/reading.mjs <role> --issue <its issue>`.

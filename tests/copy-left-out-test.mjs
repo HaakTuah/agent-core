@@ -107,7 +107,8 @@ for (const name of Object.keys(NOT_CHECKS)) {
 // ---- The rows with no pair, each with why and what holds it ----
 const NO_PAIR = {
   "core.yml": ["it is the copy's proof: the fault inside the copy is what it fails, so there is no copy for it to leave out", "tests/core-yml-test.mjs"],
-  "pure-sync.mjs": ["it judges the shape of a pull request's diff (only the copy and its pins moved), not a fault in a file", "tests/pure-sync-test.mjs"],
+  "pure-sync.mjs": ["it judges the shape of a pull request's diff (only the copy, its pins and what the kit renders moved), not a fault in a file", "tests/pure-sync-test.mjs"],
+  "converge.mjs": ["it reads only the project's own files and parts the core marks, never a file of the copy, so there is no fault inside the copy for it to leave out; the fault outside is staged there", "tests/converge-test.mjs"],
   "codeql.yml": ["code scanning is the host's own and cannot run here; scripts/check.mjs names it so (HOST_OWN)", "tests/check-test.mjs"],
 };
 held(Boolean(HOST_OWN["codeql.yml"]), "codeql.yml is named the host's own", "scripts/check.mjs no longer names codeql.yml among the host's own (HOST_OWN), so its row's lack of a pair has no reason",
