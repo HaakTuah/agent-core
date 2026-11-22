@@ -46,19 +46,21 @@ export function partIn(text, kitLines) {
 // kits' (`older`): { text } to write, {} where it is left as it stands, and `left` where it is left as the project's.
 export function converged(to, now, want, older = []) {
   if (now === null) return { text: want };
-  if (!BLOCKS.includes(to) && !whole(to)) return {};
-  if (BLOCKS.includes(to)) {
-    const part = blockOf(want);
-    if (part === null) return {};
-    const kitLines = new Set([want, ...older].flatMap(t => (blockOf(t) ?? t).split("\n").map(l => l.replace(/\r$/u, "")).filter(imports)));
-    const at = partIn(now, kitLines);
-    if (at === "many") return { left: "its part of the core cannot be told apart (the core's marks stand more than once or apart, or more than one run of import lines is the kit's): left as it is" };
-    const eol = now.includes("\r\n") ? "\r\n" : "\n", block = part.replaceAll("\n", eol);
-    const text = at === null ? `${now}${now.endsWith("\n") || now === "" ? "" : eol}${eol}${block}${eol}` : `${now.slice(0, at.at)}${block}${now.slice(at.end)}`;
-    return text === now ? {} : { text };
-  }
+  if (BLOCKS.includes(to)) return partConverged(now, want, older);
+  if (!whole(to)) return {};
   const core = (marked(to) && /^# The core's file:/u.test(now)) || [want, ...older].some(t => t && plainOf(t) === plainOf(now));
   if (!core) return { left: "is not the core's (no mark of the core's, and not what a starter kit writes for the project): left as it is" };
   return now === want ? {} : { text: want };
 }
 
+// A rule file of the project's own after the process: its core's part written where it stands, or at its end.
+function partConverged(now, want, older) {
+  const part = blockOf(want);
+  if (part === null) return {};
+  const kitLines = new Set([want, ...older].flatMap(t => (blockOf(t) ?? t).split("\n").map(l => l.replace(/\r$/u, "")).filter(imports)));
+  const at = partIn(now, kitLines);
+  if (at === "many") return { left: "its part of the core cannot be told apart (the core's marks stand more than once or apart, or more than one run of import lines is the kit's): left as it is" };
+  const eol = now.includes("\r\n") ? "\r\n" : "\n", block = part.replaceAll("\n", eol);
+  const text = at === null ? `${now}${now.endsWith("\n") || now === "" ? "" : eol}${eol}${block}${eol}` : `${now.slice(0, at.at)}${block}${now.slice(at.end)}`;
+  return text === now ? {} : { text };
+}

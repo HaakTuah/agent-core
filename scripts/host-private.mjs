@@ -18,28 +18,38 @@ const said = new Map(); // (one answer a repository a process, so a sync's earli
 // `env` and `ask` (a route to its answer's text) are the job's environment and gh, which a test replaces.
 export function privateOf(root, { env = process.env, ask = gh } = {}) {
   const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { cwd: root, encoding: "utf8" }).stdout?.trim() ?? "";
-  if (env.CORE_HOST_ANSWERS) {
-    const real = at => { try { return fs.realpathSync(at); } catch { return path.resolve(at); } };
-    let answers = {};
-    try { answers = JSON.parse(fs.readFileSync(env.CORE_HOST_ANSWERS, "utf8")); } catch { /* (none: as no answer) */ }
-    // (by the project's root, or by its origin, which each clone of it shares)
-    const found = Object.entries(answers).find(([at]) => real(at) === real(root) || (origin && real(at) === real(origin)))?.[1];
-    if (typeof found?.private === "boolean") return { private: found.private };
-  }
+  const standIn = answered(env, root, origin);
+  if (standIn) return standIn;
   const repo = repoOf(origin);
   if (!repo) return { unread: "whether the repository is private could not be read: the clone's origin names no repository on github.com. Mend: run it from a clone of the project's repository whose origin is its address on github.com" };
   const key = `${repo}\n${env.GITHUB_EVENT_PATH ?? ""}`;
   if (ask === gh && said.has(key)) return said.get(key);
-  let answer = null;
-  try {
-    const { repository: r } = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, "utf8"));
-    if (String(r?.full_name).toLowerCase() === repo.toLowerCase() && typeof r.private === "boolean") answer = { private: r.private };
-  } catch { /* (no event, or another repository's: gh is asked) */ }
-  if (!answer) {
-    let why = "";
-    try { const r = JSON.parse(ask(`repos/${repo}`)); if (typeof r?.private === "boolean") answer = { private: r.private }; } catch (e) { why = ` (${String(e.message).split("\n")[0].slice(0, 120)})`; }
-    answer ??= { unread: `whether ${repo} is private could not be read: GitHub gave gh no answer${why}. Mend: sign gh in for an account that can read the repository (\`gh auth login\`), then run it again` };
-  }
+  const answer = fromEvent(env, repo) ?? fromGh(ask, repo);
   if (ask === gh) said.set(key, answer);
   return answer;
+}
+
+// A test's answer for the project, by its root or by its origin, which each clone of it shares; else null.
+function answered(env, root, origin) {
+  if (!env.CORE_HOST_ANSWERS) return null;
+  const real = at => { try { return fs.realpathSync(at); } catch { return path.resolve(at); } };
+  let answers = {};
+  try { answers = JSON.parse(fs.readFileSync(env.CORE_HOST_ANSWERS, "utf8")); } catch { /* (none: as no answer) */ }
+  const found = Object.entries(answers).find(([at]) => real(at) === real(root) || (origin && real(at) === real(origin)))?.[1];
+  return typeof found?.private === "boolean" ? { private: found.private } : null;
+}
+
+// What the event GitHub's job runs on says of `repo`; null where there is none, or it is another repository's.
+function fromEvent(env, repo) {
+  try {
+    const { repository: r } = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, "utf8"));
+    return String(r?.full_name).toLowerCase() === repo.toLowerCase() && typeof r.private === "boolean" ? { private: r.private } : null;
+  } catch { return null; }
+}
+
+// What gh says of `repo`, or why it could not, with the mend.
+function fromGh(ask, repo) {
+  let why = "";
+  try { const r = JSON.parse(ask(`repos/${repo}`)); if (typeof r?.private === "boolean") return { private: r.private }; } catch (e) { why = ` (${String(e.message).split("\n")[0].slice(0, 120)})`; }
+  return { unread: `whether ${repo} is private could not be read: GitHub gave gh no answer${why}. Mend: sign gh in for an account that can read the repository (\`gh auth login\`), then run it again` };
 }
