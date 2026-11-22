@@ -1,4 +1,4 @@
-// Tests of the core's releases (releases.mjs) and of cutting one (release.mjs): what a project follows, which tags are
+// Tests of the core's releases (releases.mjs) and of cutting one (release.mjs, with the trial on a real project in release-trial.mjs): what a project follows, which tags are
 // releases, which is the newest and whether it is past a pin, what a sync between two commits asks, whether a release
 // asks a sync of a project at all, and what the next release would be. In a scratch repository that stands in for the core, fetched as the scripts fetch the core; on
 // Linux and on Windows. Git and Node's own modules only.
@@ -9,7 +9,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
-import { OWN, TRIAL, compared, costed, fullRun, held, inTheCore, next, older, trialAt, trialRecord } from "../scripts/release.mjs";
+import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
+import { TRIAL, compared, trialAt, trialRecord } from "../scripts/release-trial.mjs";
 import { STEPS } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, POINTER, entries, notesAt } from "../scripts/sync-notes.mjs";
 import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, jumped, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";

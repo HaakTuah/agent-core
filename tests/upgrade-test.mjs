@@ -13,7 +13,7 @@
 // files, and the daily core-moved run; then its hooks, from main's copy as Claude Code runs them. Before the sync and
 // after it, the core's checks from plain git (scripts/check.mjs --own) run on a push to main and on a pull request of
 // its own, its own workflows among them, one of which runs a check of its copy with no install step (the case of
-// #1079), and no job that passed before fails after (release.mjs, compared); in a new repository of each kind, as the
+// #1079), and no job that passed before fails after (release-trial.mjs, compared); in a new repository of each kind, as the
 // kit at the commit under test writes it, every job passes (#1084). GitHub's own services
 // (CodeQL, the dependency review) are not run here, and GitHub's API is a stand-in that gives the security-review check
 // one completed review. The sync's pull request is pure, as pure-sync.mjs reads it from the release it moves to, in
@@ -55,7 +55,7 @@ import { importsOf, projectFilesByContent, readProject } from "../scripts/nuget.
 import { STEPS, callers, leads, notDone, project as read, report } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, notesAt } from "../scripts/sync-notes.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
-import { compared } from "../scripts/release.mjs";
+import { compared } from "../scripts/release-trial.mjs";
 import { evaluate, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
 
 const STEP_LEADS = STEPS.map(s => s.lead);

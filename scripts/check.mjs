@@ -22,7 +22,7 @@
 // With --own it runs the project's own jobs too (#1084), each job of its own workflows that calls no workflow and names
 // no environment, as the change itself holds them, given no secret, after the core's and only where the copy is the core; with
 // --verdicts it writes each job's verdict that ran, "passed" or "failed", by its place, to a file, so that a run before
-// an update and one after can be set side by side (release.mjs, compared).
+// an update and one after can be set side by side (release-trial.mjs, compared).
 // Git, bash and Node's own modules, and gh where the manifest has no owner's row and no workflow's event says whose
 // account holds the repository (releases.mjs, hostAccount).
 //
