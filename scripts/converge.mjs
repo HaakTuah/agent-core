@@ -19,8 +19,10 @@
 //   node core/scripts/converge.mjs [--older <dir>]          what it would write, and what it leaves as the project's
 //   node core/scripts/converge.mjs --write [--older <dir>]  writes it (<dir>: a folder of earlier kits, each a folder
 //                                                           holding setup/template/, as sync.mjs gives fresh.mjs)
-//   node core/scripts/converge.mjs --check --base <rev>     core.yml's check: fails where the pull request changed a
-//                                                           file or part the core marks and it is not as the core writes it
+//   node core/scripts/converge.mjs --check --base <rev>     the check (checks.mjs runs it in the copies part, in
+//                                                           core.yml's job and copies.yml's, the base in CONVERGE_BASE):
+//                                                           fails where the pull request changed a file or part the
+//                                                           core marks and it is not as the core writes it
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -80,7 +82,8 @@ export function kits(p, older) {
 function run(argv) {
   const root = process.cwd(), p = project(root);
   const at = argv.indexOf("--older"), older = at < 0 ? null : argv[at + 1];
-  if (argv.includes("--check")) return check(p, argv[argv.indexOf("--base") + 1]);
+  // (checks.mjs runs it as a check of the copies part, with the base in CONVERGE_BASE and no argument)
+  if (argv.includes("--check") || process.env.CONVERGE_BASE !== undefined) return check(p, argv.includes("--base") ? argv[argv.indexOf("--base") + 1] : process.env.CONVERGE_BASE);
   const bad = unformed(p, kind(p));
   if (bad.length) { for (const b of bad) console.error(`FAIL ${b}; the process wrote nothing.`); process.exitCode = 1; return; }
   const { kit, before } = kits(p, older);

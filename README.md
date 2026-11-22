@@ -97,8 +97,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    that needs the parser says so, with its mend; in a project's own job that installs the first alone, the shape check
    reads nothing of C# or Python, nor any function of JavaScript or TypeScript, and says so as a warning, failing
    nothing by that. Its
-   devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
-   copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
+   devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`, which, once the copy
+   is written, writes what the core owns by the one process a new project's starter kit uses too (`scripts/converge.mjs`;
+   `AGENTS.md`, "One process takes the core in"). A pure sync (only the copy, its pins and what that process writes, as
+   `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
    core files the sync moved or removed is reviewed like any PR. Where a change to the core asks something of the

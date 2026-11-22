@@ -34,7 +34,7 @@ on:
   workflow_call:
     inputs:
       copies:
-        description: The copies check's config, a JSON file of the caller's (core/scripts/copies.mjs); given, the copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks run.
+        description: The copies check's config, a JSON file of the caller's (core/scripts/copies.mjs); given, the copies, pointer, reading-size, workflow, entry-file, manifest, shape, choice records' and core's files' checks run.
         required: false
         type: string
         default: ""
@@ -353,7 +353,7 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
         run: if [ -f "${CORE_AT}scripts/lychee.sh" ]; then bash "${CORE_AT}scripts/lychee.sh" >> "$GITHUB_ENV"; fi
-      - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks
+      - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape, choice records' and core's files' checks
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.copies != '' }}
         timeout-minutes: 5
         env:

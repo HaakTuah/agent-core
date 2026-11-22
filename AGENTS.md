@@ -191,7 +191,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   - a pull request that makes something worse than it stood may fail, and the session mends it there; every failure
     says its mend (#254);
   - what stood before the check came, or before it read more, never turns it red: the check keeps a baseline, what
-    breaks it today, listed and allowed only to shrink. A sync pull request holds the copy alone, so until the list
+    breaks it today, listed and allowed only to shrink. A sync pull request holds the copy and what the core writes alone, so until the list
     is written the pull request's base counts as it, and the entry of `setup/sync-notes.md` that brings the check
     has a step whose check reads that the list is written: no old breach goes unlisted. The one exception, on the owner's word and no other: the personal-terms check fails a listed term wherever
     it stands, one the project held before and a name a machine's git writes into each commit included, its failure
@@ -211,6 +211,27 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   it did not start before, and fails a pull request that adds a copy until the mend its failure words is made; by the
   heading "What it asks of a project" below; and, for the dose, by the scheduled look (`scripts/look.mjs`), which
   reads it from the shape check's baseline (`scripts/dose.mjs`).
+- **One process takes the core in** (#1083). By default the starter kit (`scripts/init.mjs`) and every sync
+  (`scripts/sync.mjs`) take the core into a repository, a new one or one at any earlier copy, by one process,
+  `scripts/converge.mjs`, which writes what the core owns from the kit's templates at the copy's commit and what the
+  project holds, so both end in the same state, and run again changes nothing. The core owns each workflow, Dependabot
+  config, issue form, hooks' settings and tool entry file the kit writes, whole, where it is not there, carries the
+  core's mark or is what a kit writes for the project; and its part of `AGENTS.md` and `CLAUDE.md`, between its marks.
+  Each value of the project's that lands in a file it writes is held to its form first (floor topic 5), and where one is
+  not, it writes nothing and says the mend. The one condition that changes it: a file the project holds that is not
+  the core's, or one the manifest's "Differences" names: the process writes nothing of it and names it as a
+  difference, as it names a rule file whose part it cannot tell apart. The trigger is a run of the kit or a sync: the
+  session that runs it commits what it wrote in the sync's pull request, which `scripts/pure-sync.mjs`, run from the
+  core's `main`, proves equal byte for byte to what the process there writes from the kit at the new pin and the
+  project's `main`, so it stays a pure sync (floor rule 8). It does not mean that a project's own rule, workflow or
+  setting is changed, a difference it keeps on purpose lost, or what only the owner can do done; nor that the manifest,
+  `SECURITY.md`, the threat model, the progress file, the choice records or a check's config is written where it
+  stands. Reason: a release asked 63 things of each project, 19 of them workflow changes each with two security
+  reviews, built by hand from the notes, and a project of another owner held 25 differences from what the kit writes
+  for a new one. Held by `tests/converge-test.mjs` and `tests/pure-sync-test.mjs` (a render that differs, a word outside
+  the core's part changed, a value out of its form, each refused with its mend), and by the copies part's check of
+  `scripts/checks.mjs`, in `core.yml`'s job and `copies.yml`'s, which fails a pull request that changes a file or part
+  the core marks so that it is not as the core writes it.
 - **A release says what it asks, step by step.** Whoever adds an entry to the sync notes (`setup/sync-notes/`)
   gives it a step in `scripts/steps/` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
@@ -220,7 +241,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   a task the project's agents take (`roles/orchestrator.md`; with no orchestrator, the session that syncs), a step
   only the owner can do labelled so, and each difference kept on purpose declared in the manifest's "Differences".
   Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
-  owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps (it stays pure), nor
+  owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps beyond what the core writes (it stays pure), nor
   that a step not done fails or stops anything. Reason: a step written only in prose is where one is missed, and
   nothing showed that it was. Held by `tests/steps-test.mjs`, which fails an entry with no step and a step with a
   check that cannot be taken out and mended, and by `tests/upgrade-test.mjs`: after the sync every step reads done,

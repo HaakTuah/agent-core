@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { CORE, CORE_SOURCE } from "../scripts/core-address.mjs";
 import { COMMAND } from "../scripts/helper-call.mjs";
 import { FILES, files, fill, filtered, GAME_ROWS, licences, linked, modules, named, options, READ, READY_ONLY, sizes, startOf, TEMPLATES } from "../scripts/init.mjs";
-import { scratch, scratchDir } from "../scripts/scratch-core.mjs";
+import { scratch, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
 import { evaluate } from "../scripts/workflow-run.mjs";
 import { mended } from "../scripts/mend.mjs";
@@ -468,8 +468,12 @@ if (p.status === 0) {
   fs.writeFileSync(sizesAt, was);
   ok(roomy.status === 0 && roomy.stdout.includes(`set it to ${own + 4000}`) && grownPast.status === 0 && grownPast.stdout.includes(`set it to ${own}`) && roomier.stdout.includes(`set it to ${own}`) && !/leaves [0-9]+ bytes of room/.test(sizeCheck().stdout),
     "a total set when it counted the core's copy passes, and a note gives the mark that keeps the project's room in one step, a KB above its own at least, after the core grew past that room too; a total of the project's own says nothing", `${roomy.stdout}\n${grownPast.stdout}\n${roomier.stdout}`);
-  const again = run(p.dir, script, "--owner", "someone-else");
-  ok(again.status === 1 && again.out.includes("never overwrites") && git(p.dir, "status", "--porcelain") === "", "run again, it overwrites nothing and says which files stand");
+  // (run again, the project holds the core: the kit hands it to the sync, the one process for such a project (#1083),
+  // which reaches the scratch core by the core's own address; at the same pin it moves nothing, and the process finds
+  // nothing to write)
+  const again = spawnSync(process.execPath, [script, "--owner", "someone-else", "--at", pin], { cwd: p.dir, env: scratchEnv(core, tmp), encoding: "utf8" });
+  const said = `${again.stdout}${again.stderr}`;
+  ok(again.status === 0 && said.includes("taken by the sync") && said.includes("nothing to write") && git(p.dir, "status", "--porcelain") === "", "run again, it takes the project the sync's way, the same process, and changes nothing", said);
 }
 git(core, "reset", "-q", "--hard", pin); // (the copies cases are over: the projects below take the core whole again, tests/ and the pin as scratch() made them)
 const q = project("private-game", "--owner", "x", "--private", "--game", "--name", "A private game");

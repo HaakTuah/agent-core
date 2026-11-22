@@ -93,8 +93,10 @@ const calls = read(p, ".github/workflows/core.yml");
 ok(s.status === 0 && s.out.includes(`${SHA(A)} -> ${SHA(B)}`) && read(p, "core-manifest.md") === manifest(OWNER, B), "the sync takes a project that follows main to the core's newest commit, and moves the manifest's pin", s.out);
 ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) && s.out.includes("personal-terms.yml"), "  it moves a call whose workflow changed, and leaves one whose workflow did not", calls);
 ok(s.out.includes("a note for the test"), "  and prints the sync notes the core gained between the two pins", s.out);
-ok(/For the sync PR's description[\s\S]*Steps not done[\s\S]*security review shown on every pull request[\s\S]*Beside a fresh start[\s\S]*AGENTS\.md: missing/.test(s.out),
-  "  then, from the copy it wrote, every step not done, a standing one too, and every difference from a fresh start, for the PR's description", s.out);
+ok(/The core's files and parts written[\s\S]*AGENTS\.md[\s\S]*For the sync PR's description[\s\S]*Steps not done[\s\S]*security review shown on every pull request[\s\S]*Beside a fresh start/.test(s.out),
+  "  then, from the copy it wrote, what the core owns written by the one process (#1083), and every step not done, a standing one too, and every difference from a fresh start, for the PR's description", s.out);
+ok(read(p, "AGENTS.md").includes("<!-- The core's part ends. -->") && read(p, ".github/workflows/core.yml") === calls && /Left as the project's[\s\S]*\.github\/workflows\/core\.yml is not the core's/.test(s.out),
+  "  the kit's files the project lacked are written, and a workflow of its own that is no kit's is left as it stands and named", s.out);
 git(p, "add", "-A");
 git(p, "commit", "-q", "-m", "sync");
 const LEGIT = git(p, "rev-parse", "HEAD");
@@ -155,10 +157,13 @@ const outside = path.join(tmp, "same-outside.md");
 const tries = [
   ["a job added to a workflow", () => write(p, ".github/workflows/core.yml", calls.replace("jobs:\n", "jobs:\n  evil:\n    runs-on: ubuntu-latest\n    steps: [{run: \"echo evil\"}]\n")), "lines added or removed, not only a pin moved"],
   ["a job removed from a workflow", () => write(p, ".github/workflows/core.yml", calls.replace(/  terms:\n[^]*$/u, "")), "lines added or removed, not only a pin moved"],
-  ["a new workflow", () => write(p, ".github/workflows/new.yml", "on: push\n"), "a file created, deleted or given a new mode"],
+  ["a new workflow", () => write(p, ".github/workflows/new.yml", "on: push\n"), ".github/workflows/new.yml: lines added or removed"],
   ["a workflow deleted", () => fs.rmSync(path.join(p, ".github/workflows/core.yml")), "a file created, deleted or given a new mode"],
-  ["a file outside core/ edited", () => write(p, "README.md", "# A project, changed\n"), "README.md: not the core's copy, its pin or a workflow"],
-  ["a hook's settings added", () => write(p, ".claude/settings.json", "{}\n"), ".claude/settings.json: not the core's copy, its pin or a workflow"],
+  ["a file outside core/ edited", () => write(p, "README.md", "# A project, changed\n"), "README.md: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
+  ["a hook's settings added", () => write(p, ".claude/settings.json", "{}\n"), ".claude/settings.json: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
+  ["the core's part of a rule file written otherwise", () => write(p, "AGENTS.md", read(p, "AGENTS.md").replace("@core/roles/builder.md\n", "@core/roles/builder.md\n@evil.md\n")), "AGENTS.md: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
+  ["a word outside the core's part of a rule file changed", () => write(p, "AGENTS.md", read(p, "AGENTS.md").replace("## Commands", "## Commands, changed")), "AGENTS.md: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
+  ["a file of the core's written otherwise", () => write(p, ".github/workflows/look.yml", `${read(p, ".github/workflows/look.yml")}# more\n`), ".github/workflows/look.yml: lines added or removed"],
   ["core/ edited", () => write(p, "core/README.md", `${read(p, "core/README.md")}x\n`), NOT_COPY, DIFFERS],
   ["a file added under core/", () => write(p, "core/extra.md", "x\n"), NOT_COPY, DIFFERS],
   ["a mode change on a workflow", () => { git(p, "update-index", "--chmod=+x", ".github/workflows/core.yml"); return "staged"; }, "a file created, deleted or given a new mode"],
@@ -168,7 +173,7 @@ const tries = [
   ["the manifest and a call pinned to a commit not on the core's main", () => { write(p, "core-manifest.md", manifest(OWNER, SIDE)); write(p, ".github/workflows/core.yml", calls.replace(`personal-terms.yml@${B}`, `personal-terms.yml@${SIDE}`)); }, `${SIDE} is not a commit of the core's main`],
   ["text added beside a pin", () => write(p, ".github/workflows/core.yml", calls.replace(`personal-terms.yml@${B}`, `personal-terms.yml@${B} # ok`)), "a change beyond a pin"],
   ["every workflow line given a carriage return", () => write(p, ".github/workflows/core.yml", calls.replace(/\n/g, "\r\n")), "a changed line with no pin, or one not the new pin"],
-  ["a .gitattributes added at the root", () => write(p, ".gitattributes", "* text eol=crlf\n"), ".gitattributes: not the core's copy, its pin or a workflow"],
+  ["a .gitattributes added at the root", () => write(p, ".gitattributes", "* text eol=crlf\n"), ".gitattributes: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
   ["core/ made a submodule", () => { removeCore(); git(p, "update-index", "--add", "--cacheinfo", `160000,${B},core`); return "staged"; }, NOT_COPY, NO_FOLDER],
   ["core/ made a submodule's pointer whose id is the copy's own tree", () => { const tree = git(p, "rev-parse", "HEAD:core"); removeCore(); git(p, "update-index", "--add", "--cacheinfo", `160000,${tree},core`); return "staged"; }, NOT_COPY, NO_FOLDER],
   ...(canLink ? [["a file of core/ made a link to an identical file outside the project", () => { fs.copyFileSync(path.join(p, "core/README.md"), outside); fs.rmSync(path.join(p, "core/README.md")); fs.symlinkSync(path.relative(path.join(p, "core"), outside), path.join(p, "core/README.md")); }, NOT_COPY, DIFFERS]] : []),
