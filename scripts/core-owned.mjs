@@ -5,9 +5,10 @@
 // The first line of each workflow and Dependabot config the kit writes, which says the file is the core's, and the two
 // lines that hold the core's part of a rule file of the project's own (AGENTS.md, CLAUDE.md), as their templates write them.
 // (the part's marks name no path: a project whose copy stands elsewhere has each core/ in the kit's text written as its
-// copy's path, and the marks are read word for word; the workflows' mark is read by its opening alone)
+// copy's path, and the marks are read word for word; the workflows' mark is read by its opening alone; the opening
+// mark holds fewer words than the copies check's window of twelve, so the two rule files that hold it hold no copy)
 export const MARK = "# The core's file: core/scripts/converge.mjs writes it from the starter kit at each sync. To keep a change of the project's own, take this line out and name the file in core-manifest.md's \"Differences\".";
-export const BEGIN = "<!-- The core's part: each sync writes it from the core's starter kit (converge.mjs); the project's own words stand outside it. -->";
+export const BEGIN = "<!-- The core's part: a sync writes it; write yours outside. -->";
 export const END = "<!-- The core's part ends. -->";
 export const marked = to => /^\.github\/(?:workflows\/[^/]+\.yml|dependabot\.yml)$/u.test(to);
 
@@ -64,5 +65,10 @@ function partConverged(now, want, older) {
   if (at === "many") return { left: "its part of the core cannot be told apart (the core's marks stand more than once or apart, or more than one run of import lines is the kit's): left as it is" };
   const eol = now.includes("\r\n") ? "\r\n" : "\n", block = part.replaceAll("\n", eol);
   const text = at === null ? `${now}${now.endsWith("\n") || now === "" ? "" : eol}${eol}${block}${eol}` : `${now.slice(0, at.at)}${block}${now.slice(at.end)}`;
-  return text === now ? {} : { text };
+  if (text === now) return {};
+  // (a run of imports from before the marks that no kit wrote as it stands, one the project took an import out of or
+  // reordered, is written as the kit writes it all the same, and named, so the change to its rule file is seen)
+  const runOf = t => (blockOf(t) ?? t).split("\n").map(l => l.replace(/\r$/u, "")).filter(imports).join("\n");
+  if (at?.lines && ![want, ...older].some(t => runOf(t) === at.lines.join("\n"))) return { text, left: "held a run of the kit's imports that no kit writes as it stood (one taken out or moved): the core's part is written over it as this kit writes it, so check that no import the project took out on purpose came back" };
+  return { text };
 }

@@ -10,7 +10,8 @@
 //     before there were marks, the one run of import lines (each line "@" and a path) every line of which a kit
 //     writes; that part alone is written, every byte outside it kept, and a file with no such run gets it at its end;
 //   - the rest of what the kit writes (the manifest, SECURITY.md, the threat model, the progress file, the choice
-//     records, the checks' configs): the project's own from its first commit, written only where it is not there.
+//     records, the checks' configs): the project's own from its first commit, written only where it is not there, and
+//     only at the first copy (--first): later, each is a step's to ask, with the baseline a config needs beside it.
 // A file named in the manifest's "Differences" (a line that quotes its path) is the project's, and never written. A
 // value the project gives that lands in a file written (the owner's login, the project's name, the folders of npm and
 // NuGet, the pin, the copy's path) is held to its form first (floor topic 5), and where one is not, nothing is
@@ -20,6 +21,7 @@
 //   node core/scripts/converge.mjs [--older <dir>]          what it would write, and what it leaves as the project's
 //   node core/scripts/converge.mjs --write [--older <dir>]  writes it (<dir>: a folder of earlier kits, each a folder
 //                                                           holding setup/template/, as sync.mjs gives fresh.mjs)
+//   ... --first                                             at the first copy (sync.mjs): the project's own files too
 //   node core/scripts/converge.mjs --check --base <rev>     the check (checks.mjs runs it in the copies part, in
 //                                                           core.yml's job and copies.yml's, the base in CONVERGE_BASE):
 //                                                           fails where the pull request changed a file or part the
@@ -30,7 +32,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyAt } from "./workflow-calls.mjs";
 import { fresh, kind } from "./fresh.mjs";
-import { BLOCKS, blockOf, converged, lf, marked } from "./core-owned.mjs";
+import { BLOCKS, blockOf, converged, lf, marked, whole } from "./core-owned.mjs";
 import { NAME, TEMPLATES, linked, named } from "./init.mjs";
 import { project } from "./steps.mjs";
 import { inside } from "./step-paths.mjs";
@@ -60,11 +62,15 @@ export function unformed(p, { o, pin, unread }) {
 const outside = to => { try { inside(to, "the path"); return false; } catch { return true; } };
 
 // What the process does to the project `p`: [{ to, text }] to write, [{ to, why }] left as the project's. `kit` is
-// what this kit writes for it ([path, text]), `older` the earlier kits'.
-export function plan(p, kit, older = []) {
+// what this kit writes for it ([path, text]), `older` the earlier kits'. A file the project's own from its first commit
+// (neither a whole file of the core's nor a rule file it holds a part of) is written only where `first`, at the first
+// copy: at any later sync each is a step's to ask, with what it needs beside it (a config's baseline), and a sync that
+// created one would be no pure sync (floor rule 8 covers the core's own files and parts alone).
+export function plan(p, kit, older = [], { first = false } = {}) {
   const write = [], left = [];
   for (const [to, want] of kit) {
     if (p.differences.some(l => l.includes(`"${to}"`))) continue;
+    if (!first && !whole(to) && !BLOCKS.includes(to)) continue;
     if (outside(to)) { left.push({ to, why: "lies outside the project, where the manifest places it: never written" }); continue; }
     const link = linked(p.root, to);
     if (link) { left.push({ to, why: `stands under the link ${link}, which the process never writes through` }); continue; }
@@ -97,7 +103,7 @@ function run(argv) {
   const { kit, before } = kits(p, older, k);
   const out = kit.map(([to]) => to).filter(outside);
   if (out.length) { for (const to of out) console.error(`FAIL ${to}, where core-manifest.md places a file the kit writes, lies outside the project. Mend: name a path inside the project in that row; the process wrote nothing.`); process.exitCode = 1; return; }
-  const { write, left } = plan(p, kit, before);
+  const { write, left } = plan(p, kit, before, { first: argv.includes("--first") });
   const writing = argv.includes("--write");
   for (const { to, text } of write) {
     if (!writing) continue;
@@ -117,7 +123,7 @@ function check(p, base) {
   const k = kind(p), bad = unformed(p, k);
   if (bad.length) { console.log(`the core's files and parts could not be read against the kit: ${bad.join("; ")}`); return; }
   const { kit } = kits(p, null, k);
-  const wrong = [];
+  const wrong = [], stale = [];
   for (const [to, want] of kit) {
     if (!changed.includes(to) || p.differences.some(l => l.includes(`"${to}"`))) continue;
     const now = p.read(to, true);
@@ -125,11 +131,22 @@ function check(p, base) {
     const ours = BLOCKS.includes(to) ? blockOf(now) !== null : marked(to) && /^# The core's file:/u.test(now);
     if (!ours) continue;
     const same = BLOCKS.includes(to) ? lf(blockOf(now)) === blockOf(want) : now === want;
-    if (!same) wrong.push(to);
+    if (same) continue;
+    // (a part or file that stood so on the base, and that the pull request left as it was, is reported, never failed)
+    const was = atBase(p, base, to), part = t => t === null ? null : lf(blockOf(t) ?? "");
+    const stood = BLOCKS.includes(to) ? was !== null && part(was) === part(now) : was !== null && was !== want && marked(to) && /^# The core's file:/u.test(was);
+    if (stood) stale.push(to);
+    else wrong.push(to);
   }
+  for (const to of stale) console.log(`${to}: ${BLOCKS.includes(to) ? "the core's part of it" : "the core's file"} stood otherwise than the core writes it before this pull request, which ${BLOCKS.includes(to) ? "left that part as it was" : "did not bring it nearer"}: reported, not failed. Mend, in a task: run \`node ${copyAt(p)}scripts/converge.mjs --write\` and commit what it writes.`);
   for (const to of wrong) console.log(`FAIL ${to}: ${BLOCKS.includes(to) ? "the core's part of it" : "the core's file"} is not as the core writes it for this project at its pin. Mend: run \`node ${copyAt(p)}scripts/converge.mjs --write\`, which writes it again, and commit it; or, to keep the change as the project's own, ${BLOCKS.includes(to) ? "write it outside the core's part" : "take out its first line, the core's mark, and name the file in core-manifest.md's \"Differences\" on the owner's word"}.`);
   if (wrong.length) process.exitCode = 1;
   else console.log("the core's files and parts the pull request changed are as the core writes them");
+}
+
+// The file `to` as the base holds it, or null where it holds none.
+function atBase(p, base, to) {
+  try { return execFileSync("git", ["show", `${base}:${to}`], { cwd: p.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }); } catch { return null; }
 }
 
 if (started(import.meta.url)) {

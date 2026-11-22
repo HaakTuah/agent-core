@@ -191,7 +191,7 @@ function sync(tmp) {
   install(dir);
 
   const { moved, unread } = moveCalls(pin, tmp, own);
-  if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); converge(dir, null); return; }
+  if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); converge(dir, null, true); return; }
   sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp);
   const kits = kitsOf(old, tmp);
   converge(dir, kits);
@@ -201,12 +201,18 @@ function sync(tmp) {
 // What the core owns, written from the new copy's own kit by the one process (#1083; converge.mjs, beside this file),
 // with the earlier kits by which it knows a file of the core's that carries no mark yet; a copy from before it has none.
 // What it leaves as the project's it says, for the sync PR's description; where it refuses, it says why and the mend.
-function converge(dir, kits) {
+// At the first copy (`first`) it writes the project's own files the kit writes too, where they are not there. Where
+// the process refused, the sync says so in a line of its own and exits 1: the copy moved, the core's files did not.
+function converge(dir, kits, first = false) {
   const script = path.join(dir, "scripts", "converge.mjs");
   if (!fs.existsSync(script)) return;
-  const r = spawnSync(process.execPath, [script, "--write", ...(kits ? ["--older", kits] : [])], { encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
+  const r = spawnSync(process.execPath, [script, "--write", ...(kits ? ["--older", kits] : []), ...(first ? ["--first"] : [])], { encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
   const said = `${r.stdout ?? ""}${String(r.stderr ?? "").split("\n").filter(l => l.startsWith("FAIL")).join("\n")}`.trim();
   console.log(said || `${dir}/scripts/converge.mjs failed: run it again by itself to see why`);
+  if (r.status !== 0) {
+    console.log(`FAIL the core's files and parts were not written: the one process refused, as it says above, though ${dir}/ moved. Mend: make the mend it names, then run \`node ${dir}/scripts/sync.mjs <the manifest's pin>\` again, which at the same pin moves nothing and writes them, and commit what it writes in this pull request.`);
+    process.exitCode = 1;
+  }
 }
 
 // The new copy's packages, installed from its lock file by its own install script, into its .packages/node_modules/,

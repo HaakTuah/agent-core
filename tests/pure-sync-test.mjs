@@ -106,7 +106,18 @@ const LEGIT = git(p, "rev-parse", "HEAD");
 ok(entries(git(p, "rev-parse", "HEAD:core"), path.join(p, ".git")) === entries(copyTree(B, coreRepo), coreRepo), "  core/ is now the core's tree at B");
 
 // the proof, from the core at B, and the core's own check of the copy, as GitHub runs core.yml
-const pure = () => node(p, path.join(theCore, "scripts", "pure-sync.mjs"));
+// (its host's answer as GitHub's job gives it, from the event, for the clone's origin by its address on GitHub, which
+// git takes to the bare repository; pure-sync.mjs honours no test's stand-in)
+const GH_ORIGIN = "https://github.com/someone/project.git", event = path.join(tmp, "event.json");
+fs.writeFileSync(event, JSON.stringify({ repository: { full_name: "someone/project", private: false } }));
+git(p, "config", `url.${slash(origin)}.insteadOf`, GH_ORIGIN);
+const pure = () => {
+  git(p, "remote", "set-url", "origin", GH_ORIGIN);
+  try {
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
+    return { status: r.status, out: `${r.stdout}${r.stderr}` };
+  } finally { git(p, "remote", "set-url", "origin", origin); }
+};
 const coreCheck = () => {
   const sha = git(p, "rev-parse", "HEAD");
   git(p, "push", "-q", "-f", "origin", "HEAD:refs/heads/check");
@@ -135,7 +146,7 @@ const reviewCheck = () => {
   fs.writeFileSync(ghData, JSON.stringify({ "pulls/1$": pull, "issues/1/comments": [], "pulls/1/comments": [], "pulls/1/commits": [{ sha, parents: [{ sha: base }] }], "pulls/1/files": files }));
   fs.writeFileSync(ghLog, "");
   const github = { event_name: "pull_request", repository: "someone/project", actor: "someone", server_url: "https://github.com", run_id: "1", token: "not-a-token",
-    event: { action: "synchronize", pull_request: pull, repository: { default_branch: "main", private: false } } };
+    event: { action: "synchronize", pull_request: pull, repository: { default_branch: "main", private: false, full_name: "someone/project" } } };
   const [job] = runWorkflow(read(theCore, ".github/workflows/security-review.yml"), { github, base: reviewEnv, temp: tmp, inputs: { advisory: false },
     workspace: () => { const ws = fs.mkdtempSync(path.join(tmp, "ws-")); git(ws, "clone", "-q", origin, "."); return ws; },
     uses: { "actions/checkout": checkoutStandIn(env, tmp), "actions/setup-node": () => {} } });
@@ -220,6 +231,26 @@ git(p, "commit", "-q", "-m", "the sync, its own workflow swapped for the kit's")
 const swaps = pure();
 ok(rendered.status === 0 && read(p, ".github/workflows/core.yml") !== calls && swaps.status === 1 && /NOT PURE[^\n]*\.github\/workflows\/core\.yml/.test(swaps.out),
   "a workflow of the project's own that main marks export-ignore, swapped by the sync for the kit's render, is not pure", `${rendered.out}\n${swaps.out}`);
+git(p, "push", "-q", "-f", "origin", `${base}:main`);
+// main's part of AGENTS.md stale (an import of the kit's missing), and the sync writes it again as the process does:
+// pure, proved against the render, the host's answer from GitHub's event; with the test's stand-in alone answering,
+// which the proof does not honour, and gh giving none, the part is not proved and the sync is reviewed
+git(p, "checkout", "-q", "-B", "main-stale", base);
+write(p, "AGENTS.md", read(p, "AGENTS.md").replace("@core/roles/builder.md\n", ""));
+git(p, "commit", "-q", "-am", "the core's part stale");
+git(p, "push", "-q", "-f", "origin", "main-stale:main");
+git(p, "checkout", "-q", "-B", "sync-mends");
+git(p, "checkout", "-q", LEGIT, "--", ".");
+git(p, "commit", "-q", "-m", "the sync, the core's part written again");
+const mends = pure();
+ok(mends.status === 0 && read(p, "AGENTS.md").includes("@core/roles/builder.md\n"), "a sync that writes the core's part of a rule file again, as the process does, is pure, proved against the kit's render", mends.out);
+const silent = path.join(tmp, "gh-silent");
+fs.mkdirSync(silent, { recursive: true });
+fs.writeFileSync(path.join(silent, "gh"), "#!/bin/sh\necho 'gh: not signed in' >&2\nexit 1\n", { mode: 0o755 });
+git(p, "remote", "set-url", "origin", GH_ORIGIN);
+const standIn = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, CORE_HOST_ANSWERS: hostSays(), [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
+git(p, "remote", "set-url", "origin", origin);
+ok(standIn.status === 1 && /NOT PURE[^\n]*AGENTS\.md: the project's kind or values cannot be read/.test(`${standIn.stdout}${standIn.stderr}`), "  and with only the test's stand-in for the host answering, which the proof does not honour, it is not proved", `${standIn.stdout}${standIn.stderr}`);
 git(p, "push", "-q", "-f", "origin", `${base}:main`);
 git(p, "checkout", "-q", "sync");
 git(p, "reset", "-q", "--hard", LEGIT);

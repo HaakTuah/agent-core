@@ -363,6 +363,9 @@ function init(argv) {
     if (r.status !== 0) process.exitCode = r.status ?? 1;
     return;
   }
+  // (a manifest of the project's own with no "Core:" line would name no copy the kit writes: every later sync, step
+  // and check would refuse on it)
+  if (fs.existsSync(path.join(here, "core-manifest.md"))) fail("the project holds a core-manifest.md of its own with no \"Core:\" line, so the copy the starter kit writes would be named by no manifest, and it wrote nothing. Mend: move that file aside and run the starter kit again, which writes the manifest, then carry its rows over; or write its \"Core:\" line as the kit writes it and run the sync");
   const pin = pinOf(o);
   const moduleNames = modulesAt(pin);
 

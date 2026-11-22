@@ -56,6 +56,12 @@ try {
   commit(p.dir, "the process");
   const again = converge(p.dir, "--write");
   ok(again.out.includes("nothing to write") && git(p.dir, "status", "--porcelain") === "", "  run again, it changes nothing", again.out);
+  // (a run from before the marks that the project took an import out of: written as the kit writes it, and named)
+  write(p.dir, "AGENTS.md", read(p.dir, "AGENTS.md").replace(`${BEGIN}\n`, "").replace(`${END}\n`, "").replace("@core/roles/shared/inbox.md\n", ""));
+  const back = converge(p.dir, "--write");
+  ok(read(p.dir, "AGENTS.md").includes(`${BEGIN}\n`) && read(p.dir, "AGENTS.md").includes("@core/roles/shared/inbox.md\n") && /Left as the project's[\s\S]*AGENTS\.md held a run of the kit's imports that no kit writes as it stood/.test(back.out),
+    "  a run of the kit's imports the project took one out of is written as the kit writes it, and named", back.out);
+  git(p.dir, "checkout", "-q", "--", ".");
 
   // ---- what is the project's is never written ----
   write(p.dir, "core-manifest.md", read(p.dir, "core-manifest.md").replace(/^## Differences\r?\n+None\./m, '## Differences\n\n- ".github/workflows/delete-merged-branches.yml": kept as the project\'s own, on the owner\'s word.'));
@@ -124,6 +130,16 @@ try {
   const inside = check();
   ok(inside.status === 1 && /FAIL AGENTS\.md: the core's part of it/.test(inside.out) && /FAIL \.github\/workflows\/core\.yml: the core's file/.test(inside.out) && mended(inside.out),
     "  and fails one that makes a file or part the core marks other than the core writes it, with its mend", inside.out);
+  // (main's part, or a marked file, already stale: a pull request that leaves the part as it was, or does not bring the
+  // file back, is not failed for what stood before it; it is reported with the mend)
+  git(p.dir, "branch", "-f", "stale");
+  write(p.dir, "AGENTS.md", read(p.dir, "AGENTS.md").replace("## Commands, worded again", "## Commands, worded a third time"));
+  write(p.dir, ".github/workflows/core.yml", `${read(p.dir, ".github/workflows/core.yml")}# and more\n`);
+  commit(p.dir, "outside the stale part, and the stale workflow again");
+  const stood = converge(p.dir, "--check", "--base", "stale");
+  ok(stood.status === 0 && /AGENTS\.md: the core's part of it stood otherwise[^\n]*reported, not failed\. Mend/.test(stood.out) && /\.github\/workflows\/core\.yml: the core's file stood otherwise/.test(stood.out),
+    "  and passes, reporting it, one whose base already held the part or the file otherwise, where the part is left as it was", stood.out);
+  git(p.dir, "reset", "-q", "--hard", "stale");
   const env2 = spawnSync(process.execPath, ["core/scripts/converge.mjs"], { cwd: p.dir, env: { ...env, CONVERGE_BASE: "base" }, encoding: "utf8" });
   ok(env2.status === 1, "  as the copies part of checks.mjs runs it, its base in CONVERGE_BASE", `${env2.stdout}${env2.stderr}`);
   const noBase = spawnSync(process.execPath, ["core/scripts/converge.mjs"], { cwd: p.dir, env: { ...env, CONVERGE_BASE: "" }, encoding: "utf8" });

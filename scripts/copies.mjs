@@ -36,6 +36,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, unrooted } from "./guards.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
+import { whole } from "./core-owned.mjs";
 import { readBlobs } from "./blobs.mjs";
 import { projectAt } from "./core-path.mjs";
 import { keysOf, shapeFaults } from "./schemas.mjs";
@@ -421,7 +422,11 @@ const over = h => !(h in base.windows) || places.get(h) > base.windows[h];
 // (a copy in an agent tool's file that the baseline does not list yet: noted where the base held it, or where there is
 // no base to read against; #405)
 const before = c => inTools(c) && (!process.env.COPIES_BASE || c.windows.filter(over).every(h => stood(h, places.get(h))));
-const fresh = found.filter(c => c.windows.some(over) && !before(c)), unlisted = found.filter(c => c.windows.some(over) && before(c));
+// (a copy whose every place is a file the core writes whole, an agent tool's entry file of the starter kit's: the
+// kit's own text, which a sync writes and the core answers for, noted and failing nothing; core-owned.mjs, #1083)
+const kits = c => c.files.every(whole);
+const fresh = found.filter(c => c.windows.some(over) && !before(c) && !kits(c)), unlisted = found.filter(c => c.windows.some(over) && before(c) && !kits(c));
+for (const c of found.filter(c => c.windows.some(over) && kits(c))) console.log(`note ${logged(`a copy in the core's own files, as the starter kit writes them: ${c.places.join(" and ")} (it starts "${c.starts}")`)}: the core's text, failing nothing`);
 const shrunk = Object.keys(base.windows).filter(h => !places.has(h) || places.get(h) < base.windows[h]);
 for (const c of unlisted) console.log(`note ${logged(`an old copy in an agent tool's file, not yet in the baseline: ${c.places.join(" and ")} (it starts "${c.starts}")`)}: ${process.env.COPIES_BASE ? "the pull request's base held it" : "with no base to read against"}, so it fails nothing; list it with ${SELF} ${logged(configPath)} --tools, and commit ${logged(BASELINE)}`);
 for (const c of fresh) console.error(`FAIL: ${logged(`a new copy: ${c.places.join(' and ')} (it starts "${c.starts}")`)}. Mend: keep it in the one place it belongs and point there from the others`);

@@ -24,7 +24,7 @@ try {
   const g = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   const commit = what => { g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", what); return g("rev-parse", "HEAD").trim(); };
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of ["copies.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "schemas.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
+  for (const f of ["copies.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "schemas.mjs", "core-owned.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
   fs.cpSync(path.join(here, "schemas"), path.join(dir, "core/scripts/schemas"), { recursive: true });
   fs.cpSync(path.join(here, "..", ".packages"), path.join(dir, "core/.packages"), { recursive: true, filter: parserLeftOut });
   fs.copyFileSync(path.join(here, "..", ".gitignore"), path.join(dir, "core/.gitignore")); // (the copy's own: the installed packages, each install's, are no file of the project's)
@@ -58,6 +58,15 @@ try {
   r = check({ COPIES_BASE: base });
   ok(r.status === 1 && mended(r.out) && /^FAIL: a new copy: (\.agents\/rules\/new\.md:3-3 and docs\/a\.md:3-3|docs\/a\.md:3-3 and \.agents\/rules\/new\.md:3-3) .*Mend: keep it in the one place/m.test(r.out) && OLD.test(r.out), "a copy the base did not hold fails, saying its mend, while the old one is still noted", r.out);
   g("rm", "-q", "-f", ".agents/rules/new.md");
+  // (a copy whose every place is an entry file the core writes whole, as the starter kit writes them, is the kit's own
+  // text: noted, failing nothing, though the base did not hold it; #1083)
+  const KIT = "a file added to those lines is added here in the same pull request as the core asks";
+  put(".kiro/steering/core.md", `# The core, for Kiro\n\n${KIT}.\n`);
+  put(".agents/rules/core.md", `# The core, for Antigravity\n\n${KIT}.\n`);
+  g("add", "-A");
+  r = check({ COPIES_BASE: base });
+  ok(r.status === 0 && /^note a copy in the core's own files, as the starter kit writes them: [^\n]*\.kiro\/steering\/core\.md[^\n]*the core's text, failing nothing$/m.test(r.out), "a copy between two entry files the core writes whole, which the base did not hold, is noted as the kit's text and fails nothing", r.out);
+  g("rm", "-q", "-f", ".kiro/steering/core.md", ".agents/rules/core.md");
   put("GEMINI.md", `# Gemini\n\n${SAID}.\n`);
   g("add", "-A");
   r = check({ COPIES_BASE: base });
