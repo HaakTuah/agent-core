@@ -13,7 +13,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1085 | rule builder | #1081 |
 | #1087 | rule builder | #1083 |
 | #1086 | rule builder | |
-| #1093, with #1090 | rule builder | |
+| #1093, with #1090 | rule builder | #1084 |
 | #1091 | rule builder | #1085 |
 | #1092 | rule builder | #1091 |
 | #1094 | rule builder | #1092 |
