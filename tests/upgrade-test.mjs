@@ -442,6 +442,23 @@ function upgrade(p, from, ownChanges, expect) {
   const tall = checks(p, "pull_request", taller, { baseSha: main1, only: "copies.yml" }).filter(([, r]) => !r.passed);
   ok(tall.length === 1 && tall[0][1].steps.some(x => /1 function passes a mark[\s\S]*Mend: split each by what it does/.test(x.out)), `${p.name}: a pull request that adds a function past a mark fails, and its failure says the mend`, failures(tall) || "it passed");
 
+  // a workflow of the project's own that runs the core's workflow check with no install step before it (#1079): on a runner
+  // with no packages, the check says it did not run and fails nothing, and the step the sync prints is the guarded one
+  git(p.dir, "checkout", "-q", "-B", "own-run", main1);
+  fs.mkdirSync(path.join(p.dir, ".github/workflows"), { recursive: true });
+  fs.writeFileSync(path.join(p.dir, ".github/workflows/own-core-checks.yml"), "name: own-core-checks\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  own:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: node core/scripts/workflows.mjs\n");
+  git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "a workflow of its own that runs the core's workflow check");
+  const ownRun = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: main1, only: "own-core-checks.yml", ownToo: true });
+  ok(started(ownRun).length === 1 && !failures(ownRun) && ownRun.every(([, r]) => r.steps.some(x => /the package yaml is not installed[\s\S]*Mend:/.test(x.out))),
+    `${p.name}: a workflow of its own that runs the workflow check with no install step before it passes, the check saying it did not run, with its mend`, failures(ownRun) || ownRun.map(([, r]) => r.steps.map(x => x.out).join("\n")).join("\n"));
+  const unguarded = stepsIn(p.dir);
+  ok(unguarded.out.includes("if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi"), `${p.name}: the step the sync prints for that workflow gives the guarded install`, unguarded.out);
+  const bare = path.join(tmp, `${p.name}-core-run`);
+  git(tmp, "clone", "-q", "--branch", "own-run", p.dir, bare);
+  const coreRun = spawnSync(process.execPath, ["core/scripts/workflows.mjs", "--core"], { cwd: bare, env: base, encoding: "utf8" });
+  ok(coreRun.status === 1 && /the package yaml is not installed[\s\S]*Mend:/.test(`${coreRun.stdout}${coreRun.stderr}`), `${p.name}: the same check run as the core's own (--core) still fails where the package is missing, saying its mend`, `${coreRun.stdout}${coreRun.stderr}`);
+  git(p.dir, "checkout", "-q", "main");
+
   // every step a release asks reads done; each step the commit under test adds, taken out, is reported and mended
   git(p.dir, "checkout", "-q", "main");
   // (its own suite goes first: it lists the files that hold only calls to the core's workflows as they stood, and a

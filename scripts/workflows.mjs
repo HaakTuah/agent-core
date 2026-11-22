@@ -57,10 +57,10 @@ import { fileURLToPath } from "node:url";
 import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
 import { DEEPEST, LONGEST, pruned, twice } from "./yaml-keys.mjs";
-import { loadSync, unreached } from "./packages.mjs";
+import { installed, loadSync, unreached } from "./packages.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
-import { parseYaml } from "./parse-yaml.mjs";
+import { didNotRun, parseYaml } from "./parse-yaml.mjs";
 import { compared, run } from "./workflow-tools.mjs";
 
 const WORD = "pull_request_target";
@@ -404,8 +404,9 @@ if (started(import.meta.url)) {
   // (where the job's install could not reach the registry, in a project's pull request, the calls a draft skips, which
   // the YAML package reads, did not run, said as a warning; every failure above still fails:
   // #654, point 4)
-  const skipped = unreached("yaml");
-  if (skipped) console.log("::warning::The check for a file that is no YAML did not run, nor the one for a call a draft skips: the package yaml could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault");
+  // (#1079: a package not installed reads as one not fetched)
+  const skipped = unreached("yaml") || (!core && !installed("yaml"));
+  if (skipped) console.log(didNotRun("The check for a file that is no YAML did not run, nor the one for a call a draft skips", "yaml", copy));
   const against = core ? () => null : base ? show : null;
   const ready = skipped ? { fails: [], notes: [] } : unreadied(texts, against);
   const bad = core && !skipped ? unparsed(texts) : { fails: [] };

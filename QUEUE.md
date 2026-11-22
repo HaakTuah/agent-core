@@ -7,10 +7,15 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #810 | the orchestrator, for its done-when: reads `main`'s runs, then closes it | a stretch of merges landing faster than a run; at the batch's end, if none came, the orchestrator reads `main`'s runs since #813 and closes #810 on that |
+| #1083 | rule builder; floor rule 8 | #1080 |
+| #1084 | rule builder | #1083 |
+| #1081 | rule builder | #1084 |
+| #1085 | rule builder | #1081 |
+| #1087 | rule builder | #1083 |
+| #1086 | rule builder | |
+| #810 | the orchestrator | the batch's end |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
-| #704 | builder; `tests.yml` | |
 | #770 | builder; `tests.yml` | #704 |
 | #772 | builder; `tests.yml` | #770 |
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
