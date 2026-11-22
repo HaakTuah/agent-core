@@ -29,6 +29,7 @@ import { CORE as ADDRESS, CORE_SOURCE as A } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
 import { followsOf, hostSaid, inBare, releasesIn } from "./releases.mjs";
 import { plan, unformed } from "./converge.mjs";
+import { BLOCKS, whole } from "./core-owned.mjs";
 import { fresh, kind } from "./fresh.mjs";
 import { privateOf } from "./host-private.mjs";
 import { project } from "./steps.mjs";
@@ -95,15 +96,21 @@ function pinsOnly(f) {
 
 // The core's own files and parts the sync changed, each proved equal, byte for byte, to what the one process writes
 // (converge.mjs, as this checkout of the core's main holds it) from the kit at the new pin, with the project as main
-// holds it and the new pin, every byte outside the core's part kept; a file it would leave as the project's is held to
-// the pins alone, as any workflow is. `dir`: the core's main and releases, fetched.
+// holds it and the new pin, every byte outside the core's part kept. Only the core's own: a whole file of the core's
+// (core-owned.mjs, `whole`) and the core's part of a rule file that main holds; never a file that is the project's from
+// its first commit (the manifest, SECURITY.md, the threat model, a config), nor a rule file created whole, though the
+// process writes those where they are not there (floor rule 8 covers the core's files and parts alone; #1083). A file
+// it would leave as the project's, or where nothing can be rendered (no kit at the pin, the kind or the project's values
+// unread), is held to the pins alone where it is a workflow, as before the process, and refused otherwise. `dir`: the
+// core's main and releases, fetched.
 function provedOwned(dir) {
   if (!later.length) return;
+  const unproved = (why) => { for (const f of later) { if (WORKFLOW.test(f)) pinsOnly(f); else fail.push(`${f}: ${why}`); } };
   const tmp = mkdtempSync(join(tmpdir(), "core-render-")), kits = join(tmp, "kits"), base_ = join(tmp, "project");
   try {
     const tree = (sha, to) => { mkdirSync(to, { recursive: true }); execFileSync("tar", ["-x", "-f", "-", "-C", to], { input: inBare(dir, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 }) }); };
-    // (a pin whose core holds no kit, or one git cannot read, proves no file outside the copy: refused, never a crash)
-    try { tree(pin, join(kits, "now")); } catch { fail.push(`${later.join(", ")}: the core at ${pin} holds no starter kit to render, so no file outside the copy is proved`); return; }
+    // (a pin whose core holds no kit, or one git cannot read, proves no file outside the copy: never a crash)
+    try { tree(pin, join(kits, "now")); } catch { unproved(`the core at ${pin} holds no starter kit to render, so it is not proved what the core's process writes`); return; }
     const older = [...new Set([oldPin, ...releasesIn(dir).map((r) => r.sha)])].flatMap((sha) => { try { tree(sha, join(kits, sha)); return [join(kits, sha)]; } catch { return []; } });
     // (the project as its main holds it, the copy left out, its manifest the head's, whose one change is the pin, read above)
     mkdirSync(base_);
@@ -112,16 +119,18 @@ function provedOwned(dir) {
     writeFileSync(join(base_, "core-manifest.md"), raw(["show", `${head}:core-manifest.md`]));
     // (whether it is private, as the host says it of the checkout's repository: host-private.mjs)
     const p = project(base_), k = kind(p, privateOf(process.cwd())), bad = unformed(p, k);
-    if (bad.length) { fail.push(`the project's kind or values cannot be read in their forms, so no file of the core's is proved: ${bad.join("; ")}`); return; }
-    const kit = fresh(p, join(kits, "now", "setup", "template"), { k });
-    if (!kit.length) { fail.push(`the kit at ${pin} gives no file this checkout of the core can render: a sync that writes the core's files is reviewed like any PR`); return; }
-    const { write } = plan(p, kit, older.map((at) => fresh(p, join(at, "setup", "template"), { k })));
+    if (bad.length) { unproved(`the project's kind or values cannot be read in their forms, so it is not proved what the core's process writes: ${bad.join("; ")}`); return; }
+    const kit = fresh(p, join(kits, "now", "setup", "template"), { kitOnly: true, k });
+    if (!kit.length) { unproved(`the kit at ${pin} gives no file this checkout of the core can render`); return; }
+    const { write } = plan(p, kit, older.map((at) => fresh(p, join(at, "setup", "template"), { kitOnly: true, k })));
+    const onMain = (f) => { try { raw(["cat-file", "-e", `${base}:${f}`]); return true; } catch { return false; } };
     for (const f of later) {
       const want = write.find((w) => w.to === f);
+      const owned = whole(f) || (BLOCKS.includes(f) && onMain(f));
       // (a workflow not written so, by a sync from a copy before the process among them, is held to its pins alone)
-      if (want && execFileSync("git", ["show", `${head}:${f}`], { maxBuffer: 1 << 26 }).equals(Buffer.from(want.text))) continue;
+      if (want && owned && execFileSync("git", ["show", `${head}:${f}`], { maxBuffer: 1 << 26 }).equals(Buffer.from(want.text))) continue;
       if (WORKFLOW.test(f)) pinsOnly(f);
-      else fail.push(`${f}: not the core's copy, its pin, a workflow's pins or what the core's process writes for the project at ${pin} (converge.mjs)`);
+      else fail.push(`${f}: not the core's copy, its pin, a workflow's pins or what the core's process writes of the core's own files and parts for the project at ${pin} (converge.mjs)`);
     }
   } finally {
     rmSync(tmp, { recursive: true, force: true });

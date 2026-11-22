@@ -103,6 +103,14 @@ try {
   const refusedHost = privateOf(hosted, { env: { GITHUB_EVENT_PATH: event }, ask: () => { throw new Error("gh: Not Found (HTTP 404)"); } });
   ok(/could not be read: GitHub gave gh no answer \(gh: Not Found \(HTTP 404\)\)\. Mend: sign gh in/.test(refusedHost.unread ?? ""), "  an event of another repository is not read, and where gh gives no answer, it says so with the mend", JSON.stringify(refusedHost));
 
+  // ---- a path the manifest places outside the project (floor rule 13) ----
+  const placed = read(p.dir, "core-manifest.md");
+  write(p.dir, "core-manifest.md", placed.replace("| *mutation tool* |", "| *shape check* | `../escaped-shape.json` |\n| *mutation tool* |"));
+  const escaped = converge(p.dir, "--write");
+  ok(read(p.dir, "core-manifest.md").includes("../escaped-shape.json") && !fs.existsSync(path.join(p.dir, "..", "escaped-shape.json")) && escaped.status === 1 && /FAIL \.\.\/escaped-shape\.json, where core-manifest\.md places a file the kit writes, lies outside the project/.test(escaped.out) && mended(escaped.out),
+    "a file the manifest places outside the project is never written: the process writes nothing and says the mend", escaped.out);
+  git(p.dir, "checkout", "-q", "--", ".");
+
   // ---- the check, on a pull request ----
   git(p.dir, "branch", "-f", "base");
   const check = () => converge(p.dir, "--check", "--base", "base");

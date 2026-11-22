@@ -73,10 +73,9 @@ The calls from a cloud session: `tasks/github-calls.md`.
   pull request with a short description (its first line and the line `Waits on:`), writes the full description in one
   edit after its last push and before it marks the pull request ready, and after that edits it only where what it says
   changes (a review's fix, what it waits on), gathering the changes that come together into one edit. It does not mean
-  that a description is left untrue, or a `Waits on:` line left stale, to save an edit, nor that a draft carries no
-  description. Reason: each edit of a description starts the checks that read it (two jobs in the core, about 76 an
-  hour on 19 November 2026, #820), which hold runner slots and, on a private repository's free plan, bill a whole
-  minute each. Held by nothing yet.
+  that a description is left untrue to save an edit. Reason: each edit of a description starts the checks that read it
+  (two jobs in the core, about 76 an hour on 19 November 2026, #820), which hold runner slots and, on a private
+  repository's free plan, bill a whole minute each. Held by nothing yet.
 - **Push after every commit,** even before the PR opens (a draft if not ready).
   - Before pushing to a branch whose PR you opened earlier, check whether it merged; if it did, start a new branch and
     PR.

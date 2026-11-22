@@ -191,6 +191,21 @@ for (const [what, alter, refused, coreFails] of tries) {
   git(p, "reset", "-q", "--hard", LEGIT);
   git(p, "clean", "-q", "-fd");
 }
+// a file that is the project's from its first commit (SECURITY.md), which main lacks and the sync creates as the kit
+// renders it: not pure, since floor rule 8 covers the core's own files and parts alone (#1083)
+git(p, "checkout", "-q", "-B", "main-lacking", base);
+git(p, "rm", "-q", "SECURITY.md");
+git(p, "commit", "-q", "-m", "SECURITY.md taken out");
+git(p, "push", "-q", "-f", "origin", "main-lacking:main");
+git(p, "checkout", "-q", "-B", "sync-creates");
+git(p, "checkout", "-q", LEGIT, "--", ".");
+git(p, "commit", "-q", "-m", "the sync, SECURITY.md created");
+const creates = pure();
+ok(creates.status === 1 && /NOT PURE[^\n]*SECURITY\.md: not the core's copy, its pin, a workflow's pins or what the core's process writes of the core's own files and parts/.test(creates.out) && read(p, "SECURITY.md") === git(p, "show", `${LEGIT}:SECURITY.md`) + "\n",
+  "a file that is the project's own, created by the sync where main lacks it, is not pure, though it is what the kit renders", creates.out);
+git(p, "push", "-q", "-f", "origin", `${base}:main`);
+git(p, "checkout", "-q", "sync");
+git(p, "reset", "-q", "--hard", LEGIT);
 // a file's executable bit alone: no difference to either (a copy made on Windows records none)
 git(p, "update-index", "--chmod=+x", "core/README.md");
 git(p, "update-index", "--chmod=-x", "core/scripts/work-saved.sh");

@@ -33,6 +33,7 @@ import { fresh, kind } from "./fresh.mjs";
 import { BLOCKS, blockOf, converged, lf, marked } from "./core-owned.mjs";
 import { NAME, TEMPLATES, linked, named } from "./init.mjs";
 import { project } from "./steps.mjs";
+import { inside } from "./step-paths.mjs";
 import { started } from "./started.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -54,12 +55,17 @@ export function unformed(p, { o, pin, unread }) {
   return bad;
 }
 
+// Whether a path the kit writes lies outside the project (a row of the manifest that places it with ".." or from the
+// root): floor rule 13 and topic 5.
+const outside = to => { try { inside(to, "the path"); return false; } catch { return true; } };
+
 // What the process does to the project `p`: [{ to, text }] to write, [{ to, why }] left as the project's. `kit` is
 // what this kit writes for it ([path, text]), `older` the earlier kits'.
 export function plan(p, kit, older = []) {
   const write = [], left = [];
   for (const [to, want] of kit) {
     if (p.differences.some(l => l.includes(`"${to}"`))) continue;
+    if (outside(to)) { left.push({ to, why: "lies outside the project, where the manifest places it: never written" }); continue; }
     const link = linked(p.root, to);
     if (link) { left.push({ to, why: `stands under the link ${link}, which the process never writes through` }); continue; }
     let there = false;
@@ -89,6 +95,8 @@ function run(argv) {
   const k = kind(p), bad = unformed(p, k);
   if (bad.length) { for (const b of bad) console.error(`FAIL ${b}; the process wrote nothing.`); process.exitCode = 1; return; }
   const { kit, before } = kits(p, older, k);
+  const out = kit.map(([to]) => to).filter(outside);
+  if (out.length) { for (const to of out) console.error(`FAIL ${to}, where core-manifest.md places a file the kit writes, lies outside the project. Mend: name a path inside the project in that row; the process wrote nothing.`); process.exitCode = 1; return; }
   const { write, left } = plan(p, kit, before);
   const writing = argv.includes("--write");
   for (const { to, text } of write) {
