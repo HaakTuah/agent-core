@@ -12,7 +12,7 @@
 // kit at the new pin for the project as its main holds it, so nothing outside the core's files and parts changed, and
 // each other changed line differs from the one it replaces only in the manifest's pin or a call's to a core workflow,
 // each moved to the new pin; a file is created only so, and deleted only as `provedGone` below proves it (a call whose
-// check the one job of core.yml the process writes runs, the pin's tree holding the process); the new pin is
+// check the one job of the core.yml the process ends with runs, the pin's tree holding the process); the new pin is
 // a commit of the core's main at or past the old one, and, where the manifest follows the core's releases, a release
 // of the core (any other sync is reviewed like any PR, and merges after it); the copy is a folder, and the core's tree at
 // that pin, compared as copy-tree.mjs compares (and says why), without the folder the core keeps to itself; and every
@@ -166,7 +166,7 @@ function provedGone(dir, write, remove) {
   const at_ = (sha) => { try { return execFileSync("git", ["show", `${sha}:${CORE_YML}`], { maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; } };
   const folds = write.find((w) => w.to === CORE_YML), headCore = at_(head), baseCore = at_(base);
   const runs = headCore !== null && (folds ? headCore.equals(Buffer.from(folds.text)) : baseCore !== null && headCore.equals(baseCore));
-  for (const f of gone) if (!remove.some((r) => r.to === f) || !runs) fail.push(`${f}: deleted, and not a workflow of the core's whose check the one job of the core.yml the core's process writes at ${pin} runs, which alone it takes out (converge.mjs)`);
+  for (const f of gone) if (!remove.some((r) => r.to === f) || !runs) fail.push(`${f}: deleted, and not a workflow of the core's whose check the one job of the core.yml the core's process at ${pin} ends with runs, which alone it takes out (converge.mjs)`);
 }
 
 // every pin the branch ends with: the manifest's and each call's
