@@ -56,6 +56,11 @@ export function converged(to, now, want, older = []) {
   return now === want ? {} : { text: want };
 }
 
+// Whether a whole file of the core's that the kit no longer writes, standing as `now`, is to be taken out: it carries
+// the core's mark, or it is, but for its mark and its pins, what an earlier kit wrote (`older`); any other is the
+// project's and stays.
+export const dropped = (to, now, older) => whole(to) && ((marked(to) && /^# The core's file:/u.test(now)) || older.some(t => plainOf(t) === plainOf(now)));
+
 // A rule file of the project's own after the process: its core's part written where it stands, or at its end.
 function partConverged(now, want, older) {
   const part = blockOf(want);

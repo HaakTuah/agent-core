@@ -378,13 +378,16 @@ const started = results => results.filter(([, r]) => r.ran).map(([where]) => whe
 
 // Whether a step of a workflow of the project's ran, in a set of results.
 // (a step of the core's own, or one of those scripts/checks.mjs runs within it, which it names on a line "== <name>")
+// The workflow that holds the copies part: copies.yml, or, in a private project as the starter kit writes it, the one
+// job of core.yml, which folds it
+const copiesIn = p => fs.existsSync(path.join(p.dir, ".github/workflows/copies.yml")) ? "copies.yml" : "core.yml";
 const ran = (results, file, step) => results.some(([where, r]) => where.startsWith(`${file}/`) && r.steps.some(x => x.ran && (x.name === step || (x.out ?? "").split(/\r?\n/).includes(`== ${step}`))));
 const jobRan = (results, file) => results.some(([where, r]) => where.startsWith(`${file}/`) && r.ran);
 
 function upgrade(p, from, ownChanges, expect) {
   git(p.dir, "commit", "-q", "-m", "the starter kit");
   git(p.dir, "push", "-q", "origin", "main");
-  const main0 = git(p.dir, "rev-parse", "HEAD");
+  const main0 = p.main0 = git(p.dir, "rev-parse", "HEAD");
   // a pull request of the project's own, before the sync: which jobs it starts
   const own = (from, change) => { git(p.dir, "checkout", "-q", "-B", "change", from); change(p.dir); git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "a change of its own"); git(p.dir, "push", "-q", "-f", "origin", "change"); return git(p.dir, "rev-parse", "HEAD"); };
   const was = ownChanges.map(([what, change]) => [what, started(checks(p, "pull_request", own(main0, change), { baseSha: main0, dry: true }))]);
@@ -485,17 +488,17 @@ function upgrade(p, from, ownChanges, expect) {
   // a change that makes something worse than it stood fails, and the mend as the failure words it passes
   const copied = fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/).find(l => /^- It is never pushed to/.test(l)) ?? "";
   const worse = own(main1, dir => fs.appendFileSync(path.join(dir, "SECURITY.md"), `\n${copied}\n`));
-  const failing = checks(p, "pull_request", worse, { baseSha: main1, only: "copies.yml" }).filter(([, r]) => !r.passed);
+  const failing = checks(p, "pull_request", worse, { baseSha: main1, only: copiesIn(p) }).filter(([, r]) => !r.passed);
   ok(copied && failing.length === 1 && failing[0][1].steps.some(x => /a new copy:[\s\S]*Mend: keep it in the one place it belongs and point there from the others/.test(x.out)), `${p.name}: a pull request that adds a copy fails, and its failure says the mend`, failures(failing) || "it passed");
   git(p.dir, "checkout", "-q", "change");
   git(p.dir, "checkout", "-q", main1, "--", "SECURITY.md");
   git(p.dir, "commit", "-q", "-m", "point to one place instead");
-  const mended = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: main1, only: "copies.yml" });
+  const mended = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: main1, only: copiesIn(p) });
   ok(mended.length && !failures(mended), `${p.name}: the mend as the failure words it, the copy taken out, passes`, failures(mended));
   // (the shape check holds from the sync on, though the project has written no config of it yet: the pull request's
   // base is its baseline, so the old function past a mark and the old cycle passed above, and a new one fails)
   const taller = own(main1, dir => fs.writeFileSync(path.join(dir, "src/newer.js"), `export function newer(a) {\n${"  a += 1;\n".repeat(70)}  return a;\n}\n`));
-  const tall = checks(p, "pull_request", taller, { baseSha: main1, only: "copies.yml" }).filter(([, r]) => !r.passed);
+  const tall = checks(p, "pull_request", taller, { baseSha: main1, only: copiesIn(p) }).filter(([, r]) => !r.passed);
   ok(tall.length === 1 && tall[0][1].steps.some(x => /1 function passes a mark[\s\S]*Mend: split each by what it does/.test(x.out)), `${p.name}: a pull request that adds a function past a mark fails, and its failure says the mend`, failures(tall) || "it passed");
 
   // a workflow of the project's own that runs the core's workflow check with no install step before it (#1079): on a runner
@@ -540,7 +543,7 @@ function upgrade(p, from, ownChanges, expect) {
     git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "what the release asks of every project");
     // (the mend is a pull request of the project's own: it passes the copies workflow, where the checks that read a
     // config or a rule file against the pull request's base run; the other workflows read nothing a mend changes)
-    const onMend = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: unmended, only: "copies.yml" });
+    const onMend = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: unmended, only: copiesIn(p) });
     ok(!failures(onMend) && onMend.some(([, r]) => r.ran), `${p.name}: the pull request that makes those mends passes the copies workflow's checks, read against the project before it`, failures(onMend));
   }
   r = stepsIn(p.dir);
@@ -596,6 +599,27 @@ function parserUnnamed(p) {
   ok(!failures(read) && read.some(([, r]) => r.ran) && !/::warning::The shape check did not read/u.test(shapeOut(read)),
     `${p.name}: and with its install step naming every install, as the mend says, it reads C#'s functions again, warning nothing`, `${failures(read)}\n${shapeOut(read).slice(-1500)}`);
   git(p.dir, "checkout", "-q", "main"); git(p.dir, "branch", "-q", "-D", "change");
+}
+
+// The private project's calls as its earlier kit wrote them, which the sync, through the one process, took out (#1101,
+// point 2): the separate copies, description and NuGet calls that the starter kit's one job of core.yml folds, gone
+// once it synced; written back on main as they stood before it, for the cases below, which take a project with its
+// calls kept as they were through the steps that bring them to the kit's (#373, #375, #376).
+function asItStood(p) {
+  git(p.dir, "checkout", "-q", "main");
+  const folded = ["copies.yml", "pr-description.yml", "nuget.yml"].map(f => `.github/workflows/${f}`);
+  const had = folded.filter(f => { try { git(p.dir, "cat-file", "-e", `${p.main0}:${f}`); return true; } catch { return false; } });
+  ok(had.length >= 2 && !folded.some(f => fs.existsSync(path.join(p.dir, f))), `${p.name}: the calls its earlier kit wrote that the one job of core.yml folds (${had.length}) are taken out by the sync, as a new project of its kind lacks them`, had.join("\n"));
+  // (the calls the cases read, each as the release's own sync left it: as before, its pins moved to the manifest's)
+  const pin = /^Core: \S+ at ([0-9a-f]{40}),/m.exec(fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8"))[1];
+  for (const f of [...folded, ...["core.yml", "personal-terms.yml", "signatures.yml"].map(w => `.github/workflows/${w}`)]) {
+    let was;
+    try { was = git(p.dir, "show", `${p.main0}:${f}`); } catch { continue; }
+    fs.writeFileSync(path.join(p.dir, f), `${was.replace(/(\/\.github\/workflows\/[\w.-]+@)[0-9a-f]{40}/g, `$1${pin}`)}\n`);
+  }
+  git(p.dir, "add", "-A");
+  git(p.dir, "commit", "-q", "-m", "its calls kept as they were");
+  git(p.dir, "push", "-q", "origin", "main");
 }
 
 // A private repository's NuGet check bills no job a pull request cannot need (#373): its call with the starter kit's
@@ -990,8 +1014,9 @@ for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newe
   upgrade(dotnetProject, from, [["touches only its docs", dir => write(dir, "README.md", "# A .NET project\r\n\r\nMore words.\r\n")],
     ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
   (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
-    ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
+    ...(sdk ? [[["nuget.yml", "core.yml"].some(f => ran(results, f, "Restore each project file from its lock file alone")) === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
   readersAgainstTools(dotnetProject); // (and against the .NET SDK, held as Windows holds it)
+  asItStood(dotnetProject);
   nugetInPrivate(dotnetProject);
   parserUnnamed(dotnetProject);
   if (tag === starts.at(-1)) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); } // (the kit's calls are the same from either release)

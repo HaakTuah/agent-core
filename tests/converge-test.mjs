@@ -14,6 +14,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { BEGIN, END, partIn } from "../scripts/core-owned.mjs";
+import { kits, plan } from "../scripts/converge.mjs";
 import { kind } from "../scripts/fresh.mjs";
 import { privateOf } from "../scripts/host-private.mjs";
 import { mended } from "../scripts/mend.mjs";
@@ -56,6 +57,23 @@ try {
   commit(p.dir, "the process");
   const again = converge(p.dir, "--write");
   ok(again.out.includes("nothing to write") && git(p.dir, "status", "--porcelain") === "", "  run again, it changes nothing", again.out);
+  // (a whole file of the core's that this kit no longer writes, as the one-job core.yml of a private project folds the
+  // checks an earlier kit wrote as workflows of their own: taken out where it carries the core's mark or is, mark and
+  // pins aside, an earlier kit's text; one the project changed, or names in "Differences", stays; #1101, point 2)
+  {
+    const gone = ".github/workflows/an-earlier-check.yml", marked = ".github/workflows/a-marked-check.yml", own = ".github/workflows/a-changed-check.yml", named = ".github/workflows/a-named-check.yml";
+    const earlier = `name: x\njobs:\n  x:\n    uses: the-core/.github/workflows/x.yml@${"a".repeat(40)}\n`;
+    write(p.dir, gone, earlier.replace("a".repeat(40), "b".repeat(40)));
+    write(p.dir, marked, `${read(p.dir, ".github/workflows/core.yml").split("\n")[0]}\nname: y\n`);
+    write(p.dir, own, `${earlier}# a line of the project's own\n`);
+    write(p.dir, named, earlier);
+    write(p.dir, "core-manifest.md", read(p.dir, "core-manifest.md").replace(/^## Differences\r?\n+None\./m, `## Differences\n\n- "${named}": the project's own, on the owner's word.`));
+    const q = held(p.dir), { kit } = kits(q, null), r = plan(q, kit, [[gone, own, named, marked].map(f => [f, earlier])]);
+    ok(r.remove.map(x => x.to).sort().join() === [gone, marked].sort().join() && !r.write.some(w => [gone, marked, own, named].includes(w.to)),
+      "a whole file of the core's this kit no longer writes is taken out, where it carries the core's mark or is an earlier kit's text, its pins aside; one the project changed, or names as a difference, stays", JSON.stringify(r.remove));
+    for (const f of [gone, marked, own, named]) fs.rmSync(path.join(p.dir, f));
+    git(p.dir, "checkout", "-q", "--", "core-manifest.md");
+  }
   // (a run from before the marks that the project took an import out of: written as the kit writes it, and named)
   write(p.dir, "AGENTS.md", read(p.dir, "AGENTS.md").replace(`${BEGIN}\n`, "").replace(`${END}\n`, "").replace("@core/roles/shared/inbox.md\n", ""));
   const back = converge(p.dir, "--write");

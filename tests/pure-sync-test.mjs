@@ -21,6 +21,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { copyTree, entries } from "../scripts/copy-tree.mjs";
+import { MARK } from "../scripts/core-owned.mjs";
 import { checkoutStandIn, ghStandIn, hostSays, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 
@@ -172,7 +173,7 @@ const tries = [
   ["a job added to a workflow", () => write(p, ".github/workflows/core.yml", calls.replace("jobs:\n", "jobs:\n  evil:\n    runs-on: ubuntu-latest\n    steps: [{run: \"echo evil\"}]\n")), "lines added or removed, not only a pin moved"],
   ["a job removed from a workflow", () => write(p, ".github/workflows/core.yml", calls.replace(/  terms:\n[^]*$/u, "")), "lines added or removed, not only a pin moved"],
   ["a new workflow", () => write(p, ".github/workflows/new.yml", "on: push\n"), ".github/workflows/new.yml: lines added or removed"],
-  ["a workflow deleted", () => fs.rmSync(path.join(p, ".github/workflows/core.yml")), "a file created, deleted or given a new mode"],
+  ["a workflow deleted", () => fs.rmSync(path.join(p, ".github/workflows/core.yml")), "core.yml: deleted, and not a file of the core's that the kit"],
   ["a file outside core/ edited", () => write(p, "README.md", "# A project, changed\n"), "README.md: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
   ["a hook's settings added", () => write(p, ".claude/settings.json", "{}\n"), ".claude/settings.json: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
   ["the core's part of a rule file written otherwise", () => write(p, "AGENTS.md", read(p, "AGENTS.md").replace("@core/roles/builder.md\n", "@core/roles/builder.md\n@evil.md\n")), "AGENTS.md: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
@@ -255,6 +256,28 @@ git(p, "push", "-q", "-f", "origin", `${base}:main`);
 git(p, "checkout", "-q", "sync");
 git(p, "reset", "-q", "--hard", LEGIT);
 git(p, "clean", "-q", "-fd");
+// main holds a workflow the kit at the pin no longer writes: the sync that takes it out, as the process does, is pure
+// where it carries the core's mark, and not where it is the project's own (#1101, point 2)
+for (const [what, text, isPure] of [["the core's, marked", `${MARK}\nname: dropped\n`, true], ["the project's own", "name: dropped\n", false]]) {
+  git(p, "checkout", "-q", "-B", "main-holds", base);
+  write(p, ".github/workflows/a-dropped-check.yml", text);
+  git(p, "add", "-A");
+  git(p, "commit", "-q", "-m", "a workflow the kit no longer writes");
+  git(p, "push", "-q", "-f", "origin", "main-holds:main");
+  git(p, "checkout", "-q", "-B", "sync-drops");
+  git(p, "checkout", "-q", LEGIT, "--", ".");
+  const taken = node(p, "core/scripts/converge.mjs", "--write");
+  if (!isPure) fs.rmSync(path.join(p, ".github/workflows/a-dropped-check.yml"), { force: true });
+  git(p, "add", "-A");
+  git(p, "commit", "-q", "-m", "the sync, the workflow taken out");
+  const r = pure();
+  ok(isPure ? r.status === 0 && /taken out: \.github\/workflows\/a-dropped-check\.yml/.test(taken.out) : r.status === 1 && /NOT PURE[^\n]*a-dropped-check\.yml: deleted, and not a file of the core's/.test(r.out),
+    `a sync that takes out a workflow ${what} that the kit no longer writes is ${isPure ? "" : "not "}pure`, `${taken.out}\n${r.out}`);
+  git(p, "push", "-q", "-f", "origin", `${base}:main`);
+  git(p, "checkout", "-q", "sync");
+  git(p, "reset", "-q", "--hard", LEGIT);
+  git(p, "clean", "-q", "-fd");
+}
 // a file's executable bit alone: no difference to either (a copy made on Windows records none)
 git(p, "update-index", "--chmod=+x", "core/README.md");
 git(p, "update-index", "--chmod=-x", "core/scripts/work-saved.sh");

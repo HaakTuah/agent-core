@@ -6,6 +6,7 @@ import { read, write } from "../stage-helpers.mjs";
 export default {
   // (AGENTS.md as a kit from before the process wrote it, its run of import lines with no mark; the mend, as the process
   // writes it, holds that run between the core's two marks again)
-  stage: dir => write(dir, "AGENTS.md", read(dir, "AGENTS.md").replace(`${BEGIN}\n`, "").replace(`${END}\n`, "")),
-  mend: dir => write(dir, "AGENTS.md", read(dir, "AGENTS.md").replace(/^(@core-manifest\.md\r?\n(?:@.*\r?\n)*)/mu, `${BEGIN}\n$1${END}\n`)),
+  // (either line end: a project held as Windows holds it has CRLF; #1083)
+  stage: dir => write(dir, "AGENTS.md", [BEGIN, END].reduce((t, m) => t.replace(`${m}\r\n`, "").replace(`${m}\n`, ""), read(dir, "AGENTS.md"))),
+  mend: dir => { const t = read(dir, "AGENTS.md"), eol = t.includes("\r\n") ? "\r\n" : "\n"; write(dir, "AGENTS.md", t.replace(/^(@core-manifest\.md\r?\n(?:@.*\r?\n)*)/mu, `${BEGIN}${eol}$1${END}${eol}`)); },
 };

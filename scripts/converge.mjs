@@ -32,7 +32,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyAt } from "./workflow-calls.mjs";
 import { fresh, kind } from "./fresh.mjs";
-import { BLOCKS, blockOf, converged, lf, marked, whole } from "./core-owned.mjs";
+import { BLOCKS, blockOf, converged, dropped, lf, marked, whole } from "./core-owned.mjs";
 import { NAME, TEMPLATES, linked, named } from "./init.mjs";
 import { project } from "./steps.mjs";
 import { inside } from "./step-paths.mjs";
@@ -61,8 +61,11 @@ export function unformed(p, { o, pin, unread }) {
 // root): floor rule 13 and topic 5.
 const outside = to => { try { inside(to, "the path"); return false; } catch { return true; } };
 
-// What the process does to the project `p`: [{ to, text }] to write, [{ to, why }] left as the project's. `kit` is
-// what this kit writes for it ([path, text]), `older` the earlier kits'. A file the project's own from its first commit
+// What the process does to the project `p`: [{ to, text }] to write, [{ to }] to take out, [{ to, why }] left as the
+// project's. `kit` is what this kit writes for it ([path, text]), `older` the earlier kits'. A whole file of the core's
+// that this kit no longer writes (one with the core's mark, or, mark and pins aside, what an earlier kit wrote) is taken
+// out, so a project ends as a new one of its kind and no check runs twice (#1101, point 2): the one-job core.yml of a
+// private project runs the copies, description and NuGet checks its earlier kit wrote as workflows of their own. A file the project's own from its first commit
 // (neither a whole file of the core's nor a rule file it holds a part of) is written only where `first`, at the first
 // copy: at any later sync each is a step's to ask, with what it needs beside it (a config's baseline), and a sync that
 // created one would be no pure sync (floor rule 8 covers the core's own files and parts alone).
@@ -82,7 +85,21 @@ export function plan(p, kit, older = [], { first = false } = {}) {
     if (r.text !== undefined) write.push({ to, text: r.text });
     if (r.left) left.push({ to, why: r.left });
   }
-  return { write, left };
+  return { write, remove: dropping(p, kit, older), left };
+}
+
+// The whole files of the core's that this kit no longer writes and the project holds as the core's, [{ to }]: of the
+// paths an earlier kit writes and the project's files that carry the core's mark, each not named in "Differences".
+function dropping(p, kit, older) {
+  const kept = new Set(kit.map(([to]) => to)), remove = [];
+  for (const to of [...new Set([...older.flatMap(k => k.map(([f]) => f)), ...p.files.filter(marked)])].filter(f => whole(f) && !kept.has(f))) {
+    if (p.differences.some(l => l.includes(`"${to}"`)) || outside(to) || linked(p.root, to)) continue;
+    let file = false;
+    try { file = fs.lstatSync(path.join(p.root, to)).isFile(); } catch { /* (not there) */ }
+    const now = file ? p.read(to, true) : null;
+    if (now !== null && dropped(to, now, older.map(k => k.find(([f]) => f === to)?.[1]).filter(t => t !== undefined))) remove.push({ to });
+  }
+  return remove;
 }
 
 // The kit's files for the project (the configs fresh.mjs adds beside them left out: those are the starter kit's and
@@ -111,15 +128,21 @@ function run(argv) {
   const { kit, before } = kits(p, older, k);
   const out = kit.map(([to]) => to).filter(outside);
   if (out.length) { for (const to of out) console.error(`FAIL ${to}, where core-manifest.md places a file the kit writes, lies outside the project. Mend: name a path inside the project in that row; the process wrote nothing.`); process.exitCode = 1; return; }
-  const { write, left } = plan(p, kit, before, { first: argv.includes("--first") });
+  const { write, remove, left } = plan(p, kit, before, { first: argv.includes("--first") });
   const writing = argv.includes("--write");
+  if (writing) applied(root, write, remove);
+  console.log(write.length ? `The core's files and parts ${writing ? "written" : "to write (--write writes them)"} (\`core/scripts/converge.mjs\`): ${write.map(w => w.to).join(", ")}.` : "The core's files and parts are as the core writes them (`core/scripts/converge.mjs`): nothing to write.");
+  if (remove.length) console.log(`The core's files its kit no longer writes, ${writing ? "taken out" : "to take out (--write takes them out)"}: ${remove.map(r => r.to).join(", ")}.`);
+  if (left.length) console.log(`Left as the project's, each a difference the manifest's "Differences" declares on the owner's word or a task the project's agents take:\n${left.map(l => `- ${l.to} ${l.why}`).join("\n")}`);
+}
+
+// What the plan writes and takes out, done in the project at `root`.
+function applied(root, write, remove) {
   for (const { to, text } of write) {
-    if (!writing) continue;
     fs.mkdirSync(path.dirname(path.join(root, to)), { recursive: true });
     fs.writeFileSync(path.join(root, to), text);
   }
-  console.log(write.length ? `The core's files and parts ${writing ? "written" : "to write (--write writes them)"} (\`core/scripts/converge.mjs\`): ${write.map(w => w.to).join(", ")}.` : "The core's files and parts are as the core writes them (`core/scripts/converge.mjs`): nothing to write.");
-  if (left.length) console.log(`Left as the project's, each a difference the manifest's "Differences" declares on the owner's word or a task the project's agents take:\n${left.map(l => `- ${l.to} ${l.why}`).join("\n")}`);
+  for (const { to } of remove) fs.rmSync(path.join(root, to));
 }
 
 // core.yml's check: of the paths the pull request changed against `base`, each the core marks (a whole file whose first

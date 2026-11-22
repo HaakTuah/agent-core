@@ -11,7 +11,8 @@
 // each file the process writes (converge.mjs, #1083) is, byte for byte, what this checkout's process writes from the
 // kit at the new pin for the project as its main holds it, so nothing outside the core's files and parts changed, and
 // each other changed line differs from the one it replaces only in the manifest's pin or a call's to a core workflow,
-// each moved to the new pin; a file is created only so, and nothing deleted; the new pin is
+// each moved to the new pin; a file is created only so, and deleted only where the process takes it out, a whole file
+// of the core's that the kit at the new pin no longer writes; the new pin is
 // a commit of the core's main at or past the old one, and, where the manifest follows the core's releases, a release
 // of the core (any other sync is reviewed like any PR, and merges after it); the copy is a folder, and the core's tree at
 // that pin, compared as copy-tree.mjs compares (and says why), without the folder the core keeps to itself; and every
@@ -61,16 +62,17 @@ const diff = (opt, ...paths) => // only the last newline dropped, so a line's tr
 const files = diff("--name-only").split("\n").filter(Boolean);
 // (every file outside the copy and the manifest is proved below against what the core's one process writes for the
 // project at the new pin, #1083, and a workflow it leaves as the project's is held to its pins alone; a regular file
-// created is let through to that proof)
-const later = [];
+// created is let through to that proof, and so is one deleted, which the proof holds to what the process takes out)
+const later = [], gone = [];
 for (const line of diff("--summary").split("\n").filter(Boolean)) {
   const named = line.trim().replace(/^.*\b\d{6} /u, "");
   if (named.startsWith(at)) continue;
   if (/^create mode 100644 /u.test(line.trim())) continue;
+  if (/^delete mode 100644 /u.test(line.trim())) { gone.push(named); continue; }
   fail.push(`a file created, deleted or given a new mode: ${line.trim()}`);
 }
 for (const f of files) {
-  if (f.startsWith(at)) continue;
+  if (f.startsWith(at) || gone.includes(f)) continue;
   if (f === "core-manifest.md") pinsOnly(f);
   else later.push(f);
 }
@@ -119,8 +121,8 @@ function tracked(sha, to) {
 // unread), is held to the pins alone where it is a workflow, as before the process, and refused otherwise. `dir`: the
 // core's main and releases, fetched.
 function provedOwned(dir) {
-  if (!later.length) return;
-  const unproved = (why) => { for (const f of later) { if (WORKFLOW.test(f)) pinsOnly(f); else fail.push(`${f}: ${why}`); } };
+  if (!later.length && !gone.length) return;
+  const unproved = (why) => { for (const f of later) { if (WORKFLOW.test(f)) pinsOnly(f); else fail.push(`${f}: ${why}`); } for (const f of gone) fail.push(`${f}: deleted, ${why}`); };
   const tmp = mkdtempSync(join(tmpdir(), "core-render-")), kits = join(tmp, "kits"), base_ = join(tmp, "project");
   try {
     const tree = (sha, to) => { mkdirSync(to, { recursive: true }); execFileSync("tar", ["-x", "-f", "-", "-C", to], { input: inBare(dir, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 }) }); };
@@ -138,7 +140,9 @@ function provedOwned(dir) {
     if (bad.length) { unproved(`the project's kind or values cannot be read in their forms, so it is not proved what the core's process writes: ${bad.join("; ")}`); return; }
     const kit = fresh(p, join(kits, "now", "setup", "template"), { kitOnly: true, k });
     if (!kit.length) { unproved(`the kit at ${pin} gives no file this checkout of the core can render`); return; }
-    const { write } = plan(p, kit, older.flatMap((at) => asEarlier(p, join(at, "setup", "template"), k, { kitOnly: true })));
+    const { write, remove } = plan(p, kit, older.flatMap((at) => asEarlier(p, join(at, "setup", "template"), k, { kitOnly: true })));
+    // (a file deleted only where the process takes it out: a whole file of the core's that the kit at the pin no longer writes)
+    for (const f of gone) if (!remove.some((r) => r.to === f)) fail.push(`${f}: deleted, and not a file of the core's that the kit at ${pin} no longer writes, which alone the core's process takes out (converge.mjs)`);
     const onMain = (f) => { try { raw(["cat-file", "-e", `${base}:${f}`]); return true; } catch { return false; } };
     for (const f of later) {
       const want = write.find((w) => w.to === f);
@@ -175,7 +179,7 @@ try {
     fail.push(`the project ${follows === "releases" ? "follows the core's releases" : "does not say what it follows"}, and ${pin} is no release of the core: the sync is reviewed like any PR${newest ? `, or made again from the project's main to a release with its full SHA, \`node ${at}scripts/sync.mjs ${newest.sha}\` (${newest.name}, the newest), as a copy older than release-1, whose sync script takes the core's main, must` : ""}`);
   }
   if (pin && oldPin && inCore(["merge-base", "--is-ancestor", pin, "refs/heads/main"])) provedOwned(dir);
-  else if (later.length) fail.push(`${later.join(", ")}: no file outside the copy is proved where the pin is not a commit of the core's main`);
+  else if (later.length || gone.length) fail.push(`${[...later, ...gone].join(", ")}: no file outside the copy is proved where the pin is not a commit of the core's main`);
   const own = git(["rev-parse", "--absolute-git-dir"]); // (the project's clone, named outright as copy-tree.mjs asks)
   if (pin && inCore(["cat-file", "-e", `${pin}^{commit}`]) && (!coreIsFolder(head, own, at.slice(0, -1)) || entries(copyTree(pin, dir), dir) !== entries(`${head}:${at.slice(0, -1)}`, own))) {
     fail.push(`${at} is not a folder holding the core's tree at ${pin} (copy-tree.mjs)`);
