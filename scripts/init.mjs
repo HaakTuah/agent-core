@@ -4,9 +4,12 @@
 // forms, the choice records, Dependabot's config and its calls to the core's workflows, each pinned to the commit the
 // manifest pins) and makes the first copy of the core under core/. The templates and the copy are both read from the
 // commit the manifest pins, never from the clone's working folder, so what it writes is what was reviewed. It never
-// overwrites: where one of its files exists, it names them and writes nothing; nor does it write through a link, which
-// could lead outside the project (floor rule 13). It ends by listing what is left: the lines the project fills in
-// itself, and the owner's settings. It commits and pushes nothing. Git, tar and Node's own modules only.
+// overwrites (#1083): of a file of its own that the project holds already it takes what the core owns alone, as every
+// sync does (converge.mjs), its part of AGENTS.md and CLAUDE.md, or a whole file the core marks or the kit writes, and
+// names each it leaves as the project's; a project that holds the core already is taken by the sync (sync.mjs), run
+// from the same clone; it writes through no link, which could lead outside the project (floor rule 13), and refuses a
+// folder core/ that no manifest names. It ends by listing what is left: the lines the project fills in itself, and the
+// owner's settings. It commits and pushes nothing. Git, tar and Node's own modules only.
 //
 //   node <the clone>/scripts/init.mjs --owner <login> [--name <the project's name>] [--at <full SHA>]
 //                                     [--npm <the folder of package-lock.json>] [--nuget <the folder of the solution>]
@@ -250,14 +253,18 @@ export function licences(o, has) {
 // The first baselines of the copies check and the shape check: what stands today, which each reads from the files git
 // knows of, so the kit's own are added first; and the first list of what holds the project's own rules (#662).
 function firstBaselines(here) {
+  const made = [];
   for (const check of ["copies", "shape"]) {
+    if (fs.existsSync(path.join(here, `checks/${check}-baseline.json`))) continue;
+    made.push(`checks/${check}-baseline.json`);
     execFileSync(process.execPath, [`core/scripts/${check}.mjs`, `checks/${check}.json`, "--first"], { cwd: here, env: guarded(), stdio: ["ignore", "ignore", "inherit"] });
     git(["add", "--", `checks/${check}-baseline.json`], here, guarded());
   }
   // (a pin from before #662 holds a holders.mjs with no --own: the list is then the sync's step, and nothing is run)
-  if (!fs.readFileSync(path.join(here, "core/scripts/holders.mjs"), "utf8").includes("--own")) return;
+  if (!fs.readFileSync(path.join(here, "core/scripts/holders.mjs"), "utf8").includes("--own") || fs.existsSync(path.join(here, "checks/holders.json"))) return made;
   execFileSync(process.execPath, ["core/scripts/holders.mjs", "--own", "--write"], { cwd: here, env: guarded(), stdio: ["ignore", "ignore", "inherit"] });
   git(["add", "--", "checks/holders.json"], here, guarded());
+  return [...made, "checks/holders.json"];
 }
 
 // The project the kit is run in, held to what the kit writes into: the root of its git repository, not the core, a
@@ -287,21 +294,31 @@ function pinOf(o) {
   return pin;
 }
 
-// A Failure where a path the kit writes is a link or is there already: it then writes nothing.
+// A Failure where a path the kit writes is a link, or where the copy's folder stands already: it then writes nothing.
 function refuseTaken(here, out) {
   const targets = [...out.map(([to]) => to), ...MADE];
   const links = [...new Set(targets.map(to => linked(here, to)).filter(Boolean))];
   if (links.length) fail(`the project holds a link at ${links.join(", ")}: the starter kit writes through no link, and wrote nothing`);
   // (a link whose target is missing is there all the same: asked without following it)
-  const taken = targets.filter(to => { try { fs.lstatSync(path.join(here, to)); return true; } catch { return false; } });
-  if (taken.length) fail(`the project already has ${taken.join(", ")}: the starter kit never overwrites, and wrote nothing`);
+  const there = to => { try { fs.lstatSync(path.join(here, to)); return true; } catch { return false; } };
+  if (there("core")) fail("the project already has core/, and no core-manifest.md that names a copy there: the starter kit never overwrites a folder of the project's own, and wrote nothing. Mend: move that folder, or write the manifest's \"Core:\" line for it and run the sync");
 }
 
-// The kit's files, the first copy of the core, and the checks' first configs and baselines, written and staged.
-function writeKit(o, here, pin, out) {
+// The kit's files, the first copy of the core, and the checks' first configs and baselines, written and staged. A file
+// the project holds already is never written over: of the kit's files it takes the core's part alone, as every sync
+// takes it (converge.mjs, `converged`), and what is left as the project's is said; a config or baseline that stands is
+// kept.
+function writeKit(o, here, pin, out, converged) {
+  const there = to => fs.existsSync(path.join(here, to));
   // ("wx": a file that has appeared since, a link too, is refused and never written over)
-  const write = (to, text) => { fs.mkdirSync(path.dirname(path.join(here, to)), { recursive: true }); fs.writeFileSync(path.join(here, to), text, { flag: "wx" }); };
-  for (const [to, text] of out) write(to, text);
+  const write = (to, text, flag = "wx") => { fs.mkdirSync(path.dirname(path.join(here, to)), { recursive: true }); fs.writeFileSync(path.join(here, to), text, { flag }); };
+  const written = [], left = [];
+  for (const [to, text] of out) {
+    if (!there(to)) { write(to, text); written.push(to); continue; }
+    const r = converged(to, fs.readFileSync(path.join(here, to), "utf8"), text);
+    if (r.text !== undefined) { write(to, r.text, "w"); written.push(to); }
+    if (r.left) left.push(`${to} ${r.left}`);
+  }
   // the first copy, as the sync makes every copy: the core's tree at the pin, without what it keeps to itself
   fs.mkdirSync(path.join(here, "core"));
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
@@ -314,18 +331,19 @@ function writeKit(o, here, pin, out) {
     const r = spawnSync(process.execPath, [installer, ...everyInstall(path.join(here, "core"))], { cwd: here, encoding: "utf8" });
     if (r.status !== 0) console.log(`note the core's packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node core/scripts/install.mjs before running a check`);
   }
-  const marks = sizes(Object.fromEntries(startOf(Object.fromEntries(out)).map(f => [f, sizeOf(path.join(here, f))])));
-  write("checks/sizes.json", `${JSON.stringify(marks, null, 2)}\n`);
-  write("checks/licences.json", `${JSON.stringify(licences(o, f => fs.existsSync(path.join(here, f))), null, 2)}\n`);
-  git(["add", "--", ...out.map(([to]) => to), "checks/sizes.json", "checks/licences.json", "core"], here, guarded());
-  firstBaselines(here);
+  const made = [];
+  if (!there("checks/sizes.json")) { write("checks/sizes.json", `${JSON.stringify(sizes(Object.fromEntries(startOf(Object.fromEntries(out)).filter(there).map(f => [f, sizeOf(path.join(here, f))]))), null, 2)}\n`); made.push("checks/sizes.json"); }
+  if (!there("checks/licences.json")) { write("checks/licences.json", `${JSON.stringify(licences(o, there), null, 2)}\n`); made.push("checks/licences.json"); }
+  git(["add", "--", ...written, ...made, "core"], here, guarded());
+  return { written, left, made: [...made, ...firstBaselines(here)] };
 }
 
 // What the kit wrote, and what it leaves for the project and for the owner.
-function sayLeft(o, pin, out) {
-  const made = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", ...(fs.existsSync("checks/holders.json") ? ["checks/holders.json"] : [])];
-  console.log(`The starter kit is written: ${out.length + made.length} files (the last ${made.length === 5 ? "five" : "four"} ${made.slice(0, -1).join(", ")} and ${made.at(-1)}), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
-  const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
+function sayLeft(o, pin, out, { written, left, made }) {
+  const list = m => m.length > 1 ? `${m.slice(0, -1).join(", ")} and ${m.at(-1)}` : m.join("");
+  console.log(`The starter kit is written: ${written.length + made.length} files${made.length ? ` (the checks' first configs and baselines ${list(made)} among them)` : ""}, and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
+  if (left.length) console.log(`\nLeft as the project's, never written over (each a difference the manifest's "Differences" declares on the owner's word, or a task the project's agents take):\n${left.map(l => `  ${l}`).join("\n")}`);
+  const open = out.filter(([to]) => written.includes(to)).flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
   console.log(`\nLeft for the project, each marked FILL IN:\n${open.join("\n")}`);
   console.log(`  checks/copies.json: "code", the project's own code as git pathspecs, once it has any`);
   console.log(`  checks/shape.json: "systems", each system the project has, by its name, with its paths, what it uses and its entrance, once it has any; "tests", its test files (core/tasks/code-shape.md)`);
@@ -339,22 +357,30 @@ function sayLeft(o, pin, out) {
   console.log("\nWhat owning this project asks of the owner, in one plain page: core/setup/owner-guide.md");
 }
 
-function init(argv) {
+async function init(argv) {
   const o = options(argv);
   const here = process.cwd();
   checkProject(o, here);
+  // (a project that holds the core already, its manifest naming a copy, is taken the one way every such project is:
+  // the sync, run from this clone, which writes what the core owns as this kit would; #1083)
+  if (/^Core: /m.test(fs.existsSync(path.join(here, "core-manifest.md")) ? fs.readFileSync(path.join(here, "core-manifest.md"), "utf8") : "")) {
+    console.log("The project holds the core already (core-manifest.md names a copy): taken by the sync, as every such project is.");
+    const r = spawnSync(process.execPath, [path.join(ROOT, "scripts", "sync.mjs"), ...(o.at ? [o.at] : [])], { cwd: here, stdio: "inherit" });
+    if (r.status !== 0) process.exitCode = r.status ?? 1;
+    return;
+  }
   const pin = pinOf(o);
   const moduleNames = modulesAt(pin);
 
   const read = name => { try { return raw(["show", `${pin}:${TEMPLATES}/${name}`], ROOT); } catch { return fail(`${pin} holds no ${TEMPLATES}/${name}: take a commit of the core that has the starter kit`); } };
   const out = files(o, pin, moduleNames, read);
   refuseTaken(here, out);
-  writeKit(o, here, pin, out);
-  sayLeft(o, pin, out);
+  const { converged } = await import("./converge.mjs");
+  sayLeft(o, pin, out, writeKit(o, here, pin, out, converged));
 }
 
 if (started(import.meta.url)) {
-  try { init(process.argv.slice(2)); } catch (e) {
+  try { await init(process.argv.slice(2)); } catch (e) {
     console.error(`FAIL: ${e instanceof Failure ? e.message : e.stack}`);
     process.exitCode = 1;
   }

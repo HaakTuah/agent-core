@@ -4,7 +4,7 @@
 // listing those calls, and prints what the sync asks of the project beyond the copy (the core's setup/sync-notes.md, the
 // entries it gained between the two commits), then, from the copy it has just written, every step a release asks that
 // is not done, every difference from a fresh start, where the owner's inbox is and what its labels and openers lack
-// (steps.mjs, fresh.mjs, inbox.mjs and labels.mjs, beside this file), for the sync PR's description: they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
+// (steps.mjs, fresh.mjs, inbox.mjs and labels.mjs, beside this file), for the sync PR's description, having written what the core owns, from the new copy's kit, by the one process that writes it for a new project too (converge.mjs, beside this file; #1083): they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
 // which, a pure sync, its merger checks with `scripts/pure-sync.mjs` (floor rule 8). Git, tar, gh where it asks whose
 // account holds the repository (releases.mjs, hostAccount) and Node's own modules only; the core's address:
 // core-address.mjs, beside this file. Where the line says a library carries the core, it syncs nothing: the library's
@@ -181,7 +181,7 @@ function sync(tmp) {
   if (!target) return;
   const { pin, release } = target;
   if (!past(pin, "refs/heads/main", tmp)) fail(`${pin} is not a commit of the core's main`);
-  if (pin === old && !first) { console.log(`${at} is already at ${pin}: nothing to sync`); return; }
+  if (pin === old && !first) { console.log(`${at} is already at ${pin}: nothing to sync`); converge(dir, kitsOf(old, tmp)); return; }
 
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
@@ -191,9 +191,22 @@ function sync(tmp) {
   install(dir);
 
   const { moved, unread } = moveCalls(pin, tmp, own);
-  if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); return; }
+  if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); converge(dir, null); return; }
   sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp);
-  report(at, dir, kitsOf(old, tmp));
+  const kits = kitsOf(old, tmp);
+  converge(dir, kits);
+  report(at, dir, kits);
+}
+
+// What the core owns, written from the new copy's own kit by the one process (#1083; converge.mjs, beside this file),
+// with the earlier kits by which it knows a file of the core's that carries no mark yet; a copy from before it has none.
+// What it leaves as the project's it says, for the sync PR's description; where it refuses, it says why and the mend.
+function converge(dir, kits) {
+  const script = path.join(dir, "scripts", "converge.mjs");
+  if (!fs.existsSync(script)) return;
+  const r = spawnSync(process.execPath, [script, "--write", ...(kits ? ["--older", kits] : [])], { encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
+  const said = `${r.stdout ?? ""}${String(r.stderr ?? "").split("\n").filter(l => l.startsWith("FAIL")).join("\n")}`.trim();
+  console.log(said || `${dir}/scripts/converge.mjs failed: run it again by itself to see why`);
 }
 
 // The new copy's packages, installed from its lock file by its own install script, into its .packages/node_modules/,
