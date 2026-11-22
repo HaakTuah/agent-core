@@ -7,12 +7,17 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #1083 | rule builder; floor rule 8 | #1080 |
+| #1083, with #1095, point 1 | rule builder; floor rule 8 | |
 | #1084 | rule builder | #1083 |
 | #1081 | rule builder | #1084 |
 | #1085 | rule builder | #1081 |
 | #1087 | rule builder | #1083 |
 | #1086 | rule builder | |
+| #1093, with #1090 | rule builder | |
+| #1091 | rule builder | #1085 |
+| #1092 | rule builder | #1091 |
+| #1094 | rule builder | #1092 |
+| #1095, points 2 to 6 | rule builder | #1094 |
 | #810 | the orchestrator | the batch's end |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
@@ -32,8 +37,8 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #314 | rule builder | |
 | #457 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
-| #441, with #484, points 6 and 7 | rule builder; the file stays whole where #469's measure finds no kind of task reads less | #469 |
-| #355 | builder | #530: the readers left go on the parser #529 brings |
+| #441, with #484, points 6 and 7 | rule builder | #469 |
+| #355 | builder | #530 |
 | #542, point 5 | rule builder | #457 |
 | #675 | builder | |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
