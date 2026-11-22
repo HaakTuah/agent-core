@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { leadsOut } from "./guards.mjs";
 
 // The record of the trial: counts alone, never a project's name, its jobs or its code.
 export const TRIAL = "reports/release-trial.json";
@@ -72,17 +73,11 @@ function ownProjects() {
 // heading, "None found.", a note in brackets) name none. releases-test.mjs holds it to shownAs's words.
 export const ownCount = printed => printed.split("\n").filter(l => /^- (`[^`]+`|a private project of the owner's): /.test(l)).length;
 
-// Whether the file `f` lies in the folder `root`, by their real paths (a link followed), the folder itself included.
-export function within(root, f) {
-  const real = p => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
-  const rel = path.relative(real(root), path.join(real(path.dirname(path.resolve(f))), path.basename(f)));
-  return !(rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel));
-}
 
 // --trial <sha> [<before> <after>]...: writes the trial's record, each pair one project's runs of check.mjs --verdicts.
 export function trial([sha, ...files], fail) {
   if (!/^[0-9a-f]{40}$/.test(sha ?? "") || files.length % 2) return fail("--trial needs the full SHA of the commit tried, then for each project tried the file check.mjs --verdicts wrote before the update and the one it wrote after; no file where no project allowed a trial");
-  const inside = files.find(f => within(ROOT, f));
+  const inside = files.find(f => !leadsOut(ROOT, f));
   if (inside) return fail(`${inside} lies in the core's own repository, where a project's job names could be committed: write the runs' verdicts to a scratch folder outside every repository, and give those files`);
   if (!files.length) { const own = ownProjects(); if (own === null || own > 0) return fail(own === null ? "which of the owner's projects take the core could not be read (scripts/state-report.mjs --projects): run it where gh answers for the owner's account" : `${plural(own, "project")} of the owner's take the core, as scripts/state-report.mjs --projects finds them: try the release on one, and record its runs before and after`); }
   const pairs = [];

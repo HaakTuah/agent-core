@@ -38,7 +38,7 @@ import { carriedAt, readCore } from "./core-path.mjs";
 import { MEND } from "./mend.mjs";
 import { hostSaid, plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
-import { within } from "./release-trial.mjs";
+import { leadsOut } from "./guards.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { evaluate, pathsLetThrough, runWorkflow, withAbsolutePath } from "./workflow-run.mjs";
 
@@ -96,7 +96,7 @@ function main() {
   for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
   const o = options();
   const p = { ...project(o), own: o.own, verdicts: o.verdicts === null ? null : path.resolve(o.verdicts) };
-  if (p.verdicts !== null && within(p.root, p.verdicts)) fail(`--verdicts ${o.verdicts} lies in the project's own repository, which this check writes nothing in.`, "give a file in a scratch folder outside every repository.");
+  if (p.verdicts !== null && !leadsOut(p.root, p.verdicts)) fail(`--verdicts ${o.verdicts} lies in the project's own repository, which this check writes nothing in.`, "give a file in a scratch folder outside every repository.");
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
   const { failed, ran } = runAll(p, runner(p, tmp), calledJobs(p, tmp));
