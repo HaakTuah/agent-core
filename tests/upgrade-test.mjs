@@ -416,6 +416,9 @@ function upgrade(p, from, ownChanges, expect) {
   const call = hook("PreToolUse", { hook_event_name: "PreToolUse", session_id: "s1", tool_name: "Agent", tool_input: { description: "x", prompt: "y", subagent_type: "general-purpose", model: "sonnet", effort: "medium" } });
   const stop = hook("Stop", { hook_event_name: "Stop", session_id: "s1", stop_hook_active: false });
   ok(start.status === 0 && call.status === 0 && stop.status === 0 && !/"decision"\s*:\s*"block"/.test(stop.out + start.out), `${p.name}: its hooks run from main's copy and stop nothing in a clean clone`, `${start.out}\n${call.out}\n${stop.out}`);
+  // (the start may install the copy's packages where they differ from main's lock file, and says so in a note, never a
+  // block: the steps below read them, so a start that left them out is seen here, with its note, not as the steps' "not installed"; #1078)
+  ok(fs.existsSync(path.join(p.dir, "core/.packages/node_modules/.package-lock.json")) && !/packages are not installed/u.test(start.out), `${p.name}: and leaves the copy's packages installed`, start.out);
 
   // a change that makes something worse than it stood fails, and the mend as the failure words it passes
   const copied = fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/).find(l => /^- It is never pushed to/.test(l)) ?? "";
