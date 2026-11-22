@@ -31,7 +31,7 @@ export function installsFirst(p) {
     const at = job.steps.findIndex(st => runs(st, t => t.startsWith(script) && t.endsWith(".mjs") && t !== install));
     return at >= 0 && !job.steps.slice(0, at).some(st => installs(st));
   })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
-  return wrong.length ? `In one small pull request, add a step \`node ${install}\` before the first step that runs a .mjs script under \`${script}\` in each such job of ${wrong.join(", ")}: the core's scripts load the packages it installs from its lock file, and without them a check says it did not run.` : null;
+  return wrong.length ? `In one small pull request, add the step \`if [ -f ${install} ]; then node ${install}; fi\` (guarded, so it passes on a copy older than the install script, and may go in before the sync or after it) before the first step that runs a .mjs script under \`${script}\` in each such job of ${wrong.join(", ")}: the core's scripts load the packages it installs from its lock file, and without them a check says it did not run, failing nothing.` : null;
 }
 
 // Where a job of the project's own workflows runs the shape check (its script, or the copies check's steps through
