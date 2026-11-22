@@ -204,8 +204,26 @@ const creates = pure();
 ok(creates.status === 1 && /NOT PURE[^\n]*SECURITY\.md: not the core's copy, its pin, a workflow's pins or what the core's process writes of the core's own files and parts/.test(creates.out) && read(p, "SECURITY.md") === git(p, "show", `${LEGIT}:SECURITY.md`) + "\n",
   "a file that is the project's own, created by the sync where main lacks it, is not pure, though it is what the kit renders", creates.out);
 git(p, "push", "-q", "-f", "origin", `${base}:main`);
+// main marks its own workflow export-ignore (a common line of .gitattributes): the proof reads main's tree blob by blob,
+// as git holds it, so a sync that swaps that workflow for the kit's render is not pure (floor rule 3's second review)
+git(p, "checkout", "-q", "-B", "main-ignores", base);
+write(p, ".gitattributes", ".github/workflows/core.yml export-ignore\n");
+git(p, "add", "-A");
+git(p, "commit", "-q", "-m", "its own workflow kept out of exports");
+git(p, "push", "-q", "-f", "origin", "main-ignores:main");
+git(p, "checkout", "-q", "-B", "sync-swaps");
+git(p, "checkout", "-q", LEGIT, "--", ".");
+fs.rmSync(path.join(p, ".github/workflows/core.yml"));
+const rendered = node(p, "core/scripts/converge.mjs", "--write");
+git(p, "add", "-A");
+git(p, "commit", "-q", "-m", "the sync, its own workflow swapped for the kit's");
+const swaps = pure();
+ok(rendered.status === 0 && read(p, ".github/workflows/core.yml") !== calls && swaps.status === 1 && /NOT PURE[^\n]*\.github\/workflows\/core\.yml/.test(swaps.out),
+  "a workflow of the project's own that main marks export-ignore, swapped by the sync for the kit's render, is not pure", `${rendered.out}\n${swaps.out}`);
+git(p, "push", "-q", "-f", "origin", `${base}:main`);
 git(p, "checkout", "-q", "sync");
 git(p, "reset", "-q", "--hard", LEGIT);
+git(p, "clean", "-q", "-fd");
 // a file's executable bit alone: no difference to either (a copy made on Windows records none)
 git(p, "update-index", "--chmod=+x", "core/README.md");
 git(p, "update-index", "--chmod=-x", "core/scripts/work-saved.sh");

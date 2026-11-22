@@ -21,9 +21,9 @@
 // repository (releases.mjs, hostAccount); it changes nothing.
 import "./whole-output.mjs";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { copyTree, coreIsFolder, entries } from "./copy-tree.mjs";
 import { CORE as ADDRESS, CORE_SOURCE as A } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
@@ -94,6 +94,21 @@ function pinsOnly(f) {
   }
 }
 
+// The tree of the project's commit `sha` written out at `to`, the copy left out: each file's bytes as git holds them,
+// read blob by blob, never through `git archive`, which applies the tree's own attributes (an `export-ignore` would hide
+// a file of the project's from the proof, which would then read it as not there); a link as a link, a submodule left.
+function tracked(sha, to) {
+  for (const entry of raw(["ls-tree", "-r", "-z", "--full-tree", sha]).split("\0").filter(Boolean)) {
+    const [, mode, type, id, f] = /^(\d{6}) (\w+) ([0-9a-f]+)\t(.*)$/su.exec(entry);
+    if (type !== "blob" || f.startsWith(at)) continue;
+    const file = join(to, f);
+    mkdirSync(dirname(file), { recursive: true });
+    const bytes = execFileSync("git", ["cat-file", "blob", id], { maxBuffer: 1 << 28 });
+    if (mode === "120000") symlinkSync(bytes.toString("utf8"), file);
+    else writeFileSync(file, bytes);
+  }
+}
+
 // The core's own files and parts the sync changed, each proved equal, byte for byte, to what the one process writes
 // (converge.mjs, as this checkout of the core's main holds it) from the kit at the new pin, with the project as main
 // holds it and the new pin, every byte outside the core's part kept. Only the core's own: a whole file of the core's
@@ -115,7 +130,7 @@ function provedOwned(dir) {
     // (the project as its main holds it, the copy left out, its manifest the head's, whose one change is the pin, read above)
     mkdirSync(base_);
     execFileSync("git", ["init", "-q"], { cwd: base_ });
-    execFileSync("tar", ["-x", "-f", "-", "-C", base_], { input: execFileSync("git", ["archive", base, "--", ".", `:(exclude)${at.slice(0, -1)}`], { maxBuffer: 1 << 28 }) });
+    tracked(base, base_);
     writeFileSync(join(base_, "core-manifest.md"), raw(["show", `${head}:core-manifest.md`]));
     // (whether it is private, as the host says it of the checkout's repository: host-private.mjs)
     const p = project(base_), k = kind(p, privateOf(process.cwd())), bad = unformed(p, k);

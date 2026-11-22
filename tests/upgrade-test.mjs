@@ -41,7 +41,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { fill, oneJob, readyOnly } from "../scripts/init.mjs";
-import { scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
+import { hostSays, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 import { where } from "../scripts/shape.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { configs } from "../scripts/check-configs.mjs";
@@ -104,6 +104,8 @@ fs.mkdirSync(path.join(home, "AppData", "Local"), { recursive: true });
 fs.mkdirSync(path.join(home, "AppData", "Roaming"), { recursive: true });
 Object.assign(env, { HOME: home, USERPROFILE: home, APPDATA: path.join(home, "AppData", "Roaming"), LOCALAPPDATA: path.join(home, "AppData", "Local"), XDG_CONFIG_HOME: path.join(home, ".config"),
   npm_config_cache: path.join(home, ".npm") }); // (npm's own config is the home's, which holds none)
+// (the host's answer, whether each project is private, as GitHub's job reads it from its event: scripts/host-private.mjs)
+env.CORE_HOST_ANSWERS = hostSays();
 const named = new Map(); // (a project's folder, and the name git writes into each commit made in it)
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env: { ...env, ...named.get(dir) }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
 const node = (dir, ...args) => { const r = spawnSync(process.execPath, args, { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
@@ -193,6 +195,7 @@ function project(name, from, { owner, kit, isPrivate, windows, files, as }) {
   git(dir, "init", "-q", "-b", "main");
   if (windows) { git(dir, "config", "core.fileMode", "false"); git(dir, "config", "core.autocrlf", "true"); }
   git(dir, "remote", "add", "origin", origin);
+  hostSays(dir, isPrivate); hostSays(origin, isPrivate);
   files(dir);
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "the project");
@@ -1031,6 +1034,7 @@ function preRelease(name, { windows }) {
   git(dir, "push", "-q", "origin", "main");
   ok(first.status === 0 && !fs.existsSync(path.join(dir, "core/scripts/core-moved.mjs")), `${name}: written by hand at ${PRE}, its copies baseline by its own copy of the check, and no core-moved.mjs`, first.out);
   const p = { name, dir, owner: "someone-else", isPrivate: true, repo: `someone-else/${name}` };
+  hostSays(dir, true);
   const main0 = git(dir, "rev-parse", "HEAD");
   const docs = from => { git(dir, "checkout", "-q", "-B", "change", from); fs.appendFileSync(path.join(dir, "README.md"), `${eol}More words.${eol}`); git(dir, "commit", "-q", "-am", "a change of its own"); return git(dir, "rev-parse", "HEAD"); };
   const before = started(checks(p, "pull_request", docs(main0), { baseSha: main0, dry: true }));

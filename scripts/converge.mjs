@@ -47,7 +47,7 @@ export function unformed(p, { o, pin, unread }) {
   const bad = unread ? [unread] : [];
   if (!LOGIN.test(o.owner)) bad.push(`the owner's account in core-manifest.md is no GitHub login. Mend: write the row *owner's account* with one login, letters, digits and hyphens`);
   if (!named(o.name)) bad.push(`the project's name, AGENTS.md's first heading, is not ${NAME}. Mend: write the name so in that heading`);
-  for (const [key, what] of [["packages", "npm's lock file"], ["nuget", "NuGet's solution"]]) {
+  for (const [key, what] of [["packages", "the lock file of npm"], ["nuget", "NuGet's solution"]]) {
     if (o[key] !== undefined && !FOLDER.test(o[key])) bad.push(`the folder of ${what}, as the project's calls and files name it, is not a folder inside the project in plain letters, digits, ".", "_" and "-". Mend: move it to such a folder, or name it so in the call`);
   }
   if (!/^[0-9a-f]{40}$/u.test(pin)) bad.push(`core-manifest.md's "Core:" line has no full commit SHA. Mend: write the line as the sync writes it`);
