@@ -21,7 +21,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { copyTree, entries } from "../scripts/copy-tree.mjs";
-import { checkoutStandIn, ghStandIn, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
+import { checkoutStandIn, ghStandIn, hostSays, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 
 let failed = 0, count = 0;
@@ -61,6 +61,9 @@ const clone = path.join(tmp, "core-clone");
 git(tmp, "clone", "-q", theCore, clone);
 git(clone, "checkout", "-q", A);
 const origin = path.join(tmp, "project.git"), p = path.join(tmp, "project");
+// (the host says the project, and each clone of it, is public, the security-review job's clone by its address on GitHub)
+hostSays(origin, false);
+hostSays("https://github.com/someone/project.git", false);
 git(tmp, "init", "-q", "--bare", "-b", "main", origin);
 fs.mkdirSync(p);
 git(p, "init", "-q", "-b", "main");

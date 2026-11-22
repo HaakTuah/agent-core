@@ -30,6 +30,7 @@ import { readCore } from "./core-path.mjs";
 import { followsOf, hostSaid, inBare, releasesIn } from "./releases.mjs";
 import { plan, unformed } from "./converge.mjs";
 import { fresh, kind } from "./fresh.mjs";
+import { privateOf } from "./host-private.mjs";
 import { project } from "./steps.mjs";
 
 const CORE = `https://github.com/${ADDRESS}.git`;
@@ -108,11 +109,12 @@ function provedOwned(dir) {
     execFileSync("git", ["init", "-q"], { cwd: base_ });
     execFileSync("tar", ["-x", "-f", "-", "-C", base_], { input: execFileSync("git", ["archive", base, "--", ".", `:(exclude)${at.slice(0, -1)}`], { maxBuffer: 1 << 28 }) });
     writeFileSync(join(base_, "core-manifest.md"), raw(["show", `${head}:core-manifest.md`]));
-    const p = project(base_), bad = unformed(p, kind(p));
-    if (bad.length) { fail.push(`the project's values do not hold to their forms, so no file of the core's is proved: ${bad.join("; ")}`); return; }
-    const kit = fresh(p, join(kits, "now", "setup", "template"));
+    // (whether it is private, as the host says it of the checkout's repository: host-private.mjs)
+    const p = project(base_), k = kind(p, privateOf(process.cwd())), bad = unformed(p, k);
+    if (bad.length) { fail.push(`the project's kind or values cannot be read in their forms, so no file of the core's is proved: ${bad.join("; ")}`); return; }
+    const kit = fresh(p, join(kits, "now", "setup", "template"), { k });
     if (!kit.length) { fail.push(`the kit at ${pin} gives no file this checkout of the core can render: a sync that writes the core's files is reviewed like any PR`); return; }
-    const { write } = plan(p, kit, older.map((k) => fresh(p, join(k, "setup", "template"))));
+    const { write } = plan(p, kit, older.map((at) => fresh(p, join(at, "setup", "template"), { k })));
     for (const f of later) {
       const want = write.find((w) => w.to === f);
       // (a workflow not written so, by a sync from a copy before the process among them, is held to its pins alone)

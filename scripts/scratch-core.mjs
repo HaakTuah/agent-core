@@ -82,12 +82,23 @@ export function scratchDir(prefix) {
   return tmp;
 }
 
+// The host's answers for the scratch projects, whether each is private (scripts/host-private.mjs, #1095): one file a
+// test process, named by CORE_HOST_ANSWERS in its environment and so in every run's. `dir` given, its answer is set.
+let answers = null;
+export function hostSays(dir, isPrivate) {
+  if (!answers) { answers = path.join(scratchDir("host-answers-"), "answers.json"); fs.writeFileSync(answers, "{}"); process.env.CORE_HOST_ANSWERS = answers; }
+  if (dir) fs.writeFileSync(answers, JSON.stringify({ ...JSON.parse(fs.readFileSync(answers, "utf8")), [dir]: { private: !!isPrivate } }));
+  return answers;
+}
+
 // `prefix` names the temporary folder. It gives: `tmp`, that folder; `env`, the environment of every call; `git(dir,
 // ...args)` and `run(dir, ...args)`, git and Node run in a folder (run: the script and its arguments, giving its exit
 // status and what it printed); `core`, the scratch copy of the core, `pin`, its one commit, and `script`, its
 // init.mjs; `fresh(name)`, a new empty repository under tmp; and `project(name, ...args)`, a new one in which the
-// starter kit was run with those arguments.
+// starter kit was run with those arguments. The host says each is public, a project's run with --private private
+// (`hostSays`).
 export function scratch(prefix) {
+  hostSays();
   const tmp = scratchDir(prefix);
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
   Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" });
@@ -100,8 +111,8 @@ export function scratch(prefix) {
   git(core, "commit", "-q", "-m", "the core as it stands");
   const pin = git(core, "rev-parse", "HEAD");
   const script = path.join(core, "scripts", "init.mjs");
-  const fresh = name => { const dir = path.join(tmp, name); fs.mkdirSync(dir); git(dir, "init", "-q", "-b", "main"); return dir; };
-  const project = (name, ...args) => { const dir = fresh(name); return { dir, ...run(dir, script, ...args) }; };
+  const fresh = name => { const dir = path.join(tmp, name); fs.mkdirSync(dir); git(dir, "init", "-q", "-b", "main"); hostSays(dir, false); return dir; };
+  const project = (name, ...args) => { const dir = fresh(name); hostSays(dir, args.includes("--private")); return { dir, ...run(dir, script, ...args) }; };
   return { tmp, env, git, run, core, pin, script, fresh, project };
 }
 
@@ -165,6 +176,7 @@ const slash = (p) => p.replace(/\\/g, "/");
  *  lets git find a bare repository by itself, for a test that runs the scripts of releases cut before they named theirs
  *  (upgrade-test.mjs). */
 export function scratchEnv(theCore, tmp, { findsBare = false } = {}) {
+  hostSays();
   const url = `https://github.com/${CORE}`;
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$|CLAUDE_|GH_|NPM_|NUGET_|DOTNET_CLI_HOME$)|^npm_|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(name)));
   Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid",

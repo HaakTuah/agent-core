@@ -14,7 +14,8 @@
 // A file named in the manifest's "Differences" (a line that quotes its path) is the project's, and never written. A
 // value the project gives that lands in a file written (the owner's login, the project's name, the folders of npm and
 // NuGet, the pin, the copy's path) is held to its form first (floor topic 5), and where one is not, nothing is
-// written. Nothing is written through a link. It commits and pushes nothing. Node's own modules and git only.
+// written; so too where the host cannot say whether the repository is private (fresh.mjs, `kind`). Nothing is written
+// through a link. It commits and pushes nothing. Node's own modules, git and gh.
 //
 //   node core/scripts/converge.mjs [--older <dir>]          what it would write, and what it leaves as the project's
 //   node core/scripts/converge.mjs --write [--older <dir>]  writes it (<dir>: a folder of earlier kits, each a folder
@@ -39,9 +40,10 @@ const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/u;
 const FOLDER = /^(\.|[A-Za-z0-9_][A-Za-z0-9._-]*(\/[A-Za-z0-9_][A-Za-z0-9._-]*)*)$/u;
 const COPY = /^[A-Za-z0-9_][A-Za-z0-9._-]*(\/[A-Za-z0-9_][A-Za-z0-9._-]*)*\/$/u;
 
-// What of the project's values does not hold to its form, each a line with its mend; none, an empty list.
-export function unformed(p, { o, pin }) {
-  const bad = [];
+// What of the project's values does not hold to its form, each a line with its mend, the kind the host could not say
+// first; none, an empty list.
+export function unformed(p, { o, pin, unread }) {
+  const bad = unread ? [unread] : [];
   if (!LOGIN.test(o.owner)) bad.push(`the owner's account in core-manifest.md is no GitHub login. Mend: write the row *owner's account* with one login, letters, digits and hyphens`);
   if (!named(o.name)) bad.push(`the project's name, AGENTS.md's first heading, is not ${NAME}. Mend: write the name so in that heading`);
   for (const [key, what] of [["packages", "npm's lock file"], ["nuget", "NuGet's solution"]]) {
@@ -73,9 +75,9 @@ export function plan(p, kit, older = []) {
 
 // The kit's files for the project (the configs fresh.mjs adds beside them left out: those are the starter kit's and
 // the steps' to write, with what the project holds) and the earlier kits', each [path, text].
-export function kits(p, older) {
-  const kit = fresh(p, path.join(HERE, TEMPLATES), { kitOnly: true });
-  const before = older ? fs.readdirSync(older).map(d => fresh(p, path.join(older, d, TEMPLATES))) : [];
+export function kits(p, older, k = kind(p)) {
+  const kit = fresh(p, path.join(HERE, TEMPLATES), { kitOnly: true, k });
+  const before = older ? fs.readdirSync(older).map(d => fresh(p, path.join(older, d, TEMPLATES), { k })) : [];
   return { kit, before };
 }
 
@@ -84,9 +86,9 @@ function run(argv) {
   const at = argv.indexOf("--older"), older = at < 0 ? null : argv[at + 1];
   // (checks.mjs runs it as a check of the copies part, with the base in CONVERGE_BASE and no argument)
   if (argv.includes("--check") || process.env.CONVERGE_BASE !== undefined) return check(p, argv.includes("--base") ? argv[argv.indexOf("--base") + 1] : process.env.CONVERGE_BASE);
-  const bad = unformed(p, kind(p));
+  const k = kind(p), bad = unformed(p, k);
   if (bad.length) { for (const b of bad) console.error(`FAIL ${b}; the process wrote nothing.`); process.exitCode = 1; return; }
-  const { kit, before } = kits(p, older);
+  const { kit, before } = kits(p, older, k);
   const { write, left } = plan(p, kit, before);
   const writing = argv.includes("--write");
   for (const { to, text } of write) {
@@ -104,9 +106,9 @@ function run(argv) {
 function check(p, base) {
   if (!base) { console.log("the core's files and parts are read on a pull request alone: nothing to read"); return; }
   const changed = execFileSync("git", ["diff", "--name-only", "--no-renames", `${base}...HEAD`], { cwd: p.root, encoding: "utf8" }).split("\n").filter(Boolean);
-  const bad = unformed(p, kind(p));
+  const k = kind(p), bad = unformed(p, k);
   if (bad.length) { console.log(`the core's files and parts could not be read against the kit: ${bad.join("; ")}`); return; }
-  const { kit } = kits(p, null);
+  const { kit } = kits(p, null, k);
   const wrong = [];
   for (const [to, want] of kit) {
     if (!changed.includes(to) || p.differences.some(l => l.includes(`"${to}"`))) continue;

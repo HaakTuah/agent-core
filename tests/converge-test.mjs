@@ -3,7 +3,9 @@
 // run twice the process changes nothing; a project at a kit from before the marks gets its whole files and its parts of
 // AGENTS.md and CLAUDE.md written, every byte outside the parts kept; a workflow of the project's own, a file the
 // manifest's "Differences" names and a rule file whose run of imports holds a line of its own are never written over;
-// a value out of its form writes nothing and says the mend; and the check fails a pull request that makes a file or
+// a value out of its form writes nothing and says the mend; the kind is read from the host (whether the repository is
+// private: from GitHub's event in a job, from gh in a session), never from the workflows that stand, and with no answer
+// the process writes nothing and says the mend; and the check fails a pull request that makes a file or
 // part the core marks other than the core writes it, with its mend, and passes one that changes only what is the
 // project's. Git and Node's own modules.
 //
@@ -12,12 +14,15 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { BEGIN, END, partIn } from "../scripts/core-owned.mjs";
+import { kind } from "../scripts/fresh.mjs";
+import { privateOf } from "../scripts/host-private.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratch } from "../scripts/scratch-core.mjs";
+import { project as held } from "../scripts/steps.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
-const { tmp, env, git, project } = scratch("converge-test-");
+const { tmp, env, git, project, fresh } = scratch("converge-test-");
 const read = (dir, f) => fs.readFileSync(path.join(dir, f), "utf8");
 const write = (dir, f, t) => fs.writeFileSync(path.join(dir, f), t);
 const converge = (dir, ...args) => { const r = spawnSync(process.execPath, ["core/scripts/converge.mjs", ...args], { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
@@ -72,6 +77,31 @@ try {
   ok(refused.status === 1 && refused.out.includes("AGENTS.md's first heading") && mended(refused.out) && read(p.dir, ".github/workflows/core.yml") === "name: core\n",
     "a value that lands in a file out of its form: the process writes nothing and says the mend", refused.out);
   git(p.dir, "checkout", "-q", "--", ".");
+
+  // ---- the kind, read from the host and never guessed from the workflows that stand (#1095, point 1) ----
+  ok(kind(held(p.dir), { private: true }).o.private === true, "a repository the host says is private is read as private, though it holds the CodeQL and licence workflows");
+  for (const f of ["codeql.yml", "licences.yml"]) fs.rmSync(path.join(p.dir, ".github/workflows", f));
+  ok(kind(held(p.dir), { private: true }).o.private === true && kind(held(p.dir), { private: false }).o.private === undefined,
+    "  a private repository with no CodeQL workflow read as private, and a public one with none read as public");
+  const unanswered = kind(held(p.dir), privateOf(p.dir, { env: {}, ask: () => { throw new Error("not asked"); } }));
+  ok(unanswered.o.private === undefined && /could not be read[\s\S]*Mend:/.test(unanswered.unread), "  where the clone's origin names no repository on GitHub, it says it could not read it, with the mend, and guesses nothing", unanswered.unread);
+  const plainEnv = { ...env, CORE_HOST_ANSWERS: "" };
+  const blind = spawnSync(process.execPath, ["core/scripts/converge.mjs", "--write"], { cwd: p.dir, env: plainEnv, encoding: "utf8" });
+  ok(blind.status === 1 && /FAIL whether the repository is private could not be read/.test(`${blind.stdout}${blind.stderr}`) && mended(`${blind.stdout}${blind.stderr}`) && !fs.existsSync(path.join(p.dir, ".github/workflows/codeql.yml")),
+    "  and the process, given no answer, writes nothing and says the mend", `${blind.stdout}${blind.stderr}`);
+  const compared = spawnSync(process.execPath, ["core/scripts/fresh.mjs"], { cwd: p.dir, env: plainEnv, encoding: "utf8" });
+  ok(compared.status === 0 && /not compared, since whether the repository is private could not be read/.test(compared.stdout), "  nor is the project compared with a fresh start", compared.stdout);
+  git(p.dir, "checkout", "-q", "--", ".");
+  const hosted = fresh("a-hosted-clone"), repo = "someone-else/a-hosted-clone";
+  git(hosted, "remote", "add", "origin", `https://github.com/${repo}.git`);
+  const routes = [], gh = answer => route => { routes.push(route); return JSON.stringify(answer); };
+  ok(privateOf(hosted, { env: {}, ask: gh({ private: true }) }).private === true && routes.join() === `repos/${repo}`, "  a session asks gh of the repository its origin names", routes.join());
+  const event = path.join(tmp, "event.json");
+  write(tmp, "event.json", JSON.stringify({ repository: { full_name: repo, private: false } }));
+  ok(privateOf(hosted, { env: { GITHUB_EVENT_PATH: event }, ask: () => { throw new Error("not asked"); } }).private === false, "  GitHub's job reads it from the event it runs on, and asks gh nothing");
+  write(tmp, "event.json", JSON.stringify({ repository: { full_name: "someone-else/another", private: false } }));
+  const refusedHost = privateOf(hosted, { env: { GITHUB_EVENT_PATH: event }, ask: () => { throw new Error("gh: Not Found (HTTP 404)"); } });
+  ok(/could not be read: GitHub gave gh no answer \(gh: Not Found \(HTTP 404\)\)\. Mend: sign gh in/.test(refusedHost.unread ?? ""), "  an event of another repository is not read, and where gh gives no answer, it says so with the mend", JSON.stringify(refusedHost));
 
   // ---- the check, on a pull request ----
   git(p.dir, "branch", "-f", "base");
