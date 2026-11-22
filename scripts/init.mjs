@@ -36,6 +36,7 @@ import { everyInstall } from "./packages.mjs";
 import { MODULES } from "./reading.mjs";
 import { plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
+import { MARK, converged, marked } from "./core-owned.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const TEMPLATES = "setup/template";
@@ -85,13 +86,6 @@ export const FILES = [
   ["workflows/signatures.yml.tmpl", ".github/workflows/signatures.yml", o => o.packages !== undefined && !o.private],
   ["workflows/nuget.yml.tmpl", ".github/workflows/nuget.yml", o => o.nuget !== undefined && !o.private],
 ];
-// The core's marks (#1083; converge.mjs): the first line of each workflow and Dependabot config the kit writes, which says
-// the file is the core's, and the two lines that hold the core's part of a rule file of the project's own (AGENTS.md,
-// CLAUDE.md), as their templates write them.
-export const MARK = "# The core's file: core/scripts/converge.mjs writes it from the starter kit at each sync. To keep a change of the project's own, take this line out and name the file in core-manifest.md's \"Differences\".";
-export const BEGIN = "<!-- The core's part: core/scripts/converge.mjs writes it at each sync; the project's own words stand outside it. -->";
-export const END = "<!-- The core's part ends. -->";
-export const marked = to => /^\.github\/(?:workflows\/[^/]+\.yml|dependabot\.yml)$/u.test(to);
 // What the script makes itself, beside the templates' files: none of these may exist either.
 const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "checks/holders.json", "core"];
 // What a builder's session reads at its start in a project the kit writes at any commit, as the kit's own entry files
@@ -308,7 +302,7 @@ function refuseTaken(here, out) {
 // the project holds already is never written over: of the kit's files it takes the core's part alone, as every sync
 // takes it (converge.mjs, `converged`), and what is left as the project's is said; a config or baseline that stands is
 // kept.
-function writeKit(o, here, pin, out, converged) {
+function writeKit(o, here, pin, out) {
   const there = to => fs.existsSync(path.join(here, to));
   // ("wx": a file that has appeared since, a link too, is refused and never written over)
   const write = (to, text, flag = "wx") => { fs.mkdirSync(path.dirname(path.join(here, to)), { recursive: true }); fs.writeFileSync(path.join(here, to), text, { flag }); };
@@ -357,7 +351,7 @@ function sayLeft(o, pin, out, { written, left, made }) {
   console.log("\nWhat owning this project asks of the owner, in one plain page: core/setup/owner-guide.md");
 }
 
-async function init(argv) {
+function init(argv) {
   const o = options(argv);
   const here = process.cwd();
   checkProject(o, here);
@@ -375,12 +369,11 @@ async function init(argv) {
   const read = name => { try { return raw(["show", `${pin}:${TEMPLATES}/${name}`], ROOT); } catch { return fail(`${pin} holds no ${TEMPLATES}/${name}: take a commit of the core that has the starter kit`); } };
   const out = files(o, pin, moduleNames, read);
   refuseTaken(here, out);
-  const { converged } = await import("./converge.mjs");
-  sayLeft(o, pin, out, writeKit(o, here, pin, out, converged));
+  sayLeft(o, pin, out, writeKit(o, here, pin, out));
 }
 
 if (started(import.meta.url)) {
-  try { await init(process.argv.slice(2)); } catch (e) {
+  try { init(process.argv.slice(2)); } catch (e) {
     console.error(`FAIL: ${e instanceof Failure ? e.message : e.stack}`);
     process.exitCode = 1;
   }

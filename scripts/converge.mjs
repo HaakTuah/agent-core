@@ -27,17 +27,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyAt } from "./workflow-calls.mjs";
 import { fresh, kind } from "./fresh.mjs";
-import { BEGIN, END, FILES, NAME, TEMPLATES, linked, marked, named } from "./init.mjs";
+import { BLOCKS, blockOf, converged, lf, marked } from "./core-owned.mjs";
+import { NAME, TEMPLATES, linked, named } from "./init.mjs";
 import { project } from "./steps.mjs";
 import { started } from "./started.mjs";
 
-export const BLOCKS = ["AGENTS.md", "CLAUDE.md"];
-// (of the kit's files, the project's own from its first commit: written only where they are not there)
-const OWN = new Set(["core-manifest.md", "SECURITY.md", "docs/threat-model.md", "docs/PROGRESS.md", "docs/choices.md", "checks/copies.json", "checks/shape.json", "checks/licences-audit.json"]);
-export const WHOLE = FILES.map(([, to]) => to).filter(to => !OWN.has(to) && !BLOCKS.includes(to));
-const KIT = new Set(FILES.map(([, to]) => to));
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-
 const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/u;
 const FOLDER = /^(\.|[A-Za-z0-9_][A-Za-z0-9._-]*(\/[A-Za-z0-9_][A-Za-z0-9._-]*)*)$/u;
 const COPY = /^[A-Za-z0-9_][A-Za-z0-9._-]*(\/[A-Za-z0-9_][A-Za-z0-9._-]*)*\/$/u;
@@ -53,52 +48,6 @@ export function unformed(p, { o, pin }) {
   if (!/^[0-9a-f]{40}$/u.test(pin)) bad.push(`core-manifest.md's "Core:" line has no full commit SHA. Mend: write the line as the sync writes it`);
   if (!COPY.test(copyAt(p))) bad.push(`the copy's path in core-manifest.md's "Core:" line is not a folder in plain letters, digits, ".", "_" and "-". Mend: name it so`);
   return bad;
-}
-
-const lf = t => t.replace(/\r\n/gu, "\n");
-// (a file as the comparison reads it: its line ends made one, the core's mark taken out and every pin made one, since
-// the sync and Dependabot move pins)
-const plainOf = t => lf(t).replace(/^# The core's file:[^\n]*\n/u, "").replace(/@[0-9a-f]{40}(\s*#\s*v?[\w.-]+)?/gu, "@<pin>");
-const blockOf = t => { const b = lf(t).indexOf(BEGIN), e = lf(t).indexOf(END); return b < 0 || e < b ? null : lf(t).slice(b, e + END.length); };
-const imports = l => /^@\S+$/u.test(l);
-
-// Where the core's part stands in a rule file's text: { at, end } (end past its last line, its line end kept outside),
-// null where it has none, or "many" where it cannot be told which run of import lines it is. `kitLines` are the lines
-// every kit's part holds.
-export function partIn(text, kitLines) {
-  const b = text.indexOf(BEGIN), e = text.indexOf(END);
-  if (b >= 0 && e > b && text.indexOf(BEGIN, b + 1) < 0) return { at: b, end: e + END.length };
-  if (b >= 0 || e >= 0) return "many";
-  const lines = text.split("\n"), runs = [];
-  let offset = 0, run = null;
-  lines.forEach((l, i) => {
-    const bare = l.replace(/\r$/u, "");
-    if (imports(bare)) { run ??= { at: offset, lines: [] }; run.lines.push(bare); run.end = offset + bare.length; } else if (run) { runs.push(run); run = null; }
-    offset += l.length + (i < lines.length - 1 ? 1 : 0);
-  });
-  if (run) runs.push(run);
-  const core = runs.filter(r => r.lines.every(l => kitLines.has(l)));
-  return core.length === 1 ? core[0] : core.length ? "many" : null;
-}
-
-// One file after the process, from what stands, `now` (null where nothing does), the kit's text `want` and the earlier
-// kits' (`older`): { text } to write, {} where it is left as it stands, and `left` where it is left as the project's.
-export function converged(to, now, want, older = []) {
-  if (now === null) return { text: want };
-  if (OWN.has(to) || !KIT.has(to)) return {};
-  if (BLOCKS.includes(to)) {
-    const part = blockOf(want);
-    if (part === null) return {};
-    const kitLines = new Set([want, ...older].flatMap(t => (blockOf(t) ?? t).split("\n").map(l => l.replace(/\r$/u, "")).filter(imports)));
-    const at = partIn(now, kitLines);
-    if (at === "many") return { left: "its part of the core cannot be told apart (the core's marks stand more than once or apart, or more than one run of import lines is the kit's): left as it is" };
-    const eol = now.includes("\r\n") ? "\r\n" : "\n", block = part.replaceAll("\n", eol);
-    const text = at === null ? `${now}${now.endsWith("\n") || now === "" ? "" : eol}${eol}${block}${eol}` : `${now.slice(0, at.at)}${block}${now.slice(at.end)}`;
-    return text === now ? {} : { text };
-  }
-  const core = (marked(to) && /^# The core's file:/u.test(now)) || [want, ...older].some(t => t && plainOf(t) === plainOf(now));
-  if (!core) return { left: "is not the core's (no mark of the core's, and not what a starter kit writes for the project): left as it is" };
-  return now === want ? {} : { text: want };
 }
 
 // What the process does to the project `p`: [{ to, text }] to write, [{ to, why }] left as the project's. `kit` is
