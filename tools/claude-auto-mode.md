@@ -37,7 +37,7 @@ for them to be added.
 "autoMode": { "allow": [
   "$defaults",
   "Editing the text of an issue or a comment in a repository under github.com/<account> is allowed; never deleting one, and never in a repository of another account.",
-  "In a repository under github.com/<account>, running the program at the path that the core's lychee.sh or workflow-tools.sh (scripts/ in the core's repository, core/scripts/ in a project) just set in LYCHEE, ACTIONLINT or ZIZMOR is allowed; never a program at any other path, nor one in another account's repository.",
+  "In a repository under github.com/<account>, running the program at the path that the core's lychee.sh or workflow-tools.sh (scripts/ in the core's repository, core/scripts/ in a project) just printed as LYCHEE=, ACTIONLINT= or ZIZMOR=, by that path or by that variable set from what the script printed, is allowed; never a program at any other path, nor one in another account's repository.",
   "Deleting a branch that this session itself created, in a repository under github.com/<account>, is allowed; never the default branch, never agents-stop, and never a branch another session or a person created."
 ] }
 ```
@@ -45,9 +45,9 @@ for them to be added.
 Each, and why it is safe:
 - editing text: it reaches only the owner's own repositories, deletes nothing, and the host keeps each edit's earlier
   text;
-- running a fetched program: the script, a protected file of the owner's own repository (floor rule 3), sets the path
-  only after the program matched the SHA-256 the core names for its version (floor rule 7), a check the classifier
-  cannot see and the script makes;
+- running a fetched program: the script, a protected file of the owner's own repository (floor rule 3), prints the
+  path only after the program, or for zizmor its wheel, matched the SHA-256 the core names for its version (floor rule
+  7), a check the classifier cannot see and the script makes;
 - deleting a branch: only one the session made, as it cleans up what it made ("Sessions" in
   `roles/shared/work-flow.md`), never `main`, which the host protects, nor the owner's stop switch, which no agent
   touches.
