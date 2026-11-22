@@ -213,13 +213,14 @@ fs.mkdirSync(fetchedOnce.temp);
 const installedOnce = { store: new Map(), temp: path.join(tmp, "installed-once") };
 fs.mkdirSync(installedOnce.temp);
 {
+  // (a step reads its folder as `$RUNNER_TEMP/tool`, so on Windows the runner folder's own backslashes then a slash; the case expects that form, #1076)
   // (the runner's own case: the first job runs the matching step with the shared folder as its runner folder, the next takes
   // its result and its GITHUB_ENV line; a step of another text, or run with no `once`, runs in its own job's folder)
   const wf = (a, b) => `on: push\njobs:\n  j:\n    steps:\n      - run: |\n          echo ${a} >> "$COUNT"\n          echo "TOOL=$RUNNER_TEMP/tool" >> "$GITHUB_ENV"\n      - run: test "$TOOL" = "$EXPECT" && echo reads >> "$COUNT"\n      - run: echo ${b} >> "$COUNT" && exit 3\n`;
   const dir = path.join(tmp, "once-case"), count = path.join(dir, "count"), shared = path.join(dir, "shared");
   fs.mkdirSync(shared, { recursive: true });
   const once = { pattern: /fetch|break/, store: new Map(), temp: shared };
-  const go = (text, o) => runWorkflow(text, { github: { repository: "o/r", event_name: "push" }, base: { PATH: process.env.PATH, COUNT: count, EXPECT: path.join(shared, "tool") }, workspace: () => dir, uses: {}, temp: dir, ...o })[0];
+  const go = (text, o) => runWorkflow(text, { github: { repository: "o/r", event_name: "push" }, base: { PATH: process.env.PATH, COUNT: count, EXPECT: `${shared}/tool` }, workspace: () => dir, uses: {}, temp: dir, ...o })[0];
   const first = go(wf("fetch", "break"), { once }), second = go(wf("fetch", "break"), { once }), plain = go(wf("fetch", "break"), {}), other = go(wf("get", "break"), { once });
   const lines = fs.readFileSync(count, "utf8").trim().split("\n"), times = w => lines.filter(l => l === w).length;
   ok(times("fetch") === 2 && times("break") === 1 && times("reads") === 2 && !first.passed && !second.passed && second.steps[0].ran && second.steps[0].passed && second.steps[2].passed === false,
@@ -405,6 +406,13 @@ function upgrade(p, from, ownChanges, expect) {
   // its hooks, as Claude Code runs them: from main's copy, through the commands of its settings
   git(p.dir, "checkout", "-q", "main");
   git(p.dir, "fetch", "-q", "origin");
+  // (the copy's packages, which the release's own older sync.mjs does not install and the steps below read: installed by
+  // the copy's install script, as a session does where a check says they are not installed, every install of it, the
+  // parser's too, as main's sync.mjs installs. Left to the session start's install, which gives up after 20 seconds and
+  // says so in a note, never a failure, they were once missing on Windows, so the steps read "not installed" for the 24
+  // they could not read; #1078. The start's own install is tested in tests/work-saved-test.mjs)
+  const installedCopy = node(p.dir, "core/scripts/install.mjs", "all");
+  ok(installedCopy.status === 0, `${p.name}: the copy's packages are installed by its own install script, as a session installs them where a check says they are not`, installedCopy.out);
   const settings = JSON.parse(fs.readFileSync(path.join(p.dir, ".claude/settings.json"), "utf8")).hooks;
   const hook = (event, input) => {
     const command = settings[event][0].hooks[0].command;
@@ -415,6 +423,9 @@ function upgrade(p, from, ownChanges, expect) {
   const call = hook("PreToolUse", { hook_event_name: "PreToolUse", session_id: "s1", tool_name: "Agent", tool_input: { description: "x", prompt: "y", subagent_type: "general-purpose", model: "sonnet", effort: "medium" } });
   const stop = hook("Stop", { hook_event_name: "Stop", session_id: "s1", stop_hook_active: false });
   ok(start.status === 0 && call.status === 0 && stop.status === 0 && !/"decision"\s*:\s*"block"/.test(stop.out + start.out), `${p.name}: its hooks run from main's copy and stop nothing in a clean clone`, `${start.out}\n${call.out}\n${stop.out}`);
+  // (the packages stand from the install above, which the start accepts and leaves; a start that took them away, with
+  // its note, is seen here and not as the steps' "not installed"; #1078)
+  ok(fs.existsSync(path.join(p.dir, "core/.packages/node_modules/.package-lock.json")) && !/packages are not installed/u.test(start.out), `${p.name}: and leaves the copy's packages installed`, start.out);
 
   // a change that makes something worse than it stood fails, and the mend as the failure words it passes
   const copied = fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/).find(l => /^- It is never pushed to/.test(l)) ?? "";
@@ -431,6 +442,23 @@ function upgrade(p, from, ownChanges, expect) {
   const taller = own(main1, dir => fs.writeFileSync(path.join(dir, "src/newer.js"), `export function newer(a) {\n${"  a += 1;\n".repeat(70)}  return a;\n}\n`));
   const tall = checks(p, "pull_request", taller, { baseSha: main1, only: "copies.yml" }).filter(([, r]) => !r.passed);
   ok(tall.length === 1 && tall[0][1].steps.some(x => /1 function passes a mark[\s\S]*Mend: split each by what it does/.test(x.out)), `${p.name}: a pull request that adds a function past a mark fails, and its failure says the mend`, failures(tall) || "it passed");
+
+  // a workflow of the project's own that runs the core's workflow check with no install step before it (#1079): on a runner
+  // with no packages, the check says it did not run and fails nothing, and the step the sync prints is the guarded one
+  git(p.dir, "checkout", "-q", "-B", "own-run", main1);
+  fs.mkdirSync(path.join(p.dir, ".github/workflows"), { recursive: true });
+  fs.writeFileSync(path.join(p.dir, ".github/workflows/own-core-checks.yml"), "name: own-core-checks\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  own:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: node core/scripts/workflows.mjs\n");
+  git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "a workflow of its own that runs the core's workflow check");
+  const ownRun = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: main1, only: "own-core-checks.yml", ownToo: true });
+  ok(started(ownRun).length === 1 && !failures(ownRun) && ownRun.every(([, r]) => r.steps.some(x => /the package yaml is not installed[\s\S]*Mend:/.test(x.out))),
+    `${p.name}: a workflow of its own that runs the workflow check with no install step before it passes, the check saying it did not run, with its mend`, failures(ownRun) || ownRun.map(([, r]) => r.steps.map(x => x.out).join("\n")).join("\n"));
+  const unguarded = stepsIn(p.dir);
+  ok(unguarded.out.includes("if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi"), `${p.name}: the step the sync prints for that workflow gives the guarded install`, unguarded.out);
+  const bare = path.join(tmp, `${p.name}-core-run`);
+  git(tmp, "clone", "-q", "--branch", "own-run", p.dir, bare);
+  const coreRun = spawnSync(process.execPath, ["core/scripts/workflows.mjs", "--core"], { cwd: bare, env: base, encoding: "utf8" });
+  ok(coreRun.status === 1 && /the package yaml is not installed[\s\S]*Mend:/.test(`${coreRun.stdout}${coreRun.stderr}`), `${p.name}: the same check run as the core's own (--core) still fails where the package is missing, saying its mend`, `${coreRun.stdout}${coreRun.stderr}`);
+  git(p.dir, "checkout", "-q", "main");
 
   // every step a release asks reads done; each step the commit under test adds, taken out, is reported and mended
   git(p.dir, "checkout", "-q", "main");
