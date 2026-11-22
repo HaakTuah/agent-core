@@ -11,5 +11,5 @@ export default {
   stage: dir => write(dir, ".github/workflows/look.yml", fs.existsSync(at(dir, ".github/workflows/look.yml"))
     ? read(dir, ".github/workflows/look.yml").replace(/(\r?\n) {4}secrets:\r?\n {6}PERSONAL_TERMS: .*\r?\n/u, "$1")
     : `name: look\n\non:\n  schedule:\n    - cron: '41 5 * * *'\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\njobs:\n  look:\n    permissions:\n      contents: read\n      issues: write\n      pull-requests: read\n      checks: read\n      statuses: read\n    uses: ${CORE}/.github/workflows/look.yml@${PIN}\n`),
-  mend: dir => write(dir, ".github/workflows/look.yml", read(dir, ".github/workflows/look.yml").replace(/^( {4}uses: .*\/\.github\/workflows\/look\.yml@.*\n)(?! {4}secrets:)/mu, "$1    secrets:\n      PERSONAL_TERMS: ${{ secrets.PERSONAL_TERMS }}\n")),
+  mend: dir => write(dir, ".github/workflows/look.yml", read(dir, ".github/workflows/look.yml").replace(/^( {4}uses: .*\/\.github\/workflows\/look\.yml@.*?(\r?\n))(?! {4}secrets:)/mu, "$1    secrets:$2      PERSONAL_TERMS: ${{ secrets.PERSONAL_TERMS }}$2")),
 };
