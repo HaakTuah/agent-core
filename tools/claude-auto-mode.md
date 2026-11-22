@@ -37,7 +37,7 @@ for them to be added.
 "autoMode": { "allow": [
   "$defaults",
   "Editing the text of an issue or a comment in a repository under github.com/<account> is allowed; never deleting one, and never in a repository of another account.",
-  "In a repository under github.com/<account>, running the program at the path that the core's lychee.sh or workflow-tools.sh (scripts/ in the core's repository, core/scripts/ in a project) just printed as LYCHEE=, ACTIONLINT= or ZIZMOR=, by that path or by that variable set from what the script printed, is allowed; never a program at any other path, nor one in another account's repository.",
+  "In a repository under github.com/<account>, running the program at the path that the core's lychee.sh or workflow-tools.sh (scripts/ in the core's repository, core/scripts/ in a project) just printed as LYCHEE=, ACTIONLINT= or ZIZMOR=, by that variable set from what the script printed in a command it can read, is allowed; never a program at any other path, nor one in another account's repository.",
   "Deleting a branch that this session itself created, in a repository under github.com/<account>, is allowed; never the default branch, never agents-stop, and never a branch another session or a person created."
 ] }
 ```
