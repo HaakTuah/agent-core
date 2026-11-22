@@ -4,8 +4,10 @@
 
 // The first line of each workflow and Dependabot config the kit writes, which says the file is the core's, and the two
 // lines that hold the core's part of a rule file of the project's own (AGENTS.md, CLAUDE.md), as their templates write them.
+// (the part's marks name no path: a project whose copy stands elsewhere has each core/ in the kit's text written as its
+// copy's path, and the marks are read word for word; the workflows' mark is read by its opening alone)
 export const MARK = "# The core's file: core/scripts/converge.mjs writes it from the starter kit at each sync. To keep a change of the project's own, take this line out and name the file in core-manifest.md's \"Differences\".";
-export const BEGIN = "<!-- The core's part: core/scripts/converge.mjs writes it at each sync; the project's own words stand outside it. -->";
+export const BEGIN = "<!-- The core's part: each sync writes it from the core's starter kit (converge.mjs); the project's own words stand outside it. -->";
 export const END = "<!-- The core's part ends. -->";
 export const marked = to => /^\.github\/(?:workflows\/[^/]+\.yml|dependabot\.yml)$/u.test(to);
 

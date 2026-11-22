@@ -98,7 +98,8 @@ ok(notPure(r, "core/ is not a folder holding the core's tree") && r.ms < 5000, `
 branch("many", () => { for (let i = 0; i < MANY; i++) write(`.github/many/f${i}.yml`, `${i}\n`); });
 r = pure();
 // (only its exit is read: printed to a pipe, a long refusal can be cut short as the script exits, its last line lost)
-ok(r.status === 1 && r.out.includes("NOT PURE a file created") && !raw(r.out) && r.ms < 5000, `pure-sync: ${MANY} files added beside the copy are each refused, read in ${r.ms} ms`);
+// (a file created goes on to the proof of what the one process writes, #1083, which proves none of these)
+ok(r.status === 1 && /NOT PURE \.github\/many\/f0\.yml, /.test(r.out) && !raw(r.out) && r.ms < 5000, `pure-sync: ${MANY} files added beside the copy are each refused, read in ${r.ms} ms`);
 branch("core-link", () => { fs.rmSync(path.join(p, "core"), { recursive: true }); link(outside, "core"); });
 ok(notPure(pure(), "core/ is not a folder"), "pure-sync: core/ made a link that leads out of the checkout is refused");
 branch("link-in-core", () => link("../../outside/secret.txt", "core/scripts/y.mjs"));

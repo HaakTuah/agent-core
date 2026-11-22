@@ -454,7 +454,7 @@ check a project runs that the list leaves out.
 | Check | The copy | Why, and what holds it in the core |
 | --- | --- | --- |
 | `core.yml` | read | It is the copy's proof: every file, byte for byte, against the core at the pin. |
-| `pure-sync.mjs` | left out | A pull request that moves only the copy and its pins gets no review of its own (floor rule 8). The core's own pull request was reviewed. |
+| `pure-sync.mjs` | left out | A pull request that moves only the copy, its pins and what the kit renders gets no review of its own (floor rule 8). The core's own pull request was reviewed. |
 | `security-review.mjs` | left out | A change under the copy never asks floor rule 3's two security reviews of what runs by itself: only a sync changes the copy, and `core.yml` fails any other change. Every file of the core is protected, so the core's own pull request had its two. |
 | `code-review-wait.mjs` | read | A change inside the copy counts as a rule file's, and waits for a code review. |
 | `licence-scan.mjs` | left out | The core's own scan holds it (`.github/licences.json`). That scan skips the files of the scanner's own code and tests, which hold licence text as patterns. |
@@ -463,6 +463,7 @@ check a project runs that the list leaves out.
 | `codeql.yml` | read | The whole checkout, in the languages the project names. The core's own code scanning runs on its repository. |
 | `code-scan.mjs` | left out | Where no workflow calls `codeql.yml`, the scan hands the engine the code a pull request adds or alters outside the copy alone. The core's repository is public, and the host's CodeQL scans its code (`codeql.yml`). |
 | `copies.mjs` | left out in part | It reads the copy as the project's config names it: the starter kit's names the copy's rule files' prose. A file of the copy moved, or its text moved into another, counts as gone, never as the config reading less, since a sync alone moves those. The core's own copies check holds them. |
+| `converge.mjs` | left out | It reads only the project's own files and parts that the core marks, at the paths a pull request changed, against what the copy's kit writes for the project, and the copy is none of them. `core.yml` holds the copy. |
 | `pointers.mjs` | left out | The copy's files are only what a pointer leads to. The core's run with `--core` holds its own pointers. |
 | `reading-size.mjs` | left out in part | Each file of the copy under `"read"` is held to its own mark. The total and the split mark count the project's own files alone. The core's caps hold the copy (`scripts/size.mjs`). The core's own split mark is in `.github/sizes.json`, which the size workflow reads with this script. |
 | `workflows.mjs` | left out | The core's run with `--core` holds the copy's workflows and actions (floor rule 2). |

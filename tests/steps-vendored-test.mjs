@@ -7,6 +7,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { kits, plan } from "../scripts/converge.mjs";
 import { heldKitIn } from "../scripts/steps-kit.mjs";
 import { STEPS, configs, notDone, project, report } from "../scripts/steps.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
@@ -22,6 +23,13 @@ for (const [name, o, at] of [["a-vendored-npm-project", { packages: "." }, "vend
 for (const [name, at] of [["a-vendored-npm-project", "vendor/core/"], ["a-vendored-dotnet-game", "third_party/the-core/"]]) {
   const shape = fs.readFileSync(path.join(vendored[name], "checks/shape.json"), "utf8"), copies = fs.readFileSync(path.join(vendored[name], "checks/copies.json"), "utf8");
   ok(shape.includes(`":!${at}"`) && !/":!core\//u.test(shape) && copies.includes(`"${at}floor/*.md"`) && !/"core\//u.test(copies), `${name}: the starter kit's shape and copies configs leave out and name the copy where the manifest says it stands`, `${shape}\n${copies}`);
+}
+// (the one process finds the core's part of each rule file where the copy stands at another path, and writes none again:
+// its marks name no path the kit's text is moved with; #1083)
+for (const [name, dir] of Object.entries(vendored)) {
+  const p = project(dir), { kit } = kits(p, null), { write } = plan(p, kit);
+  const again = write.filter(w => w.to === "AGENTS.md" || w.to === "CLAUDE.md").map(w => w.to);
+  ok(!again.length, `${name}: the one process finds the core's part of AGENTS.md and CLAUDE.md at the copy's path, and writes neither again`, again.join(", "));
 }
 // (the steps that read a project's own run of the core's scripts read it at the copy's path: a mutation tool's strength
 // check, and the selection of the tests a change can reach with the name of the check that gates a tree that passed)

@@ -102,7 +102,8 @@ function provedOwned(dir) {
   const tmp = mkdtempSync(join(tmpdir(), "core-render-")), kits = join(tmp, "kits"), base_ = join(tmp, "project");
   try {
     const tree = (sha, to) => { mkdirSync(to, { recursive: true }); execFileSync("tar", ["-x", "-f", "-", "-C", to], { input: inBare(dir, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 }) }); };
-    tree(pin, join(kits, "now"));
+    // (a pin whose core holds no kit, or one git cannot read, proves no file outside the copy: refused, never a crash)
+    try { tree(pin, join(kits, "now")); } catch { fail.push(`${later.join(", ")}: the core at ${pin} holds no starter kit to render, so no file outside the copy is proved`); return; }
     const older = [...new Set([oldPin, ...releasesIn(dir).map((r) => r.sha)])].flatMap((sha) => { try { tree(sha, join(kits, sha)); return [join(kits, sha)]; } catch { return []; } });
     // (the project as its main holds it, the copy left out, its manifest the head's, whose one change is the pin, read above)
     mkdirSync(base_);

@@ -11,7 +11,7 @@ This project takes the shared rules in `core/` by `core-manifest.md`, whose slot
 builder reads these whole at the start of every task (Claude Code, Kiro and Antigravity pull them in through their
 entry files; any other tool: open each file named):
 
-<!-- The core's part: core/scripts/converge.mjs writes it at each sync; the project's own words stand outside it. -->
+<!-- The core's part: each sync writes it from the core's starter kit (converge.mjs); the project's own words stand outside it. -->
 @core-manifest.md
 @core/floor/security.md
 @core/roles/builder.md
