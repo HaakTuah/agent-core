@@ -415,10 +415,13 @@ function upgrade(p, from, ownChanges, expect) {
   // a pull request of the project's own, before the sync: which jobs it starts
   const own = (from, change) => { git(p.dir, "checkout", "-q", "-B", "change", from); change(p.dir); git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "a change of its own"); git(p.dir, "push", "-q", "-f", "origin", "change"); return git(p.dir, "rev-parse", "HEAD"); };
   const was = ownChanges.map(([what, change]) => [what, started(checks(p, "pull_request", own(main0, change), { baseSha: main0, dry: true }))]);
-  // (the baseline: check.mjs, its own workflows too, on its first pull request of its own and on a push to main)
-  const baseline = { pr: verdictsOf(p, main0) };
+  // (the baseline: check.mjs, its own workflows too, on its first pull request of its own and on a push to main; not for
+  // a NuGet project where there is no .NET SDK, whose NuGet step could not start, as on GitHub's runners it does)
+  const trial = sdk || !p.kit.includes("--nuget");
+  if (!trial) console.log(`note ${p.name}: no .NET SDK here, so check.mjs is not run before and after the sync`);
+  const baseline = trial ? { pr: verdictsOf(p, main0) } : null;
   git(p.dir, "checkout", "-q", "main");
-  baseline.push = verdictsOf(p);
+  if (trial) baseline.push = verdictsOf(p);
 
   // the sync, as the project's own copy of the release's sync.mjs makes it
   git(p.dir, "checkout", "-q", "-B", "sync", main0);
@@ -476,11 +479,10 @@ function upgrade(p, from, ownChanges, expect) {
   ok(!failures(onPush), `${p.name}: every check passes on main after the merge (${started(onPush).length} jobs)`, failures(onPush));
   // (each project's own workflows, the core's calls among them, run by check.mjs as GitHub would, beside the baseline:
   // none that passed before the sync fails after it; #1084)
-  const afterSync = { push: verdictsOf(p) };
-  own(main1, ownChanges[0][1]);
-  afterSync.pr = verdictsOf(p, main1);
+  const afterSync = trial ? { push: verdictsOf(p) } : null;
+  if (trial) { own(main1, ownChanges[0][1]); afterSync.pr = verdictsOf(p, main1); }
   git(p.dir, "checkout", "-q", "main");
-  for (const [event, said] of [["push", "a push to main"], ["pr", `a pull request of its own that ${ownChanges[0][0]}`]]) {
+  for (const [event, said] of trial ? [["push", "a push to main"], ["pr", `a pull request of its own that ${ownChanges[0][0]}`]] : []) {
     const c = compared(baseline[event].verdicts, afterSync[event].verdicts);
     ok(afterSync[event].verdicts["own-checks.yml/own"] === "passed" && Object.keys(afterSync[event].verdicts).some(j => j.startsWith("core.yml/")) && !c.failedAfter.length,
       `${p.name}: on ${said}, check.mjs runs its own workflows with the core's, and no check that passed before the sync fails after it (${c.passedBoth.length} passed, ${c.failedBoth.length} failed both)`,
@@ -491,7 +493,7 @@ function upgrade(p, from, ownChanges, expect) {
   git(p.dir, "rm", "-q", ".github/workflows/own-checks.yml");
   git(p.dir, "commit", "-q", "-m", "its own check workflow, taken out");
   git(p.dir, "push", "-q", "origin", "main");
-  if (from.tag === starts.at(-1)) {
+  if (trial && from.tag === starts.at(-1)) {
     // (and a new repository of its kind, as the kit at the commit under test writes it: every check passes)
     git(p.newDir, "commit", "-q", "-m", "the starter kit");
     const fresh = verdictsOf({ name: `${p.name}-new`, dir: p.newDir });
