@@ -486,6 +486,11 @@ function upgrade(p, from, ownChanges, expect) {
       `${p.name}: on ${said}, check.mjs runs its own workflows with the core's, and no check that passed before the sync fails after it (${c.passedBoth.length} passed, ${c.failedBoth.length} failed both)`,
       `${c.failedAfter.join("\n")}\n${JSON.stringify(afterSync[event].verdicts)}\n${afterSync[event].out.slice(-2500)}`);
   }
+  // (the workflow taken out again on main, so the steps read below find the project as before: sync step 610 would ask it
+  // for the install step, which the case of #1079 leaves out on purpose)
+  git(p.dir, "rm", "-q", ".github/workflows/own-checks.yml");
+  git(p.dir, "commit", "-q", "-m", "its own check workflow, taken out");
+  git(p.dir, "push", "-q", "origin", "main");
   if (from.tag === starts.at(-1)) {
     // (and a new repository of its kind, as the kit at the commit under test writes it: every check passes)
     git(p.newDir, "commit", "-q", "-m", "the starter kit");
