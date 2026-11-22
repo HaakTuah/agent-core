@@ -21,7 +21,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { copyTree, entries } from "../scripts/copy-tree.mjs";
-import { MARK } from "../scripts/core-owned.mjs";
 import { checkoutStandIn, ghStandIn, hostSays, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 

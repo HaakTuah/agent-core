@@ -11,8 +11,8 @@
 // each file the process writes (converge.mjs, #1083) is, byte for byte, what this checkout's process writes from the
 // kit at the new pin for the project as its main holds it, so nothing outside the core's files and parts changed, and
 // each other changed line differs from the one it replaces only in the manifest's pin or a call's to a core workflow,
-// each moved to the new pin; a file is created only so, and deleted only where the process takes it out, a whole file
-// of the core's that the kit at the new pin no longer writes; the new pin is
+// each moved to the new pin; a file is created only so, and deleted only as `provedGone` below proves it (a call whose
+// check the one job of core.yml the process writes runs, the pin's tree holding the process); the new pin is
 // a commit of the core's main at or past the old one, and, where the manifest follows the core's releases, a release
 // of the core (any other sync is reviewed like any PR, and merges after it); the copy is a folder, and the core's tree at
 // that pin, compared as copy-tree.mjs compares (and says why), without the folder the core keeps to itself; and every

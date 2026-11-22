@@ -218,7 +218,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   end in the same state, and run again changes nothing. The core owns each workflow, Dependabot
   config, issue form, hooks' settings and tool entry file the kit writes, whole, where it is not there, carries the
   core's mark or is what a kit writes for the project; and its part of `AGENTS.md` and `CLAUDE.md`, between its marks.
-  A workflow of the core's whose check the one job of the `core.yml` it writes now runs, it takes out (#1083, point 1).
+  A workflow of the core's whose check the one job of the `core.yml` it ends with runs, it takes out (#1083, point 1).
   Each value of the project's that lands in a file it writes is held to its form first (floor topic 5), and where one is
   not, it writes nothing and says the mend. The one condition that changes it: a file the project holds that is not
   the core's, or one the manifest's "Differences" names: the process writes nothing of it and names it as a
