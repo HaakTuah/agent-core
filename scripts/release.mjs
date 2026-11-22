@@ -10,8 +10,9 @@
 // the upgrade test on Windows have passed on that commit (#715), and hands it the commit it was started on and GitHub's
 // list of the checks that ran there; the cut is refused where main has moved on
 // from that commit, or where a check on it has not passed; and, once the staged cases hold a release (staged.mjs,
-// beside this file), where one failed in its last run as that commit's record holds it. Git and Node's own modules
-// only.
+// beside this file), where one failed in its last run as that commit's record holds it; and where the trial on a real
+// project (TRIAL, below; #1084) has no record that stands for that commit, or one where a check passed before the
+// update and failed after it. Git and Node's own modules only.
 //
 //   node scripts/release.mjs          what the next release would be, and what it carries
 //   node scripts/release.mjs --cut --at <sha> --runs <file> --full <file>
@@ -21,6 +22,10 @@
 //                                     all passed, and the tests' hourly or hand-started runs in --full, its answer to
 //                                     repos/<core>/actions/workflows/tests.yml/runs?head_sha=<sha>&branch=main, are none
 //                                     unfinished, the newest passed (fullRun); without the three it cuts nothing
+//   node scripts/release.mjs --trial <sha> [<before> <after>]...
+//                                     writes the trial's record for the commit <sha>: for each project tried, the file
+//                                     check.mjs --verdicts wrote before the update and the one after, counted; none
+//                                     where no project that takes the core allowed a trial
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -79,6 +84,68 @@ export function inTheCore(file = fileURLToPath(import.meta.url)) {
 }
 
 // The value after a flag on the command line, null where the flag is not there; it throws where the flag stands last.
+// The trial of a release on a real project (#1084; AGENTS.md, "A release is cut on the owner's word"): its record holds
+// counts alone, never a project's name, its jobs or its code.
+export const TRIAL = "reports/release-trial.json";
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+// A run of check.mjs --verdicts before an update set beside one after it, each job by its place: failed both, standing
+// before the update; failed after where it passed before or did not run, the update's; and passed after, whatever it
+// was before, since nothing of it is the update's. A job that ran before alone is not counted: an update may fold it
+// into another's steps.
+export function compared(before, after) {
+  const out = { passedBoth: [], failedBoth: [], failedAfter: [] };
+  for (const [job, v] of Object.entries(after ?? {})) out[v !== "failed" ? "passedBoth" : before?.[job] === "failed" ? "failedBoth" : "failedAfter"].push(job);
+  return out;
+}
+
+// The record of a trial at `sha` on the day `day`: each project's runs, [before, after], counted; no pair where no
+// project that takes the core allowed one.
+export function trialRecord(sha, day, pairs) {
+  const counts = { passedBoth: 0, failedBoth: 0, failedAfter: 0 };
+  for (const [before, after] of pairs) for (const [k, jobs] of Object.entries(compared(before, after))) counts[k] += jobs.length;
+  return { commit: sha, day, projects: pairs.length, ...counts };
+}
+
+// What the trial's record says of the release at `sha`, read through `git` (its arguments give its output), and why it
+// holds the cut, or null: the record stands for the commit where it names it, or one before it from which the release
+// changes the record alone; it holds the cut where it does not stand, and where a check passed before and failed after.
+export function trialAt(sha, git) {
+  let r = null;
+  try { r = JSON.parse(git(["show", `${sha}:${TRIAL}`])); } catch { /* (not there, or not read) */ }
+  const again = `try the release on a copy of a project that takes the core and whose owner allows it, before the release workflow is started, as AGENTS.md says ("A release is cut on the owner's word"), and record it with \`node scripts/release.mjs --trial <the commit tried> <before> <after>\` (\`--trial <the commit>\` alone where no project allows one), in a pull request of its own; then start the release again`;
+  const formed = r !== null && typeof r === "object" && /^[0-9a-f]{40}$/.test(String(r.commit)) && [r.projects, r.passedBoth, r.failedBoth, r.failedAfter].every(n => Number.isInteger(n) && n >= 0);
+  if (!formed) return { said: `The trial on a real project has not run for ${sha.slice(0, 7)}: ${TRIAL} ${r === null ? "is not there or cannot be read" : "is in no form this script writes"}.`, held: `the trial on a real project has not run for ${sha.slice(0, 7)}. Mend: ${again}` };
+  let more;
+  try { git(["merge-base", "--is-ancestor", r.commit, sha]); more = git(["diff", "--name-only", r.commit, sha]).split("\n").map(f => f.trim()).filter(f => f && f !== TRIAL); } catch { more = null; }
+  if (more === null || more.length) return { said: `The trial on a real project ran on ${r.commit.slice(0, 7)}, and this commit changes more since.`, held: `the trial's record stands for ${r.commit.slice(0, 7)}, and ${sha.slice(0, 7)} ${more ? `changes more than the record since (${more.slice(0, 3).join(", ")}${more.length > 3 ? ", …" : ""})` : "does not follow it"}. Mend: ${again}` };
+  return {
+    said: trialSaid(r),
+    held: r.projects === 0 ? null : r.failedAfter ? `${plural(r.failedAfter, "check")} passed before the release and failed after it in the trial on a real project. Mend: find the release's fault from the trial's run after the update, mend it in the core in a pull request of its own, and ${again}` : null,
+  };
+}
+
+// What a record in its form says.
+const trialSaid = r => (r.projects === 0
+  ? `No project that takes the core allowed a trial of this release (${TRIAL}${r.day ? `, ${r.day}` : ""}), so none ran.`
+  : `The trial on a real project ran on ${r.commit.slice(0, 7)}${r.day ? ` on ${r.day}` : ""}, in ${plural(r.projects, "project")}: ${plural(r.passedBoth, "check")} passed, ${r.failedBoth} failed before and after (standing before the release), ${r.failedAfter} passed before and failed after (the release's).`);
+
+// --trial <sha> [<before> <after>]...: writes the trial's record, each pair one project's runs of check.mjs --verdicts.
+function trial([sha, ...files], fail) {
+  if (!/^[0-9a-f]{40}$/.test(sha ?? "") || files.length % 2) return fail("--trial needs the full SHA of the commit tried, then for each project tried the file check.mjs --verdicts wrote before the update and the one it wrote after; no file where no project allowed a trial");
+  const pairs = [];
+  for (let i = 0; i < files.length; i += 2) {
+    const read = f => { try { const v = JSON.parse(fs.readFileSync(f, "utf8")); return v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every(x => x === "passed" || x === "failed") ? v : null; } catch { return null; } };
+    const pair = [read(files[i]), read(files[i + 1])];
+    if (pair.includes(null)) return fail(`${pair[0] === null ? files[i] : files[i + 1]} is no run's verdicts: give the files check.mjs --verdicts wrote`);
+    pairs.push(pair);
+  }
+  const record = trialRecord(sha, new Date().toISOString().slice(0, 10), pairs);
+  fs.writeFileSync(path.join(ROOT, TRIAL), `${JSON.stringify(record, null, 2)}\n`);
+  console.log(`${TRIAL} written. ${trialSaid(record)}`);
+}
+
 function after(flag, argv) {
   const i = argv.indexOf(flag);
   if (i < 0) return null;
@@ -113,8 +180,9 @@ export function fullRun(list) {
   return last?.conclusion === "success" ? null : `the tests in full (their ${how} run): ${last?.conclusion ?? "unreadable"}`;
 }
 
-function whyNot(name, sha, staged, runs, fullFile) {
+function whyNot(name, sha, staged, trialed, runs, fullFile) {
   if (staged.held) return `${name} is not cut: ${staged.held}.`;
+  if (trialed.held) return `${name} is not cut: ${trialed.held}.`;
   const readList = f => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } };
   const list = readList(runs), full = readList(fullFile);
   const notFull = Array.isArray(full?.workflow_runs) ? fullRun(full) : "the tests' runs on it could not be read";
@@ -125,6 +193,7 @@ function whyNot(name, sha, staged, runs, fullFile) {
 function main(argv) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exitCode = 1; };
   if (!inTheCore()) return fail("run it in the core's own repository: a project cuts no release");
+  if (argv[0] === "--trial") return trial(argv.slice(1), fail);
   const cut = argv.includes("--cut");
   let at, runs;
   let full;
@@ -145,8 +214,10 @@ function main(argv) {
         : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);
     const staged = atRelease(sha, before, rev => inBare(dir, rev));
     console.log(staged.said);
+    const trialed = trialAt(sha, rev => inBare(dir, rev));
+    console.log(trialed.said);
     if (!cut) { console.log(older(name, sha)); console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
-    const stop = whyNot(name, sha, staged, runs, full);
+    const stop = whyNot(name, sha, staged, trialed, runs, full);
     if (stop) return fail(stop);
     // (the commit goes straight to the new tag on the core's repository: a tag that exists is never moved)
     inBare(dir, ["push", "--quiet", `https://github.com/${CORE}`, `${sha}:refs/tags/${name}`]);
