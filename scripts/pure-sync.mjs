@@ -30,7 +30,7 @@ import { CORE as ADDRESS, CORE_SOURCE as A } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
 import { followsOf, hostSaid, inBare, releasesIn } from "./releases.mjs";
 import { asEarlier, plan, unformed } from "./converge.mjs";
-import { BLOCKS, whole } from "./core-owned.mjs";
+import { BLOCKS, CORE_YML, whole } from "./core-owned.mjs";
 import { fresh, kind } from "./fresh.mjs";
 import { privateOf } from "./host-private.mjs";
 import { project } from "./steps.mjs";
@@ -141,8 +141,7 @@ function provedOwned(dir) {
     const kit = fresh(p, join(kits, "now", "setup", "template"), { kitOnly: true, k });
     if (!kit.length) { unproved(`the kit at ${pin} gives no file this checkout of the core can render`); return; }
     const { write, remove } = plan(p, kit, older.flatMap((at) => asEarlier(p, join(at, "setup", "template"), k, { kitOnly: true })));
-    // (a file deleted only where the process takes it out: a whole file of the core's that the kit at the pin no longer writes)
-    for (const f of gone) if (!remove.some((r) => r.to === f)) fail.push(`${f}: deleted, and not a file of the core's that the kit at ${pin} no longer writes, which alone the core's process takes out (converge.mjs)`);
+    provedGone(dir, write, remove);
     const onMain = (f) => { try { raw(["cat-file", "-e", `${base}:${f}`]); return true; } catch { return false; } };
     for (const f of later) {
       const want = write.find((w) => w.to === f);
@@ -155,6 +154,19 @@ function provedOwned(dir) {
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
+}
+
+// Each file the sync deleted, proved one the process takes out (converge.mjs, `remove`, from main's tree): a workflow of
+// the core's whose check the one job of core.yml runs, and only where the head's core.yml is that one job as the
+// process writes it, or, where it writes none, as main holds it: never one left otherwise; and only where the pin's own
+// tree holds the process, so no deletion is proved that the kit at the pin would never make (its renderer: #1101).
+function provedGone(dir, write, remove) {
+  if (!gone.length) return;
+  try { inBare(dir, ["cat-file", "-e", `${pin}:scripts/converge.mjs`]); } catch { for (const f of gone) fail.push(`${f}: deleted, and the core at ${pin} holds no process that takes a file out (scripts/converge.mjs)`); return; }
+  const at_ = (sha) => { try { return execFileSync("git", ["show", `${sha}:${CORE_YML}`], { maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; } };
+  const folds = write.find((w) => w.to === CORE_YML), headCore = at_(head), baseCore = at_(base);
+  const runs = headCore !== null && (folds ? headCore.equals(Buffer.from(folds.text)) : baseCore !== null && headCore.equals(baseCore));
+  for (const f of gone) if (!remove.some((r) => r.to === f) || !runs) fail.push(`${f}: deleted, and not a workflow of the core's whose check the one job of the core.yml the core's process writes at ${pin} runs, which alone it takes out (converge.mjs)`);
 }
 
 // every pin the branch ends with: the manifest's and each call's

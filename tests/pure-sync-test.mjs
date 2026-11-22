@@ -173,7 +173,7 @@ const tries = [
   ["a job added to a workflow", () => write(p, ".github/workflows/core.yml", calls.replace("jobs:\n", "jobs:\n  evil:\n    runs-on: ubuntu-latest\n    steps: [{run: \"echo evil\"}]\n")), "lines added or removed, not only a pin moved"],
   ["a job removed from a workflow", () => write(p, ".github/workflows/core.yml", calls.replace(/  terms:\n[^]*$/u, "")), "lines added or removed, not only a pin moved"],
   ["a new workflow", () => write(p, ".github/workflows/new.yml", "on: push\n"), ".github/workflows/new.yml: lines added or removed"],
-  ["a workflow deleted", () => fs.rmSync(path.join(p, ".github/workflows/core.yml")), "core.yml: deleted, and not a file of the core's that the kit"],
+  ["a workflow deleted", () => fs.rmSync(path.join(p, ".github/workflows/core.yml")), "core.yml: deleted, and not a workflow of the core's whose check the one job"],
   ["a file outside core/ edited", () => write(p, "README.md", "# A project, changed\n"), "README.md: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
   ["a hook's settings added", () => write(p, ".claude/settings.json", "{}\n"), ".claude/settings.json: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
   ["the core's part of a rule file written otherwise", () => write(p, "AGENTS.md", read(p, "AGENTS.md").replace("@core/roles/builder.md\n", "@core/roles/builder.md\n@evil.md\n")), "AGENTS.md: not the core's copy, its pin, a workflow's pins or what the core's process writes"],
@@ -256,28 +256,44 @@ git(p, "push", "-q", "-f", "origin", `${base}:main`);
 git(p, "checkout", "-q", "sync");
 git(p, "reset", "-q", "--hard", LEGIT);
 git(p, "clean", "-q", "-fd");
-// main holds a workflow the kit at the pin no longer writes: the sync that takes it out, as the process does, is pure
-// where it carries the core's mark, and not where it is the project's own (#1101, point 2)
-for (const [what, text, isPure] of [["the core's, marked", `${MARK}\nname: dropped\n`, true], ["the project's own", "name: dropped\n", false]]) {
-  git(p, "checkout", "-q", "-B", "main-holds", base);
-  write(p, ".github/workflows/a-dropped-check.yml", text);
-  git(p, "add", "-A");
-  git(p, "commit", "-q", "-m", "a workflow the kit no longer writes");
-  git(p, "push", "-q", "-f", "origin", "main-holds:main");
-  git(p, "checkout", "-q", "-B", "sync-drops");
+// a private project whose main holds the calls its earlier kit wrote that the one job of core.yml folds: the sync that
+// writes the one job and takes them out, as the process does, is pure; the same deletions with core.yml left as main
+// holds it are not, nor is one of a check the one job does not run, the licence check (#1101, point 2)
+const asHost = (isPrivate, run) => {
+  fs.writeFileSync(event, JSON.stringify({ repository: { full_name: "someone/project", private: isPrivate } }));
+  try { return run(); } finally { fs.writeFileSync(event, JSON.stringify({ repository: { full_name: "someone/project", private: false } })); }
+};
+const converged = isPrivate => asHost(isPrivate, () => {
+  git(p, "remote", "set-url", "origin", GH_ORIGIN);
+  try { const r = spawnSync(process.execPath, ["core/scripts/converge.mjs", "--write"], { cwd: p, env: { ...env, GITHUB_EVENT_PATH: event, CORE_HOST_ANSWERS: "" }, encoding: "utf8" }); return `${r.stdout}${r.stderr}`; }
+  finally { git(p, "remote", "set-url", "origin", origin); }
+});
+// (main as the kit writes a public project, its calls of their own; pushed as main for each case)
+git(p, "checkout", "-q", "-B", "main-public", base);
+for (const f of ["core", "copies", "pr-description", "signatures"]) fs.rmSync(path.join(p, `.github/workflows/${f}.yml`), { force: true });
+converged(false);
+git(p, "add", "-A");
+git(p, "commit", "-q", "-m", "the kit's calls, as a public project's");
+const publicMain = git(p, "rev-parse", "HEAD");
+const drops = (what, change, isPure, said) => {
+  git(p, "push", "-q", "-f", "origin", `${publicMain}:refs/heads/main`);
+  git(p, "checkout", "-q", "-B", "sync-drops", publicMain);
   git(p, "checkout", "-q", LEGIT, "--", ".");
-  const taken = node(p, "core/scripts/converge.mjs", "--write");
-  if (!isPure) fs.rmSync(path.join(p, ".github/workflows/a-dropped-check.yml"), { force: true });
+  git(p, "checkout", "-q", publicMain, "--", ".github/workflows/");
+  const taken = converged(true);
+  change();
   git(p, "add", "-A");
-  git(p, "commit", "-q", "-m", "the sync, the workflow taken out");
-  const r = pure();
-  ok(isPure ? r.status === 0 && /taken out: \.github\/workflows\/a-dropped-check\.yml/.test(taken.out) : r.status === 1 && /NOT PURE[^\n]*a-dropped-check\.yml: deleted, and not a file of the core's/.test(r.out),
-    `a sync that takes out a workflow ${what} that the kit no longer writes is ${isPure ? "" : "not "}pure`, `${taken.out}\n${r.out}`);
+  git(p, "commit", "-q", "-m", "the sync, as a private project's");
+  const r = asHost(true, pure);
+  ok(isPure ? r.status === 0 && /taken out: [^\n]*copies\.yml/.test(taken) : r.status === 1 && said.test(r.out), `${what}: ${isPure ? "" : "not "}pure`, `${taken}\n${r.out}`);
   git(p, "push", "-q", "-f", "origin", `${base}:main`);
   git(p, "checkout", "-q", "sync");
   git(p, "reset", "-q", "--hard", LEGIT);
   git(p, "clean", "-q", "-fd");
-}
+};
+drops("a private project's sync that writes core.yml's one job and takes out the calls it folds", () => {}, true);
+drops("  the same deletions with core.yml left as main holds it", () => git(p, "checkout", "-q", publicMain, "--", ".github/workflows/core.yml"), false, /NOT PURE[^\n]*copies\.yml: deleted, and not a workflow of the core's whose check the one job/);
+drops("  a deletion of the licence check, which the one job does not run", () => fs.rmSync(path.join(p, ".github/workflows/licences.yml"), { force: true }), false, /NOT PURE[^\n]*licences\.yml: deleted/);
 // a file's executable bit alone: no difference to either (a copy made on Windows records none)
 git(p, "update-index", "--chmod=+x", "core/README.md");
 git(p, "update-index", "--chmod=-x", "core/scripts/work-saved.sh");

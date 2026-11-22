@@ -12,14 +12,17 @@
 //   - the rest of what the kit writes (the manifest, SECURITY.md, the threat model, the progress file, the choice
 //     records, the checks' configs): the project's own from its first commit, written only where it is not there, and
 //     only at the first copy (--first): later, each is a step's to ask, with the baseline a config needs beside it.
-// A file named in the manifest's "Differences" (a line that quotes its path) is the project's, and never written. A
+// A workflow of the core's whose check the one job of the core.yml it ends with runs (a private project's copies,
+// description, signature and NuGet calls an earlier kit wrote) is taken out, so it runs once (core-owned.mjs, FOLDED).
+// A file named in the manifest's "Differences" (a line that quotes its path) is the project's, and never written or
+// taken out. A
 // value the project gives that lands in a file written (the owner's login, the project's name, the folders of npm and
 // NuGet, the pin, the copy's path) is held to its form first (floor topic 5), and where one is not, nothing is
 // written; so too where the host cannot say whether the repository is private (fresh.mjs, `kind`). Nothing is written
 // through a link. It commits and pushes nothing. Node's own modules, git and gh.
 //
 //   node core/scripts/converge.mjs [--older <dir>]          what it would write, and what it leaves as the project's
-//   node core/scripts/converge.mjs --write [--older <dir>]  writes it (<dir>: a folder of earlier kits, each a folder
+//   node core/scripts/converge.mjs --write [--older <dir>]  writes it, and takes out (<dir>: a folder of earlier kits, each a folder
 //                                                           holding setup/template/, as sync.mjs gives fresh.mjs)
 //   ... --first                                             at the first copy (sync.mjs): the project's own files too
 //   node core/scripts/converge.mjs --check --base <rev>     the check (checks.mjs runs it in the copies part, in
@@ -32,7 +35,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyAt } from "./workflow-calls.mjs";
 import { fresh, kind } from "./fresh.mjs";
-import { BLOCKS, blockOf, converged, dropped, lf, marked, whole } from "./core-owned.mjs";
+import { BLOCKS, CORE_YML, FOLDED, blockOf, converged, dropped, lf, marked, whole } from "./core-owned.mjs";
 import { NAME, TEMPLATES, linked, named } from "./init.mjs";
 import { project } from "./steps.mjs";
 import { inside } from "./step-paths.mjs";
@@ -62,13 +65,10 @@ export function unformed(p, { o, pin, unread }) {
 const outside = to => { try { inside(to, "the path"); return false; } catch { return true; } };
 
 // What the process does to the project `p`: [{ to, text }] to write, [{ to }] to take out, [{ to, why }] left as the
-// project's. `kit` is what this kit writes for it ([path, text]), `older` the earlier kits'. A whole file of the core's
-// that this kit no longer writes (one with the core's mark, or, mark and pins aside, what an earlier kit wrote) is taken
-// out, so a project ends as a new one of its kind and no check runs twice (#1101, point 2): the one-job core.yml of a
-// private project runs the copies, description and NuGet checks its earlier kit wrote as workflows of their own. A file the project's own from its first commit
-// (neither a whole file of the core's nor a rule file it holds a part of) is written only where `first`, at the first
-// copy: at any later sync each is a step's to ask, with what it needs beside it (a config's baseline), and a sync that
-// created one would be no pure sync (floor rule 8 covers the core's own files and parts alone).
+// project's. `kit` is what this kit writes for it ([path, text]), `older` the earlier kits'. A workflow of the core's
+// whose check the one job of the core.yml the project ends with runs (`FOLDED`) is taken out, where it carries the
+// core's mark or is, mark and pins aside, an earlier kit's text, so that check runs once (#1101, point 2): a private
+// project's earlier kit wrote the copies, description, signature and NuGet calls that the one job folds.
 export function plan(p, kit, older = [], { first = false } = {}) {
   const write = [], left = [];
   for (const [to, want] of kit) {
@@ -85,14 +85,20 @@ export function plan(p, kit, older = [], { first = false } = {}) {
     if (r.text !== undefined) write.push({ to, text: r.text });
     if (r.left) left.push({ to, why: r.left });
   }
-  return { write, remove: dropping(p, kit, older), left };
+  return { write, remove: dropping(p, kit, older, write, left), left };
 }
 
-// The whole files of the core's that this kit no longer writes and the project holds as the core's, [{ to }]: of the
-// paths an earlier kit writes and the project's files that carry the core's mark, each not named in "Differences".
-function dropping(p, kit, older) {
+// The workflows of the core's that the one job of core.yml now runs and the project holds as the core's, [{ to }]:
+// only where the process ends with the kit's core.yml (written now, or standing as the kit writes it), each check its
+// one job folds by a key of its `with:`, and never one this kit writes, nor one named in "Differences". Any other file a
+// later kit no longer writes stays, and fresh.mjs names it.
+function dropping(p, kit, older, write, left) {
+  const want = kit.find(([to]) => to === CORE_YML)?.[1];
+  const ends = want !== undefined && !left.some(l => l.to === CORE_YML) && !p.differences.some(l => l.includes(`"${CORE_YML}"`))
+    && (write.some(w => w.to === CORE_YML) || p.read(CORE_YML, true) === want);
+  if (!ends) return [];
   const kept = new Set(kit.map(([to]) => to)), remove = [];
-  for (const to of [...new Set([...older.flatMap(k => k.map(([f]) => f)), ...p.files.filter(marked)])].filter(f => whole(f) && !kept.has(f))) {
+  for (const to of Object.keys(FOLDED).filter(f => !kept.has(f) && new RegExp(`^ {6}${FOLDED[f]}: `, "mu").test(want))) {
     if (p.differences.some(l => l.includes(`"${to}"`)) || outside(to) || linked(p.root, to)) continue;
     let file = false;
     try { file = fs.lstatSync(path.join(p.root, to)).isFile(); } catch { /* (not there) */ }

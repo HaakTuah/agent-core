@@ -57,21 +57,28 @@ try {
   commit(p.dir, "the process");
   const again = converge(p.dir, "--write");
   ok(again.out.includes("nothing to write") && git(p.dir, "status", "--porcelain") === "", "  run again, it changes nothing", again.out);
-  // (a whole file of the core's that this kit no longer writes, as the one-job core.yml of a private project folds the
-  // checks an earlier kit wrote as workflows of their own: taken out where it carries the core's mark or is, mark and
-  // pins aside, an earlier kit's text; one the project changed, or names in "Differences", stays; #1101, point 2)
+  // (a workflow of the core's whose check the one job of the core.yml the process ends with runs, as a private project's
+  // core.yml folds the calls its earlier kit wrote: taken out where it carries the core's mark or is, mark and pins
+  // aside, an earlier kit's text; one whose check the one job does not run, one the project changed, and every one
+  // where core.yml is named in "Differences", stay; #1101, point 2)
   {
-    const gone = ".github/workflows/an-earlier-check.yml", marked = ".github/workflows/a-marked-check.yml", own = ".github/workflows/a-changed-check.yml", named = ".github/workflows/a-named-check.yml";
-    const earlier = `name: x\njobs:\n  x:\n    uses: the-core/.github/workflows/x.yml@${"a".repeat(40)}\n`;
-    write(p.dir, gone, earlier.replace("a".repeat(40), "b".repeat(40)));
-    write(p.dir, marked, `${read(p.dir, ".github/workflows/core.yml").split("\n")[0]}\nname: y\n`);
-    write(p.dir, own, `${earlier}# a line of the project's own\n`);
-    write(p.dir, named, earlier);
-    write(p.dir, "core-manifest.md", read(p.dir, "core-manifest.md").replace(/^## Differences\r?\n+None\./m, `## Differences\n\n- "${named}": the project's own, on the owner's word.`));
-    const q = held(p.dir), { kit } = kits(q, null), r = plan(q, kit, [[gone, own, named, marked].map(f => [f, earlier])]);
-    ok(r.remove.map(x => x.to).sort().join() === [gone, marked].sort().join() && !r.write.some(w => [gone, marked, own, named].includes(w.to)),
-      "a whole file of the core's this kit no longer writes is taken out, where it carries the core's mark or is an earlier kit's text, its pins aside; one the project changed, or names as a difference, stays", JSON.stringify(r.remove));
-    for (const f of [gone, marked, own, named]) fs.rmSync(path.join(p.dir, f));
+    const wf = f => `.github/workflows/${f}.yml`, earlier = `name: x\njobs:\n  x:\n    uses: the-core/.github/workflows/x.yml@${"a".repeat(40)}\n`;
+    const folds = `${read(p.dir, wf("core"))}    with:\n      copies: checks/copies.json\n      description: true\n      signatures: "."\n`;
+    write(p.dir, wf("copies"), earlier.replace("a".repeat(40), "b".repeat(40)));
+    write(p.dir, wf("pr-description"), `${read(p.dir, wf("core")).split("\n")[0]}\nname: y\n`);
+    write(p.dir, wf("signatures"), `${earlier}# a line of the project's own\n`);
+    write(p.dir, wf("nuget"), earlier);
+    const q = held(p.dir), { kit } = kits(q, null), one = kit.map(([to, t]) => [to, to === wf("core") ? folds : t]).filter(([to]) => !["copies", "pr-description", "signatures", "nuget"].map(wf).includes(to));
+    const older = [[wf("copies"), wf("pr-description"), wf("signatures"), wf("nuget"), wf("licences")].map(f => [f, earlier])];
+    const r = plan(q, one, older);
+    ok(r.remove.map(x => x.to).sort().join() === [wf("copies"), wf("pr-description")].sort().join() && r.write.some(w => w.to === wf("core")),
+      "a workflow of the core's whose check the one job of the core.yml written runs is taken out, where it carries the core's mark or is an earlier kit's text, its pins aside; one the project changed, and one the one job does not run, stay", JSON.stringify(r.remove));
+    const untouched = plan(q, kit, older);
+    ok(!untouched.remove.length, "  where the core.yml the process ends with folds none, nothing is taken out, though an earlier kit wrote the file", JSON.stringify(untouched.remove));
+    write(p.dir, "core-manifest.md", read(p.dir, "core-manifest.md").replace(/^## Differences\r?\n+None\./m, `## Differences\n\n- "${wf("core")}": the project's own, on the owner's word.`));
+    const declared = plan(held(p.dir), one, older);
+    ok(!declared.remove.length, "  nor where core.yml is named in \"Differences\", so its one job is never written", JSON.stringify(declared.remove));
+    for (const f of ["copies", "pr-description", "signatures", "nuget"]) fs.rmSync(path.join(p.dir, wf(f)));
     git(p.dir, "checkout", "-q", "--", "core-manifest.md");
   }
   // (a run from before the marks that the project took an import out of: written as the kit writes it, and named)

@@ -218,7 +218,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   end in the same state, and run again changes nothing. The core owns each workflow, Dependabot
   config, issue form, hooks' settings and tool entry file the kit writes, whole, where it is not there, carries the
   core's mark or is what a kit writes for the project; and its part of `AGENTS.md` and `CLAUDE.md`, between its marks.
-  A whole file of the core's that the kit no longer writes it takes out, so no check runs twice (#1101).
+  A workflow of the core's whose check the one job of the `core.yml` it writes now runs, it takes out (#1083, point 1).
   Each value of the project's that lands in a file it writes is held to its form first (floor topic 5), and where one is
   not, it writes nothing and says the mend. The one condition that changes it: a file the project holds that is not
   the core's, or one the manifest's "Differences" names: the process writes nothing of it and names it as a
@@ -226,12 +226,13 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   session that runs it commits what it wrote in the sync's pull request, which `scripts/pure-sync.mjs`, run from the
   core's `main`, proves equal byte for byte to what the process there writes from the kit at the new pin and the
   project's `main`, so it stays a pure sync (floor rule 8). It does not mean that a project's own rule, workflow or
-  setting is changed, a difference it keeps on purpose lost, or what only the owner can do done; nor that the manifest,
+  setting is changed, a difference it keeps on purpose lost, a check that nothing else runs taken out, or what only the
+  owner can do done; nor that the manifest,
   `SECURITY.md`, the threat model, the progress file, the choice records or a check's config is written where it
   stands, nor after the first copy where it does not: each is then a step's to ask, with what it needs beside it. Reason: a release asked 63 things of each project, 19 of them workflow changes each with two security
   reviews, built by hand from the notes, and a project of another owner held 25 differences from what the kit writes
   for a new one. Held by `tests/converge-test.mjs` and `tests/pure-sync-test.mjs` (a render that differs, a word outside
-  the core's part changed, a value out of its form, each refused with its mend), by `tests/upgrade-test.mjs`, which takes
+  the core's part changed, a value out of its form, a deletion the one job does not cover, each refused), by `tests/upgrade-test.mjs`, which takes
   projects of the last two releases through the process and finds the core's files and parts as the kit writes them in
   a new repository of the same kind, and by the copies part's check of
   `scripts/checks.mjs`, in `core.yml`'s job and `copies.yml`'s, which fails a pull request that changes a file or part

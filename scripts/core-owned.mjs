@@ -56,6 +56,11 @@ export function converged(to, now, want, older = []) {
   return now === want ? {} : { text: want };
 }
 
+// The workflows of the core's whose check the one job of core.yml runs, as a private project's starter kit writes it
+// (init.mjs, `oneJob`), each by the key of its `with:` that runs it there.
+export const CORE_YML = ".github/workflows/core.yml";
+export const FOLDED = { ".github/workflows/copies.yml": "copies", ".github/workflows/pr-description.yml": "description", ".github/workflows/signatures.yml": "signatures", ".github/workflows/nuget.yml": "nuget" };
+
 // Whether a whole file of the core's that the kit no longer writes, standing as `now`, is to be taken out: it carries
 // the core's mark, or it is, but for its mark and its pins, what an earlier kit wrote (`older`); any other is the
 // project's and stays.
