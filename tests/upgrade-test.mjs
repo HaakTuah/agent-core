@@ -406,12 +406,13 @@ function upgrade(p, from, ownChanges, expect) {
   // its hooks, as Claude Code runs them: from main's copy, through the commands of its settings
   git(p.dir, "checkout", "-q", "main");
   git(p.dir, "fetch", "-q", "origin");
-  // (the copy's packages, which a release's own older sync.mjs does not install and the steps below read: installed as the
-  // note a session is given says, node core/scripts/install.mjs all. Left to the session start's install, which gives up
-  // after 20 seconds and says so in a note, never a failure, they were once missing on Windows, so the steps read "not
-  // installed" for the 24 they could not read; #1078)
+  // (the copy's packages, which the release's own older sync.mjs does not install and the steps below read: installed by
+  // the copy's install script, as a session does where a check says they are not installed, every install of it, the
+  // parser's too, as main's sync.mjs installs. Left to the session start's install, which gives up after 20 seconds and
+  // says so in a note, never a failure, they were once missing on Windows, so the steps read "not installed" for the 24
+  // they could not read; #1078. The start's own install is tested in tests/work-saved-test.mjs)
   const installedCopy = node(p.dir, "core/scripts/install.mjs", "all");
-  ok(installedCopy.status === 0, `${p.name}: the copy's packages are installed by its own install script, as the sync's note says`, installedCopy.out);
+  ok(installedCopy.status === 0, `${p.name}: the copy's packages are installed by its own install script, as a session installs them where a check says they are not`, installedCopy.out);
   const settings = JSON.parse(fs.readFileSync(path.join(p.dir, ".claude/settings.json"), "utf8")).hooks;
   const hook = (event, input) => {
     const command = settings[event][0].hooks[0].command;
@@ -422,8 +423,8 @@ function upgrade(p, from, ownChanges, expect) {
   const call = hook("PreToolUse", { hook_event_name: "PreToolUse", session_id: "s1", tool_name: "Agent", tool_input: { description: "x", prompt: "y", subagent_type: "general-purpose", model: "sonnet", effort: "medium" } });
   const stop = hook("Stop", { hook_event_name: "Stop", session_id: "s1", stop_hook_active: false });
   ok(start.status === 0 && call.status === 0 && stop.status === 0 && !/"decision"\s*:\s*"block"/.test(stop.out + start.out), `${p.name}: its hooks run from main's copy and stop nothing in a clean clone`, `${start.out}\n${call.out}\n${stop.out}`);
-  // (the start may install the copy's packages where they differ from main's lock file, and says so in a note, never a
-  // block: the steps below read them, so a start that left them out is seen here, with its note, not as the steps' "not installed"; #1078)
+  // (the packages stand from the install above, which the start accepts and leaves; a start that took them away, with
+  // its note, is seen here and not as the steps' "not installed"; #1078)
   ok(fs.existsSync(path.join(p.dir, "core/.packages/node_modules/.package-lock.json")) && !/packages are not installed/u.test(start.out), `${p.name}: and leaves the copy's packages installed`, start.out);
 
   // a change that makes something worse than it stood fails, and the mend as the failure words it passes
