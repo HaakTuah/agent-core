@@ -28,7 +28,8 @@
 # among them (#719), from npm's registry, running no install script (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
 # tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
 # Once, on Linux, the core's own lock files are held as a project's are: each package it brings looked up in npm's
-# registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures); the
+# registry (scripts/lookup.mjs), the week's wait on each one a change brings or updates (scripts/week-wait.mjs), and the
+# registry's signature on each installed one (npm audit signatures); the
 # mutation tool's in tests/mutation/ in the job that installs it, the step after its install.
 # Each job of the suites, three on Linux and eight on Windows on each Node, the network's on both, and the upgrade
 # test, are measured against a time mark (the "suites" of .github/shape.json, by scripts/shape.mjs), which a job past
