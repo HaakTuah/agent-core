@@ -7,10 +7,15 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
+| #1083 | rule builder, on Opus at high; release 6, before its cut; it changes the floor (rule 8) and `.github/workflows/core.yml` | #1080 (#1079), the one pull request `main` holds open before it |
+| #1084 | rule builder, on Opus at high; release 6, before its cut; `tests/upgrade-test.mjs`, `release.yml`, `AGENTS.md` | #1083 (it tests what #1083 writes; `AGENTS.md`, one at a time) |
+| #1081 | rule builder, on Opus at high; release 6, before its cut; `scripts/sync.mjs` | #1083 and #1084 |
+| #1085 | rule builder, on Opus at high; release 6, before its cut; `README.md`, the sync's report | #1083 and #1081 (`README.md`, `scripts/sync.mjs`, one at a time) |
+| #1087 | rule builder, on Opus at high; release 6, before its cut; `tasks/cleaning.md`, `roles/auditor.md` | #1083 (what the auditor reads at its start, whose cap the floor shares, one at a time) |
+| #1086 | rule builder, on Opus at high; release 6, before its cut; `tools/claude-auto-mode.md`, beside the lines above | |
 | #810 | the orchestrator, for its done-when: reads `main`'s runs, then closes it | a stretch of merges landing faster than a run; at the batch's end, if none came, the orchestrator reads `main`'s runs since #813 and closes #810 on that |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
-| #704 | builder; `tests.yml` | |
 | #770 | builder; `tests.yml` | #704 |
 | #772 | builder; `tests.yml` | #770 |
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
