@@ -93,10 +93,10 @@ const calls = read(p, ".github/workflows/core.yml");
 ok(s.status === 0 && s.out.includes(`${SHA(A)} -> ${SHA(B)}`) && read(p, "core-manifest.md") === manifest(OWNER, B), "the sync takes a project that follows main to the core's newest commit, and moves the manifest's pin", s.out);
 ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) && s.out.includes("personal-terms.yml"), "  it moves a call whose workflow changed, and leaves one whose workflow did not", calls);
 ok(s.out.includes("a note for the test"), "  and prints the sync notes the core gained between the two pins", s.out);
-ok(/The core's files and parts written[\s\S]*AGENTS\.md[\s\S]*For the sync PR's description[\s\S]*Steps not done[\s\S]*security review shown on every pull request[\s\S]*Beside a fresh start/.test(s.out),
+ok(/The core's files and parts written[\s\S]*\.github\/workflows\/look\.yml[\s\S]*For the sync PR's description[\s\S]*Steps not done[\s\S]*Beside a fresh start/.test(s.out),
   "  then, from the copy it wrote, what the core owns written by the one process (#1083), and every step not done, a standing one too, and every difference from a fresh start, for the PR's description", s.out);
 ok(read(p, "AGENTS.md").includes("<!-- The core's part ends. -->") && read(p, ".github/workflows/core.yml") === calls && /Left as the project's[\s\S]*\.github\/workflows\/core\.yml is not the core's/.test(s.out),
-  "  the kit's files the project lacked are written, and a workflow of its own that is no kit's is left as it stands and named", s.out);
+  "  the kit's files the project lacked are written (at its first copy already), each call of the core's own files pinned to the new pin, and a workflow of its own that is no kit's is left as it stands and named", s.out);
 git(p, "add", "-A");
 git(p, "commit", "-q", "-m", "sync");
 const LEGIT = git(p, "rev-parse", "HEAD");
