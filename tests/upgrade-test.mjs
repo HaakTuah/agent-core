@@ -444,6 +444,10 @@ function upgrade(p, from, ownChanges, expect) {
     `${p.name}: a workflow of its own that runs the workflow check with no install step before it passes, the check saying it did not run, with its mend`, failures(ownRun) || ownRun.map(([, r]) => r.steps.map(x => x.out).join("\n")).join("\n"));
   const unguarded = stepsIn(p.dir);
   ok(unguarded.out.includes("if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi"), `${p.name}: the step the sync prints for that workflow gives the guarded install`, unguarded.out);
+  const bare = path.join(tmp, `${p.name}-core-run`);
+  git(tmp, "clone", "-q", "--branch", "own-run", p.dir, bare);
+  const coreRun = spawnSync(process.execPath, ["core/scripts/workflows.mjs", "--core"], { cwd: bare, env: base, encoding: "utf8" });
+  ok(coreRun.status === 1 && /the package yaml is not installed[\s\S]*Mend:/.test(`${coreRun.stdout}${coreRun.stderr}`), `${p.name}: the same check run as the core's own (--core) still fails where the package is missing, saying its mend`, `${coreRun.stdout}${coreRun.stderr}`);
   git(p.dir, "checkout", "-q", "main");
 
   // every step a release asks reads done; each step the commit under test adds, taken out, is reported and mended
