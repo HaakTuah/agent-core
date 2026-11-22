@@ -10,7 +10,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
-import { TRIAL, compared, trialAt, trialRecord } from "../scripts/release-trial.mjs";
+import { TRIAL, compared, ownCount, trialAt, trialRecord, within } from "../scripts/release-trial.mjs";
+import { shownAs } from "../scripts/state-report.mjs";
 import { STEPS } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, POINTER, entries, notesAt } from "../scripts/sync-notes.mjs";
 import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, jumped, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
@@ -322,6 +323,12 @@ ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[
   ok(/changes more than the record since \(old\.json\)/.test(trialAt(at, read).held ?? ""), "a file taken out beside the record is no rename of it: the cut is held", trialAt(at, read).held);
   const cli = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", "abc"], { encoding: "utf8" });
   ok(cli.status === 1 && /--trial needs the full SHA/.test(cli.stderr), "--trial with no full SHA writes nothing and says what it needs", cli.stderr);
+  const listed = ["**The projects that take the core** (read 2026-11-22)", `- ${shownAs("o/a", true, false)}: it has no state report yet.`, `- ${shownAs("o/b", true, true)}: from its report of 2026-10: 3.`, `- ${shownAs("x/c", false, false)}: it has no state report yet.`, "- (GitHub's code search gave no answer.)"].join("\n");
+  ok(ownCount(listed) === 2 && ownCount("**The projects that take the core**\n- None found.") === 0, "the owner's projects are counted from what state-report.mjs --projects prints, in shownAs's words: its own public and private, never another owner's, a note or none found");
+  const linked = path.join(tmp, "linked");
+  fs.symlinkSync(t, linked, process.platform === "win32" ? "junction" : "dir");
+  ok(within(t, path.join(t, "..verdicts.json")) && within(t, path.join(linked, "v.json")) && within(t, t) && !within(t, path.join(tmp, "v.json")) && !within(t, path.join(t, "..", "v.json")),
+    "a file named with two dots in a folder, or reached through a link to it, lies in it; one beside it does not");
   const inCore = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", later, path.join(path.dirname(fileURLToPath(import.meta.url)), "before.json"), path.join(tmp, "after.json")], { encoding: "utf8" });
   ok(inCore.status === 1 && /lies in the core's own repository/.test(inCore.stderr), "--trial refuses a run's verdicts kept in the core's own repository, where a project's job names could be committed", inCore.stderr);
 }

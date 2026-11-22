@@ -56,21 +56,33 @@ export function trialAt(sha, git) {
 
 // What a record in its form says.
 const trialSaid = r => (r.projects === 0
-  ? `No project that takes the core allowed a trial of this release (${TRIAL}${r.day ? `, ${r.day}` : ""}), so none ran.`
-  : `The trial on a real project ran on ${r.commit.slice(0, 7)}${r.day ? ` on ${r.day}` : ""}, in ${plural(r.projects, "project")}: ${plural(r.passedAfter, "check")} passed after the update, ${r.failedBoth} failed before and after (standing before the release), ${r.failedAfter} passed before and failed after (the release's), and ${r.ranBeforeAlone} ran before the update alone.`);
+  ? `No project that takes the core allowed a trial of this release (${TRIAL}, ${r.day}), so none ran.`
+  : `The trial on a real project ran on ${r.commit.slice(0, 7)} on ${r.day}, in ${plural(r.projects, "project")}: ${plural(r.passedAfter, "check")} passed after the update, ${r.failedBoth} failed before and after (standing before the release), ${r.failedAfter} passed before and failed after (the release's), and ${r.ranBeforeAlone} ran before the update alone.`);
 
 // How many of the owner's own projects take the core, as scripts/state-report.mjs --projects lists them (a line each,
 // another owner's named as such), or null where it could not read them.
 function ownProjects() {
   const r = spawnSync(process.execPath, [path.join(ROOT, "scripts", "state-report.mjs"), "--projects"], { encoding: "utf8" });
   if (r.status !== 0) return null;
-  return r.stdout.split("\n").filter(l => /^- /.test(l) && !/^- (None found\.|\(|a project of another owner)/.test(l)).length;
+  return ownCount(r.stdout);
+}
+
+// Of what state-report.mjs --projects prints, how many lines name a project of the owner's: each project is a line
+// "- <how shownAs names it>: <its counts>.", another owner's named "a project of another owner"; its other lines (a
+// heading, "None found.", a note in brackets) name none. releases-test.mjs holds it to shownAs's words.
+export const ownCount = printed => printed.split("\n").filter(l => /^- (`[^`]+`|a private project of the owner's): /.test(l)).length;
+
+// Whether the file `f` lies in the folder `root`, by their real paths (a link followed), the folder itself included.
+export function within(root, f) {
+  const real = p => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
+  const rel = path.relative(real(root), path.join(real(path.dirname(path.resolve(f))), path.basename(f)));
+  return !(rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel));
 }
 
 // --trial <sha> [<before> <after>]...: writes the trial's record, each pair one project's runs of check.mjs --verdicts.
 export function trial([sha, ...files], fail) {
   if (!/^[0-9a-f]{40}$/.test(sha ?? "") || files.length % 2) return fail("--trial needs the full SHA of the commit tried, then for each project tried the file check.mjs --verdicts wrote before the update and the one it wrote after; no file where no project allowed a trial");
-  const inside = files.find(f => { const rel = path.relative(ROOT, path.resolve(f)); return !rel.startsWith("..") && !path.isAbsolute(rel); });
+  const inside = files.find(f => within(ROOT, f));
   if (inside) return fail(`${inside} lies in the core's own repository, where a project's job names could be committed: write the runs' verdicts to a scratch folder outside every repository, and give those files`);
   if (!files.length) { const own = ownProjects(); if (own === null || own > 0) return fail(own === null ? "which of the owner's projects take the core could not be read (scripts/state-report.mjs --projects): run it where gh answers for the owner's account" : `${plural(own, "project")} of the owner's take the core, as scripts/state-report.mjs --projects finds them: try the release on one, and record its runs before and after`); }
   const pairs = [];
