@@ -190,6 +190,22 @@ function whyNot(name, sha, staged, trialed, runs, fullFile) {
   return reasons.length ? `${name} is not cut: the checks on ${sha.slice(0, 7)} have not all passed. Start the release again once they have.\n${reasons.map(r => `  ${r}`).join("\n")}` : null;
 }
 
+// Prints what the release is, what it asks of a project, and what the staged cases and the trial on a real project say
+// of it; gives those two.
+function told({ name, sha, before, asks }, dir) {
+  console.log(`${name} at ${sha}${before ? `, after ${before.name} at ${before.sha.slice(0, 7)}: https://github.com/${CORE}/compare/${before.name}...${sha}` : ", the first release"}`);
+  console.log(asks === null
+    ? `What it asks of a project beyond the copy could not be read: read the entries of ${FOLDER}/ newer than ${before.name}.`
+    : asks.length
+      ? `It asks more of a project than the copy (${NOTES}), each with roughly what it costs a project where it is not done yet:\n${asks.map(costed).join("\n")}`
+      : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);
+  const staged = atRelease(sha, before, rev => inBare(dir, rev));
+  console.log(staged.said);
+  const trialed = trialAt(sha, rev => inBare(dir, rev));
+  console.log(trialed.said);
+  return { staged, trialed };
+}
+
 function main(argv) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exitCode = 1; };
   if (!inTheCore()) return fail("run it in the core's own repository: a project cuts no release");
@@ -205,17 +221,8 @@ function main(argv) {
     fetchCore(dir);
     const release = next(dir, at);
     if (!release) { console.log(`the newest release, ${releasesIn(dir)[0].name}, already stands on main's newest commit: nothing to release`); return; }
-    const { name, sha, before, asks } = release;
-    console.log(`${name} at ${sha}${before ? `, after ${before.name} at ${before.sha.slice(0, 7)}: https://github.com/${CORE}/compare/${before.name}...${sha}` : ", the first release"}`);
-    console.log(asks === null
-      ? `What it asks of a project beyond the copy could not be read: read the entries of ${FOLDER}/ newer than ${before.name}.`
-      : asks.length
-        ? `It asks more of a project than the copy (${NOTES}), each with roughly what it costs a project where it is not done yet:\n${asks.map(costed).join("\n")}`
-        : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);
-    const staged = atRelease(sha, before, rev => inBare(dir, rev));
-    console.log(staged.said);
-    const trialed = trialAt(sha, rev => inBare(dir, rev));
-    console.log(trialed.said);
+    const { name, sha } = release;
+    const { staged, trialed } = told(release, dir);
     if (!cut) { console.log(older(name, sha)); console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
     const stop = whyNot(name, sha, staged, trialed, runs, full);
     if (stop) return fail(stop);

@@ -93,25 +93,36 @@ function main() {
   // (and what this process starts, git and gh, looks only in the PATH's absolute folders)
   if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
   for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
-  const p = project(options());
+  const o = options();
+  const p = { ...project(o), own: o.own, verdicts: o.verdicts === null ? null : path.resolve(o.verdicts) };
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
-  const run = runner(p, tmp);
-  const jobs = callers(p, tmp).filter(({ wf }) => triggered(wf.on, p))
-    .flatMap(({ file, wf }) => Object.entries(wf.jobs ?? {}).map(([id, job]) => ({ file, id, job, name: call.exec(String(job?.uses ?? ""))?.[1] })))
-    .filter(j => j.name).sort((a, b) => (b.name === "core.yml") - (a.name === "core.yml"));
-  if (!jobs.some(j => j.name === "core.yml")) fail("no call to the core's core.yml starts on this change, so nothing proves the copy of the core is the core.", "call it on every pull request and push to main, as the starter kit's .github/workflows/core.yml does, in the base the change merges into.");
-  let failed = 0, ran = 0, copy = true;
-  for (const j of jobs) {
-    const r = run(j.file, j.id, j.job);
-    failed += r.failed; ran += r.ran;
-    if (j.name === "core.yml" && (r.copy ?? r.failed > 0)) { copy = false; warn(`FAIL the copy of the core is not the core at its pin, so no other check runs: each would run the copy's scripts. ${MEND}mend what core.yml says above, commit, and run this check again.`); break; }
-  }
-  if (p.own && copy) for (const o of ownWorkflows(p)) { const r = run.own(o); failed += r.failed; ran += r.ran; }
+  const { failed, ran } = runAll(p, runner(p, tmp), calledJobs(p, tmp));
   if (p.verdicts !== null) fs.writeFileSync(p.verdicts, `${JSON.stringify(verdicts, null, 2)}\n`);
   if (!failed && !ran) fail("no check of the core ran on this change.", "call the core's workflows in the base the change merges into, as the starter kit writes them.");
   say(failed ? `${failed} of the core's checks failed` : `ok   every check of the core that runs from plain git passed (${ran})`);
   process.exitCode = failed ? 1 : 0;
+}
+
+// The jobs that call a workflow of the core's and start on this change, core.yml's first; it fails where none is core.yml.
+function calledJobs(p, tmp) {
+  const jobs = callers(p, tmp).filter(({ wf }) => triggered(wf.on, p))
+    .flatMap(({ file, wf }) => Object.entries(wf.jobs ?? {}).map(([id, job]) => ({ file, id, job, name: call.exec(String(job?.uses ?? ""))?.[1] })))
+    .filter(j => j.name).sort((a, b) => (b.name === "core.yml") - (a.name === "core.yml"));
+  if (!jobs.some(j => j.name === "core.yml")) fail("no call to the core's core.yml starts on this change, so nothing proves the copy of the core is the core.", "call it on every pull request and push to main, as the starter kit's .github/workflows/core.yml does, in the base the change merges into.");
+  return jobs;
+}
+
+// Runs those jobs, then, with --own, the project's own, where the copy is the core: how many ran, and how many failed.
+function runAll(p, run, jobs) {
+  let failed = 0, ran = 0;
+  for (const j of jobs) {
+    const r = run(j.file, j.id, j.job);
+    failed += r.failed; ran += r.ran;
+    if (j.name === "core.yml" && (r.copy ?? r.failed > 0)) { warn(`FAIL the copy of the core is not the core at its pin, so no other check runs: each would run the copy's scripts. ${MEND}mend what core.yml says above, commit, and run this check again.`); return { failed, ran }; }
+  }
+  if (p.own) for (const o of ownWorkflows(p)) { const r = run.own(o); failed += r.failed; ran += r.ran; }
+  return { failed, ran };
 }
 
 // The options given, each checked.
@@ -134,7 +145,7 @@ function pinAt(manifest, root, rev, show) {
 }
 
 // The project at the commit checked out: its root, head, base, manifest's pin and owner, and the pull request's text.
-function project({ base: baseArg, title, description, branch, own, verdicts: verdictsFile }) {
+function project({ base: baseArg, title, description, branch }) {
   let root;
   try { root = git(process.cwd(), "rev-parse", "--show-toplevel"); } catch { fail("this folder is in no git repository.", "run it from the project's root, in its clone."); }
   const show = (rev, file) => { try { return git(root, "show", `${rev}:${file}`); } catch { return null; } };
@@ -155,7 +166,7 @@ function project({ base: baseArg, title, description, branch, own, verdicts: ver
   // (the branch's own name, which the personal-terms check reads too: given, or the one checked out)
   let named = branch;
   if (named === null) { try { named = git(root, "symbolic-ref", "--short", "-q", "HEAD"); } catch { named = ""; } }
-  return { root, show, head, pin: pin.pin, base, owner, body, described: description !== null, own, verdicts: verdictsFile === null ? null : path.resolve(verdictsFile), branch: named || "change", title: title ?? git(root, "log", "-1", "--format=%s", head),
+  return { root, show, head, pin: pin.pin, base, owner, body, described: description !== null, branch: named || "change", title: title ?? git(root, "log", "-1", "--format=%s", head),
     event: base ? "pull_request" : "push", changed: base ? git(root, "diff", "-z", "--name-only", `${base}...${head}`).split("\0").filter(Boolean) : [] };
   // (-z: each path as it is, never quoted as git quotes a name beyond ASCII, so a workflow's path filter reads it)
 }

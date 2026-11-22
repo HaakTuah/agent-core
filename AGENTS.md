@@ -182,7 +182,17 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   page under Actions has the button; `.github/workflows/release.yml`), and the workflow cuts it only
   where every check on `main`'s newest commit has passed and, once the staged cases hold a release ("Staged cases hold
   what no check reads"), no case failed in its last run: the tag `release-N` on that commit, never moved or deleted
-  afterwards. `node scripts/release.mjs` says what the next one would carry.
+  afterwards. `node scripts/release.mjs` says what the next one would carry. **Each release is tried on a real project
+  first** (#1084). By default, before the `release` workflow is started, a builder at the strongest tier tries the
+  release on a copy of a project that takes the core and whose owner allows it, read-only, nothing written there: its
+  checks run once before the update, as a baseline, and again after it (`scripts/check.mjs --own --verdicts`, the sync
+  between), each passed both, failed both (standing before) or passed before and failed after (the release's, which
+  stops the cut), and it records the counts alone (`node scripts/release.mjs --trial`) in a pull request of its own.
+  The one condition that changes it: no such project allows a trial; the record says so, and so does the release. It
+  does not mean that a project is written to, that its private code leaves it, or that it is named anywhere. Reason:
+  #1079 passed every check of the core and failed only on a real project. Held by `scripts/release.mjs`, which says
+  the trial has not run, and cuts nothing, where its record does not stand for the commit, and cuts nothing where a
+  check passed before and failed after.
 - **Nothing locks a project,** in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
   what an agent can mend alone may bind, and what only the owner can do (a yes the floor names, a setting on the
