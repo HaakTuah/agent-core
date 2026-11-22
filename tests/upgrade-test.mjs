@@ -406,6 +406,12 @@ function upgrade(p, from, ownChanges, expect) {
   // its hooks, as Claude Code runs them: from main's copy, through the commands of its settings
   git(p.dir, "checkout", "-q", "main");
   git(p.dir, "fetch", "-q", "origin");
+  // (the copy's packages, which a release's own older sync.mjs does not install and the steps below read: installed as the
+  // note a session is given says, node core/scripts/install.mjs all. Left to the session start's install, which gives up
+  // after 20 seconds and says so in a note, never a failure, they were once missing on Windows, so the steps read "not
+  // installed" for the 24 they could not read; #1078)
+  const installedCopy = node(p.dir, "core/scripts/install.mjs", "all");
+  ok(installedCopy.status === 0, `${p.name}: the copy's packages are installed by its own install script, as the sync's note says`, installedCopy.out);
   const settings = JSON.parse(fs.readFileSync(path.join(p.dir, ".claude/settings.json"), "utf8")).hooks;
   const hook = (event, input) => {
     const command = settings[event][0].hooks[0].command;
