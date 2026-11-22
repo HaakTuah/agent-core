@@ -82,6 +82,13 @@ export const FILES = [
   ["workflows/signatures.yml.tmpl", ".github/workflows/signatures.yml", o => o.packages !== undefined && !o.private],
   ["workflows/nuget.yml.tmpl", ".github/workflows/nuget.yml", o => o.nuget !== undefined && !o.private],
 ];
+// The core's marks (#1083; converge.mjs): the first line of each workflow and Dependabot config the kit writes, which says
+// the file is the core's, and the two lines that hold the core's part of a rule file of the project's own (AGENTS.md,
+// CLAUDE.md), as their templates write them.
+export const MARK = "# The core's file: core/scripts/converge.mjs writes it from the starter kit at each sync. To keep a change of the project's own, take this line out and name the file in core-manifest.md's \"Differences\".";
+export const BEGIN = "<!-- The core's part: core/scripts/converge.mjs writes it at each sync; the project's own words stand outside it. -->";
+export const END = "<!-- The core's part ends. -->";
+export const marked = to => /^\.github\/(?:workflows\/[^/]+\.yml|dependabot\.yml)$/u.test(to);
 // What the script makes itself, beside the templates' files: none of these may exist either.
 const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "checks/holders.json", "core"];
 // What a builder's session reads at its start in a project the kit writes at any commit, as the kit's own entry files
@@ -196,7 +203,7 @@ export function files(o, pin, moduleNames, read) {
     }
     if (to === ".github/workflows/core.yml" && o.private) text = oneJob(text, o);
     if (READY_ONLY.includes(to) && o.private) text = readyOnly(text);
-    return [to, text];
+    return [to, marked(to) ? `${MARK}\n${text}` : text];
   });
 }
 

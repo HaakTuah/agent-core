@@ -148,8 +148,9 @@ function asHeld(p, to, text) {
 
 // What the kit of this copy would write for the project `p`; with `templates`, the folder of an earlier kit's
 // templates, what that kit would have written: a template it lacks, one this kit added since, gives that file nothing;
-// one whose words this kit no longer fills, and a folder with no kit, give that kit nothing.
-export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
+// one whose words this kit no longer fills, and a folder with no kit, give that kit nothing. `kitOnly`: the templates'
+// files alone, without the configs the kit writes beside them (converge.mjs).
+export function fresh(p, templates = path.join(HERE, TEMPLATES), { kitOnly = false } = {}) {
   const { o, pin } = kind(p);
   const modules = MODULES.flatMap(d => fs.readdirSync(path.join(HERE, d)).filter(n => n.endsWith(".md")));
   const older = templates !== path.join(HERE, TEMPLATES);
@@ -167,7 +168,7 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     const at = configs(p);
     const placed = { [CHOICES]: where(p.manifest) ?? CHOICES, [SHAPE]: shapeAt(p.manifest), [KIT_CONFIGS.copies]: at.copies, [KIT_CONFIGS.audit]: at.audit };
     const kit = built.filter(([to]) => !gone.has(to) && placed[to] !== null).map(([to, text]) => [placed[to] ?? to, asHeld(p, to, text)]);
-    if (older) return kit;
+    if (older || kitOnly) return kit;
     // the configs the kit writes beside its templates, by the paths the project runs its checks with, each read by its keys
     // (sizes.json's optional "skip" and "past" left out)
     const { skip, past, ...marks } = sizes({});
