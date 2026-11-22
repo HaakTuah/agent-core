@@ -617,6 +617,9 @@ function asItStood(p) {
     try { was = git(p.dir, "show", `${p.main0}:${f}`); } catch { continue; }
     fs.writeFileSync(path.join(p.dir, f), `${was.replace(/(\/\.github\/workflows\/[\w.-]+@)[0-9a-f]{40}/g, `$1${pin}`)}\n`);
   }
+  // (and each step that a call written back asks again, made as its mend words it, as the project's agents made it)
+  const steps = stepsIn(p.dir).out.split("\n").filter(l => l.startsWith("- ")).map(l => STEP_LEADS.find(lead => l.startsWith(`- ${lead}:`) || l.startsWith(`- ${lead} (`))).filter(lead => lead && STAGES[lead]);
+  for (const lead of steps) STAGES[lead].mend(p.dir);
   git(p.dir, "add", "-A");
   git(p.dir, "commit", "-q", "-m", "its calls kept as they were");
   git(p.dir, "push", "-q", "origin", "main");
