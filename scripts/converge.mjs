@@ -89,8 +89,16 @@ export function plan(p, kit, older = [], { first = false } = {}) {
 // the steps' to write, with what the project holds) and the earlier kits', each [path, text].
 export function kits(p, older, k = kind(p)) {
   const kit = fresh(p, path.join(HERE, TEMPLATES), { kitOnly: true, k });
-  const before = older ? fs.readdirSync(older).map(d => fresh(p, path.join(older, d, TEMPLATES), { k })) : [];
+  const before = older ? fs.readdirSync(older).flatMap(d => asEarlier(p, path.join(older, d, TEMPLATES), k)) : [];
   return { kit, before };
+}
+
+// An earlier kit's files for the project, to know a file of the core's by: as this checkout renders the kit for its
+// kind, and, for a private one, also as kits before #375 and #376 wrote it (its workflows not yet one job, nor started
+// only once a pull request is ready), which this checkout's renderer would otherwise put in a form that kit never wrote.
+// Only what is written comes from the kit at the pin. `opts`: fresh.mjs's.
+export function asEarlier(p, templates, k, opts = {}) {
+  return [fresh(p, templates, { ...opts, k }), ...(k.o.private ? [fresh(p, templates, { ...opts, k: { ...k, o: { ...k.o, private: undefined } } })] : [])];
 }
 
 function run(argv) {
@@ -123,25 +131,24 @@ function check(p, base) {
   const k = kind(p), bad = unformed(p, k);
   if (bad.length) { console.log(`the core's files and parts could not be read against the kit: ${bad.join("; ")}`); return; }
   const { kit } = kits(p, null, k);
-  const wrong = [], stale = [];
-  for (const [to, want] of kit) {
-    if (!changed.includes(to) || p.differences.some(l => l.includes(`"${to}"`))) continue;
-    const now = p.read(to, true);
-    if (now === null) continue;
-    const ours = BLOCKS.includes(to) ? blockOf(now) !== null : marked(to) && /^# The core's file:/u.test(now);
-    if (!ours) continue;
-    const same = BLOCKS.includes(to) ? lf(blockOf(now)) === blockOf(want) : now === want;
-    if (same) continue;
-    // (a part or file that stood so on the base, and that the pull request left as it was, is reported, never failed)
-    const was = atBase(p, base, to), part = t => t === null ? null : lf(blockOf(t) ?? "");
-    const stood = BLOCKS.includes(to) ? was !== null && part(was) === part(now) : was !== null && was !== want && marked(to) && /^# The core's file:/u.test(was);
-    if (stood) stale.push(to);
-    else wrong.push(to);
-  }
-  for (const to of stale) console.log(`${to}: ${BLOCKS.includes(to) ? "the core's part of it" : "the core's file"} stood otherwise than the core writes it before this pull request, which ${BLOCKS.includes(to) ? "left that part as it was" : "did not bring it nearer"}: reported, not failed. Mend, in a task: run \`node ${copyAt(p)}scripts/converge.mjs --write\` and commit what it writes.`);
+  const read = kit.filter(([to]) => changed.includes(to) && !p.differences.some(l => l.includes(`"${to}"`))).map(([to, want]) => [to, judged(p, base, to, want)]);
+  const wrong = read.filter(([, j]) => j === "wrong").map(([to]) => to);
+  for (const [to] of read.filter(([, j]) => j === "stale")) console.log(`${to}: ${BLOCKS.includes(to) ? "the core's part of it" : "the core's file"} stood otherwise than the core writes it before this pull request, which ${BLOCKS.includes(to) ? "left that part as it was" : "did not bring it nearer"}: reported, not failed. Mend, in a task: run \`node ${copyAt(p)}scripts/converge.mjs --write\` and commit what it writes.`);
   for (const to of wrong) console.log(`FAIL ${to}: ${BLOCKS.includes(to) ? "the core's part of it" : "the core's file"} is not as the core writes it for this project at its pin. Mend: run \`node ${copyAt(p)}scripts/converge.mjs --write\`, which writes it again, and commit it; or, to keep the change as the project's own, ${BLOCKS.includes(to) ? "write it outside the core's part" : "take out its first line, the core's mark, and name the file in core-manifest.md's \"Differences\" on the owner's word"}.`);
   if (wrong.length) process.exitCode = 1;
   else console.log("the core's files and parts the pull request changed are as the core writes them");
+}
+
+// Of one file the pull request changed, `to`, the kit writing `want`: null where it is no file or part the core
+// marks or is as the core writes it; "stale" where it stood otherwise on the base and the pull request left the part
+// as it was, or did not bring the file back (reported, never failed); else "wrong".
+function judged(p, base, to, want) {
+  const now = p.read(to, true), block = BLOCKS.includes(to), ours = t => block ? blockOf(t) !== null : marked(to) && /^# The core's file:/u.test(t);
+  if (now === null || !ours(now)) return null;
+  if (block ? lf(blockOf(now)) === blockOf(want) : now === want) return null;
+  const was = atBase(p, base, to), part = t => lf(blockOf(t) ?? "");
+  if (was === null) return "wrong";
+  return (block ? part(was) === part(now) : was !== want && ours(was)) ? "stale" : "wrong";
 }
 
 // The file `to` as the base holds it, or null where it holds none.

@@ -28,7 +28,7 @@ import { copyTree, coreIsFolder, entries } from "./copy-tree.mjs";
 import { CORE as ADDRESS, CORE_SOURCE as A } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
 import { followsOf, hostSaid, inBare, releasesIn } from "./releases.mjs";
-import { plan, unformed } from "./converge.mjs";
+import { asEarlier, plan, unformed } from "./converge.mjs";
 import { BLOCKS, whole } from "./core-owned.mjs";
 import { fresh, kind } from "./fresh.mjs";
 import { privateOf } from "./host-private.mjs";
@@ -138,7 +138,7 @@ function provedOwned(dir) {
     if (bad.length) { unproved(`the project's kind or values cannot be read in their forms, so it is not proved what the core's process writes: ${bad.join("; ")}`); return; }
     const kit = fresh(p, join(kits, "now", "setup", "template"), { kitOnly: true, k });
     if (!kit.length) { unproved(`the kit at ${pin} gives no file this checkout of the core can render`); return; }
-    const { write } = plan(p, kit, older.map((at) => fresh(p, join(at, "setup", "template"), { kitOnly: true, k })));
+    const { write } = plan(p, kit, older.flatMap((at) => asEarlier(p, join(at, "setup", "template"), k, { kitOnly: true })));
     const onMain = (f) => { try { raw(["cat-file", "-e", `${base}:${f}`]); return true; } catch { return false; } };
     for (const f of later) {
       const want = write.find((w) => w.to === f);

@@ -21,7 +21,7 @@
 //   --npm      its packages come from npm: the signature check and Dependabot's npm updates, for that folder
 //   --nuget    its packages come from NuGet (.NET): the NuGet check and Dependabot's NuGet updates, for the folder
 //              that holds its solution or project files (. for the root)
-//   --private  a private repository without GitHub's paid code security: no call to the core's CodeQL and licence
+//   --private  (read from the host where it answers; the flag overrides) a private repository without GitHub's paid code security: no call to the core's CodeQL and licence
 //              workflows, which need it (README.md, point 5, "A private repository"), its checks without a secret as
 //              steps of core.yml's one job (oneJob), and each pull-request check started only once a pull request is
 //              no draft (READY_ONLY)
@@ -37,6 +37,7 @@ import { MODULES } from "./reading.mjs";
 import { plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
 import { MARK, converged, marked } from "./core-owned.mjs";
+import { privateOf } from "./host-private.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const TEMPLATES = "setup/template";
@@ -366,6 +367,13 @@ function init(argv) {
   // (a manifest of the project's own with no "Core:" line would name no copy the kit writes: every later sync, step
   // and check would refuse on it)
   if (fs.existsSync(path.join(here, "core-manifest.md"))) fail("the project holds a core-manifest.md of its own with no \"Core:\" line, so the copy the starter kit writes would be named by no manifest, and it wrote nothing. Mend: move that file aside and run the starter kit again, which writes the manifest, then carry its rows over; or write its \"Core:\" line as the kit writes it and run the sync");
+  // (whether the repository is private, as its host says it, as a sync reads it: host-private.mjs, #1095; --private
+  // overrides, and where the host cannot say and the flag is not given, the kit writes it as public and says so)
+  if (!o.private) {
+    const host = privateOf(here);
+    if (host.private) o.private = true;
+    else if (host.unread) console.log(`note ${host.unread}; the kit writes it as a public repository: give --private for a private one`);
+  }
   const pin = pinOf(o);
   const moduleNames = modulesAt(pin);
 
