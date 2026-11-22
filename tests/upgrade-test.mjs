@@ -442,7 +442,7 @@ function upgrade(p, from, ownChanges, expect) {
   const ownRun = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: main1, only: "own-core-checks.yml", ownToo: true });
   ok(started(ownRun).length === 1 && !failures(ownRun) && ownRun.every(([, r]) => r.steps.some(x => /the package yaml is not installed[\s\S]*Mend:/.test(x.out))),
     `${p.name}: a workflow of its own that runs the workflow check with no install step before it passes, the check saying it did not run, with its mend`, failures(ownRun) || ownRun.map(([, r]) => r.steps.map(x => x.out).join("\n")).join("\n"));
-  const unguarded = node(p.dir, "core/scripts/steps.mjs");
+  const unguarded = stepsIn(p.dir);
   ok(unguarded.out.includes("if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi"), `${p.name}: the step the sync prints for that workflow gives the guarded install`, unguarded.out);
   git(p.dir, "checkout", "-q", "main");
 
