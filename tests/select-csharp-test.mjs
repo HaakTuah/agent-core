@@ -2,20 +2,20 @@
 // a type named by a word in a namespace the file sees (its own and those around it, a using directive's, a global one's,
 // MSBuild's <Using>), by an attribute, by its full name, through an alias or `using static`; an extension member; a
 // delegate; a file of top-level statements by Program; a file C# or a test framework runs with no name; and the files
-// whose reach cannot be told (lost by the grammar, reflection, C# git holds that the config does not read, a <Using>
-// that names a property, C# of no project). Needs the parser (node scripts/install.mjs parser). Run by the core's tests
-// workflow (.github/workflows/tests.yml).
+// whose reach cannot be told (lost by the grammar, reflection, a <Using> that names a property, C# of no project); and
+// C# git holds that the config does not read, read as links between the files it reads. Needs the parser (node
+// scripts/install.mjs parser). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/select-csharp-test.mjs
 import { csharpReach, ofNoProject } from "../scripts/select-csharp.mjs";
-import { selection } from "../scripts/select.mjs";
+import { links, reached, selection } from "../scripts/select.mjs";
 import { parseConfig, survey } from "../scripts/shape.mjs";
 import { readCsharp } from "../scripts/shape-csharp.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const nothing = () => ({ msbuild: [], unreadCs: false });
+const nothing = () => ({ msbuild: [], cs: {} });
 
 const PROJ = "<Project Sdk=\"Microsoft.NET.Sdk\" />\n";
 const config = parseConfig(JSON.stringify({ baseline: "b.json", code: ["src", "tests"], tests: ["tests/"] }));
@@ -65,7 +65,7 @@ const globals = {
 ok(same(pick(globals, "src/Rules.cs").tests, ["tests/RulesTest.cs"]), "a namespace a .csproj's <Using> names is seen by every file", JSON.stringify(pick(globals, "src/Rules.cs")));
 const viaFile = { ...globals, "tests/Tests.csproj": PROJ, "tests/Usings.cs": "global using App;\n" };
 ok(same(pick(viaFile, "src/Rules.cs").tests, ["tests/RulesTest.cs"]), "and so is one a global using directive names, in any file", JSON.stringify(pick(viaFile, "src/Rules.cs")));
-const props = csharpReach({ ...globals, "tests/Tests.csproj": PROJ }, undefined, () => ({ msbuild: ["<Project><ItemGroup><Using Include=\"App\" /></ItemGroup></Project>"], unreadCs: false }));
+const props = csharpReach({ ...globals, "tests/Tests.csproj": PROJ }, undefined, () => ({ msbuild: ["<Project><ItemGroup><Using Include=\"App\" /></ItemGroup></Project>"], cs: {} }));
 ok(props.links.get("tests/RulesTest.cs")?.has("src/Rules.cs"), "and one a .props or .targets file git holds beside the config's files names", JSON.stringify([...props.links]));
 
 // ---- top-level statements, and what runs with no name ----
@@ -87,10 +87,16 @@ ok(same(pick(scans, "src/Lone.cs").tests, ["tests/WebTest.cs"]), "a test that re
 const reflects = { ...web, "tests/MakeTest.cs": "namespace Tests;\nclass MakeTest { object o = System.Activator.CreateInstance(System.Type.GetType(\"App.Start\")); }\n" };
 ok(pick(reflects, "src/Start.cs").tests.includes("tests/MakeTest.cs"), "and so does one that makes a type by reflection", JSON.stringify(pick(reflects, "src/Start.cs")));
 const csTexts = { "src/App.csproj": PROJ, "src/A.cs": "namespace App;\nclass A { }\n", "tests/T.cs": "namespace Tests;\nclass T { }\n" };
-for (const [beside, what] of [[() => ({ msbuild: [], unreadCs: true }), "git holds a file of C# the config does not read"], [() => ({ msbuild: ["<Using Include=\"$(Root).App\" />"], unreadCs: false }), "a <Using> names an MSBuild property"], [() => ({ unknown: true }), "git cannot be asked"]]) {
+for (const [beside, what] of [[() => ({ msbuild: ["<Using Include=\"$(Root).App\" />"], cs: {} }), "a <Using> names an MSBuild property"], [() => ({ unknown: true }), "git cannot be asked"]]) {
   const r = csharpReach(csTexts, undefined, beside);
   ok(same([...r.unsure].sort(), ["src/A.cs", "tests/T.cs"]), `where ${what}, every file of C# is unsure`, JSON.stringify([...r.unsure]));
 }
+const unread = csharpReach({ "src/App.csproj": PROJ, "src/A.cs": "namespace App;\nclass A { }\n", "tests/T.cs": "using App.Data;\nnamespace Tests;\nclass T { Seed s; }\n" }, undefined,
+  () => ({ msbuild: [], cs: { "src/Data/Seed.cs": "namespace App.Data;\nclass Seed { A a; }\n" } }));
+ok(unread.links.get("tests/T.cs")?.has("src/Data/Seed.cs") && unread.links.get("src/Data/Seed.cs")?.has("src/A.cs") && !unread.unsure.size,
+  "a file of C# git holds that the config does not read is read as a link between those it reads", JSON.stringify([...unread.links].map(([f, to]) => [f, [...to]])));
+const through = reached(new Set(["tests/T.cs"]), links({ "tests/T.cs": "", "src/A.cs": "" }, new Set(["tests/T.cs"]), new Map(), undefined, unread.links));
+ok(through.get("tests/T.cs").has("src/A.cs"), "and a test reaches, through it, what it links to", JSON.stringify([...through.get("tests/T.cs")]));
 ok(ofNoProject("lib/A.cs", csTexts) && !ofNoProject("src/A.cs", csTexts) && !ofNoProject("A.cs", { "App.csproj": PROJ }), "C# is of no project where no .csproj stands in a folder above it");
 const lone = { ...app, "shared/Common.cs": "namespace App;\npublic class Common { }\n" };
 const loneRun = selection({ changed: ["shared/Common.cs"], texts: lone, tests: new Set(["tests/UsingTest.cs"]), reach: new Map(), config });

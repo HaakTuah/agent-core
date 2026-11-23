@@ -87,6 +87,8 @@ export function links(texts, tests, reach, pace = () => {}, csharp = new Map()) 
     if (py) for (const run of [...above("__init__.py", file, texts), ...above("conftest.py", file, texts)]) to.add(run);
     out.set(file, to);
   }
+  // (the files of C# the config does not read, as links between those it reads: select-csharp.mjs)
+  for (const [file, to] of csharp) if (!out.has(file)) out.set(file, to);
   return out;
 }
 

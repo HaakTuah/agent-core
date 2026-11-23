@@ -9,8 +9,9 @@
 // tests give it; and the files C# or a test framework runs with no name (an assembly's attribute, a module initializer, an
 // assembly's or a session's set-up, a source generator). It reads more than a file takes, never less. Where reach cannot
 // be told, a file is unsure (a test that reaches it runs on any change): where the grammar lost it, where it reads
-// types by reflection or scans an assembly for them, and, every file of C#, where git holds a file of C# the config does
-// not read, or a <Using> names an MSBuild property. Node's own modules and git.
+// types by reflection or scans an assembly for them, and, every file of C#, where a <Using> names an MSBuild property or
+// git cannot be asked. The files of C# git holds that the config does not read (a folder of migrations it leaves out)
+// are read here too, as links between the files it reads. Node's own modules and git.
 import fs from "node:fs";
 import path from "node:path";
 import { readCsharp } from "./shape-csharp.mjs";
@@ -154,12 +155,13 @@ function msbuildUsings(texts) {
 }
 
 // What git holds that the config does not read and C# compiles with: { msbuild: [the texts of each .props and .targets],
-// unreadCs: whether a file of C# is among them }; { unknown: true } where git cannot be asked or a file cannot be read.
+// cs: { path: text } of each file of C# }, a link read as no text; { unknown: true } where git cannot be asked or a file
+// cannot be read.
 export function heldBeside(texts) {
   try {
-    const held = git(["ls-files", "-z", "--", ":(glob)**/*.props", ":(glob)**/*.targets", ":(glob)**/*.cs"]).split("\0").filter(Boolean);
-    const msbuild = held.filter(f => !f.endsWith(".cs") && !(f in texts)).map(f => (fs.lstatSync(f).isFile() ? fs.readFileSync(f, "utf8") : ""));
-    return { msbuild, unreadCs: held.some(f => f.endsWith(".cs") && !(f in texts)) };
+    const held = git(["ls-files", "-z", "--", ":(glob)**/*.props", ":(glob)**/*.targets", ":(glob)**/*.cs"]).split("\0").filter(f => f && !(f in texts));
+    const text = f => (fs.lstatSync(f).isFile() ? fs.readFileSync(f, "utf8") : "");
+    return { msbuild: held.filter(f => !f.endsWith(".cs")).map(text), cs: Object.fromEntries(held.filter(f => f.endsWith(".cs")).map(f => [f, text(f)])) };
   } catch { return { unknown: true }; }
 }
 
@@ -205,16 +207,18 @@ function reachOf(x, ix) {
   return to;
 }
 
-// The links of each file of C# among `texts` to the files it may reach, and the files whose reach cannot be told:
-// { links: Map of a file to a Set of files, unsure: Set }. `beside` is what git holds beside the texts (heldBeside).
+// The links of each file of C# among `texts`, and of each git holds beside them, to the files it may reach, and the
+// files whose reach cannot be told: { links: Map of a file to a Set of files, unsure: Set }. `beside` is what git holds
+// beside the texts (heldBeside).
 export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
-  const files = Object.keys(texts).filter(f => f.endsWith(".cs")), links = new Map();
-  if (!files.length) return { links, unsure: new Set() };
+  const links = new Map();
+  if (!Object.keys(texts).some(f => f.endsWith(".cs"))) return { links, unsure: new Set() };
   const held = beside(texts), projects = Object.entries(texts).filter(([f]) => f.endsWith(".csproj")).map(([, t]) => t);
   const msbuild = held.unknown ? null : msbuildUsings([...held.msbuild, ...projects]);
-  // (where git holds C# the config does not read, or the usings of every file cannot be told, every file is unsure)
-  if (msbuild === null || held.unreadCs) return { links, unsure: new Set(files) };
-  const facts = new Map(files.map(f => { pace(); return [f, factsOf(readCsharp(texts[f]))]; }));
+  const all = { ...held.cs, ...texts }, files = Object.keys(all).filter(f => f.endsWith(".cs"));
+  // (where the usings every file holds cannot be told, every file is unsure)
+  if (msbuild === null) return { links, unsure: new Set(files) };
+  const facts = new Map(files.map(f => { pace(); return [f, factsOf(readCsharp(all[f]))]; }));
   const ix = indexOf(facts);
   ix.globals.push(...msbuild);
   for (const [f, x] of facts) { pace(); const to = reachOf(x, ix); to.delete(f); links.set(f, to); }
