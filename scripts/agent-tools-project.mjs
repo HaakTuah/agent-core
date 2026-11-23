@@ -2,11 +2,11 @@
 // a link, a letter case or a submodule makes of them (agent-tools-links.mjs).
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { commitReader, listing, notFile, shownNotBlob, libraryHolds, LISTING_MAX } from "./agent-tools-listing.mjs";
 import { configured } from "./agent-tools-configured.mjs";
 import { commitProblems } from "./agent-tools-links.mjs";
 import { fold } from "./agent-tools-entries.mjs";
+import { ignoredAt, ignoredDone } from "./git-objects.mjs";
 
 // The project at `root`, at its working tree or at a commit `rev`: configured()'s answer. Nothing is read through a
 // link, at a commit (where git lists nothing below one) or in the working tree: each link where a tool reads its files
@@ -19,13 +19,12 @@ export function readProject(root, rev = null, linkedOnMain = () => false, alias 
   const viaLink = f => f.split("/").some((_, i, parts) => { const p = parts.slice(0, i + 1); if (linkedAtHead.has(p.join("/"))) return true; try { return fs.lstatSync(path.join(root, ...p)).isSymbolicLink(); } catch { return false; } });
   // (in the working tree, a file git ignores is a person's or a machine's own, as a .claude/settings.local.json mostly
   // is, and no file of the project's: floor rule 18)
-  const ignored = f => { try { execFileSync("git", ["check-ignore", "-q", "--", f], { cwd: root, stdio: "ignore" }); return true; } catch { return false; } };
   const read = rev ? commit.read
     : f => {
       if (viaLink(f)) return null;
       let text;
       try { text = fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; }
-      return ignored(f) ? null : text;
+      return ignoredAt(root, f) ? null : text;
     };
   // (the names in a folder of the project, at the commit or in the working tree)
   const names = dir => {
@@ -45,7 +44,9 @@ export function readProject(root, rev = null, linkedOnMain = () => false, alias 
   // (the file a library's commit holds at a path, at this commit's pin and at the base's, which a hook reads until the pull
   // request merges: anything but a plain file at either is the answer, else what this commit's pin reads as)
   const inLibrary = (library, rest) => { const held = [commitRev, ...(base ? [base] : [])].map(r => libraryHolds(root, r, library, rest)); return held.includes("link") ? "link" : held.includes("other") ? "other" : held[0]; };
-  const project = configured(read, skills, names, linked, () => [...agentMarkdown(root, commitRev), ...(alias.markdown ?? [])], inLibrary);
+  // (the working tree read, git's process of what it ignores is stopped: what it read is as of now, and it holds the folder)
+  let project;
+  try { project = configured(read, skills, names, linked, () => [...agentMarkdown(root, commitRev), ...(alias.markdown ?? [])], inLibrary); } finally { if (!rev) ignoredDone(root); }
   // (read at the commit, the working tree's at HEAD, the pull request's head: a file not committed, ignored or not, is
   // no file of the project's, and the base is read the same way)
   for (const [problem, text] of commitProblems(root, commitRev)) { project.problems.push(problem); project.texts.set(problem, text); project.baselined.add(problem); }
