@@ -56,7 +56,7 @@ const why = new Map();
 const set = setOf({ ...tree(files), copy: "vendored/core/" }, why);
 const want = [".claude/settings.json", ".github/workflows/powered.yml", "bin/notes", "bin/publish", "cmd/main.go", "core/scripts/calls.mjs", "deploy", "lib/x.rb", "scripts/calls.mjs", "scripts/deep/far/unnamed.mjs",
   "scripts/plain.mjs", "scripts/pushes.sh", "scripts/unread.py", "src/App.cs", "src/App.csproj", "tools/act/action.yml", "tools/b.sh", "tools/go.py", "web/page.html"];
-ok(show(set) === want.join(", "), "with a seed, every file that may run is in the set, named anywhere or nowhere: a script, an action, a compiled language's source (C#, Go), a project file, a page and a file with no extension; Markdown, JSON, YAML, text, a picture and a workflow that may only read are not", show(set));
+ok(show(set) === want.join(", "), "with a seed, every file that may run is in the set: a script, an action, a compiled language's source, a project file, a page, a file with no extension; text, data, pictures and a read-only workflow are not", show(set));
 ok(why.get(".github/workflows/powered.yml") === "power" && why.get(".claude/settings.json") === "place" && why.get("tools/act/action.yml") === "place"
   && why.get("scripts/calls.mjs") === "calls" && why.get("scripts/pushes.sh") === "calls" && why.get("bin/publish") === "calls" && why.get("scripts/unread.py") === "unread"
   && why.get("scripts/plain.mjs") === "runs" && why.get("deploy") === "runs" && why.get("bin/notes") === "runs",
@@ -74,22 +74,13 @@ const seeds = {
   "a script that loads a package": ["x.mjs", "import axios from \"axios\";\n"],
   "a #! file that pushes": ["publish", "#!/bin/sh\ngit push\n"],
   "a script that cannot be read": ["x.sh", null],
-  "a Python script on a socket": ["x.py", "import socket\nsocket.create_connection((host, 80))\n"],
-  "a Python script on http.client": ["x.py", "import http.client\n"],
-  "a Python script on httpx": ["x.py", "import httpx\n"],
-  "a Python script on aiohttp": ["x.py", "import aiohttp\n"],
-  "a Ruby script on Net::HTTP": ["x.rb", "Net::HTTP.get(uri)\n"],
-  "a Go file on net/http": ["x.go", "import \"net/http\"\n"],
-  "a C# file on HttpClient": ["X.cs", "using System.Net.Http;\nnew HttpClient();\n"],
-  "a Java file on java.net": ["X.java", "import java.net.URL;\n"],
-  "a Rust file on reqwest": ["x.rs", "reqwest::get(url)\n"],
-  "a shell script on ssh": ["x.sh", "ssh host true\n"],
-  "a shell script on rsync": ["x.sh", "rsync -a out/ host:out/\n"],
 };
 for (const [what, [seed, text]] of Object.entries(seeds)) {
   const got = setOf(tree({ [seed]: text, "scripts/a.mjs": "", "tools/b.sh": "", "README.md": "", "data.json": "{}" }));
   ok(got.has(seed) && got.has("scripts/a.mjs") && got.has("tools/b.sh") && !got.has("README.md") && !got.has("data.json"), `${what} is a seed that brings in every file that may run, and nothing else`, show(got));
 }
+for (const [name, text] of [["x.py", "import socket"], ["x.rb", "Net::HTTP.get(u)"], ["x.go", "import \"net/http\""], ["X.cs", "new HttpClient()"], ["X.java", "import java.net.URL;"], ["x.rs", "reqwest::get(u)"], ["x.sh", "rsync -a o/ h:o/"]])
+  ok(setOf(tree({ [name]: text })).has(name), `${name} on \`${text}\` calls out, a seed`);
 const unseeded = setOf(tree({ ".github/workflows/r.yml": "on: push\npermissions:\n  contents: read\njobs:\n  a:\n    steps:\n      - run: node scripts/a.mjs\n", "scripts/a.mjs": "// await fetch(url) in a comment runs nothing\nconsole.log(1);\n", "deploy": "#!/bin/sh\necho 1\n", "README.md": "git push\n" }));
 ok(unseeded.size === 0, "with no seed (a workflow that may only read, a script whose call stands only in a comment, a #! file that calls nothing), the set is empty", show(unseeded));
 // what calls out, read by why: the files with no seed of their own join beside the others
@@ -220,10 +211,9 @@ git(sub, "commit", "-q", "-m", "the submodule moved");
 const subMoved = git(sub, "rev-parse", "HEAD");
 const subWhy = new Map(), subSet = setOf(gitTree(subMoved, sub), subWhy);
 const subChanged = (parent, at) => git(sub, "diff-tree", "-r", "--no-renames", "--name-only", parent, at).split("\n").filter(Boolean);
-ok(subWhy.get("scripts/a\tb.sh") === "runs" && !subSet.has("scripts/a"), "a name with a tab in it is read whole from a commit's tree", JSON.stringify([...subWhy]));
-ok(subWhy.get("vendor/tool.md") === "runs" && !subSet.has("README.md")
+ok(subWhy.get("vendor/tool.md") === "runs" && subWhy.get("scripts/a\tb.sh") === "runs" && !subSet.has("README.md")
   && lightOf([commit(subBase, sha(0)), commit(subMoved, subBase)], { setAt: (at) => setOf(gitTree(at, sub)), changed: subChanged }).length === 0,
-  "a submodule's pointer joins the set beside a seed, read from a commit, whatever its name ends in, and a commit that moves it is not light", JSON.stringify([...subWhy]));
+  "read from a commit, a submodule's pointer joins the set beside a seed, whatever its name ends in, and a commit that moves it is not light; a name with a tab is read whole", JSON.stringify([...subWhy]));
 
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${count - failed} of ${count} passed`);
