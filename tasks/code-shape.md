@@ -30,8 +30,9 @@ one declared entrance.
   says `none` with a reason, on the owner's word, and the pull request's base says so too; the check then passes,
   saying it is off and why, and no step asks for its config or baseline. The trigger is the owner's word that the check
   is to be off: the session it is given to writes the row, and the pull request that writes it is still checked, with
-  a warning that it turns the check off. It does not mean that a `none` with no reason, or a config left out, turns it
-  off, nor that the config's other readers (the selection, the time marks) stop. Reason: a check a project could leave
+  a warning that it turns the check off; the row keeps naming a config of the project's own path after the reason, and
+  one that drops it fails there. It does not mean that a `none` with no reason, or a config left out, turns it off, nor
+  that the config's other readers (the selection, the time marks, the strength) stop. Reason: a check a project could leave
   off by writing nothing would hold nothing. Held by the shape check, which is off only for a `none` with a reason its
   base holds too, and by `core/scripts/read-nothing.mjs`, which names it as reading nothing; that the owner's word is
   behind the row, by none.

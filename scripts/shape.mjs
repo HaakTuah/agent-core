@@ -610,8 +610,10 @@ export function notLinked(file, root = ".") {
   return path.join(root, file);
 }
 
-// The config the manifest's *shape check* row names (its first path to a .json file, in backticks), else the kit's.
-export const where = manifest => /`([\w./-]+\.json)`/u.exec(/^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "")?.[1] ?? KIT;
+// The config the manifest's *shape check* row names (its first path to a .json file, in backticks, after a `none` and its
+// reason too, so that the config's other readers keep reading it while the check is off), else the kit's.
+const rowNames = manifest => /`([\w./-]+\.json)`/u.exec(/^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "")?.[1] ?? null;
+export const where = manifest => rowNames(manifest) ?? KIT;
 
 // A manifest row's first text in backticks after its name `label`: { said } (trimmed) and { reason }, where `said` is
 // `none`, what follows that token as it stands (padded or not), "" where it holds no letter or digit, which gives no
@@ -939,11 +941,14 @@ function baseOf() {
 }
 
 // Where the config is: the one named, else the one the project's rules name (its manifest; in the core, its
-// AGENTS.md), else the kit's; null where the project has none yet. A row that says `none` and still runs (no reason, or
-// one its base does not hold) names no config, so the check reads the one the base's rules name.
+// AGENTS.md), else the kit's; null where the project has none yet. A row that says `none` keeps naming a config of the
+// project's own path after its reason, which the config's other readers (the selection, the strength, the mutation) read
+// too: one that drops the path its base names fails.
 function configAt(named, self, base) {
   const manifest = tolerant(() => fs.readFileSync("core-manifest.md", "utf8"));
-  const at = named ?? (base && offBy(manifest) !== null ? baseFiles(base, null).at : where(manifest ?? tolerant(() => fs.readFileSync("AGENTS.md", "utf8"))));
+  const at = named ?? where(manifest ?? tolerant(() => fs.readFileSync("AGENTS.md", "utf8")));
+  const dropped = !named && base && offBy(manifest) !== null && rowNames(manifest) === null ? baseFiles(base, null).at : KIT;
+  if (dropped !== KIT) refuse(`the manifest's *shape check* row says \`none\` and no longer names the config at ${dropped}, which ${base.name}'s names, so the config's other readers (the selection, the strength, the mutation) would read the starter kit's at ${KIT}`, `keep the path in the row after the reason: | *shape check* | \`none\`: <the owner's reason>; config \`${dropped}\` |`);
   if (fs.existsSync(notLinked(at))) return aFile(at);
   if (named) refuse(`there is no config at ${at}`, `write it as the starter kit does (core/setup/template/shape.json.tmpl), then node ${self} ${at} --first`);
   const was = base ? baseFiles(base, named) : null; // (where the base's own manifest places it, if this one moved it)
