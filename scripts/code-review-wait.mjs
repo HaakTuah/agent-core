@@ -102,11 +102,14 @@ function postedShas(list, pull, bound, more, clear = false, kind = POSTED) {
 // SHA in a review of any kind posted by an account security-review.mjs counts (as first posted, where the pull request
 // is held) that declares no blocking finding; the commit of Codex's completed code review with nothing blocking; and
 // that of its completed security review that found nothing (`state`, its summary's, as codexState reads it)
+// whether Codex's completed security review found nothing: false, or null in both fields, the state it gives where it
+// found nothing (as security-review.mjs reads it); any other value is read as a finding
+const clean = (review) => (review.has_any_findings === false || review.has_any_findings === null) && (review.has_unresolved_findings === false || review.has_unresolved_findings === null);
 function checkedOf(list, state, pull, bound, more) {
   const checked = postedShas(list, pull, bound, more, true, ANY);
   const code = state?.code_review, security = state?.security_review;
   if (code !== null && typeof code === "object" && code.status === "completed" && typeof code.commit_sha === "string" && codexClear(code, list, more?.findings)) checked.add(code.commit_sha);
-  if (security !== null && typeof security === "object" && security.status === "completed" && security.has_any_findings === false && typeof security.commit_sha === "string") checked.add(security.commit_sha);
+  if (security !== null && typeof security === "object" && security.status === "completed" && clean(security) && typeof security.commit_sha === "string") checked.add(security.commit_sha);
   return checked;
 }
 // the commits of the pull request's own after which a review that found nothing blocking still stands (#1134, point 1):

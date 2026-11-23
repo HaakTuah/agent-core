@@ -93,8 +93,22 @@ const spawned = setOf(tree({
   "scripts/run.mjs": "execFileSync(process.execPath, [\"scripts/job.mjs\"]);\nspawnSync(\"node\", [\"two.mjs\"], { cwd: \"tools\" });\nexecFileSync(\"node\", [\"three.mjs\"], { cwd: dir });\n",
   "scripts/job.mjs": "", "tools/two.mjs": "", "lib/deep/three.mjs": "", "lib/four.mjs": "",
 }));
-ok(show(spawned) === ".github/workflows/t.yml, lib/deep/three.mjs, scripts/job.mjs, scripts/run.mjs, tools/two.mjs",
-  "a script a module starts as a process joins the set, from the root, from a plain cwd, and from any folder where its cwd is built; one none names stays out", show(spawned));
+const templated = setOf(tree({
+  ".github/workflows/t.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node scripts/run.mjs\n",
+  "scripts/run.mjs": "spawnSync(\"node\", [\"five.mjs\"], { cwd: `${root}/tools` });\n", "lib/tools/five.mjs": "", "lib/four.mjs": "",
+}));
+ok(show(spawned) === ".github/workflows/t.yml, lib/deep/three.mjs, scripts/job.mjs, scripts/run.mjs, tools/two.mjs"
+  && show(templated) === ".github/workflows/t.yml, lib/tools/five.mjs, scripts/run.mjs",
+  "a script a module starts as a process joins the set, from the root, from a plain cwd, and from any folder where its cwd is built, by a name or a template; one none names stays out", show(spawned));
+// a load whose name is a template with a space or a bracket in a folder's name, or whose name stands on the line after
+// its bracket, is read as a path all the same; a template of code that names no folder before its placeholder names none
+const spaced = setOf(tree({
+  ".github/workflows/u.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node scripts/run.mjs\n",
+  "scripts/run.mjs": "await import(`./release steps/${name}.mjs`);\nawait import(`./kit (old)/${name}.mjs`);\nawait import(\n  `./steps/${name}.mjs`\n);\nexecSync(`node -e ${code}`);\n",
+  "scripts/release steps/a.mjs": "", "scripts/kit (old)/b.mjs": "", "scripts/steps/c.mjs": "", "scripts/other.mjs": "", "tools/d.mjs": "",
+}));
+ok(show(spaced) === ".github/workflows/u.yml, scripts/kit (old)/b.mjs, scripts/release steps/a.mjs, scripts/run.mjs, scripts/steps/c.mjs",
+  "a template path with a space or a bracket in a folder's name, and a load whose name stands on the next line, join the set; a template of code names no other script", show(spaced));
 ok(show(bareNames) === ".github/workflows/m.yml, scripts/helper.js, scripts/lib/index.js, scripts/run.cjs, tools/go.py, tools/util.py",
   "a module named without its extension joins the set as its language loads it: helper.js, a folder's index.js, a Python module; one not named stays out", show(bareNames));
 const files = {

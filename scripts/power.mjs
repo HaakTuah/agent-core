@@ -70,7 +70,7 @@ const JS_ENDS = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".jsx", ".tsx"];
 const RESOLVES = [[MODULE, [...JS_ENDS, ...JS_ENDS.map((end) => `/index${end}`)]], [/\.py$/iu, [".py", "/__init__.py"]]];
 // a folder a text moves to before it runs what it names: a step's `working-directory:`, a shell's `cd` or `pushd`, a
 // tool's `-C`, `--prefix` or `--cwd` (each name as written, a quoted one unquoted)
-const MOVES = /\bworking-directory[ \t]*:[ \t]*["']?([^\s"'#]+)|(?:^|[\s;&|(`"'])(?:cd|pushd)[ \t]+["']?([^\s"';&|)`]+)|[ \t](?:-C|--prefix|--cwd)(?:[ \t]+|=)["']?([^\s"';&|)`]+)|\bcwd[ \t]*[:=][ \t]*(["'])?([^\s"'`,;})]+)/gu;
+const MOVES = /\bworking-directory[ \t]*:[ \t]*["']?([^\s"'#]+)|(?:^|[\s;&|(`"'])(?:cd|pushd)[ \t]+["']?([^\s"';&|)`]+)|[ \t](?:-C|--prefix|--cwd)(?:[ \t]+|=)["']?([^\s"';&|)`]+)|\bcwd[ \t]*[:=][ \t]*(["'`])?([^\s"'`,;})]+)/gu;
 // a Python module run by its name (`python -m tools.job`)
 const RUN_MODULE = /(?:^|[\s"'])-m[ \t]+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)/gu;
 // a Python file's own imports: `import a.b, c as d`, `from a.b import c`, `from . import c`, `from ..a import (c, d)`
@@ -131,8 +131,8 @@ function movesOf(text, folder) {
   let anywhere = false;
   for (const match of text.matchAll(MOVES)) {
     const to = match[1] ?? match[2] ?? match[3] ?? match[5];
-    // a process's `cwd` that is no plain string is a folder built at run time
-    if (/[$~`]|^-/u.test(to) || (match[5] !== undefined && match[4] === undefined)) { anywhere = true; continue; }
+    // a process's `cwd` that is no plain quoted string (a name, a call, a template) is a folder built at run time
+    if (/[$~`]|^-/u.test(to) || (match[5] !== undefined && match[4] !== "'" && match[4] !== '"')) { anywhere = true; continue; }
     for (const from of ["", folder]) at.add(path.posix.normalize(path.posix.join(from, to)));
   }
   return { at: [...at].filter((name) => !name.startsWith("..")), anywhere };
@@ -193,15 +193,18 @@ function namedIn(name, text, all, byBase = new Map()) {
 // which names the module itself, or from a package installed by what is in the set by its place.
 // A string on such a line as a folder from where it stands: the whole of a plain one, a template's fixed start up to the
 // last folder it names whole, the script's own where it names none (`./${name}.mjs`, `${name}`); none for a plain string
-// that names a variable (`$DIR`) or that is empty, nor for code a template builds.
+// that names a variable (`$DIR`) or that is empty. A template whose own text, its placeholders aside, holds a space or
+// a bracket may be code or a path with such a name (`./release steps/${name}.mjs`): its fixed start up to the last
+// folder it names is read both whole and from after its last space, quote, bracket or `=`, and where it names no
+// folder, as code, it names nothing (a folder read wrongly so names no file, and only one read as none takes them all).
 function folderOf(quoted) {
-  // a template whose own text, its placeholders aside, holds a space or a bracket is code, not a path
-  if (/[\s()]/u.test(quoted.replace(/\$\{[^{}]*\}/gu, ""))) return null;
   const built = quoted.indexOf("${");
-  if (built === -1 && quoted.includes("$")) return null;
-  const bare = (built === -1 ? quoted : quoted.slice(0, quoted.lastIndexOf("/", built) + 1)).replace(/^(?:\.\/)+|\/+$/gu, "");
-  if (built !== -1) return { bare: bare === "" ? "." : bare, built: true };
-  return bare === "" || bare === "." ? null : { bare, built: false };
+  if (built === -1) return quoted.includes("$") ? [] : [quoted.replace(/^(?:\.\/)+|\/+$/gu, "")].filter((bare) => bare !== "" && bare !== ".").map((bare) => ({ bare, built: false }));
+  const start = quoted.slice(0, quoted.lastIndexOf("/", built) + 1);
+  const code = /[\s()]/u.test(quoted.replace(/\$\{[^{}]*\}/gu, ""));
+  if (code && start === "") return [];
+  const starts = code ? [start, start.replace(/^[^]*[\s"'(=]/u, "")] : [start];
+  return [...new Set(starts.map((at) => at.replace(/^(?:\.\/)+|\/+$/gu, "")))].map((bare) => ({ bare: bare === "" ? "." : bare, built: true }));
 }
 
 // Where a folder a string names stands: from the script's own folder, and from the root where the start names one.
@@ -209,7 +212,8 @@ const placesOf = (folder, bare) => (bare === "." ? [folder] : [path.posix.normal
 
 function loadable(name, text, own) {
   const folder = path.posix.dirname(name), folders = new Set(own.map((other) => path.posix.dirname(other)));
-  const lines = text.split("\n"), loading = lines.filter((line) => BUILT.test(line));
+  // (a load's brackets opened on one line and its name on the next are read as one line)
+  const lines = text.replace(/\([ \t]*\r?\n\s*/gu, "(").split("\n"), loading = lines.filter((line) => BUILT.test(line));
   const used = new Set(loading.flatMap((line) => line.match(/[A-Za-z_$][\w$]*/gu) ?? []));
   const setting = lines.filter((line) => [...line.matchAll(/\b(?:const|let|var)[ \t]+([A-Za-z_$][\w$]*)[ \t]*=/gu)].some(([, id]) => used.has(id)));
   const named = new Set(), under = new Set();
@@ -217,10 +221,9 @@ function loadable(name, text, own) {
     if (built) { if (at !== ".." && !at.startsWith("../")) under.add(at === "." ? "" : `${at}/`); } else if (at !== "." && at !== folder && folders.has(at)) named.add(at);
   };
   for (const line of [...loading, ...setting]) {
-    // a template whole, spaces and all; a plain string up to its first space
-    for (const [, template, plain] of line.matchAll(/`([^`]*)`|["']([^"'\s]+)["']/gu)) {
-      const start = folderOf(template ?? plain);
-      if (start !== null) for (const at of placesOf(folder, start.bare)) take(start.built, at);
+    // a template or a plain string whole, spaces and all
+    for (const [, template, double, single] of line.matchAll(/`([^`]*)`|"([^"\n]*)"|'([^'\n]*)'/gu)) {
+      for (const start of folderOf(template ?? double ?? single)) for (const at of placesOf(folder, start.bare)) take(start.built, at);
     }
   }
   return own.filter((other) => SCRIPT.test(other) && (named.has(path.posix.dirname(other)) || [...under].some((at) => other.startsWith(at))));
