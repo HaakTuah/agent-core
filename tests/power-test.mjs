@@ -44,15 +44,15 @@ ok(powered("on: push\npermissions:\n  contents: read\njobs:\n  a:\n    env:\n   
   && !powered("on: push\npermissions:\n  contents: read\njobs:\n  a:\n    env:\n      T: ${{ secrets.GITHUB_TOKEN }}\n"),
 "a workflow given the secrets whole, or declaring one it is called with, is powered; one given only the job's token is not");
 // what a powered workflow runs from a folder it moves to: by a step's working-directory, a shell's cd, a module run by
-// its name, and, where the folder's name is built, a name that stands in any folder
+// its name; a name is read in any folder, so the root's and another folder's of that name join too
 const moves = setOf(tree({
   ".github/workflows/w.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: ./build.sh\n        working-directory: tools\n      - run: cd ci && node publish.mjs\n      - run: python -m tools2.job\n      - run: python -m pkg\n",
   ".github/workflows/v.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: for d in a b; do (cd \"$d\" && ./make.sh); done\n",
   "tools/build.sh": "echo build\n", "ci/publish.mjs": "console.log(1);\n", "tools2/job.py": "print(1)\n", "pkg/__main__.py": "print(1)\n",
   "a/make.sh": "echo a\n", "b/deep/make.sh": "echo b\n", "build.sh": "echo root\n", "publish.mjs": "console.log(0);\n", "other/build.sh": "echo other\n",
 }));
-ok(show(moves) === ".github/workflows/v.yml, .github/workflows/w.yml, a/make.sh, b/deep/make.sh, build.sh, ci/publish.mjs, pkg/__main__.py, publish.mjs, tools/build.sh, tools2/job.py",
-  "a powered workflow's script run from a folder it moves to joins the set: by working-directory, by cd, a Python module by its name, and in any folder where the folder's name is built; the root's of the same name too, and one in a folder it does not move to stays out", show(moves));
+ok(show(moves) === ".github/workflows/v.yml, .github/workflows/w.yml, a/make.sh, b/deep/make.sh, build.sh, ci/publish.mjs, other/build.sh, pkg/__main__.py, publish.mjs, tools/build.sh, tools2/job.py",
+  "a powered workflow's script run from a folder it moves to joins the set: by working-directory, by cd, a Python module by its name; a name stands in any folder, so the root's and another folder's of that name join too", show(moves));
 // a Python module run by name brings each package above it, whose __init__.py runs first, and what each imports
 const python = setOf(tree({
   ".github/workflows/p.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: python -m tools.jobs.run\n",
@@ -97,9 +97,8 @@ const templated = setOf(tree({
   ".github/workflows/t.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node scripts/run.mjs\n",
   "scripts/run.mjs": "spawnSync(\"node\", [\"five.mjs\"], { cwd: `${root}/tools` });\n", "lib/tools/five.mjs": "", "lib/four.mjs": "",
 }));
-// a script started from the working directory a step's `working-directory` gives it starts its own from there, so a
-// shell script's names, and those of a module that starts a process, may stand in any folder; a module's that starts
-// none, and a workflow's, do not
+// a script started from the working directory a step's `working-directory` gives it starts its own from there; and a
+// name a module only prints is read as one it runs, since a text cannot tell the two apart
 const inherited = setOf(tree({
   ".github/workflows/t.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node scripts/run.mjs && sh scripts/go.sh\n        working-directory: tools\n      - run: node scripts/plain.mjs\n        working-directory: tools\n",
   "tools/scripts/run.mjs": "execFileSync(process.execPath, [\"job.mjs\"]);\n", "tools/scripts/go.sh": "./step.sh\n", "tools/scripts/plain.mjs": "console.log(\"see other.mjs\");\n",
@@ -107,9 +106,9 @@ const inherited = setOf(tree({
 }));
 // a script that loads a network module by an ESM import is one that calls out, as one that requires it is
 const esm = setOf(tree({ "scripts/get.mjs": "import { get } from 'http';\nget(url);\n", "scripts/tls.mjs": "import https from \"https\";\n", "scripts/text.mjs": "console.log(\"from http\");\n" }));
-ok(show(inherited) === ".github/workflows/t.yml, tools/job.mjs, tools/scripts/go.sh, tools/scripts/plain.mjs, tools/scripts/run.mjs, tools/step.sh"
+ok(show(inherited) === ".github/workflows/t.yml, tools/job.mjs, tools/other.mjs, tools/scripts/go.sh, tools/scripts/plain.mjs, tools/scripts/run.mjs, tools/step.sh"
   && show(esm) === "scripts/get.mjs, scripts/tls.mjs",
-  "a script whose working directory its step gives starts its own from there, and a bare ESM import of a network module calls out; a module that starts nothing, and a word, do not", `${show(inherited)} | ${show(esm)}`);
+  "a script whose working directory its step gives starts its own from there, a name a module prints joins too, and a bare ESM import of a network module calls out; a word does not", `${show(inherited)} | ${show(esm)}`);
 ok(show(spawned) === ".github/workflows/t.yml, lib/deep/three.mjs, scripts/job.mjs, scripts/run.mjs, tools/two.mjs"
   && show(templated) === ".github/workflows/t.yml, lib/tools/five.mjs, scripts/run.mjs",
   "a script a module starts as a process joins the set, from the root, from a plain cwd, and from any folder where its cwd is built, by a name or a template; one none names stays out", show(spawned));
@@ -155,18 +154,18 @@ const files = {
 const why = new Map();
 const set = setOf({ ...tree(files), copy: "vendored/core/" }, why);
 const want = [".claude/settings.json", ".github/workflows/called.yml", ".github/workflows/powered.yml", "bin/publish", "bin/release", "core/scripts/calls.mjs", "deploy", "scripts/by-action.mjs", "scripts/by-call.sh",
-  "scripts/calls.mjs", "scripts/helper.mjs", "scripts/pushes.sh", "scripts/run.mjs", "scripts/steps/one.mjs", "scripts/unread.py", "tools/act/action.yml"];
+  "scripts/calls.mjs", "scripts/helper.mjs", "scripts/not-run.mjs", "scripts/pushes.sh", "scripts/run.mjs", "scripts/steps/deeper/two.mjs", "scripts/steps/one.mjs", "scripts/unread.py", "tools/act/action.yml"];
 ok(show(set) === want.join(", "), "the set holds the powered workflow, what it runs and calls and loads, a script that calls out, .claude/, an action and what it runs, and an unread script, and nothing else", show(set));
 ok(why.get(".github/workflows/powered.yml") === "power" && why.get(".claude/settings.json") === "place" && why.get("tools/act/action.yml") === "place"
   && why.get("scripts/calls.mjs") === "calls" && why.get("scripts/pushes.sh") === "calls" && why.get("scripts/unread.py") === "unread"
-  && why.get("scripts/run.mjs") === ".github/workflows/powered.yml" && why.get("scripts/helper.mjs") === "scripts/run.mjs"
+  && why.get("scripts/run.mjs") === "calls" && why.get("scripts/helper.mjs") === "scripts/run.mjs"
   && why.get("scripts/steps/one.mjs") === "scripts/run.mjs (built)" && why.get(".github/workflows/called.yml") === ".github/workflows/powered.yml",
-"each says what brought it in", JSON.stringify([...why]));
+"each says what brought it in, a module that loads by a name it builds, which may be a package's, by itself", JSON.stringify([...why]));
 ok(why.get("deploy") === ".github/workflows/powered.yml" && why.get("bin/release") === ".github/workflows/powered.yml" && why.get("bin/publish") === "calls" && !set.has("bin/notes"),
   "a file with no extension a powered workflow runs is in it, and one that starts with #! and calls out, but not one with no #! line", JSON.stringify([...why]));
 ok(!set.has(".github/workflows/named.yml") && !set.has("scripts/by-named.mjs"), "a workflow a powered one only names is not followed, nor what it runs");
-ok(!set.has("scripts/not-run.mjs"), "a root-relative path a module only prints is not followed: a module's names lead from its own folder");
-ok(!set.has("scripts/steps/deeper/two.mjs") && !set.has("scripts/other/three.mjs"), "a module loaded by a built name brings in the folder it names alone, not one below it or another");
+ok(set.has("scripts/not-run.mjs"), "a path a module only prints is followed: a text cannot tell it from one it runs, nor the folder it leads from");
+ok(set.has("scripts/steps/deeper/two.mjs") && !set.has("scripts/other/three.mjs"), "a module loaded by a built name brings in every script below the folder it names, the name holding a / or not, and no other folder");
 ok(set.has("core/scripts/calls.mjs") && !set.has("vendored/core/scripts/calls.mjs"), "the copy at the path the manifest names is left out, and a folder core/ that is not the copy is read");
 ok(setOf(tree(files)).has("vendored/core/scripts/calls.mjs"), "where no manifest names a copy, as in the core's own repository, nothing is left out");
 ok(!set.has(".github/workflows/readonly.yml") && !set.has("scripts/plain.mjs"), "a workflow that may only read is not in it, nor what it alone runs");
@@ -181,6 +180,29 @@ const quiet = setOf(tree({
 }));
 ok(!quiet.has("scripts/sib.mjs"), "a module whose built name names no folder brings in nothing: the name comes from what calls it", show(quiet));
 ok(!quiet.has("tools/sib.sh"), "  and a shell script's line with no import( or require( is no load", show(quiet));
+// ---- each class a name is read by, and what may call out (#1134): a form of each that the reader before missed ----
+const flow = (run) => `on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: ${run}\n`;
+const classes = {
+  "a template whose first placeholder builds the folder names what follows it in any folder": [{ "scripts/run.mjs": "await import(`${root}/steps/${name}.mjs`);\nawait import(`${root}/parts/one.mjs`);\n", "steps/x.mjs": "", "lib/steps/y.mjs": "", "parts/one.mjs": "" }, ["parts/two.mjs", "lib/other.mjs"]],
+  "a static import whose path holds a space, or a letter outside ASCII, names its file": [{ "scripts/run.mjs": "import './release steps/helper.mjs';\nimport './hjælp.mjs';\n", "scripts/release steps/helper.mjs": "", "scripts/hjælp.mjs": "" }, ["scripts/other.mjs"]],
+  "a load by a file's URL, a worker, a require createRequire made, and a name written with escapes name their files": [{ "scripts/run.mjs": "await import(pathToFileURL(\"tools/a.mjs\").href);\nnew Worker(\"tools/b.mjs\");\nconst require = createRequire(process.cwd() + \"/\");\nrequire(\"./tools/c.cjs\");\nawait import(decodeURIComponent(\"./d%2De.mjs\"));\n", "tools/a.mjs": "", "tools/b.mjs": "", "tools/c.cjs": "", "scripts/d-e.mjs": "" }, ["tools/f.mjs"]],
+  "a name joined by join( or +, a shell's glob, by a workflow or a sourced loop, and a Python f-string name each file that fits": [{ "scripts/run.mjs": "spawnSync(process.execPath, [path.join(ROOT, \"steps\", name + \".mjs\")]);\nawait import(\"./parts/\" + name + \".mjs\");\n", "steps/x.mjs": "", "scripts/parts/deep/y.mjs": "", "tools/steps/z.sh": "", "tools/go.sh": "for f in \"$(dirname \"$0\")\"/bits/*; do . \"$f\"; done\n", "tools/bits/w.sh": "", "tools/go.py": "import importlib\nm = importlib.import_module(f\"mods.{name}\")\n", "tools/mods/__init__.py": "", "tools/mods/v.py": "" }, ["lib/u.mjs"], "node scripts/run.mjs && for f in tools/steps/*.sh; do bash \"$f\"; done && bash tools/go.sh && python tools/go.py"],
+  "a name of holes alone takes the folder a constant behind a constant names, not one another function's own name holds": [{ "scripts/run.mjs": "const BASE = \"steps\";\nexport async function run(n) {\n  const dir = path.join(root, BASE);\n  return import(path.join(dir, n));\n}\nfunction other() {\n  const dir = \"lib\";\n}\n", "steps/a/x.mjs": "" }, ["lib/y.mjs"]],
+  "a name in a module's comment loads nothing, a // inside a regular expression hides no load after it, and a /// directive is read": [{ "scripts/run.mjs": "// see notes.mjs\nconst r = /\\/\\//g; await import(\"./kept.mjs\"); // and gone.mjs\n/// <reference path=\"./typed.ts\" />\n", "scripts/kept.mjs": "", "scripts/typed.ts": "" }, ["scripts/notes.mjs", "scripts/gone.mjs"]],
+};
+for (const [what, [files, out, run = "node scripts/run.mjs"]] of Object.entries(classes)) {
+  const got = setOf(tree({ ".github/workflows/w.yml": flow(run), ...files, ...Object.fromEntries(out.map((f) => [f, ""])) }));
+  ok(Object.keys(files).every((f) => got.has(f)) && !out.some((f) => got.has(f)), what, show(got));
+}
+const outward = setOf(tree({
+  "a.mjs": "const h = await import(\"https\");\n", "b.mjs": "import axios from \"axios\";\n", "c.cjs": "const { Octokit } = require(\"@octokit/rest\");\n", "d.mjs": "import { request } from \"undici\";\n",
+  "e.mjs": "import fetch from 'node-fetch';\n", "f.mjs": "import got from\n  \"got\";\n", "g.mjs": "export * from \"node:dns\";\n", "h.mjs": "const m = await import(name);\n",
+  "i.mjs": "import fs from \"node:fs\";\nimport { a } from \"./a.mjs\";\nconst t = \"import axios from 'axios'\";\nBuffer.from(\"axios\");\nawait import(`./steps/${n}.mjs`);\n",
+}));
+ok(show(outward) === "a.mjs, b.mjs, c.cjs, d.mjs, e.mjs, f.mjs, g.mjs, h.mjs",
+  "a script that loads a module by a plain name that is no path and none of Node's own that stay on the machine calls out, by any form of load, as does one that loads by a name it builds; Node's own, a path, and a load inside a string do not", show(outward));
+ok(powered("on: push\npermissions:\n  contents:\n    write\n") && powered("on: push\npermissions:\n  \"contents\": &w write\n") && powered("on: push\npermissions:\n  contents: read\njobs:\n  a:\n    env:\n      K: ${{ SECRETS.KEY }}\n"),
+  "a write permission on the line after its scope or after an anchor, and a secret written in capitals, give power");
 // ---- the light commits, with stand-ins ----
 const sha = (n) => String(n).repeat(40).slice(0, 40);
 const [A, B, C, D, E, M] = ["a", "b", "c", "d", "e", "f"].map(sha);
