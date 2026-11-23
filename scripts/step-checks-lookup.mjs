@@ -17,11 +17,16 @@ export const lookupOf = (st, flag, copy, at, job) => {
   if (/\$\{\{\s*inputs\./u.test(at.cfg ?? "") || !beforeLookup(st, copy)) return false;
   const i = job.steps.indexOf(st);
   if (i < 0 || !job.steps.slice(0, i).every(x => beforeLookup(x, copy))) return false;
-  const by = !st.counts ? null : looksUp(st.cmds[0], flag, copy) ? "lookup.mjs" : flag === false && job.deep && licencesLookUp(st.cmds[0], copy) ? "licences.mjs" : null;
+  const by = lookupBy(st, flag, copy, job);
   if (!by || placed(configOf(st.cmds[0], by, copy), st.dir) !== at.cfg) return false;
   const name = /\$\{?(\w+)|%(\w+)%/u.exec(at.cfg ?? "");
   return !name || st.env[name[1] ?? name[2]] === at.step.env[name[1] ?? name[2]];
 };
+
+// The script of the copy's by which a counted step runs the lookup, given `flag`, or null: the lookup itself, or npm's
+// by the licence check, in a job whose checkout holds the pull request's base.
+const lookupBy = (st, flag, copy, job) => (!st.counts ? null : looksUp(st.cmds[0], flag, copy) ? "lookup.mjs"
+  : flag === false && job.deep && licencesLookUp(st.cmds[0], copy) ? "licences.mjs" : null);
 
 // Where a lookup stands, as the step's mend says it (beforeLookup).
 export const FIRST = copy => `with nothing before it in its job but the checkout, \`setup-\` actions and the core's lookup, exact-versions, licence, agent-tools and install scripts, each run as \`node ${copy}scripts/<name>.mjs\` from the project's root under bash (named, or on GitHub's own Linux or macOS runner) in a job with no container or services, with no env but a variable its config is named by, each setup action given only its version, its cache, if named, turned off (\`package-manager-cache: false\`, or in \`setup-dotnet\` \`cache: false\`), so that nothing of the pull request's (\`npm\`, \`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`) has run before it`;
