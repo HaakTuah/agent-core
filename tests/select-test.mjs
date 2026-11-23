@@ -133,6 +133,27 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
   ok(!picked.all && picked.tests.length === 0 && Date.now() - from < 3000, `500 changed files over 600 tests and 10 globs of "select.whole" select in ${Date.now() - from} ms, none of those tests reaching every file`, JSON.stringify(picked.tests.slice(0, 3)));
 }
 
+// ---- C# a pull request writes to be slow to read (select-csharp.mjs): each ends in time, selected or as the whole suite ----
+{
+  const csConfig = parseConfig(JSON.stringify({ baseline: "b.json", code: ["src", "tests"], tests: ["tests/"] })), csTests = new Set(["tests/T.cs"]);
+  const base = { "App.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\" />\n", "tests/T.cs": "namespace Tests;\nclass T { }\n" };
+  const words = n => Array.from({ length: n }, (_, k) => `N${k}`).join(".");
+  const shrunk = Object.fromEntries(Array.from({ length: 50 }, (_, k) => [`src/S${k}.cs`, `namespace App;\nclass S${k} { }\n`]));
+  for (const [what, more, changed, before] of [
+    ["a name of 25,000 dotted words", { "src/X.cs": `namespace App;\nclass X { object o = ${words(25000)}; }\n` }, ["src/X.cs"]],
+    ["a namespace of 20,000 dotted words", { "src/X.cs": `namespace ${words(20000)};\nclass X { }\n` }, ["src/X.cs"]],
+    ["190,000 \"$\" before no string", { "src/X.cs": `namespace App;\nclass X { string s = ${"$".repeat(190000)}; }\n` }, ["src/X.cs"]],
+    ["a .props of 150,000 \"<Using \"", { "Directory.Build.props": "<Using ".repeat(150000), "src/X.cs": "namespace App;\nclass X { }\n" }, ["src/X.cs"]],
+    ["50 files of C# each 100,000 characters at the base, past what the selection reads", shrunk, Object.keys(shrunk), f => (f in shrunk ? `namespace App;\n${"// x\n".repeat(20000)}` : null)],
+  ]) {
+    const texts = { ...base, ...more }, from = Date.now();
+    let got;
+    try { got = selection({ changed, texts, tests: csTests, reach: new Map(), config: csConfig, watch: hurry({ files: new Set(changed) }), beside: () => ({ msbuild: [], cs: {} }), ...(before && { before }) }); } catch (e) { got = e instanceof Late ? "late" : String(e); }
+    const ms = Date.now() - from;
+    ok((before ? got === "late" : got === "late" || got.all !== undefined) && ms < 5000, `${what}: ${got === "late" ? "the whole suite, late" : got.all ? "the whole suite" : "selected"} in ${ms} ms`, String(got));
+  }
+}
+
 // ---- the files whose names a text holds, in one pass (name-trie.mjs; #881) ----
 {
   // (the same files as the regular expression of each name that it replaced, over names and texts made to be hard)
@@ -187,7 +208,7 @@ s = selection({ changed: ["pkg/__init__.py"], texts: py, tests: pyTests, reach: 
 ok(!s.all && same(s.tests, ["tests/test_rules.py"]), "a Python package's __init__.py, which runs on every import under it, reaches the tests that import the package", JSON.stringify(s));
 const cs = { "App.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\" />\n", "src/Rules.cs": "namespace App;\npublic static class Rules { public static bool Allowed() => true; }\n", "tests/RulesTest.cs": "namespace Tests;\nclass RulesTest { void T() { App.Rules.Allowed(); } }\n", "web/app.js": "function draw() {}\n" };
 const csConfig = parseConfig(JSON.stringify({ baseline: "b.json", code: ["src", "tests", "web"], tests: ["tests/"] })), csTests = new Set(["tests/RulesTest.cs"]), csFound = survey(cs, csConfig, csTests);
-s = selection({ changed: ["src/Rules.cs"], texts: cs, tests: csTests, reach: csFound.reach, scripts: csFound.scripts, unsure: csFound.unsure, config: csConfig });
+s = selection({ changed: ["src/Rules.cs"], texts: cs, tests: csTests, reach: csFound.reach, scripts: csFound.scripts, unsure: csFound.unsure, config: csConfig, beside: () => ({ msbuild: [], cs: {} }) });
 ok(!s.all && same(s.tests, ["tests/RulesTest.cs"]), "C#: a test that names a type by its full name, with no using directive, reaches its file (select-csharp-test.mjs reads the rest)", JSON.stringify(s));
 s = selection({ changed: ["web/app.js"], texts: cs, tests: csTests, reach: csFound.reach, scripts: csFound.scripts, config: csConfig });
 ok(s.all && s.why.includes("web/app.js"), "a script of the global space, which no import names, runs the whole suite", JSON.stringify(s));

@@ -136,9 +136,9 @@ if (started(import.meta.url)) {
     return !r.links.get("tests/T.cs")?.has("src/X.cs") || r.unsure.size;
   });
   ok(!suffixed.length, "a hook written with \"Attribute\" is a hook too, and no scan of an assembly", suffixed.join(", "));
-  const bridged = { ...app, "src/Bridge.cs": "namespace App;\nref class Bridge { public static bool Check() => Rules.Allowed(); }\n", "tests/BridgeTest.cs": "using App;\nnamespace Tests;\nclass BridgeTest { void T() { Bridge.Check(); } }\n" };
-  ok(readCsharp(bridged["src/Bridge.cs"]).functions === null && pick(bridged, "src/Rules.cs").tests.includes("tests/BridgeTest.cs"),
-    "a file the grammar loses, whose declarations are not known, is reached from every file and unsure, so a test that names it runs", JSON.stringify(pick(bridged, "src/Rules.cs")));
+  const forms = ["(int Count, App.Data.Store Item)", "App.Data.Store[]", "App.Data.Store?"].filter(form => !reached(new Set(["tests/AliasTest.cs"]), csharpReach({ ...app,
+    "src/Usings.cs": `global using S = ${form};\n`, "tests/AliasTest.cs": "namespace Tests;\nclass AliasTest { S s; }\n" }, undefined, nothing).links).get("tests/AliasTest.cs").has("src/Store.cs"));
+  ok(!forms.length, "a global alias of a tuple, an array or a nullable type is read for the types it names", forms.join(", "));
   const nsAlias = one("namespace App.Data;\npublic class Store { }\n", { "tests/T.cs": "using D = App;\nnamespace Tests;\nclass T { object s = new D.Data.Store(); }\n" });
   ok(nsAlias.links.get("tests/T.cs")?.has("src/X.cs"), "a namespace alias that heads a name in full is put for what it names", JSON.stringify([...nsAlias.links].map(([f, to]) => [f, [...to]])));
   const items = ["<Using Include=\"App.Data.Store\" Alias=\"S\" />", "<Using Include=\"App.Data.Store\" Static=\"true\" />"].filter(item => !csharpReach({

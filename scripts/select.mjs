@@ -44,10 +44,10 @@ import { fileURLToPath } from "node:url";
 import { CODE } from "./code-shape.mjs";
 import { logged } from "./guards.mjs";
 import { WORDS, mentioned, nameTrie } from "./name-trie.mjs";
-import { Late, hurry } from "./hurry.mjs";
+import { CHARACTERS, Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { matcher } from "./select-matcher.mjs";
-import { csharpReach, ofNoProject, undeclared } from "./select-csharp.mjs";
+import { csharpReach, heldBeside, ofNoProject, undeclared } from "./select-csharp.mjs";
 import { git, passedWhole } from "./select-passed.mjs";
 import { isCode } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
@@ -109,19 +109,19 @@ export function reached(tests, linked, pace = () => {}) {
 // What a pull request runs: { all, why, tests }, `why` the reason for the whole suite, or for each test selected.
 // `changed` the paths it changes (gone ones among them), `texts` and `tests` the project as the shape check reads it,
 // `reach` its imports, `failed` the tests that failed last time, `config` the shape check's, `before` a changed file's
-// text at the base (null where it was not there).
-export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), unread = [], failed = [], config, watch = null, before = () => null }) {
+// text at the base (null where it was not there), `beside` what git holds of C# and MSBuild beside the texts (heldBeside).
+export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), unread = [], failed = [], config, watch = null, before = () => null, beside = heldBeside }) {
   const proof = matcher(config.select.proof), m = { whole: matcher(config.select.whole), none: matcher(config.select.none), isTest: matcher(config.tests) };
   const by = new Map(), add = (t, why) => { if (tests.has(t) && !by.has(t)) by.set(t, why); };
   const pace = watch?.pace(); // (one budget for the linking and the search from each test)
-  const cs = csharpReach(texts, pace);
+  const cs = csharpReach(texts, pace, beside);
   const reaches = reached(tests, links(texts, tests, reach, pace, cs.links), pace);
   // (a test that reaches an import the readers cannot follow may reach any file: it runs as one that reaches every file)
   // (and, where pytest runs a conftest.py the config does not read, each test of Python, whose fixtures may come from it)
   const blind = new Set([...reaches].filter(([t, files]) => [...files].some(f => (f.endsWith(".cs") ? cs.unsure : unsure).has(f)) || (t.endsWith(".py") && unread.some(c => c.endsWith("conftest.py")))).map(([t]) => t));
   // (the tests that reach every file, told once: the config's pathspecs are tried on each test, never on each changed file's account)
   let every = null;
-  const ctx = { texts, tests, scripts, add, reaches, before, ...m, wholes: () => (every ??= [...tests].filter(t => m.whole(t) || blind.has(t))) };
+  const ctx = { texts, tests, scripts, add, reaches, before: heldToBudget(before, pace), ...m, wholes: () => (every ??= [...tests].filter(t => m.whole(t) || blind.has(t))) };
   for (const t of tests) if (proof(t)) add(t, "never selected out: the project's proof that behaviour was kept");
   for (const t of failed) add(t, "failed last time");
   for (const f of changed) {
@@ -154,6 +154,19 @@ function csharpUnknown(f, texts, before) {
   if (ofNoProject(f, texts)) return `${f} is C# of no project (no .csproj in a folder above it), which a project may compile by its path, so what reaches it cannot be told`;
   const lost = undeclared(before(f), texts[f]);
   return lost && `${f} changed so that ${lost}, and a test that reached it by that may now reach another file, so what reaches it cannot be told`;
+}
+
+// `before` held to the budget: `pace` asked before each text at the base is read, and the texts read held together to
+// CHARACTERS, past which the run stops (Late), as the changed files' own are.
+function heldToBudget(before, pace = () => {}) {
+  let n = 0;
+  return f => {
+    pace();
+    const text = before(f);
+    n += text?.length ?? 0;
+    if (n > CHARACTERS) throw new Late(`the changed files of C# held ${n.toLocaleString("en")} characters at the base, past the ${CHARACTERS.toLocaleString("en")} the selection reads, so what each reaches cannot be told in time`);
+    return text;
+  };
 }
 
 const pick = ({ reach, scripts, unsure }) => ({ reach, scripts, unsure });

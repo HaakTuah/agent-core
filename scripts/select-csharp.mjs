@@ -16,6 +16,7 @@
 // are read here too, as links between the files it reads. Node's own modules and git.
 import fs from "node:fs";
 import path from "node:path";
+import { CHARACTERS, Late } from "./hurry.mjs";
 import { readCsharp } from "./shape-csharp.mjs";
 import { git } from "./select-passed.mjs";
 
@@ -27,11 +28,16 @@ const HOOKS = new Set(["ModuleInitializer", "AssemblyInitialize", "AssemblyClean
 const REFLECTS = new Set(["Activator", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
   "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR"]);
 
-const RAW = /\$+"""/u;
+const RAW = /\$"""/u; // (one "$" before the quotes, not a run of them: the test is linear in the text)
 const hookWord = w => HOOKS.has(w.replace(/Attribute$/u, ""));
 const word = k => k.v.replace(/^@/u, "");
 const ids = toks => toks.filter(k => k.t === "id").map(word);
-const prefixes = name => name.split(".").map((_, k, parts) => parts.slice(0, k + 1).join("."));
+// The names that head a dotted name, shortest first, no deeper than `depth` words (a name deeper than every one the
+// index holds matches none), `pace` asked for each.
+function* prefixes(name, depth, pace) {
+  const parts = name.split(".");
+  for (let k = 0, head = ""; k < Math.min(parts.length, depth); k++) { pace(); head = join(head, parts[k]); yield head; }
+}
 const join = (a, b) => (a ? `${a}.${b}` : b);
 const into = (map, key, made = () => new Set()) => { if (!map.has(key)) map.set(key, made()); return map.get(key); };
 
@@ -62,13 +68,19 @@ function pastGeneric(toks, k) {
 }
 
 // The using directive that opens at toks[i] ("using", or "global using"): { end, target, global, alias }, or null where
-// the tokens there are no directive (a using statement or declaration).
+// the tokens there are no directive (a using statement or declaration). An alias of a type that is no name, a tuple, an
+// array or a nullable ("using Pair = (int, App.Item);"), has no target: the words of its type are read as any others,
+// so the file that holds a global one, which every file reaches, reaches what they name.
 function directive(toks, i) {
   const k = pastHead(toks, i);
   if (k < 0) return null;
   const { parts, end } = nameAt(toks, k), last = pastGeneric(toks, end), eq = toks[k - 1]?.v === ":" ? k - 4 : k - 1;
-  return parts.length && toks[last]?.v === ";"
-    ? { end: last, target: parts.join("."), global: toks[i].v === "global", alias: toks[eq]?.v === "=" ? word(toks[eq - 1]) : null } : null;
+  const global = toks[i].v === "global", alias = toks[eq]?.v === "=" ? word(toks[eq - 1]) : null;
+  if (parts.length && toks[last]?.v === ";") return { end: last, target: parts.join("."), global, alias };
+  if (!alias) return null;
+  let semi = k;
+  while (semi < toks.length && toks[semi].v !== ";") semi++;
+  return semi < toks.length ? { end: semi, target: null, global, alias } : null;
 }
 
 
@@ -162,11 +174,14 @@ function factsOf(r, src) {
 const attribute = (tag, name) => { const m = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "u").exec(tag); return m ? m[1] ?? m[2] : undefined; };
 
 // The <Using Include="N"> items of MSBuild's files, each a global using directive ({ target, alias }, an Alias="S" its
-// alias), or null where one names a property ("$(...)"), whose value cannot be told here.
-function msbuildUsings(texts) {
-  const out = [];
+// alias), or null where one names a property ("$(...)"), whose value cannot be told here. `pace` is asked for each
+// file, and past CHARACTERS of them together the run stops (Late), as it does for the changed files of code.
+function msbuildUsings(texts, pace) {
+  const out = [], n = texts.reduce((sum, t) => sum + t.length, 0);
+  if (n > CHARACTERS) throw new Late(`the project's MSBuild files hold ${n.toLocaleString("en")} characters, past the ${CHARACTERS.toLocaleString("en")} the selection reads, so what each file of C# reaches cannot be told in time`);
   for (const text of texts) {
-    for (const m of text.matchAll(/<Using\b([^>]*)>/gu)) {
+    pace();
+    for (const m of text.matchAll(/<Using\b([^<>]*)>/gu)) { // (each try ends at the next "<": linear in the text)
       const [include, alias] = ["Include", "Alias"].map(a => attribute(m[1], a));
       if (include === undefined) continue;
       if (`${include}${alias ?? ""}`.includes("$(")) return null;
@@ -198,17 +213,20 @@ export function ofNoProject(file, texts) {
 // Map of its namespace to its files, extensions: Map of a namespace to the files that may extend in it, every: the files
 // every file reaches (those run with no name, those that hold a global using directive, which bears on every file, and
 // those unread, whose declarations are not known), globals: what global using directives name, aliases: Map of a global
-// alias to what it names, unsure: the files unread, that hold a raw interpolated string or that reflect }.
+// alias to what it names, unsure: the files unread, that hold a raw interpolated string or that reflect, depth: the most
+// words of a name declared, deeper than which no name is looked up }.
 function indexOf(facts) {
-  const ix = { types: new Map(), byLast: new Map(), extensions: new Map(), every: [], globals: [], aliases: new Map(), unsure: new Set() };
+  const ix = { types: new Map(), byLast: new Map(), extensions: new Map(), every: [], globals: [], aliases: new Map(), unsure: new Set(), depth: 1 };
+  const deep = name => { ix.depth = Math.max(ix.depth, name.split(".").length); };
   const declare = (full, file) => {
     const dot = full.lastIndexOf(".");
+    deep(full);
     into(ix.types, full).add(file);
     into(into(ix.byLast, full.slice(dot + 1), () => new Map()), dot < 0 ? "" : full.slice(0, dot)).add(file);
   };
   for (const [f, x] of facts) {
     for (const t of declared(x)) declare(t, f);
-    if (x.extensions) for (const ns of x.placed) into(ix.extensions, ns).add(f);
+    if (x.extensions) for (const ns of x.placed) { deep(ns); into(ix.extensions, ns).add(f); }
     const globals = x.usings.filter(d => d.global);
     globally(ix, globals);
     if (x.hook || x.unread || globals.length) ix.every.push(f);
@@ -238,7 +256,7 @@ export function undeclared(was, now) {
 
 // Global using directives into the index: an alias's target under its name, any other's target among the globals.
 function globally(ix, usings) {
-  for (const u of usings) if (u.alias) into(ix.aliases, u.alias).add(u.target); else ix.globals.push(u.target);
+  for (const u of usings) if (u.alias) { if (u.target !== null) into(ix.aliases, u.alias).add(u.target); } else ix.globals.push(u.target);
 }
 
 // The names a file writes in full (x its facts): its runs of dotted words, each with an alias that heads it put for
@@ -246,7 +264,7 @@ function globally(ix, usings) {
 // `using static` of MSBuild's names a type no file need name). `pace` is asked for each.
 function fullNames(x, ix, pace) {
   const aliases = new Map(ix.aliases), runs = new Set([...x.runs, ...ix.globals]);
-  for (const u of x.usings) if (u.alias) into(aliases, u.alias).add(u.target);
+  for (const u of x.usings) if (u.alias && u.target !== null) into(aliases, u.alias).add(u.target);
   for (const run of [...x.runs, ...x.words]) { pace(); const [head, ...rest] = run.split("."); for (const t of aliases.get(head) ?? []) runs.add([t, ...rest].join(".")); }
   return runs;
 }
@@ -256,11 +274,11 @@ function fullNames(x, ix, pace) {
 // or as an attribute, read against the namespaces around it; and the files that may extend in a namespace it sees.
 // `pace` is asked in each expansion.
 function reachOf(x, ix, pace) {
-  const around = new Set(["", ...x.r.namespaces.flatMap(n => { pace(); return prefixes(n); })]), sees = new Set(around);
-  for (const target of [...ix.globals, ...x.usings.map(u => u.target)]) for (const p of around) { pace(); for (const n of prefixes(join(p, target))) sees.add(n); }
+  const around = new Set(["", ...x.r.namespaces.flatMap(n => [...prefixes(n, ix.depth, pace)])]), sees = new Set(around);
+  for (const target of [...ix.globals, ...x.usings.map(u => u.target).filter(t => t !== null)]) for (const p of around) for (const n of prefixes(join(p, target), ix.depth, pace)) sees.add(n);
   const to = new Set(ix.every), add = files => { for (const g of files ?? []) to.add(g); }, runs = fullNames(x, ix, pace);
   for (const w of x.words) for (const last of [w, `${w}Attribute`]) for (const [ns, files] of ix.byLast.get(last) ?? []) if (sees.has(ns)) add(files);
-  for (const run of runs) for (const p of around) { pace(); for (const name of prefixes(join(p, run))) { add(ix.types.get(name)); add(ix.types.get(`${name}Attribute`)); } }
+  for (const run of runs) for (const p of around) for (const name of prefixes(join(p, run), ix.depth, pace)) { add(ix.types.get(name)); add(ix.types.get(`${name}Attribute`)); }
   for (const ns of sees) add(ix.extensions.get(ns));
   return to;
 }
@@ -272,7 +290,7 @@ export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   const links = new Map();
   if (!Object.keys(texts).some(f => f.endsWith(".cs"))) return { links, unsure: new Set() };
   const held = beside(texts), read = Object.entries(texts).filter(([f]) => /\.(csproj|props|targets)$/u.test(f)).map(([, t]) => t);
-  const msbuild = held.unknown ? null : msbuildUsings([...held.msbuild, ...read]);
+  const msbuild = held.unknown ? null : msbuildUsings([...held.msbuild, ...read], pace);
   const all = { ...held.cs, ...texts }, files = Object.keys(all).filter(f => f.endsWith(".cs"));
   // (where the usings every file holds cannot be told, every file is unsure)
   if (msbuild === null) return { links, unsure: new Set(files) };
