@@ -228,19 +228,22 @@ function optionError(args, at, by, since) {
   return null;
 }
 
-// --make: the labels the repository lacks made, those of the list set to its colour and description.
-function makeLabels(repo) {
-  const have = pagesOf(`repos/${repo}/labels`);
+// --make, and the daily look's job (look.mjs; #1092): the labels the repository lacks made, those of the list set to its
+// colour and description, through `gh` (ghApi's form), each line said by `say`; the names made or set. A write GitHub
+// refuses throws, with gh's words, and what was made before it stands.
+export function makeLabels(repo, gh = ghApi, say = console.log) {
+  const have = pagesOf(`repos/${repo}/labels`, gh);
   const todo = toMake(have);
   // (a label set anew is named with what it was before it is set, so a project that used the name otherwise can
   // restore it, even where a later call fails)
   const was = new Map(have.map(l => [String(l.name).toLowerCase(), l]));
   for (const l of todo) {
-    if (l.how === "set") console.log(`Setting ${l.name}: it was ${l.was}, colour ${was.get(l.name.toLowerCase())?.color}, "${was.get(l.name.toLowerCase())?.description ?? ""}".`);
-    if (l.how === "make") ghApi("-X", "POST", `repos/${repo}/labels`, "-f", `name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
-    else ghApi("-X", "PATCH", `repos/${repo}/labels/${encodeURIComponent(l.was)}`, "-f", `new_name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
+    if (l.how === "set") say(`Setting ${l.name}: it was ${l.was}, colour ${was.get(l.name.toLowerCase())?.color}, "${was.get(l.name.toLowerCase())?.description ?? ""}".`);
+    if (l.how === "make") gh("-X", "POST", `repos/${repo}/labels`, "-f", `name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
+    else gh("-X", "PATCH", `repos/${repo}/labels/${encodeURIComponent(l.was)}`, "-f", `new_name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
   }
-  console.log(todo.length ? `Made or set in ${repo}: ${todo.map(l => l.name).join(", ")}.` : `Every label of the list stands in ${repo} as it says.`);
+  say(todo.length ? `Made or set in ${repo}: ${todo.map(l => l.name).join(", ")}.` : `Every label of the list stands in ${repo} as it says.`);
+  return todo.map(l => l.name);
 }
 
 // What is said where gh gave no list: issues switched off, or no answer at all.

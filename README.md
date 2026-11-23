@@ -575,7 +575,9 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   script again, and says what is left; the value of `PERSONAL_TERMS` the owner types on its page alone, never into the
   session (floor rule 11). It is asked at a project's first taking of the core, where the starter kit and the sync's
   first copy print it, and again only where a sync brings a setting the old copy's list did not hold; nothing waits on
-  it, and nothing fails until a setting is given (`AGENTS.md`, "Nothing locks a project").
+  it, and nothing fails until a setting is given (`AGENTS.md`, "Nothing locks a project"). Each day the look's job
+  reads the same settings with its own token where GitHub lets it, and keeps one issue, "Settings only the owner gives",
+  labelled `needs-owner`, of each it read as not given, with its link, and of each write GitHub refused it (#1092).
 - An adviser (`roles/adviser.md`): its session started with every repository of the owner's it is to advise on, so it
   can read them, file in them and start each one's orchestrator, reading what another account can write only through
   that repository's orchestrator (`roles/adviser.md`); at the effort its tool's part advises (`tools/claude.md`).

@@ -525,6 +525,9 @@ jobs:
       - name: The settings only the owner gives, in one checklist
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/owner-settings-test.mjs ')) }}
         run: node tests/owner-settings-test.mjs
+      - name: The host read and written for the steps, on a stand-in for GitHub
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/host-test.mjs ')) }}
+        run: node tests/host-test.mjs
       - name: The reader of a project's call of the security review, for the owner's settings
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/review-caller-test.mjs ')) }}
         run: node tests/review-caller-test.mjs

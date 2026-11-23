@@ -1,12 +1,15 @@
 // What a release asks of a project, step by step (AGENTS.md, "Nothing locks a project"; core archive 215): each entry
 // of the sync notes (sync-notes.mjs, beside this file) has a step, by the entry's lead (its date and its name), with
 // roughly what it costs and how it is told done, in a file of its own in steps/ beside this file, named as the entry's
-// file is. A step is told done one of three ways, each exact and none by guessing:
+// file is. A step is told done one of four ways, each exact and none by guessing:
 //   - "check": this script reads the project and answers done, or not done with the mend, in words a session acts on
 //     with no rule file open;
 //   - "held": a check of the project's own, named, fails where the step is not done, and its failure says the mend;
 //   - "unread": no check reads it exactly, and the step says why; the staged case "steps" plants it and reads what a
-//     session did, or says why it cannot (staged/steps.mjs, beside this file).
+//     session did, or says why it cannot (staged/steps.mjs, beside this file);
+//   - "host": its state is GitHub's, not a file's, and a check reads it from what GitHub answered (host.mjs and
+//     step-checks-host.mjs, beside this file; #1092), run where the host was read (the daily look, and host.mjs at a
+//     sync) and left out elsewhere; one GitHub gave no answer for is said not read, never done or missing.
 // A step only the project's owner can do says so ("owner"): it is advisory, labelled `needs-owner` (labels.json, beside
 // this file), and the rest goes on. A step the project leaves undone on purpose is declared in its manifest's "Differences", on its owner's
 // word, by a line that quotes the step's lead ("13 November 2026, the core has moved"): such a step is not reported.
@@ -76,22 +79,28 @@ export const STEPS = await Promise.all(fs.readdirSync(FOLDER).filter(f => f.ends
 export const declared = (p, step) => p.differences.some(l => l.includes(`"${step.lead}"`));
 
 // The steps not done in the project at `root`: each { lead, owner, cost, mend }. A check that throws is not read as
-// done: it is reported, with what went wrong.
-export function notDone(root, steps = STEPS) {
+// done: it is reported, with what went wrong. `host`, what GitHub answered (host.mjs's readHost), runs the steps read on
+// the host too; one of those that cannot read what it needs is listed in `hostUnread`, { lead, why }, and not reported.
+export function notDone(root, steps = STEPS, host = null) {
   const p = project(root), copy = copyAt(p);
   // (a path of the project's own files outside the copy, a file or a folder: what a mend names as the core's is the copy's
   // and never that)
   const mine = p.files.filter(f => !f.startsWith(copy)), own = at => mine.some(f => f === at || f.startsWith(`${at}/`));
-  const out = [];
+  const out = [], hostUnread = [];
   for (const step of steps) {
-    if (!step.check || declared(p, step)) continue;
+    const read = step.check ?? (host && step.host ? q => step.host(q, host) : null);
+    if (!read || declared(p, step)) continue;
     let mend, unread = false;
-    try { mend = step.check(p); } catch (e) { unread = true; mend = `Its check could not read the project (${plain(e.message, root)}): read its entry in \`core/${NOTES_FOLDER}/\` against it.`; }
+    try { mend = read(p); } catch (e) {
+      if (!step.check) { hostUnread.push({ lead: step.lead, why: plain(e.message, root) }); continue; }
+      unread = true; mend = `Its check could not read the project (${plain(e.message, root)}): read its entry in \`core/${NOTES_FOLDER}/\` against it.`;
+    }
     // (the entries and the checks say core/, the starter kit's path for the copy; a project that keeps it elsewhere is
     // told its own: #628. `unread`: its check could not read the project, which attached.mjs counts neither way)
-    if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend: mendAt(mend, copy, own), unread });
+    if (mend) out.push({ lead: step.lead, owner: typeof step.owner === "function" ? !!step.owner(host) : !!step.owner, cost: step.cost, mend: mendAt(mend, copy, own), unread });
   }
   out.unread = p.unread;
+  out.hostUnread = hostUnread;
   out.copy = copy;
   try { out.nothing = readNothing(p.root, p.manifest, p.read); } catch (e) { out.nothing = null; out.nothingWhy = plain(e.message, root); }
   return out;
