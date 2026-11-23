@@ -68,18 +68,24 @@ try {
   const privately = { ...all, repo: { body: { ...all.repo.body, private: true } } };
   s = statesOf(privately, root);
   ok(s["security-review-required"].given === null && /with: private: true/.test(s["security-review-required"].said), "a private repository whose call does not run the check: not asked for", s["security-review-required"].said);
-  const call = w => `on:\n  pull_request:\njobs:\n  security-review:\n    if: \${{ !cancelled() }}\n    uses: someone/agent-core/.github/workflows/security-review.yml@${"a".repeat(40)} # the pin\n${w}`;
+  const call = w => `on:\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\njobs:\n  security-review:\n    needs: queue\n    if: \${{ !cancelled() }}\n    uses: someone/agent-core/.github/workflows/security-review.yml@${"a".repeat(40)} # the pin\n${w}`;
   for (const [w, said] of [["    with:\n      private: true\n", "`private: true`"], ["    with:\n      advisory: false\n", "`advisory: false`, which posts the status"],
     ["    with: { private: true }\n", "`private: true` in a flow mapping"], ["    with:\n      private: true # runs in a private repository\n", "`private: true` with a comment"],
     ["    with:\n      advisory: false  # enforce review\n", "`advisory: false` with a comment"]]) {
     review(call(w));
     ok(statesOf(privately, root)["security-review-required"].given === true, `a private repository whose call is given ${said}: read from the ruleset`);
+    review(call(w).replace(/on:\n  pull_request:\n.*\n/, "on: [pull_request]\n").replace("    needs: queue\n    if: ${{ !cancelled() }}\n", ""));
+    ok(statesOf(privately, root)["security-review-required"].given === true, `a private repository whose call is given ${said}: read from the ruleset`);
   }
   for (const [text, said] of [[call("    with:\n      private: ${{ vars.PRIVATE }}\n"), "an input read only at its run"], ["jobs: [\n", "no YAML"],
     ["jobs:\n  other:\n    uses: x/y/.github/workflows/z.yml@b\n    with:\n      private: true\n", "no call of the core's security review"],
-    [call("    with:\n      private: true\n").replace("jobs:\n  security-review:\n    if:", "jobs:\n  - if:"), "jobs as a list, which GitHub refuses"],
+    [call("    with:\n      private: true\n").replace("jobs:\n  security-review:\n    needs:", "jobs:\n  - needs:"), "jobs as a list, which GitHub refuses"],
     [call("    with:\n      private: true\n").replace("if: ${{ !cancelled() }}", "if: false"), "a condition on its call other than the kit's"],
-    [call("    with:\n      private: true\n").replace("on:\n  pull_request:\n", "on: [push]\n"), "no pull request among its triggers"],
+    [call("    with:\n      private: true\n").replace(/on:\n  pull_request:\n.*\n/, "on: [push]\n"), "no pull request among its triggers"],
+    [call("    with:\n      private: true\n").replace("types: [opened, reopened, synchronize, ready_for_review]", "types: [closed]"), "a pull request's types the kit's do not hold"],
+    [call("    with:\n      private: true\n").replace("    types:", "    branches: [release]\n    types:"), "a filter of branches"],
+    [call("    with:\n      private: true\n").replace("    types:", "    paths: ['docs/**']\n    types:"), "a filter of paths"],
+    [call("    with:\n      private: true\n").replace("    if: ${{ !cancelled() }}\n", ""), "a job it needs and no condition, so skipped where that job fails"],
     [`# private: true\n${call("    with:\n      private: false\n")}`, "only a comment that says it, not the call"]]) {
     review(text);
     const st = statesOf(privately, root)["security-review-required"];
