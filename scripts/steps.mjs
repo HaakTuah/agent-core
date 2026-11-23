@@ -139,21 +139,23 @@ export function writeReport(done, how = null) {
   if (!done.length) return "No step left a script could write (`core/scripts/steps.mjs --write`).";
   const kept = " No word of a rule's text is written, but a pointer's path.", later = "once this sync's pull request merges, on a fresh branch from `main`,";
   const head = !done.some(d => d.wrote?.length) ? "The steps' writers wrote nothing (`core/scripts/steps.mjs --write`)."
-    : how === "aside" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), then set aside in the stash "${ASIDE}", so this sync stays a pure one: ${later} run \`git stash pop\` (or \`node core/scripts/steps.mjs --write\` again, which writes the same) and commit them in a pull request of its own, with the usual reviews.${kept}`
+    : how === "aside" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), then set aside in the stash "${ASIDE}", so this sync stays a pure one: ${later} run \`git stash list\` and \`git stash pop stash@{N}\`, N the number it gives the stash "${ASIDE}" (or \`node core/scripts/steps.mjs --write\` again, which writes the same) and commit them in a pull request of its own, with the usual reviews.${kept}`
     : how === "put back" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), and put back as they stood, since git could not set them aside, so this sync stays a pure one: ${later} run \`node core/scripts/steps.mjs --write\` and commit what it writes in a pull request of its own, with the usual reviews.${kept}`
     : `Written by the steps' writers (\`core/scripts/steps.mjs --write\`): commit them in a pull request of their own, with the usual reviews.${kept}`;
   return [head, ...done.map(d => d.why ? `- ${d.lead}: wrote nothing, since ${d.why}.` : `- ${d.lead}: wrote ${d.wrote.map(f => `\`${shown(f)}\``).join(", ")}${d.mend ? `; still to do: ${d.mend}` : "; the step is done"}.`)].join("\n");
 }
 // What the writers wrote set aside in a stash, so the tree stands as it stood before them; where git cannot make one (no
-// name to make it under, a file it refuses), each file put back as it stood, and false. (`push`, git's own, is given
-// another only by the test, to fail.)
-export function setAside(root, files, push = () => execFileSync("git", ["stash", "push", "--include-untracked", "--quiet", "-m", ASIDE, "--", ...files], { cwd: root, stdio: ["ignore", "ignore", "pipe"] })) {
+// name to make it under, a file it refuses), each file put back as it stood, and false: a file git holds taken back from
+// its last commit, index and tree, since a writer writes none with changes not yet committed, and a new one taken out.
+// Paths are read as written, never as patterns. (`push`, git's own, is given another only by the test, to fail.)
+export function setAside(root, files, push = () => execFileSync("git", ["--literal-pathspecs", "stash", "push", "--include-untracked", "--quiet", "-m", ASIDE, "--", ...files], { cwd: root, stdio: ["ignore", "ignore", "pipe"] })) {
   try {
     push();
     return true;
   } catch {
-    const tracked = execFileSync("git", ["ls-files", "-z", "--", ...files], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
-    if (tracked.length) execFileSync("git", ["checkout", "-q", "--", ...tracked], { cwd: root, stdio: "ignore" });
+    const tracked = execFileSync("git", ["--literal-pathspecs", "ls-tree", "-r", "-z", "--name-only", "HEAD", "--", ...files], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
+    execFileSync("git", ["--literal-pathspecs", "reset", "-q", "--", ...files], { cwd: root, stdio: "ignore" });
+    if (tracked.length) execFileSync("git", ["--literal-pathspecs", "checkout", "-q", "HEAD", "--", ...tracked], { cwd: root, stdio: "ignore" });
     for (const f of files.filter(f => !tracked.includes(f))) fs.rmSync(path.join(root, f), { force: true });
     return false;
   }

@@ -2,7 +2,7 @@
 // writes in a scratch folder, committed: each step a writer does whole, taken out, reads done after `--write`, the
 // project's rule files keeping their words; the step of the rules' move and that of the agent tools' files written as far
 // as they are exact, the rest left to their mends; a file with changes not yet committed, a writer that cannot run, a
-// step the manifest declares undone on purpose and a run outside the copy write nothing; and `--aside` sets what it
+// step the manifest declares undone on purpose, a file git ignores and a run outside the copy write nothing; and `--aside` sets what it
 // wrote aside in a stash, which brings it back. Node's own modules and git.
 //
 //   node tests/steps-write-test.mjs
@@ -117,6 +117,13 @@ for (const l of WHOLE) {
   ok(r.status === 0 && r.stdout.includes(`- ${l}: wrote nothing, since \`checks/holders.json\` is no regular file`) && !dirty(), "a writer that cannot write its file says why and writes nothing", `${r.stdout}${r.stderr}`);
   back();
   STAGES[l].stage(dir);
+  put(".gitignore", `${fs.existsSync(path.join(dir, ".gitignore")) ? read(".gitignore") : ""}checks/holders.json\n`);
+  commit("the list ignored");
+  r = write();
+  ok(r.status === 0 && r.stdout.includes(`- ${l}: wrote nothing, since git ignores \`checks/holders.json\``) && !fs.existsSync(path.join(dir, "checks/holders.json")) && !dirty(),
+    "a file git ignores, which no stash could set aside, is never written: --write says so and writes nothing", `${r.stdout}${r.stderr}`);
+  back();
+  STAGES[l].stage(dir);
   declare(dir, `"${l}": the owner's word`);
   commit("declared");
   r = write();
@@ -127,21 +134,24 @@ for (const l of WHOLE) {
   r = spawnSync(process.execPath, [path.join(root, "scripts/steps.mjs"), "--write"], { cwd: dir, encoding: "utf8" });
   ok(r.status === 1 && /^FAIL: .*the copy's own script.*Mend: /u.test(r.stderr) && !dirty(), "run as another script than the copy's, it refuses with its mend and writes nothing", `${r.stdout}${r.stderr}`);
 
-  // ---- --aside: what it wrote set aside in a stash, which brings it back ----
+  // ---- --aside: what it wrote set aside in a stash, which brings it back; a change of the sync's own, not yet
+  // committed, left where it stands ----
+  put("sync-own.md", "the sync's own\n");
   r = write("--aside");
   const stashed = git("stash", "list");
-  ok(r.status === 0 && r.stdout.includes(`set aside in the stash "${ASIDE}"`) && !dirty() && stashed.includes(ASIDE) && missed(l).length === 1, "--aside sets what it wrote aside in a stash, the tree as it stood", `${r.stdout}${r.stderr}\n${stashed}`);
+  ok(r.status === 0 && r.stdout.includes(`set aside in the stash "${ASIDE}"`) && r.stdout.includes("git stash pop stash@{N}") && dirty() === "?? sync-own.md" && stashed.includes(ASIDE) && missed(l).length === 1,
+    "--aside sets what it wrote aside in a stash, the tree as it stood, the sync's own change left out of it, and names the stash to pop", `${r.stdout}${r.stderr}\n${stashed}\n${dirty()}`);
   git("stash", "pop", "-q");
-  ok(!missed(l).length, "and the stash, popped, brings it back: the step reads done", report(notDone(dir)));
+  ok(!missed(l).length && read("sync-own.md") === "the sync's own\n", "and the stash, popped, brings it back: the step reads done", report(notDone(dir)));
   back();
-  // (git refusing the stash: each file it wrote put back as it stood, a new one taken out, and the report says to write
-  // them after the merge)
+  // (git refusing the stash after it staged what it was given: each file it wrote put back as it stood, index and tree,
+  // a new one taken out, and the report says to write them after the merge)
   STAGES[l].stage(dir);
   const stamped = "checks/sizes.json", stood = read(stamped);
   commit("taken out");
   put(stamped, `${stood} `);
   put("checks/holders.json", "{}\n");
-  const kept = setAside(dir, [stamped, "checks/holders.json"], () => { throw new Error("no stash"); });
+  const kept = setAside(dir, [stamped, "checks/holders.json"], () => { git("add", "--", stamped, "checks/holders.json"); throw new Error("no stash"); });
   ok(kept === false && read(stamped) === stood && !fs.existsSync(path.join(dir, "checks/holders.json")) && !dirty() && writeReport([{ lead: l, wrote: [stamped], mend: null }], "put back").includes("put back as they stood"),
     "where git cannot make the stash, each file the writers wrote is put back as it stood, a new one taken out, and the report says to write them after the merge", dirty());
   back();

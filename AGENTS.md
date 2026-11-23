@@ -261,8 +261,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   only the owner can do labelled so, and each difference kept on purpose declared in the manifest's "Differences".
   Where a script does a step exactly, the sync does it (#1091): `scripts/steps.mjs --write` runs each such step's writer,
   which writes only a check's own config or baseline or a pointer's path, never a word of a rule nor a file git holds
-  changed, lists what it wrote, set aside for a pull request after the sync's with the usual reviews, and where it
-  cannot run says so and writes nothing. Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
+  changed, lists what it wrote, set aside for the session that syncs to commit in a pull request after the sync's,
+  with the usual reviews, and where it cannot run says so and writes nothing. Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
   owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps beyond what the core writes (it stays pure), nor
   that a step not done fails or stops anything, nor that a step that needs judgement is written by a script. Reason: a
   step written only in prose is where one is missed, and nothing showed that it was; one a script can write, rebuilt

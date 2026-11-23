@@ -31,14 +31,15 @@ export function held(root) {
   return new Set(out.split("\0").filter(Boolean).map(l => l.slice(3)));
 }
 
-// Whether `f` may be written: a path of the project's own outside the copy, no link and under none, and no file with
-// changes not yet committed; else Unwritten, naming it.
+// Whether `f` may be written: a plain path of the project's own outside the copy, no link and under none, no file with
+// changes not yet committed and none git ignores, which no stash could set aside; else Unwritten, naming it.
 function writable(p, f, busy) {
   const at = path.join(p.root, f);
-  if (f.startsWith(copyAt(p)) || leadsOut(p.root, at)) throw new Unwritten(`\`${shown(f)}\` is no file of the project's own outside the copy`);
+  if (path.posix.normalize(f) !== f || f.startsWith(copyAt(p)) || leadsOut(p.root, at)) throw new Unwritten(`\`${shown(f)}\` is no file of the project's own outside the copy`);
   const st = fs.lstatSync(at, { throwIfNoEntry: false });
   if (st && !st.isFile()) throw new Unwritten(`\`${shown(f)}\` is no regular file`);
   if (busy.has(f)) throw new Unwritten(`\`${shown(f)}\` has changes not yet committed: commit them or set them aside, then run it again`);
+  if (spawnSync("git", ["check-ignore", "-q", "--", f], { cwd: p.root }).status === 0) throw new Unwritten(`git ignores \`${shown(f)}\`: take it out of the ignore list and commit it, then run it again`);
 }
 
 // A file written, its folders made, once `writable` passed.
@@ -94,7 +95,11 @@ function marksWritten(p, run, change, busy) {
 
 // 13 November 2026: each mark of a file that shrank lowered to what the check gives.
 export function writeShrunk(p, busy) {
-  const r = marksRun(p), lower = {};
+  // (a step no check of the core's reads: where the marks cannot be read, the project's own check says so, and this
+  // writes nothing and says nothing, so a sync of a project with no marks prints no line for it)
+  let r;
+  try { r = marksRun(p); } catch (e) { if (e instanceof Unwritten) return []; throw e; }
+  const lower = {};
   for (const l of r.lines) {
     const m = /^FAIL: (.+) has shrunk to \d+ bytes\. Mend: lower its mark in .+ from (\d+) to (\d+)$/u.exec(l);
     if (m && r.json.read[m[1]] === Number(m[2])) lower[m[1]] = Number(m[3]);
@@ -184,7 +189,7 @@ export const OLD_PATHS = "Paths: in the core's files, one into floor/, modules/,
 const quoted = f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 export function writeMoved(p, busy) {
   const map = moved(), copy = copyAt(p), writes = [];
-  const oldPath = Object.keys(map).length ? new RegExp(`core/(${Object.keys(map).map(quoted).join("|")})(?![\\w/-])`, "gu") : null;
+  const oldPath = Object.keys(map).length ? new RegExp(`(?<![\\w-])core/(${Object.keys(map).map(quoted).join("|")})(?![\\w/-]|\\.\\w)`, "gu") : null;
   for (const f of namers(p)) {
     const text = p.read(f) ?? "";
     let next = movedIn(text, map, oldPath);
