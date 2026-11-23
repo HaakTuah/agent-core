@@ -486,8 +486,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   may react), and a new game of that kind would have had to find them again. Held by none yet.
 - **A check that read nothing says so** (#459, point 2). By default a check of the core's that reads a project's code
   passes where it finds nothing wrong. The one condition that changes it: it found no file there it could read, the
-  shape check where its config is missing or its "code" and "tests" name no file of a language its readers know, the
-  tests' strength where the manifest names no *mutation tool*, or `none`, or the shape check's config, whose files it
+  shape check where its config is missing, its "code" and "tests" name no file of a language its readers know, or the
+  manifest turns it off with `none` and the owner's reason, the tests' strength where the manifest names no *mutation
+  tool*, or `none`, or Stryker from a folder that holds no lock file, or the shape check's config, whose files it
   measures, is missing or names no file it measures. Then `scripts/read-nothing.mjs` names it, with the rules of the
   modules the project takes that it holds, in the report every sync prints (`scripts/steps.mjs`), and where it cannot
   tell, the report says so. The trigger is such a check, written or widened: whoever builds it gives it its case in

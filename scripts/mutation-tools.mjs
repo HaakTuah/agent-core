@@ -27,6 +27,7 @@ import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { notLinked, parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 import { measuredCode, toolOf } from "./strength.mjs";
+import { installIn } from "./stryker.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const LIST = JSON.parse(fs.readFileSync(path.join(HERE, "mutation-tools.json"), "utf8"));
@@ -129,6 +130,13 @@ function foldersWithin(root, folder) {
   return true;
 }
 
+// The folder of the project's a row's command installs the tool from, as the list's Stryker command names it after
+// `--tool` (`command`, the row's words), or null where it runs no tool through the core's script of one.
+export function folderOf(command) {
+  const words = command ?? [], at = words.indexOf("--tool");
+  return words.some(w => /(?:^|\/)scripts\/stryker\.mjs$/u.test(w)) && at >= 0 && words[at + 1] ? words[at + 1] : null;
+}
+
 // What is left to do for the tool the row names, `has(f)` whether the project holds a file and `config` its licence
 // check's config (null where none can be read): the lock file, the config's entries for it and the npm config, and the
 // job's install and step, each worded so a session acts on it with no rule file open. Nothing once all stand.
@@ -139,7 +147,7 @@ export function leftFor(tool, has, config = null) {
   if (!has(lock)) left.push(`commit ${tool.folder}/package.json with its lock file, written from it with no install scripts by npm install --package-lock-only --ignore-scripts --prefix ${tool.folder}`);
   if (!names("lockfiles", lock)) left.push(`name ${lock} under "lockfiles" in the licence check's config (checks/licences.json, as the starter kit writes it), so that check reads the licence of every package it installs (floor rule 10)`);
   if (!names("ignoreScriptsIn", npmrc)) left.push(`name ${npmrc} under "ignoreScriptsIn" in that config, so that check holds it to ignore-scripts=true and min-release-age=7 (floor rules 7 and 15)`);
-  if (!has(lock)) left.push(`in the project's own job that runs its tests on a pull request, after them, add two steps: the install, npm ci --ignore-scripts --allow-git=none --allow-remote=none --allow-file=none --allow-directory=none --workspaces=false --prefix ${tool.folder}, and node core/scripts/strength.mjs with STRENGTH_BASE set to the pull request's base (origin/<its base branch>, fetched first). A change to a workflow, it passes two security reviews (floor rule 3); until it is made the strength check reports that it did not measure, and fails nothing`);
+  if (!has(lock)) left.push(`in the project's own job that runs its tests on a pull request, after them, add two steps: the install, ${installIn(tool.folder)}, and node core/scripts/strength.mjs with STRENGTH_BASE set to the pull request's base (origin/<its base branch>, fetched first). A change to a workflow, it passes two security reviews (floor rule 3); until it is made the strength check reports that it did not measure, and fails nothing`);
   return left;
 }
 

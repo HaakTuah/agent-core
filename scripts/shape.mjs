@@ -613,6 +613,15 @@ export function notLinked(file, root = ".") {
 // The config the manifest's *shape check* row names (its first path to a .json file, in backticks), else the kit's.
 export const where = manifest => /`([\w./-]+\.json)`/u.exec(/^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "")?.[1] ?? KIT;
 
+// Whether the manifest's *shape check* row turns the check off (tasks/code-shape.md, "Only the owner turns the shape
+// check off"; #1107, point 3): the reason given after a `none` that is the row's first word in backticks, "" where it
+// gives none, which turns nothing off; null where the row says no `none`.
+export function offBy(manifest) {
+  const row = /^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "", rest = row.slice(row.indexOf("*shape check*") + 13);
+  if (/`([^`]*)`/u.exec(rest)?.[1]?.trim() !== "none") return null;
+  return rest.slice(rest.indexOf("`none`") + 6).replace(/^[\s:|,;-]+|[\s|]+$/gu, "");
+}
+
 // ---- the verdict ----
 
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -972,10 +981,24 @@ function check(config, at, self, found, base, named) {
   return 0;
 }
 
+// Whether the project's manifest turns the check off with a reason: it then says so, and why, and where the pull
+// request's base did not, that this pull request turns it off, which only the owner does. A `none` with no reason turns
+// nothing off, and it says so.
+function isOff(base) {
+  const said = offBy(tolerant(() => fs.readFileSync("core-manifest.md", "utf8")));
+  if (said === "") console.log("note the manifest's *shape check* row says `none` with no reason, which turns nothing off: the check runs. Mend: where the owner turns it off, give the owner's reason after `none`; else name the config there, or take the `none` out");
+  if (!said) return false;
+  const turned = base && !offBy(base.show("core-manifest.md")) ? `; this pull request turns it off (${base.name} did not), which only the owner does` : "";
+  console.log(`ok   the shape check is off: the manifest's *shape check* row says \`none\`: ${logged(said)}${turned} (core/tasks/code-shape.md, "Only the owner turns the shape check off")`);
+  return true;
+}
+
 function main(argv) {
   const self = path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/"); // (as a mend names it)
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, rest = named ? argv.slice(1) : argv;
-  const base = baseOf(), at = configAt(named, self, base);
+  const base = baseOf();
+  if (named === null && !rest.length && isOff(base)) return 0;
+  const at = configAt(named, self, base);
   if (at === null) return unwritten(self, base);
   const config = parseConfig(fs.readFileSync(at, "utf8"), at);
   unchecked();

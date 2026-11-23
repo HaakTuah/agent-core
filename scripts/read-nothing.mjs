@@ -1,8 +1,10 @@
 // Which of the core's checks that read a project's code found nothing there they could read (#459, point 2): the shape
-// check (shape.mjs), where its config is missing or its "code" and "tests" name no file of a language its readers know
-// (shape-readers.mjs, LANGUAGES), listed by the shape check's own lister (codeListed) so that the two cannot drift; and
-// the strength of the tests (strength.mjs), where the manifest names no mutation tool, or `none`, or the shape check's
-// config, whose files it measures, is missing or names none it measures (measuredCode, its own lister). Each comes with the rules it holds, as scripts/holders/ says (one fact,
+// check (shape.mjs), where the manifest turns it off (`none`, with the owner's reason; offBy), its config is missing or
+// its "code" and "tests" name no file of a language its readers know (shape-readers.mjs, LANGUAGES), listed by the shape
+// check's own lister (codeListed) so that the two cannot drift; and the strength of the tests (strength.mjs), where the
+// manifest names no mutation tool, or `none`, or Stryker from a folder that holds no lock file to install it from
+// (mutation-tools.mjs, folderOf), or the shape check's config, whose files it measures, is missing or names none it
+// measures (measuredCode, its own lister). Each comes with the rules it holds, as scripts/holders/ says (one fact,
 // one place), so that a report can say those rules are held by nothing there: a check that passes on nothing makes its
 // rule look held. A check that holds no rule of the modules the project takes is not named. It fails nothing (AGENTS.md
 // of the core, "Nothing locks a project"); the sync's report (steps.mjs) and a project's state report
@@ -11,7 +13,8 @@ import { copyOf } from "./core-path.mjs";
 import { holders } from "./holders.mjs";
 import { ROOT, takenRules } from "./rules.mjs";
 import { LANGUAGES } from "./shape-readers.mjs";
-import { codeListed, parseConfig, where } from "./shape.mjs";
+import { folderOf } from "./mutation-tools.mjs";
+import { codeListed, offBy, parseConfig, where } from "./shape.mjs";
 import { measuredCode, toolOf } from "./strength.mjs";
 
 // The rules each of the core's scripts holds, by its path under scripts/, as scripts/holders/ names them: those of the
@@ -31,14 +34,15 @@ const count = list => { try { return list().length; } catch { return null; } };
 // where there is none): [{ script, check, holds, why }], `script` its path in the core (scripts/shape.mjs), `check` the
 // same as the project calls it (by its copy's path), `holds` the rules it holds.
 export function readNothing(root, manifest, read) {
-  const found = [], at = where(manifest), text = read(at), tool = toolOf(manifest);
+  const found = [], at = where(manifest), text = read(at), tool = toolOf(manifest), off = offBy(manifest);
+  const folder = tool?.command ? folderOf(tool.command) : null;
   let config = null;
-  if (text === null) found.push({ script: "scripts/shape.mjs", why: `the project holds no \`${at}\`, the check's config` });
-  else {
-    try { config = parseConfig(text, at); } catch { /* (a config the check cannot read fails the check itself, with its mend: it is no check that passes on nothing) */ }
-    if (config && count(() => codeListed(config, root)) === 0) found.push({ script: "scripts/shape.mjs", why: `\`${at}\` names under "code" and "tests" no file the check's readers know (${LANGUAGES.join(", ")})` });
-  }
+  if (text !== null) try { config = parseConfig(text, at); } catch { /* (a config the check cannot read fails the check itself, with its mend: it is no check that passes on nothing) */ }
+  if (off) found.push({ script: "scripts/shape.mjs", why: `the manifest's *shape check* is \`none\`, which turns it off: ${off}` });
+  else if (text === null) found.push({ script: "scripts/shape.mjs", why: `the project holds no \`${at}\`, the check's config` });
+  else if (config && count(() => codeListed(config, root)) === 0) found.push({ script: "scripts/shape.mjs", why: `\`${at}\` names under "code" and "tests" no file the check's readers know (${LANGUAGES.join(", ")})` });
   if (tool === null || tool.none !== undefined) found.push({ script: "scripts/strength.mjs", why: tool === null ? "the manifest names no *mutation tool*" : "the manifest's *mutation tool* is `none`" });
+  else if (folder && read(`${folder}/package-lock.json`) === null) found.push({ script: "scripts/strength.mjs", why: `the manifest's *mutation tool* runs Stryker from \`${folder}\`, which holds no lock file to install it from, so no job installs it and the check says it did not measure` });
   else if (text === null) found.push({ script: "scripts/strength.mjs", why: `the measure waits for \`${at}\`, the shape check's config, whose files it measures` });
   else if (config && count(() => measuredCode(config, root)) === 0) found.push({ script: "scripts/strength.mjs", why: `\`${at}\` names under "code" no file it measures: none that is no test, in a language the core knows by its ending` });
   if (!found.length) return [];
