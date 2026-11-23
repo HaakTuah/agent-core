@@ -8,6 +8,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { hostReport, hostSteps, readHost, refusal, settingsOf, settingsTask } from "../scripts/host.mjs";
 import { LIST, makeLabels } from "../scripts/labels.mjs";
@@ -183,6 +184,13 @@ const reviewRule = { type: "required_status_checks", parameters: { required_stat
   const broken = hostOf(ctx, { yes: true }, { gh, ask: () => { throw new TypeError("x"); }, root: dir });
   ok(!wroteOutside && outside.host?.name === "o/r" && none.host === null && broken.host === null && lines.some(l => /^The host was not read here \(TypeError/.test(l)),
     "outside GitHub's job no label is written; with no manifest the host is not read; a reading that throws is said, not hidden", lines.join("\n"));
+}
+
+// ---- each sync prints what host.mjs reads, and that run fails nothing and writes nothing ----
+{
+  const r = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/host.mjs", import.meta.url))], { cwd: scratch(), encoding: "utf8" });
+  const listed = /\["labels\.mjs"\], \["host\.mjs"\]/.test(fs.readFileSync(new URL("../scripts/sync.mjs", import.meta.url), "utf8"));
+  ok(listed && r.status === 0 && /^The host was not read: the origin is on no github\.com/.test(r.stdout), "the sync runs host.mjs among its reports, and with no host to read it says so and fails nothing", `${r.status} ${r.stdout}${r.stderr}`);
 }
 
 // ---- each right of the look's workflows named with what it is for ----
