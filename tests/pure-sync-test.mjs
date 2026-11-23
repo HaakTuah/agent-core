@@ -9,8 +9,9 @@
 // another manifest line, a call moved to an older commit of main or renamed to another core workflow, the pin off main,
 // text beside a pin, carriage returns, a root .gitattributes, the pin moved backwards; each is refused for the reason
 // it means, so a check of pure-sync.mjs's gone fails the suite. Where the change lies under core/, the core's own
-// core.yml job, run as GitHub runs it (workflow-run.mjs), fails it too; a file's executable bit alone is no difference
-// to either (copy-tree.mjs). And the sync script's own refusals, and its following of the core's releases: a project
+// core.yml job, run as GitHub runs it (workflow-run.mjs), fails it too; a file's executable bit the core marks, lost, is
+// no difference to either, and one it does not mark is refused by the proof alone (copy-tree.mjs), which the sync run
+// again at the same pin, where git records no bit, mends by recording the core's. And the sync script's own refusals, and its following of the core's releases: a project
 // that follows them takes a commit that is no release only through review. On Linux and on Windows. Git, tar, bash and
 // Node's own modules.
 //
@@ -312,13 +313,34 @@ const drops = (what, change, isPure, said) => {
 drops("a private project's sync that writes core.yml's one job and takes out the calls it folds", () => {}, true);
 drops("  the same deletions with core.yml left as main holds it", () => git(p, "checkout", "-q", publicMain, "--", ".github/workflows/core.yml"), false, /NOT PURE[^\n]*copies\.yml: deleted, and not a workflow of the core's whose check the one job/);
 drops("  a deletion of the licence check, which the one job does not run", () => fs.rmSync(path.join(p, ".github/workflows/licences.yml"), { force: true }), false, /NOT PURE[^\n]*licences\.yml: deleted/);
-// a file's executable bit alone: no difference to either (a copy made on Windows records none)
-git(p, "update-index", "--chmod=+x", "core/README.md");
+// a file's executable bit: one the core marks, lost, is no difference to either (a copy made on Windows by a sync from
+// before #1093 records none); one the core does not mark is none to the core's check, which reads no bit, but the proof
+// refuses it; and the sync run again at the same pin, where git records no bit (core.fileMode off, as on Windows),
+// records the core's in the index, a stray one taken off, and is pure, and where git reads the bit from the disk, a
+// later `git add` keeps them, the files' own bits set too (#1093)
+const mode = f => git(p, "ls-files", "-s", f).slice(0, 6);
 git(p, "update-index", "--chmod=-x", "core/scripts/work-saved.sh");
-git(p, "commit", "-q", "-m", "modes");
-const modes = pure();
-ok(modes.status === 0 && git(p, "ls-files", "-s", "core/scripts/work-saved.sh").startsWith("100644"), "a copy whose files' executable bits differ from the core's, as one made on Windows, is still pure", modes.out);
+fs.chmodSync(path.join(p, "core/scripts/work-saved.sh"), 0o644);
+git(p, "commit", "-q", "-m", "a bit lost");
+const lost = pure();
+ok(lost.status === 0 && mode("core/scripts/work-saved.sh") === "100644", "a copy that lost an executable bit the core marks, as one made on Windows by an older sync, is still pure", lost.out);
 ok(coreCheck().passed, "  and the core's own check of the copy passes it");
+git(p, "update-index", "--chmod=+x", "core/README.md");
+fs.chmodSync(path.join(p, "core/README.md"), 0o755);
+git(p, "commit", "-q", "-m", "a bit added");
+const added = pure();
+ok(added.status === 1 && /NOT PURE core\/README\.md is marked executable, which the core at [0-9a-f]{40} does not mark it/.test(added.out), "a copy that marks executable a file the core does not mark: not pure", added.out);
+ok(coreCheck().passed, "  though the core's own check of the copy, which reads no bit, passes it");
+git(p, "config", "core.fileMode", "false");
+const again = node(p, "core/scripts/sync.mjs", B);
+git(p, "config", "core.fileMode", "true");
+ok(again.status === 0 && mode("core/scripts/work-saved.sh") === "100755" && mode("core/README.md") === "100644" && mode("core/scripts/sync.mjs") === "100644",
+  "the sync run again at the same pin, where git records no executable bit, stages each the core marks and takes off one it does not, read from the core's tree", `${again.out}\n${git(p, "ls-files", "-s", "core/scripts")}`);
+git(p, "add", "-A");
+if (process.platform !== "win32") ok(mode("core/scripts/work-saved.sh") === "100755" && mode("core/README.md") === "100644", "  and a `git add` after it, where git reads the bit from the disk, keeps them", git(p, "ls-files", "-s", "core/scripts/work-saved.sh", "core/README.md"));
+git(p, "commit", "-q", "-m", "the bits recorded");
+const recorded = pure();
+ok(recorded.status === 0, "  and that sync is pure", recorded.out);
 git(p, "reset", "-q", "--hard", LEGIT);
 
 // the pin moved backwards, as the sync script itself would move it given an older commit

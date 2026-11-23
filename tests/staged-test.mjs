@@ -44,9 +44,11 @@ for (const c of CASES) {
   ok(c.holds.length && c.holds.every(k => keys.has(k)) && c.inPart.every(k => c.holds.includes(k)), `${c.name}: names rules that stand, and holds in part only rules it holds`, c.holds.filter(k => !keys.has(k)).join("; "));
   ok(typeof c.task === "string" && !/staged|scratch|test/i.test(`${c.task}\n${c.role ?? ""}`), `${c.name}: its task and its role do not say it is a staged case's`);
 }
-const unread = STEPS.filter(st => st.unread).map(st => st.lead);
+// (a step read on the host, #1092, is read by no check of the project's files, and only where the host was read: the
+// case reads what a session does with it as before)
+const unread = STEPS.filter(st => st.unread || st.host).map(st => st.lead);
 ok(unread.every(l => l in PLANTED || l in UNPLANTED) && Object.keys(PLANTED).every(l => unread.includes(l)) && Object.values(UNPLANTED).every(Boolean),
-  "every step no check reads is planted by the steps case, or listed there with why not, and it plants no other",
+  "every step no check of the project's files reads is planted by the steps case, or listed there with why not, and it plants no other",
   `neither: ${unread.filter(l => !(l in PLANTED) && !(l in UNPLANTED)).join("; ")}; planted but read by a check: ${Object.keys(PLANTED).filter(l => !unread.includes(l)).join("; ")}`);
 
 }

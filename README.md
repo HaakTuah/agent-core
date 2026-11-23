@@ -118,7 +118,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    release says what it asks, step by step"). The core's
    `core.yml`, which the project calls on every PR as a required check, fails one whose `core/` differs from the core at
    its pin, entry by entry by git's object ids and types, as `pure-sync.mjs` compares too: a file's content, a link or a
-   submodule, but not the executable bit, which a copy made on Windows records for no file and which nothing reads. The
+   submodule, but not the executable bit, which a copy made on Windows by an older sync records for no file; from #1093
+   the sync records the bits the core marks, and `pure-sync.mjs` refuses one the core does not mark. The
    first copy is the sync script's too, run from a clone of this repository once the manifest is written (the script's
    header says how); the copy's own `.gitattributes` keeps every line ending as it is.
 
@@ -574,7 +575,9 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   script again, and says what is left; the value of `PERSONAL_TERMS` the owner types on its page alone, never into the
   session (floor rule 11). It is asked at a project's first taking of the core, where the starter kit and the sync's
   first copy print it, and again only where a sync brings a setting the old copy's list did not hold; nothing waits on
-  it, and nothing fails until a setting is given (`AGENTS.md`, "Nothing locks a project").
+  it, and nothing fails until a setting is given (`AGENTS.md`, "Nothing locks a project"). Each day the look's job
+  reads the same settings with its own token where GitHub lets it, and keeps one issue, "Settings only the owner gives",
+  labelled `needs-owner`, of each it read as not given, with its link, and of each write GitHub refused it (#1092).
 - An adviser (`roles/adviser.md`): its session started with every repository of the owner's it is to advise on, so it
   can read them, file in them and start each one's orchestrator, reading what another account can write only through
   that repository's orchestrator (`roles/adviser.md`); at the effort its tool's part advises (`tools/claude.md`).

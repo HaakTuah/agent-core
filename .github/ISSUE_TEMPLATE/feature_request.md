@@ -22,6 +22,9 @@ What went wrong or cost time without it, and how often.
 **Which part of the core it touches**
 The file and section, if there is one. The commit of the core your project holds.
 
+**The rule's reasons**
+Where the issue names a rule of the core: which of the reasons `node core/scripts/reasons.mjs "<the rule>"` prints for it does not hold for your project, and why, from what you read of the project (`tasks/updates.md`, "A question or difference about a rule of the core starts from its reasons").
+
 **The kind of project**
 No closer than this: public or private; the platform it is built on; the cloud or the owner's own computer.
 
