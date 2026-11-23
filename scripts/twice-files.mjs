@@ -65,8 +65,8 @@ const FLOOR = /^(?:floor\/|SECURITY\.md$)/u;
 export const safetyOf = own => new Set((ownText(own, "AGENTS.md") ?? "").split("\n").filter(l => /safety/iu.test(l)).flatMap(l => [...l.matchAll(/`([^`\s]+)`/gu)].map(m => m[1].replace(/^\.\//u, ""))));
 // A file goes only where every pointer to it can be moved: none is left in a file the script does not write (one of
 // the core's the project holds whole, a link), none in a text that still names its path once the pointers it moves
-// are moved (a form it does not read, such as a path further down another's, or one read from the caller's folder), and
-// no link leads to it or a folder of it.
+// are moved (a form it does not read, such as a path further down another's, or one read from the caller's folder), none
+// as a link's target that, decoded, still leads to it, and no link leads to it or a folder of it.
 function noneLeft(p, found) {
   const texts = textFiles(p), fixed = texts.map(t => t.file), kept = p.outside.filter(f => !fixed.includes(f) && !SKIP.test(f) && !found.some(x => x.file === f));
   const ends = linkEnds(p);
@@ -79,7 +79,8 @@ function noneLeft(p, found) {
     const has = exists(p), moved = t => t.text.replace(pointersTo(t.file, x.file, has), pointerTo(t.file, x.file, x.to));
     const at = kept.find(f => pointersTo(f, x.file).test(p.own.read(f, true) ?? ""))
       ?? texts.find(t => t.file !== x.file && left.test(moved(t)))?.file
-      ?? texts.find(t => WORKFLOW.test(t.file) && byName(x.file).test(moved(t)))?.file;
+      ?? texts.find(t => WORKFLOW.test(t.file) && byName(x.file).test(moved(t)))?.file
+      ?? texts.find(t => t.file !== x.file && linkTargets(moved(t)).some(l => leadsFrom(t.file, l) === x.file))?.file;
     if (at) Object.assign(x, { to: null, why: `${at} names it in a form the script cannot move, or is a file it does not write` });
   }
   return found;
@@ -89,17 +90,23 @@ function noneLeft(p, found) {
 // read from `x.file` (or to nothing, or to a folder): a Markdown link, a reference's definition, an HTML href or src.
 // One with a scheme, from the root (/) or to an anchor alone reads the same from both.
 function linksOut(p, x) {
-  const text = p.own.read(x.file, true) ?? "";
-  const targets = [...text.matchAll(/\]\(\s*<?([^)\s>]+)|^\s{0,3}\[[^\]]+\]:\s*<?([^\s>]+)|\b(?:href|src)\s*=\s*["']([^"']+)/gmu)].map(m => m[1] ?? m[2] ?? m[3]);
   const bytes = f => { try { return fs.readFileSync(path.join(p.root, f)); } catch { return null; } };
-  for (const t of targets) {
-    if (/^(?:[a-z][a-z0-9+.-]*:|\/|#)/iu.test(t)) continue;
-    let rel = t.replace(/[?#].*$/su, "");
-    try { rel = decodeURIComponent(rel); } catch { return t; }
-    const [a, b] = [x.file, x.to].map(f => bytes(path.posix.join(path.posix.dirname(f), rel)));
-    if (!a || !b || !a.equals(b)) return t;
+  for (const t of linkTargets(p.own.read(x.file, true) ?? "")) {
+    const [a, b] = [x.file, x.to].map(f => leadsFrom(f, t)), [ba, bb] = [a, b].map(f => f && bytes(f));
+    if (a !== null && (!ba || !bb || !ba.equals(bb))) return t;
   }
   return null;
+}
+// The targets of a text's links: a Markdown link, a reference's definition, an HTML href or src.
+const linkTargets = text => [...text.matchAll(/\]\(\s*<?([^)\s>]+)|^\s{0,3}\[[^\]]+\]:\s*<?([^\s>]+)|\b(?:href|src)\s*=\s*["']([^"']+)/gmu)].map(m => m[1] ?? m[2] ?? m[3]);
+// Where the target `t` of a link in the file `from` leads, as a path from the root, decoded as a browser decodes it (a
+// sequence that does not decode kept as it stands); null where it has a scheme, starts at the root (/) or is an anchor.
+function leadsFrom(from, t) {
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/|#)/iu.test(t)) return null;
+  const rel = t.replace(/[?#].*$/su, "");
+  let decoded = rel;
+  try { decoded = decodeURIComponent(rel); } catch { /* kept as it stands */ }
+  return path.posix.join(path.posix.dirname(from), decoded);
 }
 
 // A workflow's command may name a file from another folder (a working-directory, a cd): its name, left where no folder

@@ -1,9 +1,9 @@
 // Tests what --fix of what a project holds twice cannot follow, and so keeps (scripts/twice.mjs, scripts/twice-files.mjs;
 // tasks/cleaning.md, "The reading asks what a project holds twice"; #1087): a file that is no Markdown, one a tool may
 // look for where it stands, one whose relative link leads elsewhere from the copy's file, one named in a form the
-// script does not move, through a link, from another folder, from a folder that holds a file of that path of its own,
-// or in bytes not UTF-8, and one a link leads to; a call a workflow's outputs name; and a workflow's path opening with
-// ./, which it does move. On the scratch core and project of scripts/twice-scratch.mjs. Node's own modules and git.
+// script does not move (an encoded link's target among them), through a link, from another folder, from a folder that
+// holds a file of that path of its own, or in bytes not UTF-8, and one a link leads to; a call a workflow's outputs
+// name; and a workflow's path opening with ./, which it does move. On the scratch core and project of scripts/twice-scratch.mjs. Node's own modules and git.
 //
 //   node tests/twice-kept-test.mjs
 import fs from "node:fs";
@@ -93,6 +93,15 @@ const reader = dir => f => fs.readFileSync(path.join(dir, f), "utf8");
   write(dir, { "app/docs/guide.md": "# App guide\n\nThe app's own guide, which the core never held.\n", "app/notes.md": notes });
   const r = run(dir, "--fix", ...fetched);
   ok(/docs\/guide\.md .*app\/notes\.md names it/u.test(r.stdout) && fs.existsSync(path.join(dir, "docs/guide.md")) && reader(dir)("app/notes.md") === notes, "a path the caller's folder holds a file of its own at stays as it was, and so does the root's file", r.stdout);
+}
+
+// A link whose target, percent-encoded, still leads to the file keeps it: the script does not move that form.
+{
+  const dir = project("encoded");
+  const page = "# Page\n\nSee [the guide](guide%2Emd).\n";
+  write(dir, { "docs/page.md": page });
+  const r = run(dir, "--fix", ...fetched);
+  ok(/docs\/guide\.md .*docs\/page\.md names it in a form the script cannot move/u.test(r.stdout) && fs.existsSync(path.join(dir, "docs/guide.md")) && reader(dir)("docs/page.md") === page, "a file an encoded link leads to stays, and so does the link", r.stdout);
 }
 
 done("what --fix of what a project holds twice keeps");
