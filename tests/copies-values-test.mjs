@@ -47,8 +47,10 @@ const dir = scratchDir("copies-values-test-");
 // (a sync never fails here, so no file the kit writes that carries no mark of the core's may hold a pin: only the
 // workflows, whose mark tells the core's from the project's, may)
 const kit = fileURLToPath(new URL("../setup/template/", import.meta.url));
-const unmarked = fs.readdirSync(kit, { recursive: true }).filter(f => !/workflows|\.yml(\.tmpl)?$/u.test(f) && fs.statSync(path.join(kit, f)).isFile());
-ok(unmarked.length > 0 && unmarked.every(f => !pins(fs.readFileSync(path.join(kit, f), "utf8")).length), "no file the starter kit writes with no mark of the core's holds a pin", unmarked.filter(f => pins(fs.readFileSync(path.join(kit, f), "utf8")).length).join(", "));
+// (its placeholders rendered, the core's pin as a commit hash; the manifest alone names the pin, as the project's own)
+const unmarked = fs.readdirSync(kit, { recursive: true }).filter(f => !/workflows|\.yml(\.tmpl)?$/u.test(f) && f !== "core-manifest.md.tmpl" && fs.statSync(path.join(kit, f)).isFile());
+const rendered = f => fs.readFileSync(path.join(kit, f), "utf8").replaceAll("{{pin}}", SHA);
+ok(unmarked.length > 0 && unmarked.every(f => !pins(rendered(f)).length), "no file the starter kit writes with no mark of the core's holds a pin, its placeholders rendered", unmarked.filter(f => pins(rendered(f)).length).join(", "));
 try {
   const put = (f, body) => { fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), body); };
   const drop = f => fs.rmSync(path.join(dir, f), { force: true });
@@ -77,7 +79,7 @@ try {
   };
   const STOOD = /^note 2 values stand in two files or more, as the pull request's base held them: each a debt to work down, failing nothing/m;
   let r = check();
-  ok(r.status === 0 && /^note 2 values stand in two files or more, with no base to read against/m.test(r.out) && r.out.includes(`${DIGEST}: deploy.sh:1 and src/fetch.mjs:1`)
+  ok(r.status === 0 && /^note 2 values stand in two files or more, with no base to read against/m.test(r.out) && r.out.includes(`${DIGEST.slice(0, 12)}...: deploy.sh:1 and src/fetch.mjs:1`) && !r.out.includes(DIGEST)
     && /^ok {3}no value newly written twice/m.test(r.out), "with no base, each value written twice is noted, by file and line, and none fails", r.out);
   r = check({ COPIES_BASE: base });
   ok(r.status === 0 && STOOD.test(r.out) && /^ok {3}no new copies/m.test(r.out), "what the pull request's base held is noted, and fails nothing", r.out);
@@ -85,7 +87,7 @@ try {
   // (a pin written into one more file of the project's own fails, naming a file that held it, then its mend)
   put("ci/fetch.ps1", `$sum = "${DIGEST.toUpperCase()}"\n`);
   r = check({ COPIES_BASE: base });
-  ok(r.status === 1 && mended(r.out) && /^FAIL: a value written twice: [0-9a-f]{64} stands in ci\/fetch\.ps1:1 and deploy\.sh:1 and src\/fetch\.mjs:1\. Mend: read the value from (deploy\.sh|src\/fetch\.mjs) \(import it, or read the file\), or say in checks\/copies\.json's "twice" why both must hold it$/m.test(r.out),
+  ok(r.status === 1 && mended(r.out) && /^FAIL: a value written twice: [0-9a-f]{12}\.\.\. stands in ci\/fetch\.ps1:1 and deploy\.sh:1 and src\/fetch\.mjs:1\. Mend: read the value from (deploy\.sh|src\/fetch\.mjs) \(import it, or read the file\), or say in checks\/copies\.json's "twice" why both must hold it$/m.test(r.out),
     "a pin the base held in two files, written into a third, fails with its mend, whatever its case", r.out);
   r = check();
   ok(r.status === 0, "with no base the same is only noted", r.out);
@@ -93,7 +95,7 @@ try {
   put("src/again.mjs", `const ref = "${OTHER}";\n`);
   put("src/more.mjs", `const ref = "${OTHER}";\n`);
   r = check({ COPIES_BASE: base });
-  ok(r.status === 1 && r.out.includes(`FAIL: a value written twice: ${OTHER} stands in src/again.mjs:1 and src/more.mjs:1`), "a new pin written into two files at once fails", r.out);
+  ok(r.status === 1 && r.out.includes(`FAIL: a value written twice: ${OTHER.slice(0, 12)}... stands in src/again.mjs:1 and src/more.mjs:1`), "a new pin written into two files at once fails", r.out);
   drop("src/again.mjs"); drop("src/more.mjs");
 
   // (a pattern, the same)
@@ -116,7 +118,7 @@ try {
   ok(r.status === 0, "a value the core's copy or a workflow the core writes whole gains fails nothing: a sync changes those alone", r.out);
   put(".github/workflows/own.yml", `name: own\njobs:\n  a:\n    steps:\n      - run: echo ${DIGEST}\n`);
   r = check({ COPIES_BASE: base });
-  ok(r.status === 1 && /^FAIL: a value written twice: [0-9a-f]{64} stands in /m.test(r.out) && r.out.includes(".github/workflows/own.yml:5"), "one a workflow of the project's own gains fails", r.out);
+  ok(r.status === 1 && /^FAIL: a value written twice: [0-9a-f]{12}\.\.\. stands in /m.test(r.out) && r.out.includes(".github/workflows/own.yml:5"), "one a workflow of the project's own gains fails", r.out);
   drop(".github/workflows/own.yml"); drop(".github/workflows/core.yml"); drop("core/setup/more-pins.txt");
   // (a file of a kind the kit writes whole but that carries no mark, the project's own settings, is read as the project's)
   put(".claude/settings.json", `{ "env": { "SUM": "${DIGEST}" } }\n`);
@@ -153,11 +155,15 @@ try {
   drop("ci/fetch.ps1");
   put("deploy.sh", "sum=read-it\n");
   r = check({ COPIES_BASE: base });
-  ok(r.status === 0 && r.out.includes(`note checks/copies.json's "twice" names ${DIGEST}, which no longer stands in two files`), "the config's own \"twice\" is no place of the value: one said, left in one file, is noted to take out", r.out);
+  ok(r.status === 0 && r.out.includes(`note checks/copies.json's "twice" names ${DIGEST.slice(0, 12)}..., which no longer stands in two files`), "the config's own \"twice\" is no place of the value: one said, left in one file, is noted to take out", r.out);
   put("deploy.sh", `sum=${DIGEST}\n`);
   config({ twice: { [OTHER]: "said long ago" } });
   r = check({ COPIES_BASE: base });
-  ok(r.status === 0 && r.out.includes(`note checks/copies.json's "twice" names ${OTHER}, which no longer stands in two files: take it out of "twice"`), "a value said that no longer stands twice is noted, failing nothing", r.out);
+  ok(r.status === 0 && r.out.includes(`note checks/copies.json's "twice" names ${OTHER.slice(0, 12)}..., which no longer stands in two files: take it out of "twice"`), "a value said that no longer stands twice is noted, failing nothing", r.out);
+  // (a pathspec git cannot read fails with its mend, never a stack)
+  config({ tests: [":(bogus)test/"] });
+  r = check({ COPIES_BASE: base });
+  ok(r.status === 1 && mended(r.out) && /^FAIL: git could not read the values checks\/copies\.json names: /m.test(r.out) && !/\n {4}at /u.test(r.out), "a pathspec git cannot read fails with its mend", r.out);
   config({ twice: { [OTHER]: "" } });
   r = check({ COPIES_BASE: base });
   ok(r.status === 1 && mended(r.out) && /"twice"/.test(r.out), "a reason left empty fails the config's shape, with its mend", r.out);

@@ -72,7 +72,7 @@ const list = v => (Array.isArray(v) ? v.filter(x => typeof x === "string" && x) 
 
 // A file's text at a commit or ("") in the work tree, or null where it is not a file or past READ_MOST.
 function readAt(commit, f) {
-  if (commit) { try { const t = git(["show", `${commit}:${f}`]); return t.length > READ_MOST ? null : t; } catch { return null; } }
+  if (commit) { try { return Number(git(["cat-file", "-s", `${commit}:${f}`])) > READ_MOST ? null : git(["show", `${commit}:${f}`]); } catch { return null; } }
   const st = fs.lstatSync(f, { throwIfNoEntry: false });
   return st?.isFile() && st.size <= READ_MOST ? fs.readFileSync(f, "utf8") : null;
 }
@@ -143,6 +143,14 @@ function freshOf(asked, { read, ls, base, core }) {
 // `ls(specs)`, the files pathspecs read, as copies.mjs lists them. It prints its notes and failures and returns whether
 // anything failed.
 export function valuesTwice({ core, config, configPath, configAt, base, ls }) {
+  try { return values({ core, config, configPath, configAt, base, ls }); }
+  catch (e) {
+    console.error(`FAIL: git could not read the values ${logged(configPath)} names: ${logged(String(e.stderr || e.message).trim().split("\n")[0])}. Mend: write each pathspec of its "code", "prose" and "tests" as git reads it (a path, or one of git's magic words), and run the check again`);
+    return true;
+  }
+}
+
+function values({ core, config, configPath, configAt, base, ls }) {
   const said = config.twice && typeof config.twice === "object" && !Array.isArray(config.twice) ? config.twice : {};
   const read = scope(config, core, configAt);
   const twice = [...valuesAt(read, ls, "")].filter(([, places]) => places.size >= 2);
@@ -154,7 +162,8 @@ export function valuesTwice({ core, config, configPath, configAt, base, ls }) {
 }
 
 function report({ asked, fresh, kept, stale, base, configPath }) {
-  const shown = v => (v.length > 80 ? `${v.slice(0, 77)}...` : v);
+  // (a pin by its first 12 characters, so a secret written twice never stands whole in a log: its file and line find it)
+  const shown = v => (pinsIn(v).has(v) ? `${v.slice(0, 12)}...` : v.length > 80 ? `${v.slice(0, 77)}...` : v);
   const where = places => [...places].map(([f, l]) => `${f}:${l}`).join(" and ");
   const old = asked.filter(([v]) => !fresh.some(([k]) => k === v));
   if (old.length) {
