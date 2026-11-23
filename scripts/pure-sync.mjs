@@ -31,6 +31,7 @@ import { readCore } from "./core-path.mjs";
 import { followsOf, hostSaid, inBare, releasesIn } from "./releases.mjs";
 import { asEarlier, plan, unformed } from "./converge.mjs";
 import { BLOCKS, CORE_YML, whole } from "./core-owned.mjs";
+import { WORKFLOW } from "./comment-only.mjs";
 import { fresh, kind } from "./fresh.mjs";
 import { privateOf } from "./host-private.mjs";
 import { project } from "./steps.mjs";
@@ -41,7 +42,6 @@ const git = (args, cwd) => raw(args, cwd).trim();
 // the only SHAs a sync may move: the manifest's pin, and a call's to a core workflow (any case, as GitHub reads it)
 const PIN_REF = new RegExp(`^(Core: ${A} at )([0-9a-f]{40})(?=, copied whole under )`, "gu");
 const CALL = new RegExp(`(?<![\\w./-])(${A}\\/\\.github\\/workflows\\/[\\w.-]+@)([0-9a-f]{40})(?![\\w./-])`, "giu");
-const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u;
 const fail = [];
 
 const head = git(["rev-parse", "HEAD"]);

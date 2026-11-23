@@ -35,6 +35,7 @@ import { started } from "./started.mjs";
 
 
 export const RUNS = /(?:^|\/)(?:\.(?:github|claude)(?:\/|$)|action\.ya?ml$)/iu; // what runs by itself, as far as this proof reads it
+export const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u; // a workflow of the host's, by its path
 const YAML = /\.ya?ml$/iu;
 // what YAML 1.1 or 1.2 reads as a line break besides \n, a tab, a byte order mark, every other control character, and
 // the two characters YAML refuses in a file (U+FFFE and U+FFFF), which would stop the whole file being read
