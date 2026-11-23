@@ -10,6 +10,7 @@
 // where a <Using> cannot be read whole, a global alias names a hook's attribute, or git cannot be asked. C# git holds
 // that the config does not read links those it reads (select-csharp-project.mjs).
 import { heldBeside, msbuildUsings, outside } from "./select-csharp-project.mjs";
+import { delegates, join, pairs, word } from "./select-csharp-delegates.mjs";
 import { leftOut } from "./select-csharp-text.mjs";
 import { readCsharp } from "./shape-csharp.mjs";
 
@@ -23,7 +24,6 @@ const REFLECTS = new Set(["IIncrementalGenerator", "ISourceGenerator", "Activato
 
 const hookWord = w => HOOKS.has(w.replace(/Attribute$/u, ""));
 const TUNIT = /^(Before|After)(Attribute)?$/u;
-const word = k => k.v.replace(/^@/u, "");
 const ids = toks => toks.filter(k => k.t === "id").map(word);
 // The names that head a dotted name, shortest first, no deeper than `depth` words (a name deeper than every one the
 // index holds matches none), `pace` asked for each.
@@ -31,7 +31,6 @@ function* prefixes(name, depth, pace) {
   const parts = name.split(".");
   for (let k = 0, head = ""; k < Math.min(parts.length, depth); k++) { pace(); head = join(head, parts[k]); yield head; }
 }
-const join = (a, b) => (a ? `${a}.${b}` : b);
 const into = (map, key, made = () => new Set()) => { if (!map.has(key)) map.set(key, made()); return map.get(key); };
 
 // Past the head of a using directive that opens at toks[i] ("using", or "global using", then "static", "unsafe", an
@@ -59,15 +58,16 @@ function pastGeneric(toks, k) {
   return k;
 }
 
-// The using directive that opens at toks[i] ("using", or "global using"): { end, target, global, alias }, or null where
-// the tokens there are no directive (a using statement or declaration). An alias of a type that is no name
-// ("using Pair = (int, App.Item);") has no target: the words of its type are read as any others.
+// The using directive that opens at toks[i] ("using", or "global using"): { end, target, global, alias, qual (the
+// alias D of "D::", global:: aside) }, or null where the tokens there are no directive (a using statement or
+// declaration). An alias of a type that is no name ("using Pair = (int, App.Item);") has no target: the words of its
+// type are read as any others.
 function directive(toks, i) {
   const k = pastHead(toks, i);
   if (k < 0) return null;
   const { parts, end } = nameAt(toks, k), last = parts.length ? pastGeneric(toks, end) : end, eq = toks[k - 1]?.v === ":" ? k - 4 : k - 1;
-  const global = toks[i].v === "global", alias = toks[eq]?.v === "=" ? word(toks[eq - 1]) : null;
-  if (parts.length && toks[last]?.v === ";") return { end: last, target: parts.join("."), global, alias };
+  const global = toks[i].v === "global", alias = toks[eq]?.v === "=" ? word(toks[eq - 1]) : null, qual = eq < k - 1 && toks[k - 3].v !== "global" ? word(toks[k - 3]) : null;
+  if (parts.length && toks[last]?.v === ";") return { end: last, target: parts.join("."), global, alias, qual };
   if (!alias) return null;
   const semi = pairs(toks).semi[k];
   return semi < toks.length ? { end: semi, target: null, global, alias } : null;
@@ -87,86 +87,6 @@ function topLevel(toks, src) {
   }
   while (MODIFIER.has(toks[i]?.v)) i++;
   return i < toks.length && !TYPE.has(toks[i].v) || new RegExp(`@(?:${[...TYPE].join("|")})\\b`, "u").test(src);
-}
-
-// Where each "(" and "<" of a file's tokens closes (a Map of its place to that of its ")" or ">"), and at each place
-// the next ";" (semi); read once per file.
-const paired = new WeakMap(), SHUT = { __proto__: null, ")": "(", ">": "<" };
-function pairs(toks) {
-  if (paired.has(toks)) return paired.get(toks);
-  const close = new Map(), open = { "(": [], "<": [] }, semi = new Int32Array(toks.length + 1).fill(toks.length);
-  toks.forEach((t, k) => { if (t.v === "(" || t.v === "<") open[t.v].push(k); else if (open[SHUT[t.v]]?.length) close.set(open[SHUT[t.v]].pop(), k); });
-  for (let k = toks.length - 1; k >= 0; k--) semi[k] = toks[k].v === ";" ? k : semi[k + 1];
-  paired.set(toks, Object.assign(close, { semi }));
-  return paired.get(toks);
-}
-
-// The delegates a file declares, by their full names: `delegate` then a return type (an anonymous delegate, "delegate {"
-// or "delegate (…) {", and a function pointer, "delegate*", declare none; "delegate ref (int X, int Y) P()" returns a
-// tuple), each in the namespace it stands in, read from the tokens as they go (namespaces). Each scan goes on where
-// the last stopped (pairs): linear in the tokens, and a namespace's full name is made once, where a delegate stands.
-function delegates(r, pace) {
-  const toks = r.toks, out = [], within = namespaces(toks, new Set(r.namespaces), pace);
-  for (let i = 0; i < toks.length; i++) {
-    const next = within.step(i);
-    if (next !== i) { i = next; continue; }
-    if (toks[i].v !== "delegate" || ["{", "*"].includes(toks[i + 1]?.v)) continue;
-    let s = i + 1;
-    while (["ref", "readonly"].includes(toks[s]?.v)) s++;
-    const start = toks[s]?.v === "(" ? (pairs(toks).get(s) ?? toks.length - 1) + 1 : s;
-    if (toks[start]?.v === "{") continue;
-    const { name, end } = delegateName(toks, start);
-    if (name) out.push(join(within.name(), name));
-    i = Math.max(i, end - 1);
-  }
-  return out;
-}
-
-// The namespace a scan of a file's tokens stands in: step(i) reads the token at i, a brace or a namespace's head, and
-// gives where the scan goes on (i, or past the head); name() the full name where it stands. The tokens drop an escaped
-// word's "@", so "namespace" heads a namespace only at a namespace's own level, not after a ".", and naming one the
-// grammar declared (`known`): `class C { @namespace field; }` declares none. `pace` is asked at each head.
-function namespaces(toks, known, pace) {
-  const open = [];
-  let depth = 0, file = { full: "" };
-  return {
-    name: () => (open.at(-1) ?? file).full,
-    step(i) {
-      const v = toks[i].v;
-      if (v === "{") depth++;
-      else if (v === "}") { depth--; while (open.at(-1)?.depth > depth) open.pop(); }
-      else if (v === "namespace" && depth === (open.at(-1)?.depth ?? 0) && toks[i - 1]?.v !== ".") {
-        pace();
-        const { name, end } = dotted(toks, i + 1), whole = join((open.at(-1) ?? file).full, name);
-        if (toks[end]?.v === ";" && known.has(name)) file = { full: name };
-        else if (toks[end]?.v === "{" && known.has(whole)) open.push({ full: whole, depth: ++depth });
-        else return i;
-        return end;
-      }
-      return i;
-    },
-  };
-}
-
-// A dotted name from `k` on ("App.Rules"), and where it ended.
-function dotted(toks, k) {
-  const parts = [];
-  for (; toks[k]?.t === "id"; k += 2) { parts.push(word(toks[k])); if (toks[k + 1]?.v !== ".") { k++; break; } }
-  return { name: parts.join("."), end: k };
-}
-
-// A delegate's name, from its return type at `k` on (the last word before "(" outside the type's "<>"), and where
-// the scan ended (a ";", "{" or "}": `@delegate` reads as the keyword, and `new[] { @delegate }` declares none).
-function delegateName(toks, k) {
-  let depth = 0, name = null;
-  for (; k < toks.length && ![";", "{", "}"].includes(toks[k].v); k++) {
-    const v = toks[k].v;
-    if (v === "<") depth++;
-    else if (v === ">") depth--;
-    else if (v === "(" && depth === 0) break;
-    else if (toks[k].t === "id" && depth === 0) name = word(toks[k]);
-  }
-  return { name, end: k };
 }
 
 const qualifies = (toks, i) => toks[i]?.t === "id" && toks[i + 1]?.v === ":" && toks[i + 2]?.v === ":";
@@ -220,7 +140,7 @@ function factsOf(read, src) {
 // files every file reaches and unsure: the files unsure (each as the head says), globals: what global using directives
 // name, aliases: Map of a global alias to what it names, depth: the most words of a declared name }.
 function indexOf(facts, pace) {
-  const ix = { types: new Map(), byLast: new Map(), extensions: new Map(), every: [], globals: [], aliases: new Map(), unsure: new Set(), depth: 1 };
+  const ix = { types: new Map(), byLast: new Map(), extensions: new Map(), every: [], globals: [], aliases: new Map(), qualified: [], unsure: new Set(), depth: 1 };
   const deep = name => { ix.depth = Math.max(ix.depth, name.split(".").length); };
   const declare = (full, file) => {
     const dot = full.lastIndexOf(".");
@@ -260,18 +180,31 @@ export function undeclared(was, now, pace = () => {}) {
 
 // Global using directives into the index: an alias's target under its name, any other's target among the globals.
 function globally(ix, usings) {
-  for (const u of usings) if (u.alias) { if (u.target !== null) into(ix.aliases, u.alias).add(u.target); } else ix.globals.push(u.target);
+  for (const u of usings) if (u.alias) { if (u.target !== null) into(ix.aliases, u.alias).add(u.target); } else { ix.globals.push(u.target); if (u.qual) ix.qualified.push(u); }
 }
 
 // The names a file writes in full (x its facts): its runs of dotted words, each with an alias that heads it put for
 // what the alias names (its own or a global one, the word alone too, and `[D]` for DAttribute), and what global using
 // directives name (a `using static` of MSBuild's names a type no file names), cut past the index's depth. `pace` asked for
 // each.
-function fullNames(x, ix, pace) {
-  const aliases = new Map(ix.aliases), runs = new Set([...x.runs, ...ix.globals]);
-  for (const u of x.usings) if (u.alias && u.target !== null) into(aliases, u.alias).add(u.target);
+function fullNames(x, ix, aliases, pace) {
+  const runs = new Set([...x.runs, ...ix.globals]);
   for (const run of [...x.runs, ...x.words]) { pace(); const [head, ...rest] = run.split(".", ix.depth + 1); for (const t of [...aliases.get(head) ?? [], ...aliases.get(`${head}Attribute`) ?? []]) { pace(); runs.add([t, ...rest].join(".")); } }
   return runs;
+}
+
+// The aliases a file sees (x its facts): the global ones and its own, each to what it names.
+function aliasesOf(x, ix) {
+  const aliases = new Map(ix.aliases);
+  for (const u of x.usings) if (u.alias && u.target !== null) into(aliases, u.alias).add(u.target);
+  return aliases;
+}
+
+// The namespaces the global using directives and a file's own name (x its facts), one that "D::" heads also as what
+// the alias D names ("using D = App;" then "using D::Data;" names App.Data).
+function targetsOf(x, ix, aliases) {
+  const qualified = [...ix.qualified, ...x.usings.filter(u => u.qual && !u.alias)].flatMap(u => [...aliases.get(u.qual) ?? []].map(t => join(t, u.target)));
+  return [...ix.globals, ...x.usings.map(u => u.target).filter(t => t !== null), ...qualified];
 }
 
 // The files one file reaches (x its facts), by the index: the files every file reaches; each type a word of its names
@@ -280,9 +213,9 @@ function fullNames(x, ix, pace) {
 function reachOf(x, ix, pace) {
   const around = new Set([""]);
   for (const n of x.r.namespaces) for (const p of prefixes(n, ix.depth, pace)) around.add(p);
-  const sees = new Set(around);
-  for (const target of [...ix.globals, ...x.usings.map(u => u.target).filter(t => t !== null)]) for (const p of around) for (const n of prefixes(join(p, target), ix.depth, pace)) sees.add(n);
-  const to = new Set(ix.every), add = files => { for (const g of files ?? []) to.add(g); }, runs = fullNames(x, ix, pace);
+  const sees = new Set(around), aliases = aliasesOf(x, ix);
+  for (const target of targetsOf(x, ix, aliases)) for (const p of around) for (const n of prefixes(join(p, target), ix.depth, pace)) sees.add(n);
+  const to = new Set(ix.every), add = files => { for (const g of files ?? []) to.add(g); }, runs = fullNames(x, ix, aliases, pace);
   for (const w of x.words) for (const last of [w, `${w}Attribute`]) for (const [ns, files] of ix.byLast.get(last) ?? []) if (sees.has(ns)) add(files);
   for (const run of runs) for (const p of around) for (const name of prefixes(join(p, run), ix.depth, pace)) { add(ix.types.get(name)); add(ix.types.get(`${name}Attribute`)); }
   for (const ns of sees) add(ix.extensions.get(ns));

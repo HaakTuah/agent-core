@@ -53,11 +53,12 @@ function targets(out, include, given) {
   return true;
 }
 
-// Whether a text imports a file other than a .props or .targets (an <Import> whose Project names neither, a common
-// path such as GetPathOfFileAbove('Directory.Build.props', …) read as one): git's .xml or .proj may hold a <Using>
+// Whether a text imports a file other than a .props or .targets (an <Import> where a part of Project, split at ";",
+// ends in neither, in lower case as git lists them; a common path such as GetPathOfFileAbove('Directory.Build.props',
+// …) read as one): git's .xml or .proj may hold a <Using>
 // the reader never sees. (Each try ends at the next "<": linear.)
 function importsOther(text) {
-  for (const m of text.matchAll(/<Import\b([^<>]*)>/giu)) if (!/\.(?:props|targets)(?![\p{L}\p{N}_])/iu.test(attributes(m[1])?.project ?? "")) return true;
+  for (const m of text.matchAll(/<Import\b([^<>]*)>/giu)) if (!(attributes(m[1])?.project ?? "").split(";").every(p => /\.(?:props|targets)(?=\s*(?:['")]|$))/u.test(p))) return true;
   return false;
 }
 
@@ -78,7 +79,7 @@ export function msbuildUsings(texts, pace) {
       const attrs = attributes(m[1]), meta = !attrs || m[1].trimEnd().endsWith("/") ? {} : children(text, m.index + m[0].length);
       if (!attrs || meta === null || "update" in attrs) return null; // (an Update changes an item the reader took already)
       const include = attrs.include ?? meta.include, given = [attrs.alias, meta.alias].map(a => a?.trim()).filter(Boolean);
-      if (include === undefined) continue;
+      if (include === undefined) { if ("remove" in attrs) continue; return null; } // (an item definition's Alias or Static applies to every <Using>)
       if (/\$\(|@\(|%|&/u.test(`${include}${given.join("")}`)) return null;
       if (!targets(out, include, given)) return null;
     }

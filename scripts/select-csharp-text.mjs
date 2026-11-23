@@ -113,7 +113,7 @@ function inHole(src, i, s) {
 // comment, which may hide where the hole ends.
 function hides(src, i, s) {
   const c = src[i];
-  return (s.align && /[\p{L}\p{Nl}_]/u.test(c)) || named(src, i) || c === "$" || c === "@" || src.startsWith("\"\"\"", i) || (c === "/" && /[/*]/u.test(src[i + 1] ?? ""));
+  return (s.align && /[\p{L}\p{Nl}_]/u.test(c)) || (c === "'" && "{}".includes(src[i + 1])) || named(src, i) || c === "$" || c === "@" || src.startsWith("\"\"\"", i) || (c === "/" && /[/*]/u.test(src[i + 1] ?? ""));
 }
 
 // The index of the quote that closes a plain string or a character whose text begins at i (or the line's end).

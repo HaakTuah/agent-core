@@ -144,7 +144,7 @@ ok(same(esc, [true, true]), "an escaped @delegate in braces declares nothing, an
   const receivers = ["[NotNullWhen(true)] this string? s", "ref this int s", "this in int s", "scoped this ref int s", "this (int X, int Y) v"].filter(param =>
     !one(`namespace App.Ext;\npublic static class E { public static bool Has(${param}) => true; }\n`, { "tests/T.cs": "using App.Ext;\nnamespace Tests;\nclass T { }\n" }).links.get(TEST)?.has(SRC));
   ok(!receivers.length, "an extension's receiver is read behind an attribute, ref, in and scoped, and as a tuple", receivers.join(", "));
-  ok(same(pick(viaFile, "tests/Usings.cs").tests, ["tests/RulesTest.cs", "tests/Usings.cs"]), "a file that holds a global using directive is reached from every file, since a change to it bears on each", JSON.stringify(pick(viaFile, "tests/Usings.cs")));
+  ok(same(pick(viaFile, "tests/Usings.cs").tests, ["tests/RulesTest.cs", "tests/Usings.cs"]), "a file that holds a global using directive is reached from every file", JSON.stringify(pick(viaFile, "tests/Usings.cs")));
   const suffixed = ["System.Runtime.CompilerServices.ModuleInitializerAttribute", "AssemblyInitializeAttribute"].filter(w => {
     const r = one(`namespace H;\nclass X { [${w}] static void Go() { } }\n`);
     return !r.links.get(TEST)?.has(SRC) || r.unsure.size;
@@ -153,8 +153,8 @@ ok(same(esc, [true, true]), "an escaped @delegate in braces declares nothing, an
   const forms = ["(int Count, App.Data.Store Item)", "App.Data.Store[]", "App.Data.Store?"].filter(form => !reached(new Set(["tests/AliasTest.cs"]), csharpReach({ ...app,
     "src/Usings.cs": `global using S = ${form};\n`, "tests/AliasTest.cs": "namespace Tests;\nclass AliasTest { S s; }\n" }, undefined, nothing).links).get("tests/AliasTest.cs").has("src/Store.cs"));
   ok(!forms.length, "a global alias of a tuple, an array or a nullable type is read for the types it names", forms.join(", "));
-  const nsAlias = [["using D = App;", "D.Data.Store"], ["using D = App;", "D::Data.Store"], ["using L::App.Data;", "Store"], ["", "L::App.Data.Store"]].filter(([u, n]) => !one("namespace App.Data;\npublic class Store { }\n", { "tests/T.cs": `extern alias L;\n${u}\nnamespace Tests;\nclass T { object s = new ${n}(); }\n` }).links.get(TEST)?.has(SRC));
-  ok(!nsAlias.length, "a name in full is read through an alias's \".\" or \"::\", and an extern alias's \"::\" in it or in a using directive", nsAlias.join("; "));
+  const nsAlias = [["using D = App;", "D.Data.Store"], ["using D = App;", "D::Data.Store"], ["using L::App.Data;", "Store"], ["", "L::App.Data.Store"], ["using D = App;\nusing D::Data;", "Store"]].filter(([u, n]) => !one("namespace App.Data;\npublic class Store { }\n", { "tests/T.cs": `extern alias L;\n${u}\nnamespace Tests;\nclass T { object s = new ${n}(); }\n` }).links.get(TEST)?.has(SRC));
+  ok(!nsAlias.length, "a name in full or a using directive is read through an alias's \".\" or \"::\", an extern alias's too", nsAlias.join("; "));
   const items = ["<Using Include=\"App.Data.Store\" Alias=\"S\" />", "<Using Include=\"App.Data.Store\" Alias=\"SAttribute\" />", "<Using Include=\"App.Data.Store\" Static=\"true\" />"].filter(item => !csharpReach({
     "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npublic class Store { public static void Go() { } }\n",
     "tests/Tests.csproj": `<Project><ItemGroup>${item}</ItemGroup></Project>`, "tests/T.cs": "namespace Tests;\nclass T { [S] S s; void M() { Go(); } }\n",
