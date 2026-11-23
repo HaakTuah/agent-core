@@ -31,7 +31,7 @@ ok(powered(null), "a workflow that cannot be read has power");
 // ---- the set of a tree ----
 const tree = (files) => ({ paths: Object.keys(files), read: (name) => (Object.hasOwn(files, name) ? files[name] : null) });
 const files = {
-  ".github/workflows/powered.yml": "on: push\npermissions:\n  issues: write\njobs:\n  a:\n    steps:\n      - run: node scripts/run.mjs\n      - uses: ./.github/workflows/called.yml\n      - run: echo see .github/workflows/named.yml\n",
+  ".github/workflows/powered.yml": "on: push\npermissions:\n  issues: write\njobs:\n  a:\n    steps:\n      - run: node scripts/run.mjs\n      - uses: ./.github/workflows/called.yml\n      - run: echo see .github/workflows/named.yml\n      - run: ./deploy && bin/release\n",
   ".github/workflows/called.yml": "on: workflow_call\npermissions:\n  contents: read\njobs:\n  a:\n    steps:\n      - run: bash scripts/by-call.sh\n",
   ".github/workflows/named.yml": "on: push\npermissions:\n  contents: read\njobs:\n  a:\n    steps:\n      - run: node scripts/by-named.mjs\n",
   ".github/workflows/readonly.yml": "on: push\npermissions:\n  contents: read\njobs:\n  a:\n    steps:\n      - run: node scripts/plain.mjs\n",
@@ -53,10 +53,14 @@ const files = {
   "core/scripts/calls.mjs": "await fetch(\"https://example.invalid\");\n",
   "vendored/core/scripts/calls.mjs": "await fetch(\"https://example.invalid\");\n",
   "README.md": "node scripts/plain.mjs\n",
+  "deploy": "#!/bin/sh\necho deploying\n",
+  "bin/release": "#!/bin/sh\necho 1\n",
+  "bin/publish": "#!/usr/bin/env bash\ngit push origin HEAD\n",
+  "bin/notes": "git push is described here, with no #! line\n",
 };
 const why = new Map();
 const set = setOf({ ...tree(files), copy: "vendored/core/" }, why);
-const want = [".claude/settings.json", ".github/workflows/called.yml", ".github/workflows/powered.yml", "scripts/by-action.mjs", "scripts/by-call.sh",
+const want = [".claude/settings.json", ".github/workflows/called.yml", ".github/workflows/powered.yml", "bin/publish", "bin/release", "deploy", "scripts/by-action.mjs", "scripts/by-call.sh",
   "scripts/calls.mjs", "scripts/helper.mjs", "scripts/pushes.sh", "scripts/run.mjs", "scripts/steps/one.mjs", "scripts/unread.py", "tools/act/action.yml"];
 ok(show(set) === want.join(", "), "the set holds the powered workflow, what it runs and calls and loads, a script that calls out, .claude/, an action and what it runs, and an unread script, and nothing else", show(set));
 ok(why.get(".github/workflows/powered.yml") === "power" && why.get(".claude/settings.json") === "place" && why.get("tools/act/action.yml") === "place"
@@ -64,6 +68,8 @@ ok(why.get(".github/workflows/powered.yml") === "power" && why.get(".claude/sett
   && why.get("scripts/run.mjs") === ".github/workflows/powered.yml" && why.get("scripts/helper.mjs") === "scripts/run.mjs"
   && why.get("scripts/steps/one.mjs") === "scripts/run.mjs (built)" && why.get(".github/workflows/called.yml") === ".github/workflows/powered.yml",
 "each says what brought it in", JSON.stringify([...why]));
+ok(why.get("deploy") === ".github/workflows/powered.yml" && why.get("bin/release") === ".github/workflows/powered.yml" && why.get("bin/publish") === "calls" && !set.has("bin/notes"),
+  "a file with no extension a powered workflow runs is in it, and one that starts with #! and calls out, but not one with no #! line", JSON.stringify([...why]));
 ok(!set.has(".github/workflows/named.yml") && !set.has("scripts/by-named.mjs"), "a workflow a powered one only names is not followed, nor what it runs");
 ok(!set.has("scripts/not-run.mjs"), "a root-relative path a module only prints is not followed: a module's names lead from its own folder");
 ok(!set.has("scripts/steps/deeper/two.mjs") && !set.has("scripts/other/three.mjs"), "a module loaded by a built name brings in the folder it names alone, not one below it or another");

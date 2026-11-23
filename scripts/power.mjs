@@ -7,10 +7,11 @@
 //   - .claude/, and what comment-only.mjs, beside this file, reads as running by itself beyond .github/ (RUNS_TOO: an
 //     agent tool's own folder, hooks, the files that say what installs or builds), the copy of the core aside;
 //   - what such a file runs or loads: a path it names (a root-relative one, or one relative to its own folder) that is
-//     a script or an action, and a workflow it calls (`uses:`), followed on through what that names in turn, and, where a script of the
+//     a script, an action or a file with no extension (an executable such as `./deploy`), and a workflow it calls (`uses:`), followed on through what that names in turn, and, where a script of the
 //     set loads a module by a name it builds (an `import(` or `require(` of no plain string), the scripts directly in
 //     each folder it names (one that names none loads what its caller names, which is followed from the caller);
-//   - a script whose own text calls GitHub, the network or `git push` (CALLS).
+//   - a script whose own text calls GitHub, the network or `git push` (CALLS), a file with no extension whose text
+//     starts with `#!` among them.
 // Code an agent changes is read as data alone: its text is matched, never run. A tree is read from a folder on disk
 // (the default branch's checkout) or from a commit of a git clone (`git ls-tree`, `git cat-file`), never checked out.
 //
@@ -62,6 +63,8 @@ const LARGEST = 1 << 20;
 // whether a workflow's text gives it power
 export const powered = (text) => text === null || POWERED.test(text) || !PERMISSIONS.test(text);
 // whether a path is in the set by where it stands alone
+// whether a path has no extension: an executable named so (`deploy`, `bin/release`) is run as a script is
+const unextended = (name) => path.posix.extname(name) === "";
 const placed = (name) => ACTION.test(name) || name.startsWith(".claude/") || RUNS_TOO.test(name);
 
 // The set of a tree: `paths`, every file's path; `read(path)`, its text, or null where it cannot be read or is too large;
@@ -83,7 +86,7 @@ export function setOf({ paths, read, copy }, why = new Map()) {
 function seedOf(name, read) {
   if (WORKFLOW.test(name)) return powered(read(name)) ? "power" : null;
   if (placed(name)) return "place";
-  if (!SCRIPT.test(name)) return null;
+  if (!SCRIPT.test(name)) { const text = unextended(name) ? read(name) : null; return text !== null && text.startsWith("#!") && CALLS.test(text) ? "calls" : null; }
   const text = read(name);
   if (text === null) return "unread";
   return CALLS.test(text) ? "calls" : null;
@@ -102,7 +105,7 @@ function namedIn(name, text, all) {
     const bare = token.replace(/^\/+/u, "").replace(/[.]+$/u, "");
     const from = [path.posix.normalize(path.posix.join(folder, bare)), ...(MODULE.test(name) ? [] : [bare.replace(/^(?:\.\/)+/u, "")])];
     for (const at of from) {
-      if (all.has(at) && at !== name && (SCRIPT.test(at) || ACTION.test(at))) found.add(at);
+      if (all.has(at) && at !== name && (SCRIPT.test(at) || ACTION.test(at) || unextended(at))) found.add(at);
     }
   }
   for (const [, called] of text.matchAll(/(?:^|\n)[ \t-]*uses[ \t]*:[ \t]*["']?\.\/(\.github\/workflows\/[^\s"'@#]+)/gu)) if (all.has(called)) found.add(called);
