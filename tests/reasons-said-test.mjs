@@ -4,6 +4,7 @@
 //
 //   node tests/reasons-said-test.mjs
 import fs from "node:fs";
+import { quick } from "../scripts/hostile.mjs";
 import { HEADING, namesRule, ownWords, reasonsUnsaid, under } from "../scripts/reasons-said.mjs";
 
 let failed = 0, count = 0;
@@ -21,8 +22,9 @@ ok(namesRule("see `core/tasks/updates.md`") && namesRule("On roles/shared/inbox.
   "a rule is named by a rule file's path, with core/ before it or not, a file of a subfolder too, or as a floor rule");
 ok(!namesRule("tasks/nothere.md, core/scripts/labels.mjs, xtasks/updates.md, tasks/updates.mdx, tasks/updates.md.bak") && !namesRule("```\ntasks/updates.md\n```") && !namesRule("<!-- floor rule 3 -->") && !namesRule("the rule on updates"),
   "no rule file, a file that is no rule file, a path inside a longer word, one in a fenced block or a comment, and a rule named by words alone are not");
-ok(under(`**${HEADING}**\nx\n  y\n\nFound while: z\n**Next**\nw`, HEADING) === "x y" && under(`## ${HEADING}\n<!-- a -->\n## Next`, HEADING) === "" && under("**Other**\nx", HEADING) === null,
-  "the words under the heading, bold or with #, to the next heading, without comments or the Found while line; none where it is not there");
+ok(under(`**${HEADING}**\nx\n  y\n\nFound while: z\n**The kind of project**\nw`, HEADING) === "x y" && under(`## ${HEADING}\n<!-- a -->\n## The kind of project`, HEADING) === "" && under("**Other**\nx", HEADING) === null
+  && under(`${R}\n**Its first reason**\nholds not\n**The kind of project**`, HEADING) === "**Its first reason** holds not",
+  "the words under the heading, bold or with #, to the next of the forms' headings (a bold line of the filer's own is the filer's), without comments or the Found while line; none where it is not there");
 
 const owner = "someone", me = { login: "Someone" }, other = { login: "another" }, bot = { login: "github-actions[bot]", type: "Bot" };
 const late = "2026-12-01T10:00:00Z", early = "2026-11-01T10:00:00Z", since = "2026-11-16T00:00:00Z";
@@ -48,11 +50,12 @@ ok(got.length === 1 && got[0].items.join() === "#50,#51,#56,#61",
   JSON.stringify(got));
 ok(got[0]?.what.includes("reasons.mjs") && got[0].what.includes(HEADING) && /owner's account filed it, edit the issue/.test(got[0].what) && /ask its filer/.test(got[0].what),
   "its mend names the heading, the script that prints the reasons, and who adds them");
-ok(reasonsUnsaid({ issues: filed.slice(2, 5), owner, since }).length === 0 && reasonsUnsaid({ issues: null, owner, since }).length === 0, "nothing to mend: nothing reported");
+ok(reasonsUnsaid({ issues: filed.slice(2, 5), owner, since }).length === 0 && reasonsUnsaid({ issues: null, owner, since }).length === 0 && reasonsUnsaid({ issues: [null, 7, "x"], owner, since }).length === 0,
+  "nothing to mend, or a list holding what is no issue: nothing reported, nothing thrown");
 
-const t0 = Date.now();
-namesRule(`${"tasks/".repeat(30000)}x`); namesRule(`${"core/floor/a".repeat(20000)}.md`); under(`${R}\n${"**x\n".repeat(30000)}`, HEADING); under(`${"#".repeat(65000)} x\n${R}`, HEADING); ownWords(`${"**x\n".repeat(30000)}`);
-ok(Date.now() - t0 < 2000, "a body of any shape, the longest GitHub keeps, is read in time in step with its length", `${Date.now() - t0} ms`);
+ok(quick(() => !namesRule(`${"tasks/".repeat(30000)}x`) && !namesRule(`${"core/floor/a".repeat(20000)}.md`) && under(`${R}\n${"**x\n".repeat(30000)}`, HEADING) !== null
+  && under(`${"#".repeat(65000)} x\n${R}`, HEADING) === "" && ownWords(`${"**x\n".repeat(30000)}`).length > 0),
+  "a body of any shape, the longest GitHub keeps, is read in a few seconds");
 
 console.log(failed ? `${failed} of ${count} failed` : `${count} of ${count} passed`);
 process.exit(failed ? 1 : 0);

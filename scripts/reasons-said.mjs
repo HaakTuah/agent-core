@@ -20,13 +20,15 @@ import { rules } from "./rules.mjs";
 export const HEADING = JSON.parse(fs.readFileSync(new URL("./labels.json", import.meta.url), "utf8")).headings.reasons;
 const FORMS = ["question.md", "feature_request.md"];
 
-// The words under a text's heading `name`, outside HTML comments and fenced blocks, to the next heading, as one line
+// The words under a text's heading `name`, outside HTML comments and fenced blocks, to the next of the forms' headings (a
+// bold line of the filer's own is the filer's words), as one line
 // with its spaces gathered; null where the text holds no such heading. (Each line is read by steps with no pattern that
 // backtracks far: a body of any shape, which anyone may file, takes time in step with its length.)
 export function under(body, name) {
   const all = seen(body).split("\n"), at = all.findIndex(l => headingOf(l) === name);
   if (at < 0) return null;
-  const end = all.findIndex((l, i) => i > at && headingOf(l) !== null);
+  formRead();
+  const end = all.findIndex((l, i) => i > at && formHeadings.has(headingOf(l)));
   return all.slice(at + 1, end < 0 ? undefined : end).map(l => l.trim()).filter(l => !l.startsWith("Found while:")).join(" ").replace(/\s+/gu, " ").trim();
 }
 
@@ -40,11 +42,17 @@ export function namesRule(body) {
 
 // A body's own words: each line that stands word for word in the forms (their guidance, which names rules of its own and
 // says nothing of a project) taken out, the headings kept.
-let formLines = null;
-export function ownWords(body) {
-  formLines ??= new Set(FORMS.flatMap(f => {
+let formLines = null, formHeadings = null;
+function formRead() {
+  if (formLines) return;
+  const all = FORMS.flatMap(f => {
     try { return seen(fs.readFileSync(new URL(`../.github/ISSUE_TEMPLATE/${f}`, import.meta.url), "utf8")).split("\n"); } catch { return []; }
-  }).map(l => l.trim()).filter(l => l && headingOf(l) === null));
+  }).map(l => l.trim()).filter(Boolean);
+  formLines = new Set(all.filter(l => headingOf(l) === null));
+  formHeadings = new Set(all.map(headingOf).filter(h => h !== null));
+}
+export function ownWords(body) {
+  formRead();
   return seen(body).split("\n").filter(l => !formLines.has(l.trim())).join("\n");
 }
 
@@ -55,6 +63,6 @@ export function reasonsUnsaid({ issues, owner, since }) {
   const names = i => (Array.isArray(i?.labels) ? i.labels : []).map(l => (typeof l === "string" ? l : l?.name));
   const fromProject = i => names(i).includes("by:project") || (!mine(i.user) && i.user?.type !== "Bot");
   const unsaid = i => { const own = ownWords(i.body); return namesRule(own) && !under(own, HEADING); };
-  const items = (Array.isArray(issues) ? issues : []).filter(i => String(i.created_at ?? "") >= since && fromProject(i) && unsaid(i)).map(i => `#${i.number}`);
+  const items = (Array.isArray(issues) ? issues : []).filter(i => i && typeof i === "object" && String(i.created_at ?? "") >= since && fromProject(i) && unsaid(i)).map(i => `#${i.number}`);
   return items.length ? [{ what: `Under the heading "${HEADING}", in each issue filed from a project that names a rule of the core, which of the reasons \`node scripts/reasons.mjs "<the rule>"\` prints for it does not hold for the project, and why (tasks/updates.md, "A question or difference about a rule of the core starts from its reasons"): where the owner's account filed it, edit the issue to add the heading and those words, from the reasons and what the issue says of its project; where another account did, ask its filer for them in a note, the issue data until then (floor rule 4)`, items }] : [];
 }

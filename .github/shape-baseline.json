@@ -41,7 +41,6 @@
     "process: tests/choices-check-test.mjs -> node:child_process": "Split from tests/choices-test.mjs (#912), whose scratch histories it builds through git: the records are read at a base commit and the check runs as a command with CHOICES_BASE, so what git holds at the base and the command's exit code with its printed mend are what the test guards (#515).",
     "process: tests/choices-look-test.mjs -> node:child_process": "Split from tests/choices-test.mjs (#912): the signs are read from a scratch project's history built through git, and the script runs as a command from a project's root, so its printed lines and exit code are what the test guards.",
     "process: tests/choices-folder-test.mjs -> node:child_process": "The records of a folder are read at a base commit through git, and the check runs as a command on a history the test builds: what git holds at the base and the command's exit code are what the test guards (#870).",
-    "timed: tests/reasons-said-test.mjs -> Date.now": "The clock is what it guards: an issue's body, which anyone may file, of the longest GitHub keeps and of any shape is read in under 2 s, so the look cannot hang on a hostile issue (#765).",
     "timed: tests/stryker-test.mjs -> Date.now": "It holds Stryker's run to its budget and a test to its limit with a fault in, both measured on the clock the run itself reads, which is what the test guards (#581).",
     "process: tests/stryker-test.mjs -> node:child_process": "It runs Stryker, another publisher's tool, as the strength step runs it, and stops a run by a signal: the process and its group are what the test guards (#581).",
     "process: tests/issue-terms-test.mjs -> node:child_process": "It runs the personal-terms check's own shell lines (its link and unlinked) in bash on each text, which is what holds the two matchers in step (#783).",
@@ -212,7 +211,6 @@
     "timed: tests/shape-readers-test.mjs -> Date.now": true,
     "timed: tests/shape-test.mjs -> Date.now": true,
     "timed: tests/staged-test.mjs -> Date.now": true,
-    "timed: tests/reasons-said-test.mjs -> Date.now": true,
     "timed: tests/stryker-test.mjs -> Date.now": true,
     "timed: tests/work-saved-test.mjs -> Date.now": true,
     "timed: tests/workflows-test.mjs -> Date.now": true
