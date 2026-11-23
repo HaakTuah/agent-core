@@ -60,11 +60,13 @@ export function libraryHolds(root, rev, library, rest) {
   // (the library's own path committed as a link: the folder it stands in is the branch's to choose)
   if (l.linked.has(library)) return "link";
   if (commit === undefined) return null;
-  let dir;
-  try { dir = path.resolve(root, execFileSync("git", ["rev-parse", "--git-path", `modules/${library}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()); } catch { return "unread"; }
-  try { execFileSync("git", ["--git-dir", dir, "--no-replace-objects", "cat-file", "-e", `${commit}^{commit}`], { cwd: root, stdio: "ignore" }); } catch { return "unread"; }
+  const dir = once(`${root}\0${library}`, () => { try { return path.resolve(root, execFileSync("git", ["rev-parse", "--git-path", `modules/${library}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()); } catch { return null; } });
+  if (dir === null || !once(`${dir}\0${commit}`, () => { try { execFileSync("git", ["--git-dir", dir, "--no-replace-objects", "cat-file", "-e", `${commit}^{commit}`], { cwd: root, stdio: "ignore" }); return true; } catch { return false; } })) return "unread";
   return shownNotBlob(root, commit, rest, dir) ? "other" : "file";
 }
+// (each library's module repository, and whether it holds a commit, git asked once a run for each hook that reads there)
+export const modules = new Map();
+const once = (key, ask) => { if (!modules.has(key)) modules.set(key, ask()); return modules.get(key); };
 // The path a walk at a commit reached, and what it is there: the checkout's root, which no listing names (as a link to
 // ".." from a folder at the root leads to), and any folder a "tree", a file a "blob", anything else a submodule's.
 function reached(f, blobs, dirs, others) {
