@@ -89,8 +89,8 @@ path `scripts/stage-order.mjs`. What reviewers judge by: `roles/shared/review-gu
      blocking finding carries over it, with no check or note. What runs with power is what `node scripts/power.mjs
      --list` prints, its opening comment saying why: a workflow with a write permission, a secret or no top-level
      `permissions:`, an action, `.claude/`, what `scripts/comment-only.mjs` reads as running beyond `.github/` (an agent
-     tool's own folder, hooks, the install and build files), what one of them runs or loads, a file with no extension
-     among them, and a script that calls GitHub, the network or `git push`. It does not mean a commit that answers no
+     tool's own folder, hooks, the install and build files) and a script that calls GitHub, the network or `git push`;
+     and, where any of them stands, every file that may run (a script, an action, a file with no extension). It does not mean a commit that answers no
      finding, or one that is not light, goes unchecked: it is reviewed for what it changes. Reason: about 1,100 of 1,675
      review comments on 371 pull requests checked a later commit. Held by `scripts/power.mjs`, which the
      `security-review` status reads, and `scripts/code-review-wait.mjs`, by which the `code-review` status carries the

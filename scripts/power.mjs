@@ -1,39 +1,23 @@
 #!/usr/bin/env node
 // What runs with power, and which later commits of a pull request touch none of it (#1134, points 1 and 4;
-// tasks/reviews.md, "What a posted review stands for"). The set, as this script reads it from a tree of the repository:
+// tasks/reviews.md, "What a posted review stands for"). The set, as this script reads it from a tree of the repository,
+// starts from its seeds:
 //   - a workflow (.github/workflows/) with a write permission (its value on the line of its scope or the next, in any
 //     letters), a secret (by its name, by an index, or the secrets whole, in any letters), or no top-level
 //     `permissions:`, where the host's default token, which may write, is what it gets;
 //   - an action (an action.yml or action.yaml in any folder);
 //   - .claude/, and what comment-only.mjs, beside this file, reads as running by itself beyond .github/ (RUNS_TOO: an
-//     agent tool's own folder, hooks, the files that say what installs or builds), the copy of the core at the path
-//     the manifest names aside;
-//   - what such a file runs or loads, of the files that may run (a script, an action, a file with no extension such as
-//     `./deploy`), read from its whole text, a module's comments aside, which run nothing (a `///` directive kept, which
-//     a tool reads), in three ways that ask
-//     nothing of where a name stands, how it is quoted or which call takes it:
-//       1. a name written whole (NAMED): each word (a run of TOKENS, read again with %XX, \xXX and \uXXXX decoded), by
-//          its last part and each part of that between dots, names each file of that last name in any folder, with
-//          any ending a language adds (`helper` for helper.js or helper.py) or as the index.js, __init__.py or
-//          __main__.py of a folder of that name; so a folder it leads from, a space or a quote cannot hide it;
-//       2. a name built of fixed text and holes (BUILT: a `${}`, a shell's `$NAME` and `$()`, a format's `{}` and `%s`,
-//          a glob's `*` and `?`; a string joined by `+` or `/` to code, the strings of a `join(`/`resolve(` call; a
-//          shell's word) that holds a `/` or a `.`, and fixed text besides its ending: each file whose path holds its
-//          fixed text in order, a hole standing for any run of characters, the first at the start of a folder's name
-//          unless a hole comes first, the last at the end where the name ends in fixed text;
-//       3. a name built of holes alone, with its ending at most (`import(x)`, `${root}/${name}.mjs`): it comes from
-//          what calls the script, which is read in turn, so it names, besides, only every file below a module's own
-//          folder where it starts `./` or `../`, and every file below each folder a plain string names on a line that
-//          loads by `import(` or `require(` or on a line that sets a name such a line uses (`const STEPS = "steps"`),
-//          declared at the top level or in that line's own block, or assigned anywhere, and so on through each name
-//          such a setting line uses in turn;
-//     and a workflow it calls (`uses:`), followed on through what each names in turn;
+//     agent tool's own folder, hooks, the files that say what installs or builds);
 //   - a script whose own text calls GitHub, the network or `git push` (CALLS), or loads a module by a plain name that is
 //     no path and none of Node's own modules that reach nothing beyond the machine (LOCAL): a package (axios), or
 //     https; or by a name it builds that does not start as a path (UNPLACED), which may be a package's; a file with no
-//     extension whose text starts with `#!` among them.
-// Code an agent changes is read as data alone: its text is matched, never run. A tree is read from a folder on disk
-// (the default branch's checkout) or from a commit of a git clone (`git ls-tree`, `git cat-file`), never checked out.
+//     extension whose text starts with `#!` among them; and a script that cannot be read.
+// Where any seed stands, every file of the tree that may run joins it: each script (SCRIPT), each action and each file
+// with no extension (an executable is often named so: `./deploy`). No name is followed from one file to another, so no
+// form of naming, building or hiding a name can leave a file out; a tree with no seed has an empty set. The copy of the
+// core at the path the manifest names is left out. Code an agent changes is read as data alone: its text is matched,
+// never run. A tree is read from a folder on disk (the default branch's checkout) or from a commit of a git clone
+// (`git ls-tree`, `git cat-file`), never checked out.
 //
 // Run by the core's workflow security-review.yml from the default branch's copy, in the clone of the head's commits it
 // fetches (which checks out nothing), it prints, as JSON:
@@ -48,8 +32,8 @@
 // Usage (in that clone):  node scripts/power.mjs <the pull request, as GitHub's API gives it> <its commits, the same>
 //                           <its files, the same> <the default branch's checkout>
 //         node scripts/power.mjs --list [<folder>]   prints the set of a folder on disk (the repository's root by
-//                                                   default), a path a line with what brought it in (power, place,
-//                                                   calls, unread, or the file that runs or loads it)
+//                                                   default), a path a line with what brought it in (a seed's power,
+//                                                   place, calls or unread; runs, a file that may run beside a seed)
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
@@ -80,14 +64,12 @@ function outward(text) {
   return UNPLACED.test(bare(text)) || [...marked.matchAll(/(?:(?:^|[^\w$.])from|(?:^|[^\w$])(?:import|require))\s*\(?\s*\u0001(\d+)\u0001/gu)].map(([, at]) => strings[Number(at)])
     .some((name) => /^[^\s\\]+$/u.test(name) && !/^(?:\.{0,2}\/|#|file:)/u.test(name) && !LOCAL.has(name.replace(/^node:/u, "").split("/")[0]));
 }
-// a module loaded by a name built at run time: an import( or require( whose argument is no plain string (LOADS), and of
-// those, one that does not start as a path or a file's URL (UNPLACED)
+// a module loaded by a name built at run time that does not start as a path or a file's URL: an import( or require(
+// whose argument is no plain string, and is not one
 const LOADING = String.raw`(?:^|\n)[ \t]*(?!\/\/|\*|#)[^\n]*?\b(?:import|require)[ \t]*\([ \t]*(?!["'][^"'\n$]*["'][ \t]*[,)]`;
-const LOADS = new RegExp(`${LOADING})`, "u"), UNPLACED = new RegExp(`${LOADING}|[\`"'](?:\\.{0,2}\\/)|[\\w.]*pathToFileURL\\()`, "u");
+const UNPLACED = new RegExp(`${LOADING}|[\`"'](?:\\.{0,2}\\/)|[\\w.]*pathToFileURL\\()`, "u");
 // a module's own code, whose comments run nothing
 const MODULE = /\.(?:[cm]?[jt]sx?)$/iu;
-// a text whose words are commands, each a name it may run
-const SHELL = /\.(?:sh|bash|zsh|ps1|psm1|bat|cmd|ya?ml)$/iu;
 // a module's code with its comments out (`code`), a `///` directive of TypeScript's, which may add a file, and each
 // string and regular expression kept (so a `//` inside one is no comment); and with its strings left empty but for a
 // path's start (`bare`)
@@ -95,22 +77,8 @@ const COMMENTS = /(?<!\\)\/\*[\s\S]*?\*\/|(?<![/\\])\/\/(?!\/)[^\n]*|"(?:[^"\\\n
 const code = (text) => text.replace(COMMENTS, (found) => (/^\/[/*]/u.test(found) ? " " : found));
 const bare = (text) => text.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\$]|\\.|\$(?!\{))*`/gu,
   (found) => (/^["'`]/u.test(found) ? `"${found.slice(1).match(/^\.{0,2}\//u)?.[0] ?? ""}"` : " "));
-// the names a text may give a path by, and a text with the escapes a name may be written in decoded
-const TOKENS = /[A-Za-z0-9_@.+~/-]+/gu;
-const decoded = (text) => text.replace(/%([0-9A-Fa-f]{2})|\\x([0-9A-Fa-f]{2})|\\u([0-9A-Fa-f]{4})|\\u\{([0-9A-Fa-f]{1,6})\}/gu,
-  (found, ...hex) => { const at = parseInt(hex.slice(0, 4).find((part) => part !== undefined), 16); return at <= 0x10ffff ? String.fromCodePoint(at) : found; });
-// the endings a language adds to a name given without one, and the files a folder's name runs
-const ENDS = ["", ".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".jsx", ".tsx", ".py", ".ps1", ".cmd", ".bat"];
-const INSIDE = new Set([...ENDS.slice(1, 9).map((end) => `index${end}`), "__init__.py", "__main__.py"]);
-// a hole in a built name; the holes each language writes; a quoted string; a run of strings and code joined by + or /
-const HOLE = "\u0000";
-const HOLES = /\$\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}|\$\((?:[^()]|\([^()]*\))*\)|\$[A-Za-z_]\w*|\$[0-9@*#?!]|\{[^{}\n]*\}|%[-#0 +]*\d*(?:\.\d+)?[sdifr]|[*?]+/gu;
+// a quoted string, its text the first group of the three that matches
 const STRING = /`([^`]*)`|"((?:[^"\\\n]|\\.)*)"|'((?:[^'\\\n]|\\.)*)'/gu;
-const OPERAND = String.raw`[\w$.\[\]\u0000]+(?:\([^()\n]*\))?`, MARK = String.raw`\u0001\d+\u0001`;
-const JOINED = new RegExp(String.raw`(?:${OPERAND}[ \t]*[+/][ \t]*)*${MARK}(?:[ \t]*[+/][ \t]*(?:${MARK}|${OPERAND}))*`, "gu");
-const JOIN = /\b(?:join|resolve|joinpath|Join-Path)[ \t]*\(/gu;
-// where a built name may end: as written, with an ending, or as a folder's index
-const ENDING = String.raw`(?:\.[^/]*|/(?:index|__init__|__main__)\.[^/]+)?$`;
 // the largest text read: a file past it is held in the set, unread
 const LARGEST = 1 << 20;
 
@@ -132,18 +100,13 @@ const runnable = (name) => SCRIPT.test(name) || ACTION.test(name) || unextended(
 export function setOf({ paths, read: raw, copy }, why = new Map()) {
   const read = (name) => lf(raw(name));
   const own = paths.filter((name) => typeof name === "string" && !(typeof copy === "string" && copy !== "" && name.startsWith(copy)));
-  const runs = own.filter(runnable);
-  const tree = { all: new Set(own), runs, byLast: indexOf(runs), folders: new Set(own.map((other) => path.posix.dirname(other))), fits: new Map() };
-  const set = new Set(), queue = [];
-  const add = (name, from) => { if (!set.has(name)) { set.add(name); queue.push(name); why.set(name, from); } };
-  for (const name of own) { const seed = seedOf(name, read); if (seed) add(name, seed); }
-  for (let i = 0; i < queue.length; i++) {
-    const name = queue[i], text = read(name);
-    if (text !== null) for (const [other, from] of loadsOf(name, text, tree)) if (other !== name) add(other, from);
-  }
-  return set;
+  const found = new Map();
+  for (const name of own) { const seed = seedOf(name, read); if (seed) found.set(name, seed); }
+  if (found.size) for (const name of own) if (runnable(name) && !found.has(name)) found.set(name, "runs");
+  for (const [name, from] of found) why.set(name, from);
+  return new Set(found.keys());
 }
-// why a file is in the set by itself (power, place, unread or calls), or null where it is not
+// why a file is a seed (power, place, unread or calls), or null where it is not
 function seedOf(name, read) {
   if (WORKFLOW.test(name)) return powered(read(name)) ? "power" : null;
   if (placed(name)) return "place";
@@ -153,113 +116,6 @@ function seedOf(name, read) {
   return calls(MODULE.test(name) ? code(text) : text) ? "calls" : null;
 }
 const calls = (text) => CALLS.test(text) || outward(text);
-// what a file of the set runs or loads, each [path, what brought it in]: by a name written whole, then by one built
-function loadsOf(name, raw, tree) {
-  const text = MODULE.test(name) ? code(raw) : raw;
-  const found = [...namedIn(text, tree)].map((other) => [other, name]);
-  const built = new Set(patternsOf(text, SHELL.test(name) || unextended(name)).flatMap((pattern) => fitting(pattern, tree)));
-  if (SCRIPT.test(name) && LOADS.test(MODULE.test(name) ? bare(raw) : raw)) for (const other of loadable(name, text, tree)) built.add(other);
-  return [...found, ...[...built].map((other) => [other, `${name} (built)`])];
-}
-
-// The files that may run, by each key a word names them by: their last part, each run of TOKENS in it (`my helper.mjs`
-// by `helper.mjs`), and, for a folder's index.js, __init__.py or __main__.py, the folder's name in the same ways.
-function indexOf(runs) {
-  const byLast = new Map(), add = (key, at) => byLast.set(key, [...(byLast.get(key) ?? []), at]);
-  const keysOf = (part) => new Set([part, ...(part.match(TOKENS) ?? [])]);
-  for (const name of runs) {
-    const last = path.posix.basename(name);
-    for (const key of keysOf(last)) add(key, name);
-    if (INSIDE.has(last)) for (const key of keysOf(path.posix.basename(path.posix.dirname(name)))) add(key, name);
-  }
-  return byLast;
-}
-// What a text names whole (NAMED): each word's last part, and each part of it between dots (`tools.jobs.run`), as a
-// key of the index, bare or with each ending; and a workflow a `uses:` calls.
-function namedIn(text, { all, byLast }) {
-  const found = new Set();
-  const look = (key) => { for (const end of ENDS) for (const at of byLast.get(key + end) ?? []) found.add(at); };
-  const words = new Set([...(text.match(TOKENS) ?? []), ...(/[%\\]/u.test(text) ? decoded(text).match(TOKENS) ?? [] : [])]);
-  for (const word of words) {
-    const last = word.replace(/\.+$/u, "").split("/").pop();
-    if (last === "") continue;
-    look(last);
-    if (last.includes(".")) for (const part of last.split(".")) if (part !== "") look(part);
-  }
-  for (const [, called] of text.matchAll(/(?:^|\n)[ \t-]*uses[ \t]*:[ \t]*["']?\.\/(\.github\/workflows\/[^\s"'@#]+)/gu)) if (all.has(called)) found.add(called);
-  return found;
-}
-
-// The names a text builds (BUILT): each string, its holes marked; each run of strings and code joined by + or /, the
-// code a hole; the strings of each join( or resolve( call, joined by `/`, its other arguments holes; and, in a text of
-// commands, each word, its quotes out.
-function patternsOf(text, shell) {
-  const holed = text.replace(HOLES, HOLE), strings = [], found = new Set();
-  if (shell) for (const word of holed.replace(/["'\\]/gu, "").split(/[\s;|&<>()=,`]+/u)) found.add(word);
-  const marked = holed.replace(STRING, (...string) => { strings.push(string[1] ?? string[2] ?? string[3]); return `\u0001${strings.length - 1}\u0001`; });
-  const fill = (span) => span.split(/\u0001(\d+)\u0001/u).map((part, i) => (i % 2 ? strings[Number(part)] : /^[\s+]*$/u.test(part) ? "" : HOLE)).join("");
-  for (const string of strings) found.add(string);
-  for (const [run] of marked.matchAll(JOINED)) found.add(fill(run));
-  for (const call of marked.matchAll(JOIN)) found.add(argumentsOf(marked, call.index + call[0].length).map(fill).join("/"));
-  return [...found].map((pattern) => pattern.replace(/\u0000+/gu, HOLE)).filter((pattern) => pattern.includes(HOLE));
-}
-// a call's arguments, from just after its opening bracket to the one that closes it
-function argumentsOf(text, from) {
-  const args = [""];
-  for (let at = from, depth = 1; at < text.length; at++) {
-    const c = text[at];
-    depth += c === "(" ? 1 : c === ")" ? -1 : 0;
-    if (depth === 0) break;
-    if (c === "," && depth === 1) args.push(""); else args[args.length - 1] += c;
-  }
-  return args;
-}
-// the files a built name may be, each pattern read once a tree: none where it holds no `/` or `.`, or no fixed text
-// besides its ending
-function fitting(pattern, { runs, fits }) {
-  if (fits.has(pattern)) return fits.get(pattern);
-  const lead = pattern.match(/^(?:\u0000|\.{1,2}\/|\/)*/u)[0], rest = pattern.slice(lead.length);
-  let fit = [];
-  if (/[/.]/u.test(pattern) && /[A-Za-z0-9_]/u.test(rest.replace(/\.[A-Za-z0-9]+$/u, ""))) {
-    const start = lead.endsWith(HOLE) ? "^.*" : String.raw`^(?:.*[/\s])?`;
-    const shapes = rest.includes("/") ? [rest] : [rest, rest.replace(/\./gu, "/")];
-    const tests = shapes.map((shape) => new RegExp(`${start}${shape.split(HOLE).map(escaped).join(".*")}${shape.endsWith(HOLE) ? "" : ENDING}`, "u"));
-    fit = runs.filter((name) => tests.some((test) => test.test(name)));
-  }
-  fits.set(pattern, fit);
-  return fit;
-}
-const escaped = (text) => text.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&");
-
-// What a module that loads by a name of holes alone may load (way 3): every file below its own folder where the name
-// starts `./` or `../`; and below each folder of the tree a plain string names, from the module's own folder or the
-// root, on a line that loads by import( or require(, or on a line that sets a name such a line uses (settingOf).
-function loadable(name, text, { runs, folders }) {
-  const folder = path.posix.dirname(name), under = new Set();
-  // (a load's brackets opened on one line and its name on the next are read as one line)
-  const lines = text.replace(/\([ \t]*\n\s*/gu, "(").split("\n"), loading = lines.flatMap((line, at) => (LOADS.test(line) ? [at] : []));
-  for (const [, up] of loading.map((at) => lines[at]).join("\n").matchAll(/[`"'](\.{1,2}\/(?:\.\.\/)*)(?:\$\{|["'][ \t]*\+)/gu)) under.add(path.posix.join(folder, up, "."));
-  for (const line of settingOf(lines, loading)) for (const [, double, single] of line.matchAll(/"([^"$\n]*)"|'([^'$\n]*)'/gu)) {
-    const named = (double ?? single).replace(/^(?:\.\/)+|\/+$/gu, "");
-    for (const at of named === "" ? [] : [path.posix.normalize(path.posix.join(folder, named)), named]) if (at !== "." && at !== folder && !at.startsWith("../") && [...folders].some((f) => f === at || f.startsWith(`${at}/`))) under.add(at);
-  }
-  return runs.filter((other) => [...under].some((at) => other.startsWith(`${at}/`)));
-}
-// The loading lines and the lines that set a name they use, followed back through the names those use in turn: a
-// declaration at the top level or in a loading line's own top-level block (one in another block is that block's own),
-// an assignment anywhere.
-const IDENTIFIER = /[A-Za-z_$][\w$]*/gu, SETS = /\b(?:const|let|var)[ \t]+[[{]?[ \t]*([A-Za-z_$][\w$]*)|(?:^|[\s;(,])([A-Za-z_$][\w$]*)[ \t]*=(?![=>])/gu;
-function settingOf(lines, loading) {
-  const top = lines.map((line) => /^[^\s})\]]/u.test(line)), blockOf = [];
-  lines.forEach((line, at) => blockOf.push(top[at] || at === 0 ? at : blockOf[at - 1]));
-  const near = new Set(loading.map((at) => blockOf[at])), taken = new Set(loading), used = new Set(loading.flatMap((at) => lines[at].match(IDENTIFIER) ?? []));
-  const sets = (line, at) => [...line.matchAll(SETS)].some(([, declared, assigned]) => used.has(declared ?? assigned) && (assigned !== undefined || top[at] || near.has(blockOf[at])));
-  for (let more = true; more;) {
-    more = false;
-    for (const [at, line] of lines.entries()) if (!taken.has(at) && sets(line, at)) { taken.add(at); more = true; for (const id of line.match(IDENTIFIER) ?? []) used.add(id); }
-  }
-  return [...taken].map((at) => lines[at]);
-}
 
 // A tree on disk: every file under `root`, .git and node_modules aside.
 export function diskTree(root) {
