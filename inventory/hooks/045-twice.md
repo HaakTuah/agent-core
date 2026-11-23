@@ -1,4 +1,4 @@
-- `scripts/twice.mjs`, `scripts/twice-files.mjs`, `scripts/twice-text.mjs`, `tests/twice-test.mjs`: at a project's reading against the core and at each sync after it,
+- `scripts/twice.mjs`, `scripts/twice-files.mjs`, `scripts/twice-text.mjs`, `tests/twice-test.mjs`, `tests/twice-kept-test.mjs`, `tests/twice-fixture.mjs`: at a project's reading against the core and at each sync after it,
   lists what the project holds twice or against the core (#1087): a file equal to a file of the copy, or of an earlier
   copy, outside it; a paragraph of its own rule files that reads close to the core's, or to another of its own; a
   second call of a core workflow with the same inputs; a pointer to a path the core has left. `--fix` corrects only

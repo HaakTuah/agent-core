@@ -101,11 +101,16 @@ function noneLeft(p, found) {
     if (end) { Object.assign(x, { to: null, why: `the link ${end.file} leads to it, which the script does not move` }); continue; }
     const esc = x.file.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&"), left = new RegExp(`(?<![A-Za-z0-9_-]|${p.copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")})${esc}(?![A-Za-z0-9_/-]|\\.[A-Za-z0-9])`, "u");
     const at = kept.find(f => pointersTo(f, x.file).test(p.own.read(f, true) ?? ""))
-      ?? texts.find(t => t.file !== x.file && left.test(t.text.replace(pointersTo(t.file, x.file), pointerTo(t.file, x.file, x.to))))?.file;
+      ?? texts.find(t => t.file !== x.file && left.test(t.text.replace(pointersTo(t.file, x.file), pointerTo(t.file, x.file, x.to))))?.file
+      ?? texts.find(t => WORKFLOW.test(t.file) && byName(x.file).test(t.text.replace(pointersTo(t.file, x.file), pointerTo(t.file, x.file, x.to))))?.file;
     if (at) Object.assign(x, { to: null, why: `${at} names it in a form the script cannot move, or is a file it does not write` });
   }
   return found;
 }
+
+// A workflow's command may name a file from another folder (a working-directory, a cd): its name, left where no folder
+// of the repository's path stands before it, keeps the file.
+const byName = file => new RegExp(`(?<![A-Za-z0-9_-]/)(?<![A-Za-z0-9_.-])${path.posix.basename(file).replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")}(?![A-Za-z0-9_/-]|\\.[A-Za-z0-9])`, "u");
 
 // Where each link of the project's leads inside the repository, as a path from the root ("" the root itself); one that
 // leads nowhere, or out of the repository, leads to none of its files.
@@ -141,4 +146,6 @@ export const pointerTo = (inFile, from, to) => hit => {
 // a workflow is the core's only where it carries the core's mark.
 const WORKFLOW = /^\.github\/workflows\//u;
 export const coreMarked = (p, f) => whole(f) && (!WORKFLOW.test(f) || /^# The core's file:/u.test(p.own.read(f, true) ?? ""));
-export const textFiles = p => p.outside.filter(f => !coreMarked(p, f) && !SKIP.test(f) && !linked(p, f)).flatMap(f => { const t = p.own.read(f, true); return t === null || t.includes("\0") ? [] : [{ file: f, text: t }]; });
+export const textFiles = p => p.outside.filter(f => !coreMarked(p, f) && !SKIP.test(f) && !linked(p, f)).flatMap(f => { const t = p.own.read(f, true); return t === null || t.includes("\0") || !lossless(p, f, t) ? [] : [{ file: f, text: t }]; });
+// Whether the text read is the file's bytes whole, so that writing it back loses nothing (no other encoding).
+const lossless = (p, f, t) => { try { return Buffer.from(t, "utf8").equals(fs.readFileSync(path.join(p.root, f))); } catch { return false; } };

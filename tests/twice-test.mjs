@@ -3,86 +3,21 @@
 // beside it, it lists each, corrects with --fix only what is exact (a file equal to the core's, at the copy or an
 // earlier one, taken out and its pointers moved; code only with the files it names; the second of two calls the same in
 // every input; a pointer to a file the core moved unchanged), lists the rest for the auditor and changes nothing of
-// it, reads no dated record nor the core's part of a rule file, and run again finds nothing exact left. Node's own
-// modules and git.
+// it, reads no dated record nor the core's part of a rule file, and run again finds nothing exact left. What --fix keeps
+// because it cannot follow it: tests/twice-kept-test.mjs; the scratch core and project: tests/twice-fixture.mjs. Node's
+// own modules and git.
 //
 //   node tests/twice-test.mjs
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
-import { BEGIN, END } from "../scripts/core-owned.mjs";
 import { closeness, unitsOf } from "../scripts/twice-text.mjs";
 import { findings, pointerTo, pointersTo, projectOf, report, withoutJob } from "../scripts/twice.mjs";
-import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { root, tally } from "../scripts/scratch-core.mjs";
+import { A, FLOOR, NEAR, OTHER, RULE, SAFE, WORKFLOW, core, earlier, fetched, git, project, run, tmp, write } from "./twice-fixture.mjs";
 
 const { ok, done } = tally();
-const git = (cwd, ...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd, encoding: "utf8" }).trim();
-const write = (dir, files) => { for (const [f, t] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), t); } };
-
-const RULE = "- **A rule of the core.** By default every session reads the queue before it starts any task, and says what it took up in its pull request.";
-const NEAR = "- **A rule of the project.** By default every session reads the queue before it starts any task, and says what it took up in its own description.";
-const OTHER = "A paragraph of the project's own that says something the core never says, about its build, its players and its own release.";
-const TWICE = "Every pull request of this project runs its game's whole suite on a phone before it is marked ready, and says how long it took.";
-const GUIDE_OLD = `# A guide\n\n${"The core's guide, as an earlier copy held it, long enough to be compared as a file. ".repeat(3)}\n`;
-const GUIDE_NEW = `# A guide\n\n${"The core's guide, as the copy holds it now, long enough to be compared as a file again. ".repeat(3)}\n`;
-const PLACE = `# A place\n\n${"A file the core moved from one folder to another, its bytes unchanged by the move. ".repeat(3)}\n`;
-const A = `// The core's script a, which reads its sibling b and nothing else at all, long enough.\nimport { b } from "./b.mjs";\nexport const a = () => b() + 1;\n`;
-const B = `// The core's script b, which a reads, and which reads nothing of its own at all here.\nexport const b = () => 41;\n`;
-const C = "// The core's script c, which reads its settings beside it through a template literal, long enough.\nexport const c = () => JSON.parse(require(\"fs\").readFileSync(new URL(`./c.json`, import.meta.url))).v;\n";
-const FLOOR = `# The floor\n\n${"A rule of the floor, which no script takes out of a project without its owner's word. ".repeat(3)}\n`;
-const SAFE = `# Safe\n\n${"A file of the core's that the project's AGENTS.md calls one of its safety rules. ".repeat(3)}\n`;
-const RUN = `#!/bin/sh\n# The core's script run.sh, kept as a plain file by the core, long enough to be compared.\nexec node "$@"\n`;
-const EXTRA = `# Extra\n\n${"A file of the core's that a workflow of the core's, held whole in the project, names. ".repeat(3)}\n`;
-
-// The scratch core: an earlier commit and the pin, on main; the project's copy is the pin's tree.
-const tmp = scratchDir("twice-");
-const core = path.join(tmp, "core-repo");
-fs.mkdirSync(core);
-git(core, "init", "-q", "-b", "main");
-write(core, { "tasks/x.md": `# x\n\n${RULE}\n`, "docs/guide.md": GUIDE_OLD, "old/place.md": PLACE, "scripts/a.mjs": A, "scripts/b.mjs": B, "scripts/c.mjs": C, "scripts/c.json": `{ "v": 1 }\n`, "floor/security.md": FLOOR, "docs/safe.md": SAFE, "docs/extra.md": EXTRA, "scripts/run.sh": RUN, "docs/ref.md": "# A reference\n\nThe guide stands at docs/guide.md, for whoever reads this file.\n", "gone.md": `${"A file the core took out. ".repeat(6)}\n` });
-git(core, "add", "-A"); git(core, "commit", "-qm", "earlier");
-const earlier = git(core, "rev-parse", "HEAD");
-fs.rmSync(path.join(core, "gone.md"));
-fs.mkdirSync(path.join(core, "new"));
-fs.renameSync(path.join(core, "old/place.md"), path.join(core, "new/place.md"));
-write(core, { "docs/guide.md": GUIDE_NEW });
-git(core, "add", "-A"); git(core, "commit", "-qm", "pin");
-const pin = git(core, "rev-parse", "HEAD");
-
-const CALL = `${CORE}/.github/workflows/copies.yml@${pin}`;
-const WORKFLOW = `name: own\non: pull_request\njobs:\n  one:\n    uses: ${CALL}\n    with:\n      config: checks/copies.json\n  two:\n    uses: ${CALL}\n    with:\n      config: checks/copies.json\n  three:\n    uses: ${CALL}\n    with:\n      config: checks/other.json\n  after:\n    needs: one\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo done\n`;
-
-// The project: its copy, and each kind exactly and nearly.
-function project(name) {
-  const dir = path.join(tmp, name);
-  fs.mkdirSync(dir);
-  git(dir, "init", "-q", "-b", "main");
-  execFileSync("tar", ["-x", "-f", "-", "-C", (fs.mkdirSync(path.join(dir, "core")), path.join(dir, "core"))], { input: execFileSync("git", ["archive", pin], { cwd: core }) });
-  write(dir, {
-    "core-manifest.md": `# The core manifest\n\nCore: ${CORE} at ${pin}, copied whole under core/\n`,
-    "AGENTS.md": `# The project\n\n${NEAR}\n\n${OTHER}\n\n${TWICE}\n\n${BEGIN}\n${RULE}\n${END}\n\nSafety rules: \`docs/safe.md\`.\n`,
-    "CLAUDE.md": `# Claude\n\n${TWICE}\n\nIt reads core/old/place.md, core/gone.md and core/tasks/x.md, and docs/guide.md.\n`,
-    "SECURITY.md": `# Security\n\n${RULE}\n`,
-    "README.md": `# Read me\n\nThe guide: [the guide](docs/guide.md); the old place: core/old/place.md.\n`,
-    "docs/guide.md": GUIDE_OLD,
-    "docs/notes.md": "# Notes\n\nSee [the guide](./guide.md) and [again](guide.md).\n",
-    "tools/a.mjs": A, "tools/b.mjs": B,
-    "lib/a.mjs": A, "lib/b.mjs": B.replace("41", "42"),
-    "run.mjs": `import { a } from "./tools/a.mjs";\nimport { a as c } from "./lib/a.mjs";\nconsole.log(a(), c());\n`,
-    ".github/workflows/own.yml": WORKFLOW,
-    ".github/workflows/build.yml": "name: build\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node tools/a.mjs\n",
-    ".github/workflows/core-made.yml": "# The core's file: a workflow it holds whole.\nname: made\non: push\njobs:\n  read:\n    runs-on: ubuntu-latest\n    steps:\n      - run: cat docs/extra.md\n",
-    "floor/security.md": FLOOR, "docs/safe.md": SAFE, "docs/extra.md": EXTRA,
-    "tools/c.mjs": C, "tools/c.json": `{ "v": 2 }\n`,
-    "reports/2026-11-01.md": `# A report\n\n${RULE}\n\nIt names core/gone.md.\n`,
-  });
-  return dir;
-}
-
-// The script run as a session runs it.
-const run = (dir, ...args) => spawnSync(process.execPath, [path.join(root, "scripts/twice.mjs"), ...args], { cwd: dir, encoding: "utf8" });
-const fetched = ["--fetched", path.join(core, ".git"), "--since", earlier];
 
 // The units of a text, and how close two read.
 {
@@ -142,35 +77,6 @@ const fetched = ["--fetched", path.join(core, ".git"), "--since", earlier];
   ok(read("AGENTS.md") === before && read("reports/2026-11-01.md").includes("core/gone.md"), "no rule's text and no dated record is changed");
   const again = run(dir, ...fetched);
   ok(!/Exact, which/u.test(again.stdout) && /For the auditor/u.test(again.stdout), "run again it finds nothing exact left", again.stdout);
-}
-
-// What --fix cannot follow keeps the file: one run as a program where the copy's is not, one named through a link, and
-// one named in a form it does not move; a workflow's path opening with ./ is moved.
-{
-  const dir = project("more");
-  write(dir, {
-    "tools/run.sh": RUN, ".github/workflows/dot.yml": "name: dot\non: push\njobs:\n  run:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node ./tools/a.mjs && tools/run.sh x\n",
-    "MORE.md": "# More\n\nRun `cat $ROOT/docs/guide.md` to read it.\n",
-    ".github/workflows/called.yml": `name: called\non:\n  workflow_call:\n    outputs:\n      head:\n        value: \${{ jobs.two.outputs.head }}\njobs:\n  one:\n    uses: ${CALL}\n  two:\n    uses: ${CALL}\n`,
-  });
-  fs.chmodSync(path.join(dir, "tools/run.sh"), 0o755);
-  fs.symlinkSync("core/docs/ref.md", path.join(dir, "linked.md"));
-  const r = run(dir, "--fix", ...fetched), read = f => fs.readFileSync(path.join(dir, f), "utf8");
-  ok(/tools\/run\.sh is the core's scripts\/run\.sh, byte for byte; it may be run as a program and the copy's file may not/u.test(r.stdout) && fs.existsSync(path.join(dir, "tools/run.sh")), "a file run as a program stays where the copy's is not", r.stdout);
-  ok(read(".github/workflows/called.yml").includes("  two:"), "a call a workflow's outputs name stays", read(".github/workflows/called.yml"));
-  ok(read(".github/workflows/dot.yml").includes("node ./core/scripts/a.mjs") && !fs.existsSync(path.join(dir, "tools/a.mjs")), "a workflow's path from the root opening with ./ moves", read(".github/workflows/dot.yml"));
-  ok(/docs\/guide\.md .*(?:MORE\.md|linked\.md) names it in a form the script cannot move/u.test(r.stdout) && fs.existsSync(path.join(dir, "docs/guide.md")), "a file named in a form not moved, or through a link, stays", r.stdout);
-  ok(read("core/docs/ref.md").includes("at docs/guide.md,"), "nothing is written through a link into the copy");
-  const solo = project("linked");
-  fs.rmSync(path.join(solo, "MORE.md"), { force: true });
-  fs.symlinkSync("core/docs/ref.md", path.join(solo, "linked.md"));
-  const s2 = run(solo, "--fix", ...fetched);
-  ok(/docs\/guide\.md .*linked\.md names it/u.test(s2.stdout) && fs.readFileSync(path.join(solo, "core/docs/ref.md"), "utf8").includes("at docs/guide.md,"), "a link's text keeps the file it names, and the copy is not written", s2.stdout);
-  const alias = project("alias");
-  fs.symlinkSync("a.mjs", path.join(alias, "tools/alias.mjs"));
-  fs.symlinkSync("tools", path.join(alias, "kit"));
-  const s3 = run(alias, "--fix", ...fetched);
-  ok(/tools\/a\.mjs .*the link (?:tools\/alias\.mjs|kit) leads to it/u.test(s3.stdout) && fs.existsSync(path.join(alias, "tools/a.mjs")) && fs.existsSync(path.join(alias, "tools/b.mjs")), "a file a link leads to, or a folder of it, stays", s3.stdout);
 }
 
 // A path that held other content at an earlier release moves only as it moved from the old pin, and the command the
