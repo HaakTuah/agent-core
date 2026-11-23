@@ -53,11 +53,11 @@ const ACTION = /(?:^|\/)action\.ya?ml$/iu;
 const POWERED = /(?:^|\n)[ \t]*[^#\n][^\n]*?(?:\bwrite-all\b|\b[a-z-]+["']?[ \t]*:[ \t]*["']?write["']?[ \t]*(?:[,}#]|\n|$)|\bsecrets\b(?!\.GITHUB_TOKEN\b))/u;
 const PERMISSIONS = /(?:^|\n)permissions[ \t]*:/u;
 // a call to GitHub, the network or `git push`, as a script's text shows it
-export const CALLS = /\bfetch[ \t]*\(|\bnode:(?:https?|http2|net|tls|dgram)\b|\brequire\([ \t]*["'](?:https?|http2|net|tls|dgram)["']|\bXMLHttpRequest\b|\bWebSocket\b|\bcurl\b|\bwget\b|\bInvoke-(?:WebRequest|RestMethod)\b|\burllib\b|\brequests\.(?:get|post|put|patch|delete|request)\b|\bgh[ \t]+(?:api|pr|issue|release|run|repo|workflow|auth|secret|label|search)\b|["']gh["']|api\.github\.com|\bGH_TOKEN\b|\bGITHUB_TOKEN\b|\bgit[ \t]+(?:push|fetch|clone|pull|ls-remote)\b|["'](?:push|fetch|clone|pull|ls-remote)["']/u;
+export const CALLS = /\bfetch[ \t]*\(|\bnode:(?:https?|http2|net|tls|dgram)\b|\b(?:require\([ \t]*|from[ \t]+|import[ \t]+)["'](?:https?|http2|net|tls|dgram)["']|\bXMLHttpRequest\b|\bWebSocket\b|\bcurl\b|\bwget\b|\bInvoke-(?:WebRequest|RestMethod)\b|\burllib\b|\brequests\.(?:get|post|put|patch|delete|request)\b|\bgh[ \t]+(?:api|pr|issue|release|run|repo|workflow|auth|secret|label|search)\b|["']gh["']|api\.github\.com|\bGH_TOKEN\b|\bGITHUB_TOKEN\b|\bgit[ \t]+(?:push|fetch|clone|pull|ls-remote)\b|["'](?:push|fetch|clone|pull|ls-remote)["']/u;
 // a module loaded by a name built at run time: an import( or require( whose argument is no plain string
 const BUILT = /(?:^|\n)[ \t]*(?!\/\/|\*|#)[^\n]*?\b(?:import|require)[ \t]*\([ \t]*(?!["'][^"'\n$]*["'][ \t]*[,)])/u;
 // a module's code that starts another process, whose names lead from the working directory as well
-const SPAWNS = /\b(?:child_process|execa(?:Sync)?|(?:exec|execFile|spawn)(?:Sync)?|fork)\b|\bDeno\.(?:run|Command)\b|\bBun\.spawn/u;
+const SPAWNS = /\b(?:child_process|execa(?:Sync)?|(?:exec|execFile|spawn)(?:Sync)?|fork)\b|\bDeno\.(?:run|Command)\b|\bBun\.spawn|\bsubprocess\b|\bos\.(?:system|popen|exec[lv]p?e?)\b/u;
 // a module's own code, whose names lead from its own folder alone (a root-relative path in it is text it prints)
 const MODULE = /\.(?:[cm]?[jt]sx?)$/iu;
 // a module's code with its strings left empty and its comments out, for BUILT to read (a template with a `${` stays
@@ -143,15 +143,20 @@ const runnable = (name) => SCRIPT.test(name) || ACTION.test(name) || unextended(
 // from a folder it moves to (or, where it moves to one it builds, from any folder: `byBase`, the runnable paths by their
 // last part), the Python modules it runs by name, and the workflows it calls (`uses: ./.github/workflows/...`): a
 // workflow it only names, it does not run
+// whether a script's names lead from the working directory its caller gave it (a shell script, or a module that starts
+// a process), which a step's `working-directory` may set, so that they may stand in any folder: a workflow and an action
+// start from the root
+const inheritsFolder = (name, text) => !WORKFLOW.test(name) && !ACTION.test(name) && (!(MODULE.test(name) || /\.py$/iu.test(name)) || SPAWNS.test(text));
 function namedIn(name, text, all, byBase = new Map()) {
   const folder = path.posix.dirname(name), found = new Set();
   const moved = movesOf(text, folder);
+  const inherits = inheritsFolder(name, text);
   const take = (at) => { if (all.has(at) && at !== name && runnable(at)) found.add(at); };
   // a name as it may stand relative to any folder: each runnable path it ends
   const anyFolder = (stem) => { for (const at of byBase.get(path.posix.basename(stem)) ?? []) if (at === stem || at.endsWith(`/${stem}`)) take(at); };
   const resolve = (bare, tries, bases) => {
     for (const stem of bases.map((base) => path.posix.normalize(path.posix.join(base, bare)))) for (const end of tries) take(stem + end);
-    if (moved.anywhere) for (const end of tries) anyFolder(path.posix.normalize(bare + end));
+    if (moved.anywhere || inherits) for (const end of tries) anyFolder(path.posix.normalize(bare + end));
   };
   const tries = ["", ...(RESOLVES.find(([kind]) => kind.test(name))?.[1] ?? [])];
   // (a module's own code names a path from its own folder alone, a root-relative one in it being text it prints, save

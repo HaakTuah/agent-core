@@ -97,6 +97,19 @@ const templated = setOf(tree({
   ".github/workflows/t.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node scripts/run.mjs\n",
   "scripts/run.mjs": "spawnSync(\"node\", [\"five.mjs\"], { cwd: `${root}/tools` });\n", "lib/tools/five.mjs": "", "lib/four.mjs": "",
 }));
+// a script started from the working directory a step's `working-directory` gives it starts its own from there, so a
+// shell script's names, and those of a module that starts a process, may stand in any folder; a module's that starts
+// none, and a workflow's, do not
+const inherited = setOf(tree({
+  ".github/workflows/t.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node scripts/run.mjs && sh scripts/go.sh\n        working-directory: tools\n      - run: node scripts/plain.mjs\n        working-directory: tools\n",
+  "tools/scripts/run.mjs": "execFileSync(process.execPath, [\"job.mjs\"]);\n", "tools/scripts/go.sh": "./step.sh\n", "tools/scripts/plain.mjs": "console.log(\"see other.mjs\");\n",
+  "tools/job.mjs": "", "tools/step.sh": "", "tools/other.mjs": "",
+}));
+// a script that loads a network module by an ESM import is one that calls out, as one that requires it is
+const esm = setOf(tree({ "scripts/get.mjs": "import { get } from 'http';\nget(url);\n", "scripts/tls.mjs": "import https from \"https\";\n", "scripts/text.mjs": "console.log(\"from http\");\n" }));
+ok(show(inherited) === ".github/workflows/t.yml, tools/job.mjs, tools/scripts/go.sh, tools/scripts/plain.mjs, tools/scripts/run.mjs, tools/step.sh"
+  && show(esm) === "scripts/get.mjs, scripts/tls.mjs",
+  "a script whose working directory its step gives starts its own from there, and a bare ESM import of a network module calls out; a module that starts nothing, and a word, do not", `${show(inherited)} | ${show(esm)}`);
 ok(show(spawned) === ".github/workflows/t.yml, lib/deep/three.mjs, scripts/job.mjs, scripts/run.mjs, tools/two.mjs"
   && show(templated) === ".github/workflows/t.yml, lib/tools/five.mjs, scripts/run.mjs",
   "a script a module starts as a process joins the set, from the root, from a plain cwd, and from any folder where its cwd is built, by a name or a template; one none names stays out", show(spawned));
