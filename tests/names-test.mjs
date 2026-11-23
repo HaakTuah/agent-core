@@ -144,10 +144,11 @@ try {
 {
   const deep = Array.from({ length: 2000 }, () => "a").join("/");
   const tracked = ["b", "c", "d", "e"].map(x => `${deep}/${x}.ts`);
-  const name = `${Array.from({ length: DEEPEST }, () => "a").join("/")}/b.ts`;
+  // (a name of exactly DEEPEST segments that stands is read and found; one as deep as the tracked paths is left alone)
+  const edge = `${Array.from({ length: DEEPEST - 1 }, () => "a").join("/")}/b.ts`;
   const started = Date.now();
-  const r = brokenNames({ read: () => null, tracked, blocksOf: () => [{ i: 0, text: `\`a/a/b.ts\` \`a/z.ts\` \`${name}\`` }], core: true });
+  const r = brokenNames({ read: () => null, tracked, blocksOf: () => [{ i: 0, text: `\`a/a/b.ts\` \`a/z.ts\` \`${edge}\` \`${tracked[0]}\`` }], core: true });
   const took = Date.now() - started;
-  ok(took < 10000 && r.count === 2 && r.left >= 1 && r.found.length <= 1 && !r.found.some(x => x.name === "a/a/b.ts"), `deep tracked paths are indexed in seconds, and a name past ${DEEPEST} segments is left alone and counted`, `${took} ms, ${JSON.stringify({ count: r.count, left: r.left, found: r.found.map(x => x.name) })}`);
+  ok(took < 10000 && r.count === 3 && r.left >= 1 && !r.found.some(x => x.name === "a/a/b.ts" || x.name === edge), `deep tracked paths are indexed in seconds, a name of ${DEEPEST} segments is read, and one past it is left alone and counted`, `${took} ms, ${JSON.stringify({ count: r.count, left: r.left, found: r.found.map(x => x.name.slice(0, 40)) })}`);
 }
 process.exit(failed ? 1 : 0);
