@@ -7,9 +7,10 @@
 //     (core-owned.mjs, BEGIN to END) and the core's whole files, that is a copy of one of the copy's own Markdown files
 //     or of another of the project's, or reads close to one (twice-text.mjs, beside this file); listed;
 //   - a file outside the copy equal byte for byte to one of the core's, at the copy or, with the core fetched, at an
-//     earlier copy (the old pin and each release); it goes, its pointers moved to the copy's file, where one file of
-//     the copy stands for it and no pointer to it is left that cannot be moved, and it is neither the floor's text nor a
-//     file the project's AGENTS.md calls a safety rule; else it is listed;
+//     earlier copy (the old pin and each release); it goes, its pointers moved to the copy's file, where it is Markdown
+//     a tool does not look for where it stands, one file of the copy stands for it, no pointer to it is left that cannot
+//     be moved, and it is neither the floor's text nor a file the project's AGENTS.md calls a safety rule; else it is
+//     listed;
 //   - a job that calls one of the core's workflows that another job calls too: the second of two in one workflow, the
 //     same in all but its name and named in no `needs:`, goes from a workflow of the project's own; any other is listed;
 //   - a pointer, in the project's own text, to a path of the copy that is not there: with the core fetched, one the
@@ -34,7 +35,7 @@ import { ownFiles } from "./own-files.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { fetchCore, inBare, releasesIn } from "./releases.mjs";
 import { started } from "./started.mjs";
-import { SKIP, filesFound, listTree, pointerTo, pointersTo, safetyOf, textFiles } from "./twice-files.mjs";
+import { SKIP, exists, filesFound, listTree, pointerTo, pointersTo, safetyOf, textFiles } from "./twice-files.mjs";
 import { textFound } from "./twice-text.mjs";
 
 export { blobId, filesFound, pointerTo, pointersTo } from "./twice-files.mjs"; // (the tests' way in)
@@ -157,7 +158,7 @@ export function findings(p) {
 export function fix(p, found) {
   const done = [], edits = new Map(), texts = textFiles(p);
   const text = f => edits.has(f) ? edits.get(f) : p.own.read(f, true);
-  const move = (file, from, to) => { const now = text(file), moved = now.replace(pointersTo(file, from), pointerTo(file, from, to)); if (moved !== now) edits.set(file, moved); return moved !== now; };
+  const move = (file, from, to) => { const now = text(file), moved = now.replace(pointersTo(file, from, exists(p)), pointerTo(file, from, to)); if (moved !== now) edits.set(file, moved); return moved !== now; };
   const gone = new Set(found.filter(f => f.fix?.kind === "file").map(f => f.fix.file));
   for (const { fix: x } of found.filter(f => f.fix?.kind === "file")) {
     for (const t of texts) if (!gone.has(t.file)) move(t.file, x.file, x.to);

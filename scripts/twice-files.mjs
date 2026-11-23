@@ -29,70 +29,44 @@ function coreBlobs(p) {
 }
 export const listTree = (bare, sha) => inBare(bare, ["ls-tree", "-r", "-z", sha], { maxBuffer: 1 << 28 }).split("\0").flatMap(l => { const m = /^\d+ blob ([0-9a-f]{40})\t(.+)$/su.exec(l); return m ? [{ id: m[1], file: m[2] }] : []; });
 
-const CODE = /\.(?:mjs|cjs|js|ts|py|sh|ps1)$/iu;
-// The paths a code file names in quotes or backticks (its imports, the files it reads), resolved from its folder: each
-// that opens with ./ or ../, and each other that names a file of the project's beside it; null where one is built as it
-// runs (a ${...} in a path), which cannot be read.
-const named = (text, file, has) => {
-  const out = [];
-  for (const [, s] of text.matchAll(/["'`]([^"'`\s]+)["'`]/gu)) {
-    const at = path.posix.normalize(path.posix.join(path.posix.dirname(file), s.replace(/\$\{.*$/u, "")));
-    if (s.includes("${") && /^\.\.?\/|\//u.test(s)) return null;
-    if (/^\.\.?\//u.test(s) || (/^[\w.-]+(?:\/[\w.-]+)*\.\w+$/u.test(s) && has(at))) out.push(at);
-  }
-  return out;
-};
-
 // The files outside the copy equal byte for byte to one of the core's: { file, core, at, to }, `to` the copy's file
-// that stands for it, or null where none does, more than one does, or, for code, where it is not the copy's own (an
-// earlier version runs otherwise) or a file it names would not stand beside the copy's as it stands beside this one.
+// that stands for it, or null where none does, more than one does, or what uses the file cannot all be read (below).
 export function filesFound(p) {
   const byId = coreBlobs(p), found = [];
   for (const f of p.outside) {
     const hit = compared(p, f) && equalTo(p, byId, f);
     if (hit) found.push(hit);
   }
-  return withWhatTheyName(p, noneLeft(p, withWhatTheyName(p, found)));
+  return noneLeft(p, found);
 }
 const compared = (p, f) => !whole(f) && !NOT_COMPARED.test(f) && !SKIP.test(f) && !linked(p, f) && p.own.read(f, true) !== null;
 // A link is never read as the project's own file nor written through: what it leads to may be the copy's.
 const linked = (p, f) => { try { return fs.lstatSync(path.join(p.root, f)).isSymbolicLink(); } catch { return true; } };
-// Whether a file may be run as a program (no such mark where the system keeps none).
-const runnable = file => { try { return (fs.statSync(file).mode & 0o111) !== 0; } catch { return false; } };
+// Only Markdown goes: what else a project holds (code, a manifest, a config) may be run, or found by a tool where it
+// stands, in ways no pointer shows; and of Markdown, not a name a tool looks for in its folder, nor one in a dot folder.
+const MARKDOWN = /\.md$/iu;
+const BY_PLACE = /(?:^|\/)(?:README|index|AGENTS|CLAUDE|GEMINI|REVIEW|SECURITY|CONTRIBUTING|CODE_OF_CONDUCT|CHANGELOG|SUPPORT)\.md$|(?:^|\/)\./iu;
 // The file `f` as a finding where it is equal to one of the core's, else null.
 function equalTo(p, byId, f) {
   let buf;
   try { buf = fs.readFileSync(path.join(p.root, f)); } catch { return null; }
   const hits = buf.length < SMALLEST ? null : byId.get(blobId(buf));
   if (!hits) return null;
-  const kept = CODE.test(f) ? hits.filter(h => h.at === "the copy") : hits;
-  const to = [...new Set(kept.map(h => h.at === "the copy" ? h.file : p.moved.has(h.file) ? p.moved.get(h.file) : p.copySet.has(h.file) ? h.file : null))];
-  const found = { file: f, core: hits[0].file, at: hits[0].at, to: to.length === 1 && to[0] ? `${p.copy}${to[0]}` : null, text: buf.toString("utf8") };
+  const to = [...new Set(hits.map(h => h.at === "the copy" ? h.file : p.moved.has(h.file) ? p.moved.get(h.file) : p.copySet.has(h.file) ? h.file : null))];
+  const found = { file: f, core: hits[0].file, at: hits[0].at, to: to.length === 1 && to[0] ? `${p.copy}${to[0]}` : null };
   if (hits.some(h => FLOOR.test(h.file)) || p.safety.has(f)) Object.assign(found, { to: null, why: "it is the floor's text or a safety rule, which goes only on its owner's word" });
-  else if (found.to && runnable(path.join(p.root, f)) && !runnable(path.join(p.root, found.to))) Object.assign(found, { to: null, why: "it may be run as a program and the copy's file may not" });
+  else if (found.to && !MARKDOWN.test(f)) Object.assign(found, { to: null, why: "it is no Markdown, which may be run or found where it stands in ways no pointer shows" });
+  else if (found.to && BY_PLACE.test(f)) Object.assign(found, { to: null, why: "a tool may look for it where it stands" });
   return found;
 }
 // The floor's text (security.md, its topics, the threat model) and the files the project's own AGENTS.md calls safety
 // rules, in backticks on a line that says so: never taken out by a script (tasks/cleaning.md).
 const FLOOR = /^(?:floor\/|SECURITY\.md$)/u;
 export const safetyOf = own => new Set((ownText(own, "AGENTS.md") ?? "").split("\n").filter(l => /safety/iu.test(l)).flatMap(l => [...l.matchAll(/`([^`\s]+)`/gu)].map(m => m[1].replace(/^\.\//u, ""))));
-// Code goes only with every file it names: each goes too, to the copy's file at the same place beside it.
-function withWhatTheyName(p, found) {
-  const has = f => p.outside.includes(f);
-  let dropped = true;
-  while (dropped) {
-    dropped = false;
-    const going = new Map(found.filter(x => x.to).map(x => [x.file, x.to]));
-    for (const x of found.filter(x => x.to && CODE.test(x.file))) {
-      const ok = named(x.text, x.file, has)?.every(n => going.get(n) === path.posix.normalize(path.posix.join(path.posix.dirname(x.to), path.posix.relative(path.posix.dirname(x.file), n))));
-      if (!ok) { x.to = null; x.why = "it names a file that would not stand beside the copy's as it stands beside it, or one built as it runs"; dropped = true; }
-    }
-  }
-  return found;
-}
 // A file goes only where every pointer to it can be moved: none is left in a file the script does not write (one of
 // the core's the project holds whole, a link), none in a text that still names its path once the pointers it moves
-// are moved (a form it does not read, such as a path further down another's), and no link leads to it or a folder of it.
+// are moved (a form it does not read, such as a path further down another's, or one read from the caller's folder), and
+// no link leads to it or a folder of it.
 function noneLeft(p, found) {
   const texts = textFiles(p), fixed = texts.map(t => t.file), kept = p.outside.filter(f => !fixed.includes(f) && !SKIP.test(f) && !found.some(x => x.file === f));
   const ends = linkEnds(p);
@@ -100,9 +74,10 @@ function noneLeft(p, found) {
     const end = ends.find(e => e.to === "" || x.file === e.to || x.file.startsWith(`${e.to}/`));
     if (end) { Object.assign(x, { to: null, why: `the link ${end.file} leads to it, which the script does not move` }); continue; }
     const esc = x.file.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&"), left = new RegExp(`(?<![A-Za-z0-9_-]|${p.copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")})${esc}(?![A-Za-z0-9_/-]|\\.[A-Za-z0-9])`, "u");
+    const has = exists(p), moved = t => t.text.replace(pointersTo(t.file, x.file, has), pointerTo(t.file, x.file, x.to));
     const at = kept.find(f => pointersTo(f, x.file).test(p.own.read(f, true) ?? ""))
-      ?? texts.find(t => t.file !== x.file && left.test(t.text.replace(pointersTo(t.file, x.file), pointerTo(t.file, x.file, x.to))))?.file
-      ?? texts.find(t => WORKFLOW.test(t.file) && byName(x.file).test(t.text.replace(pointersTo(t.file, x.file), pointerTo(t.file, x.file, x.to))))?.file;
+      ?? texts.find(t => t.file !== x.file && left.test(moved(t)))?.file
+      ?? texts.find(t => WORKFLOW.test(t.file) && byName(x.file).test(moved(t)))?.file;
     if (at) Object.assign(x, { to: null, why: `${at} names it in a form the script cannot move, or is a file it does not write` });
   }
   return found;
@@ -126,11 +101,13 @@ function linkEnds(p) {
 
 // Each pointer in a text to the path `from`: as the repository's path, as a relative path that opens with ./ or ../,
 // or as a Markdown link's target relative to the file `inFile`; in a workflow, whose commands run from the root, the
-// repository's path opening with ./ too.
-export function pointersTo(inFile, from) {
+// repository's path opening with ./ too. The repository's path is none where, read from the folder of `inFile`, it
+// names another file that `has` finds: that is the caller's own.
+export function pointersTo(inFile, from, has = () => false) {
   const esc = s => s.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&");
   const rel = path.posix.relative(path.posix.dirname(inFile), from), dotted = rel.startsWith(".") ? rel : `./${rel}`;
-  const forms = [`(?<![A-Za-z0-9._/-])${esc(from)}`, `(?<![A-Za-z0-9._/-])${esc(dotted)}`, `(?<=\\]\\()${esc(rel)}`];
+  const own = !WORKFLOW.test(inFile) && path.posix.dirname(inFile) !== "." && has(path.posix.join(path.posix.dirname(inFile), from));
+  const forms = [...own ? [] : [`(?<![A-Za-z0-9._/-])${esc(from)}`], `(?<![A-Za-z0-9._/-])${esc(dotted)}`, `(?<=\\]\\()${esc(rel)}`];
   if (WORKFLOW.test(inFile)) forms.push(`(?<![A-Za-z0-9._/-])\\./${esc(from)}`);
   return new RegExp(`(?:${forms.join("|")})(?![A-Za-z0-9_/-]|\\.[A-Za-z0-9])`, "gu");
 }
@@ -141,6 +118,9 @@ export const pointerTo = (inFile, from, to) => hit => {
   const rel = path.posix.relative(path.posix.dirname(inFile), to);
   return hit.startsWith("./") && !rel.startsWith(".") ? `./${rel}` : rel;
 };
+
+// Whether a path of the repository stands, for pointersTo's `has`.
+export const exists = p => f => fs.existsSync(path.join(p.root, f));
 
 // The project's own text files that may hold a pointer: outside the copy, the core's whole files and the dated records;
 // a workflow is the core's only where it carries the core's mark.

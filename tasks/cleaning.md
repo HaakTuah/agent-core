@@ -127,7 +127,7 @@ code is held to: `tasks/code-shape.md`.
   it reads without guessing (text that is a copy of the core's or of the project's own, or reads close to one; a file
   outside the copy equal to one of the core's, at the copy or an earlier one; a call of one of the core's workflows made
   twice; a pointer to a path the core has left), and its `--fix`, run by the session that takes the reading's task in a
-  pull request of its own that the usual reviews read, corrects only what is exact: a file equal byte for byte to one
+  pull request of its own that the usual reviews read, corrects only what is exact: Markdown equal byte for byte to one
   of the core's goes, its pointers moved to the copy's; the second of two calls the same in every input goes; a pointer
   to a file the core moved unchanged moves to where it stands. Then the auditor answers, for each finding the script did
   not settle, the same, stricter or narrower, different, contradicting, or unsure, with its evidence, by meaning and
