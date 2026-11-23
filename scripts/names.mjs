@@ -6,8 +6,8 @@
 //                              tracked file's or folder's path is that name or ends with "/" and that name ("./" and
 //                              "../" before it read as nothing), where git ignores it, or where a tracked file of the
 //                              project's own that is no Markdown (nor the list below) holds it, as the code that writes
-//                              a record names it; one of more than DEEPEST (32) segments, or past SEARCHED (1000) to
-//                              search the code for, is left alone and counted
+//                              a record names it; one of more than DEEPEST segments, or past SEARCHED to search the
+//                              code for, is left alone and counted
 //   `npm run lint`             a script of the package file at the project's root ("scripts"), as npm, pnpm or yarn
 //                              run it (`npm run-script lint`, `pnpm run lint`, `yarn run lint`, `npm test`), the name
 //                              alone or followed by " -- " and its arguments; with no package file there, left alone
@@ -99,11 +99,11 @@ function runsOf(tracked, depth) {
   return runs;
 }
 
-// The most segments a file's name that the descriptions put in code marks has, read in a pass of its own that keeps
-// only the number, so the names are never all held at once.
-function deepestOf(files, blocksOf) {
+// The most segments a file's name that the descriptions put in code marks has (each { file, blocks }), read in a pass
+// of its own that keeps only the number, so the names are never all held at once.
+function deepestOf(described) {
   let depth = 1;
-  for (const file of files) for (const b of blocksOf(file)) for (const n of namesIn(b.text)) if (n.file) depth = Math.max(depth, n.file.split("/").length);
+  for (const { blocks } of described) for (const b of blocks) for (const n of namesIn(b.text)) if (n.file) depth = Math.max(depth, n.file.split("/").length);
   return depth;
 }
 
@@ -128,13 +128,13 @@ function judge(n, { core, exts, runs, tops, scripts }) {
 export function brokenNames({ read, tracked, blocksOf, skip = () => false, core = false, copy = "", tree = null, usable = () => true }) {
   const d = core ? { files: ["README.md"] } : descriptionsOf(read("core-manifest.md"), tracked);
   const unusable = d.files.filter(f => !usable(f));
-  const files = d.files.filter(f => !unusable.includes(f));
-  const ctx = { core, runs: runsOf(tracked, Math.min(DEEPEST, deepestOf(files, blocksOf))), tops: new Set(tracked.filter(f => f.includes("/")).map(f => f.split("/")[0])),
+  const described = d.files.filter(f => !unusable.includes(f)).map(file => ({ file, blocks: blocksOf(file) }));
+  const ctx = { core, runs: runsOf(tracked, Math.min(DEEPEST, deepestOf(described))), tops: new Set(tracked.filter(f => f.includes("/")).map(f => f.split("/")[0])),
     scripts: core ? null : scriptsOf(read("package.json")),
     exts: new Set(tracked.map(f => /\.([^./]+)$/u.exec(posix.basename(f))?.[1]).filter(Boolean)) };
   const found = [];
   let count = 0, deep = 0;
-  for (const file of files) for (const b of blocksOf(file)) for (const n of namesIn(b.text)) {
+  for (const { file, blocks } of described) for (const b of blocks) for (const n of namesIn(b.text)) {
     const v = skip(file, n.name) ? "skip" : judge(n, ctx);
     if (v === "skip" || v === "deep") { deep += v === "deep"; continue; }
     count++;

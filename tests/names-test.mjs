@@ -144,7 +144,7 @@ try {
 {
   const deep = Array.from({ length: 2000 }, () => "a").join("/");
   const tracked = ["b", "c", "d", "e"].map(x => `${deep}/${x}.ts`);
-  // (a name of exactly DEEPEST segments that stands is read and found; one as deep as the tracked paths is left alone)
+  // (a name of exactly DEEPEST segments that stands is read and stands; one as deep as the tracked paths is left alone)
   const edge = `${Array.from({ length: DEEPEST - 1 }, () => "a").join("/")}/b.ts`;
   const started = Date.now();
   const r = brokenNames({ read: () => null, tracked, blocksOf: () => [{ i: 0, text: `\`a/a/b.ts\` \`a/z.ts\` \`${edge}\` \`${tracked[0]}\`` }], core: true });
