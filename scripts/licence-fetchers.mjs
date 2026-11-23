@@ -1,6 +1,6 @@
 // The fetchers the licence scan cannot read the packages of (licence-scan.mjs, beside this file, fails a file that
 // holds one): other fetchers (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone and the like) by
-// OTHER_FETCHER, Windows' and .NET's by WINDOWS_FETCHER, found in a text by otherFetch; and, of those, the downloads
+// OTHER_FETCHER, Windows' and .NET's by WINDOWS_FETCHER, found in a text by otherFetches; and, of those, the downloads
 // by address (curl, wget and PowerShell's), by downloads. What npm's own commands fetch is read apart, in
 // licence-npm.mjs, and where commands stand in a file, in licence-commands.mjs.
 // Node's own modules only (none).
@@ -47,15 +47,18 @@ export const WINDOWS_FETCHER = (() => {
     "imu",
   );
 })();
-/** The first fetch in text by a fetcher the scan cannot read, or undefined. */
-export const otherFetch = (text) => (OTHER_FETCHER.exec(text) ?? WINDOWS_FETCHER.exec(text))?.[0];
+// Each fetch in text by a fetcher the scan cannot read, as the two readers above find them: their matches, each place
+// once, in the order they stand.
+const matches = (text) => [...new Map([OTHER_FETCHER, WINDOWS_FETCHER].flatMap((re) => [...text.matchAll(new RegExp(re.source, `${re.flags}g`))]).map((m) => [m.index, m])).values()].sort((a, b) => a.index - b.index);
+/** Each fetch in text by a fetcher the scan cannot read, in the order they stand. */
+export const otherFetches = (text) => matches(text).map((m) => m[0]);
 // The fetchers among those that download a file by its address, a program among them: curl and wget, and PowerShell's.
 const DOWNLOADER = /(?:curl|wget|Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer|(?<![\w-])(?:iwr|irm)(?![\w-]))/iu;
 /** Each download by address in text, as the two readers above find their fetches: the line each stands in and the
  *  lines it runs on to (after a "\\" or PowerShell's "`" at a line's end), trimmed, once for each download, so that
  *  two alike count twice; for a report and a count, never compared word for word. */
 export function downloads(text) {
-  const at = [OTHER_FETCHER, WINDOWS_FETCHER].flatMap((re) => [...text.matchAll(new RegExp(re.source, `${re.flags}g`))].filter((m) => DOWNLOADER.test(m[0])).map((m) => m.index + m[0].search(/\S/u)));
+  const at = matches(text).filter((m) => DOWNLOADER.test(m[0])).map((m) => m.index + m[0].search(/\S/u));
   return [...new Set(at)].sort((a, b) => a - b).map((i) => {
     let end = text.indexOf("\n", i);
     while (end !== -1 && /[\\`]\r?$/u.test(text.slice(text.lastIndexOf("\n", end - 1) + 1, end))) end = text.indexOf("\n", end + 1);

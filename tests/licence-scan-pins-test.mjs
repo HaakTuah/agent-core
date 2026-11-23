@@ -1,6 +1,7 @@
 // Checks that a program a file downloads by its address is pinned by version and checksum (#488, point 5), in the licence
 // scan (scripts/licence-scan.mjs) read against a pull request's base, on a scratch project of its own, with the check of
-// scripts/licences.mjs. The scan's other cases are licence-scan-test.mjs's. Run by the core's tests workflow
+// scripts/licences.mjs, and a fetch the scan cannot read that stood unaudited at that base (#1074). The scan's other
+// cases are licence-scan-test.mjs's. Run by the core's tests workflow
 // (.github/workflows/tests.yml).
 //
 //   node tests/licence-scan-pins-test.mjs
@@ -101,5 +102,41 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
+
+
+// A fetch the scan has come to read, standing unaudited at the pull request's base, is reported and passes (AGENTS.md,
+// "Nothing locks a project"; #1074); one the pull request adds, or whose entry it takes out, fails, saying the mend.
+{
+  const dir = scratchDir("licence-fetch-base-");
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+  const git = (...args) => execFileSync("git", args, { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] });
+  const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); git("add", "-A"); };
+  const config = { ships: [], lockfiles: [], audit: "audit.json", scan: { served: [], skip: [] } };
+  const stood = (r, f) => r.failures.length === 0 && r.reports.some((m) => m.startsWith(`${f}: `) && m.includes("fetches what no entry") && m.includes("at the pull request's base"));
+  const GET = "#!/usr/bin/env bash\npip download mosspy -d wheels\n";
+  try {
+    git("init", "-q");
+    put("audit.json", JSON.stringify({ entries: [] }));
+    put("scripts/get.sh", GET);
+    put("tools/package.json", JSON.stringify({ name: "moss", scripts: { wheels: "pip3 wheel mosspy" } }));
+    git("commit", "-q", "-m", "base");
+    put("README.md", "a change of its own\n"); git("commit", "-q", "-m", "c");
+    let r = licenceCheck(config, dir, "HEAD^1", config);
+    ok(stood(r, "scripts/get.sh") && stood(r, "tools/package.json"), "a fetch the scan now reads, unaudited at the base and unchanged, is reported and passes, in a script and in JSON", JSON.stringify(r));
+    r = licenceCheck(config, dir, null, config);
+    ok(r.failures.length === 2 && r.failures.every((m) => /fetches what no entry/u.test(m)) && mended(asOutput(r.failures)), "with no base to read, it fails, saying the mend", JSON.stringify(r));
+    put("scripts/get.sh", `${GET}pip download lichenpy -d wheels\n`);
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 1 && r.failures[0].startsWith("scripts/get.sh: ") && mended(asOutput(r.failures)), "a second fetch added to a file that stood unaudited fails: the base is compared fetch by fetch", JSON.stringify(r));
+    put("scripts/get.sh", GET);
+    put("audit.json", JSON.stringify({ entries: [{ name: "Moss tools", licence: "MIT", files: ["scripts/get.sh", "tools/package.json"] }] }));
+    git("commit", "-q", "-m", "audited");
+    put("audit.json", JSON.stringify({ entries: [] }));
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 2 && r.failures.every((m) => /fetches what no entry/u.test(m)), "a pull request that takes out the entry auditing a fetch fails: the base is read by its own audit", JSON.stringify(r));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 done();

@@ -1,7 +1,8 @@
 // Checks the licence scan (scripts/licence-scan.mjs, with its readers licence-commands.mjs, licence-npm.mjs,
 // licence-fetchers.mjs and licence-pages.mjs) on the fetchers it cannot read (curl, pip, git clone, .NET's and Windows') and the scripts in a language it cannot read, each
 // staged in the project licence-scan-stage.mjs writes and failing for the reason it names. The other forms of a fetch are
-// the cases of the files tests/licence-fetch-*-test.mjs. Run by the core's tests workflow (.github/workflows/tests.yml).
+// the cases of the files tests/licence-fetch-*-test.mjs, and one of these that stood at a pull request's base is
+// licence-scan-pins-test.mjs's. Run by the core's tests workflow (.github/workflows/tests.yml).
 //   node tests/licence-fetch-other-test.mjs
 import { append, done, ok, run, write } from "../scripts/licence-scan-stage.mjs";
 
