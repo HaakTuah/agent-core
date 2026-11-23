@@ -28,7 +28,8 @@
 # among them (#719), from npm's registry, running no install script (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
 # tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
 # Once, on Linux, the core's own lock files are held as a project's are: each package it brings looked up in npm's
-# registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures); the
+# registry (scripts/lookup.mjs), the week's wait on each one a change brings or updates (scripts/week-wait.mjs), and the
+# registry's signature on each installed one (npm audit signatures); the
 # mutation tool's in tests/mutation/ in the job that installs it, the step after its install.
 # Each job of the suites, three on Linux and eight on Windows on each Node, the network's on both, and the upgrade
 # test, are measured against a time mark (the "suites" of .github/shape.json, by scripts/shape.mjs), which a job past
@@ -175,9 +176,8 @@ jobs:
     # reaches it fails there, saying its mend where its output shows the fetch refused, or stalls until its time runs
     # out; a step that must reach it names its own shell, bash, and
     # tests/workflows-test.mjs holds which those are: the installs, the tools' fetches, the selection, the registry's
-    # lookups and the base's fetch, the fetches of the code scan's wheels and of Betterleaks' archive for their tests, and
-    # until #772 makes them self-contained the tests that still reach the network and the mutation run, which runs them;
-    # scripts/offline.sh; #770)
+    # lookups and the base's fetch, the week's wait on each new package, and the fetches of the code scan's wheels and of
+    # Betterleaks' archive for their tests; scripts/offline.sh; #770, #772)
     defaults:
       run:
         shell: ${{ matrix.os == 'ubuntu-latest' && matrix.parts != 'network' && format('bash {0}/scripts/offline.sh {{0}}', github.workspace) || 'bash' }}
@@ -299,7 +299,6 @@ jobs:
         run: node tests/held-test.mjs
       - name: The core's packages, from its lock file alone
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/packages-test.mjs ')) }}
-        shell: bash
         run: node tests/packages-test.mjs
       - name: The agent-tools check, the kit's hooks and a project with no list
         if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-test.mjs ')) }}
@@ -614,6 +613,12 @@ jobs:
       - name: The copies check on the agent tools' files, what stood there noted until it is listed
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/copies-tools-test.mjs ')) }}
         run: node tests/copies-tools-test.mjs
+      - name: What a project holds twice, or against the core, listed and its exact part corrected
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/twice-test.mjs ')) }}
+        run: node tests/twice-test.mjs
+      - name: What --fix of what a project holds twice cannot follow, and so keeps
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/twice-kept-test.mjs ')) }}
+        run: node tests/twice-kept-test.mjs
       - name: The pointers in the core's own floor and modules lead somewhere, and their Markdown links and the headings they name, by lychee
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/pointers.mjs --core
@@ -731,6 +736,10 @@ jobs:
           LOOKUP_BASE: ${{ github.event.pull_request.base.sha }} # empty on a push to main, where nothing is new
         shell: bash
         run: node scripts/lookup.mjs .github/licences.json
+      - name: The week's wait on each package the lock files bring or update (floor rule 7; once, on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }}
+        shell: bash
+        run: node scripts/week-wait.mjs # (asks npm's registry for each date, which the test of the lock file's form, run with the network cut off, does not)
       - name: The registry's signature on each of the core's own installed packages (floor rule 7; once, on Linux)
         if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }} # (only where the install passed)
         working-directory: .packages
@@ -785,7 +794,6 @@ jobs:
         env:
           STRENGTH_BASE: origin/${{ github.base_ref }}
           MUTATE_BUDGET: "240"
-        shell: bash
         run: node scripts/strength.mjs
 
   # (on Linux the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the older

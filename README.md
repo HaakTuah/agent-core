@@ -109,7 +109,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`), where the owner's
    inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`), the settings only the owner
    gives where the sync brings one the old copy's list did not hold (`scripts/owner-settings.mjs`; "Setting up (the
-   owner's part)"), the line `Read for it:`
+   owner's part)"), what the project holds twice or against the core (`scripts/twice.mjs`), the line `Read for it:`
    (`scripts/reading.mjs`) and, last, one line that says whether the project then holds the core whole and wired,
    `attached: yes` or `attached: no` with how many things stand in the way (`scripts/attached.mjs`, which lists each with
    its mend when a session runs it), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A

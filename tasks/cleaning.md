@@ -117,6 +117,34 @@ code is held to: `tasks/code-shape.md`.
   it lacks through checks and steps, each for one rule, and a reading of a whole project against the whole core found
   what none had: rules met only in part, many held by review or habit alone. Held by the sync's step
   (`core/scripts/steps.mjs`), read from the record; that a jump is said, by the sync's report alone.
+- **The reading asks what a project holds twice** (#1087). By default the reading of a project against the core
+  (above) asks too what the project holds twice or against the core, in this order of harm: a rule of its own that
+  contradicts or loosens one it takes from the core and that the manifest's "Differences" does not declare; one that
+  says what a rule of the core says, in meaning and intent, in other words; the same rule stated twice in its own files;
+  a check of its own (a workflow, a script, a hook) that does the job of one of the core's; and a file of an older
+  layout of the core left outside the copy, or documentation that restates the core's text. Nothing changes it. The
+  trigger is the reading,
+  whole or of the rules a sync changed, and every sync: first `core/scripts/twice.mjs`, which the sync runs, lists what
+  it reads without guessing (text that is a copy of the core's or of the project's own, or reads close to one; a file
+  outside the copy equal to one of the core's, at the copy or an earlier one; a call of one of the core's workflows made
+  twice; a pointer to a path the core has left), and its `--fix`, run by the session that takes the reading's task in a
+  pull request of its own that the usual reviews read, corrects only what is exact: Markdown equal byte for byte to one
+  of the core's goes where no other file of the repository holds its name in any form (its file name without the
+  extension, in any case, after percent-encoding and character references are decoded), and no pointer is moved for
+  it, else it is listed with each file that names it; the second of two calls the same in every input goes; a pointer
+  to a file the core moved unchanged moves to where it stands. Then the auditor answers, for each finding the script did
+  not settle, the same, stricter or narrower, different, contradicting, or unsure, with its evidence, by meaning and
+  intent. The session then takes out what says the same, the core's text or the one place kept for it standing; keeps
+  what is stricter, narrower or different, declared under "Differences" on its owner's word where it replaces a rule of
+  the core ("A project's own rules add to the core's", `core/roles/shared/how-to-work.md`); has a contradiction
+  declared so on its owner's word, or takes it out; takes out a check the core's covers whole and notes one that covers
+  more; and gives an unsure one to the stand-in, and to the owner where it stays unsure. It does not mean that a rule
+  goes for a likeness of words, that a script decides by meaning or takes out a rule's text, that a rule of the
+  project's that adds to the core's goes, nor that the floor's text, or a project rule its `AGENTS.md` calls a safety
+  rule, goes without its owner's word. Reason: a project that held its own rules before it took the core keeps
+  rules the core now holds, read twice by every session, and they drift apart. Held, for the script, by
+  `tests/twice-test.mjs` and `tests/twice-kept-test.mjs`, on a project holding each kind exactly and nearly; for the rest, by the reading's record and
+  its step, and by the reviews of each pull request that takes out or moves anything.
 - **A sweep's scope is read, not listed** (#593). By default an issue names what it covers. The one condition that
   changes it: an issue asks something of every or all of a kind (an inventory, an audit, a sorting, a check of each
   file), a *sweep*. The trigger is such an issue written: whoever writes it names the source a script counts that kind
