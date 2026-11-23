@@ -20,7 +20,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 7, one PR each | release 6's cut |
 | #1123 | rule builder; release 7 | release 6's cut; #974, #1060 (`roles/adviser.md`) |
 | #1112, #1074, #1073, #1098, #1133 | builder; release 7, one PR each | release 6's cut |
-| #1142 | rule builder; release 7; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md`; its record relayed as the owner's yes (floor rule 3); with #650's route, as #1142 says | release 6's cut |
+| #1142 | rule builder; release 7; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md`; its record relayed as the owner's yes (floor rule 3) | release 6's cut |
 | #810 | the orchestrator | the batch's end |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
