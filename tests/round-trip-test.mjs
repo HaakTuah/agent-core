@@ -43,6 +43,7 @@ const WRITERS = {
   "queue.mjs": ["tests/queue-test.mjs", "the progress file --clear rewrites, read by its reader"],
   "screens.mjs": ["tests/screens-test.mjs", "the screens' baseline --write rewrites, read by readBaseline"],
   "strength.mjs": ["tests/strength-test.mjs", "the strength baseline --whole and --lower write, read by the check"],
+  "step-writers.mjs": ["tests/steps-write-test.mjs", "each config, baseline and pointer's path the steps' writers write, read back by the step's own check as done"],
   "twice.mjs": ["tests/twice-test.mjs", "the workflows and pointers --fix corrects, read again by its YAML reader: nothing exact left"],
 };
 // The scripts that write a file no reader of the core reads in a project, each with why.
