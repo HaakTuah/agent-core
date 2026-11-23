@@ -78,10 +78,15 @@ const plainEnv = { ...env };
 {
   const { tooYoung, failure } = await import(pathToFileURL(path.join(root, "scripts/week-wait.mjs")).href);
   ok(mended(failure(["yaml@2.9.2: published 2026-11-17T00:00:00.000Z"])), "the week's wait fails with its mend on the failure's own line", failure(["x"]));
-  // (and as the step runs it: a base that holds no lock file makes every entry new, and a day before any was published
-  // makes each too young, or the registry unreached, so the run fails whatever the network; its exit code is 1)
-  const run = spawnSync(process.execPath, [path.join(root, "scripts/week-wait.mjs")], { cwd: root, encoding: "utf8", env: { ...env, PACKAGES_BASE: "no-such-commit", PACKAGES_TODAY: "2000-01-01" } });
-  ok(run.status === 1 && mended(run.stdout), "the check, run as its step runs it, exits 1 with its mend on the line it prints", `${run.status} ${run.stdout}${run.stderr}`);
+  // (and as the step runs it, in a copy whose lock files hold one entry with a field no registry package carries, which
+  // fails before any registry is asked, so the run needs no network: its exit code is 1 and its mend on the line it prints)
+  const where = scratchDir("week-wait-");
+  fs.cpSync(path.join(root, "scripts"), path.join(where, "scripts"), { recursive: true });
+  fs.mkdirSync(path.join(where, ".packages/parser"), { recursive: true });
+  fs.writeFileSync(path.join(where, ".packages/package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/yaml": { version: "2.9.1", resolved: "https://registry.npmjs.org/yaml/-/yaml-2.9.1.tgz", integrity: "sha512-a", link: true } } }));
+  fs.writeFileSync(path.join(where, ".packages/parser/package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: {} }));
+  const run = spawnSync(process.execPath, [path.join(where, "scripts/week-wait.mjs")], { cwd: where, encoding: "utf8", env: { ...env, PACKAGES_BASE: "no-such-commit" } });
+  ok(run.status === 1 && mended(run.stdout) && /its field link/u.test(run.stdout), "the check, run as its step runs it, exits 1 with its mend on the line it prints", `${run.status} ${run.stdout}${run.stderr}`);
   // (held on a lock written by hand: a version field kept while the address names another tarball, an entry with no
   // version, an address off the registry, and a young version, against answers made here)
   const day = 86400000, now = Date.parse("2026-11-18T00:00:00Z");

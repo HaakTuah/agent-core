@@ -50,7 +50,7 @@ try {
   write("test/broken-test.mjs", "import '../src/a.mjs';\nprocess.exit(1);\n");
   git("add", "-A"); git("commit", "-q", "-m", "base");
   const out = path.join(dir, "report.json");
-  const run = spawnSync(process.execPath, [SCRIPT, "--report", out], { cwd: dir, encoding: "utf8" });
+  const run = spawnSync(process.execPath, [SCRIPT, "--report", out], { cwd: dir, encoding: "utf8", env: { ...process.env, CORE_OFFLINE: "" } });
   const got = JSON.parse(fs.readFileSync(out, "utf8")).files;
   const status = (file, line, replacement) => got[file]?.mutants.find(m => m.location.start.line === line && m.replacement === replacement)?.status;
   ok(run.status === 0 && status("src/a.mjs", 1, ">=") === "Survived" && status("src/a.mjs", 2, "!==") === "Killed" && status("src/b.mjs", 1, "false") === "NoCoverage", "a fault a test catches is Killed, one it does not Survived, one no test names NoCoverage", run.stdout + run.stderr);
