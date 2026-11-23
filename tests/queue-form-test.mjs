@@ -5,7 +5,7 @@
 //
 //   node tests/queue-form-test.mjs
 import { mended } from "../scripts/mend.mjs";
-import { command, statesOf } from "../scripts/queue.mjs";
+import { LARGEST, command, statesOf } from "../scripts/queue.mjs";
 import { unformed } from "../scripts/queue-form.mjs";
 
 let failed = 0, count = 0;
@@ -23,6 +23,12 @@ r = check(rows + "| the menu, #16 | builder | |\n| | builder | |\n");
 ok(r.status === 1 && mended(r.out) && /names no issue first: \| the menu, #16 /u.test(r.out) && /names no issue first: \| \| builder/u.test(r.out), "a row that names no issue first, or none at all, fails, saying the mend", r.out);
 ok(check(rows + "| #15 | builder | | x |\n", { project: "core/" }).status === 0, "a project's progress file is not read for its form (#552's scope)");
 ok(unformed("| #13 | builder | |\n| x | y |\n").length === 1 && unformed("| A | B |\n|:--|--:|\n| #2 | a | b |\n").length === 1, "rows under no header are each read for their issue; a header's line of dashes may hold colons");
+
+// a hostile queue as large as the reader takes is read in one pass (Codex's finding on 1b59b43)
+const hostile = ["| h |\n|---" + " ".repeat(LARGEST - 20) + "x\n", "| h |\n|" + "-".repeat(LARGEST / 2) + " ".repeat(LARGEST / 2 - 20) + "x\n", "| h |\n| - |\n|" + "\\".repeat(LARGEST - 20) + "\n", "|" + " |".repeat(LARGEST / 2 - 4) + "\n"];
+const started = Date.now();
+for (const text of hostile) unformed(text);
+ok(Date.now() - started < 2000, "a hostile queue as large as the reader takes is read in a pass, well under two seconds", `${Date.now() - started} ms`);
 
 answer = null;
 r = check(rows);

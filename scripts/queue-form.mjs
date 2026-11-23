@@ -5,14 +5,15 @@
 
 // The rows out of their form: { text, why } for each row of a table, past its header and the line under it, that names
 // no issue first ("#n", as the readers read it, so no reader takes it as a line) or holds more cells than its header (a
-// note, which the file never holds). A cell is split at each "|" Markdown splits it at, one written "\|" kept whole.
+// note, which the file never holds). A cell is split at each "|" Markdown splits it at, one written "\|" kept whole; each
+// pattern reads a line in one pass, whatever it holds (SECURITY.md, rule 5).
 const cellsOf = row => row.trim().replace(/^\|/u, "").replace(/(?<!\\)\|$/u, "").split(/(?<!\\)\|/u);
 export function unformed(text) {
   const all = String(text ?? "").split("\n").map(l => l.replace(/\r$/u, "")), out = [];
   for (let at = 0; at < all.length; at++) {
     if (!/^\s*\|/u.test(all[at]) || (at > 0 && /^\s*\|/u.test(all[at - 1]))) continue;
     // (rows under no header and its line of dashes are no table, each read for its issue alone)
-    const table = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/u.test(all[at + 1] ?? ""), width = table ? cellsOf(all[at]).length : Infinity;
+    const table = /^\s*\|/u.test(all[at + 1] ?? "") && cellsOf(all[at + 1]).every(c => /^:?-+:?$/u.test(c.trim())), width = table ? cellsOf(all[at]).length : Infinity;
     for (at += table ? 2 : 0; at < all.length && /^\s*\|/u.test(all[at]); at++) {
       const cells = cellsOf(all[at]), row = all[at].trim();
       if (!/^\s*#\d/u.test(cells[0])) out.push({ text: row, why: "names no issue first" });
