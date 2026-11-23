@@ -48,8 +48,11 @@ export function pinBack(root, pin) {
 }
 function pinOnly(root) {
   const at = rev => { try { return execFileSync("git", ["show", `${rev}:${MANIFEST}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; } };
-  const head = at("HEAD"), but = t => t?.replace(PIN_LINE, "");
-  return head !== null && [at(""), fs.readFileSync(path.join(root, MANIFEST), "utf8")].every(t => t !== null && but(t) === but(head));
+  let tree = null;
+  try { tree = fs.readFileSync(path.join(root, MANIFEST), "utf8"); } catch { /* gone or no file: busy */ }
+  // (line ends read as one, as git with core.autocrlf writes a tree the blob holds with LF alone)
+  const head = at("HEAD"), but = t => t?.replace(/\r\n/gu, "\n").replace(PIN_LINE, "");
+  return head !== null && [at(""), tree].every(t => t !== null && but(t) === but(head));
 }
 
 // Whether `f` may be written: a plain path of the project's own outside the copy, no link and under none, no file with

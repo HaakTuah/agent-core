@@ -18,7 +18,8 @@
 // nothing. It reads only, but where it is told to write: a step whose work is exact, a check's own config or baseline,
 // a pointer's path, or the manifest's module lines placed from what is read (#1094), has a writer ("write",
 // step-writers.mjs beside this file; #1091), which --write runs where its step is not done, never on a file with changes
-// not yet committed, and lists what it wrote; a step that needs judgement has none. Node's own modules and git only.
+// not yet committed but the manifest changed in its `Core:` line alone, as a sync leaves it (held), and lists what it
+// wrote; a step that needs judgement has none. Node's own modules and git only.
 //
 //   node core/scripts/steps.mjs                  from a project's root: the steps not done, each with its mend; nothing else
 //   node core/scripts/steps.mjs --write          each writer of a step not done run, and what it wrote listed, for a pull

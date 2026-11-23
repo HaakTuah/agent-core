@@ -157,7 +157,8 @@ export function ruleTexts(dir) {
   return Object.fromEntries(ruleFiles(p.read, d => p.files.filter(f => f.startsWith(`${d}/`)), { tools: true }).map(f => [f, p.read(f)]));
 }
 export const wordsKept = (before, after) => {
-  const words = text => (text === null || text === undefined ? null : text.replace(/core\/[\w./-]+/gu, "core/-").replace(/^Paths: .*$/mu, "Paths: -")
-    .replace(/^(.*\bModules: ).*$/mu, "$1-").replace(/\r?\n(?:\r?\n)?(?:Not taken|Modules to confirm): [^\r\n]*/gu, ""));
-  return Object.keys({ ...before, ...after }).every(f => words(before[f]) === words(after[f]));
+  // (the module lines read past in the manifest alone, where the writers write them)
+  const modules = text => text.replace(/^(.*\bModules: ).*$/mu, "$1-").replace(/\r?\n(?:\r?\n)?(?:Not taken|Modules to confirm): [^\r\n]*/gu, "");
+  const words = (text, f) => (text === null || text === undefined ? null : (f === "core-manifest.md" ? modules : t => t)(text.replace(/core\/[\w./-]+/gu, "core/-").replace(/^Paths: .*$/mu, "Paths: -")));
+  return Object.keys({ ...before, ...after }).every(f => words(before[f], f) === words(after[f], f));
 };

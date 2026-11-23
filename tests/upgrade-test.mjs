@@ -668,7 +668,7 @@ function upgrade(p, from, ownChanges, expect) {
   const wrote = STEP_LEADS.filter(l => w.out.split("\n").some(line => line.startsWith(`- ${l}: wrote `) && line.endsWith("; the step is done.")));
   r = stepsIn(p.dir);
   const left = reported(r.out);
-  ok(w.status === 0 && wrote.every(l => !left.includes(l)) && left.every(l => undone.includes(l) || STAGES[l].written && wrote.length) && wordsKept(rules, ruleTexts(p.dir)),
+  ok(w.status === 0 && wrote.every(l => !left.includes(l)) && left.every(l => undone.includes(l) || wrote.some(m => STAGES[l].written?.includes(m))) && wordsKept(rules, ruleTexts(p.dir)),
     `${p.name}: --write on them writes ${wrote.length} whole, each reading done after it, no other step undone and no rule file's words changed`, `${w.out}\n---\n${r.out}`);
   git(p.dir, "reset", "-q", "--hard", "HEAD~1");
   clean();

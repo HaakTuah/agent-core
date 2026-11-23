@@ -200,6 +200,28 @@ for (const l of WHOLE) {
   git("stash", "pop", "-q");
   ok(!missed(placing).length && read("core-manifest.md").includes(`${pin}\n`), "and the stash, popped once the sync merged, brings the module lines back on the moved pin", read("core-manifest.md"));
   back();
+  // (the same where git writes the tree's line ends as Windows does, and the manifest gone, which stays busy, and fails nothing)
+  STAGES[placing].stage(dir);
+  commit("a module neither taken nor left out");
+  git("config", "core.autocrlf", "true");
+  put("core-manifest.md", moved.replace(/\r?\n/gu, "\r\n"));
+  r = write();
+  ok(r.status === 0 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``), "and where the tree holds the manifest with Windows line ends", `${r.stdout}${r.stderr}`);
+  git("config", "--unset", "core.autocrlf");
+  back();
+  STAGES[placing].stage(dir);
+  commit("a module neither taken nor left out");
+  fs.rmSync(path.join(dir, "core-manifest.md"));
+  r = write();
+  ok(r.status === 0 && !r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``) && !fs.existsSync(path.join(dir, "core-manifest.md")), "a manifest taken out and not yet committed is written by none, and --write fails nothing", `${r.stdout}${r.stderr}`);
+  back();
+}
+
+// (the module lines read past in the manifest alone, never in another rule file)
+{
+  const m = "Floor: whole. Modules: `a.md`.\n", t = { "core-manifest.md": m, "AGENTS.md": m };
+  ok(wordsKept(t, { ...t, "core-manifest.md": "Floor: whole. Modules: `a.md`, `b.md`.\n\nModules to confirm: `b.md`.\n" }) && !wordsKept(t, { ...t, "AGENTS.md": "Floor: whole. Modules: `b.md`.\n" }),
+    "the words kept read past the module lines of the manifest, and of no other rule file");
 }
 
 done("the steps' writers");
