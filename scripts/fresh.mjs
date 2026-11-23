@@ -55,6 +55,13 @@ function previewBuild(p) {
   const one = Array.isArray(after) && after.length === 1 ? after[0] : after;
   return typeof one === "string" && BUILD.test(one) ? one : undefined;
 }
+// A game's previews and the versions check, as the kit's options: { pages, versions } where the project calls them.
+function calledKind(p) {
+  const o = {}, build = previewBuild(p), listed = calledWith(p, "versions.yml", "config");
+  if (build !== undefined) o.pages = build;
+  if (listed !== undefined) o.versions = typeof listed === "string" && /^[A-Za-z0-9_][A-Za-z0-9._/-]*\.json$/.test(listed) && !listed.includes("..") ? listed : VERSIONS;
+  return o;
+}
 // Whether the project calls the NuGet check: the core's nuget.yml, or core.yml with its input nuget (#376).
 const nugetCalled = p => { try { return !!call(p, "nuget.yml") || folded(p, "nuget").length > 0; } catch { return false; } };
 const SKIPPED = new Set(["docs/PROGRESS.md"]); // (the progress file: the project's own from its first task)
@@ -94,10 +101,7 @@ export function kind(p, host = privateOf(p.root)) {
   // (a game's previews and the versions check, from its calls to the core's preview.yml and versions.yml: what only
   // the project knows, the build its previews run after and where its versions are listed, is read from them; #1095,
   // point 6)
-  const build = previewBuild(p);
-  if (build !== undefined) o.pages = build;
-  const listed = calledWith(p, "versions.yml", "config");
-  if (listed !== undefined) o.versions = typeof listed === "string" && /^[A-Za-z0-9_][A-Za-z0-9._/-]*\.json$/.test(listed) && !listed.includes("..") ? listed : VERSIONS;
+  Object.assign(o, calledKind(p));
   return host.unread ? { o, pin, unread: host.unread } : { o, pin };
 }
 

@@ -162,14 +162,20 @@ export function options(argv) {
   if (o.at !== undefined && !/^[0-9a-f]{40}$/.test(o.at)) fail("--at <full SHA>: the core's commit as 40 hex characters");
   if (o.name !== undefined && !named(o.name)) fail(`--name: ${NAME}`);
   o.name = o.name?.normalize("NFC");
-  if (o.pages !== undefined && !(o.game && BUILD.test(o.pages))) fail(`--pages <name>: with --game, ${BUILD_FORM}`);
-  if (o.versions) o.versions = VERSIONS;
+  callsAsked(o);
   for (const [flag, key] of [["--npm", "packages"], ["--nuget", "nuget"]]) {
     if (o[key] === undefined) continue;
     o[key] = o[key].replace(/\\/g, "/").replace(/\/+$/, "") || ".";
     if (!/^(\.|[A-Za-z0-9_][A-Za-z0-9._-]*(\/[A-Za-z0-9_][A-Za-z0-9._-]*)*)$/.test(o[key])) fail(`${flag} <folder>: a folder inside the project, from its root (. for the root itself)`);
   }
   return o;
+}
+
+// A game's previews and the versions check, where asked (#1095, point 6): the build's name held to its form, for a game
+// alone, and the versions check given the kit's config.
+function callsAsked(o) {
+  if (o.pages !== undefined && !(o.game && BUILD.test(o.pages))) fail(`--pages <name>: with --game, ${BUILD_FORM}`);
+  if (o.versions) o.versions = VERSIONS;
 }
 
 // The modules a project takes, as its manifest lists them: all of them for a game, and for any other project each but
