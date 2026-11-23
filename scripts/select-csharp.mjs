@@ -1,4 +1,4 @@
-// What a file of C# reaches, for the test selection (select.mjs, beside this file; #675), read word by word on the
+// What a file of C# reaches, for the test selection (select.mjs; #675), read word by word on the
 // parser's tokens (shape-csharp.mjs); it never runs the code. A file reaches the files that declare a type it may name:
 // each word it holds as a type (or an attribute's, `[Fact]` naming FactAttribute) in a namespace it sees (its own and
 // those around it, the global one, those its using directives name, global ones from any file and from <Using> in MSBuild's
@@ -6,9 +6,9 @@
 // extension members in a namespace it sees; a file of top-level statements, by the name Program; and the files every file
 // reaches: those run with no name (an assembly's attribute, a module initializer, a framework's set-up, a source
 // generator, an xUnit collection's definition), those that hold a global using directive, and those the grammar lost.
-// It reads more than a file takes, never less. A file is unsure (a test that reaches it runs on any change) where the
+// It reads more than a file takes. A file is unsure (a test that reaches it runs on any change) where the
 // grammar lost it, it holds a raw interpolated string, or it reads types by reflection or scans an assembly; every file
-// is, where a <Using> names an MSBuild property or git cannot be asked. Files of C# git holds that the config does not
+// is, where a <Using> names an MSBuild expression or git cannot be asked. Files of C# git holds that the config does not
 // read are read too, as links between those it reads (select-csharp-project.mjs).
 import { heldBeside, msbuildUsings } from "./select-csharp-project.mjs";
 import { readCsharp } from "./shape-csharp.mjs";
@@ -169,14 +169,19 @@ function delegateName(toks, k) {
   return { name, end: k };
 }
 
-// Each run of dotted words in a file (of two words or more, "App.Rules.Allowed"), and its using directives.
+const qualifies = (toks, i) => toks[i]?.t === "id" && toks[i + 1]?.v === ":" && toks[i + 2]?.v === ":";
+
+// Each run of dotted words in a file (of two words or more, "App.Rules.Allowed"; "D::Data" as "D.Data", a "global::"
+// dropped: qualifies), and its using directives.
 function runsOf(toks) {
   const runs = new Set(), usings = [];
   for (let i = 0; i < toks.length; i++) {
     const d = ["using", "global"].includes(toks[i].v) && directive(toks, i);
     if (d) usings.push(d);
-    if (toks[i].t !== "id" || toks[i - 1]?.v === "." || toks[i + 1]?.v !== ".") continue;
-    const { parts } = nameAt(toks, i);
+    const q = qualifies(toks, i);
+    if (toks[i].t !== "id" || toks[i - 1]?.v === "." || qualifies(toks, i - 3) || (!q && toks[i + 1]?.v !== ".")) continue;
+    const { parts } = nameAt(toks, q ? i + 3 : i);
+    if (q && toks[i].v !== "global") parts.unshift(word(toks[i]));
     if (parts.length > 1) runs.add(parts.join("."));
   }
   return { runs, usings };

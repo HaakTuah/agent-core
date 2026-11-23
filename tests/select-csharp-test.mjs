@@ -151,8 +151,8 @@ ok(same(esc, [true, true]), "an escaped @delegate in braces declares nothing, an
   const forms = ["(int Count, App.Data.Store Item)", "App.Data.Store[]", "App.Data.Store?"].filter(form => !reached(new Set(["tests/AliasTest.cs"]), csharpReach({ ...app,
     "src/Usings.cs": `global using S = ${form};\n`, "tests/AliasTest.cs": "namespace Tests;\nclass AliasTest { S s; }\n" }, undefined, nothing).links).get("tests/AliasTest.cs").has("src/Store.cs"));
   ok(!forms.length, "a global alias of a tuple, an array or a nullable type is read for the types it names", forms.join(", "));
-  const nsAlias = one("namespace App.Data;\npublic class Store { }\n", { "tests/T.cs": "using D = App;\nnamespace Tests;\nclass T { object s = new D.Data.Store(); }\n" });
-  ok(nsAlias.links.get("tests/T.cs")?.has("src/X.cs"), "a namespace alias that heads a name in full is put for what it names", JSON.stringify([...nsAlias.links].map(([f, to]) => [f, [...to]])));
+  const nsAlias = ["D.Data", "D::Data"].filter(n => !one("namespace App.Data;\npublic class Store { }\n", { "tests/T.cs": `using D = App;\nnamespace Tests;\nclass T { object s = new ${n}.Store(); }\n` }).links.get("tests/T.cs")?.has("src/X.cs"));
+  ok(!nsAlias.length, "a namespace alias that heads a name in full, by \".\" or \"::\", is put for what it names", nsAlias.join(", "));
   const items = ["<Using Include=\"App.Data.Store\" Alias=\"S\" />", "<Using Include=\"App.Data.Store\" Static=\"true\" />"].filter(item => !csharpReach({
     "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npublic class Store { public static void Go() { } }\n",
     "tests/Tests.csproj": `<Project><ItemGroup>${item}</ItemGroup></Project>`, "tests/T.cs": "namespace Tests;\nclass T { S s; void M() { Go(); } }\n",
