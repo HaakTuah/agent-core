@@ -475,8 +475,7 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     && steps.join() === ["node tests/init-dotnet-test.mjs", "node tests/nuget-fetch-test.mjs", "node tests/nuget-gate-network-test.mjs"].join(),
     "the tests that reach the network run in no pull request's run nor a push's, and once an hour and by hand in a job of their own on each system and Node (point 9)", steps.join(", "));
   // (#770: on Linux, but in the part network, each step runs with the network cut off, and those that must reach it
-  // name their shell, bash, each listed here with why; the tests and the mutation run until #772 makes them
-  // self-contained)
+  // name their shell, bash, each listed here with why; #772 made the last tests self-contained)
   const ONLINE = {
     "node scripts/install.mjs all": "installs the core's packages from npm's registry",
     'bash scripts/workflow-tools.sh >> "$GITHUB_ENV"': "fetches zizmor and actionlint at their pins",
@@ -484,13 +483,12 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     'bash scripts/test-downloads.sh wheels >> "$GITHUB_ENV"': "fetches the code scan's engine's wheels at their pins, for its test",
     'bash scripts/test-downloads.sh archives >> "$GITHUB_ENV"': "fetches Betterleaks' archive at the personal-terms check's pin, for its tests",
     'node scripts/select.mjs .github/shape.json --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}': "asks GitHub, on a push, whether the merged head passed",
-    "node tests/packages-test.mjs": "#772: its week's wait reads npm's registry",
+    "node scripts/week-wait.mjs": "asks npm's registry for the date of each package a change brings",
     "node scripts/lookup.mjs .github/licences.json": "looks each new package up in npm's registry",
     'for d in . parser; do if [ -d "$d/node_modules" ]; then (cd "$d" && npm audit signatures --prefix=.); fi; done': "reads the registry's signatures",
     'git fetch --no-tags --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"': "fetches the base from GitHub",
     "node scripts/install.mjs mutation": "installs Stryker from npm's registry",
     "npm audit signatures --prefix=.": "reads the registry's signatures on Stryker's packages",
-    "node scripts/strength.mjs": "#772: the mutation run runs the tests that name a changed file, those that reach the network among them",
   };
   const shells = tests.jobs.suites.steps.filter(s => "shell" in s);
   const online = shells.map(s => String(s.run).replace(/\s+#.*$/u, "").trim());

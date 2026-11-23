@@ -141,7 +141,7 @@
     },
     "tests/packages-test.mjs": {
       "mark": 68081,
-      "why": "Its checks of the lock file and the week's wait gate the install below them (where one fails, nothing is installed or loaded), and the install's cases run on a copy of the same lock files; split, the install would run on a lock file that failed, or each file would read the lock files again, so the file stays one flow (#1008)."
+      "why": "Its checks of the lock file and the week's wait's reading gate the install below them (where one fails, nothing is installed or loaded), and the install's cases run on a copy of the same lock files; split, the install would run on a lock file that failed, or each file would read the lock files again, so the file stays one flow (#1008)."
     },
     "tests/pointers-test.mjs": {
       "mark": 23333,
