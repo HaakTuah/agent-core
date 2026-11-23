@@ -14,7 +14,9 @@
 //   node core/scripts/queue.mjs --clear   takes out the line of each closed issue, in the pull request that changes
 //                                         the file
 //   node core/scripts/queue.mjs --check   on a pull request that changes the file: fails where a line of a closed issue
-//                                         stands, saying the mend (in the core, own-description.yml runs it)
+//                                         stands, saying the mend, and says so and fails nothing where GitHub cannot be
+//                                         read (#459); in the core, also where a row of a table names no issue first or
+//                                         holds more cells than its table's header (#552); own-description.yml runs it
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -105,6 +107,26 @@ export function read(text, closed) {
   return { open, gone, stale, next: open.find(free) ?? null };
 }
 
+// The rows of the core's queue out of its form (roles/shared/inbox.md, "The progress file holds order only"; #552): {
+// text, why } for each row of a table, past its header and the line under it, that names no issue first ("#n", as the
+// readers read it, so no reader takes it as a line) or holds more cells than its header (a note, which the file never
+// holds). A cell is split at each "|" Markdown splits it at, one written "\|" kept whole. A project's progress file is not read so (#552's scope).
+const cellsOf = row => row.trim().replace(/^\|/u, "").replace(/(?<!\\)\|$/u, "").split(/(?<!\\)\|/u);
+export function unformed(text) {
+  const all = String(text ?? "").split("\n").map(l => l.replace(/\r$/u, "")), out = [];
+  for (let at = 0; at < all.length; at++) {
+    if (!/^\s*\|/u.test(all[at]) || (at > 0 && /^\s*\|/u.test(all[at - 1]))) continue;
+    // (rows under no header and its line of dashes are no table, each read for its issue alone)
+    const table = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/u.test(all[at + 1] ?? ""), width = table ? cellsOf(all[at]).length : Infinity;
+    for (at += table ? 2 : 0; at < all.length && /^\s*\|/u.test(all[at]); at++) {
+      const cells = cellsOf(all[at]), row = all[at].trim();
+      if (!/^\s*#\d/u.test(cells[0])) out.push({ text: row, why: "names no issue first" });
+      else if (cells.length > width) out.push({ text: row, why: `holds ${cells.length} cells, its table's header ${width}` });
+    }
+  }
+  return out;
+}
+
 // The text with each line all of whose issues have closed taken out, and nothing else changed.
 export function cleared(text, closed) {
   const out = new Set(read(text, closed).gone.flatMap(l => Array.from({ length: l.span }, (_, i) => l.at + i)));
@@ -154,7 +176,10 @@ function readIn(flag, at, FILE) {
   if (text === null) return { fail: `FAIL: ${FILE} is not here. Mend: run it from the repository's root, where the progress file its manifest names stands (in the core, QUEUE.md)` };
   if (Buffer.byteLength(text) > LARGEST) return { fail: `FAIL: ${FILE} is ${Buffer.byteLength(text)} bytes, past the ${LARGEST} the reader takes. Mend: take out the lines of finished work and any notes, which belong in the pull requests' descriptions` };
   let closed;
-  try { closed = at.closed(); } catch (e) { return { fail: `FAIL: the issues the queue names could not be read: ${e.message}. Mend: run it again; where gh is not signed in, sign it in, or set GH_TOKEN` }; }
+  try { closed = at.closed(); } catch (e) {
+    if (flag === "--check") return { text, unread: e.message };
+    return { fail: `FAIL: the issues the queue names could not be read: ${e.message}. Mend: run it again; where gh is not signed in, sign it in, or set GH_TOKEN` };
+  }
   const all = read(text, closed);
   if (all.gone.length && !all.open.length) return { fail: `FAIL: GitHub's list of open issues names none of the ${all.gone.length} lines of ${FILE}, which may be the list of another repository. Mend: run it again from the repository's root, GITHUB_REPOSITORY set to its owner/name; where every line's issue has truly closed, take them out by hand` };
   return { text, closed, all };
@@ -167,9 +192,9 @@ function readIn(flag, at, FILE) {
 export function command(flag, at) {
   const FILE = at.file ?? "QUEUE.md", got = readIn(flag, at, FILE);
   if (got.fail) return { status: 1, out: got.fail };
+  if (flag === "--check") return checking(FILE, got, at);
   const { open, gone, stale, next } = got.all;
   if (flag === "--clear") return clearing(FILE, got, at);
-  if (flag === "--check") return checking(FILE, gone, stale, at);
   const last = [`${open.length} open lines${gone.length ? `, ${gone.length} of closed issues skipped (${namesOf(gone)}), which the next pull request that changes the queue takes out` : ""}`, next ? `next: ${next.issues.map(n => `#${n}`).join(" and ")}` : "next: none that a session takes waits on nothing open"];
   return { status: 0, out: [...open.map(l => l.text), ...last].join("\n") };
 }
@@ -185,11 +210,19 @@ function clearing(FILE, got, at) {
   return { status: 0, out: done.length ? `${FILE}: took out the lines of ${namesOf(done)}, closed` : `${FILE}: no line of a closed issue` };
 }
 
-// --check: fails where a line of a closed issue stands, one --clear takes out, or one kept that only a hand does.
-function checking(FILE, gone, stale, at) {
-  if (gone.length) return { status: 1, out: `FAIL: ${FILE} holds the line of ${gone.length === 1 ? "an issue" : "issues"} closed: ${namesOf(gone)}, and this pull request changes the queue. Mend: run node ${at.project || ""}scripts/queue.mjs --clear and commit ${FILE}` };
-  if (stale.length) return { status: 1, out: `FAIL: ${FILE} holds a line whose issues read have all closed, though the reader cannot read them whole: ${stale.map(l => l.text.trim()).join("; ")}. Mend: take the line out of ${FILE} by hand, or name its issues as "#n", "#a to #b" or "#n, points ..." and run node ${at.project || ""}scripts/queue.mjs --clear` };
-  return { status: 0, out: `ok   ${FILE} holds no line of a closed issue` };
+// --check: fails where a line of a closed issue stands, one --clear takes out, or one kept that only a hand does, and,
+// in the core, where a row is out of its form; where GitHub could not be read, it says so and fails on the form alone.
+function checking(FILE, got, at) {
+  const out = [], form = at.project ? [] : unformed(got.text);
+  for (const r of form) out.push(`FAIL: ${FILE} holds a row that ${r.why}: ${r.text}. Mend: give each line of ${FILE} its issue first as "#n" and its three cells, issue, who builds it and what it waits on, a "|" inside a cell written "\\|", and put any note in the description of the line's pull request (AGENTS.md, "The file holds no note")`);
+  if (got.unread !== undefined) out.push(`note the issues the queue names could not be read (${got.unread}), so no line of a closed issue was looked for; it fails nothing for it (#459)`);
+  else {
+    const { gone, stale } = got.all;
+    if (gone.length) out.push(`FAIL: ${FILE} holds the line of ${gone.length === 1 ? "an issue" : "issues"} closed: ${namesOf(gone)}, and this pull request changes the queue. Mend: run node ${at.project || ""}scripts/queue.mjs --clear and commit ${FILE}`);
+    if (stale.length) out.push(`FAIL: ${FILE} holds a line whose issues read have all closed, though the reader cannot read them whole: ${stale.map(l => l.text.trim()).join("; ")}. Mend: take the line out of ${FILE} by hand, or name its issues as "#n", "#a to #b" or "#n, points ..." and run node ${at.project || ""}scripts/queue.mjs --clear`);
+    if (!out.some(l => l.startsWith("FAIL"))) out.push(`ok   ${FILE} holds no line of a closed issue${at.project ? "" : ", and each row names its issue first in its table's cells"}`);
+  }
+  return { status: out.some(l => l.startsWith("FAIL")) ? 1 : 0, out: out.join("\n") };
 }
 
 // The progress file where the command runs: a project's, as its manifest names it; the core's own where none stands.
