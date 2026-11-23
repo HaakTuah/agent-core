@@ -64,74 +64,85 @@ export function patternsIn(text, file) {
   return found;
 }
 
-// The part, run by copies.mjs from the project's root: `core`, the copy's path from the root ("" in the core's own
-// repository); `config`, the check's config and `configPath` its path; `base`, the pull request's base or "";
-// `ls(specs)` and `lsAt(commit, specs)`, the files pathspecs read, as copies.mjs lists them. It prints its notes and
-// failures and returns whether anything failed.
-export function valuesTwice({ core, config, configPath, base, ls, lsAt }) {
-  const git = (args, ok = [0]) => {
-    try { return execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] }); }
-    catch (e) { if (ok.includes(e.status)) return e.stdout ?? ""; throw e; }
-  };
-  const list = v => (Array.isArray(v) ? v.filter(x => typeof x === "string" && x) : []);
-  const said = config.twice && typeof config.twice === "object" && !Array.isArray(config.twice) ? config.twice : {};
+const git = (args, ok = [0]) => {
+  try { return execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] }); }
+  catch (e) { if (ok.includes(e.status)) return e.stdout ?? ""; throw e; }
+};
+const list = v => (Array.isArray(v) ? v.filter(x => typeof x === "string" && x) : []);
+
+// A file's text at a commit or ("") in the work tree, or null where it is not a file or past READ_MOST.
+function readAt(commit, f) {
+  if (commit) { try { const t = git(["show", `${commit}:${f}`]); return t.length > READ_MOST ? null : t; } catch { return null; } }
+  const st = fs.lstatSync(f, { throwIfNoEntry: false });
+  return st?.isFile() && st.size <= READ_MOST ? fs.readFileSync(f, "utf8") : null;
+}
+
+// What is read: `specs`, every tracked file less what is left out; `codeSpecs`, the config's "code" less the same.
+function scope(config, core) {
   const out = list(config.code).concat(list(config.prose)).filter(s => s.startsWith(":!") || s.startsWith(":(exclude"));
   const leftOut = [...out, ...list(config.tests).map(s => (s.startsWith(":") ? s : `:(exclude)${s}`)),
     ...LOCKS.map(f => `:(exclude,glob)**/${f}`), ...RECORDS.flatMap(r => [`:(exclude)${r}`, ...(core ? [`:(exclude)${core}${r}`] : [])])];
-  const specs = [".", ...leftOut];
-  // (the scripts: the files the config's "code" lists, of JavaScript or TypeScript, less what is left out)
-  const code = list(config.code).filter(s => !s.startsWith(":")), codeSpecs = [...code, ...leftOut];
-  const scriptsAt = commit => (code.length ? (commit ? lsAt(commit, codeSpecs) : ls(codeSpecs)).filter(f => SCRIPT.test(f)) : []);
-  // (the core writes it: a file of its copy, or one it writes whole that carries its mark where its kind carries one)
-  const coreWrites = (f, read) => !!core && (f.startsWith(core) || (whole(f) && (!marked(f) || /^# The core's file:/u.test(read(f) ?? ""))));
+  const code = list(config.code).filter(s => !s.startsWith(":"));
+  return { specs: [".", ...leftOut], code, codeSpecs: [...code, ...leftOut] };
+}
 
-  // Each value, as a Map of value -> Map of file -> line, at a commit or ("") in the work tree; at a commit, the patterns
-  // of `want` alone, read only in the scripts that hold one of them as text.
-  function valuesAt(commit, want = []) {
-    const at = new Map(), add = (v, f, line) => { const m = at.get(v) ?? at.set(v, new Map()).get(v); if (!m.has(f)) m.set(f, line); };
-    const prefix = commit ? `${commit}:` : "";
-    const raw = git(["grep", "-I", "-z", "-n", "-E", "-i", "-e", "[0-9a-f]{40}", ...(commit ? [commit] : []), "--", ...specs], [0, 1]);
-    for (let i = 0; i < raw.length;) {
-      const a = raw.indexOf("\0", i), b = raw.indexOf("\0", a + 1), e = raw.indexOf("\n", b + 1);
-      if (a < 0 || b < 0) break;
-      const file = raw.slice(i, a).slice(prefix.length), line = Number(raw.slice(a + 1, b)), text = raw.slice(b + 1, e < 0 ? raw.length : e);
-      for (const v of pinsIn(text).keys()) add(v, file, line);
-      i = e < 0 ? raw.length : e + 1;
-    }
-    const scripts = commit ? (want.length && code.length ? held(commit, want) : []) : scriptsAt("");
-    for (const f of scripts) {
-      const text = readAt(commit, f);
-      if (text !== null) for (const [v, line] of patternsIn(text, f)) add(v, f, line);
-    }
-    return at;
+// Each value, as a Map of value -> Map of file -> line, at a commit or ("") in the work tree; at a commit, the patterns of
+// `want` alone, read only in the scripts that hold one of them as text, found by one git grep of fixed strings.
+function valuesAt({ specs, code, codeSpecs }, ls, commit, want = []) {
+  const at = new Map(), add = (v, f, line) => { const m = at.get(v) ?? at.set(v, new Map()).get(v); if (!m.has(f)) m.set(f, line); };
+  const prefix = commit ? `${commit}:` : "";
+  const raw = git(["grep", "-I", "-z", "-n", "-E", "-i", "-e", "[0-9a-f]{40}", ...(commit ? [commit] : []), "--", ...specs], [0, 1]);
+  for (let i = 0; i < raw.length;) {
+    const a = raw.indexOf("\0", i), b = raw.indexOf("\0", a + 1), e = raw.indexOf("\n", b + 1);
+    if (a < 0 || b < 0) break;
+    const file = raw.slice(i, a).slice(prefix.length), line = Number(raw.slice(a + 1, b)), text = raw.slice(b + 1, e < 0 ? raw.length : e);
+    for (const v of pinsIn(text).keys()) add(v, file, line);
+    i = e < 0 ? raw.length : e + 1;
   }
-  // (the scripts that hold one of `texts` at a commit, by one git grep of fixed strings)
-  const held = (commit, texts) => git(["grep", "-l", "-z", "-F", ...texts.flatMap(t => ["-e", t]), commit, "--", ...codeSpecs], [0, 1])
-    .split("\0").filter(Boolean).map(f => f.slice(commit.length + 1)).filter(f => SCRIPT.test(f));
-  const readAt = (commit, f) => {
-    if (commit) { try { const t = git(["show", `${commit}:${f}`]); return t.length > READ_MOST ? null : t; } catch { return null; } }
-    const st = fs.lstatSync(f, { throwIfNoEntry: false });
-    return st?.isFile() && st.size <= READ_MOST ? fs.readFileSync(f, "utf8") : null;
-  };
+  const scripts = !code.length ? [] : !commit ? ls(codeSpecs) : !want.length ? []
+    : git(["grep", "-l", "-z", "-F", ...want.flatMap(t => ["-e", t]), commit, "--", ...codeSpecs], [0, 1]).split("\0").filter(Boolean).map(f => f.slice(prefix.length));
+  for (const f of scripts.filter(x => SCRIPT.test(x))) {
+    const text = readAt(commit, f);
+    if (text !== null) for (const [v, line] of patternsIn(text, f)) add(v, f, line);
+  }
+  return at;
+}
 
-  const now = valuesAt("");
-  const twice = [...now].filter(([, places]) => places.size >= 2);
-  const kept = twice.filter(([v]) => typeof said[v] === "string" && said[v].trim());
-  const asked = twice.filter(([v]) => !kept.some(([k]) => k === v));
-  const ownNow = places => [...places.keys()].filter(f => !coreWrites(f, g => readAt("", g)));
+// The values the change wrote into one more file of the project's own than the base held them in, each with the files
+// of the project's own that held it there. (only a file the change touched can hold a value it did not hold at the base)
+function freshOf(asked, { read, ls, base, core }) {
+  if (!base) return [];
+  // (the core writes it: a file of its copy, or one it writes whole that carries its mark where its kind carries one)
+  const coreWrites = (f, at) => !!core && (f.startsWith(core) || (whole(f) && (!marked(f) || /^# The core's file:/u.test(readAt(at, f) ?? ""))));
+  const changed = new Set(git(["diff", "--name-only", "-z", base, "--"]).split("\0").filter(Boolean));
   let before = null;
   const fresh = [];
-  if (base) {
-    // (only a file the change touched can hold a value it did not hold at the base)
-    const changed = new Set(git(["diff", "--name-only", "-z", base, "--"]).split("\0").filter(Boolean));
-    for (const [v, places] of asked) {
-      const own = ownNow(places);
-      if (!own.some(f => changed.has(f))) continue;
-      before ??= valuesAt(base, asked.map(([k]) => k).filter(k => k.startsWith("/")));
-      const was = [...(before.get(v)?.keys() ?? [])].filter(f => !coreWrites(f, g => readAt(base, g)));
-      if (own.length > was.length) fresh.push([v, places, was]);
-    }
+  for (const [v, places] of asked) {
+    const own = [...places.keys()].filter(f => !coreWrites(f, ""));
+    if (!own.some(f => changed.has(f))) continue;
+    before ??= valuesAt(read, ls, base, asked.map(([k]) => k).filter(k => k.startsWith("/")));
+    const was = [...(before.get(v)?.keys() ?? [])].filter(f => !coreWrites(f, base));
+    if (own.length > was.length) fresh.push([v, places, was]);
   }
+  return fresh;
+}
+
+// The part, run by copies.mjs from the project's root: `core`, the copy's path from the root ("" in the core's own
+// repository); `config`, the check's config and `configPath` its path; `base`, the pull request's base or "";
+// `ls(specs)`, the files pathspecs read, as copies.mjs lists them. It prints its notes and failures and returns whether
+// anything failed.
+export function valuesTwice({ core, config, configPath, base, ls }) {
+  const said = config.twice && typeof config.twice === "object" && !Array.isArray(config.twice) ? config.twice : {};
+  const read = scope(config, core);
+  const twice = [...valuesAt(read, ls, "")].filter(([, places]) => places.size >= 2);
+  const kept = twice.filter(([v]) => typeof said[v] === "string" && said[v].trim());
+  const asked = twice.filter(([v]) => !kept.some(([k]) => k === v));
+  const fresh = freshOf(asked, { read, ls, base, core });
+  report({ asked, fresh, kept, stale: Object.keys(said).filter(v => !twice.some(([k]) => k === v)), base, configPath });
+  return fresh.length > 0;
+}
+
+function report({ asked, fresh, kept, stale, base, configPath }) {
   const shown = v => (v.length > 80 ? `${v.slice(0, 77)}...` : v);
   const where = places => [...places].map(([f, l]) => `${f}:${l}`).join(" and ");
   const old = asked.filter(([v]) => !fresh.some(([k]) => k === v));
@@ -140,12 +151,10 @@ export function valuesTwice({ core, config, configPath, base, ls, lsAt }) {
     for (const [v, places] of old.slice(0, 10)) console.log(`  ${logged(`${shown(v)}: ${where(places)}`)}`);
     if (old.length > 10) console.log(`  and ${old.length - 10} more`);
   }
-  const stale = Object.keys(said).filter(v => !twice.some(([k]) => k === v));
   for (const v of stale) console.log(`note ${logged(configPath)}'s "twice" names ${logged(shown(v))}, which no longer stands in two files: take it out of "twice"`);
   for (const [v, places, was] of fresh) {
     const first = was[0] ?? [...places.keys()][0];
     console.error(`FAIL: ${logged(`a value written twice: ${shown(v)} stands in ${where(places)}`)}. Mend: read the value from ${logged(first)} (import it, or read the file), or say in ${logged(configPath)}'s "twice" why both must hold it`);
   }
   if (!fresh.length) console.log(`ok   no value newly written twice (a pin or a pattern${kept.length ? `; ${kept.length} said in ${logged(configPath)}'s "twice"` : ""})`);
-  return fresh.length > 0;
 }
