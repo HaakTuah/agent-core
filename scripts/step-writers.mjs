@@ -15,6 +15,8 @@ import { parseConfig, where as shapeAt } from "./shape.mjs";
 import { copiesConfig, marksConfig } from "./check-configs.mjs";
 import { atCopy } from "./core-path.mjs";
 import { MOVED_GLOB, MOVED_GLOBS, moved, namers, readsOldAlone } from "./step-checks-moved.mjs";
+import { places } from "./step-checks-modules.mjs";
+import { placed } from "./manifest-reads.mjs";
 import { HERE, plain, shown } from "./step-checks.mjs";
 import { Unread, copyAt } from "./workflow-calls.mjs";
 import { installed } from "./packages.mjs";
@@ -221,3 +223,13 @@ function pathsLine(p, writes) {
   if (before) before[1] = manifest.replace(OLD_PATHS, now);
   else writes.push(["core-manifest.md", manifest.replace(OLD_PATHS, now)]);
 }
+
+// The manifest with each module its list neither takes nor leaves out placed from what is read exactly (#1094;
+// step-checks-modules.mjs, `places`, which `opts` narrows), where there is one to place.
+export const writePlaced = opts => (p, busy) => {
+  const left = places(p, opts);
+  if (!left.length) return [];
+  writable(p, "core-manifest.md", busy);
+  put(p, "core-manifest.md", placed(p.manifest, left));
+  return ["core-manifest.md"];
+};

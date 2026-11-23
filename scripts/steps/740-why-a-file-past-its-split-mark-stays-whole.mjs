@@ -2,4 +2,4 @@
 // of their names.
 import { COST } from "../step-checks.mjs";
 
-export default { lead: "19 November 2026, why a file past its split mark stays whole", cost: COST.check, held: "the reading-size check" };
+export default { lead: "19 November 2026, why a file past its split mark stays whole", cost: COST.check, asks: "nothing", held: "the reading-size check" };
