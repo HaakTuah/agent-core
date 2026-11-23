@@ -1,0 +1,151 @@
+// The copies check's part for a value written out in two files (copies.mjs, beside this file, runs it; "One fact, one
+// place" in the core's roles/shared/how-to-work.md; #1139): the copies too short for its runs of lines or words to read.
+// A value is one of two fixed forms, compared as exact strings, never guessed at:
+//   - a pin: 40 or 64 hexadecimal characters standing alone (a commit hash, a SHA-256), in lower case, in any tracked
+//     file; save one after `uses: <action>@`, which the host asks of each workflow on its own and Dependabot moves, and a
+//     run of digits alone, which is a number;
+//   - a pattern: a regular expression literal of JavaScript or TypeScript, as the measures' lexer reads it
+//     (code-shape-lexer.mjs), of at least 30 characters, in a file the config's "code" lists; save one that matches one
+//     text alone (no ., [, *, +, ?, {, | or class escape such as \d), since that is a script's printed wording read, which
+//     the reviews judge.
+// A value counts where it stands in two files or more. Not read: lock files, the dated records (archive/, reports/,
+// words/, at the root and in the core's copy), what the config's ":!" specs leave out, and the files its "tests" lists,
+// whose copies of the code are another check's (#460, point 3); a value the config's "twice" names, with why both files
+// must hold it, is taken as said.
+// Nothing locks a project (AGENTS.md of the core): what the pull request's base held is the baseline. A value fails only
+// where a file of the project's own (outside the core's copy, and no file the core writes whole: core-owned.mjs) holds
+// it now and the base held it in fewer such files; so a sync, which changes the core's files alone, never fails here,
+// and a value moved from one file to another passes. Every other value written twice is noted, at every run, a debt to
+// work down; with no base (a push to main) every one is noted and none fails. Node's own modules and git.
+import fs from "node:fs";
+import { execFileSync } from "node:child_process";
+import { tokens, jsxIn } from "./code-shape-lexer.mjs";
+import { whole, marked } from "./core-owned.mjs";
+import { logged } from "./guards.mjs";
+
+export const PATTERN_LEAST = 30;
+const PIN = /(?<![0-9A-Za-z_])(?:[0-9a-fA-F]{64}|[0-9a-fA-F]{40})(?![0-9A-Za-z_])/gu;
+const USES = /uses:[ \t]*["']?[^\s"'@]+@(?:sha256:)?$/u;
+const LOCKS = ["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lock", "packages.lock.json", "Cargo.lock", "poetry.lock", "Pipfile.lock", "uv.lock", "Gemfile.lock", "composer.lock", "go.sum"];
+const RECORDS = ["archive/", "reports/", "words/"];
+const SCRIPT = /\.(?:[cm]?js|jsx|[cm]?ts|tsx)$/u;
+const READ_MOST = 1 << 20;
+
+// The pins a text holds, each once, in lower case.
+export function pinsIn(text) {
+  const found = new Map();
+  String(text).split("\n").forEach((line, i) => {
+    for (const m of line.matchAll(PIN)) {
+      if (/^\d+$/u.test(m[0]) || USES.test(line.slice(0, m.index))) continue;
+      const v = m[0].toLowerCase();
+      if (!found.has(v)) found.set(v, i + 1);
+    }
+  });
+  return found;
+}
+
+// Whether a regular expression literal matches more than one text: a ., [, *, +, ?, {, | or a class escape (\d, \w,
+// \s, \p and their capitals) outside an escape. (an anchor or a group alone widens nothing)
+export function widens(literal) {
+  const body = literal.slice(1, literal.lastIndexOf("/"));
+  for (let i = 0; i < body.length; i++) {
+    if (body[i] === "\\") { if (/[dDwWsSpP]/u.test(body[i + 1] ?? "")) return true; i++; continue; }
+    if (".[*+?{|".includes(body[i])) return true;
+  }
+  return false;
+}
+
+// The patterns a script's text holds, each once, with the line it first stands on.
+export function patternsIn(text, file) {
+  let toks = tokens(text, jsxIn(file));
+  if (toks.lost) toks = tokens(text, false);
+  const found = new Map();
+  for (const t of toks) if (t.t === "regex" && t.v.length >= PATTERN_LEAST && widens(t.v) && !found.has(t.v)) found.set(t.v, t.line);
+  return found;
+}
+
+// The part, run by copies.mjs from the project's root: `core`, the copy's path from the root ("" in the core's own
+// repository); `config`, the check's config and `configPath` its path; `base`, the pull request's base or "";
+// `ls(specs)` and `lsAt(commit, specs)`, the files pathspecs read, as copies.mjs lists them. It prints its notes and
+// failures and returns whether anything failed.
+export function valuesTwice({ core, config, configPath, base, ls, lsAt }) {
+  const git = (args, ok = [0]) => {
+    try { return execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] }); }
+    catch (e) { if (ok.includes(e.status)) return e.stdout ?? ""; throw e; }
+  };
+  const list = v => (Array.isArray(v) ? v.filter(x => typeof x === "string" && x) : []);
+  const said = config.twice && typeof config.twice === "object" && !Array.isArray(config.twice) ? config.twice : {};
+  const out = list(config.code).concat(list(config.prose)).filter(s => s.startsWith(":!") || s.startsWith(":(exclude"));
+  const leftOut = [...out, ...list(config.tests).map(s => (s.startsWith(":") ? s : `:(exclude)${s}`)),
+    ...LOCKS.map(f => `:(exclude,glob)**/${f}`), ...RECORDS.flatMap(r => [`:(exclude)${r}`, ...(core ? [`:(exclude)${core}${r}`] : [])])];
+  const specs = [".", ...leftOut];
+  // (the scripts: the files the config's "code" lists, of JavaScript or TypeScript, less what is left out)
+  const code = list(config.code).filter(s => !s.startsWith(":")), codeSpecs = [...code, ...leftOut];
+  const scriptsAt = commit => (code.length ? (commit ? lsAt(commit, codeSpecs) : ls(codeSpecs)).filter(f => SCRIPT.test(f)) : []);
+  // (the core writes it: a file of its copy, or one it writes whole that carries its mark where its kind carries one)
+  const coreWrites = (f, read) => !!core && (f.startsWith(core) || (whole(f) && (!marked(f) || /^# The core's file:/u.test(read(f) ?? ""))));
+
+  // Each value, as a Map of value -> Map of file -> line, at a commit or ("") in the work tree; at a commit, the patterns
+  // of `want` alone, read only in the scripts that hold one of them as text.
+  function valuesAt(commit, want = []) {
+    const at = new Map(), add = (v, f, line) => { const m = at.get(v) ?? at.set(v, new Map()).get(v); if (!m.has(f)) m.set(f, line); };
+    const prefix = commit ? `${commit}:` : "";
+    const raw = git(["grep", "-I", "-z", "-n", "-E", "-i", "-e", "[0-9a-f]{40}", ...(commit ? [commit] : []), "--", ...specs], [0, 1]);
+    for (let i = 0; i < raw.length;) {
+      const a = raw.indexOf("\0", i), b = raw.indexOf("\0", a + 1), e = raw.indexOf("\n", b + 1);
+      if (a < 0 || b < 0) break;
+      const file = raw.slice(i, a).slice(prefix.length), line = Number(raw.slice(a + 1, b)), text = raw.slice(b + 1, e < 0 ? raw.length : e);
+      for (const v of pinsIn(text).keys()) add(v, file, line);
+      i = e < 0 ? raw.length : e + 1;
+    }
+    const scripts = commit ? (want.length && code.length ? held(commit, want) : []) : scriptsAt("");
+    for (const f of scripts) {
+      const text = readAt(commit, f);
+      if (text !== null) for (const [v, line] of patternsIn(text, f)) add(v, f, line);
+    }
+    return at;
+  }
+  // (the scripts that hold one of `texts` at a commit, by one git grep of fixed strings)
+  const held = (commit, texts) => git(["grep", "-l", "-z", "-F", ...texts.flatMap(t => ["-e", t]), commit, "--", ...codeSpecs], [0, 1])
+    .split("\0").filter(Boolean).map(f => f.slice(commit.length + 1)).filter(f => SCRIPT.test(f));
+  const readAt = (commit, f) => {
+    if (commit) { try { const t = git(["show", `${commit}:${f}`]); return t.length > READ_MOST ? null : t; } catch { return null; } }
+    const st = fs.lstatSync(f, { throwIfNoEntry: false });
+    return st?.isFile() && st.size <= READ_MOST ? fs.readFileSync(f, "utf8") : null;
+  };
+
+  const now = valuesAt("");
+  const twice = [...now].filter(([, places]) => places.size >= 2);
+  const kept = twice.filter(([v]) => typeof said[v] === "string" && said[v].trim());
+  const asked = twice.filter(([v]) => !kept.some(([k]) => k === v));
+  const ownNow = places => [...places.keys()].filter(f => !coreWrites(f, g => readAt("", g)));
+  let before = null;
+  const fresh = [];
+  if (base) {
+    // (only a file the change touched can hold a value it did not hold at the base)
+    const changed = new Set(git(["diff", "--name-only", "-z", base, "--"]).split("\0").filter(Boolean));
+    for (const [v, places] of asked) {
+      const own = ownNow(places);
+      if (!own.some(f => changed.has(f))) continue;
+      before ??= valuesAt(base, asked.map(([k]) => k).filter(k => k.startsWith("/")));
+      const was = [...(before.get(v)?.keys() ?? [])].filter(f => !coreWrites(f, g => readAt(base, g)));
+      if (own.length > was.length) fresh.push([v, places, was]);
+    }
+  }
+  const shown = v => (v.length > 80 ? `${v.slice(0, 77)}...` : v);
+  const where = places => [...places].map(([f, l]) => `${f}:${l}`).join(" and ");
+  const old = asked.filter(([v]) => !fresh.some(([k]) => k === v));
+  if (old.length) {
+    console.log(`note ${old.length} ${old.length === 1 ? "value stands" : "values stand"} in two files or more${base ? ", as the pull request's base held them" : ", with no base to read against"}: each a debt to work down, failing nothing (read it from one file, or say in ${logged(configPath)}'s "twice" why both must hold it)`);
+    for (const [v, places] of old.slice(0, 10)) console.log(`  ${logged(`${shown(v)}: ${where(places)}`)}`);
+    if (old.length > 10) console.log(`  and ${old.length - 10} more`);
+  }
+  const stale = Object.keys(said).filter(v => !twice.some(([k]) => k === v));
+  for (const v of stale) console.log(`note ${logged(configPath)}'s "twice" names ${logged(shown(v))}, which no longer stands in two files: take it out of "twice"`);
+  for (const [v, places, was] of fresh) {
+    const first = was[0] ?? [...places.keys()][0];
+    console.error(`FAIL: ${logged(`a value written twice: ${shown(v)} stands in ${where(places)}`)}. Mend: read the value from ${logged(first)} (import it, or read the file), or say in ${logged(configPath)}'s "twice" why both must hold it`);
+  }
+  if (!fresh.length) console.log(`ok   no value newly written twice (a pin or a pattern${kept.length ? `; ${kept.length} said in ${logged(configPath)}'s "twice"` : ""})`);
+  return fresh.length > 0;
+}
