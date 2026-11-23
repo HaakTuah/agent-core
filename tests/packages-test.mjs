@@ -1,7 +1,8 @@
 // Checks how the core takes the packages of other publishers its scripts run (#654): from its lock file in .packages/,
 // installed by scripts/install.mjs into .packages/node_modules/, which git does not track, and loaded by scripts/packages.mjs from there alone.
 // The lock file is in npm's own form, each package at one exact version from npm's registry with a sha512, and each it
-// brings or updates a week old by the registry's date (floor rule 7), which npm ci never asks; nothing of
+// brings or updates a week old by the registry's date (floor rule 7), which npm ci never asks, held by
+// scripts/week-wait.mjs, whose reading and failure this test holds on answers made here; nothing of
 // another publisher's is tracked in the core, or so in any copy, which core.yml holds to the core; and each script that
 // loads a package, with none installed, says it did not run and how to install, never passing, nor reading a project's
 // own install of the same name.
@@ -77,6 +78,10 @@ const plainEnv = { ...env };
 {
   const { tooYoung, failure } = await import(pathToFileURL(path.join(root, "scripts/week-wait.mjs")).href);
   ok(mended(failure(["yaml@2.9.2: published 2026-11-17T00:00:00.000Z"])), "the week's wait fails with its mend on the failure's own line", failure(["x"]));
+  // (and as the step runs it: a base that holds no lock file makes every entry new, and a day before any was published
+  // makes each too young, or the registry unreached, so the run fails whatever the network; its exit code is 1)
+  const run = spawnSync(process.execPath, [path.join(root, "scripts/week-wait.mjs")], { cwd: root, encoding: "utf8", env: { ...env, PACKAGES_BASE: "no-such-commit", PACKAGES_TODAY: "2000-01-01" } });
+  ok(run.status === 1 && mended(run.stdout), "the check, run as its step runs it, exits 1 with its mend on the line it prints", `${run.status} ${run.stdout}${run.stderr}`);
   // (held on a lock written by hand: a version field kept while the address names another tarball, an entry with no
   // version, an address off the registry, and a young version, against answers made here)
   const day = 86400000, now = Date.parse("2026-11-18T00:00:00Z");
@@ -152,6 +157,7 @@ try {
   const pp = path.join(pk, "parser");
   const staged = json(".packages/parser/package-lock.json").packages["node_modules/node-addon-api"];
   ok(staged?.integrity, "the parser's lock names node-addon-api, which this case installs from the job's cache", "Mend: stage another package of the parser's lock with no dependency in this case, and its name where the case loads it");
+  if (!staged?.integrity) process.exit(1); // (nothing below can stage what the lock does not name)
   const parserList = { ...JSON.parse(fs.readFileSync(path.join(pp, "package.json"), "utf8")), dependencies: { "node-addon-api": staged.version } };
   fs.writeFileSync(path.join(pp, "package.json"), JSON.stringify(parserList, null, 2));
   fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license, dependencies: parserList.dependencies }, "node_modules/node-addon-api": staged } }, null, 2));
