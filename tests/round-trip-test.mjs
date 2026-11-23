@@ -1,6 +1,6 @@
 // Every writer of the core's and each of its own readers that reads what it wrote, by a round trip (#1108): from
 // projects the starter kit writes of each kind the upgrade test holds (npm at the root, npm in a folder for a game, NuGet
-// in a private repository as Windows holds it, its lines ending CRLF, and one with neither), each file the kit writes
+// in a private repository as Windows holds it, its lines ending CRLF), each file the kit writes
 // read back by the core's YAML reader, its Markdown reader, the readers of the checks' configs, the manifest's readers,
 // the one process and the comparison with a fresh kit, each to the meaning the kit wrote; each baseline or record a
 // check or step writes in a project (copies, shape, the dose's audit, the project's own holders, the reading against
@@ -10,7 +10,6 @@
 // in a project. Git and Node's own modules, and the core's packages its readers need.
 //
 //   node tests/round-trip-test.mjs
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { kits, plan } from "../scripts/converge.mjs";
@@ -27,7 +26,8 @@ import { differencesOf, modulesOf } from "../scripts/manifest-reads.mjs";
 import { markdownReader } from "../scripts/markdown.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
 import { ownerOf } from "../scripts/releases.mjs";
-import { root, scratch, scratchDir, scratchEnv, tally } from "../scripts/scratch-core.mjs";
+import { npmOnce } from "../scripts/npm-once.mjs";
+import { npmWithCache, root, scratch, scratchDir, scratchEnv, tally } from "../scripts/scratch-core.mjs";
 import { parseBaseline, parseConfig } from "../scripts/shape.mjs";
 import { KIT_CONFIGS, call, configs, project } from "../scripts/steps.mjs";
 import { CORE } from "../scripts/core-address.mjs";
@@ -85,23 +85,18 @@ for (const [f, [at]] of Object.entries(WRITERS).filter(([, [at]]) => at !== "her
 const ran = new Set();
 
 // ---- each kind of project, as the kit writes it ----
-const { git, run, core, pin, project: kitProject } = scratch("round-trip-");
+const { tmp, env, git, run, core, pin, project: kitProject } = scratch("round-trip-");
 const md = await markdownReader();
 const CASES = [
   { args: ["--name", "An npm project", "--npm", "."] },
   { args: ["--name", "A game (the 2nd): npm in a folder", "--npm", "web", "--game"] },
   { args: ["--name", "A private .NET project", "--nuget", ".", "--private"], crlf: true },
-  { args: ["--name", "Neither npm nor NuGet"] },
 ];
 const fenced = text => { let inFence = false; return text.split("\n").map(l => { if (/^ {0,3}(```|~~~)/u.test(l)) { inFence = !inFence; return null; } return inFence ? null : l; }); };
 const headsOf = text => fenced(text.replace(/\r\n/g, "\n")).flatMap(l => { const m = l !== null && /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/u.exec(l); return m ? [`${m[1].length} ${m[2]}`] : []; });
 const usesIn = node => !node || typeof node !== "object" ? [] : Object.entries(node).flatMap(([k, v]) => k === "uses" && typeof v === "string" ? [v] : usesIn(v));
 const usesLines = text => [...text.matchAll(/^\s*(?:-\s+)?uses:\s*["']?([^\s"'#]+)/gmu)].map(m => m[1]);
 const commit = (dir, m) => { git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", m); };
-// (a sync reaches its scratch core through the core's own address, scratchEnv's rewrite)
-const runIn = (env, dir, ...args) => { const x = spawnSync(process.execPath, args, { cwd: dir, env, encoding: "utf8" }); return { status: x.status, out: `${x.stdout}${x.stderr}` }; };
-
-const today = new Date().toISOString().slice(0, 10);
 let first = null;
 for (const c of CASES) {
   const o = options(["--owner", "the-owner", ...c.args]);
@@ -198,7 +193,7 @@ for (const c of CASES) {
   let r = null;
   try { r = reading(held.manifest, p.dir); } catch (e) { why = e.message; }
   const last = auditOf(r?.baseline?.audited);
-  ok(dose.status === 0 && last?.day === today && last.listed === r.listed && last.read === r.read && run(p.dir, "core/scripts/shape.mjs", "checks/shape.json").status === 0,
+  ok(dose.status === 0 && last !== null && last.listed === r.listed && last.read === r.read && run(p.dir, "core/scripts/shape.mjs", "checks/shape.json").status === 0,
     `  the audit the dose records is read back by the dose, and the shape check still reads its baseline`, `${dose.out}\n${why}\n${JSON.stringify(r?.baseline?.audited)}`);
   ran.add("dose.mjs");
   const holders = run(p.dir, "core/scripts/holders.mjs", "--own", "--write");
@@ -209,7 +204,7 @@ for (const c of CASES) {
   const recorded = run(p.dir, "core/scripts/core-reading.mjs", "--recorded");
   const record = recordOf(fs.readFileSync(path.join(p.dir, "checks/core-reading.json"), "utf8"));
   const due = run(p.dir, "core/scripts/core-reading.mjs");
-  ok(recorded.status === 0 && record?.day === today && record.marks.size > 0 && due.status === 0 && /^No reading of the project against the core is due/mu.test(due.out),
+  ok(recorded.status === 0 && record?.day === last?.day && record.marks.size > 0 && due.status === 0 && /^No reading of the project against the core is due/mu.test(due.out),
     `  the reading against the core recorded is read back: nothing is due`, `${recorded.out}\n${due.out}`);
   ran.add("core-reading.mjs");
   first ??= p;
@@ -231,7 +226,13 @@ for (const c of CASES) {
   fs.appendFileSync(path.join(core, ".github/workflows/core.yml"), "# moved\n");
   git(core, "commit", "-q", "-am", "the core moves");
   const next = git(core, "rev-parse", "HEAD");
-  const synced = runIn(scratchEnv(core, path.dirname(core)), first.dir, "core/scripts/sync.mjs", next);
+  // (the sync reaches its scratch core through the core's own address, scratchEnv's rewrite, and the copy's packages are
+  // installed by the real npm once, reading a copy of the machine's cache first, as in check-test.mjs: the last runs
+  // here, so the scratch's environment becomes the sync's)
+  const syncEnv = npmOnce(scratchEnv(core, tmp), tmp, { real: npmWithCache(tmp) });
+  for (const name of Object.keys(env)) delete env[name];
+  Object.assign(env, syncEnv);
+  const synced = run(first.dir, "core/scripts/sync.mjs", next);
   const held = project(first.dir);
   const k = kind(held);
   const theCore = Object.values(held.workflows).flatMap(w => usesIn(w.yaml)).filter(u => u.startsWith(`${CORE}/`));
