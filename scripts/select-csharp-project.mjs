@@ -72,8 +72,16 @@ const PATH = String.raw`(?:[^$%@&;'"()]|\$\(${RESERVED}\))`;
 const PART = new RegExp(String.raw`^(?:${PATH}|\$\(\[MSBuild\]::GetDirectoryNameOfFileAbove\((?:${PATH}|'(?:${PATH})*')*\)\))*\.(?:props|targets)$`, "u");
 const ABOVE = new RegExp(String.raw`^\$\(\[MSBuild\]::GetPathOfFileAbove\(\s*'?((?:[^\s$%@&;'"(),][^$%@&;'"(),]*)?\.(?:props|targets))'?\s*(?:,((?:${PATH}|'(?:${PATH})*')*))?\)\)$`, "u");
 const NAME_ABOVE = /^\$\(\[MSBuild\]::GetDirectoryNameOfFileAbove\(((?:[^,()]|\$\(MSBuildThisFileDirectory\))*),([^,()]*)\)\)(.*)$/iu;
+// Such a property names no file where its element is empty (<TargetFrameworkProfile />), or, of a switch named Import…
+// (ImportDirectoryBuildProps), holds only true or false; any other content, or an attribute, may name one.
+const HOOK = /<((?:Custom(?:Before|After)|[\w.]*(?:Props|Targets|Profile)|MSBuild(?:User)?ExtensionsPath)[\w.]*)/giu;
+const BARE = /\s*(?:\/>|>(?:\s*(true|false))?\s*<\/([\w.]+)\s*>)/yiu;
 function importsOther(text, f, known) {
-  if (/<(?:Custom(?:Before|After)|[\w.]*(?:Props|Targets|Profile)|MSBuild(?:User)?ExtensionsPath)/iu.test(text)) return true;
+  for (const m of text.matchAll(HOOK)) {
+    BARE.lastIndex = m.index + m[0].length;
+    const b = BARE.exec(text);
+    if (!b || (b[2] !== undefined && b[2] !== m[1]) || (b[1] !== undefined && !/^Import/u.test(m[1]))) return true;
+  }
   const inside = at => at !== null && at !== "" && known.has(at);
   // (the folder at or above `start` that holds `name`, as git lists it: "" the top; null where none does, or `start`
   // is no folder known here)
@@ -124,7 +132,7 @@ export function msbuildUsings(entries, pace) {
 }
 
 // The texts MSBuild reads as a project's: a .csproj and what it imports by name or beside it.
-export const MSBUILD = /\.(?:csproj|props|targets|csproj\.user|pubxml|pubxml\.user)$/u;
+export const MSBUILD = /\.(?:csproj|props|targets|csproj\.user|pubxml|pubxml\.user)$/iu; // (in any case, as MSBuild finds them on Windows)
 
 // What git holds that the config does not read and C# compiles with: { msbuild: { path: text } of each .props, .targets,
 // .csproj.user, which MSBuild imports beside its .csproj, and .pubxml and .pubxml.user, which the SDK imports by a
@@ -132,13 +140,13 @@ export const MSBUILD = /\.(?:csproj|props|targets|csproj\.user|pubxml|pubxml\.us
 // be read, a link among them (never followed) too, or a Directory.Build.rsp stands, whose switches may set any property
 // with no element to read; past CHARACTERS bytes of them, Late. `pace` is asked before each file is read; `listed`
 // gives the files git holds of those kinds.
-export function heldBeside(texts, pace = () => {}, listed = () => git(["ls-files", "-z", "--", ":(glob)**/*.props", ":(glob)**/*.targets", ":(glob)**/*.csproj.user", ":(glob)**/*.pubxml", ":(glob)**/*.pubxml.user", ":(glob)**/Directory.Build.rsp", ":(glob)**/*.cs"]).split("\0")) {
+export function heldBeside(texts, pace = () => {}, listed = () => git(["ls-files", "-z", "--", ...["*.props", "*.targets", "*.csproj.user", "*.pubxml", "*.pubxml.user", "Directory.Build.rsp", "*.cs"].map(p => `:(glob,icase)**/${p}`)]).split("\0")) {
   let n = 0;
   try {
     const held = listed().filter(f => f && !(f in texts));
     if (held.some(f => path.posix.basename(f).toLowerCase() === "directory.build.rsp")) return { unknown: true };
     const text = f => { pace(); const st = fs.lstatSync(f); if (!st.isFile()) throw new Error(`${f} is no file`); if ((n += st.size) > CHARACTERS) throw tooMuch("the files git holds beside", n, "bytes"); return fs.readFileSync(f, "utf8"); };
-    return { msbuild: Object.fromEntries(held.filter(f => !f.endsWith(".cs")).map(f => [f, text(f)])), cs: Object.fromEntries(held.filter(f => f.endsWith(".cs")).map(f => [f, text(f)])) };
+    return { msbuild: Object.fromEntries(held.filter(f => !/\.cs$/iu.test(f)).map(f => [f, text(f)])), cs: Object.fromEntries(held.filter(f => /\.cs$/iu.test(f)).map(f => [f, text(f)])) };
   } catch (e) { if (e instanceof Late) throw e; return { unknown: true }; }
 }
 

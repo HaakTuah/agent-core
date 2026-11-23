@@ -13,6 +13,7 @@ import { Late } from "../scripts/hurry.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 import { csharpReach } from "../scripts/select-csharp.mjs";
 import { heldBeside, msbuildUsings, ofNoProject } from "../scripts/select-csharp-project.mjs";
+import { git } from "../scripts/select-passed.mjs";
 import { PROJ, done, nothing, ok, one, same } from "./select-csharp-test.mjs";
 
 // ---- a <Using>, and every file where one cannot be read ----
@@ -21,10 +22,13 @@ for (const [held, what] of [...["$(Root).App", "@(ExtraUsings)", "%(Ns.Identity)
   ...["$(D)u.xml", "c.proj", "u.props.xml", "a.props;u.xml", "../U.Props", "c.props/u.xml", "u.xml;a.props", "$(X).props", ...["GetPathOfFileAbove('u.xml', 'a.props')", "IO.Path]::ChangeExtension('a.props', '.xml')", "IO.Path]::Combine('a.props', '..', 'u.xml')",
     "String]::Copy('a.props').Replace('.props', '.xml')", "String]::Concat('a.props', '.xml')"].map(f => `$([${f.startsWith("Get") ? "MSBuild]::" : "System."}${f})`)].map(p => [`<Import Project="${p}" />`, `a .props git holds imports ${p}, whose <Using> items it may not hold`]),
   ...["MSBuildMine", "MSBuildAllProjects", "MSBuildProjectExtensionsPath"].map(m => [`<PropertyGroup><${m}>u.xml;a</${m}></PropertyGroup><Import Project="$(${m}).props" />`, `a .props imports $(${m}).props, a property of MSBuild's name that a file can set`]),
-  ...["CustomAfterMicrosoftCommonTargets", "DirectoryBuildTargetsPath", "_DirectoryBuildTargetsFile", "_DirectoryBuildPropsFile", "DirectoryPackagesPropsPath", "LanguageTargets", "MSBuildUserExtensionsPath", "MSBuildExtensionsPath", "CustomAfterDirectoryBuildTargets", "CustomBeforeDirectoryBuildProps", "CodeAnalysisTargets", "AfterMicrosoftNETSdkTargets", "AlternateCommonProps", "NuGetBuildTasksPackTargets", "NuGetRestoreTargets", "BeforeTargetFrameworkInferenceTargets", "PublishProfile", "WebPublishProfileFile"].map(m => [`<PropertyGroup><${m}>$(MSBuildThisFileDirectory)u.xml</${m}></PropertyGroup>`, `a .props names a file MSBuild or the SDK imports by ${m}`]), [null, "git cannot be asked"]]) {
+  ...["CustomAfterMicrosoftCommonTargets", "DirectoryBuildTargetsPath", "_DirectoryBuildTargetsFile", "_DirectoryBuildPropsFile", "DirectoryPackagesPropsPath", "LanguageTargets", "MSBuildUserExtensionsPath", "MSBuildExtensionsPath", "CustomAfterDirectoryBuildTargets", "CustomBeforeDirectoryBuildProps", "CodeAnalysisTargets", "AfterMicrosoftNETSdkTargets", "AlternateCommonProps", "NuGetBuildTasksPackTargets", "NuGetRestoreTargets", "BeforeTargetFrameworkInferenceTargets", "PublishProfile", "WebPublishProfileFile"].map(m => [`<PropertyGroup><${m}>$(MSBuildThisFileDirectory)u.xml</${m}></PropertyGroup>`, `a .props names a file MSBuild or the SDK imports by ${m}`]),
+  ...["<CustomAfterMicrosoftCommonTargets>true</CustomAfterMicrosoftCommonTargets>", "<ImportDirectoryBuildProps Condition=\"$(A)\">true</ImportDirectoryBuildProps>", "<ImportDirectoryBuildProps>true</X>", "<ImportDirectoryBuildProps>true;u.xml</ImportDirectoryBuildProps>"].map(e => [`<PropertyGroup>${e}</PropertyGroup>`, `a .props holds ${e}, which may name a file`]), [null, "git cannot be asked"]]) {
   const r = csharpReach(csTexts, undefined, () => held ? { msbuild: [held], cs: {} } : { unknown: true });
   ok(same([...r.unsure].sort(), ["src/A.cs", "tests/T.cs"]), `where ${what}, every file of C# is unsure`, JSON.stringify([...r.unsure]));
 }
+const bare = ["<TargetFrameworkProfile />", "<TargetFrameworkProfile></TargetFrameworkProfile>", "<ImportDirectoryBuildProps>true</ImportDirectoryBuildProps>", "<ImportDirectoryBuildTargets> False </ImportDirectoryBuildTargets>"].filter(e => csharpReach(csTexts, undefined, () => ({ msbuild: [`<Project><PropertyGroup>${e}</PropertyGroup></Project>`], cs: {} })).unsure.size);
+ok(!bare.length, "a property of a hook's name that is empty, or a switch named Import… of true or false, names no file and leaves the files read", bare.join(" | "));
 const userFiles = ["src/App.csproj.user", "src/Properties/PublishProfiles/P.pubxml", "src/Properties/PublishProfiles/P.pubxml.user"].filter(f => !same([...csharpReach({ ...csTexts, [f]: "<Project><ItemGroup><Using Include=\"$(Root).App\" /></ItemGroup></Project>" }, undefined, nothing).unsure].sort(), ["src/A.cs", "tests/T.cs"]));
 ok(!userFiles.length, "a .csproj.user, which MSBuild imports beside its .csproj, and a .pubxml or .pubxml.user, which the SDK imports by a publish profile, are read for their <Using> items", userFiles.join(" | "));
 ok(ofNoProject("lib/A.cs", csTexts) && !ofNoProject("src/A.cs", csTexts) && !ofNoProject("A.cs", { "App.csproj": PROJ }), "C# is of no project where no .csproj stands in a folder above it");
@@ -87,6 +91,10 @@ ok(!unread.length && rooted("", { "Directory.Build.props": group("<RootNamespace
     let asked = 0, paced;
     try { heldBeside({}, () => { if (++asked > 2) throw new Late("past the budget"); }, () => files); } catch (e) { paced = e; }
     ok(paced instanceof Late && asked === 3, "the budget is asked before each file git holds beside the texts is read, so many empty files cannot outlast it", String(paced));
+    // (git lists them in any case, as MSBuild finds them on Windows)
+    git(["init", "-q"]); fs.writeFileSync(path.join(dir, "directory.build.rsp"), "-p:A=b\n"); fs.writeFileSync(path.join(dir, "Low.PROPS"), "<Project />\n"); git(["add", "directory.build.rsp", "Low.PROPS"]);
+    const lower = heldBeside({}); fs.rmSync(path.join(dir, "directory.build.rsp")); git(["rm", "-q", "--cached", "directory.build.rsp"]);
+    ok(lower.unknown && Object.keys(heldBeside({}).msbuild).includes("Low.PROPS"), "a directory.build.rsp or a .PROPS git holds is listed in any case", JSON.stringify(lower));
     fs.symlinkSync("Directory.Build.props", path.join(dir, "Link.props"));
     fs.writeFileSync(path.join(dir, "Directory.Build.rsp"), "-p:CustomAfterMicrosoftCommonTargets=u.xml\n");
     ok(heldBeside({}, undefined, () => [...files, "Directory.Build.rsp"]).unknown, "a Directory.Build.rsp git holds, whose switches may set any property, leaves what git holds unknown, so every file is unsure");
