@@ -6,13 +6,13 @@
 //
 //   node tests/pattern-test.mjs
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { entryFile } from "../scripts/holders.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { holdersOf, judge, lacking, main, report } from "../scripts/pattern.mjs";
 import { rulesOf } from "../scripts/rules.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what) => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}`); } };
@@ -76,18 +76,15 @@ ok(none.code === 0 && counted && Number(counted[1]) > 100 && counted.slice(2).ev
   "without a base it fails nothing, counts the rules that bind and those that lack each mark, and says so");
 const bad = [main(["--base", "--no-such"], root), main(["--base"], root), main(["--base", "no-such-commit"], root)];
 ok(bad.every(b => b.code === 1 && mended(b.lines.join("\n")) && /^FAIL --base needs a commit/u.test(b.lines[0])), "a base that is an option, missing or no commit fails, with its mend");
-const empty = fs.mkdtempSync(path.join(os.tmpdir(), "pattern-"));
-const nothing = main([], empty);
-fs.rmSync(empty, { recursive: true, force: true });
+const nothing = main([], scratchDir("pattern-"));
 ok(nothing.code === 1 && mended(nothing.lines.join("\n")) && /no rule of the floor/u.test(nothing.lines[0]), "where no rule is read it fails, since it would pass anything, with its mend");
 
 // the holders the check reads from a project's scripts/holders/, as main() reads them: a lead marked "describes" there
 // is not read
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "pattern-"));
+const scratch = scratchDir("pattern-");
 fs.mkdirSync(path.join(scratch, "scripts/holders"), { recursive: true });
 fs.writeFileSync(path.join(scratch, "scripts/holders", entryFile(`${file}: Describes`)), JSON.stringify({ rule: `${file}: Describes`, holder: "describes" }));
 const read = holdersOf(scratch);
-fs.rmSync(scratch, { recursive: true, force: true });
 ok(read[`${file}: Describes`] === "describes" && !judge(head, base, read).added.some(r => r.lead === "Describes")
   && judge(head, base, {}).added.length === judge(head, base, read).added.length,
   "the holders are read from scripts/holders/ as main() reads them, and a lead marked \"describes\" there is not read");
