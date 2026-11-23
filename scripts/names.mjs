@@ -24,7 +24,7 @@ import { posix } from "node:path";
 // A name of a file: an optional run of "./" or "../", then path parts of letters, digits and ". _ - @ +", the last
 // with an extension that holds a letter. A mark with anything else (a space, "<", "*", "{", ":", "/" at its start) is
 // none.
-const FILE = /^(?:\.{1,2}\/)*(\.?[\w@+-][\w@+.-]*(?:\/[\w@+-][\w@+.-]*)*\.([A-Za-z0-9]*[A-Za-z][A-Za-z0-9]*))$/u;
+const FILE = /^(?:\.{1,2}\/)*(\.?[\w@+-][\w@+.-]*(?:\/[\w@+-][\w@+.-]*)*\.((?=[0-9]*[A-Za-z])[A-Za-z0-9]+))$/u;
 const SCRIPT = /^(?:(?:npm|pnpm|yarn) run|npm run-script) ([\w:@./-]+)(?: -- .*)?$|^npm (test|t)(?: -- .*)?$/u;
 /** The list of the names that stood when a project took the check, which only shrinks. */
 export const LIST = "checks/names.json";

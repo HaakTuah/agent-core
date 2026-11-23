@@ -93,6 +93,20 @@ try {
   const noted = t.out.match(/^note a name in a description that stands nowhere: docs\/many\.md/gmu)?.length ?? 0;
   ok(t.status === 0 && noted === SEARCHED - 1 && /^note 1 names in the descriptions that no tracked file is were not searched for/m.test(t.out) && !/`records\/log\.json`/.test(t.out), `past ${SEARCHED} names, the rest are left alone and counted, and the code is searched for the others in one run`, t.out.slice(-600));
   if (linked) ok(/^note docs\/link\.md is a link or no regular file/m.test(t.out) && !/docs\/link\.md:/.test(t.out), "a description that is a link is noted and not read", t.out.slice(-600));
+  if (linked) {
+    // a package file that is a link is read as none, so its scripts are left alone; and no list is written through a link
+    fs.rmSync(path.join(desc, "package.json"));
+    fs.symlinkSync("README.md", path.join(desc, "package.json"));
+    put("docs/many.md", "# Many\n\nRun `npm run nowhere`.\n");
+    g("add", "-A");
+    t = check();
+    ok(t.status === 0 && !/npm run nowhere/.test(t.out), "a package file that is a link is read as none, and its scripts are left alone", t.out.slice(-600));
+    fs.rmSync(path.join(desc, "checks/names.json"), { force: true });
+    fs.symlinkSync("../README.md", path.join(desc, "checks/names.json"));
+    const before = fs.readFileSync(path.join(desc, "README.md"), "utf8");
+    t = check({}, ["--write-names"]);
+    ok(t.status === 1 && mended(t.out) && fs.readFileSync(path.join(desc, "README.md"), "utf8") === before, "--write-names writes nothing through a list that is a link, and says the mend", t.out);
+  }
 } finally { fs.rmSync(desc, { recursive: true, force: true }); }
 // the core's own run: there every name that stands nowhere fails, and no list is kept
 const coreDir = scratchDir("names-test-core-");

@@ -293,13 +293,16 @@ if (AT) { console.log(JSON.stringify([...new Set(broken)].map(inTool).filter(Boo
 // other fails. `--write-names` writes the list: where there is none, each that stands nowhere; else those of it that
 // still do, never one more.
 const NAMES = { core: CORE, copy: CORE ? "" : HOME, skip: (f, n) => RULES.includes(f) && pathForm(n) };
-// (a description is read only where it is a regular file of this checkout, no link, of at most DESCRIBED bytes, so a
-// description that leads elsewhere or is too large to read is noted, never followed)
+// (a description, the manifest and the package file are read only where each is a regular file of this checkout, no
+// link, of at most DESCRIBED bytes, so one that leads elsewhere or is too large to read is noted or read as missing,
+// never followed)
 const DESCRIBED = 1024 * 1024;
 const usable = f => { try { const st = fs.lstatSync(f); return st.isFile() && st.size <= DESCRIBED; } catch { return false; } };
-const names = brokenNames({ ...NAMES, read: f => (files.has(f) ? text(f) : null), tracked, blocksOf: f => (files.has(f) ? parse(f).blocks : []), usable });
+const names = brokenNames({ ...NAMES, read: f => (files.has(f) && usable(f) ? text(f) : null), tracked, blocksOf: f => (files.has(f) ? parse(f).blocks : []), usable });
 if (process.argv.includes("--write-names")) {
   if (CORE) { console.error("FAIL: the core keeps no list of names: each that stands nowhere fails in its own run. Mend: run it without --write-names"); process.exit(1); }
+  const st = f => fs.lstatSync(f, { throwIfNoEntry: false });
+  if ((st("checks") && !st("checks").isDirectory()) || (st(LIST) && !st(LIST).isFile())) { console.error(`FAIL: ${LIST} or its folder is a link or no regular file, so it is not written through. Mend: delete it, commit that, and run this again`); process.exit(1); }
   const there = fs.existsSync(LIST), had = there ? listOf(text(LIST)) : null;
   if (there && !had) { console.error(`FAIL: ${LIST} cannot be read as { "names": [{ "file", "name" }] }. Mend: delete it and run this again, which writes it anew`); process.exit(1); }
   const keep = [...new Map(names.found.filter(x => !had || had.has(nameKey(x))).map(x => [nameKey(x), { file: x.file, name: x.name }])).values()];
