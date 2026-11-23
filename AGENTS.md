@@ -251,6 +251,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   a new repository of the same kind, and by the copies part's check of
   `scripts/checks.mjs`, in `core.yml`'s job and `copies.yml`'s, which fails a pull request that changes a file or part
   the core marks so that it is not as the core writes it.
+- **A writer of the core's and its readers meet in a round trip** (#1108). By default each file the core writes into a
+  project (the starter kit, the one process, the sync, and the baselines and records a check or a step writes there) is
+  read back in a test by each of the core's own readers that reads it (the YAML and Markdown readers, the readers of
+  the checks' configs, the manifest's), written in projects of each kind the upgrade test holds, and the test fails
+  where a reader cannot read it or reads another meaning. Nothing changes it. The trigger is a pull request that adds a
+  script that writes a file, or a reader of what one writes, or changes the form either takes: its builder adds the
+  round trip in the same pull request, in `tests/round-trip-test.mjs` or the writer's own test, and lists the script
+  there, or names it there with why it writes nothing a reader of the core reads in a project. It does not mean that a
+  property-testing library is added, nor that a project is asked anything. Reason: on 22 November 2026 only the upgrade
+  test, a run of whole projects, found that the core's YAML reader could not read the `core.yml` the one process wrote.
+  Held by `tests/round-trip-test.mjs`, in `.github/workflows/tests.yml`, which fails a script that writes a file and
+  stands in neither of its lists, and a writer whose round trip did not run; that a new reader brings its round trip,
+  by none.
 - **A release says what it asks, step by step.** Whoever adds an entry to the sync notes (`setup/sync-notes/`)
   gives it a step in `scripts/steps/` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
