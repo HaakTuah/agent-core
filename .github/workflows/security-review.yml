@@ -259,11 +259,14 @@ jobs:
               and (.parents | length) == 2 and (.parents[1].sha as $p | any($s[]; . == $p) | not))' \
               "$d/commits.json" > /dev/null
           then merge=1; fi
-          # and where it has more than one commit, for which of them are light: they touch nothing that runs with power
-          # (#1134, point 1: power.mjs reads the set from each commit's tree, never checking one out)
-          many=
-          if [ -f "$ROOT/scripts/power.mjs" ] && [[ "$head" =~ ^[0-9a-f]{40}$ ]] && [ "$(jq '[.[][]] | length' "$d/commits.json")" -gt 1 ]
-          then many=1; fi
+          # and, for which of its files run with power and which of its commits are light, touching none of it (#1134,
+          # points 1 and 4: power.mjs reads the set from each commit's tree, never checking one out), every pull request,
+          # its own commits and their parents alone where neither proof above needs the history whole
+          many= depth=()
+          if [ -f "$ROOT/scripts/power.mjs" ] && [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
+            many=1
+            [ -n "$shape$merge" ] || depth=(--depth "$(($(jq '[.[][]] | length' "$d/commits.json") + 1))")
+          fi
           if [ -n "$shape$merge$many" ]; then
             key=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
             echo "::add-mask::$key"
@@ -271,7 +274,7 @@ jobs:
             auth=("GIT_CONFIG_COUNT=$((n + 1))" "GIT_CONFIG_KEY_$n=http.$SERVER/$REPO.git.extraheader"
               "GIT_CONFIG_VALUE_$n=AUTHORIZATION: basic $key")
             if git init -q -b pr "$d/pr" && git -C "$d/pr" remote add origin "$SERVER/$REPO.git" \
-              && env "${auth[@]}" timeout "$(proof_time 90)" git -C "$d/pr" fetch -q --no-tags --update-head-ok origin "+$head:refs/heads/pr" \
+              && env "${auth[@]}" timeout "$(proof_time 90)" git -C "$d/pr" fetch -q --no-tags "${depth[@]}" --update-head-ok origin "+$head:refs/heads/pr" \
               && [ "$(git -C "$d/pr" rev-parse refs/heads/pr)" = "$head" ]
             then cloned=1; fi
           fi
@@ -297,17 +300,20 @@ jobs:
             then mv "$d/proved.json" "$d/merges.json"; echo "Merges from main that are the ones git makes: $(jq -r 'length' "$d/merges.json")."
             else echo "The merges from main could not be proved the ones git makes: a review of the head is asked."; fi
           fi
-          # the light commits, read by the default branch's power.mjs in that clone with no token, by the step's 210th
-          # second (DEADLINE: a commit it has not read by then is not light); where it cannot, none is, and a review of
-          # the head is asked as before (a default branch whose core is older has no such script)
+          # the files that run with power and the light commits, read by the default branch's power.mjs in that clone with
+          # no token, the light ones within its time (DEADLINE: a commit it has not read by then is not light); where it
+          # cannot, every changed script or workflow is read as running with power and no commit as light, so floor
+          # rule 3's two and a review of the head are asked (a default branch whose core is older has no such script, and
+          # its script reads what runs by itself as before)
           power=()
           if [ -n "$many" ]; then
             proof="$PWD/$ROOT/scripts/power.mjs" checkout=$PWD
             t=$(proof_time 60)
-            if [ -n "$cloned" ] && (cd "$d/pr" && env -u GH_TOKEN DEADLINE=$(($(date +%s) + t - 5)) timeout "$t" node "$proof" "$d/pull.json" "$d/commits.json" "$checkout" > "$d/power.json") \
-              && jq -e '(.light | type) == "array"' "$d/power.json" > /dev/null
-            then power=("POWER=$d/power.json"); echo "Light commits, which touch nothing that runs with power: $(jq -r '.light | length' "$d/power.json")."
-            else echo "Which commits are light could not be read: a review of the head is asked."; fi
+            if [ -n "$cloned" ] && (cd "$d/pr" && env -u GH_TOKEN DEADLINE=$(($(date +%s) + t - 5)) timeout "$t" node "$proof" "$d/pull.json" "$d/commits.json" "$d/files.json" "$checkout" > "$d/power.json") \
+              && jq -e '(.light | type) == "array" and (.power | type) == "array"' "$d/power.json" > /dev/null
+            then echo "Files that run with power: $(jq -r '.power | length' "$d/power.json"); light commits, which touch none of it: $(jq -r '.light | length' "$d/power.json")."
+            else echo '{}' > "$d/power.json"; echo "What runs with power could not be read: each changed script and workflow is read as running with it, and a review of the head is asked."; fi
+            power=("POWER=$d/power.json")
           fi
           # whose posted review counts besides the owner's and the accounts named: a person the host lets write (#412),
           # read from GitHub's rights for each account, at most twenty, that posted a "Security review:", a "Code

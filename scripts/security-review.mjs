@@ -75,6 +75,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { copyOf } from "./core-path.mjs";
 import { RUNS } from "./comment-only.mjs";
+import { SCRIPT } from "./power.mjs";
 import { blockingOf } from "./review-comments.mjs";
 import { started } from "./started.mjs";
 
@@ -157,7 +158,9 @@ export const UNREAD = "Codex's summary is on the pull request, but its state can
 // { reviewers, the accounts besides the repository's owner whose posted review counts; rights, GitHub's answers on
 // accounts' rights to the repository, whose writers' posted reviews count too; pure, whether pure-sync.mjs
 // proved the head a pure sync; queue, whether the caller's queue-only.mjs proved it queue-only (#750); merges, the SHAs of the merges clean-merges.mjs proved the ones git makes, where it ran;
-// light, the SHAs of the pull request's commits power.mjs read as touching nothing that runs with power, where it ran }
+// light, the SHAs of the pull request's commits power.mjs read as touching nothing that runs with power, where it ran;
+// power, the Set of the pull request's paths power.mjs read as running with power, null where it ran and could not
+// read them, undefined where it did not run }
 export function judge(pull, comments, reviewComments, commits, files, bound = true, more = {}) {
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
@@ -170,7 +173,7 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   const queue = more.queue === true && queueOnly(pull, files, more.copy);
   let verdict = judgeWith({ sha, list, posted, forHead, stand, chain, lightly, bind: chain !== undefined, review, pull, reviewComments, commits, changed, bound, pure: more.pure === true || queue, queue, cut, mends: mendsFor(read) });
   verdict = begunAfter(verdict, { sha, running, all, posted, bound });
-  verdict = floorTwo(verdict, { sha, pull, files, posted, review, bound, pure: more.pure === true || queue, copy: more.copy });
+  verdict = floorTwo(verdict, { sha, pull, files, posted, review, bound, pure: more.pure === true || queue, copy: more.copy, power: more.power });
   if (edited && all.length === 0 && !verdict.done) verdict = { ...verdict, why: EDITED };
   return warning ? { ...verdict, warning } : verdict;
 }
@@ -233,10 +236,14 @@ function begunAfter(verdict, { sha, running, all, posted, bound }) {
   // (one whose head does not hold this check as the default branch does stood before it came: reported)
   return bound ? { sha, done: false, why } : { sha, done: true, why: "before this check came, so not waited for: Codex's security review began after every \"Security review:\"" };
 }
-// floor rule 3's two, where what runs by itself changed beyond its pins and no proof of comments alone is posted (a
-// pure sync needs neither: floor rule 8)
-function floorTwo(verdict, { sha, pull, files, posted, review, bound, pure, copy }) {
-  if (!(verdict.done && pure !== true && files !== undefined && (!whole(pull, files) || flat(files).some((file) => runs(file, copy) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha)))) return verdict;
+// floor rule 3's two, where what runs with power changed beyond its pins and no proof of comments alone is posted (a
+// pure sync needs neither: floor rule 8). What runs with power is `power`, as power.mjs read it (#1134, point 4); where
+// it ran and could not read it (null), each changed script or workflow, and what runs by itself; where it did not run (a
+// default branch whose core is older), what runs by itself alone, as that core reads it
+const withPower = (file, copy, power) => (power instanceof Set ? [file.filename, file.previous_filename].some((name) => typeof name === "string" && power.has(name))
+  : runs(file, copy) || (power === null && [file.filename, file.previous_filename].some((name) => typeof name === "string" && !name.startsWith(copy ?? "core/") && SCRIPT.test(name))));
+function floorTwo(verdict, { sha, pull, files, posted, review, bound, pure, copy, power }) {
+  if (!(verdict.done && pure !== true && files !== undefined && (!whole(pull, files) || flat(files).some((file) => withPower(file, copy, power) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha)))) return verdict;
   const codexDone = review !== null && typeof review === "object" && review.status === "completed";
   if ((codexDone ? 1 : 0) + posted.length < 2) {
     const why = `floor rule 3 asks two. Mend: the fallback reviewer reviews, posts the second, or comment-only.mjs's printout for ${sha.slice(0, 7)}`;
@@ -426,6 +433,13 @@ export function lightOf(file, read) {
   const light = read(file)?.light;
   return Array.isArray(light) ? light.filter((at) => typeof at === "string" && SHA.test(at)) : undefined;
 }
+// the paths power.mjs read as running with power, from the same file: a Set, null where it wrote none it could read,
+// or undefined where it did not run
+export function powerFilesOf(file, read) {
+  if (!file) return undefined;
+  const power = read(file)?.power;
+  return Array.isArray(power) && power.every((name) => typeof name === "string") ? new Set(power) : null;
+}
 
 // the commit status GitHub is given: while advisory always a pass, saying what the check would have done (context: the
 // status's name, this check's unless scripts/code-review-wait.mjs gives its own)
@@ -454,7 +468,7 @@ if (started(import.meta.url)) {
     { reviewers: reviewersOf(process.env.REVIEWERS), rights: process.env.RIGHTS ? read(process.env.RIGHTS) : undefined, pure: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.PURE === pull.head.sha,
       queue: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.QUEUE === pull.head.sha,
       merges: mergesFile ? read(mergesFile) : undefined,
-      light: lightOf(process.env.POWER, read),
+      light: lightOf(process.env.POWER, read), power: powerFilesOf(process.env.POWER, read),
       copy: existsSync("core-manifest.md") ? copyOf(".") : undefined }); // (the copy at the path the default branch's manifest names, checked out here, as code-review-wait.mjs reads it)
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }

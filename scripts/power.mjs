@@ -16,14 +16,16 @@
 //
 // Run by the core's workflow security-review.yml from the default branch's copy, in the clone of the head's commits it
 // fetches (which checks out nothing), it prints, as JSON:
-//   { "light": [the commits of the pull request, each with one parent among its commits, whose changed paths are in the
+//   { "power": [the paths of the pull request's files in the set, at the default branch or at the head],
+//     "light": [the commits of the pull request, each with one parent among its commits, whose changed paths are in the
 //     set neither at the parent nor at the commit] }
-// which security-review.mjs reads (POWER).
+// which security-review.mjs reads (POWER): floor rule 3's two reviews where "power" holds a path, and a review carried
+// across the light commits.
 // A commit it could not read in the time it has (DEADLINE, the seconds since the epoch by which it stops; the newest
 // commits first) is not light, so its review is asked as before. Git and Node's own modules only.
 //
 // Usage (in that clone):  node scripts/power.mjs <the pull request, as GitHub's API gives it> <its commits, the same>
-//                           <the default branch's checkout>
+//                           <its files, the same> <the default branch's checkout>
 //         node scripts/power.mjs --list [<folder>]   prints the set of a folder on disk (the repository's root by
 //                                                   default), a path a line with what brought it in (power, place,
 //                                                   calls, unread, or the file that runs or loads it)
@@ -158,6 +160,10 @@ export function gitTree(commit, cwd) {
   return { paths: entries.map((entry) => entry.name), read: (name) => texts.get(name) ?? null };
 }
 
+// The paths of a pull request's files (`files`, as GitHub's API gives them, a moved file by both its names) in any of `sets`.
+export const powerOf = (files, ...sets) => [...new Set(flat(files).flatMap((file) => [file.filename, file.previous_filename])
+  .filter((name) => typeof name === "string" && sets.some((set) => set.has(name))))].sort();
+
 const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry) => entry !== null && typeof entry === "object");
 
 // Of a pull request's commits (`commits`, as GitHub's API gives them), the light ones: one parent, that parent a commit
@@ -191,16 +197,16 @@ if (started(import.meta.url)) {
     for (const name of [...setOf({ ...diskTree(root), copy }, why)].sort()) console.log(`${name}\t${why.get(name)}`);
     process.exit(0);
   }
-  const [pullFile, commitsFile, baseDir] = args;
-  if (!pullFile || !commitsFile || !baseDir) {
-    console.error("usage: node scripts/power.mjs <the pull request, as JSON> <its commits, as JSON> <the default branch's checkout>");
+  const [pullFile, commitsFile, filesFile, baseDir] = args;
+  if (!pullFile || !commitsFile || !filesFile || !baseDir) {
+    console.error("usage: node scripts/power.mjs <the pull request, as JSON> <its commits, as JSON> <its files, as JSON> <the default branch's checkout>");
     process.exit(2);
   }
   const read = (file) => {
     try { return JSON.parse(readFileSync(file, "utf8")); }
     catch (e) { return fail(`could not read ${file} as JSON (${e.code ?? e.name})`, "write it again from the GitHub API, as the security-review workflow does, and run the check again"); }
   };
-  const pull = read(pullFile), commits = read(commitsFile);
+  const pull = read(pullFile), commits = read(commitsFile), files = read(filesFile);
   const head = pull?.head?.sha;
   if (typeof head !== "string" || !SHA.test(head)) fail("was given a pull request with no head commit", "give it the pull request as GitHub's API gives it");
   const copy = existsSync(path.join(baseDir, "core-manifest.md")) ? (await import("./core-path.mjs")).copyOf(baseDir) : undefined;
@@ -208,6 +214,8 @@ if (started(import.meta.url)) {
   const setAt = (commit) => { if (!sets.has(commit)) sets.set(commit, setOf({ ...gitTree(commit, "."), copy })); return sets.get(commit); };
   const changed = (parent, commit) => git(["diff-tree", "-r", "-z", "--no-renames", "--name-only", parent, commit], ".").split("\0").filter(Boolean);
   const deadline = Number(process.env.DEADLINE) * 1000 || Infinity;
-  try { git(["cat-file", "-e", `${head}^{commit}`], "."); } catch (e) { fail(`could not read the head ${head} in this clone (${e.code ?? e.name})`, "run it in a clone that holds the head's commits, as the security-review workflow fetches them"); }
-  console.log(JSON.stringify({ light: lightOf(commits, { setAt, changed, deadline }) }));
+  let atHead;
+  try { atHead = setAt(head); } catch (e) { fail(`could not read the head ${head} in this clone (${e.code ?? e.name})`, "run it in a clone that holds the head's commits, as the security-review workflow fetches them"); }
+  const power = powerOf(files, setOf({ ...diskTree(baseDir), copy }), atHead);
+  console.log(JSON.stringify({ power, light: lightOf(commits, { setAt, changed, deadline }) }));
 }
