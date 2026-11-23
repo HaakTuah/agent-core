@@ -492,6 +492,9 @@ jobs:
       - name: The workflow check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/workflows-test.mjs ')) }}
         run: node tests/workflows-test.mjs
+      - name: The workflow check's glue that runs zizmor and actionlint
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/workflow-tools-test.mjs ')) }}
+        run: node tests/workflow-tools-test.mjs
       - name: The step's shell with the network cut off, and, run under it, that the cut stands (#770)
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/offline-test.mjs ')) }}
         run: node tests/offline-test.mjs
