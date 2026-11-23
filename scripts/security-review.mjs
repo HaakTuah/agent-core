@@ -72,11 +72,10 @@
 //         the link the status carries; REVIEWERS for the accounts named; RIGHTS for a file of GitHub's answers on
 //         their rights (collaborators/<login>/permission, as a JSON list); PURE for the head pure-sync.mjs proved;
 //         QUEUE for the head the caller's queue-only.mjs proved (#750).
-import path from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { copyOf } from "./core-path.mjs";
 import { RUNS } from "./comment-only.mjs";
-import { SCRIPT } from "./power.mjs";
+import { runnable } from "./power.mjs";
 import { blockingOf } from "./review-lines.mjs";
 import { started } from "./started.mjs";
 
@@ -239,11 +238,11 @@ function begunAfter(verdict, { sha, running, all, posted, bound }) {
 }
 // floor rule 3's two, where what runs with power changed beyond its pins and no proof of comments alone is posted (a
 // pure sync needs neither: floor rule 8). What runs with power is `power`, as power.mjs read it (#1134, point 4); where
-// it ran and could not read it (null), each changed script, workflow or file with no extension (an executable such as
-// `./deploy`, as power.mjs reads one), and what runs by itself; where it did not run (a
+// it ran and could not read it (null), each changed file that may run (any but text, data and pictures, as power.mjs
+// reads one), and what runs by itself; where it did not run (a
 // default branch whose core is older), what runs by itself alone, as that core reads it
 const withPower = (file, copy, power) => (power instanceof Set ? [file.filename, file.previous_filename].some((name) => typeof name === "string" && power.has(name))
-  : runs(file, copy) || (power === null && [file.filename, file.previous_filename].some((name) => typeof name === "string" && !name.startsWith(copy ?? "core/") && (SCRIPT.test(name) || path.posix.extname(name) === ""))));
+  : runs(file, copy) || (power === null && [file.filename, file.previous_filename].some((name) => typeof name === "string" && !name.startsWith(copy ?? "core/") && runnable(name))));
 function floorTwo(verdict, { sha, pull, files, posted, review, bound, pure, copy, power }) {
   if (!(verdict.done && pure !== true && files !== undefined && (!whole(pull, files) || flat(files).some((file) => withPower(file, copy, power) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha)))) return verdict;
   const codexDone = review !== null && typeof review === "object" && review.status === "completed";

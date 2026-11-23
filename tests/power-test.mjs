@@ -49,13 +49,14 @@ const files = {
   ".claude/settings.json": "{}\n", "tools/act/action.yml": "runs:\n  using: node20\n  main: index.js\n",
   "core/scripts/calls.mjs": fetches, "vendored/core/scripts/calls.mjs": fetches,
   "deploy": "#!/bin/sh\necho deploying\n", "bin/publish": "#!/usr/bin/env bash\ngit push origin HEAD\n", "bin/notes": "git push is described here, with no #! line\n",
-  "README.md": "node scripts/plain.mjs\n", "config/list.json": "[\"scripts/plain.mjs\"]\n", "docs/picture.png": null,
+  "src/App.cs": "class App {}\n", "src/App.csproj": "<Project />\n", "cmd/main.go": "package main\n", "web/page.html": "<script src=\"a.js\"></script>\n",
+  "README.md": "node scripts/plain.mjs\n", "config/list.json": "[\"scripts/plain.mjs\"]\n", "config/set.yaml": "a: 1\n", "notes.txt": "x\n", "docs/picture.png": null,
 };
 const why = new Map();
 const set = setOf({ ...tree(files), copy: "vendored/core/" }, why);
-const want = [".claude/settings.json", ".github/workflows/powered.yml", "bin/notes", "bin/publish", "core/scripts/calls.mjs", "deploy", "lib/x.rb", "scripts/calls.mjs", "scripts/deep/far/unnamed.mjs",
-  "scripts/plain.mjs", "scripts/pushes.sh", "scripts/unread.py", "tools/act/action.yml", "tools/b.sh", "tools/go.py"];
-ok(show(set) === want.join(", "), "with a seed, every file that may run is in the set (each script, action and file with no extension, named anywhere or nowhere); a Markdown file, a JSON file, a picture and a workflow that may only read are not", show(set));
+const want = [".claude/settings.json", ".github/workflows/powered.yml", "bin/notes", "bin/publish", "cmd/main.go", "core/scripts/calls.mjs", "deploy", "lib/x.rb", "scripts/calls.mjs", "scripts/deep/far/unnamed.mjs",
+  "scripts/plain.mjs", "scripts/pushes.sh", "scripts/unread.py", "src/App.cs", "src/App.csproj", "tools/act/action.yml", "tools/b.sh", "tools/go.py", "web/page.html"];
+ok(show(set) === want.join(", "), "with a seed, every file that may run is in the set, named anywhere or nowhere: a script, an action, a compiled language's source (C#, Go), a project file, a page and a file with no extension; Markdown, JSON, YAML, text, a picture and a workflow that may only read are not", show(set));
 ok(why.get(".github/workflows/powered.yml") === "power" && why.get(".claude/settings.json") === "place" && why.get("tools/act/action.yml") === "place"
   && why.get("scripts/calls.mjs") === "calls" && why.get("scripts/pushes.sh") === "calls" && why.get("bin/publish") === "calls" && why.get("scripts/unread.py") === "unread"
   && why.get("scripts/plain.mjs") === "runs" && why.get("deploy") === "runs" && why.get("bin/notes") === "runs",

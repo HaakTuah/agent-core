@@ -12,8 +12,9 @@
 //     no path and none of Node's own modules that reach nothing beyond the machine (LOCAL): a package (axios), or
 //     https; or by a name it builds that does not start as a path (UNPLACED), which may be a package's; a file with no
 //     extension whose text starts with `#!` among them; and a script that cannot be read.
-// Where any seed stands, every file of the tree that may run joins it: each script (SCRIPT), each action and each file
-// with no extension (an executable is often named so: `./deploy`). No name is followed from one file to another, so no
+// Where any seed stands, every file of the tree that may run joins it: every file but text, data and pictures (INERT:
+// Markdown, JSON, YAML, a picture and the like), so a script, an action, a file of a compiled language's source and a
+// file with no extension (an executable is often named so: `./deploy`) each join, whatever their language. No name is followed from one file to another, so no
 // form of naming, building or hiding a name can leave a file out; a tree with no seed has an empty set. The copy of the
 // core at the path the manifest names is left out. Code an agent changes is read as data alone: its text is matched,
 // never run. A tree is read from a folder on disk (the default branch's checkout) or from a commit of a git clone
@@ -41,7 +42,9 @@ import { RUNS_TOO } from "./comment-only.mjs";
 import { started } from "./started.mjs";
 
 const SHA = /^[0-9a-f]{40}$/u;
-// a script, by its name
+// a file of text, data or a picture, which runs nothing by itself (an action's own action.yml aside)
+const INERT = /\.(?:md|markdown|txt|rst|adoc|json|jsonc|ya?ml|csv|tsv|png|jpe?g|gif|svg|webp|ico|bmp|pdf)$/iu;
+// a script, by its name: a file whose text is read for a call that makes it a seed
 export const SCRIPT = /\.(?:[cm]?[jt]sx?|sh|bash|zsh|py|ps1|psm1|rb|pl|php|lua|bat|cmd)$/iu;
 const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u;
 const ACTION = /(?:^|\/)action\.ya?ml$/iu;
@@ -90,8 +93,8 @@ export const powered = (text) => text === null || POWERED.test(lf(text)) || !PER
 const unextended = (name) => path.posix.extname(name) === "";
 // whether a path is in the set by where it stands alone
 const placed = (name) => ACTION.test(name) || name.startsWith(".claude/") || RUNS_TOO.test(name);
-// whether a path is one a file may run or load
-const runnable = (name) => SCRIPT.test(name) || ACTION.test(name) || unextended(name);
+// whether a path is one that may run: any but text, data and pictures
+export const runnable = (name) => ACTION.test(name) || !INERT.test(name);
 
 // The set of a tree: `paths`, every file's path; `read(path)`, its text, or null where it cannot be read or is too large;
 // `copy`, the folder of the core's copy as the manifest names it, left out (only a sync changes it, its code reviewed in
