@@ -149,8 +149,11 @@ export function checklist({ repo, states, fresh = null, script }) {
   return [...head, ...rows].join("\n");
 }
 
-// The checklist as a public repository's pull request carries it: its first line, the counts, and where the rest is read.
-export const publicly = (list, script) => `${list.split("\n")[0]}\nThe repository is public, so its settings' states stand in no pull request, since GitHub shows them to its admins alone: the owner's session runs \`${script}\` for the checklist and takes it in one sitting.`;
+// The checklist as a sync's pull request carries it (`--report`): whole only where GitHub answered the repository is
+// private; else, public or not answered, its first line, the counts, and where the rest is read, since GitHub shows a
+// repository's security settings to its admins alone.
+export const forReport = (list, host, script) => host.repo?.body?.private === true ? list
+  : `${list.split("\n")[0]}\nThe repository is public, or GitHub did not answer that it is private, so its settings' states stand in no pull request, since GitHub shows them to its admins alone: the owner's session runs \`${script}\` for the checklist and takes it in one sitting.`;
 
 // The ids of the list at `sha` of the core, read from the bare repository `bare`; [] where that commit has none.
 export function idsAt(sha, bare) {
@@ -171,9 +174,7 @@ function main(argv) {
   const repo = repoOf(origin.stdout);
   const host = repo ? readHost(repo) : { repo: { why: "the origin is on no github.com" }, rules: null, secrets: null, actions: null };
   const list = checklist({ repo, states: statesOf(host, root), fresh, script });
-  // (for a sync's pull request, `--report`: in a public repository its description shows only the counts, since GitHub
-  // shows a repository's security settings to its admins alone)
-  console.log(argv.includes("--report") && host.repo.body?.private === false ? publicly(list, script) : list);
+  console.log(argv.includes("--report") ? forReport(list, host, script) : list);
   return 0;
 }
 

@@ -9,7 +9,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { SETTINGS, checklist, idsAt, readHost, statesOf } from "../scripts/owner-settings.mjs";
+import { SETTINGS, checklist, forReport, idsAt, readHost, statesOf } from "../scripts/owner-settings.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -122,6 +122,14 @@ try {
   ok(r.status === 0 && /^No setting only the owner gives is new since [0-9a-f]{7}: the sitting is not asked again/.test(r.out), "at a sync where no setting is new: one line, the sitting not asked again", r.out);
   r = run("--since", before, "--fetched", bare);
   ok(r.status === 0 && (r.out.match(/\(new since the copy before\)/g) ?? []).length === SETTINGS.length, "at a sync from a copy before the list: every setting asked, each marked new", r.out);
+  r = run("--report");
+  ok(r.status === 0 && r.out.trim().split("\n").length === 2 && /did not answer that it is private/.test(r.out) && !/^- \[/m.test(r.out), "for a sync's report, with no answer of GitHub's, only the counts and where the rest is read", r.out);
+  for (const [said, repo, whole] of [["private", { body: { private: true } }, true], ["public", { body: { private: false } }, false], ["not answered", { why: "GitHub answered 502" }, false],
+    ["answered with no word on it", { body: {} }, false], ["answered \"true\"", { body: { private: "true" } }, false]]) {
+    const report = forReport(list, { repo }, "s.mjs");
+    ok(whole ? report === list : report.split("\n").length === 2 && report.startsWith(list.split("\n")[0]) && !/^- \[/m.test(report),
+      `a sync's report of a repository ${said} carries ${whole ? "the whole checklist" : "the counts alone"}`);
+  }
   r = run("--since", "abc");
   ok(r.status === 1 && /^FAIL: [^\n]*Mend: /.test(r.out), "a wrong call fails, saying its mend", r.out);
   ok(g(root, "status", "--porcelain") === status, "it writes nothing in the project");
