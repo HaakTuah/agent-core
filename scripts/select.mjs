@@ -48,7 +48,7 @@ import { CHARACTERS, Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { matcher } from "./select-matcher.mjs";
 import { csharpReach, undeclared } from "./select-csharp.mjs";
-import { heldBeside, ofNoProject, tooMuch } from "./select-csharp-project.mjs";
+import { CS, heldBeside, ofNoProject, tooMuch } from "./select-csharp-project.mjs";
 import { git, passedWhole } from "./select-passed.mjs";
 import { isCode } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
@@ -77,7 +77,7 @@ export function links(texts, tests, reach, pace = () => {}, csharp = new Map()) 
   const out = new Map();
   for (const [file, text] of Object.entries(texts)) {
     pace();
-    const to = new Set((file.endsWith(".cs") ? csharp : reach).get(file) ?? []), py = file.endsWith(".py");
+    const to = new Set((CS.test(file) ? csharp : reach).get(file) ?? []), py = file.endsWith(".py");
     if (py || CODE.includes(path.posix.extname(file))) {
       // (a Python module's dotted name is looked for in every text of code, as its pattern was, JavaScript's that starts `python -m` too)
       const plain = uncommented(text, py), named = mentioned(byName, plain, WORDS.name, pace);
@@ -119,7 +119,7 @@ export function selection({ changed, texts, tests, reach, scripts = new Set(), u
   const reaches = reached(tests, links(texts, tests, reach, pace, cs.links), pace);
   // (a test that reaches an import the readers cannot follow may reach any file: it runs as one that reaches every file)
   // (and, where pytest runs a conftest.py the config does not read, each test of Python, whose fixtures may come from it)
-  const blind = new Set([...reaches].filter(([t, files]) => [...files].some(f => (f.endsWith(".cs") ? cs.unsure : unsure).has(f)) || (t.endsWith(".py") && unread.some(c => c.endsWith("conftest.py")))).map(([t]) => t));
+  const blind = new Set([...reaches].filter(([t, files]) => [...files].some(f => (CS.test(f) ? cs.unsure : unsure).has(f)) || (t.endsWith(".py") && unread.some(c => c.endsWith("conftest.py")))).map(([t]) => t));
   // (the tests that reach every file, told once: the config's pathspecs are tried on each test, never on each changed file's account)
   let every = null;
   const ctx = { texts, tests, scripts, add, reaches, pace, before: heldToBudget(before, pace), ...m, wholes: () => (every ??= [...tests].filter(t => m.whole(t) || blind.has(t))) };
@@ -140,12 +140,12 @@ function oneChange(f, { texts, tests, scripts, add, reaches, pace, before, whole
   // links nothing: a change to either may reach every test)
   if (!(f in texts) || !isCode(f)) return `${f} is no code the readers follow, or is gone, so what reaches it cannot be told`;
   // (a script of the global space is reached by no import at all)
-  const cs = f.endsWith(".cs") ? csharpUnknown(f, texts, before, pace) : null;
+  const cs = CS.test(f) ? csharpUnknown(f, texts, before, pace) : null;
   if (cs) return cs;
   if (f.endsWith(".d.ts") || scripts.has(f)) return `${f} is a declaration of types, or a script of the global space, whose users no import names, so what reaches it cannot be told`;
   for (const [t, files] of reaches) if (files.has(f)) add(t, `reaches ${f}`);
   // (a test's own file is no file of the project's a whole run tests; one of C# may be a helper a test reaches by reflection)
-  if (!isTest(f) || f.endsWith(".cs")) for (const t of wholes()) add(t, `reaches every file (${f})`);
+  if (!isTest(f) || CS.test(f)) for (const t of wholes()) add(t, `reaches every file (${f})`);
   return null;
 }
 

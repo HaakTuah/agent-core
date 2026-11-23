@@ -158,6 +158,7 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
     ...["", "a"].map(w => [`a <RootNamespace> of "${w}", 200,000 spaces and a word, no close`, { "src/App.csproj": `<Project><PropertyGroup><RootNamespace>${w}${" ".repeat(200000)}x</PropertyGroup></Project>`, "src/X.cs": "namespace App;\nclass X { }\n" }, ["src/X.cs"]]),
     ["a <RootNamespace> of 3,900,000 dots", { "src/App.csproj": `<Project><PropertyGroup><RootNamespace>${".".repeat(3900000)}</RootNamespace></PropertyGroup></Project>`, "src/X.cs": "namespace App;\nclass X { }\n" }, ["src/X.cs"]],
     ["an <Import> of GetPathOfFileAbove( and 1,000,000 spaces, no .props", { "Directory.Build.props": `<Project><Import Project="$([MSBuild]::GetPathOfFileAbove(${" ".repeat(1000000)}x))" /></Project>`, "src/X.cs": "namespace App;\nclass X { }\n" }, ["src/X.cs"]],
+    ...["GetPathOfFileAbove('x.props', '$(MSBuildThisFileDirectory)~'", "GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory)~, x.props"].map(call => [`an <Import> of ${call.split("(")[0]} from a folder 1,900,000 deep`, { "Directory.Build.props": `<Project><Import Project="$([MSBuild]::${call.replace("~", "a/".repeat(1900000))}))${call.startsWith("GetDir") ? "/x.props" : ""}" /></Project>`, "src/X.cs": "namespace App;\nclass X { }\n" }, ["src/X.cs"]]),
     ["4,000 aliases each heading the one before it, \".\" and \"::\" in turn", { "src/X.cs": `using A0 = App;\nnamespace N {\n${Array.from({ length: 4000 }, (_, k) => `using A${4000 - k} = A${3999 - k}${k % 2 ? "::" : "."}W;`).join("\n")}\nclass X { }\n}\n` }, ["src/X.cs"]],
     ["a <Using of 1,000,000 spaces before a stray character", { "Directory.Build.props": `<Project><ItemGroup><Using${" ".repeat(1000000)}x /></ItemGroup></Project>`, "src/X.cs": "namespace App;\nclass X { }\n" }, ["src/X.cs"]],
     ...["/*", "var s = @\""].map(open => [`a ${open} of 199,900 line ends`, { "src/X.cs": `namespace App;\nclass X { }\n${open}${"\n".repeat(199900)}*/";\n` }, ["src/X.cs"]]),
@@ -165,7 +166,7 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
   ]) {
     const texts = { ...base, ...more }, from = Date.now();
     let got;
-    try { got = selection({ changed, texts, tests: csTests, reach: new Map(), config: csConfig, watch: hurry({ files: new Set(changed) }), beside: () => ({ msbuild: [], cs: {} }), ...(before && { before }) }); } catch (e) { got = e instanceof Late ? "late" : String(e); }
+    try { got = selection({ changed, texts, tests: csTests, reach: new Map(), config: csConfig, watch: hurry({ files: new Set(changed) }), beside: () => ({ msbuild: {}, cs: {} }), ...(before && { before }) }); } catch (e) { got = e instanceof Late ? "late" : String(e); }
     const ms = Date.now() - from;
     ok((before ? got === "late" : got === "late" || got.all !== undefined) && ms < 5000, `${what}: ${got === "late" ? "the whole suite, late" : got.all ? "the whole suite" : "selected"} in ${ms} ms`, String(got));
   }
@@ -225,7 +226,7 @@ s = selection({ changed: ["pkg/__init__.py"], texts: py, tests: pyTests, reach: 
 ok(!s.all && same(s.tests, ["tests/test_rules.py"]), "a Python package's __init__.py, which runs on every import under it, reaches the tests that import the package", JSON.stringify(s));
 const cs = { "App.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\" />\n", "src/Rules.cs": "namespace App;\npublic static class Rules { public static bool Allowed() => true; }\n", "tests/RulesTest.cs": "namespace Tests;\nclass RulesTest { void T() { App.Rules.Allowed(); } }\n", "web/app.js": "function draw() {}\n" };
 const csConfig = parseConfig(JSON.stringify({ baseline: "b.json", code: ["src", "tests", "web"], tests: ["tests/"] })), csTests = new Set(["tests/RulesTest.cs"]), csFound = survey(cs, csConfig, csTests);
-s = selection({ changed: ["src/Rules.cs"], texts: cs, tests: csTests, reach: csFound.reach, scripts: csFound.scripts, unsure: csFound.unsure, config: csConfig, beside: () => ({ msbuild: [], cs: {} }) });
+s = selection({ changed: ["src/Rules.cs"], texts: cs, tests: csTests, reach: csFound.reach, scripts: csFound.scripts, unsure: csFound.unsure, config: csConfig, beside: () => ({ msbuild: {}, cs: {} }) });
 ok(!s.all && same(s.tests, ["tests/RulesTest.cs"]), "C#: a test that names a type by its full name, with no using directive, reaches its file (select-csharp-test.mjs reads the rest)", JSON.stringify(s));
 s = selection({ changed: ["web/app.js"], texts: cs, tests: csTests, reach: csFound.reach, scripts: csFound.scripts, config: csConfig });
 ok(s.all && s.why.includes("web/app.js"), "a script of the global space, which no import names, runs the whole suite", JSON.stringify(s));

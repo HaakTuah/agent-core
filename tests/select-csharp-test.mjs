@@ -19,7 +19,7 @@ let failed = 0, count = 0;
 export const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
 export const done = () => { console.log(`${count - failed} of ${count} passed`); process.exitCode = failed ? 1 : 0; };
 export const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-export const nothing = () => ({ msbuild: [], cs: {} });
+export const nothing = () => ({ msbuild: {}, cs: {} });
 const TEST = "tests/T.cs", SRC = "src/X.cs";
 
 export const PROJ = "<Project Sdk=\"Microsoft.NET.Sdk\" />\n";
@@ -82,7 +82,7 @@ if (started(import.meta.url)) {
   // ---- usings every file holds: a global using directive, MSBuild's <Using> ----
   ok(same(pick(globals, "src/Rules.cs").tests, ["tests/RulesTest.cs"]), "a namespace a .csproj's <Using> names is seen by every file", JSON.stringify(pick(globals, "src/Rules.cs")));
   ok(same(pick(viaFile, "src/Rules.cs").tests, ["tests/RulesTest.cs"]), "and so is one a global using directive names, in any file", JSON.stringify(pick(viaFile, "src/Rules.cs")));
-  const props = csharpReach({ ...globals, "tests/Tests.csproj": PROJ }, undefined, () => ({ msbuild: ["<Project><ItemGroup><Using Include=\"App\" /></ItemGroup></Project>"], cs: {} }));
+  const props = csharpReach({ ...globals, "tests/Tests.csproj": PROJ }, undefined, () => ({ msbuild: { "Directory.Build.props": "<Project><ItemGroup><Using Include=\"App\" /></ItemGroup></Project>" }, cs: {} }));
   ok(props.links.get("tests/RulesTest.cs")?.has("src/Rules.cs"), "and one a .props or .targets file git holds beside the config's files names", JSON.stringify([...props.links]));
 
   // ---- top-level statements, and what runs with no name ----
@@ -91,7 +91,7 @@ if (started(import.meta.url)) {
 
   // ---- C# git holds that the config does not read ----
   const unread = csharpReach({ "src/App.csproj": PROJ, "src/A.cs": "namespace App;\nclass A { }\n", "tests/T.cs": "using App.Data;\nnamespace Tests;\nclass T { Seed s; }\n" }, undefined,
-    () => ({ msbuild: [], cs: { "src/Data/Seed.cs": "namespace App.Data;\nclass Seed { A a; }\n" } }));
+    () => ({ msbuild: {}, cs: { "src/Data/Seed.cs": "namespace App.Data;\nclass Seed { A a; }\n" } }));
   ok(unread.links.get(TEST)?.has("src/Data/Seed.cs") && unread.links.get("src/Data/Seed.cs")?.has("src/A.cs") && !unread.unsure.size,
     "a file of C# git holds that the config does not read is read as a link between those it reads", JSON.stringify([...unread.links].map(([f, to]) => [f, [...to]])));
   const through = reached(new Set(["tests/T.cs"]), links({ "tests/T.cs": "", "src/A.cs": "" }, new Set(["tests/T.cs"]), new Map(), undefined, unread.links));

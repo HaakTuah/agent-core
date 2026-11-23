@@ -9,7 +9,7 @@
 // any change) where it is unread, holds code the tokens leave out, or finds types unnamed (REFLECTS); every file is,
 // where a <Using> cannot be read whole, a global alias names a hook's attribute, or git cannot be asked. C# git holds
 // that the config does not read links those it reads (select-csharp-project.mjs).
-import { MSBUILD, heldBeside, msbuildUsings, outside } from "./select-csharp-project.mjs";
+import { CS, MSBUILD, heldBeside, msbuildUsings, outside } from "./select-csharp-project.mjs";
 import { delegates, join, pairs, word } from "./select-csharp-delegates.mjs";
 import { leftOut } from "./select-csharp-text.mjs";
 import { readCsharp } from "./shape-csharp.mjs";
@@ -254,10 +254,10 @@ function reachOf(x, ix, pace) {
 // (heldBeside).
 export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   const links = new Map();
-  if (!Object.keys(texts).some(f => f.endsWith(".cs"))) return { links, unsure: new Set() };
+  if (!Object.keys(texts).some(f => CS.test(f))) return { links, unsure: new Set() };
   const held = beside(texts, pace), read = Object.entries(texts).filter(([f]) => MSBUILD.test(f));
   const msbuild = held.unknown ? null : msbuildUsings([...Object.entries(held.msbuild), ...read], pace);
-  const all = { ...held.cs, ...texts }, files = Object.keys(all).filter(f => f.endsWith(".cs"));
+  const all = { ...held.cs, ...texts }, files = Object.keys(all).filter(f => CS.test(f));
   // (where the usings every file holds are untold, every file is unsure)
   if (msbuild === null) return { links, unsure: new Set(files) };
   const facts = new Map(files.map(f => { pace(); return [f, factsOf(readCsharp(all[f]), all[f])]; }));
