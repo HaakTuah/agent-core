@@ -72,18 +72,27 @@ export function setOf({ paths, read, copy }, why = new Map()) {
   const all = new Set(own);
   const set = new Set(), queue = [];
   const add = (name, from) => { if (!set.has(name)) { set.add(name); queue.push(name); why.set(name, from); } };
-  for (const name of own) {
-    if (WORKFLOW.test(name)) { if (powered(read(name))) add(name, "power"); }
-    else if (placed(name)) add(name, "place");
-    else if (SCRIPT.test(name)) { const text = read(name); if (text === null || CALLS.test(text)) add(name, text === null ? "unread" : "calls"); }
-  }
+  for (const name of own) { const seed = seedOf(name, read); if (seed) add(name, seed); }
   for (let i = 0; i < queue.length; i++) {
     const name = queue[i], text = read(name);
-    if (text === null) continue;
-    for (const other of namedIn(name, text, all)) add(other, name);
-    if (SCRIPT.test(name) && BUILT.test(MODULE.test(name) ? code(text) : text)) for (const other of loadable(name, text, own)) add(other, `${name} (built)`);
+    if (text !== null) for (const [other, from] of loadsOf(name, text, all, own)) add(other, from);
   }
   return set;
+}
+// why a file is in the set by itself (power, place, unread or calls), or null where it is not
+function seedOf(name, read) {
+  if (WORKFLOW.test(name)) return powered(read(name)) ? "power" : null;
+  if (placed(name)) return "place";
+  if (!SCRIPT.test(name)) return null;
+  const text = read(name);
+  if (text === null) return "unread";
+  return CALLS.test(text) ? "calls" : null;
+}
+// what a file of the set runs or loads, each [path, what brought it in]
+function loadsOf(name, text, all, own) {
+  const found = [...namedIn(name, text, all)].map((other) => [other, name]);
+  if (SCRIPT.test(name) && BUILT.test(MODULE.test(name) ? code(text) : text)) found.push(...[...loadable(name, text, own)].map((other) => [other, `${name} (built)`]));
+  return found;
 }
 // the scripts and actions of `all` a file's text names, by a path from the repository's root or from its own folder,
 // and the workflows it calls (`uses: ./.github/workflows/...`): a workflow it only names, it does not run

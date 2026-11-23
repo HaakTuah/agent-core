@@ -120,9 +120,14 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
   if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules, copy))) return { sha, done: true, why: "no code review is running" };
   // (one its caller proved queue-only, its files as queueOnly reads them, needs none: floor rule 8, #750)
   if (more?.queue === true && queueOnly(pull, files, copy ?? undefined)) return { sha, done: true, why: "queue-only, as queue-only.mjs proves: no code review needed" };
+  return reviewRan(sha, posted, review, pull, commits, bound, merges, clearOf(list, review, pull, bound, more));
+}
+// the commits a code review that found nothing blocking ran on: posted with no blocking finding, or Codex's completed
+// review with none of its findings blocking
+function clearOf(list, review, pull, bound, more) {
   const clear = postedShas(list, pull, bound, more, true);
   if (review !== null && typeof review === "object" && review.status === "completed" && typeof review.commit_sha === "string" && codexClear(review.commit_sha, list, more?.findings)) clear.add(review.commit_sha);
-  return reviewRan(sha, posted, review, pull, commits, bound, merges, clear);
+  return clear;
 }
 // whether a code review has run on the head, or on a commit only updates from main follow: posted, or Codex's
 // completed; or one that found nothing blocking (`clear`) on a commit only the pull request's own commits follow

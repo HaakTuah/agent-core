@@ -76,7 +76,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { copyOf } from "./core-path.mjs";
 import { RUNS } from "./comment-only.mjs";
 import { SCRIPT } from "./power.mjs";
-import { blockingOf } from "./review-comments.mjs";
+import { blockingOf } from "./review-lines.mjs";
 import { started } from "./started.mjs";
 
 export const CODEX = "chatgpt-codex-connector[bot]";
@@ -288,21 +288,17 @@ export function standsFrom(pull, commits, head, merges, past) {
   const proved = merges === undefined ? undefined : new Set(Array.isArray(merges) ? merges : []);
   const by = new Map(commits.filter((commit) => typeof commit.sha === "string").map((commit) => [commit.sha, commit]));
   const passes = new Set(Array.isArray(past) || past instanceof Set ? past : []);
-  for (let at = head; chain.size <= by.size;) {
-    const parents = by.get(at)?.parents;
-    if (passes.has(at) && Array.isArray(parents) && parents.length === 1 && typeof parents[0]?.sha === "string" && by.has(parents[0].sha)) {
-      at = parents[0].sha;
-      if (chain.has(at)) break;
-      chain.add(at);
-      continue;
-    }
-    if (!Array.isArray(parents) || parents.length !== 2 || typeof parents[0]?.sha !== "string" || typeof parents[1]?.sha !== "string" || by.has(parents[1].sha)) break;
-    if (proved !== undefined && !proved.has(at)) break;
-    at = parents[0].sha;
-    if (chain.has(at)) break;
-    chain.add(at);
-  }
+  for (let at = before(head, by, passes, proved); at !== null && !chain.has(at) && chain.size <= by.size; at = before(at, by, passes, proved)) chain.add(at);
   return chain;
+}
+// the commit a review of `at`'s carries back to, or null: the parent of a commit of `passes` whose one parent is the
+// pull request's own, or the first parent of a merge from main, proved where `proved` is given
+function before(at, by, passes, proved) {
+  const parents = by.get(at)?.parents;
+  if (!Array.isArray(parents) || parents.some((parent) => typeof parent?.sha !== "string")) return null;
+  if (passes.has(at) && parents.length === 1 && by.has(parents[0].sha)) return parents[0].sha;
+  if (parents.length !== 2 || by.has(parents[1].sha) || (proved !== undefined && !proved.has(at))) return null;
+  return parents[0].sha;
 }
 // the update from main where the chain stops for want of proof (#323), or undefined where nothing stops it so: the
 // last commit the chain reaches, where without the proof it reaches further

@@ -137,7 +137,7 @@ path `scripts/stage-order.mjs`. What reviewers judge by: `roles/shared/review-gu
    - **A finding that does not block starts no round** (#1134, point 2). By default it is fixed only in a commit a
      blocking finding's fix makes anyway. The one condition that changes it: no such commit; then the builder lists it
      in one follow-up issue for the pull request, or answers it with why it is wrong. It does not mean a security
-     finding goes in public (floor rule 9). Reason: a round for what holds no merge is a review of every check again.
+     finding is dealt with but as floor rule 9 says. Reason: a round for what holds no merge is a review of every check again.
      Held by none yet.
 6. **Rounds end:** after a fix, one request to its reviewer and a security check only as point 3 says; a PR is never
    marked draft and ready again to rerun its reviews.
