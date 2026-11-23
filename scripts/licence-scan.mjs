@@ -149,15 +149,17 @@ function fetches(c, text, f, literal = false) {
   if (!byHand(c, f)) c.others.push(...otherFetches(text));
 }
 
-// The fetches `found` in the file `f` that the scan cannot read and no entry audits (byKind) fail, but where the pull
-// request's base held as many there, read by the base's own audit, which are reported (AGENTS.md, "Nothing locks a
-// project": a reader that reads more turns no file red that stood; #1074).
+// The fetches `found` in the file `f` that the scan cannot read and no entry audits (byKind), each its line, fail, but
+// where each stood word for word at the pull request's base, unaudited by the base's own audit, which are reported
+// (AGENTS.md, "Nothing locks a project": a reader that reads more turns no file red that stood; #1074). A fetch changed,
+// or added, fails: the base allows what it held, not as many others.
 function unaudited(c, f, found) {
   if (!found.length) return;
-  const said = `${f}: ${found[0].trim()} fetches what no entry's "files" says`, mend = `name ${f} in the "files" of the entry that audits it`;
-  const was = c.base ? atBase(c, f) : null;
-  if (was !== null && found.length <= byKind({ ...c, entries: baseEntries(c), fail() {}, reports: [] }, f, was).length) c.reports.push(`${said}; it stood so at the pull request's base, so it passes: ${mend}`);
-  else c.fail(`${said}. Mend: ${mend}`);
+  const was = c.base ? atBase(c, f) : null, held = was === null ? [] : byKind({ ...c, entries: baseEntries(c), fail() {}, reports: [] }, f, was);
+  const fresh = found.filter((line) => { const i = held.indexOf(line); if (i < 0) return true; held.splice(i, 1); return false; });
+  const shown = (line) => (line.length > 80 ? `${line.slice(0, 79)}…` : line), mend = `name ${f} in the "files" of the entry that audits it`;
+  if (fresh.length) c.fail(`${f}: ${shown(fresh[0])} fetches what no entry's "files" says. Mend: ${mend}`);
+  else c.reports.push(`${f}: ${shown(found[0])} fetches what no entry's "files" says; it stood so at the pull request's base, so it passes: ${mend}`);
 }
 
 // What is no program a download could fetch: the owner's own work, data, an asset, a font, a service of GitHub's.

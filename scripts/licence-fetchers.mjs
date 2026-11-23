@@ -50,8 +50,10 @@ export const WINDOWS_FETCHER = (() => {
 // Each fetch in text by a fetcher the scan cannot read, as the two readers above find them: their matches, each place
 // once, in the order they stand.
 const matches = (text) => [...new Map([OTHER_FETCHER, WINDOWS_FETCHER].flatMap((re) => [...text.matchAll(new RegExp(re.source, `${re.flags}g`))]).map((m) => [m.index, m])).values()].sort((a, b) => a.index - b.index);
-/** Each fetch in text by a fetcher the scan cannot read, in the order they stand. */
-export const otherFetches = (text) => matches(text).map((m) => m[0]);
+/** Each fetch in text by a fetcher the scan cannot read, in the order they stand: the whole line it stands in, spaces
+ *  run together, so that one fetch is told from another by its source and its words (licence-scan.mjs's `unaudited`). */
+export const otherFetches = (text) => matches(text).map((m) => m.index + Math.max(0, m[0].search(/\S/u)))
+  .map((at) => text.slice(text.lastIndexOf("\n", at) + 1, (text.indexOf("\n", at) + 1 || text.length + 1) - 1).replace(/\s+/gu, " ").trim());
 // The fetchers among those that download a file by its address, a program among them: curl and wget, and PowerShell's.
 const DOWNLOADER = /(?:curl|wget|Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer|(?<![\w-])(?:iwr|irm)(?![\w-]))/iu;
 /** Each download by address in text, as the two readers above find their fetches: the line each stands in and the
