@@ -119,16 +119,17 @@ function linkEnds(p) {
 }
 
 // Each pointer in a text to the path `from`: as the repository's path, as a relative path that opens with ./ or ../,
-// or as a Markdown link's target relative to the file `inFile`; in a workflow, whose commands run from the root, the
+// or relative to the file `inFile` as a Markdown link's target, a reference's definition or an HTML href or src; in a
+// workflow, whose commands run from the root, the
 // repository's path opening with ./ too. The repository's path is none where, read from the folder of `inFile`, it
 // names another file that `has` finds: that is the caller's own.
 export function pointersTo(inFile, from, has = () => false) {
   const esc = s => s.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&");
   const rel = path.posix.relative(path.posix.dirname(inFile), from), dotted = rel.startsWith(".") ? rel : `./${rel}`;
   const own = !WORKFLOW.test(inFile) && path.posix.dirname(inFile) !== "." && has(path.posix.join(path.posix.dirname(inFile), from));
-  const forms = [...own ? [] : [`(?<![A-Za-z0-9._/-])${esc(from)}`], `(?<![A-Za-z0-9._/-])${esc(dotted)}`, `(?<=\\]\\()${esc(rel)}`];
+  const forms = [...own ? [] : [`(?<![A-Za-z0-9._/-])${esc(from)}`], `(?<![A-Za-z0-9._/-])${esc(dotted)}`, `(?<=\\]\\(\\s*<?|^ {0,3}\\[[^\\]\\n]+\\]:[ \\t]*<?|\\b(?:href|src)\\s*=\\s*["'])${esc(rel)}`];
   if (WORKFLOW.test(inFile)) forms.push(`(?<![A-Za-z0-9._/-])\\./${esc(from)}`);
-  return new RegExp(`(?:${forms.join("|")})(?![A-Za-z0-9_/-]|\\.[A-Za-z0-9])`, "gu");
+  return new RegExp(`(?:${forms.join("|")})(?![A-Za-z0-9_/-]|\\.[A-Za-z0-9])`, "gmu");
 }
 // The same pointer to `to`, in the form it stood in.
 export const pointerTo = (inFile, from, to) => hit => {

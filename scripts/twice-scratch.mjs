@@ -59,7 +59,7 @@ export function project(name) {
     "SECURITY.md": `# Security\n\n${RULE}\n`,
     "README.md": `# Read me\n\nThe guide: [the guide](docs/guide.md); the old place: core/old/place.md.\n`,
     "docs/guide.md": GUIDE_OLD,
-    "docs/notes.md": "# Notes\n\nSee [the guide](./guide.md) and [again](guide.md).\n",
+    "docs/notes.md": "# Notes\n\nSee [the guide](./guide.md), [again](guide.md), [by its reference][g] and <a href=\"guide.md\">by HTML</a>.\n\n[g]: guide.md\n",
     "tools/a.mjs": A, "tools/b.mjs": B,
     "lib/a.mjs": A, "lib/b.mjs": B.replace("41", "42"),
     "run.mjs": `import { a } from "./tools/a.mjs";\nimport { a as c } from "./lib/a.mjs";\nconsole.log(a(), c());\n`,
