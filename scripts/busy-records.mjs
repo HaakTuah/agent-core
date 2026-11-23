@@ -8,6 +8,7 @@
 //
 //   node core/scripts/busy-records.mjs                       from a project's root, the last 31 days
 //   node core/scripts/busy-records.mjs --repo owner/name --days 35
+import { parseArgs } from "node:util";
 import { mergedIn } from "./cited.mjs";
 import { repoOf } from "./core-cost.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
@@ -16,14 +17,13 @@ import { started } from "./started.mjs";
 const DAY = 864e5, WEEK = 7 * DAY;
 
 // The files `pull` added lines to, as the host lists them (a file only deleted from, or removed, adds no entry).
-export const addedTo = (repo, pull, gh = ghApi) =>
-  pagesOf(`repos/${repo}/pulls/${pull}/files`, gh).filter(f => f.status !== "removed" && f.additions > 0).map(f => f.filename);
+export const addedTo = (repo, pull, gh = ghApi) => pagesOf(`repos/${repo}/pulls/${pull}/files`, gh).filter(f => f.additions > 0).map(f => f.filename);
 
 // Each file two pull requests merged within a week of each other both added to: [{ file, pulls: [number] }], the
 // pulls of every such pair, oldest merge first; the files by name. `merged` is [{ number, at, files }].
 export function busy(merged) {
   const by = new Map();
-  for (const p of merged) for (const f of new Set(p.files)) by.set(f, [...(by.get(f) ?? []), p]);
+  for (const p of merged) for (const f of new Set(p.files)) { if (!by.has(f)) by.set(f, []); by.get(f).push(p); }
   const out = [];
   for (const [file, list] of by) {
     const sorted = list.sort((a, b) => Date.parse(a.at) - Date.parse(b.at)), pulls = new Set();
@@ -31,7 +31,7 @@ export function busy(merged) {
       if (Date.parse(sorted[i].at) - Date.parse(sorted[i - 1].at) <= WEEK) pulls.add(sorted[i - 1].number).add(sorted[i].number);
     if (pulls.size) out.push({ file, pulls: sorted.map(p => p.number).filter(n => pulls.has(n)) });
   }
-  return out.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+  return out.sort((a, b) => (a.file < b.file ? -1 : 1)); // (each file stands once)
 }
 
 // What is read of `repo` for the `days` before `now`: the pull requests merged into its default branch, each with the
@@ -39,7 +39,7 @@ export function busy(merged) {
 export function read(repo, days, now = Date.now(), gh = ghApi) {
   const to = new Date(now).toISOString(), from = new Date(now - days * DAY).toISOString();
   const base = JSON.parse(gh(`repos/${repo}`)).default_branch;
-  return mergedIn(repo, from, to, gh).filter(p => p.base?.ref === base)
+  return mergedIn(repo, from, to, gh).filter(p => p.base.ref === base)
     .map(p => ({ number: p.number, at: p.merged_at, files: addedTo(repo, p.number, gh) }));
 }
 
@@ -49,18 +49,27 @@ export const report = (found, merged, days) => [
   ...found.map(f => `  ${f.file}  (#${f.pulls.join(", #")})`),
 ];
 
+// The repository and the days to read, from the command line, or why they cannot be.
+export function options(argv, here = repoOf) {
+  let values;
+  try { ({ values } = parseArgs({ args: argv, options: { repo: { type: "string" }, days: { type: "string", default: "31" } } })); }
+  catch (e) { return { why: e.message }; }
+  const repo = values.repo ?? here(), days = Number(values.days);
+  if (!repo) return { why: "no repository named, and none read from this clone" };
+  return Number.isInteger(days) && days > 0 ? { repo, days } : { why: `--days ${values.days} is no whole number of days` };
+}
+
 if (started(import.meta.url)) {
-  const arg = name => { const i = process.argv.indexOf(name); return i < 0 ? null : process.argv[i + 1]; };
-  const repo = arg("--repo") ?? repoOf(), days = Number(arg("--days") ?? 31);
-  if (!repo || !(Number.isInteger(days) && days > 0)) {
-    console.error(`FAIL: busy-records: ${repo ? `--days ${arg("--days")} is no whole number of days` : "no repository named, and none read from this clone"}. Mend: run it from the project's root, or give --repo owner/name and --days <a whole number>`);
+  const { repo, days, why } = options(process.argv.slice(2));
+  if (why) {
+    console.error(`FAIL: busy-records: ${why}. Mend: run it from the project's root, or give --repo owner/name and --days <a whole number>`);
     process.exit(1);
   }
   try {
     const merged = read(repo, days);
     for (const l of report(busy(merged), merged.length, days)) console.log(l);
   } catch (e) {
-    console.error(`FAIL: busy-records: the host's record of ${repo}'s pull requests could not be read: ${String(e.message ?? e).split("\n")[0]}. Mend: sign gh in for the repository and run it again; where the project's host is not GitHub, read the same from the host's own list of the merged pull requests and their files`);
+    console.error(`FAIL: busy-records: the host's record of ${repo}'s pull requests could not be read: ${e.message.split("\n")[0]}. Mend: sign gh in for the repository and run it again; where the project's host is not GitHub, read the same from the host's own list of the merged pull requests and their files`);
     process.exit(1);
   }
 }

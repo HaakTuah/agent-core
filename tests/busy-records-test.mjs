@@ -7,7 +7,7 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { addedTo, busy, read, report } from "../scripts/busy-records.mjs";
+import { addedTo, busy, options, read, report } from "../scripts/busy-records.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0, count = 0;
@@ -16,9 +16,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 // ---- which files are busy ----
 const p = (number, day, files) => ({ number, at: `2026-11-${String(day).padStart(2, "0")}T12:00:00Z`, files });
-const found = busy([p(1, 2, ["QUEUE.md", "a.md"]), p(2, 6, ["a.md", "b.md"]), p(3, 20, ["b.md"]), p(4, 9, ["a.md"]), p(5, 28, ["b.md", "b.md"])]);
-ok(JSON.stringify(found) === JSON.stringify([{ file: "a.md", pulls: [1, 2, 4] }]),
-  "a file two pull requests merged within a week of each other added to is busy, with every pull request of such a pair, oldest first; one they added to further apart, or one alone added to, is not", JSON.stringify(found));
+const found = busy([p(4, 9, ["z.md", "a.md"]), p(3, 20, ["b.md", "a.md"]), p(2, 6, ["a.md", "b.md"]), p(1, 2, ["QUEUE.md", "a.md"]), p(5, 28, ["b.md", "b.md"]), p(6, 12, ["z.md"])]);
+ok(JSON.stringify(found) === JSON.stringify([{ file: "a.md", pulls: [1, 2, 4] }, { file: "z.md", pulls: [4, 6] }]),
+  "a file two pull requests merged within a week of each other added to is busy, with every pull request of such a pair, oldest first, the files by name; one they added to further apart, or one alone added to, is not", JSON.stringify(found));
 ok(busy([p(1, 1, ["a.md"]), p(2, 8, ["a.md"])]).length === 1 && busy([p(1, 1, ["a.md"]), { number: 2, at: "2026-11-08T12:00:01Z", files: ["a.md"] }]).length === 0,
   "a week is seven days to the second");
 ok(busy([p(1, 3, ["a.md", "a.md"])]).length === 0, "a file named twice by one pull request is that pull request's once");
@@ -58,11 +58,17 @@ ok(report(busy(merged), merged.length, 28).join("\n") === "2 pull request(s) mer
   "it prints the count read and each busy file with its pull requests");
 
 // ---- the failures ----
-const run = (...a) => spawnSync(process.execPath, [path.join(root, "scripts/busy-records.mjs"), ...a], { encoding: "utf8", env: { ...process.env, PATH: "", GITHUB_REPOSITORY: "" } });
-const noGh = run("--repo", "o/r");
+// (with no gh and no git on its path, as a session where the host cannot be read)
+const run = (args, cwd = root) => spawnSync(process.execPath, [path.join(root, "scripts/busy-records.mjs"), ...args], { encoding: "utf8", cwd, env: { ...process.env, PATH: "", GITHUB_REPOSITORY: "" } });
+const noGh = run(["--repo", "o/r"]);
 ok(noGh.status === 1 && mended(noGh.stderr), "where the host cannot be read, it says so with its mend and exits 1", noGh.stderr);
-const badDays = run("--repo", "o/r", "--days", "x");
-ok(badDays.status === 1 && /--days x/u.test(badDays.stderr) && mended(badDays.stderr), "a --days that is no whole number is refused with its mend", badDays.stderr);
+// ---- what it is told ----
+ok(JSON.stringify(options(["--repo", "o/r"])) === '{"repo":"o/r","days":31}' && JSON.stringify(options(["--days", "7"], () => "a/b")) === '{"repo":"a/b","days":7}',
+  "it reads the repository named, else this clone's, and 31 days unless told the days");
+ok(["x", "0", "1.5"].every(d => options(["--repo", "o/r", "--days", d]).why === `--days ${d} is no whole number of days`), "a --days that is no whole number of days is refused, saying so");
+ok(options([], () => null).why === "no repository named, and none read from this clone" && /--bogus/u.test(options(["--bogus"]).why), "no repository, or an option it does not know, is refused, saying so");
+const bad = run(["--repo", "o/r", "--days", "0"]);
+ok(bad.status === 1 && bad.stderr.includes("--days 0 is no whole number") && mended(bad.stderr), "a refusal is printed with its mend, and it exits 1", bad.stderr);
 
 console.log(`${count - failed} of ${count} assertions on the busy records' reader passed`);
 if (failed) process.exit(1);
