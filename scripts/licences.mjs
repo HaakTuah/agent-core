@@ -702,6 +702,32 @@ if (started(import.meta.url)) {
     for (const r of result.reports) console.log(`REPORT: ${logged(r)}`);
     for (const f of result.failures) console.error(`FAIL: ${logged(f)}`);
     console.log(result.summary);
-    process.exit(result.failures.length ? 1 : 0);
+    // (the checks floor rule 7 and floor topic 15 ask of the same lock files come with it, so a project's own job that
+    // runs this script runs them too, its workflow unchanged; #1093, point 2)
+    const besides = await alongside(configPath, root);
+    process.exit(result.failures.length || besides ? 1 : 0);
   }
+}
+
+// The exact-versions check (exact-versions.mjs) and the lookup of each package new to the project in npm's registry
+// (lookup.mjs), run beside the licence check on the config at `configPath`, each printing its lines: whether either
+// failed. What stood at the pull request's base before the exact-versions check came is reported, never failed, and a
+// pull request whose checkout holds no base has its lookup said as a warning that it did not run, failing nothing
+// ("Nothing locks a project" in the core's AGENTS.md).
+async function alongside(configPath, root) {
+  const { report } = await import("./exact-versions.mjs");
+  const { run, namedBase, summarise } = await import("./lookup.mjs");
+  const base = baseOf(root);
+  const exact = report(resolve(configPath), root, base ? (f) => textAt(root, base, f) : null);
+  for (const line of exact.err) console.error(line);
+  for (const line of exact.out) console.log(line);
+  const at = namedBase(root) ?? base;
+  if (!at && process.env.GITHUB_EVENT_NAME?.startsWith("pull_request")) {
+    console.log("::warning::The lookup of the packages new to the project did not run: this is a pull request, and its checkout holds no base to read it against. Mend: give the job's checkout fetch-depth: 2 (the pull request merged into its base, with both parents)");
+    return exact.status !== 0;
+  }
+  const { lines, code } = await run(configPath, { root, base: at });
+  for (const line of lines) (line.startsWith("FAIL") ? console.error : console.log)(line);
+  summarise(lines, false);
+  return exact.status !== 0 || code !== 0;
 }

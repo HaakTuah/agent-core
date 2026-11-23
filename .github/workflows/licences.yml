@@ -12,9 +12,10 @@
 # a full commit SHA ("How a project takes the core" in README.md, point 5), passing its config's path. Reads only, with
 # no secret: nothing is installed, and besides GitHub's dependency review nothing runs but the caller's own
 # core/scripts/licences.mjs, core/scripts/exact-versions.mjs, core/scripts/lookup.mjs and core/scripts/agent-tools.mjs, which core.yml holds to the
-# core pin. The second holds floor rule 7's "one exact version, never a range" for the same lockfiles: each dependency
+# core pin. The licence script runs the next two itself (#1093, point 2), so a project's own job that runs it runs them
+# too. The second holds floor rule 7's "one exact version, never a range" for the same lockfiles: each dependency
 # a package list of the project's own asks for is one version as SemVer writes one and, letter for letter, the version
-# its lockfile installs.
+# its lockfile installs; what stood so at the pull request's base is reported, never failed.
 # The lookup, core/scripts/lookup.mjs, asks npm's registry of each package the pull request brings into a lockfile that
 # no lockfile of its base held (floor topic 15, "A new one is looked up in its registry"): it fails a name the registry
 # does not know and one first published under 90 days ago, and prints the rest for the review; it reaches npm's
@@ -75,21 +76,11 @@ jobs:
           allow-licenses: ${{ steps.lists.outputs.allow-licenses }}
           allow-dependencies-licenses: ${{ steps.lists.outputs.allow-dependencies-licenses }}
           comment-summary-in-pr: never
-      - name: Every package and audit entry, each to its own list
-        env:
-          CONFIG: ${{ inputs.config }}
-        run: node "$CORE_AT"scripts/licences.mjs "$CONFIG"
-      - name: Every dependency at the one exact version its lock file installs (floor rule 7)
-        if: ${{ !cancelled() }}
-        env:
-          CONFIG: ${{ inputs.config }}
-        run: node "$CORE_AT"scripts/exact-versions.mjs "$CONFIG"
-      - name: Each package new to the project looked up in npm's registry (floor topic 15)
-        if: ${{ !cancelled() }}
+      - name: Every package and audit entry, each to its own list; every dependency at the one exact version its lock file installs (floor rule 7); each package new to the project looked up in npm's registry (floor topic 15)
         env:
           CONFIG: ${{ inputs.config }}
           LOOKUP_BASE: ${{ github.event.pull_request.base.sha }} # empty where the caller runs on anything but a pull request
-        run: node "$CORE_AT"scripts/lookup.mjs "$CONFIG"
+        run: node "$CORE_AT"scripts/licences.mjs "$CONFIG"
       - name: Every tool the agents load listed, with its publisher and version (floor topic 15)
         if: ${{ !cancelled() }}
         env:
