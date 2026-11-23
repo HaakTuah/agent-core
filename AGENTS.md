@@ -277,6 +277,25 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   Held by `tests/round-trip-test.mjs`, in `.github/workflows/tests.yml`, which fails a script that writes a file and
   stands in neither of its lists, and a writer whose round trip did not run; that a new reader brings its round trip,
   by none.
+- **The host is read and written by the look** (#1092). By default a step of the sync notes whose state is the host's,
+  not a file's (a label, a setting, the look's own record, an account's right), is told done by a check of what the host
+  answers (its `host` in `scripts/steps/`, `scripts/step-checks-host.mjs`, read through `scripts/host.mjs`), and what a
+  step needs written on the host, the labels of the core's list and the look's issues, the daily look's own job writes
+  with that job's token, each right it uses named in its workflow's `permissions:` with a comment saying what it is for
+  (`.github/workflows/look.yml`, the starter kit's call of it). The one condition that changes it: GitHub refuses the
+  read or the write to that token, or shows a setting to the repository's admins alone; then the step is said not read,
+  never done, and the look files in one issue, "Settings only the owner gives", labelled `needs-owner`, each setting
+  only the owner gives it read as not given, with its link, and each write refused, with the right it would need, naming
+  there too the settings it could not read, which the owner's sitting reads. The trigger is the look's run in a project,
+  each day, and each sync, which prints what `host.mjs` reads and writes nothing. It does not mean that an agent session
+  edits the host for a step with its own sign-in, save where the floor asks it (secret scanning in a public repository,
+  floor topic 9), that the look's token gains a right to give a setting only the owner gives, that the value of the
+  secret `PERSONAL_TERMS` is read (the workflow says only whether it is given), nor that a step not read fails anything.
+  Reason: a step the host holds was left to a session's own sign-in, which reaches past the project and an agent tool's
+  automatic mode may refuse, the step then waiting on the owner. Held by `tests/host-test.mjs`, on a stand-in for the
+  host: each step read done, not done and not read, the host only read where nothing is to be written, the labels made,
+  a write refused said with its right, the issue's text, and each right of the look's workflows named with what it is
+  for.
 - **A release says what it asks, step by step.** Whoever adds an entry to the sync notes (`setup/sync-notes/`)
   gives it a step in `scripts/steps/` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
@@ -486,8 +505,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   may react), and a new game of that kind would have had to find them again. Held by none yet.
 - **A check that read nothing says so** (#459, point 2). By default a check of the core's that reads a project's code
   passes where it finds nothing wrong. The one condition that changes it: it found no file there it could read, the
-  shape check where its config is missing or its "code" and "tests" name no file of a language its readers know, the
-  tests' strength where the manifest names no *mutation tool*, or `none`, or the shape check's config, whose files it
+  shape check where its config is missing, its "code" and "tests" name no file of a language its readers know, or the
+  manifest turns it off with `none` and the owner's reason, the tests' strength where the manifest names no *mutation
+  tool*, or `none`, or Stryker from a folder that holds no lock file, or the shape check's config, whose files it
   measures, is missing or names no file it measures. Then `scripts/read-nothing.mjs` names it, with the rules of the
   modules the project takes that it holds, in the report every sync prints (`scripts/steps.mjs`), and where it cannot
   tell, the report says so. The trigger is such a check, written or widened: whoever builds it gives it its case in
