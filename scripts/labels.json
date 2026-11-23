@@ -39,6 +39,7 @@
     "design": "What it is",
     "view": "The session's view (not a decision)",
     "found": "Found while:",
-    "current": "This is the issue's current text."
+    "current": "This is the issue's current text.",
+    "reasons": "The rule's reasons"
   }
 }

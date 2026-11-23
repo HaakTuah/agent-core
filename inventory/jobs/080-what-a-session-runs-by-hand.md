@@ -1,10 +1,10 @@
-- **What a session runs by hand** (`scripts/session-cost.mjs`, `scripts/labels.mjs`, `scripts/labels.json`,
+- **What a session runs by hand** (`scripts/session-cost.mjs`, `scripts/labels.mjs`, `scripts/reasons-said.mjs`, `scripts/labels.json`,
   `scripts/inbox.mjs`, `scripts/state-report.mjs`, `scripts/pruning.mjs`, `scripts/pruning-list.mjs`, `scripts/pruning-read.mjs`, `scripts/pruning-record.mjs`, `scripts/cited.mjs`, `scripts/outcomes.mjs`,
   `scripts/outcomes-read.mjs`, `scripts/stand-in-record.mjs`, `scripts/review-record.mjs`, `scripts/review-comments.mjs`, `scripts/review-rounds.mjs`, `scripts/review-checks.mjs`,
   `scripts/core-cost.mjs`, `scripts/builder-trial.mjs`, `scripts/fixes.mjs`, `scripts/test-record.mjs`,
   `scripts/tools-read.mjs`, `scripts/tool-bots.json`, `scripts/stage-order.mjs`, `scripts/merge-line.mjs`, `scripts/reasons.mjs`, `scripts/busy-records.mjs`), a part the
   inventory did not list, found by the challenge: `scripts/session-cost.mjs` (the cost line a pull request ends with),
-  `scripts/labels.mjs` (the labels and openers), `scripts/state-report.mjs`, `scripts/pruning.mjs`, and the records
+  `scripts/labels.mjs` (the labels and openers, and beside them in the core `scripts/reasons-said.mjs`, #765), `scripts/state-report.mjs`, `scripts/pruning.mjs`, and the records
   (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`, `scripts/core-cost.mjs`, and `scripts/builder-trial.mjs`,
   #767's trial read from them). *Runs:* any session. *Else:* for the cost line, ccusage (MIT, 20.0.48, 7 packages, 5.6
   MB, a program for each system behind a small wrapper, 69 releases in the year to 17 November 2026), which reads the
