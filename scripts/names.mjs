@@ -78,15 +78,26 @@ function elsewhere(paths, { tree, copy }) {
   return { off, left: (lines === null ? Math.min(rest.length, SEARCHED) : 0) + Math.max(0, rest.length - SEARCHED) };
 }
 
+// Every run of whole segments of a tracked path (`a/b/c.ts` gives `a`, `a/b`, `b/c.ts`, `c.ts` and the rest), so that a
+// name is looked up once, however many names and paths there are: one stands where it is such a run, a file or folder.
+function runsOf(tracked) {
+  const runs = new Set();
+  for (const t of tracked) {
+    const s = t.split("/");
+    for (let i = 0; i < s.length; i++) for (let j = i + 1; j <= s.length; j++) runs.add(s.slice(i, j).join("/"));
+  }
+  return runs;
+}
+
 // Of a name read, the reason it stands nowhere, or null where it stands, "skip" where it is not read: `ctx` holds what
-// brokenNames reads once (the extensions and paths tracked, the package file's scripts, whether the core is read).
-function judge(n, { core, exts, have, tracked, scripts }) {
+// brokenNames reads once (the extensions tracked, the runs and top folders of the tracked paths, the package file's
+// scripts, whether the core is read).
+function judge(n, { core, exts, runs, tops, scripts }) {
   if (n.script !== undefined) return !scripts ? "skip" : scripts.has(n.script) ? null : { what: "names no script of the package file at the project's root" };
   const p = core ? n.file.replace(/^core\//u, "") : n.file;
   // (in the core, a path under a folder it does not hold, `docs/` say, is a project's, which its README describes too)
-  if (!exts.has(n.ext) || (core && p.includes("/") && !tracked.some(t => t.startsWith(`${p.split("/")[0]}/`)))) return "skip";
-  const stands = have.has(p) || tracked.some(t => t.endsWith(`/${p}`) || t.startsWith(`${p}/`) || t.includes(`/${p}/`));
-  return stands ? null : { path: p, what: "names no file the project tracks" };
+  if (!exts.has(n.ext) || (core && p.includes("/") && !tops.has(p.split("/")[0]))) return "skip";
+  return runs.has(p) ? null : { path: p, what: "names no file the project tracks" };
 }
 
 /** The names that stand nowhere, each { file, line, name, what }. `read(f)` gives a file's text or null, `tracked` the
@@ -97,7 +108,8 @@ function judge(n, { core, exts, have, tracked, scripts }) {
 export function brokenNames({ read, tracked, blocksOf, skip = () => false, core = false, copy = "", tree = null, usable = () => true }) {
   const d = core ? { files: ["README.md"] } : descriptionsOf(read("core-manifest.md"), tracked);
   const unusable = d.files.filter(f => !usable(f));
-  const ctx = { core, tracked, have: new Set(tracked), scripts: core ? null : scriptsOf(read("package.json")),
+  const ctx = { core, runs: runsOf(tracked), tops: new Set(tracked.filter(f => f.includes("/")).map(f => f.split("/")[0])),
+    scripts: core ? null : scriptsOf(read("package.json")),
     exts: new Set(tracked.map(f => /\.([^./]+)$/u.exec(posix.basename(f))?.[1]).filter(Boolean)) };
   const found = [];
   let count = 0;

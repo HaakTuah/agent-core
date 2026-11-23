@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { SEARCHED } from "../scripts/names.mjs";
+import { SEARCHED, brokenNames } from "../scripts/names.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
@@ -129,4 +129,14 @@ try {
   const listless = spawnSync(process.execPath, [path.join(coreDir, "scripts/pointers.mjs"), "--core", "--write-names"], { cwd: coreDir, encoding: "utf8" });
   ok(listless.status === 1 && mended(listless.stdout + listless.stderr), "the core keeps no list of names", listless.stdout + listless.stderr);
 } finally { fs.rmSync(coreDir, { recursive: true, force: true }); }
+// each name is looked up once, not against every tracked path: 40,000 names that stand nowhere among 10,000 tracked
+// files are read in seconds (Codex's code review on #1195: they took a CPU for over 40 seconds)
+{
+  const tracked = Array.from({ length: 10000 }, (_, i) => `src/deep/f${i}.ts`);
+  const text = Array.from({ length: 40000 }, (_, i) => `\`gone${i}.ts\``).join(" ");
+  const started = Date.now();
+  const r = brokenNames({ read: () => null, tracked, blocksOf: () => [{ i: 0, text }], core: true });
+  const took = Date.now() - started;
+  ok(r.count === 40000 && took < 10000, "many names among many tracked paths are read in seconds, each looked up once", `${r.count} names in ${took} ms`);
+}
 process.exit(failed ? 1 : 0);
