@@ -32,8 +32,9 @@ project's own guidelines, its `SECURITY.md` and the floor.
   out. It does not mean a new rule, one loosened or tightened, a move that changes who reads a rule or when, or a change
   to a check, a protected file or who decides goes without the yes. Reason: a yes asked for what means
   nothing becomes a formality. Held by `scripts/meaning-kept.mjs`, in the description check, and the state report.
-- **A later round** checks that the earlier points were fixed. Something new about work it already saw is raised only
-  if it blocks.
+- **A later round** checks, on the fix's diff, that its own earlier points were fixed. Something new about work it
+  already saw is raised only if it blocks, and after the third round holds no merge where that code is unchanged since,
+  save a security finding or one a failing test shows (`tasks/reviews.md`, point 6).
 
 ## What blocks
 
