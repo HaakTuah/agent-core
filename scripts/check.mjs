@@ -96,14 +96,32 @@ function main() {
   for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
   const o = options();
   const p = { ...project(o), own: o.own, verdicts: o.verdicts === null ? null : path.resolve(o.verdicts) };
-  if (p.verdicts !== null && !leadsOut(p.root, p.verdicts)) fail(`--verdicts ${o.verdicts} lies in the project's own repository, which this check writes nothing in.`, "give a file in a scratch folder outside every repository.");
+  if (p.verdicts !== null) outside(p, o.verdicts);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
   const { failed, ran } = runAll(p, runner(p, tmp), calledJobs(p, tmp));
-  if (p.verdicts !== null) fs.writeFileSync(p.verdicts, `${JSON.stringify(verdicts, null, 2)}\n`);
+  if (p.verdicts !== null) writeVerdicts(p, o.verdicts);
   if (!failed && !ran) fail("no check of the core ran on this change.", "call the core's workflows in the base the change merges into, as the starter kit writes them.");
   say(failed ? `${failed} of the core's checks failed` : `ok   every check of the core that runs from plain git passed (${ran})`);
   process.exitCode = failed ? 1 : 0;
+}
+
+// --verdicts names a file outside the project's repository, and no link: leadsOut reads a link to nothing as leading
+// out, and a write follows a link to where it points.
+function outside(p, given) {
+  if (!leadsOut(p.root, p.verdicts)) fail(`--verdicts ${given} lies in the project's own repository, which this check writes nothing in.`, "give a file in a scratch folder outside every repository.");
+  const at = fs.lstatSync(p.verdicts, { throwIfNoEntry: false });
+  if (at && !at.isFile()) fail(`--verdicts ${given} is ${at.isSymbolicLink() ? "a link" : "no file"}, which this check writes nothing through.`, "give a file in a scratch folder outside every repository, one that is no link and does not stand yet or is a file.");
+}
+
+// Writes the verdicts afresh, once more held outside the project, the file that stood taken out first and the new one
+// made only where nothing stands, so what the jobs left there in the meantime is never followed.
+function writeVerdicts(p, given) {
+  outside(p, given);
+  try {
+    fs.rmSync(p.verdicts, { force: true });
+    fs.writeFileSync(p.verdicts, `${JSON.stringify(verdicts, null, 2)}\n`, { flag: "wx" });
+  } catch (e) { fail(`--verdicts ${given} could not be written (${e.code ?? e.message}).`, "give a file in a scratch folder outside every repository that nothing else writes to, and run the check again."); }
 }
 
 // The jobs that call a workflow of the core's and start on this change, core.yml's first; it fails where none is core.yml.
