@@ -118,7 +118,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    release says what it asks, step by step"). The core's
    `core.yml`, which the project calls on every PR as a required check, fails one whose `core/` differs from the core at
    its pin, entry by entry by git's object ids and types, as `pure-sync.mjs` compares too: a file's content, a link or a
-   submodule, but not the executable bit, which a copy made on Windows records for no file and which nothing reads. The
+   submodule, but not the executable bit, which a copy made on Windows by an older sync records for no file; from #1093
+   the sync records the bits the core marks, and `pure-sync.mjs` refuses one the core does not mark. The
    first copy is the sync script's too, run from a clone of this repository once the manifest is written (the script's
    header says how); the copy's own `.gitattributes` keeps every line ending as it is.
 
@@ -352,11 +353,14 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      marks a finding of its review open, posted after it, and, while Codex's review runs, one posted after it began,
      never a note posted before it; a review of an earlier commit than the head stands only
      where updates from `main` alone follow it, each the merge git makes of its parents (the check running
-     `clean-merges.mjs` on the head's commits, #323), and the status says so, any other later commit needing such a
+     `clean-merges.mjs` on the head's commits, #323), or, where it declared no blocking finding, light commits of the
+     pull request's own, each touching nothing that runs with power (`power.mjs`, run in the head's clone; #1134), and
+     the status says so, any other later commit needing such a
      comment naming the head, or the merge where that stops, by its whole SHA; a pure sync passes with none where no review starts by itself, the check running
      `pure-sync.mjs` on its head, and so does a pull request of the *progress file* alone that a job of the caller's proves with
      `queue-only.mjs`, whose token may read issues, handing the head to the input `queue` (the core's own caller does;
-     #750); where the pull request changes what runs by itself beyond its pins, both, or two such
+     #750); where the pull request changes what runs with power beyond its pins (`power.mjs`; where it read
+     nothing, each workflow, each file that may run and each that runs by itself changed), both, or two such
      comments (floor rule 3), or one holding what `comment-only.mjs` printed on the head. Where a summary of Codex's is
      there but its state cannot be read, a form nobody documents having changed, the status says so, the run warns, and
      the check waits or passes as it would with no summary (a summary whose first line itself changed is not known as
@@ -370,7 +374,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      Beside it, in the same job, the status `code-review` waits while Codex's code review runs on the head commit, until
      it finishes or a comment that opens "Code review:", from an account the security review counts, names that commit
      by its whole SHA (`tasks/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
-     nor a sync's shape) has had none on its head, or on a commit only such updates from `main` follow; while the newest
+     nor a sync's shape) has had none on its head, or on a commit only such updates from `main` follow, or, where it
+     found nothing blocking, the pull request's own commits after it that a review checked and found nothing blocking
+     in (#1134); while the newest
      "Security review:", "Code review:" or "Design check:" posted from 18 November lacks its lines "Blocking findings:"
      and "Other findings:", or, posted from 20 November, its line "Score:" (`tasks/reviews.md`, point 3); and, in the
      core's own repository, while a pull request opened from that day that changes `floor/`, `roles/`, `tasks/` or
@@ -499,7 +505,7 @@ for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit
 | *descriptions* | every place that describes what a change changes, for each kind of reader | choice: left out, the project's README and `AGENTS.md` |
 | *copies check* | the check that fails a new copy, and its config for `scripts/copies.mjs` | choice: left out, `core/scripts/copies.mjs` with `checks/copies.json`, which the starter kit writes |
 | *size marks* | the reading-size check's marks, its config for `scripts/reading-size.mjs` | choice: left out, `checks/sizes.json` |
-| *shape check* | the check of how the code is put together, and its config for `scripts/shape.mjs`, in backticks: the project's names for its systems, its marks and its suites' time marks (`tasks/code-shape.md`), and what the tests cost: the tests never selected out ("select.proof"), those that reach every file and the files no test reads, what a test imports that opens a screen, the time mark on a push's checks ("wait") and the seconds from which a measurement runs outside the session ("long", an hour where none is given) (`tasks/tests.md`) | choice: left out, `checks/shape.json`, which the starter kit writes |
+| *shape check* | the check of how the code is put together, and its config for `scripts/shape.mjs`, in backticks: the project's names for its systems, its marks and its suites' time marks (`tasks/code-shape.md`), and what the tests cost: the tests never selected out ("select.proof"), those that reach every file and the files no test reads, what a test imports that opens a screen, the time mark on a push's checks ("wait") and the seconds from which a measurement runs outside the session ("long", an hour where none is given) (`tasks/tests.md`) ; or `none` with the owner's reason, which turns the check off, then the config's path where it is not the starter kit's (`tasks/code-shape.md`, "Only the owner turns the shape check off") | choice: left out, `checks/shape.json`, which the starter kit writes |
 | *dose* | `in debt`, `paying down` or `in standard`, in backticks, where the project's owner names the state its codebase is cleaned and audited by (`tasks/cleaning.md`) | read: the state the shape check's baseline shows (`scripts/dose.mjs`) |
 | *mutation tool* | the command, in backticks, that runs the project's mutation tool, a tool of development only, on the lines given in `{lines}` (`<file>:<first>-<last>`, joined by commas) and writes its report in the mutation-testing-elements schema to `{report}` (`tasks/code-shape.md`; `scripts/strength.mjs` runs it, with no shell); or `none`, in backticks, with its reason, where the core's list (`scripts/mutation-tools.json`) gives no tool for the project's code and tests or the owner turns the measure off | read: by `scripts/mutation-tools.mjs`, which the starter kit runs and its `--write` after it: the core's list's tool for the languages of the project's code by their endings, whether it has tests and what the project's package list runs them with; a command, or a `none` with a reason of the owner's own, overrides it |
 | *audits* | the folder that holds the reports of the audits of how its code is put together, each named by its day (`tasks/cleaning.md`) | choice: left out, `docs/audits/` |
@@ -574,7 +580,9 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   script again, and says what is left; the value of `PERSONAL_TERMS` the owner types on its page alone, never into the
   session (floor rule 11). It is asked at a project's first taking of the core, where the starter kit and the sync's
   first copy print it, and again only where a sync brings a setting the old copy's list did not hold; nothing waits on
-  it, and nothing fails until a setting is given (`AGENTS.md`, "Nothing locks a project").
+  it, and nothing fails until a setting is given (`AGENTS.md`, "Nothing locks a project"). Each day the look's job
+  reads the same settings with its own token where GitHub lets it, and keeps one issue, "Settings only the owner gives",
+  labelled `needs-owner`, of each it read as not given, with its link, and of each write GitHub refused it (#1092).
 - An adviser (`roles/adviser.md`): its session started with every repository of the owner's it is to advise on, so it
   can read them, file in them and start each one's orchestrator, reading what another account can write only through
   that repository's orchestrator (`roles/adviser.md`); at the effort its tool's part advises (`tools/claude.md`).

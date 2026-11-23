@@ -7,7 +7,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { inCopy } from "./core-path.mjs";
 import { parseConfig } from "./shape.mjs";
+import { folderOf } from "./mutation-tools.mjs";
 import { toolOf } from "./strength.mjs";
+import { installIn } from "./stryker.mjs";
 import { copyAt, readable } from "./workflow-calls.mjs";
 import { HERE, onPullRequests } from "./step-checks.mjs";
 import { where as shapeAt } from "./shape.mjs";
@@ -39,13 +41,14 @@ function strengthRuns(p) {
 // strength check (core/tasks/code-shape.md, "How strong the tests are is measured on the lines a pull request
 // changes").
 export function strengthNamed(p) {
-  const tool = toolOf(p.manifest);
-  const row = "Add to the manifest's slots the row `| *mutation tool* | `<command>` |`, the command that runs the project's mutation tool (a tool of development only) on `{lines}` and writes its report in the mutation-testing-elements schema to `{report}`; or `| *mutation tool* | `none`: <why> |`, where no such tool exists for its language";
-  if (!tool) return `${row}. Until then the measure does not run, and nothing fails for it.`;
-  if (tool.none !== undefined && !tool.none) return "The manifest's row *mutation tool* says `none` with no reason: add the reason after it (`none`: <why>).";
-  if (tool.none !== undefined) return tool.none.startsWith("no tests yet") && testsStand(p) ? `The manifest's row *mutation tool* says \`none\`: no tests yet, as the starter kit wrote it, and the project has tests now: ${row.charAt(0).toLowerCase()}${row.slice(1)}.` : null;
+  const tool = toolOf(p.manifest), copy = copyAt(p);
+  const row = `run \`node ${copy}scripts/mutation-tools.mjs --write\`, which writes the row the core's list gives the project (\`${copy}scripts/mutation-tools.json\`): its tool's command, or \`none\` with the reason where the list has no tool for its code or it has no tests yet; then do what it prints as left to do`;
+  if (!tool) return `The manifest has no row *mutation tool*: ${row}. Until then the measure does not run, and nothing fails for it.`;
+  if (tool.none !== undefined && !tool.none) return `The manifest's row *mutation tool* says \`none\` with no reason: ${row}; where the owner turns the measure off, the owner gives the reason after \`none\` instead.`;
+  if (tool.none !== undefined) return tool.none.startsWith("no tests yet") && testsStand(p) ? `The manifest's row *mutation tool* says \`none\`: no tests yet, and the project has tests now: ${row}.` : null;
   if (strengthRuns(p)) return null;
-  return "The manifest names a mutation tool and no workflow runs it: add a step `node core/scripts/strength.mjs` after the tests in the job that runs them, with `STRENGTH_BASE` set to the pull request's base (`origin/<its base branch>`, fetched first), as `core/setup/sync-notes.md` says (\"how strong the tests are\").";
+  const folder = folderOf(tool.command), install = folder ? `the install of the tool, \`${installIn(folder)}\`, then ` : "";
+  return `The manifest names a mutation tool and no workflow runs it: in the job that runs the tests on a pull request, after them, add ${install}a step \`node ${copy}scripts/strength.mjs\` with \`STRENGTH_BASE\` set to the pull request's base (\`origin/<its base branch>\`, fetched first). A change to a workflow, it passes two security reviews (floor rule 3).`;
 }
 
 // The project's tracked test files, as the shape check's config names them, else as the starter kit's does, so that a

@@ -19,6 +19,9 @@ The file, and its section or line. The commit of the core your project holds.
 **The two readings, or what it leaves open**
 Each in a line.
 
+**The rule's reasons**
+Where the issue names a rule of the core: which of the reasons `node core/scripts/reasons.mjs "<the rule>"` prints for it does not hold for your project, and why, from what you read of the project (`tasks/updates.md`, "A question or difference about a rule of the core starts from its reasons").
+
 **The reading you took meanwhile**
 The work does not wait for the answer.
 

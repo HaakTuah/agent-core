@@ -25,12 +25,13 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { copyTree, coreIsFolder, entries } from "./copy-tree.mjs";
+import { copyTree, coreIsFolder, entries, executable } from "./copy-tree.mjs";
 import { CORE as ADDRESS, CORE_SOURCE as A } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
 import { followsOf, hostSaid, inBare, releasesIn } from "./releases.mjs";
 import { asEarlier, plan, unformed } from "./converge.mjs";
 import { BLOCKS, CORE_YML, whole } from "./core-owned.mjs";
+import { WORKFLOW } from "./power.mjs";
 import { fresh, kind } from "./fresh.mjs";
 import { privateOf } from "./host-private.mjs";
 import { project } from "./steps.mjs";
@@ -41,7 +42,6 @@ const git = (args, cwd) => raw(args, cwd).trim();
 // the only SHAs a sync may move: the manifest's pin, and a call's to a core workflow (any case, as GitHub reads it)
 const PIN_REF = new RegExp(`^(Core: ${A} at )([0-9a-f]{40})(?=, copied whole under )`, "gu");
 const CALL = new RegExp(`(?<![\\w./-])(${A}\\/\\.github\\/workflows\\/[\\w.-]+@)([0-9a-f]{40})(?![\\w./-])`, "giu");
-const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u;
 const fail = [];
 
 const head = git(["rev-parse", "HEAD"]);
@@ -193,8 +193,11 @@ try {
   if (pin && oldPin && inCore(["merge-base", "--is-ancestor", pin, "refs/heads/main"])) provedOwned(dir);
   else if (later.length || gone.length) fail.push(`${[...later, ...gone].join(", ")}: no file outside the copy is proved where the pin is not a commit of the core's main`);
   const own = git(["rev-parse", "--absolute-git-dir"]); // (the project's clone, named outright as copy-tree.mjs asks)
-  if (pin && inCore(["cat-file", "-e", `${pin}^{commit}`]) && (!coreIsFolder(head, own, at.slice(0, -1)) || entries(copyTree(pin, dir), dir) !== entries(`${head}:${at.slice(0, -1)}`, own))) {
-    fail.push(`${at} is not a folder holding the core's tree at ${pin} (copy-tree.mjs)`);
+  if (pin && inCore(["cat-file", "-e", `${pin}^{commit}`])) {
+    const theirs = copyTree(pin, dir), ours = `${head}:${at.slice(0, -1)}`;
+    if (!coreIsFolder(head, own, at.slice(0, -1)) || entries(theirs, dir) !== entries(ours, own)) fail.push(`${at} is not a folder holding the core's tree at ${pin} (copy-tree.mjs)`);
+    // (a bit the core marks, or none, as a copy made on Windows by an older sync holds; never one it does not: #1093)
+    else { const marks = executable(theirs, dir); for (const f of executable(ours, own).filter((f) => !marks.includes(f))) fail.push(`${at}${f} is marked executable, which the core at ${pin} does not mark it (copy-tree.mjs)`); }
   }
 } finally {
   rmSync(dir, { recursive: true, force: true });

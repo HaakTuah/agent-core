@@ -26,7 +26,9 @@
 // The config, a JSON file the project keeps (its *copies check* slot names it), says what is checked: "baseline", the
 // baseline's path; "code" and "prose", lists of git pathspecs (":!" leaves a path out); and "proseFromSecurity": true
 // to add the project's rule files: those floor rule 3 names, those its SECURITY.md adds, and an agent tool's
-// (rule-files.mjs, beside it).
+// (rule-files.mjs, beside it); "tests", git pathspecs of the files that are tests, and "twice", each value written in two
+// files to why both must hold it, for the part that reads a value too short for these runs, a pin or a pattern
+// (copies-values.mjs, beside it, which says what it reads and fails).
 import "./whole-output.mjs";
 import fs from "node:fs";
 import os from "node:os";
@@ -42,6 +44,7 @@ import { projectAt } from "./core-path.mjs";
 import { keysOf, shapeFaults } from "./schemas.mjs";
 import { didNotRun } from "./packages.mjs";
 import { uncommented } from "./yaml-keys.mjs";
+import { valuesTwice } from "./copies-values.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
 // core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
 // (git says it, as the path from the root to this folder, so no spelling of a path, such as Windows' short names,
@@ -435,6 +438,8 @@ if (WRITE) {
   if (fresh.length) process.exit(1);
 } else {
   if (shrunk.length) console.error(`FAIL: ${logged(BASELINE)} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run ${SELF} ${logged(configPath)} --write and commit the baseline it lowers`);
-  if (fresh.length || shrunk.length) process.exit(1);
-  console.log(`ok   no new copies (${found.length - unlisted.length} old ones, listed in ${logged(BASELINE)}, to be removed${unlisted.length ? `; ${unlisted.length} in an agent tool's files, noted above` : ""})`);
+  if (!fresh.length && !shrunk.length) console.log(`ok   no new copies (${found.length - unlisted.length} old ones, listed in ${logged(BASELINE)}, to be removed${unlisted.length ? `; ${unlisted.length} in an agent tool's files, noted above` : ""})`);
+  // (a value written out in two files, a pin or a pattern, too short for the runs above: copies-values.mjs)
+  const values = valuesTwice({ core: CORE, config, configPath, configAt: CONFIG_AT, base: process.env.COPIES_BASE || "", ls });
+  if (fresh.length || shrunk.length || values) process.exit(1);
 }

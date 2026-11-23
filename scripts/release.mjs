@@ -65,7 +65,9 @@ export function next(dir, at = null) {
 export const costed = entry => {
   if (entry.startsWith(NOTICE)) return `${entry}\n  Cost: that of each entry it sends the session to, as its step says.`;
   const step = STEPS.find(s => entry.startsWith(`- **${s.lead}.**`));
-  return `${entry}\n  Cost: ${step ? `${step.cost}${step.owner ? " (the owner's)" : ""}` : "unknown: the entry has no step in scripts/steps/"}.`;
+  // (an `owner` read from the host, step 390's, is the owner's in a private repository alone)
+  const whose = !step?.owner ? "" : typeof step.owner === "function" ? " (the owner's in a private repository)" : " (the owner's)";
+  return `${entry}\n  Cost: ${step ? `${step.cost}${whose}` : "unknown: the entry has no step in scripts/steps/"}.`;
 };
 
 // What the core's owner tells a project whose copy is older than release-1 when handing a release on (#365): its own
