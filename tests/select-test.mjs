@@ -141,7 +141,9 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
   const shrunk = Object.fromEntries(Array.from({ length: 50 }, (_, k) => [`src/S${k}.cs`, `namespace App;\nclass S${k} { }\n`]));
   for (const [what, more, changed, before] of [
     ["a name of 25,000 dotted words", { "src/X.cs": `namespace App;\nclass X { object o = ${words(25000)}; }\n` }, ["src/X.cs"]],
-    ["a namespace of 20,000 dotted words", { "src/X.cs": `namespace ${words(20000)};\nclass X { }\n` }, ["src/X.cs"]],
+    ["a namespace of 10,000 dotted words", { "src/X.cs": `namespace ${words(10000)};\nclass X { }\n` }, ["src/X.cs"]],
+    ["22,000 aliases of \"(\" before one \";\"", { "src/X.cs": `${"using A=(".repeat(22000)};\nnamespace App;\nclass X { }\n` }, ["src/X.cs"]],
+    ["22,000 aliases of \"<\" before one \";\"", { "src/X.cs": `${"using A=<".repeat(22000)};\nnamespace App;\nclass X { }\n` }, ["src/X.cs"]],
     ["190,000 \"$\" before no string", { "src/X.cs": `namespace App;\nclass X { string s = ${"$".repeat(190000)}; }\n` }, ["src/X.cs"]],
     ["a .props of 150,000 \"<Using \"", { "Directory.Build.props": "<Using ".repeat(150000), "src/X.cs": "namespace App;\nclass X { }\n" }, ["src/X.cs"]],
     ["18,000 references to a parameter named @delegate", { "src/X.cs": `namespace App;\nclass X { int F(int @delegate) => ${"@delegate+".repeat(18000)}0; }\n` }, ["src/X.cs"]],

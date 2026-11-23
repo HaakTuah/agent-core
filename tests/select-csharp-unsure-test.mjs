@@ -2,11 +2,16 @@
 // scripts/select.mjs; #675): a file lost by the grammar, one that reads types by reflection or scans an assembly, one
 // with a raw interpolated string, every file where a <Using> names a property or git cannot be asked; and the whole
 // suite where a changed file is C# of no project or no longer declares what it declared at the base, a change to a
-// helper among the tests, and the budget. The cases: select-csharp-test.mjs. Needs the parser (node scripts/install.mjs
+// helper among the tests, and the budget, of what git holds beside the texts too. The cases: select-csharp-test.mjs. Needs the parser (node scripts/install.mjs
 // parser). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/select-csharp-unsure-test.mjs
-import { csharpReach, ofNoProject } from "../scripts/select-csharp.mjs";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { Late } from "../scripts/hurry.mjs";
+import { csharpReach } from "../scripts/select-csharp.mjs";
+import { heldBeside, ofNoProject } from "../scripts/select-csharp-project.mjs";
 import { selection } from "../scripts/select.mjs";
 import { readCsharp } from "../scripts/shape-csharp.mjs";
 import { PROJ, app, config, done, nothing, ok, one, pick, same, web } from "./select-csharp-test.mjs";
@@ -59,5 +64,22 @@ const deep = Array.from({ length: 400 }, (_, k) => `N${k}`).join(".");
 let asked = 0, stopped = false;
 try { csharpReach({ "src/App.csproj": PROJ, "src/X.cs": `using System;\nnamespace ${deep};\nclass Y { }\n` }, () => { if (++asked > 50) throw new Error("late"); }, nothing); } catch { stopped = true; }
 ok(stopped, "the budget is asked inside the expansion of a deep namespace, so a file of one cannot outlast it", `asked ${asked}`);
+
+// (what git holds beside the texts, the files it lists written in a scratch folder: within CHARACTERS bytes, read; past
+// it, Late before a file is read whole)
+{
+  const here = process.cwd(), dir = fs.mkdtempSync(path.join(os.tmpdir(), "held-")), files = [];
+  const add = (f, text) => { fs.writeFileSync(path.join(dir, f), text); files.push(f); };
+  try {
+    add("A.cs", "class A { }\n"); add("Directory.Build.props", "<Project />\n"); add("B.cs", "class B { }\n");
+    process.chdir(dir);
+    const held = heldBeside({ "B.cs": "" }, () => files);
+    ok(same(Object.keys(held.cs), ["A.cs"]) && held.msbuild.length === 1, "what git holds of C# and MSBuild beside the texts is read", JSON.stringify(held));
+    add("Big.cs", `// ${"x".repeat(4_000_000)}\n`);
+    let thrown;
+    try { heldBeside({}, () => files); } catch (e) { thrown = e; }
+    ok(thrown instanceof Late && /past the 4,000,000/u.test(thrown.message), "past 4,000,000 bytes of it, the selection is late and runs the whole suite", String(thrown));
+  } finally { process.chdir(here); fs.rmSync(dir, { recursive: true, force: true }); }
+}
 
 done();

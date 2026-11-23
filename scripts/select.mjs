@@ -8,8 +8,8 @@
 // way names it, outside a comment, by its name ("scripts/build.mjs", as a script is started by its path), or where it
 // is the __init__.py of a package a file of Python on that way lies in, which Python runs on each import; from a file of
 // C#, the files that declare a type it may name, by a word in a namespace it sees or by a name written out in full
-// (select-csharp.mjs, which says what it reads, and where a file's reach cannot be told). A test the
-// config's "select.whole" names reaches every file (one that copies or runs the whole project). It never guesses: where
+// (select-csharp.mjs and select-csharp-project.mjs, which say what they read, and where a file's reach cannot be told).
+// A test the config's "select.whole" names reaches every file (one that copies or runs the whole project). It never guesses: where
 // a changed file is no code the readers read and no test, a file that is gone, C# of no project (no .csproj above it),
 // C# that no longer declares a type it declared at the base, a declaration of types, a script of the global space, or anything the config does not name
 // under "select.none" (the files no test reads), the whole suite runs, and so it does where no base is told (on main, on
@@ -47,7 +47,8 @@ import { WORDS, mentioned, nameTrie } from "./name-trie.mjs";
 import { CHARACTERS, Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { matcher } from "./select-matcher.mjs";
-import { csharpReach, heldBeside, ofNoProject, undeclared } from "./select-csharp.mjs";
+import { csharpReach, undeclared } from "./select-csharp.mjs";
+import { heldBeside, ofNoProject, tooMuch } from "./select-csharp-project.mjs";
 import { git, passedWhole } from "./select-passed.mjs";
 import { isCode } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
@@ -164,7 +165,7 @@ function heldToBudget(before, pace = () => {}) {
     pace();
     const text = before(f);
     n += text?.length ?? 0;
-    if (n > CHARACTERS) throw new Late(`the changed files of C# held ${n.toLocaleString("en")} characters at the base, past the ${CHARACTERS.toLocaleString("en")} the selection reads, so what each reaches cannot be told in time`);
+    if (n > CHARACTERS) throw tooMuch("the changed files of C# at the base", n);
     return text;
   };
 }

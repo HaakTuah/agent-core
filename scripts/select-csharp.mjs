@@ -9,12 +9,9 @@
 // It reads more than a file takes, never less. A file is unsure (a test that reaches it runs on any change) where the
 // grammar lost it, it holds a raw interpolated string, or it reads types by reflection or scans an assembly; every file
 // is, where a <Using> names an MSBuild property or git cannot be asked. Files of C# git holds that the config does not
-// read are read too, as links between those it reads. Node's own modules and git.
-import fs from "node:fs";
-import path from "node:path";
-import { CHARACTERS, Late } from "./hurry.mjs";
+// read are read too, as links between those it reads (select-csharp-project.mjs).
+import { heldBeside, msbuildUsings } from "./select-csharp-project.mjs";
 import { readCsharp } from "./shape-csharp.mjs";
-import { git } from "./select-passed.mjs";
 
 const TYPE = new Set(["class", "struct", "interface", "enum", "record", "delegate", "namespace"]);
 const MODIFIER = new Set(["public", "internal", "private", "protected", "static", "sealed", "abstract", "partial", "readonly", "ref", "unsafe", "file", "new", "extern"]);
@@ -24,7 +21,7 @@ const HOOKS = new Set(["ModuleInitializer", "AssemblyInitialize", "AssemblyClean
 const REFLECTS = new Set(["Activator", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
   "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR"]);
 
-const RAW = /\$"""/u; // (one "$" before the quotes, not a run of them: the test is linear in the text)
+const RAW = /\$"""/u; // (one "$", not a run of them: linear in the text)
 const hookWord = w => HOOKS.has(w.replace(/Attribute$/u, ""));
 const word = k => k.v.replace(/^@/u, "");
 const ids = toks => toks.filter(k => k.t === "id").map(word);
@@ -55,34 +52,31 @@ function nameAt(toks, k) {
   return { parts, end: k };
 }
 
-// The index past the "<...>" that opens at toks[k], or k where none does ("using L = List<App.Item>;": the names in it
-// are read as any other words).
+// The index past the "<...>" (one or more) that opens at toks[k], or k where none does ("using L = List<App.Item>;": the
+// names in it are read as any other words).
 function pastGeneric(toks, k) {
-  let depth = 0;
-  for (; k < toks.length && (toks[k].v === "<" || depth > 0); k++) depth += toks[k].v === "<" ? 1 : toks[k].v === ">" ? -1 : 0;
+  while (toks[k]?.v === "<") k = (pairs(toks).get(k) ?? toks.length - 1) + 1;
   return k;
 }
 
 // The using directive that opens at toks[i] ("using", or "global using"): { end, target, global, alias }, or null where
-// the tokens there are no directive (a using statement or declaration). An alias of a type that is no name, a tuple, an
-// array or a nullable ("using Pair = (int, App.Item);"), has no target: the words of its type are read as any others,
-// so the file that holds a global one, which every file reaches, reaches what they name.
+// the tokens there are no directive (a using statement or declaration). An alias of a type that is no name
+// ("using Pair = (int, App.Item);") has no target: the words of its type are read as any others.
 function directive(toks, i) {
   const k = pastHead(toks, i);
   if (k < 0) return null;
-  const { parts, end } = nameAt(toks, k), last = pastGeneric(toks, end), eq = toks[k - 1]?.v === ":" ? k - 4 : k - 1;
+  const { parts, end } = nameAt(toks, k), last = parts.length ? pastGeneric(toks, end) : end, eq = toks[k - 1]?.v === ":" ? k - 4 : k - 1;
   const global = toks[i].v === "global", alias = toks[eq]?.v === "=" ? word(toks[eq - 1]) : null;
   if (parts.length && toks[last]?.v === ";") return { end: last, target: parts.join("."), global, alias };
   if (!alias) return null;
-  let semi = k;
-  while (semi < toks.length && toks[semi].v !== ";") semi++;
+  const semi = pairs(toks).semi[k];
   return semi < toks.length ? { end: semi, target: null, global, alias } : null;
 }
 
 
 // Where the statements at the top of a file begin: the first token past its using directives, extern aliases and
-// attribute sections; true where that token opens a statement (the file is of top-level statements, which C# compiles
-// into a class Program of the global namespace).
+// attribute sections; true where that token opens a statement (top-level statements, which C# compiles into a global
+// class Program).
 function topLevel(toks) {
   let i = 0;
   for (;;) {
@@ -96,22 +90,26 @@ function topLevel(toks) {
   return i < toks.length && !TYPE.has(toks[i].v);
 }
 
-// Where each "(" of the tokens closes: a Map of its place to that of its ")", read in one pass.
-function closings(toks) {
-  const close = new Map(), open = [];
-  toks.forEach((t, k) => { if (t.v === "(") open.push(k); else if (t.v === ")" && open.length) close.set(open.pop(), k); });
-  return close;
+// Where each "(" and "<" of a file's tokens closes (a Map of its place to that of its ")" or ">"), and at each place
+// the next ";" (semi); read once per file.
+const paired = new WeakMap(), SHUT = { __proto__: null, ")": "(", ">": "<" };
+function pairs(toks) {
+  if (paired.has(toks)) return paired.get(toks);
+  const close = new Map(), open = { "(": [], "<": [] }, semi = new Int32Array(toks.length + 1).fill(toks.length);
+  toks.forEach((t, k) => { if (t.v === "(" || t.v === "<") open[t.v].push(k); else if (open[SHUT[t.v]]?.length) close.set(open[SHUT[t.v]].pop(), k); });
+  for (let k = toks.length - 1; k >= 0; k--) semi[k] = toks[k].v === ";" ? k : semi[k + 1];
+  paired.set(toks, Object.assign(close, { semi }));
+  return paired.get(toks);
 }
 
 // The delegates a file declares, by their names: `delegate` then a return type (an anonymous delegate, "delegate {" or
 // "delegate (…) {", and a function pointer, "delegate*", declare none; "delegate (int X, int Y) Pair()" returns a
-// tuple). Each scan goes on where the last stopped, the parentheses matched once: linear in the tokens.
+// tuple). Each scan goes on where the last stopped (pairs): linear in the tokens.
 function delegates(toks) {
   const out = [];
-  let close = null;
   for (let i = 0; i < toks.length; i++) {
     if (toks[i].v !== "delegate" || ["{", "*"].includes(toks[i + 1]?.v)) continue;
-    const start = toks[i + 1]?.v === "(" ? ((close ??= closings(toks)).get(i + 1) ?? toks.length - 1) + 1 : i + 1;
+    const start = toks[i + 1]?.v === "(" ? (pairs(toks).get(i + 1) ?? toks.length - 1) + 1 : i + 1;
     if (toks[start]?.v === "{") continue;
     const { name, end } = delegateName(toks, start);
     if (name) out.push(name);
@@ -148,8 +146,7 @@ function runsOf(toks) {
 }
 
 // Whether a file may declare extension members: a parameter "this T" (behind an attribute, ref, in or scoped too; T a
-// tuple too), or an
-// extension block ("extension(" or "extension<", whose header the grammar reads as "class _").
+// tuple too), or an extension block ("extension(" or "extension<", whose header the grammar reads as "class _").
 const extending = toks => toks.some((k, i) => (k.v === "this" && ["(", "]", "ref", "in", "scoped", "readonly"].includes(toks[i - 1]?.v) && (toks[i + 1]?.t === "id" || toks[i + 1]?.v === "("))
   || (k.v === "extension" && ["(", "<"].includes(toks[i + 1]?.v)) || (k.v === "class" && toks[i + 1]?.v === "_"));
 // Whether C# or a test framework runs a file with no name: a hook's word, an assembly's or a module's attribute, or
@@ -165,8 +162,8 @@ const reflecting = (toks, words) => words.some(w => REFLECTS.has(w))
 // What a file holds that bears on its reach: its own namespaces, the namespaces its types stand in, its words, its runs
 // of dotted words, its using directives, and whether it declares extension members, runs with no name, reads types by
 // reflection, is of top-level statements, was lost by the grammar (unread: what it declares is not known either), or
-// holds code the tokens leave out (a raw interpolated string's holes, which they do not read; any text of `$"""` counts,
-// a comment's too, which reads more).
+// holds code the tokens leave out (a raw interpolated string's holes; any `$"""` counts, a comment's
+// too).
 function factsOf(r, src) {
   const toks = r.toks ?? [], words = ids(toks), placed = new Set(r.namespaces);
   if (!r.namespaces.length || r.types.some(t => !t.includes("."))) placed.add("");
@@ -174,51 +171,12 @@ function factsOf(r, src) {
     reflects: reflecting(toks, words), unread: r.usings === null || r.functions === null, raw: RAW.test(src), program: topLevel(toks) };
 }
 
-// An attribute's value in the text of an XML tag, in either quotes; undefined where the tag has none.
-const attribute = (tag, name) => { const m = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "u").exec(tag); return m ? m[1] ?? m[2] : undefined; };
-
-// The <Using Include="N"> items of MSBuild's files, each a global using directive ({ target, alias }, an Alias="S" its
-// alias), or null where one names a property ("$(...)"), whose value cannot be told here. `pace` is asked for each
-// file, and past CHARACTERS of them together the run stops (Late), as it does for the changed files of code.
-function msbuildUsings(texts, pace) {
-  const out = [], n = texts.reduce((sum, t) => sum + t.length, 0);
-  if (n > CHARACTERS) throw new Late(`the project's MSBuild files hold ${n.toLocaleString("en")} characters, past the ${CHARACTERS.toLocaleString("en")} the selection reads, so what each file of C# reaches cannot be told in time`);
-  for (const text of texts) {
-    pace();
-    for (const m of text.matchAll(/<Using\b([^<>]*)>/gu)) { // (each try ends at the next "<": linear in the text)
-      const [include, alias] = ["Include", "Alias"].map(a => attribute(m[1], a));
-      if (include === undefined) continue;
-      if (`${include}${alias ?? ""}`.includes("$(")) return null;
-      for (const s of include.split(";")) { const target = s.trim().replace(/^global::/u, ""); if (target) out.push({ target, alias: alias?.trim() || null }); } // one by one: a spread of many outruns the stack
-    }
-  }
-  return out;
-}
-
-// What git holds that the config does not read and C# compiles with: { msbuild: [the texts of each .props and .targets],
-// cs: { path: text } of each file of C# }, a link read as no text; { unknown: true } where git cannot be asked or a file
-// cannot be read.
-export function heldBeside(texts) {
-  try {
-    const held = git(["ls-files", "-z", "--", ":(glob)**/*.props", ":(glob)**/*.targets", ":(glob)**/*.cs"]).split("\0").filter(f => f && !(f in texts));
-    const text = f => (fs.lstatSync(f).isFile() ? fs.readFileSync(f, "utf8") : "");
-    return { msbuild: held.filter(f => !f.endsWith(".cs")).map(text), cs: Object.fromEntries(held.filter(f => f.endsWith(".cs")).map(f => [f, text(f)])) };
-  } catch { return { unknown: true }; }
-}
-
-// A file of C# that lies under no .csproj's folder: no project compiles it by default, and one may by a path written
-// out (<Compile Include>), so what reaches it cannot be told.
-export function ofNoProject(file, texts) {
-  return !Object.keys(texts).some(f => f.endsWith(".csproj") && file.startsWith(path.posix.dirname(f) === "." ? "" : `${path.posix.dirname(f)}/`));
-}
-
-
-// Where the project declares each type: { types: Map of a full name to its files, byLast: Map of a type's last word to a
-// Map of its namespace to its files, extensions: Map of a namespace to the files that may extend in it, every: the files
-// every file reaches (those run with no name, those that hold a global using directive, which bears on every file, and
-// those unread, whose declarations are not known), globals: what global using directives name, aliases: Map of a global
-// alias to what it names, unsure: the files unread, that hold a raw interpolated string or that reflect, depth: the most
-// words of a name declared, deeper than which no name is looked up }.
+// Where the project declares each type: { types: Map of a full name to its files, byLast: Map of a type's last word to
+// a Map of its namespace to its files, extensions: Map of a namespace to the files that may extend in it, every: the
+// files every file reaches (those run with no name, those that hold a global using directive, and those unread, whose
+// declarations are not known), globals: what global using directives name, aliases: Map of a global alias to what it
+// names, unsure: the files unread, that hold a raw interpolated string or that reflect, depth: the most words of a name
+// declared, deeper than which no name is looked up }.
 function indexOf(facts) {
   const ix = { types: new Map(), byLast: new Map(), extensions: new Map(), every: [], globals: [], aliases: new Map(), unsure: new Set(), depth: 1 };
   const deep = name => { ix.depth = Math.max(ix.depth, name.split(".").length); };
