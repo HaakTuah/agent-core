@@ -149,7 +149,7 @@ try {
 
   // (a value the config says is taken as said; one said that no longer stands twice is noted, to take out)
   put("ci/fetch.ps1", `$sum = "${DIGEST}"\n`);
-  config({ twice: { [DIGEST]: "the deploy script and the CI's fetch run on machines that share no file" } });
+  config({ twice: { [DIGEST.toUpperCase()]: "the deploy script and the CI's fetch run on machines that share no file" } });
   r = check({ COPIES_BASE: base });
   ok(r.status === 0 && /^ok {3}no value newly written twice \(a pin or a pattern; 1 said in checks\/copies\.json's "twice"\)$/m.test(r.out), "a value the config's \"twice\" says why both must hold is taken as said", r.out);
   drop("ci/fetch.ps1");

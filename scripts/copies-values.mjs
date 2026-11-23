@@ -145,13 +145,16 @@ function freshOf(asked, { read, ls, base, core }) {
 export function valuesTwice({ core, config, configPath, configAt, base, ls }) {
   try { return values({ core, config, configPath, configAt, base, ls }); }
   catch (e) {
+    if (!/^fatal:/mu.test(String(e.stderr ?? ""))) throw e;
     console.error(`FAIL: git could not read the values ${logged(configPath)} names: ${logged(String(e.stderr || e.message).trim().split("\n")[0])}. Mend: write each pathspec of its "code", "prose" and "tests" as git reads it (a path, or one of git's magic words), and run the check again`);
     return true;
   }
 }
 
 function values({ core, config, configPath, configAt, base, ls }) {
-  const said = config.twice && typeof config.twice === "object" && !Array.isArray(config.twice) ? config.twice : {};
+  // (a pin named in capitals is the pin, read in lower case as every pin is; a pattern is kept as written)
+  const said = Object.fromEntries(Object.entries(config.twice && typeof config.twice === "object" && !Array.isArray(config.twice) ? config.twice : {})
+    .map(([v, why]) => [pinsIn(v).has(v.toLowerCase()) ? v.toLowerCase() : v, why]));
   const read = scope(config, core, configAt);
   const twice = [...valuesAt(read, ls, "")].filter(([, places]) => places.size >= 2);
   const kept = twice.filter(([v]) => typeof said[v] === "string" && said[v].trim());
