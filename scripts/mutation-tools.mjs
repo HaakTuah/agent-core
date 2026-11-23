@@ -1,0 +1,260 @@
+// The mutation tool a project's manifest names, read from the core's list (mutation-tools.json, beside this file;
+// tasks/code-shape.md, "How strong the tests are"; #1107): the row *mutation tool* is filled by the starter kit at the
+// first copy, and by --write after it, from what can be read exactly, never asked: the languages of the project's code
+// (the files of its shape check's "code" that are no test, by their endings), whether it has tests (its "tests"), and,
+// for a tool that runs the tests one way, how the project runs them (the test script of its package.json). The row
+// names the tool's command where every language of the code has the same tool and that tool fits; else `none` with
+// the reason, which says what is missing. Each tool of the list is one of development only, its licence on the
+// floor's list (floor/topics/licences.md, rule 10) and its exact version pinned where the core gives a command for
+// it, as its test holds.
+//
+// A row the project wrote is never written over: --write fills one that is not there, a `none` with no reason, or one
+// that holds a reason this script or the starter kit gave (`none`: no tests yet, or a reason of the list's), so a project's owner turns the
+// measure off with `none` and a reason of the owner's own, and nothing else does (#1107, point 3).
+//
+//   node core/scripts/mutation-tools.mjs           what it read, and the row the list gives the project
+//   node core/scripts/mutation-tools.mjs --write   that row written into core-manifest.md, where it is not the project's own,
+//                                                  and the package list and npm config of the folder the tool is installed
+//                                                  in, each where none stands, with what is left to do: its lock file, the
+//                                                  licence check's entries for both, and the job's install and step
+// Run from the project's root. Reads the project; --write writes the row and those two files, each through no link.
+// git and Node's own modules.
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { copyOf } from "./core-path.mjs";
+import { READ_MOST, ownFiles } from "./own-files.mjs";
+import { notLinked, parseConfig, where } from "./shape.mjs";
+import { started } from "./started.mjs";
+import { measuredCode, toolOf } from "./strength.mjs";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+export const LIST = JSON.parse(fs.readFileSync(path.join(HERE, "mutation-tools.json"), "utf8"));
+const ROW = "*mutation tool*";
+const MANIFEST = "core-manifest.md";
+// (the reasons the kit and this script give where there are no tests or no code yet: a row that says one is filled again)
+export const NO_TESTS = "no tests yet; the tool is named from the core's list once there are (`node core/scripts/mutation-tools.mjs --write`)";
+const NO_CODE = "no code yet in a language the core knows by its ending; the tool is named from the core's list once there is (`node core/scripts/mutation-tools.mjs --write`)";
+// (the reason the kit wrote before #1107, filled again the same way)
+const OLD_KIT = "no tests yet; the builder who adds the first names the tool here (`core/tasks/code-shape.md`)";
+// (the reasons rowFor gives with a part that varies, each matched whole, so that an owner's own reason in other words
+// that starts the same is never taken for one)
+const GIVEN = [
+  /^its code holds files ending .+, of a language the core's list gives no mutation tool for \(`.*scripts\/mutation-tools\.json`\)$/u,
+  /^its code is in .+, and the row names one tool$/u,
+  /^its tests run by `.+` \(package\.json's test script\), and the core runs .+ only on tests run by `.+ <file>` \(`.*scripts\/stryker\.mjs`\)$/u,
+];
+// The npm config written beside the tool's package list, as the core's own folder holds it (tests/mutation/.npmrc): no
+// install script runs, and no release under a week old is taken (floor rules 7 and 15).
+export const NPMRC = "ignore-scripts=true\nmin-release-age=7\n";
+
+// The language of a file by its ending, as the list names it, or the ending itself where the list names none.
+const languageOf = file => LIST.languages.find(l => l.endings.includes(path.posix.extname(file)))?.name ?? path.posix.extname(file);
+const toolFor = language => LIST.languages.find(l => l.name === language)?.tool ?? null;
+
+// What the project's root package.json runs its tests with: the first word of its test script, or null where it gives
+// none; where that word is node and it starts a program of a package (node node_modules/jest/bin/jest.js), that
+// program too, since a runner started through node runs its tests otherwise than node <file> does.
+export function testRunner(packageJson) {
+  let test;
+  try { test = JSON.parse(packageJson ?? "null")?.scripts?.test; } catch { return null; }
+  if (typeof test !== "string" || !test.trim()) return null;
+  const words = test.trim().split(/\s+/u), program = words.find(w => /(?:^|[/\\])node_modules[/\\]/u.test(w));
+  return words[0] === "node" && program ? `node ${program}` : words[0];
+}
+
+// The row the list gives a project: { command, tool } or { none } (its reason), from `code` (its files of code that are
+// no test), `tests` (whether it has any), `runner` (testRunner's word) and `copy` (the copy's path, "core/").
+export function rowFor({ code, tests, runner, copy }) {
+  if (!tests) return { none: NO_TESTS };
+  if (!code.length) return { none: NO_CODE };
+  const languages = [...new Set(code.map(languageOf))].sort();
+  const unknown = languages.filter(l => !toolFor(l));
+  if (unknown.length) return { none: `its code holds files ending ${unknown.join(", ")}, of a language the core's list gives no mutation tool for (\`${copy}scripts/mutation-tools.json\`)` };
+  const tools = [...new Set(languages.map(toolFor))];
+  if (tools.length > 1) return { none: `its code is in ${languages.map(l => `${l} (${toolFor(l)})`).join(" and ")}, and the row names one tool` };
+  const tool = LIST.tools[tools[0]];
+  if (tool.none) return { none: tool.none };
+  if (tool.runner && runner && runner !== tool.runner) return { none: `its tests run by \`${runner}\` (package.json's test script), and the core runs ${tools[0]} only on tests run by \`${tool.runner} <file>\` (\`${copy}scripts/stryker.mjs\`)` };
+  return { tool: tools[0], command: tool.command.replaceAll("{copy}", copy) };
+}
+
+// The row's line in the manifest.
+export const lineOf = row => (row.command ? `| ${ROW} | \`${row.command}\`: ${row.tool}, from the core's list (\`mutation-tools.json\`) |` : `| ${ROW} | \`none\`: ${row.none} |`);
+
+// Whether the row the manifest holds is the kit's or this script's to fill again: none there, a `none` with no reason,
+// which turns nothing off (the owner's `none` gives the owner's reason), or a `none` with a reason the kit, this script
+// or the list gives. A command, or a `none` with a reason of the project's own, is the project's.
+export function fillable(manifest) {
+  const now = toolOf(manifest);
+  if (!now) return true;
+  if (now.none === undefined) return false;
+  if (!now.none) return true;
+  const ours = [NO_TESTS, NO_CODE, OLD_KIT, ...Object.values(LIST.tools).map(t => t.none).filter(Boolean)];
+  return ours.includes(now.none) || GIVEN.some(r => r.test(now.none));
+}
+
+// The package list of the folder a tool is installed in, as the core's own (tests/mutation/package.json), or null for
+// a tool the core installs no other way (only a tool of the npm registry has a folder in the list).
+export function packageList(tool) {
+  if (!tool.folder) return null;
+  return `${JSON.stringify({ name: "mutation-tool", private: true, devDependencies: { [tool.package]: tool.version }, overrides: tool.overrides }, null, 2)}\n`;
+}
+
+// The folder the row's tool is installed in, set up at `root`: its package list and its npm config (NPMRC) each written
+// where nothing stands at its path, as { written, blocked }, the paths written and, where nothing could be, the line that
+// says so. The starter kit and --write each set it up. Each step of the folder's path is a folder of the project's own,
+// made where it is not there: where one is a link or no folder, nothing is written (floor rule 13: no link leads the
+// write out of the project). No entry for Dependabot is asked: its config is the core's, written whole, and the tool's
+// version is the core's list's, which follows the core's own folder (tests/mutation/, which the core's versions check
+// proposes updates of); step 810 names a package list behind the list's.
+export function setUp(root, row) {
+  const tool = LIST.tools[row?.tool], list = tool && packageList(tool);
+  const files = list ? [[`${tool.folder}/package.json`, list], [`${tool.folder}/.npmrc`, NPMRC]] : [];
+  const missing = files.filter(([at]) => !fs.lstatSync(path.join(root, at), { throwIfNoEntry: false }));
+  if (missing.length && !foldersWithin(root, tool.folder)) return { written: [], blocked: `make ${tool.folder} a folder of the project's own (a step of its path is a link or a file, so nothing was written there), then run node core/scripts/mutation-tools.mjs --write again` };
+  for (const [at, text] of missing) fs.writeFileSync(path.join(root, at), text, { flag: "wx" });
+  return { written: missing.map(([at]) => at), blocked: null };
+}
+
+// Whether each step of `folder` (a path with "/") below `root` is a folder, none a link, each made where it is not there.
+function foldersWithin(root, folder) {
+  let at = root;
+  for (const part of folder.split("/")) {
+    at = path.join(at, part);
+    const stat = fs.lstatSync(at, { throwIfNoEntry: false });
+    if (!stat) fs.mkdirSync(at);
+    else if (stat.isSymbolicLink() || !stat.isDirectory()) return false;
+  }
+  return true;
+}
+
+// What is left to do for the tool the row names, `has(f)` whether the project holds a file and `config` its licence
+// check's config (null where none can be read): the lock file, the config's entries for it and the npm config, and the
+// job's install and step, each worded so a session acts on it with no rule file open. Nothing once all stand.
+export function leftFor(tool, has, config = null) {
+  if (!tool?.folder) return [];
+  const lock = `${tool.folder}/package-lock.json`, npmrc = `${tool.folder}/.npmrc`, names = (key, f) => Array.isArray(config?.[key]) && config[key].includes(f);
+  const left = [];
+  if (!has(lock)) left.push(`commit ${tool.folder}/package.json with its lock file, written from it with no install scripts by npm install --package-lock-only --ignore-scripts --prefix ${tool.folder}`);
+  if (!names("lockfiles", lock)) left.push(`name ${lock} under "lockfiles" in the licence check's config (checks/licences.json, as the starter kit writes it), so that check reads the licence of every package it installs (floor rule 10)`);
+  if (!names("ignoreScriptsIn", npmrc)) left.push(`name ${npmrc} under "ignoreScriptsIn" in that config, so that check holds it to ignore-scripts=true and min-release-age=7 (floor rules 7 and 15)`);
+  if (!has(lock)) left.push(`in the project's own job that runs its tests on a pull request, after them, add two steps: the install, npm ci --ignore-scripts --allow-git=none --allow-remote=none --allow-file=none --allow-directory=none --workspaces=false --prefix ${tool.folder}, and node core/scripts/strength.mjs with STRENGTH_BASE set to the pull request's base (origin/<its base branch>, fetched first). A change to a workflow, it passes two security reviews (floor rule 3); until it is made the strength check reports that it did not measure, and fails nothing`);
+  return left;
+}
+
+// The manifest's text with the row written: in place of the one that stands, or after the last row of its slots.
+// Its line ends are the manifest's own, "\r\n" where it holds them.
+export function written(manifest, row) {
+  const end = manifest.includes("\r\n") ? "\r\n" : "\n", lines = manifest.split(/\r?\n/u), line = lineOf(row), at = lines.findIndex(l => l.includes(ROW));
+  if (at >= 0) { lines[at] = line; return lines.join(end); }
+  const slots = lines.findIndex(l => /^## Slots\s*$/u.test(l));
+  let last = slots;
+  for (let i = slots + 1; slots >= 0 && i < lines.length && !lines[i].startsWith("## "); i++) if (lines[i].startsWith("| *")) last = i;
+  if (last < 0) return `${manifest.replace(/(?:\r?\n)*$/u, "")}${end}${end}## Slots${end}| Slot | Here |${end}| --- | --- |${end}${line}${end}`;
+  lines.splice(last + 1, 0, line);
+  return lines.join(end);
+}
+
+// What the project at `root` holds that the row is read from, its manifest's text `manifest`; its files read by `read`,
+// own-files.mjs's reader by default, which reads only a regular file of the project's own of a bounded size, so that
+// no pipe, device or link out of the project that a project holds stops the steps or the sync (floor topic 5).
+export function readProject(root, manifest, read = ownReader(root)) {
+  const at = where(manifest), text = read(at) ?? fs.readFileSync(path.join(HERE, "..", "setup/template/shape.json.tmpl"), "utf8");
+  let config;
+  try { config = parseConfig(text, at); } catch { return null; }
+  const copy = copyOf(root), own = f => !f.startsWith(copy);
+  const code = measuredCode(config, root).filter(own);
+  const tests = config.tests.length > 0 && measuredTests(config, root).some(own);
+  return { code, tests, runner: testRunner(read("package.json")), copy };
+}
+
+// own-files.mjs's reader of the project at `root`; where git cannot list its files, one that reads nothing.
+function ownReader(root) {
+  try { return ownFiles(root).read; } catch { return () => null; }
+}
+
+// The test files the config's "tests" name, as strength.mjs lists the code (git's files, tracked or not, none ignored).
+function measuredTests(config, root) {
+  return measuredCode({ code: config.tests, tests: [] }, root);
+}
+
+// The step of the sync notes that asks for the row (steps.mjs; the project `p` as it reads it): null where the row is
+// the project's own, or what the list gives with its tool's package list standing at the list's version, the reasons of
+// nothing to measure yet (no tests, no code) read as one; null too where there is no row, which step 420 asks for, or
+// the shape check's config cannot be read, which step 370's does; else the mend.
+export function named(p) {
+  const now = toolOf(p.manifest), line = p.manifest.split(/\r?\n/u).find(l => l.includes(ROW)), read = p.read ?? ownReader(p.root);
+  const project = now && (fillable(p.manifest) || now.command) ? readProject(p.root, p.manifest, read) : null;
+  if (!project) return null;
+  const row = rowFor(project), yet = reason => /^no (?:tests|code) yet/u.test(reason ?? "");
+  const tool = LIST.tools[row.tool], list = tool?.folder && `${tool.folder}/package.json`, write = `node ${project.copy}scripts/mutation-tools.mjs --write`;
+  if (line === lineOf(row)) return list ? listNamed(read(list), list, row.tool, write) : null;
+  if (!fillable(p.manifest) || (yet(row.none) && yet(now.none))) return null;
+  return `The manifest's row *mutation tool* is not what the core's list gives this project: ${lineOf(row)}. Mend: run \`${write}\`, which writes it, and do what it prints as left to do (for Stryker, the lock file of checks/mutation/, its entries in the licence check's config, and the job's install and strength step); to keep the measure off, the owner writes \`none\` with a reason of the owner's own in that row`;
+}
+
+// Of the package list `list` the tool `name` is installed from, its text `text` (null where it is no file of the
+// project's own): null where it names the tool at the list's version, else the mend, `write` the writer's command.
+function listNamed(text, list, name, write) {
+  const tool = LIST.tools[name];
+  if (text === null) return `The manifest's row *mutation tool* names ${name} from the core's list, and ${list}, the package list it is installed from, is not there as a file of the project's own. Mend: run \`${write}\`, which writes it, and do what it prints as left to do`;
+  let version;
+  try { version = JSON.parse(text)?.devDependencies?.[tool.package]; } catch { version = undefined; }
+  return version === tool.version ? null : `${list} names ${tool.package} at ${version ?? "no version"}, where the core's list gives ${tool.version}. Mend: take ${list} out and run \`${write}\`, which writes it at the list's version and overrides, then write its lock file afresh as it prints`;
+}
+
+// The manifest's path, reached through no link (shape.mjs, notLinked: floor rule 13), as { at }, or { fail } with its mend.
+function manifestAt() {
+  try { return { at: notLinked(MANIFEST) }; } catch (e) { return { fail: String(e.message) }; }
+}
+
+// The manifest's text, with its line ends, the project's reader, and what the project holds that the row is read from;
+// or the failure, with its mend. The manifest is read through own-files.mjs's reader, as a regular file of the project's
+// own of a bounded size.
+function readHere(argv) {
+  if (argv.length > 1 || (argv.length && argv[0] !== "--write")) return { fail: "the script does not know that. Mend: run node core/scripts/mutation-tools.mjs, or with --write" };
+  const { at, fail } = manifestAt();
+  if (fail) return { fail };
+  if (!fs.lstatSync(at, { throwIfNoEntry: false })) return { fail: `there is no ${MANIFEST} here. Mend: run it from the project's root, beside its manifest` };
+  const read = ownReader("."), manifest = read(MANIFEST, true);
+  if (manifest === null) return { fail: `${MANIFEST} cannot be read as a file of the project's own: it is no regular file, is past ${READ_MOST} bytes, or git does not list it in this repository. Mend: make it a plain file of the project's own, in the project's git repository, then run this again` };
+  const project = readProject(".", manifest, read);
+  if (!project) return { fail: `the shape check's config (${where(manifest)}) cannot be read, and the code and tests are read from it. Mend: mend it as node ${copyOf(".")}scripts/shape.mjs says, then run this again` };
+  return { manifest, read, project };
+}
+
+// The licence check's config, as the starter kit writes it (checks/licences.json), or null where it cannot be read.
+function licencesOf(read) {
+  try { return JSON.parse(read("checks/licences.json") ?? "null"); } catch { return null; }
+}
+
+// The row and the tool's folder written, each through no link, and what is left said; 1 where the manifest is reached
+// through a link by now.
+function writeRow(manifest, read, row) {
+  const now = written(manifest, row);
+  if (now !== manifest) {
+    const { at, fail } = manifestAt();
+    if (fail) { console.error(`FAIL: ${fail}`); return 1; }
+    fs.writeFileSync(at, now);
+  }
+  console.log(now === manifest ? `${MANIFEST} holds that row already.` : `${MANIFEST}: the row written.`);
+  const { written: made, blocked } = setUp(".", row), tool = LIST.tools[row.tool];
+  for (const f of made) console.log(f.endsWith("package.json") ? `${f}: written, ${tool.package} at ${tool.version}.` : `${f}: written, no install script and no release under a week old.`);
+  for (const l of [blocked, ...leftFor(tool, f => fs.existsSync(path.join(".", f)), licencesOf(read))].filter(Boolean)) console.log(`Left to do: ${l}.`);
+  return 0;
+}
+
+function main(argv) {
+  const { fail, manifest, read, project: p } = readHere(argv);
+  if (fail) { console.error(`FAIL: ${fail}`); return 1; }
+  const row = rowFor(p), languages = [...new Set(p.code.map(languageOf))].sort();
+  console.log(`Read: ${p.code.length} files of code (${languages.join(", ") || "none"}), ${p.tests ? "tests" : "no tests"}, the tests run by ${p.runner ?? "no script of package.json's"}.`);
+  console.log(`The list gives: ${lineOf(row)}`);
+  const line = manifest.split(/\r?\n/u).find(l => l.includes(ROW));
+  if (!fillable(manifest) && line !== lineOf(row)) console.log(`${MANIFEST}'s row is the project's own, and stays: ${line}`);
+  else if (argv[0] === "--write") return writeRow(manifest, read, row);
+  return 0;
+}
+
+if (started(import.meta.url)) process.exitCode = main(process.argv.slice(2));
