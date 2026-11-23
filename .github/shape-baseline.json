@@ -61,7 +61,8 @@
     "process: tests/steps-fresh-test.mjs -> node:child_process": "Split from tests/steps-test.mjs (#916), whose project it builds through git, the starter kit's: the reader it tests compares a project with a fresh start by what git tracks there (a file taken out, a link, a submodule), which only git makes.",
     "process: tests/steps-own-configs-test.mjs -> node:child_process": "Split from tests/steps-test.mjs (#916), whose project it builds through git, the starter kit's: the configs it tests are found where the project's own workflows name them, among the files git tracks there, which only git makes.",
     "process: tests/steps-vendored-test.mjs -> node:child_process": "Split from tests/steps-test.mjs (#916), whose project it builds through git, the starter kit's: it tests a core a library carries, a submodule and a copy at another path, which only git makes (a submodule is git's own).",
-    "process: tests/owner-settings-test.mjs -> node:child_process": "The checklist is run as a session runs it (#1085): from a scratch project's root, its exit code and what it prints, the one line where no setting is new and the mend of a wrong call, are what the cases guard, and the list at an older commit is read from a bare repository git writes."
+    "process: tests/owner-settings-test.mjs -> node:child_process": "The checklist is run as a session runs it (#1085): from a scratch project's root, its exit code and what it prints, the one line where no setting is new and the mend of a wrong call, are what the cases guard, and the list at an older commit is read from a bare repository git writes.",
+    "timed: tests/queue-form-test.mjs -> Date.now": "The clock is what it guards (#552): a hostile queue as large as the reader takes is read in a pass, under 2 s, so the queue's check that own-description.yml runs cannot hang on a row or a line of dashes built to backtrack (SECURITY.md, rule 5)."
   },
   "listed": {
     "function: scripts/licence-commands.mjs#atCommand": {
@@ -193,6 +194,7 @@
     "timed: tests/nuget-test.mjs -> Date.now": true,
     "timed: tests/packages-test.mjs -> new Date()": true,
     "timed: tests/pr-description-test.mjs -> Date.now": true,
+    "timed: tests/queue-form-test.mjs -> Date.now": true,
     "timed: tests/reading-test.mjs -> Date.now": true,
     "timed: tests/review-record-test.mjs -> Date.now": true,
     "timed: tests/select-matcher-test.mjs -> Date.now": true,
