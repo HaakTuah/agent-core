@@ -291,7 +291,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   with its own sign-in, that the look's token gains a right to give a setting only the owner gives, that the value of
   the secret `PERSONAL_TERMS` is read (the workflow says only whether it is given), nor that a step not read fails
   anything. Reason: a step the host holds was left to a session's own sign-in, which reaches past the project and an
-  agent tool's automatic mode may refuse, and the owner asked for an update as robust and smooth as it can be. Held by
+  agent tool's automatic mode may refuse, the step then waiting on the owner. Held by
   `tests/host-test.mjs`, on a stand-in for the host: each step read done, not done and not read, the host only read
   where nothing is to be written, the labels made, a write refused said with its right, the issue's text, and each
   right of the look's workflows named with what it is for.
