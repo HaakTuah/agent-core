@@ -209,6 +209,14 @@ for (const l of WHOLE) {
   ok(r.status === 0 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``), "and where the tree holds the manifest with Windows line ends", `${r.stdout}${r.stderr}`);
   git("config", "--unset", "core.autocrlf");
   back();
+  // (and, where git leaves line ends as they are, a tree with Windows ones over the blob's: the stash leaves the blob's,
+  // and the moved pin is put back with no line end of its own)
+  STAGES[placing].stage(dir);
+  commit("a module neither taken nor left out");
+  put("core-manifest.md", moved.replace(/\r?\n/gu, "\r\n"));
+  r = write("--aside");
+  ok(r.status === 0 && read("core-manifest.md") === moved, "and with --aside, the pin put back on a file whose line ends the stash changed, keeping them", JSON.stringify(read("core-manifest.md").slice(0, 300)));
+  back();
   STAGES[placing].stage(dir);
   commit("a module neither taken nor left out");
   fs.rmSync(path.join(dir, "core-manifest.md"));
