@@ -78,11 +78,20 @@ function readAt(commit, f) {
 }
 
 // What is read: `specs`, every tracked file less what is left out, the config among it; `codeSpecs`, the config's "code" less the same.
+// (git's pathspec magic kept: an exclusion is ":!", ":^" or a long form naming exclude; any other, a glob among them,
+// includes, and a test's spec, so included, is turned into its exclusion with its magic kept)
+const excludes = s => /^:(?:[!^]|\([^)]*\bexclude\b)/u.test(s);
+const excluded = s => {
+  const long = /^:\(([^)]*)\)(.*)$/su.exec(s);
+  if (long) return `:(${long[1] ? `${long[1]},` : ""}exclude)${long[2]}`;
+  const short = /^:([/]*):?(.*)$/su.exec(s);
+  return short && s.startsWith(":") ? `:(${short[1] ? "top," : ""}exclude)${short[2]}` : `:(exclude)${s}`;
+};
 function scope(config, core, configAt) {
-  const out = list(config.code).concat(list(config.prose)).filter(s => s.startsWith(":!") || s.startsWith(":(exclude"));
-  const leftOut = [...out, ...list(config.tests).map(s => (s.startsWith(":") ? s : `:(exclude)${s}`)),
+  const out = list(config.code).concat(list(config.prose)).filter(excludes);
+  const leftOut = [...out, ...list(config.tests).filter(s => !excludes(s)).map(excluded),
     ...(configAt ? [`:(exclude,literal)${configAt}`] : []), ...LOCKS.map(f => `:(exclude,glob)**/${f}`), ...RECORDS.flatMap(r => [`:(exclude)${r}`, ...(core ? [`:(exclude)${core}${r}`] : [])])];
-  const code = list(config.code).filter(s => !s.startsWith(":"));
+  const code = list(config.code).filter(s => !excludes(s));
   return { specs: [".", ...leftOut], code, codeSpecs: [...code, ...leftOut] };
 }
 

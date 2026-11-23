@@ -133,6 +133,18 @@ try {
   ok(r.status === 0 && STOOD.test(r.out), "a value in the tests the config lists, a lock file or a dated record is not read", r.out);
   drop("test/fetch.test.mjs"); drop("web/package-lock.json"); drop("archive/old.md"); drop("core/reports/old.md");
 
+  // (git's pathspec magic is kept: a glob in "code" is read, and one in "tests" left out)
+  config({ code: [":(glob)src/*.mjs", "core/scripts/*.mjs"], tests: [":(glob)test/*.mjs"] });
+  put("test/fetch.test.mjs", `const SUM = "${DIGEST}";\n`);
+  r = check({ COPIES_BASE: base });
+  ok(r.status === 0 && STOOD.test(r.out), "a test a glob of \"tests\" names is not read", r.out);
+  drop("test/fetch.test.mjs");
+  put("src/other.mjs", `export const PACKAGE = ${LONG};\n`);
+  r = check({ COPIES_BASE: base });
+  ok(r.status === 1 && r.out.includes(`${LONG} stands in src/fetch.mjs:2 and src/other.mjs:1`), "a pattern copied into a script a glob of \"code\" names fails", r.out);
+  drop("src/other.mjs");
+  config({});
+
   // (a value the config says is taken as said; one said that no longer stands twice is noted, to take out)
   put("ci/fetch.ps1", `$sum = "${DIGEST}"\n`);
   config({ twice: { [DIGEST]: "the deploy script and the CI's fetch run on machines that share no file" } });
