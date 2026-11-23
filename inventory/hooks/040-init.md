@@ -1,4 +1,4 @@
-- `scripts/init.mjs`, `scripts/converge.mjs`, `scripts/core-owned.mjs`, `scripts/host-private.mjs`, `scripts/steps.mjs`, `scripts/step-checks.mjs`, `scripts/step-checks-tests.mjs`,
+- `scripts/init.mjs`, `scripts/converge.mjs`, `scripts/core-owned.mjs`, `scripts/host-private.mjs`, `scripts/steps.mjs`, `scripts/step-writers.mjs`, `scripts/step-checks.mjs`, `scripts/step-checks-tests.mjs`,
   `scripts/step-checks-ready.mjs`, `scripts/step-checks-tool-files.mjs`, `scripts/step-checks-shape.mjs`,
   `scripts/step-checks-workflow-text.mjs`, `scripts/step-checks-jobs.mjs`, `scripts/step-checks-lookup.mjs`,
   `scripts/step-checks-hostile.mjs`, `scripts/step-checks-moved.mjs`, `scripts/step-checks-packages.mjs`,
@@ -11,7 +11,7 @@
   `tests/steps-checks-run-test.mjs`, `tests/steps-files-test.mjs`, `tests/steps-tool-files-test.mjs`,
   `tests/steps-slots-test.mjs`, `tests/steps-fresh-test.mjs`, `tests/steps-vendored-test.mjs`,
   `tests/steps-own-configs-test.mjs`, `tests/steps-run-configs-test.mjs`, `tests/steps-run-wrappers-test.mjs`,
-  `tests/steps-run-words-test.mjs`, `tests/steps-run-hostile-test.mjs`: the starter kit
+  `tests/steps-run-words-test.mjs`, `tests/steps-write-test.mjs`, `tests/steps-run-hostile-test.mjs`: the starter kit
   writes a new project's files; the sync writes the copy at a newer commit and moves the pins; each step of the sync
   notes reads done or not, the sync's report names each check that read nothing there (#459) and ends with one verdict, attached or not (#1081), the settings only the owner gives stand in one checklist, asked at the first copy and where a release adds one (#1085), and the step of a reading
   against the core names the rules no reading covered (#464). *Runs:* any session, in the project. *Else:* Copier and

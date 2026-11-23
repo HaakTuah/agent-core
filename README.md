@@ -90,13 +90,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    that no workspace pattern of the project's own package list takes the copy's package list in): the sync runs it after
    it writes the copy, a session's start runs npm's own install where what is installed is not what the lock file names
    and the copy's npm files are `main`'s own (the work-saved hook), and each of the core's workflows a project calls
-   runs it before its checks; a check that finds a package missing says it did not run, with that command (#654). The
+   runs it before its checks; run from the copy in a project's own job, a check installs what it needs itself first,
+   and where that cannot be made says, as a warning, that it did not run and why, failing nothing (#654, #1093). The
    parser's packages, whose grammars carry far more than a reader runs, have a lock file of their own in
    `.packages/parser/`, installed only where a job names it (`install.mjs parser`, or `all`, as the sync runs it and
    the copies check's job, which runs the shape check; #719): a session's start installs the first alone, and a check
-   that needs the parser says so, with its mend; in a project's own job that installs the first alone, the shape check
-   reads nothing of C# or Python, nor any function of JavaScript or TypeScript, and says so as a warning, failing
-   nothing by that. Its
+   that needs the parser installs it itself in a copy, as above; in the core it says so, with its mend. Its
    devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`, which, once the copy
    is written, writes what the core owns by the one process a new project's starter kit uses too (`scripts/converge.mjs`;
    `AGENTS.md`, "One process takes the core in"). A pure sync (only the copy, its pins and what that process writes or takes out, as
@@ -107,10 +106,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    project itself (a row of its manifest, a line of a rule file, a workflow), an entry of the sync notes says so
    (`setup/sync-notes.md`, each entry a file of `setup/sync-notes/`, read whole by `scripts/sync-notes.mjs`), and its
    step of the same name in `scripts/steps/` tells it done or not (`scripts/steps.mjs`); the sync script prints the entries a sync brings, then every
-   step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`), where the owner's
+   step not done, what the steps' writers wrote where a script does a step exactly, set aside in a git stash to commit
+   in a PR of its own once the sync is merged (`scripts/steps.mjs --write --aside`; #1091), every difference from what
+   the starter kit writes today (`scripts/fresh.mjs`), where the owner's
    inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`), the settings only the owner
    gives where the sync brings one the old copy's list did not hold (`scripts/owner-settings.mjs`; "Setting up (the
-   owner's part)"), the line `Read for it:`
+   owner's part)"), what the project holds twice or against the core (`scripts/twice.mjs`), the line `Read for it:`
    (`scripts/reading.mjs`) and, last, one line that says whether the project then holds the core whole and wired,
    `attached: yes` or `attached: no` with how many things stand in the way (`scripts/attached.mjs`, which lists each with
    its mend when a session runs it), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
@@ -386,7 +387,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      failing a finding its base did not hold, the engine installed from the core's `.packages/requirements.txt` by its hashes in a
      step of that job before it (`node core/scripts/install.mjs pypi`, with the runner's pip), and only where the change
      touches a file the scan reads; where it is not installed, as in a session that has not run that command, the scan
-     fails, saying so. Its Actions settings must allow this repository's workflows, and each check
+     installs it first, and where it cannot, says as a warning that it did not run (#1093). Its Actions settings must allow this repository's workflows, and each check
      there spends paid minutes, which its owner set aside by making it private (so no step waits for the owner's yes
      over them: floor rule 14), so each runs only where a change can affect it and only once a pull request is ready:
      its calls to `core.yml` and `personal-terms.yml`, as the starter kit writes them, also start when a pull request
@@ -500,7 +501,7 @@ for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit
 | *size marks* | the reading-size check's marks, its config for `scripts/reading-size.mjs` | choice: left out, `checks/sizes.json` |
 | *shape check* | the check of how the code is put together, and its config for `scripts/shape.mjs`, in backticks: the project's names for its systems, its marks and its suites' time marks (`tasks/code-shape.md`), and what the tests cost: the tests never selected out ("select.proof"), those that reach every file and the files no test reads, what a test imports that opens a screen, the time mark on a push's checks ("wait") and the seconds from which a measurement runs outside the session ("long", an hour where none is given) (`tasks/tests.md`) | choice: left out, `checks/shape.json`, which the starter kit writes |
 | *dose* | `in debt`, `paying down` or `in standard`, in backticks, where the project's owner names the state its codebase is cleaned and audited by (`tasks/cleaning.md`) | read: the state the shape check's baseline shows (`scripts/dose.mjs`) |
-| *mutation tool* | the command, in backticks, that runs the project's mutation tool, a tool of development only, on the lines given in `{lines}` (`<file>:<first>-<last>`, joined by commas) and writes its report in the mutation-testing-elements schema to `{report}` (`tasks/code-shape.md`; `scripts/strength.mjs` runs it, with no shell); or `none`, in backticks, with its reason, where no such tool exists for the project's language | cannot be read: a build file names the tool at most, never the command that runs it on given lines into a given report, and even the tool waits on #501's reader; left out, no measure, and the sync's step asks the project's builder for the row |
+| *mutation tool* | the command, in backticks, that runs the project's mutation tool, a tool of development only, on the lines given in `{lines}` (`<file>:<first>-<last>`, joined by commas) and writes its report in the mutation-testing-elements schema to `{report}` (`tasks/code-shape.md`; `scripts/strength.mjs` runs it, with no shell); or `none`, in backticks, with its reason, where the core's list (`scripts/mutation-tools.json`) gives no tool for the project's code and tests or the owner turns the measure off | read: by `scripts/mutation-tools.mjs`, which the starter kit runs and its `--write` after it: the core's list's tool for the languages of the project's code by their endings, whether it has tests and what the project's package list runs them with; a command, or a `none` with a reason of the owner's own, overrides it |
 | *audits* | the folder that holds the reports of the audits of how its code is put together, each named by its day (`tasks/cleaning.md`) | choice: left out, `docs/audits/` |
 | *large file* | how large a file is before it is never read whole | choice: left out, past about 50 KB |
 | *one at a time* | what never runs as parallel lanes | choice: left out, the main lane's tasks |

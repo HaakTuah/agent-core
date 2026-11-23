@@ -95,7 +95,7 @@ export function plan(p, kit, older = [], { first = false } = {}) {
 function dropping(p, kit, older, write, left) {
   const want = kit.find(([to]) => to === CORE_YML)?.[1];
   const ends = want !== undefined && !left.some(l => l.to === CORE_YML) && !p.differences.some(l => l.includes(`"${CORE_YML}"`))
-    && (write.some(w => w.to === CORE_YML) || p.read(CORE_YML, true) === want);
+    && (write.some(w => w.to === CORE_YML) || lf(p.read(CORE_YML, true) ?? "") === lf(want));
   if (!ends) return [];
   const kept = new Set(kit.map(([to]) => to)), remove = [];
   for (const to of Object.keys(FOLDED).filter(f => !kept.has(f) && new RegExp(`^ {6}${FOLDED[f]}: `, "mu").test(want))) {
@@ -174,10 +174,10 @@ function check(p, base) {
 function judged(p, base, to, want) {
   const now = p.read(to, true), block = BLOCKS.includes(to), ours = t => block ? blockOf(t) !== null : marked(to) && /^# The core's file:/u.test(t);
   if (now === null || !ours(now)) return null;
-  if (block ? lf(blockOf(now)) === blockOf(want) : now === want) return null;
+  if (block ? lf(blockOf(now)) === blockOf(want) : lf(now) === lf(want)) return null;
   const was = atBase(p, base, to), part = t => lf(blockOf(t) ?? "");
   if (was === null) return "wrong";
-  return (block ? part(was) === part(now) : was !== want && ours(was)) ? "stale" : "wrong";
+  return (block ? part(was) === part(now) : lf(was) !== lf(want) && ours(was)) ? "stale" : "wrong";
 }
 
 // The file `to` as the base holds it, or null where it holds none.

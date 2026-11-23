@@ -57,10 +57,10 @@ import { fileURLToPath } from "node:url";
 import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
 import { DEEPEST, LONGEST, pruned, twice } from "./yaml-keys.mjs";
-import { installed, loadSync, unreached } from "./packages.mjs";
+import { didNotRun, installed, loadSync, unreached } from "./packages.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
-import { didNotRun, parseYaml } from "./parse-yaml.mjs";
+import { parseYaml } from "./parse-yaml.mjs";
 import { compared, run } from "./workflow-tools.mjs";
 
 const WORD = "pull_request_target";
@@ -401,12 +401,11 @@ if (started(import.meta.url)) {
     for (const line of found.slice(0, 5)) console.log(`FAIL ${logged(file)}:${line}: ${WORD} runs a pull request with the repository's own token and secrets. Mend: take the word out, in a comment too, and trigger the workflow on pull_request, which runs one without them`);
     if (found.length > 5) console.log(`FAIL ${logged(file)}: and on ${found.length - 5} more lines. Mend: take the word out of each, as above`);
   }
-  // (where the job's install could not reach the registry, in a project's pull request, the calls a draft skips, which
-  // the YAML package reads, did not run, said as a warning; every failure above still fails:
-  // #654, point 4)
-  // (#1079: a package not installed reads as one not fetched)
+  // (where the YAML package could not be installed, in a project's job or where the core's install could not reach the
+  // registry, the calls a draft skips, which it reads, did not run, said as a warning; every failure above still fails:
+  // #654, point 4; #1093, point 1)
   const skipped = unreached("yaml") || (!core && !installed("yaml"));
-  if (skipped) console.log(didNotRun("The check for a file that is no YAML did not run, nor the one for a call a draft skips", "yaml", copy));
+  if (skipped) console.log(didNotRun("The check for a file that is no YAML did not run, nor the one for a call a draft skips", "yaml"));
   const against = core ? () => null : base ? show : null;
   const ready = skipped ? { fails: [], notes: [] } : unreadied(texts, against);
   const bad = core && !skipped ? unparsed(texts) : { fails: [] };
