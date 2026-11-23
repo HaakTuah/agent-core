@@ -90,9 +90,13 @@ ok(not(of(`@@ -1 +1,2 @@\n+${row(10)}`, file(`@@ -1 +1,2 @@\n+${row(10)}`, { fil
   "nor where the progress file is a rule file, by its name or as the project's SECURITY.md lists it (floor rule 8)");
 const queue = readFileSync(path.join(root, "QUEUE.md"), "utf8"), form = formOf(queue), off = linesOf(queue).filter((l) => formFault(l.text, form) !== null);
 ok(linesOf(queue).length > 0 && !off.length, "every line of the core's own QUEUE.md is in its form", off.map((l) => l.text).join("\n     "));
-const copies = ["| #900 | builder | |", "| #900 | rule builder | |", "| #900 | builder | #715 |", "| #900 | rule builder; it changes what every role reads at its start | |",
-  "| #900 | builder; `tests.yml` | #704 |", "| #900 | rule builder; it changes the floor (rules 7 and 10) | |", "| #900 | the owner | on hold |", "| #900 to #903 | rule builder; one PR each | |"];
-const offCopies = copies.filter((l) => formFault(l, form) !== null || namesPoints(l));
+// (the copies are taken from the lines that stand in the file, so that the case holds as the queue changes: each row of
+// three cells, its first cell an issue of its own, the numbers in the others its own too; a copy naming points is left to the reviews)
+const cellsOf = (line) => line.trimEnd().split("|").slice(1, -1);
+const copies = linesOf(queue).map((l) => l.text).filter((t) => cellsOf(t).length === 3)
+  .map((t) => `| #900 |${cellsOf(t).slice(1).join("|").replace(/\d+/gu, "901")}|`).filter((c) => !namesPoints(c));
+ok(copies.length > 0, "  the file holds a line to copy from", "none of its rows of three cells is one a copy can be made of");
+const offCopies = copies.filter((l) => formFault(l, form) !== null);
 ok(!offCopies.length, "  and a new line copied from one of them, its issues and numbers its own, is in it too", offCopies.join("\n     "));
 ok(not(of(`@@ -1 +1,2 @@\n+${row(10)}`, undefined, { ...pull, head: { ...pull.head, repo: { full_name: "outsider/project" } } }), "no branch of the repository's own")
   && not(of(`@@ -1 +1,2 @@\n+${row(10)}`, undefined, { ...pull, head: { ...pull.head, repo: null } }), "no branch of the repository's own"),
