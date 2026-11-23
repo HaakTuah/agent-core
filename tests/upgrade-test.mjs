@@ -602,6 +602,19 @@ function upgrade(p, from, ownChanges, expect) {
   }
   r = stepsIn(p.dir);
   ok(r.status === 0 && r.out.includes("Every step a check reads is done"), `${p.name}: and with each such step mended as it words it, every step a check reads is done`, r.out);
+  // one verdict (#1081): synced whole, each step done, it reads attached; a pointer left at a path the core has left, and
+  // a file of the copy changed, each read not attached, naming its cause and its mend
+  const attached = () => node(p.dir, "core/scripts/attached.mjs");
+  let a = attached();
+  ok(a.status === 0 && a.out.split("\n")[0] === "attached: yes", `${p.name}: synced whole, each step done, one verdict reads it attached`, a.out);
+  fs.appendFileSync(path.join(p.dir, "AGENTS.md"), "\nThe old rule stands in `core/tasks/left-by-the-core.md`.\n");
+  a = attached();
+  ok(a.status === 0 && a.out.startsWith("attached: no, 1 thing in the way\n") && /^- a pointer: [^\n]*core\/tasks\/left-by-the-core\.md[^\n]*Mend: /mu.test(a.out), `${p.name}: with a pointer left at a path the core has left, it reads not attached, naming the pointer and its mend`, a.out);
+  clean();
+  fs.appendFileSync(path.join(p.dir, "core/README.md"), "\nA line of the project's own.\n");
+  a = attached();
+  ok(a.status === 0 && a.out.startsWith("attached: no, 1 thing in the way\n") && /^- the copy: core\/ differs from the core at its pin [0-9a-f]{7}: core\/README\.md is changed\. Mend: /mu.test(a.out), `${p.name}: with a file of the copy changed, it reads not attached, naming the file and its mend`, a.out);
+  clean();
   for (const lead of added) {
     STAGES[lead].stage(p.dir);
     r = stepsIn(p.dir);

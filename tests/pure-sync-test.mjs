@@ -98,6 +98,7 @@ ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) 
 ok(s.out.includes("a note for the test"), "  and prints the sync notes the core gained between the two pins", s.out);
 ok(/The core's files and parts written[\s\S]*\.github\/workflows\/look\.yml[\s\S]*For the sync PR's description[\s\S]*Steps not done[\s\S]*Beside a fresh start/.test(s.out),
   "  then, from the copy it wrote, what the core owns written by the one process (#1083), and every step not done, a standing one too, and every difference from a fresh start, for the PR's description", s.out);
+ok(/\nattached: (yes|no, \d+ things? in the way)\s*$/u.test(s.out), "  and ends with the one line that says whether the project then holds the core whole and wired (attached.mjs; #1081)", s.out);
 ok(read(p, "AGENTS.md").includes("<!-- The core's part ends. -->") && read(p, ".github/workflows/core.yml") === calls && /Left as the project's[\s\S]*\.github\/workflows\/core\.yml is not the core's/.test(s.out),
   "  the kit's files the project lacked are written (at its first copy already), each call of the core's own files pinned to the new pin, and a workflow of its own that is no kit's is left as it stands and named", s.out);
 git(p, "add", "-A");
@@ -127,11 +128,21 @@ const coreCheck = () => {
     uses: { "actions/checkout": checkoutStandIn(env, tmp) } });
   return { passed: job.passed, out: job.steps.map(x => x.out).join("") };
 };
-const legit = pure();
+// (whether the core is attached, as a session runs it on the sync's branch: pure-sync.mjs among its parts, run from the
+// core's side, its host's answer as above; #1081)
+const attachedHere = () => {
+  git(p, "remote", "set-url", "origin", GH_ORIGIN);
+  try {
+    const r = spawnSync(process.execPath, ["core/scripts/attached.mjs"], { cwd: p, env: { ...env, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
+    return { status: r.status, out: `${r.stdout}${r.stderr}` };
+  } finally { git(p, "remote", "set-url", "origin", origin); }
+};
+const legit = pure(), legitAttached = attachedHere();
 git(p, "push", "-q", "-f", "origin", "HEAD:refs/heads/check");
 git(p, "repack", "-adq"); git(tmp, `--git-dir=${origin}`, "repack", "-adq"); // (as the core's above: each check that follows clones these; the push before it puts what they hold into origin first, so keep it)
 ok(legit.status === 0 && legit.out.includes(`sha=${LEGIT}`), "the sync as the script makes it is pure, and the proof names the head it read", legit.out);
 ok(coreCheck().passed, "  and the core's own check of the copy passes it");
+ok(legitAttached.status === 0 && /^attached: /u.test(legitAttached.out) && !/^- the (sync|copy): /mu.test(legitAttached.out), "  and whether the core is attached, read on the sync's branch, finds its copy at its pin and the sync pure, run from the core's side", legitAttached.out);
 
 // the security-review check proves the sync pure itself, as GitHub runs its workflow on the sync's pull request (#99):
 // the default branch's pure-sync.mjs, in a clone of the head that checks nothing out, the token sent to the project's
@@ -211,9 +222,10 @@ git(p, "push", "-q", "-f", "origin", "main-lacking:main");
 git(p, "checkout", "-q", "-B", "sync-creates");
 git(p, "checkout", "-q", LEGIT, "--", ".");
 git(p, "commit", "-q", "-m", "the sync, SECURITY.md created");
-const creates = pure();
+const creates = pure(), createsAttached = attachedHere();
 ok(creates.status === 1 && /NOT PURE[^\n]*SECURITY\.md: not the core's copy, its pin, a workflow's pins or what the core's process writes of the core's own files and parts/.test(creates.out) && read(p, "SECURITY.md") === git(p, "show", `${LEGIT}:SECURITY.md`) + "\n",
   "a file that is the project's own, created by the sync where main lacks it, is not pure, though it is what the kit renders", creates.out);
+ok(/^attached: no, /u.test(createsAttached.out) && /^- the sync: not pure: [^\n]*SECURITY\.md[^\n]*Mend: /mu.test(createsAttached.out), "  and whether the core is attached reads no on that branch, naming the file and its mend", createsAttached.out);
 git(p, "push", "-q", "-f", "origin", `${base}:main`);
 // main marks its own workflow export-ignore (a common line of .gitattributes): the proof reads main's tree blob by blob,
 // as git holds it, so a sync that swaps that workflow for the kit's render is not pure (floor rule 3's second review)

@@ -47,11 +47,11 @@ function workingTree(root, at, bare) {
 
 // The copy against its pin: in the way where the line is wrong, the pin is no commit of the core's main, or the copy
 // differs from the core's tree there, entry by entry as copy-tree.mjs compares (and says why).
-function copyAgainstPin(root, bare, said) {
+function copyAgainstPin(root, bare, why, said) {
   const line = readCore(fs.readFileSync(path.join(root, MANIFEST), "utf8"));
   if (line.wrong) return said.way("the manifest", line.wrong);
   if (line.form === "carried") return said.unread("the copy", `the core is carried by ${line.library}, whose own repository holds it to its pin (core.yml there)`);
-  if (!bare) return said.unread("the copy", "the core could not be fetched, so the copy was not compared with it");
+  if (!bare) return said.unread("the copy", `the core could not be fetched${why}, so the copy was not compared with it`);
   if (!past(line.pin, "refs/heads/main", bare)) return said.way("the copy", `${MANIFEST} pins ${line.pin}, which is no commit of the core's main. Mend: sync to a commit of it, \`node ${line.path}scripts/sync.mjs\``);
   if (!fs.existsSync(path.join(root, line.path))) return said.way("the copy", `${line.path} is not there. Mend: run the sync from a clone of the core (\`node <the clone>/scripts/sync.mjs\`), which writes the copy whole at the manifest's pin`);
   const map = tree => new Map(entries(tree, bare).split("\n").filter(Boolean).map(e => [e.slice(e.indexOf("\t") + 1), e.slice(0, e.indexOf("\t"))]));
@@ -92,7 +92,11 @@ function steps(root, said) {
 function freshStart(root, said) {
   const p = project(root), k = kind(p);
   if (k.unread) return said.unread("a fresh start", `not compared, since ${k.unread}`);
-  for (const d of differences(p, fresh(p, undefined, { k }))) said.way("beside a fresh start", `${d}. Mend: make it as the starter kit writes it, or declare it in ${MANIFEST}'s "Differences", on the owner's word, by a line that quotes the file's path`);
+  for (const d of differences(p, fresh(p, undefined, { k }))) {
+    // (one it could not compare, its packages not installed say, it names so: not read, counted neither way)
+    if (/^[^:]*\bnot (compared|read)\b/u.test(d)) said.unread("a fresh start", d);
+    else said.way("beside a fresh start", `${d}. Mend: make it as the starter kit writes it, or declare it in ${MANIFEST}'s "Differences", on the owner's word, by a line that quotes the file's path`);
+  }
 }
 
 // Whether the head is a sync's: a branch whose manifest pins another commit than the project's main does.
@@ -107,10 +111,10 @@ function syncBranch(root) {
 // On a sync's branch, pure-sync.mjs from the core's side: the release the sync moves to, where the project follows the
 // releases and the pin is one, else the core's main, as its header says; its packages those of the copy where the two
 // lock files are the same, else installed by its own install script.
-function pureSync(root, at, bare, tmp, said) {
+function pureSync(root, at, bare, why, tmp, said) {
   const pin = syncBranch(root);
   if (!pin) return;
-  if (!bare) return said.unread("the sync", "the core could not be fetched, so pure-sync.mjs was not run from the core's side");
+  if (!bare) return said.unread("the sync", `the core could not be fetched${why}, so pure-sync.mjs was not run from the core's side`);
   const follows = followsOf(git(root, ["show", `HEAD:${MANIFEST}`]), hostSaid(() => {}));
   const side = follows === "releases" && releasesIn(bare).some(r => r.sha === pin) ? pin : inBare(bare, ["rev-parse", "refs/heads/main"]).trim();
   const dir = path.join(tmp, "side");
@@ -140,14 +144,14 @@ export function attached(root, { fetched = null } = {}) {
   };
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-attached-"));
   try {
-    let bare = fetched;
-    if (!bare) { try { fetchCore(bare = path.join(tmp, "core")); } catch { bare = null; } }
+    let bare = path.join(tmp, "core"), why = "";
+    if (!fetched) { try { fs.mkdirSync(bare); fetchCore(bare); } catch (e) { bare = null; why = ` (${plain(firstLine(e.stderr || e.message), root)})`; } }
     // (one already fetched is cloned sharing its objects, so what the comparison writes stays out of it)
-    else execFileSync("git", ["clone", "-q", "--bare", "--shared", "--", fetched, bare = path.join(tmp, "core")], { stdio: "ignore" });
+    else execFileSync("git", ["clone", "-q", "--bare", "--shared", "--", fetched, bare], { stdio: "ignore" });
     const at = readCore(fs.readFileSync(path.join(root, MANIFEST), "utf8")).path ?? "core/";
-    const parts = [["the copy", () => copyAgainstPin(root, bare, said)], ["the pointers", () => pointers(root, at, said)], ["the steps", () => steps(root, said)],
+    const parts = [["the copy", () => copyAgainstPin(root, bare, why, said)], ["the pointers", () => pointers(root, at, said)], ["the steps", () => steps(root, said)],
       ["a fresh start", () => freshStart(root, said)], ["the manifest", () => projectNotes(root, path.join(root, at)).forEach(n => said.way("the manifest", n))],
-      ["the sync", () => pureSync(root, at, bare, tmp, said)]];
+      ["the sync", () => pureSync(root, at, bare, why, tmp, said)]];
     for (const [part, read] of parts) { try { read(); } catch (e) { said.unread(part, `it could not be read (${plain(firstLine(e.message), root)})`); } }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
