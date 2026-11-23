@@ -10,6 +10,11 @@ import { project } from "./steps.mjs";
 export const at = (dir, f) => path.join(dir, f);
 export const read = (dir, f) => fs.readFileSync(at(dir, f), "utf8");
 export const write = (dir, f, text) => { fs.mkdirSync(path.dirname(at(dir, f)), { recursive: true }); fs.writeFileSync(at(dir, f), text); };
+// The manifest's line "Not taken:" without the module named, the line gone where it names no other.
+export const notTakenWithout = (text, name) => text.replace(/^Not taken: (.*?)\.?(\r?\n|$)/m, (all, items, end) => {
+  const kept = items.split(/, (?=`)/).filter(i => !i.startsWith(`\`${name}\``));
+  return kept.length ? `Not taken: ${kept.join(", ")}.${end}` : "";
+});
 export const SLOTS = /^(\| Slot \| Here \|\r?\n\| --- \| --- \|\r?\n)/m;
 
 export const PIN = "0".repeat(40);
