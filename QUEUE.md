@@ -8,20 +8,22 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #1083, with #1095, point 1 | rule builder; floor rule 8 | |
-| #1084 | rule builder | #1083 |
-| #1081 | rule builder | #1084 |
+| #1081 | rule builder | |
 | #1085 | rule builder | #1081 |
 | #1087 | rule builder | #1083 |
-| #1086 | rule builder | |
-| #1093, with #1090 | rule builder | #1084 |
+| #1093, with #1090 | rule builder | |
 | #1091 | rule builder | #1085 |
 | #1092 | rule builder | #1091 |
 | #1094 | rule builder | #1092 |
 | #1095, points 2 to 6 | rule builder | #1094 |
+| #1107 | rule builder | |
+| #1108 | rule builder | |
+| #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 7, one PR each | release 6's cut |
+| #1123 | rule builder; release 7 | release 6's cut; #974, #1060 (`roles/adviser.md`) |
+| #1112, #1074, #1073, #1098 | builder; release 7, one PR each | release 6's cut |
 | #810 | the orchestrator | the batch's end |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
-| #770 | builder; `tests.yml` | #704 |
 | #772 | builder; `tests.yml` | #770 |
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #584 | rule builder | |
@@ -43,10 +45,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #675 | builder | |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 5 | builder | the types record reopening |
-| #460, point 2 (the author's address) | builder | |
-| #460, point 3 (a copy in a test) | builder | |
-| #460, point 4 (names in descriptions) | builder | |
-| #460, point 5 (a report's size) | builder | |
+| #460, points 2 to 5, one PR each | builder | |
 | #502, case 2 | rule builder; it changes what every role reads at its start | |
 | #593, points 4 and 12 | rule builder; it changes what a builder reads at its start | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
@@ -108,7 +107,5 @@ They read and change no rule.
 | #278 | builder | a project's choice record first naming a Cargo dependency that ships |
 | #400 | a session of Kiro | a session of Kiro, which no session here can start |
 | #315 | the owner | the count of its point 3, which the orchestrator posts on it before the release |
-| #163 | the owner | on hold |
-| #187 | the owner | on hold |
-| #188 | the owner | on hold, after #187 |
-| #189 | the owner | on hold, after #187 |
+| #163, #187 | the owner | on hold |
+| #188, #189 | the owner | on hold, after #187 |
