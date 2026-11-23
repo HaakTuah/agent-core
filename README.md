@@ -118,7 +118,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    release says what it asks, step by step"). The core's
    `core.yml`, which the project calls on every PR as a required check, fails one whose `core/` differs from the core at
    its pin, entry by entry by git's object ids and types, as `pure-sync.mjs` compares too: a file's content, a link or a
-   submodule, but not the executable bit, which a copy made on Windows records for no file and which nothing reads. The
+   submodule, but not the executable bit, which a copy made on Windows by an older sync records for no file; from #1093
+   the sync records the bits the core marks, and `pure-sync.mjs` refuses one the core does not mark. The
    first copy is the sync script's too, run from a clone of this repository once the manifest is written (the script's
    header says how); the copy's own `.gitattributes` keeps every line ending as it is.
 

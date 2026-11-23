@@ -25,7 +25,6 @@
     "tasks/cleaning.md": { "mark": 23083, "why": "the question of a split is asked in #1132" },
     "scripts/init.mjs": { "mark": 30906, "why": "the question of a split is asked in #1098" },
     "tests/check-test.mjs": { "mark": 28691, "why": "the question of a split is asked in #1073" },
-    "tests/code-scan-test.mjs": { "mark": 22506, "why": "the question of a split is asked in #1073" },
     "scripts/check.mjs": { "mark": 26892, "why": "the question of a split is asked in #1064" },
     "scripts/checks.mjs": { "mark": 24179, "why": "the question of a split is asked in #1064" },
     "scripts/code-scan.mjs": { "mark": 20998, "why": "the question of a split is asked in #1064" },
@@ -264,8 +263,8 @@
       "why": "One check's readers (the word, the calls a draft skips, the line breaks, the tools' findings against the base) that all read the same texts against the same base through the one baseOf(); a task that changes one reads how the others count against the base, so a split would make it open each part."
     },
     "tests/workflows-test.mjs": {
-      "mark": 74117,
-      "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md). The cases of workflow-tools.mjs, a script of its own, are to move to a file of their own: #1017."
+      "mark": 70465,
+      "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md). The cases of workflow-tools.mjs, a script of its own, stand in tests/workflow-tools-test.mjs (#1017)."
     }
   }
 }
