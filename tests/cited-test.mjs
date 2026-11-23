@@ -6,7 +6,7 @@
 //   node tests/cited-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, citedFrom, citedIn, count, HEADING, lines, matchers, mergedIn, OPENERS, plain, report, roleOf, ROLES, startRules, texts } from "../scripts/cited.mjs";
@@ -127,12 +127,12 @@ ok(run.status === 1 && mended(run.stdout + run.stderr), "a month or repository i
   // the issue's own case: --trial with no files and a gh that fails refuses and says the mend (a stub gh first on PATH;
   // not on Windows, where Node runs no extension-less stub and gh.exe would be called)
   if (process.platform !== "win32") {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "stub-gh-"));
-    try {
+    const dir = scratchDir("stub-gh-");
+    {
       fs.writeFileSync(path.join(dir, "gh"), "#!/bin/sh\necho 'gh: HTTP 502 Bad Gateway' >&2\nexit 1\n", { mode: 0o755 });
       const down = spawnSync(process.execPath, [path.join(root, "scripts", "release.mjs"), "--trial", "a".repeat(40)], { encoding: "utf8", env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH}` } });
       ok(down.status === 1 && /could not be read/.test(down.stderr) && /Mend: run it where gh answers/.test(down.stderr), "--trial with no files and a gh that fails refuses, saying what could not be read and the mend", down.stderr);
-    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    }
   }
 }
 
