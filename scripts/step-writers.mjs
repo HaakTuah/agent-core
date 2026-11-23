@@ -33,7 +33,7 @@ export function held(root) {
 
 // Whether `f` may be written: a plain path of the project's own outside the copy, no link and under none, no file with
 // changes not yet committed and none git ignores, which no stash could set aside; else Unwritten, naming it.
-function writable(p, f, busy) {
+export function writable(p, f, busy) {
   const at = path.join(p.root, f);
   if (path.posix.normalize(f) !== f || f.startsWith(copyAt(p)) || leadsOut(p.root, at)) throw new Unwritten(`\`${shown(f)}\` is no file of the project's own outside the copy`);
   const st = fs.lstatSync(at, { throwIfNoEntry: false });
@@ -187,9 +187,11 @@ export function writeBreaks(p, busy) {
 // is left as it stands, and so is a "Paths:" line of the project's own words, for the step's mend.
 export const OLD_PATHS = "Paths: in the core's files, one into floor/, modules/, scripts/, setup/ or archive/ is under core/; any other is ours.";
 const quoted = f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+// The old paths of `map` as a pattern: `core/<old>` alone, never inside a longer name (`hardcore/`, `<old>.bak`).
+export const oldPathsIn = map => Object.keys(map).length ? new RegExp(`(?<![\\w-])core/(${Object.keys(map).map(quoted).join("|")})(?![\\w/-]|\\.\\w)`, "gu") : null;
 export function writeMoved(p, busy) {
   const map = moved(), copy = copyAt(p), writes = [];
-  const oldPath = Object.keys(map).length ? new RegExp(`(?<![\\w-])core/(${Object.keys(map).map(quoted).join("|")})(?![\\w/-]|\\.\\w)`, "gu") : null;
+  const oldPath = oldPathsIn(map);
   for (const f of namers(p)) {
     const text = p.read(f) ?? "";
     let next = movedIn(text, map, oldPath);

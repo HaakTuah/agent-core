@@ -12,7 +12,7 @@ import path from "node:path";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { declare, kitIn, ruleTexts, wordsKept } from "../scripts/steps-kit.mjs";
 import { ASIDE, MOVED_GLOB, MOVED_GLOBS, STEPS, notDone, report, setAside, writeReport } from "../scripts/steps.mjs";
-import { OLD_PATHS } from "../scripts/step-writers.mjs";
+import { OLD_PATHS, Unwritten, oldPathsIn, writable } from "../scripts/step-writers.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -144,6 +144,21 @@ for (const l of WHOLE) {
   git("stash", "pop", "-q");
   ok(!missed(l).length && read("sync-own.md") === "the sync's own\n", "and the stash, popped, brings it back: the step reads done", report(notDone(dir)));
   back();
+  // (a path that is not plain is refused; paths reach git as written, never as patterns; an old path inside a longer
+  // name is no old path)
+  const refused = f => { try { writable({ root: dir }, f, new Set()); return false; } catch (e) { return e instanceof Unwritten; } };
+  ok(refused("./checks/holders.json") && refused("checks/../checks/holders.json") && !refused("checks/holders.json"), "a path that is not plain is never written");
+  put("a[b].json", "{}\n");
+  put("ab.json", "{}\n");
+  commit("two names a pattern would mix up");
+  put("a[b].json", "{ }\n");
+  put("ab.json", "{ }\n");
+  ok(setAside(dir, ["a[b].json"]) && dirty() === "M ab.json" && read("a[b].json") === "{}\n", "a name with [ or * is set aside as written, never as a pattern that takes another file", dirty());
+  git("stash", "drop", "-q");
+  back();
+  const old = oldPathsIn({ "rules/git.md": "floor/topics/git.md" }), hits = t => [...t.matchAll(old)].map(m => m[1]);
+  ok(hits("see core/rules/git.md, `core/rules/git.md`.").length === 2 && !hits("hardcore/rules/git.md my-core/rules/git.md core/rules/git.md.bak core/rules/git.mdx core/rules/git.md/x").length,
+    "an old path is read alone, never inside a longer name", hits("hardcore/rules/git.md my-core/rules/git.md core/rules/git.md.bak core/rules/git.mdx core/rules/git.md/x").join());
   // (git refusing the stash after it staged what it was given: each file it wrote put back as it stood, index and tree,
   // a new one taken out, and the report says to write them after the merge)
   STAGES[l].stage(dir);
