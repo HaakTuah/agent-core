@@ -69,7 +69,6 @@
   },
   "listed": {
     "function: scripts/licence-commands.mjs#atCommand": {
-    "timed: tests/strength-test.mjs -> Date.now": true,
       "lines": 43,
       "depth": 2,
       "branches": 51
@@ -215,6 +214,7 @@
     "timed: tests/shape-readers-test.mjs -> Date.now": true,
     "timed: tests/shape-test.mjs -> Date.now": true,
     "timed: tests/staged-test.mjs -> Date.now": true,
+    "timed: tests/strength-test.mjs -> Date.now": true,
     "timed: tests/stryker-test.mjs -> Date.now": true,
     "timed: tests/work-saved-test.mjs -> Date.now": true,
     "timed: tests/workflows-test.mjs -> Date.now": true
