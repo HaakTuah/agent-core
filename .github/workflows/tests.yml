@@ -545,9 +545,15 @@ jobs:
       - name: The core's own inputs, each named with its hostile tests (SECURITY.md, rule 5)
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node tests/own-inputs-test.mjs
-      - name: The core's releases, what a project follows, and cutting one
+      - name: The core's releases, which tags are one, and what a sync between two asks
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/releases-test.mjs ')) }}
         run: node tests/releases-test.mjs
+      - name: What a project follows
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/follows-test.mjs ')) }}
+        run: node tests/follows-test.mjs
+      - name: Cutting a release, and the trial on a real project
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/release-test.mjs ')) }}
+        run: node tests/release-test.mjs
       - name: The jobs a start by hand that names parts runs alone
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/tests-parts-test.mjs ')) }}
         run: node tests/tests-parts-test.mjs
