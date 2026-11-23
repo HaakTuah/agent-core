@@ -152,6 +152,8 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
     ["two files of 10,000 namespaces each in the last, a delegate innermost", { "src/X.cs": `${"namespace a{".repeat(10000)}delegate void d();${"}".repeat(10000)}`, "src/Y.cs": `${"namespace b{".repeat(10000)}delegate void d();${"}".repeat(10000)}` }, ["src/X.cs", "src/Y.cs"]],
     ["a <Using> of 150,000 names", { "Directory.Build.props": `<Project><ItemGroup><Using Include="${"A;".repeat(150000)}" /></ItemGroup></Project>`, "src/X.cs": "namespace App;\nclass X { }\n" }, ["src/X.cs"]],
     ["an alias of 18,000 targets heading a name of 15,001 words", { "Directory.Build.props": `<Project><ItemGroup><Using Include="${words(18000)}" Alias="D" /></ItemGroup></Project>`.replaceAll(".", ";"), "src/X.cs": `namespace App;\nclass X { object o = ${"D.".repeat(15000)}D; }\n` }, ["src/X.cs"]],
+    ...["", "a"].map(w => [`a <RootNamespace> of "${w}", 200,000 spaces and a word, no close`, { "src/App.csproj": `<Project><PropertyGroup><RootNamespace>${w}${" ".repeat(200000)}x</PropertyGroup></Project>`, "src/X.cs": "namespace App;\nclass X { }\n" }, ["src/X.cs"]]),
+    ["a <Using of 1,000,000 spaces before a stray character", { "Directory.Build.props": `<Project><ItemGroup><Using${" ".repeat(1000000)}x /></ItemGroup></Project>`, "src/X.cs": "namespace App;\nclass X { }\n" }, ["src/X.cs"]],
     ...["/*", "var s = @\""].map(open => [`a ${open} of 199,900 line ends`, { "src/X.cs": `namespace App;\nclass X { }\n${open}${"\n".repeat(199900)}*/";\n` }, ["src/X.cs"]]),
     ["50 files of C# each 100,000 characters at the base, past what the selection reads", shrunk, Object.keys(shrunk), f => (f in shrunk ? `namespace App;\n${"// x\n".repeat(20000)}` : null)],
   ]) {

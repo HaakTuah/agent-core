@@ -14,7 +14,7 @@ function attributes(tag) {
   const pair = /\s*([\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/uy, out = {};
   let at = 0;
   for (let m; (pair.lastIndex = at, m = pair.exec(tag)); at = pair.lastIndex) out[m[1].toLowerCase()] = m[2] ?? m[3];
-  return /^\s*\/?\s*$/u.test(tag.slice(at)) ? out : null;
+  return /^\s*\/?$/u.test(tag.slice(at).trimEnd()) ? out : null; // (one "\s*": two would backtrack)
 }
 
 // The namespaces a project's SDK or test framework imports with no <Using> git holds, where ImplicitUsings is on (the
@@ -88,7 +88,8 @@ export function outside(texts, facts, pace) {
   for (const [f, t] of Object.entries(texts)) {
     if (!f.endsWith(".csproj")) continue;
     let n = roots;
-    for (const w of (/<RootNamespace\s*>\s*([^<$]*?)\s*<\/RootNamespace\s*>/iu.exec(t)?.[1] || path.posix.basename(f, ".csproj")).split(".")) n = n.get(w) ?? n.set(w, new Map()).get(w);
+    const given = /<RootNamespace\s*>([^<]*)<\/RootNamespace\s*>/iu.exec(t)?.[1].trim(); // (no two runs share a space: linear)
+    for (const w of (given && !/[$%&]/u.test(given) ? given : path.posix.basename(f, ".csproj")).split(".")) n = n.get(w) ?? n.set(w, new Map()).get(w);
     n.set(end, true);
   }
   const under = ns => { let n = roots; for (const w of ns.split(".")) { n = n.get(w); if (!n) return false; if (n.has(end)) return true; } return false; };
