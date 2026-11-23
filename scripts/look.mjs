@@ -58,9 +58,9 @@ import { report as citedReport } from "./cited.mjs";
 import { report as outcomesReport } from "./outcomes-read.mjs";
 import { auditIsDue, cleaningDue } from "./dose.mjs";
 import { asked, FOLDER, repoOf } from "./inbox.mjs";
-import { check, gather, ghApi, makeLabels, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
-import { readHost, refusal, settingsOf, settingsTask } from "./host.mjs";
-import { HOST_READ, LOOKED } from "./step-checks-host.mjs";
+import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
+import { settingsOf, settingsTask } from "./host.mjs";
+import { hostOf, recordRead, staleOf } from "./look-host.mjs";
 import { pathIn } from "./reading.mjs";
 import { ownerOf } from "./releases.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
@@ -70,11 +70,11 @@ import { dueIssue as stagedCases } from "./staged.mjs";
 import { line as blindLine, reader as blindSample, shareNow, TITLE as BLIND } from "./blind-sample.mjs";
 import { ownReport } from "./holders.mjs";
 import { before as monthBefore, copies, monthOf, pushWait, readCounts, shape, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
-import { STEPS, notDone, project, report as stepsReport } from "./steps.mjs";
+import { STEPS, notDone, report as stepsReport } from "./steps.mjs";
 import { MISSED, TITLES } from "./look-kinds.mjs";
 import { idleFinding } from "./look-pulls.mjs";
 import { lateFinding, redFinding, staleFinding } from "./look-checks.mjs";
-import { keepIssues, lastRun, mine, RECORD, recordBody, slug, toFolder } from "./look-keep.mjs";
+import { keepIssues, lastRun, mine, RECORD, slug, toFolder } from "./look-keep.mjs";
 
 // What the look is made of stands in the files beside this one, each read for one thing: look-kinds.mjs (the title of
 // each kind of issue), look-pulls.mjs (the pull requests: idle, and the work standing still), look-checks.mjs (the
@@ -149,19 +149,6 @@ function reachOf(repo) {
   return got && typeof got === "object" && got.permissions ? asked(repo, got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
 }
 
-// What GitHub answers for the repository, read once in a project (host.mjs), with the record as this run writes it, so
-// the steps that read the record (330, 600, 820) read this run; and, in GitHub's job, the labels of the core's list made
-// first, each write refused said: { host (null where it was not read), refused }.
-function hostOf(ctx, reach) {
-  const { repo, manifest, job, dry, at, say } = ctx, refused = [];
-  if (job && !dry && reach.yes) { try { makeLabels(repo, ghApi, () => {}); } catch (e) { refused.push(refusal("The labels of the core's list", e, "issues: write")); } }
-  refused.forEach(r => say(r));
-  if (manifest === null) return { host: null, refused };
-  try { return { host: readHost(project(process.cwd()), repo, { reach, record: { body: recordBody({ ...ctx, hostRead: at }) }, at, looking: true }), refused }; } catch { return { host: null, refused }; }
-}
-
-// What the look finds, kind by kind, each { title, what, unread }; and `stepsLeft`, the count of a release's steps not
-// done (null where they were not read), for the state report.
 function findingsOf(ctx, reach, last) {
   const { repo, manifest, owner, at, say } = ctx;
   const findings = [];
@@ -213,28 +200,6 @@ function monthlyOf({ repo, owner, manifest, at, scripts }, reach, kept, stepsLef
     monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: last, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), outcomes: outcomesReport({ repo, month: monthBefore(month), manifest, previous: last, blind: blindLine(shareNow(repo, kept.get(BLIND), owner)) }), ...(manifest === null ? {} : { holders: ownHeld(scripts) }), scripts });
   }
   return { reportTitle, reportFile, monthly };
-}
-
-// The packages a project holds looked up (look-checks.mjs's staleFinding), the record's line written where they were.
-function lookUp(ctx) {
-  const stale = staleFinding();
-  if (!stale.unread) ctx.looked = ctx.at;
-  return stale;
-}
-
-// The finding of the packages gone stale, where they were looked up this run: at once, or with the monthly report.
-function staleOf(ctx, report, stale) {
-  if (!stale && report.monthly !== null && ctx.manifest !== null) return [lookUp(ctx)];
-  return stale ? [stale] : [];
-}
-
-// What the record says of the look's runs before (its lines "Packages looked up:" and "Host read:"), set on `ctx`; in a
-// project, the packages it holds looked up at once where the record shows they never were, as step 600 asks, and then
-// once a month with the state report (#488, point 8; #1092).
-function recordRead(ctx, record) {
-  ctx.looked = LOOKED.exec(record?.body ?? "")?.[1] ?? null;
-  ctx.hostRead = HOST_READ.exec(record?.body ?? "")?.[1] ?? null;
-  return ctx.manifest !== null && !ctx.looked ? lookUp(ctx) : null;
 }
 
 function main(args) {
