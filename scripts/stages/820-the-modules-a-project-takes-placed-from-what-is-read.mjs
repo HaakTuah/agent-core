@@ -3,6 +3,8 @@
 import { read, write } from "../stage-helpers.mjs";
 
 export default {
+  // (asked once a writer of the module lines took one by choice, as at the sync after the core gained one)
+  asked: true,
   // (a module taken by choice and asked of the owner, in a paragraph of its own, as the steps that place the modules
   // write it; the mend is the owner's answer that it fits: the line taken out)
   stage: dir => write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/^(Floor: .*(?:\r?\n.+)*)/m, "$1\n\nModules to confirm: `planning.md`.")),
