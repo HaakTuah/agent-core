@@ -2,10 +2,11 @@
 // (select-csharp.mjs; #675): a raw interpolated string's holes, an interpolation's alignment ("{x,App.Width}", whose
 // constant sets the padding), or a name written with an escape ("R\u0075les") or a formatting character (U+200C), which
 // the tokens split. 2 where the file may hide a name it declares: such a name in code, or anywhere once the scan cannot
-// keep in step, or a comment or string across an "#if"'s line; else 1 (0 where none). Read in one pass from the file's
-// start, passing over comments, strings, characters and directives as the lexer does, so a "$\"" in one opens nothing; a
-// raw interpolated string's "$\"\"\"" and an odd line end (ODD) count anywhere, and a comment in a hole, or one across
-// another directive, makes it unsure: it reads more, never less. Linear in the text: each character is read once.
+// keep in step, or a comment or string across an "#if"'s line, or such a line anywhere once it cannot; else 1 (0
+// where none). Read in one pass from the file's start, passing over comments, strings, characters and directives as the
+// lexer does, so a "$\"" in one opens nothing; a raw interpolated string's "$\"\"\"" and an odd line end (ODD) count
+// anywhere, and a comment in a hole, or one across another directive, makes it unsure: it reads more, never less.
+// Linear in the text: each character is read once.
 
 // (a raw interpolated string's "$\"\"\"", one "$" of a run; or a line's end other than "\n", "\r\n": "\r", U+0085, U+2028
 // or U+2029, which the scan and the tree read as no end)
@@ -19,11 +20,13 @@ export function leftOut(text) {
     i = step(src, i);
     if (i < 0) found = -i;
   }
-  return found === 1 && SPLIT.test(src) ? 2 : found; // (out of step, a split name is sought anywhere: it reads more)
+  return found === 1 && SPLIT.test(src) ? 2 : found; // (out of step, what may hide a name is sought anywhere: it reads more)
 }
 
-// (a name's escape, "\u" or "\U", the only escape C# code holds, or a formatting character: in a string or not)
-const SPLIT = /\\[uU]|\p{Cf}/u;
+// (a name's escape, "\u" or "\U", the only escape C# code holds, or a formatting character, in a string or not; or an
+// "#if", "#elif", "#else" or "#endif" line, where a comment or string one branch opens may hide a declaration)
+const SPLIT = /\\[uU]|\p{Cf}|(?<![^\n\r\u0085\u2028\u2029])[^\S\n\r\u2028\u2029]*#[^\S\n\r\u2028\u2029]*(?:if|elif|else|endif)\b/u;
+// (a line begins past any of C#'s line ends; the spaces before a "#" hold none, so no two tries share one: linear)
 
 // Whether a name's escape or a formatting character stands at i (in code a "\" begins nothing else).
 const named = (src, i) => src[i] === "\\" || /^\p{Cf}/u.test(src.slice(i, i + 2));

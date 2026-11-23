@@ -67,8 +67,9 @@ const split = [["src/Rules.cs", "namespace App;\npublic static class R\\u0075les
   // alignment's word, an odd line end)
   ...["$\"\"\"{1}\"\"\"", "$\"{1 /* c */}\"", "$\"{1,K.W}\"", "\"\"; // \r"].flatMap(e => ["R\\u0075les", "Ru\u200Cles"].map(n => ["src/Rules.cs",
     `namespace App;\npublic static class ${n} { static string s = ${e};\n public static bool Allowed() => true; }\n`, "tests/UsingTest.cs"])),
-  // (and a plain name a comment one branch of an "#if" opens hides from the tokens)
-  ["src/Rules.cs", "namespace App;\n#if NEVER\n/*\n#endif\npublic static class Rules { public static bool Allowed() => true; }\n// */\n", "tests/UsingTest.cs"]].filter(([f, text, test]) => !pick({ ...app, [f]: text }, "src/Rules.cs").tests.includes(test));
+  // (and a plain name a comment one branch of an "#if" opens hides from the tokens, there too after what the scan cannot
+  // keep in step with)
+  ...["", "// $\"\"\"\n", "static class K { static string s = $\"{1,K.W}\"; const int W = 1; }\n"].map(e => ["src/Rules.cs", `namespace App;\n${e}#if NEVER\n/*\n#endif\npublic static class Rules { public static bool Allowed() => true; }\n// */\n`, "tests/UsingTest.cs"])].filter(([f, text, test]) => !pick({ ...app, [f]: text }, "src/Rules.cs").tests.includes(test));
 ok(!split.length, "a file where an escape or a formatting character may split a name it declares or names, or an \"#if\" may hide one, is reached from every file", split.map(c => c[0]).join(", "));
 ok(!pick({ ...app, "tests/OtherTest.cs": `\uFEFF${app["tests/OtherTest.cs"]}` }, "src/Rules.cs").tests.includes("tests/OtherTest.cs"), "a byte order mark at a file's start splits no name");
 const implicit = one("namespace System;\npublic static class Ext { public static bool Allowed(this string s) => true; }\n", { "tests/T.cs": "namespace Tests;\nclass T { bool b = \"x\".Allowed(); }\n" });
