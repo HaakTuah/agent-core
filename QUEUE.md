@@ -15,12 +15,12 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1094 | rule builder | #1092 |
 | #1095, points 2 to 6 | rule builder | #1094 |
 | #1107, #1108 | rule builder; one PR each | |
-| #1134 | rule builder; release 6; the floor (rule 3), `tasks/reviews.md`, the review guidelines, `tools/claude.md`, one PR or more; its record relayed as the owner's yes (floor rule 3) | #1087 (the auditor's start, one at a time) |
+| #1134 | rule builder; release 6; the floor (rule 3), `tasks/reviews.md`, the review guidelines, `tools/claude.md`, one PR or more | #1087 (the auditor's start, one at a time) |
 | #1136 to #1140 | builder; release 7, one PR each | release 6's cut |
 | #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 7, one PR each | release 6's cut |
 | #1123 | rule builder; release 7 | release 6's cut; #974, #1060 (`roles/adviser.md`) |
 | #1112, #1074, #1073, #1098, #1133 | builder; release 7, one PR each | release 6's cut |
-| #1142 | rule builder; release 7; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md`; its record relayed as the owner's yes (floor rule 3) | release 6's cut |
+| #1142 | rule builder; release 7; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md` | release 6's cut |
 | #810 | the orchestrator | the batch's end |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
@@ -43,8 +43,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #593, points 4 and 12 | rule builder; it changes what a builder reads at its start | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
-| #650 | rule builder | |
-| #679 to #682, #707 | rule builder; one PR each | |
+| #650, #679 to #682, #707 | rule builder; one PR each | |
 | #701, #716 | builder; one PR each | |
 | #739 | rule builder; it changes the game module (`tasks/game-design.md`) | |
 | #786 | rule builder; it changes the floor (the threat model) | |
@@ -52,8 +51,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #896 | builder; a check for #887's rule: `scripts/pr-description.mjs`, `scripts/pruning.mjs` | |
 | #899 | builder; `tasks/tests.md`, a change that keeps the meaning, its design check stating it | |
 | #907 | rule builder; each other tool's part under `tools/`, completing #492's point 14 | |
-| #913 | builder; a split of `tasks/choices.md`, its meaning kept | |
-| #870, #943 | builder; one PR each; #943 a split, its meaning kept | |
+| #913, #870, #943 | builder; one PR each; #913 a split of `tasks/choices.md`, #943 a split, each its meaning kept | |
 | #974 | rule builder; `roles/adviser.md` | |
 | #1046 | rule builder; #767's third kind, `AGENTS.md` | |
 | #1051 | rule builder; each pull request records its own cost | |
@@ -67,18 +65,14 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #732 | builder; a faster check | |
-| #550 | builder; a case a PR | |
-| #765, #809, #552 | builder; one PR each | |
+| #732, #550, #765, #809, #552 | builder; one PR each; #732 a faster check, #550 a case a PR | |
 | #553 | builder | #552 |
 | #554 | builder | #553 |
 | #555 | builder | #534's tools, and #554 |
 | #556 | builder | #554; #534's tools, for its linter rules |
 | #557 | builder | #556 |
 | #558 | builder | #557 |
-| #895 | builder; a test split; `tests.yml` names the suite | |
-| #931, #884, #852, #860, #857, #685, #937, #958 | builder; one PR each | |
-| #1017 | builder; a split, its meaning kept; `tests.yml` names the new suite | |
+| #895, #931, #884, #852, #860, #857, #685, #937, #958, #1017 | builder; one PR each; #895 a test split, #1017 a split, its meaning kept; `tests.yml` naming each split's new suite | |
 | #1064 | builder; splits weighed, each its meaning kept | #772 (`scripts/check.mjs`, `scripts/checks.mjs`, one at a time) |
 
 ## Not taken up
