@@ -46,10 +46,10 @@ const headText = [
   `- **Parent.** ${whole}`, "  - **Nested.** By default x.", "",
 ].join("\n");
 const head = [...rulesOf(file, headText), ...rulesOf("tasks/y.md", "**Moved.** By default x.\n")];
-const holders = { [`${file}: Points elsewhere`]: "describes", [`${file}: Describes`]: "describes", [`${file}: Nested`]: ["describes", "audit"] };
+const holders = { [`${file}: Points elsewhere`]: "describes", [`${file}: Describes`]: "describes", [`${file}: Nested`]: ["describes", "audit"], [`${file}: Added bare`]: "check: scripts/describes.mjs" };
 const { added, changed } = judge(head, base, holders);
 const leads = list => list.map(r => r.lead).sort().join(", ");
-ok(leads(added) === "Added bare, Added whole, Nested, Parent", "the rules a change adds are those whose lead the base holds nowhere; one moved to another file is not added, one marked \"describes\" alone not read");
+ok(leads(added) === "Added bare, Added whole, Nested, Parent", "the rules a change adds are those whose lead the base holds nowhere; one moved to another file is not added, one marked \"describes\" alone not read, and one a check of that name holds is read");
 ok(String(added.find(r => r.lead === "Added bare").lacks.map(m => m.part)) === "no reason,no holder,two conditions", "a rule added is read for every mark it lacks");
 ok(String(added.find(r => r.lead === "Nested").lacks.map(m => m.part)) === "no reason,no holder,no condition"
   && !added.find(r => r.lead === "Parent").lacks.length, "a rule's own text leaves out a rule nested in it, which is read on its own");
