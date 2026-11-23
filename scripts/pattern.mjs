@@ -70,25 +70,34 @@ export function report(head, base, holders, baseRev) {
   return { lines, failed };
 }
 
-if (started(import.meta.url)) {
-  const args = process.argv.slice(2);
+// The check on `args` (the command line's, after the script): { code, lines }, what it prints and its exit code.
+export function main(args, root = ROOT) {
   const at = args.indexOf("--base");
   const baseRev = at >= 0 ? args[at + 1] : null;
-  const fail = line => { console.log(`FAIL ${line}`); process.exit(1); };
-  if (at >= 0 && (!/^[\w^~./][\w^~./-]*$/u.test(baseRev ?? "") || (() => { try { execFileSync("git", ["-C", ROOT, "rev-parse", "--verify", "--quiet", "--end-of-options", `${baseRev}^{commit}`], { stdio: "ignore" }); return false; } catch { return true; } })()))
-    fail(`--base needs a commit of this repository, and "${baseRev ?? ""}" is none. Mend: fetch the base (git fetch origin main) and name its commit after --base`);
-  const head = rules(ROOT, { agents: true });
-  if (!head.length) fail("no rule of the floor, the modules or AGENTS.md was read, so the check would pass anything. Mend: run it from the core's root");
-  const holders = named(ROOT).holders;
+  const fail = line => ({ code: 1, lines: [`FAIL ${line}`] });
+  if (at >= 0 && !isCommit(root, baseRev)) return fail(`--base needs a commit of this repository, and "${baseRev ?? ""}" is none. Mend: fetch the base (git fetch origin main) and name its commit after --base`);
+  const head = rules(root, { agents: true });
+  if (!head.length) return fail("no rule of the floor, the modules or AGENTS.md was read, so the check would pass anything. Mend: run the core's own copy of this script, in a checkout that holds its rule files");
+  const holders = named(root).holders;
   if (!baseRev) {
     const { added } = judge(head, [], holders);
     const counts = MARKS.map(m => `${added.filter(r => r.lacks.includes(m)).length} with ${m.part}`).join(", ");
-    console.log(`no --base given: nothing failed. Of ${added.length} rules that bind: ${counts}`);
-    process.exit(0);
+    return { code: 0, lines: [`no --base given: nothing failed. Of ${added.length} rules that bind: ${counts}`] };
   }
-  const base = rulesAt(ROOT, baseRev, { agents: true });
-  if (!base.length) fail(`no rule was read at ${baseRev}, so every rule would be taken for new. Mend: name after --base the commit this change starts from, one that holds the rule files`);
+  const base = rulesAt(root, baseRev, { agents: true });
+  if (!base.length) return fail(`no rule was read at ${baseRev}, so every rule would be taken for new. Mend: name after --base the commit this change starts from, one that holds the rule files`);
   const { lines, failed } = report(head, base, holders, baseRev);
+  return { code: failed ? 1 : 0, lines };
+}
+
+// (a commit, never an option: git is asked whether it is one, and it stands after --end-of-options)
+function isCommit(root, rev) {
+  if (!/^[\w^~./][\w^~./-]*$/u.test(rev ?? "")) return false;
+  try { execFileSync("git", ["-C", root, "rev-parse", "--verify", "--quiet", "--end-of-options", `${rev}^{commit}`], { stdio: "ignore" }); return true; } catch { return false; }
+}
+
+if (started(import.meta.url)) {
+  const { code, lines } = main(process.argv.slice(2));
   console.log(lines.join("\n"));
-  process.exit(failed ? 1 : 0);
+  process.exitCode = code;
 }
