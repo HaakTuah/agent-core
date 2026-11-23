@@ -43,6 +43,12 @@ ok(patterns(`const x = <div>{1}</div>;\nconst r = ${LONG};\n`, "a.jsx").join() =
 // ---- the check, in a project ----
 const here = fileURLToPath(new URL("../scripts/", import.meta.url));
 const dir = scratchDir("copies-values-test-");
+
+// (a sync never fails here, so no file the kit writes that carries no mark of the core's may hold a pin: only the
+// workflows, whose mark tells the core's from the project's, may)
+const kit = fileURLToPath(new URL("../setup/template/", import.meta.url));
+const unmarked = fs.readdirSync(kit, { recursive: true }).filter(f => !/workflows|\.yml(\.tmpl)?$/u.test(f) && fs.statSync(path.join(kit, f)).isFile());
+ok(unmarked.length > 0 && unmarked.every(f => !pins(fs.readFileSync(path.join(kit, f), "utf8")).length), "no file the starter kit writes with no mark of the core's holds a pin", unmarked.filter(f => pins(fs.readFileSync(path.join(kit, f), "utf8")).length).join(", "));
 try {
   const put = (f, body) => { fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), body); };
   const drop = f => fs.rmSync(path.join(dir, f), { force: true });
@@ -112,6 +118,11 @@ try {
   r = check({ COPIES_BASE: base });
   ok(r.status === 1 && /^FAIL: a value written twice: [0-9a-f]{64} stands in /m.test(r.out) && r.out.includes(".github/workflows/own.yml:5"), "one a workflow of the project's own gains fails", r.out);
   drop(".github/workflows/own.yml"); drop(".github/workflows/core.yml"); drop("core/setup/more-pins.txt");
+  // (a file of a kind the kit writes whole but that carries no mark, the project's own settings, is read as the project's)
+  put(".claude/settings.json", `{ "env": { "SUM": "${DIGEST}" } }\n`);
+  r = check({ COPIES_BASE: base });
+  ok(r.status === 1 && r.out.includes(".claude/settings.json:1"), "one the project's own settings gain fails: a file of a kind with no mark is the project's", r.out);
+  drop(".claude/settings.json");
 
   // (what is not read: the tests the config lists, lock files, the dated records)
   put("test/fetch.test.mjs", `const SUM = "${DIGEST}";\nconst NAME = ${LONG};\n`);
@@ -128,6 +139,10 @@ try {
   r = check({ COPIES_BASE: base });
   ok(r.status === 0 && /^ok {3}no value newly written twice \(a pin or a pattern; 1 said in checks\/copies\.json's "twice"\)$/m.test(r.out), "a value the config's \"twice\" says why both must hold is taken as said", r.out);
   drop("ci/fetch.ps1");
+  put("deploy.sh", "sum=read-it\n");
+  r = check({ COPIES_BASE: base });
+  ok(r.status === 0 && r.out.includes(`note checks/copies.json's "twice" names ${DIGEST}, which no longer stands in two files`), "the config's own \"twice\" is no place of the value: one said, left in one file, is noted to take out", r.out);
+  put("deploy.sh", `sum=${DIGEST}\n`);
   config({ twice: { [OTHER]: "said long ago" } });
   r = check({ COPIES_BASE: base });
   ok(r.status === 0 && r.out.includes(`note checks/copies.json's "twice" names ${OTHER}, which no longer stands in two files: take it out of "twice"`), "a value said that no longer stands twice is noted, failing nothing", r.out);

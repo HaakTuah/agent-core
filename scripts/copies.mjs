@@ -440,6 +440,6 @@ if (WRITE) {
   if (shrunk.length) console.error(`FAIL: ${logged(BASELINE)} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run ${SELF} ${logged(configPath)} --write and commit the baseline it lowers`);
   if (!fresh.length && !shrunk.length) console.log(`ok   no new copies (${found.length - unlisted.length} old ones, listed in ${logged(BASELINE)}, to be removed${unlisted.length ? `; ${unlisted.length} in an agent tool's files, noted above` : ""})`);
   // (a value written out in two files, a pin or a pattern, too short for the runs above: copies-values.mjs)
-  const values = valuesTwice({ core: CORE, config, configPath, base: process.env.COPIES_BASE || "", ls });
+  const values = valuesTwice({ core: CORE, config, configPath, configAt: CONFIG_AT, base: process.env.COPIES_BASE || "", ls });
   if (fresh.length || shrunk.length || values) process.exit(1);
 }

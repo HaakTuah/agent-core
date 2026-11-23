@@ -5,7 +5,6 @@
   "proseFromSecurity": false,
   "tests": ["tests/"],
   "twice": {
-    "c174b42d7aa60caf58c0c3e555c0e4bed01fe6b0d99a412bce777b5af4ce913e": "Betterleaks' archive for Linux x64: personal-terms.yml pins it for its own fetch, and scripts/test-downloads.sh fetches the same archive for the tests while the network is up; a workflow's step imports no script, and tests/workflows-test.mjs holds the two equal",
-    "0123456789abcdef0123456789abcdef01234567": "a made-up commit hash, no pin: the scratch projects of the tests each write it as the commit their own fixture names"
+    "c174b42d7aa60caf58c0c3e555c0e4bed01fe6b0d99a412bce777b5af4ce913e": "Betterleaks' archive for Linux x64: personal-terms.yml pins it for its own fetch, and scripts/test-downloads.sh fetches the same archive for the tests while the network is up; a workflow's step imports no script, and tests/workflows-test.mjs holds the two equal"
   }
 }

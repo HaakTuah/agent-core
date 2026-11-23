@@ -13,14 +13,14 @@
 // whose copies of the code are another check's (#460, point 3); a value the config's "twice" names, with why both files
 // must hold it, is taken as said.
 // Nothing locks a project (AGENTS.md of the core): what the pull request's base held is the baseline. A value fails only
-// where a file of the project's own (outside the core's copy, and no file the core writes whole: core-owned.mjs) holds
+// where a file of the project's own (outside the core's copy, and no file of the core's that carries its mark: core-owned.mjs) holds
 // it now and the base held it in fewer such files; so a sync, which changes the core's files alone, never fails here,
 // and a value moved from one file to another passes. Every other value written twice is noted, at every run, a debt to
 // work down; with no base (a push to main) every one is noted and none fails. Node's own modules and git.
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tokens, jsxIn } from "./code-shape-lexer.mjs";
-import { whole, marked } from "./core-owned.mjs";
+import { marked } from "./core-owned.mjs";
 import { logged } from "./guards.mjs";
 
 export const PATTERN_LEAST = 30;
@@ -77,11 +77,11 @@ function readAt(commit, f) {
   return st?.isFile() && st.size <= READ_MOST ? fs.readFileSync(f, "utf8") : null;
 }
 
-// What is read: `specs`, every tracked file less what is left out; `codeSpecs`, the config's "code" less the same.
-function scope(config, core) {
+// What is read: `specs`, every tracked file less what is left out, the config among it; `codeSpecs`, the config's "code" less the same.
+function scope(config, core, configAt) {
   const out = list(config.code).concat(list(config.prose)).filter(s => s.startsWith(":!") || s.startsWith(":(exclude"));
   const leftOut = [...out, ...list(config.tests).map(s => (s.startsWith(":") ? s : `:(exclude)${s}`)),
-    ...LOCKS.map(f => `:(exclude,glob)**/${f}`), ...RECORDS.flatMap(r => [`:(exclude)${r}`, ...(core ? [`:(exclude)${core}${r}`] : [])])];
+    ...(configAt ? [`:(exclude,literal)${configAt}`] : []), ...LOCKS.map(f => `:(exclude,glob)**/${f}`), ...RECORDS.flatMap(r => [`:(exclude)${r}`, ...(core ? [`:(exclude)${core}${r}`] : [])])];
   const code = list(config.code).filter(s => !s.startsWith(":"));
   return { specs: [".", ...leftOut], code, codeSpecs: [...code, ...leftOut] };
 }
@@ -112,8 +112,9 @@ function valuesAt({ specs, code, codeSpecs }, ls, commit, want = []) {
 // of the project's own that held it there. (only a file the change touched can hold a value it did not hold at the base)
 function freshOf(asked, { read, ls, base, core }) {
   if (!base) return [];
-  // (the core writes it: a file of its copy, or one it writes whole that carries its mark where its kind carries one)
-  const coreWrites = (f, at) => !!core && (f.startsWith(core) || (whole(f) && (!marked(f) || /^# The core's file:/u.test(readAt(at, f) ?? ""))));
+  // (the core writes it: a file of its copy, or one of a kind that carries the core's mark, carrying it; a whole file of
+  // a kind with no mark is the project's own, since only its text tells it from a kit's, as converged() reads it)
+  const coreWrites = (f, at) => !!core && (f.startsWith(core) || (marked(f) && /^# The core's file:/u.test(readAt(at, f) ?? "")));
   const changed = new Set(git(["diff", "--name-only", "-z", base, "--"]).split("\0").filter(Boolean));
   let before = null;
   const fresh = [];
@@ -128,12 +129,13 @@ function freshOf(asked, { read, ls, base, core }) {
 }
 
 // The part, run by copies.mjs from the project's root: `core`, the copy's path from the root ("" in the core's own
-// repository); `config`, the check's config and `configPath` its path; `base`, the pull request's base or "";
+// repository); `config`, the check's config, `configPath` its path as given and `configAt` from the root, the config
+// itself never read for values, since its "twice" names them; `base`, the pull request's base or "";
 // `ls(specs)`, the files pathspecs read, as copies.mjs lists them. It prints its notes and failures and returns whether
 // anything failed.
-export function valuesTwice({ core, config, configPath, base, ls }) {
+export function valuesTwice({ core, config, configPath, configAt, base, ls }) {
   const said = config.twice && typeof config.twice === "object" && !Array.isArray(config.twice) ? config.twice : {};
-  const read = scope(config, core);
+  const read = scope(config, core, configAt);
   const twice = [...valuesAt(read, ls, "")].filter(([, places]) => places.size >= 2);
   const kept = twice.filter(([v]) => typeof said[v] === "string" && said[v].trim());
   const asked = twice.filter(([v]) => !kept.some(([k]) => k === v));
