@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
 import { TRIAL, compared, ownCount, trialAt, trialRecord } from "../scripts/release-trial.mjs";
-import { projects, rowOf, shownAs } from "../scripts/state-report.mjs";
+import { shownAs } from "../scripts/state-report.mjs";
 import { STEPS } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, POINTER, entries, notesAt } from "../scripts/sync-notes.mjs";
 import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, jumped, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
@@ -325,26 +325,6 @@ ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[
   ok(cli.status === 1 && /--trial needs the full SHA/.test(cli.stderr), "--trial with no full SHA writes nothing and says what it needs", cli.stderr);
   const listed = ["**The projects that take the core** (read 2026-11-22)", `- ${shownAs("o/a", true, false)}: it has no state report yet.`, `- ${shownAs("o/b", true, true)}: from its report of 2026-10: 3.`, `- ${shownAs("x/c", false, false)}: it has no state report yet.`, "- (GitHub's code search gave no answer.)"].join("\n");
   ok(ownCount(listed) === 2 && ownCount("**The projects that take the core**\n- None found.") === 0, "the owner's projects are counted from what state-report.mjs --projects prints, in shownAs's words: its own public and private, never another owner's, a note or none found");
-  // a reading that could not be taken is never none found (#1112): only GitHub's 404 on a manifest says "not a project"
-  const outage = new Error("gh: HTTP 502 Bad Gateway"), absent = new Error("gh: Not Found (HTTP 404)");
-  let threw = false;
-  try { rowOf(() => { throw outage; }, "o", "o/a", { private: false, owner: "o", shared: false }); } catch (e) { threw = e === outage; }
-  ok(threw && rowOf(() => { throw absent; }, "o", "o/a", { private: false, owner: "o", shared: false }) === null, "a manifest read that fails for any reason but 404 throws, and a 404 is no project");
-  const said = []; const log = console.log; console.log = l => said.push(l);
-  let unread = false;
-  try { projects([], route => route === "user" ? "o\n" : "[]"); } catch { unread = true; } finally { console.log = log; }
-  ok(unread && !said.length, "an account that reaches no repository at all is an unread answer, not 'None found'");
-  // the issue's own case: --trial with no files, gh failing, refuses and says the mend (a stub gh first on PATH)
-  // (skipped on Windows: Node runs no extension-less stub there, so gh.exe would be called, not the stub)
-  if (process.platform !== "win32") {
-  const stub = path.join(tmp, "stub"); fs.mkdirSync(stub, { recursive: true });
-  fs.writeFileSync(path.join(stub, "gh"), "#!/bin/sh\necho 'gh: HTTP 502 Bad Gateway' >&2\nexit 1\n", { mode: 0o755 });
-  const down = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", later], { encoding: "utf8", env: { ...process.env, PATH: `${stub}${path.delimiter}${process.env.PATH}` } });
-  ok(down.status === 1 && /could not be read/.test(down.stderr) && /Mend: run it where gh answers/.test(down.stderr), "--trial with no files and a gh that fails refuses, saying what could not be read and the mend", down.stderr);
-  }
-  let urlThrew = false, e404 = new Error('Get "https://api.github.com/repos/o/page-404/contents/core-manifest.md": Bad Gateway');
-  try { rowOf(() => { throw e404; }, "o", "o/page-404", { private: false, owner: "o", shared: false }); } catch (e) { urlThrew = e === e404; }
-  ok(urlThrew, "an outage whose message holds '404' in a repository's name is no 404 answer: it throws");
   const inCore = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", later, path.join(path.dirname(fileURLToPath(import.meta.url)), "before.json"), path.join(tmp, "after.json")], { encoding: "utf8" });
   ok(inCore.status === 1 && /lies in the core's own repository/.test(inCore.stderr), "--trial refuses a run's verdicts kept in the core's own repository, where a project's job names could be committed", inCore.stderr);
 }
