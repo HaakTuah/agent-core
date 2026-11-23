@@ -149,7 +149,7 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
     ["5,000 namespaces of one delegate each", { "src/X.cs": Array.from({ length: 5000 }, (_, k) => `namespace N${k}{delegate void D${k}();}`).join("\n") }, ["src/X.cs"]],
     ["18,000 references to a parameter named @delegate", { "src/X.cs": `namespace App;\nclass X { int F(int @delegate) => ${"@delegate+".repeat(18000)}0; }\n` }, ["src/X.cs"]],
     ["2,000 namespaces each in the last", { "src/X.cs": `${"namespace a{".repeat(2000)}class c{}${"}".repeat(2000)}` }, ["src/X.cs"]],
-    ["two files of 12,000 namespaces each in the last", { "src/X.cs": `${"namespace a{".repeat(12000)}${"}".repeat(12000)}`, "src/Y.cs": `${"namespace b{".repeat(12000)}${"}".repeat(12000)}` }, ["src/X.cs", "src/Y.cs"]],
+    ["two files of 10,000 namespaces each in the last, a delegate innermost", { "src/X.cs": `${"namespace a{".repeat(10000)}delegate void d();${"}".repeat(10000)}`, "src/Y.cs": `${"namespace b{".repeat(10000)}delegate void d();${"}".repeat(10000)}` }, ["src/X.cs", "src/Y.cs"]],
     ["a <Using> of 150,000 names", { "Directory.Build.props": `<Project><ItemGroup><Using Include="${"A;".repeat(150000)}" /></ItemGroup></Project>`, "src/X.cs": "namespace App;\nclass X { }\n" }, ["src/X.cs"]],
     ["50 files of C# each 100,000 characters at the base, past what the selection reads", shrunk, Object.keys(shrunk), f => (f in shrunk ? `namespace App;\n${"// x\n".repeat(20000)}` : null)],
   ]) {
