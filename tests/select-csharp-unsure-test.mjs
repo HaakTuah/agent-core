@@ -7,9 +7,9 @@
 //
 //   node tests/select-csharp-unsure-test.mjs
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { Late } from "../scripts/hurry.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 import { csharpReach } from "../scripts/select-csharp.mjs";
 import { heldBeside, ofNoProject } from "../scripts/select-csharp-project.mjs";
 import { selection } from "../scripts/select.mjs";
@@ -68,7 +68,7 @@ ok(stopped, "the budget is asked inside the expansion of a deep namespace, so a 
 // (what git holds beside the texts, the files it lists written in a scratch folder: within CHARACTERS bytes, read; past
 // it, Late before a file is read whole)
 {
-  const here = process.cwd(), dir = fs.mkdtempSync(path.join(os.tmpdir(), "held-")), files = [];
+  const here = process.cwd(), dir = scratchDir("held-"), files = [];
   const add = (f, text) => { fs.writeFileSync(path.join(dir, f), text); files.push(f); };
   try {
     add("A.cs", "class A { }\n"); add("Directory.Build.props", "<Project />\n"); add("B.cs", "class B { }\n");
@@ -79,7 +79,7 @@ ok(stopped, "the budget is asked inside the expansion of a deep namespace, so a 
     let thrown;
     try { heldBeside({}, () => files); } catch (e) { thrown = e; }
     ok(thrown instanceof Late && /past the 4,000,000/u.test(thrown.message), "past 4,000,000 bytes of it, the selection is late and runs the whole suite", String(thrown));
-  } finally { process.chdir(here); fs.rmSync(dir, { recursive: true, force: true }); }
+  } finally { process.chdir(here); }
 }
 
 done();
