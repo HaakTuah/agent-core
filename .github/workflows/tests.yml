@@ -685,6 +685,9 @@ jobs:
       - name: Which rules each role cites, counted for the state report
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/cited-test.mjs ')) }}
         run: node tests/cited-test.mjs
+      - name: Which files two merged pull requests each added to within a week, for the busy-record step
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/busy-records-test.mjs ')) }}
+        run: node tests/busy-records-test.mjs
       - name: The outcomes the state report leads with, and how a correction is counted
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/outcomes-test.mjs ')) }}
         run: node tests/outcomes-test.mjs
