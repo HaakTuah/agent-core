@@ -79,6 +79,14 @@ const quotedAndTemplate = setOf(tree({
 }));
 ok(show(quotedAndTemplate) === ".github/workflows/r.yml, scripts/load.mjs, scripts/tasks/deep/two.mjs, scripts/tasks/one.mjs",
   "a workflow whose write permission names its scope in quotes is powered, and a template's fixed folder brings in every script under it; another folder stays out", show(quotedAndTemplate));
+// a template whose fixed start is the script's own folder, or whose placeholder holds spaces, brings in what it may load
+const ownFolder = setOf(tree({
+  ".github/workflows/s.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node scripts/run.mjs && node tools/go.mjs\n",
+  "scripts/run.mjs": "await import(`./${process.argv[2]}.mjs`);\n", "scripts/other.mjs": "", "scripts/sub/deep.mjs": "",
+  "tools/go.mjs": "await import(`./steps/${ name }.mjs`);\nspawnSync(node, [\"-e\", `import(${url}).then((m) => m.run())`]);\n", "tools/steps/a.mjs": "", "tools/unrelated.mjs": "", "lib/away.mjs": "",
+}));
+ok(show(ownFolder) === ".github/workflows/s.yml, scripts/other.mjs, scripts/run.mjs, scripts/sub/deep.mjs, tools/go.mjs, tools/steps/a.mjs",
+  "a template that names no folder before its placeholder brings in every script under the script's own, and one whose placeholder holds spaces is read too; a folder neither names stays out, and a template that is code names none", show(ownFolder));
 ok(show(bareNames) === ".github/workflows/m.yml, scripts/helper.js, scripts/lib/index.js, scripts/run.cjs, tools/go.py, tools/util.py",
   "a module named without its extension joins the set as its language loads it: helper.js, a folder's index.js, a Python module; one not named stays out", show(bareNames));
 const files = {

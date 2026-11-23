@@ -188,13 +188,20 @@ function namedIn(name, text, all, byBase = new Map()) {
 // every script under the folder its fixed start names. A built name that holds no such string comes from what calls the script,
 // which names the module itself, or from a package installed by what is in the set by its place.
 // A string on such a line as a folder from where it stands: the whole of a plain one, a template's fixed start up to the
-// last folder it names whole; none for a plain string that names a variable (`$DIR`) or for an empty start.
+// last folder it names whole, the script's own where it names none (`./${name}.mjs`, `${name}`); none for a plain string
+// that names a variable (`$DIR`) or that is empty, nor for code a template builds.
 function folderOf(quoted) {
+  // a template whose own text, its placeholders aside, holds a space or a bracket is code, not a path
+  if (/[\s()]/u.test(quoted.replace(/\$\{[^{}]*\}/gu, ""))) return null;
   const built = quoted.indexOf("${");
   if (built === -1 && quoted.includes("$")) return null;
   const bare = (built === -1 ? quoted : quoted.slice(0, quoted.lastIndexOf("/", built) + 1)).replace(/^(?:\.\/)+|\/+$/gu, "");
-  return bare === "" || bare === "." ? null : { bare, built: built !== -1 };
+  if (built !== -1) return { bare: bare === "" ? "." : bare, built: true };
+  return bare === "" || bare === "." ? null : { bare, built: false };
 }
+
+// Where a folder a string names stands: from the script's own folder, and from the root where the start names one.
+const placesOf = (folder, bare) => (bare === "." ? [folder] : [path.posix.normalize(path.posix.join(folder, bare)), bare]);
 
 function loadable(name, text, own) {
   const folder = path.posix.dirname(name), folders = new Set(own.map((other) => path.posix.dirname(other)));
@@ -202,16 +209,17 @@ function loadable(name, text, own) {
   const used = new Set(loading.flatMap((line) => line.match(/[A-Za-z_$][\w$]*/gu) ?? []));
   const setting = lines.filter((line) => [...line.matchAll(/\b(?:const|let|var)[ \t]+([A-Za-z_$][\w$]*)[ \t]*=/gu)].some(([, id]) => used.has(id)));
   const named = new Set(), under = new Set();
+  const take = (built, at) => {
+    if (built) { if (at !== ".." && !at.startsWith("../")) under.add(at === "." ? "" : `${at}/`); } else if (at !== "." && at !== folder && folders.has(at)) named.add(at);
+  };
   for (const line of [...loading, ...setting]) {
-    for (const [, quoted] of line.matchAll(/["'`]([^"'`\s]+)["'`]/gu)) {
-      const start = folderOf(quoted);
-      if (start === null) continue;
-      for (const at of [path.posix.normalize(path.posix.join(folder, start.bare)), start.bare]) {
-        if (start.built) { if (at !== "." && at !== ".." && !at.startsWith("../")) under.add(at); } else if (at !== "." && at !== folder && folders.has(at)) named.add(at);
-      }
+    // a template whole, spaces and all; a plain string up to its first space
+    for (const [, template, plain] of line.matchAll(/`([^`]*)`|["']([^"'\s]+)["']/gu)) {
+      const start = folderOf(template ?? plain);
+      if (start !== null) for (const at of placesOf(folder, start.bare)) take(start.built, at);
     }
   }
-  return own.filter((other) => SCRIPT.test(other) && (named.has(path.posix.dirname(other)) || [...under].some((at) => other.startsWith(`${at}/`))));
+  return own.filter((other) => SCRIPT.test(other) && (named.has(path.posix.dirname(other)) || [...under].some((at) => other.startsWith(at))));
 }
 
 // A tree on disk: every file under `root`, .git and node_modules aside.
