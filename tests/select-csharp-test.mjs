@@ -2,8 +2,9 @@
 // a type named by a word in a namespace the file sees (its own and those around it, a using directive's, a global one's,
 // MSBuild's <Using>), by an attribute, by its full name, through an alias or `using static`; an extension member; a
 // delegate; a file of top-level statements by Program; a file C# or a test framework runs with no name; and the files
-// whose reach cannot be told (lost by the grammar, reflection, a <Using> that names a property, C# of no project); and
-// C# git holds that the config does not read, read as links between the files it reads. Needs the parser (node
+// whose reach cannot be told (lost by the grammar, reflection, a <Using> that names a property, C# of no project, C# that
+// no longer declares what it declared at the base); and C# git holds that the config does not read, read as links
+// between the files it reads. Needs the parser (node
 // scripts/install.mjs parser). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/select-csharp-test.mjs
@@ -19,10 +20,10 @@ const nothing = () => ({ msbuild: [], cs: {} });
 
 const PROJ = "<Project Sdk=\"Microsoft.NET.Sdk\" />\n";
 const config = parseConfig(JSON.stringify({ baseline: "b.json", code: ["src", "tests"], tests: ["tests/"] }));
-// What a change to `changed` selects among `texts`, the tests those under tests/.
-function pick(texts, changed) {
+// What a change to `changed` selects among `texts`, the tests those under tests/, `was` its text at the base.
+function pick(texts, changed, was) {
   const tests = new Set(Object.keys(texts).filter(f => f.startsWith("tests/") && f.endsWith(".cs"))), found = survey(texts, config, tests);
-  return selection({ changed: [changed], texts, tests, reach: found.reach, scripts: found.scripts, unsure: found.unsure, config });
+  return selection({ changed: [changed], texts, tests, reach: found.reach, scripts: found.scripts, unsure: found.unsure, config, ...(was !== undefined && { before: f => (f === changed ? was : null) }) });
 }
 
 // ---- a type named by a word, in a namespace the file sees ----
@@ -164,6 +165,25 @@ const items = ["<Using Include=\"App.Data.Store\" Alias=\"S\" />", "<Using Inclu
   "tests/Tests.csproj": `<Project><ItemGroup>${item}</ItemGroup></Project>`, "tests/T.cs": "namespace Tests;\nclass T { S s; void M() { Go(); } }\n",
 }, undefined, nothing).links.get("tests/T.cs")?.has("src/Store.cs"));
 ok(!items.length, "a <Using> with an Alias, or Static, reaches the type it names from every file", items.join(", "));
+const collected = { ...app, "src/Db.cs": "namespace App;\npublic class DbFixture { }\n", "tests/DbCollection.cs": "using App;\nusing Xunit;\nnamespace Tests;\n[CollectionDefinition(\"db\")]\npublic class DbCollection : ICollectionFixture<DbFixture> { }\n",
+  "tests/DbTest.cs": "using Xunit;\nnamespace Tests;\n[Collection(\"db\")]\nclass DbTest { }\n" };
+ok(pick(collected, "src/Db.cs").tests.includes("tests/DbTest.cs"), "an xUnit collection's definition, which its tests find by a string, is reached from every file, and the fixture it names with it", JSON.stringify(pick(collected, "src/Db.cs")));
+const quoted = csharpReach({ "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npublic class Store { }\n", "tests/Tests.csproj": "<Project><ItemGroup><Using Include='App.Data' /></ItemGroup></Project>",
+  "tests/T.cs": "namespace Tests;\nclass T { Store s; }\n" }, undefined, nothing);
+ok(quoted.links.get("tests/T.cs")?.has("src/Store.cs"), "a <Using> whose attribute stands in single quotes is read", JSON.stringify([...quoted.links].map(([f, to]) => [f, [...to]])));
+ok(same([...one("using T = System.Type;\nnamespace R;\nclass X { void Go() { T.GetType(\"App.Rules, App\")!.GetMethod(\"Allowed\")!.Invoke(null, null); } }\n").unsure], ["src/X.cs"]),
+  "a GetType given a name, through an alias of Type too, makes its file unsure");
+const helped = { ...app, "tests/Helper.cs": "namespace Tests;\npublic static class Helper { public static bool Allowed() => true; }\n",
+  "tests/ReflectTest.cs": "namespace Tests;\nclass ReflectTest { void T() { System.Type.GetType(\"Tests.Helper\")!.GetMethod(\"Allowed\")!.Invoke(null, null); } }\n" };
+ok(same(pick(helped, "tests/Helper.cs").tests, ["tests/Helper.cs", "tests/ReflectTest.cs"]), "a change to a helper of C# among the tests runs a test whose reach cannot be told", JSON.stringify(pick(helped, "tests/Helper.cs")));
+const was = "namespace App;\npublic static class Rules { public static bool Allowed() => true; }\n";
+const moved = { ...app, "src/Rules.cs": "namespace Retired;\npublic static class Rules { public static bool Allowed() => true; }\n" };
+const kept = { ...app, "src/Rules.cs": "namespace App;\npublic static class Rules { public static bool Allowed() => false; }\n" };
+const unextended = { ...app, "src/Ext.cs": "namespace App.Ext;\npublic static class Twice { public static int Double(int x) => x * 2; }\n" };
+ok(pick(moved, "src/Rules.cs", was).all && pick(moved, "src/Rules.cs", "namespace App;\nref class Rules { }\n").all && pick(unextended, "src/Ext.cs", app["src/Ext.cs"]).all
+  && pick(app, "src/Unused.cs", `global using App;\n${app["src/Unused.cs"]}`).all,
+  "a file of C# that no longer declares a type it declared at the base, its extension members or a global using directive, or whose base cannot be read, runs the whole suite", JSON.stringify(pick(moved, "src/Rules.cs", was)));
+ok(!pick(kept, "src/Rules.cs", was).all && !pick(app, "src/Unused.cs", null).all, "one that keeps what it declared, and one that is new, select by their reach", JSON.stringify(pick(kept, "src/Rules.cs", was)));
 const deep = Array.from({ length: 400 }, (_, k) => `N${k}`).join(".");
 let asked = 0, stopped = false;
 try { csharpReach({ "src/App.csproj": PROJ, "src/X.cs": `using System;\nnamespace ${deep};\nclass Y { }\n` }, () => { if (++asked > 50) throw new Error("late"); }, nothing); } catch { stopped = true; }

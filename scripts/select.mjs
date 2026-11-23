@@ -11,7 +11,7 @@
 // (select-csharp.mjs, which says what it reads, and where a file's reach cannot be told). A test the
 // config's "select.whole" names reaches every file (one that copies or runs the whole project). It never guesses: where
 // a changed file is no code the readers read and no test, a file that is gone, C# of no project (no .csproj above it),
-// a declaration of types, a script of the global space, or anything the config does not name
+// C# that no longer declares a type it declared at the base, a declaration of types, a script of the global space, or anything the config does not name
 // under "select.none" (the files no test reads), the whole suite runs, and so it does where no base is told (on main, on
 // a schedule, before a release), where the shape check's config cannot be read and where the files the change holds, or
 // the project's files all together, are more than the readers take in time (hurry.mjs). A fault the whole suite finds that
@@ -47,7 +47,7 @@ import { WORDS, mentioned, nameTrie } from "./name-trie.mjs";
 import { Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { matcher } from "./select-matcher.mjs";
-import { csharpReach, ofNoProject } from "./select-csharp.mjs";
+import { csharpReach, ofNoProject, undeclared } from "./select-csharp.mjs";
 import { git, passedWhole } from "./select-passed.mjs";
 import { isCode } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
@@ -108,8 +108,9 @@ export function reached(tests, linked, pace = () => {}) {
 
 // What a pull request runs: { all, why, tests }, `why` the reason for the whole suite, or for each test selected.
 // `changed` the paths it changes (gone ones among them), `texts` and `tests` the project as the shape check reads it,
-// `reach` its imports, `failed` the tests that failed last time, `config` the shape check's.
-export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), unread = [], failed = [], config, watch = null }) {
+// `reach` its imports, `failed` the tests that failed last time, `config` the shape check's, `before` a changed file's
+// text at the base (null where it was not there).
+export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), unread = [], failed = [], config, watch = null, before = () => null }) {
   const proof = matcher(config.select.proof), m = { whole: matcher(config.select.whole), none: matcher(config.select.none), isTest: matcher(config.tests) };
   const by = new Map(), add = (t, why) => { if (tests.has(t) && !by.has(t)) by.set(t, why); };
   const pace = watch?.pace(); // (one budget for the linking and the search from each test)
@@ -120,7 +121,7 @@ export function selection({ changed, texts, tests, reach, scripts = new Set(), u
   const blind = new Set([...reaches].filter(([t, files]) => [...files].some(f => (f.endsWith(".cs") ? cs.unsure : unsure).has(f)) || (t.endsWith(".py") && unread.some(c => c.endsWith("conftest.py")))).map(([t]) => t));
   // (the tests that reach every file, told once: the config's pathspecs are tried on each test, never on each changed file's account)
   let every = null;
-  const ctx = { texts, tests, scripts, add, reaches, ...m, wholes: () => (every ??= [...tests].filter(t => m.whole(t) || blind.has(t))) };
+  const ctx = { texts, tests, scripts, add, reaches, before, ...m, wholes: () => (every ??= [...tests].filter(t => m.whole(t) || blind.has(t))) };
   for (const t of tests) if (proof(t)) add(t, "never selected out: the project's proof that behaviour was kept");
   for (const t of failed) add(t, "failed last time");
   for (const f of changed) {
@@ -131,23 +132,38 @@ export function selection({ changed, texts, tests, reach, scripts = new Set(), u
 }
 
 // What one changed file selects, through `ctx.add`; the reason the whole suite runs where its reach cannot be told.
-function oneChange(f, { texts, tests, scripts, add, reaches, wholes, none, isTest }) {
+function oneChange(f, { texts, tests, scripts, add, reaches, before, wholes, none, isTest }) {
   if (none(f)) return null;
   if (isTest(f) && tests.has(f)) add(f, "added or changed"); // (and, a helper among the tests, what imports it)
   // (a file gone, a helper among the tests too, leaves no import to follow; a package's manifest, read beside the code,
   // links nothing: a change to either may reach every test)
   if (!(f in texts) || !isCode(f)) return `${f} is no code the readers follow, or is gone, so what reaches it cannot be told`;
-  // (a script of the global space is reached by no import at all, and C# of no project by a path a project file may write out)
-  if (f.endsWith(".cs") && ofNoProject(f, texts)) return `${f} is C# of no project (no .csproj in a folder above it), which a project may compile by its path, so what reaches it cannot be told`;
+  // (a script of the global space is reached by no import at all)
+  const cs = f.endsWith(".cs") ? csharpUnknown(f, texts, before) : null;
+  if (cs) return cs;
   if (f.endsWith(".d.ts") || scripts.has(f)) return `${f} is a declaration of types, or a script of the global space, whose users no import names, so what reaches it cannot be told`;
   for (const [t, files] of reaches) if (files.has(f)) add(t, `reaches ${f}`);
-  if (!isTest(f)) for (const t of wholes()) add(t, `reaches every file (${f})`); // (a test's own file is no file of the project's a whole run tests)
+  // (a test's own file is no file of the project's a whole run tests; one of C# may be a helper a test reaches by reflection)
+  if (!isTest(f) || f.endsWith(".cs")) for (const t of wholes()) add(t, `reaches every file (${f})`);
   return null;
+}
+
+// Why what reaches a changed file of C# cannot be told, or null: it is of no project, reached by a path a project file may
+// write out, or no longer declares what a test may have named it by, the test now finding another by no link to this file.
+function csharpUnknown(f, texts, before) {
+  if (ofNoProject(f, texts)) return `${f} is C# of no project (no .csproj in a folder above it), which a project may compile by its path, so what reaches it cannot be told`;
+  const lost = undeclared(before(f), texts[f]);
+  return lost && `${f} changed so that ${lost}, and a test that reached it by that may now reach another file, so what reaches it cannot be told`;
 }
 
 const pick = ({ reach, scripts, unsure }) => ({ reach, scripts, unsure });
 // The conftest.py files git holds that the config's pathspecs leave out: pytest runs them all the same.
 const unreadConftests = texts => git(["ls-files", "-z", "--", ":(glob)**/conftest.py"]).split("\0").filter(f => f && !(f in texts));
+
+// A file's text at the base, or null where it was not there.
+function textAt(base, file) {
+  try { return git(["show", `${base}:${file}`]); } catch { return null; }
+}
 
 // The paths a pull request changes against its base, renames as a path gone and a path added.
 const changedSince = base => git(["diff", "-z", "--name-only", "--no-renames", base, "HEAD"]).split("\0").filter(Boolean);
@@ -197,7 +213,7 @@ function configOf(at) {
 // together, are too many or too slow to read within the time rule 5 of SECURITY.md allows (hurry.mjs; #881, #962).
 function selectedFrom(from, { now, config, failed }) {
   const changed = changedSince(from), watch = hurry({ files: new Set(changed) });
-  try { return selection({ changed, texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests, watch)), unread: unreadConftests(now.texts), failed, config, watch }); }
+  try { return selection({ changed, texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests, watch)), unread: unreadConftests(now.texts), failed, config, watch, before: f => textAt(from, f) }); }
   catch (e) { if (e instanceof Late) return { all: true, why: e.message, tests: [...now.tests].sort() }; throw e; }
 }
 

@@ -8,7 +8,7 @@
 // heads it put for what it names; the files that may declare extension members in a namespace it sees; each file of
 // top-level statements, by the name Program that its tests give it; and the files every file reaches: those C# or a test
 // framework runs with no name (an assembly's attribute, a module initializer, an assembly's or a session's set-up, a
-// source generator), those that hold a global using directive, and those the grammar lost, whose declarations are not
+// source generator, an xUnit collection's definition, which its tests find by a string), those that hold a global using directive, and those the grammar lost, whose declarations are not
 // known. It reads more than a file takes, never less. Where reach cannot be told, a file is unsure (a test that reaches
 // it runs on any change): where the grammar lost it, where it holds a raw interpolated string, where it reads types by
 // reflection or scans an assembly for them, and, every file of C#, where a <Using> names an MSBuild property or git
@@ -22,7 +22,7 @@ import { git } from "./select-passed.mjs";
 const TYPE = new Set(["class", "struct", "interface", "enum", "record", "delegate", "namespace"]);
 const MODIFIER = new Set(["public", "internal", "private", "protected", "static", "sealed", "abstract", "partial", "readonly", "ref", "unsafe", "file", "new", "extern"]);
 // (what C# or a test framework runs with no name: the files that hold one are reached from every file of C#)
-const HOOKS = new Set(["ModuleInitializer", "AssemblyInitialize", "AssemblyCleanup", "GlobalTestInitialize", "GlobalTestCleanup", "SetUpFixture", "BeforeEvery", "AfterEvery", "IIncrementalGenerator", "ISourceGenerator"]);
+const HOOKS = new Set(["ModuleInitializer", "AssemblyInitialize", "AssemblyCleanup", "GlobalTestInitialize", "GlobalTestCleanup", "SetUpFixture", "BeforeEvery", "AfterEvery", "IIncrementalGenerator", "ISourceGenerator", "CollectionDefinition"]);
 // (what finds types by reflection, or scans an assembly for them; any word of Assembly or Assemblies too)
 const REFLECTS = new Set(["Activator", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
   "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR"]);
@@ -144,7 +144,7 @@ const runsUnnamed = (toks, words) => words.some(hookWord) || toks.some((k, i) =>
 const hookOf = (toks, i) => toks[i - 1]?.v === "(" && ["Before", "After"].includes(toks[i - 2]?.v);
 const reflecting = (toks, words) => words.some(w => REFLECTS.has(w))
   || toks.some((k, i) => k.t === "id" && /Assembl(y|ies)/u.test(word(k)) && !hookWord(word(k)) && !hookOf(toks, i))
-  || toks.some((k, i) => k.v === "Type" && toks[i + 1]?.v === "." && toks[i + 2]?.v === "GetType");
+  || toks.some((k, i) => k.v === "GetType" && toks[i + 1]?.v === "(" && toks[i + 2]?.v !== ")");
 
 // What a file holds that bears on its reach: its own namespaces, the namespaces its types stand in, its words, its runs
 // of dotted words, its using directives, and whether it declares extension members, runs with no name, reads types by
@@ -158,13 +158,16 @@ function factsOf(r, src) {
     reflects: reflecting(toks, words), unread: r.usings === null || r.functions === null, raw: RAW.test(src), program: topLevel(toks) };
 }
 
+// An attribute's value in the text of an XML tag, in either quotes; undefined where the tag has none.
+const attribute = (tag, name) => { const m = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "u").exec(tag); return m ? m[1] ?? m[2] : undefined; };
+
 // The <Using Include="N"> items of MSBuild's files, each a global using directive ({ target, alias }, an Alias="S" its
 // alias), or null where one names a property ("$(...)"), whose value cannot be told here.
 function msbuildUsings(texts) {
   const out = [];
   for (const text of texts) {
     for (const m of text.matchAll(/<Using\b([^>]*)>/gu)) {
-      const [include, alias] = ["Include", "Alias"].map(a => new RegExp(`\\b${a}\\s*=\\s*"([^"]*)"`, "u").exec(m[1])?.[1]);
+      const [include, alias] = ["Include", "Alias"].map(a => attribute(m[1], a));
       if (include === undefined) continue;
       if (`${include}${alias ?? ""}`.includes("$(")) return null;
       out.push(...include.split(";").map(s => s.trim().replace(/^global::/u, "")).filter(Boolean).map(target => ({ target, alias: alias?.trim() || null })));
@@ -204,9 +207,7 @@ function indexOf(facts) {
     into(into(ix.byLast, full.slice(dot + 1), () => new Map()), dot < 0 ? "" : full.slice(0, dot)).add(file);
   };
   for (const [f, x] of facts) {
-    for (const t of x.r.types) declare(t, f);
-    for (const d of delegates(x.r.toks ?? [])) for (const ns of x.placed) declare(join(ns, d), f);
-    if (x.program) declare("Program", f);
+    for (const t of declared(x)) declare(t, f);
     if (x.extensions) for (const ns of x.placed) into(ix.extensions, ns).add(f);
     const globals = x.usings.filter(d => d.global);
     globally(ix, globals);
@@ -214,6 +215,25 @@ function indexOf(facts) {
     if (x.unread || x.raw || x.reflects) ix.unsure.add(f);
   }
   return ix;
+}
+
+// The full names of the types a file declares (x its facts): those the grammar indexes, its delegates in each namespace
+// its types stand in, and Program for top-level statements.
+const declared = x => [...x.r.types, ...delegates(x.r.toks ?? []).flatMap(d => x.placed.map(ns => join(ns, d))), ...(x.program ? ["Program"] : [])];
+
+// What a changed file of C# no longer does that a test may have reached it by, `was` its text at the base (null where
+// it was not there) and `now` its text: a type it declared there and declares no more (a test that named it may now
+// find another of that name, by no link to this file), extension members in a namespace, or being reached from every
+// file; or that what it declared there cannot be read. Null where it keeps all of them.
+export function undeclared(was, now) {
+  if (was === null) return null;
+  const [before, after] = [was, now].map(src => factsOf(readCsharp(src), src));
+  if (before.unread) return "what it declared at the base cannot be read";
+  if (after.unread) return null; // (every file reaches it, and every test that does runs on any change)
+  const marks = x => [...declared(x).map(t => `the type ${t}`), ...(x.extensions ? x.placed.map(ns => `extension members in ${ns || "the global namespace"}`) : []),
+    ...(x.hook || x.usings.some(u => u.global) ? ["what every file reaches (code run with no name, or a global using directive)"] : [])];
+  const kept = new Set(marks(after)), gone = marks(before).find(m => !kept.has(m));
+  return gone === undefined ? null : `it no longer holds ${gone}`;
 }
 
 // Global using directives into the index: an alias's target under its name, any other's target among the globals.
