@@ -87,7 +87,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`), the sync and its steps
-     (`scripts/sync.mjs`, `scripts/steps.mjs`), the reader of the checks that read nothing (`scripts/read-nothing.mjs`,
+     (`scripts/sync.mjs`, `scripts/steps.mjs`, and the steps' writers, `scripts/step-writers.mjs`, which write only a
+     regular file of the project outside the copy that git holds unchanged, by the copy's own scripts), the reader of the checks that read nothing (`scripts/read-nothing.mjs`,
      from the steps and the state report, listing files by the shape check's own lister) and the scheduled look
      (`scripts/look.mjs`); limits: 64 MB of a file the steps read, past which it is reported unread, and none of their
      own in count, since a project's config is its own; hostile tests: `tests/hostile-configs-test.mjs`.
