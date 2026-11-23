@@ -373,7 +373,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      it finishes or a comment that opens "Code review:", from an account the security review counts, names that commit
      by its whole SHA (`tasks/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
      nor a sync's shape) has had none on its head, or on a commit only such updates from `main` follow, or, where it
-     found nothing blocking, the pull request's own fixes (#1134); while the newest
+     found nothing blocking, the pull request's own commits after it that a review checked and found nothing blocking
+     in (#1134); while the newest
      "Security review:", "Code review:" or "Design check:" posted from 18 November lacks its lines "Blocking findings:"
      and "Other findings:", or, posted from 20 November, its line "Score:" (`tasks/reviews.md`, point 3); and, in the
      core's own repository, while a pull request opened from that day that changes `floor/`, `roles/`, `tasks/` or

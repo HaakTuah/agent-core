@@ -198,6 +198,8 @@ ok(is(powered([script], new Set(["scripts/run.mjs"])), false, "second") && is(po
 ok(is(powered([pinMove], new Set([".github/workflows/ci.yml"])), true, "has run"), "a powered workflow whose pins alone moved asks one, as before (floor rule 17)");
 ok(is(powered([script], null), false, "second") && is(powered([file("docs/x.md", patch(["a", "b"]))], null), true, "has run") && is(powered([file("core/scripts/x.mjs", patch(["a", "b"]))], null), true, "has run"),
   "where the set could not be read, each changed script asks two, and a document, or a script of the copy, asks one");
+ok(is(powered([file("bin/deploy", patch(["a", "b"]))], null), false, "second") && is(powered([file("bin/deploy", patch(["a", "b"]))], new Set()), true, "has run"),
+  "where the set could not be read, a changed file with no extension asks two, as power.mjs reads it runnable; given the set, only where it is in it");
 // each status that waits says its mend, whole, within GitHub's 140 characters
 const waits = [judge(pull, []), judge(pull, [summary(open)], [finding("2026-11-12T10:30:00Z")]), judge(pull, [summary(open)]), judge(pull, [late, said("Security review: x")], [finding("2026-11-12T10:30:00Z")]),
   judge(pull, [summary(running), early]), two([summary(done)], [stepChange])];

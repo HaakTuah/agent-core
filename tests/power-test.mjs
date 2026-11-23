@@ -39,6 +39,20 @@ const bareNames = setOf(tree({
   "scripts/helper.js": "module.exports = 1;\n", "scripts/lib/index.js": "module.exports = 2;\n", "scripts/other.js": "module.exports = 3;\n",
   "tools/go.py": "import util\n", "tools/util.py": "x = 1\n",
 }));
+// a workflow given the secrets whole is powered, as one given one by name; one that names only the token is not
+ok(powered("on: push\npermissions:\n  contents: read\njobs:\n  a:\n    env:\n      ALL: ${{ toJSON(secrets) }}\n") && powered("on:\n  workflow_call:\n    secrets:\n      KEY:\npermissions: {}\n")
+  && !powered("on: push\npermissions:\n  contents: read\njobs:\n  a:\n    env:\n      T: ${{ secrets.GITHUB_TOKEN }}\n"),
+"a workflow given the secrets whole, or declaring one it is called with, is powered; one given only the job's token is not");
+// what a powered workflow runs from a folder it moves to: by a step's working-directory, a shell's cd, a module run by
+// its name, and, where the folder's name is built, a name that stands in any folder
+const moves = setOf(tree({
+  ".github/workflows/w.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: ./build.sh\n        working-directory: tools\n      - run: cd ci && node publish.mjs\n      - run: python -m tools2.job\n      - run: python -m pkg\n",
+  ".github/workflows/v.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: for d in a b; do (cd \"$d\" && ./make.sh); done\n",
+  "tools/build.sh": "echo build\n", "ci/publish.mjs": "console.log(1);\n", "tools2/job.py": "print(1)\n", "pkg/__main__.py": "print(1)\n",
+  "a/make.sh": "echo a\n", "b/deep/make.sh": "echo b\n", "build.sh": "echo root\n", "publish.mjs": "console.log(0);\n", "other/build.sh": "echo other\n",
+}));
+ok(show(moves) === ".github/workflows/v.yml, .github/workflows/w.yml, a/make.sh, b/deep/make.sh, build.sh, ci/publish.mjs, pkg/__main__.py, publish.mjs, tools/build.sh, tools2/job.py",
+  "a powered workflow's script run from a folder it moves to joins the set: by working-directory, by cd, a Python module by its name, and in any folder where the folder's name is built; the root's of the same name too, and one in a folder it does not move to stays out", show(moves));
 ok(show(bareNames) === ".github/workflows/m.yml, scripts/helper.js, scripts/lib/index.js, scripts/run.cjs, tools/go.py, tools/util.py",
   "a module named without its extension joins the set as its language loads it: helper.js, a folder's index.js, a Python module; one not named stays out", show(bareNames));
 const files = {
@@ -71,7 +85,7 @@ const files = {
 };
 const why = new Map();
 const set = setOf({ ...tree(files), copy: "vendored/core/" }, why);
-const want = [".claude/settings.json", ".github/workflows/called.yml", ".github/workflows/powered.yml", "bin/publish", "bin/release", "deploy", "scripts/by-action.mjs", "scripts/by-call.sh",
+const want = [".claude/settings.json", ".github/workflows/called.yml", ".github/workflows/powered.yml", "bin/publish", "bin/release", "core/scripts/calls.mjs", "deploy", "scripts/by-action.mjs", "scripts/by-call.sh",
   "scripts/calls.mjs", "scripts/helper.mjs", "scripts/pushes.sh", "scripts/run.mjs", "scripts/steps/one.mjs", "scripts/unread.py", "tools/act/action.yml"];
 ok(show(set) === want.join(", "), "the set holds the powered workflow, what it runs and calls and loads, a script that calls out, .claude/, an action and what it runs, and an unread script, and nothing else", show(set));
 ok(why.get(".github/workflows/powered.yml") === "power" && why.get(".claude/settings.json") === "place" && why.get("tools/act/action.yml") === "place"
@@ -84,7 +98,8 @@ ok(why.get("deploy") === ".github/workflows/powered.yml" && why.get("bin/release
 ok(!set.has(".github/workflows/named.yml") && !set.has("scripts/by-named.mjs"), "a workflow a powered one only names is not followed, nor what it runs");
 ok(!set.has("scripts/not-run.mjs"), "a root-relative path a module only prints is not followed: a module's names lead from its own folder");
 ok(!set.has("scripts/steps/deeper/two.mjs") && !set.has("scripts/other/three.mjs"), "a module loaded by a built name brings in the folder it names alone, not one below it or another");
-ok(!set.has("core/scripts/calls.mjs") && !set.has("vendored/core/scripts/calls.mjs"), "the copy of the core is left out, wherever it stands");
+ok(set.has("core/scripts/calls.mjs") && !set.has("vendored/core/scripts/calls.mjs"), "the copy at the path the manifest names is left out, and a folder core/ that is not the copy is read");
+ok(setOf(tree(files)).has("vendored/core/scripts/calls.mjs"), "where no manifest names a copy, as in the core's own repository, nothing is left out");
 ok(!set.has(".github/workflows/readonly.yml") && !set.has("scripts/plain.mjs"), "a workflow that may only read is not in it, nor what it alone runs");
 
 // a built name in a test's string is no load, and a script whose built name names no folder brings in none

@@ -83,14 +83,18 @@ path `scripts/stage-order.mjs`. What reviewers judge by: `roles/shared/review-gu
      the merge once a ruleset requires it (#320).
    - **A fix is checked by its finding's reviewer; a light commit carries the security review** (#1134, point 1). By
      default a review stands as above. The one condition that changes it: a later commit of the pull request's own.
-     The builder asks again only the reviewer whose blocking finding it answers, on its diff alone; every other review
-     stands. Where it is light, touching no file of what runs with power at it or its parent, as `scripts/power.mjs`
-     reads it (a workflow with a write permission or a secret, an action, `.claude/`, an agent tool's own folder, and a
-     script one of them runs, or that calls GitHub, the network or `git push`), a security review that declared no
-     blocking finding carries over it, with no check or note. It does not mean a commit that is not light goes
-     unchecked. Reason: about 1,100 of 1,675 review comments on 371 pull requests checked a later commit. Held by
-     `scripts/power.mjs`, which the `security-review` status reads, and `scripts/code-review-wait.mjs`, by which the
-     `code-review` status carries the code review and design check across the pull request's own fixes.
+     Where it answers a blocking finding, the builder asks again only the reviewer that raised it, on its diff alone;
+     once that check, posted or Codex's, declares no blocking finding, every other review stands across the commit.
+     Where it is light, touching no file of what runs with power at it or its parent, a security review that declared no
+     blocking finding carries over it, with no check or note. What runs with power is what `node scripts/power.mjs
+     --list` prints, its opening comment saying why: a workflow with a write permission, a secret or no top-level
+     `permissions:`, an action, `.claude/`, what `scripts/comment-only.mjs` reads as running beyond `.github/` (an agent
+     tool's own folder, hooks, the install and build files), what one of them runs or loads, a file with no extension
+     among them, and a script that calls GitHub, the network or `git push`. It does not mean a commit that answers no
+     finding, or one that is not light, goes unchecked: it is reviewed for what it changes. Reason: about 1,100 of 1,675
+     review comments on 371 pull requests checked a later commit. Held by `scripts/power.mjs`, which the
+     `security-review` status reads, and `scripts/code-review-wait.mjs`, by which the `code-review` status carries the
+     code review and design check across a commit a review checked and found nothing blocking in.
    - **A pull request of the *progress file* alone needs no review of its own** (#750). By default every pull request
      gets its reviews. Where `scripts/queue-only.mjs`, run from the default branch on the head, proves that it changes
      the *progress file* alone, from a branch of the repository's own into the default branch, each line it adds in a
@@ -150,7 +154,8 @@ path `scripts/stage-order.mjs`. What reviewers judge by: `roles/shared/review-gu
    *review reference*, the review guidelines (the core's and the project's), the project's `SECURITY.md` and threat
    model with the floor, and its stance (point 1), and nothing else.
    - **One fallback reviewer a pull request** (#1134, point 3). By default the builder starts one fresh session at the
-     strongest tier and high effort that did not write the change, and it gives every review asked of the fallback
+     strongest tier and high effort that did not write the change. Nothing changes it. It gives every review asked of
+     the fallback
      reviewer (the second security review, the design check, the code review where none other comes, the leanness
      check), each in its own comment, and is continued for each later check, on what changed, while its tool keeps its
      context. It does not mean one comment for two kinds. Reason: each fresh one read the whole pull request again.

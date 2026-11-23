@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 // What runs with power, and which later commits of a pull request touch none of it (#1134, points 1 and 4;
 // tasks/reviews.md, "What a posted review stands for"). The set, as this script reads it from a tree of the repository:
-//   - a workflow (.github/workflows/) with a write permission, a secret, or no top-level `permissions:`, where the
-//     host's default token, which may write, is what it gets;
+//   - a workflow (.github/workflows/) with a write permission, a secret (by its name, by an index, or the secrets
+//     whole), or no top-level `permissions:`, where the host's default token, which may write, is what it gets;
 //   - an action (an action.yml or action.yaml in any folder);
 //   - .claude/, and what comment-only.mjs, beside this file, reads as running by itself beyond .github/ (RUNS_TOO: an
-//     agent tool's own folder, hooks, the files that say what installs or builds), the copy of the core aside;
-//   - what such a file runs or loads: a path it names (a root-relative one, or one relative to its own folder) that is
-//     a script, an action or a file with no extension (an executable such as `./deploy`), and a workflow it calls (`uses:`), followed on through what that names in turn, and, where a script of the
+//     agent tool's own folder, hooks, the files that say what installs or builds), the copy of the core at the path
+//     the manifest names aside;
+//   - what such a file runs or loads: a path it names (a root-relative one, one relative to its own folder, or one
+//     relative to a folder it moves to: `working-directory:`, `cd`, `pushd`, `-C`, `--prefix`, `--cwd`; where it moves
+//     to a folder whose name it builds, one relative to any folder) that is a script, an action or a file with no
+//     extension (an executable such as `./deploy`), a Python module it runs by name (`-m a.b`), and a workflow it calls
+//     (`uses:`), followed on through what that names in turn, and, where a script of the
 //     set loads a module by a name it builds (an `import(` or `require(` of no plain string), the scripts directly in
 //     each folder it names (one that names none loads what its caller names, which is followed from the caller);
 //   - a script whose own text calls GitHub, the network or `git push` (CALLS), a file with no extension whose text
@@ -41,9 +45,10 @@ const SHA = /^[0-9a-f]{40}$/u;
 export const SCRIPT = /\.(?:[cm]?[jt]sx?|sh|bash|zsh|py|ps1|psm1|rb|pl|php|lua|bat|cmd)$/iu;
 const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u;
 const ACTION = /(?:^|\/)action\.ya?ml$/iu;
-// what a workflow's line says of power, comment lines aside: a write permission (`<scope>: write`), write-all, or a
-// secret other than the token the job's own permissions bound (secrets.GITHUB_TOKEN)
-const POWERED = /(?:^|\n)[ \t]*[^#\n][^\n]*?(?:\bwrite-all\b|\b[a-z-]+[ \t]*:[ \t]*["']?write["']?[ \t]*(?:[,}#]|\n|$)|\bsecrets(?:\.(?!GITHUB_TOKEN\b)|\[|[ \t]*:[ \t]*inherit\b))/u;
+// what a workflow's line says of power, comment lines aside: a write permission (`<scope>: write`), write-all, or the
+// secrets in any form (`secrets.NAME`, an index, `inherit`, a declared one, `toJSON(secrets)`) but the token the job's
+// own permissions bound (secrets.GITHUB_TOKEN)
+const POWERED = /(?:^|\n)[ \t]*[^#\n][^\n]*?(?:\bwrite-all\b|\b[a-z-]+[ \t]*:[ \t]*["']?write["']?[ \t]*(?:[,}#]|\n|$)|\bsecrets\b(?!\.GITHUB_TOKEN\b))/u;
 const PERMISSIONS = /(?:^|\n)permissions[ \t]*:/u;
 // a call to GitHub, the network or `git push`, as a script's text shows it
 export const CALLS = /\bfetch[ \t]*\(|\bnode:(?:https?|http2|net|tls|dgram)\b|\brequire\([ \t]*["'](?:https?|http2|net|tls|dgram)["']|\bXMLHttpRequest\b|\bWebSocket\b|\bcurl\b|\bwget\b|\bInvoke-(?:WebRequest|RestMethod)\b|\burllib\b|\brequests\.(?:get|post|put|patch|delete|request)\b|\bgh[ \t]+(?:api|pr|issue|release|run|repo|workflow|auth|secret|label|search)\b|["']gh["']|api\.github\.com|\bGH_TOKEN\b|\bGITHUB_TOKEN\b|\bgit[ \t]+(?:push|fetch|clone|pull|ls-remote)\b|["'](?:push|fetch|clone|pull|ls-remote)["']/u;
@@ -59,6 +64,11 @@ const code = (text) => text.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:[^"\\\n]|\\
 // `helper.js`, or `helper/index.js`); a name that resolves to none of these is read as it stands
 const JS_ENDS = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".jsx", ".tsx"];
 const RESOLVES = [[MODULE, [...JS_ENDS, ...JS_ENDS.map((end) => `/index${end}`)]], [/\.py$/iu, [".py", "/__init__.py"]]];
+// a folder a text moves to before it runs what it names: a step's `working-directory:`, a shell's `cd` or `pushd`, a
+// tool's `-C`, `--prefix` or `--cwd` (each name as written, a quoted one unquoted)
+const MOVES = /\bworking-directory[ \t]*:[ \t]*["']?([^\s"'#]+)|(?:^|[\s;&|(`"'])(?:cd|pushd)[ \t]+["']?([^\s"';&|)`]+)|[ \t](?:-C|--prefix|--cwd)(?:[ \t]+|=)["']?([^\s"';&|)`]+)/gu;
+// a Python module run by its name (`python -m tools.job`)
+const RUN_MODULE = /(?:^|[\s"'])-m[ \t]+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)/gu;
 // the names a text may give a path by
 const TOKENS = /[A-Za-z0-9_@.+~/-]+/gu;
 // the largest text read: a file past it is held in the set, unread
@@ -74,18 +84,22 @@ const unextended = (name) => path.posix.extname(name) === "";
 const placed = (name) => ACTION.test(name) || name.startsWith(".claude/") || RUNS_TOO.test(name);
 
 // The set of a tree: `paths`, every file's path; `read(path)`, its text, or null where it cannot be read or is too large;
-// `copy`, the folder of the core's copy, left out (only a sync changes it, its code reviewed in the core's own pull
-// request). `why`, where given, is filled with what brought each path in.
+// `copy`, the folder of the core's copy as the manifest names it, left out (only a sync changes it, its code reviewed in
+// the core's own pull request; a repository whose manifest names none, the core's own among them, leaves out nothing).
+// `why`, where given, is filled with what brought each path in.
 export function setOf({ paths, read: raw, copy }, why = new Map()) {
   const read = (name) => lf(raw(name));
-  const own = paths.filter((name) => typeof name === "string" && !(copy && name.startsWith(copy)) && !name.startsWith("core/"));
+  const own = paths.filter((name) => typeof name === "string" && !(typeof copy === "string" && copy !== "" && name.startsWith(copy)));
   const all = new Set(own);
+  // the runnable paths by their last part, for a name read relative to any folder
+  const byBase = new Map();
+  for (const name of own) if (runnable(name)) byBase.set(path.posix.basename(name), [...(byBase.get(path.posix.basename(name)) ?? []), name]);
   const set = new Set(), queue = [];
   const add = (name, from) => { if (!set.has(name)) { set.add(name); queue.push(name); why.set(name, from); } };
   for (const name of own) { const seed = seedOf(name, read); if (seed) add(name, seed); }
   for (let i = 0; i < queue.length; i++) {
     const name = queue[i], text = read(name);
-    if (text !== null) for (const [other, from] of loadsOf(name, text, all, own)) add(other, from);
+    if (text !== null) for (const [other, from] of loadsOf(name, text, all, own, byBase)) add(other, from);
   }
   return set;
 }
@@ -99,23 +113,44 @@ function seedOf(name, read) {
   return CALLS.test(text) ? "calls" : null;
 }
 // what a file of the set runs or loads, each [path, what brought it in]
-function loadsOf(name, text, all, own) {
-  const found = [...namedIn(name, text, all)].map((other) => [other, name]);
+function loadsOf(name, text, all, own, byBase) {
+  const found = [...namedIn(name, text, all, byBase)].map((other) => [other, name]);
   if (SCRIPT.test(name) && BUILT.test(MODULE.test(name) ? code(text) : text)) found.push(...[...loadable(name, text, own)].map((other) => [other, `${name} (built)`]));
   return found;
 }
-// the scripts and actions of `all` a file's text names, by a path from the repository's root or from its own folder,
-// and the workflows it calls (`uses: ./.github/workflows/...`): a workflow it only names, it does not run
-function namedIn(name, text, all) {
-  const folder = path.posix.dirname(name), found = new Set();
-  const tries = ["", ...(RESOLVES.find(([kind]) => kind.test(name))?.[1] ?? [])];
-  for (const [token] of text.matchAll(TOKENS)) {
-    const bare = token.replace(/^\/+/u, "").replace(/[.]+$/u, "");
-    const from = [path.posix.normalize(path.posix.join(folder, bare)), ...(MODULE.test(name) ? [] : [bare.replace(/^(?:\.\/)+/u, "")])];
-    for (const at of from.flatMap((stem) => tries.map((end) => stem + end))) {
-      if (all.has(at) && at !== name && (SCRIPT.test(at) || ACTION.test(at) || unextended(at))) found.add(at);
-    }
+// the folders a file's text moves to (MOVES), each from the root and from the file's own folder, and whether it moves to
+// one whose name it builds or leaves to its caller (`$`, `~`, `-`), so that its names may stand in any folder
+function movesOf(text, folder) {
+  const at = new Set();
+  let anywhere = false;
+  for (const match of text.matchAll(MOVES)) {
+    const to = match[1] ?? match[2] ?? match[3];
+    if (/[$~`]|^-/u.test(to)) { anywhere = true; continue; }
+    for (const from of ["", folder]) at.add(path.posix.normalize(path.posix.join(from, to)));
   }
+  return { at: [...at].filter((name) => !name.startsWith("..")), anywhere };
+}
+// whether a path is one a file may run or load: a script, an action or a file with no extension
+const runnable = (name) => SCRIPT.test(name) || ACTION.test(name) || unextended(name);
+// the scripts and actions of `all` a file's text names, by a path from the repository's root, from its own folder or
+// from a folder it moves to (or, where it moves to one it builds, from any folder: `byBase`, the runnable paths by their
+// last part), the Python modules it runs by name, and the workflows it calls (`uses: ./.github/workflows/...`): a
+// workflow it only names, it does not run
+function namedIn(name, text, all, byBase = new Map()) {
+  const folder = path.posix.dirname(name), found = new Set();
+  const moved = movesOf(text, folder);
+  const take = (at) => { if (all.has(at) && at !== name && runnable(at)) found.add(at); };
+  // a name as it may stand relative to any folder: each runnable path it ends
+  const anyFolder = (stem) => { for (const at of byBase.get(path.posix.basename(stem)) ?? []) if (at === stem || at.endsWith(`/${stem}`)) take(at); };
+  const resolve = (bare, tries, bases) => {
+    for (const stem of bases.map((base) => path.posix.normalize(path.posix.join(base, bare)))) for (const end of tries) take(stem + end);
+    if (moved.anywhere) for (const end of tries) anyFolder(path.posix.normalize(bare + end));
+  };
+  const tries = ["", ...(RESOLVES.find(([kind]) => kind.test(name))?.[1] ?? [])];
+  // (a module's own code names a path from its own folder alone; a root-relative one in it is text it prints)
+  const bases = [folder, ...moved.at, ...(MODULE.test(name) ? [] : [""])];
+  for (const [token] of text.matchAll(TOKENS)) resolve(token.replace(/^\/+/u, "").replace(/[.]+$/u, "").replace(/^(?:\.\/)+/u, ""), tries, bases);
+  for (const [, run] of text.matchAll(RUN_MODULE)) resolve(run.replaceAll(".", "/"), [".py", "/__main__.py", "/__init__.py"], ["", folder, ...moved.at]);
   for (const [, called] of text.matchAll(/(?:^|\n)[ \t-]*uses[ \t]*:[ \t]*["']?\.\/(\.github\/workflows\/[^\s"'@#]+)/gu)) if (all.has(called)) found.add(called);
   return found;
 }

@@ -489,7 +489,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by
   the case's script on what the session did, read from the project (its commits, its pushes, what it wrote to GitHub),
   never on what it says of itself. A case is due on the first scheduled look of each month, and once the words of a
-  rule it holds change (`node scripts/staged.mjs`); the look then keeps the issue "Staged cases to run". The session
+  rule it holds change (`node scripts/staged.mjs`), save the reviewers' case `review`, due monthly alone
+  (`tasks/reviews.md`, point 9); the look then keeps the issue "Staged cases to run". The session
   that takes it runs each due case in a fresh helper at the builder's model and high effort, records the verdicts in
   `reports/staged-cases.json` in a pull request of its own, and says there of each failure whether the rule, the case
   or the session was wrong. The cases advise until three months in a row have run every one with no verdict found
