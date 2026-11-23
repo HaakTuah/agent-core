@@ -1,6 +1,7 @@
 {
   "lockfiles": [".packages/package-lock.json", ".packages/parser/package-lock.json", "tests/mutation/package-lock.json"],
   "ignoreScriptsIn": [".packages/.npmrc", ".packages/parser/.npmrc", "tests/mutation/.npmrc"],
+  "pypi": [".packages/requirements.txt"],
   "ships": [],
   "data": ["spdx-exceptions", "caniuse-lite"],
   "audit": ".github/licences-audit.json",

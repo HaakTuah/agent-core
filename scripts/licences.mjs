@@ -31,7 +31,8 @@
 // font package is known by its registry address. "accepted" holds what is off its list and the owner wants anyway,
 // each with the owner's yes (licence-yes.mjs, beside this file, says how one is written and what it never takes in).
 // A project whose packages come from NuGet names its lock files under "nuget", which the NuGet check reads (nuget.mjs,
-// beside this file) with this file's lists, the same audit and an "accepted" of its own.
+// beside this file) with this file's lists, the same audit and an "accepted" of its own. "pypi" names requirements
+// files in PyPI's lock form, which the lookup alone reads (lookup.mjs, beside this file; #716).
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, posix, relative, resolve, sep } from "node:path";
@@ -332,7 +333,7 @@ function npmrcFiles(root, dir = "") {
 /** One spelling for every path in a config ("./package.json" is "package.json"), so "ships" matches its lockfile's. */
 function normalised(config) {
   const out = { ...config };
-  for (const key of ["lockfiles", "ships", "ignoreScriptsIn"]) if (Array.isArray(out[key])) out[key] = out[key].map((p) => posix.normalize(p));
+  for (const key of ["lockfiles", "ships", "ignoreScriptsIn", "pypi"]) if (Array.isArray(out[key])) out[key] = out[key].map((p) => posix.normalize(p));
   if (typeof out.audit === "string") out.audit = posix.normalize(out.audit);
   return out;
 }
@@ -385,7 +386,7 @@ function configShape(config) {
 
 /** The config's keys, each one it knows, its lists each a list of names, and "ships" among them. */
 function configLists(config) {
-  const lists = ["lockfiles", "ships", "data", "fonts", "ignoreScriptsIn"];
+  const lists = ["lockfiles", "ships", "data", "fonts", "ignoreScriptsIn", "pypi"];
   // ("nuget" is the NuGet check's own, which reads and checks it: nuget.mjs, beside this file; "agentTools" the agent-tools
   // check's: agent-tools.mjs)
   const unknown = Object.keys(config).filter((k) => !lists.includes(k) && !["audit", "notices", "scan", "nuget", "accepted", "agentTools"].includes(k));
@@ -427,7 +428,7 @@ function scanPathOk(key, p) {
  *  refused, and, given the project's `root`, so is one whose file is reached through a link that leads out of it: the
  *  config, where none is. */
 function within(config, root) {
-  const named = [...(config.lockfiles ?? []), ...(config.ships ?? []), ...(config.ignoreScriptsIn ?? []), config.audit, config.notices].filter((p) => p !== undefined);
+  const named = [...(config.lockfiles ?? []), ...(config.ships ?? []), ...(config.ignoreScriptsIn ?? []), ...(config.pypi ?? []), config.audit, config.notices].filter((p) => p !== undefined);
   const out = named.filter((p) => !inProject(p) || (root !== undefined && leadsOut(root, join(root, p))));
   if (out.length) throw new Error(`the config names a path outside the project: ${out.map((p) => logged(p)).join(", ")}. Mend: name each file by its path from the project's root, with no ".." that leads above it, and make it a file of the project's own, reached through no link that leads out of it`);
   return config;

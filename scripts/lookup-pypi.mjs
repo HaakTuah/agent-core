@@ -1,0 +1,155 @@
+// The lookup's part for PyPI (#716; lookup.mjs, beside this file, runs it): a requirements file in PyPI's lock form,
+// each package at one exact version (==) with the hashes of its files, as `pip-compile --generate-hashes` and `uv pip
+// compile --generate-hashes` write one, read to packages; and what PyPI says of each new one. A file of the licence
+// check's config under "pypi" is read so: a line in any other form (a range, an address, a package with no hash, an
+// include, an index that is not PyPI's) fails it whole, since pip would install what the lookup did not read. Which
+// package another brings, and which the project names, is read from the "# via" lines those tools write; a file with
+// none names every package itself, and says nothing of what each brings. Names are compared as pip compares them
+// (PEP 503: in lower case, each run of "-", "_" and "." one "-"). What PyPI answers is a publisher's text: it is said
+// on one line by the lookup's report, and an answer of another shape is a lookup that failed. The reader of a
+// repository's address is the lookup's own, passed in (`readRepo`), so neither file imports the other.
+
+import { reach } from "./reach.mjs";
+
+const PYPI = "https://pypi.org/";
+// (a name as PyPI gives one, PEP 508's, and a version as PEP 440 writes one exactly: never a wildcard or a range)
+const NAME = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/u;
+const VERSION = /^[0-9A-Za-z][0-9A-Za-z.+!_-]{0,63}$/u;
+const HASH = /^--hash[=\s]+(?:sha256:[0-9a-f]{64}|sha384:[0-9a-f]{96}|sha512:[0-9a-f]{128})$/u;
+// (the options a file may name that change neither what is installed nor where from; PyPI's own index alone)
+const HARMLESS = /^(?:--require-hashes|--prefer-binary|--pre|--only-binary[=\s]+\S+|--no-binary[=\s]+\S+|(?:-i|--index-url)[=\s]+https:\/\/pypi\.org\/simple\/?)$/u;
+const MOST_OWNERS = 5;
+const WRITE = "write the file anew with pip-compile --generate-hashes (or uv pip compile --generate-hashes), each package at one exact version with its hashes, never by hand";
+const object = (x) => Boolean(x) && typeof x === "object" && !Array.isArray(x);
+const when = (text) => (typeof text === "string" && /^\d{4}-\d\d-\d\dT/u.test(text) ? Date.parse(text) : NaN);
+
+/** A name as pip compares it. */
+export const normal = (name) => name.toLowerCase().replace(/[-_.]+/gu, "-");
+
+/** The packages of a requirements file's text in PyPI's lock form: each { name, version, path, direct, brings, by, pypi }. */
+export function pypiPackages(text, lockPath) {
+  const entries = [];
+  let via = null;
+  for (const [n, line] of logical(text)) {
+    const refuse = (what, mend = WRITE) => { throw new Error(`${lockPath}, line ${n}: ${what}, so it is not PyPI's lock form. Mend: ${mend}`); };
+    if (line.startsWith("#")) { via = viaLine(line, entries.at(-1) ?? null, via); continue; }
+    via = null;
+    const bare = line.replace(/\s+#.*$/u, "");
+    if (bare.startsWith("-")) {
+      if (!HARMLESS.test(bare)) refuse("an option the lookup does not read (an include, an address, or an index other than PyPI's own)", `name each file in "pypi" of the config itself, take packages from PyPI's own index alone, and ${WRITE}`);
+    } else if (bare) entries.push(entryOf(bare, refuse));
+  }
+  return graphed(entries);
+}
+
+// Each logical line, trimmed, with the number of its first: its continuations joined, as pip reads them.
+function* logical(text) {
+  const lines = text.replace(/^\uFEFF/u, "").split(/\r?\n/u);
+  for (let i = 0; i < lines.length; i++) {
+    const n = i + 1;
+    let line = lines[i];
+    while (/\\\s*$/u.test(line) && i + 1 < lines.length) line = line.replace(/\\\s*$/u, " ") + lines[++i];
+    yield [n, line.trim()];
+  }
+}
+
+// The entry a comment's "# via" names go to, if any: "# via a, b" after an entry, or "# via" then a line "#   a" for
+// each; any other comment ends the list.
+function viaLine(line, last, via) {
+  const head = /^#\s*via\b(.*)$/u.exec(line), item = /^#\s{2,}(\S.*)$/u.exec(line);
+  const to = head ? last : item ? via : null;
+  to?.via.push(...(head ?? item)[1].split(/[\s,]+/u).filter(Boolean));
+  return to;
+}
+
+// The package a line names at one exact version with its hashes, or the file refused.
+function entryOf(bare, refuse) {
+  const at = bare.search(/\s--hash\b/u);
+  const spec = (at < 0 ? bare : bare.slice(0, at)).split(";")[0].trim();
+  const hashes = at < 0 ? [] : bare.slice(at).trim().split(/\s+(?=--hash\b)/u);
+  const pinned = /^([^\s[=<>!~@;]+)\s*(?:\[[^\]]*\])?\s*==\s*([^\s=]+)$/u.exec(spec);
+  if (!pinned || !NAME.test(pinned[1]) || !VERSION.test(pinned[2])) refuse("a package not at one exact version from PyPI (name==version)");
+  if (!hashes.length || !hashes.every((h) => HASH.test(h))) refuse(`${pinned[1]} names no hash of its files that pip checks`);
+  return { name: normal(pinned[1]), version: pinned[2], via: [] };
+}
+
+// Each entry as the lookup reads it. One with no "# via" line, or whose line names anything but a package of the file
+// (the project's own file, "-r requirements.in", "(pyproject.toml)"), is named by the project; the packages a line
+// names bring it. A file with no "# via" line at all says nothing of what each brings.
+function graphed(entries) {
+  const any = entries.some((e) => e.via.length), names = new Set(entries.map((e) => e.name));
+  const parents = (e) => e.via.map((v) => normal(v.replace(/\[.*$/u, ""))).filter((v) => names.has(v));
+  const direct = (e) => !any || parents(e).length < e.via.length || !e.via.length;
+  const children = new Map(), byName = new Map(entries.map((e) => [e.name, e]));
+  for (const e of entries) for (const p of parents(e)) children.set(p, (children.get(p) ?? new Set()).add(e.name));
+  return entries.map((e) => ({ name: e.name, version: e.version, path: e.name, direct: direct(e), pypi: true,
+    get brings() { return any ? reach(e.name, (x) => children.get(x) ?? []).size : null; },
+    get by() { return direct(e) ? [] : [...reach(e.name, (x) => parents(byName.get(x)))].filter((x) => direct(byName.get(x))); } }));
+}
+
+/** What PyPI says of the package `p` ({ name, version }), asked with `get(url)` ({ status, json }): its facts, or
+ *  { missing } where PyPI has no such package or version. */
+export async function pypiRegistry(p, get, readRepo) {
+  if (!NAME.test(p.name) || !VERSION.test(p.version)) throw new Error("its name or version is not one PyPI gives");
+  const name = normal(p.name);
+  const r = await get(`${PYPI}pypi/${name}/json`);
+  if (r.status === 404) return { missing: "the registry answers that it knows no such name" };
+  if (r.status !== 200) throw new Error(`it answered ${r.status}`);
+  const facts = pypiFacts(r.json, p.version, readRepo);
+  if (facts.missing) return facts;
+  facts.provenance = await provenance(name, facts, get);
+  return facts;
+}
+
+/** What PyPI's answer `doc` (its JSON of a project) says of the package at `version`: { first, last, repo, publisher,
+ *  note, file } or { missing }. */
+export function pypiFacts(doc, version, readRepo) {
+  if (!object(doc) || !object(doc.releases)) throw new Error("its answer is no JSON object that lists releases");
+  const releases = doc.releases;
+  const files = (v) => (Array.isArray(releases[v]) ? releases[v].filter(object) : []);
+  const all = Object.keys(releases).flatMap((v) => files(v).map((f) => ({ at: when(f.upload_time_iso_8601), yanked: f.yanked === true }))).filter((f) => !Number.isNaN(f.at));
+  if (!all.length) return { missing: "the registry knows the name, and holds no file of it" };
+  // (a version as written in the lock file, else as PyPI keys it, in either case)
+  const key = Object.hasOwn(releases, version) ? version : Object.keys(releases).find((v) => v.toLowerCase() === version.toLowerCase());
+  const own = key ? files(key) : [];
+  if (!own.length) return { missing: `the registry knows the name, and no file of version ${version.slice(0, 64)} of it` };
+  const kept = all.filter((f) => !f.yanked), info = object(doc.info) ? doc.info : {};
+  return { first: Math.min(...all.map((f) => f.at)), last: Math.max(...(kept.length ? kept : all).map((f) => f.at)), repo: repoOf(info, readRepo),
+    publisher: publisher(doc.ownership, info), note: own.every((f) => f.yanked === true) ? "this version is yanked: PyPI asks that it not be installed" : "", version: key, file: fileOf(own) };
+}
+
+// The name of one file of the version that is not yanked, in the form PyPI gives, to ask its provenance of.
+const fileOf = (own) => own.find((f) => !f.yanked && typeof f.filename === "string" && /^[A-Za-z0-9][\w.+!-]{0,250}$/u.test(f.filename))?.filename ?? null;
+
+// The repository the project names: a GitHub address among its links, one named for its source first; else the first
+// link named for its source; else none.
+function repoOf(info, readRepo) {
+  const links = [...Object.entries(object(info.project_urls) ? info.project_urls : {}), ["home page", info.home_page]]
+    .filter(([, u]) => typeof u === "string" && u.length <= 300);
+  const source = ([k]) => /source|repo|code|github/iu.test(k);
+  const read = links.map(([k, u]) => [k, readRepo(u)]).filter(([, r]) => r);
+  return read.find((e) => source(e) && e[1].owner)?.[1] ?? read.find(([, r]) => r.owner)?.[1] ?? read.find(source)?.[1] ?? null;
+}
+
+// Who publishes it: its owners as PyPI lists them, else its authors as the package writes them.
+function publisher(ownership, info) {
+  const roles = Array.isArray(ownership?.roles) ? ownership.roles.filter((r) => typeof r?.user === "string").map((r) => r.user) : [];
+  const org = typeof ownership?.organization === "string" && ownership.organization ? `the organization ${ownership.organization}, ` : "";
+  if (org || roles.length) return `${org}${roles.length ? `owners ${roles.slice(0, MOST_OWNERS).join(", ")}${roles.length > MOST_OWNERS ? ` and ${roles.length - MOST_OWNERS} more` : ""}` : "no owner listed"} (as PyPI lists them)`;
+  const author = [info.author, info.maintainer].find((a) => typeof a === "string" && a);
+  return author ? `${author} (as the package writes its authors)` : "not named";
+}
+
+// Whether one file of the version has an attestation (PEP 740), as PyPI's integrity interface gives it, and by whom: its
+// address built here from the name, the version and the file's name, on PyPI alone (floor rule 5).
+async function provenance(name, facts, get) {
+  if (!facts.file) return "no file of this version to ask";
+  const r = await get(`${PYPI}integrity/${name}/${encodeURIComponent(facts.version)}/${encodeURIComponent(facts.file)}/provenance`).catch(() => ({ status: 0 }));
+  if (r.status === 404) return "no";
+  const by = Array.isArray(r.json?.attestation_bundles) ? r.json.attestation_bundles.map((b) => b?.publisher).filter((x) => x && typeof x === "object") : null;
+  if (r.status !== 200 || !by) return "PyPI did not answer";
+  const text = (v) => (typeof v === "string" ? v : "");
+  const from = by.map((x) => `${text(x.kind) || "a publisher"}${text(x.repository) && ` ${x.repository}`}${text(x.workflow) && ` (${x.workflow})`}`);
+  const named = facts.repo?.owner && by.some((x) => typeof x.repository === "string" && x.repository.toLowerCase() === `${facts.repo.owner}/${facts.repo.name}`.toLowerCase());
+  return `yes, from ${[...new Set(from)].join(", ") || "a publisher PyPI does not name"}${facts.repo?.owner ? `, ${named ? "the repository it names" : "not the repository it names"}` : ""}`;
+}

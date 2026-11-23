@@ -32,6 +32,7 @@
     "data": { "$ref": "#/$defs/names" },
     "fonts": { "$ref": "#/$defs/names" },
     "ignoreScriptsIn": { "$ref": "#/$defs/names" },
+    "pypi": { "$ref": "#/$defs/names" },
     "audit": {
       "type": "string",
       "minLength": 1,
