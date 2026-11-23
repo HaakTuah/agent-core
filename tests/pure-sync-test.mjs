@@ -227,6 +227,12 @@ ok(creates.status === 1 && /NOT PURE[^\n]*SECURITY\.md: not the core's copy, its
   "a file that is the project's own, created by the sync where main lacks it, is not pure, though it is what the kit renders", creates.out);
 ok(/^attached: no, /u.test(createsAttached.out) && /^- the sync: not pure: [^\n]*SECURITY\.md[^\n]*Mend: /mu.test(createsAttached.out), "  and whether the core is attached reads no on that branch, naming the file and its mend", createsAttached.out);
 git(p, "push", "-q", "-f", "origin", `${base}:main`);
+// a sync's branch that changes what the project follows: nothing of the core's runs, since only what main follows may
+git(p, "checkout", "-q", "-B", "sync-follows", LEGIT);
+write(p, "core-manifest.md", `${read(p, "core-manifest.md").trimEnd()}\n| *follows* | \`releases\` |\n`);
+git(p, "commit", "-q", "-am", "the sync, and what it follows changed");
+const followsAttached = attachedHere();
+ok(/^attached: no, /u.test(followsAttached.out) && /^- the sync: it changes what the project follows[^\n]*was not run\. Mend: /mu.test(followsAttached.out), "  and on a sync's branch that changes what the project follows, pure-sync.mjs is not run, and that stands in the way with its mend", followsAttached.out);
 // main marks its own workflow export-ignore (a common line of .gitattributes): the proof reads main's tree blob by blob,
 // as git holds it, so a sync that swaps that workflow for the kit's render is not pure (floor rule 3's second review)
 git(p, "checkout", "-q", "-B", "main-ignores", base);
