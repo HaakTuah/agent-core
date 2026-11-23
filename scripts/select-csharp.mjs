@@ -20,7 +20,8 @@ const MODIFIER = new Set(["public", "internal", "private", "protected", "static"
 const HOOKS = new Set(["ModuleInitializer", "AssemblyInitialize", "AssemblyCleanup", "GlobalTestInitialize", "GlobalTestCleanup", "SetUpFixture", "BeforeEvery", "AfterEvery", "IIncrementalGenerator", "ISourceGenerator", "CollectionDefinition"]);
 // (what finds types unnamed: reflection, a scan of an assembly or the compilation; a word Assembly or CreateInstance… too)
 const REFLECTS = new Set(["IIncrementalGenerator", "ISourceGenerator", "Activator", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
-  "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR", "Migrate", "MigrateAsync"]);
+  "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR", "Migrate", "MigrateAsync",
+  "GetMigrations", "GetPendingMigrations", "HasPendingModelChanges"]);
 
 const hookWord = w => HOOKS.has(w.replace(/Attribute$/u, ""));
 const TUNIT = /^(Before|After)(Attribute)?$/u;
@@ -181,7 +182,7 @@ export function undeclared(was, now, pace = () => {}) {
 
 // Global using directives into the index: an alias's target under its name, any other's target among the globals.
 function globally(ix, usings) {
-  for (const u of usings) if (u.alias) { if (u.target !== null) into(ix.aliases, u.alias).add(u.target); } else { ix.globals.push(u.target); if (u.qual) ix.qualified.push(u); }
+  for (const u of usings) if (u.alias) { if (u.target !== null) into(ix.aliases, u.alias).add(u.target); if (u.qual && u.target !== null) ix.qualified.push(u); } else { ix.globals.push(u.target); if (u.qual) ix.qualified.push(u); }
 }
 
 // The names a file writes in full (x its facts): its runs of dotted words, each with an alias that heads it put for
@@ -194,10 +195,13 @@ function fullNames(x, ix, aliases, pace) {
   return runs;
 }
 
-// The aliases a file sees (x its facts): the global ones and its own, each to what it names.
-function aliasesOf(x, ix) {
-  const aliases = new Map(ix.aliases);
-  for (const u of x.usings) if (u.alias && u.target !== null) into(aliases, u.alias).add(u.target);
+// The aliases a file sees (x its facts): the global ones and its own, each to what it names, and one whose target "D::"
+// heads also to what the alias D names ("using D = App;" then "using E = D::Data;" names App.Data). `pace` asked for each.
+function aliasesOf(x, ix, pace) {
+  const aliases = new Map(ix.aliases), own = new Set();
+  const add = (k, t) => { if (!own.has(k)) { own.add(k); aliases.set(k, new Set(aliases.get(k))); } aliases.get(k).add(t); }; // (the global sets kept as they are)
+  for (const u of x.usings) if (u.alias && u.target !== null) add(u.alias, u.target);
+  for (const u of [...ix.qualified, ...x.usings]) if (u.alias && u.qual && u.target !== null) for (const t of [...aliases.get(u.qual) ?? []]) { pace(); add(u.alias, join(t, u.target)); }
   return aliases;
 }
 
@@ -215,7 +219,7 @@ function* targetsOf(x, ix, aliases, pace) {
 function reachOf(x, ix, pace) {
   const around = new Set([""]);
   for (const n of x.r.namespaces) for (const p of prefixes(n, ix.depth, pace)) around.add(p);
-  const sees = new Set(around), aliases = aliasesOf(x, ix);
+  const sees = new Set(around), aliases = aliasesOf(x, ix, pace);
   for (const target of targetsOf(x, ix, aliases, pace)) for (const p of around) for (const n of prefixes(join(p, target), ix.depth, pace)) sees.add(n);
   const to = new Set(ix.every), add = files => { for (const g of files ?? []) to.add(g); }, runs = fullNames(x, ix, aliases, pace);
   for (const w of x.words) for (const last of [w, `${w}Attribute`]) for (const [ns, files] of ix.byLast.get(last) ?? []) if (sees.has(ns)) add(files);

@@ -3,8 +3,9 @@
 // MSBuild's <Using>), by an attribute, by its full name, through an alias or `using static`; an extension member; a
 // delegate; a file of top-level statements by Program; a file C# or a test framework runs with no name; and C# git holds
 // that the config does not read, read as links between the files it reads. Where reach cannot be told:
-// select-csharp-unsure-test.mjs, which imports the cases made here; run by itself, this file checks them. Needs the
-// parser (node scripts/install.mjs parser). Run by the core's tests workflow (.github/workflows/tests.yml).
+// select-csharp-unsure-test.mjs; where MSBuild's files decide it: select-csharp-msbuild-test.mjs; each imports the cases
+// made here, and run by itself, this file checks them. Needs the parser (node scripts/install.mjs parser). Run by the
+// core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/select-csharp-test.mjs
 import { csharpReach } from "../scripts/select-csharp.mjs";
@@ -153,13 +154,8 @@ ok(same(esc, [true, true]), "an escaped @delegate in braces declares nothing, an
   const forms = ["(int Count, App.Data.Store Item)", "App.Data.Store[]", "App.Data.Store?"].filter(form => !reached(new Set(["tests/AliasTest.cs"]), csharpReach({ ...app,
     "src/Usings.cs": `global using S = ${form};\n`, "tests/AliasTest.cs": "namespace Tests;\nclass AliasTest { S s; }\n" }, undefined, nothing).links).get("tests/AliasTest.cs").has("src/Store.cs"));
   ok(!forms.length, "a global alias of a tuple, an array or a nullable type is read for the types it names", forms.join(", "));
-  const nsAlias = [["using D = App;", "D.Data.Store"], ["using D = App;", "D::Data.Store"], ["using L::App.Data;", "Store"], ["", "L::App.Data.Store"], ["using D = App;\nusing D::Data;", "Store"]].filter(([u, n]) => !one("namespace App.Data;\npublic class Store { }\n", { "tests/T.cs": `extern alias L;\n${u}\nnamespace Tests;\nclass T { object s = new ${n}(); }\n` }).links.get(TEST)?.has(SRC));
+  const nsAlias = [["using D = App;", "D.Data.Store"], ["using D = App;", "D::Data.Store"], ["using L::App.Data;", "Store"], ["", "L::App.Data.Store"], ["using D = App;\nusing D::Data;", "Store"], ...["E.Store", "E::Store"].map(n => ["global using D = App;\nusing E = D::Data;", n])].filter(([u, n]) => !one("namespace App.Data;\npublic class Store { }\n", { "tests/T.cs": `extern alias L;\n${u}\nnamespace Tests;\nclass T { object s = new ${n}(); }\n` }).links.get(TEST)?.has(SRC));
   ok(!nsAlias.length, "a name in full or a using directive is read through an alias's \".\" or \"::\", an extern alias's too", nsAlias.join("; "));
-  const items = ["<Using Include=\"App.Data.Store\" Alias=\"S\" />", "<Using Include=\"App.Data.Store\" Alias=\"SAttribute\" />", "<Using Include=\"App.Data.Store\" Static=\"true\" />"].filter(item => !csharpReach({
-    "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npublic class Store { public static void Go() { } }\n",
-    "tests/Tests.csproj": `<Project><ItemGroup>${item}</ItemGroup></Project>`, "tests/T.cs": "namespace Tests;\nclass T { [S] S s; void M() { Go(); } }\n",
-  }, undefined, nothing).links.get(TEST)?.has("src/Store.cs"));
-  ok(!items.length, "a <Using> with an Alias (an attribute's too), or Static, reaches the type it names from every file", items.join(", "));
   const collected = { ...app, "src/Db.cs": "namespace App;\npublic class DbFixture { }\n", "tests/DbCollection.cs": "using App;\nusing Xunit;\nnamespace Tests;\n[CollectionDefinition(\"db\")]\npublic class DbCollection : ICollectionFixture<DbFixture> { }\n",
     "tests/DbTest.cs": "using Xunit;\nnamespace Tests;\n[Collection(\"db\")]\nclass DbTest { }\n" };
   ok(pick(collected, "src/Db.cs").tests.includes("tests/DbTest.cs"), "an xUnit collection's definition, which its tests find by a string, is reached from every file, and the fixture it names with it", JSON.stringify(pick(collected, "src/Db.cs")));

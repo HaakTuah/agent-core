@@ -53,12 +53,19 @@ function targets(out, include, given) {
   return true;
 }
 
-// Whether a text imports a file other than a .props or .targets (an <Import> where a part of Project, split at ";",
-// ends in neither, in lower case as git lists them; a common path such as GetPathOfFileAbove('Directory.Build.props',
-// …) read as one): git's .xml or .proj may hold a <Using>
-// the reader never sees. (Each try ends at the next "<": linear.)
+// Whether a text imports a file other than a .props or .targets: git's .xml or .proj may hold a <Using> the reader never
+// sees. Each part of an <Import>'s Project, split at ";" and trimmed, is read as one only where it ends in ".props" or
+// ".targets", in lower case as git lists them, and holds nothing MSBuild expands but $(MSBuild…) (a reserved property,
+// which no file sets) and GetDirectoryNameOfFileAbove of such: a part written whole as GetPathOfFileAbove('….props', …)
+// too. Any other part ($(X).props, whose X may hold ";", or a property function that ends elsewhere) is another file,
+// and so is a Custom{Before,After}Microsoft… property, which the SDK imports by name. (Each regex is anchored, its
+// alternatives start apart: linear.)
+const PATH = String.raw`(?:[^$%@&;'"()]|\$\(MSBuild\w+\))`;
+const PART = new RegExp(String.raw`^(?:${PATH}|\$\(\[MSBuild\]::GetDirectoryNameOfFileAbove\((?:${PATH}|'(?:${PATH})*')*\)\))*\.(?:props|targets)$`, "u");
+const ABOVE = new RegExp(String.raw`^\$\(\[MSBuild\]::GetPathOfFileAbove\(\s*'?[^$%@&;'"(),]*\.(?:props|targets)'?\s*(?:,(?:${PATH}|'(?:${PATH})*')*)?\)\)$`, "u");
 function importsOther(text) {
-  for (const m of text.matchAll(/<Import\b([^<>]*)>/giu)) if (!(attributes(m[1])?.project ?? "").split(";").every(p => /\.(?:props|targets)(?=\s*(?:['")]|$))/u.test(p))) return true;
+  if (/<Custom(?:Before|After)Microsoft/iu.test(text)) return true;
+  for (const m of text.matchAll(/<Import\b([^<>]*)>/giu)) if (!(attributes(m[1])?.project ?? "").split(";").every(p => PART.test(p.trim()) || ABOVE.test(p.trim()))) return true;
   return false;
 }
 
@@ -88,13 +95,13 @@ export function msbuildUsings(texts, pace) {
 }
 
 // What git holds that the config does not read and C# compiles with: { msbuild: [the texts of each .props and .targets],
-// cs: { path: text } of each file of C# }, a link read as no text; { unknown: true } where git cannot be asked or a file
-// cannot be read; past CHARACTERS bytes of them, Late. `listed` gives the files git holds of those kinds.
+// cs: { path: text } of each file of C# }; { unknown: true } where git cannot be asked or a file cannot be read, a link
+// among them (never followed) too; past CHARACTERS bytes of them, Late. `listed` gives the files git holds of those kinds.
 export function heldBeside(texts, listed = () => git(["ls-files", "-z", "--", ":(glob)**/*.props", ":(glob)**/*.targets", ":(glob)**/*.cs"]).split("\0")) {
   let n = 0;
   try {
     const held = listed().filter(f => f && !(f in texts));
-    const text = f => { const st = fs.lstatSync(f); if ((n += st.isFile() ? st.size : 0) > CHARACTERS) throw tooMuch("the files git holds beside", n, "bytes"); return st.isFile() ? fs.readFileSync(f, "utf8") : ""; };
+    const text = f => { const st = fs.lstatSync(f); if (!st.isFile()) throw new Error(`${f} is no file`); if ((n += st.size) > CHARACTERS) throw tooMuch("the files git holds beside", n, "bytes"); return fs.readFileSync(f, "utf8"); };
     return { msbuild: held.filter(f => !f.endsWith(".cs")).map(text), cs: Object.fromEntries(held.filter(f => f.endsWith(".cs")).map(f => [f, text(f)])) };
   } catch (e) { if (e instanceof Late) throw e; return { unknown: true }; }
 }

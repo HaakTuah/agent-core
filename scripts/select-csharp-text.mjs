@@ -109,11 +109,11 @@ function inHole(src, i, s) {
 }
 
 // Whether what stands at i in a hole is what the tokens leave out: a word in an alignment (a letter, a letter-number
-// such as "Ⅻ" or "_" may begin one), a name's escape "\u0041" or a formatting character, an interpolated, verbatim or raw string's start, or a
-// comment, which may hide where the hole ends.
+// such as "Ⅻ" or "_" may begin one), a name's escape "\u0041" or a formatting character, an interpolated, verbatim or raw string's start, a
+// character of a bracket, "," or ":" (which the tokens' recovery of "{{{" counts as code), or a comment, which may hide where the hole ends.
 function hides(src, i, s) {
   const c = src[i];
-  return (s.align && /[\p{L}\p{Nl}_]/u.test(c)) || (c === "'" && "{}".includes(src[i + 1])) || named(src, i) || c === "$" || c === "@" || src.startsWith("\"\"\"", i) || (c === "/" && /[/*]/u.test(src[i + 1] ?? ""));
+  return (s.align && /[\p{L}\p{Nl}_]/u.test(c)) || (c === "'" && "{}()[],:".includes(src[i + 1])) || named(src, i) || c === "$" || c === "@" || src.startsWith("\"\"\"", i) || (c === "/" && /[/*]/u.test(src[i + 1] ?? ""));
 }
 
 // The index of the quote that closes a plain string or a character whose text begins at i (or the line's end).
