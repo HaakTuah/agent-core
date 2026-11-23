@@ -16,11 +16,12 @@
 //   is ordinary words).
 // Node's own modules.
 //
-//   import { headMends, named, keysAt } from "./pr-head.mjs";
+//   import { headMends, keysAt } from "./pr-head.mjs";
 import { items } from "./archive.mjs";
 
-export const PLACEHOLDERS = ["to be added", "TBD", "TODO", "XXX", "FIXME"];
+const PLACEHOLDERS = ["to be added", "TBD", "TODO", "XXX", "FIXME"];
 export const HEAD_MEND = "Mend: bring the description to the head in one edit: name the item that stands, or take the line out";
+export const PLACE_MEND = "Mend: in one edit, write what the placeholder stands for, or take the line out; where the word is meant as it stands, put it in code marks";
 
 const KEY = String.raw`(#\d+(?:\.\d+)?|\d+)\b`;
 const CORE_KEY = new RegExp(String.raw`\bcore archive ${KEY}`, "giu");
@@ -53,7 +54,7 @@ function linesOf(body) {
 
 // What the description names, each with the line it stands on: { keys, placeholders }, each a list of { at, token,
 // said }. `own` says whether the repository is the core's own, whose archive "archive item N" names.
-export function named(body, own = true) {
+function named(body, own = true) {
   const keys = [], placeholders = [];
   for (const { at, text, prose } of linesOf(body)) {
     // (in the order they stand on the line)
@@ -77,6 +78,6 @@ export function headMends(body, { keys, own = true }) {
   const { keys: said, placeholders } = named(body, own), mends = [], notes = [];
   if (said.length && keys === null) notes.push("the archive keys the description names are not read here: no archive could be read");
   else for (const k of said) if (!keys.has(k.token.replace(/^0+(?=\d)/u, ""))) mends.push(`line ${k.at} of the description names "${k.said}", which the head's archive does not hold. ${HEAD_MEND}`);
-  for (const p of placeholders) mends.push(`line ${p.at} of the description holds the placeholder "${p.said}". ${HEAD_MEND}, or write what it stands for; where the word is meant as it stands, put it in code marks`);
+  for (const p of placeholders) mends.push(`line ${p.at} of the description holds the placeholder "${p.said}". ${PLACE_MEND}`);
   return { mends, notes };
 }

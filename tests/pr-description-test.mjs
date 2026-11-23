@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { asked, copyAtBase, doneAsked, DONE_SINCE, missing, PARTS } from "../scripts/pr-description.mjs";
 import { costMend, NO_COST } from "../scripts/pr-cost.mjs";
-import { HEAD_MEND, headMends, keysAt } from "../scripts/pr-head.mjs";
+import { HEAD_MEND, PLACE_MEND, headMends, keysAt } from "../scripts/pr-head.mjs";
 import { numberMend } from "../scripts/pr-number.mjs";
 import { reasonsMend } from "../scripts/pr-reasons.mjs";
 import { heldAt, waitsMend, waitsOn } from "../scripts/pr-waits.mjs";
@@ -96,7 +96,7 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   ok(["todo", "TODOs", "a line to be added to the list", "`TODO`", "```\nFIXME\n```", "a \"TODO\""].every(t => fails(`The change.\n${t}\n`).length === 0),
     "  but not the word in small letters or in a longer word, \"to be added\" in a sentence, nor one in code marks or double quotes");
   const all = fails("core archive 263\nTBD\n");
-  ok(all.length === 2 && all.every(m => mended(`FAIL ${m}`) && m.includes(HEAD_MEND)), "each failure says its mend");
+  ok(all.length === 2 && all.every(m => mended(`FAIL ${m}`)) && all[0].includes(HEAD_MEND) && all[1].includes(PLACE_MEND), "each failure says its mend");
   const slow = Date.now();
   headMends(`${" ".repeat(200000)}x\n- ${" ".repeat(200000)}x\n:${" ".repeat(200000)}x\n${"`".repeat(100000)}\n${"<!--".repeat(50000)}\n${"\"".repeat(100001)}\n${"core archive ".repeat(20000)}\n`, { keys });
   ok(Date.now() - slow < 2000, "a long description of blanks, marks and quotes is read in no time");
