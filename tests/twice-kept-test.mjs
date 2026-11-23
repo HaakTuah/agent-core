@@ -49,7 +49,7 @@ for (const [form, [file, content]] of Object.entries(FORMS)) {
   else write(dir, { [file]: content });
   const before = content === null ? null : fs.readFileSync(path.join(dir, file));
   const r = run(dir, "--fix", ...fetched);
-  const listed = new RegExp(`^  notes/zephyr-notes\\.md is the core's docs/zephyr-notes\\.md, byte for byte; ${file.replace(/[.]/gu, "\\.")} names it, so it stays for the auditor$`, "mu").test(r.stdout);
+  const listed = new RegExp(`^  notes/zephyr-notes\\.md is the core's docs/zephyr-notes\\.md, byte for byte; ${file.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")} names it, so it stays for the auditor$`, "mu").test(r.stdout);
   ok(listed && has(dir, "notes/zephyr-notes.md") && (before === null || fs.readFileSync(path.join(dir, file)).equals(before)), `a file named ${form} stays, listed with the file that names it, which is not written`, r.stdout);
 }
 
