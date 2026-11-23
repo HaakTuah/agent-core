@@ -24,7 +24,8 @@
 // step a release asks reads done (steps.mjs), but one the commit under test adds that it asks of every project (a
 // check's own list to write), which is reported, alone, and done by its mend as written; each step the commit under
 // test adds over the release started from, taken out, is reported, and its mend as written makes it done; and steps
-// taken out at random are reported, exactly those. Of the private one, its NuGet call with the starter kit's paths
+// taken out at random are reported, exactly those, and the steps' writers (steps.mjs --write; #1091), run on them,
+// leave each step they say they did done, no other undone and no rule file's words changed. Of the private one, its NuGet call with the starter kit's paths
 // starts no job where nothing NuGet reads changed, and its pull-request checks with the kit's trigger and condition
 // start none on a push to a draft and each once it is marked ready (#375); then that a release changing only the
 // core's own files (a test, its queue, a workflow no project calls) asks no sync, and the next one syncs all the same.
@@ -48,6 +49,7 @@ import { fill, oneJob, readyOnly } from "../scripts/init.mjs";
 import { hostSays, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 import { where } from "../scripts/shape.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
+import { ruleTexts, wordsKept } from "../scripts/steps-kit.mjs";
 import { BLOCKS, blockOf, whole } from "../scripts/core-owned.mjs";
 import { configs } from "../scripts/check-configs.mjs";
 import { copyAt } from "../scripts/workflow-calls.mjs";
@@ -648,6 +650,16 @@ function upgrade(p, from, ownChanges, expect) {
   for (const lead of out) STAGES[lead].stage(p.dir);
   r = stepsIn(p.dir);
   ok(JSON.stringify(reported(r.out)) === JSON.stringify(STEP_LEADS.filter(l => out.includes(l))), `${p.name}: steps taken out at random are reported, exactly those (${out.length})`, `${out.join("\n")}\n---\n${r.out}`);
+  // (#1091: the steps' writers on them, committed, as a sync finds a project: each step a writer says is done reads
+  // done, no step reads undone that did not before, and no rule file's words changed)
+  git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "steps taken out");
+  const undone = reported(r.out), rules = ruleTexts(p.dir), w = node(p.dir, "core/scripts/steps.mjs", "--write");
+  const wrote = STEP_LEADS.filter(l => w.out.split("\n").some(line => line.startsWith(`- ${l}: wrote `) && line.endsWith("; the step is done.")));
+  r = stepsIn(p.dir);
+  const left = reported(r.out);
+  ok(w.status === 0 && wrote.every(l => !left.includes(l)) && left.every(l => undone.includes(l)) && wordsKept(rules, ruleTexts(p.dir)),
+    `${p.name}: --write on them writes ${wrote.length} whole, each reading done after it, no other step undone and no rule file's words changed`, `${w.out}\n---\n${r.out}`);
+  git(p.dir, "reset", "-q", "--hard", "HEAD~1");
   clean();
 
   // where issues answer as switched off, the owner's inbox is the folder: a task given, queued, built and closed there,

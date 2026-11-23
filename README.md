@@ -106,7 +106,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    project itself (a row of its manifest, a line of a rule file, a workflow), an entry of the sync notes says so
    (`setup/sync-notes.md`, each entry a file of `setup/sync-notes/`, read whole by `scripts/sync-notes.mjs`), and its
    step of the same name in `scripts/steps/` tells it done or not (`scripts/steps.mjs`); the sync script prints the entries a sync brings, then every
-   step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`), where the owner's
+   step not done, what the steps' writers wrote where a script does a step exactly, set aside in a git stash to commit
+   in a PR of its own once the sync is merged (`scripts/steps.mjs --write --aside`; #1091), every difference from what
+   the starter kit writes today (`scripts/fresh.mjs`), where the owner's
    inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`), the settings only the owner
    gives where the sync brings one the old copy's list did not hold (`scripts/owner-settings.mjs`; "Setting up (the
    owner's part)"), what the project holds twice or against the core (`scripts/twice.mjs`), the line `Read for it:`
