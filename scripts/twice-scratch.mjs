@@ -1,12 +1,12 @@
 // The scratch core and project the tests of what a project holds twice share (scripts/twice.mjs; #1087): a scratch core
 // of two commits, the earlier and the pin, and a project holding its copy and each kind exactly and nearly; the script
-// run as a session runs it. Node's own modules and git.
+// run as a session runs it. Tests only. Node's own modules and git.
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { CORE } from "../scripts/core-address.mjs";
-import { BEGIN, END } from "../scripts/core-owned.mjs";
-import { root, scratchDir } from "../scripts/scratch-core.mjs";
+import { CORE } from "./core-address.mjs";
+import { BEGIN, END } from "./core-owned.mjs";
+import { root, scratchDir } from "./scratch-core.mjs";
 
 export const git = (cwd, ...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd, encoding: "utf8" }).trim();
 export const write = (dir, files) => { for (const [f, t] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), t); } };

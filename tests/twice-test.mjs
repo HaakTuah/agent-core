@@ -4,7 +4,7 @@
 // earlier one, taken out and its pointers moved; the second of two calls the same in every input; a pointer to a file
 // the core moved unchanged), lists the rest, code among it, for the auditor and changes nothing of it, reads no dated
 // record nor the core's part of a rule file, and run again finds nothing exact left. What --fix keeps because it cannot
-// follow it: tests/twice-kept-test.mjs; the scratch core and project: tests/twice-fixture.mjs. Node's own modules and
+// follow it: tests/twice-kept-test.mjs; the scratch core and project: scripts/twice-scratch.mjs. Node's own modules and
 // git.
 //
 //   node tests/twice-test.mjs
@@ -15,7 +15,7 @@ import { CORE } from "../scripts/core-address.mjs";
 import { closeness, unitsOf } from "../scripts/twice-text.mjs";
 import { findings, pointerTo, pointersTo, projectOf, report, withoutJob } from "../scripts/twice.mjs";
 import { root, tally } from "../scripts/scratch-core.mjs";
-import { A, FLOOR, NEAR, OTHER, RULE, SAFE, WORKFLOW, core, earlier, fetched, git, project, run, tmp, write } from "./twice-fixture.mjs";
+import { A, FLOOR, NEAR, OTHER, RULE, SAFE, WORKFLOW, core, earlier, fetched, git, project, run, tmp, write } from "../scripts/twice-scratch.mjs";
 
 const { ok, done } = tally();
 

@@ -3,13 +3,13 @@
 // look for where it stands, one named in a form the script does not move, through a link, from another folder, from a
 // folder that holds a file of that path of its own, or in bytes not UTF-8, and one a link leads to; a call a workflow's
 // outputs name; and a workflow's path opening with ./, which it does move. On the scratch core and project of
-// tests/twice-fixture.mjs. Node's own modules and git.
+// scripts/twice-scratch.mjs. Node's own modules and git.
 //
 //   node tests/twice-kept-test.mjs
 import fs from "node:fs";
 import path from "node:path";
 import { tally } from "../scripts/scratch-core.mjs";
-import { CALL, GUIDE_NEW, RUN, fetched, project, run, write } from "./twice-fixture.mjs";
+import { CALL, GUIDE_NEW, RUN, fetched, project, run, write } from "../scripts/twice-scratch.mjs";
 
 const { ok, done } = tally();
 const reader = dir => f => fs.readFileSync(path.join(dir, f), "utf8");
