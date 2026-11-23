@@ -100,10 +100,13 @@ function onEach(on, name, kinds, byDefault) {
 const onEveryPull = on => onEach(on, "pull_request", ["opened", "reopened", "synchronize", "ready_for_review"], false)
   && onEach(on, "issue_comment", ["created", "edited"], true);
 
-// What each of the core's workflows a project calls asks of its token (their own `permissions`): GitHub refuses the
-// whole run of a file in which a call is granted less.
+// What each of the core's workflows a project calls asks of its token (their own `permissions`), and the inputs it
+// defines with their types (its `workflow_call`): GitHub refuses the whole run of a file in which a call is granted
+// less, or given an input its workflow does not define.
 const ASKS = { "security-review": { contents: "read", "pull-requests": "read", statuses: "write" }, "queue-only": { contents: "read", "pull-requests": "read", issues: "read" } };
+const INPUTS = { "security-review": { advisory: "boolean", root: "string", private: "boolean", queue: "string", reviewers: "string" }, "queue-only": { root: "string", private: "boolean" } };
 const LEVEL = { read: 1, write: 2 };
+const keysIn = (o, allowed) => o !== null && typeof o === "object" && !Array.isArray(o) && Object.keys(o).every(k => allowed.includes(k));
 
 // Whether a token's `permissions` (`p`) grant all `asks`; none given at all leaves them to the repository's default,
 // which is not read.
@@ -113,19 +116,29 @@ function grants(p, asks) {
   return p !== null && typeof p === "object" && !Array.isArray(p) && Object.entries(asks).every(([k, a]) => (LEVEL[p[k]] ?? 0) >= LEVEL[a]);
 }
 
-// Whether the workflow `doc` starts whole: each call in it of the core's granted what that workflow asks, from its own
-// job's `permissions` or else the workflow's, no call of any other's (what that asks is not read), each job a job
-// needs there, and no `concurrency`, by which a later run could cancel the one that posts.
+// Whether job `j` of a workflow whose `permissions` are `top` is a call as the kit's are: of one of the core's two
+// workflows, holding no key but these, given only inputs that workflow defines, each of its type or an expression,
+// granted what it asks, and needing only jobs `ids` holds.
+function callWhole(j, ids, top) {
+  if (!keysIn(j, ["needs", "if", "permissions", "uses", "with"])) return false;
+  const core = typeof j.uses === "string" && /^[\w.-]+\/[\w.-]+\/\.github\/workflows\/(security-review|queue-only)\.yml@[\w./-]+$/.exec(j.uses);
+  if (!core) return false;
+  const defined = INPUTS[core[1]], given = j.with ?? {};
+  if (!keysIn(given, Object.keys(defined)) || !Object.entries(given).every(([k, v]) => typeof v === defined[k] || (typeof v === "string" && /^\$\{\{[^}]*\}\}$/.test(v.trim())))) return false;
+  const needs = j.needs === undefined ? [] : typeof j.needs === "string" ? [j.needs] : j.needs;
+  return Array.isArray(needs) && needs.every(n => typeof n === "string" && ids.includes(n)) && grants(Object.hasOwn(j, "permissions") ? j.permissions : top, ASKS[core[1]]);
+}
+
+// Whether the workflow `doc` starts whole, in the kit's form and no other, since what GitHub refuses or leaves waiting
+// in any other is not read: no key at its top but a name, its triggers, its `permissions` and its jobs (no
+// `concurrency`, by which a later run could cancel the one that posts); each job named as GitHub allows and a call
+// whole (`callWhole`), so none waits on a runner or an approval; and no job needing itself, at any depth.
 function startsWhole(doc, jobs) {
-  if (doc.concurrency !== undefined) return false;
-  return Object.values(jobs).every(j => {
-    if (!j || typeof j !== "object" || j.concurrency !== undefined) return false;
-    const needs = j.needs === undefined ? [] : typeof j.needs === "string" ? [j.needs] : j.needs;
-    if (!Array.isArray(needs) || !needs.every(n => typeof n === "string" && Object.hasOwn(jobs, n))) return false;
-    if (j.uses === undefined) return true;
-    const core = typeof j.uses === "string" && /\/\.github\/workflows\/(security-review|queue-only)\.yml@/.exec(j.uses);
-    return Boolean(core) && grants(Object.hasOwn(j, "permissions") ? j.permissions : doc.permissions, ASKS[core[1]]);
-  });
+  const ids = Object.keys(jobs);
+  if (!keysIn(doc, ["name", "on", "permissions", "jobs"]) || !ids.length || !ids.every(id => /^[A-Za-z_][\w-]*$/.test(id) && callWhole(jobs[id], ids, doc.permissions))) return false;
+  const needsOf = id => [jobs[id].needs ?? []].flat(), done = new Set();
+  const settles = (id, path) => done.has(id) || (!path.includes(id) && needsOf(id).every(n => settles(n, [...path, id])) && done.add(id));
+  return ids.every(id => settles(id, []));
 }
 
 // Whether the project's `security-review.yml` (`text`) calls the core's security review so that it posts its status on
@@ -160,7 +173,7 @@ function reviewOf(host, rules, root) {
   if (text === null) return apart("the project has no `.github/workflows/security-review.yml`, so nothing posts the status, and a status required that never comes would hold every pull request");
   if (!repo) return unread(host.repo.why);
   const posts = callsPosting(text, repo.private === false);
-  if (posts === null) return unread("the project's `.github/workflows/security-review.yml` could not be read as YAML, calls no security review of the core's, starts on some pull requests alone, runs its call on a condition other than the kit's, grants a call of it less than it asks, holds a call of another's, needs a job it has not, sets a `concurrency`, or gives `private` or `advisory` a value read only at its run, so whether its call posts the status on every pull request is not known");
+  if (posts === null) return unread("the project's `.github/workflows/security-review.yml` could not be read as YAML, calls no security review of the core's, starts on some pull requests alone, runs its call on a condition other than the kit's, is not in the kit's form (each job a call of the core's two workflows granted what it asks and given only the inputs it defines, needing only those jobs and none itself, no other key, `concurrency` among them), or gives `private` or `advisory` a value read only at its run, so whether its call posts the status on every pull request is not known");
   if (!posts) return apart("in a private repository the check posts its status only where its call is given `with: private: true` or `advisory: false`, and a status required that never comes would hold every pull request");
   if (!rules) return unread(host.rules?.why ?? host.repo.why);
   return rules.checks.has(CONTEXT) ? given() : notGiven();

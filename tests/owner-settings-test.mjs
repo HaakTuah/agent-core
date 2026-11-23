@@ -107,6 +107,12 @@ try {
     [t => t.replace("queue-only.yml", "other.yml"), "a call of another workflow, whose asks are not read"],
     [t => t.replace("jobs:", "concurrency:\n  group: x\n  cancel-in-progress: true\njobs:"), "a concurrency, by which a later run may cancel the one that posts"],
     [t => t.replace("    needs: queue\n", "    needs: queue\n    concurrency: { group: x, cancel-in-progress: true }\n"), "a concurrency on its call"],
+    [t => t.replace(/(queue-only\.yml@a+\n)/, "$1    with:\n      advisroy: false\n"), "an input its workflow does not define"],
+    [t => t.replace(/(queue-only\.yml@a+\n)/, "$1    with:\n      private: 'yes'\n"), "an input not of its type"],
+    [t => t.replace(/(queue-only\.yml@a+\n)/, "$1    secrets: inherit\n"), "a secret passed"], [t => t.replace(/(queue-only\.yml@a+\n)/, "$1    runs-on: x\n"), "a call with a runner"],
+    [t => t.replace("  queue:\n", "  queue:\n    needs: security-review\n"), "jobs that need each other"], [t => t.replace("needs: queue", "needs: [queue, security-review]"), "a job that needs itself"],
+    [t => t.replace("jobs:\n", "jobs:\n  build:\n    runs-on: x\n    steps: [{ run: echo }]\n"), "a job not a call, which may wait on a runner or an approval"],
+    [t => t.replace("jobs:", "bogus: 1\njobs:"), "a key at its top not the kit's"], [t => t.replace("  queue:\n", "  1q:\n").replace("needs: queue", "needs: 1q"), "a job named as GitHub refuses"],
     [t => t.replace("    if: ${{ !cancelled() }}\n", ""), "a job it needs and no condition, so skipped where that job fails"]]) {
     for (const [w, answers, where] of [["    with:\n      private: true\n", privately, "private"], ["", none, "public"]]) {
       const broken = change(call(w));
