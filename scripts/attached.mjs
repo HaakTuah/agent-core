@@ -128,20 +128,21 @@ function syncBranch(root) {
   return head && base && head !== base && git(root, ["rev-parse", "HEAD"]) !== git(root, ["rev-parse", main]) ? head : null;
 }
 
-// On a sync's branch, pure-sync.mjs from the core's side: the release the sync moves to, where the project follows the
-// releases, or the core's main, where it follows main, as its header says; its packages those of the copy where the two
-// lock files are the same, else installed by its own install script.
-function pureSync(root, at, bare, why, tmp, said) {
-  const pin = syncBranch(root);
-  if (!pin) return;
-  if (!bare) return said.unread("the sync", `the core could not be fetched${why}, so pure-sync.mjs was not run from the core's side`);
-  // (only what the project follows runs: where that cannot be read, nothing, and a project that follows the releases
-  // never runs the core's main, whose newest commit may be no release)
+// The commit of the core whose pure-sync.mjs reads the sync moving to `pin`: the release it moves to, where the project
+// follows the releases, or the core's main, where it follows main, as pure-sync.mjs's header says; null, said, where
+// none may run. (Only what the project follows runs: where that cannot be read, nothing, and a project that follows the
+// releases never runs the core's main, whose newest commit may be no release.)
+function sideOf(root, at, bare, pin, said) {
   const follows = followsOf(git(root, ["show", `HEAD:${MANIFEST}`]), hostSaid(() => {}));
-  if (follows === null) return said.unread("the sync", "whether the project follows the core's main or its releases could not be read (its manifest's row *follows*, or whose account holds it), so pure-sync.mjs was not run");
-  if (follows === "releases" && !releasesIn(bare).some(r => r.sha === pin)) return said.way("the sync", `it moves the copy to ${pin.slice(0, 7)}, which is no release of the core, and the project follows the releases. Mend: sync to the newest release, \`node ${at}scripts/sync.mjs\` with no commit named`);
-  const side = follows === "releases" ? pin : inBare(bare, ["rev-parse", "refs/heads/main"]).trim();
-  const dir = path.join(tmp, "side");
+  if (follows === null) return said.unread("the sync", "whether the project follows the core's main or its releases could not be read (its manifest's row *follows*, or whose account holds it), so pure-sync.mjs was not run"), null;
+  if (follows === "main") return inBare(bare, ["rev-parse", "refs/heads/main"]).trim();
+  if (releasesIn(bare).some(r => r.sha === pin)) return pin;
+  return said.way("the sync", `it moves the copy to ${pin.slice(0, 7)}, which is no release of the core, and the project follows the releases. Mend: sync to the newest release, \`node ${at}scripts/sync.mjs\` with no commit named`), null;
+}
+
+// The core at `side`, unpacked into `dir`, its packages those of the copy where the two lock files are the same, else
+// installed by its own install script.
+function unpack(root, at, bare, side, dir) {
   fs.mkdirSync(dir);
   execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(bare, ["archive", side], { encoding: "buffer", maxBuffer: 1 << 28 }) });
   for (const install of [".packages", ".packages/parser"]) {
@@ -150,6 +151,17 @@ function pureSync(root, at, bare, why, tmp, said) {
     if (lock(dir) !== null && lock(dir) === lock(path.join(root, at)) && fs.existsSync(mine)) fs.symlinkSync(mine, path.join(dir, install, "node_modules"), "junction");
   }
   if (!fs.existsSync(path.join(dir, ".packages", "node_modules"))) spawnSync(process.execPath, [path.join(dir, "scripts", "install.mjs"), "all"], { encoding: "utf8", timeout: 600000 });
+}
+
+// On a sync's branch, pure-sync.mjs from the core's side (sideOf), each line it finds not pure in the way.
+function pureSync(root, at, bare, why, tmp, said) {
+  const pin = syncBranch(root);
+  if (!pin) return;
+  if (!bare) return said.unread("the sync", `the core could not be fetched${why}, so pure-sync.mjs was not run from the core's side`);
+  const side = sideOf(root, at, bare, pin, said);
+  if (!side) return;
+  const dir = path.join(tmp, "side");
+  unpack(root, at, bare, side, dir);
   const r = spawnSync(process.execPath, [path.join(dir, "scripts", "pure-sync.mjs")], { cwd: root, encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
   if (r.status === 0) return;
   const notPure = String(r.stdout ?? "").split("\n").filter(l => l.startsWith("  NOT PURE ")).map(l => l.slice("  NOT PURE ".length));
