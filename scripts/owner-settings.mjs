@@ -93,12 +93,13 @@ function onEveryPull(on) {
   return pulls.types === undefined || (Array.isArray(pulls.types) && ["opened", "synchronize"].every(t => pulls.types.includes(t)));
 }
 
-// Whether the project's `security-review.yml` (`text`) calls the core's security review with `private: true` or
-// `advisory: false`, which makes it post its status in a private repository: true or false, as GitHub reads its YAML;
-// null where it is no YAML here, calls no such workflow, gives either input a value that is no plain boolean (an
-// expression GitHub reads at its run), starts on some pull requests alone, or runs its call on a condition other than
-// the kit's, since that cannot be told.
-function callsPosting(text) {
+// Whether the project's `security-review.yml` (`text`) calls the core's security review so that it posts its status on
+// every pull request: in a public repository whatever its inputs, in a private one (`open` false) only with
+// `private: true` or `advisory: false`. True or false, as GitHub reads its YAML; null where it is no YAML here, calls no
+// such workflow, gives either input of a private one's call a value that is no plain boolean (an expression GitHub reads
+// at its run), starts on some pull requests alone, or runs its call on a condition other than the kit's, since that
+// cannot be told.
+function callsPosting(text, open) {
   let doc;
   try { doc = parseYaml(text); } catch { return null; }
   const jobs = doc?.jobs && typeof doc.jobs === "object" && !Array.isArray(doc.jobs) ? doc.jobs : {};
@@ -109,7 +110,7 @@ function callsPosting(text) {
   const always = j => j.if === "${{ !cancelled() }}" || (j.if === undefined && j.needs === undefined);
   const said = calls.map(j => {
     const given = j.with && typeof j.with === "object" ? j.with : {};
-    if (given.private === true || given.advisory === false) return everyPull && always(j) ? true : null;
+    if (open || given.private === true || given.advisory === false) return everyPull && always(j) ? true : null;
     return [given.private, given.advisory].every(v => v === undefined || typeof v === "boolean") ? false : null;
   });
   return said.includes(true) ? true : said.includes(null) ? null : false;
@@ -123,11 +124,9 @@ function reviewOf(host, rules, root) {
   if (fs.existsSync(path.join(root, ".git"))) try { text = ownFiles(root).read(".github/workflows/security-review.yml"); } catch { /* (git could not list its files: nothing of its own read) */ }
   if (text === null) return apart("the project has no `.github/workflows/security-review.yml`, so nothing posts the status, and a status required that never comes would hold every pull request");
   if (!repo) return unread(host.repo.why);
-  if (repo.private !== false) {
-    const posts = callsPosting(text);
-    if (posts === null) return unread("the project's `.github/workflows/security-review.yml` could not be read as YAML, or calls no security review of the core's, or gives `private` or `advisory` a value read only at its run, so whether its call posts the status is not known");
-    if (!posts) return apart("in a private repository the check posts its status only where its call is given `with: private: true` or `advisory: false`, and a status required that never comes would hold every pull request");
-  }
+  const posts = callsPosting(text, repo.private === false);
+  if (posts === null) return unread("the project's `.github/workflows/security-review.yml` could not be read as YAML, calls no security review of the core's, starts on some pull requests alone, runs its call on a condition other than the kit's, or gives `private` or `advisory` a value read only at its run, so whether its call posts the status on every pull request is not known");
+  if (!posts) return apart("in a private repository the check posts its status only where its call is given `with: private: true` or `advisory: false`, and a status required that never comes would hold every pull request");
   if (!rules) return unread(host.rules?.why ?? host.repo.why);
   return rules.checks.has(CONTEXT) ? given() : notGiven();
 }

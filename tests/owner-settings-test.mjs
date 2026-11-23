@@ -26,8 +26,10 @@ try {
   execFileSync("git", ["init", "-q"], { cwd: root, env }); // (its own files are those git lists: own-files.mjs)
   const review = text => fs.writeFileSync(path.join(root, ".github", "workflows", "security-review.yml"), text);
 
+  const call = w => `on:\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\njobs:\n  security-review:\n    needs: queue\n    if: \${{ !cancelled() }}\n    uses: someone/agent-core/.github/workflows/security-review.yml@${"a".repeat(40)} # the pin\n${w}`;
+
   // every setting given, in a public repository
-  review("jobs:\n  security-review:\n    uses: x\n");
+  review(call(""));
   const rules = checks => [{ type: "deletion" }, { type: "non_fast_forward" }, { type: "pull_request" }, { type: "required_status_checks", parameters: { required_status_checks: checks.map(context => ({ context })) } }];
   const all = {
     repo: { body: { private: false, default_branch: "main", security_and_analysis: { secret_scanning: { status: "enabled" }, secret_scanning_push_protection: { status: "enabled" } } } },
@@ -68,7 +70,6 @@ try {
   const privately = { ...all, repo: { body: { ...all.repo.body, private: true } } };
   s = statesOf(privately, root);
   ok(s["security-review-required"].given === null && /with: private: true/.test(s["security-review-required"].said), "a private repository whose call does not run the check: not asked for", s["security-review-required"].said);
-  const call = w => `on:\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\njobs:\n  security-review:\n    needs: queue\n    if: \${{ !cancelled() }}\n    uses: someone/agent-core/.github/workflows/security-review.yml@${"a".repeat(40)} # the pin\n${w}`;
   for (const [w, said] of [["    with:\n      private: true\n", "`private: true`"], ["    with:\n      advisory: false\n", "`advisory: false`, which posts the status"],
     ["    with: { private: true }\n", "`private: true` in a flow mapping"], ["    with:\n      private: true # runs in a private repository\n", "`private: true` with a comment"],
     ["    with:\n      advisory: false  # enforce review\n", "`advisory: false` with a comment"]]) {
@@ -91,6 +92,13 @@ try {
     const st = statesOf(privately, root)["security-review-required"];
     ok(said.startsWith("only") ? st.given === null && /^does not apply/.test(st.said) : st.given === null && /^not read: /.test(st.said), `a private repository whose call holds ${said}: ${said.startsWith("only") ? "not asked for" : "said not read, never not for it"}`, st.said);
   }
+  for (const [text, said] of [[call("").replace("if: ${{ !cancelled() }}", "if: false"), "a condition on its call other than the kit's"],
+    [call("").replace(/on:\n  pull_request:\n.*\n/, "on: [push]\n"), "no pull request among its triggers"],
+    [call("").replace("    types:", "    branches: [release]\n    types:"), "a filter of branches"]]) {
+    review(text);
+    const st = statesOf(none, root)["security-review-required"];
+    ok(st.given === null && /^not read: /.test(st.said), `a public repository whose call holds ${said}: said not read, never asked for`, st.said);
+  }
   fs.rmSync(path.join(root, ".github", "workflows", "security-review.yml"));
   if (process.platform !== "win32") { // (a link needs a right of its own on Windows)
     fs.symlinkSync(path.join(at, "elsewhere.yml"), path.join(root, ".github", "workflows", "security-review.yml"));
@@ -110,7 +118,7 @@ try {
   asked.length = 0;
   const host = readHost("someone/a-game", route => { asked.push(route); return route === "repos/someone/a-game" ? all.repo : /secrets\?/.test(route) ? many.secrets : /secrets\//.test(route) ? { body: { name: "PERSONAL_TERMS" } } : { body: [] }; });
   ok(asked.length === 5 && asked[3] === "repos/someone/a-game/actions/secrets/PERSONAL_TERMS" && host.terms.body.name === "PERSONAL_TERMS", "where the list runs past its page, the secret is asked by name, a fifth read", asked.join(" | "));
-  review("jobs:\n  security-review:\n    uses: x\n");
+  review(call(""));
   const list = checklist({ repo: "someone/a-game", states: statesOf(none, root), fresh: ["personal-terms"], script: "core/scripts/owner-settings.mjs" });
   ok(/^The settings only the owner gives, for someone\/a-game \(`core\/scripts\/owner-settings.mjs`[^\n]*: 0 given, 6 not, 1 not read/.test(list), "the checklist opens with its counts", list.split("\n")[0]);
   ok(/one sitting: the owner starts a session in person, which applies each setting the owner approves[\s\S]*reads each back/.test(list) && /Nothing waits on them/.test(list), "it says how the sitting goes, and that nothing waits on it");

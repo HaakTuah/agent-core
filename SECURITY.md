@@ -108,8 +108,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      `scripts/nuget.mjs`, `scripts/workflows.mjs`, `scripts/agent-tools.mjs`, `scripts/runners.mjs`), the reader of a
      project's own workflows (`scripts/parse-yaml.mjs`, for `check.mjs`, `own-runs.mjs` and `steps.mjs`) and the
      sync's move of the pins (`scripts/sync.mjs`) and the owner's settings' reader of the project's
-     `security-review.yml` (`scripts/owner-settings.mjs`, only whether its call of the core's security review gives
-     `private: true` or `advisory: false`, on every pull request (no filter of branches or paths, its types the kit's,
+     `security-review.yml` (`scripts/owner-settings.mjs`, only whether its call of the core's security review runs
+     on every pull request, in a private repository giving `private: true` or `advisory: false` (no filter of branches or paths, its types the kit's,
      and its job run whatever the job it needs did), through `scripts/own-files.mjs`: 64 MB of it, a file
      git lists as the project's own, no link followed out of it, and read as YAML by `scripts/parse-yaml.mjs`, at most its 256 K characters, what it
      cannot read said unread, never not for the project);
