@@ -40,6 +40,8 @@ ok(by("brand-new-moss")?.direct === false && by("brand-new-moss")?.by.join() ===
 ok(by("own-moss")?.direct === true, "a \"# via\" line that names the project itself, no package of the file, is named by the project");
 const plain = pypiPackages(`﻿plain-moss==1.0.0 ${H()}\r\nother-moss==2.0.0 ${H("b")} ${H("c")}\r\n`, "requirements.txt");
 ok(plain.length === 2 && plain.every((p) => p.direct && p.brings === null), `a file with no "# via" line names every package itself, and says nothing of what each brings (${JSON.stringify(plain)})`);
+const separated = ["\r", "\v", "\f", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"].map((sep) => pypiPackages(`# a note${sep}hidden-moss==1.0.0 ${H()}`, "r.txt").map((p) => p.name).join());
+ok(separated.every((n) => n === "hidden-moss"), `a line ends at each separator pip ends one at, a lone carriage return among them, so no package hides behind a comment (${separated})`);
 const joined = pypiPackages(`# a note that ends so \\\nhidden-moss==1.0.0 ${H()}\nsplit-\\\nmoss==1.0.0 \\\n  ${H()}\n`, "r.txt");
 ok(joined.map((p) => p.name).join() === "hidden-moss,split-moss", `lines join as pip joins them: a comment ending in "\\" takes no package with it, and a package's name runs on unbroken (${joined.map((p) => p.name)})`);
 ok(pypiPackages(`--require-hashes\n--index-url https://pypi.org/simple\nplain-moss==1.0.0 ${H()}`, "r.txt").length === 1, "an option that changes neither what is installed nor where from passes");

@@ -46,7 +46,8 @@ export function pypiPackages(text, lockPath) {
 // on into the next, its backslashes taken off both ends, but a comment line never does, and one ends a line that ran
 // on into it, joined after a space.
 function* logical(text) {
-  const lines = text.replace(/^\uFEFF/u, "").split(/\r?\n/u);
+  // (at each separator Python's str.splitlines() knows, as pip splits a file: a lone carriage return among them)
+  const lines = text.replace(/^\uFEFF/u, "").split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/u);
   let joined = null, first = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i], comment = /^\s*#/u.test(line);
