@@ -85,11 +85,11 @@ const hookAlias = csharpReach({ ...csTexts, "src/Usings.cs": "global using MI = 
 ok(hookAlias.unsure.has("src/Init.cs") && hookAlias.unsure.has("tests/T.cs"), "a global alias of a hook's attribute, which the file that applies it never names, makes every file unsure", JSON.stringify([...hookAlias.unsure]));
 const store = item => csharpReach({ "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npublic class Store { }\n", "tests/Tests.csproj": `<Project><ItemGroup>${item}</ItemGroup></Project>`,
   "tests/T.cs": "namespace Tests;\nclass T { D.Data.Store s; }\n" }, undefined, nothing);
-const tags = ["<Using Note=\"Alias='Q'\" Include=\"App\" Alias=\"D\" />", "<using Include=\"App\" Alias=\"D\" />", "<USING Include=\"App\" Alias=\"D\"></USING>", "<Using Include=\"App\" Alias=\"Q\"><Alias>D</Alias></Using>"]
+const tags = ["<Using Note=\"Alias='Q'\" Include=\"App\" Alias=\"D\" />", "<using Include=\"App\" Alias=\"D\" />", "<USING Include=\"App\" Alias=\"D\"></USING>", "<Using Include=\"App\" Alias=\"Q\"><Alias>D</Alias></Using>", "<Using Include=\"App\" Alias=\"@D\" />"]
   .filter(item => !store(item).links.get("tests/T.cs")?.has("src/Store.cs"));
-ok(!tags.length, "a <Using> is read in any case, each attribute from its own pair, and both aliases where an attribute and an element each give one", tags.join(" | "));
-const untold = ["<Using Include=\"App\" /><Using Update=\"App\" Alias=\"D\" />", "<Using Include=\"App\" Alias=\"D\" Note=\"a\"b\" />", "<Using Include=\"App.Data.Store[]\" Alias=\"D\" />", "<Using Include=\"App.Data.Store?\" Alias=\"D\" />"].filter(item => store(item).unsure.size !== 2);
-ok(!untold.length, "a <Using> that updates another, whose tag is no run of attributes, or whose target is no plain name, makes every file unsure", untold.join(" | "));
+ok(!tags.length, "a <Using> is read in any case, each attribute from its own pair, both aliases where an attribute and an element each give one, and an alias's \"@\" dropped", tags.join(" | "));
+const untold = ["<Using Include=\"App\" /><Using Update=\"App\" Alias=\"D\" />", "<Using Include=\"App\" Alias=\"D\" Note=\"a\"b\" />", "<Using Include=\"App.Data.Store[]\" Alias=\"D\" />", "<Using Include=\"App.Data.Store?\" Alias=\"D\" />", "<Using Include=\"App\" Alias=\"D-x\" />"].filter(item => store(item).unsure.size !== 2);
+ok(!untold.length, "a <Using> that updates another, whose tag is no run of attributes, or whose target or alias is no plain name, makes every file unsure", untold.join(" | "));
 const tunit = one("global using B = TUnit.Core.BeforeAttribute;\nnamespace App;\nstatic class Init { [B(Assembly)] public static void Go() { } }\n");
 const session = one("namespace App;\nstatic class Init { [Before(HookType.TestSession)] public static void Go() { } }\n");
 ok(tunit.unsure.has("tests/T.cs") && session.links.get("tests/T.cs")?.has("src/X.cs"), "TUnit's Before or After beside a word Assembly, TestSession or TestDiscovery is a hook, and a global alias of it makes every file unsure",
