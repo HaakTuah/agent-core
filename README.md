@@ -97,8 +97,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    that needs the parser says so, with its mend; in a project's own job that installs the first alone, the shape check
    reads nothing of C# or Python, nor any function of JavaScript or TypeScript, and says so as a warning, failing
    nothing by that. Its
-   devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
-   copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
+   devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`, which, once the copy
+   is written, writes what the core owns by the one process a new project's starter kit uses too (`scripts/converge.mjs`;
+   `AGENTS.md`, "One process takes the core in"). A pure sync (only the copy, its pins and what that process writes or takes out, as
+   `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
    core files the sync moved or removed is reviewed like any PR. Where a change to the core asks something of the
@@ -106,8 +108,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    (`setup/sync-notes.md`, each entry a file of `setup/sync-notes/`, read whole by `scripts/sync-notes.mjs`), and its
    step of the same name in `scripts/steps/` tells it done or not (`scripts/steps.mjs`); the sync script prints the entries a sync brings, then every
    step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`), where the owner's
-   inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`) and the line `Read for it:`
-   (`scripts/reading.mjs`), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
+   inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`), the settings only the owner
+   gives where the sync brings one the old copy's list did not hold (`scripts/owner-settings.mjs`; "Setting up (the
+   owner's part)"), the line `Read for it:`
+   (`scripts/reading.mjs`) and, last, one line that says whether the project then holds the core whole and wired,
+   `attached: yes` or `attached: no` with how many things stand in the way (`scripts/attached.mjs`, which lists each with
+   its mend when a session runs it), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
    release says what it asks, step by step"). The core's
    `core.yml`, which the project calls on every PR as a required check, fails one whose `core/` differs from the core at
    its pin, entry by entry by git's object ids and types, as `pure-sync.mjs` compares too: a file's content, a link or a
@@ -117,7 +123,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
    **What a project follows:** the core's `main`, or its releases (core archive 195). A release is a tag `release-N` on
    a commit of `main`, cut on the owner's word by this repository's `release` workflow, only where that commit's checks
-   have passed (`AGENTS.md`, "A release is cut on the owner's word"; `scripts/release.mjs`). A project whose *owner's
+   have passed and its trial on a real project found no check it broke (`AGENTS.md`, "A release is cut on the owner's word"; `scripts/release.mjs`). A project whose *owner's
    account* is not the account the core is under follows the releases, unless its manifest's *follows* row says `main`;
    the projects of the core's own owner follow `main`, unless theirs says `releases` (`scripts/releases.mjs`). Following
    `main`, the sync script and the core-moved check take its newest commit whose checks all passed, never one ahead of
@@ -452,7 +458,7 @@ check a project runs that the list leaves out.
 | Check | The copy | Why, and what holds it in the core |
 | --- | --- | --- |
 | `core.yml` | read | It is the copy's proof: every file, byte for byte, against the core at the pin. |
-| `pure-sync.mjs` | left out | A pull request that moves only the copy and its pins gets no review of its own (floor rule 8). The core's own pull request was reviewed. |
+| `pure-sync.mjs` | left out | A pull request that moves only the copy, its pins and what the kit renders gets no review of its own (floor rule 8). The core's own pull request was reviewed. |
 | `security-review.mjs` | left out | A change under the copy never asks floor rule 3's two security reviews of what runs by itself: only a sync changes the copy, and `core.yml` fails any other change. Every file of the core is protected, so the core's own pull request had its two. |
 | `code-review-wait.mjs` | read | A change inside the copy counts as a rule file's, and waits for a code review. |
 | `licence-scan.mjs` | left out | The core's own scan holds it (`.github/licences.json`). That scan skips the files of the scanner's own code and tests, which hold licence text as patterns. |
@@ -461,6 +467,7 @@ check a project runs that the list leaves out.
 | `codeql.yml` | read | The whole checkout, in the languages the project names. The core's own code scanning runs on its repository. |
 | `code-scan.mjs` | left out | Where no workflow calls `codeql.yml`, the scan hands the engine the code a pull request adds or alters outside the copy alone. The core's repository is public, and the host's CodeQL scans its code (`codeql.yml`). |
 | `copies.mjs` | left out in part | It reads the copy as the project's config names it: the starter kit's names the copy's rule files' prose. A file of the copy moved, or its text moved into another, counts as gone, never as the config reading less, since a sync alone moves those. The core's own copies check holds them. |
+| `converge.mjs` | left out | It reads only the project's own files and parts that the core marks, at the paths a pull request changed, against what the copy's kit writes for the project, and the copy is none of them. `core.yml` holds the copy. |
 | `pointers.mjs` | left out | The copy's files are only what a pointer leads to. The core's run with `--core` holds its own pointers. |
 | `reading-size.mjs` | left out in part | Each file of the copy under `"read"` is held to its own mark. The total and the split mark count the project's own files alone. The core's caps hold the copy (`scripts/size.mjs`). The core's own split mark is in `.github/sizes.json`, which the size workflow reads with this script. |
 | `workflows.mjs` | left out | The core's run with `--core` holds the copy's workflows and actions (floor rule 2). |
@@ -556,6 +563,17 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
 
 ## Setting up (the owner's part)
 
+- **The settings only the owner gives, in one sitting** (#1085). `scripts/owner-settings.mjs`, run from the project's
+  root, lists in one checklist each setting of the repository's below that only its owner can give (secret scanning
+  and its push protection, the ruleset, the status `security-review` required where the project's workflow posts it,
+  the Actions setting on pins, the secret `PERSONAL_TERMS` and the security reviewer's app), each with its state where
+  GitHub lets it be read, a direct link to where it is set and what it protects. The owner works through it in one
+  session the owner starts in person, where the owner's own word allows what an agent tool's automatic mode refuses:
+  the session applies each setting the owner approves, never one without that word, reads each back by running the
+  script again, and says what is left; the value of `PERSONAL_TERMS` the owner types on its page alone, never into the
+  session (floor rule 11). It is asked at a project's first taking of the core, where the starter kit and the sync's
+  first copy print it, and again only where a sync brings a setting the old copy's list did not hold; nothing waits on
+  it, and nothing fails until a setting is given (`AGENTS.md`, "Nothing locks a project").
 - An adviser (`roles/adviser.md`): its session started with every repository of the owner's it is to advise on, so it
   can read them, file in them and start each one's orchestrator, reading what another account can write only through
   that repository's orchestrator (`roles/adviser.md`); at the effort its tool's part advises (`tools/claude.md`).

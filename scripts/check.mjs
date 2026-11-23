@@ -19,11 +19,15 @@
 // part (tasks/hosts.md). The personal-terms list is read from the environment (PERSONAL_TERMS), never from a file, as
 // the host keeps it among its secrets, and each of its terms is printed as *** wherever a step prints it, in any case. It prints
 // each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed.
+// With --own it runs the project's own jobs too (#1084), each job of its own workflows that calls no workflow and names
+// no environment, as the change itself holds them, given no secret, after the core's and only where the copy is the core; with
+// --verdicts it writes each job's verdict that ran, "passed" or "failed", by its place, to a file, so that a run before
+// an update and one after can be set side by side (release-trial.mjs, compared).
 // Git, bash and Node's own modules, and gh where the manifest has no owner's row and no workflow's event says whose
 // account holds the repository (releases.mjs, hostAccount).
 //
 //   node core/scripts/check.mjs [--base <commit>] [--title <the pull request's title>] [--description <a file>]
-//                               [--branch <the branch's name, where none is checked out>]
+//                               [--branch <the branch's name, where none is checked out>] [--own] [--verdicts <a file>]
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -34,6 +38,7 @@ import { carriedAt, readCore } from "./core-path.mjs";
 import { MEND } from "./mend.mjs";
 import { hostSaid, plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
+import { leadsOut } from "./guards.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { evaluate, pathsLetThrough, runWorkflow, withAbsolutePath } from "./workflow-run.mjs";
 
@@ -69,6 +74,7 @@ function stepEnv(home) {
   return { ...kept, ...git, GIT_CONFIG_COUNT: String(rewrites.length), GIT_CONFIG_NOSYSTEM: "1", HOME: home, USERPROFILE: home };
 }
 let coreClone = null; // (the clone of the core's address, made at the first call: coreFile)
+const verdicts = {}; // (each job's verdict that ran, by its place, for --verdicts)
 const git = (cwd, ...a) => execFileSync("git", a, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
 // Every line printed, each term of the personal-terms list (PERSONAL_TERMS, the host's secret) printed as ***, in any
 // letters' case, as the check matches it: a workflow's, a job's or a step's name too, not only what a step printed.
@@ -88,31 +94,63 @@ function main() {
   // (and what this process starts, git and gh, looks only in the PATH's absolute folders)
   if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
   for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
-  const p = project(options());
+  const o = options();
+  const p = { ...project(o), own: o.own, verdicts: o.verdicts === null ? null : path.resolve(o.verdicts) };
+  if (p.verdicts !== null) outside(p, o.verdicts);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
-  const run = runner(p, tmp);
-  const jobs = callers(p, tmp).filter(({ wf }) => triggered(wf.on, p))
-    .flatMap(({ file, wf }) => Object.entries(wf.jobs ?? {}).map(([id, job]) => ({ file, id, job, name: call.exec(String(job?.uses ?? ""))?.[1] })))
-    .filter(j => j.name).sort((a, b) => (b.name === "core.yml") - (a.name === "core.yml"));
-  if (!jobs.some(j => j.name === "core.yml")) fail("no call to the core's core.yml starts on this change, so nothing proves the copy of the core is the core.", "call it on every pull request and push to main, as the starter kit's .github/workflows/core.yml does, in the base the change merges into.");
-  let failed = 0, ran = 0;
-  for (const j of jobs) {
-    const r = run(j.file, j.id, j.job);
-    failed += r.failed; ran += r.ran;
-    if (j.name === "core.yml" && (r.copy ?? r.failed > 0)) { warn(`FAIL the copy of the core is not the core at its pin, so no other check runs: each would run the copy's scripts. ${MEND}mend what core.yml says above, commit, and run this check again.`); break; }
-  }
+  const { failed, ran } = runAll(p, runner(p, tmp), calledJobs(p, tmp));
+  if (p.verdicts !== null) writeVerdicts(p, o.verdicts);
   if (!failed && !ran) fail("no check of the core ran on this change.", "call the core's workflows in the base the change merges into, as the starter kit writes them.");
   say(failed ? `${failed} of the core's checks failed` : `ok   every check of the core that runs from plain git passed (${ran})`);
   process.exitCode = failed ? 1 : 0;
 }
 
+// --verdicts names a file outside the project's repository, and no link: leadsOut reads a link to nothing as leading
+// out, and a write follows a link to where it points.
+function outside(p, given) {
+  if (!leadsOut(p.root, p.verdicts)) fail(`--verdicts ${given} lies in the project's own repository, which this check writes nothing in.`, "give a file in a scratch folder outside every repository.");
+  const at = fs.lstatSync(p.verdicts, { throwIfNoEntry: false });
+  if (at && !at.isFile()) fail(`--verdicts ${given} is ${at.isSymbolicLink() ? "a link" : "no file"}, which this check writes nothing through.`, "give a file in a scratch folder outside every repository, one that is no link and does not stand yet or is a file.");
+}
+
+// Writes the verdicts afresh, once more held outside the project, the file that stood taken out first and the new one
+// made only where nothing stands, so what the jobs left there in the meantime is never followed.
+function writeVerdicts(p, given) {
+  outside(p, given);
+  try {
+    fs.rmSync(p.verdicts, { force: true });
+    fs.writeFileSync(p.verdicts, `${JSON.stringify(verdicts, null, 2)}\n`, { flag: "wx" });
+  } catch (e) { fail(`--verdicts ${given} could not be written (${e.code ?? e.message}).`, "give a file in a scratch folder outside every repository that nothing else writes to, and run the check again."); }
+}
+
+// The jobs that call a workflow of the core's and start on this change, core.yml's first; it fails where none is core.yml.
+function calledJobs(p, tmp) {
+  const jobs = callers(p, tmp).filter(({ wf }) => triggered(wf.on, p))
+    .flatMap(({ file, wf }) => Object.entries(wf.jobs ?? {}).map(([id, job]) => ({ file, id, job, name: call.exec(String(job?.uses ?? ""))?.[1] })))
+    .filter(j => j.name).sort((a, b) => (b.name === "core.yml") - (a.name === "core.yml"));
+  if (!jobs.some(j => j.name === "core.yml")) fail("no call to the core's core.yml starts on this change, so nothing proves the copy of the core is the core.", "call it on every pull request and push to main, as the starter kit's .github/workflows/core.yml does, in the base the change merges into.");
+  return jobs;
+}
+
+// Runs those jobs, then, with --own, the project's own, where the copy is the core: how many ran, and how many failed.
+function runAll(p, run, jobs) {
+  let failed = 0, ran = 0;
+  for (const j of jobs) {
+    const r = run(j.file, j.id, j.job);
+    failed += r.failed; ran += r.ran;
+    if (j.name === "core.yml" && (r.copy ?? r.failed > 0)) { warn(`FAIL the copy of the core is not the core at its pin, so no other check runs: each would run the copy's scripts. ${MEND}mend what core.yml says above, commit, and run this check again.`); return { failed, ran }; }
+  }
+  if (p.own) for (const o of ownWorkflows(p)) { const r = run.own(o); failed += r.failed; ran += r.ran; }
+  return { failed, ran };
+}
+
 // The options given, each checked.
 function options() {
   const args = process.argv.slice(2);
-  for (const a of args) if (a.startsWith("--") && !["--base", "--title", "--description", "--branch"].includes(a)) fail(`${a} is no option of this check.`, "use --base, --title, --description or --branch, as the usage line at the top of scripts/check.mjs shows.");
+  for (const a of args) if (a.startsWith("--") && !["--base", "--title", "--description", "--branch", "--own", "--verdicts"].includes(a)) fail(`${a} is no option of this check.`, "use --base, --title, --description, --branch, --own or --verdicts, as the usage line at the top of scripts/check.mjs shows.");
   const opt = name => { const i = args.indexOf(name); return i < 0 ? null : args[i + 1] ?? fail(`${name} is given no value.`, "give it one, as the usage line at the top of scripts/check.mjs shows."); };
-  return { base: opt("--base"), title: opt("--title"), description: opt("--description"), branch: opt("--branch") };
+  return { base: opt("--base"), title: opt("--title"), description: opt("--description"), branch: opt("--branch"), own: args.includes("--own"), verdicts: opt("--verdicts") };
 }
 
 // The pin of the core the manifest's text names (core-path.mjs): its own, or, where a library carries the core, the
@@ -243,14 +281,14 @@ function runner(p, tmp) {
   const terms = process.env.PERSONAL_TERMS ?? "";
   const home = path.join(tmp, "home");
   fs.mkdirSync(home);
-  return (file, id, job) => {
+  const byCall = (file, id, job) => {
     const name = call.exec(String(job?.uses ?? ""))?.[1];
     const none = { failed: 0, ran: 0 };
     if (!name) return none;
     if (HOST_OWN[name]) { say(`host ${file}/${id}: ${name} is not run here (${HOST_OWN[name]})`); return none; }
     if (name === "pr-description.yml" && !p.described) { say(`note ${file}/${id}: pr-description.yml is not run here: give --description <a file> that holds the pull request's description`); return none; }
     const called = coreFile(tmp, call.exec(job.uses)[2], `.github/workflows/${name}`);
-    if (called === null) { warn(`FAIL ${file}/${id}: ${name} is not at ${call.exec(job.uses)[2]} in the core's history. ${MEND}pin the call to a commit of the core's main that holds it, as the sync writes it, or take the call out.`); return { failed: 1, ran: 0 }; }
+    if (called === null) { verdicts[`${file}/${id}`] = "failed"; warn(`FAIL ${file}/${id}: ${name} is not at ${call.exec(job.uses)[2]} in the core's history. ${MEND}pin the call to a commit of the core's main that holds it, as the sync writes it, or take the call out.`); return { failed: 1, ran: 0 }; }
     // (a caller's `with:` reads no secret, as on GitHub; its `secrets:` reads the one list this script is given)
     const value = (v, secrets) => (typeof v === "string" && v.includes("${{") ? evaluate(v.replace(/^\s*\$\{\{|\}\}\s*$/g, ""), { github, inputs: {}, secrets, vars: {} }) : v);
     const inputs = Object.fromEntries(Object.entries(job.with ?? {}).map(([k, v]) => [k, value(v, {})]));
@@ -259,10 +297,46 @@ function runner(p, tmp) {
     try {
       return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp, stop: name === "core.yml" ? ownSteps(called) : null }), p.event);
     } catch (e) {
+      verdicts[`${file}/${id}`] = "failed";
       warn(`FAIL ${file}/${id}: ${name} cannot be run from plain git here (${e.message}). ${MEND}run that check on the host meanwhile, and report it to the core (core/README.md, "Reporting to the core").`);
       return { failed: 1, ran: 0 };
     }
   };
+  // (a workflow of the project's own, its jobs that call no workflow alone, run as the calls' jobs are, its steps the
+  // change's own code, given no secret, not even the personal-terms list the calls are given)
+  byCall.own = ({ file, wf, error }) => {
+    if (wf === null) {
+      verdicts[file] = "failed";
+      warn(`FAIL ${file}: this workflow of the project's own is written in a form this check cannot read (${error}), so none of its jobs ran. ${MEND}write it in plain YAML, or run it on the host meanwhile and report the form to the core (core/README.md, "Reporting to the core").`);
+      return { failed: 1, ran: 0 };
+    }
+    try {
+      return report(file, runWorkflow(JSON.stringify(wf), { secrets: {}, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp }), p.event);
+    } catch (e) {
+      verdicts[file] = "failed";
+      warn(`FAIL ${file}: this workflow of the project's own cannot be run from plain git here (${e.message}). ${MEND}run it on the host meanwhile, and where what it uses is GitHub's own, report it to the core (core/README.md, "Reporting to the core").`);
+      return { failed: 1, ran: 0 };
+    }
+  };
+  return byCall;
+}
+
+// The project's own workflows this pull request or push starts, as the change itself holds them (GitHub reads a
+// workflow from the commit it runs on), each kept to its jobs that call no workflow (#1084); none where it has none.
+function ownWorkflows(p) {
+  let files;
+  try { files = git(p.root, "ls-tree", "-z", "--name-only", `${p.head}:.github/workflows`).split("\0").filter(f => /\.ya?ml$/.test(f)); } catch { return []; }
+  const read = file => { try { return { file, wf: parseYaml(p.show(p.head, `.github/workflows/${file}`)) }; } catch (e) { return { file, wf: null, error: e.message }; } };
+  return files.map(read).filter(c => c.wf === null || triggered(c.wf.on, p)).flatMap(c => (c.wf === null ? [c] : ownJobs(c)));
+}
+
+// A workflow kept to its jobs that call no workflow and name no environment (a job that names one deploys, or holds
+// what the host guards: the host's own, never run here, and said so); none where none is left.
+function ownJobs({ file, wf }) {
+  const jobs = Object.entries(wf.jobs ?? {}).filter(([, job]) => job && typeof job === "object" && job.uses === undefined);
+  for (const [id] of jobs.filter(([, job]) => job.environment !== undefined)) say(`host ${file}/${id}: it names an environment, so it is the host's own, not run here`);
+  const kept = jobs.filter(([, job]) => job.environment === undefined);
+  return kept.length ? [{ file, wf: { ...wf, jobs: Object.fromEntries(kept) } }] : [];
 }
 
 // core.yml's own steps, before those it runs of the copy's scripts (which begin where it reads where the copy stands):
@@ -324,6 +398,7 @@ function report(where, results, event) {
     const at = `${where}/${r.job}`;
     if (!r.ran) { say(`skip ${at}: its condition does not hold for this ${event === "push" ? "push" : "pull request"}`); continue; }
     ran++;
+    verdicts[at] = r.passed ? "passed" : "failed";
     for (const s of r.steps.filter(s => s.ran === false && s.out)) say(`host ${at}: "${s.name}" is the host's own, not run here`);
     if (r.passed) { say(`ok   ${at}`); continue; }
     failed++;

@@ -73,7 +73,8 @@ saved data; a weakened check).
 - A PR that `scripts/pure-sync.mjs` or `queue-only.mjs`, run from the core's `main`, proves one of these, merged
   only at the head checked, needs no review of its own, nor rule 3's two:
   - a pure sync, reviewed in the core's PR: its diff only the core's copy, its pin and the pins of calls to the
-    core's workflows, moved forward to one commit of the core's `main`;
+    core's workflows, moved forward to one commit of the core's `main`, and the core's own files and parts as that
+    commit's kit renders them for the project;
   - the *progress file* alone.
 - **Nothing is reviewed twice:** a later commit is reviewed only for what it changes.
 - **Nothing runs on the owner's computer unless the owner starts it:** no poller, scheduled task or service of an

@@ -76,11 +76,11 @@ export function notDone(root, steps = STEPS) {
   const out = [];
   for (const step of steps) {
     if (!step.check || declared(p, step)) continue;
-    let mend;
-    try { mend = step.check(p); } catch (e) { mend = `Its check could not read the project (${plain(e.message, root)}): read its entry in \`core/${NOTES_FOLDER}/\` against it.`; }
+    let mend, unread = false;
+    try { mend = step.check(p); } catch (e) { unread = true; mend = `Its check could not read the project (${plain(e.message, root)}): read its entry in \`core/${NOTES_FOLDER}/\` against it.`; }
     // (the entries and the checks say core/, the starter kit's path for the copy; a project that keeps it elsewhere is
-    // told its own: #628)
-    if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend: mendAt(mend, copy, own) });
+    // told its own: #628. `unread`: its check could not read the project, which attached.mjs counts neither way)
+    if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend: mendAt(mend, copy, own), unread });
   }
   out.unread = p.unread;
   out.copy = copy;

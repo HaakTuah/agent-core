@@ -4,9 +4,12 @@
 // forms, the choice records, Dependabot's config and its calls to the core's workflows, each pinned to the commit the
 // manifest pins) and makes the first copy of the core under core/. The templates and the copy are both read from the
 // commit the manifest pins, never from the clone's working folder, so what it writes is what was reviewed. It never
-// overwrites: where one of its files exists, it names them and writes nothing; nor does it write through a link, which
-// could lead outside the project (floor rule 13). It ends by listing what is left: the lines the project fills in
-// itself, and the owner's settings. It commits and pushes nothing. Git, tar and Node's own modules only.
+// overwrites (#1083): of a file of its own that the project holds already it takes what the core owns alone, as every
+// sync does (converge.mjs), its part of AGENTS.md and CLAUDE.md, or a whole file the core marks or the kit writes, and
+// names each it leaves as the project's; a project that holds the core already is taken by the sync (sync.mjs), run
+// from the same clone; it writes through no link, which could lead outside the project (floor rule 13), and refuses a
+// folder core/ that no manifest names. It ends by listing what is left: the lines the project fills in itself, and the
+// owner's settings. It commits and pushes nothing. Git, tar and Node's own modules only.
 //
 //   node <the clone>/scripts/init.mjs --owner <login> [--name <the project's name>] [--at <full SHA>]
 //                                     [--npm <the folder of package-lock.json>] [--nuget <the folder of the solution>]
@@ -18,7 +21,7 @@
 //   --npm      its packages come from npm: the signature check and Dependabot's npm updates, for that folder
 //   --nuget    its packages come from NuGet (.NET): the NuGet check and Dependabot's NuGet updates, for the folder
 //              that holds its solution or project files (. for the root)
-//   --private  a private repository without GitHub's paid code security: no call to the core's CodeQL and licence
+//   --private  (read from the host where it answers; the flag overrides) a private repository without GitHub's paid code security: no call to the core's CodeQL and licence
 //              workflows, which need it (README.md, point 5, "A private repository"), its checks without a secret as
 //              steps of core.yml's one job (oneJob), and each pull-request check started only once a pull request is
 //              no draft (READY_ONLY)
@@ -33,6 +36,8 @@ import { everyInstall } from "./packages.mjs";
 import { MODULES } from "./reading.mjs";
 import { plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
+import { MARK, converged, marked } from "./core-owned.mjs";
+import { privateOf } from "./host-private.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const TEMPLATES = "setup/template";
@@ -196,7 +201,7 @@ export function files(o, pin, moduleNames, read) {
     }
     if (to === ".github/workflows/core.yml" && o.private) text = oneJob(text, o);
     if (READY_ONLY.includes(to) && o.private) text = readyOnly(text);
-    return [to, text];
+    return [to, marked(to) ? `${MARK}\n${text}` : text];
   });
 }
 
@@ -243,14 +248,18 @@ export function licences(o, has) {
 // The first baselines of the copies check and the shape check: what stands today, which each reads from the files git
 // knows of, so the kit's own are added first; and the first list of what holds the project's own rules (#662).
 function firstBaselines(here) {
+  const made = [];
   for (const check of ["copies", "shape"]) {
+    if (fs.existsSync(path.join(here, `checks/${check}-baseline.json`))) continue;
+    made.push(`checks/${check}-baseline.json`);
     execFileSync(process.execPath, [`core/scripts/${check}.mjs`, `checks/${check}.json`, "--first"], { cwd: here, env: guarded(), stdio: ["ignore", "ignore", "inherit"] });
     git(["add", "--", `checks/${check}-baseline.json`], here, guarded());
   }
   // (a pin from before #662 holds a holders.mjs with no --own: the list is then the sync's step, and nothing is run)
-  if (!fs.readFileSync(path.join(here, "core/scripts/holders.mjs"), "utf8").includes("--own")) return;
+  if (!fs.readFileSync(path.join(here, "core/scripts/holders.mjs"), "utf8").includes("--own") || fs.existsSync(path.join(here, "checks/holders.json"))) return made;
   execFileSync(process.execPath, ["core/scripts/holders.mjs", "--own", "--write"], { cwd: here, env: guarded(), stdio: ["ignore", "ignore", "inherit"] });
   git(["add", "--", "checks/holders.json"], here, guarded());
+  return [...made, "checks/holders.json"];
 }
 
 // The project the kit is run in, held to what the kit writes into: the root of its git repository, not the core, a
@@ -280,21 +289,31 @@ function pinOf(o) {
   return pin;
 }
 
-// A Failure where a path the kit writes is a link or is there already: it then writes nothing.
+// A Failure where a path the kit writes is a link, or where the copy's folder stands already: it then writes nothing.
 function refuseTaken(here, out) {
   const targets = [...out.map(([to]) => to), ...MADE];
   const links = [...new Set(targets.map(to => linked(here, to)).filter(Boolean))];
   if (links.length) fail(`the project holds a link at ${links.join(", ")}: the starter kit writes through no link, and wrote nothing`);
   // (a link whose target is missing is there all the same: asked without following it)
-  const taken = targets.filter(to => { try { fs.lstatSync(path.join(here, to)); return true; } catch { return false; } });
-  if (taken.length) fail(`the project already has ${taken.join(", ")}: the starter kit never overwrites, and wrote nothing`);
+  const there = to => { try { fs.lstatSync(path.join(here, to)); return true; } catch { return false; } };
+  if (there("core")) fail("the project already has core/, and no core-manifest.md that names a copy there: the starter kit never overwrites a folder of the project's own, and wrote nothing. Mend: move that folder, or write the manifest's \"Core:\" line for it and run the sync");
 }
 
-// The kit's files, the first copy of the core, and the checks' first configs and baselines, written and staged.
+// The kit's files, the first copy of the core, and the checks' first configs and baselines, written and staged. A file
+// the project holds already is never written over: of the kit's files it takes the core's part alone, as every sync
+// takes it (converge.mjs, `converged`), and what is left as the project's is said; a config or baseline that stands is
+// kept.
 function writeKit(o, here, pin, out) {
+  const there = to => fs.existsSync(path.join(here, to));
   // ("wx": a file that has appeared since, a link too, is refused and never written over)
-  const write = (to, text) => { fs.mkdirSync(path.dirname(path.join(here, to)), { recursive: true }); fs.writeFileSync(path.join(here, to), text, { flag: "wx" }); };
-  for (const [to, text] of out) write(to, text);
+  const write = (to, text, flag = "wx") => { fs.mkdirSync(path.dirname(path.join(here, to)), { recursive: true }); fs.writeFileSync(path.join(here, to), text, { flag }); };
+  const written = [], left = [];
+  for (const [to, text] of out) {
+    if (!there(to)) { write(to, text); written.push(to); continue; }
+    const r = converged(to, fs.readFileSync(path.join(here, to), "utf8"), text);
+    if (r.text !== undefined) { write(to, r.text, "w"); written.push(to); }
+    if (r.left) left.push(`${to} ${r.left}`);
+  }
   // the first copy, as the sync makes every copy: the core's tree at the pin, without what it keeps to itself
   fs.mkdirSync(path.join(here, "core"));
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
@@ -307,18 +326,19 @@ function writeKit(o, here, pin, out) {
     const r = spawnSync(process.execPath, [installer, ...everyInstall(path.join(here, "core"))], { cwd: here, encoding: "utf8" });
     if (r.status !== 0) console.log(`note the core's packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node core/scripts/install.mjs before running a check`);
   }
-  const marks = sizes(Object.fromEntries(startOf(Object.fromEntries(out)).map(f => [f, sizeOf(path.join(here, f))])));
-  write("checks/sizes.json", `${JSON.stringify(marks, null, 2)}\n`);
-  write("checks/licences.json", `${JSON.stringify(licences(o, f => fs.existsSync(path.join(here, f))), null, 2)}\n`);
-  git(["add", "--", ...out.map(([to]) => to), "checks/sizes.json", "checks/licences.json", "core"], here, guarded());
-  firstBaselines(here);
+  const made = [];
+  if (!there("checks/sizes.json")) { write("checks/sizes.json", `${JSON.stringify(sizes(Object.fromEntries(startOf(Object.fromEntries(out)).filter(there).map(f => [f, sizeOf(path.join(here, f))]))), null, 2)}\n`); made.push("checks/sizes.json"); }
+  if (!there("checks/licences.json")) { write("checks/licences.json", `${JSON.stringify(licences(o, there), null, 2)}\n`); made.push("checks/licences.json"); }
+  git(["add", "--", ...written, ...made, "core"], here, guarded());
+  return { written, left, made: [...made, ...firstBaselines(here)] };
 }
 
 // What the kit wrote, and what it leaves for the project and for the owner.
-function sayLeft(o, pin, out) {
-  const made = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", ...(fs.existsSync("checks/holders.json") ? ["checks/holders.json"] : [])];
-  console.log(`The starter kit is written: ${out.length + made.length} files (the last ${made.length === 5 ? "five" : "four"} ${made.slice(0, -1).join(", ")} and ${made.at(-1)}), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
-  const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
+function sayLeft(o, pin, out, { written, left, made }) {
+  const list = m => m.length > 1 ? `${m.slice(0, -1).join(", ")} and ${m.at(-1)}` : m.join("");
+  console.log(`The starter kit is written: ${written.length + made.length} files${made.length ? ` (the checks' first configs and baselines ${list(made)} among them)` : ""}, and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
+  if (left.length) console.log(`\nLeft as the project's, never written over (each a difference the manifest's "Differences" declares on the owner's word, or a task the project's agents take):\n${left.map(l => `  ${l}`).join("\n")}`);
+  const open = out.filter(([to]) => written.includes(to)).flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
   console.log(`\nLeft for the project, each marked FILL IN:\n${open.join("\n")}`);
   console.log(`  checks/copies.json: "code", the project's own code as git pathspecs, once it has any`);
   console.log(`  checks/shape.json: "systems", each system the project has, by its name, with its paths, what it uses and its entrance, once it has any; "tests", its test files (core/tasks/code-shape.md)`);
@@ -327,8 +347,11 @@ function sayLeft(o, pin, out) {
   console.log("  its labels, once its repository is on GitHub: node core/scripts/labels.mjs --make, which makes those of core/scripts/labels.json (core/roles/shared/inbox.md)");
   if (o.nuget !== undefined) console.log("  its NuGet packages: lock files turned on (RestorePackagesWithLockFile in its project files or Directory.Build.props) and committed, and each packages.lock.json named in checks/licences.json under \"nuget\", as one whose packages ship or one of tools that only run");
   if (o.private) console.log("  no call to the core's CodeQL and licence workflows was written (--private): a workflow of the project's own runs the licence check, as the core's README, point 5, \"A private repository\", says");
-  console.log(`\nLeft for the owner (the core's README, "Setting up"): the ruleset on main, with the checks \`core / core\` and the project's own required;`);
-  console.log("  the Actions setting that every action is pinned to a full commit SHA; the Actions secret PERSONAL_TERMS; and the security reviewer's app.");
+  // (the settings only the owner gives, in one checklist the owner takes in one sitting: the copy's owner-settings.mjs,
+  // run here, where the copy holds it; #1085)
+  const settings = path.join("core", "scripts", "owner-settings.mjs");
+  const r = fs.existsSync(settings) ? spawnSync(process.execPath, [settings], { encoding: "utf8", timeout: 600000 }) : null;
+  console.log(r?.status === 0 && r.stdout.trim() ? `\nLeft for the owner:\n${r.stdout.trim()}` : `\nLeft for the owner: the settings in the core's README, "Setting up (the owner's part)".`);
   console.log("\nWhat owning this project asks of the owner, in one plain page: core/setup/owner-guide.md");
 }
 
@@ -336,14 +359,31 @@ function init(argv) {
   const o = options(argv);
   const here = process.cwd();
   checkProject(o, here);
+  // (a project that holds the core already, its manifest naming a copy, is taken the one way every such project is:
+  // the sync, run from this clone, which writes what the core owns as this kit would; #1083)
+  if (/^Core: /m.test(fs.existsSync(path.join(here, "core-manifest.md")) ? fs.readFileSync(path.join(here, "core-manifest.md"), "utf8") : "")) {
+    console.log("The project holds the core already (core-manifest.md names a copy): taken by the sync, as every such project is.");
+    const r = spawnSync(process.execPath, [path.join(ROOT, "scripts", "sync.mjs"), ...(o.at ? [o.at] : [])], { cwd: here, stdio: "inherit" });
+    if (r.status !== 0) process.exitCode = r.status ?? 1;
+    return;
+  }
+  // (a manifest of the project's own with no "Core:" line would name no copy the kit writes: every later sync, step
+  // and check would refuse on it)
+  if (fs.existsSync(path.join(here, "core-manifest.md"))) fail("the project holds a core-manifest.md of its own with no \"Core:\" line, so the copy the starter kit writes would be named by no manifest, and it wrote nothing. Mend: move that file aside and run the starter kit again, which writes the manifest, then carry its rows over; or write its \"Core:\" line as the kit writes it and run the sync");
+  // (whether the repository is private, as its host says it, as a sync reads it: host-private.mjs, #1095; --private
+  // overrides, and where the host cannot say and the flag is not given, the kit writes it as public and says so)
+  if (!o.private) {
+    const host = privateOf(here);
+    if (host.private) o.private = true;
+    else if (host.unread) console.log(`note ${host.unread}; the kit writes it as a public repository: give --private for a private one`);
+  }
   const pin = pinOf(o);
   const moduleNames = modulesAt(pin);
 
   const read = name => { try { return raw(["show", `${pin}:${TEMPLATES}/${name}`], ROOT); } catch { return fail(`${pin} holds no ${TEMPLATES}/${name}: take a commit of the core that has the starter kit`); } };
   const out = files(o, pin, moduleNames, read);
   refuseTaken(here, out);
-  writeKit(o, here, pin, out);
-  sayLeft(o, pin, out);
+  sayLeft(o, pin, out, writeKit(o, here, pin, out));
 }
 
 if (started(import.meta.url)) {

@@ -12,7 +12,7 @@ import { STEPS, configs, notDone, project, report } from "./steps.mjs";
 import { hookCommands, readCore } from "./core-path.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { READERS } from "./shape-readers.mjs";
-import { root } from "./scratch-core.mjs";
+import { hostSays, root } from "./scratch-core.mjs";
 
 export const PIN = "a".repeat(40);
 const modules = ["roles/shared", "tasks", "tools"].flatMap(d => fs.readdirSync(path.join(root, d)).filter(n => n.endsWith(".md")));
@@ -29,6 +29,7 @@ export function kitIn(tmp) {
     const dir = path.join(tmp, name);
     fs.mkdirSync(dir);
     execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
+    hostSays(dir, o.private);
     const there = text => at === "core/" ? text : text.replace(/(?<![\w-])core\//gu, at);
     const readAt = f => at === "core/" ? f : f.replace(/^core\//u, at);
     for (const [to, text] of files({ owner: "someone-else", name, ...o }, PIN, modules, n => fs.readFileSync(path.join(root, TEMPLATES, n), "utf8"))) {

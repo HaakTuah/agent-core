@@ -1,4 +1,6 @@
 {
   "rule": "AGENTS.md: A release is cut on the owner's word",
-  "behind": [195, 196, 197]
+  "holder": ["check: scripts/release.mjs, in part"],
+  "behind": [195, 196, 197, "#1084"],
+  "number": "correction: does not work; outcome: robust"
 }

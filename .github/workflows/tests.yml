@@ -507,6 +507,12 @@ jobs:
       - name: The labels and openers, and their check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/labels-test.mjs ')) }}
         run: node tests/labels-test.mjs
+      - name: The settings only the owner gives, in one checklist
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/owner-settings-test.mjs ')) }}
+        run: node tests/owner-settings-test.mjs
+      - name: The reader of a project's call of the security review, for the owner's settings
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/review-caller-test.mjs ')) }}
+        run: node tests/review-caller-test.mjs
       - name: The hostile tests of an input, a pull request's description
         if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-pr-text-test.mjs ')) }}
         run: node tests/hostile-pr-text-test.mjs
@@ -562,6 +568,9 @@ jobs:
       - name: The sync, and the proof that a sync is pure, against every way a sync branch can carry more
         if: ${{ !cancelled() && contains(matrix.parts, 'sync') && (env.RUN == 'all' || contains(env.RUN, ' tests/pure-sync-test.mjs ')) }}
         run: node tests/pure-sync-test.mjs
+      - name: The one process that writes what the core owns, on projects the starter kit writes (#1083)
+        if: ${{ !cancelled() && contains(matrix.parts, 'sync') && (env.RUN == 'all' || contains(env.RUN, ' tests/converge-test.mjs ')) }}
+        run: node tests/converge-test.mjs
       - name: The proof that a change to what runs by itself is only comments and steps' names
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/comment-only-test.mjs ')) }}
         run: node tests/comment-only-test.mjs

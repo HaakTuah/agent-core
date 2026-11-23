@@ -4,7 +4,9 @@
 // listing those calls, and prints what the sync asks of the project beyond the copy (the core's setup/sync-notes.md, the
 // entries it gained between the two commits), then, from the copy it has just written, every step a release asks that
 // is not done, every difference from a fresh start, where the owner's inbox is and what its labels and openers lack
-// (steps.mjs, fresh.mjs, inbox.mjs and labels.mjs, beside this file), for the sync PR's description: they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
+// (steps.mjs, fresh.mjs, inbox.mjs and labels.mjs, beside this file), the settings only the owner gives where the sync
+// brings one the old copy's list did not hold, and at the first copy all of them (owner-settings.mjs; #1085), and at its end the one line that says whether the
+// project then holds the core whole and wired (attached.mjs, beside this file; #1081), for the sync PR's description, having written what the core owns, from the new copy's kit, by the one process that writes it for a new project too (converge.mjs, beside this file; #1083): they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
 // which, a pure sync, its merger checks with `scripts/pure-sync.mjs` (floor rule 8). Git, tar, gh where it asks whose
 // account holds the repository (releases.mjs, hostAccount) and Node's own modules only; the core's address:
 // core-address.mjs, beside this file. Where the line says a library carries the core, it syncs nothing: the library's
@@ -39,10 +41,11 @@ class Failure extends Error {}
 const fail = msg => { throw new Failure(msg); };
 
 // What a sync prints for its pull request's description, each a script of the new copy with its arguments (`kits`:
-// the folder of the earlier starter kits): the steps not done, the differences from a fresh start, where the inbox
-// is, what the labels lack, and last the line that lists what the sync's own paths outside the copy call for, the
+// the folder of the earlier starter kits, beside the bare repository of the core; `old`, the copy's pin before): the
+// steps not done, the differences from a fresh start, where the inbox is, what the labels lack, the owner's settings
+// where one is new since `old`, and last the line that lists what the sync's own paths outside the copy call for, the
 // pins of the project's workflows above all (reading.mjs, by which the description check reads that line).
-const REPORTS = kits => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["reading.mjs", "builder", "--changed", "HEAD", "--line"]];
+const REPORTS = (kits, old) => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["owner-settings.mjs", "--since", old, "--fetched", path.dirname(kits), "--report"], ["reading.mjs", "builder", "--changed", "HEAD", "--line"], ["attached.mjs", "--line", "--fetched", path.dirname(kits)]];
 
 // Where the copy stands, as the manifest's "Core:" line names it (tasks/repositories.md; core-path.mjs); null, said,
 // where a library carries the core, which is synced in the library's own repository.
@@ -148,20 +151,23 @@ function kitsOf(old, tmp) {
 }
 
 // Every step not done, a standing one too, every difference from a fresh start, where the owner's inbox is and what its
-// labels and openers lack, as the new copy reads them; for the sync PR's description. (A copy from before these scripts has neither: nothing is said of them.)
-function report(at, dir, kits) {
+// labels and openers lack, as the new copy reads them, and then whether the core is attached (#1081); for the sync PR's description. (A copy from before these scripts has neither: nothing is said of them.)
+function report(at, dir, kits, old) {
   console.log("For the sync PR's description (each a task, none in this PR; nothing waits on them):");
-  for (const [script, ...args] of REPORTS(kits)) {
-    if (!fs.existsSync(path.join(dir, "scripts", script))) continue;
-    // (each given ten minutes, so that none can hold the sync. Of what it writes to stderr only its own "FAIL:" lines are
-    // printed, which name no path of the machine: a crash's trace would, and this goes into a PR's description)
-    const r = spawnSync(process.execPath, [path.join(dir, "scripts", script), ...args], { encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
-    const said = String(r.stderr ?? "").split("\n").filter(l => l.startsWith("FAIL:")).join("\n");
-    const text = `${r.stdout ?? ""}${said}`.trim() || (r.status === 0 ? `${at}scripts/${script} said nothing` : "");
-    if (text) console.log(text);
-    if (r.error?.code === "ETIMEDOUT") console.log(`${at}scripts/${script} was stopped after ten minutes: run it again by itself`);
-    else if (r.status !== 0 && !said) console.log(`${at}scripts/${script} failed: run it again by itself to see why`);
-  }
+  for (const [script, ...args] of REPORTS(kits, old)) reportOf(at, dir, script, args);
+}
+
+// What one script of the new copy prints for the sync PR's description; nothing where the copy has no such script.
+function reportOf(at, dir, script, args) {
+  if (!fs.existsSync(path.join(dir, "scripts", script))) return;
+  // (each given ten minutes, so that none can hold the sync. Of what it writes to stderr only its own "FAIL:" lines are
+  // printed, which name no path of the machine: a crash's trace would, and this goes into a PR's description)
+  const r = spawnSync(process.execPath, [path.join(dir, "scripts", script), ...args], { encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
+  const said = String(r.stderr ?? "").split("\n").filter(l => l.startsWith("FAIL:")).join("\n");
+  const text = `${r.stdout ?? ""}${said}`.trim() || (r.status === 0 ? `${at}scripts/${script} said nothing` : "");
+  if (text) console.log(text);
+  if (r.error?.code === "ETIMEDOUT") console.log(`${at}scripts/${script} was stopped after ten minutes: run it again by itself`);
+  else if (r.status !== 0 && !said) console.log(`${at}scripts/${script} failed: run it again by itself to see why`);
 }
 
 function sync(tmp) {
@@ -181,7 +187,7 @@ function sync(tmp) {
   if (!target) return;
   const { pin, release } = target;
   if (!past(pin, "refs/heads/main", tmp)) fail(`${pin} is not a commit of the core's main`);
-  if (pin === old && !first) { console.log(`${at} is already at ${pin}: nothing to sync`); return; }
+  if (pin === old && !first) { console.log(`${at} is already at ${pin}: nothing to sync`); converge(dir, kitsOf(old, tmp)); return; }
 
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
@@ -191,9 +197,28 @@ function sync(tmp) {
   install(dir);
 
   const { moved, unread } = moveCalls(pin, tmp, own);
-  if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); return; }
+  if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); converge(dir, null, true); reportOf(at, dir, "owner-settings.mjs", ["--report"]); return; }
   sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp);
-  report(at, dir, kitsOf(old, tmp));
+  const kits = kitsOf(old, tmp);
+  converge(dir, kits);
+  report(at, dir, kits, old);
+}
+
+// What the core owns, written from the new copy's own kit by the one process (#1083; converge.mjs, beside this file),
+// with the earlier kits by which it knows a file of the core's that carries no mark yet; a copy from before it has none.
+// What it leaves as the project's it says, for the sync PR's description; where it refuses, it says why and the mend.
+// At the first copy (`first`) it writes the project's own files the kit writes too, where they are not there. Where
+// the process refused, the sync says so in a line of its own and exits 1: the copy moved, the core's files did not.
+function converge(dir, kits, first = false) {
+  const script = path.join(dir, "scripts", "converge.mjs");
+  if (!fs.existsSync(script)) return;
+  const r = spawnSync(process.execPath, [script, "--write", ...(kits ? ["--older", kits] : []), ...(first ? ["--first"] : [])], { encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
+  const said = `${r.stdout ?? ""}${String(r.stderr ?? "").split("\n").filter(l => l.startsWith("FAIL")).join("\n")}`.trim();
+  console.log(said || `${dir}/scripts/converge.mjs failed: run it again by itself to see why`);
+  if (r.status !== 0) {
+    console.log(`FAIL the core's files and parts were not written: the one process refused, as it says above, though ${dir}/ moved. Mend: make the mend it names, then run \`node ${dir}/scripts/sync.mjs <the manifest's pin>\` again, which at the same pin moves nothing and writes them, and commit what it writes in this pull request.`);
+    process.exitCode = 1;
+  }
 }
 
 // The new copy's packages, installed from its lock file by its own install script, into its .packages/node_modules/,

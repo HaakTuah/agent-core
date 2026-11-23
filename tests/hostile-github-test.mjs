@@ -4,7 +4,8 @@
 // allows, with too long, the wrong type, markup, a file path, a number or date out of range and nothing at all, and
 // takes nothing of it as a pass or a value: core-moved.mjs (with a stand-in git and gh), releases.mjs and release.mjs
 // (in a scratch repository), wait.mjs, stalled.mjs, core-cost.mjs, clean-merges.mjs, look.mjs's checksOf and
-// tools-offer.mjs's openFrom (an issue's state).
+// tools-offer.mjs's openFrom (an issue's state), and owner-settings.mjs's statesOf, readHost and shown (a repository's
+// settings, its default branch's rules and its secrets' names).
 // workflow-run.mjs reads no answer of GitHub's (its contexts are the caller's). Test data is made up. Run by the core's
 // tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
 //
@@ -25,6 +26,7 @@ import { isGits, proved } from "../scripts/clean-merges.mjs";
 import { checksOf } from "../scripts/look.mjs";
 import { writersOf } from "../scripts/security-review.mjs";
 import { openFrom } from "../scripts/tools-offer.mjs";
+import { SETTINGS, checklist, readHost, shown, statesOf } from "../scripts/owner-settings.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -221,5 +223,43 @@ for (const v of [undefined, null, "", 7, {}, "[]"]) ok(writersOf(v).size === 0, 
 ok(openFrom("open\n") === true && openFrom("closed\n") === false, "tools-offer: an issue's state reads open or closed");
 ok([undefined, null, "", "OPEN", "opened", "open; closed", 42, ["open"], { state: "open" }, `open${" ".repeat(40)}x`, "x".repeat(5000)].every(a => openFrom(a) === null),
   "tools-offer: nothing, the wrong type, another word and a long answer read as not answered, never as open or closed");
+
+// ---- owner-settings.mjs: a repository's settings, its rules and its secrets' names ----
+{
+  const bare = scratchDir("hostile-owner-settings-");
+  const none = st => Object.values(st).every(s => s.given !== true);
+  const lines = st => checklist({ repo: "o/r", states: st, script: "s.mjs" }).split("\n");
+  ok(shown("main") === "`main`" && shown("x".repeat(5000)).length === 102 && !/[\n\r`]/.test(shown("a`b\nc\r::error::d").slice(1, -1)),
+    "owner-settings: a name is printed as text alone, at most 100 characters, with no backtick or line break of its own");
+  ok([undefined, null, "", 7, {}, ["main"], true].every(v => shown(v) === null), "owner-settings: a name of the wrong type, or nothing, is no name");
+  for (const host of [{ repo: { why: "x" } }, { repo: {} }, { repo: { body: null } }, { repo: { body: "repo" }, rules: { body: "rules" }, secrets: { body: [] }, actions: { body: 7 } },
+    { repo: { body: { private: "false", security_and_analysis: { secret_scanning: { status: "ENABLED" }, secret_scanning_push_protection: { status: true } } } },
+      rules: { body: { type: "pull_request" } }, secrets: { body: { secrets: "PERSONAL_TERMS", total_count: 1 } }, actions: { body: { sha_pinning_required: "true" } } },
+    { repo: { body: { private: false } }, rules: { body: [{ type: 7 }, { type: ["deletion"] }, { type: "required_status_checks", parameters: { required_status_checks: "core / core" } },
+      { type: "required_status_checks", parameters: { required_status_checks: [{ context: ["core / core"] }, { context: 7 }] } }] },
+      secrets: { body: { secrets: [{ name: ["PERSONAL_TERMS"] }, { name: 7 }], total_count: "200" } }, actions: { body: { sha_pinning_required: 1 } } }]) {
+    const st = statesOf(host, bare);
+    ok(none(st) && Object.values(st).every(s => typeof s.said === "string" && !/undefined|\[object/.test(s.said)) && lines(st).length === SETTINGS.length + 2,
+      `owner-settings: answers of ${JSON.stringify(host).slice(0, 80)} tick no setting, and print no line of their own`);
+  }
+  const many = { repo: { body: { private: false, default_branch: "main\n- [x] all given" } }, rules: { body: [
+    ...["deletion", "non_fast_forward", "pull_request"].map(type => ({ type })),
+    { type: "required_status_checks", parameters: { required_status_checks: ["core / core", ...Array.from({ length: 500 }, (_, i) => `c${i}\`\n- [x] x`)].map(context => ({ context })) } }] } };
+  const st = statesOf(many, bare), rows = lines(st);
+  ok(st.ruleset.given === null && /and 480 more/.test(st.ruleset.said) && st.ruleset.said.length < 3000 && rows.length === SETTINGS.length + 2 && rows.filter(l => l.startsWith("- [x]")).length === 0,
+    "owner-settings: 500 checks with markup in their names are named 20 at most, each as text, and tick nothing");
+  const asked = [], ask = route => { asked.push(route); return { body: { default_branch: { name: "main" } } }; };
+  readHost("o/r", ask);
+  ok(!asked.some(r => /rules\/branches/.test(r)), "owner-settings: a default branch of the wrong type reads no rules");
+  asked.length = 0;
+  readHost("o/r", route => { asked.push(route); return { body: { default_branch: "../../x?y#z" } }; });
+  ok(asked.includes("repos/o/r/rules/branches/..%2F..%2Fx%3Fy%23z"), "owner-settings: a default branch's name is asked as one part of the route, never a path or a query");
+  for (const total_count of ["200", 1.5, null, [9], -1]) {
+    asked.length = 0;
+    readHost("o/r", route => { asked.push(route); return route.includes("secrets") ? { body: { secrets: [], total_count } } : { body: { default_branch: "main" } }; });
+    ok(asked.length === 4 && !asked.some(r => r.includes("PERSONAL_TERMS")), `owner-settings: a count of secrets of ${JSON.stringify(total_count)} asks nothing more`);
+  }
+  fs.rmSync(bare, { recursive: true, force: true });
+}
 
 process.exit(failed ? 1 : 0);

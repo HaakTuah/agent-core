@@ -7,8 +7,12 @@
 //   node <the core's main, or that release>/scripts/pure-sync.mjs
 //
 // It reads the branch's head commit, not the working tree, and passes only when, against the project's main, the diff
-// touches only the copy, core-manifest.md and .github/workflows/*.yml, the copy's path the same on both sides; outside it, each changed line differs from the
-// one it replaces only in the manifest's pin or a call's to a core workflow, each moved to the new pin; the new pin is
+// touches only the copy, core-manifest.md, .github/workflows/*.yml and the files the core's one process writes, the copy's path the same on both sides; outside it,
+// each file the process writes (converge.mjs, #1083) is, byte for byte, what this checkout's process writes from the
+// kit at the new pin for the project as its main holds it, so nothing outside the core's files and parts changed, and
+// each other changed line differs from the one it replaces only in the manifest's pin or a call's to a core workflow,
+// each moved to the new pin; a file is created only so, and deleted only as `provedGone` below proves it (a call whose
+// check the one job of the core.yml the process ends with runs, the pin's tree holding the process); the new pin is
 // a commit of the core's main at or past the old one, and, where the manifest follows the core's releases, a release
 // of the core (any other sync is reviewed like any PR, and merges after it); the copy is a folder, and the core's tree at
 // that pin, compared as copy-tree.mjs compares (and says why), without the folder the core keeps to itself; and every
@@ -18,13 +22,18 @@
 // repository (releases.mjs, hostAccount); it changes nothing.
 import "./whole-output.mjs";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { copyTree, coreIsFolder, entries } from "./copy-tree.mjs";
 import { CORE as ADDRESS, CORE_SOURCE as A } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
 import { followsOf, hostSaid, inBare, releasesIn } from "./releases.mjs";
+import { asEarlier, plan, unformed } from "./converge.mjs";
+import { BLOCKS, CORE_YML, whole } from "./core-owned.mjs";
+import { fresh, kind } from "./fresh.mjs";
+import { privateOf } from "./host-private.mjs";
+import { project } from "./steps.mjs";
 
 const CORE = `https://github.com/${ADDRESS}.git`;
 const raw = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
@@ -51,13 +60,25 @@ else if (now.path !== at) fail.push(`the copy's path moves from ${at} to ${now.p
 const diff = (opt, ...paths) => // only the last newline dropped, so a line's trailing whitespace still counts
   raw(["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--text", "--no-color", opt, base, head, "--", ...paths]).replace(/\n$/u, "");
 const files = diff("--name-only").split("\n").filter(Boolean);
+// (every file outside the copy and the manifest is proved below against what the core's one process writes for the
+// project at the new pin, #1083, and a workflow it leaves as the project's is held to its pins alone; a regular file
+// created is let through to that proof, and so is one deleted, which the proof holds to what the process takes out)
+const later = [], gone = [];
 for (const line of diff("--summary").split("\n").filter(Boolean)) {
-  if (!line.trim().replace(/^.*\b\d{6} /u, "").startsWith(at)) fail.push(`a file created, deleted or given a new mode: ${line.trim()}`);
+  const named = line.trim().replace(/^.*\b\d{6} /u, "");
+  if (named.startsWith(at)) continue;
+  if (/^create mode 100644 /u.test(line.trim())) continue;
+  if (/^delete mode 100644 /u.test(line.trim())) { gone.push(named); continue; }
+  fail.push(`a file created, deleted or given a new mode: ${line.trim()}`);
 }
 for (const f of files) {
-  if (f.startsWith(at)) continue;
-  if (f !== "core-manifest.md" && !WORKFLOW.test(f)) { fail.push(`${f}: not the core's copy, its pin or a workflow`); continue; }
-  // each hunk's removed lines, then its added ones: the nth added line must be the nth removed with only its pins moved
+  if (f.startsWith(at) || gone.includes(f)) continue;
+  if (f === "core-manifest.md") pinsOnly(f);
+  else later.push(f);
+}
+
+// Each hunk's removed lines, then its added ones: the nth added line must be the nth removed with only its pins moved.
+function pinsOnly(f) {
   const hunks = [];
   for (const l of diff("-U0", f).split("\n")) {
     if (l.startsWith("@@")) hunks.push({ "-": [], "+": [] });
@@ -73,6 +94,79 @@ for (const f of files) {
       else if (line.replace(ref, "$1<sha>") !== h["-"][i].replace(ref, "$1<sha>")) fail.push(`${f}: a change beyond a pin: ${line.slice(0, 80)}`);
     });
   }
+}
+
+// The tree of the project's commit `sha` written out at `to`, the copy left out: each file's bytes as git holds them,
+// read blob by blob, never through `git archive`, which applies the tree's own attributes (an `export-ignore` would hide
+// a file of the project's from the proof, which would then read it as not there); a link as a link, a submodule left.
+function tracked(sha, to) {
+  for (const entry of raw(["ls-tree", "-r", "-z", "--full-tree", sha]).split("\0").filter(Boolean)) {
+    const [, mode, type, id, f] = /^(\d{6}) (\w+) ([0-9a-f]+)\t(.*)$/su.exec(entry);
+    if (type !== "blob" || f.startsWith(at)) continue;
+    const file = join(to, f);
+    mkdirSync(dirname(file), { recursive: true });
+    const bytes = execFileSync("git", ["cat-file", "blob", id], { maxBuffer: 1 << 28 });
+    if (mode === "120000") symlinkSync(bytes.toString("utf8"), file);
+    else writeFileSync(file, bytes);
+  }
+}
+
+// The core's own files and parts the sync changed, each proved equal, byte for byte, to what the one process writes
+// (converge.mjs, as this checkout of the core's main holds it) from the kit at the new pin, with the project as main
+// holds it and the new pin, every byte outside the core's part kept. Only the core's own: a whole file of the core's
+// (core-owned.mjs, `whole`) and the core's part of a rule file that main holds; never a file that is the project's from
+// its first commit (the manifest, SECURITY.md, the threat model, a config), nor a rule file created whole, though the
+// process writes those where they are not there (floor rule 8 covers the core's files and parts alone; #1083). A file
+// it would leave as the project's, or where nothing can be rendered (no kit at the pin, the kind or the project's values
+// unread), is held to the pins alone where it is a workflow, as before the process, and refused otherwise. `dir`: the
+// core's main and releases, fetched.
+function provedOwned(dir) {
+  if (!later.length && !gone.length) return;
+  const unproved = (why) => { for (const f of later) { if (WORKFLOW.test(f)) pinsOnly(f); else fail.push(`${f}: ${why}`); } for (const f of gone) fail.push(`${f}: deleted, ${why}`); };
+  const tmp = mkdtempSync(join(tmpdir(), "core-render-")), kits = join(tmp, "kits"), base_ = join(tmp, "project");
+  try {
+    const tree = (sha, to) => { mkdirSync(to, { recursive: true }); execFileSync("tar", ["-x", "-f", "-", "-C", to], { input: inBare(dir, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 }) }); };
+    // (a pin whose core holds no kit, or one git cannot read, proves no file outside the copy: never a crash)
+    try { tree(pin, join(kits, "now")); } catch { unproved(`the core at ${pin} holds no starter kit to render, so it is not proved what the core's process writes`); return; }
+    const older = [...new Set([oldPin, ...releasesIn(dir).map((r) => r.sha)])].flatMap((sha) => { try { tree(sha, join(kits, sha)); return [join(kits, sha)]; } catch { return []; } });
+    // (the project as its main holds it, the copy left out, its manifest the head's, whose one change is the pin, read above)
+    mkdirSync(base_);
+    execFileSync("git", ["init", "-q"], { cwd: base_ });
+    tracked(base, base_);
+    writeFileSync(join(base_, "core-manifest.md"), raw(["show", `${head}:core-manifest.md`]));
+    // (whether it is private, as the host says it of the checkout's repository, from GitHub's event or gh alone:
+    // host-private.mjs; never from a test's stand-in, which this gate, that waives the reviews, does not honour)
+    const p = project(base_), k = kind(p, privateOf(process.cwd(), { env: { ...process.env, CORE_HOST_ANSWERS: "" } })), bad = unformed(p, k);
+    if (bad.length) { unproved(`the project's kind or values cannot be read in their forms, so it is not proved what the core's process writes: ${bad.join("; ")}`); return; }
+    const kit = fresh(p, join(kits, "now", "setup", "template"), { kitOnly: true, k });
+    if (!kit.length) { unproved(`the kit at ${pin} gives no file this checkout of the core can render`); return; }
+    const { write, remove } = plan(p, kit, older.flatMap((at) => asEarlier(p, join(at, "setup", "template"), k, { kitOnly: true })));
+    provedGone(dir, write, remove);
+    const onMain = (f) => { try { raw(["cat-file", "-e", `${base}:${f}`]); return true; } catch { return false; } };
+    for (const f of later) {
+      const want = write.find((w) => w.to === f);
+      const owned = whole(f) || (BLOCKS.includes(f) && onMain(f));
+      // (a workflow not written so, by a sync from a copy before the process among them, is held to its pins alone)
+      if (want && owned && execFileSync("git", ["show", `${head}:${f}`], { maxBuffer: 1 << 26 }).equals(Buffer.from(want.text))) continue;
+      if (WORKFLOW.test(f)) pinsOnly(f);
+      else fail.push(`${f}: not the core's copy, its pin, a workflow's pins or what the core's process writes of the core's own files and parts for the project at ${pin} (converge.mjs)`);
+    }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// Each file the sync deleted, proved one the process takes out (converge.mjs, `remove`, from main's tree): a workflow of
+// the core's whose check the one job of core.yml runs, and only where the head's core.yml is that one job as the
+// process writes it, or, where it writes none, as main holds it: never one left otherwise; and only where the pin's own
+// tree holds the process, so no deletion is proved that the kit at the pin would never make (its renderer: #1101).
+function provedGone(dir, write, remove) {
+  if (!gone.length) return;
+  try { inBare(dir, ["cat-file", "-e", `${pin}:scripts/converge.mjs`]); } catch { for (const f of gone) fail.push(`${f}: deleted, and the core at ${pin} holds no process that takes a file out (scripts/converge.mjs)`); return; }
+  const at_ = (sha) => { try { return execFileSync("git", ["show", `${sha}:${CORE_YML}`], { maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; } };
+  const folds = write.find((w) => w.to === CORE_YML), headCore = at_(head), baseCore = at_(base);
+  const runs = headCore !== null && (folds ? headCore.equals(Buffer.from(folds.text)) : baseCore !== null && headCore.equals(baseCore));
+  for (const f of gone) if (!remove.some((r) => r.to === f) || !runs) fail.push(`${f}: deleted, and not a workflow of the core's whose check the one job of the core.yml the core's process at ${pin} ends with runs, which alone it takes out (converge.mjs)`);
 }
 
 // every pin the branch ends with: the manifest's and each call's
@@ -96,6 +190,8 @@ try {
     const [newest] = releasesIn(dir);
     fail.push(`the project ${follows === "releases" ? "follows the core's releases" : "does not say what it follows"}, and ${pin} is no release of the core: the sync is reviewed like any PR${newest ? `, or made again from the project's main to a release with its full SHA, \`node ${at}scripts/sync.mjs ${newest.sha}\` (${newest.name}, the newest), as a copy older than release-1, whose sync script takes the core's main, must` : ""}`);
   }
+  if (pin && oldPin && inCore(["merge-base", "--is-ancestor", pin, "refs/heads/main"])) provedOwned(dir);
+  else if (later.length || gone.length) fail.push(`${[...later, ...gone].join(", ")}: no file outside the copy is proved where the pin is not a commit of the core's main`);
   const own = git(["rev-parse", "--absolute-git-dir"]); // (the project's clone, named outright as copy-tree.mjs asks)
   if (pin && inCore(["cat-file", "-e", `${pin}^{commit}`]) && (!coreIsFolder(head, own, at.slice(0, -1)) || entries(copyTree(pin, dir), dir) !== entries(`${head}:${at.slice(0, -1)}`, own))) {
     fail.push(`${at} is not a folder holding the core's tree at ${pin} (copy-tree.mjs)`);

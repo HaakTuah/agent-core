@@ -11,8 +11,9 @@
 // Each difference is one the manifest's "Differences" declares on purpose, on the owner's word, by a line that quotes
 // the file's path ("AGENTS.md"), so that file is not compared, or a task the project's agents take. The kind is read
 // from the project: its owner and name from the manifest and AGENTS.md, npm and NuGet from its calls to the core's
-// signature and NuGet checks and from a lock file or a project file of its own, a private repository from its having neither the CodeQL nor the licence workflow, a game
-// from "Modules: all". Given earlier kits (the sync gives the kit of the project's old pin and of every release of the
+// signature and NuGet checks and from a lock file or a project file of its own, a private repository from its host
+// (host-private.mjs; #1095, point 1), never from which workflows stand, and a game from the manifest's line "Modules:
+// all". Where the host cannot say whether it is private, nothing is compared, and the report says so with the mend. Given earlier kits (the sync gives the kit of the project's old pin and of every release of the
 // core's), it lists too what the project still holds of theirs that the kit no longer writes: the wording the core
 // has left. It reads only and fails nothing. Node's own modules and git only.
 //
@@ -33,6 +34,7 @@ import { started } from "./started.mjs";
 import { KIT_CONFIGS, packagesFolder } from "./check-configs.mjs";
 import { Unread, copyAt, folded } from "./workflow-calls.mjs";
 import { atCopy } from "./step-checks.mjs";
+import { privateOf } from "./host-private.mjs";
 import { call as callOf, configs, plain, project } from "./steps.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -57,8 +59,10 @@ function signedIn(p, lock) {
 // solution's or project file's folder (`built`).
 const nugetFolder = (named, built) => named ? named[1].replace(/\/+$/, "") || "." : built ? path.posix.dirname(built) : ".";
 
-// The starter kit's options for a project of the same kind as `p` (steps.mjs reads it), and the pin its manifest names.
-export function kind(p) {
+// The starter kit's options for a project of the same kind as `p` (steps.mjs reads it), and the pin its manifest names;
+// `unread`, with its mend, where the host could not say whether the repository is private (`host`, as privateOf gives
+// it), so no reader writes or compares a kind it guessed.
+export function kind(p, host = privateOf(p.root)) {
   const pin = /^Core: \S+ at ([0-9a-f]{40}),/m.exec(p.manifest)?.[1] ?? "0".repeat(40); // (a carried core: none)
   const o = { owner: ownerOf(p.manifest) ?? "the-owner", name: /^# (.+)$/m.exec(p.read("AGENTS.md") ?? "")?.[1]?.trim() ?? path.basename(p.root) };
   // (npm and NuGet from what the project holds, a lock file or a project file of its own, as well as from its calls to
@@ -71,9 +75,9 @@ export function kind(p) {
   const built = shallowest(/\.(sln|slnx|csproj|fsproj|vbproj)$/i);
   const named = /package-ecosystem:\s*"?nuget"?\s*\n\s*directory:\s*"?\/?([^"\n]*)"?/.exec(p.read(".github/dependabot.yml") ?? "");
   if (nugetCalled(p) || built) o.nuget = nugetFolder(named, built);
-  if (!p.workflows["codeql.yml"] && !p.workflows["licences.yml"]) o.private = true;
+  if (host.private === true) o.private = true;
   if (/^Floor: whole\. Modules: all\.$/m.test(p.manifest)) o.game = true;
-  return { o, pin };
+  return host.unread ? { o, pin, unread: host.unread } : { o, pin };
 }
 
 const oneSpace = t => t.replace(/\s+/g, " ").trim();
@@ -148,9 +152,11 @@ function asHeld(p, to, text) {
 
 // What the kit of this copy would write for the project `p`; with `templates`, the folder of an earlier kit's
 // templates, what that kit would have written: a template it lacks, one this kit added since, gives that file nothing;
-// one whose words this kit no longer fills, and a folder with no kit, give that kit nothing.
-export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
-  const { o, pin } = kind(p);
+// one whose words this kit no longer fills, and a folder with no kit, give that kit nothing. `kitOnly`: the templates'
+// files alone, without the configs the kit writes beside them (converge.mjs).
+// `k`: the project's kind, as `kind` reads it.
+export function fresh(p, templates = path.join(HERE, TEMPLATES), { kitOnly = false, k = kind(p) } = {}) {
+  const { o, pin } = k;
   const modules = MODULES.flatMap(d => fs.readdirSync(path.join(HERE, d)).filter(n => n.endsWith(".md")));
   const older = templates !== path.join(HERE, TEMPLATES);
   try {
@@ -167,7 +173,7 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     const at = configs(p);
     const placed = { [CHOICES]: where(p.manifest) ?? CHOICES, [SHAPE]: shapeAt(p.manifest), [KIT_CONFIGS.copies]: at.copies, [KIT_CONFIGS.audit]: at.audit };
     const kit = built.filter(([to]) => !gone.has(to) && placed[to] !== null).map(([to, text]) => [placed[to] ?? to, asHeld(p, to, text)]);
-    if (older) return kit;
+    if (older || kitOnly) return kit;
     // the configs the kit writes beside its templates, by the paths the project runs its checks with, each read by its keys
     // (sizes.json's optional "skip" and "past" left out)
     const { skip, past, ...marks } = sizes({});
@@ -192,10 +198,13 @@ export function report(found) {
 
 if (started(import.meta.url)) {
   try {
-    const p = project(process.cwd());
-    const at = process.argv.indexOf("--older");
-    const older = at < 0 ? [] : fs.readdirSync(process.argv[at + 1]).map(d => fresh(p, path.join(process.argv[at + 1], d, TEMPLATES)));
-    console.log(report(differences(p, fresh(p), older)));
+    const p = project(process.cwd()), k = kind(p);
+    if (k.unread) console.log(`Beside a fresh start (\`core/scripts/fresh.mjs\`): not compared, since ${k.unread}.`);
+    else {
+      const at = process.argv.indexOf("--older");
+      const older = at < 0 ? [] : fs.readdirSync(process.argv[at + 1]).map(d => fresh(p, path.join(process.argv[at + 1], d, TEMPLATES), { k }));
+      console.log(report(differences(p, fresh(p, undefined, { k }), older)));
+    }
   } catch (e) {
     console.error(`FAIL: the project could not be compared (${plain(e.message)}): run it from the project's root, a git repository`);
     process.exitCode = 1;

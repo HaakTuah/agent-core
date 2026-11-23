@@ -105,7 +105,7 @@ jobs:
           node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: The core's packages, installed from its lock file for the release (#654)
         run: node scripts/install.mjs
-      - name: The release, cut where the upgrade test on Windows, every check on main's newest commit and the newest of its hourly or hand-started runs of the tests have passed, none of them unfinished
+      - name: The release, cut where the upgrade test on Windows, every check on main's newest commit and the newest of its hourly or hand-started runs of the tests have passed, none of them unfinished, and the trial on a real project stands for that commit with no check failed after the update
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

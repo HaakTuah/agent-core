@@ -88,6 +88,29 @@ const dir = p.dir;
 commit(dir, "the starter kit");
 let r = check(dir);
 ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && /ok {3}copies\.yml\/copies/.test(r.out), "a project as the kit writes it passes on a push to main, its copy and its copies checked", r.out);
+// (with --own, the project's own workflows run too, its jobs that call no workflow, after the core's; with --verdicts,
+// each job's verdict that ran is written by its place: #1084)
+fs.writeFileSync(path.join(dir, ".github/workflows/own.yml"), "name: own\non:\n  push:\n    branches: [main]\njobs:\n  fine:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo fine\n  broken:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo broken && exit 3\n  later:\n    if: github.event_name == 'pull_request'\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 4\n  deploy:\n    environment: production\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 5\n  secret:\n    runs-on: ubuntu-latest\n    steps:\n      - run: test -z \"${{ secrets.PERSONAL_TERMS }}\"\n");
+commit(dir, "a workflow of its own");
+const verdictsFile = path.join(tmp, "verdicts.json");
+const without = check(dir);
+r = check(dir, "--own", "--verdicts", verdictsFile);
+const verdicts = JSON.parse(fs.readFileSync(verdictsFile, "utf8"));
+ok(without.status === 0 && !/own\.yml/.test(without.out) && r.status === 1 && /ok {3}own\.yml\/fine/.test(r.out) && /FAIL own\.yml\/broken: its step "echo broken && exit 3" failed/.test(r.out) && /skip own\.yml\/later/.test(r.out),
+  "with --own the project's own jobs run too, a failing one failing the check, one whose condition does not hold skipped; without it, none", `${without.out}\n${r.out}`);
+ok(/host own\.yml\/deploy: it names an environment/.test(r.out) && !("own.yml/deploy" in verdicts) && verdicts["own.yml/secret"] === "passed",
+  "a job of its own that names an environment, which deploys, is the host's own and not run, and its own jobs are given no secret", r.out);
+const inside = check(dir, "--own", "--verdicts", path.join(dir, "verdicts.json"));
+ok(inside.status === 1 && mended(inside.out) && /--verdicts .* lies in the project.s own repository/.test(inside.out) && !fs.existsSync(path.join(dir, "verdicts.json")), "--verdicts in the project's own repository is refused, saying its mend, and nothing is written there", inside.out);
+// (a --verdicts path that is a link to nothing in the project is refused too: a write would follow it there)
+const dangling = path.join(tmp, "dangling.json");
+let linked = true;
+try { fs.symlinkSync(path.join(dir, "linked.json"), dangling, "file"); } catch { linked = false; }
+const through = linked ? check(dir, "--verdicts", dangling) : null;
+ok(!linked || (through.status === 1 && mended(through.out) && /--verdicts .* is a link/.test(through.out) && !fs.existsSync(path.join(dir, "linked.json"))), "--verdicts that is a link to nothing in the project's repository is refused, saying its mend, and nothing is written there", through?.out);
+ok(verdicts["own.yml/fine"] === "passed" && verdicts["own.yml/broken"] === "failed" && !("own.yml/later" in verdicts) && verdicts["core.yml/core/core"] === "passed" && Object.values(verdicts).every(v => v === "passed" || v === "failed"),
+  "and --verdicts writes each job's verdict that ran, the core's and the project's own, by its place", JSON.stringify(verdicts));
+git(dir, "reset", "-q", "--hard", "HEAD~1");
 
 // (programs named as those the checks start, committed at the change's root, never run in their place: on Windows a
 // program started by its bare name is looked for in its folder first, unless told not to, so the test's own git is
@@ -165,7 +188,7 @@ fs.writeFileSync(path.join(dir, "src", "one.js"), `${block}\n`);
 fs.writeFileSync(path.join(dir, "src", "two.js"), `${block}\n`);
 commit(dir, "a copy of code");
 r = check(dir, "--base", "base");
-ok(r.status === 1 && /FAIL copies\.yml\/copies\/copies: its step "The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks/.test(r.out) && /^ +== No new copies$/m.test(r.out) && mended(r.out), "a new copy of code fails on a pull request, with the copies check's own failure and its mend", r.out);
+ok(r.status === 1 && /FAIL copies\.yml\/copies\/copies: its step "The copies, pointer, reading-size, workflow, entry-file, manifest, shape, choice records' and core's files' checks/.test(r.out) && /^ +== No new copies$/m.test(r.out) && mended(r.out), "a new copy of code fails on a pull request, with the copies check's own failure and its mend", r.out);
 
 // a private project, as the kit writes it: its checks without a secret as steps of core.yml's one job (#376), which a
 // failure of the copy stops here, since each runs the copy's scripts
@@ -186,7 +209,7 @@ ok(r.status === 1 && /FAIL copies\.yml\/copies\/copies: its step "The copies, po
   fs.writeFileSync(path.join(q.dir, "src", "two.js"), `${block}\n`);
   commit(q.dir, "a copy of code");
   s = check(q.dir, "--base", "base");
-  ok(s.status === 1 && /FAIL core\.yml\/core\/core: its step "The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks" failed/.test(s.out) && /^ +== No new copies$/m.test(s.out) && !/the copy of the core is not the core at its pin/.test(s.out) && mended(s.out),
+  ok(s.status === 1 && /FAIL core\.yml\/core\/core: its step "The copies, pointer, reading-size, workflow, entry-file, manifest, shape, choice records' and core's files' checks" failed/.test(s.out) && /^ +== No new copies$/m.test(s.out) && !/the copy of the core is not the core at its pin/.test(s.out) && mended(s.out),
     "a new copy of code fails it, with the copies check's own failure and its mend, a step of the one job and no failure of the copy", s.out);
   fs.writeFileSync(path.join(q.dir, "core", "README.md"), "edited here\n");
   commit(q.dir, "and an edit to the copy");

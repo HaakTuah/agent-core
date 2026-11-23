@@ -45,7 +45,7 @@ Not taken, each for its reason:
 The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *milestone*: a batch and its release ("One batch,
 then one release"; #322), and of `tasks/planning.md` the point on a task's release and of `tasks/cleaning.md` the reading of a project
 against the core (#259 is that reading here) have nothing to act on here, which holds no copy; the *report*: the PR's description (`reports/` keeps
-those written before 12 November 2026, and the staged cases' record); the *audits*: `reports/`; the *choice records*:
+those written before 12 November 2026, the staged cases' record and the trial's); the *audits*: `reports/`; the *choice records*:
 `CHOICES.md`, a file each in `choices/` (#870); the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
 the *mutation tool*: `node scripts/stryker.mjs --tool tests/mutation --report {report} {lines}`, Stryker at the version
 `tests/mutation/`'s lock file pins (#581), in `tests.yml`;
@@ -138,7 +138,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   is the owner's ("A release is cut on the owner's word"): no session cuts one by its own choice. That word is given
   for every batch: once the file holds no line a session can take, no PR of a session's is
   open, every check on `main`'s newest commit has passed, and no open issue is left that is to be queued, the session
-  that finds it so, the orchestrator at the end of its work, starts the `release` workflow.
+  that finds it so, the orchestrator at the end of its work, starts the `release` workflow once the trial on a real
+  project is recorded ("A release is cut on the owner's word").
 - **A batch is sized by what the projects can take:** once its release is synced, the count of "The core is measured
   as a feature is" is taken again in each of the owner's projects and named to the owner, who sizes the next by it. It
   holds back no line the owner has said yes to: there is no pause on new rules.
@@ -182,7 +183,20 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   page under Actions has the button; `.github/workflows/release.yml`), and the workflow cuts it only
   where every check on `main`'s newest commit has passed and, once the staged cases hold a release ("Staged cases hold
   what no check reads"), no case failed in its last run: the tag `release-N` on that commit, never moved or deleted
-  afterwards. `node scripts/release.mjs` says what the next one would carry.
+  afterwards. `node scripts/release.mjs` says what the next one would carry. **Each release is tried on a real project
+  first** (#1084). By default, before the `release` workflow is started, the orchestrator has a builder at the
+  strongest tier try the release on a copy of a project that takes the core and whose owner allows it, the owner's own
+  as `scripts/state-report.mjs --projects` finds them, read-only, nothing written there: its checks run as on a pull
+  request (`scripts/check.mjs --base <its main> --own --verdicts <a file outside every repository>`) once before the
+  update, as a baseline, and again after it, the sync between, each passed both, failed both (standing before) or
+  passed before and failed after (the release's, which stops the cut); it records the counts alone (`node
+  scripts/release.mjs --trial`) in a pull request of its own. Another owner's project has its own code run only where
+  no sign-in or key of the owner's is held (floor rule 18). The one condition that changes it: no such project allows
+  a trial; the record says so, and so does the release. It does not mean that a project is written to, that its
+  private code leaves it, or that it is named anywhere. Reason: #1079 passed every check of the core and failed only on
+  a real project. Held by `scripts/release.mjs`, which says the trial has not run, and cuts nothing, where its record
+  does not stand for the commit, cuts nothing where a check passed before and failed after, and refuses the record of
+  none allowed where a project of the owner's takes the core; where another owner's code may run, by nothing yet.
 - **Nothing locks a project,** in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
   what an agent can mend alone may bind, and what only the owner can do (a yes the floor names, a setting on the
@@ -191,7 +205,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   - a pull request that makes something worse than it stood may fail, and the session mends it there; every failure
     says its mend (#254);
   - what stood before the check came, or before it read more, never turns it red: the check keeps a baseline, what
-    breaks it today, listed and allowed only to shrink. A sync pull request holds the copy alone, so until the list
+    breaks it today, listed and allowed only to shrink. A sync pull request holds the copy and what the core writes alone, so until the list
     is written the pull request's base counts as it, and the entry of `setup/sync-notes.md` that brings the check
     has a step whose check reads that the list is written: no old breach goes unlisted. The one exception, on the owner's word and no other: the personal-terms check fails a listed term wherever
     it stands, one the project held before and a name a machine's git writes into each commit included, its failure
@@ -211,6 +225,32 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   it did not start before, and fails a pull request that adds a copy until the mend its failure words is made; by the
   heading "What it asks of a project" below; and, for the dose, by the scheduled look (`scripts/look.mjs`), which
   reads it from the shape check's baseline (`scripts/dose.mjs`).
+- **One process takes the core in** (#1083). By default the starter kit (`scripts/init.mjs`) and every sync
+  (`scripts/sync.mjs`) take the core into a repository, a new one or one at any earlier copy, by one process,
+  `scripts/converge.mjs` (the kit by the same `converged` of `scripts/core-owned.mjs`), which writes what the core owns
+  from the kit's templates at the copy's commit and what the project holds, its kind read from the host (#1095), so both
+  end in the same state, and run again changes nothing. The core owns each workflow, Dependabot
+  config, issue form, hooks' settings and tool entry file the kit writes, whole, where it is not there, carries the
+  core's mark or is what a kit writes for the project; and its part of `AGENTS.md` and `CLAUDE.md`, between its marks.
+  A workflow of the core's whose check the one job of the `core.yml` it ends with runs, it takes out (#1083, point 1).
+  Each value of the project's that lands in a file it writes is held to its form first (floor topic 5), and where one is
+  not, it writes nothing and says the mend. The one condition that changes it: a file the project holds that is not
+  the core's, or one the manifest's "Differences" names: the process writes nothing of it and names it as a
+  difference, as it names a rule file whose part it cannot tell apart. The trigger is a run of the kit or a sync: the
+  session that runs it commits what it wrote in the sync's pull request, which `scripts/pure-sync.mjs`, run from the
+  core's `main`, proves equal byte for byte to what the process there writes from the kit at the new pin and the
+  project's `main`, so it stays a pure sync (floor rule 8). It does not mean that a project's own rule, workflow or
+  setting is changed, a difference it keeps on purpose lost, a check that nothing else runs taken out, or what only the
+  owner can do done; nor that the manifest,
+  `SECURITY.md`, the threat model, the progress file, the choice records or a check's config is written where it
+  stands, nor after the first copy where it does not: each is then a step's to ask, with what it needs beside it. Reason: a release asked 63 things of each project, 19 of them workflow changes each with two security
+  reviews, built by hand from the notes, and a project of another owner held 25 differences from what the kit writes
+  for a new one. Held by `tests/converge-test.mjs` and `tests/pure-sync-test.mjs` (a render that differs, a word outside
+  the core's part changed, a value out of its form, a deletion the one job does not cover, each refused), by `tests/upgrade-test.mjs`, which takes
+  projects of the last two releases through the process and finds the core's files and parts as the kit writes them in
+  a new repository of the same kind, and by the copies part's check of
+  `scripts/checks.mjs`, in `core.yml`'s job and `copies.yml`'s, which fails a pull request that changes a file or part
+  the core marks so that it is not as the core writes it.
 - **A release says what it asks, step by step.** Whoever adds an entry to the sync notes (`setup/sync-notes/`)
   gives it a step in `scripts/steps/` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
@@ -220,7 +260,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   a task the project's agents take (`roles/orchestrator.md`; with no orchestrator, the session that syncs), a step
   only the owner can do labelled so, and each difference kept on purpose declared in the manifest's "Differences".
   Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
-  owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps (it stays pure), nor
+  owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps beyond what the core writes (it stays pure), nor
   that a step not done fails or stops anything. Reason: a step written only in prose is where one is missed, and
   nothing showed that it was. Held by `tests/steps-test.mjs`, which fails an entry with no step and a step with a
   check that cannot be taken out and mended, and by `tests/upgrade-test.mjs`: after the sync every step reads done,
