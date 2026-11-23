@@ -92,6 +92,10 @@ const NOT_CHECKS = {
   "security-review.yml": "its steps run security-review.mjs, pure-sync.mjs, clean-merges.mjs, power.mjs and code-review-wait.mjs, each a row or named here",
   "delete-merged-branches.yml": "it deletes merged branches on the host and checks nothing",
   "look.yml": "it runs on the daily schedule and fails no pull request",
+  "preview.yml": "it runs once a game's build has run, publishes its preview to gh-pages and fails no pull request",
+  "site-publish.sh": "preview.yml runs it to publish a game's built site, and it judges no file of the tree",
+  "versions.yml": "it runs on the monthly schedule and fails no pull request",
+  "versions.mjs": "it runs on the monthly schedule (versions.yml), reads the versions its config names, and fails no pull request",
 };
 for (const [name, from] of [...[...workflows].map(w => [w, "the starter kit"]), ...scripts]) {
   held(rows.has(name) || Object.hasOwn(NOT_CHECKS, name), `${name} (run from ${from}) is a row of the list or named as no check of the copy`,

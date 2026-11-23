@@ -51,6 +51,7 @@ export const HOST_OWN = {
   "look.yml": "the daily look is started by the host's schedule",
   "core-moved.yml": "it is started by the host's schedule",
   "versions.yml": "it is started by the host's schedule",
+  "preview.yml": "it is started by the host once a game's build has run, and publishes a preview, checking nothing",
 };
 
 // (the caller's environment, its PATH held to absolute folders: an empty or relative entry is the folder a program
