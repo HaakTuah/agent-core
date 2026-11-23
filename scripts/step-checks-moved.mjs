@@ -1,7 +1,7 @@
 // What the step of the rules' move reads: which of the paths the rules left a project's own files still name
 // (steps.mjs, beside this file, holds the steps, and step-checks.mjs the words they share). Each piece takes the
 // project as steps.mjs's `project` reads it and returns the mend, or null where the step is done; a step names the
-// ones it needs, none runs by itself. It reads only. Node's own modules and git only.
+// ones it needs, none runs by itself, and the step's writer (step-writers.mjs) reads the project with the same pieces. It reads only. Node's own modules and git only.
 import fs from "node:fs";
 import path from "node:path";
 import { atCopy } from "./core-path.mjs";
@@ -44,7 +44,7 @@ const dated = f => /\.(md|txt)$/u.test(f) && (/(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.t
 // now: each rule file and each file a tool takes its instructions from, whatever its name or folder; every file at the
 // root whose name, or whose folder's, opens with a dot, where tools keep what they read, whatever its name; and every
 // other file of text that is no dated record.
-function namers(p) {
+export function namers(p) {
   let rules = [];
   try { rules = ruleFiles(p.read, dir => p.files.filter(f => f.startsWith(`${dir}/`)), { tools: true }); } catch { /* (no list of rule files yet: the files of text alone) */ }
   return p.files.filter(f => !f.startsWith(copyAt(p)) && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
@@ -59,7 +59,7 @@ function namedStill(p, map) {
 
 // A copies config that reads the old folder and not yet each folder the rules stand in, however its patterns are laid out.
 // (the patterns as a project whose copy stands at `copy` holds them: #628)
-const readsOldAlone = (p, f, copy) => f.endsWith(".json") && (p.read(f) ?? "").includes(atCopy(MOVED_GLOB, copy)) && !NEW_GLOBS.every(g => (p.read(f) ?? "").includes(atCopy(g, copy)));
+export const readsOldAlone = (p, f, copy) => f.endsWith(".json") && (p.read(f) ?? "").includes(atCopy(MOVED_GLOB, copy)) && !NEW_GLOBS.every(g => (p.read(f) ?? "").includes(atCopy(g, copy)));
 
 // Where two old paths now lead to one file, the word that it is named once; and, where a file a tool takes its
 // instructions from by pulling files in (Kiro's steering, Antigravity's rules) still names an old path, that the step

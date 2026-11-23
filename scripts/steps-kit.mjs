@@ -12,6 +12,7 @@ import { STEPS, configs, notDone, project, report } from "./steps.mjs";
 import { hookCommands, readCore } from "./core-path.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { READERS } from "./shape-readers.mjs";
+import { ruleFiles } from "./rule-files.mjs";
 import { hostSays, root } from "./scratch-core.mjs";
 
 export const PIN = "a".repeat(40);
@@ -145,3 +146,16 @@ export const only = lead => STEPS.filter(s => s.lead === lead);
 
 // The commands that fetch or install, npx and curl, built from pieces, so that the licence check reads no tool here.
 export const NPX = ["np", "x"].join(""), CURL = ["cu", "rl"].join("");
+
+// The project's rule files and the files its agent tools take their instructions from, each with its text, as a step's
+// writer must leave their words (rule-files.mjs; #1091); and whether a text after the writers kept the words of a text
+// before them: the same, but for the paths into the copy (core/...), which a writer moves, and the manifest's "Paths:"
+// line, which it writes as the starter kit does.
+export function ruleTexts(dir) {
+  const p = project(dir);
+  return Object.fromEntries(ruleFiles(p.read, d => p.files.filter(f => f.startsWith(`${d}/`)), { tools: true }).map(f => [f, p.read(f)]));
+}
+export const wordsKept = (before, after) => {
+  const words = text => (text === null || text === undefined ? null : text.replace(/core\/[\w./-]+/gu, "core/-").replace(/^Paths: .*$/mu, "Paths: -"));
+  return Object.keys({ ...before, ...after }).every(f => words(before[f]) === words(after[f]));
+};

@@ -105,6 +105,7 @@ export const PLANTED = {
 PLANTED["15 November 2026, every step has its check"] = dir => Object.entries(PLANTED).every(([lead, done]) => lead === "15 November 2026, every step has its check" || done(dir));
 
 // The steps no check reads that this case does not plant, each with why.
+const none = (why) => `it asks nothing of a session: ${why}, so there is no step to take or leave`;
 export const UNPLANTED = {
   "18 November 2026, a blind sample each month": "it asks nothing of a session: the scheduled look keeps the sample's issue, and only the owner answers it",
   "18 November 2026, another publisher's code named in a lock file": "it needs a project that ships or runs another publisher's code loaded otherwise than from a lock file (a content network's script), and this case's project is a private tool that loads none",
@@ -119,6 +120,12 @@ export const UNPLANTED = {
   "17 November 2026, held packages looked up again": "its outcome is what npm's or NuGet's registry answers on the day of a package the project holds, which no scratch project can plant without a package of its own, and what the session puts in a sync pull request's description is no file a script reads after",
   "20 November 2026, the workflow check runs zizmor and actionlint": "what it asks, a task filed from the notes of the sync pull request's own run, needs that run of the workflow check on the host's runners, where the two tools alone run, and this case's scratch project has no runner",
   "20 November 2026, the pointer check reads Markdown's links with lychee": "what it asks, a task filed from the notes of the sync pull request's own run, needs that run of the pointer check on the host's runners, where lychee alone runs, and this case's scratch project has no runner",
+  // (five steps the core now does itself, which ask a session nothing: #1093, point 2)
+  "12 November 2026, exact versions": none("the licence check runs the exact-versions check itself"),
+  "16 November 2026, the NuGet check where it can matter": none("the NuGet check runs in core.yml's one job and the sync takes out nuget.yml"),
+  "18 November 2026, the core's packages installed from its lock file": none("a check run from the copy installs the core's packages itself"),
+  "13 November 2026, the core's scripts started through bash": none("the sync records in git's index the executable bits the core marks"),
+  "19 November 2026, the parser's packages installed where the shape check runs": none("the shape check and the selection of tests install the parser's packages themselves"),
 };
 
 export function set(dir, opts = {}) {
