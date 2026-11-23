@@ -38,6 +38,7 @@ import { plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
 import { MARK, converged, marked } from "./core-owned.mjs";
 import { privateOf } from "./host-private.mjs";
+import { NO_TESTS, lineOf, readProject, rowFor } from "./mutation-tools.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const TEMPLATES = "setup/template";
@@ -190,7 +191,9 @@ function modulesAt(pin) {
 // `read` gives a template's text by its name under setup/template/ (the program reads it from the pinned commit).
 export function files(o, pin, moduleNames, read) {
   const words = { owner: o.owner, project: o.name, core: CORE, pin, npm: o.packages, nuget: o.nuget, modules: modules(moduleNames, o.game), declined: o.game ? "" : "\nNot taken: `game-design.md` (the project is no game).",
-    games: o.game ? GAME_ROWS.map(([slot, what]) => `\n| *${slot}* | FILL IN: ${what} |`).join("") : "" };
+    games: o.game ? GAME_ROWS.map(([slot, what]) => `\n| *${slot}* | FILL IN: ${what} |`).join("") : "",
+    // (the mutation tool the core's list gives the project's code and tests, read by the kit; #1107)
+    mutation: lineOf(o.mutation ?? { none: NO_TESTS }) };
   return FILES.filter(([, , when]) => !when || when(o)).map(([template, to]) => {
     let text = fill(read(template), words);
     // (Dependabot's own part for each installer the project named, after the part every project has)
@@ -379,6 +382,9 @@ function init(argv) {
   }
   const pin = pinOf(o);
   const moduleNames = modulesAt(pin);
+  // (the manifest's row *mutation tool*, from the core's list for the code and tests the project holds already; #1107)
+  const project = readProject(here, "");
+  if (project) o.mutation = rowFor(project);
 
   const read = name => { try { return raw(["show", `${pin}:${TEMPLATES}/${name}`], ROOT); } catch { return fail(`${pin} holds no ${TEMPLATES}/${name}: take a commit of the core that has the starter kit`); } };
   const out = files(o, pin, moduleNames, read);
