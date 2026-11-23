@@ -129,14 +129,18 @@ function syncBranch(root) {
 }
 
 // On a sync's branch, pure-sync.mjs from the core's side: the release the sync moves to, where the project follows the
-// releases and the pin is one, else the core's main, as its header says; its packages those of the copy where the two
+// releases, or the core's main, where it follows main, as its header says; its packages those of the copy where the two
 // lock files are the same, else installed by its own install script.
 function pureSync(root, at, bare, why, tmp, said) {
   const pin = syncBranch(root);
   if (!pin) return;
   if (!bare) return said.unread("the sync", `the core could not be fetched${why}, so pure-sync.mjs was not run from the core's side`);
+  // (only what the project follows runs: where that cannot be read, nothing, and a project that follows the releases
+  // never runs the core's main, whose newest commit may be no release)
   const follows = followsOf(git(root, ["show", `HEAD:${MANIFEST}`]), hostSaid(() => {}));
-  const side = follows === "releases" && releasesIn(bare).some(r => r.sha === pin) ? pin : inBare(bare, ["rev-parse", "refs/heads/main"]).trim();
+  if (follows === null) return said.unread("the sync", "whether the project follows the core's main or its releases could not be read (its manifest's row *follows*, or whose account holds it), so pure-sync.mjs was not run");
+  if (follows === "releases" && !releasesIn(bare).some(r => r.sha === pin)) return said.way("the sync", `it moves the copy to ${pin.slice(0, 7)}, which is no release of the core, and the project follows the releases. Mend: sync to the newest release, \`node ${at}scripts/sync.mjs\` with no commit named`);
+  const side = follows === "releases" ? pin : inBare(bare, ["rev-parse", "refs/heads/main"]).trim();
   const dir = path.join(tmp, "side");
   fs.mkdirSync(dir);
   execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(bare, ["archive", side], { encoding: "buffer", maxBuffer: 1 << 28 }) });
