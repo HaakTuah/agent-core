@@ -493,12 +493,14 @@ commit("a project");
 let r = run([]);
 ok(r.status === 0 && /has not written its config of the shape check yet/.test(r.out) && /nothing was held/.test(r.out), "a project with no config and no base passes, and says that nothing was held", r.out);
 put("core-manifest.md", "| *shape check* | `none` |\n"); r = run([]);
-const noReason = /turns nothing off/.test(r.out) && /nothing was held/.test(r.out);
+let noReason = /turns nothing off/.test(r.out) && /nothing was held/.test(r.out);
+put("core-manifest.md", "| *shape check* | `none ` |\n"); r = run([]);
+noReason &&= /turns nothing off/.test(r.out) && /nothing was held/.test(r.out); // (padded inside its backticks, no reason all the same)
 git("branch", "before");
 r = run([], { SHAPE_BASE: "before" });
 ok(r.status === 0 && /nothing new in how the code is put together against before, by the starter kit's config/.test(r.out), "with a base, a project with no config is held to the starter kit's, the base as its baseline: what stood passes", r.out);
 put("core-manifest.md", "| *shape check* | `none`: kept off |\n"); r = run([], { SHAPE_BASE: "before" });
-ok(noReason && r.status === 0 && /is off: .*kept off; this pull request turns it off/.test(r.out), "only a `none` with a reason turns the check off", r.out);
+ok(noReason && r.status === 0 && /is off: .*kept off; this pull request turns it off/.test(r.out), "only a `none` with a reason turns the check off, padded or not", r.out);
 fs.rmSync(path.join(dir, "core-manifest.md"));
 put("src/rules/more.js", long("another", 61));
 put("src/rules/more.test.js", long("inATest", 200));

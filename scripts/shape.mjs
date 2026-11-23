@@ -618,8 +618,9 @@ export const where = manifest => /`([\w./-]+\.json)`/u.exec(/^.*\*shape check\*.
 // gives none, which turns nothing off; null where the row says no `none`.
 export function offBy(manifest) {
   const row = /^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "", rest = row.slice(row.indexOf("*shape check*") + 13);
-  if (/`([^`]*)`/u.exec(rest)?.[1]?.trim() !== "none") return null;
-  return rest.slice(rest.indexOf("`none`") + 6).replace(/^[\s:|,;-]+|[\s|]+$/gu, "");
+  const token = /`([^`]*)`/u.exec(rest);
+  if (token?.[1].trim() !== "none") return null;
+  return rest.slice(token.index + token[0].length).replace(/^[\s:|,;-]+|[\s|]+$/gu, ""); // (after the token as it stands, padded or not)
 }
 
 // ---- the verdict ----
