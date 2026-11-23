@@ -39,11 +39,11 @@ import { waysOf } from "./ways.mjs";
 import { baseOf } from "./licences.mjs";
 import { forget, textAt } from "./git-objects.mjs";
 import { parseBounded, logged } from "./guards.mjs";
-import { unreached } from "./packages.mjs";
+import { notInstalled, unreached } from "./packages.mjs";
 import { started } from "./started.mjs";
 import { configured } from "./agent-tools-configured.mjs";
 import { describe, show, TREE, listed } from "./agent-tools-entries.mjs";
-import { listings, shown, notFile, listing, shownNotBlob } from "./agent-tools-listing.mjs";
+import { listings, shown, modules, notFile, listing, shownNotBlob } from "./agent-tools-listing.mjs";
 import { readProject } from "./agent-tools-project.mjs";
 import { configAtBase, mendedBase, heldBy, heldBefore, sortPins, sortSources, sortBehind, sortUnlisted } from "./agent-tools-base.mjs";
 
@@ -131,6 +131,7 @@ function run(root, file, { core = false, base = baseOf(root), ways = installedBy
   // may be another commit's)
   listings.clear();
   shown.clear();
+  modules.clear();
   forget();
   let config;
   try { config = parseBounded(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
@@ -162,13 +163,14 @@ function run(root, file, { core = false, base = baseOf(root), ways = installedBy
   sortUnlisted(unlisted, { head, base, held, file }, fail, notes);
   return { fail, notes };
 }
-// The part of the check that did not run, or null: where the job's install could not reach the registry, in a project's
-// pull request, a project's Codex config, which the TOML package reads, is left unread, at the head and the base alike,
+// The part of the check that did not run, or null (asked only where a Codex config is held, so that a copy installs
+// its packages for none other): where the TOML package could not be installed (packages.mjs,
+// unreached(): the registry not answering, or a copy's install failing; #1093, point 1), a project's Codex config, which the TOML package reads, is left unread, at the head and the base alike,
 // and its entries in the list are not failed as configured nowhere; every other failure stands (#654, point 4).
 function partlyUnread(root, base = baseOf(root)) {
   const codex = ".codex/config.toml";
   const held = () => fs.existsSync(path.join(root, codex)) || (!!base && textAt(root, base, codex) !== null);
-  return unreached("smol-toml") && held() ? `The agent-tools check did not read ${codex}: it is read by the package smol-toml, which could not be installed, the registry not answering; every other part of the check ran. Mend: run this job again before the pull request merges; if it fails again, file it as a fault` : null;
+  return held() && unreached("smol-toml") ? `The agent-tools check did not read ${codex}, and ran every other part: ${notInstalled("smol-toml")}` : null;
 }
 // With no base to read against, as before a commit or on a push, each problem a project may hold, noted as sortSources
 // notes its own; in the core's own repository none may stand.
@@ -177,7 +179,9 @@ function unreadOf(head, baseProject, core) {
 }
 // What the check prints, in order, and its exit status: { lines: [[stream ("out" or "err"), line]], status }.
 export function printed(root, file, opts) {
-  const { fail, notes } = run(root, file, opts), partly = partlyUnread(root, opts?.base);
+  // (the base read once a run, for both)
+  const base = opts?.base === undefined ? baseOf(root) : opts.base;
+  const { fail, notes } = run(root, file, { ...opts, base }), partly = partlyUnread(root, base);
   const lines = [...(partly ? [["out", `::warning::${partly}`]] : []), ...notes.map(n => ["out", `note ${logged(n)}`]), ...fail.map(f => ["err", `FAIL: ${logged(f)}`]),
     ["out", fail.length ? `${fail.length} of the agent's own tools not as floor topic 15 asks` : "ok   every tool the project configures for its agents is listed"]];
   return { lines, status: fail.length ? 1 : 0 };

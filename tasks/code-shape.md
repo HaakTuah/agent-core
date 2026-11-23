@@ -102,10 +102,13 @@ one declared entrance.
   by discipline alone.
 - **How strong the tests are is measured on the lines a pull request changes** (#253). By default the job that runs a
   project's tests runs its *mutation tool* on those lines through `core/scripts/strength.mjs`, which shows on the pull
-  request how many of the faults put in on purpose a test caught, and fails nothing. The project names the tool in its
-  manifest, a tool of development only, under the floor's rules for dependencies and licences, that writes its report
-  in an open form, the mutation-testing-elements schema; a project with no such tool for its language, or with no
-  tests yet, says `none` there with its reason, and the measure is left out. The one condition that changes it: once
+  request how many of the faults put in on purpose a test caught, and fails nothing. The tool is the core's list's
+  for the language of the project's code (`core/scripts/mutation-tools.json`), a tool of development only, under the
+  floor's rules for dependencies and licences, that writes its report in an open form, the mutation-testing-elements
+  schema: the starter kit names it in the manifest's row, and `core/scripts/mutation-tools.mjs --write` once the
+  project's code or tests change what the list gives, where the row holds no tool or reason of the project's own
+  (#1107). Where the list has no tool that fits, or there are no tests yet, the row says `none` with that reason and
+  the measure is left out; else only the owner turns it off, with `none` and a reason of the owner's. The one condition that changes it: once
   the project's baseline stands, a fault that survives on a changed line and the baseline does not list fails, and the
   session writes a test that catches it; only where the fault changes nothing the program does, it lists it with that
   reason, as "Never worse" says of any entry. The baseline lists what survives a whole run, which is the audit's,
@@ -115,7 +118,8 @@ one declared entrance.
   a changed line is the change's own. Reason: the projects lean on their suites as the proof that a
   change kept behaviour, and nothing measured whether a test fails where the code is wrong. Held by the strength
   check, which counts each kind of fault a file holds against what the baseline lists of it and fails a survivor past
-  it, an entry that joins with no reason, and one dropped while its fault survives, and by the reviews of that reason.
+  it, an entry that joins with no reason, and one dropped while its fault survives, and by the reviews of that reason;
+  the row, by `tests/mutation-tools-test.mjs`, and that only the owner writes a `none` of the project's own, by none.
 - **A test taken out or weakened is said.** By default a pull request keeps its tests and what they assert. The
   trigger is a pull request that leaves a test file with fewer lines that assert, deletes it, or skips a case in it:
   its builder names that file on the description's line `Tests changed:`, with why, and the reviewer rules on it,

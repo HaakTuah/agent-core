@@ -19,6 +19,7 @@ export const OWN = new Set(["core-manifest.md", "SECURITY.md", "docs/threat-mode
 const WHOLE = [".github/dependabot.yml", ".github/ISSUE_TEMPLATE/bug_report.md", ".github/ISSUE_TEMPLATE/feature_request.md", ".claude/settings.json", ".codex/hooks.json", ".kiro/steering/core.md", ".kiro/hooks/work-saved.json", ".agents/rules/core.md"];
 export const whole = to => /^\.github\/workflows\/[^/]+\.yml$/u.test(to) || WHOLE.includes(to);
 
+// line ends alone never count, as git makes them one: safe while every whole file is YAML, JSON or Markdown
 export const lf = t => t.replace(/\r\n/gu, "\n");
 // (a file as the comparison reads it: its line ends made one, the core's mark taken out and every pin made one, since
 // the sync and Dependabot move pins)
@@ -53,7 +54,8 @@ export function converged(to, now, want, older = []) {
   if (!whole(to)) return {};
   const core = (marked(to) && /^# The core's file:/u.test(now)) || [want, ...older].some(t => t && plainOf(t) === plainOf(now));
   if (!core) return { left: "is not the core's (no mark of the core's, and not what a starter kit writes for the project): left as it is" };
-  return now === want ? {} : { text: want };
+  // (a file whose line ends alone differ, as a checkout on Windows holds it, is as the core writes it: git makes them one)
+  return lf(now) === lf(want) ? {} : { text: want };
 }
 
 // The workflows of the core's whose check the one job of core.yml runs, as a private project's starter kit writes it

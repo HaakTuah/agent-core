@@ -77,8 +77,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   audit (#259) and a change to a rule that keeps its meaning (#886, point 2) join without the owner's word: the design
   check of the PR that builds such a change states it, as `roles/shared/review-guidelines.md` says of the floor ("A
   change that keeps the meaning is stated so"), and where it does not, that PR waits for the owner's yes, held for the
-  floor and the guidelines by `scripts/meaning-kept.mjs` and for any other rule by nothing yet. A bug waits for no
-  line, as that module says. A line does not leave in the PR that closes its issue: the readers of the file skip the
+  floor and the guidelines by `scripts/meaning-kept.mjs` and for any other rule by nothing yet. A line does not leave in the PR that
+  closes its issue: the readers of the file skip the
   line of a closed issue, and the next PR that changes the file takes such lines out together (`node scripts/queue.mjs
   --clear`; #750, point 1), as that module says, since PRs merging side by side collided on it. Held here by `own-description.yml`, which fails a ready PR that changes the
   file and leaves one.
@@ -153,14 +153,10 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that say the mend, the labels and the queue, the daily look and the monthly state report, which lists the core
   beside the projects. Its audit and cleaning share is set by the state its own code is in, as any project's is, and
   the staged cases run on its repository. An issue here is done only when the core's own repository meets it.
-- **Whoever builds a change finishes it,** the design session and a builder alike: the branch, the draft PR and the
-  push after every commit, then ready, its reviews, their findings fixed and the merge, as `roles/shared/work-flow.md`
+- **Whoever builds a change finishes it,** the design session and a builder alike, as `roles/shared/work-flow.md`
   says ("Git and GitHub", and point 1). A PR that changes a rule says what it changes in every project.
 - **Every PR gets Codex's code and security reviews,** save one of queue lines alone that `scripts/queue-only.mjs`
-  proves (floor rule 8; `tasks/reviews.md`, point 3); one that changes the floor or the review guidelines needs the
-  owner's yes in it, save one that keeps the meaning as floor rule 3 says: that of its queued issue ("Queued
-  means wanted"), or, for one that goes beyond it, a new yes, for which it waits unmerged while its builder takes the
-  next line.
+  proves (floor rule 8; `tasks/reviews.md`, point 3).
 - **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`).
   By default what a role reads at its start, as its file under `roles/` names it, stays under that role's cap, so
   whoever adds a rule there replaces text. Where a fresh session has read all the rules for room and found too little,
@@ -251,6 +247,36 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   a new repository of the same kind, and by the copies part's check of
   `scripts/checks.mjs`, in `core.yml`'s job and `copies.yml`'s, which fails a pull request that changes a file or part
   the core marks so that it is not as the core writes it.
+- **The core's checks run in a project's own jobs as they stand** (#1093). By default a script of the core that a
+  project's own job may run takes what it needs from the core itself: run from a copy, it installs the core's packages
+  it needs from the core's lock file (`scripts/packages.mjs`, by `scripts/install.mjs`) once, before it reads, and the
+  licence check, the shape check and the suites' selection (`scripts/select.mjs`) bring what a project's workflow once
+  carried for them, so no step asks a project to edit its own workflow for an install. The one condition that changes it:
+  the install cannot be made (the registry does not answer, the installer is missing); the script then says, as a
+  warning, that it did not run and why, with its mend, and fails nothing. The trigger is a check written or widened
+  that a project's own job may run: whoever builds it has it take what it needs so, and every mend that names an
+  install gives the guarded form (`if [ -f core/scripts/install.mjs ]; then …; fi`). It does not mean that a project's
+  own workflow is rewritten by the core, nor that no step asks where its own lookup stands or what its own suites skip
+  (#1093), nor that the core's own repository installs as it runs: its jobs name what
+  they install, and a package not there fails there. Reason: #1079 turned a project's sync pull request red over
+  nothing it changed, and seven steps asked an agent to edit a project's own workflows by hand. Held by
+  `tests/upgrade-test.mjs` (a project's own job that runs the copy's scripts on a runner with nothing installed passes
+  after the sync with no change of its own) and `tests/packages-test.mjs` (a copy's script with its packages missing,
+  installed first, or, where the install cannot be made, a warning that fails nothing), and, for the guarded form,
+  `tests/mend-test.mjs`.
+- **A writer of the core's and its readers meet in a round trip** (#1108). By default each file the core writes into a
+  project (the starter kit, the one process, the sync, and the baselines and records a check or a step writes there) is
+  read back in a test by each of the core's own readers that reads it (the YAML and Markdown readers, the readers of
+  the checks' configs, the manifest's), written in projects of each kind the upgrade test holds, and the test fails
+  where a reader cannot read it or reads another meaning. Nothing changes it. The trigger is a pull request that adds a
+  script that writes a file, or a reader of what one writes, or changes the form either takes: its builder adds the
+  round trip in the same pull request, in `tests/round-trip-test.mjs` or the writer's own test, and lists the script
+  there, or names it there with why it writes nothing a reader of the core reads in a project. It does not mean that a
+  property-testing library is added, nor that a project is asked anything. Reason: on 22 November 2026 only the upgrade
+  test, a run of whole projects, found that the core's YAML reader could not read the `core.yml` the one process wrote.
+  Held by `tests/round-trip-test.mjs`, in `.github/workflows/tests.yml`, which fails a script that writes a file and
+  stands in neither of its lists, and a writer whose round trip did not run; that a new reader brings its round trip,
+  by none.
 - **A release says what it asks, step by step.** Whoever adds an entry to the sync notes (`setup/sync-notes/`)
   gives it a step in `scripts/steps/` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
@@ -259,14 +285,17 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`); each is
   a task the project's agents take (`roles/orchestrator.md`; with no orchestrator, the session that syncs), a step
   only the owner can do labelled so, and each difference kept on purpose declared in the manifest's "Differences".
-  Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
+  Where a script does a step exactly, the sync runs it (`scripts/steps.mjs --write`; #1091): it writes a check's config
+  or baseline or a pointer's path alone, lists it and sets it aside for the session that syncs to commit after the
+  sync's merge, or says why it wrote nothing. Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
   owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps beyond what the core writes (it stays pure), nor
-  that a step not done fails or stops anything. Reason: a step written only in prose is where one is missed, and
-  nothing showed that it was. Held by `tests/steps-test.mjs`, which fails an entry with no step and a step with a
+  that a step not done fails or stops anything, nor that a step that needs judgement is written by a script. Reason: a
+  step written only in prose is where one is missed, and nothing showed that it was. Held by
+  `tests/steps-write-test.mjs` (no rule's words changed), by `tests/steps-test.mjs`, which fails an entry with no step and a step with a
   check that cannot be taken out and mended, and by `tests/upgrade-test.mjs`: after the sync every step reads done,
   but one the release adds that it asks of every project (a check's own list to write), which is reported and done
   by its mend as written; each step added since the release started from, taken out, is reported and its mend as
-  written makes it done, and steps taken out at random are reported, exactly those.
+  written makes it done, and steps taken out at random are reported, exactly those, and done by the writers.
 - **A pull request says what it asks of a project:** one that changes the floor, a module, a script,
   the setup or a workflow has the heading "What it asks of a project", saying what happens in a project that changes
   nothing of its own: nothing, a baseline written, or an ask in the sync notes with its cost. It does not mean that
