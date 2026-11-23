@@ -3,11 +3,14 @@
   "holder": [
     "check: tests/steps-test.mjs",
     "check: tests/upgrade-test.mjs",
-    "check: tests/steps-write-test.mjs"
+    "check: tests/steps-write-test.mjs",
+    "check: tests/manifest-reads-test.mjs",
+    "check: tests/releases-test.mjs"
   ],
   "behind": [
     215,
-    "#1091"
+    "#1091",
+    "#1094"
   ],
   "number": "check fires; outcome: robust"
 }
