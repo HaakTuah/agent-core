@@ -16,14 +16,19 @@
       "why": "One runner of a workflow as GitHub runs it: its expression evaluator and job runner, read by their headings, found by searching; its YAML reader is split out (parse-yaml.mjs, #1056), and no other part stands alone for a reader of either."
     },
     "scripts/copies.mjs": { "mark": 34376, "why": "the question of a split is asked in #1102" },
+    "scripts/labels.mjs": { "mark": 22008, "why": "the question of a split is asked in #1186" },
+    "scripts/staged/steps.mjs": { "mark": 20663, "why": "the question of a split is asked in #1186" },
     ".github/sizes.json": { "mark": 20901, "why": "a list a script reads, each entry looked up by its path; no split lets anyone read less" },
     "scripts/licences.mjs": { "mark": 52937, "why": "the question of a split is asked in #1151" },
     "scripts/packages.mjs": { "mark": 25772, "why": "the question of a split is asked in #1151" },
     "tests/exact-versions-test.mjs": { "mark": 20990, "why": "the question of a split is asked in #1151" },
     "tasks/cleaning.md": { "mark": 23083, "why": "the question of a split is asked in #1132" },
+    "tasks/reviews.md": { "mark": 21736, "why": "the question of a split is asked in #1156" },
+    ".github/sizes.json": { "mark": 21377, "why": "A list scripts read whole and a session reads by the path of the one line it adds, found by searching; split, a script would read two files and no one less" },
+    ".github/workflows/security-review.yml": { "mark": 29919, "why": "One job that each project calls pinned, its shell inline so that nothing the pull request checks out runs with its token; a session reads the step it changes, found by its name, and a second called workflow would start a second job, billed a whole minute on a private repository's free plan" },
+    "scripts/staged.mjs": { "mark": 30534, "why": "the question of a split is asked in #1157" },
     "scripts/init.mjs": { "mark": 30906, "why": "the question of a split is asked in #1098" },
     "tests/check-test.mjs": { "mark": 28691, "why": "the question of a split is asked in #1073" },
-    "tests/code-scan-test.mjs": { "mark": 22506, "why": "the question of a split is asked in #1073" },
     "scripts/check.mjs": { "mark": 26892, "why": "the question of a split is asked in #1064" },
     "scripts/checks.mjs": { "mark": 24179, "why": "the question of a split is asked in #1064" },
     "scripts/code-scan.mjs": { "mark": 20998, "why": "the question of a split is asked in #1064" },
@@ -266,8 +271,8 @@
       "why": "One check's readers (the word, the calls a draft skips, the line breaks, the tools' findings against the base) that all read the same texts against the same base through the one baseOf(); a task that changes one reads how the others count against the base, so a split would make it open each part."
     },
     "tests/workflows-test.mjs": {
-      "mark": 74117,
-      "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md). The cases of workflow-tools.mjs, a script of its own, are to move to a file of their own: #1017."
+      "mark": 70465,
+      "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md). The cases of workflow-tools.mjs, a script of its own, stand in tests/workflow-tools-test.mjs (#1017)."
     }
   }
 }

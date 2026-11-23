@@ -65,6 +65,34 @@ ok(is(had([summary(done)]), true, "a code review has run") && is(had([said(`Code
 ok(is(had([summary({ ...done, commit_sha: OLD })]), false, "no code review") && is(had([said(`Code review: of ${OLD}`)]), false, "no code review"), "one of an earlier commit with a commit of the builder's after it does not");
 ok(is(had([said(`Code review: of ${HEAD.slice(0, 39)}`)]), false, "no code review") && is(had([said(`Code review: of ${HEAD}`, "NONE")]), false, "no code review") && is(had([said(`Security review: of ${HEAD}`)]), false, "no code review"), "nor one naming part of the SHA, by another account, or that is no code review");
 const updated = [commit(OLD, "8".repeat(40)), commit(M, OLD, MAIN), commit(HEAD, M, "7".repeat(40))];
+// A review that found nothing blocking stands across the pull request's own commits after it that a review checked and
+// found nothing blocking in, each a fix its own finding's reviewer checks (#1134, point 1); across one no review
+// checked, or with a blocking finding, or Codex's with a blocking finding on its commit or its findings not given, not
+{
+  const checks = [said(`Security review: of ${HEAD}\nBlocking findings: 0.\nOther findings: 1.`)];
+  // (Codex's security review here names the earlier commit, so it checks no later one)
+  const ofOld = (s) => ({ ...s, body: s.body.replace(`"security_review":${JSON.stringify(secDone)}`, `"security_review":` + JSON.stringify({ ...secDone, commit_sha: OLD })) });
+  const found = (more, by = checks) => judge({ commits: line.length, changed_files: 1, ...pull }, [ofOld(summary({ ...done, commit_sha: OLD })), ...by], line, code, [], true, undefined, null, more);
+  const codexFinds = (badge, on = { commit_id: OLD }) => [{ id: 1, user: { login: "chatgpt-codex-connector[bot]", type: "Bot" }, body: `**<sub><sub>![${badge} Badge](https://img.shields.io/badge/${badge}-red?style=flat)</sub></sub>  A finding**`, ...on }];
+  ok(is(had([said(`Code review: of ${OLD}\nBlocking findings: 0.\nOther findings: 2.`), ...checks]), true, "only checked fixes or updates from main since") && is(had([said(`Code review: of ${OLD}\nBlocking findings: 1.\nOther findings: 0.`), ...checks]), false, "no code review"),
+    "a posted review of an earlier commit that found nothing blocking stands across the builder's commits after it that a review checked; one with a blocking finding does not");
+  ok(is(had([said(`Code review: of ${OLD}\nBlocking findings: 0.\nOther findings: 2.`)]), false, "no code review") && is(found({ findings: [] }, []), false, "no code review")
+    && is(found({ findings: [] }, [said(`Security review: of ${HEAD}\nBlocking findings: 1.\nOther findings: 0.`)]), false, "no code review") && is(found({ findings: [] }, [said(`Security review: of ${HEAD}\nBlocking findings: 0.\nOther findings: 0.`, "NONE")]), false, "no code review"),
+    "nor across a later commit no review checked, one whose check found something blocking, or one checked by an account not counted: new work asks a review of what it changes");
+  const secured = (state) => judge({ commits: line.length, changed_files: 1, ...pull }, [{ ...summary({ ...done, commit_sha: OLD }), body: summary({ ...done, commit_sha: OLD }).body.replace(`"security_review":${JSON.stringify(secDone)}`, `"security_review":` + JSON.stringify({ ...secDone, ...state })) }], line, code, [], true, undefined, null, { findings: [] });
+  ok(is(secured({ has_any_findings: false }), true, "only checked fixes") && is(secured({}), true, "only checked fixes")
+    && is(secured({ has_any_findings: true, has_unresolved_findings: false }), false, "no code review") && is(secured({ has_unresolved_findings: true }), false, "no code review") && is(secured({ commit_sha: OLD }), false, "no code review"),
+    "Codex's security review of the later commit that found nothing checks it, as a posted review does, in either form it gives (false, or null in both fields); one that found something, or of another commit, does not");
+  ok(is(found({ findings: [] }), true, "only checked fixes") && is(found({ findings: codexFinds("P2") }), true, "only checked fixes") && is(found({ findings: codexFinds("P2", { commit_id: OLD, in_reply_to_id: null }) }), true, "only checked fixes"),
+    "Codex's of an earlier commit with no blocking finding stands so too");
+  ok(is(found({ findings: codexFinds("P1") }), false, "no code review") && is(found({ findings: codexFinds("P0", {}) }), false, "no code review") && is(found({ findings: codexFinds("P1", { commit_id: "1".repeat(40) }) }), true, "only checked fixes") && is(found(), false, "no code review"),
+    "but not with a blocking finding on its commit or on none named, nor where its findings are not given; one on another commit is that commit's");
+  const reported = (more) => judge({ commits: line.length, changed_files: 1, ...pull }, [ofOld(summary({ ...done, commit_sha: OLD, has_any_findings: true, has_unresolved_findings: true })), ...checks], line, code, [], true, undefined, null, more);
+  ok(is(reported({ findings: [] }), false, "no code review") && is(reported({ findings: codexFinds("P1", { commit_id: "1".repeat(40) }) }), false, "no code review") && is(reported({ findings: codexFinds("P2") }), true, "only checked fixes"),
+    "nor where its summary says it found something and none of it on that commit is read here; one whose findings read here block nothing stands");
+  const merged = [commit(OLD, "8".repeat(40)), commit(M, MAIN, OLD), commit(HEAD, M)];
+  ok(is(had([said(`Code review: of ${OLD}\nBlocking findings: 0.\nOther findings: 0.`)], merged), false, "no code review"), "a merge of the pull request's own commit into another line is no fix it stands across");
+}
 ok(is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but updates from main") && is(had([said(`Code review: of ${OLD}`)], updated), true, "nothing but updates"), "one of an earlier commit followed only by merges from main stands");
 // Given the merges clean-merges.mjs proved (#323), only those carry a review past them; the status names the one that
 // stops it, with its mend
@@ -89,8 +117,12 @@ ok(is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but 
   ok(is(had(ran, line, tasks, core), false, "no design check") && mended(`FAIL ${had(ran, line, tasks, core).why}`), "if a pull request of the core that changes tasks/ has no design check of its head, the status waits, saying its mend");
   ok(is(had([...ran, now(`Design check: ${HEAD}\n${lines}`)], line, tasks, core), true, "a code review has run") && is(had([...ran, now(`Design check: ${OLD}\n${lines}`)], updated, tasks, core), true, "a code review has run"),
     "a design check naming the head, or a commit only updates from main follow, settles it");
-  ok(is(had([...ran, now(`Design check: ${OLD}\n${lines}`)], line, tasks, core), false, "no design check") && is(had([...ran, { ...now(`Design check: ${HEAD}\n${lines}`), updated_at: "2026-11-18T11:00:00Z" }], line, tasks, core), false, "no design check"),
-    "one of an earlier commit with the builder's after it, or one edited since it was posted, does not");
+  const blocked = "Blocking findings: 1.\nNo other finding.";
+  ok(is(had([...ran, now(`Design check: ${OLD}\n${blocked}`)], line, tasks, core), false, "no design check") && is(had([...ran, { ...now(`Design check: ${HEAD}\n${lines}`), updated_at: "2026-11-18T11:00:00Z" }], line, tasks, core), false, "no design check"),
+    "one of an earlier commit with a blocking finding and the builder's after it, or one edited since it was posted, does not");
+  ok(is(had([...ran, now(`Design check: ${OLD}\n${lines}`), now(`Code review: of ${HEAD}\n${lines}`)], line, tasks, core), true, "a code review has run")
+    && is(had([{ ...ran[0], body: ran[0].body.replace(`"security_review":${JSON.stringify(secDone)}`, `"security_review":` + JSON.stringify({ ...secDone, has_any_findings: true, has_unresolved_findings: true })) }, now(`Design check: ${OLD}\n${lines}`)], line, tasks, core), false, "no design check"),
+    "one of an earlier commit that found nothing blocking stands across the builder's fixes after it that a review checked, and not across one none checked (#1134, point 1)");
   ok(is(had(ran, line, code, core), true, "a code review has run") && is(had(ran, line, tasks, { ...core, base: { repo: { full_name: "someone/project" } } }), true, "")
     && is(had(ran, line, tasks, { ...core, created_at: "2026-11-17T12:00:00Z" }), true, "a code review has run"),
     "a change outside the rule folders, a project's pull request, and one opened before the rule's day ask no design check");

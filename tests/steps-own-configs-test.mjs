@@ -86,6 +86,18 @@ ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks
   const goSaid = readNothing(bare, withTool, withConfig({ code: ["go/"], tests: [] })), shSaid = readNothing(bare, withTool, withConfig({ code: ["bin/", "t/"], tests: ["t/"] }));
   ok(!strengthOf(goSaid) && goSaid.some(n => n.script === "scripts/shape.mjs") && /names under "code" no file it measures/u.test(strengthOf(shSaid)?.why ?? "") && !shSaid.some(n => n.script === "scripts/shape.mjs"),
     "the strength is said to read nothing by what it measures, a file of a language the shape check's readers do not know among it, never by the shape check's languages", JSON.stringify({ goSaid, shSaid }));
+  // (#1107, point 3: the shape check the manifest turns off, with the owner's reason, is said to read nothing, its reason
+  // given, whatever its config names, and a `none` with no reason turns nothing off; Stryker named from a folder that
+  // holds no lock file is said to read nothing, since no job installs it, and one with its lock file is not)
+  const shapeOf = l => l.find(n => n.script === "scripts/shape.mjs"), readsTests = withConfig({ code: ["t/"], tests: ["t/"] });
+  const offSaid = readNothing(bare, `${withTool}\n| *shape check* | \`none\`: the owner's reason |\n`, readsTests);
+  const noReason = readNothing(bare, `${withTool}\n| *shape check* | \`none\` |\n`, readsTests);
+  const stryker = withTool.replace(/^\| \*mutation tool\* \|[^\n]*$/mu, "| *mutation tool* | `node core/scripts/stryker.mjs --tool checks/mutation --report {report} {lines}` |");
+  const lockless = readNothing(bare, stryker, withConfig({ code: ["go/"], tests: [] }));
+  const locked = readNothing(bare, stryker, f => (f === "checks/mutation/package-lock.json" ? "{}" : withConfig({ code: ["go/"], tests: [] })(f)));
+  ok(/is `none`, which turns it off: the owner's reason$/u.test(shapeOf(offSaid)?.why ?? "") && !shapeOf(noReason)
+    && /runs Stryker from `checks\/mutation`, which holds no lock file/u.test(strengthOf(lockless)?.why ?? "") && !strengthOf(locked),
+    "the shape check turned off by the owner's `none` with a reason reads nothing, one with no reason is not off, and Stryker with no lock file to install it from reads nothing", JSON.stringify({ offSaid, noReason, lockless, locked }));
   execFileSync("git", ["rm", "-q", "-r", "-f", "--", "go", "bin", "t"], { cwd: bare });
   // (a file of code the shape check does not read, a link or one listed and gone from the disk, makes it read nothing)
   fs.mkdirSync(path.join(bare, "ln"), { recursive: true });

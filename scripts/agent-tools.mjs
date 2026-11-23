@@ -43,7 +43,7 @@ import { notInstalled, unreached } from "./packages.mjs";
 import { started } from "./started.mjs";
 import { configured } from "./agent-tools-configured.mjs";
 import { describe, show, TREE, listed } from "./agent-tools-entries.mjs";
-import { listings, shown, notFile, listing, shownNotBlob } from "./agent-tools-listing.mjs";
+import { listings, shown, modules, notFile, listing, shownNotBlob } from "./agent-tools-listing.mjs";
 import { readProject } from "./agent-tools-project.mjs";
 import { configAtBase, mendedBase, heldBy, heldBefore, sortPins, sortSources, sortBehind, sortUnlisted } from "./agent-tools-base.mjs";
 
@@ -131,6 +131,7 @@ function run(root, file, { core = false, base = baseOf(root), ways = installedBy
   // may be another commit's)
   listings.clear();
   shown.clear();
+  modules.clear();
   forget();
   let config;
   try { config = parseBounded(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
@@ -178,7 +179,9 @@ function unreadOf(head, baseProject, core) {
 }
 // What the check prints, in order, and its exit status: { lines: [[stream ("out" or "err"), line]], status }.
 export function printed(root, file, opts) {
-  const { fail, notes } = run(root, file, opts), partly = partlyUnread(root, opts?.base);
+  // (the base read once a run, for both)
+  const base = opts?.base === undefined ? baseOf(root) : opts.base;
+  const { fail, notes } = run(root, file, { ...opts, base }), partly = partlyUnread(root, base);
   const lines = [...(partly ? [["out", `::warning::${partly}`]] : []), ...notes.map(n => ["out", `note ${logged(n)}`]), ...fail.map(f => ["err", `FAIL: ${logged(f)}`]),
     ["out", fail.length ? `${fail.length} of the agent's own tools not as floor topic 15 asks` : "ok   every tool the project configures for its agents is listed"]];
   return { lines, status: fail.length ? 1 : 0 };

@@ -1,4 +1,4 @@
 {
   "rule": "tools/claude.md",
-  "behind": ["#767"]
+  "behind": ["#767", "#1134.3"]
 }
