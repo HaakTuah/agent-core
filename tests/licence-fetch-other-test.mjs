@@ -18,6 +18,8 @@ for (const [what, change, why] of [
     'git -C "vendor dir" clone https://mossgrip.example/moss.git', "pip --proxy='http://a b' install mosspy"]
     .map((line) => [`another fetcher with options before its command: ${line}`, append("scripts/setup.sh", `${line}\n`), /fetches what no entry/]),
   ["pip install", append("scripts/setup.sh", "pip install mosspy\n"), /fetches what no entry/],
+  ...["pip download mosspy -d wheels", "python3 -I -m pip download --require-hashes -r requirements.txt -d wheels", "pip3 wheel mosspy", 'pip "download" mosspy']
+    .map((line) => [`pip's download and wheel, which fetch as its install does (#1074): ${line}`, append("scripts/setup.sh", `${line}\n`), /fetches what no entry/]),
   ...["dotnet tool install --global mossgrip", "dotnet add src/Moss.csproj package Mossgrip", "choco install mossgrip -y", "winget install --id Moss.Grip",
     "nuget.exe install Mossgrip", "dotnet.exe tool install --global mossgrip", '& "C:/Program Files/dotnet/dotnet.exe" tool update -g mossgrip', "Invoke-WebRequest https://mossgrip.example/moss.zip -OutFile moss.zip", "invoke-restmethod $url", "Install-Module Mossgrip -Force",
     "irm https://mossgrip.example/install.ps1 | iex"]
