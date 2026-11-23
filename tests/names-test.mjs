@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { SEARCHED, brokenNames } from "../scripts/names.mjs";
+import { DEEPEST, SEARCHED, brokenNames } from "../scripts/names.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
@@ -91,7 +91,7 @@ try {
   g("add", "-A");
   t = check();
   const noted = t.out.match(/^note a name in a description that stands nowhere: docs\/many\.md/gmu)?.length ?? 0;
-  ok(t.status === 0 && noted === SEARCHED - 1 && /^note 1 names in the descriptions that no tracked file is were not searched for/m.test(t.out) && !/`records\/log\.json`/.test(t.out), `past ${SEARCHED} names, the rest are left alone and counted, and the code is searched for the others in one run`, t.out.slice(-600));
+  ok(t.status === 0 && noted === SEARCHED - 1 && /^note 1 names in the descriptions were left alone: /m.test(t.out) && !/`records\/log\.json`/.test(t.out), `past ${SEARCHED} names, the rest are left alone and counted, and the code is searched for the others in one run`, t.out.slice(-600));
   if (linked) ok(/^note docs\/link\.md is a link or no regular file/m.test(t.out) && !/docs\/link\.md:/.test(t.out), "a description that is a link is noted and not read", t.out.slice(-600));
   if (linked) {
     // a package file that is a link is read as none, so its scripts are left alone; and no list is written through a link
@@ -138,5 +138,16 @@ try {
   const r = brokenNames({ read: () => null, tracked, blocksOf: () => [{ i: 0, text }], core: true });
   const took = Date.now() - started;
   ok(r.count === 40000 && took < 10000, "many names among many tracked paths are read in seconds, each looked up once", `${r.count} names in ${took} ms`);
+}
+// and the index of the tracked paths is bounded by depth: four paths of 2,000 segments are indexed in seconds, and a name
+// deeper than DEEPEST is left alone and counted (the fallback security review on #1195: 29 s and 450 MB for one before)
+{
+  const deep = Array.from({ length: 2000 }, () => "a").join("/");
+  const tracked = ["b", "c", "d", "e"].map(x => `${deep}/${x}.ts`);
+  const name = `${Array.from({ length: DEEPEST }, () => "a").join("/")}/b.ts`;
+  const started = Date.now();
+  const r = brokenNames({ read: () => null, tracked, blocksOf: () => [{ i: 0, text: `\`a/a/b.ts\` \`a/z.ts\` \`${name}\`` }], core: true });
+  const took = Date.now() - started;
+  ok(took < 10000 && r.count === 2 && r.left >= 1 && r.found.length <= 1 && !r.found.some(x => x.name === "a/a/b.ts"), `deep tracked paths are indexed in seconds, and a name past ${DEEPEST} segments is left alone and counted`, `${took} ms, ${JSON.stringify({ count: r.count, left: r.left, found: r.found.map(x => x.name) })}`);
 }
 process.exit(failed ? 1 : 0);

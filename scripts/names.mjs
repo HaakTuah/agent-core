@@ -78,25 +78,41 @@ function elsewhere(paths, { tree, copy }) {
   return { off, left: (lines === null ? Math.min(rest.length, SEARCHED) : 0) + Math.max(0, rest.length - SEARCHED) };
 }
 
-// Every run of whole segments of a tracked path (`a/b/c.ts` gives `a`, `a/b`, `b/c.ts`, `c.ts` and the rest), so that a
-// name is looked up once, however many names and paths there are: one stands where it is such a run, a file or folder.
-function runsOf(tracked) {
+/** The most segments a name it looks up has: a deeper one is left alone and counted, since the index of the tracked
+ * paths grows with their depth times this (#460, point 4). */
+export const DEEPEST = 32;
+
+// Every run of whole segments of a tracked path, of at most `depth` segments (`a/b/c.ts` gives `a`, `a/b`, `b/c.ts`,
+// `c.ts` and the rest), so that a name is looked up once, however many names and paths there are: one stands where it
+// is such a run, a file or folder.
+function runsOf(tracked, depth) {
   const runs = new Set();
   for (const t of tracked) {
     const s = t.split("/");
-    for (let i = 0; i < s.length; i++) for (let j = i + 1; j <= s.length; j++) runs.add(s.slice(i, j).join("/"));
+    for (let i = 0; i < s.length; i++) {
+      let run = s[i];
+      runs.add(run);
+      for (let j = i + 1; j < Math.min(s.length, i + depth); j++) runs.add(run += `/${s[j]}`);
+    }
   }
   return runs;
 }
 
-// Of a name read, the reason it stands nowhere, or null where it stands, "skip" where it is not read: `ctx` holds what
-// brokenNames reads once (the extensions tracked, the runs and top folders of the tracked paths, the package file's
-// scripts, whether the core is read).
+// The names the descriptions read put in code marks, each { file, b, n }, and the most segments a file's name has.
+function readNames(files, blocksOf) {
+  const all = files.flatMap(file => blocksOf(file).flatMap(b => namesIn(b.text).map(n => ({ file, b, n }))));
+  return { all, depth: all.reduce((m, x) => Math.max(m, x.n.file ? x.n.file.split("/").length : 1), 1) };
+}
+
+// Of a name read, the reason it stands nowhere, or null where it stands, "skip" where it is not read, "deep" where it is
+// past DEEPEST: `ctx` holds what brokenNames reads once (the extensions tracked, the runs and top folders of the tracked
+// paths, the package file's scripts, whether the core is read).
 function judge(n, { core, exts, runs, tops, scripts }) {
   if (n.script !== undefined) return !scripts ? "skip" : scripts.has(n.script) ? null : { what: "names no script of the package file at the project's root" };
   const p = core ? n.file.replace(/^core\//u, "") : n.file;
   // (in the core, a path under a folder it does not hold, `docs/` say, is a project's, which its README describes too)
   if (!exts.has(n.ext) || (core && p.includes("/") && !tops.has(p.split("/")[0]))) return "skip";
+  if (p.split("/").length > DEEPEST) return "deep";
   return runs.has(p) ? null : { path: p, what: "names no file the project tracks" };
 }
 
@@ -104,23 +120,25 @@ function judge(n, { core, exts, runs, tops, scripts }) {
  * tracked paths, `blocksOf(file)` a file's blocks ({ i, text }, markdown.mjs), `skip(file, name)` a name another
  * reading of the check reads already; `core` reads the core's own repository, `copy` is the project's copy of the core,
  * `tree` the commit read, null for the work tree, `usable(f)` whether a description may be read at all. `{ found, count,
- * unread, unusable, left }`: `count` the names read, `unusable` the descriptions not read, `left` the names not searched. */
+ * unread, unusable, left }`: `count` the names read, `unusable` the descriptions not read, `left` the names left alone,
+ * past DEEPEST or not searched. */
 export function brokenNames({ read, tracked, blocksOf, skip = () => false, core = false, copy = "", tree = null, usable = () => true }) {
   const d = core ? { files: ["README.md"] } : descriptionsOf(read("core-manifest.md"), tracked);
   const unusable = d.files.filter(f => !usable(f));
-  const ctx = { core, runs: runsOf(tracked), tops: new Set(tracked.filter(f => f.includes("/")).map(f => f.split("/")[0])),
+  const names = readNames(d.files.filter(f => !unusable.includes(f)), blocksOf);
+  const ctx = { core, runs: runsOf(tracked, Math.min(DEEPEST, names.depth)), tops: new Set(tracked.filter(f => f.includes("/")).map(f => f.split("/")[0])),
     scripts: core ? null : scriptsOf(read("package.json")),
     exts: new Set(tracked.map(f => /\.([^./]+)$/u.exec(posix.basename(f))?.[1]).filter(Boolean)) };
   const found = [];
-  let count = 0;
-  for (const file of d.files.filter(f => !unusable.includes(f))) for (const b of blocksOf(file)) for (const n of namesIn(b.text)) {
+  let count = 0, deep = 0;
+  for (const { file, b, n } of names.all) {
     const v = skip(file, n.name) ? "skip" : judge(n, ctx);
-    if (v === "skip") continue;
+    if (v === "skip" || v === "deep") { deep += v === "deep"; continue; }
     count++;
     if (v) found.push({ file, line: b.i + 1, name: n.name, ...v });
   }
   const { off, left } = elsewhere([...new Set(found.filter(x => x.path).map(x => x.path))], { tree, copy });
-  return { found: found.filter(x => !x.path || !off.has(x.path)).map(({ path, ...x }) => x), count, unread: d.unread, unusable, left };
+  return { found: found.filter(x => !x.path || !off.has(x.path)).map(({ path, ...x }) => x), count, unread: d.unread, unusable, left: left + deep };
 }
 
 /** A broken name's key, as the list holds it: its file and its name, its line aside, so that one held is known though lines moved. */

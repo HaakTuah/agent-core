@@ -43,7 +43,7 @@ import { corePath, projectAt } from "./core-path.mjs";
 import { logged } from "./guards.mjs";
 import { checkRules } from "./links.mjs";
 import { markdownReader } from "./markdown.mjs";
-import { LIST, SEARCHED, brokenNames, listOf, nameKey } from "./names.mjs";
+import { DEEPEST, LIST, SEARCHED, brokenNames, listOf, nameKey } from "./names.mjs";
 import { didNotRun, installed } from "./packages.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 
@@ -329,7 +329,7 @@ for (const x of names.found) {
 }
 if (names.unread) console.log(`note ${logged(names.unread)}, so no names in the descriptions were read`);
 for (const f of names.unusable) console.log(`note ${logged(`${f} is a link or no regular file, or past ${DESCRIBED} bytes`)}, so its names were not read`);
-if (names.left) console.log(`note ${names.left} names in the descriptions that no tracked file is were not searched for in the project's code (past ${SEARCHED}, or git could not search), so they were left alone`);
+if (names.left) console.log(`note ${names.left} names in the descriptions were left alone: deeper than ${DEEPEST} segments, or, being no tracked file, past ${SEARCHED} to search the project's code for, or not searched since git could not`);
 for (const x of oldNames) console.log(`note ${logged(`a name in a description that stands nowhere: ${x}`)} (${namesHeld ? `the pull request's base held it` : "with no base to read against"}, so it fails nothing: name what holds it now, or take it out, and lower the list with node ${HOME}scripts/pointers.mjs --write-names)`);
 // (in a project, one the pull request's base held is noted, and every one where there is no base to read against)
 const old = [];
