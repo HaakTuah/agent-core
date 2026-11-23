@@ -215,6 +215,28 @@ function monthlyOf({ repo, owner, manifest, at, scripts }, reach, kept, stepsLef
   return { reportTitle, reportFile, monthly };
 }
 
+// The packages a project holds looked up (look-checks.mjs's staleFinding), the record's line written where they were.
+function lookUp(ctx) {
+  const stale = staleFinding();
+  if (!stale.unread) ctx.looked = ctx.at;
+  return stale;
+}
+
+// The finding of the packages gone stale, where they were looked up this run: at once, or with the monthly report.
+function staleOf(ctx, report, stale) {
+  if (!stale && report.monthly !== null && ctx.manifest !== null) return [lookUp(ctx)];
+  return stale ? [stale] : [];
+}
+
+// What the record says of the look's runs before (its lines "Packages looked up:" and "Host read:"), set on `ctx`; in a
+// project, the packages it holds looked up at once where the record shows they never were, as step 600 asks, and then
+// once a month with the state report (#488, point 8; #1092).
+function recordRead(ctx, record) {
+  ctx.looked = LOOKED.exec(record?.body ?? "")?.[1] ?? null;
+  ctx.hostRead = HOST_READ.exec(record?.body ?? "")?.[1] ?? null;
+  return ctx.manifest !== null && !ctx.looked ? lookUp(ctx) : null;
+}
+
 function main(args) {
   const options = optionsOf(args);
   if (!options) return 1;
@@ -236,18 +258,12 @@ function main(args) {
   }
   const record = kept.get(RECORD) ?? null, last = lastRun(record?.body);
   if (!job && !now && last && hoursBetween(last, at) < SOON) { say(`The scheduled look ran ${hoursBetween(last, at)} h ago (${last}): nothing more to do until ${SOON} h have passed.`); return 0; }
-  // (in a project, the packages it holds looked up at once where the record shows they never were, as step 600 asks,
-  // and then once a month with the state report: #488, point 8; #1092)
-  ctx.looked = LOOKED.exec(record?.body ?? "")?.[1] ?? null;
-  ctx.hostRead = HOST_READ.exec(record?.body ?? "")?.[1] ?? null;
-  let stale = ctx.manifest !== null && !ctx.looked ? staleFinding() : null;
-  if (stale && !stale.unread) ctx.looked = at;
+  const stale = recordRead(ctx, record);
 
   const { findings, stepsLeft } = findingsOf(ctx, reach, last);
   // the state report, once a month
   const report = monthlyOf(ctx, reach, kept, stepsLeft);
-  if (report.monthly !== null && ctx.manifest !== null && !stale) { stale = staleFinding(); if (!stale.unread) ctx.looked = at; }
-  if (stale) findings.push(stale);
+  findings.push(...staleOf(ctx, report, stale));
 
   // what is done with each
   if (!reach.yes) { toFolder(ctx, reach, findings, report); return 0; }

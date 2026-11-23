@@ -163,5 +163,12 @@ const reviewRule = { type: "required_status_checks", parameters: { required_stat
   ok(/answered 403/.test(said ?? "") && /`issues: write`/.test(said ?? "") && !/integration/.test(said ?? ""), "a write GitHub refuses is said with the right the job needs, never with gh's own words", said);
 }
 
+// ---- each right of the look's workflows named with what it is for ----
+for (const f of [".github/workflows/look.yml", ".github/workflows/own-look.yml", "setup/template/workflows/look.yml.tmpl"]) {
+  const lines = fs.readFileSync(f, "utf8").split("\n"), bare = [];
+  lines.forEach((l, i) => { if (/^\s+permissions:\s*$/.test(l)) for (let j = i + 1; j < lines.length && /^\s+[a-z-]+: (read|write)\b/.test(lines[j]); j++) if (!/ # \S/.test(lines[j])) bare.push(lines[j].trim()); });
+  ok(!bare.length && lines.some(l => /^\s+issues: write # /.test(l)), `${f}: each right its job uses is named with a comment saying what it is for`, bare.join("; "));
+}
+
 console.log(`\n${count - failed} of ${count} passed`);
 process.exitCode = failed ? 1 : 0;
