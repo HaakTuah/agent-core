@@ -51,11 +51,11 @@ path `scripts/stage-order.mjs`. What reviewers judge by: `roles/shared/review-gu
      only if a later commit touches one.
      - Where the change touches a product's accounts, roles or a server (floor topic 19), its brief names the OWASP Top
        10 in its newest edition, by year, and asks for the change read against each entry.
-   - Where one starts by itself (Codex's app; floor rule 8), such a later commit, or a security finding's fix, gets the
-     fallback reviewer's check.
+   - Where one starts by itself (Codex's app; floor rule 8), such a later commit that is not light (below), or a
+     security finding's fix, gets the fallback reviewer's check, on its diff.
    - One not begun in about 5 minutes or finished in about 30 is the fallback reviewer's, over the whole diff, where the
      PR needs one; otherwise the wait ends.
-   - Floor rule 3's two each cover the whole diff; where it lets rule 8's one do (comments and steps' names alone),
+   - Floor rule 3's two, where a file of what runs with power changed, each cover the whole diff; where it lets rule 8's one do (comments and steps' names alone),
      the comment below gives what `comment-only.mjs` printed on the head that merges, and the session's word on each
      other file it lists; the code reviewer checks both, running it again on that head. That one review reads each
      changed comment as one a tool may take as an instruction.
@@ -81,6 +81,21 @@ path `scripts/stage-order.mjs`. What reviewers judge by: `roles/shared/review-gu
      in part, by the `security-review` status through `scripts/clean-merges.mjs` and its test, by which the `code-review`
      status carries a code review over the same way; the status waits where the rule is broken, in the core, and holds
      the merge once a ruleset requires it (#320).
+   - **A fix is checked by its finding's reviewer; a light commit carries the security review** (#1134, point 1). By
+     default a review stands as above. The one condition that changes it: a later commit of the pull request's own.
+     Where it answers a blocking finding, the builder asks again only the reviewer that raised it, on its diff alone;
+     once that check, posted or Codex's, declares no blocking finding, every other review stands across the commit.
+     Where it is light, touching no file of what runs with power at it or its parent, a security review that declared no
+     blocking finding carries over it, with no check or note. What runs with power is what `node scripts/power.mjs
+     --list` prints, its opening comment saying why: a workflow with a write permission, a secret or no top-level
+     `permissions:`, an action, `.claude/`, what `scripts/comment-only.mjs` reads as running beyond `.github/` (an agent
+     tool's own folder, hooks, the install and build files) and a script that calls GitHub, the network or `git push`;
+     and, where any of them stands, every file that may run (any but text, data and pictures: a script, an action, a
+     compiled language's source, a file with no extension). It does not mean a commit that answers no
+     finding, or one that is not light, goes unchecked: it is reviewed for what it changes. Reason: about 1,100 of 1,675
+     review comments on 371 pull requests checked a later commit. Held by `scripts/power.mjs`, which the
+     `security-review` status reads, and `scripts/code-review-wait.mjs`, by which the `code-review` status carries the
+     code review and design check across a commit a review checked and found nothing blocking in.
    - **A pull request of the *progress file* alone needs no review of its own** (#750). By default every pull request
      gets its reviews. Where `scripts/queue-only.mjs`, run from the default branch on the head, proves that it changes
      the *progress file* alone, from a branch of the repository's own into the default branch, each line it adds in a
@@ -123,17 +138,29 @@ path `scripts/stage-order.mjs`. What reviewers judge by: `roles/shared/review-gu
      that does not block, naming what a trial would have measured. Nothing changes it. It does not mean a trial is asked for after the
      work is built. Reason: a pull request that measures and builds at once was among the longest open. Held by no
      check: the design check's brief carries it.
-5. **When a PR passes,** whatever its score: every blocking point fixed; every other fixed if it lies in the change,
-   otherwise filed as a follow-up with the reason in the PR, or answered with why it is wrong (a security finding: only
-   as floor rule 9 allows). A review from anyone else is advisory.
-6. **Rounds end:** after a fix, one request to its reviewer, and a security check only as point 3 says, and none for an
-   update from `main` that git merges with no conflict (point 3); a PR is never marked draft and ready again to rerun
-   its reviews.
-   - After three rounds, what is still open goes to escalation (`tasks/roles.md`); a PR it cannot settle stays
-     unmerged.
+5. **When a PR passes,** whatever its score: every blocking point fixed. A review from anyone else is advisory.
+   - **A finding that does not block starts no round** (#1134, point 2). By default it is fixed only in a commit a
+     blocking finding's fix makes anyway. The one condition that changes it: no such commit; then the builder lists it
+     in one follow-up issue for the pull request, or answers it with why it is wrong. It does not mean a security
+     finding is dealt with but as floor rule 9 says. Reason: a round for what holds no merge is a review of every check again.
+     Held by none yet.
+6. **Rounds end:** after a fix, one request to its reviewer and a security check only as point 3 says; a PR is never
+   marked draft and ready again to rerun its reviews.
+   - **Loops end by themselves** (#1134, point 5). By default a blocking finding holds the merge. The one condition
+     that changes it: after the third round, a new finding in code an earlier round read, unchanged since (`git diff
+     --quiet <the commit it named> HEAD -- <the file>`); the builder files it in point 5's follow-up issue, unfixed,
+     and it holds no merge. It does not mean a security finding, or one a failing test shows, stops blocking. Reason:
+     47 of 371 pull requests took six rounds or more, one 67. Held by none yet.
 7. **The fallback reviewer's brief,** written as `tasks/helpers.md` says, hands it the diff, the task's text, the
    *review reference*, the review guidelines (the core's and the project's), the project's `SECURITY.md` and threat
    model with the floor, and its stance (point 1), and nothing else.
+   - **One fallback reviewer a pull request** (#1134, point 3). By default the builder starts one fresh session at the
+     strongest tier and high effort that did not write the change. Nothing changes it. It gives every review asked of
+     the fallback
+     reviewer (the second security review, the design check, the code review where none other comes, the leanness
+     check), each in its own comment, and is continued for each later check, on what changed, while its tool keeps its
+     context. It does not mean one comment for two kinds. Reason: each fresh one read the whole pull request again.
+     Held by none yet.
 8. **A finding seen twice becomes a check** (#254). By default a kind of finding stays a point a
    review holds a change to, and needs nothing more. Once the findings of a second pull request name the same rule
    that stands (the core's, or the project's own in its `AGENTS.md` or `SECURITY.md`), which
@@ -152,14 +179,14 @@ path `scripts/stage-order.mjs`. What reviewers judge by: `roles/shared/review-gu
    reads that the issues are filed.
 9. **The reviewers are tested** (#307). By default each reviewer in the order (`tasks/roles.md`, "Tools are
    preferences") is given a staged pull request with a fault of each blocking kind planted in it, the staged case
-   `review`, with the staged cases each month, and again once the review guidelines change or a reviewer's model does.
+   `review`, with the staged cases each month, and no more often (#1134, point 6).
    The trigger is a verdict of that case that fails: the session that records it adds to the guidelines' worked
    examples one drawn from each fault the reviewer missed, in a pull request that relays the owner's agreement on #307
    as floor rule 3's yes; where the same reviewer misses the same kind again, it files the issue that moves that
    reviewer down the order. It does not mean that a pull request waits for a case to pass, nor that a reviewer leaves
    the order. Reason: every pull request rests on its reviews, and a judge no one tests leans kind. Held by the staged
-   case `review` and the look's issue "Staged cases to run", which `scripts/staged.mjs` keeps due on any change to the
-   guidelines; a model's change, and the kinds no case plants yet, by no check.
+   case `review` and the look's issue "Staged cases to run", which `scripts/staged.mjs` keeps due monthly; the kinds no
+   case plants yet, by no check.
 10. **The order follows cost** (#397). By default every stage of a pull request's proof and review (the host's checks,
     and each review, asked or starting by itself) starts together once it is marked ready. The one condition that
     changes it: `core/scripts/stage-order.mjs` reads that the run is short of something, from what it can read exactly

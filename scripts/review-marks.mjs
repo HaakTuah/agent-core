@@ -56,16 +56,17 @@ export const designAsked = (pull, files, core, since = MARKS_SINCE) => core && S
   && files.some(f => [f?.filename, f?.previous_filename].some(n => typeof n === "string" && DESIGNED.test(n)));
 
 // Whether a "Design check:" from an account whose review counts (`whose`), as first posted, names a commit of `chain`
-// (the head and the commits that only updates from main follow, as security-review.mjs's standsFrom gives them).
-export const designed = (comments, whose, chain) => comments.some(c => postedKind(c?.body) === "design" && counts(c, whose) && asPosted(c)
-  && (String(c.body).match(SHAS) ?? []).some(sha => chain.has(sha.toLowerCase())));
+// (the head and the commits that only updates from main follow, as security-review.mjs's standsFrom gives them), or,
+// declaring no blocking finding, one of `carried` (those the pull request's own fixes follow too, #1134, point 1).
+export const designed = (comments, whose, chain, carried = chain) => comments.some(c => postedKind(c?.body) === "design" && counts(c, whose) && asPosted(c)
+  && (String(c.body).match(SHAS) ?? []).some(sha => chain.has(sha.toLowerCase()) || (carried.has(sha.toLowerCase()) && blockingOf(c.body) === 0)));
 
 // What the marks make a pull request wait on, a line with its mend, or null where they are kept.
 // (the first kind missing is named, so that its form fits; once it is posted again, the next is named)
-export function marksWait({ pull, comments, files, chain, whose, core }) {
+export function marksWait({ pull, comments, files, chain, carried, whose, core }) {
   const missing = undeclared(comments, whose);
   if (missing.length) return `${missing[0]} lacks lines. Mend: repost: ${formOf(missing[0])}`;
-  if (files !== undefined && chain !== undefined && designAsked(pull, files, core) && !designed(comments, whose, chain)) return `no design check. Mend: a fresh reviewer posts ${formOf(KINDS.design)}`;
+  if (files !== undefined && chain !== undefined && designAsked(pull, files, core) && !designed(comments, whose, chain, carried ?? chain)) return `no design check. Mend: a fresh reviewer posts ${formOf(KINDS.design)}`;
   return null;
 }
 

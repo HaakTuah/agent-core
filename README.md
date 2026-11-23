@@ -353,11 +353,14 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      marks a finding of its review open, posted after it, and, while Codex's review runs, one posted after it began,
      never a note posted before it; a review of an earlier commit than the head stands only
      where updates from `main` alone follow it, each the merge git makes of its parents (the check running
-     `clean-merges.mjs` on the head's commits, #323), and the status says so, any other later commit needing such a
+     `clean-merges.mjs` on the head's commits, #323), or, where it declared no blocking finding, light commits of the
+     pull request's own, each touching nothing that runs with power (`power.mjs`, run in the head's clone; #1134), and
+     the status says so, any other later commit needing such a
      comment naming the head, or the merge where that stops, by its whole SHA; a pure sync passes with none where no review starts by itself, the check running
      `pure-sync.mjs` on its head, and so does a pull request of the *progress file* alone that a job of the caller's proves with
      `queue-only.mjs`, whose token may read issues, handing the head to the input `queue` (the core's own caller does;
-     #750); where the pull request changes what runs by itself beyond its pins, both, or two such
+     #750); where the pull request changes what runs with power beyond its pins (`power.mjs`; where it read
+     nothing, each workflow, each file that may run and each that runs by itself changed), both, or two such
      comments (floor rule 3), or one holding what `comment-only.mjs` printed on the head. Where a summary of Codex's is
      there but its state cannot be read, a form nobody documents having changed, the status says so, the run warns, and
      the check waits or passes as it would with no summary (a summary whose first line itself changed is not known as
@@ -371,7 +374,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      Beside it, in the same job, the status `code-review` waits while Codex's code review runs on the head commit, until
      it finishes or a comment that opens "Code review:", from an account the security review counts, names that commit
      by its whole SHA (`tasks/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
-     nor a sync's shape) has had none on its head, or on a commit only such updates from `main` follow; while the newest
+     nor a sync's shape) has had none on its head, or on a commit only such updates from `main` follow, or, where it
+     found nothing blocking, the pull request's own commits after it that a review checked and found nothing blocking
+     in (#1134); while the newest
      "Security review:", "Code review:" or "Design check:" posted from 18 November lacks its lines "Blocking findings:"
      and "Other findings:", or, posted from 20 November, its line "Score:" (`tasks/reviews.md`, point 3); and, in the
      core's own repository, while a pull request opened from that day that changes `floor/`, `roles/`, `tasks/` or
