@@ -4,8 +4,9 @@
 // nothing (read-nothing.mjs, through steps.mjs), the manifest against the modules (manifest-reads.mjs) and, on a sync's
 // branch, whether the sync is pure (pure-sync.mjs, run from the core's side as its merger runs it: the release it moves
 // to, or the core's main). It prints one line first, `attached: yes`, or `attached: no` with how many things stand in
-// the way, then each with its mend; a step only the project's owner can take is listed apart, advised, standing in the
-// way of nothing; and what it could not read, and the checks that read nothing here, it says, counted neither way. It
+// the way, then each with its mend; a step only the project's owner can take, and a rule file's wording beside a fresh
+// start, are listed apart, advised, standing in the way of nothing; and what it could not read, and the checks that
+// read nothing here, it says, counted neither way. It
 // reports and fails nothing (AGENTS.md of the core, "Nothing locks a project"), and each part keeps its own check where
 // it stands. The sync prints its line at its end (sync.mjs, beside this file). Reads only: what git writes to compare
 // the copy goes to a temporary folder. Git, tar, gh where pure-sync.mjs asks whose account holds the repository, and
@@ -38,7 +39,7 @@ const firstLine = text => String(text ?? "").trim().split("\n").filter(Boolean).
 // a commit of it would hold it: built with a copy of the project's index, its objects written to the bare repository
 // `bare` alone (the project's own objects read through it), so the project is left as it was.
 function workingTree(root, at, bare) {
-  const index = path.join(bare, "attached-index"), own = path.join(root, git(root, ["rev-parse", "--git-path", "index"]));
+  const index = path.join(bare, "attached-index"), own = path.resolve(root, git(root, ["rev-parse", "--git-path", "index"]));
   if (fs.existsSync(own)) fs.copyFileSync(own, index);
   const env = { ...process.env, GIT_INDEX_FILE: index, GIT_OBJECT_DIRECTORY: path.join(bare, "objects"), GIT_ALTERNATE_OBJECT_DIRECTORIES: path.resolve(root, git(root, ["rev-parse", "--git-path", "objects"])) };
   git(root, ["add", "-A", "--", at.slice(0, -1)], env);
@@ -88,13 +89,17 @@ function steps(root, said) {
   else for (const l of saidOf(missed.nothing ?? [], missed.copy).filter(l => l.startsWith("- "))) said.nothing(l.slice(2));
 }
 
-// The differences from a fresh start (fresh.mjs), each one the manifest does not declare.
+// The differences from a fresh start (fresh.mjs), each one the manifest does not declare: what wires the core counts.
 function freshStart(root, said) {
   const p = project(root), k = kind(p);
   if (k.unread) return said.unread("a fresh start", `not compared, since ${k.unread}`);
   for (const d of differences(p, fresh(p, undefined, { k }))) {
     // (one it could not compare, its packages not installed say, it names so: not read, counted neither way)
     if (/^[^:]*\bnot (compared|read)\b/u.test(d)) said.unread("a fresh start", d);
+    // (the wording of a rule file, the manifest or an issue form, its rows and paragraphs, which an earlier kit wrote
+    // otherwise and the project keeps as its own: advised, counted neither way; a file, a workflow's or the hooks' line
+    // and a config's key wire the core, and count)
+    else if (/: (lacks the (row|paragraph) |still holds )/u.test(d) && !/: lacks .*\bthe (line|key) /u.test(d)) said.wording(d);
     else said.way("beside a fresh start", `${d}. Mend: make it as the starter kit writes it, or declare it in ${MANIFEST}'s "Differences", on the owner's word, by a line that quotes the file's path`);
   }
 }
@@ -135,10 +140,11 @@ function pureSync(root, at, bare, why, tmp, said) {
 
 // Each part read, none stopping another: a part that throws is said not read.
 export function attached(root, { fetched = null } = {}) {
-  const found = { way: [], owner: [], unread: [], nothing: [] };
+  const found = { way: [], owner: [], wording: [], unread: [], nothing: [] };
   const said = {
     way: (part, what) => { found.way.push(`${part}: ${what}`); },
     owner: what => { found.owner.push(what); },
+    wording: what => { found.wording.push(what); },
     unread: (part, what) => { found.unread.push(`${part}: ${what}`); },
     nothing: what => { found.nothing.push(what); },
   };
@@ -168,6 +174,7 @@ export function report(found) {
   return [verdict(found),
     ...list("In the way, each with its mend:", found.way),
     ...list("The owner's to take, advised, in the way of nothing:", found.owner),
+    ...list("Wording beside a fresh start, the project's own to bring to the starter kit's or declare, advised, in the way of nothing:", found.wording),
     ...list(`Not read, so counted neither way (${CORE}'s checks that read them say why where they run):`, found.unread),
     ...list("Read nothing here, so the rules they hold are held by nothing here, counted neither way:", found.nothing)].join("\n");
 }
