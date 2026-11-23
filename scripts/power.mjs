@@ -60,17 +60,20 @@ const TOKENS = /[A-Za-z0-9_@.+~/-]+/gu;
 // the largest text read: a file past it is held in the set, unread
 const LARGEST = 1 << 20;
 
+// a text with its line ends as LF alone, so a file written with CRLF (as Windows may) reads as one written with LF
+const lf = (text) => (text === null ? null : text.replace(/\r\n?/gu, "\n"));
 // whether a workflow's text gives it power
-export const powered = (text) => text === null || POWERED.test(text) || !PERMISSIONS.test(text);
-// whether a path is in the set by where it stands alone
+export const powered = (text) => text === null || POWERED.test(lf(text)) || !PERMISSIONS.test(lf(text));
 // whether a path has no extension: an executable named so (`deploy`, `bin/release`) is run as a script is
 const unextended = (name) => path.posix.extname(name) === "";
+// whether a path is in the set by where it stands alone
 const placed = (name) => ACTION.test(name) || name.startsWith(".claude/") || RUNS_TOO.test(name);
 
 // The set of a tree: `paths`, every file's path; `read(path)`, its text, or null where it cannot be read or is too large;
 // `copy`, the folder of the core's copy, left out (only a sync changes it, its code reviewed in the core's own pull
 // request). `why`, where given, is filled with what brought each path in.
-export function setOf({ paths, read, copy }, why = new Map()) {
+export function setOf({ paths, read: raw, copy }, why = new Map()) {
+  const read = (name) => lf(raw(name));
   const own = paths.filter((name) => typeof name === "string" && !(copy && name.startsWith(copy)) && !name.startsWith("core/"));
   const all = new Set(own);
   const set = new Set(), queue = [];

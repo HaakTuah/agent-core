@@ -27,9 +27,12 @@ ok(powered("on: push\npermissions: {}\njobs:\n  a:\n    secrets: inherit\n"), " 
 ok(!powered("on: push\npermissions:\n  contents: read\njobs:\n  a:\n    env:\n      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n"), "a workflow that reads only the token its own permissions bound, and may only read, has none");
 ok(!powered("on: push\npermissions:\n  contents: read\n# contents: write\njobs:\n  a:\n    steps:\n      - run: echo \"Mend: write that down\"\n"), "  nor one whose write stands only in a comment or in a line's text");
 ok(powered(null), "a workflow that cannot be read has power");
+ok(powered("on: push\r\npermissions:\r\n  contents: write\r\njobs: {}\r\n"), "a workflow written with CRLF line ends has its write permission read as with LF");
 
 // ---- the set of a tree ----
 const tree = (files) => ({ paths: Object.keys(files), read: (name) => (Object.hasOwn(files, name) ? files[name] : null) });
+const crlf = setOf(tree({ ".github/workflows/c.yml": "on: push\r\npermissions:\r\n  contents: write\r\njobs:\r\n  a:\r\n    steps:\r\n      - run: node scripts/run.cjs\r\n", "scripts/run.cjs": "console.log(1);\r\n" }));
+ok(show(crlf) === ".github/workflows/c.yml, scripts/run.cjs", "a workflow written with CRLF line ends brings in what it runs, as with LF", show(crlf));
 const files = {
   ".github/workflows/powered.yml": "on: push\npermissions:\n  issues: write\njobs:\n  a:\n    steps:\n      - run: node scripts/run.mjs\n      - uses: ./.github/workflows/called.yml\n      - run: echo see .github/workflows/named.yml\n      - run: ./deploy && bin/release\n",
   ".github/workflows/called.yml": "on: workflow_call\npermissions:\n  contents: read\njobs:\n  a:\n    steps:\n      - run: bash scripts/by-call.sh\n",
