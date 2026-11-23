@@ -24,7 +24,7 @@ export function bashCommands(run) {
     try { found = inParser(import.meta.url, "read", text); } catch (e) {
       // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step)
       const mended = / Mend: /u.test(e?.message ?? "");
-      if (e?.kind === "load") throw new Error(`The parser or the grammar of bash could not be loaded: ${mended ? e.message : `${e.message}. Mend: run node core/scripts/install.mjs parser (in the core, scripts/install.mjs parser), which installs the parser's packages from its lock file, then run this again`}`);
+      if (e?.kind === "load") throw new Error(`The parser or the grammar of bash could not be loaded: ${mended ? e.message : `${e.message}. Mend: run \`if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs parser; fi\` (in the core, node scripts/install.mjs parser), which installs the parser's packages from its lock file, then run this again`}`);
       throw e;
     }
     if (READ.size >= READ_MOST) READ.clear();

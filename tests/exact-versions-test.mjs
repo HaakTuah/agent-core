@@ -162,6 +162,28 @@ if (run("1.2.3", "../tools/package-lock.json") !== 1 || run("1.2.3", join(tmpdir
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
+// Beside the licence check (licences.mjs; #1093, point 2), read against the pull request's base: a range the base held
+// is reported, never failed, and one the pull request brings fails, saying its mend.
+{
+  const dir = scratchDir("exact-versions-");
+  try {
+    mkdirSync(join(dir, "t"));
+    const list = (deps) => JSON.stringify({ dependencies: deps });
+    writeFileSync(join(dir, "c.json"), JSON.stringify({ lockfiles: ["t/package-lock.json"] }));
+    const lock = JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/a": { version: "1.2.3" }, "node_modules/b": { version: "2.0.0" } } });
+    writeFileSync(join(dir, "t/package-lock.json"), lock);
+    writeFileSync(join(dir, "t/package.json"), list({ a: "^1.2.3", b: "~2.0.0" }));
+    const base = { "t/package-lock.json": lock, "t/package.json": list({ a: "^1.2.3", b: "2.0.0" }) };
+    const r = report("c.json", dir, (f) => base[f] ?? null);
+    if (r.status !== 1 || r.err.length !== 1 || !/"b": "~2\.0\.0"/u.test(r.err[0]) || !mended(r.err[0]) || !r.out.some((l) => /^REPORT: [^\n]*"a": "\^1\.2\.3"[^\n]*stood so at the pull request's base/u.test(l))) { failed++; console.error(`FAIL a range the base held is reported and a new one fails: ${JSON.stringify(r)}`); }
+    const none = report("c.json", dir, () => null);
+    if (none.status !== 1 || none.err.length !== 2) { failed++; console.error(`FAIL where the base held no lock file, every range fails: ${JSON.stringify(none)}`); }
+    base["t/package.json"] = list({ a: "^1.2.3", b: "~2.0.0" });
+    const old = report("c.json", dir, (f) => base[f] ?? null);
+    if (old.status !== 0 || old.err.length || !/^ok .*, but 2 that stood so before$/mu.test(old.out.join("\n"))) { failed++; console.error(`FAIL what all stood before passes, reported: ${JSON.stringify(old)}`); }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
 // A package list or lock file nested past the bound is refused, saying its mend, never read by recursion.
 const deep = (inner) => `${"{\"a\":".repeat(20000)}${inner}${"}".repeat(20000)}`;
 expect("overrides nested past the bound are refused", check("package-lock.json", reader({ "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {} } }), "package.json": `{"overrides":${deep('"1.2.3"')}}` })), ["cannot be read as JSON (it nests deeper than 200 objects and lists). Mend: "]);

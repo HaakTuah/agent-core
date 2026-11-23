@@ -37,7 +37,7 @@ import { inStep, items, KEY, LAST_NUMBERED } from "./archive.mjs";
 import { FILE, HOOKS, counts, hook, holderOf } from "./holder-form.mjs";
 import { OWN, ownHolders, ownMain, ownReport, writeOwn } from "./holders-own.mjs";
 import { NUMBER } from "./outcomes.mjs";
-import { installed, unreached } from "./packages.mjs";
+import { didNotRun, installed } from "./packages.mjs";
 import { FOLDERS, ROOT, rules } from "./rules.mjs";
 import { shapeFaults } from "./schemas.mjs";
 import { started } from "./started.mjs";
@@ -191,9 +191,7 @@ export const shareLine = (own, core) => `- rules held by a check: the project's 
 
 // Where ajv is not installed the file's form went unchecked: said as a warning, and the check goes on.
 function unchecked() {
-  if (installed("ajv")) return;
-  console.log(unreached("ajv") ? `::warning::The form of ${FILE}/ was not checked: the package ajv could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`
-    : `::warning::The form of ${FILE}/ was not checked: the package ajv is not installed. Mend: run node scripts/install.mjs, then this check again`);
+  if (!installed("ajv")) console.log(didNotRun(`The form of ${FILE}/ was not checked`, "ajv"));
 }
 
 if (started(import.meta.url) && process.argv.includes("--own")) {

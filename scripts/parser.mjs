@@ -16,7 +16,7 @@
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import { MessageChannel, Worker, receiveMessageOnPort } from "node:worker_threads";
-import { installedFile, unnamed, unreached } from "./packages.mjs";
+import { installed, installedFile, unreached } from "./packages.mjs";
 
 // Each language read, by the name a reader asks for, and its grammar's package and file.
 const GRAMMARS = {
@@ -25,12 +25,10 @@ const GRAMMARS = {
   typescript: ["tree-sitter-typescript", "tree-sitter-typescript.wasm"], tsx: ["tree-sitter-typescript", "tree-sitter-tsx.wasm"],
   python: ["tree-sitter-python", "tree-sitter-python.wasm"],
 };
-// Whether the parser or the grammar of `language` could not be installed, the registry not answering, in a project's
-// pull request (install.mjs), or was never installed, a project's own job naming only the core's first install
-// (unnamedFor; #719): its reader then reads no file of it, and the check that runs it says so as a warning, failing
-// nothing by that alone (#654, point 4).
+// Whether the parser or the grammar of `language` could not be installed (packages.mjs, unreached()): the registry not
+// answering, or, in a project's own job, its install failing where the copy ran it (#1093, point 1): its reader then
+// reads no file of it, and the check that runs it says so as a warning, failing nothing by that alone (#654, point 4).
 export const unreachedFor = language => ["web-tree-sitter", GRAMMARS[language][0]].some(unreached);
-export const unnamedFor = language => ["web-tree-sitter", GRAMMARS[language][0]].some(unnamed);
 const bytes = (name, rel) => fs.readFileSync(installedFile(name, rel));
 // (how long a call waits on the worker: a file the parser takes longer on is one its reader cannot follow)
 const WAIT = 120000;
@@ -72,6 +70,9 @@ export async function load() {
 
 let bridge = null;
 function start() {
+  // (asked here, on the main thread, so that a copy whose parser's packages are not installed installs them before the
+  // thread reads them: the thread itself never installs; packages.mjs, #1093, point 1)
+  installed("web-tree-sitter");
   const { port1, port2 } = new MessageChannel(), signal = new Int32Array(new SharedArrayBuffer(4));
   // (the thread takes the process's flags but --input-type, which Node refuses for a module file: a script run with -e and
   // it would start a thread that dies at once, and every file read wait out WAIT and be lost)

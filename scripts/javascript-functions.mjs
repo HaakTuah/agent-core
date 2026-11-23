@@ -39,7 +39,7 @@ export function javascriptFunctions(file, src) {
     // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step: #719; tested apart
     // from the message, since the mutation tool's lexer misreads a regular expression inside a template literal)
     const mended = / Mend: /u.test(e?.message ?? "");
-    if (e?.kind === "load") throw new Error(`The parser or JavaScript's grammars could not be loaded: ${mended ? e.message : `${e.message}. Mend: run node core/scripts/install.mjs parser (in the core, scripts/install.mjs parser), which installs the parser's packages from its lock file, then run this again`}`);
+    if (e?.kind === "load") throw new Error(`The parser or JavaScript's grammars could not be loaded: ${mended ? e.message : `${e.message}. Mend: run \`if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs parser; fi\` (in the core, node scripts/install.mjs parser), which installs the parser's packages from its lock file, then run this again`}`);
     throw e;
   }
 }

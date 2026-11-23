@@ -1,7 +1,6 @@
 // The step of setup/sync-notes/670-the-parser-s-packages-installed-where-the-shape.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
 import { COST } from "../step-checks.mjs";
-import { parserFirst } from "../step-checks-lookup.mjs";
 
-export default { lead: "19 November 2026, the parser's packages installed where the shape check runs", cost: COST.workflow, check: parserFirst,
-  partly: "that a job reaching the shape check through the project's own npm or shell script installs the parser's first is read by the review" };
+export default { lead: "19 November 2026, the parser's packages installed where the shape check runs", cost: COST.workflow,
+  unread: "nothing is asked of a project from #1093 on: the shape check and the selection of tests install the parser's packages themselves before they read, or say they did not run and why, failing nothing" };
