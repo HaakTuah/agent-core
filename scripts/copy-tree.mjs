@@ -7,9 +7,10 @@
 // `gitDir` (a bare repository's own folder, or a clone's .git), from the pin's own entries: each call names that folder
 // outright, as releases.mjs says a bare repository must be. And how two trees are compared, here and in core.yml alike
 // (core archive 201): entry by entry, by git's object ids and types, so a file's content, a link and a submodule each
-// count, while the executable bit does not: a copy made on Windows records every file 100644, and nothing runs a file
-// of the copy by its mode (each of its scripts is started through bash or node). This is the one place that reason is
-// written; core.yml and pure-sync.mjs point here. Git and Node's own modules only; proven by copy-tree-test.mjs.
+// count, while the executable bit does not: a copy made on Windows by a sync from before #1093 records every file 100644,
+// and such a copy is the core's all the same. From #1093 the sync records the bits the core marks (sync.mjs, `modes`),
+// and pure-sync.mjs refuses a bit the core does not mark (`executable`, below), so a sync widens no file's mode beyond
+// the core's. This is the one place that reason is written; core.yml and pure-sync.mjs point here. Git and Node's own modules only; proven by copy-tree-test.mjs.
 import { inBare } from "./releases.mjs";
 
 export const KEPT = ["reports", "words", "tests"];
@@ -30,6 +31,12 @@ export function copyTree(pin, gitDir) {
  *  them: two copies are the same where these are. `tree` names a tree in the repository whose git folder is `gitDir`. */
 export function entries(tree, gitDir) {
   return git(["-c", "core.quotePath=true", "ls-tree", "-r", "--full-tree", tree], gitDir).split("\n").filter(Boolean).map((e) => e.replace(/^100755 blob /, "100644 blob ")).join("\n");
+}
+
+/** The files a tree marks executable (mode 100755), one path each, as git quotes it, in git's order. `tree` names a
+ *  tree in the repository whose git folder is `gitDir`. */
+export function executable(tree, gitDir) {
+  return git(["-c", "core.quotePath=true", "ls-tree", "-r", "--full-tree", tree], gitDir).split("\n").filter((e) => e.startsWith("100755 blob ")).map((e) => e.slice(e.indexOf("\t") + 1));
 }
 
 /** Whether the copy's folder `at` (the manifest's path without its last "/": core-path.mjs) in the commit `rev`, in the
