@@ -21,7 +21,7 @@ import { scratchCore, victimRepo } from "../scripts/releases-scratch.mjs";
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
 
-// a scratch core: main with four commits, a side branch, and tags (as in releases-test.mjs)
+// a scratch core: main with four commits, a side branch, and tags
 const { tmp, git, core, commit, head, c1, c2, c3, c4, side, fetched } = scratchCore("release-test-");
 
 let dir = fetched();
