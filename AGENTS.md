@@ -286,8 +286,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   refuses the read or the write to that token, or shows a setting to the repository's admins alone; then the step is
   said not read, never done, and the look files in one issue, "Settings only the owner gives", labelled `needs-owner`,
   each setting only the owner gives it read as not given, with its link, each write refused, with the right it would
-  need, and the settings it could not read. The trigger is the look's run in a project, each day; `host.mjs`, run by
-  itself, prints what it reads and writes nothing. It does not mean that an agent session edits the host for a step
+  need, and the settings it could not read. The trigger is the look's run in a project, each day, and each sync, which
+  prints what `host.mjs` reads and writes nothing. It does not mean that an agent session edits the host for a step
   with its own sign-in, that the look's token gains a right to give a setting only the owner gives, that the value of
   the secret `PERSONAL_TERMS` is read (the workflow says only whether it is given), nor that a step not read fails
   anything. Reason: a step the host holds was left to a session's own sign-in, which reaches past the project and an
