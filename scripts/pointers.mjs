@@ -43,7 +43,7 @@ import { corePath, projectAt } from "./core-path.mjs";
 import { logged } from "./guards.mjs";
 import { checkRules } from "./links.mjs";
 import { markdownReader } from "./markdown.mjs";
-import { LIST, brokenNames, listOf, nameKey } from "./names.mjs";
+import { LIST, SEARCHED, brokenNames, listOf, nameKey } from "./names.mjs";
 import { didNotRun, installed } from "./packages.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 
@@ -293,7 +293,11 @@ if (AT) { console.log(JSON.stringify([...new Set(broken)].map(inTool).filter(Boo
 // other fails. `--write-names` writes the list: where there is none, each that stands nowhere; else those of it that
 // still do, never one more.
 const NAMES = { core: CORE, copy: CORE ? "" : HOME, skip: (f, n) => RULES.includes(f) && pathForm(n) };
-const names = brokenNames({ ...NAMES, read: f => (files.has(f) ? text(f) : null), tracked, blocksOf: f => (files.has(f) ? parse(f).blocks : []) });
+// (a description is read only where it is a regular file of this checkout, no link, of at most DESCRIBED bytes, so a
+// description that leads elsewhere or is too large to read is noted, never followed)
+const DESCRIBED = 1024 * 1024;
+const usable = f => { try { const st = fs.lstatSync(f); return st.isFile() && st.size <= DESCRIBED; } catch { return false; } };
+const names = brokenNames({ ...NAMES, read: f => (files.has(f) ? text(f) : null), tracked, blocksOf: f => (files.has(f) ? parse(f).blocks : []), usable });
 if (process.argv.includes("--write-names")) {
   if (CORE) { console.error("FAIL: the core keeps no list of names: each that stands nowhere fails in its own run. Mend: run it without --write-names"); process.exit(1); }
   const there = fs.existsSync(LIST), had = there ? listOf(text(LIST)) : null;
@@ -321,6 +325,8 @@ for (const x of names.found) {
   else oldNames.push(said);
 }
 if (names.unread) console.log(`note ${logged(names.unread)}, so no names in the descriptions were read`);
+for (const f of names.unusable) console.log(`note ${logged(`${f} is a link or no regular file, or past ${DESCRIBED} bytes`)}, so its names were not read`);
+if (names.left) console.log(`note ${names.left} names in the descriptions that no tracked file is were not searched for in the project's code (past ${SEARCHED}, or git could not search), so they were left alone`);
 for (const x of oldNames) console.log(`note ${logged(`a name in a description that stands nowhere: ${x}`)} (${namesHeld ? `the pull request's base held it` : "with no base to read against"}, so it fails nothing: name what holds it now, or take it out, and lower the list with node ${HOME}scripts/pointers.mjs --write-names)`);
 // (in a project, one the pull request's base held is noted, and every one where there is no base to read against)
 const old = [];

@@ -58,17 +58,24 @@ export function descriptionsOf(manifest, tracked) {
   return files.length ? { files: [...new Set(files)] } : { files: [], unread: "the manifest's row *descriptions* names no tracked file or folder in code marks, nor the README" };
 }
 
+/** The most names it searches the project's code for, in one run: past it, a name is left alone and counted, since the
+ * search's work grows with the names times what it found (#460, point 4). */
+export const SEARCHED = 1000;
+
 // Of the paths given, those that stand otherwise than as a tracked file: git ignores them, or a tracked file of the
-// project's own that is no Markdown, nor the list, holds them (at `tree`, a commit, or the work tree where it is null).
+// project's own that is no Markdown, nor the list, holds them (at `tree`, a commit, or the work tree where it is null),
+// searched in one run of git for them all, the lines it finds read for each; past SEARCHED, or where git could not
+// search, the rest are left alone, counted in `left`.
 function elsewhere(paths, { tree, copy }) {
-  if (!paths.length) return new Set();
+  if (!paths.length) return { off: new Set(), left: 0 };
   const ignored = spawnSync("git", ["check-ignore", "--stdin"], { input: paths.join("\n"), encoding: "utf8" }).stdout ?? "";
-  const out = new Set(ignored.split("\n").filter(Boolean));
+  const off = new Set(ignored.split("\n").filter(Boolean)), rest = paths.filter(x => !off.has(x));
   const spec = ["--", ".", ":(exclude,glob)**/*.md", `:(exclude)${LIST}`, ...(copy ? [`:(exclude)${copy}`] : [])];
-  for (const p of paths.filter(x => !out.has(x))) {
-    if (spawnSync("git", ["grep", "-q", "-F", "-I", "-e", p, ...(tree ? [tree] : []), ...spec]).status === 0) out.add(p);
-  }
-  return out;
+  const r = rest.length ? spawnSync("git", ["grep", "-h", "-F", "-I", "-f", "-", ...(tree ? [tree] : []), ...spec],
+    { input: rest.slice(0, SEARCHED).join("\n"), encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }) : { stdout: "" };
+  const lines = r.error || r.status > 1 ? null : r.stdout;
+  for (const [i, p] of rest.entries()) if (i >= SEARCHED || lines === null || lines.includes(p)) off.add(p);
+  return { off, left: (lines === null ? Math.min(rest.length, SEARCHED) : 0) + Math.max(0, rest.length - SEARCHED) };
 }
 
 // Of a name read, the reason it stands nowhere, or null where it stands, "skip" where it is not read: `ctx` holds what
@@ -85,21 +92,23 @@ function judge(n, { core, exts, have, tracked, scripts }) {
 /** The names that stand nowhere, each { file, line, name, what }. `read(f)` gives a file's text or null, `tracked` the
  * tracked paths, `blocksOf(file)` a file's blocks ({ i, text }, markdown.mjs), `skip(file, name)` a name another
  * reading of the check reads already; `core` reads the core's own repository, `copy` is the project's copy of the core,
- * `tree` the commit read, null for the work tree. `{ found, count, unread }`, `count` the names read. */
-export function brokenNames({ read, tracked, blocksOf, skip = () => false, core = false, copy = "", tree = null }) {
+ * `tree` the commit read, null for the work tree, `usable(f)` whether a description may be read at all. `{ found, count,
+ * unread, unusable, left }`: `count` the names read, `unusable` the descriptions not read, `left` the names not searched. */
+export function brokenNames({ read, tracked, blocksOf, skip = () => false, core = false, copy = "", tree = null, usable = () => true }) {
   const d = core ? { files: ["README.md"] } : descriptionsOf(read("core-manifest.md"), tracked);
+  const unusable = d.files.filter(f => !usable(f));
   const ctx = { core, tracked, have: new Set(tracked), scripts: core ? null : scriptsOf(read("package.json")),
     exts: new Set(tracked.map(f => /\.([^./]+)$/u.exec(posix.basename(f))?.[1]).filter(Boolean)) };
   const found = [];
   let count = 0;
-  for (const file of d.files) for (const b of blocksOf(file)) for (const n of namesIn(b.text)) {
+  for (const file of d.files.filter(f => !unusable.includes(f))) for (const b of blocksOf(file)) for (const n of namesIn(b.text)) {
     const v = skip(file, n.name) ? "skip" : judge(n, ctx);
     if (v === "skip") continue;
     count++;
     if (v) found.push({ file, line: b.i + 1, name: n.name, ...v });
   }
-  const off = elsewhere([...new Set(found.filter(x => x.path).map(x => x.path))], { tree, copy });
-  return { found: found.filter(x => !x.path || !off.has(x.path)).map(({ path, ...x }) => x), count, unread: d.unread };
+  const { off, left } = elsewhere([...new Set(found.filter(x => x.path).map(x => x.path))], { tree, copy });
+  return { found: found.filter(x => !x.path || !off.has(x.path)).map(({ path, ...x }) => x), count, unread: d.unread, unusable, left };
 }
 
 /** A broken name's key, as the list holds it: its file and its name, its line aside, so that one held is known though lines moved. */

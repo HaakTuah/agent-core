@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
+import { SEARCHED } from "../scripts/names.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
@@ -82,6 +83,16 @@ try {
   g("add", "-A");
   t = check();
   ok(t.status === 0 && /^note the manifest's row \*descriptions\* names no tracked file or folder in code marks, nor the README, so no names in the descriptions were read/m.test(t.out), "a row that names no tracked file reads none, and says so", t.out);
+  // a description that is a link is noted and never followed, and the names searched for in the code are capped
+  put("core-manifest.md", "# Manifest\n\n| Slot | Value |\n| --- | --- |\n| *descriptions* | `docs/link.md` and `docs/many.md` |\n");
+  put("docs/many.md", `# Many\n\n\`records/log.json\` ${Array.from({ length: SEARCHED }, (_, i) => `\`gone/n${i}.ts\``).join(" ")}\n`);
+  let linked = true;
+  try { fs.symlinkSync("guide.md", path.join(desc, "docs/link.md")); } catch { linked = false; }
+  g("add", "-A");
+  t = check();
+  const noted = t.out.match(/^note a name in a description that stands nowhere: docs\/many\.md/gmu)?.length ?? 0;
+  ok(t.status === 0 && noted === SEARCHED - 1 && /^note 1 names in the descriptions that no tracked file is were not searched for/m.test(t.out) && !/`records\/log\.json`/.test(t.out), `past ${SEARCHED} names, the rest are left alone and counted, and the code is searched for the others in one run`, t.out.slice(-600));
+  if (linked) ok(/^note docs\/link\.md is a link or no regular file/m.test(t.out) && !/docs\/link\.md:/.test(t.out), "a description that is a link is noted and not read", t.out.slice(-600));
 } finally { fs.rmSync(desc, { recursive: true, force: true }); }
 // the core's own run: there every name that stands nowhere fails, and no list is kept
 const coreDir = scratchDir("names-test-core-");
