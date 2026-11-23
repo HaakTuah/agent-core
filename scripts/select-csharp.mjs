@@ -107,8 +107,8 @@ function pairs(toks) {
 // tuple), each in the namespace it stands in, read from the tokens as they go: a block's within its braces, inside
 // those around it, and a file-scoped one's to the end. Each scan goes on where the last stopped (pairs): linear in the
 // tokens, and a namespace's full name is made once, where a delegate stands in it.
-function delegates(toks) {
-  const out = [], within = namespaces(toks);
+function delegates(r) {
+  const toks = r.toks ?? [], out = [], within = namespaces(toks, new Set(r.namespaces));
   for (let i = 0; i < toks.length; i++) {
     const next = within.step(i);
     if (next !== i) { i = next; continue; }
@@ -123,8 +123,10 @@ function delegates(toks) {
 }
 
 // The namespace a scan of a file's tokens stands in: step(i) reads the token at i, a brace or a namespace's head, and
-// gives where the scan goes on (i, or past the head); name() the full name where it stands.
-function namespaces(toks) {
+// gives where the scan goes on (i, or past the head); name() the full name where it stands. The tokens drop an escaped
+// word's "@", so "namespace" heads a namespace only at a namespace's own level, not after a ".", and naming one the
+// grammar declared (`known`): `class C { @namespace field; }` declares none.
+function namespaces(toks, known) {
   const open = [];
   let depth = 0, file = { name: "" };
   const full = f => f.full ?? (f.full = f.up ? join(full(f.up), f.name) : f.name);
@@ -134,10 +136,11 @@ function namespaces(toks) {
       const v = toks[i].v;
       if (v === "{") depth++;
       else if (v === "}") { depth--; while (open.at(-1)?.depth > depth) open.pop(); }
-      else if (v === "namespace") {
-        const { name, end } = dotted(toks, i + 1);
-        if (toks[end]?.v === ";") file = { name };
-        else if (toks[end]?.v === "{") open.push({ name, up: open.at(-1) ?? file, depth: ++depth });
+      else if (v === "namespace" && depth === (open.at(-1)?.depth ?? 0) && toks[i - 1]?.v !== ".") {
+        const { name, end } = dotted(toks, i + 1), up = open.at(-1) ?? file;
+        if (toks[end]?.v === ";" && known.has(name)) file = { name };
+        else if (toks[end]?.v === "{" && known.has(join(full(up), name))) open.push({ name, up, depth: ++depth });
+        else return i;
         return end;
       }
       return i;
@@ -233,7 +236,7 @@ function indexOf(facts) {
 
 // The full names of the types a file declares (x its facts): those the grammar indexes, its delegates, and Program for
 // top-level statements.
-const declared = x => [...x.r.types, ...delegates(x.r.toks ?? []), ...(x.program ? ["Program"] : [])];
+const declared = x => [...x.r.types, ...delegates(x.r), ...(x.program ? ["Program"] : [])];
 
 // What a changed file of C# no longer does that a test may have reached it by, `was` its text at the base (null where
 // it was not there) and `now` its text: a type it declared there and declares no more (a test that named it may now
