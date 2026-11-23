@@ -1,6 +1,8 @@
 // Tests where the test selection cannot tell what reaches a file of C# (scripts/select-csharp.mjs, through
 // scripts/select.mjs; #675): a file lost by the grammar, one that reads types by reflection or scans an assembly, one
-// with a raw interpolated string or an alignment that names something, every file where a <Using> names a property or git cannot be asked; and the whole
+// with a raw interpolated string or an alignment that names something, every file where a <Using> names a property or
+// holds what the reader cannot read, a global alias names a hook's attribute or git cannot be asked; a namespace an SDK
+// imports by ImplicitUsings and a <Using>'s Alias given as an element, which reach every file; and the whole
 // suite where a changed file is C# of no project or no longer declares what it declared at the base, a change to a
 // helper among the tests, and the budget, of what git holds beside the texts too. The cases: select-csharp-test.mjs. Needs the parser (node scripts/install.mjs
 // parser). Run by the core's tests workflow (.github/workflows/tests.yml).
@@ -46,8 +48,19 @@ ok(same([...rawHole.unsure], ["src/X.cs"]), "a raw interpolated string, whose ho
 ok(!one("namespace Tests;\nclass Y { string s = \"\"\"a\"\"\" + $\"{1}\" + $\"{2,-10:F1}\" + $\"{F(1, 2)}\"; }\n").unsure.size, "a raw string that is not interpolated, an interpolated one that is not raw, an alignment that names nothing and a call's \",\" make none");
 const aligned = ["$\"{1,App.Layout.Width}\"", "$@\"{1,(int)W}\""].filter(e => !one(`namespace Tests;\nclass Y { string s = ${e}; }\n`).unsure.has("src/X.cs"));
 ok(!aligned.length, "an interpolation's alignment that holds a word, which the tokens do not read, makes its file unsure", aligned.join(", "));
-const hidden = ["\"Price: $\" + $\"{1,App.Layout.Width}\"", "/* $\" */ $\"{1,App.Layout.Width}\"", "// $\"\n$\"{1,App.Layout.Width}\"", "'\"' + $\"{1,App.Layout.Width}\"", "@\"a\"\"$\" + $\"{1,App.Layout.Width}\"", "\"\"\"a \" b\"\"\" + $\"{1,App.Layout.Width}\"", "$\"{1 /* } */ ,App.Layout.Width}\""].filter(e => !one(`namespace Tests;\nclass Y { string s = ${e}; }\n`).unsure.has("src/X.cs"));
-ok(!hidden.length, "a \"$\\\"\" in a string, a character or a comment, and a comment in a hole, hide no alignment", hidden.join(" | "));
+const hidden = ["\"Price: $\" + $\"{1,App.Layout.Width}\"", "/* $\" */ $\"{1,App.Layout.Width}\"", "// $\"\n$\"{1,App.Layout.Width}\"", "'\"' + $\"{1,App.Layout.Width}\"", "@\"a\"\"$\" + $\"{1,App.Layout.Width}\"", "\"\"\"a \" b\"\"\" + $\"{1,App.Layout.Width}\"", "$\"{1 /* } */ ,App.Layout.Width}\"", "$\"{\"\"\"a\"}\"\"\"}\" + $\"{1,App.Layout.Width}\"", "$@\"{\"\"\"a\"}\"\"\"}\" + $\"{1,App.Layout.Width}\"", "$\"{1,Ⅻ.Ⅹ}\"", "$\"{1,\\u0041pp.Width}\"",
+  "1;\n#if NEVER\n/*\n#endif\nint w = App.Layout.Width;\n// */\nstring t = \"\"", ...["@\"", "\"\"\""].map(q => `1;\n#if false\nstring q = ${q}\n#endif\nstring t = $"{1,App.Layout.Width}";\n#if false\n${q};\n#endif\nstring u = ""`),
+  ...["\r", "\u0085", "\u2028", "\u2029"].map(e => `1; // x${e}string t = $"{1,App.Layout.Width}";\nstring u = ""`), "1;\n#region r\rstring t = $\"{1,App.Layout.Width}\";\nstring u = \"\""].filter(e => !one(`namespace Tests;\nclass Y { string s = ${e}; }\n`).unsure.has("src/X.cs"));
+ok(!hidden.length, "a \"$\\\"\" in a string, a character or a comment, a comment or raw string in a hole, a name of letter-numbers or escapes, a comment or string one branch of an \"#if\" opens, and a line's end other than \"\\n\", hide no alignment", hidden.join(" | "));
+const implicit = one("namespace System;\npublic static class Ext { public static bool Allowed(this string s) => true; }\n", { "tests/T.cs": "namespace Tests;\nclass T { bool b = \"x\".Allowed(); }\n" });
+ok(implicit.links.get("tests/T.cs")?.has("src/X.cs"), "a namespace an SDK imports by ImplicitUsings, which no <Using> git holds names, is seen by every file", JSON.stringify([...implicit.links.get("tests/T.cs") ?? []]));
+const child = ["<Using Include=\"App\"><Alias>D</Alias></Using>", "<Using Include=\"App\">\n  <alias>D</alias>\n  <Visible>false</Visible>\n</Using>"].filter(item => !csharpReach({ "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npublic class Store { }\n",
+  "tests/Tests.csproj": `<Project><ItemGroup>${item}</ItemGroup></Project>`, "tests/T.cs": "namespace Tests;\nclass T { object s = new D.Data.Store(); }\n" }, undefined, nothing).links.get("tests/T.cs")?.has("src/Store.cs"));
+ok(!child.length, "a <Using>'s Alias given as an element of its own is read as the attribute is", child.join(", "));
+const unreadMeta = csharpReach({ ...csTexts, "tests/Tests.csproj": "<Project><ItemGroup><Using Include=\"App\"><!-- <Alias>D</Alias> --></Using></ItemGroup></Project>" }, undefined, nothing);
+ok(same([...unreadMeta.unsure].sort(), ["src/A.cs", "tests/T.cs"]), "a <Using> whose elements the reader cannot read makes every file unsure", JSON.stringify([...unreadMeta.unsure]));
+const hookAlias = csharpReach({ ...csTexts, "src/Usings.cs": "global using MI = System.Runtime.CompilerServices.ModuleInitializerAttribute;\n", "src/Init.cs": "namespace App;\nstatic class Init { [MI] internal static void Go() { } }\n" }, undefined, nothing);
+ok(hookAlias.unsure.has("src/Init.cs") && hookAlias.unsure.has("tests/T.cs"), "a global alias of a hook's attribute, which the file that applies it never names, makes every file unsure", JSON.stringify([...hookAlias.unsure]));
 const bridged = { ...app, "src/Bridge.cs": "namespace App;\nref class Bridge { public static bool Check() => Rules.Allowed(); }\n", "tests/BridgeTest.cs": "using App;\nnamespace Tests;\nclass BridgeTest { void T() { Bridge.Check(); } }\n" };
 ok(readCsharp(bridged["src/Bridge.cs"]).functions === null && pick(bridged, "src/Rules.cs").tests.includes("tests/BridgeTest.cs"),
   "a file the grammar loses, whose declarations are not known, is reached from every file and unsure, so a test that names it runs", JSON.stringify(pick(bridged, "src/Rules.cs")));

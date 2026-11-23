@@ -1,15 +1,14 @@
-// What a file of C# reaches, for the test selection (select.mjs; #675), read word by word on the
-// parser's tokens (shape-csharp.mjs); it never runs the code. A file reaches the files that declare a type it may name:
-// each word it holds as a type (or an attribute's, `[Fact]` naming FactAttribute) in a namespace it sees (its own and
-// those around it, the global one, those its using directives name, global ones from any file and from <Using> in MSBuild's
-// files); each name written out in full, an alias that heads it put for what it names; the files that may declare
-// extension members in a namespace it sees; a file of top-level statements, by the name Program; and the files every file
-// reaches: those run with no name (an assembly's attribute, a module initializer, a framework's set-up, a source
-// generator, an xUnit collection's definition), those that hold a global using directive, and those the grammar lost.
-// It reads more than a file takes. A file is unsure (a test that reaches it runs on any change) where the
-// grammar lost it, it holds code the tokens leave out, or it reads types by reflection or scans an assembly; every file
-// is, where a <Using> names an MSBuild expression or git cannot be asked. Files of C# git holds that the config does not
-// read are read too, as links between those it reads (select-csharp-project.mjs).
+// What a file of C# reaches, for the test selection (select.mjs; #675), read on the parser's tokens (shape-csharp.mjs);
+// it never runs the code. A file reaches the files that declare a type it may name: each word it holds as a type (or an
+// attribute's, `[Fact]` naming FactAttribute) in a namespace it sees (its own and those around it, the global one, those
+// its using directives name, global ones from any file and MSBuild's <Using>); each name written out in full, an alias
+// that heads it put for what it names; the files that may declare extension members in a namespace it sees; a file of
+// top-level statements, by the name Program; and the files every file reaches: those run with no name (runsUnnamed),
+// those that hold a global using directive, and those the grammar lost. It reads more than a file takes. A file is
+// unsure (a test that reaches it runs on any change) where the grammar lost it, it holds code the tokens leave out, or
+// it reads types by reflection or scans an assembly; every file is, where a <Using> names an MSBuild expression, a
+// global alias a hook's attribute, or git cannot be asked. Files of C# git holds that the config does not read are read
+// too, as links between those it reads (select-csharp-project.mjs).
 import { heldBeside, msbuildUsings } from "./select-csharp-project.mjs";
 import { leftOut } from "./select-csharp-text.mjs";
 import { readCsharp } from "./shape-csharp.mjs";
@@ -35,7 +34,7 @@ const join = (a, b) => (a ? `${a}.${b}` : b);
 const into = (map, key, made = () => new Set()) => { if (!map.has(key)) map.set(key, made()); return map.get(key); };
 
 // Past the head of a using directive that opens at toks[i] ("using", or "global using", then "static", "unsafe", an
-// alias's "N =" and "global::" or an extern alias's "L::", each where it stands): the index of its name, or -1 where no directive opens there.
+// alias's "N =", and "global::" or an extern alias's "L::"): the index of its name, or -1 where no directive opens there.
 function pastHead(toks, i) {
   let k = toks[i]?.v === "global" ? i + 1 : i;
   if (toks[k]?.v !== "using") return -1;
@@ -206,8 +205,8 @@ const LITERAL = { t: "str", v: "" };
 // What a file holds that bears on its reach: its own namespaces, the namespaces its types stand in, its words, its runs
 // of dotted words, its using directives, and whether it declares extension members, runs with no name, reads types by
 // reflection, is of top-level statements, was lost by the grammar (unread: what it declares is not known either), or
-// holds code the tokens leave out (select-csharp-text.mjs). A character literal's token keeps its character ('}'), which no scan here takes for punctuation: each reads
-// the tokens with every literal's value emptied.
+// holds code the tokens leave out (select-csharp-text.mjs). Each scan reads the tokens with every literal's value
+// emptied, so a character's ('}') is no punctuation.
 function factsOf(read, src) {
   const toks = (read.toks ?? []).map(k => (k.t === "str" ? LITERAL : k)), r = { ...read, toks };
   const words = ids(toks), placed = new Set(r.namespaces);
@@ -306,6 +305,8 @@ export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   const facts = new Map(files.map(f => { pace(); return [f, factsOf(readCsharp(all[f]), all[f])]; }));
   const ix = indexOf(facts, pace);
   globally(ix, msbuild);
+  // (or a global alias names a hook's attribute, which no word of the file that applies it shows)
+  if ([...ix.aliases.values()].some(ts => [...ts].some(t => hookWord(t.split(".").pop())))) return { links, unsure: new Set(files) };
   for (const [f, x] of facts) { pace(); const to = reachOf(x, ix, pace); to.delete(f); links.set(f, to); }
   return { links, unsure: ix.unsure };
 }
