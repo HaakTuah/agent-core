@@ -77,8 +77,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   audit (#259) and a change to a rule that keeps its meaning (#886, point 2) join without the owner's word: the design
   check of the PR that builds such a change states it, as `roles/shared/review-guidelines.md` says of the floor ("A
   change that keeps the meaning is stated so"), and where it does not, that PR waits for the owner's yes, held for the
-  floor and the guidelines by `scripts/meaning-kept.mjs` and for any other rule by nothing yet. A bug waits for no
-  line, as that module says. A line does not leave in the PR that closes its issue: the readers of the file skip the
+  floor and the guidelines by `scripts/meaning-kept.mjs` and for any other rule by nothing yet. A line does not leave in the PR that
+  closes its issue: the readers of the file skip the
   line of a closed issue, and the next PR that changes the file takes such lines out together (`node scripts/queue.mjs
   --clear`; #750, point 1), as that module says, since PRs merging side by side collided on it. Held here by `own-description.yml`, which fails a ready PR that changes the
   file and leaves one.
@@ -153,14 +153,10 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that say the mend, the labels and the queue, the daily look and the monthly state report, which lists the core
   beside the projects. Its audit and cleaning share is set by the state its own code is in, as any project's is, and
   the staged cases run on its repository. An issue here is done only when the core's own repository meets it.
-- **Whoever builds a change finishes it,** the design session and a builder alike: the branch, the draft PR and the
-  push after every commit, then ready, its reviews, their findings fixed and the merge, as `roles/shared/work-flow.md`
+- **Whoever builds a change finishes it,** the design session and a builder alike, as `roles/shared/work-flow.md`
   says ("Git and GitHub", and point 1). A PR that changes a rule says what it changes in every project.
 - **Every PR gets Codex's code and security reviews,** save one of queue lines alone that `scripts/queue-only.mjs`
-  proves (floor rule 8; `tasks/reviews.md`, point 3); one that changes the floor or the review guidelines needs the
-  owner's yes in it, save one that keeps the meaning as floor rule 3 says: that of its queued issue ("Queued
-  means wanted"), or, for one that goes beyond it, a new yes, for which it waits unmerged while its builder takes the
-  next line.
+  proves (floor rule 8; `tasks/reviews.md`, point 3).
 - **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`).
   By default what a role reads at its start, as its file under `roles/` names it, stays under that role's cap, so
   whoever adds a rule there replaces text. Where a fresh session has read all the rules for room and found too little,
@@ -251,6 +247,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   a new repository of the same kind, and by the copies part's check of
   `scripts/checks.mjs`, in `core.yml`'s job and `copies.yml`'s, which fails a pull request that changes a file or part
   the core marks so that it is not as the core writes it.
+- **A writer of the core's and its readers meet in a round trip** (#1108). By default each file the core writes into a
+  project (the starter kit, the one process, the sync, and the baselines and records a check or a step writes there) is
+  read back in a test by each of the core's own readers that reads it (the YAML and Markdown readers, the readers of
+  the checks' configs, the manifest's), written in projects of each kind the upgrade test holds, and the test fails
+  where a reader cannot read it or reads another meaning. Nothing changes it. The trigger is a pull request that adds a
+  script that writes a file, or a reader of what one writes, or changes the form either takes: its builder adds the
+  round trip in the same pull request, in `tests/round-trip-test.mjs` or the writer's own test, and lists the script
+  there, or names it there with why it writes nothing a reader of the core reads in a project. It does not mean that a
+  property-testing library is added, nor that a project is asked anything. Reason: on 22 November 2026 only the upgrade
+  test, a run of whole projects, found that the core's YAML reader could not read the `core.yml` the one process wrote.
+  Held by `tests/round-trip-test.mjs`, in `.github/workflows/tests.yml`, which fails a script that writes a file and
+  stands in neither of its lists, and a writer whose round trip did not run; that a new reader brings its round trip,
+  by none.
 - **A release says what it asks, step by step.** Whoever adds an entry to the sync notes (`setup/sync-notes/`)
   gives it a step in `scripts/steps/` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it

@@ -38,6 +38,7 @@ import { plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
 import { MARK, converged, marked } from "./core-owned.mjs";
 import { privateOf } from "./host-private.mjs";
+import { LIST as MUTATION, NO_TESTS, leftFor, lineOf, readProject, rowFor, setUp } from "./mutation-tools.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const TEMPLATES = "setup/template";
@@ -190,7 +191,9 @@ function modulesAt(pin) {
 // `read` gives a template's text by its name under setup/template/ (the program reads it from the pinned commit).
 export function files(o, pin, moduleNames, read) {
   const words = { owner: o.owner, project: o.name, core: CORE, pin, npm: o.packages, nuget: o.nuget, modules: modules(moduleNames, o.game), declined: o.game ? "" : "\nNot taken: `game-design.md` (the project is no game).",
-    games: o.game ? GAME_ROWS.map(([slot, what]) => `\n| *${slot}* | FILL IN: ${what} |`).join("") : "" };
+    games: o.game ? GAME_ROWS.map(([slot, what]) => `\n| *${slot}* | FILL IN: ${what} |`).join("") : "",
+    // (the mutation tool the core's list gives the project's code and tests, read by the kit; #1107)
+    mutation: lineOf(o.mutation ?? { none: NO_TESTS }) };
   return FILES.filter(([, , when]) => !when || when(o)).map(([template, to]) => {
     let text = fill(read(template), words);
     // (Dependabot's own part for each installer the project named, after the part every project has)
@@ -326,21 +329,31 @@ function writeKit(o, here, pin, out) {
     const r = spawnSync(process.execPath, [installer, ...everyInstall(path.join(here, "core"))], { cwd: here, encoding: "utf8" });
     if (r.status !== 0) console.log(`note the core's packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node core/scripts/install.mjs before running a check`);
   }
-  const made = [];
+  // (the folder of the mutation tool the manifest names, its package list and npm config written as mutation-tools.mjs
+  // --write writes them, before the licence check's config, which names that npm config)
+  const tool = setUp(here, o.mutation), mutation = MUTATION.tools[o.mutation?.tool];
+  const made = [...tool.written];
   if (!there("checks/sizes.json")) { write("checks/sizes.json", `${JSON.stringify(sizes(Object.fromEntries(startOf(Object.fromEntries(out)).filter(there).map(f => [f, sizeOf(path.join(here, f))]))), null, 2)}\n`); made.push("checks/sizes.json"); }
-  if (!there("checks/licences.json")) { write("checks/licences.json", `${JSON.stringify(licences(o, there), null, 2)}\n`); made.push("checks/licences.json"); }
+  let config = null;
+  if (!there("checks/licences.json")) {
+    config = licences(o, there);
+    if (mutation?.folder && there(`${mutation.folder}/.npmrc`)) config.ignoreScriptsIn = [...(config.ignoreScriptsIn ?? []), `${mutation.folder}/.npmrc`];
+    write("checks/licences.json", `${JSON.stringify(config, null, 2)}\n`); made.push("checks/licences.json");
+  }
   git(["add", "--", ...written, ...made, "core"], here, guarded());
-  return { written, left, made: [...made, ...firstBaselines(here)] };
+  // (what is left for the tool: where the licence check's config stood, the project's own, each entry it would name is asked)
+  return { written, left, made: [...made, ...firstBaselines(here)], tool: [tool.blocked, ...leftFor(mutation, there, config)].filter(Boolean) };
 }
 
 // What the kit wrote, and what it leaves for the project and for the owner.
-function sayLeft(o, pin, out, { written, left, made }) {
+function sayLeft(o, pin, out, { written, left, made, tool }) {
   const list = m => m.length > 1 ? `${m.slice(0, -1).join(", ")} and ${m.at(-1)}` : m.join("");
   console.log(`The starter kit is written: ${written.length + made.length} files${made.length ? ` (the checks' first configs and baselines ${list(made)} among them)` : ""}, and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
   if (left.length) console.log(`\nLeft as the project's, never written over (each a difference the manifest's "Differences" declares on the owner's word, or a task the project's agents take):\n${left.map(l => `  ${l}`).join("\n")}`);
   const open = out.filter(([to]) => written.includes(to)).flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
   console.log(`\nLeft for the project, each marked FILL IN:\n${open.join("\n")}`);
   console.log(`  checks/copies.json: "code", the project's own code as git pathspecs, once it has any`);
+  for (const l of tool) console.log(`  the mutation tool the manifest names: ${l}`);
   console.log(`  checks/shape.json: "systems", each system the project has, by its name, with its paths, what it uses and its entrance, once it has any; "tests", its test files (core/tasks/code-shape.md)`);
   console.log("  checks/licences.json: \"ships\" and \"scan\", once something reaches its users; \"lockfiles\" and \"ignoreScriptsIn\", each npm lock file and .npmrc that did not stand yet");
   console.log("  where it has versions Dependabot cannot see, its versions check: the core's README, point 5");
@@ -379,6 +392,9 @@ function init(argv) {
   }
   const pin = pinOf(o);
   const moduleNames = modulesAt(pin);
+  // (the manifest's row *mutation tool*, from the core's list for the code and tests the project holds already; #1107)
+  const project = readProject(here, "");
+  if (project) o.mutation = rowFor(project);
 
   const read = name => { try { return raw(["show", `${pin}:${TEMPLATES}/${name}`], ROOT); } catch { return fail(`${pin} holds no ${TEMPLATES}/${name}: take a commit of the core that has the starter kit`); } };
   const out = files(o, pin, moduleNames, read);

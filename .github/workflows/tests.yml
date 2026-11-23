@@ -390,6 +390,9 @@ jobs:
       - name: The strength check's verdict
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/strength-verdict-test.mjs ')) }}
         run: node tests/strength-verdict-test.mjs
+      - name: The mutation tool named from the core's list
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/mutation-tools-test.mjs ')) }}
+        run: node tests/mutation-tools-test.mjs
       - name: The core's own mutation tool
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/mutate-test.mjs ')) }}
         run: node tests/mutate-test.mjs
@@ -571,6 +574,9 @@ jobs:
       - name: The one process that writes what the core owns, on projects the starter kit writes (#1083)
         if: ${{ !cancelled() && contains(matrix.parts, 'sync') && (env.RUN == 'all' || contains(env.RUN, ' tests/converge-test.mjs ')) }}
         run: node tests/converge-test.mjs
+      - name: Each writer of the core's read back by its own readers, on projects of each kind the starter kit writes (#1108)
+        if: ${{ !cancelled() && contains(matrix.parts, 'sync') && (env.RUN == 'all' || contains(env.RUN, ' tests/round-trip-test.mjs ')) }}
+        run: node tests/round-trip-test.mjs
       - name: The proof that a change to what runs by itself is only comments and steps' names
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/comment-only-test.mjs ')) }}
         run: node tests/comment-only-test.mjs
