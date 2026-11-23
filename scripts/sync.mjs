@@ -4,7 +4,8 @@
 // listing those calls, and prints what the sync asks of the project beyond the copy (the core's setup/sync-notes.md, the
 // entries it gained between the two commits), then, from the copy it has just written, every step a release asks that
 // is not done, every difference from a fresh start, where the owner's inbox is and what its labels and openers lack
-// (steps.mjs, fresh.mjs, inbox.mjs and labels.mjs, beside this file), for the sync PR's description, having written what the core owns, from the new copy's kit, by the one process that writes it for a new project too (converge.mjs, beside this file; #1083): they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
+// (steps.mjs, fresh.mjs, inbox.mjs and labels.mjs, beside this file), and at its end the one line that says whether the
+// project then holds the core whole and wired (attached.mjs, beside this file; #1081), for the sync PR's description, having written what the core owns, from the new copy's kit, by the one process that writes it for a new project too (converge.mjs, beside this file; #1083): they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
 // which, a pure sync, its merger checks with `scripts/pure-sync.mjs` (floor rule 8). Git, tar, gh where it asks whose
 // account holds the repository (releases.mjs, hostAccount) and Node's own modules only; the core's address:
 // core-address.mjs, beside this file. Where the line says a library carries the core, it syncs nothing: the library's
@@ -42,7 +43,7 @@ const fail = msg => { throw new Failure(msg); };
 // the folder of the earlier starter kits): the steps not done, the differences from a fresh start, where the inbox
 // is, what the labels lack, and last the line that lists what the sync's own paths outside the copy call for, the
 // pins of the project's workflows above all (reading.mjs, by which the description check reads that line).
-const REPORTS = kits => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["reading.mjs", "builder", "--changed", "HEAD", "--line"]];
+const REPORTS = kits => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["reading.mjs", "builder", "--changed", "HEAD", "--line"], ["attached.mjs", "--line", "--fetched", path.dirname(kits)]];
 
 // Where the copy stands, as the manifest's "Core:" line names it (tasks/repositories.md; core-path.mjs); null, said,
 // where a library carries the core, which is synced in the library's own repository.
@@ -148,7 +149,7 @@ function kitsOf(old, tmp) {
 }
 
 // Every step not done, a standing one too, every difference from a fresh start, where the owner's inbox is and what its
-// labels and openers lack, as the new copy reads them; for the sync PR's description. (A copy from before these scripts has neither: nothing is said of them.)
+// labels and openers lack, as the new copy reads them, and then whether the core is attached (#1081); for the sync PR's description. (A copy from before these scripts has neither: nothing is said of them.)
 function report(at, dir, kits) {
   console.log("For the sync PR's description (each a task, none in this PR; nothing waits on them):");
   for (const [script, ...args] of REPORTS(kits)) {

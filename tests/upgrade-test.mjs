@@ -602,6 +602,33 @@ function upgrade(p, from, ownChanges, expect) {
   }
   r = stepsIn(p.dir);
   ok(r.status === 0 && r.out.includes("Every step a check reads is done"), `${p.name}: and with each such step mended as it words it, every step a check reads is done`, r.out);
+  // one verdict (#1081): synced whole, each step done, it reads attached; a pointer left at a path the core has left, and
+  // a file of the copy changed, each read not attached, naming its cause and its mend
+  const attached = () => node(p.dir, "core/scripts/attached.mjs");
+  // (made whole as its mends say, on a branch of its own: each file the starter kit writes that it lacks, and its
+  // manifest's lines of modules, as the kit writes them in a new repository of its kind)
+  git(p.dir, "checkout", "-q", "-B", "whole");
+  let a = attached();
+  const kitLine = re => fs.readFileSync(path.join(p.newDir, "core-manifest.md"), "utf8").match(re)?.[0];
+  const manifestAt = path.join(p.dir, "core-manifest.md"), modules = /^.*\bModules: .*$/mu, notTaken = /^Not taken: .*$/mu;
+  fs.writeFileSync(manifestAt, fs.readFileSync(manifestAt, "utf8").replace(modules, () => kitLine(modules)).replace(notTaken, () => kitLine(notTaken)));
+  for (const [, file] of a.out.matchAll(/^- beside a fresh start: ([^:\n]+): missing /gmu)) {
+    fs.mkdirSync(path.dirname(path.join(p.dir, file)), { recursive: true });
+    fs.copyFileSync(path.join(p.newDir, file), path.join(p.dir, file));
+  }
+  git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "made whole as attached.mjs says");
+  const unmade = a.out;
+  a = attached();
+  ok(a.status === 0 && a.out.split("\n")[0] === "attached: yes", `${p.name}: synced whole, each step done and each mend made that the verdict named, it reads attached`, `${unmade}\n---\n${a.out}`);
+  fs.appendFileSync(path.join(p.dir, "AGENTS.md"), "\nThe old rule stands in `core/tasks/left-by-the-core.md`.\n");
+  a = attached();
+  ok(a.status === 0 && a.out.startsWith("attached: no, 1 thing in the way\n") && /^- a pointer: [^\n]*core\/tasks\/left-by-the-core\.md[^\n]*Mend: /mu.test(a.out), `${p.name}: with a pointer left at a path the core has left, it reads not attached, naming the pointer and its mend`, a.out);
+  clean();
+  fs.appendFileSync(path.join(p.dir, "core/README.md"), "\nA line of the project's own.\n");
+  a = attached();
+  ok(a.status === 0 && a.out.startsWith("attached: no, 1 thing in the way\n") && /^- the copy: core\/ differs from the core at its pin [0-9a-f]{7}: core\/README\.md is changed\. Mend: /mu.test(a.out), `${p.name}: with a file of the copy changed, it reads not attached, naming the file and its mend`, a.out);
+  clean();
+  git(p.dir, "checkout", "-q", "main");
   for (const lead of added) {
     STAGES[lead].stage(p.dir);
     r = stepsIn(p.dir);

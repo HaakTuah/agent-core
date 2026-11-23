@@ -110,6 +110,15 @@ export function notes({ manifest, moduleTexts, where = {} }) {
 
 const readDir = dir => Object.fromEntries(fs.readdirSync(dir).filter(f => f.endsWith(".md")).sort().map(f => [f, fs.readFileSync(path.join(dir, f), "utf8")]));
 
+// The notes of the project at `root` whose copy is at `home`, read against the copy's modules (attached.mjs reads them
+// too); throws where either cannot be read.
+export function projectNotes(root, home) {
+  // (the modules, by name, from each folder that holds them)
+  const where = Object.fromEntries(MODULES.flatMap(d => Object.keys(readDir(path.join(home, d))).map(n => [n, d])));
+  const moduleTexts = Object.assign({}, ...MODULES.map(d => readDir(path.join(home, d))));
+  return notes({ manifest: fs.readFileSync(path.join(root, "core-manifest.md"), "utf8"), moduleTexts, where });
+}
+
 function main() {
   const core = process.argv.includes("--core");
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -124,10 +133,7 @@ function main() {
       console.log("each slot of the README's table carries its mark: read by a reader that stands here, or a default");
       return 0;
     }
-    // (the modules, by name, from each folder that holds them)
-    const where = Object.fromEntries(MODULES.flatMap(d => Object.keys(readDir(path.join(home, d))).map(n => [n, d])));
-    const moduleTexts = Object.assign({}, ...MODULES.map(d => readDir(path.join(home, d))));
-    const found = notes({ manifest: fs.readFileSync(path.join(root, "core-manifest.md"), "utf8"), moduleTexts, where });
+    const found = projectNotes(root, home);
     // (a manifest's text is data: a control character, a lone carriage return too, would start a line of its own in the
     // log, and a line led by "::" is a command to the runner)
     for (const f of found) console.log(`note ${logged(f)}`);
