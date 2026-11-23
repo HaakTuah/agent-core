@@ -2,8 +2,9 @@
 // writes in a scratch folder, committed: each step a writer does whole, taken out, reads done after `--write`, the
 // project's rule files keeping their words; the step of the rules' move and that of the agent tools' files written as far
 // as they are exact, the rest left to their mends; a file with changes not yet committed, a writer that cannot run, a
-// step the manifest declares undone on purpose, a file git ignores and a run outside the copy write nothing; and `--aside` sets what it
-// wrote aside in a stash, which brings it back. Node's own modules and git.
+// step the manifest declares undone on purpose, a file git ignores and a run outside the copy write nothing; `--aside` sets what it
+// wrote aside in a stash, which brings it back; and the one process's key-merge mode (converge.mjs, `merged`; #1095,
+// point 5) adds the kit's keys to the checks' configs, keeping the project's values. Node's own modules and git.
 //
 //   node tests/steps-write-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -14,6 +15,7 @@ import { declare, kitIn, ruleTexts, wordsKept } from "../scripts/steps-kit.mjs";
 import { ASIDE, MOVED_GLOB, MOVED_GLOBS, STEPS, notDone, report, setAside, writeReport } from "../scripts/steps.mjs";
 import { OLD_PATHS, Unwritten, oldPathsIn, writable } from "../scripts/step-writers.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { MERGED } from "../scripts/converge.mjs";
 
 const { ok, done } = tally();
 const dir = kitIn(scratchDir("steps-write-"))("an-npm-project", { packages: "." });
@@ -169,6 +171,40 @@ for (const l of WHOLE) {
   const kept = setAside(dir, [stamped, "checks/holders.json"], () => { git("add", "--", stamped, "checks/holders.json"); throw new Error("no stash"); });
   ok(kept === false && read(stamped) === stood && !fs.existsSync(path.join(dir, "checks/holders.json")) && !dirty() && writeReport([{ lead: l, wrote: [stamped], mend: null }], "put back").includes("put back as they stood"),
     "where git cannot make the stash, each file the writers wrote is put back as it stood, a new one taken out, and the report says to write them after the merge", dirty());
+  back();
+}
+
+// ---- the key-merge mode (#1095, point 5): the kit's keys a config lacks added, at any depth, the project's values
+// kept, its indent too; a config with changes not yet committed, or no JSON object, left and said ----
+{
+  const json = f => JSON.parse(read(f)), copies = json("checks/copies.json"), shape = json("checks/shape.json"), lic = json("checks/licences.json");
+  delete copies.proseFromSecurity;
+  copies.code = ["src/own.js"];
+  delete shape.tests;
+  shape.systems = { rules: { paths: ["src/"] } };
+  delete lic.scan.skip;
+  lic.scan.served = ["site/"];
+  put("checks/copies.json", `${JSON.stringify(copies, null, 4)}\n`);
+  put("checks/shape.json", `${JSON.stringify(shape, null, 2)}\n`);
+  put("checks/licences.json", `${JSON.stringify(lic, null, 2)}\n`);
+  commit("configs that lack keys of the kit's and hold values of the project's");
+  r = write();
+  const [c, s, l] = ["checks/copies.json", "checks/shape.json", "checks/licences.json"].map(json);
+  ok(r.status === 0 && r.stdout.includes(`- ${MERGED}: wrote `) && ["copies", "shape", "licences"].every(n => r.stdout.includes(`checks/${n}.json`))
+    && c.proseFromSecurity === true && c.code.join() === "src/own.js" && read("checks/copies.json").startsWith('{\n    "')
+    && Array.isArray(s.tests) && s.tests.length > 0 && s.systems.rules.paths.join() === "src/"
+    && Array.isArray(l.scan.skip) && l.scan.served.join() === "site/",
+  "--write adds the kit's keys each check's config lacks, at any depth, and keeps every value of the project's and its indent", `${r.stdout}${r.stderr}`);
+  r = write();
+  ok(r.status === 0 && !r.stdout.includes(MERGED), "run again, it writes nothing more: the configs hold the kit's keys", r.stdout);
+  back();
+  put("checks/copies.json", `${JSON.stringify({ ...json("checks/copies.json"), proseFromSecurity: undefined, code: ["src/own.js"] }, null, 2)}\n`);
+  put("checks/shape.json", "[]\n");
+  commit("a config that lacks a key, and one that is no JSON object");
+  put("checks/copies.json", `${read("checks/copies.json")} `);
+  r = write();
+  ok(r.status === 0 && r.stdout.includes("checks/copies.json` has changes not yet committed") && r.stdout.includes("`checks/shape.json` is no JSON object") && read("checks/shape.json") === "[]\n" && !("proseFromSecurity" in json("checks/copies.json")),
+    "a config with changes not yet committed, or no JSON object, is left as it is, and the report says why", r.stdout);
   back();
 }
 

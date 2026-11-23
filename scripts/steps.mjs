@@ -115,7 +115,9 @@ function steps(missed) {
 // each { lead, wrote (the files it wrote), mend (what is left of the step, null where it is done now) } or { lead, why }
 // where it wrote nothing (it could not run, or its check could not read the project). A step the manifest declares
 // undone on purpose, or done already, is left; a file with changes not yet committed when the run began is never written.
-export function written(root, steps = STEPS) {
+// `merge`, last, the one process's key-merge mode (converge.mjs, `merged`; #1095, point 5), given so, since that script
+// reads the project with this one.
+export function written(root, steps = STEPS, merge = null) {
   const busy = held(root), copy = copyAt(project(root)), out = [];
   // (a writer runs the copy's own scripts and reads what the copy holds: this script must be the copy's)
   if (path.resolve(root, copy) !== HERE) throw new Error(`the writers run only as the copy's own script, from the project's root: node ${copy}scripts/steps.mjs --write`);
@@ -130,7 +132,7 @@ export function written(root, steps = STEPS) {
     try { mend = step.check ? step.check(project(root)) : null; } catch (e) { mend = `its check could not read the project after it (${plain(e.message, root)})`; }
     out.push({ lead: step.lead, wrote, mend: mend && mendAt(mend, copy, own) });
   }
-  return out;
+  return merge ? [...out, ...merge(root, busy)] : out;
 }
 
 // What --write prints: each step written, with its files and what is left of it, and each it could not write, with why;
@@ -163,14 +165,16 @@ export function setAside(root, files, push = () => execFileSync("git", ["--liter
 const lower = text => text.replace(/^[A-Z](?=[a-z ])/u, c => c.toLowerCase());
 export const ASIDE = "the steps' writes (#1091)";
 
+// (the key-merge mode's script reads the project with this one, so it is loaded once this one has run, never awaited
+// while it runs, which would wait on itself)
 if (started(import.meta.url) && process.argv.includes("--write")) {
-  try {
-    const root = process.cwd(), done = written(root), aside = process.argv.includes("--aside"), files = [...new Set(done.flatMap(d => d.wrote ?? []))];
+  import("./converge.mjs").then(({ merged }) => {
+    const root = process.cwd(), done = written(root, STEPS, merged), aside = process.argv.includes("--aside"), files = [...new Set(done.flatMap(d => d.wrote ?? []))];
     console.log(writeReport(done, !aside || !files.length ? null : setAside(root, files) ? "aside" : "put back"));
-  } catch (e) {
+  }).catch(e => {
     console.error(`FAIL: the steps' writers could not run here (${plain(e.message)}). Mend: run it as the copy's own script, node core/scripts/steps.mjs --write, from the project's root, a git repository`);
     process.exitCode = 1;
-  }
+  });
 } else if (started(import.meta.url)) {
   try {
     console.log(report(notDone(process.cwd())));
