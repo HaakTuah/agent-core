@@ -984,7 +984,8 @@ function check(config, at, self, found, base, named) {
 // Whether the project's manifest turns the check off with a reason: it then says so, and why, and where the pull
 // request's base did not, that this pull request turns it off, which only the owner does. A `none` with no reason turns
 // nothing off, and it says so.
-function isOff(base) {
+function isOff(named, rest, base) {
+  if (named !== null || rest.length) return false; // (a config named, or a write or a suite asked, reads the config)
   const said = offBy(tolerant(() => fs.readFileSync("core-manifest.md", "utf8")));
   if (said === "") console.log("note the manifest's *shape check* row says `none` with no reason, which turns nothing off: the check runs. Mend: where the owner turns it off, give the owner's reason after `none`; else name the config there, or take the `none` out");
   if (!said) return false;
@@ -997,7 +998,7 @@ function main(argv) {
   const self = path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/"); // (as a mend names it)
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, rest = named ? argv.slice(1) : argv;
   const base = baseOf();
-  if (named === null && !rest.length && isOff(base)) return 0;
+  if (isOff(named, rest, base)) return 0;
   const at = configAt(named, self, base);
   if (at === null) return unwritten(self, base);
   const config = parseConfig(fs.readFileSync(at, "utf8"), at);
