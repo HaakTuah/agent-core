@@ -17,7 +17,7 @@ import { importsOf, readProject as readBuildFile } from "./nuget.mjs";
 export function keysOnce(p) {
   // (with the core's packages not installed, as after a sync made by a copy from before #654, this step cannot be read:
   // it says so, with the install, and every other step is still told)
-  if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`node ${copyAt(p)}scripts/install.mjs\`, then \`node ${copyAt(p)}scripts/steps.mjs\` again.`;
+  if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`if [ -f ${copyAt(p)}scripts/install.mjs ]; then node ${copyAt(p)}scripts/install.mjs; fi\`, then \`node ${copyAt(p)}scripts/steps.mjs\` again.`;
   const read = reads(p.files, copyAt(p)).map(f => [f, keysTwice(p.read(f) ?? "")]);
   const all = read.flatMap(([f, keys]) => keys.filter(k => k.key !== null).map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
   const found = all.length > 25 ? [...all.slice(0, 25), `and ${all.length - 25} more, which show once these are mended`] : all; // (a hostile file gives a key for each line: #970)
