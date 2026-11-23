@@ -70,8 +70,11 @@ The settings the core cannot make for you: the ruleset on `main`, the Actions se
 commit, the secret that lists the terms to keep out, the security reviewer's app, secret scanning in a private
 repository, where it may be billed (a session switches it on in a public one), how your own profile and git name appear
 in commits, and how the machines your agents run on are set up. Each, and why, stands in `README.md`, "Setting up (the
-owner's part)"; none of them fails a check or blocks work where you leave it unset. A project starting out gets the list
-printed at the end of `scripts/init.mjs` (`setup/starter-kit.md`).
+owner's part)"; none of them fails a check or blocks work where you leave it unset. Those of the repository you take in
+one sitting, in a session you start yourself: `scripts/owner-settings.mjs` lists them, each with its state, a link to
+where it is set and what it protects, and the session applies each you approve and reads it back. A project starting
+out gets the list at the end of `scripts/init.mjs` (`setup/starter-kit.md`), and a sync again only where a release adds
+a setting.
 
 ## Telling the core something
 

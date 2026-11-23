@@ -60,7 +60,8 @@
     "process: tests/agent-tools-tree-test.mjs -> node:child_process": "Split from tests/agent-tools-test.mjs (#919): its cases build trees git would refuse to write (an entry out of order, an empty folder at the fetched path, a link too long to follow) with git's own plumbing (mktree, hash-object, commit-tree), and the check reads what git shows of them, which only git makes.",
     "process: tests/steps-fresh-test.mjs -> node:child_process": "Split from tests/steps-test.mjs (#916), whose project it builds through git, the starter kit's: the reader it tests compares a project with a fresh start by what git tracks there (a file taken out, a link, a submodule), which only git makes.",
     "process: tests/steps-own-configs-test.mjs -> node:child_process": "Split from tests/steps-test.mjs (#916), whose project it builds through git, the starter kit's: the configs it tests are found where the project's own workflows name them, among the files git tracks there, which only git makes.",
-    "process: tests/steps-vendored-test.mjs -> node:child_process": "Split from tests/steps-test.mjs (#916), whose project it builds through git, the starter kit's: it tests a core a library carries, a submodule and a copy at another path, which only git makes (a submodule is git's own)."
+    "process: tests/steps-vendored-test.mjs -> node:child_process": "Split from tests/steps-test.mjs (#916), whose project it builds through git, the starter kit's: it tests a core a library carries, a submodule and a copy at another path, which only git makes (a submodule is git's own).",
+    "process: tests/owner-settings-test.mjs -> node:child_process": "The checklist is run as a session runs it (#1085): from a scratch project's root, its exit code and what it prints, the one line where no setting is new and the mend of a wrong call, are what the cases guard, and the list at an older commit is read from a bare repository git writes."
   },
   "listed": {
     "function: scripts/licence-commands.mjs#atCommand": {
@@ -131,6 +132,7 @@
     "process: tests/nuget-gate-test.mjs -> node:child_process": true,
     "process: tests/nuget-test.mjs -> node:child_process": true,
     "process: tests/outcomes-test.mjs -> node:child_process": true,
+    "process: tests/owner-settings-test.mjs -> node:child_process": true,
     "process: tests/packages-test.mjs -> node:child_process": true,
     "process: tests/personal-terms-test.mjs -> node:child_process": true,
     "process: tests/pointers-test.mjs -> node:child_process": true,

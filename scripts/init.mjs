@@ -347,8 +347,11 @@ function sayLeft(o, pin, out, { written, left, made }) {
   console.log("  its labels, once its repository is on GitHub: node core/scripts/labels.mjs --make, which makes those of core/scripts/labels.json (core/roles/shared/inbox.md)");
   if (o.nuget !== undefined) console.log("  its NuGet packages: lock files turned on (RestorePackagesWithLockFile in its project files or Directory.Build.props) and committed, and each packages.lock.json named in checks/licences.json under \"nuget\", as one whose packages ship or one of tools that only run");
   if (o.private) console.log("  no call to the core's CodeQL and licence workflows was written (--private): a workflow of the project's own runs the licence check, as the core's README, point 5, \"A private repository\", says");
-  console.log(`\nLeft for the owner (the core's README, "Setting up"): the ruleset on main, with the checks \`core / core\` and the project's own required;`);
-  console.log("  the Actions setting that every action is pinned to a full commit SHA; the Actions secret PERSONAL_TERMS; and the security reviewer's app.");
+  // (the settings only the owner gives, in one checklist the owner takes in one sitting: the copy's owner-settings.mjs,
+  // run here, where the copy holds it; #1085)
+  const settings = path.join("core", "scripts", "owner-settings.mjs");
+  const r = fs.existsSync(settings) ? spawnSync(process.execPath, [settings], { encoding: "utf8", timeout: 600000 }) : null;
+  console.log(r?.status === 0 && r.stdout.trim() ? `\nLeft for the owner:\n${r.stdout.trim()}` : `\nLeft for the owner: the settings in the core's README, "Setting up (the owner's part)".`);
   console.log("\nWhat owning this project asks of the owner, in one plain page: core/setup/owner-guide.md");
 }
 

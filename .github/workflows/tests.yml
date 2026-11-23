@@ -508,6 +508,12 @@ jobs:
       - name: The labels and openers, and their check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/labels-test.mjs ')) }}
         run: node tests/labels-test.mjs
+      - name: The settings only the owner gives, in one checklist
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/owner-settings-test.mjs ')) }}
+        run: node tests/owner-settings-test.mjs
+      - name: The reader of a project's call of the security review, for the owner's settings
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/review-caller-test.mjs ')) }}
+        run: node tests/review-caller-test.mjs
       - name: The hostile tests of an input, a pull request's description
         if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-pr-text-test.mjs ')) }}
         run: node tests/hostile-pr-text-test.mjs

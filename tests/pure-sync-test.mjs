@@ -98,6 +98,7 @@ ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) 
 ok(s.out.includes("a note for the test"), "  and prints the sync notes the core gained between the two pins", s.out);
 ok(/The core's files and parts written[\s\S]*\.github\/workflows\/look\.yml[\s\S]*For the sync PR's description[\s\S]*Steps not done[\s\S]*Beside a fresh start/.test(s.out),
   "  then, from the copy it wrote, what the core owns written by the one process (#1083), and every step not done, a standing one too, and every difference from a fresh start, for the PR's description", s.out);
+ok(/\n(No setting only the owner gives is new since [0-9a-f]{7}: the sitting is not asked again|The settings only the owner gives)/.test(s.out), "  and asks the owner's settings again only where one is new since the old pin, saying so where none is (owner-settings.mjs; #1085)", s.out);
 ok(/\nattached: (yes|no, \d+ things? in the way)\s*$/u.test(s.out), "  and ends with the one line that says whether the project then holds the core whole and wired (attached.mjs; #1081)", s.out);
 ok(read(p, "AGENTS.md").includes("<!-- The core's part ends. -->") && read(p, ".github/workflows/core.yml") === calls && /Left as the project's[\s\S]*\.github\/workflows\/core\.yml is not the core's/.test(s.out),
   "  the kit's files the project lacked are written (at its first copy already), each call of the core's own files pinned to the new pin, and a workflow of its own that is no kit's is left as it stands and named", s.out);

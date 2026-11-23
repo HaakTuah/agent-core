@@ -108,7 +108,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    (`setup/sync-notes.md`, each entry a file of `setup/sync-notes/`, read whole by `scripts/sync-notes.mjs`), and its
    step of the same name in `scripts/steps/` tells it done or not (`scripts/steps.mjs`); the sync script prints the entries a sync brings, then every
    step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`), where the owner's
-   inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`), the line `Read for it:`
+   inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`), the settings only the owner
+   gives where the sync brings one the old copy's list did not hold (`scripts/owner-settings.mjs`; "Setting up (the
+   owner's part)"), the line `Read for it:`
    (`scripts/reading.mjs`) and, last, one line that says whether the project then holds the core whole and wired,
    `attached: yes` or `attached: no` with how many things stand in the way (`scripts/attached.mjs`, which lists each with
    its mend when a session runs it), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
@@ -561,6 +563,17 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
 
 ## Setting up (the owner's part)
 
+- **The settings only the owner gives, in one sitting** (#1085). `scripts/owner-settings.mjs`, run from the project's
+  root, lists in one checklist each setting of the repository's below that only its owner can give (secret scanning
+  and its push protection, the ruleset, the status `security-review` required where the project's workflow posts it,
+  the Actions setting on pins, the secret `PERSONAL_TERMS` and the security reviewer's app), each with its state where
+  GitHub lets it be read, a direct link to where it is set and what it protects. The owner works through it in one
+  session the owner starts in person, where the owner's own word allows what an agent tool's automatic mode refuses:
+  the session applies each setting the owner approves, never one without that word, reads each back by running the
+  script again, and says what is left; the value of `PERSONAL_TERMS` the owner types on its page alone, never into the
+  session (floor rule 11). It is asked at a project's first taking of the core, where the starter kit and the sync's
+  first copy print it, and again only where a sync brings a setting the old copy's list did not hold; nothing waits on
+  it, and nothing fails until a setting is given (`AGENTS.md`, "Nothing locks a project").
 - An adviser (`roles/adviser.md`): its session started with every repository of the owner's it is to advise on, so it
   can read them, file in them and start each one's orchestrator, reading what another account can write only through
   that repository's orchestrator (`roles/adviser.md`); at the effort its tool's part advises (`tools/claude.md`).
