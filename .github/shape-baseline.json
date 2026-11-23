@@ -195,7 +195,7 @@
     "timed: tests/lookup-step-test.mjs -> Date.now": true,
     "timed: tests/milestones-test.mjs -> Date.now": true,
     "timed: tests/nuget-test.mjs -> Date.now": true,
-    "timed: tests/packages-test.mjs -> new Date()": true,
+    "timed: tests/packages-test.mjs -> setTimeout": true,
     "timed: tests/pr-description-test.mjs -> Date.now": true,
     "timed: tests/reading-test.mjs -> Date.now": true,
     "timed: tests/review-record-test.mjs -> Date.now": true,
