@@ -48,19 +48,21 @@ export function executable(tree, gitDir) {
  *  both ways: the bit on disk too, since where git reads it (core.fileMode) a later `git add` would stage it back. Where
  *  git refuses, it says so and fails nothing: the copy is written all the same. The sync (sync.mjs) calls it. */
 export function recordModes(dir, pin, gitDir) {
-  const marked = git(["ls-tree", "-r", "-z", pin], gitDir).split("\0").filter((e) => e.startsWith("100755 blob ")).map((e) => `${dir}/${e.slice(e.indexOf("\t") + 1)}`).filter((f) => fs.existsSync(f));
+  // (a plain file alone, read without following a link, so no bit is set or staged beyond the copy)
+  const file = (f) => { try { return fs.lstatSync(f).isFile(); } catch { return false; } };
+  const marked = git(["ls-tree", "-r", "-z", pin], gitDir).split("\0").filter((e) => e.startsWith("100755 blob ")).map((e) => `${dir}/${e.slice(e.indexOf("\t") + 1)}`).filter(file);
   // (with core.fsmonitor off, as own-files.mjs reads the index: no command of the project's settings runs)
   const run = (args) => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
   // (x wherever r, as git checks out a 100755 file; a file system that keeps no bit leaves it to the index)
-  const chmod = (f, on) => { try { const m = fs.statSync(f).mode & 0o777; fs.chmodSync(f, on ? m | ((m & 0o444) >> 2) : m & ~0o111); } catch { /* (no bit kept) */ } };
+  const chmod = (f, on) => { try { const m = fs.lstatSync(f).mode & 0o777; fs.chmodSync(f, on ? m | ((m & 0o444) >> 2) : m & ~0o111); } catch { /* (no bit kept) */ } };
   try {
-    const stray = run(["ls-files", "-s", "-z", "--", dir]).split("\0").filter((e) => e.startsWith("100755 ")).map((e) => e.slice(e.indexOf("\t") + 1)).filter((f) => !marked.includes(f) && fs.existsSync(f));
+    const stray = run(["ls-files", "-s", "-z", "--", dir]).split("\0").filter((e) => e.startsWith("100755 ")).map((e) => e.slice(e.indexOf("\t") + 1)).filter((f) => !marked.includes(f) && file(f));
     for (const f of marked) chmod(f, true);
     for (const f of stray) chmod(f, false);
     if (marked.length) run(["update-index", "--add", "--chmod=+x", "--", ...marked]);
     if (stray.length) run(["update-index", "--chmod=-x", "--", ...stray]);
-  } catch (e) {
-    console.log(`note the copy is written, but git did not record the executable bits the core marks (${String(e.stderr || e.message).trim().split("\n")[0]}). Mend: run \`git update-index --add --chmod=+x -- ${marked.join(" ")}\` from the project's root.`);
+  } catch {
+    console.log(`note the copy is written, but git did not record the executable bits the core marks (git refused the update of its index). Mend: run \`git update-index --add --chmod=+x -- ${marked.join(" ")}\` from the project's root.`);
   }
 }
 
