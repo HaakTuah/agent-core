@@ -7,10 +7,10 @@
 //
 //   import { parseToml } from "./toml.mjs";   parseToml(text) -> an object, or throws a SyntaxError naming the line, or,
 //                                             where the whole nests too deep, saying so of the file; or a
-//                                             TomlUnreached where the package could not be installed, the
-//                                             registry not answering
+//                                             TomlUnreached where the package could not be installed
+//                                             (packages.mjs, unreached())
 import { DEEPEST, tooDeep } from "./guards.mjs";
-import { loadSync, unreached } from "./packages.mjs";
+import { loadSync, notInstalled, unreached } from "./packages.mjs";
 
 // (loaded where parseToml first runs, so a script that imports this module for nothing it reads runs with nothing
 // installed; plain and scalar run only under parseToml)
@@ -19,12 +19,12 @@ let toml;
 // (a key set as a plain property, never through a setter: "__proto__" is a key like any other)
 const put = (table, key, value) => Object.defineProperty(table, key, { value, enumerable: true, writable: true, configurable: true });
 
-// (where the job's install could not reach the registry, in a project's pull request, what the caller reads did not
-// run: thrown as its own kind, which the caller tells from a file that is no TOML; #654, point 4)
+// (where the package could not be installed, the registry not answering or a copy's install failing, what the caller
+// reads did not run: thrown as its own kind, which the caller tells from a file that is no TOML; #654, point 4)
 export class TomlUnreached extends Error {}
 
 export function parseToml(text) {
-  if (unreached("smol-toml")) throw new TomlUnreached("the package smol-toml could not be installed, the registry not answering");
+  if (unreached("smol-toml")) throw new TomlUnreached(notInstalled("smol-toml"));
   // (a CRLF line end is read as LF, inside a string of several lines too, as the reader before the package read it;
   // where a CR stands alone anywhere, the text is left as it is, for the package to refuse: "\r\r\n" never becomes CRLF)
   const raw = String(text), s = /\r(?!\n)/u.test(raw) ? raw : raw.replace(/\r\n/gu, "\n"), lost = quotesLost(s);

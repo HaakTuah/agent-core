@@ -39,7 +39,7 @@ import { waysOf } from "./ways.mjs";
 import { baseOf } from "./licences.mjs";
 import { forget, textAt } from "./git-objects.mjs";
 import { parseBounded, logged } from "./guards.mjs";
-import { unreached } from "./packages.mjs";
+import { notInstalled, unreached } from "./packages.mjs";
 import { started } from "./started.mjs";
 import { configured } from "./agent-tools-configured.mjs";
 import { describe, show, TREE, listed } from "./agent-tools-entries.mjs";
@@ -162,13 +162,14 @@ function run(root, file, { core = false, base = baseOf(root), ways = installedBy
   sortUnlisted(unlisted, { head, base, held, file }, fail, notes);
   return { fail, notes };
 }
-// The part of the check that did not run, or null: where the job's install could not reach the registry, in a project's
-// pull request, a project's Codex config, which the TOML package reads, is left unread, at the head and the base alike,
+// The part of the check that did not run, or null (asked only where a Codex config is held, so that a copy installs
+// its packages for none other): where the TOML package could not be installed (packages.mjs,
+// unreached(): the registry not answering, or a copy's install failing; #1093, point 1), a project's Codex config, which the TOML package reads, is left unread, at the head and the base alike,
 // and its entries in the list are not failed as configured nowhere; every other failure stands (#654, point 4).
 function partlyUnread(root, base = baseOf(root)) {
   const codex = ".codex/config.toml";
   const held = () => fs.existsSync(path.join(root, codex)) || (!!base && textAt(root, base, codex) !== null);
-  return unreached("smol-toml") && held() ? `The agent-tools check did not read ${codex}: it is read by the package smol-toml, which could not be installed, the registry not answering; every other part of the check ran. Mend: run this job again before the pull request merges; if it fails again, file it as a fault` : null;
+  return held() && unreached("smol-toml") ? `The agent-tools check did not read ${codex}, and ran every other part: ${notInstalled("smol-toml")}` : null;
 }
 // With no base to read against, as before a commit or on a push, each problem a project may hold, noted as sortSources
 // notes its own; in the core's own repository none may stand.

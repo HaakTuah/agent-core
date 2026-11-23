@@ -13,8 +13,9 @@
 // `.packages/requirements.txt`, PyPI's own lock form, by its SHA-256, into the core's `.packages/pypi/` folder, with pip and no package
 // code run; it does so only where the host's CodeQL does not scan the project and, with a base, the change adds or
 // alters a file of the kinds the scan reads. The scan runs `semgrep-core` from there under the name `osemgrep`, by which
-// it runs as a whole command with no Python. Where the engine is not installed, the scan fails, saying so and how to
-// install it (packages.mjs). The engine runs with no variable but those a program needs to start and a home
+// it runs as a whole command with no Python. Where the engine is not installed, a copy's scan installs it first, and
+// where it cannot, says so as a warning; in the core it fails, saying how to install it (packages.mjs).
+// The engine runs with no variable but those a program needs to start and a home
 // and temporary folder of its own, so no token reaches it, and with its metrics off; a comment in the code that would
 // silence a finding (`nosemgrep`) silences none, and the files are named to it, so no ignore file of the project's
 // leaves one out. Each file is handed to the engine past its own limits of size and place, and one it
@@ -37,7 +38,7 @@ import { copyOf } from "./core-path.mjs";
 import { leadsOut, logged } from "./guards.mjs";
 import { MEND } from "./mend.mjs";
 import { started } from "./started.mjs";
-import { pypiFile, pypiUnreached } from "./packages.mjs";
+import { pypiFile, pypiNotInstalled, pypiUnreached } from "./packages.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 
 // The engine's version, as the core's .packages/requirements.txt names it: the one place it is written.
@@ -249,11 +250,14 @@ export function installNot(root, base = null) {
   return null;
 }
 
-/** The folder of the installed engine; null where the job's install could not reach the registry, in a project's pull
- *  request, so that the scan did not run, said as a warning, neither failed nor passed (#654, point 4). */
+// (the engine's file, in the core's .packages/pypi/)
+const engine = () => `semgrep/bin/semgrep-core${exe()}`;
+
+/** The folder of the installed engine; null where it could not be installed, the job's install not reaching the
+ *  registry or a copy's own install failing, so that the scan did not run, said as a warning, neither failed nor
+ *  passed (#654, point 4; #1093, point 1). */
 function engineDir() {
-  const engine = `semgrep/bin/semgrep-core${exe()}`;
-  return pypiUnreached(engine) ? null : path.dirname(pypiFile(engine));
+  return pypiUnreached(engine()) ? null : path.dirname(pypiFile(engine()));
 }
 
 /** The scan: { lines, failed }, each line to print. */
@@ -262,7 +266,7 @@ export function scan(root, { base = null, description = "", dir = null } = {}) {
   const files = targets(root, base);
   if (!files.length) return { lines: [`code scan: no file of the kinds it reads ${base ? "changed" : "tracked"}`], failed: false };
   dir ??= engineDir();
-  if (!dir) return { lines: [`::warning::The code scan did not run: Semgrep's engine could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`], failed: false };
+  if (!dir) return { lines: [`::warning::The code scan did not run: ${pypiNotInstalled(engine())}`], failed: false };
   const listed = base ? unreadListed(description) : new Set();
   const { got, held, read } = answer(dir, root, files, listed);
   if (got.failed) return base
