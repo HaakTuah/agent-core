@@ -651,6 +651,8 @@ git("reset", "-q", "--hard", "base"); git("branch", "-D", "-q", "named");
 // tries each start in turn would take; #1107)
 { const at = Date.now(), long = offBy(`| *shape check* | \`none\`: r${" ".repeat(400000)}a |`), path = offBy("| *shape check* | `none`: r;  config `x.json` |"), not = offBy("| *shape check* | `none`: r; myconfig `x.json` |");
   ok(long?.length === 400002 && path === "r" && not === "r; myconfig `x.json`" && Date.now() - at < 2000, "a reason of any length is read in one pass, and only a path after the word \"config\" is taken off it", `${Date.now() - at} ms`); }
+{ const row = "| *shape check* | `none`: config `a.json` broke; config `b.json` |";
+  ok(where(row) === "b.json" && offBy(row) === "config `a.json` broke", "the config is the path the reason ends with, the one taken off it, where the reason names another", `${where(row)} / ${offBy(row)}`); }
 
 if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)
   fs.renameSync(path.join(dir, "checks/shape-baseline.json"), path.join(dir, "elsewhere.json"));

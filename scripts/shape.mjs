@@ -611,11 +611,13 @@ export function notLinked(file, root = ".") {
 }
 
 // The config the manifest's *shape check* row names: its first path to a .json file, in backticks; in a row that says
-// `none`, the one after "config", which follows the reason, so that the config's other readers keep reading it while
-// the check is off and a path the reason quotes is not taken for it. Else the kit's.
+// `none`, the one after "config" that ends the reason (configTail), which offBy takes off it, so that the config's
+// other readers keep reading it while the check is off and a path the reason quotes is not taken for it. Else the kit's.
 const rowNames = manifest => {
+  const token = rowToken(manifest, "*shape check*");
+  if (token?.said === "none") return /^[\w./-]+\.json$/u.exec(configTail(token.reason)?.path ?? "")?.[0] ?? null;
   const row = /^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "";
-  return (rowToken(row, "*shape check*")?.said === "none" ? /\bconfig `([\w./-]+\.json)`/u : /`([\w./-]+\.json)`/u).exec(row)?.[1] ?? null;
+  return /`([\w./-]+\.json)`/u.exec(row)?.[1] ?? null;
 };
 export const where = manifest => rowNames(manifest) ?? KIT;
 
@@ -650,15 +652,17 @@ export function offBy(manifest) {
   return /[\p{L}\p{N}]/u.test(reason) ? reason : "";
 }
 
-// A reason with the config's path it ends with (`; config \`<path>\``) taken off, which is no part of it: the path
-// found from the end, then the separators before it, in one pass (a pattern that started at each place would not).
-const withoutConfig = reason => {
-  const at = reason.lastIndexOf("config `");
-  if (at < 0 || /\w/u.test(reason[at - 1] ?? "") || !/^config `[^`]*`$/u.test(reason.slice(at))) return reason;
+// The config's path a `none` row's reason ends with (`; config \`<path>\``): { path, before }, the reason before it
+// with the separators between taken off, which is all of the reason; null where it ends with none. Found from the end,
+// in one pass (a pattern that started at each place would not), and read so by rowNames and offBy alike.
+const configTail = reason => {
+  const at = reason.lastIndexOf("config `"), tail = /^config `([^`]*)`$/u.exec(reason.slice(at));
+  if (at < 0 || /\w/u.test(reason[at - 1] ?? "") || !tail) return null;
   let end = at;
   while (end > 0 && /[\s;,]/u.test(reason[end - 1])) end -= 1;
-  return reason.slice(0, end);
+  return { path: tail[1], before: reason.slice(0, end) };
 };
+const withoutConfig = reason => configTail(reason)?.before ?? reason;
 
 // ---- the verdict ----
 
