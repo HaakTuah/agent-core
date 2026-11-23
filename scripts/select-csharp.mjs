@@ -20,7 +20,7 @@ const MODIFIER = new Set(["public", "internal", "private", "protected", "static"
 const HOOKS = new Set(["ModuleInitializer", "AssemblyInitialize", "AssemblyCleanup", "GlobalTestInitialize", "GlobalTestCleanup", "SetUpFixture", "BeforeEvery", "AfterEvery", "IIncrementalGenerator", "ISourceGenerator", "CollectionDefinition"]);
 // (what finds types unnamed: reflection, a scan of an assembly or the compilation; a word Assembly or CreateInstance… too)
 const REFLECTS = new Set(["IIncrementalGenerator", "ISourceGenerator", "Activator", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
-  "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR"]);
+  "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR", "Migrate", "MigrateAsync"]);
 
 const hookWord = w => HOOKS.has(w.replace(/Attribute$/u, ""));
 const TUNIT = /^(Before|After)(Attribute)?$/u;
@@ -128,11 +128,12 @@ const LITERAL = { t: "str", v: "" };
 // top-level statements, is unread (what it declares is not known either), or holds code the tokens leave out
 // (select-csharp-text.mjs). Each scan reads the tokens with literals emptied (a '}' is no punctuation).
 function factsOf(read, src) {
-  const toks = (read.toks ?? []).map(k => (k.t === "str" ? LITERAL : k)), r = { ...read, toks }, raw = leftOut(src);
+  const lost = read.usings === null || read.functions === null; // (the parser read none of it: no scan of its text)
+  const toks = (read.toks ?? []).map(k => (k.t === "str" ? LITERAL : k)), r = { ...read, toks }, raw = lost ? 2 : leftOut(src);
   const words = ids(toks), placed = new Set(r.namespaces);
   if (!r.namespaces.length || r.types.some(t => !t.includes("."))) placed.add("");
   return { r, words: new Set(words), ...runsOf(toks), placed: [...placed], extensions: extending(toks), hook: runsUnnamed(toks, words),
-    reflects: reflecting(toks, words), unread: r.usings === null || r.functions === null || raw > 1, raw, program: topLevel(toks, src) };
+    reflects: reflecting(toks, words), unread: raw > 1, raw, program: !lost && topLevel(toks, src) };
 }
 
 // Where the project declares each type: { types: Map of a full name to its files, byLast: Map of a type's last word to

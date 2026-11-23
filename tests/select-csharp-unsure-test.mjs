@@ -41,7 +41,7 @@ ok(same([...r.unsure], ["src/Lost.cs"]), "a file the grammar loses is unsure, an
 
 // ---- each word of the list ----
 const reflectWords = ["Activator.CreateInstance(t)", "a.GetTypes()", "a.ExportedTypes", "a.DefinedTypes", "s.AddControllers()", "s.AddControllersWithViews()", "s.AddMvc()", "s.AddMvcCore()",
-  "s.AddRazorPages()", "a.MapControllers()", "a.MapRazorPages()", "a.MapRazorComponents()", "m.AddApplicationPart(a)", "s.AddAutoMapper(a)", "s.AddMediatR(a)", "GetAssemblies()", "Type.GetType(n)", "typeof(X).Assembly",
+  "s.AddRazorPages()", "a.MapControllers()", "a.MapRazorPages()", "a.MapRazorComponents()", "m.AddApplicationPart(a)", "s.AddAutoMapper(a)", "s.AddMediatR(a)", "d.Database.Migrate()", "GetAssemblies()", "Type.GetType(n)", "typeof(X).Assembly",
   "default(IIncrementalGenerator)", "default(ISourceGenerator)"];
 const missed = reflectWords.filter(w => !same([...one(`namespace R;\nclass X { void Go() { var r = ${w}; } }\n`).unsure], ["src/X.cs"]));
 ok(!missed.length, "each word that finds types by reflection or scans an assembly makes its file unsure, and no other", missed.join(", "));
