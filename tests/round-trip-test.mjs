@@ -17,12 +17,14 @@ import { SENDERS, STATES, items } from "../scripts/inbox.mjs";
 import { options } from "../scripts/init.mjs";
 import { inboxFile, slug } from "../scripts/look-keep.mjs";
 import { differencesOf, modulesOf } from "../scripts/manifest-reads.mjs";
+import { LIST as MUTATION, NPMRC, named } from "../scripts/mutation-tools.mjs";
 import { markdownReader } from "../scripts/markdown.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
 import { ownerOf } from "../scripts/releases.mjs";
 import { npmOnce } from "../scripts/npm-once.mjs";
 import { npmWithCache, root, scratch, scratchDir, scratchEnv, tally } from "../scripts/scratch-core.mjs";
 import { parseBaseline, parseConfig } from "../scripts/shape.mjs";
+import { toolOf } from "../scripts/strength.mjs";
 import { KIT_CONFIGS, call, configs, project } from "../scripts/steps.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 
@@ -38,6 +40,7 @@ const WRITERS = {
   "shape.mjs": ["here", "the shape baseline, read by the shape check and the dose"],
   "dose.mjs": ["here", "the last audit in the shape baseline, read by the dose and the shape check"],
   "holders-own.mjs": ["here", "checks/holders.json, read by holders.mjs --own"],
+  "mutation-tools.mjs": ["here", "the manifest's *mutation tool* row and the tool's package list and npm config, read by the strength check's reader and the step's"],
   "core-reading.mjs": ["here", "checks/core-reading.json, read by its own `due`"],
   "look-keep.mjs": ["here", "an inbox file, read by the inbox's reader"],
   "queue.mjs": ["tests/queue-test.mjs", "the progress file --clear rewrites, read by its reader"],
@@ -212,6 +215,21 @@ for (const c of CASES) {
   ok(recorded.status === 0 && record?.day === last?.day && record?.marks?.size > 0 && due.status === 0 && /^No reading of the project against the core is due/mu.test(due.out),
     `  the reading against the core recorded is read back: nothing is due`, `${recorded.out}\n${due.out}\n${why}`);
   ran.add("core-reading.mjs");
+
+  // the manifest's *mutation tool* row and the tool's folder, written once the project holds code and tests, read back
+  fs.mkdirSync(path.join(p.dir, "src"), { recursive: true });
+  fs.writeFileSync(path.join(p.dir, "src/app.js"), "export const one = () => 1;\n");
+  fs.mkdirSync(path.join(p.dir, "tests"), { recursive: true });
+  fs.writeFileSync(path.join(p.dir, "tests/app.test.js"), "import { one } from \"../src/app.js\";\nif (one() !== 1) process.exit(1);\n");
+  commit(p.dir, "code and tests");
+  const mutation = run(p.dir, "core/scripts/mutation-tools.mjs", "--write");
+  const manifestNow = fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8");
+  const tool = toolOf(manifestNow), stryker = MUTATION.tools.Stryker;
+  const listed = JSON.parse(fs.readFileSync(path.join(p.dir, `${stryker.folder}/package.json`), "utf8"));
+  ok(mutation.status === 0 && tool?.command?.[1] === "core/scripts/stryker.mjs" && listed.devDependencies?.[stryker.package] === stryker.version
+    && fs.readFileSync(path.join(p.dir, `${stryker.folder}/.npmrc`), "utf8") === NPMRC && named({ root: p.dir, manifest: manifestNow }) === null,
+    `${o.name}: the *mutation tool* row and the package list written are read back by the strength check's reader and the step's`, `${mutation.out}\n${JSON.stringify(tool)}\n${named({ root: p.dir, manifest: manifestNow })}`);
+  ran.add("mutation-tools.mjs");
   first ??= p;
 }
 
