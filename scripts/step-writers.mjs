@@ -28,10 +28,20 @@ import { asLF, asMended, reads as workflowsRead } from "./workflows.mjs";
 export class Unwritten extends Unread {}
 
 // The files of the project at `root` with changes not yet committed, new ones among them, as git lists them: none is
-// written, so that what a writer writes stays apart from a session's own changes and from a sync's (#1091).
+// written, so that what a writer writes stays apart from a session's own changes and from a sync's (#1091). The one
+// left out: the manifest changed in its `Core:` line alone, in the index and the tree, as the sync moves its pin before
+// the writers run (sync.mjs), whose module lines are written around it and its pin put back by setAside (#1094).
 export function held(root) {
   const out = execFileSync("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--no-renames"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
-  return new Set(out.split("\0").filter(Boolean).map(l => l.slice(3)));
+  const busy = new Set(out.split("\0").filter(Boolean).map(l => l.slice(3)));
+  if (busy.has(MANIFEST) && pinOnly(root)) busy.delete(MANIFEST);
+  return busy;
+}
+export const MANIFEST = "core-manifest.md", PIN_LINE = /^Core: .*$/mu;
+function pinOnly(root) {
+  const at = rev => { try { return execFileSync("git", ["show", `${rev}:${MANIFEST}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; } };
+  const head = at("HEAD"), but = t => t?.replace(PIN_LINE, "");
+  return head !== null && [at(""), fs.readFileSync(path.join(root, MANIFEST), "utf8")].every(t => t !== null && but(t) === but(head));
 }
 
 // Whether `f` may be written: a plain path of the project's own outside the copy, no link and under none, no file with

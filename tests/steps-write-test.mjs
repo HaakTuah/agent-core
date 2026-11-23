@@ -186,6 +186,20 @@ for (const l of WHOLE) {
     && /^Not taken: `game-design\.md` \(the project is no game: its manifest holds no game's row\)\.$/m.test(now) && /\n\nModules to confirm: `done-when\.md`\.\n/u.test(now) && /^Floor: whole\. Modules: .*`done-when\.md`/m.test(now) && outside(now) === outside(was),
     "a module the list misses is placed by --write: left out where a fact decides it, taken and asked of the owner where none does, and nothing of the manifest written but its module lines", `${r.stdout}${r.stderr}\n---\n${now}`);
   back();
+  // (at a sync, which moves the manifest's pin before the writers run: the module lines placed and set aside, the
+  // moved pin left in the tree for the sync's pull request, and the stash popped onto that pull request's merge)
+  STAGES[placing].stage(dir);
+  commit("a module neither taken nor left out");
+  const moved = read("core-manifest.md").replace(/^(Core: .*?)\b[0-9a-f]{40}\b/mu, `$1${"c".repeat(40)}`), pin = /^Core: .*$/mu.exec(moved)[0];
+  put("core-manifest.md", moved);
+  r = write("--aside");
+  const left = read("core-manifest.md");
+  ok(r.status === 0 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``) && r.stdout.includes(`set aside in the stash "${ASIDE}"`) && left === moved && dirty() === "M core-manifest.md",
+    "at a sync that moved the manifest's pin, --aside writes its module lines and sets them aside, the moved pin left where the sync put it", `${r.stdout}${r.stderr}\n---\n${left}\n---\n${dirty()}`);
+  commit("the sync's pull request, merged");
+  git("stash", "pop", "-q");
+  ok(!missed(placing).length && read("core-manifest.md").includes(`${pin}\n`), "and the stash, popped once the sync merged, brings the module lines back on the moved pin", read("core-manifest.md"));
+  back();
 }
 
 done("the steps' writers");

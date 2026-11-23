@@ -15,10 +15,10 @@
 // word, by a line that quotes the step's lead ("13 November 2026, the core has moved"): such a step is not reported.
 // The sync runs this from the copy it has just written (sync.mjs, beside this file), so a sync reports every step
 // not done, a standing one too, and never fails over one: nothing waits on a step, and running it twice changes
-// nothing. It reads only, but where it is told to write: a step whose work is exact, a check's own config or baseline
-// or a pointer's path, has a writer ("write", step-writers.mjs beside this file; #1091), which --write runs where its step
-// is not done, never on a file with changes not yet committed, and lists what it wrote; a step that needs judgement has
-// none. Node's own modules and git only.
+// nothing. It reads only, but where it is told to write: a step whose work is exact, a check's own config or baseline,
+// a pointer's path, or the manifest's module lines placed from what is read (#1094), has a writer ("write",
+// step-writers.mjs beside this file; #1091), which --write runs where its step is not done, never on a file with changes
+// not yet committed, and lists what it wrote; a step that needs judgement has none. Node's own modules and git only.
 //
 //   node core/scripts/steps.mjs                  from a project's root: the steps not done, each with its mend; nothing else
 //   node core/scripts/steps.mjs --write          each writer of a step not done run, and what it wrote listed, for a pull
@@ -37,7 +37,7 @@ import { started } from "./started.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { copyAt } from "./workflow-calls.mjs";
 import { HERE, mendAt, plain, shown } from "./step-checks.mjs";
-import { held } from "./step-writers.mjs";
+import { MANIFEST, PIN_LINE, held } from "./step-writers.mjs";
 
 // What a step reads a project with, and the words of an error with no path of the machine's in them: step-checks.mjs
 // and the files named step-checks-<what it reads>.mjs, beside this file.
@@ -146,7 +146,7 @@ export function written(root, steps = STEPS) {
 // `how` "aside" where they stand in the stash ASIDE, "put back" where git could not make one and each was put back.
 export function writeReport(done, how = null) {
   if (!done.length) return "No step left a script could write (`core/scripts/steps.mjs --write`).";
-  const kept = " No word of a rule's text is written, but a pointer's path.", later = "once this sync's pull request merges, on a fresh branch from `main`,";
+  const kept = " No word of a rule's text is written, but a pointer's path and the manifest's module lines.", later = "once this sync's pull request merges, on a fresh branch from `main`,";
   const head = !done.some(d => d.wrote?.length) ? "The steps' writers wrote nothing (`core/scripts/steps.mjs --write`)."
     : how === "aside" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), then set aside in the stash "${ASIDE}", so this sync stays a pure one: ${later} run \`git stash list\` and \`git stash pop stash@{N}\`, N the number it gives the stash "${ASIDE}" (or \`node core/scripts/steps.mjs --write\` again, which writes the same) and commit them in a pull request of its own, with the usual reviews.${kept}`
     : how === "put back" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), and put back as they stood, since git could not set them aside, so this sync stays a pure one: ${later} run \`node core/scripts/steps.mjs --write\` and commit what it writes in a pull request of its own, with the usual reviews.${kept}`
@@ -156,16 +156,21 @@ export function writeReport(done, how = null) {
 // What the writers wrote set aside in a stash, so the tree stands as it stood before them; where git cannot make one (no
 // name to make it under, a file it refuses), each file put back as it stood, and false: a file git holds taken back from
 // its last commit, index and tree, since a writer writes none with changes not yet committed, and a new one taken out.
-// Paths are read as written, never as patterns. (`push`, git's own, is given another only by the test, to fail.)
+// Paths are read as written, never as patterns. The manifest's `Core:` line as it stood is put back after either, so a
+// pin the sync moved stays in its pull request (#1094). (`push`, git's own, is given another only by the test, to fail.)
 export function setAside(root, files, push = () => execFileSync("git", ["--literal-pathspecs", "stash", "push", "--include-untracked", "--quiet", "-m", ASIDE, "--", ...files], { cwd: root, stdio: ["ignore", "ignore", "pipe"] })) {
+  const manifest = path.join(root, MANIFEST), pin = files.includes(MANIFEST) ? PIN_LINE.exec(fs.readFileSync(manifest, "utf8"))?.[0] : null;
+  const pinBack = () => { if (pin && fs.existsSync(manifest)) fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8").replace(PIN_LINE, () => pin)); };
   try {
     push();
+    pinBack();
     return true;
   } catch {
     const tracked = execFileSync("git", ["--literal-pathspecs", "ls-tree", "-r", "-z", "--name-only", "HEAD", "--", ...files], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
     execFileSync("git", ["--literal-pathspecs", "reset", "-q", "--", ...files], { cwd: root, stdio: "ignore" });
     if (tracked.length) execFileSync("git", ["--literal-pathspecs", "checkout", "-q", "HEAD", "--", ...tracked], { cwd: root, stdio: "ignore" });
     for (const f of files.filter(f => !tracked.includes(f))) fs.rmSync(path.join(root, f), { force: true });
+    pinBack();
     return false;
   }
 }
