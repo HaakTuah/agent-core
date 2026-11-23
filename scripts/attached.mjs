@@ -1,0 +1,180 @@
+// One verdict (#1081): whether a project holds the core whole and wired, read by what already reads each part, each
+// through its own script and none written twice: the copy against its pin (copy-tree.mjs, as core.yml compares it), the
+// pointers (pointers.mjs), the steps (steps.mjs), the comparison with a fresh start (fresh.mjs), the checks that read
+// nothing (read-nothing.mjs, through steps.mjs), the manifest against the modules (manifest-reads.mjs) and, on a sync's
+// branch, whether the sync is pure (pure-sync.mjs, run from the core's side as its merger runs it: the release it moves
+// to, or the core's main). It prints one line first, `attached: yes`, or `attached: no` with how many things stand in
+// the way, then each with its mend; a step only the project's owner can take is listed apart, advised, standing in the
+// way of nothing; and what it could not read, and the checks that read nothing here, it says, counted neither way. It
+// reports and fails nothing (AGENTS.md of the core, "Nothing locks a project"), and each part keeps its own check where
+// it stands. The sync prints its line at its end (sync.mjs, beside this file). Reads only: what git writes to compare
+// the copy goes to a temporary folder. Git, tar, gh where pure-sync.mjs asks whose account holds the repository, and
+// Node's own modules.
+//
+//   node core/scripts/attached.mjs                    from a project's root: the line, then what stands in the way
+//   node core/scripts/attached.mjs --line             the line alone
+//   node core/scripts/attached.mjs --fetched <dir>    with the core already fetched into the bare repository <dir>
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync, spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { copyTree, entries } from "./copy-tree.mjs";
+import { CORE } from "./core-address.mjs";
+import { MANIFEST, readCore } from "./core-path.mjs";
+import { differences, fresh, kind } from "./fresh.mjs";
+import { projectNotes } from "./manifest-reads.mjs";
+import { saidOf } from "./read-nothing.mjs";
+import { fetchCore, followsOf, hostSaid, inBare, past, releasesIn } from "./releases.mjs";
+import { started } from "./started.mjs";
+import { plain } from "./step-checks.mjs";
+import { notDone, project } from "./steps.mjs";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const git = (root, args, env = process.env) => execFileSync("git", args, { cwd: root, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
+const firstLine = text => String(text ?? "").trim().split("\n").filter(Boolean).at(-1) ?? "it said nothing";
+
+// The tree of the copy as it stands in the working folder, the index's tracked files kept and every change taken in, as
+// a commit of it would hold it: built with a copy of the project's index, its objects written to the bare repository
+// `bare` alone (the project's own objects read through it), so the project is left as it was.
+function workingTree(root, at, bare) {
+  const index = path.join(bare, "attached-index"), own = path.join(root, git(root, ["rev-parse", "--git-path", "index"]));
+  if (fs.existsSync(own)) fs.copyFileSync(own, index);
+  const env = { ...process.env, GIT_INDEX_FILE: index, GIT_OBJECT_DIRECTORY: path.join(bare, "objects"), GIT_ALTERNATE_OBJECT_DIRECTORIES: path.resolve(root, git(root, ["rev-parse", "--git-path", "objects"])) };
+  git(root, ["add", "-A", "--", at.slice(0, -1)], env);
+  return git(root, ["write-tree", `--prefix=${at}`], env);
+}
+
+// The copy against its pin: in the way where the line is wrong, the pin is no commit of the core's main, or the copy
+// differs from the core's tree there, entry by entry as copy-tree.mjs compares (and says why).
+function copyAgainstPin(root, bare, said) {
+  const line = readCore(fs.readFileSync(path.join(root, MANIFEST), "utf8"));
+  if (line.wrong) return said.way("the manifest", line.wrong);
+  if (line.form === "carried") return said.unread("the copy", `the core is carried by ${line.library}, whose own repository holds it to its pin (core.yml there)`);
+  if (!bare) return said.unread("the copy", "the core could not be fetched, so the copy was not compared with it");
+  if (!past(line.pin, "refs/heads/main", bare)) return said.way("the copy", `${MANIFEST} pins ${line.pin}, which is no commit of the core's main. Mend: sync to a commit of it, \`node ${line.path}scripts/sync.mjs\``);
+  if (!fs.existsSync(path.join(root, line.path))) return said.way("the copy", `${line.path} is not there. Mend: run the sync from a clone of the core (\`node <the clone>/scripts/sync.mjs\`), which writes the copy whole at the manifest's pin`);
+  const map = tree => new Map(entries(tree, bare).split("\n").filter(Boolean).map(e => [e.slice(e.indexOf("\t") + 1), e.slice(0, e.indexOf("\t"))]));
+  const want = map(copyTree(line.pin, bare)), have = map(workingTree(root, line.path, bare));
+  const off = [...new Set([...want.keys(), ...have.keys()])].filter(f => want.get(f) !== have.get(f)).sort()
+    .map(f => `${line.path}${f} ${!have.has(f) ? "is missing" : !want.has(f) ? "is not the core's" : "is changed"}`);
+  if (off.length) said.way("the copy", `${line.path} differs from the core at its pin ${line.pin.slice(0, 7)}: ${off.slice(0, 10).join("; ")}${off.length > 10 ? `; and ${off.length - 10} more` : ""}. Mend: take back each change to the copy (\`git checkout HEAD -- ${line.path}\` where the last commit holds it whole), or delete ${line.path} and run the sync from a clone of the core (\`node <the clone>/scripts/sync.mjs\`), which writes it whole at the pin; a change the project needs goes to the core as an issue`);
+}
+
+// The pointers, as pointers.mjs reads them in a project: each that fails, and each it lists as leading nowhere.
+function pointers(root, at, said) {
+  const r = spawnSync(process.execPath, [path.join(root, at, "scripts", "pointers.mjs")], { cwd: root, env: { ...process.env, POINTERS_BASE: "" }, encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
+  const lines = `${r.stdout ?? ""}\n${r.stderr ?? ""}`.split("\n").map(l => l.replace(/^::warning::/u, ""));
+  const notRun = lines.find(l => l.startsWith("The pointer check did not run:"));
+  if (notRun) return said.unread("the pointers", notRun);
+  const fails = lines.filter(l => l.startsWith("FAIL: "));
+  if (r.status !== 0 && !fails.length) return said.unread("the pointers", `${at}scripts/pointers.mjs stopped: ${firstLine(r.stderr || r.stdout)}`);
+  for (const l of fails) said.way("a pointer", l.slice("FAIL: ".length));
+  for (const l of lines.filter(l => /^note a broken pointer in an agent tool's file: |^note .*\(read, and not found: /u.test(l)))
+    said.way("a pointer", `${l.slice("note ".length).replace(/ \((the pull request's base held it|with no base to read against)[^)]*\)$/u, "")}. Mend: point it at the file, heading or numbered point that holds what it means, or take it out where that is gone`);
+}
+
+// The steps not done (steps.mjs): the owner's advised, one whose check could not read the project not counted; and the
+// checks that read nothing here (read-nothing.mjs), said and not counted.
+function steps(root, said) {
+  const missed = notDone(root);
+  for (const m of missed) {
+    if (m.owner) said.owner(`${m.lead}: ${m.mend}`);
+    else if (m.unread) said.unread(`the step "${m.lead}"`, m.mend);
+    else said.way(`the step "${m.lead}"`, m.mend);
+  }
+  if (missed.unread?.length) said.unread("the steps", `files past what a step reads, which a step may have read as missing: ${missed.unread.join(", ")}`);
+  if (missed.nothing === null) said.unread("the checks that read nothing", missed.nothingWhy);
+  else for (const l of saidOf(missed.nothing ?? [], missed.copy).filter(l => l.startsWith("- "))) said.nothing(l.slice(2));
+}
+
+// The differences from a fresh start (fresh.mjs), each one the manifest does not declare.
+function freshStart(root, said) {
+  const p = project(root), k = kind(p);
+  if (k.unread) return said.unread("a fresh start", `not compared, since ${k.unread}`);
+  for (const d of differences(p, fresh(p, undefined, { k }))) said.way("beside a fresh start", `${d}. Mend: make it as the starter kit writes it, or declare it in ${MANIFEST}'s "Differences", on the owner's word, by a line that quotes the file's path`);
+}
+
+// Whether the head is a sync's: a branch whose manifest pins another commit than the project's main does.
+function syncBranch(root) {
+  const pinAt = rev => { try { return readCore(git(root, ["show", `${rev}:${MANIFEST}`])).pin ?? null; } catch { return null; } };
+  const main = ["refs/heads/main", "refs/remotes/origin/main"].find(ref => { try { git(root, ["rev-parse", "--verify", "-q", ref]); return true; } catch { return false; } });
+  if (!main) return null;
+  const head = pinAt("HEAD"), base = pinAt(main);
+  return head && base && head !== base && git(root, ["rev-parse", "HEAD"]) !== git(root, ["rev-parse", main]) ? head : null;
+}
+
+// On a sync's branch, pure-sync.mjs from the core's side: the release the sync moves to, where the project follows the
+// releases and the pin is one, else the core's main, as its header says; its packages those of the copy where the two
+// lock files are the same, else installed by its own install script.
+function pureSync(root, at, bare, tmp, said) {
+  const pin = syncBranch(root);
+  if (!pin) return;
+  if (!bare) return said.unread("the sync", "the core could not be fetched, so pure-sync.mjs was not run from the core's side");
+  const follows = followsOf(git(root, ["show", `HEAD:${MANIFEST}`]), hostSaid(() => {}));
+  const side = follows === "releases" && releasesIn(bare).some(r => r.sha === pin) ? pin : inBare(bare, ["rev-parse", "refs/heads/main"]).trim();
+  const dir = path.join(tmp, "side");
+  fs.mkdirSync(dir);
+  execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(bare, ["archive", side], { encoding: "buffer", maxBuffer: 1 << 28 }) });
+  for (const install of [".packages", ".packages/parser"]) {
+    const lock = f => { try { return fs.readFileSync(path.join(f, install, "package-lock.json"), "utf8"); } catch { return null; } };
+    const mine = path.join(root, at, install, "node_modules");
+    if (lock(dir) !== null && lock(dir) === lock(path.join(root, at)) && fs.existsSync(mine)) fs.symlinkSync(mine, path.join(dir, install, "node_modules"), "junction");
+  }
+  if (!fs.existsSync(path.join(dir, ".packages", "node_modules"))) spawnSync(process.execPath, [path.join(dir, "scripts", "install.mjs"), "all"], { encoding: "utf8", timeout: 600000 });
+  const r = spawnSync(process.execPath, [path.join(dir, "scripts", "pure-sync.mjs")], { cwd: root, encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
+  if (r.status === 0) return;
+  const notPure = String(r.stdout ?? "").split("\n").filter(l => l.startsWith("  NOT PURE ")).map(l => l.slice("  NOT PURE ".length));
+  if (!notPure.length) return said.unread("the sync", `pure-sync.mjs from the core's side stopped: ${plain(firstLine(r.stderr || r.stdout), root)}`);
+  for (const f of notPure) said.way("the sync", `not pure: ${f}. Mend: take out of the sync's pull request what is not the copy, its pins or what the one process writes, and make it in a pull request of its own`);
+}
+
+// Each part read, none stopping another: a part that throws is said not read.
+export function attached(root, { fetched = null } = {}) {
+  const found = { way: [], owner: [], unread: [], nothing: [] };
+  const said = {
+    way: (part, what) => { found.way.push(`${part}: ${what}`); },
+    owner: what => { found.owner.push(what); },
+    unread: (part, what) => { found.unread.push(`${part}: ${what}`); },
+    nothing: what => { found.nothing.push(what); },
+  };
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-attached-"));
+  try {
+    let bare = fetched;
+    if (!bare) { try { fetchCore(bare = path.join(tmp, "core")); } catch { bare = null; } }
+    // (one already fetched is cloned sharing its objects, so what the comparison writes stays out of it)
+    else execFileSync("git", ["clone", "-q", "--bare", "--shared", "--", fetched, bare = path.join(tmp, "core")], { stdio: "ignore" });
+    const at = readCore(fs.readFileSync(path.join(root, MANIFEST), "utf8")).path ?? "core/";
+    const parts = [["the copy", () => copyAgainstPin(root, bare, said)], ["the pointers", () => pointers(root, at, said)], ["the steps", () => steps(root, said)],
+      ["a fresh start", () => freshStart(root, said)], ["the manifest", () => projectNotes(root, path.join(root, at)).forEach(n => said.way("the manifest", n))],
+      ["the sync", () => pureSync(root, at, bare, tmp, said)]];
+    for (const [part, read] of parts) { try { read(); } catch (e) { said.unread(part, `it could not be read (${plain(firstLine(e.message), root)})`); } }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+  return found;
+}
+
+export function verdict(found) {
+  return found.way.length ? `attached: no, ${found.way.length} thing${found.way.length === 1 ? "" : "s"} in the way` : "attached: yes";
+}
+
+export function report(found) {
+  const list = (head, items) => (items.length ? [head, ...items.map(i => `- ${i}`)] : []);
+  return [verdict(found),
+    ...list("In the way, each with its mend:", found.way),
+    ...list("The owner's to take, advised, in the way of nothing:", found.owner),
+    ...list(`Not read, so counted neither way (${CORE}'s checks that read them say why where they run):`, found.unread),
+    ...list("Read nothing here, so the rules they hold are held by nothing here, counted neither way:", found.nothing)].join("\n");
+}
+
+if (started(import.meta.url)) {
+  const at = process.argv.indexOf("--fetched");
+  try {
+    const found = attached(process.cwd(), { fetched: at < 0 ? null : path.resolve(process.argv[at + 1]) });
+    console.log(process.argv.includes("--line") ? verdict(found) : report(found));
+  } catch (e) {
+    console.error(`FAIL: whether the core is attached could not be read (${plain(e.message)}). Mend: run it from the project's root, beside ${MANIFEST}, as node ${path.relative(process.cwd(), HERE) || "."}/attached.mjs`);
+    process.exitCode = 1;
+  }
+}
