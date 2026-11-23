@@ -288,7 +288,7 @@ function countsOf(gh, name, r, own) {
 export function rowOf(gh, account, name, r) {
   if (name.toLowerCase() === CORE.toLowerCase()) return null;
   let manifest;
-  try { manifest = Buffer.from(JSON.parse(gh(`repos/${name}/contents/core-manifest.md`)).content ?? "", "base64").toString("utf8"); } catch (e) { if (/\b404\b|Not Found/i.test(String(e?.message))) return null; throw e; }
+  try { manifest = Buffer.from(JSON.parse(gh(`repos/${name}/contents/core-manifest.md`)).content ?? "", "base64").toString("utf8"); } catch (e) { if (/\(HTTP 404\)\s*$/.test(String(e?.message).trim())) return null; throw e; }
   if (!pinOf(manifest) || (r.shared && !SHARES.test(manifest))) return null;
   const own = String(r.owner).toLowerCase() === account.toLowerCase();
   const shown = shownAs(name, own, r.private);

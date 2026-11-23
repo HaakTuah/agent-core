@@ -334,6 +334,11 @@ ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[
   let unread = false;
   try { projects([], route => route === "user" ? "o\n" : "[]"); } catch { unread = true; } finally { console.log = log; }
   ok(unread && !said.length, "an account that reaches no repository at all is an unread answer, not 'None found'");
+  // the issue's own case: --trial with no files, gh failing, refuses and says the mend (a stub gh first on PATH)
+  const stub = path.join(tmp, "stub"); fs.mkdirSync(stub, { recursive: true });
+  fs.writeFileSync(path.join(stub, "gh"), "#!/bin/sh\necho 'gh: HTTP 502 Bad Gateway' >&2\nexit 1\n", { mode: 0o755 });
+  const down = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", later], { encoding: "utf8", env: { ...process.env, PATH: `${stub}${path.delimiter}${process.env.PATH}` } });
+  ok(down.status === 1 && /could not be read/.test(down.stderr) && /Mend: run it where gh answers/.test(down.stderr), "--trial with no files and a gh that fails refuses, saying what could not be read and the mend", down.stderr);
   const inCore = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", later, path.join(path.dirname(fileURLToPath(import.meta.url)), "before.json"), path.join(tmp, "after.json")], { encoding: "utf8" });
   ok(inCore.status === 1 && /lies in the core's own repository/.test(inCore.stderr), "--trial refuses a run's verdicts kept in the core's own repository, where a project's job names could be committed", inCore.stderr);
 }
