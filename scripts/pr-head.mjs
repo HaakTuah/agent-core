@@ -54,7 +54,7 @@ function linesOf(body) {
 
 // What the description names, each with the line it stands on: { keys, placeholders }, each a list of { at, token,
 // said }. `own` says whether the repository is the core's own, whose archive "archive item N" names.
-function named(body, own = true) {
+function named(body, own) {
   const keys = [], placeholders = [];
   for (const { at, text, prose } of linesOf(body)) {
     // (in the order they stand on the line)
