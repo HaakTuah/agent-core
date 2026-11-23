@@ -77,6 +77,9 @@ const updated = [commit(OLD, "8".repeat(40)), commit(M, OLD, MAIN), commit(HEAD,
     "Codex's of an earlier commit with no blocking finding stands so too");
   ok(is(found({ findings: codexFinds("P1") }), false, "no code review") && is(found({ findings: codexFinds("P0", {}) }), false, "no code review") && is(found({ findings: codexFinds("P1", { commit_id: "1".repeat(40) }) }), true, "only fixes") && is(found(), false, "no code review"),
     "but not with a blocking finding on its commit or on none named, nor where its findings are not given; one on another commit is that commit's");
+  const reported = (more) => judge({ commits: line.length, changed_files: 1, ...pull }, [summary({ ...done, commit_sha: OLD, has_any_findings: true, has_unresolved_findings: true })], line, code, [], true, undefined, null, more);
+  ok(is(reported({ findings: [] }), false, "no code review") && is(reported({ findings: codexFinds("P1", { commit_id: "1".repeat(40) }) }), false, "no code review") && is(reported({ findings: codexFinds("P2") }), true, "only fixes"),
+    "nor where its summary says it found something and none of it on that commit is read here; one whose findings read here block nothing stands");
   const merged = [commit(OLD, "8".repeat(40)), commit(M, MAIN, OLD), commit(HEAD, M)];
   ok(is(had([said(`Code review: of ${OLD}\nBlocking findings: 0.\nOther findings: 0.`)], merged), false, "no code review"), "a merge of the pull request's own commit into another line is no fix it stands across");
 }

@@ -101,14 +101,18 @@ export const fixesOf = (commits) => {
   const all = flat(commits), ours = new Set(all.map((commit) => commit.sha));
   return all.filter((commit) => typeof commit.sha === "string" && Array.isArray(commit.parents) && commit.parents.length === 1 && ours.has(commit.parents[0]?.sha)).map((commit) => commit.sha);
 };
-// whether Codex's completed code review of `at` found nothing blocking: no finding of its code review with a blocking
-// badge on that commit, or on none named (one posted as an issue comment), among `list` and `inline` (its review
-// comments, given by the workflow as FINDINGS; with none given, its review is not read as clear)
-const codexClear = (at, list, inline) => inline !== undefined && ![...list, ...flat(inline)].some((comment) => {
-  const find = codexFind(comment);
-  const on = [comment.commit_id, comment.original_commit_id].filter((sha) => typeof sha === "string");
-  return find?.review === "code" && find.blocking && (on.length === 0 || on.includes(at));
-});
+// whether Codex's completed code review (`review`, from its summary) found nothing blocking: no finding of its code
+// review with a blocking badge on its commit, or on none named (one posted as an issue comment), among `list` and
+// `inline` (its review comments, given by the workflow as FINDINGS); with none given, or where its summary says it
+// found something and none of it is read here (a finding in a review's body alone), it is not read as clear
+const codexClear = (review, list, inline) => {
+  if (inline === undefined) return false;
+  const at = review.commit_sha;
+  const finds = [...list, ...flat(inline)].map((comment) => ({ find: codexFind(comment), on: [comment.commit_id, comment.original_commit_id].filter((sha) => typeof sha === "string") }))
+    .filter(({ find, on }) => find?.review === "code" && (on.length === 0 || on.includes(at)));
+  if (review.has_any_findings === true && finds.length === 0) return false;
+  return !finds.some(({ find }) => find.blocking);
+};
 function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges, copy, more) {
   const short = sha.slice(0, 7);
   const posted = postedShas(list, pull, bound, more);
@@ -126,7 +130,7 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
 // review with none of its findings blocking
 function clearOf(list, review, pull, bound, more) {
   const clear = postedShas(list, pull, bound, more, true);
-  if (review !== null && typeof review === "object" && review.status === "completed" && typeof review.commit_sha === "string" && codexClear(review.commit_sha, list, more?.findings)) clear.add(review.commit_sha);
+  if (review !== null && typeof review === "object" && review.status === "completed" && typeof review.commit_sha === "string" && codexClear(review, list, more?.findings)) clear.add(review.commit_sha);
   return clear;
 }
 // whether a code review has run on the head, or on a commit only updates from main follow: posted, or Codex's

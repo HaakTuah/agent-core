@@ -55,6 +55,10 @@ const MODULE = /\.(?:[cm]?[jt]sx?)$/iu;
 // whole, being built)
 const code = (text) => text.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\$]|\\.|\$(?!\{))*`/gu,
   (found) => (/^["'`]/u.test(found) ? '""' : " "));
+// what a module's name given without its extension may stand for, as its language loads it (`require("./helper")` loads
+// `helper.js`, or `helper/index.js`); a name that resolves to none of these is read as it stands
+const JS_ENDS = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".jsx", ".tsx"];
+const RESOLVES = [[MODULE, [...JS_ENDS, ...JS_ENDS.map((end) => `/index${end}`)]], [/\.py$/iu, [".py", "/__init__.py"]]];
 // the names a text may give a path by
 const TOKENS = /[A-Za-z0-9_@.+~/-]+/gu;
 // the largest text read: a file past it is held in the set, unread
@@ -104,10 +108,11 @@ function loadsOf(name, text, all, own) {
 // and the workflows it calls (`uses: ./.github/workflows/...`): a workflow it only names, it does not run
 function namedIn(name, text, all) {
   const folder = path.posix.dirname(name), found = new Set();
+  const tries = ["", ...(RESOLVES.find(([kind]) => kind.test(name))?.[1] ?? [])];
   for (const [token] of text.matchAll(TOKENS)) {
     const bare = token.replace(/^\/+/u, "").replace(/[.]+$/u, "");
     const from = [path.posix.normalize(path.posix.join(folder, bare)), ...(MODULE.test(name) ? [] : [bare.replace(/^(?:\.\/)+/u, "")])];
-    for (const at of from) {
+    for (const at of from.flatMap((stem) => tries.map((end) => stem + end))) {
       if (all.has(at) && at !== name && (SCRIPT.test(at) || ACTION.test(at) || unextended(at))) found.add(at);
     }
   }
