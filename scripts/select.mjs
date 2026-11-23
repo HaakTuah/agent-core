@@ -122,7 +122,7 @@ export function selection({ changed, texts, tests, reach, scripts = new Set(), u
   const blind = new Set([...reaches].filter(([t, files]) => [...files].some(f => (f.endsWith(".cs") ? cs.unsure : unsure).has(f)) || (t.endsWith(".py") && unread.some(c => c.endsWith("conftest.py")))).map(([t]) => t));
   // (the tests that reach every file, told once: the config's pathspecs are tried on each test, never on each changed file's account)
   let every = null;
-  const ctx = { texts, tests, scripts, add, reaches, before: heldToBudget(before, pace), ...m, wholes: () => (every ??= [...tests].filter(t => m.whole(t) || blind.has(t))) };
+  const ctx = { texts, tests, scripts, add, reaches, pace, before: heldToBudget(before, pace), ...m, wholes: () => (every ??= [...tests].filter(t => m.whole(t) || blind.has(t))) };
   for (const t of tests) if (proof(t)) add(t, "never selected out: the project's proof that behaviour was kept");
   for (const t of failed) add(t, "failed last time");
   for (const f of changed) {
@@ -133,14 +133,14 @@ export function selection({ changed, texts, tests, reach, scripts = new Set(), u
 }
 
 // What one changed file selects, through `ctx.add`; the reason the whole suite runs where its reach cannot be told.
-function oneChange(f, { texts, tests, scripts, add, reaches, before, wholes, none, isTest }) {
+function oneChange(f, { texts, tests, scripts, add, reaches, pace, before, wholes, none, isTest }) {
   if (none(f)) return null;
   if (isTest(f) && tests.has(f)) add(f, "added or changed"); // (and, a helper among the tests, what imports it)
   // (a file gone, a helper among the tests too, leaves no import to follow; a package's manifest, read beside the code,
   // links nothing: a change to either may reach every test)
   if (!(f in texts) || !isCode(f)) return `${f} is no code the readers follow, or is gone, so what reaches it cannot be told`;
   // (a script of the global space is reached by no import at all)
-  const cs = f.endsWith(".cs") ? csharpUnknown(f, texts, before) : null;
+  const cs = f.endsWith(".cs") ? csharpUnknown(f, texts, before, pace) : null;
   if (cs) return cs;
   if (f.endsWith(".d.ts") || scripts.has(f)) return `${f} is a declaration of types, or a script of the global space, whose users no import names, so what reaches it cannot be told`;
   for (const [t, files] of reaches) if (files.has(f)) add(t, `reaches ${f}`);
@@ -151,9 +151,9 @@ function oneChange(f, { texts, tests, scripts, add, reaches, before, wholes, non
 
 // Why what reaches a changed file of C# cannot be told, or null: it is of no project, reached by a path a project file may
 // write out, or no longer declares what a test may have named it by, the test now finding another by no link to this file.
-function csharpUnknown(f, texts, before) {
+function csharpUnknown(f, texts, before, pace) {
   if (ofNoProject(f, texts)) return `${f} is C# of no project (no .csproj in a folder above it), which a project may compile by its path, so what reaches it cannot be told`;
-  const lost = undeclared(before(f), texts[f]);
+  const lost = undeclared(before(f), texts[f], pace);
   return lost && `${f} changed so that ${lost}, and a test that reached it by that may now reach another file, so what reaches it cannot be told`;
 }
 

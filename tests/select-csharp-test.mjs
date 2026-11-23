@@ -130,6 +130,8 @@ if (started(import.meta.url)) {
   const chars = ["namespace App { namespace Data { class C { char c = '}'; } delegate void D(); } }\n", "namespace App.Data { class C { char c = '('; } delegate (int X, int Y) D(); }\n"]
     .map(s => !!one(s, { "tests/T.cs": "class T { App.Data.D d; }\n" }).links.get("tests/T.cs")?.has("src/X.cs"));
   ok(same(chars, [true, true]), "a character literal is no brace or bracket to the scans", JSON.stringify(chars));
+const esc = ["new[] { @delegate }", "new List<object> { @delegate }"].map(e => !!one(`namespace Z { class Q { object M(object @delegate) { var a = ${e}; return a; } } }\nnamespace A { delegate void D(); }\n`, { "tests/T.cs": "using A;\nclass T { D d; }\n" }).links.get("tests/T.cs")?.has("src/X.cs"));
+ok(same(esc, [true, true]), "an escaped @delegate in braces declares nothing, and the delegate after it is read", JSON.stringify(esc));
   const propsRead = csharpReach({ ...globals, "tests/Tests.csproj": PROJ, "Directory.Build.props": "<Project><ItemGroup><Using Include=\"App\" /></ItemGroup></Project>" }, undefined, nothing);
   ok(propsRead.links.get("tests/RulesTest.cs")?.has("src/Rules.cs"), "a .props file the config reads is read for its <Using> too", JSON.stringify([...propsRead.links].map(([f, to]) => [f, [...to]])));
   const aliased = csharpReach({ ...app, "src/Usings.cs": "global using S = App.Data.Store;\n", "tests/AliasTest.cs": "namespace Tests;\nclass AliasTest { S s; }\n" }, undefined, nothing);

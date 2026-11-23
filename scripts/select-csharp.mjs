@@ -107,8 +107,8 @@ function pairs(toks) {
 // tuple), each in the namespace it stands in, read from the tokens as they go: a block's within its braces, inside
 // those around it, and a file-scoped one's to the end. Each scan goes on where the last stopped (pairs): linear in the
 // tokens, and a namespace's full name is made once, where a delegate stands in it.
-function delegates(r) {
-  const toks = r.toks, out = [], within = namespaces(toks, new Set(r.namespaces));
+function delegates(r, pace) {
+  const toks = r.toks, out = [], within = namespaces(toks, new Set(r.namespaces), pace);
   for (let i = 0; i < toks.length; i++) {
     const next = within.step(i);
     if (next !== i) { i = next; continue; }
@@ -125,21 +125,21 @@ function delegates(r) {
 // The namespace a scan of a file's tokens stands in: step(i) reads the token at i, a brace or a namespace's head, and
 // gives where the scan goes on (i, or past the head); name() the full name where it stands. The tokens drop an escaped
 // word's "@", so "namespace" heads a namespace only at a namespace's own level, not after a ".", and naming one the
-// grammar declared (`known`): `class C { @namespace field; }` declares none.
-function namespaces(toks, known) {
+// grammar declared (`known`): `class C { @namespace field; }` declares none. `pace` is asked at each head.
+function namespaces(toks, known, pace) {
   const open = [];
-  let depth = 0, file = { name: "" };
-  const full = f => f.full ?? (f.full = f.up ? join(full(f.up), f.name) : f.name);
+  let depth = 0, file = { full: "" };
   return {
-    name: () => full(open.at(-1) ?? file),
+    name: () => (open.at(-1) ?? file).full,
     step(i) {
       const v = toks[i].v;
       if (v === "{") depth++;
       else if (v === "}") { depth--; while (open.at(-1)?.depth > depth) open.pop(); }
       else if (v === "namespace" && depth === (open.at(-1)?.depth ?? 0) && toks[i - 1]?.v !== ".") {
-        const { name, end } = dotted(toks, i + 1), up = open.at(-1) ?? file;
-        if (toks[end]?.v === ";" && known.has(name)) file = { name };
-        else if (toks[end]?.v === "{" && known.has(join(full(up), name))) open.push({ name, up, depth: ++depth });
+        pace();
+        const { name, end } = dotted(toks, i + 1), whole = join((open.at(-1) ?? file).full, name);
+        if (toks[end]?.v === ";" && known.has(name)) file = { full: name };
+        else if (toks[end]?.v === "{" && known.has(whole)) open.push({ full: whole, depth: ++depth });
         else return i;
         return end;
       }
@@ -156,10 +156,10 @@ function dotted(toks, k) {
 }
 
 // A delegate's name, from its return type at `k` on (the last word before "(" outside the type's "<>"), and where
-// the scan ended.
+// the scan ended (a ";", "{" or "}": `@delegate` reads as the keyword, and `new[] { @delegate }` declares none).
 function delegateName(toks, k) {
   let depth = 0, name = null;
-  for (; k < toks.length && toks[k].v !== ";" && toks[k].v !== "{"; k++) {
+  for (; k < toks.length && ![";", "{", "}"].includes(toks[k].v); k++) {
     const v = toks[k].v;
     if (v === "<") depth++;
     else if (v === ">") depth--;
@@ -218,7 +218,7 @@ function factsOf(read, src) {
 // declarations are not known), globals: what global using directives name, aliases: Map of a global alias to what it
 // names, unsure: the files unread, that hold a raw interpolated string or that reflect, depth: the most words of a name
 // declared, deeper than which no name is looked up }.
-function indexOf(facts) {
+function indexOf(facts, pace) {
   const ix = { types: new Map(), byLast: new Map(), extensions: new Map(), every: [], globals: [], aliases: new Map(), unsure: new Set(), depth: 1 };
   const deep = name => { ix.depth = Math.max(ix.depth, name.split(".").length); };
   const declare = (full, file) => {
@@ -228,7 +228,7 @@ function indexOf(facts) {
     into(into(ix.byLast, full.slice(dot + 1), () => new Map()), dot < 0 ? "" : full.slice(0, dot)).add(file);
   };
   for (const [f, x] of facts) {
-    for (const t of declared(x)) declare(t, f);
+    for (const t of declared(x, pace)) { pace(); declare(t, f); }
     if (x.extensions) for (const ns of x.placed) { deep(ns); into(ix.extensions, ns).add(f); }
     const globals = x.usings.filter(d => d.global);
     globally(ix, globals);
@@ -239,19 +239,19 @@ function indexOf(facts) {
 }
 
 // The full names of the types a file declares (x its facts): those the grammar indexes, its delegates, and Program for
-// top-level statements.
-const declared = x => [...x.r.types, ...delegates(x.r), ...(x.program ? ["Program"] : [])];
+// top-level statements; `pace` is asked as the delegates are read.
+const declared = (x, pace) => [...x.r.types, ...delegates(x.r, pace), ...(x.program ? ["Program"] : [])];
 
 // What a changed file of C# no longer does that a test may have reached it by, `was` its text at the base (null where
 // it was not there) and `now` its text: a type it declared there and declares no more (a test that named it may now
 // find another of that name, by no link to this file), extension members in a namespace, or being reached from every
-// file; or that what it declared there cannot be read. Null where it keeps all of them.
-export function undeclared(was, now) {
+// file; or that what it declared there cannot be read. Null where it keeps all of them. `pace` is asked as it reads.
+export function undeclared(was, now, pace = () => {}) {
   if (was === null) return null;
   const [before, after] = [was, now].map(src => factsOf(readCsharp(src), src));
   if (before.unread) return "what it declared at the base cannot be read";
   if (after.unread) return null; // (every file reaches it, and every test that does runs on any change)
-  const marks = x => [...declared(x).map(t => `the type ${t}`), ...(x.extensions ? x.placed.map(ns => `extension members in ${ns || "the global namespace"}`) : []),
+  const marks = x => [...declared(x, pace).map(t => `the type ${t}`), ...(x.extensions ? x.placed.map(ns => `extension members in ${ns || "the global namespace"}`) : []),
     ...(x.hook || x.usings.some(u => u.global) ? ["what every file reaches (code run with no name, or a global using directive)"] : [])];
   const kept = new Set(marks(after)), gone = marks(before).find(m => !kept.has(m));
   return gone === undefined ? null : `it no longer holds ${gone}`;
@@ -277,7 +277,9 @@ function fullNames(x, ix, pace) {
 // or as an attribute, read against the namespaces around it; and the files that may extend in a namespace it sees.
 // `pace` is asked in each expansion.
 function reachOf(x, ix, pace) {
-  const around = new Set(["", ...x.r.namespaces.flatMap(n => [...prefixes(n, ix.depth, pace)])]), sees = new Set(around);
+  const around = new Set([""]);
+  for (const n of x.r.namespaces) for (const p of prefixes(n, ix.depth, pace)) around.add(p);
+  const sees = new Set(around);
   for (const target of [...ix.globals, ...x.usings.map(u => u.target).filter(t => t !== null)]) for (const p of around) for (const n of prefixes(join(p, target), ix.depth, pace)) sees.add(n);
   const to = new Set(ix.every), add = files => { for (const g of files ?? []) to.add(g); }, runs = fullNames(x, ix, pace);
   for (const w of x.words) for (const last of [w, `${w}Attribute`]) for (const [ns, files] of ix.byLast.get(last) ?? []) if (sees.has(ns)) add(files);
@@ -298,7 +300,7 @@ export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   // (where the usings every file holds cannot be told, every file is unsure)
   if (msbuild === null) return { links, unsure: new Set(files) };
   const facts = new Map(files.map(f => { pace(); return [f, factsOf(readCsharp(all[f]), all[f])]; }));
-  const ix = indexOf(facts);
+  const ix = indexOf(facts, pace);
   globally(ix, msbuild);
   for (const [f, x] of facts) { pace(); const to = reachOf(x, ix, pace); to.delete(f); links.set(f, to); }
   return { links, unsure: ix.unsure };
