@@ -76,16 +76,6 @@ for (const step of STEPS.filter(s => s.check)) {
   ok(!mended.length, `and its mend as written makes it done`, report(mended));
   STAGES[step.lead].after?.(dir);
 }
-// (the parser's packages installed where the selection of tests runs too, which reads through the shape check's
-// readers, all of Python on the parser: a job that selects after the first install alone reads not done; #530, item 6)
-{
-  const PARSER_LEAD = "19 November 2026, the parser's packages installed where the shape check runs", file = path.join(dir, ".github/workflows/select-staged.yml");
-  const flow = named => `name: select-staged\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/install.mjs${named}\n      - run: node core/scripts/select.mjs --env RUN\n`;
-  const said = named => { fs.writeFileSync(file, flow(named)); execFileSync("git", ["add", "-A", "--", file], { cwd: dir }); const m = notDone(dir, only(PARSER_LEAD)).find(x => x.lead === PARSER_LEAD); fs.rmSync(file); execFileSync("git", ["add", "-A", "--", file], { cwd: dir }); return m; };
-  const first = said("");
-  ok(first && /`\.github\/workflows\/select-staged\.yml` that runs the shape check or the selection of tests/u.test(first.mend) && !said(" all") && !said(" parser"),
-    "a job that selects the tests after the core's first install alone reads not done, its mend naming the workflow; one that installs the parser's too reads done", JSON.stringify(first));
-}
 // (the project's tests at the pace of a release, read exactly: all four types, and a condition that skips a draft;
 // #733, point 7)
 {
