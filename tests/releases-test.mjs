@@ -293,8 +293,8 @@ git(path.join(nested, "core"), "init", "-q");
 ok(!inTheCore(path.join(nested, "core", "scripts", "release.mjs")), "nor is a clone or submodule of the core under a project's core/");
 
 // what a release asks, each with roughly what it costs a project where it is not done yet (steps.mjs)
-const owners = STEPS.find(s => s.owner);
-ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[0].cost}.`) && costed(`- **${owners.lead}.** Done when two.`).includes("(the owner's)")
+const owners = STEPS.find(s => s.owner === true), hosts = STEPS.find(s => typeof s.owner === "function");
+ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[0].cost}.`) && costed(`- **${owners.lead}.** Done when two.`).endsWith("(the owner's).") && costed(`- **${hosts.lead}.** Done when two.`).endsWith("(the owner's in a private repository).")
   && costed("- **No such entry.** Done when three.").includes("unknown") && costed(`${NOTICE}: and so on.`).includes("each entry it sends the session to") && costed("- A line of no form.").includes("unknown"), "each ask of a release says what it costs, the owner's marked so, one with no step or of no form says so, and the notice costs what it sends to");
 
 // the trial on a real project (#1084): a run before the update beside one after it, and its record, which holds the cut

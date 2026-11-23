@@ -19,11 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: read
-      issues: write
-      pull-requests: read
-      checks: read
-      statuses: read
+      contents: read # the default branch's files, which the steps and the look read
+      issues: write # the look's issues and its record, and the labels of the core's list it makes (#1092)
+      pull-requests: read # the pull requests that stand idle, and the late review findings
+      checks: read # the checks failed on the default branch
+      statuses: read # the statuses on the default branch's newest commit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,8 +46,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: read
-      issues: write
+      contents: read # the default branch's scripts/issue-terms.mjs, which it runs
+      issues: write # the personal terms taken out of issues and their comments
       pull-requests: write # (a closed pull request's text and a review's are edited here)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
