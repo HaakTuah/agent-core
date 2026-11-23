@@ -150,12 +150,15 @@ export const NPX = ["np", "x"].join(""), CURL = ["cu", "rl"].join("");
 // The project's rule files and the files its agent tools take their instructions from, each with its text, as a step's
 // writer must leave their words (rule-files.mjs; #1091); and whether a text after the writers kept the words of a text
 // before them: the same, but for the paths into the copy (core/...), which a writer moves, and the manifest's "Paths:"
-// line, which it writes as the starter kit does.
+// line and its lines of modules ("Modules:", "Not taken:", "Modules to confirm:"), which it writes as the starter kit
+// does (#1094).
 export function ruleTexts(dir) {
   const p = project(dir);
   return Object.fromEntries(ruleFiles(p.read, d => p.files.filter(f => f.startsWith(`${d}/`)), { tools: true }).map(f => [f, p.read(f)]));
 }
 export const wordsKept = (before, after) => {
-  const words = text => (text === null || text === undefined ? null : text.replace(/core\/[\w./-]+/gu, "core/-").replace(/^Paths: .*$/mu, "Paths: -"));
-  return Object.keys({ ...before, ...after }).every(f => words(before[f]) === words(after[f]));
+  // (the module lines read past in the manifest alone, where the writers write them)
+  const modules = text => text.replace(/^(.*\bModules: ).*$/mu, "$1-").replace(/\r?\n(?:\r?\n)?(?:Not taken|Modules to confirm): [^\r\n]*/gu, "");
+  const words = (text, f) => (text === null || text === undefined ? null : (f === "core-manifest.md" ? modules : t => t)(text.replace(/core\/[\w./-]+/gu, "core/-").replace(/^Paths: .*$/mu, "Paths: -")));
+  return Object.keys({ ...before, ...after }).every(f => words(before[f], f) === words(after[f], f));
 };

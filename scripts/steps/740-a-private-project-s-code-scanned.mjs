@@ -2,4 +2,4 @@
 // of their names.
 import { COST } from "../step-checks.mjs";
 
-export default { lead: "17 November 2026, a private project's code scanned", cost: COST.check, held: "the code scan, a step of `core.yml`'s job" };
+export default { lead: "17 November 2026, a private project's code scanned", cost: COST.check, asks: "nothing", held: "the code scan, a step of `core.yml`'s job" };

@@ -13,7 +13,7 @@ import { aRepository, logged } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
 import { MODULES } from "./reading.mjs";
-import { entries, notesAt } from "./sync-notes.mjs";
+import { entries, notesAt, quietAt } from "./sync-notes.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
 // a release's name: the word and a whole number above zero, written without leading zeros
@@ -188,6 +188,14 @@ export function asksBetween(old, pin, dir) {
     const before = new Set(at(old));
     return at(pin).filter(l => !before.has(l));
   } catch { return null; }
+}
+// What the report a sync prints asks of a project (#1094): the entries asksBetween gives, but those whose step says it
+// asks nothing of what stands, which stay in the notes and are counted: { asks, quiet }, or null where asksBetween is.
+export function asksLeft(old, pin, dir) {
+  const all = asksBetween(old, pin, dir);
+  if (all === null) return null;
+  const quiet = quietAt(pin, args => inBare(dir, args));
+  return { asks: all.filter(l => !quiet.has(l)), quiet: all.filter(l => quiet.has(l)).length };
 }
 
 // The core's own files that no project reads (#342): its queue, and each of its workflows that no project can call,

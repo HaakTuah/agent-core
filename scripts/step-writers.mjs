@@ -1,10 +1,11 @@
-// What the steps write themselves (#1091): where a step's work is exact, a check's own config or baseline, or a
-// pointer's path, its `write` does it, as `node core/scripts/steps.mjs --write` runs it (steps.mjs, beside this file).
-// Each writer takes the project as steps.mjs's `project` reads it and returns the files it wrote; where it cannot run
-// (a package missing, a file it cannot read, a check that did not run to its end), it throws `Unwritten` before it writes
-// anything. It never writes a word of a project's rule text but a pointer's path, nor a file with changes not yet
-// committed (`held`), nor through a link. The writers that run a check's own writer run the project's copy of it, as
-// the steps read them. Git and Node's own modules only.
+// What the steps write themselves (#1091): where a step's work is exact, a check's own config or baseline, a pointer's
+// path, or the manifest's module lines placed from what is read (#1094), its `write` does it, as `node
+// core/scripts/steps.mjs --write` runs it (steps.mjs, beside this file). Each writer takes the project as steps.mjs's
+// `project` reads it and returns the files it wrote; where it cannot run (a package missing, a file it cannot read, a
+// check that did not run to its end), it throws `Unwritten` before it writes anything. It never writes a word of a
+// project's rule text but a pointer's path and the manifest's module lines, nor a file with changes not yet committed
+// (`held`), nor through a link. The writers that run a check's own writer run the project's copy of it, as the steps
+// read them. Git and Node's own modules only.
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -15,6 +16,8 @@ import { parseConfig, where as shapeAt } from "./shape.mjs";
 import { copiesConfig, marksConfig } from "./check-configs.mjs";
 import { atCopy } from "./core-path.mjs";
 import { MOVED_GLOB, MOVED_GLOBS, moved, namers, readsOldAlone } from "./step-checks-moved.mjs";
+import { places } from "./step-checks-modules.mjs";
+import { placed } from "./manifest-reads.mjs";
 import { HERE, plain, shown } from "./step-checks.mjs";
 import { Unread, copyAt } from "./workflow-calls.mjs";
 import { installed } from "./packages.mjs";
@@ -25,10 +28,31 @@ import { asLF, asMended, reads as workflowsRead } from "./workflows.mjs";
 export class Unwritten extends Unread {}
 
 // The files of the project at `root` with changes not yet committed, new ones among them, as git lists them: none is
-// written, so that what a writer writes stays apart from a session's own changes and from a sync's (#1091).
+// written, so that what a writer writes stays apart from a session's own changes and from a sync's (#1091). The one
+// left out: the manifest changed in its `Core:` line alone, in the index and the tree, as the sync moves its pin before
+// the writers run (sync.mjs), whose module lines are written around it and its pin put back by setAside (#1094).
 export function held(root) {
   const out = execFileSync("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--no-renames"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
-  return new Set(out.split("\0").filter(Boolean).map(l => l.slice(3)));
+  const busy = new Set(out.split("\0").filter(Boolean).map(l => l.slice(3)));
+  if (busy.has(MANIFEST) && pinOnly(root)) busy.delete(MANIFEST);
+  return busy;
+}
+export const MANIFEST = "core-manifest.md";
+const PIN_LINE = /^Core: .*$/mu;
+// The manifest's `Core:` line in the project at `root`, read before setAside (null where it names none), and put back
+// after it, so a pin the sync moved stays in its pull request (#1094).
+export const pinOf = root => { const f = path.join(root, MANIFEST); return fs.existsSync(f) ? PIN_LINE.exec(fs.readFileSync(f, "utf8"))?.[0] ?? null : null; };
+export function pinBack(root, pin) {
+  const f = path.join(root, MANIFEST);
+  if (pin && fs.existsSync(f)) fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace(PIN_LINE, () => pin));
+}
+function pinOnly(root) {
+  const at = rev => { try { return execFileSync("git", ["show", `${rev}:${MANIFEST}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; } };
+  let tree = null;
+  try { tree = fs.readFileSync(path.join(root, MANIFEST), "utf8"); } catch { /* gone or no file: busy */ }
+  // (line ends read as one, as git with core.autocrlf writes a tree the blob holds with LF alone)
+  const head = at("HEAD"), but = t => t?.replace(/\r\n/gu, "\n").replace(PIN_LINE, "");
+  return head !== null && [at(""), tree].every(t => t !== null && but(t) === but(head));
 }
 
 // Whether `f` may be written: a plain path of the project's own outside the copy, no link and under none, no file with
@@ -221,3 +245,13 @@ function pathsLine(p, writes) {
   if (before) before[1] = manifest.replace(OLD_PATHS, now);
   else writes.push(["core-manifest.md", manifest.replace(OLD_PATHS, now)]);
 }
+
+// The manifest with each module its list neither takes nor leaves out placed from what is read exactly (#1094;
+// step-checks-modules.mjs, `places`, which `opts` narrows), where there is one to place.
+export const writePlaced = opts => (p, busy) => {
+  const left = places(p, opts);
+  if (!left.length) return [];
+  writable(p, "core-manifest.md", busy);
+  put(p, "core-manifest.md", placed(p.manifest, left));
+  return ["core-manifest.md"];
+};

@@ -2,4 +2,4 @@
 // of their names.
 import { COST } from "../step-checks.mjs";
 
-export default { lead: "16 November 2026, the line that says what a pull request waits on", cost: COST.check, held: "the description check" };
+export default { lead: "16 November 2026, the line that says what a pull request waits on", cost: COST.check, asks: "nothing", held: "the description check" };
