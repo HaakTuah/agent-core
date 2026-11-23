@@ -47,6 +47,7 @@ export function busy(merged) {
 export function read(repo, days, now = Date.now(), gh = ghApi) {
   const to = new Date(now).toISOString(), from = new Date(now - days * DAY).toISOString();
   const base = parseBounded(gh(`repos/${repo}`))?.default_branch;
+  shaped("a default branch", b => typeof b === "string" && b !== "")(base);
   return mergedIn(repo, from, to, bounded(gh))
     .filter(shaped("a pull request", p => Number.isInteger(p?.number) && typeof p.merged_at === "string" && typeof p.base?.ref === "string"))
     .filter(p => p.base.ref === base)

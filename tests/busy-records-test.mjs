@@ -65,6 +65,9 @@ ok(threw === "the host's answer holds a file not of the form read", "a file not 
 threw = "";
 try { read("o/r", 28, Date.parse("2026-11-23T00:00:00Z"), answering("repos/o/r/pulls?", JSON.stringify([{ number: "10", merged_at: "2026-11-20T10:00:00Z", updated_at: "2026-11-20T10:00:00Z", base: { ref: "main" } }]))); } catch (e) { threw = e.message; }
 ok(threw === "the host's answer holds a pull request not of the form read", "a pull request not of the form read is refused", threw);
+threw = "";
+try { read("o/r", 28, Date.parse("2026-11-23T00:00:00Z"), answering("repos/o/r", JSON.stringify({ name: "r" }))); } catch (e) { threw = e.message; }
+ok(threw === "the host's answer holds a default branch not of the form read", "an answer about the repository with no default branch is refused, never read as a month with no merge", threw);
 ok(report([{ file: "a\u001b[2Jb\nc.md", pulls: [1, 2] }], 2, 7)[1] === "  a?[2Jb?c.md  (#1, #2)", "a file's name is printed on one line, its control characters shown as ?");
 
 // ---- a run ----
