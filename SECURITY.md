@@ -108,8 +108,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      `scripts/nuget.mjs`, `scripts/workflows.mjs`, `scripts/agent-tools.mjs`, `scripts/runners.mjs`), the reader of a
      project's own workflows (`scripts/parse-yaml.mjs`, for `check.mjs`, `own-runs.mjs` and `steps.mjs`) and the
      sync's move of the pins (`scripts/sync.mjs`) and the owner's settings' reader of the project's
-     `security-review.yml` (`scripts/owner-settings.mjs`, only whether a line gives `private: true` or `advisory: false`,
-     through `scripts/own-files.mjs`: 64 MB of it, a file git lists as the project's own, no link followed out of it);
+     `security-review.yml` (`scripts/owner-settings.mjs`, only whether its call of the core's security review gives
+     `private: true` or `advisory: false`, through `scripts/own-files.mjs`, a file git lists as the project's own, no
+     link followed out of it, and read as YAML by `scripts/parse-yaml.mjs`, at most its 256 K characters, what it
+     cannot read said unread, never not for the project);
      limits: 60 s for each of the workflow check's two tools on one file
      (zizmor and actionlint, `scripts/workflow-tools.mjs`, each file run on its own, one a tool stops on or cannot load said
      as a finding with its mend, and neither run in a session), 64 MB of a file for the licence check (256 MB for NuGet's), 1
@@ -134,7 +136,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      what the changed file then shows is noted, not failed (a base no YAML for another reason is read as it stands); in the core's own run each fails), and NuGet's lock file version 2, a newer refused (npm's
      lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`, for the
      reader of where the tests run `tests/runners-test.mjs`, and for the owner's settings `tests/owner-settings-test.mjs`
-     (the file missing, a link, in a private repository without the line; its size, by `own-files.mjs`'s own readers' tests).
+     (the file missing, a link, no YAML, no call of the core's, an input read only at its run, a comment on the line; its
+     size, by `own-files.mjs`'s and `parse-yaml.mjs`'s own readers' tests).
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the

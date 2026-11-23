@@ -64,14 +64,24 @@ try {
   fs.rmSync(path.join(root, ".github", "workflows", "security-review.yml"));
   s = statesOf(all, root);
   ok(s["security-review-required"].given === null && /does not apply here: the project has no/.test(s["security-review-required"].said), "no security-review workflow: the status is not asked for, since one never posted would hold every pull request");
-  review("jobs:\n  security-review:\n    uses: x\n");
+  review(`jobs:\n  security-review:\n    uses: someone/agent-core/.github/workflows/security-review.yml@${"a".repeat(40)}\n`);
   const privately = { ...all, repo: { body: { ...all.repo.body, private: true } } };
   s = statesOf(privately, root);
   ok(s["security-review-required"].given === null && /with: private: true/.test(s["security-review-required"].said), "a private repository whose call does not run the check: not asked for", s["security-review-required"].said);
-  review("jobs:\n  security-review:\n    uses: x\n    with:\n      private: true\n");
-  ok(statesOf(privately, root)["security-review-required"].given === true, "a private repository whose call is given `private: true`: read from the ruleset");
-  review("jobs:\n  security-review:\n    uses: x\n    with:\n      advisory: false\n");
-  ok(statesOf(privately, root)["security-review-required"].given === true, "a private repository whose call is given `advisory: false`, which posts the status: read from the ruleset");
+  const call = w => `jobs:\n  security-review:\n    uses: someone/agent-core/.github/workflows/security-review.yml@${"a".repeat(40)} # the pin\n${w}`;
+  for (const [w, said] of [["    with:\n      private: true\n", "`private: true`"], ["    with:\n      advisory: false\n", "`advisory: false`, which posts the status"],
+    ["    with: { private: true }\n", "`private: true` in a flow mapping"], ["    with:\n      private: true # runs in a private repository\n", "`private: true` with a comment"],
+    ["    with:\n      advisory: false  # enforce review\n", "`advisory: false` with a comment"]]) {
+    review(call(w));
+    ok(statesOf(privately, root)["security-review-required"].given === true, `a private repository whose call is given ${said}: read from the ruleset`);
+  }
+  for (const [text, said] of [[call("    with:\n      private: ${{ vars.PRIVATE }}\n"), "an input read only at its run"], ["jobs: [\n", "no YAML"],
+    ["jobs:\n  other:\n    uses: x/y/.github/workflows/z.yml@b\n    with:\n      private: true\n", "no call of the core's security review"],
+    [`# private: true\n${call("    with:\n      private: false\n")}`, "only a comment that says it, not the call"]]) {
+    review(text);
+    const st = statesOf(privately, root)["security-review-required"];
+    ok(said.startsWith("only") ? st.given === null && /^does not apply/.test(st.said) : st.given === null && /^not read: /.test(st.said), `a private repository whose call holds ${said}: ${said.startsWith("only") ? "not asked for" : "said not read, never not for it"}`, st.said);
+  }
   fs.rmSync(path.join(root, ".github", "workflows", "security-review.yml"));
   if (process.platform !== "win32") { // (a link needs a right of its own on Windows)
     fs.symlinkSync(path.join(at, "elsewhere.yml"), path.join(root, ".github", "workflows", "security-review.yml"));

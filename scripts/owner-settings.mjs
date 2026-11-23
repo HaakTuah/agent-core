@@ -19,6 +19,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { repoOf } from "./inbox.mjs";
 import { ownFiles } from "./own-files.mjs";
+import { parseYaml } from "./parse-yaml.mjs";
 import { inBare, plainEnv } from "./releases.mjs";
 import { CONTEXT } from "./security-review.mjs";
 import { started } from "./started.mjs";
@@ -82,6 +83,24 @@ function rulesetOf(host, rules) {
   return notGiven(`${none}it lacks ${lacks.join(", ")}`);
 }
 
+// Whether the project's `security-review.yml` (`text`) calls the core's security review with `private: true` or
+// `advisory: false`, which makes it post its status in a private repository: true or false, as GitHub reads its YAML;
+// null where it is no YAML here, calls no such workflow, or gives either input a value that is no plain boolean (an
+// expression GitHub reads at its run), since that cannot be told.
+function callsPosting(text) {
+  let doc;
+  try { doc = parseYaml(text); } catch { return null; }
+  const calls = Object.values(doc?.jobs && typeof doc.jobs === "object" ? doc.jobs : {})
+    .filter(j => typeof j?.uses === "string" && /\/\.github\/workflows\/security-review\.yml@/.test(j.uses));
+  if (!calls.length) return null;
+  const said = calls.map(j => {
+    const given = j.with && typeof j.with === "object" ? j.with : {};
+    if (given.private === true || given.advisory === false) return true;
+    return [given.private, given.advisory].every(v => v === undefined || typeof v === "boolean") ? false : null;
+  });
+  return said.includes(true) ? true : said.includes(null) ? null : false;
+}
+
 // The status `security-review` required, where the project's own workflow at `root` posts it on every pull request.
 function reviewOf(host, rules, root) {
   const repo = host.repo.body;
@@ -90,7 +109,11 @@ function reviewOf(host, rules, root) {
   if (fs.existsSync(path.join(root, ".git"))) try { text = ownFiles(root).read(".github/workflows/security-review.yml"); } catch { /* (git could not list its files: nothing of its own read) */ }
   if (text === null) return apart("the project has no `.github/workflows/security-review.yml`, so nothing posts the status, and a status required that never comes would hold every pull request");
   if (!repo) return unread(host.repo.why);
-  if (repo.private !== false && !/^\s*(private:\s*true|advisory:\s*false)\s*$/m.test(text)) return apart("in a private repository the check posts its status only where its call is given `with: private: true` or `advisory: false`, and a status required that never comes would hold every pull request");
+  if (repo.private !== false) {
+    const posts = callsPosting(text);
+    if (posts === null) return unread("the project's `.github/workflows/security-review.yml` could not be read as YAML, or calls no security review of the core's, or gives `private` or `advisory` a value read only at its run, so whether its call posts the status is not known");
+    if (!posts) return apart("in a private repository the check posts its status only where its call is given `with: private: true` or `advisory: false`, and a status required that never comes would hold every pull request");
+  }
   if (!rules) return unread(host.rules?.why ?? host.repo.why);
   return rules.checks.has(CONTEXT) ? given() : notGiven();
 }
