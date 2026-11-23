@@ -13,7 +13,7 @@
   },
   {
     "id": "ruleset",
-    "setting": "A ruleset on the default branch: deletions restricted, force pushes blocked, a pull request required, the status check `core / core` required (Settings, Rules)",
+    "setting": "A ruleset on the default branch: deletions restricted, force pushes blocked, a pull request required, the status checks `core / core` and the project's own CI required (Settings, Rules)",
     "page": "settings/rules",
     "protects": "the default branch changes only by a merged pull request whose checks passed (floor rule 12); a private repository on GitHub's free plan has no rulesets, GitHub Pro gives them"
   },
