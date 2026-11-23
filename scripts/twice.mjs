@@ -35,7 +35,7 @@ import { ownFiles } from "./own-files.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { fetchCore, inBare, releasesIn } from "./releases.mjs";
 import { started } from "./started.mjs";
-import { SKIP, filesFound, listTree, safetyOf, textFiles } from "./twice-files.mjs";
+import { SKIP, filesFound, linked, listTree, safetyOf, textFiles } from "./twice-files.mjs";
 import { textFound } from "./twice-text.mjs";
 
 export { blobId, filesFound } from "./twice-files.mjs"; // (the tests' way in)
@@ -62,7 +62,7 @@ const copyPaths = p => new RegExp(`(?<![A-Za-z0-9._/-])${p.copy.replace(/[\\^$.*
 // in no expression.
 export function callsFound(p) {
   const calls = [], needed = new Set();
-  for (const f of p.outside.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(f))) {
+  for (const f of p.outside.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(f) && !linked(p, f))) {
     let doc;
     try { doc = parseYaml(p.own.read(f) ?? ""); } catch { continue; }
     // (a job an expression names, as a reusable workflow's outputs do, is needed as much as one in needs:)
@@ -109,8 +109,10 @@ export function projectOf(root, { fetched = null, since = null } = {}) {
   const copy = line.path, copyDir = path.join(root, copy);
   const copyFiles = listCopy(copyDir), copySet = new Set(copyFiles);
   const copyFolders = new Set(copyFiles.flatMap(f => f.split("/").slice(0, -1).map((_, i, a) => a.slice(0, i + 1).join("/"))));
-  const outside = own.listed.filter(f => !f.startsWith(copy));
-  const markdown = outside.filter(f => /\.md$/iu.test(f) && !whole(f) && !SKIP.test(f));
+  // (the library that carries the core is another repository's, whose files this never reads as the project's own)
+  const library = line.library ? `${line.library.replace(/\/+$/u, "")}/` : null;
+  const outside = own.listed.filter(f => !f.startsWith(copy) && !(library && f.startsWith(library)));
+  const markdown = outside.filter(f => /\.md$/iu.test(f) && !whole(f) && !SKIP.test(f) && !linked({ root }, f));
   const coreMarkdown = copyFiles.filter(f => /\.md$/iu.test(f) && !/^(?:setup\/template|archive|reports|words|inventory|choices)\//u.test(f));
   const readCopy = f => { try { return fs.readFileSync(path.join(copyDir, f), "utf8"); } catch { return null; } };
   const p = { root, own, copy, copyDir, copyFiles, copySet, copyFolders, outside, markdown, coreMarkdown, readCopy, bare: fetched, earlier: [], moved: new Map(), safety: safetyOf(own) };
@@ -148,7 +150,7 @@ export function findings(p) {
     const of = f.at === "the copy" ? `core's ${f.core}` : `core's ${f.core} at ${f.at}, an earlier copy`;
     out.push({ line: `${f.file} is the ${of}, byte for byte${f.goes ? ": no file names it, so it goes" : `; ${f.why}, so it stays for the auditor`}`, fix: f.goes ? { kind: "file", ...f } : null });
   }
-  for (const c of callsFound(p)) out.push({ line: `${c.file}: the job ${c.job} calls the core's ${c.name}, as ${c.other} does${c.exact ? ", the same in every input: it goes" : ""}`, fix: c.exact ? { kind: "call", ...c } : null });
+  for (const c of callsFound(p)) out.push({ line: `${c.file}: the job ${c.job} calls the core's ${c.name}, as ${c.other} does${c.exact ? ", the same in every input: it goes, and its checks with it (where a ruleset asks one by name, the pull request waits on it until the ruleset drops it)" : ""}`, fix: c.exact ? { kind: "call", ...c } : null });
   for (const q of pointersFound(p)) out.push({ line: `${q.file}:${q.line} names ${q.path}, which the copy does not hold${q.to ? `: the core moved it unchanged to ${q.to}, where it moves` : ""}`, fix: q.to ? { kind: "pointer", ...q } : null });
   for (const t of textFound(p, new Set(files.map(f => f.file)))) out.push({ line: t, fix: null });
   return out;

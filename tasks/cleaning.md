@@ -122,7 +122,8 @@ code is held to: `tasks/code-shape.md`.
   contradicts or loosens one it takes from the core and that the manifest's "Differences" does not declare; one that
   says what a rule of the core says, in meaning and intent, in other words; the same rule stated twice in its own files;
   a check of its own (a workflow, a script, a hook) that does the job of one of the core's; and a file of an older
-  layout of the core left outside the copy, or documentation that restates the core's text. The trigger is the reading,
+  layout of the core left outside the copy, or documentation that restates the core's text. Nothing changes it. The
+  trigger is the reading,
   whole or of the rules a sync changed, and every sync: first `core/scripts/twice.mjs`, which the sync runs, lists what
   it reads without guessing (text that is a copy of the core's or of the project's own, or reads close to one; a file
   outside the copy equal to one of the core's, at the copy or an earlier one; a call of one of the core's workflows made
@@ -142,7 +143,7 @@ code is held to: `tasks/code-shape.md`.
   project's that adds to the core's goes, nor that the floor's text, or a project rule its `AGENTS.md` calls a safety
   rule, goes without its owner's word. Reason: a project that held its own rules before it took the core keeps
   rules the core now holds, read twice by every session, and they drift apart. Held, for the script, by
-  `tests/twice-test.mjs`, on a project holding each kind exactly and nearly; for the rest, by the reading's record and
+  `tests/twice-test.mjs` and `tests/twice-kept-test.mjs`, on a project holding each kind exactly and nearly; for the rest, by the reading's record and
   its step, and by the reviews of each pull request that takes out or moves anything.
 - **A sweep's scope is read, not listed** (#593). By default an issue names what it covers. The one condition that
   changes it: an issue asks something of every or all of a kind (an inventory, an audit, a sorting, a check of each
