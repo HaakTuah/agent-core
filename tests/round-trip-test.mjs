@@ -38,6 +38,7 @@ const WRITERS = {
   "shape.mjs": ["here", "the shape baseline, read by the shape check and the dose"],
   "dose.mjs": ["here", "the last audit in the shape baseline, read by the dose and the shape check"],
   "holders-own.mjs": ["here", "checks/holders.json, read by holders.mjs --own"],
+  "mutation-tools.mjs": ["tests/mutation-tools-test.mjs", "its row and list"],
   "core-reading.mjs": ["here", "checks/core-reading.json, read by its own `due`"],
   "look-keep.mjs": ["here", "an inbox file, read by the inbox's reader"],
   "queue.mjs": ["tests/queue-test.mjs", "the progress file --clear rewrites, read by its reader"],
