@@ -19,7 +19,6 @@
     "changes"
   ],
   "grown": {
-    "process: tests/busy-records-test.mjs -> node:child_process": "The busy-record reader is run as a session runs it (#860): where gh cannot answer, its exit code and the failure it prints with its mend are what two cases guard, which only the script's own run gives.",
     "process: tests/twice-test.mjs -> node:child_process": "What it guards is read from git (#1087): an earlier copy's files and the paths the core renamed between two commits come from a scratch core's history, which only git writes; one case runs the script as the sync runs it, for what it prints from a project's root.",
     "process: tests/converge-test.mjs -> node:child_process": "The one process is run as a project runs it (#1083): from a scratch project's root, which the starter kit writes and git commits, its exit code, what it prints with its mend and what it wrote are what the cases guard, and the check reads the paths a pull request changed from git against its base.",
     "process: tests/offline-test.mjs -> node:child_process": "The step's shell with the network cut off (#770) is a bash script: it is run as a step's shell is, with stand-ins for sudo, unshare, setpriv and ip, and its exit code, what it prints and whether the step's script ran are what the cases guard.",
@@ -85,7 +84,6 @@
     "process: tests/choices-check-test.mjs -> node:child_process": true,
     "process: tests/choices-folder-test.mjs -> node:child_process": true,
     "process: tests/choices-look-test.mjs -> node:child_process": true,
-    "process: tests/busy-records-test.mjs -> node:child_process": true,
     "process: tests/cited-test.mjs -> node:child_process": true,
     "process: tests/clean-merges-test.mjs -> node:child_process": true,
     "process: tests/code-review-wait-test.mjs -> node:child_process": true,

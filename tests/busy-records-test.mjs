@@ -1,18 +1,14 @@
 // Tests busy-records.mjs, which files two merged pull requests each added to within a week (#860): what is read through
 // a gh that answers from fixtures, a rebase merge and a squash each one pull request, what counts as adding to a file,
-// and the failure's mend where the host cannot be read. Its tests workflow runs it on every pull request here. Node's
-// own modules.
+// the host's answers refused where too deep or of another form, and each failure's mend, from a run in this process.
+// Its tests workflow runs it on every pull request here. Node's own modules.
 //
 //   node tests/busy-records-test.mjs
-import { spawnSync } from "node:child_process";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { addedTo, busy, options, read, report } from "../scripts/busy-records.mjs";
+import { addedTo, busy, main, options, read, report } from "../scripts/busy-records.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 // ---- which files are busy ----
 const p = (number, day, files) => ({ number, at: `2026-11-${String(day).padStart(2, "0")}T12:00:00Z`, files });
@@ -57,18 +53,35 @@ ok(addedTo("o/r", 15, gh).length === 101, "a pull request's files are read page 
 ok(report(busy(merged), merged.length, 28).join("\n") === "2 pull request(s) merged into the default branch in the last 28 days; 1 file(s) two of them added to within a week:\n  log.md  (#10, #11)",
   "it prints the count read and each busy file with its pull requests");
 
-// ---- the failures ----
-// (with no gh and no git on its path, as a session where the host cannot be read)
-const run = (args, cwd = root) => spawnSync(process.execPath, [path.join(root, "scripts/busy-records.mjs"), ...args], { encoding: "utf8", cwd, env: { ...process.env, PATH: "", GITHUB_REPOSITORY: "" } });
-const noGh = run(["--repo", "o/r"]);
-ok(noGh.status === 1 && mended(noGh.stderr), "where the host cannot be read, it says so with its mend and exits 1", noGh.stderr);
+// ---- what the host may answer ----
+const deep = "[".repeat(300) + "]".repeat(300);
+const answering = (route, text) => r => (r.startsWith(route) ? text : gh(r));
+let threw = "";
+try { read("o/r", 28, Date.parse("2026-11-23T00:00:00Z"), answering("repos/o/r/pulls?", deep)); } catch (e) { threw = e.message; }
+ok(/nests deeper/u.test(threw), "an answer nested deeper than the core reads is refused", threw);
+threw = "";
+try { addedTo("o/r", 10, answering("repos/o/r/pulls/10/files", JSON.stringify([{ filename: { x: 1 }, additions: 1 }]))); } catch (e) { threw = e.message; }
+ok(threw === "the host's answer holds a file not of the form read", "a file not of the form read is refused, never printed", threw);
+threw = "";
+try { read("o/r", 28, Date.parse("2026-11-23T00:00:00Z"), answering("repos/o/r/pulls?", JSON.stringify([{ number: "10", merged_at: "2026-11-20T10:00:00Z", updated_at: "2026-11-20T10:00:00Z", base: { ref: "main" } }]))); } catch (e) { threw = e.message; }
+ok(threw === "the host's answer holds a pull request not of the form read", "a pull request not of the form read is refused", threw);
+ok(report([{ file: "a\u001b[2Jb\nc.md", pulls: [1, 2] }], 2, 7)[1] === "  a?[2Jb?c.md  (#1, #2)", "a file's name is printed on one line, its control characters shown as ?");
+
+// ---- a run ----
+const runs = (argv, opts) => { const out = [], err = []; const code = main(argv, { out: l => out.push(l), err: l => err.push(l), ...opts }); return { code, out: out.join("\n"), err: err.join("\n") }; };
+const good = runs(["--repo", "o/r", "--days", "28"], { gh, now: Date.parse("2026-11-23T00:00:00Z") });
+ok(good.code === 0 && good.out.endsWith("log.md  (#10, #11)") && good.err === "", "a run prints the report and exits 0", JSON.stringify(good));
+const noGh = runs(["--repo", "o/r"], { gh: () => { throw new Error("gh: not found\nmore"); } });
+ok(noGh.code === 1 && mended(noGh.err) && noGh.err.includes("could not be read: gh: not found. Mend: sign gh in"), "where the host cannot be read, it says so with its mend and exits 1", noGh.err);
 // ---- what it is told ----
 ok(JSON.stringify(options(["--repo", "o/r"])) === '{"repo":"o/r","days":31}' && JSON.stringify(options(["--days", "7"], () => "a/b")) === '{"repo":"a/b","days":7}',
   "it reads the repository named, else this clone's, and 31 days unless told the days");
-ok(["x", "0", "1.5"].every(d => options(["--repo", "o/r", "--days", d]).why === `--days ${d} is no whole number of days`), "a --days that is no whole number of days is refused, saying so");
+ok(["x", "0", "1.5", "3651", "1000000000"].every(d => options(["--repo", "o/r", "--days", d]).why === `--days ${d} is no whole number of days from 1 to 3650`) && options(["--repo", "o/r", "--days", "3650"]).days === 3650,
+  "a --days that is no whole number of days from 1 to 3650 is refused, saying so");
+ok(["o", "o/r/x", "../r", "o/..", "o/r?x=1"].every(r => options(["--repo", r]).why === `--repo ${r} is no owner/name`), "a --repo that is no owner/name is refused, saying so");
 ok(options([], () => null).why === "no repository named, and none read from this clone" && /--bogus/u.test(options(["--bogus"]).why), "no repository, or an option it does not know, is refused, saying so");
-const bad = run(["--repo", "o/r", "--days", "0"]);
-ok(bad.status === 1 && bad.stderr.includes("--days 0 is no whole number") && mended(bad.stderr), "a refusal is printed with its mend, and it exits 1", bad.stderr);
+const bad = runs(["--repo", "o/r", "--days", "0"], { gh: () => { throw new Error("not asked"); } });
+ok(bad.code === 1 && bad.err.includes("--days 0 is no whole number") && mended(bad.err), "a refusal is printed with its mend, and it exits 1", bad.err);
 
 console.log(`${count - failed} of ${count} assertions on the busy records' reader passed`);
 if (failed) process.exit(1);
