@@ -95,16 +95,20 @@ function formsOf(p, f) {
   } catch { return null; }
 }
 // A text with its percent-encoding and character references decoded, again until nothing changes (an encoding of an
-// encoding), in lower case.
+// encoding), in lower case. Each pass decodes every form in one replace, so that no form's output is read by another's
+// in the same pass; the next pass reads what the last one made.
 const XML = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+const ENCODED = /&#(?:[xX]([0-9a-fA-F]+)|(\d+));?|&([A-Za-z][A-Za-z0-9]*);?|(?:%[0-9A-Fa-f]{2})+/gu;
+const percent = s => { try { return decodeURIComponent(s); } catch { return s.replace(/%([0-7][0-9A-Fa-f])/gu, (_, h) => String.fromCharCode(parseInt(h, 16))); } };
+const one = (s, h, d, name) => {
+  if (name) return XML[name.toLowerCase()] ?? ANY;
+  if (h === undefined && d === undefined) return percent(s);
+  const n = h ? parseInt(h, 16) : Number(d);
+  return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : s;
+};
 function decoded(text) {
   let t = text, was = null;
-  for (let i = 0; i < 8 && t !== was; i++) {
-    was = t;
-    t = t.replace(/&#(?:[xX]([0-9a-fA-F]+)|(\d+));?/gu, (s, h, d) => { const n = h ? parseInt(h, 16) : Number(d); return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : s; })
-      .replace(/&([A-Za-z][A-Za-z0-9]*);?/gu, (s, n) => XML[n.toLowerCase()] ?? ANY)
-      .replace(/(?:%[0-9A-Fa-f]{2})+/gu, s => { try { return decodeURIComponent(s); } catch { return s.replace(/%([0-7][0-9A-Fa-f])/gu, (_, h) => String.fromCharCode(parseInt(h, 16))); } });
-  }
+  for (let i = 0; i < 8 && t !== was; i++) { was = t; t = t.replace(ENCODED, one); }
   return t.toLowerCase();
 }
 
