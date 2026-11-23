@@ -610,6 +610,9 @@ jobs:
       - name: The words check, the dated records' added lines too
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/general-test.mjs ')) }}
         run: node tests/general-test.mjs
+      - name: The marks check, a rule written read for its reason, its holder and its condition
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pattern-test.mjs ')) }}
+        run: node tests/pattern-test.mjs
       - name: The cap's own check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/size-test.mjs ')) }}
         run: node tests/size-test.mjs
