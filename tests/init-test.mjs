@@ -259,7 +259,8 @@ if (p.status === 0) {
     for (const [, rel] of fs.readFileSync(path.join(core, f), "utf8").matchAll(/["'](\.{1,2}\/[^"'\n]+\.m?js)["']/g)) queue.push(path.posix.join(path.posix.dirname(f), rel));
   }
   git(core, "rm", "-rq", "tests");
-  git(core, "rm", "-q", ...git(core, "ls-files", "scripts/*.mjs", "scripts/*.sh").split("\n").filter(f => f && !imported.has(f)));
+  const unread = git(core, "ls-files", "scripts/*.mjs", "scripts/*.sh").split("\n").filter(f => f && !imported.has(f));
+  for (let i = 0; i < unread.length; i += 100) git(core, "rm", "-q", ...unread.slice(i, i + 100)); // a command line is capped on Windows
   git(core, "commit", "-q", "-m", "without the core's tests and the scripts the copies check does not import");
   const coreRun = run(core, "scripts/copies.mjs", ".github/copies.json");
   const how = path.join(core, "roles/shared/how-to-work.md"), howWas = fs.readFileSync(how, "utf8");
@@ -271,7 +272,7 @@ if (p.status === 0) {
   git(core, "checkout", "-q", "--", ".github/copies-baseline.json");
   ok(coreRun.status === 0 && ownCopy.status === 1 && /a new copy: .*roles\/shared\/how-to-work\.md:.*\. Mend: keep it in the one place/u.test(ownCopy.out) && mended(ownCopy.out)
     && ownNone.status === 1 && /Mend: write the project's first with node scripts\/copies\.mjs \.github\/copies\.json --first/u.test(ownNone.out) && mended(ownNone.out),
-    "the core's own copies check passes on the core without its tests, and fails a copy added there, its mends naming the core's own paths", `${coreRun.out}${ownCopy.out}${ownNone.out}`);
+    "the core's own copies check passes on the core without its tests and the scripts it does not import, and fails a copy added there, its mends naming the core's own paths", `${coreRun.out}${ownCopy.out}${ownNone.out}`);
   // (against the base, the config is held to the base's (#348): a baseline moved, or a file the base's config read and
   // this one does not, fails with its mend, and the mend as worded passes; a config widened passes)
   const cfgAt = path.join(core, ".github/copies.json"), cfgWas = fs.readFileSync(cfgAt, "utf8");
