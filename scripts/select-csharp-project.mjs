@@ -14,7 +14,8 @@ const attribute = (tag, name) => { const m = new RegExp(`\\b${name}\\s*=\\s*(?:"
 export const tooMuch = (what, n, unit = "characters") => new Late(`${what} hold ${n.toLocaleString("en")} ${unit}, past the ${CHARACTERS.toLocaleString("en")} the selection reads, so what each file of C# reaches cannot be told in time`);
 
 // The <Using Include="N"> items of MSBuild's files, each a global using directive ({ target, alias }, an Alias="S" its
-// alias), or null where one names a property ("$(...)"), whose value cannot be told here. `pace` is asked for each
+// alias), or null where one holds what MSBuild expands ("$(...)" a property, "@(...)" an item, "%" metadata or an
+// escape, "%2E" a "."), whose value cannot be told here. `pace` is asked for each
 // file; past CHARACTERS of them together, Late.
 export function msbuildUsings(texts, pace) {
   const out = [], n = texts.reduce((sum, t) => sum + t.length, 0);
@@ -24,7 +25,7 @@ export function msbuildUsings(texts, pace) {
     for (const m of text.matchAll(/<Using\b([^<>]*)>/gu)) { // (each try ends at the next "<": linear in the text)
       const [include, alias] = ["Include", "Alias"].map(a => attribute(m[1], a));
       if (include === undefined) continue;
-      if (`${include}${alias ?? ""}`.includes("$(")) return null;
+      if (/\$\(|@\(|%/u.test(`${include}${alias ?? ""}`)) return null;
       for (const s of include.split(";")) { const target = s.trim().replace(/^global::/u, ""); if (target) out.push({ target, alias: alias?.trim() || null }); } // (a spread of many outruns the stack)
     }
   }

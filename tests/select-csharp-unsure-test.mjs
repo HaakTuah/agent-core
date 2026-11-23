@@ -22,7 +22,7 @@ ok(same(pick(scans, "src/Lone.cs").tests, ["tests/WebTest.cs"]), "a test that re
 const reflects = { ...web, "tests/MakeTest.cs": "namespace Tests;\nclass MakeTest { object o = System.Activator.CreateInstance(System.Type.GetType(\"App.Start\")); }\n" };
 ok(pick(reflects, "src/Start.cs").tests.includes("tests/MakeTest.cs"), "and so does one that makes a type by reflection", JSON.stringify(pick(reflects, "src/Start.cs")));
 const csTexts = { "src/App.csproj": PROJ, "src/A.cs": "namespace App;\nclass A { }\n", "tests/T.cs": "namespace Tests;\nclass T { }\n" };
-for (const [beside, what] of [[() => ({ msbuild: ["<Using Include=\"$(Root).App\" />"], cs: {} }), "a <Using> names an MSBuild property"], [() => ({ unknown: true }), "git cannot be asked"]]) {
+for (const [beside, what] of [[() => ({ msbuild: ["<Using Include=\"$(Root).App\" />"], cs: {} }), "a <Using> names an MSBuild property"], ...["@(ExtraUsings)", "%(Ns.Identity)", "App%2EData"].map(i => [() => ({ msbuild: [`<Using Include="${i}" />`], cs: {} }), `a <Using> of ${i}, which MSBuild expands`]), [() => ({ unknown: true }), "git cannot be asked"]]) {
   const r = csharpReach(csTexts, undefined, beside);
   ok(same([...r.unsure].sort(), ["src/A.cs", "tests/T.cs"]), `where ${what}, every file of C# is unsure`, JSON.stringify([...r.unsure]));
 }
