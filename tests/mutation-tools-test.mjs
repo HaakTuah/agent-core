@@ -1,15 +1,16 @@
 // Tests the mutation tool a project's manifest names from the core's list (scripts/mutation-tools.mjs and its list
 // mutation-tools.json; #1107): the list's tools on the floor's list of licences and Stryker at the version the core's
 // own runs pin; the row read from a project's code, tests and test runner; a row the project wrote kept, and one the kit
-// or the script gave filled again; and --write in a scratch repository, which writes the row and the tool's package
-// list and says what is left. Run by the core's tests workflow (.github/workflows/tests.yml).
+// or the script gave filled again, its reasons matched whole; and --write in a scratch repository, which writes the row,
+// the tool's package list and its npm config, each through no link, and says what is left: the lock file, the licence
+// check's entries and the job's install and step. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/mutation-tools-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { LIST, NO_TESTS, fillable, leftFor, lineOf, named, packageList, readProject, rowFor, setUp, testRunner, written } from "../scripts/mutation-tools.mjs";
+import { LIST, NO_TESTS, NPMRC, fillable, leftFor, lineOf, named, packageList, readProject, rowFor, setUp, testRunner, written } from "../scripts/mutation-tools.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 import { toolOf } from "../scripts/strength.mjs";
 
@@ -27,6 +28,7 @@ const core = JSON.parse(fs.readFileSync(path.join(ROOT, "tests/mutation/package.
 const stryker = LIST.tools.Stryker;
 ok(core.devDependencies[stryker.package] === stryker.version && same(core.overrides, stryker.overrides) && same(JSON.parse(packageList(stryker)), core),
   "Stryker stands in the list at the version and overrides the core's own runs pin, and the package list it writes is the core's own");
+ok(NPMRC === fs.readFileSync(path.join(ROOT, "tests/mutation/.npmrc"), "utf8"), "the npm config written beside it is the core's own folder's: no install script, no release under a week old");
 ok(Object.values(LIST.tools).every(t => (t.command ? !t.none && /^[\w.-]+$/.test(t.version) : !!t.none)), "each tool gives a command, its version exact, or the reason the core names it for none");
 
 // ---- the row read ----
@@ -57,6 +59,10 @@ ok(fillable(MANIFEST("")) && fillable(MANIFEST(lineOf({ none: NO_TESTS }))) && f
   "a row that is not there, says `none` with no reason, or holds a reason the kit or the list gives, an older kit's included, is filled again");
 ok(!fillable(MANIFEST("| *mutation tool* | `none`: the owner keeps the measure off for this prototype |")) && !fillable(MANIFEST("| *mutation tool* | `node checks/mutate.mjs {lines}` |")),
   "a command, or a `none` with the project's own reason, is the project's and stays (#1107, point 3)");
+ok(!fillable(MANIFEST("| *mutation tool* | `none`: no tests yet worth measuring, a prototype |")) && !fillable(MANIFEST("| *mutation tool* | `none`: its code is in flux, the owner's call |")),
+  "an owner's own reason that starts as one the script gives is the owner's, and stays: the script's reasons are matched whole");
+const crlf = written(MANIFEST(lineOf({ none: NO_TESTS })).replaceAll("\n", "\r\n"), js);
+ok(crlf.includes(`${lineOf(js)}\r\n`) && !/[^\r]\n/.test(crlf), "a manifest with CRLF line ends keeps them, the row written in place included");
 const filled = written(MANIFEST(lineOf({ none: NO_TESTS })), js);
 ok(filled.includes(lineOf(js)) && !filled.includes(NO_TESTS) && filled.split("\n").length === MANIFEST(lineOf(js)).split("\n").length, "the row is written in place of the one that stands");
 const added = written(MANIFEST(""), js).split("\n");
@@ -79,10 +85,18 @@ try {
   r = run();
   ok(r.status === 0 && r.stdout.includes("Read: 1 files of code (JavaScript), tests, the tests run by node.") && read("core-manifest.md").includes(NO_TESTS), "without --write it prints what it read and the row, and writes nothing", r.stdout + r.stderr);
   r = run("--write");
-  ok(r.status === 0 && read("core-manifest.md").includes(lineOf(js)) && same(JSON.parse(read("checks/mutation/package.json")), core) && /Left to do: commit checks\/mutation\/package\.json with its lock file/.test(r.stdout) && /Left to do: install it in the project's own job/.test(r.stdout),
-    "once there are tests, --write names Stryker, writes its package list, and says the lock file and the install are left", r.stdout + r.stderr);
+  ok(r.status === 0 && read("core-manifest.md").includes(lineOf(js)) && same(JSON.parse(read("checks/mutation/package.json")), core) && read("checks/mutation/.npmrc") === NPMRC
+    && /Left to do: commit checks\/mutation\/package\.json with its lock file/.test(r.stdout) && /Left to do: name checks\/mutation\/package-lock\.json under "lockfiles"/.test(r.stdout)
+    && /Left to do: name checks\/mutation\/\.npmrc under "ignoreScriptsIn"/.test(r.stdout) && /Left to do: in the project's own job .*node core\/scripts\/strength\.mjs .*two security reviews/.test(r.stdout),
+    "once there are tests, --write names Stryker, writes its package list and npm config, and says the lock file, the licence check's entries and the job's two steps are left", r.stdout + r.stderr);
   put("checks/mutation/package-lock.json", "{}");
-  ok(leftFor(stryker, f => fs.existsSync(path.join(dir, f))).length === 0 && leftFor(undefined, () => false).length === 0, "nothing is left once the lock file stands, nor for a row that names no tool");
+  const has = f => fs.existsSync(path.join(dir, f)), config = { lockfiles: ["checks/mutation/package-lock.json"], ignoreScriptsIn: ["checks/mutation/.npmrc"] };
+  ok(leftFor(stryker, has, config).length === 0 && leftFor(stryker, has, { lockfiles: config.lockfiles }).length === 1 && leftFor(undefined, () => false).length === 0,
+    "nothing is left once the lock file stands and the licence check's config names it and the npm config, and each entry it lacks is asked; nothing for a row that names no tool");
+  fs.writeFileSync(path.join(dir, "checks/mutation/package.json"), packageList({ ...stryker, version: "9.0.0" }));
+  ok(/names @stryker-mutator\/core at 9\.0\.0, where the core's list gives 10\.1\.1\. Mend: take checks\/mutation\/package\.json out and run/.test(named({ root: dir, manifest: read("core-manifest.md") }) ?? ""),
+    "a package list behind the list's version is named, its mend the writer");
+  fs.writeFileSync(path.join(dir, "checks/mutation/package.json"), packageList(stryker));
   put("core-manifest.md", MANIFEST("| *mutation tool* | `none`: the owner keeps the measure off |"));
   r = run("--write");
   ok(r.status === 0 && read("core-manifest.md").includes("the owner keeps the measure off") && r.stdout.includes("is the project's own"), "--write keeps the project's own none", r.stdout + r.stderr);
@@ -91,11 +105,11 @@ try {
   fs.rmSync(path.join(dir, "checks"), { recursive: true, force: true });
   put("core-manifest.md", MANIFEST(lineOf(js)));
   const p = { root: dir, manifest: read("core-manifest.md") };
-  ok(/checks\/mutation\/package\.json, the package list it is installed from, is not there\. Mend: run `node core\/scripts\/mutation-tools\.mjs --write`/.test(named(p) ?? ""), "the list's row with no package list is named, its mend the writer", named(p));
+  ok(/checks\/mutation\/package\.json, the package list it is installed from, is not there as a file of the project.s own\. Mend: run `node core\/scripts\/mutation-tools\.mjs --write`/.test(named(p) ?? ""), "the list's row with no package list is named, its mend the writer", named(p));
   r = run("--write");
   ok(r.status === 0 && same(JSON.parse(read("checks/mutation/package.json")), core) && named(p) === null, "--write writes the package list where the list's row already stands, and the check then passes", r.stdout + r.stderr);
   put("checks/mutation/package.json", "{}\n");
-  ok(setUp(dir, js).written === null && read("checks/mutation/package.json") === "{}\n" && setUp(dir, { none: NO_TESTS }).written === null, "setUp writes over no package list that stands, and writes none for a row that names no tool");
+  ok(same(setUp(dir, js).written, []) && read("checks/mutation/package.json") === "{}\n" && same(setUp(dir, { none: NO_TESTS }).written, []), "setUp writes over no package list or npm config that stands, and writes none for a row that names no tool");
   // (a pipe where package.json stands is read as no file, and the read ends: a child, so that a read that hangs fails;
   // where the system makes no pipe, as Windows, the case is the one without it: a file that reads as none)
   fs.rmSync(path.join(dir, "package.json"));
@@ -109,8 +123,22 @@ try {
   fs.rmSync(path.join(dir, "checks"), { recursive: true, force: true });
   try { fs.symlinkSync(outside, path.join(dir, "checks"), "dir"); } catch { put("checks", "not a folder\n"); }
   const through = setUp(dir, js);
-  ok(through.written === null && !fs.existsSync(path.join(outside, "mutation")) && /make checks\/mutation a folder of the project's own/.test(through.left[0] ?? ""), "a link or a file on the tool folder's path is written through to nothing, and what is left says so", JSON.stringify(through));
+  ok(same(through.written, []) && !fs.existsSync(path.join(outside, "mutation")) && /make checks\/mutation a folder of the project's own/.test(through.blocked ?? ""), "a link or a file on the tool folder's path is written through to nothing, and what is left says so", JSON.stringify(through));
   fs.rmSync(path.join(dir, "checks"), { recursive: true, force: true });
+  // (a manifest that is a link, to a file outside the project: --write neither reads nor writes through it, and says the
+  // mend; where the system makes no link, the case is skipped, as nothing then can be one)
+  const kept = MANIFEST(lineOf({ none: NO_TESTS }));
+  fs.writeFileSync(path.join(outside, "core-manifest.md"), kept);
+  fs.rmSync(path.join(dir, "core-manifest.md"));
+  let linkedManifest = true;
+  try { fs.symlinkSync(path.join(outside, "core-manifest.md"), path.join(dir, "core-manifest.md"), "file"); } catch { linkedManifest = false; }
+  if (linkedManifest) {
+    r = run("--write");
+    ok(r.status === 1 && /core-manifest\.md is reached through a link.*Mend: /.test(r.stderr) && fs.readFileSync(path.join(outside, "core-manifest.md"), "utf8") === kept,
+      "a manifest reached through a link is neither read nor written through it, and the failure says the mend", r.stdout + r.stderr);
+  }
+  fs.rmSync(path.join(dir, "core-manifest.md"));
+  put("core-manifest.md", kept);
   fs.rmSync(outside, { recursive: true, force: true });
   // (a command the repository's own config names as its fsmonitor runs not when the reader lists its files)
   const hook = path.join(dir, "fsmonitor-hook"), marker = path.join(dir, "fsmonitor-ran");

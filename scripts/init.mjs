@@ -38,7 +38,7 @@ import { plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
 import { MARK, converged, marked } from "./core-owned.mjs";
 import { privateOf } from "./host-private.mjs";
-import { NO_TESTS, lineOf, readProject, rowFor, setUp } from "./mutation-tools.mjs";
+import { LIST as MUTATION, NO_TESTS, leftFor, lineOf, readProject, rowFor, setUp } from "./mutation-tools.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const TEMPLATES = "setup/template";
@@ -329,14 +329,20 @@ function writeKit(o, here, pin, out) {
     const r = spawnSync(process.execPath, [installer, ...everyInstall(path.join(here, "core"))], { cwd: here, encoding: "utf8" });
     if (r.status !== 0) console.log(`note the core's packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node core/scripts/install.mjs before running a check`);
   }
-  const made = [];
+  // (the folder of the mutation tool the manifest names, its package list and npm config written as mutation-tools.mjs
+  // --write writes them, before the licence check's config, which names that npm config)
+  const tool = setUp(here, o.mutation), mutation = MUTATION.tools[o.mutation?.tool];
+  const made = [...tool.written];
   if (!there("checks/sizes.json")) { write("checks/sizes.json", `${JSON.stringify(sizes(Object.fromEntries(startOf(Object.fromEntries(out)).filter(there).map(f => [f, sizeOf(path.join(here, f))]))), null, 2)}\n`); made.push("checks/sizes.json"); }
-  if (!there("checks/licences.json")) { write("checks/licences.json", `${JSON.stringify(licences(o, there), null, 2)}\n`); made.push("checks/licences.json"); }
-  // (the folder of the mutation tool the manifest names, its package list written as mutation-tools.mjs --write writes it)
-  const tool = setUp(here, o.mutation);
-  if (tool.written) made.push(tool.written);
+  let config = null;
+  if (!there("checks/licences.json")) {
+    config = licences(o, there);
+    if (mutation?.folder && there(`${mutation.folder}/.npmrc`)) config.ignoreScriptsIn = [...(config.ignoreScriptsIn ?? []), `${mutation.folder}/.npmrc`];
+    write("checks/licences.json", `${JSON.stringify(config, null, 2)}\n`); made.push("checks/licences.json");
+  }
   git(["add", "--", ...written, ...made, "core"], here, guarded());
-  return { written, left, made: [...made, ...firstBaselines(here)], tool: tool.left };
+  // (what is left for the tool: where the licence check's config stood, the project's own, each entry it would name is asked)
+  return { written, left, made: [...made, ...firstBaselines(here)], tool: [tool.blocked, ...leftFor(mutation, there, config)].filter(Boolean) };
 }
 
 // What the kit wrote, and what it leaves for the project and for the owner.
