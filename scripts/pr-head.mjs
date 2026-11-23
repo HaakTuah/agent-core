@@ -34,13 +34,15 @@ const ADDED = /(?:^\s*(?:(?:[-*+]|\d+[.)])\s+)?|[([<:]\s*)(to\s+be\s+added)\b/gi
 // what stands in code marks (`prose`): a fenced block's lines have no prose. A quoted line is left out whole. Each line
 // is read in one pass, so no text makes the check slow.
 function linesOf(body) {
-  const out = [], state = { comment: false };
+  const out = [], state = { comment: false }, lines = (typeof body === "string" ? body : "").split(/\r\n|\r|\n/u), closes = [];
+  // (whether a "-->" stands on a later line of the same paragraph, before the next blank line)
+  for (let i = lines.length - 1, next = false; i >= 0; i--) { closes[i] = next; next = lines[i].trim() !== "" && (next || lines[i].includes("-->")); }
   let fence = null;
-  for (const [i, raw] of String(body ?? "").split(/\r\n|\r|\n/u).entries()) {
+  for (const [i, raw] of lines.entries()) {
     const open = /^ {0,3}(`{3,}|~{3,})/u.exec(raw);
     if (fence) { if (open && open[1][0] === fence[0] && open[1].length >= fence.length && !raw.slice(open[0].length).trim()) fence = null; out.push({ at: i + 1, text: raw, prose: "" }); continue; }
     if (open && !state.comment) { fence = open[1]; out.push({ at: i + 1, text: raw, prose: "" }); continue; }
-    const { line, bare, code } = marked(raw, state);
+    const { line, bare, code } = marked(raw, state, closes[i]);
     if (/^\s*>/u.test(line)) continue;
     // (what stands in double quotes, "…" or “…”, outside code marks; one opening mark of each kind is read at a time)
     const quotes = [...bare.matchAll(/"[^"]*"|“[^“”]*”/gu)].map(m => [m.index, m.index + m[0].length]);
@@ -52,9 +54,10 @@ function linesOf(body) {
 // A line with its HTML comments taken out, one that runs on over lines too (`state.comment`); `bare`, the same with
 // what its code spans hold blanked; and `code`, where each code span stands in it. As CommonMark reads them, whichever
 // opens first wins: a "<!--" in code marks opens no comment, and a run of backticks closes at the next run of the same
-// length or is only text.
-function marked(raw, state) {
-  const runs = spans(raw), code = [];
+// length or is only text. A "<!--" opens a comment where it opens the line, or where a "-->" closes it on this line or
+// a later one of its paragraph (`closes`); elsewhere it is only text, which shows.
+function marked(raw, state, closes) {
+  const runs = spans(raw), code = [], lead = /^ {0,3}(?=<!--)/u.exec(raw)?.[0].length ?? -1, last = raw.lastIndexOf("-->");
   let line = "", bare = "", r = 0, at = 0, opener = -1;
   while (at < raw.length) {
     if (state.comment) { const end = raw.indexOf("-->", at); if (end < 0) break; state.comment = false; line += " "; bare += " "; at = end + 3; continue; }
@@ -65,7 +68,11 @@ function marked(raw, state) {
     if (run?.at === stop) {
       if (run.end > run.at + run.n) code.push([line.length, line.length + run.end - run.at]);
       line += raw.slice(run.at, run.end); bare += " ".repeat(run.end - run.at); at = run.end;
-    } else { state.comment = stop < raw.length; at = stop + 4; }
+    } else {
+      const opens = stop < raw.length && (stop === lead || stop + 4 <= last || closes);
+      if (!opens) { line += raw.slice(stop, stop + 4); bare += raw.slice(stop, stop + 4); }
+      state.comment = opens; at = stop + 4;
+    }
   }
   return { line, bare, code };
 }

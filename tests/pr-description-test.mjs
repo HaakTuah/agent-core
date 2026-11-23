@@ -111,6 +111,12 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
     "code marks are read before a comment's opening, as whichever opens first: a \"<!--\" in code marks opens no comment, and a backtick in a comment opens no code; a quote mark in code marks opens no quote, and a quote closes at the first closing mark");
   ok(lines("<!-- -->TBD\"x\"\n<!-- -->\"x\"TBD\nx `\"` TBD `\"`\na`x`\"y\"TBD\na`x`TBD\"y\"\n`TBD` \"y\" `TODO`\n\"`x` TBD\" y\na `b` <!-- TBD --> c\n") === "1,2,3,4,5",
     "  what is read stays in its place after a comment, a code span or a quote, whichever stands first, one inside another going with it");
+  ok(lines("A note <!-- with no end\nNotes: TBD\n\nA note <!-- that ends\nTBD -->\nTODO\n\nA note <!-- that would end\n\nTBD -->\n<!-- one\n\nTODO -->XXX\n") === "2,6,10,13",
+    "  a \"<!--\" opens a comment where it opens the line or where a \"-->\" closes it in its paragraph; elsewhere it is text, which shows");
+  ok(lines("x <!-- TBD") === "1" && lines("a <!-- x\nTBD -->") === "" && lines("a <!-- x\n \nTBD -->") === "3" && lines("   <!-- TBD") === "" && lines("x<!-- TBD") === "1"
+    && fails("Tests: <!-- to be added").length === 0 && fails("Tests: <!-- x --> to be added").length === 1
+    && fails("A note <!-- \"TBD\" here").length === 0 && fails("Notes:<!---->to be added").length === 1,
+    "  on the first line and the last, past a line of blanks, indented up to three; and a \"<!--\" that is text stays in its place, one that opens goes");
   ok(["  to be added", "-  to be added", "12. to be added", "To be added.", "* to be added", "2) to be added", "[to be added]", "<to be added>"].every(t => fails(`The change.\n${t}\n`).length === 1) && fails("x- to be added\nIt is to be added").length === 0,
     "  \"to be added\" after blanks, a list mark of any width, or an opening bracket fails; inside a line it does not");
   ok(headOf("TBD", "").mends.length === 1 && headOf("archive item 99999", "").mends.length === 1 && headOf("archive item 99999", "./").mends.length === 0 && headOf("core archive 99999", "./").mends.length === 1 && headOf("core archive 99999", null).mends.length === 0
@@ -119,9 +125,6 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
     "where the copy lies says which archive is read and whether the core's own form is: the core's own here, a project's copy there, none where none is found");
   ok(headAsked(HEAD_SINCE, "export const HEAD_SINCE") && headAsked("2026-11-24T00:00:00Z", "export const HEAD_SINCE") && !headAsked("2026-11-22T23:59:59Z", "export const HEAD_SINCE") && !headAsked(HEAD_SINCE, "an older copy") && !headAsked(HEAD_SINCE, null) && !headAsked("", "export const HEAD_SINCE"),
     "the line is asked of a pull request opened on or after its day, its base's copy holding it");
-  const slow = Date.now();
-  headMends(`${" ".repeat(200000)}x\n- ${" ".repeat(200000)}x\n:${" ".repeat(200000)}x\n${"`".repeat(100000)}\n${"<!--".repeat(50000)}\n${"\"".repeat(100001)}\n${"“".repeat(100000)}\n${"“x ".repeat(50000)}\n${"`<!--` ".repeat(30000)}\n${"` ".repeat(100000)}\n${Array.from({ length: 600 }, (_, n) => "`".repeat(n + 1)).join(" ")}\n${"core archive ".repeat(20000)}\n`, { keys });
-  ok(Date.now() - slow < 2000, "a long description of blanks, marks and quotes, opened and never closed, is read in no time");
 }
 // the copy whose history says which lines are asked: where the base's manifest puts the core, never the head's (#455)
 {

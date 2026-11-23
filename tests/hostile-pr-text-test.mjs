@@ -13,6 +13,7 @@ import { mended } from "../scripts/mend.mjs";
 import { PARTS, missing, reasonsMend, waitsMend, waitsOn } from "../scripts/pr-description.mjs";
 import { lineMend, listed } from "../scripts/reading.mjs";
 import { neverNeeded } from "../scripts/read-total.mjs";
+import { headMends } from "../scripts/pr-head.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -133,6 +134,28 @@ const refused = (r) => r.status === 1 && mended(r.stdout) && !/\n\s+at /u.test(r
   const named = neverNeeded("Never needed: `../../etc/passwd`, `C:\\x`, `<script>`, which a polish task never opens.");
   ok(named.size === 3 && named.has("../../etc/passwd") && named.has("<script>"), "neverNeeded: a path or markup in backticks is a name and no more, which only ever spares a file from the list of those lost");
   ok(neverNeeded("").size === 0 && neverNeeded("Never needed:").size === 0, "neverNeeded: nothing at all names nothing");
+}
+
+// the archive keys and placeholders the description names (pr-head.mjs, #1136): too long, the wrong type, markup, a
+// file path, a number out of range, nothing at all; none is taken for a key the archive holds, none hides what shows,
+// and none makes the reading slow
+{
+  const keys = new Set(["218", "#1084"]), fails = body => headMends(body, { keys }).mends;
+  const marks = [" ", "\"", "“", "“x ", "`", "` ", "<!--", "a <!-- ", "`<!--` ", "core archive "];
+  for (const mark of marks) {
+    const slow = Date.now(), said = fails(`${mark.repeat(Math.floor(65536 / mark.length))}\n`);
+    ok(Array.isArray(said) && Date.now() - slow < 2000, `headMends: 64 KB of ${JSON.stringify(mark)}, opened and never closed, is read in no time`);
+  }
+  const slow = Date.now();
+  fails(`${Array.from({ length: 360 }, (_, n) => "`".repeat(n + 1)).join(" ")}\n${" ".repeat(200000)}x\n- ${" ".repeat(200000)}x\n:${" ".repeat(200000)}x\n`);
+  ok(Date.now() - slow < 2000, "headMends: runs of backticks of every length, and long runs of blanks before a list mark or after a colon, are read in no time");
+  ok([42, NaN, true, {}, [], ["TBD"], { toString: () => "TBD" }, () => "TBD", Symbol("TBD")].every(body => fails(body).length === 0), "headMends: a body of the wrong type is no body, and names nothing");
+  ok(fails("a <!-- TBD\n**TODO** <b>XXX</b> [FIXME](x)\n`<!--` core archive 999\n").length === 5 && fails("<!-- TBD -->\n<!--\nTODO\n").length === 0,
+    "headMends: markup hides nothing that shows (an unclosed comment mid-line, bold, a tag, a link, a comment's opening in code marks), and a comment hides what it holds");
+  ok(fails("core archive ../218\ncore archive /etc/passwd\ncore archive C:\\218").length === 0 && fails("core archive 999/../218").length === 1, "headMends: a path is no key, and a key before one is read as written");
+  ok(["core archive -1", "core archive 1e9", "core archive \u0661\u0662", "core archive 0x10"].every(b => fails(b).length === 0) && ["core archive 99999999999999999999", "core archive #0", "core archive #1084.1.2"].every(b => fails(b).length === 1) && fails("core archive 000218").length === 0,
+    "headMends: a number out of its form is no key, one too large or past the archive fails, and leading zeros name the item they lead to");
+  ok([undefined, null, "", "\n\r\n \t\n"].every(body => fails(body).length === 0 && headMends(body, { keys: null }).notes.length === 0), "headMends: nothing at all names nothing, and says nothing of an archive not read");
 }
 
 process.exit(failed ? 1 : 0);
