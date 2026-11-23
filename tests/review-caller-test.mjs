@@ -21,7 +21,10 @@ ok(callsPosting(call(""), true, has) === true, "the fixture's call, the kit's fo
 // the core a call's root holds
 for (const [w, holds, said] of [["", true, "the default root, holding the core"], ["    with:\n      root: core/\n", true, "a root with its slash"],
   ["    with:\n      root: lib/core\n", false, "a root that does not hold the core"], ["    with:\n      root: ${{ vars.ROOT }}\n", false, "a root read only at its run"],
-  ["    with:\n      root: ../core\n", false, "a root out of the project"], ["    with:\n      root: /core\n", false, "a root that is absolute"]]) {
+  ["    with:\n      root: ../core\n", false, "a root out of the project"], ["    with:\n      root: /core\n", false, "a root that is absolute"],
+  ["    with:\n      root: ./core\n", true, "a root from the project's own folder"], ["    with:\n      root: /\n", false, "the runner's root"], ["    with:\n      root: ///\n", false, "the runner's root, its slash doubled"],
+  ["    with:\n      root: ''\n", false, "an empty root"], ["    with:\n      root: nope/../core\n", false, "a root through a folder that is not there"], ["    with:\n      root: core//\n", false, "a root with its slash doubled"],
+  ["    with:\n      root: 'core '\n", false, "a root with a space"]]) {
   const got = callsPosting(call(w), true, has);
   ok(got === (holds ? true : null), `a public repository whose call is given ${said}: ${holds ? "posting" : "not known"}`, String(got));
 }
@@ -31,6 +34,12 @@ for (const [w, where] of [["    with:\n      advisory: ${{ vars.ADVISORY }}\n", 
 ok(callsPosting(call("").replace("  queue:\n", "  Queue:\n  queue:\n").replace("jobs:\n  Queue:\n", "jobs:\n  Queue:\n    uses: " + CORE + "/.github/workflows/queue-only.yml@" + pin + "\n    permissions: read-all\n"), true, has) === null, "two jobs named alike but for case, which GitHub refuses: not known");
 ok(callsPosting(call("").replaceAll(CORE, "someone/agent-core"), true, has) === null, "a call of a workflow of the same name in another repository: not known");
 ok(callsPosting(call("").replace(`queue-only.yml@`, `x/queue-only.yml@`), true, has) === null, "a call of the core's by a path the core has not: not known");
+ok(callsPosting(call("").replaceAll(CORE, CORE.toLowerCase()), true, has) === true, "the core's repository named in another case, which GitHub finds: posting");
+for (const [from, to, said] of [["/.github/workflows/queue-only", "/.GITHUB/workflows/queue-only", "a folder"], ["/.github/workflows/queue-only", "/.github/Workflows/queue-only", "a folder"], ["queue-only.yml@", "Queue-Only.yml@", "a workflow's name"]]) {
+  let got;
+  try { got = callsPosting(call("").replace(from, to), true, has); } catch (e) { got = e; }
+  ok(got === null, `a call of the core's by ${said} in another case, which GitHub does not find: not known, and no failure`, String(got));
+}
 
 for (const [w, said] of [["    with:\n      private: true\n", "`private: true`"], ["    with:\n      advisory: false\n", "`advisory: false`, which posts the status"],
   ["    with: { private: true }\n", "`private: true` in a flow mapping"], ["    with:\n      private: true # runs in a private repository\n", "`private: true` with a comment"],

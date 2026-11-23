@@ -112,8 +112,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      on every pull request and on its comments, as the kit's (no filter of branches or paths; a pull request's types named, holding the
      kit's four, and a comment's holding created and edited; its job run whatever the job it needs did; in the kit's form
      alone, each job a call of the core's two workflows granted what it asks and given only the inputs it defines, each
-     of its type, a boolean plainly so, needing only those jobs and none itself, no two named alike but for case, and no other key of a job or the file, `concurrency` among them; the core's repository named, and the review's `root` a folder of the project's that holds the core's Node version and the check's script), in a private repository giving `private: true` or `advisory: false`, through `scripts/own-files.mjs`: 64 MB of it, a file
-     git lists as the project's own, no link followed out of it, and read as YAML by `scripts/parse-yaml.mjs`, at most its 256 K characters, what it
+     of its type, a boolean plainly so, needing only those jobs and none itself, no two named alike but for case, and no other key of a job or the file, `concurrency` among them; the core's repository named, its path exact, and the review's `root` a plain relative path that holds the core's Node version and the check's script), in a private repository giving `private: true` or `advisory: false`, each file read from the default branch as last fetched (by git):
+     64 MB of it, a regular file, no link or submodule followed, and read as YAML by `scripts/parse-yaml.mjs`, at most its 256 K characters, what it
      cannot read said unread, never not for the project);
      limits: 60 s for each of the workflow check's two tools on one file
      (zizmor and actionlint, `scripts/workflow-tools.mjs`, each file run on its own, one a tool stops on or cannot load said
@@ -139,7 +139,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      what the changed file then shows is noted, not failed (a base no YAML for another reason is read as it stands); in the core's own run each fails), and NuGet's lock file version 2, a newer refused (npm's
      lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`, for the
      reader of where the tests run `tests/runners-test.mjs`, and for the owner's settings `tests/owner-settings-test.mjs`
-     (the file missing, a link) and `tests/review-caller-test.mjs` (no YAML, a call of another repository's, a root that does not hold the core, jobs as a list, no call of the core's, an input read only at its run, a
+     (the file missing, a link, on no fetched default branch or in the working tree alone, the core too) and `tests/review-caller-test.mjs` (no YAML, a call of another repository's or in another case, a root that does not hold the core or is not plain, jobs as a list, no call of the core's, an input read only at its run, a
      condition on the call, a job needed with none, no pull request among its triggers or only some, GitHub's own types, no comment trigger, no right to write statuses, a call granted less than it asks, a job needed that is not there, a call of another's, a concurrency, an input not defined or not of its type, a secret passed, a runner on a call, jobs needing each other or themselves, a job not a call, a key not the kit's, a job named as GitHub refuses, a comment on the line, each in a public repository and a private one; its
      size, by `own-files.mjs`'s and `parse-yaml.mjs`'s own readers' tests).
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its

@@ -18,7 +18,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { repoOf } from "./inbox.mjs";
-import { ownFiles } from "./own-files.mjs";
+import { READ_MOST } from "./own-files.mjs";
 import { callsPosting } from "./review-caller.mjs";
 import { inBare, plainEnv } from "./releases.mjs";
 import { CONTEXT } from "./security-review.mjs";
@@ -83,16 +83,33 @@ function rulesetOf(host, rules) {
   return notGiven(`${none}it lacks ${lacks.join(", ")}`);
 }
 
+// The project's files on its default branch (`branch`) as this clone last fetched it, since the core's security review
+// runs that branch's copy of the core, whatever a pull request holds (its workflow checks the default branch out): a
+// regular file's text by its path from the project's root, null where the branch holds none there (a link, a folder, a
+// submodule's commit or a file past READ_MOST among them); and null in place of the reader where that branch was never
+// fetched here, or `root` holds no repository of its own.
+function onBranch(root, branch) {
+  const ref = `refs/remotes/origin/${branch}`, env = { ...plainEnv(), GIT_LITERAL_PATHSPECS: "1" };
+  const git = (...a) => spawnSync("git", ["--no-replace-objects", ...a], { cwd: root, encoding: "utf8", maxBuffer: READ_MOST + 1024, env });
+  if (typeof branch !== "string" || !fs.existsSync(path.join(root, ".git")) || git("check-ref-format", ref).status !== 0 || git("rev-parse", "--verify", "-q", `${ref}^{commit}`).status !== 0) return null;
+  return f => {
+    const r = git("ls-tree", "-z", "-l", "--full-tree", ref, "--", f), m = /^(?:100644|100755) blob ([0-9a-f]+) +(\d+)\t([^\0]*)\0$/.exec(r.stdout ?? "");
+    if (r.status !== 0 || !m || m[3] !== f || Number(m[2]) > READ_MOST) return null;
+    const b = git("cat-file", "blob", m[1]);
+    return b.status === 0 ? b.stdout : null;
+  };
+}
+
 // The status `security-review` required, where the project's own workflow at `root` posts it on every pull request.
 function reviewOf(host, rules, root) {
   const repo = host.repo.body;
-  // (a file of the project's own alone, as every script reads one: no link out of it, nothing past its size; own-files.mjs)
-  let text = null, files = null;
-  if (fs.existsSync(path.join(root, ".git"))) try { files = ownFiles(root); text = files.read(".github/workflows/security-review.yml"); } catch { /* (git could not list its files: nothing of its own read) */ }
-  if (text === null) return apart("the project has no `.github/workflows/security-review.yml`, so nothing posts the status, and a status required that never comes would hold every pull request");
   if (!repo) return unread(host.repo.why);
-  const posts = callsPosting(text, repo.private === false, f => files.listed.includes(f));
-  if (posts === null) return unread("the project's `.github/workflows/security-review.yml` could not be read as YAML, calls no security review of the core's repository, gives it a `root` that does not hold the core, starts on some pull requests alone, runs its call on a condition other than the kit's, is not in the kit's form (each job a call of the core's two workflows granted what it asks and given only the inputs it defines, needing only those jobs and none itself, no other key, `concurrency` among them), or gives `private` or `advisory` a value read only at its run, so whether its call posts the status on every pull request is not known");
+  const read = onBranch(root, repo.default_branch), branch = shown(repo.default_branch) ?? "the default branch";
+  if (!read) return unread(`${branch} is not fetched here, and the check runs that branch's copy of the core: fetch it (git fetch origin) and run this again`);
+  const text = read(".github/workflows/security-review.yml");
+  if (text === null) return apart(`the project has no \`.github/workflows/security-review.yml\` on ${branch} as last fetched, so nothing posts the status, and a status required that never comes would hold every pull request`);
+  const posts = callsPosting(text, repo.private === false, f => read(f) !== null);
+  if (posts === null) return unread(`the project's \`.github/workflows/security-review.yml\` on ${branch} could not be read as YAML, calls no security review of the core's repository, gives it a \`root\` that does not hold the core there, starts on some pull requests alone, runs its call on a condition other than the kit's, is not in the kit's form (each job a call of the core's two workflows granted what it asks and given only the inputs it defines, needing only those jobs and none itself, no other key, \`concurrency\` among them), or gives \`private\` or \`advisory\` a value read only at its run, so whether its call posts the status on every pull request is not known`);
   if (!posts) return apart("in a private repository the check posts its status only where its call is given `with: private: true` or `advisory: false`, and a status required that never comes would hold every pull request");
   if (!rules) return unread(host.rules?.why ?? host.repo.why);
   return rules.checks.has(CONTEXT) ? given() : notGiven();

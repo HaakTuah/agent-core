@@ -26,13 +26,19 @@ try {
   fs.mkdirSync(path.join(root, ".github", "workflows"), { recursive: true });
   fs.mkdirSync(path.join(root, "core", "scripts"), { recursive: true }); // (the core a call's root holds)
   for (const f of [".node-version", "scripts/security-review.mjs"]) fs.writeFileSync(path.join(root, "core", f), "");
-  execFileSync("git", ["init", "-q"], { cwd: root, env }); // (its own files are those git lists: own-files.mjs)
-  const review = text => fs.writeFileSync(path.join(root, ".github", "workflows", "security-review.yml"), text);
+  execFileSync("git", ["init", "-q"], { cwd: root, env });
+  // (the files read are those on the default branch as last fetched, which the core's workflow runs: each change committed and fetched, as a merge would land it)
+  const land = () => { for (const a of [["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "x"], ["update-ref", "refs/remotes/origin/main", "HEAD"]]) execFileSync("git", a, { cwd: root, env }); };
+  const review = (text, landed = true) => { fs.writeFileSync(path.join(root, ".github", "workflows", "security-review.yml"), text); if (landed) land(); };
+  const gone = () => { fs.rmSync(path.join(root, ".github", "workflows", "security-review.yml")); land(); };
 
   const call = w => `on:\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\n  issue_comment:\n    types: [created, edited]\njobs:\n  queue:\n    permissions:\n      contents: read\n      pull-requests: read\n      issues: read\n    uses: ${CORE}/.github/workflows/queue-only.yml@${"a".repeat(40)}\n  security-review:\n    needs: queue\n    if: \${{ !cancelled() }}\n    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n    uses: ${CORE}/.github/workflows/security-review.yml@${"a".repeat(40)} # the pin\n${w}`;
 
   // every setting given, in a public repository
-  review(call(""));
+  review(call(""), false);
+  const unfetched = { repo: { body: { private: false, default_branch: "main" } } };
+  ok(/^not read: `main` is not fetched here/.test(statesOf(unfetched, root)["security-review-required"].said), "a default branch never fetched here: the call not read, and how to read it said");
+  land();
   const rules = checks => [{ type: "deletion" }, { type: "non_fast_forward" }, { type: "pull_request" }, { type: "required_status_checks", parameters: { required_status_checks: checks.map(context => ({ context })) } }];
   const all = {
     repo: { body: { private: false, default_branch: "main", security_and_analysis: { secret_scanning: { status: "enabled" }, secret_scanning_push_protection: { status: "enabled" } } } },
@@ -66,9 +72,16 @@ try {
   ok(s.ruleset.given === false && /it lacks deletions restricted, the status check `core \/ core` required$/.test(s.ruleset.said) && !/no ruleset applies/.test(s.ruleset.said), "a ruleset that lacks some: each it lacks named", s.ruleset.said);
 
   // what does not apply, and what cannot be read
-  fs.rmSync(path.join(root, ".github", "workflows", "security-review.yml"));
+  gone();
   s = statesOf(all, root);
-  ok(s["security-review-required"].given === null && /does not apply here: the project has no/.test(s["security-review-required"].said), "no security-review workflow: the status is not asked for, since one never posted would hold every pull request");
+  ok(s["security-review-required"].given === null && /does not apply here: the project has no `\.github\/workflows\/security-review\.yml` on `main`/.test(s["security-review-required"].said), "no security-review workflow: the status is not asked for, since one never posted would hold every pull request");
+  review(call(""), false);
+  ok(/does not apply here: the project has no/.test(statesOf(all, root)["security-review-required"].said), "a call in the working tree alone, as on the pull request that brings the core: not asked for, since the check runs the default branch's copy");
+  fs.renameSync(path.join(root, "core"), path.join(at, "core-aside"));
+  land();
+  fs.renameSync(path.join(at, "core-aside"), path.join(root, "core"));
+  ok(statesOf(all, root)["security-review-required"].given === null && /^not read: /.test(statesOf(all, root)["security-review-required"].said), "a call landed while the core stands in the working tree alone: not read, never asked for");
+  land();
   review(`jobs:\n  security-review:\n    uses: ${CORE}/.github/workflows/security-review.yml@${"a".repeat(40)}\n`);
   const privately = { ...all, repo: { body: { ...all.repo.body, private: true } } };
   s = statesOf(privately, root);
@@ -78,11 +91,13 @@ try {
   review(call("").replace("if: ${{ !cancelled() }}", "if: false"));
   s = statesOf(none, root)["security-review-required"];
   ok(s.given === null && /^not read: /.test(s.said), "a call not read as posting (review-caller-test.mjs tries each): said not read, never asked for", s.said);
-  fs.rmSync(path.join(root, ".github", "workflows", "security-review.yml"));
+  gone();
   if (process.platform !== "win32") { // (a link needs a right of its own on Windows)
+    fs.writeFileSync(path.join(at, "elsewhere.yml"), call(""));
     fs.symlinkSync(path.join(at, "elsewhere.yml"), path.join(root, ".github", "workflows", "security-review.yml"));
+    land();
     ok(statesOf(all, root)["security-review-required"].given === null, "a workflow that is a link is not followed: read as not there");
-    fs.rmSync(path.join(root, ".github", "workflows", "security-review.yml"));
+    gone();
   }
   const refused = { why: "GitHub answered 403, which it gives an account that may not read it" };
   s = statesOf({ repo: { body: { private: false, default_branch: "main" } }, rules: refused, secrets: refused, actions: { body: {} } }, root);

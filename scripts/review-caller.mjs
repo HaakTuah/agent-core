@@ -4,7 +4,7 @@
 // (setup/template/workflows/security-review.yml.tmpl), and whatever else said not known. Node's own modules.
 
 import path from "node:path";
-import { CORE_SOURCE } from "./core-address.mjs";
+import { CORE } from "./core-address.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 
 // Whether a workflow's triggers (`on`) start it on each of `name`'s events: no filter but its types, and those holding
@@ -30,9 +30,11 @@ const onEveryPull = on => onEach(on, "pull_request", ["opened", "reopened", "syn
 const ASKS = { "security-review": { contents: "read", "pull-requests": "read", statuses: "write" }, "queue-only": { contents: "read", "pull-requests": "read", issues: "read" } };
 const INPUTS = { "security-review": { advisory: "boolean", root: "string", private: "boolean", queue: "string", reviewers: "string" }, "queue-only": { root: "string", private: "boolean" } };
 const LEVEL = { read: 1, write: 2 };
-// (a call of the core's own repository, whose two workflows' asks and inputs are those above; a workflow of the same
-// name in any other repository is not read, nor what it asks)
-const CALL = new RegExp(`^${CORE_SOURCE}/\\.github/workflows/(security-review|queue-only)\\.yml@[\\w./-]+$`, "i");
+// Which of the two `uses` calls in the core's own repository, whose asks and inputs are those above, or null: a
+// workflow of the same name in any other repository is not read, nor what it asks. Its owner and name are matched as
+// GitHub matches them, whatever their case, and the path in it exactly, as GitHub finds a file.
+const CALL = /^([^/@]+\/[^/@]+)\/\.github\/workflows\/(security-review|queue-only)\.yml@[\w./-]+$/;
+const callOf = uses => { const m = typeof uses === "string" && CALL.exec(uses); return m && m[1].toLowerCase() === CORE.toLowerCase() ? m[2] : null; };
 const keysIn = (o, allowed) => o !== null && typeof o === "object" && !Array.isArray(o) && Object.keys(o).every(k => allowed.includes(k));
 
 // Whether a token's `permissions` (`p`) grant all `asks`; none given at all leaves them to the repository's default,
@@ -48,12 +50,12 @@ function grants(p, asks) {
 // granted what it asks, and needing only jobs `ids` holds.
 function callWhole(j, ids, top) {
   if (!keysIn(j, ["needs", "if", "permissions", "uses", "with"])) return false;
-  const core = typeof j.uses === "string" && CALL.exec(j.uses);
+  const core = callOf(j.uses);
   if (!core) return false;
-  const defined = INPUTS[core[1]], given = j.with ?? {};
+  const defined = INPUTS[core], given = j.with ?? {};
   if (!keysIn(given, Object.keys(defined)) || !Object.entries(given).every(([k, v]) => typeof v === defined[k])) return false;
   const needs = j.needs === undefined ? [] : typeof j.needs === "string" ? [j.needs] : j.needs;
-  return Array.isArray(needs) && needs.every(n => typeof n === "string" && ids.includes(n)) && grants(Object.hasOwn(j, "permissions") ? j.permissions : top, ASKS[core[1]]);
+  return Array.isArray(needs) && needs.every(n => typeof n === "string" && ids.includes(n)) && grants(Object.hasOwn(j, "permissions") ? j.permissions : top, ASKS[core]);
 }
 
 // Whether the workflow `doc` starts whole, in the kit's form and no other, since what GitHub refuses or leaves waiting
@@ -76,11 +78,12 @@ function startsWhole(doc, jobs) {
 // whole (`startsWhole`), since that cannot be told.
 // Whether `root`, the folder a call of the security review is given, holds the core in the project (`has`: whether the
 // project holds a file by its path), as the call needs to post: its Node's version and the check's script, without
-// which the workflow fails or says nothing. A value read only at its run, or a path out of the project, is not read.
+// which the workflow fails or says nothing. Only a relative path of plain names is read, as written: no value read at
+// its run, none empty or from the runner's root, no step back (a `..`, which the runner's shell follows only through a
+// folder that is there), no doubled `/`, no space or other sign.
 function holdsCore(root, has) {
-  if (typeof root !== "string" || /\$\{\{/.test(root)) return false;
-  const at = path.posix.normalize(root.replace(/\/+$/, "") || ".");
-  if (path.posix.isAbsolute(at) || at === ".." || at.startsWith("../")) return false;
+  if (typeof root !== "string" || !/^[\w.-]+(\/[\w.-]+)*\/?$/.test(root) || root.split("/").includes("..")) return false;
+  const at = path.posix.normalize(root.replace(/\/$/, ""));
   return [".node-version", "scripts/security-review.mjs"].every(f => has(path.posix.join(at, f)));
 }
 
@@ -88,7 +91,7 @@ export function callsPosting(text, open, has) {
   let doc;
   try { doc = parseYaml(text); } catch { return null; }
   const jobs = doc?.jobs && typeof doc.jobs === "object" && !Array.isArray(doc.jobs) ? doc.jobs : {};
-  const calls = Object.values(jobs).filter(j => typeof j?.uses === "string" && CALL.exec(j.uses)?.[1] === "security-review");
+  const calls = Object.values(jobs).filter(j => typeof j?.uses === "string" && callOf(j.uses) === "security-review");
   if (!calls.length) return null;
   const everyPull = onEveryPull(doc.on) && startsWhole(doc, jobs);
   // (its job runs whatever a job it needs did: the kit's condition, or none and no job needed)
