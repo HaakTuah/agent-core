@@ -62,10 +62,10 @@ function rulesetOf(host, rules) {
     .filter(([type]) => !rules.types.has(type)).map(([, said]) => said);
   if (!rules.checks.has("core / core")) lacks.push("the status check `core / core` required");
   if (!lacks.length) {
-    // (which of the checks is the project's own CI cannot be read exactly: those required beside the core's are named)
+    // (whether the checks required hold all of the project's own CI cannot be read exactly, so it is never ticked on a
+    // guess: the core's part is said given, and the checks required beside it named for the owner to compare)
     const own = [...rules.checks].filter(c => c && c !== "core / core" && c !== "security-review");
-    return own.length ? given(`given, the checks required beside the core's: ${own.map(c => `\`${c}\``).join(", ")} (that they are the project's own CI is the owner's to see)`)
-      : unread("the ruleset holds all the core asks, but no check of the project's own CI is required, and whether the project has CI of its own is not read: where it has, require its checks");
+    return unread(`the core's part is given, and whether the project's own CI is required is not read: ${own.length ? `the checks required beside the core's are ${own.map(c => `\`${c}\``).join(", ")}; compare them with the project's own jobs` : "no check is required beside the core's; where the project has CI of its own, require its checks"}`);
   }
   const none = rules.types.size ? "" : `no ruleset applies to \`${host.repo.body?.default_branch ?? "the default branch"}\` (a branch protection of the older kind is not read here); `;
   return notGiven(`${none}it lacks ${lacks.join(", ")}`);

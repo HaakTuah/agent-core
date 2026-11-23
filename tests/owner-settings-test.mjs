@@ -35,12 +35,12 @@ try {
     actions: { body: { sha_pinning_required: true } },
   };
   let s = statesOf(all, root);
-  ok(IDS.filter(id => id !== "reviewer-app").every(id => s[id].given === true), "a project with every setting given reads each as given", JSON.stringify(s));
+  ok(IDS.filter(id => id !== "reviewer-app" && id !== "ruleset").every(id => s[id].given === true), "a project with every setting given reads each as given", JSON.stringify(s));
   ok(s["reviewer-app"].given === null && /not read/.test(s["reviewer-app"].said), "the reviewer's app, which no session's sign-in may list, is said not read, never guessed");
   ok(/its value is not read/.test(s["personal-terms"].said), "the secret is read by its name alone");
-  ok(/beside the core's: `tests`/.test(s.ruleset.said), "the checks required beside the core's are named, since which is the project's own CI cannot be read", s.ruleset.said);
+  ok(s.ruleset.given === null && /the core's part is given/.test(s.ruleset.said) && /beside the core's are `tests`; compare them/.test(s.ruleset.said), "the ruleset is never ticked on a guess at the project's own CI: the core's part said given, the checks beside it named", s.ruleset.said);
   s = statesOf({ ...all, rules: { body: rules(["core / core", "security-review"]) } }, root);
-  ok(s.ruleset.given === null && /no check of the project's own CI is required/.test(s.ruleset.said), "a ruleset with the core's checks alone is not ticked: the project's own CI is said not read", s.ruleset.said);
+  ok(s.ruleset.given === null && /no check is required beside the core's/.test(s.ruleset.said), "a ruleset with the core's checks alone is not ticked: the project's own CI is said not read", s.ruleset.said);
   const many = { ...all, secrets: { body: { total_count: 31, secrets: [{ name: "OTHER" }] } } };
   ok(statesOf({ ...many, terms: { body: { name: "PERSONAL_TERMS" } } }, root)["personal-terms"].given === true, "past the page read, the secret asked by name and there: given");
   ok(statesOf({ ...many, terms: { why: "GitHub answered 404, which it gives an account that may not read it" } }, root)["personal-terms"].given === false, "past the page read, the secret asked by name and not there: not given");
@@ -97,7 +97,7 @@ try {
   ok(list.split("\n").filter(l => l.startsWith("- [ ] ")).length === SETTINGS.length && list.includes("Set at: https://github.com/someone/a-game/settings/secrets/actions"), "one unticked line a setting, each with its link");
   ok((list.match(/\(new since the copy before\)/g) ?? []).length === 1 && /PERSONAL_TERMS`[^\n]*\(new since the copy before\)/.test(list), "a setting new since the copy before is marked so");
   const ticked = checklist({ repo: null, states: statesOf(all, root), script: "x" });
-  ok(ticked.split("\n").filter(l => l.startsWith("- [x] ")).length === SETTINGS.length - 1 && !/Set at:/.test(ticked) && /on no github\.com/.test(ticked), "every setting given ticks all but the unread; with no repository on github.com, no link is made, and that is said");
+  ok(ticked.split("\n").filter(l => l.startsWith("- [x] ")).length === SETTINGS.length - 2 && !/Set at:/.test(ticked) && /on no github\.com/.test(ticked), "every setting given ticks all but the unread; with no repository on github.com, no link is made, and that is said");
 
   // the list at an older commit of the core, from a bare repository
   const core = path.join(at, "core"), bare = path.join(at, "bare");
