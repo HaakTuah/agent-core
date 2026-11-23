@@ -56,11 +56,11 @@ ok(show(moves) === ".github/workflows/v.yml, .github/workflows/w.yml, a/make.sh,
 // a Python module run by name brings each package above it, whose __init__.py runs first, and what each imports
 const python = setOf(tree({
   ".github/workflows/p.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: python -m tools.jobs.run\n",
-  "tools/__init__.py": "from . import shared\n", "tools/shared.py": "print(0)\n", "tools/jobs/__init__.py": "", "tools/jobs/run.py": "import helpers.net as net\nfrom .steps import (one, two)\nfrom ..cfg import load\n",
-  "tools/jobs/steps/__init__.py": "", "tools/jobs/steps/one.py": "", "tools/jobs/steps/two.py": "", "tools/cfg.py": "", "helpers/__init__.py": "", "helpers/net.py": "",
+  "tools/__init__.py": "from . import shared\n", "tools/shared.py": "print(0)\n", "tools/jobs/__init__.py": "", "tools/jobs/run.py": "import helpers.net as net\nfrom .steps import (one, two)\nfrom ..cfg import (\n    load,\n    keys,\n)\n",
+  "tools/jobs/steps/__init__.py": "", "tools/jobs/steps/one.py": "", "tools/jobs/steps/two.py": "", "tools/cfg/__init__.py": "", "tools/cfg/load.py": "", "tools/cfg/keys.py": "", "helpers/__init__.py": "", "helpers/net.py": "",
   "tools/unused.py": "", "other/__init__.py": "",
 }));
-ok(show(python) === ".github/workflows/p.yml, helpers/__init__.py, helpers/net.py, tools/__init__.py, tools/cfg.py, tools/jobs/__init__.py, tools/jobs/run.py, tools/jobs/steps/__init__.py, tools/jobs/steps/one.py, tools/jobs/steps/two.py, tools/shared.py",
+ok(show(python) === ".github/workflows/p.yml, helpers/__init__.py, helpers/net.py, tools/__init__.py, tools/cfg/__init__.py, tools/cfg/keys.py, tools/cfg/load.py, tools/jobs/__init__.py, tools/jobs/run.py, tools/jobs/steps/__init__.py, tools/jobs/steps/one.py, tools/jobs/steps/two.py, tools/shared.py",
   "a Python module run by name brings the __init__.py of each package above it, and the modules it and they import, by an absolute, a relative or a parent-relative name; a module none imports stays out", show(python));
 // a Python import in a form a line does not hold alone, or loaded by a string, joins the set too
 const pythonForms = setOf(tree({
