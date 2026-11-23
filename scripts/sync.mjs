@@ -4,8 +4,8 @@
 // listing those calls, and prints what the sync asks of the project beyond the copy (the core's setup/sync-notes.md, the
 // entries it gained between the two commits), then, from the copy it has just written, every step a release asks that
 // is not done, what the steps' writers wrote of them where a script does it exactly, set aside in a stash to be
-// committed after the merge (steps.mjs --write --aside; #1091), every difference from a fresh start, where the owner's inbox is and what its labels and openers lack, the
-// packages it holds gone stale (#1095), and what the project holds twice or against the core (steps.mjs, fresh.mjs, inbox.mjs, labels.mjs, held.mjs and twice.mjs, beside this file), the settings only the owner gives where the sync
+// committed after the merge (steps.mjs --write --aside; #1091), every difference from a fresh start, where the owner's inbox is and what its labels and openers lack, and
+// what the project holds twice or against the core (steps.mjs, fresh.mjs, inbox.mjs, labels.mjs and twice.mjs, beside this file), the settings only the owner gives where the sync
 // brings one the old copy's list did not hold, and at the first copy all of them (owner-settings.mjs; #1085), and at its end the one line that says whether the
 // project then holds the core whole and wired (attached.mjs, beside this file; #1081), for the sync PR's description, having written what the core owns, from the new copy's kit, by the one process that writes it for a new project too (converge.mjs, beside this file; #1083): they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
 // which, a pure sync, its merger checks with `scripts/pure-sync.mjs` (floor rule 8). Git, tar, gh where it asks whose
@@ -45,7 +45,7 @@ const fail = msg => { throw new Failure(msg); };
 // What a sync prints for its pull request's description, each a script of the new copy with its arguments (`kits`:
 // the folder of the earlier starter kits, beside the bare repository of the core; `old`, the copy's pin before): the
 // steps not done, the differences from a fresh start, where the inbox is, what the labels lack, the steps read on the host (host.mjs; #1092), the
-// packages the project holds that have gone stale since it took them (held.mjs; #1095), the owner's settings
+// packages gone stale (held.mjs; #1095), the owner's settings
 // where one is new since `old`, what the project holds twice or against the core (#1087), the line that lists what the sync's own paths outside the copy call for, the
 // pins of the project's workflows above all (reading.mjs, by which the description check reads that line), then what the
 // steps' writers wrote, set aside in a stash for a pull request of its own after the sync's, which stays pure (steps.mjs

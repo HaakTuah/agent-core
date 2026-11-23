@@ -201,6 +201,15 @@ try {
     ok(r.status === (THROWS.has(f) ? 1 : 0) && /(?:did not run[^\n]*|^FAIL): the package \S+ could not be installed in \S+: npm could not be started\. Mend: /mu.test(out) && (THROWS.has(f) || /^::warning::/mu.test(r.stderr)) && !r.stdout.trim() && askedOf() === "all\n" && told(out),
       `${f}, with nothing installed beside the copy, runs the copy's installer once, and where it installs nothing says it did not run and why, ${THROWS.has(f) ? "to its caller" : "as a warning that fails nothing"}, and does not take the project's own package of the name`, `${r.status} ${out}${askedOf()}`);
   }
+  // (the steps, with nothing installed beside the copy: the copy's installer run once, and where it installs nothing, one
+  // line in place of every step said unread, with why and the mend, failing nothing; #1095, point 2)
+  for (const args of [[], ["--write"]]) {
+    fs.rmSync(asked, { force: true });
+    const r = spawnSync(process.execPath, [path.join(copy, "scripts/steps.mjs"), ...args], { cwd: project, encoding: "utf8", timeout: 60000, env });
+    const lines = r.stdout.trim().split("\n");
+    ok(r.status === 0 && lines.length === 1 && /^The steps were not read: the package \S+ could not be installed in \S+: npm could not be started\. Mend: .*\.$/u.test(lines[0]) && !/\.\.$/u.test(lines[0]) && askedOf() === "all\n",
+      `steps.mjs${args.length ? " --write" : ""}, with nothing installed beside the copy, runs the copy's installer once, and where it installs nothing says so in one line with its mend, and fails nothing`, `${r.status} ${r.stdout}${r.stderr}${askedOf()}`);
+  }
   // (the code scan, with its engine not installed, on a change it would read: it did not run, and says how to install)
   const g = (...a) => execFileSync("git", a, { cwd: project, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
   g("init", "-q"); fs.writeFileSync(path.join(project, "a.py"), "x = 1\n"); g("add", "a.py"); g("commit", "-q", "-m", "code");

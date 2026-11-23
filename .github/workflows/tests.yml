@@ -691,6 +691,9 @@ jobs:
       - name: The reader of the agent tools' files, which a step reads
         if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-tool-files-test.mjs ')) }}
         run: node tests/steps-tool-files-test.mjs
+      - name: The steps read by a tool fetched at set-up, where a session fetched it
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-fetched-test.mjs ')) }}
+        run: node tests/steps-fetched-test.mjs
       - name: What holds each rule of the floor and the modules, read
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/holders-test.mjs ')) }}
         run: node tests/holders-test.mjs

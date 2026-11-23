@@ -239,7 +239,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   setting is changed, a difference it keeps on purpose lost, a check that nothing else runs taken out, or what only the
   owner can do done; nor that the manifest,
   `SECURITY.md`, the threat model, the progress file, the choice records or a check's config is written where it
-  stands, nor after the first copy where it does not: each is then a step's to ask, with what it needs beside it. Reason: a release asked 63 things of each project, 19 of them workflow changes each with two security
+  stands, nor after the first copy where it does not: each is then a step's to ask, with what it needs beside it, save the keys of the kit's a check's config lacks, which
+  it adds with every value of the project's kept (#1095, point 5). Reason: a release asked 63 things of each project, 19 of them workflow changes each with two security
   reviews, built by hand from the notes, and a project of another owner held 25 differences from what the kit writes
   for a new one. Held by `tests/converge-test.mjs` and `tests/pure-sync-test.mjs` (a render that differs, a word outside
   the core's part changed, a value out of its form, a deletion the one job does not cover, each refused), by `tests/upgrade-test.mjs`, which takes
@@ -301,7 +302,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
   is not done; or, where no check reads it, why, held by the staged case `steps`. Every standing entry has one. Every sync
   runs them all (`scripts/sync.mjs`) and prints, for the sync pull request's description, only the steps not done, and
-  every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`), and the packages it holds gone stale (`scripts/held.mjs`; #1095); each is
+  every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`), and the packages it holds gone stale (`scripts/held.mjs`; #1095); where the core's packages cannot be installed it reads no step and says so
+  in one line with its mend, and a step only a tool fetched at set-up reads is read where the session fetched it (#1095,
+  points 2 and 4); each is
   a task the project's agents take (`roles/orchestrator.md`; with no orchestrator, the session that syncs), a step
   only the owner can do labelled so, and each difference kept on purpose declared in the manifest's "Differences".
   Where a script does a step exactly, the sync runs it (`scripts/steps.mjs --write`; #1091): it writes a check's config
