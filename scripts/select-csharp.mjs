@@ -1,12 +1,12 @@
 // What a file of C# reaches, for the test selection (select.mjs; #675), read on the parser's tokens (shape-csharp.mjs);
 // it never runs the code. A file reaches the files that declare a type it may name: each word it holds as a type (or an
 // attribute's, `[Fact]` naming FactAttribute) in a namespace it sees (its own and those around it, the global one, those
-// its using directives name, global ones from any file and MSBuild's <Using>); each name written out in full, an alias
+// its using directives name, global ones from any file and MSBuild's <Using>); each name written in full, an alias
 // that heads it put for what it names; the files that may declare extension members in a namespace it sees; a file of
 // top-level statements, by the name Program; and the files every file reaches: those run with no name (runsUnnamed),
 // those that hold a global using directive, and those the grammar lost. It reads more than a file takes. A file is
 // unsure (a test that reaches it runs on any change) where the grammar lost it, it holds code the tokens leave out, or
-// it reads types by reflection or scans an assembly; every file is, where a <Using> names an MSBuild expression, a
+// it finds types unnamed (REFLECTS); every file is, where a <Using> names an MSBuild expression, a
 // global alias a hook's attribute, or git cannot be asked. Files of C# git holds that the config does not read are read
 // too, as links between those it reads (select-csharp-project.mjs).
 import { heldBeside, msbuildUsings } from "./select-csharp-project.mjs";
@@ -15,10 +15,10 @@ import { readCsharp } from "./shape-csharp.mjs";
 
 const TYPE = new Set(["class", "struct", "interface", "enum", "record", "delegate", "namespace"]);
 const MODIFIER = new Set(["public", "internal", "private", "protected", "static", "sealed", "abstract", "partial", "readonly", "ref", "unsafe", "file", "new", "extern"]);
-// (what C# or a test framework runs with no name: the files that hold one are reached from every file of C#)
+// (what C# or a test framework runs unnamed: a file that holds one is reached from every file)
 const HOOKS = new Set(["ModuleInitializer", "AssemblyInitialize", "AssemblyCleanup", "GlobalTestInitialize", "GlobalTestCleanup", "SetUpFixture", "BeforeEvery", "AfterEvery", "IIncrementalGenerator", "ISourceGenerator", "CollectionDefinition"]);
-// (what finds types by reflection, or scans an assembly for them; any word of Assembly or Assemblies too)
-const REFLECTS = new Set(["Activator", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
+// (what finds types unnamed: by reflection, a scan of an assembly or the compilation; a word of Assembly(ies) too)
+const REFLECTS = new Set(["IIncrementalGenerator", "ISourceGenerator", "Activator", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
   "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR"]);
 
 const hookWord = w => HOOKS.has(w.replace(/Attribute$/u, ""));
@@ -51,8 +51,8 @@ function nameAt(toks, k) {
   return { parts, end: k };
 }
 
-// The index past the "<...>" (one or more) that opens at toks[k], or k where none does ("using L = List<App.Item>;": the
-// names in it are read as any other words).
+// The index past the "<...>" (one or more) that opens at toks[k], or k where none does (its names are read as any other
+// words).
 function pastGeneric(toks, k) {
   while (toks[k]?.v === "<") k = (pairs(toks).get(k) ?? toks.length - 1) + 1;
   return k;
@@ -217,10 +217,10 @@ function factsOf(read, src) {
 
 // Where the project declares each type: { types: Map of a full name to its files, byLast: Map of a type's last word to
 // a Map of its namespace to its files, extensions: Map of a namespace to the files that may extend in it, every: the
-// files every file reaches (those run with no name, those that hold a global using directive, and those unread, whose
+// files every file reaches (those run unnamed, those that hold a global using directive, and those unread, whose
 // declarations are not known), globals: what global using directives name, aliases: Map of a global alias to what it
-// names, unsure: the files unread, that hold a raw interpolated string or that reflect, depth: the most words of a name
-// declared, deeper than which no name is looked up }.
+// names, unsure: the files unread, holding code the tokens leave out or finding types unnamed, depth: the most words of
+// a declared name }.
 function indexOf(facts, pace) {
   const ix = { types: new Map(), byLast: new Map(), extensions: new Map(), every: [], globals: [], aliases: new Map(), unsure: new Set(), depth: 1 };
   const deep = name => { ix.depth = Math.max(ix.depth, name.split(".").length); };
@@ -267,11 +267,11 @@ function globally(ix, usings) {
 
 // The names a file writes in full (x its facts): its runs of dotted words, each with an alias that heads it put for
 // what the alias names (one of its own or a global one, the word alone too), and what global using directives name (a
-// `using static` of MSBuild's names a type no file need name). `pace` is asked for each.
+// `using static` of MSBuild's names a type no file need name), cut past the index's depth. `pace` is asked for each.
 function fullNames(x, ix, pace) {
   const aliases = new Map(ix.aliases), runs = new Set([...x.runs, ...ix.globals]);
   for (const u of x.usings) if (u.alias && u.target !== null) into(aliases, u.alias).add(u.target);
-  for (const run of [...x.runs, ...x.words]) { pace(); const [head, ...rest] = run.split("."); for (const t of aliases.get(head) ?? []) runs.add([t, ...rest].join(".")); }
+  for (const run of [...x.runs, ...x.words]) { pace(); const [head, ...rest] = run.split(".", ix.depth + 1); for (const t of aliases.get(head) ?? []) { pace(); runs.add([t, ...rest].join(".")); } }
   return runs;
 }
 

@@ -1,5 +1,5 @@
 // Tests where the test selection cannot tell what reaches a file of C# (scripts/select-csharp.mjs, through
-// scripts/select.mjs; #675): a file lost by the grammar, one that reads types by reflection or scans an assembly, one
+// scripts/select.mjs; #675): a file lost by the grammar, one that reads types by reflection, scans an assembly or is a source generator, one
 // with a raw interpolated string or an alignment that names something, every file where a <Using> names a property or
 // holds what the reader cannot read, a global alias names a hook's attribute or git cannot be asked; a namespace an SDK
 // imports by ImplicitUsings and a <Using>'s Alias given as an element, which reach every file; and the whole
@@ -37,9 +37,13 @@ ok(same([...r.unsure], ["src/Lost.cs"]), "a file the grammar loses is unsure, an
 
 // ---- each word of the list ----
 const reflectWords = ["Activator.CreateInstance(t)", "a.GetTypes()", "a.ExportedTypes", "a.DefinedTypes", "s.AddControllers()", "s.AddControllersWithViews()", "s.AddMvc()", "s.AddMvcCore()",
-  "s.AddRazorPages()", "a.MapControllers()", "a.MapRazorPages()", "a.MapRazorComponents()", "m.AddApplicationPart(a)", "s.AddAutoMapper(a)", "s.AddMediatR(a)", "GetAssemblies()", "Type.GetType(n)", "typeof(X).Assembly"];
+  "s.AddRazorPages()", "a.MapControllers()", "a.MapRazorPages()", "a.MapRazorComponents()", "m.AddApplicationPart(a)", "s.AddAutoMapper(a)", "s.AddMediatR(a)", "GetAssemblies()", "Type.GetType(n)", "typeof(X).Assembly",
+  "default(IIncrementalGenerator)", "default(ISourceGenerator)"];
 const missed = reflectWords.filter(w => !same([...one(`namespace R;\nclass X { void Go() { var r = ${w}; } }\n`).unsure], ["src/X.cs"]));
 ok(!missed.length, "each word that finds types by reflection or scans an assembly makes its file unsure, and no other", missed.join(", "));
+const gen = { ...app, "src/Gen.cs": "namespace Gen;\n[Generator] public class Catalog : IIncrementalGenerator { public void Initialize(object c) { } }\n", "src/Widget.cs": "namespace App;\npublic class Widget { }\n",
+  "tests/CountTest.cs": "namespace Tests;\nclass CountTest { int n = Generated.Catalog.Count; }\n" };
+ok(pick(gen, "src/Widget.cs").tests.includes("tests/CountTest.cs"), "a source generator, which reads types it never names, makes a test that reaches it run on any change", JSON.stringify(pick(gen, "src/Widget.cs")));
 ok(!one("namespace R;\nclass X { void Go() { var t = x.GetType(); } }\n").unsure.size, "a GetType of an object, not of Type, makes no file unsure");
 
 // ---- what review found (#1159) ----

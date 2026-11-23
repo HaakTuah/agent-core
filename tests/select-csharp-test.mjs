@@ -102,8 +102,8 @@ if (started(import.meta.url)) {
     .concat(["IIncrementalGenerator", "ISourceGenerator"].map(w => [w, `namespace H;\nclass X : ${w} { }\n`]),
       ["Assembly", "TestSession", "TestDiscovery"].map(w => [`Before(${w})`, `namespace H;\nclass X { [Before(${w})] void Go() { } }\n`]),
       [["[module: …]", "[module: System.Security.UnverifiableCode]\nnamespace H;\nclass X { }\n"], ["After(Assembly)", "namespace H;\nclass X { [After(Assembly)] void Go() { } }\n"]]);
-  const runs = hooks.filter(([, src]) => !one(src).links.get("tests/T.cs")?.has("src/X.cs") || one(src).unsure.size).map(([w]) => w);
-  ok(!runs.length, "each hook's word, a generator's interface, TUnit's Before and After of the assembly, the session and discovery, and a module's attribute make a file reached from every file, and none unsure", runs.join(", "));
+  const runs = hooks.filter(([w, src]) => !one(src).links.get("tests/T.cs")?.has("src/X.cs") || one(src).unsure.size !== +/Gen/u.test(w)).map(([w]) => w);
+  ok(!runs.length, "each hook's word, a generator's interface, TUnit's Before and After of the assembly, the session and discovery, and a module's attribute make a file reached from every file, and only a generator unsure", runs.join(", "));
   ok(!one("namespace H;\nclass X { [Before(Test)] void Go() { } }\n").links.get("tests/T.cs")?.has("src/X.cs"), "a hook of each test is no hook of the assembly");
   const named = (src, test = "namespace Tests;\nclass T { object f = new Factory<Program>(); }\n") => one(src, { "tests/T.cs": test }).links.get("tests/T.cs")?.has("src/X.cs");
   const heads = [["extern alias", "extern alias Old;\nusing App;\nvar x = 1;\n"], ["a generic alias", "using L = System.Collections.Generic.List<System.Collections.Generic.List<int>>;\nvar x = new L();\n"],
