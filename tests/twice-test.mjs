@@ -164,6 +164,11 @@ const fetched = ["--fetched", path.join(core, ".git"), "--since", earlier];
   fs.symlinkSync("core/docs/ref.md", path.join(solo, "linked.md"));
   const s2 = run(solo, "--fix", ...fetched);
   ok(/docs\/guide\.md .*linked\.md names it/u.test(s2.stdout) && fs.readFileSync(path.join(solo, "core/docs/ref.md"), "utf8").includes("at docs/guide.md,"), "a link's text keeps the file it names, and the copy is not written", s2.stdout);
+  const alias = project("alias");
+  fs.symlinkSync("a.mjs", path.join(alias, "tools/alias.mjs"));
+  fs.symlinkSync("tools", path.join(alias, "kit"));
+  const s3 = run(alias, "--fix", ...fetched);
+  ok(/tools\/a\.mjs .*the link (?:tools\/alias\.mjs|kit) leads to it/u.test(s3.stdout) && fs.existsSync(path.join(alias, "tools/a.mjs")) && fs.existsSync(path.join(alias, "tools/b.mjs")), "a file a link leads to, or a folder of it, stays", s3.stdout);
 }
 
 // A path that held other content at an earlier release moves only as it moved from the old pin, and the command the

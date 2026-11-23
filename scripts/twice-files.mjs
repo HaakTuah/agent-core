@@ -91,17 +91,32 @@ function withWhatTheyName(p, found) {
   return found;
 }
 // A file goes only where every pointer to it can be moved: none is left in a file the script does not write (one of
-// the core's the project holds whole, a link), and none in a text that still names its path once the pointers it
-// moves are moved (a form it does not read, such as a path further down another's).
+// the core's the project holds whole, a link), none in a text that still names its path once the pointers it moves
+// are moved (a form it does not read, such as a path further down another's), and no link leads to it or a folder of it.
 function noneLeft(p, found) {
   const texts = textFiles(p), fixed = texts.map(t => t.file), kept = p.outside.filter(f => !fixed.includes(f) && !SKIP.test(f) && !found.some(x => x.file === f));
+  const ends = linkEnds(p);
   for (const x of found.filter(x => x.to)) {
+    const end = ends.find(e => e.to === "" || x.file === e.to || x.file.startsWith(`${e.to}/`));
+    if (end) { Object.assign(x, { to: null, why: `the link ${end.file} leads to it, which the script does not move` }); continue; }
     const esc = x.file.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&"), left = new RegExp(`(?<![A-Za-z0-9_-]|${p.copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")})${esc}(?![A-Za-z0-9_/-]|\\.[A-Za-z0-9])`, "u");
     const at = kept.find(f => pointersTo(f, x.file).test(p.own.read(f, true) ?? ""))
       ?? texts.find(t => t.file !== x.file && left.test(t.text.replace(pointersTo(t.file, x.file), pointerTo(t.file, x.file, x.to))))?.file;
     if (at) Object.assign(x, { to: null, why: `${at} names it in a form the script cannot move, or is a file it does not write` });
   }
   return found;
+}
+
+// Where each link of the project's leads inside the repository, as a path from the root ("" the root itself); one that
+// leads nowhere, or out of the repository, leads to none of its files.
+function linkEnds(p) {
+  let root;
+  try { root = fs.realpathSync(p.root); } catch { return []; }
+  return p.outside.filter(f => linked(p, f)).flatMap(f => {
+    let to;
+    try { to = path.relative(root, fs.realpathSync(path.join(p.root, f))).split(path.sep).join("/"); } catch { return []; }
+    return to.startsWith("..") || path.isAbsolute(to) ? [] : [{ file: f, to }];
+  });
 }
 
 // Each pointer in a text to the path `from`: as the repository's path, as a relative path that opens with ./ or ../,
