@@ -15,8 +15,8 @@ permissions:
 jobs:
   versions:
     permissions:
-      contents: read
-      issues: write
+      contents: read # the config the check reads
+      issues: write # an enhancement issue for each version behind
     uses: {{core}}/.github/workflows/versions.yml@{{pin}}
     with:
       config: {{versions}}

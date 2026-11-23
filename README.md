@@ -118,7 +118,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    release says what it asks, step by step"). The core's
    `core.yml`, which the project calls on every PR as a required check, fails one whose `core/` differs from the core at
    its pin, entry by entry by git's object ids and types, as `pure-sync.mjs` compares too: a file's content, a link or a
-   submodule, but not the executable bit, which a copy made on Windows records for no file and which nothing reads. The
+   submodule, but not the executable bit, which a copy made on Windows by an older sync records for no file; from #1093
+   the sync records the bits the core marks, and `pure-sync.mjs` refuses one the core does not mark. The
    first copy is the sync script's too, run from a clone of this repository once the manifest is written (the script's
    header says how); the copy's own `.gitattributes` keeps every line ending as it is.
 
@@ -263,7 +264,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `versions.yml` keep their triggers and call the core's of the same name
      (`uses: HaakTuah/agent-core/.github/workflows/<name>.yml@<full commit SHA>`), each with the triggers, the
      permissions and the inputs its template has (`setup/template/workflows/`, which `tests/init-test.mjs` holds to
-     the core's workflows; `versions.yml` has none yet).
+     the core's workflows; the starter kit writes `versions.yml` with `--versions`, and its config, #1095).
    - **The core's checks without a secret may run as one job** (#376): `core.yml`, given its inputs, runs after its own
      check of the copy the copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records'
      checks (`copies`, `sizes`), the description check (`description: true`, on a pull request that is no draft and not Dependabot's)
@@ -280,7 +281,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      moved past the project's pin (point 1; `core/scripts/core-moved.mjs`), then runs the scheduled look
      (`core/scripts/look.mjs`, `roles/orchestrator.md`), and opens no pull request, since one a workflow opens gets
      no checks. Once a month, with the state report, the look asks the registries again of every package the project
-     holds (`core/scripts/held.mjs`) and keeps the issue "Packages gone stale". Given the secret `PERSONAL_TERMS`,
+     holds (`core/scripts/held.mjs`, which each sync also runs among its reports) and keeps the issue "Packages gone
+     stale". Given the secret `PERSONAL_TERMS`,
      which the template's call passes, it last takes the personal terms out of the issues and comments written in the
      week before (`core/scripts/issue-terms.mjs`; floor rule 11). A project whose daily job still calls the core's `core-moved.yml` runs both there too, the look
      reading no pull request, check or status with that job's token, until it moves to the template's. A builder
@@ -305,7 +307,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      fails a run that uses one that is not pinned (core archive 152).
    - **A game served by GitHub Pages** publishes main with `bash core/scripts/site-publish.sh root`, and its pull
      requests' previews through a `preview.yml` of its own, on `workflow_run` of its build, that calls the core's (the
-     build uploads the artifact `preview`: `pr-number`, and the site in `site/`). A preview and the live site share one
+     build uploads the artifact `preview`: `pr-number`, and the site in `site/`), as its template has it (the starter
+     kit's `--pages <the build workflow's name>`, with `--game`; #1095). A preview and the live site share one
      browser origin, with every other Pages site of the account, so a preview's code, which no review has passed yet,
      reads whatever the live game keeps in the browser: a game keeps nothing there that matters beyond its own saves,
      and its threat model says so (core archive 201).
@@ -574,7 +577,9 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   script again, and says what is left; the value of `PERSONAL_TERMS` the owner types on its page alone, never into the
   session (floor rule 11). It is asked at a project's first taking of the core, where the starter kit and the sync's
   first copy print it, and again only where a sync brings a setting the old copy's list did not hold; nothing waits on
-  it, and nothing fails until a setting is given (`AGENTS.md`, "Nothing locks a project").
+  it, and nothing fails until a setting is given (`AGENTS.md`, "Nothing locks a project"). Each day the look's job
+  reads the same settings with its own token where GitHub lets it, and keeps one issue, "Settings only the owner gives",
+  labelled `needs-owner`, of each it read as not given, with its link, and of each write GitHub refused it (#1092).
 - An adviser (`roles/adviser.md`): its session started with every repository of the owner's it is to advise on, so it
   can read them, file in them and start each one's orchestrator, reading what another account can write only through
   that repository's orchestrator (`roles/adviser.md`); at the effort its tool's part advises (`tools/claude.md`).
