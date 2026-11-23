@@ -56,12 +56,15 @@ export function pointersFound(p) {
 }
 
 // Each job that calls a workflow of the core's that another job calls too: { file, job, other, exact }, `exact` where it
-// is the second of two in one workflow of the project's own, the same in all but its name and needed by no job.
+// is the second of two in one workflow of the project's own, the same in all but its name, needed by no job and named
+// in no expression.
 export function callsFound(p) {
   const calls = [], needed = new Set();
   for (const f of p.outside.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(f))) {
     let doc;
     try { doc = parseYaml(p.own.read(f) ?? ""); } catch { continue; }
+    // (a job an expression names, as a reusable workflow's outputs do, is needed as much as one in needs:)
+    for (const m of (p.own.read(f) ?? "").matchAll(/\bjobs\s*(?:\.\s*([\w-]+)|\[\s*['"]([^'"]+)['"]\s*\])/gu)) needed.add(`${f}#${m[1] ?? m[2]}`);
     for (const [job, body] of Object.entries(doc?.jobs ?? {})) {
       const m = new RegExp(`^${CORE}/\\.github/workflows/([^@]+)@`, "u").exec(String(body?.uses ?? ""));
       for (const n of [body?.needs ?? []].flat()) needed.add(`${f}#${n}`);

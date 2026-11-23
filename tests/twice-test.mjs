@@ -151,11 +151,13 @@ const fetched = ["--fetched", path.join(core, ".git"), "--since", earlier];
   write(dir, {
     "tools/run.sh": RUN, ".github/workflows/dot.yml": "name: dot\non: push\njobs:\n  run:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node ./tools/a.mjs && tools/run.sh x\n",
     "MORE.md": "# More\n\nRun `cat $ROOT/docs/guide.md` to read it.\n",
+    ".github/workflows/called.yml": `name: called\non:\n  workflow_call:\n    outputs:\n      head:\n        value: \${{ jobs.two.outputs.head }}\njobs:\n  one:\n    uses: ${CALL}\n  two:\n    uses: ${CALL}\n`,
   });
   fs.chmodSync(path.join(dir, "tools/run.sh"), 0o755);
   fs.symlinkSync("core/docs/ref.md", path.join(dir, "linked.md"));
   const r = run(dir, "--fix", ...fetched), read = f => fs.readFileSync(path.join(dir, f), "utf8");
   ok(/tools\/run\.sh is the core's scripts\/run\.sh, byte for byte; it may be run as a program and the copy's file may not/u.test(r.stdout) && fs.existsSync(path.join(dir, "tools/run.sh")), "a file run as a program stays where the copy's is not", r.stdout);
+  ok(read(".github/workflows/called.yml").includes("  two:"), "a call a workflow's outputs name stays", read(".github/workflows/called.yml"));
   ok(read(".github/workflows/dot.yml").includes("node ./core/scripts/a.mjs") && !fs.existsSync(path.join(dir, "tools/a.mjs")), "a workflow's path from the root opening with ./ moves", read(".github/workflows/dot.yml"));
   ok(/docs\/guide\.md .*(?:MORE\.md|linked\.md) names it in a form the script cannot move/u.test(r.stdout) && fs.existsSync(path.join(dir, "docs/guide.md")), "a file named in a form not moved, or through a link, stays", r.stdout);
   ok(read("core/docs/ref.md").includes("at docs/guide.md,"), "nothing is written through a link into the copy");
