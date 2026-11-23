@@ -6,7 +6,7 @@
 // an issue form, a paragraph of the kit's that the project holds nowhere in that file (the words compared with their
 // spacing made one, so a reflowed line is no difference), and of a table, a row whose first cell it lacks (a row's
 // value is the project's to fill); of a workflow or the hooks' settings, a line of the kit's it lacks (a pin and its
-// version comment made one, since a sync and Dependabot move them); of a check's config, a key of the kit's it lacks.
+// version comment made one, since a sync and Dependabot move them); of a check's config, and of the list of what holds the project's own rules, a key of the kit's it lacks.
 // A paragraph the kit leaves to the project ("FILL IN") and the progress file, the project's own, are not compared.
 // Each difference is one the manifest's "Differences" declares on purpose, on the owner's word, by a line that quotes
 // the file's path ("AGENTS.md"), so that file is not compared, or a task the project's agents take. The kind is read
@@ -35,6 +35,7 @@ import { KIT_CONFIGS, packagesFolder } from "./check-configs.mjs";
 import { Unread, copyAt, folded } from "./workflow-calls.mjs";
 import { atCopy } from "./step-checks.mjs";
 import { privateOf } from "./host-private.mjs";
+import { OWN as OWN_HOLDERS } from "./holders-own.mjs";
 import { call as callOf, configs, plain, project } from "./steps.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -182,7 +183,9 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES), { kitOnly = fal
     // compared nowhere where the NuGet check's cannot be read)
     const { nuget, ...licence } = licences(o, () => false);
     const licenceFiles = nuget && at.nuget !== at.licences ? [[at.licences, json(licence)], [at.nuget, json({ nuget })]] : [[at.licences, json({ ...licence, ...(nuget ? { nuget } : {}) })]];
-    return [...kit, [at.sizes, json(marks)], ...licenceFiles, [at.baseline, json({ windows: {} })], [shapeBaseline(p), json({ reads: Object.keys(READERS), listed: {} })]].filter(([to]) => to !== null);
+    // (and the list of what holds the project's own rules, which the kit writes with each named "none": its key alone,
+    // the rules being the project's; #1095, point 6)
+    return [...kit, [at.sizes, json(marks)], ...licenceFiles, [at.baseline, json({ windows: {} })], [shapeBaseline(p), json({ reads: Object.keys(READERS), listed: {} })], [OWN_HOLDERS, json({ holders: {} })]].filter(([to]) => to !== null);
   } catch (e) {
     if (!older) throw e;
     return [];

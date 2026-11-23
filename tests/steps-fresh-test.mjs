@@ -57,6 +57,15 @@ fs.writeFileSync(path.join(plainProject, "checks/copies-baseline.json"), "{}\n")
 found = differences(project(plainProject), fresh(project(plainProject)));
 ok(found.includes("checks/sizes.json: missing (the starter kit writes it today)") && found.some(d => d.startsWith("checks/copies-baseline.json: lacks the key \"windows\"")) && found.length === 2,
   "a config the kit writes beside its templates, missing or lacking a key, is listed", found.join("\n"));
+// (the list of what holds the project's own rules, which the kit writes too: #1095, point 6)
+const holders = path.join(plainProject, "checks/holders.json"), heldList = fs.readFileSync(holders, "utf8");
+fs.rmSync(holders);
+found = differences(project(plainProject), fresh(project(plainProject)));
+const lost = found.includes("checks/holders.json: missing (the starter kit writes it today)");
+fs.writeFileSync(holders, '{ "about": {} }\n');
+found = differences(project(plainProject), fresh(project(plainProject)));
+ok(lost && found.includes('checks/holders.json: lacks the key "holders"'), "the list of what holds the project's own rules, missing or lacking its key, is listed", found.join("\n"));
+fs.writeFileSync(holders, heldList);
 const secWorkflow = path.join(plainProject, ".github/workflows/security-review.yml");
 fs.writeFileSync(secWorkflow, fs.readFileSync(secWorkflow, "utf8").replace(/^jobs:/m, "env: [SAMPLE\n\njobs:"));
 const unread = notDone(plainProject);
