@@ -83,15 +83,19 @@ function rulesetOf(host, rules) {
   return notGiven(`${none}it lacks ${lacks.join(", ")}`);
 }
 
-// Whether a workflow's triggers (`on`) start it on every pull request: no filter of branches or paths, and its types,
-// where given, holding the kit's opened and synchronize; any other is read only at its run.
-function onEveryPull(on) {
-  if (on === "pull_request" || (Array.isArray(on) && on.includes("pull_request"))) return true;
-  const pulls = on && typeof on === "object" && !Array.isArray(on) && Object.hasOwn(on, "pull_request") ? on.pull_request : undefined;
-  if (pulls === null) return true;
-  if (!pulls || typeof pulls !== "object" || Array.isArray(pulls) || !Object.keys(pulls).every(k => k === "types")) return false;
-  return pulls.types === undefined || (Array.isArray(pulls.types) && ["opened", "synchronize"].every(t => pulls.types.includes(t)));
+// Whether a workflow's triggers (`on`) start it on each of `name`'s events: no filter but its types, and those, where
+// given, holding `kinds`.
+function onEach(on, name, kinds) {
+  if (on === name || (Array.isArray(on) && on.includes(name))) return true;
+  const given = on && typeof on === "object" && !Array.isArray(on) && Object.hasOwn(on, name) ? on[name] : undefined;
+  if (given === null) return true;
+  if (!given || typeof given !== "object" || Array.isArray(given) || !Object.keys(given).every(k => k === "types")) return false;
+  return given.types === undefined || (Array.isArray(given.types) && kinds.every(t => given.types.includes(t)));
 }
+
+// Whether they start it on every pull request as the kit's do: on its own events, and on its comments, through which
+// alone the check posts its status on a pull request from Dependabot or a fork (the core's `security-review.yml`).
+const onEveryPull = on => onEach(on, "pull_request", ["opened", "synchronize"]) && onEach(on, "issue_comment", ["created", "edited"]);
 
 // Whether the project's `security-review.yml` (`text`) calls the core's security review so that it posts its status on
 // every pull request: in a public repository whatever its inputs, in a private one (`open` false) only with

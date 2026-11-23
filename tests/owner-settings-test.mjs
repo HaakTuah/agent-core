@@ -26,7 +26,7 @@ try {
   execFileSync("git", ["init", "-q"], { cwd: root, env }); // (its own files are those git lists: own-files.mjs)
   const review = text => fs.writeFileSync(path.join(root, ".github", "workflows", "security-review.yml"), text);
 
-  const call = w => `on:\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\njobs:\n  security-review:\n    needs: queue\n    if: \${{ !cancelled() }}\n    uses: someone/agent-core/.github/workflows/security-review.yml@${"a".repeat(40)} # the pin\n${w}`;
+  const call = w => `on:\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\n  issue_comment:\n    types: [created, edited]\njobs:\n  security-review:\n    needs: queue\n    if: \${{ !cancelled() }}\n    uses: someone/agent-core/.github/workflows/security-review.yml@${"a".repeat(40)} # the pin\n${w}`;
 
   // every setting given, in a public repository
   review(call(""));
@@ -75,16 +75,18 @@ try {
     ["    with:\n      advisory: false  # enforce review\n", "`advisory: false` with a comment"]]) {
     review(call(w));
     ok(statesOf(privately, root)["security-review-required"].given === true, `a private repository whose call is given ${said}: read from the ruleset`);
-    review(call(w).replace(/on:\n  pull_request:\n.*\n/, "on: [pull_request]\n").replace("    needs: queue\n    if: ${{ !cancelled() }}\n", ""));
+    review(call(w).replace(/on:\n  pull_request:\n.*\n  issue_comment:\n.*\n/, "on: [pull_request, issue_comment]\n").replace("    needs: queue\n    if: ${{ !cancelled() }}\n", ""));
     ok(statesOf(privately, root)["security-review-required"].given === true, `a private repository whose call is given ${said}: read from the ruleset`);
   }
   for (const [text, said] of [[call("    with:\n      private: ${{ vars.PRIVATE }}\n"), "an input read only at its run"], ["jobs: [\n", "no YAML"],
     ["jobs:\n  other:\n    uses: x/y/.github/workflows/z.yml@b\n    with:\n      private: true\n", "no call of the core's security review"],
     [call("    with:\n      private: true\n").replace("jobs:\n  security-review:\n    needs:", "jobs:\n  - needs:"), "jobs as a list, which GitHub refuses"],
     [call("    with:\n      private: true\n").replace("if: ${{ !cancelled() }}", "if: false"), "a condition on its call other than the kit's"],
-    [call("    with:\n      private: true\n").replace(/on:\n  pull_request:\n.*\n/, "on: [push]\n"), "no pull request among its triggers"],
+    [call("    with:\n      private: true\n").replace(/on:\n  pull_request:\n.*\n  issue_comment:\n.*\n/, "on: [push]\n"), "no pull request among its triggers"],
     [call("    with:\n      private: true\n").replace("types: [opened, reopened, synchronize, ready_for_review]", "types: [closed]"), "a pull request's types the kit's do not hold"],
     [call("    with:\n      private: true\n").replace("    types:", "    branches: [release]\n    types:"), "a filter of branches"],
+    [call("    with:\n      private: true\n").replace(/  issue_comment:\n.*\n/, ""), "no comment among its triggers, through which alone a pull request of Dependabot's or a fork's gets the status"],
+    [call("    with:\n      private: true\n").replace("types: [created, edited]", "types: [deleted]"), "a comment's types the kit's do not hold"],
     [call("    with:\n      private: true\n").replace("    types:", "    paths: ['docs/**']\n    types:"), "a filter of paths"],
     [call("    with:\n      private: true\n").replace("    if: ${{ !cancelled() }}\n", ""), "a job it needs and no condition, so skipped where that job fails"],
     [`# private: true\n${call("    with:\n      private: false\n")}`, "only a comment that says it, not the call"]]) {
@@ -93,8 +95,9 @@ try {
     ok(said.startsWith("only") ? st.given === null && /^does not apply/.test(st.said) : st.given === null && /^not read: /.test(st.said), `a private repository whose call holds ${said}: ${said.startsWith("only") ? "not asked for" : "said not read, never not for it"}`, st.said);
   }
   for (const [text, said] of [[call("").replace("if: ${{ !cancelled() }}", "if: false"), "a condition on its call other than the kit's"],
-    [call("").replace(/on:\n  pull_request:\n.*\n/, "on: [push]\n"), "no pull request among its triggers"],
-    [call("").replace("    types:", "    branches: [release]\n    types:"), "a filter of branches"]]) {
+    [call("").replace(/on:\n  pull_request:\n.*\n  issue_comment:\n.*\n/, "on: [push]\n"), "no pull request among its triggers"],
+    [call("").replace("    types:", "    branches: [release]\n    types:"), "a filter of branches"],
+    [call("").replace(/  issue_comment:\n.*\n/, ""), "no comment among its triggers"]]) {
     review(text);
     const st = statesOf(none, root)["security-review-required"];
     ok(st.given === null && /^not read: /.test(st.said), `a public repository whose call holds ${said}: said not read, never asked for`, st.said);
