@@ -42,15 +42,23 @@ export function pypiPackages(text, lockPath) {
   return graphed(entries);
 }
 
-// Each logical line, trimmed, with the number of its first: its continuations joined, as pip reads them.
+// Each logical line, trimmed, with the number of its first, as pip's join_lines reads them: a line ending in "\\" runs
+// on into the next, its backslashes taken off both ends, but a comment line never does, and one ends a line that ran
+// on into it, joined after a space.
 function* logical(text) {
   const lines = text.replace(/^\uFEFF/u, "").split(/\r?\n/u);
+  let joined = null, first = 0;
   for (let i = 0; i < lines.length; i++) {
-    const n = i + 1;
-    let line = lines[i];
-    while (/\\\s*$/u.test(line) && i + 1 < lines.length) line = line.replace(/\\\s*$/u, " ") + lines[++i];
-    yield [n, line.trim()];
+    const line = lines[i], comment = /^\s*#/u.test(line);
+    if (line.endsWith("\\") && !comment) {
+      if (joined === null) { joined = ""; first = i + 1; }
+      joined += line.replace(/^\\+|\\+$/gu, "");
+      continue;
+    }
+    yield joined === null ? [i + 1, line.trim()] : [first, `${joined}${comment ? " " : ""}${line}`.trim()];
+    joined = null;
   }
+  if (joined !== null) yield [first, joined.trim()];
 }
 
 // The entry a comment's "# via" names go to, if any: "# via a, b" after an entry, or "# via" then a line "#   a" for
@@ -101,6 +109,20 @@ export async function pypiRegistry(p, get, readRepo) {
   return facts;
 }
 
+// A version as PEP 440 compares it: the release's trailing zeros left out and each spelling in its one form, so "1.0",
+// "v1.0.0" and "1.0.0" meet, as do "1.0-1" and "1.0.post1"; null where it is in no form of PEP 440's.
+const PEP440 = /^v?(?:(\d+)!)?(\d+(?:\.\d+)*)(?:[-_.]?(alpha|a|beta|b|preview|pre|c|rc)[-_.]?(\d+)?)?(?:-(\d+)|[-_.]?(post|rev|r)[-_.]?(\d+)?)?(?:[-_.]?(dev)[-_.]?(\d+)?)?(?:\+([a-z0-9]+(?:[-_.][a-z0-9]+)*))?$/u;
+const int = (n) => (n ?? "0").replace(/^0+(?=\d)/u, "");
+export function pep440(version) {
+  const m = version.length <= 64 ? PEP440.exec(version.trim().toLowerCase()) : null;
+  if (!m) return null;
+  const [, epoch, release, pre, preN, postN, post, postM, dev, devN, local] = m;
+  return [`${int(epoch)}!`, release.split(".").map(int).join(".").replace(/(?:\.0)+$/u, ""),
+    pre ? `${{ alpha: "a", a: "a", beta: "b", b: "b" }[pre] ?? "rc"}${int(preN)}` : "",
+    postN !== undefined || post ? `.post${int(postN ?? postM)}` : "", dev ? `.dev${int(devN)}` : "",
+    local ? `+${local.split(/[-_.]/u).map((x) => (/^\d+$/u.test(x) ? int(x) : x)).join(".")}` : ""].join("");
+}
+
 /** What PyPI's answer `doc` (its JSON of a project) says of the package at `version`: { first, last, repo, publisher,
  *  note, file } or { missing }. */
 export function pypiFacts(doc, version, readRepo) {
@@ -109,8 +131,9 @@ export function pypiFacts(doc, version, readRepo) {
   const files = (v) => (Array.isArray(releases[v]) ? releases[v].filter(object) : []);
   const all = Object.keys(releases).flatMap((v) => files(v).map((f) => ({ at: when(f.upload_time_iso_8601), yanked: f.yanked === true }))).filter((f) => !Number.isNaN(f.at));
   if (!all.length) return { missing: "the registry knows the name, and holds no file of it" };
-  // (a version as written in the lock file, else as PyPI keys it, in either case)
-  const key = Object.hasOwn(releases, version) ? version : Object.keys(releases).find((v) => v.toLowerCase() === version.toLowerCase());
+  // (a version as written in the lock file, else the one PyPI keys that PEP 440 holds equal to it)
+  const asked = pep440(version);
+  const key = Object.hasOwn(releases, version) ? version : Object.keys(releases).find((v) => (asked ? pep440(v) === asked : v.toLowerCase() === version.toLowerCase()));
   const own = key ? files(key) : [];
   if (!own.length) return { missing: `the registry knows the name, and no file of version ${version.slice(0, 64)} of it` };
   const kept = all.filter((f) => !f.yanked), info = object(doc.info) ? doc.info : {};

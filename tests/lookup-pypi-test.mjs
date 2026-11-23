@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { lookUp, run, YOUNG } from "../scripts/lookup.mjs";
-import { pypiPackages } from "../scripts/lookup-pypi.mjs";
+import { pep440, pypiPackages } from "../scripts/lookup-pypi.mjs";
 import { INVENTED_SUM, NOW, ago, tgz } from "../scripts/lookup-stage.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -40,6 +40,8 @@ ok(by("brand-new-moss")?.direct === false && by("brand-new-moss")?.by.join() ===
 ok(by("own-moss")?.direct === true, "a \"# via\" line that names the project itself, no package of the file, is named by the project");
 const plain = pypiPackages(`﻿plain-moss==1.0.0 ${H()}\r\nother-moss==2.0.0 ${H("b")} ${H("c")}\r\n`, "requirements.txt");
 ok(plain.length === 2 && plain.every((p) => p.direct && p.brings === null), `a file with no "# via" line names every package itself, and says nothing of what each brings (${JSON.stringify(plain)})`);
+const joined = pypiPackages(`# a note that ends so \\\nhidden-moss==1.0.0 ${H()}\nsplit-\\\nmoss==1.0.0 \\\n  ${H()}\n`, "r.txt");
+ok(joined.map((p) => p.name).join() === "hidden-moss,split-moss", `lines join as pip joins them: a comment ending in "\\" takes no package with it, and a package's name runs on unbroken (${joined.map((p) => p.name)})`);
 ok(pypiPackages(`--require-hashes\n--index-url https://pypi.org/simple\nplain-moss==1.0.0 ${H()}`, "r.txt").length === 1, "an option that changes neither what is installed nor where from passes");
 for (const [what, text, said] of [
   ["a range", `ranged-moss>=1.0 ${H()}`, /line 1: a package not at one exact version/u],
@@ -97,6 +99,12 @@ r = await one(pkg("never-published-moss"));
 ok(r.failures.length === 1 && /PyPI has no such package/u.test(r.failures[0]) && mended(`FAIL: ${r.failures[0]}`), `a name PyPI does not know fails, saying the mend (${r.failures})`);
 r = await one(pkg("tidy-moss-format", { version: "9.9.9" }));
 ok(r.failures.length === 1 && /no file of version 9\.9\.9 of it/u.test(r.failures[0]), `a version PyPI does not hold fails (${r.failures})`);
+ok(["1.0", "v1.0.0", "1.0.0.0"].every((v) => pep440(v) === pep440("1.0.0")) && pep440("1.0-1") === pep440("1.0.post1") && pep440("1.0c1") === pep440("1.0rc1") && pep440("1.0.post1") !== pep440("1.0") && pep440("1!1.0") !== pep440("1.0") && pep440("not a version") === null, "versions compare as PEP 440 holds them equal, and only so");
+for (const v of ["1.1", "v1.1.0"]) {
+  asked.length = 0;
+  r = await one(pkg("tidy-moss-format", { version: v }));
+  ok(r.failures.length === 0 && asked.includes(integrity("tidy-moss-format", "1.1.0")), `a version written ${v} finds PyPI's 1.1.0, and asks its provenance as PyPI keys it (${r.failures})`);
+}
 r = await one(pkg("empty-moss", { version: "1.0.0" }));
 ok(r.failures.length === 1 && /holds no file of it/u.test(r.failures[0]), `a name registered with no file fails (${r.failures})`);
 const comes = new Date(NOW + (YOUNG - 12) * 86400000).toISOString().slice(0, 10);
@@ -137,9 +145,23 @@ try {
   settings(["requirements.txt", "data.txt"]);
   r = await run(config, { root: tmp, base, get: npmGet, now: NOW });
   ok(r.code === 1 && /^FAIL: data\.txt: never-published-moss@1\.0\.0/mu.test(r.lines.join("\n")), `a file the pull request newly names under "pypi" makes no name held (${r.lines})`);
-  settings(null);
+  for (const pypi of [null, []]) {
+    settings(pypi);
+    writeFileSync(join(tmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\nnever-published-moss==1.0.0 ${H()}\n`);
+    r = await run(config, { root: tmp, base, get: npmGet, now: NOW });
+    ok(r.code === 1 && /^FAIL: requirements\.txt: never-published-moss@1\.0\.0/mu.test(r.lines.join("\n")), `a file the base's config named is read though the pull request takes it out of "pypi" (${JSON.stringify(pypi)}) (${r.lines})`);
+  }
+  writeFileSync(join(tmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n`);
+  git("add", "-A"); git("commit", "-qm", "no pypi");
+  r = await run(config, { root: tmp, base: git("rev-parse", "HEAD"), get: npmGet, now: NOW });
+  ok(r.code === 0 && !r.lines.some((l) => /PyPI/u.test(l)), `a config that names no "pypi", nor its base's, asks nothing of PyPI, and says nothing of it (${r.lines})`);
+  rmSync(join(tmp, "requirements.txt"));
   r = await run(config, { root: tmp, base, get: npmGet, now: NOW });
-  ok(r.code === 0 && !r.lines.some((l) => /PyPI/u.test(l)), `a config that names no "pypi" asks nothing of PyPI, and says nothing of it (${r.lines})`);
+  ok(r.code === 0, `a file the base's config named, taken out of the project with its name, is not read (${r.lines})`);
+  writeFileSync(join(tmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n`);
+  writeFileSync(config, JSON.stringify({ ships: [], pypi: ["requirements.txt"] }));
+  r = await run(config, { root: tmp, base, get: npmGet, now: NOW });
+  ok(r.code === 0 && r.lines.includes("ok   0 new packages looked up in PyPI, each printed above for the review"), `a config that names PyPI's files alone, no lock file of npm's, is read (${r.lines})`);
   settings(["requirements.txt"]);
   writeFileSync(join(tmp, "requirements.txt"), "loose-moss>=1.0\n");
   r = await run(config, { root: tmp, base, get: npmGet, now: NOW });

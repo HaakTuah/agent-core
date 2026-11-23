@@ -366,7 +366,8 @@ function configRead(path) {
   return config;
 }
 
-const NOTHING = 'the config names nothing to check. Mend: name the lockfiles in "lockfiles", or the audit\'s file in "audit"';
+const NOTHING = 'the config names nothing to check. Mend: name the lockfiles in "lockfiles", the requirements files in PyPI\'s lock form in "pypi", or the audit\'s file in "audit"';
+const nothing = (config) => !config.lockfiles?.length && !config.pypi?.length && !config.audit;
 
 /** The config's form: its schema's, the first fault refused, where ajv is installed; else the checks below. Then, either
  *  way, what a schema cannot say: that it names something to check, and that each path of its scan is written as git
@@ -378,7 +379,7 @@ function configShape(config) {
     configPaths(config);
     if (config.scan !== undefined) configScan(config);
   } else if (faults.length) throw new Error(faults[0]);
-  if (!config.lockfiles?.length && !config.audit) throw new Error(NOTHING);
+  if (nothing(config)) throw new Error(NOTHING);
   for (const key of ["served", "tools", "skip"]) {
     if (!(config.scan?.[key] ?? []).every((p) => scanPathOk(key, p))) throw new Error(`the config's "scan.${key}" is not a list of paths in the project. Mend: list each as a path from the project's root`);
   }
@@ -401,7 +402,7 @@ function configLists(config) {
 /** The config's "audit" and "notices", each a path where it stands, and something named to check. */
 function configPaths(config) {
   if (config.audit !== undefined && (typeof config.audit !== "string" || !config.audit)) throw new Error('the config\'s "audit" is not a path. Mend: name the audit\'s file, or take "audit" out');
-  if (!config.lockfiles?.length && !config.audit) throw new Error(NOTHING);
+  if (nothing(config)) throw new Error(NOTHING);
   if (config.notices !== undefined && (typeof config.notices !== "string" || !config.notices || !config.audit)) throw new Error('the config\'s "notices" is not a path, or the config names no "audit" whose entries it holds. Mend: name the notices file by its path, beside an "audit", or take "notices" out');
 }
 

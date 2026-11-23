@@ -25,7 +25,7 @@
 //
 //   node core/scripts/lookup.mjs <the licence check's config> [--nuget]
 import { execFileSync } from "node:child_process";
-import { appendFileSync, readFileSync, realpathSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, realpathSync } from "node:fs";
 import path, { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { leadsOut, logged, parseBounded } from "./guards.mjs";
@@ -351,12 +351,15 @@ export async function pool(items, size, work) {
 /** The lock files of NuGet (`kind` true), PyPI ("pypi") or npm the config names, each read to packages, and the base's: those the config as the
  *  base held it named (`baseConfig`), as the base held them. Only a lock file the base's own config named counts as
  *  held, so no file merged as data first, and named in the config only by the pull request, makes a name count as held:
- *  a lock file the pull request newly names is new, and each of its packages is looked up. */
+ *  a lock file the pull request newly names is new, and each of its packages is looked up. A lock file the base's config
+ *  named and the pull request's no longer names is read all the same, where it stands, so no change to it goes unread
+ *  by taking it out of the config. */
 export function packagesOf(config, root, base, kind, baseConfig = null) {
   const pypi = kind === "pypi", nuget = !pypi && Boolean(kind), list = (v) => (Array.isArray(v) ? v : []);
   const named = (c) => { try { return pypi ? list(c?.pypi) : nuget ? [...nugetConfig(c, copyOf(root)).ships, ...nugetConfig(c, copyOf(root)).tools] : list(c?.lockfiles); } catch { return []; } };
   const read = pypi ? pypiPackages : nuget ? nugetPackages : npmPackages;
-  const head = named(config).map((f) => {
+  const kept = named(baseConfig).filter((f) => typeof f === "string" && !named(config).some((g) => typeof g === "string" && posix.normalize(g) === posix.normalize(f)) && existsSync(posix.join(root, f)));
+  const head = [...named(config), ...kept].map((f) => {
     // (a lock file the pull request makes a link out of the project is never read: floor rule 5)
     if (leadsOut(root, posix.join(root, f))) throw new Error(`${logged(f)} leads out of the project, through a link. Mend: make it a file of the project's own, written by its package manager`);
     return [f, read(readFileSync(posix.join(root, f), "utf8"), f)];
@@ -392,8 +395,7 @@ export async function run(configPath, { root, base, nuget = false, get = fetched
     ({ head, base: held } = packagesOf(config, root, base, nuget, configAt(root, base, configPath)));
     found = newPackages(head, held, nuget);
     if (nuget) sources = nugetConfig(config, copyOf(root)).sources.length;
-    // (beside npm, the requirements files the config names under "pypi", where it names any)
-    else if (config.pypi?.length) { const lists = packagesOf(config, root, base, "pypi", configAt(root, base, configPath)); py = newPackages(lists.head, lists.base); }
+    else py = pypiNew(config, root, base, configAt(root, base, configPath));
   } catch (e) { return { lines: [`FAIL: ${logged(mended(e.message, "write the config as JSON, and each lock file it names anew with its package manager, never by hand"))}`], code: 1 }; }
   const { failures, reports } = await lookUp(found, { get, now, nuget, sources });
   const pypi = py ? await lookUp(py, { get, now }) : { failures: [], reports: [] };
@@ -403,6 +405,14 @@ export async function run(configPath, { root, base, nuget = false, get = fetched
   return { lines: [...reports.map((r) => `REPORT: ${r}`), ...sourced.reports.map((r) => `REPORT: ${r}`), ...pypi.reports.map((r) => `REPORT: ${r}`), ...failures.map((f) => `FAIL: ${f}`), ...sourced.failures.map((f) => `FAIL: ${f}`), ...pypi.failures.map((f) => `FAIL: ${f}`),
     summed(failures.length, found.length, registryOf(nuget)), ...(py ? [summed(pypi.failures.length, py.length, "PyPI")] : []),
     ...(off ? [`${off} lock entr${off === 1 ? "y" : "ies"} the pull request brings not from npm's registry with an integrity value (floor rule 7)`] : [])], code: failures.length || off || pypi.failures.length ? 1 : 0 };
+}
+
+// Beside npm, the packages new to the requirements files the config names under "pypi", or its base's did: null where
+// neither names any.
+function pypiNew(config, root, base, baseConfig) {
+  if (!config.pypi?.length && !baseConfig?.pypi?.length) return null;
+  const lists = packagesOf(config, root, base, "pypi", baseConfig);
+  return newPackages(lists.head, lists.base);
 }
 
 // The line that sums up one registry's lookup.
