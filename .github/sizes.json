@@ -18,7 +18,7 @@
     "scripts/copies.mjs": { "mark": 34376, "why": "the question of a split is asked in #1102" },
     "tasks/cleaning.md": { "mark": 23083, "why": "the question of a split is asked in #1132" },
     "scripts/init.mjs": { "mark": 30906, "why": "the question of a split is asked in #1098" },
-    "tests/check-test.mjs": { "mark": 28691, "why": "the question of a split is asked in #1073" },
+    "tests/check-test.mjs": { "mark": 26512, "why": "#1073: npm stand-in's test split off; the rest is one scratch project's cases, written again by a split" },
     "tests/code-scan-test.mjs": { "mark": 22506, "why": "the question of a split is asked in #1073" },
     "scripts/check.mjs": { "mark": 26892, "why": "the question of a split is asked in #1064" },
     "scripts/checks.mjs": { "mark": 24179, "why": "the question of a split is asked in #1064" },

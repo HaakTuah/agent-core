@@ -13,7 +13,7 @@ import path from "node:path";
  *  its node_modules/; a failure is the real npm's, and every other command is the real npm's own. The scripts' install
  *  (install.mjs) runs in full, its refusals before npm too; only the same packages are not written out again, which on
  *  Windows cost seconds a job. It gives the environment with the stand-in first on its PATH. `real` names the npm it
- *  runs, for check-test's probe of it; by default the first on the PATH. */
+ *  runs, for npm-once-test.mjs's probe of it; by default the first on the PATH. */
 export function npmOnce(env, tmp, { real: given } = {}) {
   const windows = process.platform === "win32", name = windows ? "npm.cmd" : "npm";
   const PATHKEY = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
