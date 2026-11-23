@@ -100,24 +100,27 @@ function topLevel(toks) {
   return i < toks.length && !TYPE.has(toks[i].v);
 }
 
-// The token past the ")" that closes the "(" at toks[k].
-function pastParens(toks, k) {
-  let depth = 0;
-  for (; k < toks.length; k++) if (toks[k].v === "(") depth++; else if (toks[k].v === ")" && --depth === 0) return k + 1;
-  return k;
+// Where each "(" of the tokens closes: a Map of its place to that of its ")", read in one pass.
+function closings(toks) {
+  const close = new Map(), open = [];
+  toks.forEach((t, k) => { if (t.v === "(") open.push(k); else if (t.v === ")" && open.length) close.set(open.pop(), k); });
+  return close;
 }
 
 // The delegates a file declares, by their names: `delegate` then a return type, the name the last word before "(" at the
 // top level of the type's "<>" (an anonymous delegate, "delegate {" or "delegate (…) {", and a function pointer,
-// "delegate*", declare none; "delegate (int X, int Y) Pair()" returns a tuple).
+// "delegate*", declare none; "delegate (int X, int Y) Pair()" returns a tuple). Each token is read once, so a file of many
+// `delegate` (or `@delegate`, a name the tokens give without its "@") is read in time linear in its tokens: a scan goes
+// on from where the last one stopped, and the parentheses are matched in one pass beforehand.
 function delegates(toks) {
   const out = [];
+  let close = null;
   for (let i = 0; i < toks.length; i++) {
     if (toks[i].v !== "delegate" || ["{", "*"].includes(toks[i + 1]?.v)) continue;
-    const start = toks[i + 1]?.v === "(" ? pastParens(toks, i + 1) : i + 1;
+    const start = toks[i + 1]?.v === "(" ? ((close ??= closings(toks)).get(i + 1) ?? toks.length - 1) + 1 : i + 1;
     if (toks[start]?.v === "{") continue;
-    let depth = 0, name = null;
-    for (let k = start; k < toks.length && toks[k].v !== ";" && toks[k].v !== "{"; k++) {
+    let depth = 0, name = null, k = start;
+    for (; k < toks.length && toks[k].v !== ";" && toks[k].v !== "{"; k++) {
       const v = toks[k].v;
       if (v === "<") depth++;
       else if (v === ">") depth--;
@@ -125,6 +128,7 @@ function delegates(toks) {
       else if (toks[k].t === "id" && depth === 0) name = word(toks[k]);
     }
     if (name) out.push(name);
+    i = Math.max(i, k - 1);
   }
   return out;
 }
@@ -185,7 +189,7 @@ function msbuildUsings(texts, pace) {
       const [include, alias] = ["Include", "Alias"].map(a => attribute(m[1], a));
       if (include === undefined) continue;
       if (`${include}${alias ?? ""}`.includes("$(")) return null;
-      out.push(...include.split(";").map(s => s.trim().replace(/^global::/u, "")).filter(Boolean).map(target => ({ target, alias: alias?.trim() || null })));
+      for (const s of include.split(";")) { const target = s.trim().replace(/^global::/u, ""); if (target) out.push({ target, alias: alias?.trim() || null }); } // (one by one: a spread of many outruns the stack)
     }
   }
   return out;
