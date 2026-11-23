@@ -7,9 +7,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { asked, copyAtBase, doneAsked, DONE_SINCE, missing, PARTS } from "../scripts/pr-description.mjs";
+import { asked, copyAtBase, doneAsked, DONE_SINCE, HEAD_SINCE, headAsked, missing, PARTS } from "../scripts/pr-description.mjs";
 import { costMend, NO_COST } from "../scripts/pr-cost.mjs";
-import { HEAD_MEND, PLACE_MEND, headMends, keysAt } from "../scripts/pr-head.mjs";
+import { HEAD_MEND, PLACE_MEND, headMends, headOf, keysAt } from "../scripts/pr-head.mjs";
 import { numberMend } from "../scripts/pr-number.mjs";
 import { reasonsMend } from "../scripts/pr-reasons.mjs";
 import { heldAt, waitsMend, waitsOn } from "../scripts/pr-waits.mjs";
@@ -97,6 +97,24 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
     "  but not the word in small letters or in a longer word, \"to be added\" in a sentence, nor one in code marks or double quotes");
   const all = fails("core archive 263\nTBD\n");
   ok(all.length === 2 && all.every(m => mended(`FAIL ${m}`)) && all[0].includes(HEAD_MEND) && all[1].includes(PLACE_MEND), "each failure says its mend");
+  ok(fails("TBD\n").join() === `line 1 of the description holds the placeholder "TBD". ${PLACE_MEND}` && fails("x\n\ncore archive 263").join() === `line 3 of the description names "core archive 263", which the head's archive does not hold. ${HEAD_MEND}`,
+    "a failure names its line and what it holds, in its words");
+  ok(fails("core archive 0218, core archive 00218 and core archive 0").length === 1 && headMends("archive item 263", { keys }).mends.length === 1 && headMends("", { keys }).mends.length === 0 && headMends(undefined, { keys }).mends.length === 0,
+    "a number is read without its leading zeros; the core's own form is read where nothing says otherwise; an empty description fails nothing");
+  const lines = body => fails(body).map(m => Number(/^line (\d+)/u.exec(m)[1])).join();
+  ok(lines("```\nTODO\n```\nTODO\n~~~\nXXX\n~~~\nXXX\n") === "4,8" && lines("````\nTBD\n```\nTBD\n````\nTBD\n") === "6" && lines("```\nTBD\n``` not yet\nTBD\n```\nTBD\n") === "6"
+    && lines("~~~\nTBD\n```\nTBD\n~~~\nTBD\n") === "6" && lines("```js\nTBD\n```\nTBD\n") === "4" && lines("    ```\nTBD\n") === "2" && lines("x ```\nTBD\n") === "2" && lines("``\nTBD\n") === "2" && lines("~~\nTBD\n") === "2",
+    "a fenced block, of three marks or more, is not read up to the fence that closes it: of its kind, as long or longer, with nothing after; one indented four or not at a line's start opens none");
+  ok(lines("a <!-- TBD --> b TODO\n<!--\nFIXME\n-->XXX\nTBD<!-- x -->TBD\n<!-- a --> <!--\nTODO\n-->\n<!-- one\n``` -->TODO\n") === "1,4,5,5,10" && lines("  > TBD\na > TBD\n") === "2" && lines("a\"x\"TBD\na`x`TBD\n``TBD``\n`` a ` TBD ``\n") === "1,2",
+    "an HTML comment, on a line or over lines, is read around, its place a blank; a line quoted after blanks is not read, one with a \">\" inside is; what quotes and code marks hold, of any length, is not read, and a blank stands for it");
+  ok(["  to be added", "-  to be added", "12. to be added", "To be added.", "* to be added", "2) to be added", "[to be added]", "<to be added>"].every(t => fails(`The change.\n${t}\n`).length === 1) && fails("x- to be added\nIt is to be added").length === 0,
+    "  \"to be added\" after blanks, a list mark of any width, or an opening bracket fails; inside a line it does not");
+  ok(headOf("TBD", "").mends.length === 1 && headOf("archive item 99999", "").mends.length === 1 && headOf("archive item 99999", "core/").mends.length === 0 && headOf("core archive 99999", null).mends.length === 0
+    && /no archive could be read/u.test(headOf("core archive 99999", null).oks.join()) && headOf("core archive 218", "").oks.at(-1).startsWith("the description names no archive key") && headOf("TBD", "").oks.length === 0
+    && headOf("core archive 99999", scratchDir("pr-head-at-") + "/").mends.length === 0,
+    "where the copy lies says which archive is read and whether the core's own form is: the core's own here, a project's copy there, none where none is found");
+  ok(headAsked(HEAD_SINCE, "export const HEAD_SINCE") && headAsked("2026-11-24T00:00:00Z", "export const HEAD_SINCE") && !headAsked("2026-11-22T23:59:59Z", "export const HEAD_SINCE") && !headAsked(HEAD_SINCE, "an older copy") && !headAsked(HEAD_SINCE, null) && !headAsked("", "export const HEAD_SINCE"),
+    "the line is asked of a pull request opened on or after its day, its base's copy holding it");
   const slow = Date.now();
   headMends(`${" ".repeat(200000)}x\n- ${" ".repeat(200000)}x\n:${" ".repeat(200000)}x\n${"`".repeat(100000)}\n${"<!--".repeat(50000)}\n${"\"".repeat(100001)}\n${"core archive ".repeat(20000)}\n`, { keys });
   ok(Date.now() - slow < 2000, "a long description of blanks, marks and quotes is read in no time");

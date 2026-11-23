@@ -63,7 +63,7 @@ import { coreAt, lineMend, pathIn, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
 import { changedMend, plain, testsChanged } from "./weakened.mjs";
 import { NO_COST, costMend } from "./pr-cost.mjs";
-import { headMends, keysAt } from "./pr-head.mjs";
+import { headMends, headOf } from "./pr-head.mjs";
 import { HOLDS, numberMend } from "./pr-number.mjs";
 import { calledFor } from "./pr-reads.mjs";
 import { MANIFEST_MAX, REASONS, UNREADABLE, differencesAdded, reasonsMend } from "./pr-reasons.mjs";
@@ -95,8 +95,9 @@ export const REASONS_SINCE = "2026-11-19T00:00:00Z";
 export const YES_SINCE = "2026-11-18T00:00:00Z";
 
 // The day from which a description is asked to name no archive key its head does not hold and to leave no placeholder
-// in (pr-head.mjs, beside this file; #1136), as the lines above are.
+// in (pr-head.mjs, beside this file; #1136), as the lines above are, and whether it is asked.
 export const HEAD_SINCE = "2026-11-23T00:00:00Z";
+export const headAsked = (created, then) => String(created) >= HEAD_SINCE && Boolean(then?.includes("export const HEAD_SINCE"));
 
 // Whether it is asked of a pull request opened at `created` (as GitHub gives it), `then` the copy on its base when it
 // opened, or null where that could not be read: only where both are on or after the day it came.
@@ -202,13 +203,8 @@ if (started(import.meta.url)) {
       if (mend) mends.push(mend);
       else console.log(added === null ? `ok   the line "${REASONS}" is not asked here: the change could not be read against its base` : added.length ? `ok   the description says the reasons read for the difference it adds` : `ok   the line "${REASONS}" is not asked here: no line is added under the manifest's "Differences"`);
     } else console.log(`ok   the line "${REASONS}" is not asked here: ${why}`);
-    if (created >= HEAD_SINCE && then?.includes("export const HEAD_SINCE")) {
-      // (the archive of the core's copy; "archive item N" is read only in the core's own repository, whose archive it is)
-      const at = coreAt(process.cwd()), head = headMends(process.env.PR_BODY, { keys: at === null ? null : keysAt(at || "."), own: at === "" });
-      for (const note of head.notes) console.log(`ok   ${note}`);
-      if (head.mends.length) mends.push(...head.mends);
-      else console.log("ok   the description names no archive key its head does not hold, and leaves no placeholder in");
-    } else console.log(`ok   the archive keys and placeholders of the description are not asked here: ${why}`);
+    if (headAsked(created, then)) { const head = headOf(process.env.PR_BODY, coreAt(process.cwd())); for (const line of head.oks) console.log(`ok   ${line}`); mends.push(...head.mends); }
+    else console.log(`ok   the archive keys and placeholders of the description are not asked here: ${why}`);
     if (created >= YES_SINCE && then?.includes("export const YES_SINCE")) {
       const diff = spawnSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
       // (where the core lies is read from the base's manifest, never the head's, which the pull request could bring)

@@ -16,7 +16,7 @@
 //   is ordinary words).
 // Node's own modules.
 //
-//   import { headMends, keysAt } from "./pr-head.mjs";
+//   import { headMends, headOf, keysAt } from "./pr-head.mjs";
 import { items } from "./archive.mjs";
 
 const PLACEHOLDERS = ["to be added", "TBD", "TODO", "XXX", "FIXME"];
@@ -70,6 +70,14 @@ export function keysAt(root) {
   const { reasons, words } = items(root);
   const keys = new Set([...reasons.keys(), ...words.keys()].map(String));
   return keys.size ? keys : null;
+}
+
+// What the check says of a description in the repository whose copy of the core lies at `at`, as coreAt() (reading.mjs)
+// gives it: "" in the core's own, whose archive "archive item N" names; its path in a project; null where none is found,
+// so that no archive is read. { mends, oks }: the failures, and the lines that pass.
+export function headOf(body, at) {
+  const { mends, notes } = headMends(body, { keys: at === null ? null : keysAt(at || "."), own: at === "" });
+  return { mends, oks: mends.length ? notes : [...notes, "the description names no archive key its head does not hold, and leaves no placeholder in"] };
 }
 
 // The failures of a description, { mends, notes }: each mend a line naming where it stands and what it names, then its
