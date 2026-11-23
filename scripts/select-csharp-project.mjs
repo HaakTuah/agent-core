@@ -39,12 +39,23 @@ function children(text, at) {
 // The run stopped (Late) where `what` holds `n` characters (or bytes), past CHARACTERS.
 export const tooMuch = (what, n, unit = "characters") => new Late(`${what} hold ${n.toLocaleString("en")} ${unit}, past the ${CHARACTERS.toLocaleString("en")} the selection reads, so what each file of C# reaches cannot be told in time`);
 
+// Each target of an Include (";" between them) with each alias given, put in `out`; false where one is no plain name.
+function targets(out, include, given) {
+  for (const s of include.split(";")) {
+    const target = s.trim().replace(/^global::/u, "");
+    if (!target) continue;
+    if (!/^[\p{L}\p{N}_]+(?:\.[\p{L}\p{N}_]+)*$/u.test(target)) return false; // (words between dots: linear)
+    for (const alias of given.length ? given : [null]) out.push({ target, alias }); // (a spread of many outruns the stack)
+  }
+  return true;
+}
+
 // The <Using Include="N"> items of MSBuild's files, each a global using directive ({ target, alias }, an Alias="S" or
 // <Alias>S</Alias> its alias, both where both stand), and the IMPLICIT ones; or null where one holds an Update, a tag
 // that is no run of attributes, or what MSBuild expands ("$(...)" a property,
-// "@(...)" an item, "%" metadata or an escape, "%2E" a "."; "&" an XML reference, "&#46;" a ".") or what the reader
-// cannot tell from its metadata (children), whose value cannot be told here. `pace` is asked for each file; past
-// CHARACTERS of them together, Late.
+// "@(...)" an item, "%" metadata or an escape, "%2E" a "."; "&" an XML reference, "&#46;" a "."), what the reader
+// cannot tell from its metadata (children), or a target that is no plain name (an array's, a tuple's, a nullable
+// type's), whose value cannot be told here. `pace` is asked for each file; past CHARACTERS of them together, Late.
 export function msbuildUsings(texts, pace) {
   const out = IMPLICIT.map(target => ({ target, alias: null })), n = texts.reduce((sum, t) => sum + t.length, 0);
   if (n > CHARACTERS) throw tooMuch("the project's MSBuild files", n);
@@ -56,7 +67,7 @@ export function msbuildUsings(texts, pace) {
       const include = attrs.include ?? meta.include, given = [attrs.alias, meta.alias].map(a => a?.trim()).filter(Boolean);
       if (include === undefined) continue;
       if (/\$\(|@\(|%|&/u.test(`${include}${given.join("")}`)) return null;
-      for (const s of include.split(";")) { const target = s.trim().replace(/^global::/u, ""); if (target) for (const alias of given.length ? given : [null]) out.push({ target, alias }); } // (a spread of many outruns the stack)
+      if (!targets(out, include, given)) return null;
     }
   }
   return out;

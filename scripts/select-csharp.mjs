@@ -103,17 +103,18 @@ function pairs(toks) {
 }
 
 // The delegates a file declares, by their full names: `delegate` then a return type (an anonymous delegate, "delegate {"
-// or "delegate (…) {", and a function pointer, "delegate*", declare none; "delegate (int X, int Y) Pair()" returns a
-// tuple), each in the namespace it stands in, read from the tokens as they go: a block's within its braces, inside
-// those around it, and a file-scoped one's to the end. Each scan goes on where the last stopped (pairs): linear in the
-// tokens, and a namespace's full name is made once, where a delegate stands in it.
+// or "delegate (…) {", and a function pointer, "delegate*", declare none; "delegate ref (int X, int Y) P()" returns a
+// tuple), each in the namespace it stands in, read from the tokens as they go (namespaces). Each scan goes on where
+// the last stopped (pairs): linear in the tokens, and a namespace's full name is made once, where a delegate stands.
 function delegates(r, pace) {
   const toks = r.toks, out = [], within = namespaces(toks, new Set(r.namespaces), pace);
   for (let i = 0; i < toks.length; i++) {
     const next = within.step(i);
     if (next !== i) { i = next; continue; }
     if (toks[i].v !== "delegate" || ["{", "*"].includes(toks[i + 1]?.v)) continue;
-    const start = toks[i + 1]?.v === "(" ? (pairs(toks).get(i + 1) ?? toks.length - 1) + 1 : i + 1;
+    let s = i + 1;
+    while (["ref", "readonly"].includes(toks[s]?.v)) s++;
+    const start = toks[s]?.v === "(" ? (pairs(toks).get(s) ?? toks.length - 1) + 1 : s;
     if (toks[start]?.v === "{") continue;
     const { name, end } = delegateName(toks, start);
     if (name) out.push(join(within.name(), name));

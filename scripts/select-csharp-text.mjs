@@ -2,20 +2,20 @@
 // (select-csharp.mjs; #675): a raw interpolated string's holes, an interpolation's alignment ("{x,App.Width}", whose
 // constant sets the padding), or a name written with an escape ("R\u0075les") or a formatting character (U+200C), which
 // the tokens split. 2 where the file may hide a name it declares: such a name in code, or anywhere once the scan cannot
-// keep in step, or a comment or string across an "#if"'s line, or such a line anywhere once it cannot; else 1 (0
-// where none). Read in one pass from the file's start, passing over comments, strings, characters and directives as the
-// lexer does, so a "$\"" in one opens nothing; a raw interpolated string's "$\"\"\"" and an odd line end (ODD) count
-// anywhere, and a comment in a hole, or one across another directive, makes it unsure: it reads more, never less.
+// keep in step, or a comment or string across an "#if"'s line, or such a line anywhere once it cannot, or an odd line
+// end anywhere (LINE); else 1 (0 where none). Read in one pass from the file's start, passing over comments, strings,
+// characters and directives as the lexer does, so a "$\"" in one opens nothing; a raw interpolated string's "$\"\"\""
+// counts anywhere (ODD), and a comment in a hole, or one across another directive, makes it unsure: it reads more.
 // Linear in the text: each character is read once.
 
-// (a raw interpolated string's "$\"\"\"", one "$" of a run; or a line's end other than "\n", "\r\n": "\r", U+0085, U+2028
-// or U+2029, which the scan and the tree read as no end)
-const ODD = /\$"""|\r(?!\n)|[\u0085\u2028\u2029]/u;
+// (a raw interpolated string's "$\"\"\"", one "$" of a run; a line's end other than "\n", "\r\n" (LINE): "\r", U+0085,
+// U+2028 or U+2029, which the scan and the tree read as no end, so a "//" comment it ends may hide a declaration)
+const ODD = /\$"""/u, LINE = /\r(?!\n)|[\u0085\u2028\u2029]/u;
 const AT = /\/\/|\/\*|\$@?"|@\$"|@"|"{3,}|["'#]/uy; // (what begins at a place in code that the scan passes over)
 
 export function leftOut(text) {
   const src = text.replace(/^\uFEFF/u, ""); // (a byte order mark, the one formatting character a file may begin with)
-  let found = ODD.test(src) ? 1 : 0;
+  let found = LINE.test(src) ? 2 : ODD.test(src) ? 1 : 0;
   for (let i = 0; !found && i < src.length; i++) {
     i = step(src, i);
     if (i < 0) found = -i;

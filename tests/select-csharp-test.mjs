@@ -116,8 +116,8 @@ if (started(import.meta.url)) {
   ok(!asProgram.length, "a file that declares a type, behind any modifier, is no Program", asProgram.join(", "));
 
   // ---- what review found (#1159) ----
-  const tuple = one("namespace App;\npublic delegate (int X, int Y) Pair();\n", { "tests/T.cs": "using App;\nnamespace Tests;\nclass T { Pair p; }\n" });
-  ok(tuple.links.get("tests/T.cs")?.has("src/X.cs"), "a delegate that returns a tuple is reached by its name", JSON.stringify([...tuple.links].map(([f, to]) => [f, [...to]])));
+  const tuple = ["", "ref ", "ref readonly "].filter(r => !one(`namespace App;\npublic delegate ${r}(int X, int Y) Pair();\n`, { "tests/T.cs": "using App;\nnamespace Tests;\nclass T { Pair p; }\n" }).links.get("tests/T.cs")?.has("src/X.cs"));
+  ok(!tuple.length, "a delegate that returns a tuple, by ref too, is reached by name", tuple.join(", "));
   const lambda = one("namespace App;\nclass X { System.Action<int> a = delegate (int n) { }; }\n", { "tests/T.cs": "using App;\nnamespace Tests;\nclass T { n m; }\n" });
   ok(!lambda.links.get("tests/T.cs")?.has("src/X.cs"), "an anonymous delegate with parameters declares no name");
   const src = "namespace App { namespace B.C { class Q { delegate void Inner(); } } delegate void Outer(); }\nnamespace Tests { class P { } }\n";

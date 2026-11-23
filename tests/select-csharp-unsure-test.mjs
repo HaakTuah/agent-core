@@ -69,8 +69,10 @@ const split = [["src/Rules.cs", "namespace App;\npublic static class R\\u0075les
     `namespace App;\npublic static class ${n} { static string s = ${e};\n public static bool Allowed() => true; }\n`, "tests/UsingTest.cs"])),
   // (and a plain name a comment one branch of an "#if" opens hides from the tokens, there too after what the scan cannot
   // keep in step with)
-  ...["", "// $\"\"\"\n", "static class K { static string s = $\"{1,K.W}\"; const int W = 1; }\n", "/*\n#region r\n*/\n"].flatMap(e => ["#endif", "\x1A#endif", "#\x1Aendif"].map(d => [e, d])).map(([e, d]) => ["src/Rules.cs", `namespace App;\n${e}#if NEVER\n/*\n${d}\npublic static class Rules { public static bool Allowed() => true; }\n// */\n`, "tests/UsingTest.cs"])].filter(([f, text, test]) => !pick({ ...app, [f]: text }, "src/Rules.cs").tests.includes(test));
-ok(!split.length, "a file where an escape or a formatting character may split a name it declares or names, or an \"#if\" may hide one, is reached from every file", split.map(c => c[0]).join(", "));
+  ...["", "// $\"\"\"\n", "static class K { static string s = $\"{1,K.W}\"; const int W = 1; }\n", "/*\n#region r\n*/\n"].flatMap(e => ["#endif", "\x1A#endif", "#\x1Aendif"].map(d => [e, d])).map(([e, d]) => ["src/Rules.cs", `namespace App;\n${e}#if NEVER\n/*\n${d}\npublic static class Rules { public static bool Allowed() => true; }\n// */\n`, "tests/UsingTest.cs"]),
+  // (and a plain name after a "//" comment that a line's end other than "\n" ends, which the tree reads on)
+  ...["\r", "\u0085", "\u2028", "\u2029"].map(e => ["src/Rules.cs", `namespace App;\n// note${e}public static class Rules { public static bool Allowed() => true; }\n`, "tests/UsingTest.cs"])].filter(([f, text, test]) => !pick({ ...app, [f]: text }, "src/Rules.cs").tests.includes(test));
+ok(!split.length, "a file where an escape or a formatting character may split a name it declares or names, or an \"#if\" or an odd line end may hide one, is reached from every file", split.map(c => c[0]).join(", "));
 ok(!pick({ ...app, "tests/OtherTest.cs": `\uFEFF${app["tests/OtherTest.cs"]}` }, "src/Rules.cs").tests.includes("tests/OtherTest.cs"), "a byte order mark at a file's start splits no name");
 const implicit = one("namespace System;\npublic static class Ext { public static bool Allowed(this string s) => true; }\n", { "tests/T.cs": "namespace Tests;\nclass T { bool b = \"x\".Allowed(); }\n" });
 ok(implicit.links.get("tests/T.cs")?.has("src/X.cs"), "a namespace an SDK imports by ImplicitUsings, which no <Using> git holds names, is seen by every file", JSON.stringify([...implicit.links.get("tests/T.cs") ?? []]));
@@ -86,8 +88,8 @@ const store = item => csharpReach({ "src/App.csproj": PROJ, "src/Store.cs": "nam
 const tags = ["<Using Note=\"Alias='Q'\" Include=\"App\" Alias=\"D\" />", "<using Include=\"App\" Alias=\"D\" />", "<USING Include=\"App\" Alias=\"D\"></USING>", "<Using Include=\"App\" Alias=\"Q\"><Alias>D</Alias></Using>"]
   .filter(item => !store(item).links.get("tests/T.cs")?.has("src/Store.cs"));
 ok(!tags.length, "a <Using> is read in any case, each attribute from its own pair, and both aliases where an attribute and an element each give one", tags.join(" | "));
-const untold = ["<Using Include=\"App\" /><Using Update=\"App\" Alias=\"D\" />", "<Using Include=\"App\" Alias=\"D\" Note=\"a\"b\" />"].filter(item => store(item).unsure.size !== 2);
-ok(!untold.length, "a <Using> that updates another, or whose tag is no run of attributes, makes every file unsure", untold.join(" | "));
+const untold = ["<Using Include=\"App\" /><Using Update=\"App\" Alias=\"D\" />", "<Using Include=\"App\" Alias=\"D\" Note=\"a\"b\" />", "<Using Include=\"App.Data.Store[]\" Alias=\"D\" />", "<Using Include=\"App.Data.Store?\" Alias=\"D\" />"].filter(item => store(item).unsure.size !== 2);
+ok(!untold.length, "a <Using> that updates another, whose tag is no run of attributes, or whose target is no plain name, makes every file unsure", untold.join(" | "));
 const tunit = one("global using B = TUnit.Core.BeforeAttribute;\nnamespace App;\nstatic class Init { [B(Assembly)] public static void Go() { } }\n");
 const session = one("namespace App;\nstatic class Init { [Before(HookType.TestSession)] public static void Go() { } }\n");
 ok(tunit.unsure.has("tests/T.cs") && session.links.get("tests/T.cs")?.has("src/X.cs"), "TUnit's Before or After beside a word Assembly, TestSession or TestDiscovery is a hook, and a global alias of it makes every file unsure",
