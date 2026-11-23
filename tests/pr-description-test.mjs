@@ -107,16 +107,6 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
     "a fenced block, of three marks or more, is not read up to the fence that closes it: of its kind, as long or longer, with nothing after but blanks; one indented four or not at a line's start opens none; an archive key in it is read all the same, as one in code marks is");
   ok(lines("a <!-- TBD --> b TODO\n<!--\nFIXME\n-->XXX\nTBD<!-- x -->TBD\n<!-- a --> <!--\nTODO\n-->\n<!-- one\n``` -->TODO\n<!-- XXX-->\n") === "1,4,5,5,10" && lines("  > TBD\na > TBD\n") === "2" && lines("a\"x\"TBD\na`x`TBD\n``TBD``\n`` a ` TBD ``\n") === "1,2",
     "an HTML comment, on a line or over lines, is read around, its place a blank; a line quoted after blanks is not read, one with a \">\" inside is; what quotes and code marks hold, of any length, is not read, and a blank stands for it");
-  ok(lines("Document the `<!--` opening.\nNotes: TBD\nBehind it: core archive 999999\n") === "3,2" && lines("``a`<!--`` TBD\n`a` <!-- TBD --> `b`\n<!-- `x --> TBD `\n`\"` TBD `\"`\n“a “b” TBD\nx \" TBD `\"`\n") === "1,3,4,5,6",
-    "code marks are read before a comment's opening, as whichever opens first: a \"<!--\" in code marks opens no comment, and a backtick in a comment opens no code; a quote mark in code marks opens no quote, and a quote closes at the first closing mark");
-  ok(lines("<!-- -->TBD\"x\"\n<!-- -->\"x\"TBD\nx `\"` TBD `\"`\na`x`\"y\"TBD\na`x`TBD\"y\"\n`TBD` \"y\" `TODO`\n\"`x` TBD\" y\na `b` <!-- TBD --> c\n") === "1,2,3,4,5",
-    "  what is read stays in its place after a comment, a code span or a quote, whichever stands first, one inside another going with it");
-  ok(lines("A note <!-- with no end\nNotes: TBD\n\nA note <!-- that ends\nTBD -->\nTODO\n\nA note <!-- that would end\n\nTBD -->\n<!-- one\n\nTODO -->XXX\n") === "2,6,10,13",
-    "  a \"<!--\" opens a comment where it opens the line or where a \"-->\" closes it in its paragraph; elsewhere it is text, which shows");
-  ok(lines("x <!-- TBD") === "1" && lines("a <!-- x\nTBD -->") === "" && lines("a <!-- x\n \nTBD -->") === "3" && lines("   <!-- TBD") === "" && lines("x<!-- TBD") === "1"
-    && fails("Tests: <!-- to be added").length === 0 && fails("Tests: <!-- x --> to be added").length === 1
-    && fails("A note <!-- \"TBD\" here").length === 0 && fails("Notes:<!---->to be added").length === 1,
-    "  on the first line and the last, past a line of blanks, indented up to three; and a \"<!--\" that is text stays in its place, one that opens goes");
   ok(["  to be added", "-  to be added", "12. to be added", "To be added.", "* to be added", "2) to be added", "[to be added]", "<to be added>"].every(t => fails(`The change.\n${t}\n`).length === 1) && fails("x- to be added\nIt is to be added").length === 0,
     "  \"to be added\" after blanks, a list mark of any width, or an opening bracket fails; inside a line it does not");
   ok(headOf("TBD", "").mends.length === 1 && headOf("archive item 99999", "").mends.length === 1 && headOf("archive item 99999", "./").mends.length === 0 && headOf("core archive 99999", "./").mends.length === 1 && headOf("core archive 99999", null).mends.length === 0

@@ -156,6 +156,17 @@ const refused = (r) => r.status === 1 && mended(r.stdout) && !/\n\s+at /u.test(r
   ok(["core archive -1", "core archive 1e9", "core archive \u0661\u0662", "core archive 0x10"].every(b => fails(b).length === 0) && ["core archive 99999999999999999999", "core archive #0", "core archive #1084.1.2"].every(b => fails(b).length === 1) && fails("core archive 000218").length === 0,
     "headMends: a number out of its form is no key, one too large or past the archive fails, and leading zeros name the item they lead to");
   ok([undefined, null, "", "\n\r\n \t\n"].every(body => fails(body).length === 0 && headMends(body, { keys: null }).notes.length === 0), "headMends: nothing at all names nothing, and says nothing of an archive not read");
+  const lines = body => fails(body).map(m => Number(/^line (\d+)/u.exec(m)[1])).join();
+  ok(lines("Document the `<!--` opening.\nNotes: TBD\nBehind it: core archive 999999\n") === "3,2" && lines("``a`<!--`` TBD\n`a` <!-- TBD --> `b`\n<!-- `x --> TBD `\n`\"` TBD `\"`\n“a “b” TBD\nx \" TBD `\"`\n") === "1,3,4,5,6",
+    "headMends: code marks are read before a comment's opening, as whichever opens first: a \"<!--\" in code marks opens no comment, and a backtick in a comment opens no code; a quote mark in code marks opens no quote, and a quote closes at the first closing mark");
+  ok(lines("<!-- -->TBD\"x\"\n<!-- -->\"x\"TBD\nx `\"` TBD `\"`\na`x`\"y\"TBD\na`x`TBD\"y\"\n`TBD` \"y\" `TODO`\n\"`x` TBD\" y\na `b` <!-- TBD --> c\n") === "1,2,3,4,5",
+    "  what is read stays in its place after a comment, a code span or a quote, whichever stands first, one inside another going with it");
+  ok(lines("A note <!-- with no end\nNotes: TBD\n\nA note <!-- that ends\nTBD -->\nTODO\n\nA note <!-- that would end\n\nTBD -->\n<!-- one\n\nTODO -->XXX\n") === "2,6,10,13",
+    "  a \"<!--\" opens a comment where it opens the line or where a \"-->\" closes it in its paragraph; elsewhere it is text, which shows");
+  ok(lines("x <!-- TBD") === "1" && lines("a <!-- x\nTBD -->") === "" && lines("a <!-- x\n \nTBD -->") === "3" && lines("   <!-- TBD") === "" && lines("x<!-- TBD") === "1"
+    && fails("Tests: <!-- to be added").length === 0 && fails("Tests: <!-- x --> to be added").length === 1
+    && fails("A note <!-- \"TBD\" here").length === 0 && fails("Notes:<!---->to be added").length === 1,
+    "  on the first line and the last, past a line of blanks, indented up to three; and a \"<!--\" that is text stays in its place, one that opens goes");
 }
 
 process.exit(failed ? 1 : 0);
