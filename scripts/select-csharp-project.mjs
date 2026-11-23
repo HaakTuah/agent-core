@@ -53,17 +53,27 @@ function targets(out, include, given) {
   return true;
 }
 
+// Whether a text imports a file other than a .props or .targets (an <Import> whose Project names neither, a common
+// path such as GetPathOfFileAbove('Directory.Build.props', …) read as one): git's .xml or .proj may hold a <Using>
+// the reader never sees. (Each try ends at the next "<": linear.)
+function importsOther(text) {
+  for (const m of text.matchAll(/<Import\b([^<>]*)>/giu)) if (!/\.(?:props|targets)(?![\p{L}\p{N}_])/iu.test(attributes(m[1])?.project ?? "")) return true;
+  return false;
+}
+
 // The <Using Include="N"> items of MSBuild's files, each a global using directive ({ target, alias }, an Alias="S" or
 // <Alias>S</Alias> its alias, both where both stand), and the IMPLICIT ones; or null where one holds an Update, a tag
 // that is no run of attributes, or what MSBuild expands ("$(...)" a property,
 // "@(...)" an item, "%" metadata or an escape, "%2E" a "."; "&" an XML reference, "&#46;" a "."), what the reader
 // cannot tell from its metadata (children), or a target or alias that is no plain name (an array's, a tuple's, a
-// nullable type's), whose value cannot be told here. `pace` is asked for each file; past CHARACTERS of them together, Late.
+// nullable type's), whose value cannot be told here; or null where one imports a file other than a .props or
+// .targets (importsOther). `pace` is asked for each file; past CHARACTERS of them together, Late.
 export function msbuildUsings(texts, pace) {
   const out = IMPLICIT.map(target => ({ target, alias: null })), n = texts.reduce((sum, t) => sum + t.length, 0);
   if (n > CHARACTERS) throw tooMuch("the project's MSBuild files", n);
   for (const text of texts) {
     pace();
+    if (importsOther(text)) return null;
     for (const m of text.matchAll(/<Using\b([^<>]*)>/giu)) { // (an item type in any case; each try ends at the next "<": linear)
       const attrs = attributes(m[1]), meta = !attrs || m[1].trimEnd().endsWith("/") ? {} : children(text, m.index + m[0].length);
       if (!attrs || meta === null || "update" in attrs) return null; // (an Update changes an item the reader took already)

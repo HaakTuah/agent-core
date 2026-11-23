@@ -2,7 +2,7 @@
 // scripts/select.mjs; #675): a file lost by the grammar, one that reads types by reflection, scans an assembly or is a source generator, one
 // with a raw interpolated string or an alignment that names something, one where an escape or a formatting character may
 // split a name, which every file reaches, every file where a <Using> names a property or
-// holds what the reader cannot read, a global alias names a hook's attribute or git cannot be asked; a namespace an SDK
+// holds what the reader cannot read or an <Import> of another file, a global alias names a hook's attribute or git cannot be asked; a namespace an SDK
 // imports by ImplicitUsings and a <Using>'s Alias given as an element, which reach every file; and the whole
 // suite where a changed file is C# of no project or no longer declares what it declared at the base, a change to a
 // helper among the tests, and the budget, of what git holds beside the texts too. The cases: select-csharp-test.mjs. Needs the parser (node scripts/install.mjs
@@ -27,8 +27,9 @@ ok(pick(reflects, "src/Start.cs").tests.includes("tests/MakeTest.cs"), "and so d
 const domain = { ...web, "tests/DomainTest.cs": "namespace Tests;\nclass DomainTest { object o = System.AppDomain.CurrentDomain.CreateInstanceAndUnwrap(\"App\", \"App.Start\"); }\n" };
 ok(pick(domain, "src/Start.cs").tests.includes("tests/DomainTest.cs"), "and one that makes a type named in a string through an AppDomain", JSON.stringify(pick(domain, "src/Start.cs")));
 const csTexts = { "src/App.csproj": PROJ, "src/A.cs": "namespace App;\nclass A { }\n", "tests/T.cs": "namespace Tests;\nclass T { }\n" };
-for (const [beside, what] of [[() => ({ msbuild: ["<Using Include=\"$(Root).App\" />"], cs: {} }), "a <Using> names an MSBuild property"], ...["@(ExtraUsings)", "%(Ns.Identity)", "App%2EData", "App&#46;Data"].map(i => [() => ({ msbuild: [`<Using Include="${i}" />`], cs: {} }), `a <Using> of ${i}, which MSBuild expands`]), [() => ({ unknown: true }), "git cannot be asked"]]) {
-  const r = csharpReach(csTexts, undefined, beside);
+for (const [held, what] of [...["$(Root).App", "@(ExtraUsings)", "%(Ns.Identity)", "App%2EData", "App&#46;Data"].map(i => [`<Using Include="${i}" />`, `a <Using> of ${i}, which MSBuild expands`]),
+  ...["$(D)u.xml", "c.proj"].map(p => [`<Import Project="${p}" />`, `a .props git holds imports ${p}, whose <Using> items it may not hold`]), [null, "git cannot be asked"]]) {
+  const r = csharpReach(csTexts, undefined, () => held ? { msbuild: [held], cs: {} } : { unknown: true });
   ok(same([...r.unsure].sort(), ["src/A.cs", "tests/T.cs"]), `where ${what}, every file of C# is unsure`, JSON.stringify([...r.unsure]));
 }
 ok(ofNoProject("lib/A.cs", csTexts) && !ofNoProject("src/A.cs", csTexts) && !ofNoProject("A.cs", { "App.csproj": PROJ }), "C# is of no project where no .csproj stands in a folder above it");
@@ -76,20 +77,19 @@ ok(!split.length, "a file where an escape or a formatting character may split a 
 ok(!pick({ ...app, "tests/OtherTest.cs": `\uFEFF${app["tests/OtherTest.cs"]}` }, "src/Rules.cs").tests.includes("tests/OtherTest.cs"), "a byte order mark at a file's start splits no name");
 const implicit = one("namespace System;\npublic static class Ext { public static bool Allowed(this string s) => true; }\n", { "tests/T.cs": "namespace Tests;\nclass T { bool b = \"x\".Allowed(); }\n" });
 ok(implicit.links.get("tests/T.cs")?.has("src/X.cs"), "a namespace an SDK imports by ImplicitUsings, which no <Using> git holds names, is seen by every file", JSON.stringify([...implicit.links.get("tests/T.cs") ?? []]));
-const child = ["<Using Include=\"App\"><Alias>D</Alias></Using>", "<Using Include=\"App\">\n  <alias>D</alias>\n  <Visible>false</Visible>\n</Using>"].filter(item => !csharpReach({ "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npublic class Store { }\n",
-  "tests/Tests.csproj": `<Project><ItemGroup>${item}</ItemGroup></Project>`, "tests/T.cs": "namespace Tests;\nclass T { object s = new D.Data.Store(); }\n" }, undefined, nothing).links.get("tests/T.cs")?.has("src/Store.cs"));
-ok(!child.length, "a <Using>'s Alias given as an element of its own is read as the attribute is", child.join(", "));
 const unreadMeta = csharpReach({ ...csTexts, "tests/Tests.csproj": "<Project><ItemGroup><Using Include=\"App\"><!-- <Alias>D</Alias> --></Using></ItemGroup></Project>" }, undefined, nothing);
 ok(same([...unreadMeta.unsure].sort(), ["src/A.cs", "tests/T.cs"]), "a <Using> whose elements the reader cannot read makes every file unsure", JSON.stringify([...unreadMeta.unsure]));
 const hookAlias = csharpReach({ ...csTexts, "src/Usings.cs": "global using MI = System.Runtime.CompilerServices.ModuleInitializerAttribute;\n", "src/Init.cs": "namespace App;\nstatic class Init { [MI] internal static void Go() { } }\n" }, undefined, nothing);
 ok(hookAlias.unsure.has("src/Init.cs") && hookAlias.unsure.has("tests/T.cs"), "a global alias of a hook's attribute, which the file that applies it never names, makes every file unsure", JSON.stringify([...hookAlias.unsure]));
 const store = item => csharpReach({ "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npublic class Store { }\n", "tests/Tests.csproj": `<Project><ItemGroup>${item}</ItemGroup></Project>`,
   "tests/T.cs": "namespace Tests;\nclass T { D.Data.Store s; }\n" }, undefined, nothing);
-const tags = ["<Using Note=\"Alias='Q'\" Include=\"App\" Alias=\"D\" />", "<using Include=\"App\" Alias=\"D\" />", "<USING Include=\"App\" Alias=\"D\"></USING>", "<Using Include=\"App\" Alias=\"Q\"><Alias>D</Alias></Using>", "<Using Include=\"App\" Alias=\"@D\" />"]
+const tags = ["<Using Note=\"Alias='Q'\" Include=\"App\" Alias=\"D\" />", "<using Include=\"App\" Alias=\"D\" />", "<USING Include=\"App\" Alias=\"D\"></USING>", "<Using Include=\"App\" Alias=\"Q\"><Alias>D</Alias></Using>", "<Using Include=\"App\" Alias=\"@D\" />",
+  "<Using Include=\"App\">\n  <alias>D</alias>\n  <Visible>false</Visible>\n</Using></ItemGroup><Import Project=\"$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '..'))\" /><ItemGroup>"]
   .filter(item => !store(item).links.get("tests/T.cs")?.has("src/Store.cs"));
-ok(!tags.length, "a <Using> is read in any case, each attribute from its own pair, both aliases where an attribute and an element each give one, and an alias's \"@\" dropped", tags.join(" | "));
-const untold = ["<Using Include=\"App\" /><Using Update=\"App\" Alias=\"D\" />", "<Using Include=\"App\" Alias=\"D\" Note=\"a\"b\" />", "<Using Include=\"App.Data.Store[]\" Alias=\"D\" />", "<Using Include=\"App.Data.Store?\" Alias=\"D\" />", "<Using Include=\"App\" Alias=\"D-x\" />"].filter(item => store(item).unsure.size !== 2);
-ok(!untold.length, "a <Using> that updates another, whose tag is no run of attributes, or whose target or alias is no plain name, makes every file unsure", untold.join(" | "));
+ok(!tags.length, "a <Using> is read in any case, each attribute from its own pair, both aliases where an attribute and an element each give one, an alias's \"@\" dropped, and beside an <Import> of a .props", tags.join(" | "));
+const untold = ["<Using Include=\"App\" /><Using Update=\"App\" Alias=\"D\" />", "<Using Include=\"App\" Alias=\"D\" Note=\"a\"b\" />", "<Using Include=\"App.Data.Store[]\" Alias=\"D\" />", "<Using Include=\"App.Data.Store?\" Alias=\"D\" />", "<Using Include=\"App\" Alias=\"D-x\" />",
+  "<Using Include=\"App\" Alias=\"D\" /></ItemGroup><Import Project=\"u.xml\" /><ItemGroup>"].filter(item => store(item).unsure.size !== 2);
+ok(!untold.length, "a <Using> that updates another, whose tag is no run of attributes, or whose target or alias is no plain name, or a .csproj that imports an .xml, makes every file unsure", untold.join(" | "));
 const tunit = one("global using B = TUnit.Core.BeforeAttribute;\nnamespace App;\nstatic class Init { [B(Assembly)] public static void Go() { } }\n");
 const session = one("namespace App;\nstatic class Init { [Before(HookType.TestSession)] public static void Go() { } }\n");
 ok(tunit.unsure.has("tests/T.cs") && session.links.get("tests/T.cs")?.has("src/X.cs"), "TUnit's Before or After beside a word Assembly, TestSession or TestDiscovery is a hook, and a global alias of it makes every file unsure",
@@ -97,12 +97,12 @@ ok(tunit.unsure.has("tests/T.cs") && session.links.get("tests/T.cs")?.has("src/X
 const used = { "tests/T.cs": "namespace Tests;\nclass T { bool b = \"x\".Allowed(); }\n" }, ext = ns => one(`namespace ${ns};\npublic static class Ext { public static bool Allowed(this string s) => true; }\n`, used).links.get("tests/T.cs")?.has("src/X.cs");
 ok(ext("Aspire.Hosting") && !ext("App.Inner"), "a namespace declared outside every project's root, which a package's own .props may import, is seen by every file; one under a root is not");
 const ext2 = "namespace App.Inner;\npublic static class Ext { public static bool Allowed(this string s) => true; }\n", group = x => `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>${x}</PropertyGroup></Project>`;
-const rooted = (x, beside = []) => csharpReach({ "src/App.csproj": group(x), "src/X.cs": ext2, ...used }, undefined, () => ({ msbuild: beside, cs: {} })).links.get("tests/T.cs")?.has("src/X.cs");
+const rooted = (x, beside = [], more = {}) => csharpReach({ "src/App.csproj": group(x), "src/X.cs": ext2, ...used, ...more }, undefined, () => ({ msbuild: beside, cs: {} })).links.get("tests/T.cs")?.has("src/X.cs");
 const unread = ["Lib&#46;Core", "Lib%2ECore", "$(Company).App", "<![CDATA[App]]>", "App<!-- c -->", " Lib "].map(v => `<RootNamespace>${v}</RootNamespace>`)
   .concat("<RootNamespace Condition=\"'$(A)' == ''\">App</RootNamespace>", "<RootNamespace>App</RootNamespace><RootNamespace>Lib</RootNamespace>", "<!-- <RootNamespace>Lib</RootNamespace> -->",
     "</PropertyGroup><PropertyGroup Condition=\"false\"><RootNamespace>Lib</RootNamespace>", "</PropertyGroup><ProjectExtensions><RootNamespace>Lib</RootNamespace></ProjectExtensions><PropertyGroup>",
-    "</PropertyGroup><Import Project=\"root.xml\" /><PropertyGroup>").filter(x => !rooted(x));
-ok(!unread.length && rooted("", [group("<RootNamespace>Lib</RootNamespace>")]) && !rooted(""),
+    "</PropertyGroup><Import Project=\"root.props\" /><PropertyGroup>").filter(x => !rooted(x));
+ok(!unread.length && rooted("", [group("<RootNamespace>Lib</RootNamespace>")]) && rooted("", [], { "Directory.Build.props": group("<RootNamespace>Lib</RootNamespace>") }) && !rooted(""),
   "a project that names a <RootNamespace> anywhere or imports a file, or beside a .props or .targets git holds that names one, adds no root, so its namespaces are seen by every file; its name is a root", unread.join(" | "));
 const bridged = { ...app, "src/Bridge.cs": "namespace App;\nref class Bridge { public static bool Check() => Rules.Allowed(); }\n", "tests/BridgeTest.cs": "using App;\nnamespace Tests;\nclass BridgeTest { void T() { Bridge.Check(); } }\n" };
 ok(readCsharp(bridged["src/Bridge.cs"]).functions === null && pick(bridged, "src/Rules.cs").tests.includes("tests/BridgeTest.cs"),

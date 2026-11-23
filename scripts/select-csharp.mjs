@@ -74,10 +74,9 @@ function directive(toks, i) {
 }
 
 
-// Where the statements at the top of a file begin: the first token past its using directives, extern aliases and
-// attribute sections; true where that token opens a statement (top-level statements, which C# compiles into a global
-// class Program).
-function topLevel(toks) {
+// Whether a file opens with statements (in a class Program): the first token past its usings, extern aliases and
+// attribute sections opens one, or `src` escapes a TYPE word (the tokens drop its "@").
+function topLevel(toks, src) {
   let i = 0;
   for (;;) {
     const d = directive(toks, i);
@@ -87,7 +86,7 @@ function topLevel(toks) {
     break;
   }
   while (MODIFIER.has(toks[i]?.v)) i++;
-  return i < toks.length && !TYPE.has(toks[i].v);
+  return i < toks.length && !TYPE.has(toks[i].v) || new RegExp(`@(?:${[...TYPE].join("|")})\\b`, "u").test(src);
 }
 
 // Where each "(" and "<" of a file's tokens closes (a Map of its place to that of its ")" or ">"), and at each place
@@ -205,16 +204,15 @@ const reflecting = (toks, words) => words.some(w => REFLECTS.has(w) || w.startsW
 const LITERAL = { t: "str", v: "" };
 
 // What a file holds that bears on its reach: its own namespaces, the namespaces its types stand in, its words, its runs
-// of dotted words, its using directives, and whether it declares extension members, runs with no name, reads types by
-// reflection, is of top-level statements, is unread (what it declares is not known either), or holds code the tokens
-// leave out (select-csharp-text.mjs). Each scan reads the tokens with every literal's value emptied, so a character's
-// ('}') is no punctuation.
+// of dotted words, its using directives, and whether it declares extension members, runs with no name, reflects, is of
+// top-level statements, is unread (what it declares is not known either), or holds code the tokens leave out
+// (select-csharp-text.mjs). Each scan reads the tokens with literals emptied (a '}' is no punctuation).
 function factsOf(read, src) {
   const toks = (read.toks ?? []).map(k => (k.t === "str" ? LITERAL : k)), r = { ...read, toks }, raw = leftOut(src);
   const words = ids(toks), placed = new Set(r.namespaces);
   if (!r.namespaces.length || r.types.some(t => !t.includes("."))) placed.add("");
   return { r, words: new Set(words), ...runsOf(toks), placed: [...placed], extensions: extending(toks), hook: runsUnnamed(toks, words),
-    reflects: reflecting(toks, words), unread: r.usings === null || r.functions === null || raw > 1, raw, program: topLevel(toks) };
+    reflects: reflecting(toks, words), unread: r.usings === null || r.functions === null || raw > 1, raw, program: topLevel(toks, src) };
 }
 
 // Where the project declares each type: { types: Map of a full name to its files, byLast: Map of a type's last word to
@@ -242,7 +240,7 @@ function indexOf(facts, pace) {
 }
 
 // The full names of the types a file declares (x its facts): those the grammar indexes, its delegates, and Program for
-// top-level statements; `pace` is asked as the delegates are read.
+// top-level statements; `pace` asked as delegates are read.
 const declared = (x, pace) => [...x.r.types, ...delegates(x.r, pace), ...(x.program ? ["Program"] : [])];
 
 // What a changed file of C# no longer does that a test may have reached it by, `was` its text at the base (null where
@@ -266,19 +264,19 @@ function globally(ix, usings) {
 }
 
 // The names a file writes in full (x its facts): its runs of dotted words, each with an alias that heads it put for
-// what the alias names (one of its own or a global one, the word alone too), and what global using directives name (a
-// `using static` of MSBuild's names a type no file need name), cut past the index's depth. `pace` is asked for each.
+// what the alias names (its own or a global one, the word alone too, and `[D]` for DAttribute), and what global using
+// directives name (a `using static` of MSBuild's names a type no file names), cut past the index's depth. `pace` asked for
+// each.
 function fullNames(x, ix, pace) {
   const aliases = new Map(ix.aliases), runs = new Set([...x.runs, ...ix.globals]);
   for (const u of x.usings) if (u.alias && u.target !== null) into(aliases, u.alias).add(u.target);
-  for (const run of [...x.runs, ...x.words]) { pace(); const [head, ...rest] = run.split(".", ix.depth + 1); for (const t of aliases.get(head) ?? []) { pace(); runs.add([t, ...rest].join(".")); } }
+  for (const run of [...x.runs, ...x.words]) { pace(); const [head, ...rest] = run.split(".", ix.depth + 1); for (const t of [...aliases.get(head) ?? [], ...aliases.get(`${head}Attribute`) ?? []]) { pace(); runs.add([t, ...rest].join(".")); } }
   return runs;
 }
 
 // The files one file reaches (x its facts), by the index: the files every file reaches; each type a word of its names
-// in a namespace it sees, and each a name it writes in full names (fullNames) against the namespaces around it, each
-// as itself or as an attribute; and the files that may extend in a namespace it sees.
-// `pace` is asked in each expansion.
+// in a namespace it sees, and each a name it writes in full names (fullNames) against the namespaces around it, each as
+// itself or as an attribute; and the files that may extend in a namespace it sees. `pace` is asked in each expansion.
 function reachOf(x, ix, pace) {
   const around = new Set([""]);
   for (const n of x.r.namespaces) for (const p of prefixes(n, ix.depth, pace)) around.add(p);
@@ -292,8 +290,8 @@ function reachOf(x, ix, pace) {
 }
 
 // The links of each file of C# among `texts`, and of each git holds beside them, to the files it may reach, and the
-// files whose reach cannot be told: { links: Map of a file to a Set of files, unsure: Set }. `beside` is what git holds
-// beside the texts (heldBeside).
+// files whose reach cannot be told: { links: Map of a file to a Set of files, unsure: Set }. `beside` reads what git holds
+// (heldBeside).
 export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   const links = new Map();
   if (!Object.keys(texts).some(f => f.endsWith(".cs"))) return { links, unsure: new Set() };
