@@ -53,7 +53,8 @@ export function converged(to, now, want, older = []) {
   if (!whole(to)) return {};
   const core = (marked(to) && /^# The core's file:/u.test(now)) || [want, ...older].some(t => t && plainOf(t) === plainOf(now));
   if (!core) return { left: "is not the core's (no mark of the core's, and not what a starter kit writes for the project): left as it is" };
-  return now === want ? {} : { text: want };
+  // (a file whose line ends alone differ, as a checkout on Windows holds it, is as the core writes it: git makes them one)
+  return lf(now) === lf(want) ? {} : { text: want };
 }
 
 // The workflows of the core's whose check the one job of core.yml runs, as a private project's starter kit writes it
