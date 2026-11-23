@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { fileOf, groupOf, LONG, MARKS, notLinked, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
+import { fileOf, groupOf, LONG, MARKS, notLinked, offBy, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
 import { READERS } from "../scripts/shape-readers.mjs";
 import { LARGEST } from "../scripts/tree-walk.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -635,6 +635,17 @@ put("core-manifest.md", "| *shape check* | `none`: kept off; config `checks/othe
 r = run([], { SHAPE_BASE: "named" });
 ok(r.status === 0 && /::warning::this pull request turns the shape check off/.test(r.out) && /nothing new in how the code is put together/.test(r.out) && where(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8")) === "checks/other.json",
   "a pull request that turns the check off and keeps the config's path in the row runs on that config, which the other readers read too", r.out);
+// (and so does one a pull request later, once the check is off, and a path the reason quotes is not taken for the config
+// nor the path for part of the reason: round 5 of #1188's review)
+commit("turned off, the path kept"); git("branch", "-f", "named");
+put("core-manifest.md", "| *shape check* | `none`: kept off |\n");
+r = run([], { SHAPE_BASE: "named" });
+ok(r.status === 1 && mended(r.out) && /no longer names the config at checks\/other\.json/.test(r.out),
+  "a pull request that drops the config's path where its base turned the check off fails all the same, with the mend", r.out);
+put("core-manifest.md", "| *shape check* | `none`: kept off, as `old.json` said; config `checks/other.json` |\n");
+r = run([], { SHAPE_BASE: "named" });
+ok(r.status === 0 && /ok {3}the shape check is off: the manifest's \*shape check\* row says `none`: kept off, as `old\.json` said \(/.test(r.out) && where(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8")) === "checks/other.json" && offBy("| *shape check* | `none`; config `checks/other.json` |") === "",
+  "in a row that says `none`, the config is the path after \"config\", and the reason stops before it", r.out);
 git("reset", "-q", "--hard", "base"); git("branch", "-D", "-q", "named");
 
 if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)

@@ -610,9 +610,13 @@ export function notLinked(file, root = ".") {
   return path.join(root, file);
 }
 
-// The config the manifest's *shape check* row names (its first path to a .json file, in backticks, after a `none` and its
-// reason too, so that the config's other readers keep reading it while the check is off), else the kit's.
-const rowNames = manifest => /`([\w./-]+\.json)`/u.exec(/^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "")?.[1] ?? null;
+// The config the manifest's *shape check* row names: its first path to a .json file, in backticks; in a row that says
+// `none`, the one after "config", which follows the reason, so that the config's other readers keep reading it while
+// the check is off and a path the reason quotes is not taken for it. Else the kit's.
+const rowNames = manifest => {
+  const row = /^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "";
+  return (rowToken(row, "*shape check*")?.said === "none" ? /\bconfig `([\w./-]+\.json)`/u : /`([\w./-]+\.json)`/u).exec(row)?.[1] ?? null;
+};
 export const where = manifest => rowNames(manifest) ?? KIT;
 
 // A manifest row's first text in backticks after its name `label`: { said } (trimmed) and { reason }, where `said` is
@@ -641,7 +645,9 @@ const trimTail = text => {
 // gives none, which turns nothing off; null where the row says no `none`.
 export function offBy(manifest) {
   const token = rowToken(manifest, "*shape check*");
-  return token?.said === "none" ? token.reason : null;
+  if (token?.said !== "none") return null;
+  const reason = token.reason.replace(/[\s;,]*\bconfig `[^`]*`\s*$/u, ""); // (the config's path is no part of the reason)
+  return /[\p{L}\p{N}]/u.test(reason) ? reason : "";
 }
 
 // ---- the verdict ----
@@ -941,14 +947,9 @@ function baseOf() {
 }
 
 // Where the config is: the one named, else the one the project's rules name (its manifest; in the core, its
-// AGENTS.md), else the kit's; null where the project has none yet. A row that says `none` keeps naming a config of the
-// project's own path after its reason, which the config's other readers (the selection, the strength, the mutation) read
-// too: one that drops the path its base names fails.
+// AGENTS.md), else the kit's; null where the project has none yet.
 function configAt(named, self, base) {
-  const manifest = tolerant(() => fs.readFileSync("core-manifest.md", "utf8"));
-  const at = named ?? where(manifest ?? tolerant(() => fs.readFileSync("AGENTS.md", "utf8")));
-  const dropped = !named && base && offBy(manifest) !== null && rowNames(manifest) === null ? baseFiles(base, null).at : KIT;
-  if (dropped !== KIT) refuse(`the manifest's *shape check* row says \`none\` and no longer names the config at ${dropped}, which ${base.name}'s names, so the config's other readers (the selection, the strength, the mutation) would read the starter kit's at ${KIT}`, `keep the path in the row after the reason: | *shape check* | \`none\`: <the owner's reason>; config \`${dropped}\` |`);
+  const at = named ?? where(tolerant(() => fs.readFileSync("core-manifest.md", "utf8")) ?? tolerant(() => fs.readFileSync("AGENTS.md", "utf8")));
   if (fs.existsSync(notLinked(at))) return aFile(at);
   if (named) refuse(`there is no config at ${at}`, `write it as the starter kit does (core/setup/template/shape.json.tmpl), then node ${self} ${at} --first`);
   const was = base ? baseFiles(base, named) : null; // (where the base's own manifest places it, if this one moved it)
@@ -1024,10 +1025,21 @@ function isOff(named, rest, base) {
   return true;
 }
 
+// A row that says `none` keeps naming a config of the project's own path after its reason, which the config's other
+// readers (the selection, the strength, the mutation) read too: a pull request whose row says `none` and drops the path
+// its base names fails, whether or not the check is off by then.
+function pathKept(named, base) {
+  const manifest = tolerant(() => fs.readFileSync("core-manifest.md", "utf8"));
+  if (named || !base || offBy(manifest) === null || rowNames(manifest) !== null) return;
+  const was = baseFiles(base, null).at;
+  if (was !== KIT) refuse(`the manifest's *shape check* row says \`none\` and no longer names the config at ${was}, which ${base.name}'s names, so the config's other readers (the selection, the strength, the mutation) would read the starter kit's at ${KIT}`, `keep the path in the row after the reason: | *shape check* | \`none\`: <the owner's reason>; config \`${was}\` |`);
+}
+
 function main(argv) {
   const self = path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/"); // (as a mend names it)
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, rest = named ? argv.slice(1) : argv;
   const base = baseOf();
+  pathKept(named, base);
   if (isOff(named, rest, base)) return 0;
   const at = configAt(named, self, base);
   if (at === null) return unwritten(self, base);
