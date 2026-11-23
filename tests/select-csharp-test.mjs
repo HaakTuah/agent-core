@@ -110,11 +110,11 @@ if (started(import.meta.url)) {
   const named = (src, test = "namespace Tests;\nclass T { object f = new Factory<Program>(); }\n") => one(src, { "tests/T.cs": test }).links.get(TEST)?.has(SRC);
   const heads = [["extern alias", "extern alias Old;\nusing App;\nvar x = 1;\n"], ["a generic alias", "using L = System.Collections.Generic.List<System.Collections.Generic.List<int>>;\nvar x = new L();\n"],
     ["a global using", "global using App;\nvar x = 1;\n"], ["an attribute of the assembly", "using App;\n[assembly: A]\n[assembly: B]\nvar x = 1;\n"],
-    ["an escaped keyword", "using App;\n@class.Run();\n"]];
+    ["an escaped keyword", "using App;\n@class.Run();\n"], ["the word record, which the grammar loses, so the file is reached from every file", "using App;\nrecord.Bootstrap.Run();\n"]];
   const notProgram = heads.filter(([, src]) => !named(src)).map(([w]) => w);
   ok(!notProgram.length, "a file of top-level statements is Program past its using directives, extern aliases, generic aliases and attributes, or an escaped keyword", notProgram.join(", "));
   const declares = ["public", "internal", "private", "protected", "static", "sealed", "abstract", "partial", "readonly", "ref", "unsafe", "file", "new", "extern"].map(m => [m, `using App;\n${m} ${m === "ref" ? "struct" : "class"} X { }\n`])
-    .concat(["struct", "interface", "enum", "record"].map(t => [t, `using App;\n${t} X { }\n`]), [["delegate", "using App;\npublic delegate void X();\n"], ["namespace", "using App;\nnamespace H { class X { } }\n"]]);
+    .concat(["struct", "interface", "enum", "record", "record struct", "record class"].map(t => [t, `using App;\n${t} X { }\n`]), [["delegate", "using App;\npublic delegate void X();\n"], ["namespace", "using App;\nnamespace H { class X { } }\n"]]);
   const asProgram = declares.filter(([, src]) => named(src)).map(([w]) => w);
   ok(!asProgram.length, "a file that declares a type, behind any modifier, is no Program", asProgram.join(", "));
 

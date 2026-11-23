@@ -12,7 +12,7 @@ import path from "node:path";
 import { Late } from "../scripts/hurry.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 import { csharpReach } from "../scripts/select-csharp.mjs";
-import { heldBeside, ofNoProject } from "../scripts/select-csharp-project.mjs";
+import { heldBeside, msbuildUsings, ofNoProject } from "../scripts/select-csharp-project.mjs";
 import { PROJ, done, nothing, ok, one, same } from "./select-csharp-test.mjs";
 
 // ---- a <Using>, and every file where one cannot be read ----
@@ -37,13 +37,25 @@ const items = ["<Using Include=\"App.Data.Store\" Alias=\"S\" />", "<Using Inclu
   "tests/Tests.csproj": `<Project><ItemGroup>${item}</ItemGroup></Project>`, "tests/T.cs": "namespace Tests;\nclass T { [S] S s; void M() { Go(); } }\n",
 }, undefined, nothing).links.get("tests/T.cs")?.has("src/Store.cs"));
 ok(!items.length, "a <Using> with an Alias (an attribute's too), or Static, reaches the type it names from every file", items.join(", "));
-const store = item => csharpReach({ "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npublic class Store { }\n", "tests/Tests.csproj": `<Project><ItemGroup>${item}</ItemGroup></Project>`,
-  "tests/T.cs": "namespace Tests;\nclass T { D.Data.Store s; }\n" }, undefined, nothing);
+const store = (item, held = {}) => csharpReach({ "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npublic class Store { }\n", "tests/Tests.csproj": `<Project><ItemGroup>${item}</ItemGroup></Project>`,
+  "tests/T.cs": "namespace Tests;\nclass T { D.Data.Store s; }\n" }, undefined, () => ({ msbuild: held, cs: {} }));
 const tags = ["<Using Note=\"Alias='Q'\" Include=\"App\" Alias=\"D\" />", "<using Include=\"App\" Alias=\"D\" />", "<USING Include=\"App\" Alias=\"D\"></USING>", "<Using Include=\"App\" Alias=\"Q\"><Alias>D</Alias></Using>", "<Using Include=\"App\" Alias=\"@D\" />",
-  "<Using Include=\"App\">\n  <alias>D</alias>\n  <Visible>false</Visible>\n</Using>", "<Using Include=\"App\" Alias=\"D\" /></ItemGroup><Import Project=\"$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '..'))\" /><ItemGroup>",
-  "<Using Include=\"App\" Alias=\"D\" /></ItemGroup><Import Project=\"$(MSBuildThisFileDirectory)a.props; $([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory).., a.props))/a.props\" /><ItemGroup>"]
+  "<Using Include=\"App\">\n  <alias>D</alias>\n  <Visible>false</Visible>\n</Using>"]
   .filter(item => !store(item).links.get("tests/T.cs")?.has("src/Store.cs"));
-ok(!tags.length, "a <Using> is read in any case, each attribute from its own pair, both aliases where an attribute and an element each give one, an alias's \"@\" dropped, and beside an <Import> of a .props", tags.join(" | "));
+ok(!tags.length, "a <Using> is read in any case, each attribute from its own pair, both aliases where an attribute and an element each give one, and an alias's \"@\" dropped", tags.join(" | "));
+// (an <Import> of a .props or .targets git holds, by a path from the file's folder, or found above a folder it gives)
+const heldProps = { "Directory.Build.props": "<Project />", "a.props": "<Project />", "tests/a.props": "<Project />" }, imported = p => `<Using Include="App" Alias="D" /></ItemGroup><Import Project="${p}" /><ItemGroup>`;
+const unlinked = ["a.props", "../a.props", "$(MSBuildThisFileDirectory)a.props; $([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory).., a.props))/a.props", "$([MSBuild]::GetPathOfFileAbove('Directory.Build.props'))",
+  "$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)..'))", "$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), a.props))\\a.props"].filter(p => !store(imported(p), heldProps).links.get("tests/T.cs")?.has("src/Store.cs"));
+ok(!unlinked.length, "a <Using> is read beside an <Import> of a .props git holds, by a path from the file's folder or found above the folder it starts from", unlinked.join(" | "));
+// (one that leads outside the checkout, or to a file git does not hold, or found above a folder this cannot tell, may hold a <Using> never read)
+const outsideImports = ["../../shared/GlobalUsings.props", "b.props", "$(MSBuildThisFileDirectory)b.props", "$([MSBuild]::GetPathOfFileAbove('Shared.props'))", "$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '..'))",
+  "$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../..'))", "$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), b.props))/b.props", "$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), a.props))/../b.props"]
+  .filter(p => store(imported(p), heldProps).unsure.size !== 2);
+ok(!outsideImports.length, "an <Import> of a .props outside the checkout, of one git does not hold, or found above a folder this cannot tell, makes every file unsure", outsideImports.join(" | "));
+let paced = 0;
+const many = msbuildUsings([["Directory.Build.props", `<Project><ItemGroup><Using Include="${"A;".repeat(1000)}" Alias="D"><Alias>E</Alias></Using></ItemGroup></Project>`]], () => paced++);
+ok(paced >= 2000 && many.filter(u => u.target === "A").length === 2, "the budget is asked for each target and alias of a <Using>, and each is put once", `${paced} ${many.length}`);
 const untold = ["<Using Include=\"App\" /><Using Update=\"App\" Alias=\"D\" />", "<Using Include=\"App\" Alias=\"D\" Note=\"a\"b\" />", "<Using Include=\"App.Data.Store[]\" Alias=\"D\" />", "<Using Include=\"App.Data.Store?\" Alias=\"D\" />", "<Using Include=\"App\" Alias=\"D-x\" />",
   "<Using Include=\"App\" Alias=\"D\" /></ItemGroup><Import Project=\"u.xml\" /><ItemGroup>", "</ItemGroup><ItemDefinitionGroup><Using Alias=\"D\" /></ItemDefinitionGroup><ItemGroup><Using Include=\"App\" />"].filter(item => store(item).unsure.size !== 2);
 ok(!untold.length, "a <Using> that updates another or defines an item's metadata, whose tag is no run of attributes, or whose target or alias is no plain name, or a .csproj that imports an .xml, makes every file unsure", untold.join(" | "));
@@ -53,12 +65,12 @@ ok(!untold.length, "a <Using> that updates another or defines an item's metadata
 const used = { "tests/T.cs": "namespace Tests;\nclass T { bool b = \"x\".Allowed(); }\n" }, ext = ns => one(`namespace ${ns};\npublic static class Ext { public static bool Allowed(this string s) => true; }\n`, used).links.get("tests/T.cs")?.has("src/X.cs");
 ok(ext("Aspire.Hosting") && !ext("App.Inner"), "a namespace declared outside every project's root, which a package's own .props may import, is seen by every file; one under a root is not");
 const ext2 = "namespace App.Inner;\npublic static class Ext { public static bool Allowed(this string s) => true; }\n", group = x => `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>${x}</PropertyGroup></Project>`;
-const rooted = (x, beside = [], more = {}) => csharpReach({ "src/App.csproj": group(x), "src/X.cs": ext2, ...used, ...more }, undefined, () => ({ msbuild: beside, cs: {} })).links.get("tests/T.cs")?.has("src/X.cs");
+const rooted = (x, beside = {}, more = {}) => csharpReach({ "src/App.csproj": group(x), "src/X.cs": ext2, ...used, ...more }, undefined, () => ({ msbuild: beside, cs: {} })).links.get("tests/T.cs")?.has("src/X.cs");
 const unread = ["Lib&#46;Core", "Lib%2ECore", "$(Company).App", "<![CDATA[App]]>", "App<!-- c -->", " Lib "].map(v => `<RootNamespace>${v}</RootNamespace>`)
   .concat("<RootNamespace Condition=\"'$(A)' == ''\">App</RootNamespace>", "<RootNamespace>App</RootNamespace><RootNamespace>Lib</RootNamespace>", "<!-- <RootNamespace>Lib</RootNamespace> -->",
-    "</PropertyGroup><PropertyGroup Condition=\"false\"><RootNamespace>Lib</RootNamespace>", "</PropertyGroup><ProjectExtensions><RootNamespace>Lib</RootNamespace></ProjectExtensions><PropertyGroup>",
-    "</PropertyGroup><Import Project=\"root.props\" /><PropertyGroup>").filter(x => !rooted(x));
-ok(!unread.length && rooted("", [group("<RootNamespace>Lib</RootNamespace>")]) && rooted("", [], { "Directory.Build.props": group("<RootNamespace>Lib</RootNamespace>") }) && !rooted(""),
+    "</PropertyGroup><PropertyGroup Condition=\"false\"><RootNamespace>Lib</RootNamespace>", "</PropertyGroup><ProjectExtensions><RootNamespace>Lib</RootNamespace></ProjectExtensions><PropertyGroup>").filter(x => !rooted(x));
+if (!rooted("</PropertyGroup><Import Project=\"root.props\" /><PropertyGroup>", { "src/root.props": "<Project />" })) unread.push("an <Import> of a .props git holds");
+ok(!unread.length && rooted("", { "Directory.Build.props": group("<RootNamespace>Lib</RootNamespace>") }) && rooted("", [], { "Directory.Build.props": group("<RootNamespace>Lib</RootNamespace>") }) && !rooted(""),
   "a project that names a <RootNamespace> anywhere or imports a file, or beside a .props or .targets git holds that names one, adds no root, so its namespaces are seen by every file; its name is a root", unread.join(" | "));
 
 
@@ -70,15 +82,18 @@ ok(!unread.length && rooted("", [group("<RootNamespace>Lib</RootNamespace>")]) &
   try {
     add("A.cs", "class A { }\n"); add("Directory.Build.props", "<Project />\n"); add("B.cs", "class B { }\n");
     process.chdir(dir);
-    const held = heldBeside({ "B.cs": "" }, () => files);
-    ok(same(Object.keys(held.cs), ["A.cs"]) && held.msbuild.length === 1, "what git holds of C# and MSBuild beside the texts is read", JSON.stringify(held));
+    const held = heldBeside({ "B.cs": "" }, undefined, () => files);
+    ok(same(Object.keys(held.cs), ["A.cs"]) && same(Object.keys(held.msbuild), ["Directory.Build.props"]), "what git holds of C# and MSBuild beside the texts is read", JSON.stringify(held));
+    let asked = 0, paced;
+    try { heldBeside({}, () => { if (++asked > 2) throw new Late("past the budget"); }, () => files); } catch (e) { paced = e; }
+    ok(paced instanceof Late && asked === 3, "the budget is asked before each file git holds beside the texts is read, so many empty files cannot outlast it", String(paced));
     fs.symlinkSync("Directory.Build.props", path.join(dir, "Link.props"));
     fs.writeFileSync(path.join(dir, "Directory.Build.rsp"), "-p:CustomAfterMicrosoftCommonTargets=u.xml\n");
-    ok(heldBeside({}, () => [...files, "Directory.Build.rsp"]).unknown, "a Directory.Build.rsp git holds, whose switches may set any property, leaves what git holds unknown, so every file is unsure");
-    ok(heldBeside({}, () => [...files, "Link.props"]).unknown, "a link git holds there, which is not followed, leaves what git holds unknown, so every file is unsure");
+    ok(heldBeside({}, undefined, () => [...files, "Directory.Build.rsp"]).unknown, "a Directory.Build.rsp git holds, whose switches may set any property, leaves what git holds unknown, so every file is unsure");
+    ok(heldBeside({}, undefined, () => [...files, "Link.props"]).unknown, "a link git holds there, which is not followed, leaves what git holds unknown, so every file is unsure");
     add("Big.cs", `// ${"x".repeat(4_000_000)}\n`);
     let thrown;
-    try { heldBeside({}, () => files); } catch (e) { thrown = e; }
+    try { heldBeside({}, undefined, () => files); } catch (e) { thrown = e; }
     ok(thrown instanceof Late && /past the 4,000,000/u.test(thrown.message), "past 4,000,000 bytes of it, the selection is late and runs the whole suite", String(thrown));
   } finally { process.chdir(here); }
 }

@@ -19,7 +19,7 @@ const MODIFIER = new Set(["public", "internal", "private", "protected", "static"
 // (what C# or a test framework runs unnamed: a file that holds one is reached from every file)
 const HOOKS = new Set(["ModuleInitializer", "AssemblyInitialize", "AssemblyCleanup", "GlobalTestInitialize", "GlobalTestCleanup", "SetUpFixture", "BeforeEvery", "AfterEvery", "IIncrementalGenerator", "ISourceGenerator", "CollectionDefinition"]);
 // (what finds types unnamed: reflection, a scan of an assembly or the compilation; a word Assembly or CreateInstance… too)
-const REFLECTS = new Set(["IIncrementalGenerator", "ISourceGenerator", "Activator", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
+const REFLECTS = new Set(["IIncrementalGenerator", "ISourceGenerator", "Activator", "TypeDescriptor", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
   "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR", "Migrate", "MigrateAsync",
   "GetMigrations", "GetPendingMigrations", "HasPendingModelChanges"]);
 
@@ -255,8 +255,8 @@ function reachOf(x, ix, pace) {
 export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   const links = new Map();
   if (!Object.keys(texts).some(f => f.endsWith(".cs"))) return { links, unsure: new Set() };
-  const held = beside(texts), read = Object.entries(texts).filter(([f]) => MSBUILD.test(f)).map(([, t]) => t);
-  const msbuild = held.unknown ? null : msbuildUsings([...held.msbuild, ...read], pace);
+  const held = beside(texts, pace), read = Object.entries(texts).filter(([f]) => MSBUILD.test(f));
+  const msbuild = held.unknown ? null : msbuildUsings([...Object.entries(held.msbuild), ...read], pace);
   const all = { ...held.cs, ...texts }, files = Object.keys(all).filter(f => f.endsWith(".cs"));
   // (where the usings every file holds are untold, every file is unsure)
   if (msbuild === null) return { links, unsure: new Set(files) };

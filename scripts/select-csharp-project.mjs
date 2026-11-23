@@ -5,6 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { CHARACTERS, Late } from "./hurry.mjs";
+import { importPath } from "./nuget.mjs";
 import { git } from "./select-passed.mjs";
 
 // The attributes of an XML tag's text ({ include: "App" }, each name in lower case: MSBuild's metadata), read as a run
@@ -39,37 +40,59 @@ function children(text, at) {
 // The run stopped (Late) where `what` holds `n` characters (or bytes), past CHARACTERS.
 export const tooMuch = (what, n, unit = "characters") => new Late(`${what} hold ${n.toLocaleString("en")} ${unit}, past the ${CHARACTERS.toLocaleString("en")} the selection reads, so what each file of C# reaches cannot be told in time`);
 
-// Each target of an Include (";" between them) with each alias given, put in `out`, an alias's "@" dropped as the
-// tokens drop it; false where a target or an alias is no plain name.
-function targets(out, include, given) {
+// Each target of an Include (";" between them) with each alias given, put in `out` once (`seen` holds those put),
+// `pace` asked for each, an alias's "@" dropped as the tokens drop it; false where a target or an alias is no plain name.
+function targets(out, seen, include, given, pace) {
   const aliases = given.map(a => /^@?[\p{L}\p{N}_]+$/u.test(a) ? a.replace(/^@/u, "") : null);
   if (aliases.includes(null)) return false;
   for (const s of include.split(";")) {
     const target = s.trim().replace(/^global::/u, "");
     if (!target) continue;
     if (!/^[\p{L}\p{N}_]+(?:\.[\p{L}\p{N}_]+)*$/u.test(target)) return false; // (words between dots: linear)
-    for (const alias of aliases.length ? aliases : [null]) out.push({ target, alias }); // (a spread of many outruns the stack)
+    for (const alias of aliases.length ? aliases : [null]) { pace(); const key = `${target}\0${alias}`; if (!seen.has(key)) { seen.add(key); out.push({ target, alias }); } } // (a spread of many outruns the stack)
   }
   return true;
 }
 
-// Whether a text imports a file other than a .props or .targets: git's .xml or .proj may hold a <Using> the reader never
-// sees. Each part of an <Import>'s Project, split at ";" and trimmed, is read as one only where it ends in ".props" or
+// Whether the text of the file `f` imports a file other than a .props or .targets that git holds (`known`): git's .xml
+// or .proj, or a file outside the repository, may hold a <Using> the reader never sees. Each part of an <Import>'s Project, split at ";" and trimmed, is read as one only where it ends in ".props" or
 // ".targets", in lower case as git lists them, and holds nothing MSBuild expands but its reserved path properties
 // ($(MSBuildThisFileDirectory) and its kin, which no file can set, where another $(MSBuild…) can be) and
 // GetDirectoryNameOfFileAbove of such: a part written whole as GetPathOfFileAbove('….props', …) too. Any other part
 // ($(X).props, whose X may hold ";", or a property function that ends elsewhere) is another file, and so is a property
 // that may name a file MSBuild or the SDK imports by it: one named Custom{Before,After}…, any whose name holds Props,
 // Targets or Profile (DirectoryBuildTargetsPath, AfterMicrosoftNETSdkTargets, NuGetRestoreTargets, PublishProfile…),
-// and the extensions' paths, whose ImportBefore and ImportAfter folders it imports.
+// and the extensions' paths, whose ImportBefore and ImportAfter folders it imports. Each part that is one must lead,
+// as MSBuild reads it (nuget.mjs's importPath: relative to `f`'s folder), to a file of `known`; one found above a folder
+// (GetPathOfFileAbove, GetDirectoryNameOfFileAbove), from `f`'s folder or one $(MSBuildThisFileDirectory) heads, to one
+// `known` holds at that folder or above it, since past the repository's top it would read a file git does not hold.
 // (Each regex is anchored, its alternatives start apart, and a run of spaces is read by one part alone: linear.)
 const RESERVED = "MSBuild(?:ThisFile(?:Directory(?:NoRoot)?|Extension|FullPath|Name)?|Project(?:Directory(?:NoRoot)?|Extension|File|FullPath|Name)|StartupDirectory)";
 const PATH = String.raw`(?:[^$%@&;'"()]|\$\(${RESERVED}\))`;
 const PART = new RegExp(String.raw`^(?:${PATH}|\$\(\[MSBuild\]::GetDirectoryNameOfFileAbove\((?:${PATH}|'(?:${PATH})*')*\)\))*\.(?:props|targets)$`, "u");
-const ABOVE = new RegExp(String.raw`^\$\(\[MSBuild\]::GetPathOfFileAbove\(\s*'?(?:[^\s$%@&;'"(),][^$%@&;'"(),]*)?\.(?:props|targets)'?\s*(?:,(?:${PATH}|'(?:${PATH})*')*)?\)\)$`, "u");
-function importsOther(text) {
+const ABOVE = new RegExp(String.raw`^\$\(\[MSBuild\]::GetPathOfFileAbove\(\s*'?((?:[^\s$%@&;'"(),][^$%@&;'"(),]*)?\.(?:props|targets))'?\s*(?:,((?:${PATH}|'(?:${PATH})*')*))?\)\)$`, "u");
+const NAME_ABOVE = /^\$\(\[MSBuild\]::GetDirectoryNameOfFileAbove\(((?:[^,()]|\$\(MSBuildThisFileDirectory\))*),([^,()]*)\)\)(.*)$/iu;
+function importsOther(text, f, known) {
   if (/<(?:Custom(?:Before|After)|[\w.]*(?:Props|Targets|Profile)|MSBuild(?:User)?ExtensionsPath)/iu.test(text)) return true;
-  for (const m of text.matchAll(/<Import\b([^<>]*)>/giu)) if (!(attributes(m[1])?.project ?? "").split(";").every(p => PART.test(p.trim()) || ABOVE.test(p.trim()))) return true;
+  const inside = at => at !== null && at !== "" && known.has(at);
+  // (the folder at or above `start` that holds `name`, as git lists it: "" the top; null where none does, or `start`
+  // is no folder known here)
+  const above = (start, name) => {
+    const s = start === undefined ? "$(MSBuildThisFileDirectory)" : start.trim().replace(/^'|'$/gu, "").trim();
+    let d = /^\$\(MSBuildThisFileDirectory\)/iu.test(s) ? importPath(f, `${s}/.`, { anchored: true }) : null;
+    if (d === null || d === "") return null;
+    for (d = d === "." ? "" : d; ; d = d.includes("/") ? path.posix.dirname(d) : "") {
+      if (known.has(path.posix.normalize(path.posix.join(d, name.replace(/\\/gu, "/"))))) return d;
+      if (d === "") return null;
+    }
+  };
+  const leads = p => {
+    const a = ABOVE.exec(p), n = !a && NAME_ABOVE.exec(p);
+    if (a) return above(a[2], a[1]) !== null;
+    if (n) { const d = above(n[1], n[2].trim().replace(/^'|'$/gu, "")); return d !== null && inside(importPath(path.posix.join(d, "_"), n[3].replace(/^[\\/]+/u, ""))); }
+    return PART.test(p) && inside(importPath(f, p));
+  };
+  for (const m of text.matchAll(/<Import\b([^<>]*)>/giu)) if (!(attributes(m[1])?.project ?? "").split(";").every(p => leads(p.trim()))) return true;
   return false;
 }
 
@@ -79,20 +102,22 @@ function importsOther(text) {
 // "@(...)" an item, "%" metadata or an escape, "%2E" a "."; "&" an XML reference, "&#46;" a "."), what the reader
 // cannot tell from its metadata (children), or a target or alias that is no plain name (an array's, a tuple's, a
 // nullable type's), whose value cannot be told here; or null where one imports a file other than a .props or
-// .targets (importsOther). `pace` is asked for each file; past CHARACTERS of them together, Late.
-export function msbuildUsings(texts, pace) {
-  const out = IMPLICIT.map(target => ({ target, alias: null })), n = texts.reduce((sum, t) => sum + t.length, 0);
+// .targets git holds (importsOther). `entries` gives each file's name and text; `pace` is asked for each file and each
+// target; past CHARACTERS of them together, Late.
+export function msbuildUsings(entries, pace) {
+  const out = IMPLICIT.map(target => ({ target, alias: null })), seen = new Set(), n = entries.reduce((sum, [, t]) => sum + t.length, 0);
+  const known = new Set(entries.map(([f]) => f));
   if (n > CHARACTERS) throw tooMuch("the project's MSBuild files", n);
-  for (const text of texts) {
+  for (const [f, text] of entries) {
     pace();
-    if (importsOther(text)) return null;
+    if (importsOther(text, f, known)) return null;
     for (const m of text.matchAll(/<Using\b([^<>]*)>/giu)) { // (an item type in any case; each try ends at the next "<": linear)
       const attrs = attributes(m[1]), meta = !attrs || m[1].trimEnd().endsWith("/") ? {} : children(text, m.index + m[0].length);
       if (!attrs || meta === null || "update" in attrs) return null; // (an Update changes an item the reader took already)
       const include = attrs.include ?? meta.include, given = [attrs.alias, meta.alias].map(a => a?.trim()).filter(Boolean);
       if (include === undefined) { if ("remove" in attrs) continue; return null; } // (an item definition's Alias or Static applies to every <Using>)
       if (/\$\(|@\(|%|&/u.test(`${include}${given.join("")}`)) return null;
-      if (!targets(out, include, given)) return null;
+      if (!targets(out, seen, include, given, pace)) return null;
     }
   }
   return out;
@@ -101,18 +126,19 @@ export function msbuildUsings(texts, pace) {
 // The texts MSBuild reads as a project's: a .csproj and what it imports by name or beside it.
 export const MSBUILD = /\.(?:csproj|props|targets|csproj\.user|pubxml|pubxml\.user)$/u;
 
-// What git holds that the config does not read and C# compiles with: { msbuild: [the texts of each .props, .targets,
+// What git holds that the config does not read and C# compiles with: { msbuild: { path: text } of each .props, .targets,
 // .csproj.user, which MSBuild imports beside its .csproj, and .pubxml and .pubxml.user, which the SDK imports by a
-// publish profile], cs: { path: text } of each file of C# }; { unknown: true } where git cannot be asked, a file cannot
+// publish profile, cs: { path: text } of each file of C# }; { unknown: true } where git cannot be asked, a file cannot
 // be read, a link among them (never followed) too, or a Directory.Build.rsp stands, whose switches may set any property
-// with no element to read; past CHARACTERS bytes of them, Late. `listed` gives the files git holds of those kinds.
-export function heldBeside(texts, listed = () => git(["ls-files", "-z", "--", ":(glob)**/*.props", ":(glob)**/*.targets", ":(glob)**/*.csproj.user", ":(glob)**/*.pubxml", ":(glob)**/*.pubxml.user", ":(glob)**/Directory.Build.rsp", ":(glob)**/*.cs"]).split("\0")) {
+// with no element to read; past CHARACTERS bytes of them, Late. `pace` is asked before each file is read; `listed`
+// gives the files git holds of those kinds.
+export function heldBeside(texts, pace = () => {}, listed = () => git(["ls-files", "-z", "--", ":(glob)**/*.props", ":(glob)**/*.targets", ":(glob)**/*.csproj.user", ":(glob)**/*.pubxml", ":(glob)**/*.pubxml.user", ":(glob)**/Directory.Build.rsp", ":(glob)**/*.cs"]).split("\0")) {
   let n = 0;
   try {
     const held = listed().filter(f => f && !(f in texts));
     if (held.some(f => path.posix.basename(f).toLowerCase() === "directory.build.rsp")) return { unknown: true };
-    const text = f => { const st = fs.lstatSync(f); if (!st.isFile()) throw new Error(`${f} is no file`); if ((n += st.size) > CHARACTERS) throw tooMuch("the files git holds beside", n, "bytes"); return fs.readFileSync(f, "utf8"); };
-    return { msbuild: held.filter(f => !f.endsWith(".cs")).map(text), cs: Object.fromEntries(held.filter(f => f.endsWith(".cs")).map(f => [f, text(f)])) };
+    const text = f => { pace(); const st = fs.lstatSync(f); if (!st.isFile()) throw new Error(`${f} is no file`); if ((n += st.size) > CHARACTERS) throw tooMuch("the files git holds beside", n, "bytes"); return fs.readFileSync(f, "utf8"); };
+    return { msbuild: Object.fromEntries(held.filter(f => !f.endsWith(".cs")).map(f => [f, text(f)])), cs: Object.fromEntries(held.filter(f => f.endsWith(".cs")).map(f => [f, text(f)])) };
   } catch (e) { if (e instanceof Late) throw e; return { unknown: true }; }
 }
 
@@ -123,13 +149,13 @@ export function ofNoProject(file, texts) {
 }
 
 // Global using directives of each namespace the files of C# declare (facts, a Map of a file to its facts) outside the
-// root namespace of every project, among `texts` and `others` (the .props and .targets git holds beside them): a
+// root namespace of every project, among `texts` and `others` ({ path: text } of the MSBuild files git holds beside them): a
 // package's own .props may import one by a <Using> git does not hold (Aspire's, MAUI's), and one more namespace seen only
 // links more. A project's root is its name; none where a .props or .targets sets one.
-export function outside(texts, facts, pace, others = []) {
+export function outside(texts, facts, pace, others = {}) {
   const roots = new Map(), end = Symbol("root"); // (a tree of the roots' words, so a namespace is walked once: linear)
   const msbuild = Object.entries(texts).filter(([f]) => MSBUILD.test(f));
-  const shared = [...others, ...msbuild.filter(([f]) => !f.endsWith(".csproj")).map(([, t]) => t)].some(t => ROOT.test(t));
+  const shared = [...Object.values(others), ...msbuild.filter(([f]) => !f.endsWith(".csproj")).map(([, t]) => t)].some(t => ROOT.test(t));
   for (const [f, t] of shared ? [] : msbuild.filter(([f]) => f.endsWith(".csproj"))) {
     if (ROOT.test(t) || /<Import[\s/>]/iu.test(t)) continue; // (see ROOT below)
     let n = roots;
