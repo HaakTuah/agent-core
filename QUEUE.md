@@ -16,7 +16,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1095, points 2 to 6 | rule builder | #1094 |
 | #1107 | rule builder | |
 | #1108 | rule builder | |
-| #1134 | rule builder; release 6; the floor (rule 3), `tasks/reviews.md`, `roles/shared/review-guidelines.md`, `tools/claude.md`, one PR or more; #1134's record relayed as the owner's yes (floor rule 3) | #1087 (the auditor's start, one at a time) |
+| #1134 | rule builder; release 6; the floor (rule 3), `tasks/reviews.md`, the review guidelines, `tools/claude.md`, one PR or more; its record relayed as the owner's yes (floor rule 3) | #1087 (the auditor's start, one at a time) |
 | #1136 to #1140 | builder; release 7, one PR each | release 6's cut |
 | #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 7, one PR each | release 6's cut |
 | #1123 | rule builder; release 7 | release 6's cut; #974, #1060 (`roles/adviser.md`) |
