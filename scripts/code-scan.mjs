@@ -13,8 +13,9 @@
 // `.packages/requirements.txt`, PyPI's own lock form, by its SHA-256, into the core's `.packages/pypi/` folder, with pip and no package
 // code run; it does so only where the host's CodeQL does not scan the project and, with a base, the change adds or
 // alters a file of the kinds the scan reads. The scan runs `semgrep-core` from there under the name `osemgrep`, by which
-// it runs as a whole command with no Python. Where the engine is not installed, the scan fails, saying so and how to
-// install it (packages.mjs). The engine runs with no variable but those a program needs to start and a home
+// it runs as a whole command with no Python. Where the engine is not installed, a copy's scan installs it first, and
+// where it cannot, says so as a warning; in the core it fails, saying how to install it (packages.mjs).
+// The engine runs with no variable but those a program needs to start and a home
 // and temporary folder of its own, so no token reaches it, and with its metrics off; a comment in the code that would
 // silence a finding (`nosemgrep`) silences none, and the files are named to it, so no ignore file of the project's
 // leaves one out. Each file is handed to the engine past its own limits of size and place, and one it

@@ -703,9 +703,9 @@ if (started(import.meta.url)) {
     for (const f of result.failures) console.error(`FAIL: ${logged(f)}`);
     console.log(result.summary);
     // (the checks floor rule 7 and floor topic 15 ask of the same lock files come with it, so a project's own job that
-    // runs this script runs them too, its workflow unchanged; #1093, point 2)
-    const besides = await alongside(configPath, root);
-    process.exit(result.failures.length || besides ? 1 : 0);
+    // runs this script runs them too, its workflow unchanged; #1093, point 2): never awaited at the top, since
+    // lookup.mjs imports this module, which would then never finish loading
+    alongside(configPath, root).then((besides) => process.exit(result.failures.length || besides ? 1 : 0));
   }
 }
 

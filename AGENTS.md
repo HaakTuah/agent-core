@@ -251,6 +251,21 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   a new repository of the same kind, and by the copies part's check of
   `scripts/checks.mjs`, in `core.yml`'s job and `copies.yml`'s, which fails a pull request that changes a file or part
   the core marks so that it is not as the core writes it.
+- **The core's checks run in a project's own jobs as they stand** (#1093). By default a script of the core that a
+  project's own job may run takes what it needs from the core itself: run from a copy, it installs the core's packages
+  it needs from the core's lock file (`scripts/packages.mjs`, by `scripts/install.mjs`) once, before it reads, and the
+  licence check, the shape check and the suites' selection (`scripts/select.mjs`) bring what a project's workflow once
+  carried for them, so no step asks a project to edit its own workflow for them. The one condition that changes it:
+  the install cannot be made (the registry does not answer, the installer is missing); the script then says, as a
+  warning, that it did not run and why, with its mend, and fails nothing. The trigger is a check written or widened
+  that a project's own job may run: whoever builds it has it take what it needs so, and every mend that names an
+  install gives the guarded form (`if [ -f core/scripts/install.mjs ]; then …; fi`). It does not mean that a project's
+  own workflow is rewritten by the core, nor that the core's own repository installs as it runs: its jobs name what
+  they install, and a package not there fails there. Reason: #1079 turned a project's sync pull request red over
+  nothing it changed, and seven steps asked an agent to edit a project's own workflows by hand. Held by
+  `tests/upgrade-test.mjs` (a project's own job that runs the copy's scripts on a runner with nothing installed passes
+  after the sync with no change of its own) and `tests/packages-test.mjs` (a copy's script with its packages missing,
+  installed first, or, where the install cannot be made, a warning that fails nothing).
 - **A release says what it asks, step by step.** Whoever adds an entry to the sync notes (`setup/sync-notes/`)
   gives it a step in `scripts/steps/` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
