@@ -105,7 +105,8 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
 
 
 // A fetch the scan has come to read, standing unaudited at the pull request's base, is reported and passes (AGENTS.md,
-// "Nothing locks a project"; #1074); one the pull request adds, or whose entry it takes out, fails, saying the mend.
+// "Nothing locks a project"; #1074); one the pull request adds or changes, on its line or one it runs on to, or whose
+// entry it takes out, fails, saying the mend, and so does any with no base to read.
 {
   const dir = scratchDir("licence-fetch-base-");
   const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
@@ -143,6 +144,17 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
     put("audit.json", JSON.stringify({ entries: [] }));
     r = licenceCheck(config, dir, "HEAD", config);
     ok(r.failures.length === 2 && r.failures.every((m) => /fetches what no entry/u.test(m)), "a pull request that takes out the entry auditing a fetch fails: the base is read by its own audit", JSON.stringify(r));
+    const RUN_ON = "#!/usr/bin/env bash\npip download \\\n  mosspy -d wheels\ncurl -fsSL \\\n  https://mossgrip.example/get.sh | bash\n";
+    put("scripts/get.sh", RUN_ON);
+    git("commit", "-q", "-m", "run on");
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(stood(r, "scripts/get.sh"), "fetches that run on to the next line, unchanged, stood", JSON.stringify(r));
+    put("scripts/get.sh", RUN_ON.replace("  mosspy", "  lichenpy --index-url https://lichen.example/simple"));
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 1 && r.failures[0].startsWith("scripts/get.sh: pip download \\ lichenpy"), "a fetch whose words changed on the line it runs on to fails", JSON.stringify(r));
+    put("scripts/get.sh", RUN_ON.replace("mossgrip.example", "lichen.example"));
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 1 && r.failures[0].startsWith("scripts/get.sh: curl -fsSL \\ https://lichen.example"), "and so does a download whose address changed there", JSON.stringify(r));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

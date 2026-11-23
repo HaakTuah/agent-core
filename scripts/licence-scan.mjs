@@ -15,7 +15,7 @@
 //     with what it pulls in. A fetch it cannot read fails, but npm pack's, which runs nothing it fetches, and another
 //     fetcher's (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone, dotnet tool install, choco, winget,
 //     PowerShell's Invoke-WebRequest and the like): each of those passes
-//     only in a file an entry's "files" names, that entry its hand audit, a file whose base held as many reported; and where such a file downloads by address
+//     only in a file an entry's "files" names, that entry its hand audit, each fetch that stood at the base reported; and where such a file downloads by address
 //     (curl, wget, PowerShell's) and an entry covering it audits what may be a program (no data, asset, font, service
 //     of GitHub's or the owner's own work), each such entry names its version and the file holds, for each download,
 //     a checksum of its own and a command that checks by one (sha256sum, shasum, Get-FileHash and the like) (floor
@@ -149,10 +149,11 @@ function fetches(c, text, f, literal = false) {
   if (!byHand(c, f)) c.others.push(...otherFetches(text));
 }
 
-// The fetches `found` in the file `f` that the scan cannot read and no entry audits (byKind), each its line, fail, but
-// where each stood word for word at the pull request's base, unaudited by the base's own audit, which are reported
-// (AGENTS.md, "Nothing locks a project": a reader that reads more turns no file red that stood; #1074). A fetch changed,
-// or added, fails: the base allows what it held, not as many others.
+// The fetches `found` in the file `f` that the scan cannot read and no entry audits (byKind), each its line and the
+// lines it runs on to, fail, but where each stood word for word at the pull request's base, unaudited by the base's own
+// audit, which are reported (AGENTS.md, "Nothing locks a project": a reader that reads more turns no file red that
+// stood; #1074); with no base, as in a run by hand, they fail. A fetch changed, or added, fails: the base allows what
+// it held, not as many others. A source held in a variable set on another line is not read, as `heldAtBase` reads none.
 function unaudited(c, f, found) {
   if (!found.length) return;
   const was = c.base ? atBase(c, f) : null, held = was === null ? [] : byKind({ ...c, entries: baseEntries(c), fail() {}, reports: [] }, f, was);
