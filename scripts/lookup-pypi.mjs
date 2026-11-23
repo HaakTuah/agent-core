@@ -13,11 +13,17 @@ import { reach } from "./reach.mjs";
 
 const PYPI = "https://pypi.org/";
 // (a name as PyPI gives one, PEP 508's, and a version as PEP 440 writes one exactly: never a wildcard or a range)
-const NAME = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/u;
+const IDENTIFIER = "[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?";
+const NAME = new RegExp(`^${IDENTIFIER}$`, "u");
 const VERSION = /^[0-9A-Za-z][0-9A-Za-z.+!_-]{0,63}$/u;
-const HASH = /^--hash[=\s]+(?:sha256:[0-9a-f]{64}|sha384:[0-9a-f]{96}|sha512:[0-9a-f]{128})$/u;
-// (the options a file may name that change neither what is installed nor where from; PyPI's own index alone)
-const HARMLESS = /^(?:--require-hashes|--prefer-binary|--pre|--only-binary[=\s]+\S+|--no-binary[=\s]+\S+|(?:-i|--index-url)[=\s]+https:\/\/pypi\.org\/simple\/?)$/u;
+// (a requirement as pip reads one to a name and a version: its extras PEP 508's names, so nothing a path could hold, and
+// after a ";" a marker, which only decides whether it is installed)
+const PINNED = new RegExp(`^(${IDENTIFIER}) *(?:\\[ *(?:${IDENTIFIER}(?: *, *${IDENTIFIER})*)? *\\])? *== *([^ ;]+) *(?:;.*)?$`, "u");
+// (a hash as pip checks one, glued to its option as pip-compile and uv write it)
+const HASH = /^--hash=(?:sha256:[0-9a-f]{64}|sha384:[0-9a-f]{96}|sha512:[0-9a-f]{128})$/u;
+// (the options a file may name that change neither what is installed nor where from; PyPI's own index alone; a value
+// glued by "=" to a long option alone, as optparse reads "-i=…" as an index named "=…")
+const HARMLESS = /^(?:--require-hashes|--prefer-binary|--pre|--(?:only|no)-binary(?:=| )[\w.:,][\w.:,-]*|(?:-i |--index-url(?:=| ))https:\/\/pypi\.org\/simple\/?)$/u;
 const MOST_OWNERS = 5;
 const WRITE = "write the file anew with pip-compile --generate-hashes (or uv pip compile --generate-hashes), each package at one exact version with its hashes, never by hand";
 const object = (x) => Boolean(x) && typeof x === "object" && !Array.isArray(x);
@@ -28,29 +34,30 @@ export const normal = (name) => name.toLowerCase().replace(/[-_.]+/gu, "-");
 
 /** The packages of a requirements file's text in PyPI's lock form: each { name, version, path, direct, brings, by, pypi }. */
 export function pypiPackages(text, lockPath) {
-  utf8Only(text, lockPath);
+  asciiOnly(text, lockPath);
   const entries = [];
   let via = null;
   for (const [n, line] of logical(text)) {
     const refuse = (what, mend = WRITE) => { throw new Error(`${lockPath}, line ${n}: ${what}, so it is not PyPI's lock form. Mend: ${mend}`); };
     if (line.startsWith("#")) { via = viaLine(line, entries.at(-1) ?? null, via); continue; }
     via = null;
-    const bare = line.replace(/\s+#.*$/u, "");
-    if (bare.startsWith("-")) {
-      if (!HARMLESS.test(bare)) refuse("an option the lookup does not read (an include, an address, or an index other than PyPI's own)", `name each file in "pypi" of the config itself, take packages from PyPI's own index alone, and ${WRITE}`);
-    } else if (bare) entries.push(entryOf(bare, refuse));
+    const entry = lineOf(line.replace(/\s+#.*$/u, ""), refuse);
+    if (entry) entries.push(entry);
   }
   return graphed(entries);
 }
 
-// pip reads a file in the encoding its first two lines declare ("# coding: …", PEP 263's form), or by a byte-order mark
-// of UTF-16 or UTF-32, where this reader reads UTF-8 alone: such a file could hide a package from it, so it fails, as
-// do bytes that are not UTF-8 (each read as U+FFFD) and a NUL.
+// pip reads a file in the encoding a byte-order mark or its first two lines declare ("# coding: …", PEP 263's form),
+// else in the system's own, where this reader reads UTF-8: where they differ, a byte can end a line for pip alone (in
+// Latin-1, the last byte of some letters of UTF-8). Printable ASCII, a tab and a line's end read the same in each
+// encoding a system uses, so a file of these alone, after a mark of UTF-8 and declaring no encoding but UTF-8 or ASCII,
+// is read as pip reads it; any other character fails it, a byte that is not UTF-8 (read as U+FFFD), a NUL, a mark of
+// UTF-16 or UTF-32 and each separator of lines but LF and CR among them.
 const UTF8 = new Set(["utf_8", "utf8", "u8", "utf", "ascii", "us_ascii"]);
-function utf8Only(text, lockPath) {
-  const mend = `write the file in UTF-8, declaring no other encoding, and ${WRITE}`;
-  const bad = text.search(/[\0\uFFFD]/u);
-  if (bad >= 0) throw new Error(`${lockPath}, line ${text.slice(0, bad).split("\n").length}: bytes that are not UTF-8, or a NUL, so it is not PyPI's lock form. Mend: ${mend}`);
+function asciiOnly(text, lockPath) {
+  const mend = `write the file in ASCII alone, declaring no other encoding, and ${WRITE}`;
+  const bad = text.replace(/^\uFEFF/u, " ").search(/[^\t\n\r\x20-\x7e]/u);
+  if (bad >= 0) throw new Error(`${lockPath}, line ${text.slice(0, bad).split(/\r\n|[\n\r]/u).length}: a character other than printable ASCII, a tab or a line's end, so it is not PyPI's lock form. Mend: ${mend}`);
   text.split("\n").slice(0, 2).forEach((line, i) => {
     const declared = line.startsWith("#") && /coding[:=]\s*([-\w.]+)/u.exec(line)?.[1].toLowerCase().replace(/[^a-z0-9.]+/gu, "_");
     if (declared && !UTF8.has(declared)) throw new Error(`${lockPath}, line ${i + 1}: an encoding other than UTF-8 declared, so it is not PyPI's lock form. Mend: ${mend}`);
@@ -61,8 +68,8 @@ function utf8Only(text, lockPath) {
 // on into the next, its backslashes taken off both ends, but a comment line never does, and one ends a line that ran
 // on into it, joined after a space.
 function* logical(text) {
-  // (at each separator Python's str.splitlines() knows, as pip splits a file: a lone carriage return among them)
-  const lines = text.replace(/^\uFEFF/u, "").split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/u);
+  // (as Python's str.splitlines() splits a file of ASCII alone, as pip does: a lone carriage return ends a line too)
+  const lines = text.replace(/^\uFEFF/u, "").split(/\r\n|[\n\r]/u);
   let joined = null, first = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i], comment = /^\s*#/u.test(line);
@@ -86,15 +93,27 @@ function viaLine(line, last, via) {
   return to;
 }
 
-// The package a line names at one exact version with its hashes, or the file refused.
-function entryOf(bare, refuse) {
-  const at = bare.search(/\s--hash\b/u);
-  const spec = (at < 0 ? bare : bare.slice(0, at)).split(";")[0].trim();
-  const hashes = at < 0 ? [] : bare.slice(at).trim().split(/\s+(?=--hash\b)/u);
-  const pinned = /^([^\s[=<>!~@;]+)\s*(?:\[[^\]]*\])?\s*==\s*([^\s=]+)$/u.exec(spec);
-  if (!pinned || !NAME.test(pinned[1]) || !VERSION.test(pinned[2])) refuse("a package not at one exact version from PyPI (name==version)");
-  if (!hashes.length || !hashes.every((h) => HASH.test(h))) refuse(`${pinned[1]} names no hash of its files that pip checks`);
-  return { name: normal(pinned[1]), version: pinned[2], via: [] };
+// A line, its comment taken off, read as pip reads one: split at each single space, its options from the first word
+// that starts with "-" on (break_args_options), so that a line of options alone changes nothing the lookup reads, and
+// any other names one package. No character pip reads otherwise passes: a "$" ("${NAME}" is a variable of the
+// environment to pip) and a tab (where shlex splits the options and pip's split does not) fail it.
+function lineOf(bare, refuse) {
+  if (/[^\x20-\x7e]|\$/u.test(bare)) refuse('a "$" or a tab outside a comment, which pip reads otherwise than the lookup');
+  const words = bare.split(" "), at = words.findIndex((w) => w.startsWith("-"));
+  const args = (at < 0 ? words : words.slice(0, at)).join(" ").trim(), options = at < 0 ? [] : words.slice(at).filter(Boolean);
+  if (args) return entryOf(args, options, refuse);
+  if (options.length && !HARMLESS.test(options.join(" "))) refuse("an option the lookup does not read (an include, an address, or an index other than PyPI's own)", `name each file in "pypi" of the config itself, take packages from PyPI's own index alone, and ${WRITE}`);
+  return null;
+}
+
+// The package a requirement names at one exact version, its options the hashes of its files alone, or the file refused.
+// The version is PEP 440's with no local part ("+…"), which PyPI never holds and which can end as an archive's name
+// does ("1.0+x.zip"), a file pip installs in place of the package.
+function entryOf(args, options, refuse) {
+  const [, name, version] = PINNED.exec(args) ?? [];
+  if (!name || !VERSION.test(version) || !pep440(version) || version.includes("+")) refuse("a package not at one exact version from PyPI (name==version)");
+  if (!options.length || !options.every((o) => HASH.test(o))) refuse(`${name} names no hash of its files that pip checks, or an option beside them`);
+  return { name: normal(name), version, via: [] };
 }
 
 // Each entry as the lookup reads it. One with no "# via" line, or whose line names anything but a package of the file
