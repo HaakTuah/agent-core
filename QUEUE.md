@@ -19,7 +19,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1123 | rule builder; release 7 | release 6's cut; #974, #1060 (`roles/adviser.md`) |
 | #1112, #1074, #1073, #1098, #1133 | builder; release 7, one PR each | release 6's cut |
 | #1142 | rule builder; release 7; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md` | release 6's cut |
-| #1180, #1181, #1182 | rule builder; release 7, one PR each | release 6's cut; #1182 also #1134 |
+| #1180, #1181, #1182 | rule builder; release 7, one PR each | release 6's cut; #1134 |
 | #810 | the orchestrator | the batch's end |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
