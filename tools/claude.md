@@ -19,5 +19,5 @@ last step if you run at high.
   - a Sonnet builder hands what needs judgement to Opus at high, and its PR's first line says Sonnet built it.
 - **Who builds** is picked as `roles/orchestrator.md`, "The builders", says: Claude's usage, also the owner's, is saved
   for the orchestrator where Claude runs it.
-- Asked for a review (`tasks/reviews.md`, point 1): *Side by side:* a fresh session, briefed; *Through a plug-in:*
+- Asked for a review (`tasks/reviews.md`, point 1): *Side by side:* one fresh session a pull request, briefed; *Through a plug-in:*
   none known; *On the host:* none the core sets up.

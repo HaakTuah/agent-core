@@ -3,7 +3,7 @@
 // passes or fails on what the session did, read from the scratch project by the case's own script, never on what the
 // session says of itself. The cases are the files of staged/ that CASES lists, each naming the rules it holds. Their
 // runs are kept in RECORD, each verdict with a fingerprint of the rules' text, so that a case is due again in a month
-// with no run of it, or once a rule it holds has changed; the scheduled look opens an issue for what is due (due(),
+// with no run of it, or once a rule it holds has changed (save a case marked `monthly`); the scheduled look opens an issue for what is due (due(),
 // look.mjs's DUE). They advise until three months in a row have run every case with no verdict found wrong; from then
 // release.mjs cuts no release while a case's last verdict fails (gate()). Each run names its agent tool, and a tool
 // works with the core once it has passed every case since the newest release (tools(); tasks/tools.md, "Proven by
