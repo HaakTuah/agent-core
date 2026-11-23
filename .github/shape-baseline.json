@@ -69,6 +69,7 @@
   },
   "listed": {
     "function: scripts/licence-commands.mjs#atCommand": {
+    "timed: tests/strength-test.mjs -> Date.now": true,
       "lines": 43,
       "depth": 2,
       "branches": 51
