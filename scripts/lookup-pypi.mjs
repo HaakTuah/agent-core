@@ -28,6 +28,7 @@ export const normal = (name) => name.toLowerCase().replace(/[-_.]+/gu, "-");
 
 /** The packages of a requirements file's text in PyPI's lock form: each { name, version, path, direct, brings, by, pypi }. */
 export function pypiPackages(text, lockPath) {
+  utf8Only(text, lockPath);
   const entries = [];
   let via = null;
   for (const [n, line] of logical(text)) {
@@ -40,6 +41,20 @@ export function pypiPackages(text, lockPath) {
     } else if (bare) entries.push(entryOf(bare, refuse));
   }
   return graphed(entries);
+}
+
+// pip reads a file in the encoding its first two lines declare ("# coding: …", PEP 263's form), or by a byte-order mark
+// of UTF-16 or UTF-32, where this reader reads UTF-8 alone: such a file could hide a package from it, so it fails, as
+// do bytes that are not UTF-8 (each read as U+FFFD) and a NUL.
+const UTF8 = new Set(["utf_8", "utf8", "u8", "utf", "ascii", "us_ascii"]);
+function utf8Only(text, lockPath) {
+  const mend = `write the file in UTF-8, declaring no other encoding, and ${WRITE}`;
+  const bad = text.search(/[\0\uFFFD]/u);
+  if (bad >= 0) throw new Error(`${lockPath}, line ${text.slice(0, bad).split("\n").length}: bytes that are not UTF-8, or a NUL, so it is not PyPI's lock form. Mend: ${mend}`);
+  text.split("\n").slice(0, 2).forEach((line, i) => {
+    const declared = line.startsWith("#") && /coding[:=]\s*([-\w.]+)/u.exec(line)?.[1].toLowerCase().replace(/[^a-z0-9.]+/gu, "_");
+    if (declared && !UTF8.has(declared)) throw new Error(`${lockPath}, line ${i + 1}: an encoding other than UTF-8 declared, so it is not PyPI's lock form. Mend: ${mend}`);
+  });
 }
 
 // Each logical line, trimmed, with the number of its first, as pip's join_lines reads them: a line ending in "\\" runs

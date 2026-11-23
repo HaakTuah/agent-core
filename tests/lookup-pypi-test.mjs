@@ -42,6 +42,8 @@ const plain = pypiPackages(`﻿plain-moss==1.0.0 ${H()}\r\nother-moss==2.0.0 ${H
 ok(plain.length === 2 && plain.every((p) => p.direct && p.brings === null), `a file with no "# via" line names every package itself, and says nothing of what each brings (${JSON.stringify(plain)})`);
 const separated = ["\r", "\v", "\f", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"].map((sep) => pypiPackages(`# a note${sep}hidden-moss==1.0.0 ${H()}`, "r.txt").map((p) => p.name).join());
 ok(separated.every((n) => n === "hidden-moss"), `a line ends at each separator pip ends one at, a lone carriage return among them, so no package hides behind a comment (${separated})`);
+const declared = pypiPackages(`# -*- coding: utf-8 -*-\n# vim: set fileencoding=UTF8 :\nplain-moss==1.0.0 ${H()}`, "r.txt").map((p) => p.name).join();
+ok(declared === "plain-moss", `a file that declares UTF-8 is read (${declared})`);
 const joined = pypiPackages(`# a note that ends so \\\nhidden-moss==1.0.0 ${H()}\nsplit-\\\nmoss==1.0.0 \\\n  ${H()}\n`, "r.txt");
 ok(joined.map((p) => p.name).join() === "hidden-moss,split-moss", `lines join as pip joins them: a comment ending in "\\" takes no package with it, and a package's name runs on unbroken (${joined.map((p) => p.name)})`);
 ok(pypiPackages(`--require-hashes\n--index-url https://pypi.org/simple\nplain-moss==1.0.0 ${H()}`, "r.txt").length === 1, "an option that changes neither what is installed nor where from passes");
@@ -54,6 +56,10 @@ for (const [what, text, said] of [
   ["an include", `-r other.txt\nplain-moss==1.0.0 ${H()}`, /line 1: an option the lookup does not read/u],
   ["another index", `--extra-index-url https://example.invalid/simple\nplain-moss==1.0.0 ${H()}`, /line 1: an option/u],
   ["an editable package", "-e ./local", /line 1: an option/u],
+  ["another encoding declared", `# coding: utf-7\n# note+AAo-hidden-moss==1.0.0 ${H()}`, /line 1: an encoding other than UTF-8 declared/u],
+  ["another encoding declared on its second line", `#!/usr/bin/env pip\n# -*- coding: latin-1 -*-\nplain-moss==1.0.0 ${H()}`, /line 2: an encoding other than UTF-8 declared/u],
+  ["a mark of UTF-16", `\uFFFD\uFFFDp\0l\0`, /line 1: bytes that are not UTF-8, or a NUL/u],
+  ["a NUL", `plain-moss==1.0.0 ${H()}\n\0`, /line 2: bytes that are not UTF-8, or a NUL/u],
 ]) {
   const message = throws(() => pypiPackages(text, "requirements.txt"));
   ok(said.test(message) && mended(`FAIL: ${message}`) && /^requirements\.txt, line/u.test(message), `a file with ${what} is refused whole, saying the mend (${message})`);
