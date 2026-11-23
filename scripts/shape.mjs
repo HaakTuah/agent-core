@@ -613,14 +613,25 @@ export function notLinked(file, root = ".") {
 // The config the manifest's *shape check* row names (its first path to a .json file, in backticks), else the kit's.
 export const where = manifest => /`([\w./-]+\.json)`/u.exec(/^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "")?.[1] ?? KIT;
 
+// A manifest row's first text in backticks after its name `label`: { said } (trimmed) and { reason }, where `said` is
+// `none`, what follows that token as it stands (padded or not), "" where it holds no letter or digit, which gives no
+// reason; null where the row or the token is not there. The rows *shape check* and *mutation tool* (strength.mjs) read
+// it so.
+export function rowToken(text, label) {
+  const row = String(text ?? "").split(/\r?\n/u).find(l => l.includes(label));
+  if (row === undefined) return null;
+  const rest = row.slice(row.indexOf(label) + label.length), token = /`([^`]*)`/u.exec(rest);
+  if (!token) return null;
+  const after = rest.slice(token.index + token[0].length).replace(/^[\s:|,;-]+|[\s|]+$/gu, "");
+  return { said: token[1].trim(), reason: /[\p{L}\p{N}]/u.test(after) ? after : "" };
+}
+
 // Whether the manifest's *shape check* row turns the check off (tasks/code-shape.md, "Only the owner turns the shape
-// check off"; #1107, point 3): the reason given after a `none` that is the row's first word in backticks, "" where it
+// check off"; #1107, point 3): the reason given after a `none` that is the row's first text in backticks, "" where it
 // gives none, which turns nothing off; null where the row says no `none`.
 export function offBy(manifest) {
-  const row = /^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "", rest = row.slice(row.indexOf("*shape check*") + 13);
-  const token = /`([^`]*)`/u.exec(rest);
-  if (token?.[1].trim() !== "none") return null;
-  return rest.slice(token.index + token[0].length).replace(/^[\s:|,;-]+|[\s|]+$/gu, ""); // (after the token as it stands, padded or not)
+  const token = rowToken(manifest, "*shape check*");
+  return token?.said === "none" ? token.reason : null;
 }
 
 // ---- the verdict ----
@@ -990,8 +1001,11 @@ function isOff(named, rest, base) {
   const said = offBy(tolerant(() => fs.readFileSync("core-manifest.md", "utf8")));
   if (said === "") console.log("note the manifest's *shape check* row says `none` with no reason, which turns nothing off: the check runs. Mend: where the owner turns it off, give the owner's reason after `none`; else name the config there, or take the `none` out");
   if (!said) return false;
-  const turned = base && !offBy(base.show("core-manifest.md")) ? `; this pull request turns it off (${base.name} did not), which only the owner does` : "";
-  console.log(`ok   the shape check is off: the manifest's *shape check* row says \`none\`: ${logged(said)}${turned} (core/tasks/code-shape.md, "Only the owner turns the shape check off")`);
+  if (base && !offBy(base.show("core-manifest.md"))) {
+    console.log(`::warning::this pull request turns the shape check off (the manifest's *shape check* row says \`none\`: ${logged(said)}), which only the owner does; ${base.name} did not, so it runs here and is off from the next pull request on (core/tasks/code-shape.md, "Only the owner turns the shape check off")`);
+    return false;
+  }
+  console.log(`ok   the shape check is off: the manifest's *shape check* row says \`none\`: ${logged(said)} (core/tasks/code-shape.md, "Only the owner turns the shape check off")`);
   return true;
 }
 

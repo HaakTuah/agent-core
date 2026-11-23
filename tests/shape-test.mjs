@@ -499,8 +499,13 @@ noReason &&= /turns nothing off/.test(r.out) && /nothing was held/.test(r.out); 
 git("branch", "before");
 r = run([], { SHAPE_BASE: "before" });
 ok(r.status === 0 && /nothing new in how the code is put together against before, by the starter kit's config/.test(r.out), "with a base, a project with no config is held to the starter kit's, the base as its baseline: what stood passes", r.out);
+put("core-manifest.md", "| *shape check* | `none`: . |\n"); r = run([]);
+noReason &&= /turns nothing off/.test(r.out); // (a reason with no letter or digit is none)
 put("core-manifest.md", "| *shape check* | `none`: kept off |\n"); r = run([], { SHAPE_BASE: "before" });
-ok(noReason && r.status === 0 && /is off: .*kept off; this pull request turns it off/.test(r.out), "only a `none` with a reason turns the check off, padded or not", r.out);
+const turning = r.status === 0 && /::warning::this pull request turns the shape check off .*kept off.*so it runs here/.test(r.out) && /nothing new in how the code is put together/.test(r.out);
+commit("off"); git("branch", "off"); git("reset", "-q", "HEAD~1"); // (a base that is off, the commit taken back out of the branch's history)
+r = run([], { SHAPE_BASE: "off" });
+ok(noReason && turning && r.status === 0 && /^ok {3}the shape check is off: .*kept off/m.test(r.out) && !/nothing new/.test(r.out), "only a `none` with a reason that its base holds too turns the check off: one this pull request writes runs, saying so, and one with no reason turns nothing off, padded or not", r.out);
 fs.rmSync(path.join(dir, "core-manifest.md"));
 put("src/rules/more.js", long("another", 61));
 put("src/rules/more.test.js", long("inATest", 200));
