@@ -75,10 +75,10 @@ export function fillable(manifest) {
   return /^no (?:tests|code) yet/u.test(now.none) || ours.includes(now.none) || /^its (?:code (?:holds|is in)|tests run by) /u.test(now.none);
 }
 
-// The package list of the folder a tool of npm's is installed in, as the core's own (tests/mutation/package.json),
-// or null for a tool the core installs no other way.
+// The package list of the folder a tool is installed in, as the core's own (tests/mutation/package.json), or null for
+// a tool the core installs no other way (only a tool of the npm registry has a folder in the list).
 export function packageList(tool) {
-  if (tool.registry !== "npm" || !tool.folder) return null;
+  if (!tool.folder) return null;
   return `${JSON.stringify({ name: "mutation-tool", private: true, devDependencies: { [tool.package]: tool.version }, overrides: tool.overrides }, null, 2)}\n`;
 }
 
@@ -86,7 +86,7 @@ export function packageList(tool) {
 // strength check, each worded so a session acts on it with no rule file open.
 export function leftFor(tool, has) {
   if (!tool?.folder || has(`${tool.folder}/package-lock.json`)) return [];
-  return [`write ${tool.folder}/package-lock.json from ${tool.folder}/package.json, with no install scripts: npm install --package-lock-only --ignore-scripts --prefix ${tool.folder}, and commit both`,
+  return [`commit ${tool.folder}/package.json with its lock file, written from it with no install scripts by npm install --package-lock-only --ignore-scripts --prefix ${tool.folder}`,
     `install it in the project's own job that runs \`strength.mjs\`, before that step: npm ci --ignore-scripts --allow-git=none --allow-remote=none --allow-file=none --allow-directory=none --workspaces=false --prefix ${tool.folder}; until it is installed the strength check reports that it did not measure, and fails nothing`];
 }
 

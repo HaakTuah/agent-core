@@ -52,7 +52,7 @@ ok(fillable(MANIFEST("")) && fillable(MANIFEST(lineOf({ none: NO_TESTS }))) && f
   && fillable(MANIFEST(lineOf(at({ code: ["a.cs"], tests: true })))) && fillable(MANIFEST(lineOf(at({ code: ["a.js"], tests: true, runner: "jest" }))))
   && fillable(MANIFEST("| *mutation tool* | `none` |")),
   "a row that is not there, says `none` with no reason, or holds a reason the kit or the list gives, an older kit's included, is filled again");
-ok(!fillable(MANIFEST("| *mutation tool* | `none`: the owner keeps the measure off for this prototype |")) && !fillable(MANIFEST("| *mutation tool* | `npx stryker run` |")),
+ok(!fillable(MANIFEST("| *mutation tool* | `none`: the owner keeps the measure off for this prototype |")) && !fillable(MANIFEST("| *mutation tool* | `node checks/mutate.mjs {lines}` |")),
   "a command, or a `none` with the project's own reason, is the project's and stays (#1107, point 3)");
 const filled = written(MANIFEST(lineOf({ none: NO_TESTS })), js);
 ok(filled.includes(lineOf(js)) && !filled.includes(NO_TESTS) && filled.split("\n").length === MANIFEST(lineOf(js)).split("\n").length, "the row is written in place of the one that stands");
@@ -76,7 +76,7 @@ try {
   r = run();
   ok(r.status === 0 && r.stdout.includes("Read: 1 files of code (JavaScript), tests, the tests run by node.") && read("core-manifest.md").includes(NO_TESTS), "without --write it prints what it read and the row, and writes nothing", r.stdout + r.stderr);
   r = run("--write");
-  ok(r.status === 0 && read("core-manifest.md").includes(lineOf(js)) && same(JSON.parse(read("checks/mutation/package.json")), core) && /Left to do: write checks\/mutation\/package-lock\.json/.test(r.stdout) && /Left to do: install it in the project's own job/.test(r.stdout),
+  ok(r.status === 0 && read("core-manifest.md").includes(lineOf(js)) && same(JSON.parse(read("checks/mutation/package.json")), core) && /Left to do: commit checks\/mutation\/package\.json with its lock file/.test(r.stdout) && /Left to do: install it in the project's own job/.test(r.stdout),
     "once there are tests, --write names Stryker, writes its package list, and says the lock file and the install are left", r.stdout + r.stderr);
   put("checks/mutation/package-lock.json", "{}");
   ok(leftFor(stryker, f => fs.existsSync(path.join(dir, f))).length === 0 && leftFor(undefined, () => false).length === 0, "nothing is left once the lock file stands, nor for a row that names no tool");
