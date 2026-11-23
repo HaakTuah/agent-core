@@ -15,6 +15,10 @@ export const notTakenWithout = (text, name) => text.replace(/^Not taken: (.*?)\.
   const kept = items.split(/, (?=`)/).filter(i => !i.startsWith(`\`${name}\``));
   return kept.length ? `Not taken: ${kept.join(", ")}.${end}` : "";
 });
+// A module taken off the manifest's "Modules:" list, as a list written before it came stands, and taken back onto it
+// after the list's first name, as the step that places it words its mend (the stages of 470 and 500).
+export const modulesWithout = (text, name) => text.split(`\`${name}\`, `).join("");
+export const modulesWith = (text, name) => text.replace(/^(Floor: whole\. Modules: `[^`]+`)/m, `$1, \`${name}\``);
 export const SLOTS = /^(\| Slot \| Here \|\r?\n\| --- \| --- \|\r?\n)/m;
 
 export const PIN = "0".repeat(40);
