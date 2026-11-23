@@ -87,17 +87,31 @@ export function packageList(tool) {
   return `${JSON.stringify({ name: "mutation-tool", private: true, devDependencies: { [tool.package]: tool.version }, overrides: tool.overrides }, null, 2)}\n`;
 }
 
-// The folder the row's tool is installed in, set up at `root`: its package list written where there is none, and what
-// is left to do. The starter kit and --write each set it up.
+// The folder the row's tool is installed in, set up at `root`: its package list written where nothing stands at its
+// path, and what is left to do. The starter kit and --write each set it up. Each step of the folder's path is a folder
+// of the project's own, made where it is not there: where one is a link or no folder, nothing is written, and what is
+// left says so (floor rule 13: no link leads the write out of the project).
 export function setUp(root, row) {
   const tool = LIST.tools[row?.tool], list = tool && packageList(tool), at = list && `${tool.folder}/package.json`;
-  let written = null;
-  if (at && !fs.existsSync(path.join(root, at))) {
-    fs.mkdirSync(path.join(root, tool.folder), { recursive: true });
-    fs.writeFileSync(path.join(root, at), list, { flag: "wx" });
-    written = at;
+  let written = null, linked = false;
+  if (at && !fs.lstatSync(path.join(root, at), { throwIfNoEntry: false })) {
+    linked = !foldersWithin(root, tool.folder);
+    if (!linked) { fs.writeFileSync(path.join(root, at), list, { flag: "wx" }); written = at; }
   }
-  return { written, left: leftFor(tool, f => fs.existsSync(path.join(root, f))) };
+  const left = leftFor(tool, f => fs.existsSync(path.join(root, f)));
+  return { written, left: linked ? [`make ${tool.folder} a folder of the project's own (a step of its path is a link or a file, so nothing was written there), then run node core/scripts/mutation-tools.mjs --write again`, ...left] : left };
+}
+
+// Whether each step of `folder` (a path with "/") below `root` is a folder, none a link, each made where it is not there.
+function foldersWithin(root, folder) {
+  let at = root;
+  for (const part of folder.split("/")) {
+    at = path.join(at, part);
+    const stat = fs.lstatSync(at, { throwIfNoEntry: false });
+    if (!stat) fs.mkdirSync(at);
+    else if (stat.isSymbolicLink() || !stat.isDirectory()) return false;
+  }
+  return true;
 }
 
 // What --write leaves to do for the tool the row names: its lock file and the install in the job that runs the

@@ -9,7 +9,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { LIST, NO_TESTS, fillable, leftFor, lineOf, named, packageList, rowFor, setUp, testRunner, written } from "../scripts/mutation-tools.mjs";
+import { LIST, NO_TESTS, fillable, leftFor, lineOf, named, packageList, readProject, rowFor, setUp, testRunner, written } from "../scripts/mutation-tools.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 import { toolOf } from "../scripts/strength.mjs";
 
@@ -103,6 +103,22 @@ try {
   const piped = spawnSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(SCRIPT_URL)}); console.log(JSON.stringify(m.readProject(${JSON.stringify(dir)}, "")));`], { encoding: "utf8", timeout: 20000 });
   ok(piped.status === 0 && JSON.parse(piped.stdout || "{}").runner === null, "a pipe where package.json stands is read as none, and the read ends", piped.stdout + piped.stderr + (piped.error?.message ?? ""));
   fs.rmSync(path.join(dir, "package.json"));
+  // (a link where checks/ stands, to a folder outside the project: nothing is written through it, and what is left says
+  // so; where the system makes no link, the case is the one of a file where the folder should be)
+  const outside = scratchDir("mutation-tools-outside-");
+  fs.rmSync(path.join(dir, "checks"), { recursive: true, force: true });
+  try { fs.symlinkSync(outside, path.join(dir, "checks"), "dir"); } catch { put("checks", "not a folder\n"); }
+  const through = setUp(dir, js);
+  ok(through.written === null && !fs.existsSync(path.join(outside, "mutation")) && /make checks\/mutation a folder of the project's own/.test(through.left[0] ?? ""), "a link or a file on the tool folder's path is written through to nothing, and what is left says so", JSON.stringify(through));
+  fs.rmSync(path.join(dir, "checks"), { recursive: true, force: true });
+  fs.rmSync(outside, { recursive: true, force: true });
+  // (a command the repository's own config names as its fsmonitor runs not when the reader lists its files)
+  const hook = path.join(dir, "fsmonitor-hook"), marker = path.join(dir, "fsmonitor-ran");
+  fs.writeFileSync(hook, `#!/bin/sh\ntouch "${marker}"\n`, { mode: 0o755 });
+  sh("config", "core.fsmonitor", hook);
+  readProject(dir, "");
+  ok(!fs.existsSync(marker), "the reader lists the project's files with its fsmonitor off, so the command its config names does not run");
+  sh("config", "--unset", "core.fsmonitor");
   r = run("--wrte");
   ok(r.status === 1 && /Mend: /.test(r.stderr), "an unknown argument fails with its mend", r.stderr);
 } finally {
