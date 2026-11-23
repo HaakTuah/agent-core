@@ -6,10 +6,12 @@
 // A test reaches a file where the file lies on the test's imports, followed from file to file (the shape check's
 // readers: shape.mjs, beside this file, dynamic imports among them), or where a file of JavaScript or TypeScript on that
 // way names it, outside a comment, by its name ("scripts/build.mjs", as a script is started by its path), or where it
-// is the __init__.py of a package a file of Python on that way lies in, which Python runs on each import. A test the
+// is the __init__.py of a package a file of Python on that way lies in, which Python runs on each import; from a file of
+// C#, the files that declare a type it may name, by a word in a namespace it sees or by a name written out in full
+// (select-csharp.mjs, which says what it reads, and where a file's reach cannot be told). A test the
 // config's "select.whole" names reaches every file (one that copies or runs the whole project). It never guesses: where
-// a changed file is no code the readers read and no test, a file that is gone, C# (whose types are reached by their
-// full names too, with no using directive), a script of the global space, or anything the config does not name
+// a changed file is no code the readers read and no test, a file that is gone, C# of no project (no .csproj above it),
+// a declaration of types, a script of the global space, or anything the config does not name
 // under "select.none" (the files no test reads), the whole suite runs, and so it does where no base is told (on main, on
 // a schedule, before a release), where the shape check's config cannot be read and where the files the change holds, or
 // the project's files all together, are more than the readers take in time (hurry.mjs). A fault the whole suite finds that
@@ -45,6 +47,7 @@ import { WORDS, mentioned, nameTrie } from "./name-trie.mjs";
 import { Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { matcher } from "./select-matcher.mjs";
+import { csharpReach, ofNoProject } from "./select-csharp.mjs";
 import { git, passedWhole } from "./select-passed.mjs";
 import { isCode } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
@@ -59,13 +62,13 @@ const PLAIN = /^[\w@+.,=-][\w@+./,=-]*$/u;
 // names more, never less)
 const uncommented = (text, py) => text.split("\n").filter(l => !(py ? /^\s*#/u : /^\s*(\/\/|\/\*|\*(\s|\/|$))/u).test(l)).join("\n");
 
-// Each file's links to the others: its imports; from JavaScript, TypeScript or Python, each file whose name (in Python
+// Each file's links to the others: its imports (of C#, `csharp`'s links in their place); from JavaScript, TypeScript or Python, each file whose name (in Python
 // its dotted name too) it holds outside a comment; and from a file of Python, the __init__.py and conftest.py of its
 // folder and each folder above, which Python and pytest run with no import.
 const above = (name, file, texts) => ["", ...file.split("/").slice(0, -1).map((_, k, dirs) => `${dirs.slice(0, k + 1).join("/")}/`)].map(d => `${d}${name}`).filter(f => f !== file && f in texts);
 // A file of Python by its dotted name too ("pkg.rules"; a package's own for __init__.py and __main__.py).
 const dotted = f => f.replace(/\.py$/u, "").replace(/\/(__init__|__main__)$/u, "").split("/").join(".");
-export function links(texts, tests, reach, pace = () => {}) {
+export function links(texts, tests, reach, pace = () => {}, csharp = new Map()) {
   // (each name tried on each text took time in step with the count of names times the count of texts: the names are held in
   // a trie, walked once over each text, name-trie.mjs)
   const byName = nameTrie(Object.keys(texts).map(f => [path.posix.basename(f), f]));
@@ -73,7 +76,7 @@ export function links(texts, tests, reach, pace = () => {}) {
   const out = new Map();
   for (const [file, text] of Object.entries(texts)) {
     pace();
-    const to = new Set(reach.get(file) ?? []), py = file.endsWith(".py");
+    const to = new Set((file.endsWith(".cs") ? csharp : reach).get(file) ?? []), py = file.endsWith(".py");
     if (py || CODE.includes(path.posix.extname(file))) {
       // (a Python module's dotted name is looked for in every text of code, as its pattern was, JavaScript's that starts `python -m` too)
       const plain = uncommented(text, py), named = mentioned(byName, plain, WORDS.name, pace);
@@ -108,10 +111,11 @@ export function selection({ changed, texts, tests, reach, scripts = new Set(), u
   const proof = matcher(config.select.proof), m = { whole: matcher(config.select.whole), none: matcher(config.select.none), isTest: matcher(config.tests) };
   const by = new Map(), add = (t, why) => { if (tests.has(t) && !by.has(t)) by.set(t, why); };
   const pace = watch?.pace(); // (one budget for the linking and the search from each test)
-  const reaches = reached(tests, links(texts, tests, reach, pace), pace);
+  const cs = csharpReach(texts, pace);
+  const reaches = reached(tests, links(texts, tests, reach, pace, cs.links), pace);
   // (a test that reaches an import the readers cannot follow may reach any file: it runs as one that reaches every file)
   // (and, where pytest runs a conftest.py the config does not read, each test of Python, whose fixtures may come from it)
-  const blind = new Set([...reaches].filter(([t, files]) => [...files].some(f => unsure.has(f)) || (t.endsWith(".py") && unread.some(c => c.endsWith("conftest.py")))).map(([t]) => t));
+  const blind = new Set([...reaches].filter(([t, files]) => [...files].some(f => (f.endsWith(".cs") ? cs.unsure : unsure).has(f)) || (t.endsWith(".py") && unread.some(c => c.endsWith("conftest.py")))).map(([t]) => t));
   // (the tests that reach every file, told once: the config's pathspecs are tried on each test, never on each changed file's account)
   let every = null;
   const ctx = { texts, tests, scripts, add, reaches, ...m, wholes: () => (every ??= [...tests].filter(t => m.whole(t) || blind.has(t))) };
@@ -131,8 +135,9 @@ function oneChange(f, { texts, tests, scripts, add, reaches, wholes, none, isTes
   // (a file gone, a helper among the tests too, leaves no import to follow; a package's manifest, read beside the code,
   // links nothing: a change to either may reach every test)
   if (!(f in texts) || !isCode(f)) return `${f} is no code the readers follow, or is gone, so what reaches it cannot be told`;
-  // (C# reaches a type by its full name with no using directive, and a script of the global space by no import at all)
-  if (f.endsWith(".cs") || f.endsWith(".d.ts") || scripts.has(f)) return `${f} is C#, a declaration of types, or a script of the global space, whose users no import names, so what reaches it cannot be told`;
+  // (a script of the global space is reached by no import at all, and C# of no project by a path a project file may write out)
+  if (f.endsWith(".cs") && ofNoProject(f, texts)) return `${f} is C# of no project (no .csproj in a folder above it), which a project may compile by its path, so what reaches it cannot be told`;
+  if (f.endsWith(".d.ts") || scripts.has(f)) return `${f} is a declaration of types, or a script of the global space, whose users no import names, so what reaches it cannot be told`;
   for (const [t, files] of reaches) if (files.has(f)) add(t, `reaches ${f}`);
   if (!isTest(f)) for (const t of wholes()) add(t, `reaches every file (${f})`); // (a test's own file is no file of the project's a whole run tests)
   return null;

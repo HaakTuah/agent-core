@@ -185,12 +185,12 @@ const py = { "pkg/__init__.py": "raise RuntimeError('broken')\n", "pkg/rules.py"
 const pyConfig = parseConfig(JSON.stringify({ baseline: "b.json", code: ["pkg", "tests"], tests: ["tests/"] })), pyTests = new Set(["tests/test_rules.py"]);
 s = selection({ changed: ["pkg/__init__.py"], texts: py, tests: pyTests, reach: survey(py, pyConfig, pyTests).reach, config: pyConfig });
 ok(!s.all && same(s.tests, ["tests/test_rules.py"]), "a Python package's __init__.py, which runs on every import under it, reaches the tests that import the package", JSON.stringify(s));
-const cs = { "src/Rules.cs": "namespace App;\npublic static class Rules { public static bool Allowed() => true; }\n", "tests/RulesTest.cs": "namespace Tests;\nclass RulesTest { void T() { App.Rules.Allowed(); } }\n", "web/app.js": "function draw() {}\n" };
+const cs = { "App.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\" />\n", "src/Rules.cs": "namespace App;\npublic static class Rules { public static bool Allowed() => true; }\n", "tests/RulesTest.cs": "namespace Tests;\nclass RulesTest { void T() { App.Rules.Allowed(); } }\n", "web/app.js": "function draw() {}\n" };
 const csConfig = parseConfig(JSON.stringify({ baseline: "b.json", code: ["src", "tests", "web"], tests: ["tests/"] })), csTests = new Set(["tests/RulesTest.cs"]), csFound = survey(cs, csConfig, csTests);
-for (const f of ["src/Rules.cs", "web/app.js"]) {
-  s = selection({ changed: [f], texts: cs, tests: csTests, reach: csFound.reach, scripts: csFound.scripts, config: csConfig });
-  ok(s.all && s.why.includes(f), `${f === "web/app.js" ? "a script of the global space, which no import names," : "C#, whose types a test reaches by their full names with no using,"} runs the whole suite`, JSON.stringify(s));
-}
+s = selection({ changed: ["src/Rules.cs"], texts: cs, tests: csTests, reach: csFound.reach, scripts: csFound.scripts, unsure: csFound.unsure, config: csConfig });
+ok(!s.all && same(s.tests, ["tests/RulesTest.cs"]), "C#: a test that names a type by its full name, with no using directive, reaches its file (select-csharp-test.mjs reads the rest)", JSON.stringify(s));
+s = selection({ changed: ["web/app.js"], texts: cs, tests: csTests, reach: csFound.reach, scripts: csFound.scripts, config: csConfig });
+ok(s.all && s.why.includes("web/app.js"), "a script of the global space, which no import names, runs the whole suite", JSON.stringify(s));
 // (what only running the code tells: a test that reaches such an import runs as one that reaches every file)
 const blindTexts = { "src/a.js": "export const a = 1;\n", "src/plugins.js": "export const load = n => import(`./p/${n}.js`);\n", "src/view.vue.js": "import App from './App.vue';\n", "src/b.js": "export const b = 2;\n",
   "test/a.test.js": "import '../src/a.js';\n", "test/plugins.test.js": "import '../src/plugins.js';\n", "test/vue.test.js": "import '../src/view.vue.js';\n", "test/b.test.js": "import '../src/b.js';\n", "src/env.d.ts": "declare const X: number;\n" };

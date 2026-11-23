@@ -25,10 +25,20 @@ export const OWN = [
 // file whole; none where it could not be installed, the registry not answering in a project's pull request, which the
 // shape check says: shape-readers.mjs, unreachedReaders), usings: [{ target, static, alias }] (null where they cannot
 // be told: the parser could not be installed, or could not read the file in time), namespaces, types, toks, comments:
-// [{ line, text }] }.
+// [{ line, text }] }. A reading is kept for the next ask of the same text, up to HELD characters of text in all, so that
+// the test selection (select-csharp.mjs) reads again what the shape check's survey read at no second parse; a caller
+// copies it before it changes it.
+const HELD = 4_000_000, kept = new Map();
+let held = 0;
 export function readCsharp(src) {
   if (unreachedFor("csharp")) return { functions: [], usings: null, namespaces: [], types: [], toks: [], comments: [] };
-  return csharpTree(src) ?? { functions: null, usings: null, namespaces: [], types: [], toks: [], comments: [] };
+  if (kept.has(src)) return kept.get(src);
+  const r = csharpTree(src);
+  if (!r) return { functions: null, usings: null, namespaces: [], types: [], toks: [], comments: [] };
+  if (held + src.length > HELD) { kept.clear(); held = 0; }
+  kept.set(src, r);
+  held += src.length;
+  return r;
 }
 
 // Where the project's C# declares each namespace and type: { namespaces, types }, each a Map of a name to its files.
