@@ -53,6 +53,15 @@ const moves = setOf(tree({
 }));
 ok(show(moves) === ".github/workflows/v.yml, .github/workflows/w.yml, a/make.sh, b/deep/make.sh, build.sh, ci/publish.mjs, pkg/__main__.py, publish.mjs, tools/build.sh, tools2/job.py",
   "a powered workflow's script run from a folder it moves to joins the set: by working-directory, by cd, a Python module by its name, and in any folder where the folder's name is built; the root's of the same name too, and one in a folder it does not move to stays out", show(moves));
+// a Python module run by name brings each package above it, whose __init__.py runs first, and what each imports
+const python = setOf(tree({
+  ".github/workflows/p.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: python -m tools.jobs.run\n",
+  "tools/__init__.py": "from . import shared\n", "tools/shared.py": "print(0)\n", "tools/jobs/__init__.py": "", "tools/jobs/run.py": "import helpers.net as net\nfrom .steps import (one, two)\nfrom ..cfg import load\n",
+  "tools/jobs/steps/__init__.py": "", "tools/jobs/steps/one.py": "", "tools/jobs/steps/two.py": "", "tools/cfg.py": "", "helpers/__init__.py": "", "helpers/net.py": "",
+  "tools/unused.py": "", "other/__init__.py": "",
+}));
+ok(show(python) === ".github/workflows/p.yml, helpers/__init__.py, helpers/net.py, tools/__init__.py, tools/cfg.py, tools/jobs/__init__.py, tools/jobs/run.py, tools/jobs/steps/__init__.py, tools/jobs/steps/one.py, tools/jobs/steps/two.py, tools/shared.py",
+  "a Python module run by name brings the __init__.py of each package above it, and the modules it and they import, by an absolute, a relative or a parent-relative name; a module none imports stays out", show(python));
 ok(show(bareNames) === ".github/workflows/m.yml, scripts/helper.js, scripts/lib/index.js, scripts/run.cjs, tools/go.py, tools/util.py",
   "a module named without its extension joins the set as its language loads it: helper.js, a folder's index.js, a Python module; one not named stays out", show(bareNames));
 const files = {

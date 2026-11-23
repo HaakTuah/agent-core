@@ -10,8 +10,9 @@
 //   - what such a file runs or loads: a path it names (a root-relative one, one relative to its own folder, or one
 //     relative to a folder it moves to: `working-directory:`, `cd`, `pushd`, `-C`, `--prefix`, `--cwd`; where it moves
 //     to a folder whose name it builds, one relative to any folder) that is a script, an action or a file with no
-//     extension (an executable such as `./deploy`), a Python module it runs by name (`-m a.b`), and a workflow it calls
-//     (`uses:`), followed on through what that names in turn, and, where a script of the
+//     extension (an executable such as `./deploy`), a Python module it runs by name (`-m a.b`) or imports, with the
+//     `__init__.py` of each package above it, which Python runs first, and a workflow it calls (`uses:`), followed on
+//     through what that names in turn, and, where a script of the
 //     set loads a module by a name it builds (an `import(` or `require(` of no plain string), the scripts directly in
 //     each folder it names (one that names none loads what its caller names, which is followed from the caller);
 //   - a script whose own text calls GitHub, the network or `git push` (CALLS), a file with no extension whose text
@@ -69,6 +70,8 @@ const RESOLVES = [[MODULE, [...JS_ENDS, ...JS_ENDS.map((end) => `/index${end}`)]
 const MOVES = /\bworking-directory[ \t]*:[ \t]*["']?([^\s"'#]+)|(?:^|[\s;&|(`"'])(?:cd|pushd)[ \t]+["']?([^\s"';&|)`]+)|[ \t](?:-C|--prefix|--cwd)(?:[ \t]+|=)["']?([^\s"';&|)`]+)/gu;
 // a Python module run by its name (`python -m tools.job`)
 const RUN_MODULE = /(?:^|[\s"'])-m[ \t]+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)/gu;
+// a Python file's own imports: `import a.b, c as d`, `from a.b import c`, `from . import c`, `from ..a import (c, d)`
+const PY_IMPORT = /^[ \t]*(?:from[ \t]+(\.*)([\w.]*)[ \t]+import[ \t]+\(?([\w, \t*]+)|import[ \t]+([\w., \t]+))/gmu;
 // the names a text may give a path by
 const TOKENS = /[A-Za-z0-9_@.+~/-]+/gu;
 // the largest text read: a file past it is held in the set, unread
@@ -150,7 +153,23 @@ function namedIn(name, text, all, byBase = new Map()) {
   // (a module's own code names a path from its own folder alone; a root-relative one in it is text it prints)
   const bases = [folder, ...moved.at, ...(MODULE.test(name) ? [] : [""])];
   for (const [token] of text.matchAll(TOKENS)) resolve(token.replace(/^\/+/u, "").replace(/[.]+$/u, "").replace(/^(?:\.\/)+/u, ""), tries, bases);
-  for (const [, run] of text.matchAll(RUN_MODULE)) resolve(run.replaceAll(".", "/"), [".py", "/__main__.py", "/__init__.py"], ["", folder, ...moved.at]);
+  // a Python module by its dotted name, with each package above it, whose `__init__.py` Python runs first
+  const python = (dotted, ends, at) => {
+    const parts = dotted.split(".").filter(Boolean);
+    for (let i = 1; i < parts.length; i += 1) resolve(parts.slice(0, i).join("/"), ["/__init__.py"], at);
+    if (parts.length > 0) resolve(parts.join("/"), ends, at);
+  };
+  for (const [, run] of text.matchAll(RUN_MODULE)) python(run, [".py", "/__main__.py", "/__init__.py"], ["", folder, ...moved.at]);
+  if (/\.py$/iu.test(name)) {
+    const names = (list) => list.split(",").map((one) => one.trim().split(/[ \t]+/u)[0]).filter((one) => /^\w[\w.]*$/u.test(one));
+    for (const [, dots, from, what, plain] of text.matchAll(PY_IMPORT)) {
+      if (plain !== undefined) { for (const one of names(plain)) python(one, [".py", "/__init__.py"], [folder, ""]); continue; }
+      // a relative import leads from the file's own package, one folder up for each dot past the first
+      const at = dots === "" ? [folder, ""] : [path.posix.normalize(path.posix.join(folder, ...Array(dots.length - 1).fill("..")))];
+      python(from, [".py", "/__init__.py"], at);
+      for (const one of names(what)) python(from === "" ? one : `${from}.${one}`, [".py", "/__init__.py"], at);
+    }
+  }
   for (const [, called] of text.matchAll(/(?:^|\n)[ \t-]*uses[ \t]*:[ \t]*["']?\.\/(\.github\/workflows\/[^\s"'@#]+)/gu)) if (all.has(called)) found.add(called);
   return found;
 }
