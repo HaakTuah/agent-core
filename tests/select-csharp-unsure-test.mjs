@@ -1,6 +1,7 @@
 // Tests where the test selection cannot tell what reaches a file of C# (scripts/select-csharp.mjs, through
 // scripts/select.mjs; #675): a file lost by the grammar, one that reads types by reflection, scans an assembly or is a source generator, one
-// with a raw interpolated string or an alignment that names something, every file where a <Using> names a property or
+// with a raw interpolated string or an alignment that names something, one where an escape or a formatting character may
+// split a name, which every file reaches, every file where a <Using> names a property or
 // holds what the reader cannot read, a global alias names a hook's attribute or git cannot be asked; a namespace an SDK
 // imports by ImplicitUsings and a <Using>'s Alias given as an element, which reach every file; and the whole
 // suite where a changed file is C# of no project or no longer declares what it declared at the base, a change to a
@@ -23,6 +24,8 @@ const scans = { ...web, "src/Program.cs": "using App;\nvar app = Start.Build();\
 ok(same(pick(scans, "src/Lone.cs").tests, ["tests/WebTest.cs"]), "a test that reaches a file which scans an assembly for types runs on any change", JSON.stringify(pick(scans, "src/Lone.cs")));
 const reflects = { ...web, "tests/MakeTest.cs": "namespace Tests;\nclass MakeTest { object o = System.Activator.CreateInstance(System.Type.GetType(\"App.Start\")); }\n" };
 ok(pick(reflects, "src/Start.cs").tests.includes("tests/MakeTest.cs"), "and so does one that makes a type by reflection", JSON.stringify(pick(reflects, "src/Start.cs")));
+const domain = { ...web, "tests/DomainTest.cs": "namespace Tests;\nclass DomainTest { object o = System.AppDomain.CurrentDomain.CreateInstanceAndUnwrap(\"App\", \"App.Start\"); }\n" };
+ok(pick(domain, "src/Start.cs").tests.includes("tests/DomainTest.cs"), "and one that makes a type named in a string through an AppDomain", JSON.stringify(pick(domain, "src/Start.cs")));
 const csTexts = { "src/App.csproj": PROJ, "src/A.cs": "namespace App;\nclass A { }\n", "tests/T.cs": "namespace Tests;\nclass T { }\n" };
 for (const [beside, what] of [[() => ({ msbuild: ["<Using Include=\"$(Root).App\" />"], cs: {} }), "a <Using> names an MSBuild property"], ...["@(ExtraUsings)", "%(Ns.Identity)", "App%2EData", "App&#46;Data"].map(i => [() => ({ msbuild: [`<Using Include="${i}" />`], cs: {} }), `a <Using> of ${i}, which MSBuild expands`]), [() => ({ unknown: true }), "git cannot be asked"]]) {
   const r = csharpReach(csTexts, undefined, beside);
@@ -56,6 +59,12 @@ const hidden = ["\"Price: $\" + $\"{1,App.Layout.Width}\"", "/* $\" */ $\"{1,App
   "1;\n#if NEVER\n/*\n#endif\nint w = App.Layout.Width;\n// */\nstring t = \"\"", ...["@\"", "\"\"\""].map(q => `1;\n#if false\nstring q = ${q}\n#endif\nstring t = $"{1,App.Layout.Width}";\n#if false\n${q};\n#endif\nstring u = ""`),
   ...["\r", "\u0085", "\u2028", "\u2029"].map(e => `1; // x${e}string t = $"{1,App.Layout.Width}";\nstring u = ""`), "1;\n#region r\rstring t = $\"{1,App.Layout.Width}\";\nstring u = \"\""].filter(e => !one(`namespace Tests;\nclass Y { string s = ${e}; }\n`).unsure.has("src/X.cs"));
 ok(!hidden.length, "a \"$\\\"\" in a string, a character or a comment, a comment or raw string in a hole, a name of letter-numbers or escapes, a name's escape outside an alignment, a comment or string one branch of an \"#if\" opens, and a line's end other than \"\\n\", hide no alignment", hidden.join(" | "));
+// (a name an escape or a formatting character splits, where a file declares it or a test names it; a byte order mark splits none)
+const split = [["src/Rules.cs", "namespace App;\npublic static class R\\u0075les { public static bool Allowed() => true; }\n", "tests/UsingTest.cs"],
+  ["src/Rules.cs", "namespace App;\npublic static class Ru\u200Cles { public static bool Allowed() => true; }\n", "tests/UsingTest.cs"],
+  ["tests/OtherTest.cs", "using App;\nnamespace Tests;\nclass OtherTest { void T() { Ru\u200Cles.Allowed(); } }\n", "tests/OtherTest.cs"]].filter(([f, text, test]) => !pick({ ...app, [f]: text }, "src/Rules.cs").tests.includes(test));
+ok(!split.length, "a file where an escape or a formatting character may split a name it declares or names is reached from every file", split.map(c => c[0]).join(", "));
+ok(!pick({ ...app, "tests/OtherTest.cs": `\uFEFF${app["tests/OtherTest.cs"]}` }, "src/Rules.cs").tests.includes("tests/OtherTest.cs"), "a byte order mark at a file's start splits no name");
 const implicit = one("namespace System;\npublic static class Ext { public static bool Allowed(this string s) => true; }\n", { "tests/T.cs": "namespace Tests;\nclass T { bool b = \"x\".Allowed(); }\n" });
 ok(implicit.links.get("tests/T.cs")?.has("src/X.cs"), "a namespace an SDK imports by ImplicitUsings, which no <Using> git holds names, is seen by every file", JSON.stringify([...implicit.links.get("tests/T.cs") ?? []]));
 const child = ["<Using Include=\"App\"><Alias>D</Alias></Using>", "<Using Include=\"App\">\n  <alias>D</alias>\n  <Visible>false</Visible>\n</Using>"].filter(item => !csharpReach({ "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npublic class Store { }\n",

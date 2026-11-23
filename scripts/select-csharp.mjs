@@ -4,11 +4,11 @@
 // its using directives name, global ones from any file, MSBuild's <Using>, and those declared outside every project's
 // root); each name written in full, an alias that heads it put for what it names; the files that may declare extension
 // members in a namespace it sees; a file of top-level statements, by the name Program; and the files every file
-// reaches: those run unnamed (runsUnnamed), those that hold a global using directive, and those the grammar lost. It
-// reads more than a file takes. A file is unsure (a test that reaches it runs on any change) where the grammar lost it,
-// it holds code the tokens leave out, or it finds types unnamed (REFLECTS); every file is, where a <Using> cannot be
-// read whole, a global alias names a hook's attribute, or git cannot be asked. Files of C# git holds that the config
-// does not read are read too, as links between those it reads (select-csharp-project.mjs).
+// reaches: those run unnamed (runsUnnamed), those that hold a global using directive, and those unread (lost by the
+// grammar, or a name may be split). It reads more than a file takes. A file is unsure (a test that reaches it runs on
+// any change) where it is unread, holds code the tokens leave out, or finds types unnamed (REFLECTS); every file is,
+// where a <Using> cannot be read whole, a global alias names a hook's attribute, or git cannot be asked. C# git holds
+// that the config does not read links those it reads (select-csharp-project.mjs).
 import { heldBeside, msbuildUsings, outside } from "./select-csharp-project.mjs";
 import { leftOut } from "./select-csharp-text.mjs";
 import { readCsharp } from "./shape-csharp.mjs";
@@ -17,7 +17,7 @@ const TYPE = new Set(["class", "struct", "interface", "enum", "record", "delegat
 const MODIFIER = new Set(["public", "internal", "private", "protected", "static", "sealed", "abstract", "partial", "readonly", "ref", "unsafe", "file", "new", "extern"]);
 // (what C# or a test framework runs unnamed: a file that holds one is reached from every file)
 const HOOKS = new Set(["ModuleInitializer", "AssemblyInitialize", "AssemblyCleanup", "GlobalTestInitialize", "GlobalTestCleanup", "SetUpFixture", "BeforeEvery", "AfterEvery", "IIncrementalGenerator", "ISourceGenerator", "CollectionDefinition"]);
-// (what finds types unnamed: by reflection, a scan of an assembly or the compilation; a word Assembly too)
+// (what finds types unnamed: reflection, a scan of an assembly or the compilation; a word Assembly or CreateInstance… too)
 const REFLECTS = new Set(["IIncrementalGenerator", "ISourceGenerator", "Activator", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
   "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR"]);
 
@@ -197,7 +197,7 @@ const runsUnnamed = (toks, words) => words.some(hookWord) || toks.some((k, i) =>
   || (toks.some(k => TUNIT.test(k.v)) && toks.some(k => ["Assembly", "TestSession", "TestDiscovery"].includes(k.v)));
 // Whether a file finds types by reflection or scans an assembly for them; TUnit's "Before(Assembly)" names no scan.
 const hookOf = (toks, i) => toks[i - 1]?.v === "(" && ["Before", "After"].includes(toks[i - 2]?.v);
-const reflecting = (toks, words) => words.some(w => REFLECTS.has(w))
+const reflecting = (toks, words) => words.some(w => REFLECTS.has(w) || w.startsWith("CreateInstance"))
   || toks.some((k, i) => k.t === "id" && /Assembl(y|ies)/u.test(word(k)) && !hookWord(word(k)) && !hookOf(toks, i))
   || toks.some((k, i) => k.v === "GetType" && toks[i + 1]?.v === "(" && toks[i + 2]?.v !== ")");
 
@@ -205,22 +205,21 @@ const LITERAL = { t: "str", v: "" };
 
 // What a file holds that bears on its reach: its own namespaces, the namespaces its types stand in, its words, its runs
 // of dotted words, its using directives, and whether it declares extension members, runs with no name, reads types by
-// reflection, is of top-level statements, was lost by the grammar (unread: what it declares is not known either), or
-// holds code the tokens leave out (select-csharp-text.mjs). Each scan reads the tokens with every literal's value
-// emptied, so a character's ('}') is no punctuation.
+// reflection, is of top-level statements, is unread (what it declares is not known either), or holds code the tokens
+// leave out (select-csharp-text.mjs). Each scan reads the tokens with every literal's value emptied, so a character's
+// ('}') is no punctuation.
 function factsOf(read, src) {
-  const toks = (read.toks ?? []).map(k => (k.t === "str" ? LITERAL : k)), r = { ...read, toks };
+  const toks = (read.toks ?? []).map(k => (k.t === "str" ? LITERAL : k)), r = { ...read, toks }, raw = leftOut(src);
   const words = ids(toks), placed = new Set(r.namespaces);
   if (!r.namespaces.length || r.types.some(t => !t.includes("."))) placed.add("");
   return { r, words: new Set(words), ...runsOf(toks), placed: [...placed], extensions: extending(toks), hook: runsUnnamed(toks, words),
-    reflects: reflecting(toks, words), unread: r.usings === null || r.functions === null, raw: leftOut(src), program: topLevel(toks) };
+    reflects: reflecting(toks, words), unread: r.usings === null || r.functions === null || raw > 1, raw, program: topLevel(toks) };
 }
 
 // Where the project declares each type: { types: Map of a full name to its files, byLast: Map of a type's last word to
 // a Map of its namespace to its files, extensions: Map of a namespace to the files that may extend in it, every: the
-// files every file reaches (as the head says), globals: what global using directives name, aliases: Map of a global alias to what it
-// names, unsure: the files unread, holding code the tokens leave out or finding types unnamed, depth: the most words of
-// a declared name }.
+// files every file reaches and unsure: the files unsure (each as the head says), globals: what global using directives
+// name, aliases: Map of a global alias to what it names, depth: the most words of a declared name }.
 function indexOf(facts, pace) {
   const ix = { types: new Map(), byLast: new Map(), extensions: new Map(), every: [], globals: [], aliases: new Map(), unsure: new Set(), depth: 1 };
   const deep = name => { ix.depth = Math.max(ix.depth, name.split(".").length); };
