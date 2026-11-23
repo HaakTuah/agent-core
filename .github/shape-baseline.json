@@ -153,7 +153,6 @@
     "process: tests/read-total-test.mjs -> node:child_process": true,
     "process: tests/reading-test.mjs -> node:child_process": true,
     "process: tests/release-test.mjs -> node:child_process": true,
-    "process: tests/releases-test.mjs -> node:child_process": true,
     "process: tests/rules-test.mjs -> node:child_process": true,
     "process: tests/screens-test.mjs -> node:child_process": true,
     "process: tests/security-review-test.mjs -> node:child_process": true,

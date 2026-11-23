@@ -1,12 +1,12 @@
 // Tests of cutting a core release (release.mjs, with the trial on a real project in release-trial.mjs): the next release and
 // its number, the checks on the commit it would stand on, the full run of the tests, how a copy older than the last two
 // takes one, where a release may be cut, what each ask of a release costs, and the trial's record, which holds the cut.
-// In a scratch repository that stands in for the core, fetched as the scripts fetch the core (what a project follows,
-// which tags are releases and what a sync asks: releases-test.mjs); on Linux and on Windows. Git and Node's own
+// In a scratch repository that stands in for the core, fetched as the scripts fetch the core (which tags are releases and
+// what a sync asks: releases-test.mjs; what a project follows: follows-test.mjs); on Linux and on Windows. Git and Node's own
 // modules only.
 //
 //   node tests/release-test.mjs
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,40 +15,14 @@ import { TRIAL, compared, ownCount, trialAt, trialRecord } from "../scripts/rele
 import { shownAs } from "../scripts/state-report.mjs";
 import { STEPS } from "../scripts/steps.mjs";
 import { NOTICE } from "../scripts/sync-notes.mjs";
-import { NOTES, elsewhere, fetchCore } from "../scripts/releases.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { scratchCore, victimRepo } from "../scripts/releases-scratch.mjs";
 
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
 
 // a scratch core: main with four commits, a side branch, and tags (as in releases-test.mjs)
-const tmp = scratchDir("releases-test-");
-// (git's own variables that point at a repository are left out, so every call lands in the scratch one)
-for (const name of Object.keys(process.env)) if (elsewhere.test(name)) delete process.env[name];
-// (and git finds no bare repository by itself, as Git 3.0 has it by default: the scripts name each one they make)
-Object.assign(process.env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1",
-  GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "safe.bareRepository", GIT_CONFIG_VALUE_0: "explicit" });
-// (the test's own calls never take a variable that points elsewhere, even while one is set to try the scripts)
-const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env: Object.fromEntries(Object.entries(process.env).filter(([name]) => !elsewhere.test(name))), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-const core = path.join(tmp, "core");
-fs.mkdirSync(path.join(core, path.dirname(NOTES)), { recursive: true });
-git(core, "init", "-q", "-b", "main");
-let n = 0;
-const commit = (notes) => {
-  fs.writeFileSync(path.join(core, NOTES), notes);
-  fs.writeFileSync(path.join(core, "n"), String(++n));
-  git(core, "add", "-A");
-  git(core, "commit", "-q", "-m", `commit ${n}`);
-  return git(core, "rev-parse", "HEAD");
-};
-const head = "# What a sync asks of a project\n\n";
-const c1 = commit(head), c2 = commit(`${head}- **First.** Done when one.\n`);
-git(core, "checkout", "-q", "-b", "side");
-const side = commit(`${head}- **First.** Done when one.\n- **Aside.** Never on main.\n`);
-git(core, "checkout", "-q", "main");
-const c3 = commit(`${head}- **First.** Done when one.\n- **Second.** Done when two.\n`), c4 = commit(`${head}- **First.** Done when one.\n- **Second.** Done when two.\n`);
-const fetched = () => { const dir = fs.mkdtempSync(path.join(tmp, "fetched-")); fetchCore(dir, core); return dir; };
+const { tmp, git, core, commit, head, c1, c2, c3, c4, side, fetched } = scratchCore("release-test-");
 
 let dir = fetched();
 ok(next(dir).name === "release-1" && next(dir).sha === c4 && next(dir).before === null && next(dir).asks.length === 0, "the first release would stand on main's newest commit");
@@ -111,13 +85,7 @@ ok(cutting() && cutting("--at", "a".repeat(40)) && cutting("--runs", "runs.json"
 ok(held({ total_count: 2, workflow_runs: [null, run("tests", "completed", "success")] }).join() === "a check: unreadable" && held(list({ name: "tests", path: "p" })).join() === "tests: unreadable", "and a run in it that cannot be read");
 
 // git's own variables that point elsewhere: a project's repository is never touched, and the guard is not fooled
-const victim = path.join(tmp, "victim");
-fs.mkdirSync(path.join(victim, "core", "scripts"), { recursive: true });
-git(victim, "init", "-q", "-b", "main");
-fs.writeFileSync(path.join(victim, "f"), "x");
-git(victim, "add", "-A");
-git(victim, "commit", "-q", "-m", "its own");
-const own = git(victim, "rev-parse", "HEAD");
+const { victim } = victimRepo(tmp, git);
 process.env.GIT_DIR = path.join(victim, ".git");
 process.env.GIT_WORK_TREE = victim;
 let fooled;
