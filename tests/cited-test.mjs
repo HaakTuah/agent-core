@@ -6,12 +6,13 @@
 //   node tests/cited-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, citedFrom, citedIn, count, HEADING, lines, matchers, mergedIn, OPENERS, plain, report, roleOf, ROLES, startRules, texts } from "../scripts/cited.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { rules, rulesOf } from "../scripts/rules.mjs";
-import { body, countsFrom } from "../scripts/state-report.mjs";
+import { body, countsFrom, projects, rowOf } from "../scripts/state-report.mjs";
 
 let failed = 0, count_ = 0;
 const ok = (cond, what, detail = "") => { count_++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
@@ -107,6 +108,33 @@ ok(citedFrom("no such heading", known) === null && countsFrom(report_, false, kn
 // ---- run by hand ----
 const run = spawnSync(process.execPath, [path.join(root, "scripts/cited.mjs"), "--repo", "o/n", "--month", "2026-13"], { encoding: "utf8" });
 ok(run.status === 1 && mended(run.stdout + run.stderr), "a month or repository it cannot read is refused, with its mend", run.stderr);
+
+// ---- --projects reads nothing as nothing read (#1112) ----
+{
+  const mine = { private: false, owner: "o", shared: false };
+  const outage = new Error("gh: HTTP 502 Bad Gateway"), absent = new Error("gh: Not Found (HTTP 404)");
+  let threw = false;
+  try { rowOf(() => { throw outage; }, "o", "o/a", mine); } catch (e) { threw = e === outage; }
+  ok(threw && rowOf(() => { throw absent; }, "o", "o/a", mine) === null, "a manifest read that fails for any reason but gh's 404 throws, and a 404 is no project");
+  const url = new Error('Get "https://api.github.com/repos/o/page-404/contents/core-manifest.md": Bad Gateway');
+  let urlThrew = false;
+  try { rowOf(() => { throw url; }, "o", "o/page-404", mine); } catch (e) { urlThrew = e === url; }
+  ok(urlThrew, "an outage whose message holds '404' in a repository's name is no 404 answer: it throws");
+  const said = [], log = console.log; console.log = l => said.push(l);
+  let unread = false;
+  try { projects([], route => route === "user" ? "o\n" : "[]"); } catch { unread = true; } finally { console.log = log; }
+  ok(unread && !said.length, "an account that reaches no repository at all is an unread answer, not 'None found'");
+  // the issue's own case: --trial with no files and a gh that fails refuses and says the mend (a stub gh first on PATH;
+  // not on Windows, where Node runs no extension-less stub and gh.exe would be called)
+  if (process.platform !== "win32") {
+    const dir = scratchDir("stub-gh-");
+    {
+      fs.writeFileSync(path.join(dir, "gh"), "#!/bin/sh\necho 'gh: HTTP 502 Bad Gateway' >&2\nexit 1\n", { mode: 0o755 });
+      const down = spawnSync(process.execPath, [path.join(root, "scripts", "release.mjs"), "--trial", "a".repeat(40)], { encoding: "utf8", env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH}` } });
+      ok(down.status === 1 && /could not be read/.test(down.stderr) && /Mend: run it where gh answers/.test(down.stderr), "--trial with no files and a gh that fails refuses, saying what could not be read and the mend", down.stderr);
+    }
+  }
+}
 
 console.log(`\n${count_ - failed} of ${count_} passed`);
 if (failed) process.exitCode = 1;
