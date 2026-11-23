@@ -24,28 +24,47 @@ const HOOKS = new Set(["ModuleInitializer", "AssemblyInitialize", "AssemblyClean
 const REFLECTS = new Set(["Activator", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
   "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR"]);
 
-const ids = toks => toks.filter(k => k.t === "id").map(k => k.v.replace(/^@/u, ""));
+const word = k => k.v.replace(/^@/u, "");
+const ids = toks => toks.filter(k => k.t === "id").map(word);
 const prefixes = name => name.split(".").map((_, k, parts) => parts.slice(0, k + 1).join("."));
 const join = (a, b) => (a ? `${a}.${b}` : b);
+const into = (map, key, made = () => new Set()) => { if (!map.has(key)) map.set(key, made()); return map.get(key); };
+
+// Past the head of a using directive that opens at toks[i] ("using", or "global using", then "static", "unsafe", an
+// alias's "N =" and "global::", each where it stands): the index of its name, or -1 where no directive opens there.
+function pastHead(toks, i) {
+  let k = toks[i]?.v === "global" ? i + 1 : i;
+  if (toks[k]?.v !== "using") return -1;
+  for (const v of ["static", "unsafe"]) if (toks[k + 1]?.v === v) k++;
+  if (toks[k + 1]?.t === "id" && toks[k + 2]?.v === "=") k += 2;
+  if (["global", ":", ":"].every((v, n) => toks[k + 1 + n]?.v === v)) k += 3;
+  return k + 1;
+}
+
+// The dotted name that stands at toks[k]: { parts, end } (end the index past it).
+function nameAt(toks, k) {
+  const parts = [];
+  while (toks[k]?.t === "id") { parts.push(word(toks[k])); k++; if (toks[k]?.v !== ".") break; k++; }
+  return { parts, end: k };
+}
+
+// The index past the "<...>" that opens at toks[k], or k where none does ("using L = List<App.Item>;": the names in it
+// are read as any other words).
+function pastGeneric(toks, k) {
+  let depth = 0;
+  for (; k < toks.length && (toks[k].v === "<" || depth > 0); k++) depth += toks[k].v === "<" ? 1 : toks[k].v === ">" ? -1 : 0;
+  return k;
+}
 
 // The using directive that opens at toks[i] ("using", or "global using"): { end, target, global }, or null where the
 // tokens there are no directive (a using statement or declaration).
 function directive(toks, i) {
-  const global = toks[i]?.v === "global" && toks[i + 1]?.v === "using";
-  let k = i + (global ? 1 : 0);
-  if (toks[k]?.v !== "using") return null;
-  k++;
-  if (toks[k]?.v === "static") k++;
-  if (toks[k]?.v === "unsafe") k++;
-  if (toks[k]?.t === "id" && toks[k + 1]?.v === "=") k += 2;
-  if (toks[k]?.v === "global" && toks[k + 1]?.v === ":" && toks[k + 2]?.v === ":") k += 3;
-  const parts = [];
-  while (toks[k]?.t === "id") { parts.push(toks[k].v.replace(/^@/u, "")); k++; if (toks[k]?.v !== ".") break; k++; }
-  if (!parts.length) return null;
-  // (an alias of a generic type, "using L = List<App.Item>;", up to its end: the names in it are read as any other)
-  if (toks[k]?.v === "<") { let depth = 0; for (; k < toks.length; k++) { if (toks[k].v === "<") depth++; else if (toks[k].v === ">" && --depth === 0) { k++; break; } } }
-  return toks[k]?.v === ";" ? { end: k, target: parts.join("."), global } : null;
+  const k = pastHead(toks, i);
+  if (k < 0) return null;
+  const { parts, end } = nameAt(toks, k), last = pastGeneric(toks, end);
+  return parts.length && toks[last]?.v === ";" ? { end: last, target: parts.join("."), global: toks[i].v === "global" } : null;
 }
+
 
 // Where the statements at the top of a file begin: the first token past its using directives, extern aliases and
 // attribute sections; true where that token opens a statement (the file is of top-level statements, which C# compiles
@@ -76,35 +95,47 @@ function delegates(toks) {
       if (v === "<") depth++;
       else if (v === ">") depth--;
       else if (v === "(" && depth === 0) break;
-      else if (toks[k].t === "id" && depth === 0) name = v.replace(/^@/u, "");
+      else if (toks[k].t === "id" && depth === 0) name = word(toks[k]);
     }
     if (name) out.push(name);
   }
   return out;
 }
 
-// What a file holds that bears on its reach: its own namespaces, the namespaces its types stand in, its words, its runs
-// of dotted words (each of two words or more), its using directives, and whether it declares extension members, runs
-// with no name, reads types by reflection, or was lost by the grammar.
-function factsOf(r) {
-  const toks = r.toks ?? [], words = ids(toks);
-  const placed = new Set(r.namespaces);
-  if (!r.namespaces.length || r.types.some(t => !t.includes("."))) placed.add("");
+
+// Each run of dotted words in a file (of two words or more, "App.Rules.Allowed"), and its using directives.
+function runsOf(toks) {
   const runs = new Set(), usings = [];
   for (let i = 0; i < toks.length; i++) {
-    const d = (toks[i].v === "using" || toks[i].v === "global") && directive(toks, i);
+    const d = ["using", "global"].includes(toks[i].v) && directive(toks, i);
     if (d) usings.push(d);
     if (toks[i].t !== "id" || toks[i - 1]?.v === "." || toks[i + 1]?.v !== ".") continue;
-    const run = [toks[i].v.replace(/^@/u, "")];
-    for (let k = i + 1; toks[k]?.v === "." && toks[k + 1]?.t === "id"; k += 2) run.push(toks[k + 1].v.replace(/^@/u, ""));
-    if (run.length > 1) runs.add(run.join("."));
+    const { parts } = nameAt(toks, i);
+    if (parts.length > 1) runs.add(parts.join("."));
   }
-  const at = (k, v) => toks[k]?.v === v;
-  const extensions = toks.some((k, i) => (k.v === "this" && at(i - 1, "(") && toks[i + 1]?.t === "id") || (k.v === "extension" && (at(i + 1, "(") || at(i + 1, "<"))) || (k.v === "class" && at(i + 1, "_")));
-  const hook = words.some(w => HOOKS.has(w)) || toks.some((k, i) => k.v === "[" && ["assembly", "module"].includes(toks[i + 1]?.v) && at(i + 2, ":"))
-    || toks.some((k, i) => ["Before", "After"].includes(k.v) && at(i + 1, "(") && ["Assembly", "TestSession", "TestDiscovery"].includes(toks[i + 2]?.v));
-  const reflects = words.some(w => REFLECTS.has(w) || (/Assembl(y|ies)/u.test(w) && !HOOKS.has(w))) || toks.some((k, i) => k.v === "Type" && at(i + 1, ".") && toks[i + 2]?.v === "GetType");
-  return { r, words: new Set(words), runs, usings, placed: [...placed], extensions, hook, reflects, lost: r.usings === null || r.functions === null, program: topLevel(toks) };
+  return { runs, usings };
+}
+
+// Whether a file may declare extension members: a parameter "this T", or an extension block ("extension(" or
+// "extension<", whose header the grammar reads as "class _").
+const extending = toks => toks.some((k, i) => (k.v === "this" && toks[i - 1]?.v === "(" && toks[i + 1]?.t === "id")
+  || (k.v === "extension" && ["(", "<"].includes(toks[i + 1]?.v)) || (k.v === "class" && toks[i + 1]?.v === "_"));
+// Whether C# or a test framework runs a file with no name: a hook's word, an assembly's or a module's attribute, or
+// TUnit's "Before(Assembly)" and its kin.
+const runsUnnamed = (toks, words) => words.some(w => HOOKS.has(w)) || toks.some((k, i) => k.v === "[" && ["assembly", "module"].includes(toks[i + 1]?.v) && toks[i + 2]?.v === ":")
+  || toks.some((k, i) => ["Before", "After"].includes(k.v) && toks[i + 1]?.v === "(" && ["Assembly", "TestSession", "TestDiscovery"].includes(toks[i + 2]?.v));
+// Whether a file finds types by reflection or scans an assembly for them.
+const reflecting = (toks, words) => words.some(w => REFLECTS.has(w) || (/Assembl(y|ies)/u.test(w) && !HOOKS.has(w)))
+  || toks.some((k, i) => k.v === "Type" && toks[i + 1]?.v === "." && toks[i + 2]?.v === "GetType");
+
+// What a file holds that bears on its reach: its own namespaces, the namespaces its types stand in, its words, its runs
+// of dotted words, its using directives, and whether it declares extension members, runs with no name, reads types by
+// reflection, is of top-level statements, or was lost by the grammar.
+function factsOf(r) {
+  const toks = r.toks ?? [], words = ids(toks), placed = new Set(r.namespaces);
+  if (!r.namespaces.length || r.types.some(t => !t.includes("."))) placed.add("");
+  return { r, words: new Set(words), ...runsOf(toks), placed: [...placed], extensions: extending(toks), hook: runsUnnamed(toks, words),
+    reflects: reflecting(toks, words), lost: r.usings === null || r.functions === null, program: topLevel(toks) };
 }
 
 // The <Using Include="N"> items of MSBuild's files: their namespaces, or null where one names a property ("$(...)"),
@@ -138,49 +169,54 @@ export function ofNoProject(file, texts) {
   return !Object.keys(texts).some(f => f.endsWith(".csproj") && file.startsWith(path.posix.dirname(f) === "." ? "" : `${path.posix.dirname(f)}/`));
 }
 
-// The links of each file of C# among `texts` to the files it may reach, and the files whose reach cannot be told:
-// { links: Map of a file to a Set of files, unsure: Set }. `beside` is what git holds beside the texts (heldBeside).
-export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
-  const files = Object.keys(texts).filter(f => f.endsWith(".cs")), links = new Map(), unsure = new Set();
-  if (!files.length) return { links, unsure };
-  const held = beside(texts);
-  const msbuild = held.unknown ? null : msbuildUsings([...held.msbuild, ...Object.entries(texts).filter(([f]) => f.endsWith(".csproj")).map(([, t]) => t)]);
-  const facts = new Map();
-  for (const f of files) { pace(); facts.set(f, factsOf(readCsharp(texts[f]))); }
-  // (where git holds C# the config does not read, or the usings of every file cannot be told, every file is unsure)
-  if (msbuild === null || held.unreadCs) return { links, unsure: new Set(files) };
-  // Each type by its last word, with its namespace and files; the files that may declare extensions in each namespace.
-  const byLast = new Map(), types = new Set(), extensions = new Map(), hooks = [];
+
+// Where the project declares each type: { types: Map of a full name to its files, byLast: Map of a type's last word to a
+// Map of its namespace to its files, extensions: Map of a namespace to the files that may extend in it, hooks: the files
+// run with no name, globals: the namespaces global using directives name, unsure: the files lost or that reflect }.
+function indexOf(facts) {
+  const ix = { types: new Map(), byLast: new Map(), extensions: new Map(), hooks: [], globals: [], unsure: new Set() };
   const declare = (full, file) => {
-    const dot = full.lastIndexOf("."), last = full.slice(dot + 1), ns = dot < 0 ? "" : full.slice(0, dot);
-    types.add(full);
-    if (!byLast.has(last)) byLast.set(last, new Map());
-    const at = byLast.get(last);
-    if (!at.has(ns)) at.set(ns, new Set());
-    at.get(ns).add(file);
+    const dot = full.lastIndexOf(".");
+    into(ix.types, full).add(file);
+    into(into(ix.byLast, full.slice(dot + 1), () => new Map()), dot < 0 ? "" : full.slice(0, dot)).add(file);
   };
-  const globals = [...msbuild];
   for (const [f, x] of facts) {
     for (const t of x.r.types) declare(t, f);
     for (const d of delegates(x.r.toks ?? [])) for (const ns of x.placed) declare(join(ns, d), f);
     if (x.program) declare("Program", f);
-    if (x.extensions) for (const ns of x.placed) { if (!extensions.has(ns)) extensions.set(ns, new Set()); extensions.get(ns).add(f); }
-    if (x.hook) hooks.push(f);
-    for (const u of x.usings) if (u.global) globals.push(u.target);
-    if (x.lost || x.reflects) unsure.add(f);
+    if (x.extensions) for (const ns of x.placed) into(ix.extensions, ns).add(f);
+    if (x.hook) ix.hooks.push(f);
+    for (const u of x.usings) if (u.global) ix.globals.push(u.target);
+    if (x.lost || x.reflects) ix.unsure.add(f);
   }
-  const typed = name => { const dot = name.lastIndexOf("."); return byLast.get(name.slice(dot + 1))?.get(dot < 0 ? "" : name.slice(0, dot)) ?? []; };
-  for (const [f, x] of facts) {
-    pace();
-    // (the namespaces around the file, the global one among them; and those it sees, each target read against each)
-    const around = new Set(["", ...x.r.namespaces.flatMap(prefixes)]), sees = new Set(around);
-    for (const target of [...globals, ...x.usings.map(u => u.target)]) for (const p of around) for (const n of prefixes(join(p, target))) sees.add(n);
-    const to = new Set(hooks);
-    for (const w of x.words) for (const last of [w, `${w}Attribute`]) for (const [ns, at] of byLast.get(last) ?? []) if (sees.has(ns)) for (const g of at) to.add(g);
-    for (const run of x.runs) for (const p of around) for (const name of prefixes(join(p, run))) if (types.has(name)) for (const g of typed(name)) to.add(g);
-    for (const ns of sees) for (const g of extensions.get(ns) ?? []) to.add(g);
-    to.delete(f);
-    links.set(f, to);
-  }
-  return { links, unsure };
+  return ix;
+}
+
+// The files one file reaches (x its facts), by the index: the files run with no name; each type a word of its names in
+// a namespace it sees, as itself or as an attribute; each its runs of dotted words name in full, read against the
+// namespaces around it; and the files that may extend in a namespace it sees.
+function reachOf(x, ix) {
+  const around = new Set(["", ...x.r.namespaces.flatMap(prefixes)]), sees = new Set(around);
+  for (const target of [...ix.globals, ...x.usings.map(u => u.target)]) for (const p of around) for (const n of prefixes(join(p, target))) sees.add(n);
+  const to = new Set(ix.hooks), add = files => { for (const g of files ?? []) to.add(g); };
+  for (const w of x.words) for (const last of [w, `${w}Attribute`]) for (const [ns, files] of ix.byLast.get(last) ?? []) if (sees.has(ns)) add(files);
+  for (const run of x.runs) for (const p of around) for (const name of prefixes(join(p, run))) add(ix.types.get(name));
+  for (const ns of sees) add(ix.extensions.get(ns));
+  return to;
+}
+
+// The links of each file of C# among `texts` to the files it may reach, and the files whose reach cannot be told:
+// { links: Map of a file to a Set of files, unsure: Set }. `beside` is what git holds beside the texts (heldBeside).
+export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
+  const files = Object.keys(texts).filter(f => f.endsWith(".cs")), links = new Map();
+  if (!files.length) return { links, unsure: new Set() };
+  const held = beside(texts), projects = Object.entries(texts).filter(([f]) => f.endsWith(".csproj")).map(([, t]) => t);
+  const msbuild = held.unknown ? null : msbuildUsings([...held.msbuild, ...projects]);
+  // (where git holds C# the config does not read, or the usings of every file cannot be told, every file is unsure)
+  if (msbuild === null || held.unreadCs) return { links, unsure: new Set(files) };
+  const facts = new Map(files.map(f => { pace(); return [f, factsOf(readCsharp(texts[f]))]; }));
+  const ix = indexOf(facts);
+  ix.globals.push(...msbuild);
+  for (const [f, x] of facts) { pace(); const to = reachOf(x, ix); to.delete(f); links.set(f, to); }
+  return { links, unsure: ix.unsure };
 }
