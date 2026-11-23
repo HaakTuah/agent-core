@@ -8,9 +8,11 @@
 // outright, as releases.mjs says a bare repository must be. And how two trees are compared, here and in core.yml alike
 // (core archive 201): entry by entry, by git's object ids and types, so a file's content, a link and a submodule each
 // count, while the executable bit does not: a copy made on Windows by a sync from before #1093 records every file 100644,
-// and such a copy is the core's all the same. From #1093 the sync records the bits the core marks (sync.mjs, `modes`),
+// and such a copy is the core's all the same. From #1093 the sync records the bits the core marks (`recordModes`, below),
 // and pure-sync.mjs refuses a bit the core does not mark (`executable`, below), so a sync widens no file's mode beyond
 // the core's. This is the one place that reason is written; core.yml and pure-sync.mjs point here. Git and Node's own modules only; proven by copy-tree-test.mjs.
+import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import { inBare } from "./releases.mjs";
 
 export const KEPT = ["reports", "words", "tests"];
@@ -37,6 +39,24 @@ export function entries(tree, gitDir) {
  *  tree in the repository whose git folder is `gitDir`. */
 export function executable(tree, gitDir) {
   return git(["-c", "core.quotePath=true", "ls-tree", "-r", "--full-tree", tree], gitDir).split("\n").filter((e) => e.startsWith("100755 blob ")).map((e) => e.slice(e.indexOf("\t") + 1));
+}
+
+/** Records in git's index, run from the project's root, the executable bit of each file of the copy at `dir` as the
+ *  core's commit `pin` in `gitDir` marks it (#1093): a copy written on Windows records none, so a workflow that runs a
+ *  script of it by its path would fail with "Permission denied". Each file the core marks so is staged with its bit, and
+ *  one the index marks so that the core does not, without it. Where git refuses, it says so and fails nothing: the copy
+ *  is written all the same. The sync (sync.mjs) calls it. */
+export function recordModes(dir, pin, gitDir) {
+  const marked = git(["ls-tree", "-r", "-z", pin], gitDir).split("\0").filter((e) => e.startsWith("100755 blob ")).map((e) => `${dir}/${e.slice(e.indexOf("\t") + 1)}`).filter((f) => fs.existsSync(f));
+  // (with core.fsmonitor off, as own-files.mjs reads the index: no command of the project's settings runs)
+  const run = (args) => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
+  try {
+    const stray = run(["ls-files", "-s", "-z", "--", dir]).split("\0").filter((e) => e.startsWith("100755 ")).map((e) => e.slice(e.indexOf("\t") + 1)).filter((f) => !marked.includes(f) && fs.existsSync(f));
+    if (marked.length) run(["update-index", "--add", "--chmod=+x", "--", ...marked]);
+    if (stray.length) run(["update-index", "--chmod=-x", "--", ...stray]);
+  } catch (e) {
+    console.log(`note the copy is written, but git did not record the executable bits the core marks (${String(e.stderr || e.message).trim().split("\n")[0]}). Mend: run \`git update-index --add --chmod=+x -- ${marked.join(" ")}\` from the project's root.`);
+  }
 }
 
 /** Whether the copy's folder `at` (the manifest's path without its last "/": core-path.mjs) in the commit `rev`, in the

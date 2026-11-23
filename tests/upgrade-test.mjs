@@ -470,17 +470,15 @@ function upgrade(p, from, ownChanges, expect) {
   const onlyCalls = callers(read(p.dir)), carried = synced.filter(f => !f.startsWith("core/") && f !== "core-manifest.md" && !onlyCalls.includes(f));
   ok((carried.length > 0 || !jobRan(onSync, "suites.yml")) && (!moved.length || !synced.every(f => pathsLetThrough(["core/**", "core-manifest.md"], [f]))),
     `${p.name}: the sync, which moves ${moved.length} call${moved.length === 1 ? "" : "s"}' pins, starts none of its own suites for them, which a filter of the copy and the manifest alone would have started${carried.length ? ` (it carries ${carried.length} of the core's files besides, for which they run)` : ""}`, started(onSync).join("\n"));
-  // (#1093: the copy records the executable bit of each file the core marks so, a project whose git records none, as on
-  // Windows, too, so its own job runs a script of the copy by its path: in a clone of the sync's head, as a runner makes
-  // it, on a host that reads the bit)
-  const bits = (dir, rev, under) => git(dir, "ls-tree", "-r", rev, under).split("\n").filter(l => l.startsWith("100755 blob ")).map(l => l.slice(l.indexOf("\t") + 1).replace(/^core\//, "")).join("\n");
-  ok(bits(p.dir, syncHead, "core/") === bits(theCore, head, "."), `${p.name}: the sync's copy records the executable bit of each file the core marks so, and of no other${git(p.dir, "config", "--get", "core.fileMode") === "false" ? ", though git here records none" : ""}`, `${bits(p.dir, syncHead, "core/")}\n---\n${bits(theCore, head, ".")}`);
+  // (#1093: so a runner's clone runs the copy's scripts, where git here records no bit too)
+  const bits = (dir, rev, under) => git(dir, "ls-tree", "-r", rev, under).split("\n").filter(l => l.startsWith("100755 ")).map(l => l.slice(l.indexOf("\t") + 1).replace(/^core\//, "")).join();
+  ok(bits(p.dir, syncHead, "core/") === bits(theCore, head, "."), `${p.name}: the sync's copy records the executable bit of each file the core marks so, and of no other${git(p.dir, "config", "--get", "core.fileMode") === "false" ? ", though git here records none" : ""}`, bits(p.dir, syncHead, "core/"));
   if (process.platform !== "win32") {
     const runner = path.join(tmp, `${p.name}-runner`);
     git(tmp, "clone", "-q", "--no-checkout", p.dir, runner);
     git(runner, "checkout", "-q", syncHead);
-    const byPath = spawnSync(path.join(runner, "core/scripts/work-saved.sh"), ["none"], { cwd: runner, env: { ...env, CLAUDE_PROJECT_DIR: runner }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-    ok(byPath.status === 0, `${p.name}: and a job that runs core/scripts/work-saved.sh by its path, in a clone of it, runs it`, `${byPath.error ?? ""}${byPath.stdout}${byPath.stderr}`);
+    const run = spawnSync(path.join(runner, "core/scripts/work-saved.sh"), ["none"], { cwd: runner, env: { ...env, CLAUDE_PROJECT_DIR: runner }, encoding: "utf8" });
+    ok(run.status === 0, `${p.name}: and a job that runs core/scripts/work-saved.sh by its path, in a clone of it, runs it`, `${run.error ?? ""}${run.stdout}${run.stderr}`);
     fs.rmSync(runner, { recursive: true, force: true });
   }
   const pure = provePure(p);

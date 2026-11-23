@@ -28,6 +28,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
+import { recordModes } from "./copy-tree.mjs";
 import { readCore } from "./core-path.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { everyInstall } from "./packages.mjs";
@@ -190,14 +191,14 @@ function sync(tmp) {
   if (!target) return;
   const { pin, release } = target;
   if (!past(pin, "refs/heads/main", tmp)) fail(`${pin} is not a commit of the core's main`);
-  if (pin === old && !first) { console.log(`${at} is already at ${pin}: nothing to sync`); modes(dir, pin, tmp); converge(dir, kitsOf(old, tmp)); return; }
+  if (pin === old && !first) { console.log(`${at} is already at ${pin}: nothing to sync`); recordModes(dir, pin, tmp); converge(dir, kitsOf(old, tmp)); return; }
 
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
   execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(tmp, ["archive", pin], { encoding: "buffer", maxBuffer: 1 << 28 }) });
   fs.writeFileSync(manifest, text.replace(lineRe, line => line.replace(old, pin)));
-  modes(dir, pin, tmp);
+  recordModes(dir, pin, tmp);
   install(dir);
 
   const { moved, unread } = moveCalls(pin, tmp, own);
@@ -222,24 +223,6 @@ function converge(dir, kits, first = false) {
   if (r.status !== 0) {
     console.log(`FAIL the core's files and parts were not written: the one process refused, as it says above, though ${dir}/ moved. Mend: make the mend it names, then run \`node ${dir}/scripts/sync.mjs <the manifest's pin>\` again, which at the same pin moves nothing and writes them, and commit what it writes in this pull request.`);
     process.exitCode = 1;
-  }
-}
-
-// The executable bit of each file of the copy, recorded in git's index as the core's tree at `pin` marks it (#1093): a
-// copy written on Windows records none, so a workflow that runs a script of it by its path alone would fail with
-// "Permission denied". Read from the core's tree, never listed by hand; each file the core marks so is staged with its
-// bit, and one the index marks so that the core does not is staged without it. Where git refuses, it says so and fails
-// nothing: the copy is written all the same.
-function modes(dir, pin, tmp) {
-  const marked = inBare(tmp, ["ls-tree", "-r", "-z", pin]).split("\0").filter(e => e.startsWith("100755 blob ")).map(e => `${dir}/${e.slice(e.indexOf("\t") + 1)}`).filter(f => fs.existsSync(f));
-  // (with core.fsmonitor off, as own-files.mjs reads the index: no command of the project's settings runs)
-  const run = args => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
-  try {
-    const stray = run(["ls-files", "-s", "-z", "--", dir]).split("\0").filter(e => e.startsWith("100755 ")).map(e => e.slice(e.indexOf("\t") + 1)).filter(f => !marked.includes(f) && fs.existsSync(f));
-    if (marked.length) run(["update-index", "--add", "--chmod=+x", "--", ...marked]);
-    if (stray.length) run(["update-index", "--chmod=-x", "--", ...stray]);
-  } catch (e) {
-    console.log(`note the copy is written, but git did not record the executable bits the core marks (${String(e.stderr || e.message).trim().split("\n")[0]}). Mend: run \`git update-index --add --chmod=+x -- ${marked.join(" ")}\` from the project's root.`);
   }
 }
 
