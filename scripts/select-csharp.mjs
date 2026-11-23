@@ -202,10 +202,11 @@ function aliasesOf(x, ix) {
 }
 
 // The namespaces the global using directives and a file's own name (x its facts), one that "D::" heads also as what
-// the alias D names ("using D = App;" then "using D::Data;" names App.Data).
-function targetsOf(x, ix, aliases) {
-  const qualified = [...ix.qualified, ...x.usings.filter(u => u.qual && !u.alias)].flatMap(u => [...aliases.get(u.qual) ?? []].map(t => join(t, u.target)));
-  return [...ix.globals, ...x.usings.map(u => u.target).filter(t => t !== null), ...qualified];
+// the alias D names ("using D = App;" then "using D::Data;" names App.Data), one at a time, `pace` asked for each.
+function* targetsOf(x, ix, aliases, pace) {
+  yield* ix.globals;
+  for (const u of x.usings) if (u.target !== null) yield u.target;
+  for (const u of [...ix.qualified, ...x.usings]) if (u.qual && !u.alias) for (const t of aliases.get(u.qual) ?? []) { pace(); yield join(t, u.target); }
 }
 
 // The files one file reaches (x its facts), by the index: the files every file reaches; each type a word of its names
@@ -215,7 +216,7 @@ function reachOf(x, ix, pace) {
   const around = new Set([""]);
   for (const n of x.r.namespaces) for (const p of prefixes(n, ix.depth, pace)) around.add(p);
   const sees = new Set(around), aliases = aliasesOf(x, ix);
-  for (const target of targetsOf(x, ix, aliases)) for (const p of around) for (const n of prefixes(join(p, target), ix.depth, pace)) sees.add(n);
+  for (const target of targetsOf(x, ix, aliases, pace)) for (const p of around) for (const n of prefixes(join(p, target), ix.depth, pace)) sees.add(n);
   const to = new Set(ix.every), add = files => { for (const g of files ?? []) to.add(g); }, runs = fullNames(x, ix, aliases, pace);
   for (const w of x.words) for (const last of [w, `${w}Attribute`]) for (const [ns, files] of ix.byLast.get(last) ?? []) if (sees.has(ns)) add(files);
   for (const run of runs) for (const p of around) for (const name of prefixes(join(p, run), ix.depth, pace)) { add(ix.types.get(name)); add(ix.types.get(`${name}Attribute`)); }
