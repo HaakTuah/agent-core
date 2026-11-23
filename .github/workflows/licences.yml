@@ -10,7 +10,8 @@
 # the installed package (core/scripts/licence-installed.mjs); a hand edit to the dependencies is a review finding, and
 # the dependency review reads GitHub's own licence data. A project calls it (workflow_call) from its own .github/workflows/licences.yml on every pull request, pinned to
 # a full commit SHA ("How a project takes the core" in README.md, point 5), passing its config's path. Reads only, with
-# no secret: nothing is installed, and besides GitHub's dependency review nothing runs but the caller's own
+# no secret: nothing is installed but, where the project holds a Codex config, the core's own packages from its lock
+# file, which agent-tools.mjs installs itself with no install script run (#1093, point 1), and besides GitHub's dependency review nothing runs but the caller's own
 # core/scripts/licences.mjs, core/scripts/exact-versions.mjs, core/scripts/lookup.mjs and core/scripts/agent-tools.mjs, which core.yml holds to the
 # core pin. The licence script runs the next two itself (#1093, point 2), so a project's own job that runs it runs them
 # too. The second holds floor rule 7's "one exact version, never a range" for the same lockfiles: each dependency

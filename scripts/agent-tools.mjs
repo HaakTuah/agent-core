@@ -162,13 +162,14 @@ function run(root, file, { core = false, base = baseOf(root), ways = installedBy
   sortUnlisted(unlisted, { head, base, held, file }, fail, notes);
   return { fail, notes };
 }
-// The part of the check that did not run, or null: where the TOML package could not be installed (packages.mjs,
+// The part of the check that did not run, or null (asked only where a Codex config is held, so that a copy installs
+// its packages for none other): where the TOML package could not be installed (packages.mjs,
 // unreached(): the registry not answering, or a copy's install failing; #1093, point 1), a project's Codex config, which the TOML package reads, is left unread, at the head and the base alike,
 // and its entries in the list are not failed as configured nowhere; every other failure stands (#654, point 4).
 function partlyUnread(root, base = baseOf(root)) {
   const codex = ".codex/config.toml";
   const held = () => fs.existsSync(path.join(root, codex)) || (!!base && textAt(root, base, codex) !== null);
-  return unreached("smol-toml") && held() ? `The agent-tools check did not read ${codex}, and ran every other part: ${notInstalled("smol-toml")}` : null;
+  return held() && unreached("smol-toml") ? `The agent-tools check did not read ${codex}, and ran every other part: ${notInstalled("smol-toml")}` : null;
 }
 // With no base to read against, as before a commit or on a push, each problem a project may hold, noted as sortSources
 // notes its own; in the core's own repository none may stand.
