@@ -24,8 +24,9 @@ export const C = "// The core's script c, which reads its settings beside it thr
 export const FLOOR = `# The floor\n\n${"A rule of the floor, which no script takes out of a project without its owner's word. ".repeat(3)}\n`;
 export const SAFE = `# Safe\n\n${"A file of the core's that the project's AGENTS.md calls one of its safety rules. ".repeat(3)}\n`;
 export const RUN = `#!/bin/sh\n# The core's script run.sh, kept as a plain file by the core, long enough to be compared.\nexec node "$@"\n`;
-export const LINKS = `# Links\n\n${"A page of the core's that links to what stands beside it, long enough to be compared. ".repeat(2)}[the settings](../config/settings.json), [the site](https://example.com/x.md) and [the top](#links).\n`;
-export const FAR = `# Far\n\n${"A page of the core's that links only out of the repository, long enough to be compared. ".repeat(2)}[the site](https://example.com/x.md), [mail](mailto:x@example.invalid) and [the top](#far).\n`;
+// (files of the core's whose names no file of the scratch core or project holds, so that they go)
+export const LONE = `# A page\n\n${"A page of the core's that no file of the core or the project names, long enough to be compared. ".repeat(2)}[the site](https://example.com/x.md).\n`;
+export const [STALE_OLD, STALE_NEW] = ["as an earlier copy held it", "as the copy holds it now"].map(w => `# A page\n\n${`Another page of the core's, ${w}, that nothing names, long enough to be compared. `.repeat(3)}\n`);
 export const EXTRA = `# Extra\n\n${"A file of the core's that a workflow of the core's, held whole in the project, names. ".repeat(3)}\n`;
 
 // The scratch core: an earlier commit and the pin, on main; the project's copy is the pin's tree.
@@ -33,13 +34,13 @@ export const tmp = scratchDir("twice-");
 export const core = path.join(tmp, "core-repo");
 fs.mkdirSync(core);
 git(core, "init", "-q", "-b", "main");
-write(core, { "tasks/x.md": `# x\n\n${RULE}\n`, "docs/guide.md": GUIDE_OLD, "old/place.md": PLACE, "scripts/a.mjs": A, "scripts/b.mjs": B, "scripts/c.mjs": C, "scripts/c.json": `{ "v": 1 }\n`, "floor/security.md": FLOOR, "docs/safe.md": SAFE, "docs/extra.md": EXTRA, "scripts/run.sh": RUN, "docs/links.md": LINKS, "docs/far.md": FAR, "docs/ref.md": "# A reference\n\nThe guide stands at docs/guide.md, for whoever reads this file.\n", "gone.md": `${"A file the core took out. ".repeat(6)}\n` });
+write(core, { "tasks/x.md": `# x\n\n${RULE}\n`, "docs/guide.md": GUIDE_OLD, "old/place.md": PLACE, "scripts/a.mjs": A, "scripts/b.mjs": B, "scripts/c.mjs": C, "scripts/c.json": `{ "v": 1 }\n`, "floor/security.md": FLOOR, "docs/safe.md": SAFE, "docs/extra.md": EXTRA, "scripts/run.sh": RUN, "docs/zephyr-notes.md": LONE, "docs/quartz.md": STALE_OLD, "docs/ref.md": "# A reference\n\nThe guide stands at docs/guide.md, for whoever reads this file.\n", "gone.md": `${"A file the core took out. ".repeat(6)}\n` });
 git(core, "add", "-A"); git(core, "commit", "-qm", "earlier");
 export const earlier = git(core, "rev-parse", "HEAD");
 fs.rmSync(path.join(core, "gone.md"));
 fs.mkdirSync(path.join(core, "new"));
 fs.renameSync(path.join(core, "old/place.md"), path.join(core, "new/place.md"));
-write(core, { "docs/guide.md": GUIDE_NEW });
+write(core, { "docs/guide.md": GUIDE_NEW, "docs/quartz.md": STALE_NEW });
 git(core, "add", "-A"); git(core, "commit", "-qm", "pin");
 export const pin = git(core, "rev-parse", "HEAD");
 
@@ -58,7 +59,7 @@ export function project(name) {
     "CLAUDE.md": `# Claude\n\n${TWICE}\n\nIt reads core/old/place.md, core/gone.md and core/tasks/x.md, and docs/guide.md.\n`,
     "SECURITY.md": `# Security\n\n${RULE}\n`,
     "README.md": `# Read me\n\nThe guide: [the guide](docs/guide.md); the old place: core/old/place.md.\n`,
-    "docs/guide.md": GUIDE_OLD,
+    "docs/guide.md": GUIDE_OLD, "notes/zephyr-notes.md": LONE, "docs/quartz.md": STALE_OLD,
     "docs/notes.md": "# Notes\n\nSee [the guide](./guide.md), [again](guide.md), [by its reference][g] and <a href=\"guide.md\">by HTML</a>.\n\n[g]: guide.md\n",
     "tools/a.mjs": A, "tools/b.mjs": B,
     "lib/a.mjs": A, "lib/b.mjs": B.replace("41", "42"),

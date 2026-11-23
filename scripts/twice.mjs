@@ -7,16 +7,16 @@
 //     (core-owned.mjs, BEGIN to END) and the core's whole files, that is a copy of one of the copy's own Markdown files
 //     or of another of the project's, or reads close to one (twice-text.mjs, beside this file); listed;
 //   - a file outside the copy equal byte for byte to one of the core's, at the copy or, with the core fetched, at an
-//     earlier copy (the old pin and each release); it goes, its pointers moved to the copy's file, where it is Markdown
-//     a tool does not look for where it stands, one file of the copy stands for it, each relative link in it leads to the
-//     same bytes from the copy's file, no pointer to it is left that cannot be moved, and it is neither the floor's text
-//     nor a file the project's AGENTS.md calls a safety rule; else it is listed;
+//     earlier copy (the old pin and each release); it goes, and no pointer is moved for it, where no other file of the
+//     repository holds its name in any form (twice-files.mjs), it is Markdown a tool does not look for where it stands,
+//     and it is neither the floor's text nor a file the project's AGENTS.md calls a safety rule; else it is listed,
+//     with each file that names it;
 //   - a job that calls one of the core's workflows that another job calls too: the second of two in one workflow, the
 //     same in all but its name and named in no `needs:`, goes from a workflow of the project's own; any other is listed;
 //   - a pointer, in the project's own text, to a path of the copy that is not there: with the core fetched, one the
 //     core moved unchanged (a rename git finds whole, between an earlier copy and the copy) moves to where it stands;
 //     any other is listed.
-// The dated records (reports/, archive/) are not read, nor changed. It fails nothing (AGENTS.md of the core, "Nothing
+// The dated records (reports/, archive/) are not compared, nor changed; they are read only for a file's name. It fails nothing (AGENTS.md of the core, "Nothing
 // locks a project"); in the core's own repository, which holds no copy, it reads nothing. Node's own modules, git and
 // the YAML reader (parse-yaml.mjs); the files and pointers are read in twice-files.mjs, the text in twice-text.mjs.
 //
@@ -35,19 +35,18 @@ import { ownFiles } from "./own-files.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { fetchCore, inBare, releasesIn } from "./releases.mjs";
 import { started } from "./started.mjs";
-import { SKIP, exists, filesFound, listTree, pointerTo, pointersTo, safetyOf, textFiles } from "./twice-files.mjs";
+import { SKIP, filesFound, listTree, safetyOf, textFiles } from "./twice-files.mjs";
 import { textFound } from "./twice-text.mjs";
 
-export { blobId, filesFound, pointerTo, pointersTo } from "./twice-files.mjs"; // (the tests' way in)
+export { blobId, filesFound } from "./twice-files.mjs"; // (the tests' way in)
 
 
 // The pointers to paths of the copy that are not there: { file, line, path, to } where `to` is where the core moved it
 // unchanged (null where it did not, or it cannot be read).
 export function pointersFound(p) {
-  const re = new RegExp(`(?<![A-Za-z0-9._/-])${p.copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")}([A-Za-z0-9_][A-Za-z0-9._/-]*[A-Za-z0-9_/])`, "gu");
   const found = [];
   for (const { file, text } of textFiles(p)) {
-    for (const m of text.matchAll(re)) {
+    for (const m of text.matchAll(copyPaths(p))) {
       const at = m[1].replace(/\/$/u, "");
       if (p.copySet.has(at) || p.copyFolders.has(at)) continue;
       found.push({ file, line: text.slice(0, m.index).split("\n").length, path: `${p.copy}${at}`, to: p.moved.get(at) ? `${p.copy}${p.moved.get(at)}` : null });
@@ -55,6 +54,8 @@ export function pointersFound(p) {
   }
   return found;
 }
+// Each path of the copy a text names, as the copy's folder and the path after it.
+const copyPaths = p => new RegExp(`(?<![A-Za-z0-9._/-])${p.copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")}([A-Za-z0-9_][A-Za-z0-9._/-]*[A-Za-z0-9_/])`, "gu");
 
 // Each job that calls a workflow of the core's that another job calls too: { file, job, other, exact }, `exact` where it
 // is the second of two in one workflow of the project's own, the same in all but its name, needed by no job and named
@@ -145,8 +146,7 @@ export function findings(p) {
   const files = filesFound(p);
   for (const f of files) {
     const of = f.at === "the copy" ? `core's ${f.core}` : `core's ${f.core} at ${f.at}, an earlier copy`;
-    const why = f.why ?? "no one file of the copy stands for it as it stands";
-    out.push({ line: `${f.file} is the ${of}, byte for byte${f.to ? `: it goes, its pointers moved to ${f.to}` : `; ${why}, so it stays for the auditor`}`, fix: f.to ? { kind: "file", ...f } : null });
+    out.push({ line: `${f.file} is the ${of}, byte for byte${f.goes ? ": no file names it, so it goes" : `; ${f.why}, so it stays for the auditor`}`, fix: f.goes ? { kind: "file", ...f } : null });
   }
   for (const c of callsFound(p)) out.push({ line: `${c.file}: the job ${c.job} calls the core's ${c.name}, as ${c.other} does${c.exact ? ", the same in every input: it goes" : ""}`, fix: c.exact ? { kind: "call", ...c } : null });
   for (const q of pointersFound(p)) out.push({ line: `${q.file}:${q.line} names ${q.path}, which the copy does not hold${q.to ? `: the core moved it unchanged to ${q.to}, where it moves` : ""}`, fix: q.to ? { kind: "pointer", ...q } : null });
@@ -154,17 +154,12 @@ export function findings(p) {
   return out;
 }
 
-// The exact corrections made: each file that goes, its pointers moved; each call that goes; each pointer moved.
+// The exact corrections made: each file that goes; each call that goes; each pointer moved, in the form it was found.
 export function fix(p, found) {
-  const done = [], edits = new Map(), texts = textFiles(p);
+  const done = [], edits = new Map();
   const text = f => edits.has(f) ? edits.get(f) : p.own.read(f, true);
-  const move = (file, from, to) => { const now = text(file), moved = now.replace(pointersTo(file, from, exists(p)), pointerTo(file, from, to)); if (moved !== now) edits.set(file, moved); return moved !== now; };
   const gone = new Set(found.filter(f => f.fix?.kind === "file").map(f => f.fix.file));
-  for (const { fix: x } of found.filter(f => f.fix?.kind === "file")) {
-    for (const t of texts) if (!gone.has(t.file)) move(t.file, x.file, x.to);
-    fs.rmSync(path.join(p.root, x.file));
-    done.push(`${x.file} taken out, its pointers moved to ${x.to}`);
-  }
+  for (const f of gone) { fs.rmSync(path.join(p.root, f)); done.push(`${f} taken out`); }
   for (const { fix: x } of found.filter(f => f.fix?.kind === "call")) {
     const out = withoutJob(text(x.file), x.job);
     if (out === null) continue;
@@ -172,9 +167,10 @@ export function fix(p, found) {
     done.push(`${x.file}: the job ${x.job} taken out`);
   }
   for (const { fix: x } of found.filter(f => f.fix?.kind === "pointer" && !gone.has(f.fix.file))) {
-    if (move(x.file, x.path, x.to)) done.push(`${x.file}: ${x.path} moved to ${x.to}`);
+    const now = text(x.file), moved = now.replace(copyPaths(p), (s, at) => `${p.copy}${at}` === x.path ? x.to : s);
+    if (moved !== now) { edits.set(x.file, moved); done.push(`${x.file}: ${x.path} moved to ${x.to}`); }
   }
-  for (const [f, t] of edits) if (!gone.has(f)) fs.writeFileSync(path.join(p.root, f), t);
+  for (const [f, t] of edits) fs.writeFileSync(path.join(p.root, f), t);
   return [...new Set(done)];
 }
 

@@ -1,10 +1,10 @@
 // Tests what a project holds twice (scripts/twice.mjs; tasks/cleaning.md, "The reading asks what a project holds
 // twice"; #1087): on a scratch project holding each kind exactly and nearly, with a scratch core of two commits fetched
 // beside it, it lists each, corrects with --fix only what is exact (Markdown equal to the core's, at the copy or an
-// earlier one, taken out and its pointers moved; the second of two calls the same in every input; a pointer to a file
-// the core moved unchanged), lists the rest, code among it, for the auditor and changes nothing of it, reads no dated
-// record nor the core's part of a rule file, and run again finds nothing exact left. What --fix keeps because it cannot
-// follow it: tests/twice-kept-test.mjs; the scratch core and project: scripts/twice-scratch.mjs. Node's own modules and
+// earlier one, that no file names, taken out; the second of two calls the same in every input; a pointer to a file the
+// core moved unchanged), lists the rest, code and a file another names among it, for the auditor and changes nothing of
+// it, reads no dated record nor the core's part of a rule file, and run again finds nothing exact left. What --fix
+// keeps: tests/twice-kept-test.mjs; the scratch core and project: scripts/twice-scratch.mjs. Node's own modules and
 // git.
 //
 //   node tests/twice-test.mjs
@@ -13,9 +13,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
 import { closeness, unitsOf } from "../scripts/twice-text.mjs";
-import { findings, pointerTo, pointersTo, projectOf, report, withoutJob } from "../scripts/twice.mjs";
+import { findings, projectOf, report, withoutJob } from "../scripts/twice.mjs";
 import { root, tally } from "../scripts/scratch-core.mjs";
-import { A, FLOOR, NEAR, OTHER, RULE, SAFE, WORKFLOW, core, earlier, fetched, git, project, run, tmp, write } from "../scripts/twice-scratch.mjs";
+import { A, FLOOR, GUIDE_OLD, NEAR, OTHER, RULE, SAFE, WORKFLOW, core, earlier, fetched, git, project, run, tmp, write } from "../scripts/twice-scratch.mjs";
 
 const { ok, done } = tally();
 
@@ -24,21 +24,6 @@ const { ok, done } = tally();
   const u = unitsOf(`# T\n\n${RULE}\n${NEAR}\n\nShort line.\n\n\`\`\`\n${OTHER}\n\`\`\`\n| ${OTHER} |\n`);
   ok(u.length === 2 && u[0].line === 3 && u[1].line === 4, "each list item and paragraph is a unit, by the line it starts on; a code block, a table and a short line are none", JSON.stringify(u.map(x => x.line)));
   ok(closeness(u[0], u[1]) >= 0.6 && closeness(u[0], unitsOf(OTHER)[0]) < 0.6, "a near-copy reads close, an unrelated paragraph does not");
-}
-
-// The pointers a text holds to a path, and each moved in the form it stood in.
-{
-  const t = "docs/guide.md, ./guide.md, [x](guide.md), docs/guide.md.bak, mydocs/guide.md, [y](guide.mdx)";
-  const hits = t.match(pointersTo("docs/notes.md", "docs/guide.md"));
-  ok(JSON.stringify(hits) === JSON.stringify(["docs/guide.md", "./guide.md", "guide.md"]), "a pointer is the repository's path, a relative one opening with ./, or a link's target; a longer name is none", JSON.stringify(hits));
-  const moved = t.replace(pointersTo("docs/notes.md", "docs/guide.md"), pointerTo("docs/notes.md", "docs/guide.md", "core/docs/guide.md"));
-  ok(moved.startsWith("core/docs/guide.md, ../core/docs/guide.md, [x](../core/docs/guide.md)"), "each is moved in its own form", moved);
-  const wf = ".github/workflows/w.yml", cmd = "cat ./docs/guide.md";
-    const refs = "[a][g] and <img src='guide.md'>\n\n[g]: <guide.md>\n  [h]: guide.md \"t\"\n";
-  ok(refs.replace(pointersTo("docs/notes.md", "docs/guide.md"), "X") === "[a][g] and <img src='X'>\n\n[g]: <X>\n  [h]: X \"t\"\n", "a reference's definition and an HTML src are pointers, read from the file's folder", refs.replace(pointersTo("docs/notes.md", "docs/guide.md"), "X"));
-  ok(cmd.replace(pointersTo(wf, "docs/guide.md"), pointerTo(wf, "docs/guide.md", "core/docs/guide.md")) === "cat ./core/docs/guide.md", "in a workflow, the repository's path opening with ./ moves in that form");
-  const own = "See [it](guide.md) and docs/guide.md.";
-  ok(own.replace(pointersTo("app/notes.md", "guide.md", f => f === "app/guide.md"), "X") === own, "a path that, read from the caller's folder, names a file of its own there is no pointer to the root's", own.replace(pointersTo("app/notes.md", "guide.md", f => f === "app/guide.md"), "X"));
 }
 
 // A job taken out only where what is left reads as the workflow did without it.
@@ -51,11 +36,14 @@ const { ok, done } = tally();
 // The findings on the project, with the core fetched.
 {
   const dir = project("found");
-  const before = fs.readFileSync(path.join(dir, "AGENTS.md"), "utf8");
+  const before = fs.readFileSync(path.join(dir, "AGENTS.md"), "utf8"), notes = fs.readFileSync(path.join(dir, "docs/notes.md"), "utf8");
   const p = projectOf(dir, { fetched: path.join(core, ".git"), since: earlier });
   const found = findings(p), line = re => found.find(f => re.test(f.line));
   const exact = found.filter(f => f.fix).map(f => f.line), close = found.filter(f => !f.fix).map(f => f.line);
-  ok(line(/^docs\/guide\.md is the core's docs\/guide\.md at [0-9a-f]{7}, an earlier copy, byte for byte: it goes/u)?.fix, "a file equal to one of an earlier copy goes, its pointers moved to the copy's file", exact.join("\n"));
+  ok(line(/^docs\/quartz\.md is the core's docs\/quartz\.md at [0-9a-f]{7}, an earlier copy, byte for byte: no file names it, so it goes$/u)?.fix, "a file equal to one of an earlier copy, that no file names, goes", exact.join("\n"));
+  ok(line(/^notes\/zephyr-notes\.md is the core's docs\/zephyr-notes\.md, byte for byte: no file names it, so it goes$/u)?.fix, "a file equal to one of the copy's, that no file names, goes", exact.join("\n"));
+  const guide = line(/^docs\/guide\.md is the core's docs\/guide\.md at [0-9a-f]{7}, an earlier copy, byte for byte; (.+) name it, so it stays for the auditor$/u);
+  ok(guide && !guide.fix && ["README.md", "CLAUDE.md", "docs/notes.md", "core/docs/ref.md", "core/docs/guide.md"].every(f => guide.line.includes(f)), "a file another file names stays, listed with each file that names it, the copy's among them", close.join("\n"));
   ok(["tools/a.mjs", "tools/b.mjs", "lib/a.mjs", "tools/c.mjs"].every(f => line(new RegExp(`^${f.replace(".", "\\.")} .*it is no Markdown, which may be run or found where it stands`, "u")) && !line(new RegExp(`^${f}`, "u")).fix), "code equal to the copy's is listed for the auditor, never taken out", close.join("\n"));
   ok(line(/the job two calls the core's copies\.yml, as \.github\/workflows\/own\.yml#one does, the same in every input: it goes/u)?.fix, "the second of two calls the same in every input goes");
   ok(line(/the job three calls/u) && !line(/the job three calls/u).fix, "a call with other inputs is listed, not corrected");
@@ -66,17 +54,17 @@ const { ok, done } = tally();
   ok(line(/^AGENTS\.md:7 is a copy of CLAUDE\.md:3, the project's own/u), "the same rule twice in the project's own files is listed");
   ok(!found.some(f => /AGENTS\.md:5\b|reports\/|AGENTS\.md:1[01]\b/u.test(f.line)), "a paragraph of its own, a dated record and the core's part of a rule file are not listed", found.map(f => f.line).join("\n"));
   ok(line(/^floor\/security\.md .*the floor's text or a safety rule/u) && !line(/^floor\/security\.md/u).fix && line(/^docs\/safe\.md .*the floor's text or a safety rule/u) && !line(/^docs\/safe\.md/u).fix, "the floor's text, and a file the project's AGENTS.md calls a safety rule, never go, even byte for byte", close.join("\n"));
-  ok(line(/^docs\/extra\.md .*\.github\/workflows\/core-made\.yml names it in a form the script cannot move, or is a file it does not write/u) && !line(/^docs\/extra\.md/u).fix, "a file a workflow of the core's names stays, since that pointer cannot be moved", close.join("\n"));
-  ok(found.filter(f => f.fix).length === 4, "four are exact, the pointers moved counted one by one", exact.join("\n"));
+  ok(line(/^docs\/extra\.md .*; \.github\/workflows\/core-made\.yml, .* name it, so it stays/u) && !line(/^docs\/extra\.md/u).fix, "a file a workflow of the core's names stays", close.join("\n"));
+  ok(found.filter(f => f.fix).length === 5, "five are exact, the pointers moved counted one by one", exact.join("\n"));
 
   const fixed = run(dir, "--fix", ...fetched);
   ok(fixed.status === 0 && /Corrected, for a pull request of its own/u.test(fixed.stdout), "--fix says what it corrected", fixed.stdout + fixed.stderr);
   const read = f => fs.existsSync(path.join(dir, f)) ? fs.readFileSync(path.join(dir, f), "utf8") : null;
-  ok(read("docs/guide.md") === null && read("tools/a.mjs") === A && read("lib/a.mjs") === A, "the exact file went, and code stayed for the auditor");
-  ok(read("README.md").includes("[the guide](core/docs/guide.md)") && read("README.md").includes("core/new/place.md") && read("docs/notes.md").includes("[the guide](../core/docs/guide.md), [again](../core/docs/guide.md)") && read("docs/notes.md").includes('<a href="../core/docs/guide.md">') && read("docs/notes.md").includes("[g]: ../core/docs/guide.md"), "their pointers moved, each in its form", read("README.md") + read("docs/notes.md"));
+  ok(read("docs/quartz.md") === null && read("notes/zephyr-notes.md") === null && read("tools/a.mjs") === A && read("lib/a.mjs") === A, "the files no file names went, and code stayed for the auditor");
+  ok(read("docs/guide.md") === GUIDE_OLD && read("README.md").includes("[the guide](docs/guide.md)") && read("README.md").includes("core/new/place.md") && read("docs/notes.md") === notes, "a file named stays, and no pointer to it is moved", read("README.md") + read("docs/notes.md"));
   ok(read(".github/workflows/build.yml").includes("run: node tools/a.mjs") && read("run.mjs").includes(`from "./tools/a.mjs"`) && read("floor/security.md") === FLOOR && read("docs/safe.md") === SAFE, "what runs code still runs the project's; the floor and a safety rule stay", read(".github/workflows/build.yml"));
   ok(!read(".github/workflows/own.yml").includes("  two:") && read(".github/workflows/own.yml").includes("  three:"), "the second call went, the other stayed");
-  ok(read("CLAUDE.md").includes("core/new/place.md") && read("CLAUDE.md").includes("core/gone.md") && read("CLAUDE.md").includes("core/docs/guide.md."), "a pointer moved, one to a file gone stays", read("CLAUDE.md"));
+  ok(read("CLAUDE.md").includes("core/new/place.md") && read("CLAUDE.md").includes("core/gone.md") && read("CLAUDE.md").includes(" docs/guide.md."), "a pointer moved, one to a file gone stays", read("CLAUDE.md"));
   ok(read("AGENTS.md") === before && read("reports/2026-11-01.md").includes("core/gone.md"), "no rule's text and no dated record is changed");
   const again = run(dir, ...fetched);
   ok(!/Exact, which/u.test(again.stdout) && /For the auditor/u.test(again.stdout), "run again it finds nothing exact left", again.stdout);

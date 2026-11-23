@@ -128,7 +128,9 @@ code is held to: `tasks/code-shape.md`.
   outside the copy equal to one of the core's, at the copy or an earlier one; a call of one of the core's workflows made
   twice; a pointer to a path the core has left), and its `--fix`, run by the session that takes the reading's task in a
   pull request of its own that the usual reviews read, corrects only what is exact: Markdown equal byte for byte to one
-  of the core's goes, its pointers moved to the copy's; the second of two calls the same in every input goes; a pointer
+  of the core's goes where no other file of the repository holds its name in any form (its file name without the
+  extension, in any case, after percent-encoding and character references are decoded), and no pointer is moved for
+  it, else it is listed with each file that names it; the second of two calls the same in every input goes; a pointer
   to a file the core moved unchanged moves to where it stands. Then the auditor answers, for each finding the script did
   not settle, the same, stricter or narrower, different, contradicting, or unsure, with its evidence, by meaning and
   intent. The session then takes out what says the same, the core's text or the one place kept for it standing; keeps
