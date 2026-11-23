@@ -12,7 +12,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
 import { BEGIN, END } from "../scripts/core-owned.mjs";
-import { closeness, findings, pointerTo, pointersTo, projectOf, report, unitsOf, withoutJob } from "../scripts/twice.mjs";
+import { closeness, unitsOf } from "../scripts/twice-text.mjs";
+import { findings, pointerTo, pointersTo, projectOf, report, withoutJob } from "../scripts/twice.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();

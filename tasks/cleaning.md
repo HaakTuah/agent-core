@@ -137,8 +137,8 @@ code is held to: `tasks/code-shape.md`.
   declared so on its owner's word, or takes it out; takes out a check the core's covers whole and notes one that covers
   more; and gives an unsure one to the stand-in, and to the owner where it stays unsure. It does not mean that a rule
   goes for a likeness of words, that a script decides by meaning or takes out a rule's text, that a rule of the
-  project's that adds to the core's goes, nor that a rule the project's `AGENTS.md` marks as a safety rule, or the
-  floor's text, goes without its owner's word. Reason: a project that held its own rules before it took the core keeps
+  project's that adds to the core's goes, nor that the floor's text, or a project rule its `AGENTS.md` calls a safety
+  rule, goes without its owner's word. Reason: a project that held its own rules before it took the core keeps
   rules the core now holds, read twice by every session, and they drift apart. Held, for the script, by
   `tests/twice-test.mjs`, on a project holding each kind exactly and nearly; for the rest, by the reading's record and
   its step, and by the reviews of each pull request that takes out or moves anything.
