@@ -124,20 +124,19 @@ ok(asksBetween("f".repeat(40), c3, dir) === null, "notes that cannot be read giv
   ok(asksBetween(filed, foldered, bare).length === 0, "a sync across the notes' move into a folder asks nothing the file did not hold", asksBetween(filed, foldered, bare).join("\n"));
   ok(asksBetween(filed, gained, bare).join("|") === three && asksBetween(foldered, gained, bare).join("|") === three, "an entry the folder gains is asked, from a commit before the move or after it");
   ok(entries(notesAt(gained, args => git(notes, ...args))).join("|") === [one, three, two].join("|"), "the notes read whole at a commit hold the folder's entries in the order of the files' names");
-  // (#1094: an entry whose step says it asks nothing of what stands is read as such at the commit, by its step's file of
-  // the same name; one whose step says nothing, or a commit with no steps, gives none)
-  const quietRev = save({ "scripts/steps/015-third.mjs": `export default { lead: "Third", cost: "x", ${QUIET}, unread: "it asks nothing" };\n`, "scripts/steps/010-first.mjs": "export default { lead: \"First\", cost: \"x\", unread: \"\" };\n" });
+  // (#1094: an entry asks nothing where its step of the same name says so, at the commit read)
+  const quietRev = save({ "scripts/steps/015-third.mjs": `export default { lead: "Third", cost: "x", ${QUIET}, unread: "-" };\n`, "scripts/steps/010-first.mjs": "export default { lead: \"First\", cost: \"x\", unread: \"\" };\n" });
   const run = args => inBare(bare, args);
   fetchCore(bare, notes);
-  ok([...quietAt(quietRev, run)].join("|") === three && quietAt(gained, run).size === 0 && quietAt("f".repeat(40), run).size === 0, "the entries that ask nothing are those whose step says so, at the commit read", [...quietAt(quietRev, run)].join("|"));
+  ok([...quietAt(quietRev, run)].join("|") === three && !quietAt(gained, run).size && !quietAt("f".repeat(40), run).size, "the entries that ask nothing are those whose step says so", [...quietAt(quietRev, run)].join("|"));
   ok(quiet(`export default { lead: "T", ${QUIET} };`) && quiet(`export default {\n  lead: "T",\n  ${QUIET},\n};`) && !quiet(`// (it once said ${QUIET})\nexport default { lead: "T", check };`) && !quiet(`export default { lead: "T", check }, // ${QUIET}`) && !quiet(`export default { unread: "it ${QUIET}" };`),
-    "a step asks nothing where its object has the field, never where the words stand in a comment or in another field's text");
+    "a step asks nothing by its field, never by a comment or another field's words");
   const left = asksLeft(filed, quietRev, bare);
-  ok(left.asks.length === 0 && left.quiet === 1 && asksLeft(filed, gained, bare).asks.join("|") === three && asksLeft("f".repeat(40), quietRev, bare) === null, "the report a sync prints leaves out an entry whose step asks nothing, and counts it; one that cannot be read gives no all-clear", JSON.stringify(left));
-  // (the core's own: a step that asks nothing says so in the one form quietAt reads, and has neither a check nor a writer)
-  const here = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), stepFiles = fs.readdirSync(path.join(here, "scripts/steps")).filter(f => f.endsWith(".mjs")).sort();
-  const wrong = STEPS.filter((st, k) => (st.asks !== undefined && st.asks !== "nothing") || (st.asks === "nothing") !== quiet(fs.readFileSync(path.join(here, "scripts/steps", stepFiles[k]), "utf8")) || (st.asks && (st.check || st.write)));
-  ok(STEPS.filter(st => st.asks).length >= 9 && !wrong.length, `each step that asks nothing of what stands says \`${QUIET}\` as it is written, and has no check and no writer`, wrong.map(st => st.lead).join("\n"));
+  ok(!left.asks.length && left.quiet === 1 && asksLeft(filed, gained, bare).asks.join("|") === three && asksLeft("f".repeat(40), quietRev, bare) === null, "a sync's report leaves out and counts an entry that asks nothing; notes it cannot read give no all-clear", JSON.stringify(left));
+  // (the core's own steps that ask nothing)
+  const sd = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/steps"), stepFiles = fs.readdirSync(sd).filter(f => f.endsWith(".mjs")).sort();
+  const wrong = STEPS.filter((st, k) => ![undefined, "nothing"].includes(st.asks) || (st.asks === "nothing") !== quiet(fs.readFileSync(path.join(sd, stepFiles[k]), "utf8")) || (st.asks && (st.check || st.write)));
+  ok(STEPS.filter(st => st.asks).length >= 9 && !wrong.length, `each step that asks nothing says \`${QUIET}\`, and has no check or writer`, wrong.map(st => st.lead).join("\n"));
   // (a copy older than the folder syncs with its own script, whose reader took the lines a diff of the file alone
   // added: across the move it reads the notice the core's file holds, which sends the session to the folder)
   const notice = entries(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", NOTES), "utf8"));
