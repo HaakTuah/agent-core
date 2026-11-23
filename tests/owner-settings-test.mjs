@@ -82,6 +82,12 @@ try {
   fs.renameSync(path.join(at, "core-aside"), path.join(root, "core"));
   ok(statesOf(all, root)["security-review-required"].given === null && /^not read: /.test(statesOf(all, root)["security-review-required"].said), "a call landed while the core stands in the working tree alone: not read, never asked for");
   land();
+  execFileSync("git", ["tag", "refs/remotes/origin/trunk", "HEAD"], { cwd: root, env });
+  const branchOf = name => statesOf({ ...all, repo: { body: { ...all.repo.body, default_branch: name } } }, root)["security-review-required"];
+  ok(/^not read: `trunk` is not fetched here/.test(branchOf("trunk").said), "a default branch not fetched, though a tag bears its remote's name: not read, the tag never taken for the branch", branchOf("trunk").said);
+  let odd;
+  try { odd = branchOf("ma\u0000in"); } catch (e) { odd = { said: String(e) }; }
+  ok(/^not read: /.test(odd.said), "a default branch whose name holds a control sign: not read, and the checklist goes on", odd.said);
   review(`jobs:\n  security-review:\n    uses: ${CORE}/.github/workflows/security-review.yml@${"a".repeat(40)}\n`);
   const privately = { ...all, repo: { body: { ...all.repo.body, private: true } } };
   s = statesOf(privately, root);

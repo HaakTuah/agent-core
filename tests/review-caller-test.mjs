@@ -35,6 +35,7 @@ ok(callsPosting(call("").replace("  queue:\n", "  Queue:\n  queue:\n").replace("
 ok(callsPosting(call("").replaceAll(CORE, "someone/agent-core"), true, has) === null, "a call of a workflow of the same name in another repository: not known");
 ok(callsPosting(call("").replace(`queue-only.yml@`, `x/queue-only.yml@`), true, has) === null, "a call of the core's by a path the core has not: not known");
 ok(callsPosting(call("").replaceAll(CORE, CORE.toLowerCase()), true, has) === true, "the core's repository named in another case, which GitHub finds: posting");
+ok(callsPosting(call("").replaceAll(CORE, CORE.replace(/k/i, "\u212a")), true, has) === null, "the core's repository named with a sign that lowers to a letter (the Kelvin sign), which GitHub does not find: not known");
 for (const [from, to, said] of [["/.github/workflows/queue-only", "/.GITHUB/workflows/queue-only", "a folder"], ["/.github/workflows/queue-only", "/.github/Workflows/queue-only", "a folder"], ["queue-only.yml@", "Queue-Only.yml@", "a workflow's name"]]) {
   let got;
   try { got = callsPosting(call("").replace(from, to), true, has); } catch (e) { got = e; }

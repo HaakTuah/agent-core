@@ -112,7 +112,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      on every pull request and on its comments, as the kit's (no filter of branches or paths; a pull request's types named, holding the
      kit's four, and a comment's holding created and edited; its job run whatever the job it needs did; in the kit's form
      alone, each job a call of the core's two workflows granted what it asks and given only the inputs it defines, each
-     of its type, a boolean plainly so, needing only those jobs and none itself, no two named alike but for case, and no other key of a job or the file, `concurrency` among them; the core's repository named, its path exact, and the review's `root` a plain relative path that holds the core's Node version and the check's script), in a private repository giving `private: true` or `advisory: false`, each file read from the default branch as last fetched (by git):
+     of its type, a boolean plainly so, needing only those jobs and none itself, no two named alike but for case, and no other key of a job or the file, `concurrency` among them; the core's repository named, its path exact, and the review's `root` a plain relative path that holds the core's Node version and the check's script), in a private repository giving `private: true` or `advisory: false`, each file read from the default branch as last fetched (its ref exactly):
      64 MB of it, a regular file, no link or submodule followed, and read as YAML by `scripts/parse-yaml.mjs`, at most its 256 K characters, what it
      cannot read said unread, never not for the project);
      limits: 60 s for each of the workflow check's two tools on one file

@@ -87,13 +87,16 @@ function rulesetOf(host, rules) {
 // runs that branch's copy of the core, whatever a pull request holds (its workflow checks the default branch out): a
 // regular file's text by its path from the project's root, null where the branch holds none there (a link, a folder, a
 // submodule's commit or a file past READ_MOST among them); and null in place of the reader where that branch was never
-// fetched here, or `root` holds no repository of its own.
+// fetched here (that ref exactly, never a name git would guess at), its name holds a control sign, or `root` holds no
+// repository of its own.
 function onBranch(root, branch) {
   const ref = `refs/remotes/origin/${branch}`, env = { ...plainEnv(), GIT_LITERAL_PATHSPECS: "1" };
   const git = (...a) => spawnSync("git", ["--no-replace-objects", ...a], { cwd: root, encoding: "utf8", maxBuffer: READ_MOST + 1024, env });
-  if (typeof branch !== "string" || !fs.existsSync(path.join(root, ".git")) || git("check-ref-format", ref).status !== 0 || git("rev-parse", "--verify", "-q", `${ref}^{commit}`).status !== 0) return null;
+  if (typeof branch !== "string" || /[\u0000-\u001f\u007f]/.test(branch) || !fs.existsSync(path.join(root, ".git")) || git("check-ref-format", ref).status !== 0) return null;
+  const sha = git("show-ref", "--verify", "-s", ref).stdout?.trim();
+  if (!/^[0-9a-f]{40,64}$/.test(sha ?? "") || git("cat-file", "-e", `${sha}^{commit}`).status !== 0) return null;
   return f => {
-    const r = git("ls-tree", "-z", "-l", "--full-tree", ref, "--", f), m = /^(?:100644|100755) blob ([0-9a-f]+) +(\d+)\t([^\0]*)\0$/.exec(r.stdout ?? "");
+    const r = git("ls-tree", "-z", "-l", "--full-tree", sha, "--", f), m = /^(?:100644|100755) blob ([0-9a-f]+) +(\d+)\t([^\0]*)\0$/.exec(r.stdout ?? "");
     if (r.status !== 0 || !m || m[3] !== f || Number(m[2]) > READ_MOST) return null;
     const b = git("cat-file", "blob", m[1]);
     return b.status === 0 ? b.stdout : null;

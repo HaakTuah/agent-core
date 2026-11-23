@@ -32,8 +32,9 @@ const INPUTS = { "security-review": { advisory: "boolean", root: "string", priva
 const LEVEL = { read: 1, write: 2 };
 // Which of the two `uses` calls in the core's own repository, whose asks and inputs are those above, or null: a
 // workflow of the same name in any other repository is not read, nor what it asks. Its owner and name are matched as
-// GitHub matches them, whatever their case, and the path in it exactly, as GitHub finds a file.
-const CALL = /^([^/@]+\/[^/@]+)\/\.github\/workflows\/(security-review|queue-only)\.yml@[\w./-]+$/;
+// GitHub matches them, whatever their case (in letters of ASCII alone, as GitHub names an account and a repository,
+// since a sign such as the Kelvin sign lowers to one), and the path in it exactly, as GitHub finds a file.
+const CALL = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/\.github\/workflows\/(security-review|queue-only)\.yml@[\w./-]+$/;
 const callOf = uses => { const m = typeof uses === "string" && CALL.exec(uses); return m && m[1].toLowerCase() === CORE.toLowerCase() ? m[2] : null; };
 const keysIn = (o, allowed) => o !== null && typeof o === "object" && !Array.isArray(o) && Object.keys(o).every(k => allowed.includes(k));
 
