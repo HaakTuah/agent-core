@@ -2,7 +2,7 @@
 
 Read at its start by the role `auditor`: a session that reads what stands in a project, which it built none of, and
 answers its questions: the audit of how the code is put together and of its tests, and the reading of the project
-against the core (`tasks/cleaning.md`), and the answers on a project's own rules, which the core's `AGENTS.md` asks
+against the core, with what the project holds twice or against it (`tasks/cleaning.md`), and the answers on a project's own rules, which the core's `AGENTS.md` asks
 (#662). Each keeps its own questions, which the auditor's brief gives.
 
 **Reads at its start:** `roles/shared/how-to-work.md`.
