@@ -18,7 +18,9 @@
 // one written to look so (unsigned, signed by another key, or with a certificate made to look like GitHub's) fails, and so does every merge's author where the key
 // cannot be fetched; only in a commit of the base's, though the event
 // names an older base; a term only in the copyright lines of LICENSE and NOTICE of their shape, at the root and in the
-// core's copy (#257); and a repository without the secret. What Betterleaks, which matches the terms (#579), would read
+// core's copy (#257); and a repository without the secret. The address in a commit's author and committer line (#460,
+// point 2), with the secret or without: an address that is no no-reply one fails, one that only looks like one too; a
+// no-reply one passes, as does one only in a commit main holds, and one of a merge GitHub made under a profile above. What Betterleaks, which matches the terms (#579), would read
 // otherwise fails all the same: a file of text that begins as an archive or a PDF does, a line marked for it to pass
 // over, a term beside its ignore and config files, a term holding a pattern's characters, matched as listed, a file
 // whose name puts a binary type's mark where it reads one, a term on any line of a long run or across a long line's
@@ -45,7 +47,10 @@ const [term, other, wide] = [["qz", "vk", "wy"], ["xj", "qq", "zf"], ["zÃ§", "qÃ
 const TERMS = `${term}\n${other}\n${wide}\n`;
 const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$)/i.test(name)));
 Object.assign(env, { GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_DATE: "2026-11-13T12:00:00Z", GIT_COMMITTER_DATE: "2026-11-13T12:00:00Z" });
-const ME = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+// (the host's no-reply domain, and an invented account's address in it, which the address step passes: #460, point 2)
+const NOREPLY = ["users", "noreply", "github", "com"].join(".");
+const MINE = `${["0", "a-scratch-builder"].join("+")}@${NOREPLY}`;
+const ME = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: MINE, GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: MINE };
 const git = (dir, args, extra = {}) => execFileSync("git", args, { cwd: dir, env: { ...env, ...ME, ...extra }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const AS_GITHUB = { GIT_COMMITTER_NAME: "GitHub", GIT_COMMITTER_EMAIL: "noreply@github.com" };
 // GitHub's own signing key, stood in for by one made here, which a stand-in for curl serves as the check fetches it;
@@ -130,11 +135,11 @@ passes("deleting a file named with a term before the rule", cleanup(dir => git(d
 passes("renaming such a file to a clean name", cleanup(dir => git(dir, ["mv", `old-${term}.md`, "old.md"])));
 fails("a term in a commit's message", pull([[{ "b.md": "x\n" }, {}, `fix for ${term}`]]));
 fails("a term in a commit's author name", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]));
-fails("a term in a commit's author address", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `${other}@example.invalid` }]]));
+fails("a term in a commit's author address", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `${other}@${NOREPLY}` }]]));
 fails("a term in a commit's committer name", pull([[{ "b.md": "x\n" }, { GIT_COMMITTER_NAME: term }]]));
 // a name the machine's git writes into every commit fails in a private repository too, and the failure says how the
 // session mends the pull request itself (core archive 202), naming both commits
-const named = check(pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}`, GIT_COMMITTER_EMAIL: `${other}@example.invalid` }], [{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]), { isPrivate: true });
+const named = check(pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}`, GIT_COMMITTER_EMAIL: `${other}@${NOREPLY}` }], [{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]), { isPrivate: true });
 ok(!named.passed && mended(named.out) && /Mend: on the machine that made them/.test(named.out) && /--reset-author/.test(named.out) && (named.out.split(/author or committer \(name or address\), below\.[^\n]*\n/u)[1]?.split("\n")[0].match(/\b[0-9a-f]{7,}\b/g) ?? []).length === 2 && ![term, other, wide].some(t => named.out.includes(t)),
   "a term in commits' author or committer fails in a private repository too, both commits named, the mend said and the term never printed", named.out);
 // a merge of main into the branch, as "update branch" makes it (GitHub's) or as a person does
@@ -191,6 +196,38 @@ if (gpg) {
   fails("a commit that is no merge GitHub signed, under an author no merge of GitHub's on main carries (as its API takes one)", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]]));
 }
 fails("a commit that is no merge, with a term in its author, committed as GitHub but not signed", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...AS_GITHUB }]]));
+// The address in each commit's author and committer line (#460, point 2), read with no secret too: a no-reply one
+// passes, any other fails saying the mend, the commit and its line named and the address never printed; a commit main
+// already holds is never read; a commit GitHub itself made under a profile it wrote on main is excepted, as for the
+// terms, and one written to look so is not. Each address invented.
+const personal = ["someone", "example.invalid"].join("@");
+const addressFails = (what, repo, line, opts = {}) => {
+  for (const terms of ["", TERMS]) {
+    const r = check(repo, { terms, ...opts });
+    ok(!r.passed && mended(r.out) && /is not a no-reply one/.test(r.out) && new RegExp(`\\b[0-9a-f]{7,} ${line}\\b`).test(r.out) && !r.out.includes(personal.split("@")[1]),
+      `${what} fails${terms ? "" : " with no secret set"}, its commit and line named, the address never printed`, r.out);
+  }
+};
+const addressPasses = (what, repo) => { for (const terms of ["", TERMS]) passes(`${what}${terms ? "" : ", with no secret set,"}`, repo, { terms }); };
+addressPasses("commits under an account's no-reply address, with its id or without, a bot's, GitHub's own and Claude Code's, any letter case",
+  pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `a-builder@${NOREPLY}`, GIT_COMMITTER_EMAIL: `12+Some-Bot[bot]@${NOREPLY.toUpperCase()}` }],
+    [{ "c.md": "y\n" }, { GIT_AUTHOR_EMAIL: ["noreply", "anthropic.com"].join("@"), GIT_COMMITTER_EMAIL: ["noreply", "github.com"].join("@") }]]));
+addressFails("an author's address that is no no-reply one", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: personal }]]), "author");
+addressFails("a committer's address that is no no-reply one", pull([[{ "b.md": "x\n" }], [{ "c.md": "y\n" }, { GIT_COMMITTER_EMAIL: personal }]]), "committer");
+addressFails("an address that only looks like the host's no-reply one", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `someone@${NOREPLY}.example.invalid` }]]), "author");
+addressFails("an account's no-reply address with more than its id before the login", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `someone+1@${NOREPLY}` }]]), "author");
+addressPasses("a personal address only in a commit main already holds", pull([[{ "b.md": "x\n" }]], [[{ "c.md": "y\n" }, { GIT_AUTHOR_EMAIL: personal, GIT_COMMITTER_EMAIL: personal }, "on main"]]));
+{
+  const both = check(pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_EMAIL: personal }]]));
+  ok(!both.passed && mended(both.out) && /is not a no-reply one/.test(both.out) && /in these files/.test(both.out), "a personal address and a term together each fail, the terms read though the address failed", both.out);
+}
+if (gpg) {
+  // (a merge GitHub made into the branch under the profile it wrote on a merge of main's, its address that profile's)
+  const profiled = committer => pull([[{ "b.md": "x\n" }], [dir => { git(dir, ["merge", "-q", "--no-ff", "--no-edit", "main"], { GIT_AUTHOR_NAME: "Someone", GIT_AUTHOR_EMAIL: personal, ...committer }); }]],
+    [...onMain, [dir => { git(dir, ["checkout", "-q", "-b", "side"]); commitAll(dir, [{ "side.md": "s\n" }]); git(dir, ["checkout", "-q", "main"]); git(dir, ["merge", "-q", "--no-ff", "--no-edit", "side"], { GIT_AUTHOR_NAME: "Someone", GIT_AUTHOR_EMAIL: personal, ...GITHUB }); }, {}, "after that merge"]]);
+  addressPasses("a merge GitHub itself made into the branch under the profile it wrote on a merge of main's, whatever its address (floor rule 11's exception)", profiled(GITHUB));
+  addressFails("such a merge written to look like GitHub's, committed as GitHub but not signed", profiled(AS_GITHUB), "author");
+}
 // a merge resolved by hand: the lines its resolution adds are read
 const resolved = pull([[{ "a.md": "one\nmine\nthree\n" }], [dir => {
   try { git(dir, ["merge", "-q", "--no-edit", "main"]); } catch { /* (the conflict, resolved below) */ }

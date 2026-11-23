@@ -29,8 +29,9 @@
 # by its sums (floor rule 7), each term a rule of its own written as the job runs and removed with it, letter case aside,
 # nothing of the scanner's own rules, ignore files, inline marks, decoding or archives used (#579; INVENTORY.md); where
 # it could not be fetched (no network to its releases, or no pin below for the machine's system) the check fails, saying
-# how to mend it. Without the secret (a fork, Dependabot, a project that has not set it) it passes with a note that nothing
-# was checked: the check is optional. It checks this repository, and every project that takes the core calls it (workflow_call), pinned to a full
+# how to mend it. Without the secret (a fork, Dependabot, a project that has not set it) the terms pass with a note that
+# none was looked for: that part is optional. Its step before it, which needs no secret, fails a commit of the pull
+# request's own whose author's or committer's address is no no-reply one (#460, point 2), save GitHub's own as above. It checks this repository, and every project that takes the core calls it (workflow_call), pinned to a full
 # commit SHA (README.md, point 5), passing only that secret: the caller's event, checkout and token are the caller's own.
 name: Personal terms
 
@@ -115,8 +116,68 @@ jobs:
           fi
           echo "Betterleaks $version: $store/$bl, its SHA-256 $sum"
           { echo "path=$store/$bl"; echo "sum=$sum"; } >> "$GITHUB_OUTPUT"
-      - name: Look for personal terms
+      # (the address in each commit's author and committer line (floor rule 11; #460, point 2): of the pull request's
+      # own commits, as the step after reads them, each address is the host's no-reply one, the account's
+      # (<login>@users.noreply.github.com, its id and "+" before it where the account has one, a bot's "[bot]" after
+      # it), GitHub's own (noreply@github.com) or an agent tool's own (noreply@anthropic.com, which Claude Code writes),
+      # none of them anyone's personal address; save a commit GitHub itself made under a profile it writes on the base's
+      # side, which rule 11 excepts and the step after leaves out too, so it reads this step's list. It needs no secret,
+      # so it runs in every pull request; a commit main already holds is never read, since history is not rewritten.
+      # It prints the commit and which line, never the address)
+      - name: Look for personal addresses in commits
+        id: addresses
         env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -z "$BASE" ]; then echo "Not a pull request, so no commit's address was read."; exit 0; fi
+          work="$RUNNER_TEMP/commit-addresses"; rm -rf "$work"; mkdir -p -m 700 "$work" || exit 1
+          # (the pull request's own commits, as the step after takes them: GitHub's merge of it into its base checked
+          # out, whose first parent is the base's side and is left out, with that merge itself)
+          side=$BASE head=HEAD; if git rev-parse -q --verify 'HEAD^2' > /dev/null; then side=HEAD^1 head=HEAD^2; fi
+          commits=$(git rev-list "$BASE..$head" "^$side") || { echo "FAIL git could not list this pull request's commits. Mend: run the check again; where it fails again, report it to the core (core/README.md, \"Reporting to the core\")."; exit 1; }
+          # (GitHub's own signing key, from GitHub itself, in a keyring of this run's alone: a commit counts as GitHub's
+          # only where its committer is GitHub and an OpenPGP signature on it is good by a key of that keyring, named
+          # by its fingerprint; git's other signature formats, which may carry their own certificate, are read by no
+          # program, so one written by hand to look so does not)
+          keys="$work/github-keys"; mkdir -p -m 700 "$keys"
+          if ! curl -fsS --max-time 30 --retry 3 https://github.com/web-flow.gpg | GNUPGHOME="$keys" gpg -q --batch --import 2> /dev/null; then
+            echo "::notice::GitHub's signing key could not be fetched, so no commit is taken for one GitHub made: re-run the check"
+          fi
+          github=$(GNUPGHOME="$keys" gpg --batch --with-colons --list-keys 2> /dev/null \
+            | awk -F: '$1 == "pub" { p = 1; next } p && $1 == "fpr" { print $10; p = 0 }')
+          made() {
+            local sig
+            [ "$(git log -1 --format='%cn <%ce>' "$1")" = "GitHub <noreply@github.com>" ] && [ -n "$github" ] \
+              && sig=$(GNUPGHOME="$keys" git -c gpg.program=gpg -c gpg.x509.program=false -c gpg.ssh.program=false \
+                       log -1 --format='%G? %GP' "$1" 2> /dev/null) \
+              && printf '%s\n' "$github" | sed 's/^/G /; p; s/^G /U /' | grep -q -x -F -e "$sig"
+          }
+          # (the profiles GitHub writes as the author of what it made on the base's side, each pull request's merge or
+          # squash into main: a commit it made on the pull request's side, a merge or an edit on github.com, is
+          # GitHub's only under one of them, since one made through GitHub's API takes whatever author its caller names)
+          profiles=$(for m in $(git rev-list --max-count=100 --committer='noreply@github.com' "$side"); do
+            made "$m" && git log -1 --format='%an <%ae>' "$m"; done | sort -u)
+          form='^(([0-9]+[+])?[a-z0-9][a-z0-9-]{0,38}(\[bot\])?@users[.]noreply[.]github[.]com|noreply@github[.]com|noreply@anthropic[.]com)$'
+          own= bad=
+          for c in $commits; do
+            if made "$c" && printf '%s\n' "$profiles" | grep -q -x -F -e "$(git log -1 --format='%an <%ae>' "$c")"; then own+="$c "; continue; fi
+            short=$(git rev-parse --short "$c")
+            git log -1 --format='%ae' "$c" | LC_ALL=C grep -q -i -x -E "$form" || bad+="$short author"$'\n'
+            git log -1 --format='%ce' "$c" | LC_ALL=C grep -q -i -x -E "$form" || bad+="$short committer"$'\n'
+          done
+          echo "made=$own" >> "$GITHUB_OUTPUT"
+          rm -rf "$work"
+          if [ -n "$bad" ]; then
+            echo "FAIL These commits' author or committer address is not a no-reply one (below: the commit and which line), so it may be someone's personal address (floor rule 11). Mend: on the machine that made them, set git's address in this repository to the account's no-reply address (git config user.email <the address under Settings, Emails, ending @users.noreply.github.com>), or to the agent tool's own (noreply@anthropic.com for Claude Code), rewrite this pull request's commits with it (git rebase --exec 'git commit --amend --no-edit --reset-author' origin/main) and push the branch again (git push --force-with-lease). main is never rewritten."
+            printf '%s' "$bad"; exit 1
+          fi
+          echo "Every commit of this pull request is under a no-reply address."
+      # (run where the step before failed too, so that a pull request is read for both at once; GitHub's own commits are
+      # those that step lists, none where it stopped before listing them)
+      - name: Look for personal terms
+        if: ${{ !cancelled() }}
+        env:
+          MADE: ${{ steps.addresses.outputs.made }}
           TERMS: ${{ secrets.PERSONAL_TERMS }}
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}
@@ -287,36 +348,13 @@ jobs:
             side=$BASE head=HEAD; if git rev-parse -q --verify 'HEAD^2' > /dev/null; then side=HEAD^1 head=HEAD^2; fi
             commits=$(git rev-list "$BASE..$head" "^$side")
             rewrite="Mend: rewrite those commits without it, though a later one took it away, since merging keeps every commit (git rebase -i origin/main, a message reworded, a commit edited), and push the branch again (git push --force-with-lease); main is never rewritten."
-            # (GitHub's own signing key, from GitHub itself, in a keyring of this run's alone: a merge counts as GitHub's
-            # only where its committer is GitHub and an OpenPGP signature on it is good by a key of that keyring, named
-            # by its fingerprint; git's other signature formats, which may carry their own certificate, are read by no
-            # program, so one written by hand to look so does not)
-            keys="$work/github-keys"; mkdir -p -m 700 "$keys"
-            if ! curl -fsS --max-time 30 --retry 3 https://github.com/web-flow.gpg | GNUPGHOME="$keys" gpg -q --batch --import 2> /dev/null; then
-              echo "::notice::GitHub's signing key could not be fetched, so no commit is taken for one GitHub made: re-run the check"
-            fi
-            github=$(GNUPGHOME="$keys" gpg --batch --with-colons --list-keys 2> /dev/null \
-              | awk -F: '$1 == "pub" { p = 1; next } p && $1 == "fpr" { print $10; p = 0 }')
-            # (a commit GitHub itself made: committed as GitHub, an OpenPGP signature on it good by a key of GitHub's, by
-            # its fingerprint)
-            made() {
-              local sig
-              [ "$(git log -1 --format='%cn <%ce>' "$1")" = "GitHub <noreply@github.com>" ] && [ -n "$github" ] \
-                && sig=$(GNUPGHOME="$keys" git -c gpg.program=gpg -c gpg.x509.program=false -c gpg.ssh.program=false \
-                         log -1 --format='%G? %GP' "$1" 2> /dev/null) \
-                && printf '%s\n' "$github" | sed 's/^/G /; p; s/^G /U /' | grep -q -x -F -e "$sig"
-            }
-            # (the profiles GitHub writes as the author of what it made on the base's side, each pull request's merge or
-            # squash into main: a commit it made on the pull request's side, a merge or an edit on github.com, passes
-            # only under one of them, since one made through GitHub's API takes whatever author its caller names)
-            profiles=$(for m in $(git rev-list --max-count=100 --committer='noreply@github.com' "$side"); do
-              made "$m" && git log -1 --format='%an <%ae>' "$m"; done | sort -u)
             for c in $commits; do
               short=$(git rev-parse --short "$c")
               git log -1 --format=%B "$c" | unlinked | tr '\n' ' ' | add message "$short"
-              # (save a commit GitHub itself made under a profile above, the acting account's, as floor rule 11 excepts:
-              # a merge, "update branch" too, or an edit on github.com)
-              if ! { made "$c" && printf '%s\n' "$profiles" | grep -q -x -F -e "$(git log -1 --format='%an <%ae>' "$c")"; }; then
+              # (save a commit GitHub itself made under a profile it writes on the base's side, the acting account's, as
+              # floor rule 11 excepts: a merge, "update branch" too, or an edit on github.com; the step before tells
+              # them, signed by GitHub's key, apart from one made to look so)
+              if ! case " $MADE " in *" $c "*) true ;; *) false ;; esac; then
                 git log -1 --format='%an%n%ae%n%cn%n%ce' "$c" | add people "$short"
               fi
               # (the lines it adds, a merge's those its own resolution adds; an octopus merge, which git's remerge-diff
