@@ -305,12 +305,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   a task the project's agents take (`roles/orchestrator.md`; with no orchestrator, the session that syncs), a step
   only the owner can do labelled so, and each difference kept on purpose declared in the manifest's "Differences".
   Where a script does a step exactly, the sync runs it (`scripts/steps.mjs --write`; #1091): it writes a check's config
-  or baseline or a pointer's path alone, lists it and sets it aside for the session that syncs to commit after the
-  sync's merge, or says why it wrote nothing. Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
+  or baseline, a pointer's path or the manifest's module lines alone, lists it and sets it aside for the session that
+  syncs to commit after the sync's merge, or says why it wrote nothing. The module lines (#1094): where the manifest's
+  "Modules:" is a list, each module it neither takes nor leaves out is placed from what `scripts/manifest-reads.mjs`
+  reads exactly, and one no fact decides is taken, as the kit takes it, and named on the line "Modules to confirm:",
+  which the owner answers once while nothing waits. An entry whose step asks nothing of what stands (`asks: "nothing"`)
+  stays in the notes and leaves the report a sync prints. Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
   owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps beyond what the core writes (it stays pure), nor
-  that a step not done fails or stops anything, nor that a step that needs judgement is written by a script. Reason: a
-  step written only in prose is where one is missed, and nothing showed that it was. Held by
-  `tests/steps-write-test.mjs` (no rule's words changed), by `tests/steps-test.mjs`, which fails an entry with no step and a step with a
+  that a step not done fails or stops anything, nor that a step that needs judgement is written by a script, nor that a module the line "Not taken:" names is
+  taken without the owner's word. Reason: a
+  step written only in prose is where one is missed, and nothing showed that it was; modules placed by hand took a
+  judgement a fact settles, and entries that ask nothing hid those that ask. Held by
+  `tests/steps-write-test.mjs` (no rule's words changed but the module lines), by `tests/manifest-reads-test.mjs`
+  (the modules placed) and `tests/releases-test.mjs` (the entries that ask nothing), by `tests/steps-test.mjs`, which fails an entry with no step and a step with a
   check that cannot be taken out and mended, and by `tests/upgrade-test.mjs`: after the sync every step reads done,
   but one the release adds that it asks of every project (a check's own list to write), which is reported and done
   by its mend as written; each step added since the release started from, taken out, is reported and its mend as
@@ -505,8 +512,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   may react), and a new game of that kind would have had to find them again. Held by none yet.
 - **A check that read nothing says so** (#459, point 2). By default a check of the core's that reads a project's code
   passes where it finds nothing wrong. The one condition that changes it: it found no file there it could read, the
-  shape check where its config is missing or its "code" and "tests" name no file of a language its readers know, the
-  tests' strength where the manifest names no *mutation tool*, or `none`, or the shape check's config, whose files it
+  shape check where its config is missing, its "code" and "tests" name no file of a language its readers know, or the
+  manifest turns it off with `none` and the owner's reason, the tests' strength where the manifest names no *mutation
+  tool*, or `none`, or Stryker from a folder that holds no lock file, or the shape check's config, whose files it
   measures, is missing or names no file it measures. Then `scripts/read-nothing.mjs` names it, with the rules of the
   modules the project takes that it holds, in the report every sync prints (`scripts/steps.mjs`), and where it cannot
   tell, the report says so. The trigger is such a check, written or widened: whoever builds it gives it its case in
@@ -528,7 +536,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by
   the case's script on what the session did, read from the project (its commits, its pushes, what it wrote to GitHub),
   never on what it says of itself. A case is due on the first scheduled look of each month, and once the words of a
-  rule it holds change (`node scripts/staged.mjs`); the look then keeps the issue "Staged cases to run". The session
+  rule it holds change (`node scripts/staged.mjs`), save the reviewers' case `review`, due monthly alone
+  (`tasks/reviews.md`, point 9); the look then keeps the issue "Staged cases to run". The session
   that takes it runs each due case in a fresh helper at the builder's model and high effort, records the verdicts in
   `reports/staged-cases.json` in a pull request of its own, and says there of each failure whether the rule, the case
   or the session was wrong. The cases advise until three months in a row have run every one with no verdict found

@@ -480,6 +480,9 @@ jobs:
       - name: The proof that an update from main is the merge git makes, and the review statuses' run on one
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/clean-merges-test.mjs ')) }}
         run: node tests/clean-merges-test.mjs
+      - name: What runs with power, and the light commits that touch none of it
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/power-test.mjs ')) }}
+        run: node tests/power-test.mjs
       - name: The security-review workflow's shell, for each kind it branches on
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/security-review-workflow-test.mjs ')) }}
         run: node tests/security-review-workflow-test.mjs
@@ -637,6 +640,9 @@ jobs:
       - name: The copies check on the agent tools' files, what stood there noted until it is listed
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/copies-tools-test.mjs ')) }}
         run: node tests/copies-tools-test.mjs
+      - name: The copies check's part for a value written twice, a pin or a pattern, what the base held noted (#1139)
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/copies-values-test.mjs ')) }}
+        run: node tests/copies-values-test.mjs
       - name: What a project holds twice, or against the core, listed and its exact part corrected
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/twice-test.mjs ')) }}
         run: node tests/twice-test.mjs
