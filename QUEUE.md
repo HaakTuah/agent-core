@@ -8,9 +8,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #1083, with #1095, point 1 | rule builder; floor rule 8 | |
-| #1087 | rule builder | |
 | #1093, with #1090 | rule builder | |
-| #1091 | rule builder | |
 | #1092 | rule builder | #1091 |
 | #1094 | rule builder | #1092 |
 | #1095, points 2 to 6 | rule builder | #1094 |
@@ -21,10 +19,10 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1123 | rule builder; release 7 | release 6's cut; #974, #1060 (`roles/adviser.md`) |
 | #1112, #1074, #1073, #1098, #1133 | builder; release 7, one PR each | release 6's cut |
 | #1142 | rule builder; release 7; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md` | release 6's cut |
+| #1180, #1181, #1182 | rule builder; release 7, one PR each | release 6's cut; #1182 also #1134 |
 | #810 | the orchestrator | the batch's end |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
-| #772 | builder; `tests.yml` | |
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #584 | rule builder | |
 | #589, #590 | builder; one PR each | |
