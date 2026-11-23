@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LIST, NO_TESTS, NPMRC, fillable, leftFor, lineOf, named, packageList, readProject, rowFor, setUp, testRunner, written } from "../scripts/mutation-tools.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { scratch, scratchDir } from "../scripts/scratch-core.mjs";
 import { toolOf } from "../scripts/strength.mjs";
 
 let failed = 0, count = 0;
@@ -151,6 +151,25 @@ try {
   ok(r.status === 1 && /Mend: /.test(r.stderr), "an unknown argument fails with its mend", r.stderr);
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });
+}
+
+// ---- the round trip (#1108): in a project the starter kit writes, once it holds code and tests, what --write writes is read back ----
+{
+  const { git, run: runIn, project: kitProject } = scratch("mutation-tools-round-trip-");
+  const p = kitProject("p", "--owner", "the-owner", "--name", "An npm project", "--npm", ".");
+  ok(p.status === 0, "round trip: the starter kit writes a project", p.out);
+  fs.mkdirSync(path.join(p.dir, "src"));
+  fs.writeFileSync(path.join(p.dir, "src/app.js"), "export const one = () => 1;\n");
+  fs.mkdirSync(path.join(p.dir, "tests"));
+  fs.writeFileSync(path.join(p.dir, "tests/app.test.js"), "import { one } from \"../src/app.js\";\nif (one() !== 1) process.exit(1);\n");
+  git(p.dir, "add", "-A");
+  git(p.dir, "commit", "-q", "-m", "the kit, code and tests");
+  const written = runIn(p.dir, "core/scripts/mutation-tools.mjs", "--write");
+  const manifest = fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8"), tool = toolOf(manifest);
+  const listed = JSON.parse(fs.readFileSync(path.join(p.dir, `${stryker.folder}/package.json`), "utf8"));
+  ok(written.status === 0 && tool?.command?.[1] === "core/scripts/stryker.mjs" && listed.devDependencies?.[stryker.package] === stryker.version
+    && fs.readFileSync(path.join(p.dir, `${stryker.folder}/.npmrc`), "utf8") === NPMRC && named({ root: p.dir, manifest }) === null,
+    "round trip: the row and the package list written are read back by the strength check's reader and the step's", `${written.out}\n${JSON.stringify(tool)}\n${named({ root: p.dir, manifest })}`);
 }
 
 console.log(`\n${count - failed}/${count} passed`);
