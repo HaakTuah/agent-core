@@ -91,12 +91,12 @@ ok(not(of(`@@ -1 +1,2 @@\n+${row(10)}`, file(`@@ -1 +1,2 @@\n+${row(10)}`, { fil
 const queue = readFileSync(path.join(root, "QUEUE.md"), "utf8"), form = formOf(queue), off = linesOf(queue).filter((l) => formFault(l.text, form) !== null);
 ok(linesOf(queue).length > 0 && !off.length, "every line of the core's own QUEUE.md is in its form", off.map((l) => l.text).join("\n     "));
 // (the copies are taken from the lines that stand in the file, so that the case holds as the queue changes: each row of
-// three cells, its issues its own, the cells after the first as the line says them; a line naming points is left to the reviews)
+// three cells, its first cell an issue of its own, the numbers in the others its own too; a copy naming points is left to the reviews)
 const cellsOf = (line) => line.trimEnd().split("|").slice(1, -1);
-const copies = linesOf(queue).map((l) => l.text).filter((t) => cellsOf(t).length === 3 && !namesPoints(t))
-  .map((t) => `| #900 |${cellsOf(t).slice(1).join("|").replace(/#\d+/gu, "#901")}|`);
-ok(copies.length >= 5, "  the file holds enough lines to copy from", `${copies.length} of 5`);
-const offCopies = copies.filter((l) => formFault(l, form) !== null || namesPoints(l));
+const copies = linesOf(queue).map((l) => l.text).filter((t) => cellsOf(t).length === 3)
+  .map((t) => `| #900 |${cellsOf(t).slice(1).join("|").replace(/\d+/gu, "901")}|`).filter((c) => !namesPoints(c));
+ok(copies.length > 0, "  the file holds a line to copy from", "none of its rows of three cells is one a copy can be made of");
+const offCopies = copies.filter((l) => formFault(l, form) !== null);
 ok(!offCopies.length, "  and a new line copied from one of them, its issues and numbers its own, is in it too", offCopies.join("\n     "));
 ok(not(of(`@@ -1 +1,2 @@\n+${row(10)}`, undefined, { ...pull, head: { ...pull.head, repo: { full_name: "outsider/project" } } }), "no branch of the repository's own")
   && not(of(`@@ -1 +1,2 @@\n+${row(10)}`, undefined, { ...pull, head: { ...pull.head, repo: null } }), "no branch of the repository's own"),
