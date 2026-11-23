@@ -1,10 +1,11 @@
-// What the steps write themselves (#1091): where a step's work is exact, a check's own config or baseline, or a
-// pointer's path, its `write` does it, as `node core/scripts/steps.mjs --write` runs it (steps.mjs, beside this file).
-// Each writer takes the project as steps.mjs's `project` reads it and returns the files it wrote; where it cannot run
-// (a package missing, a file it cannot read, a check that did not run to its end), it throws `Unwritten` before it writes
-// anything. It never writes a word of a project's rule text but a pointer's path, nor a file with changes not yet
-// committed (`held`), nor through a link. The writers that run a check's own writer run the project's copy of it, as
-// the steps read them. Git and Node's own modules only.
+// What the steps write themselves (#1091): where a step's work is exact, a check's own config or baseline, a pointer's
+// path, or the manifest's module lines placed from what is read (#1094), its `write` does it, as `node
+// core/scripts/steps.mjs --write` runs it (steps.mjs, beside this file). Each writer takes the project as steps.mjs's
+// `project` reads it and returns the files it wrote; where it cannot run (a package missing, a file it cannot read, a
+// check that did not run to its end), it throws `Unwritten` before it writes anything. It never writes a word of a
+// project's rule text but a pointer's path and the manifest's module lines, nor a file with changes not yet committed
+// (`held`), nor through a link. The writers that run a check's own writer run the project's copy of it, as the steps
+// read them. Git and Node's own modules only.
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";

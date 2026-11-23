@@ -8,7 +8,8 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { markGap, markGaps, modulesOf, notes, slotTable } from "../scripts/manifest-reads.mjs";
+import { CONFIRM, factsOf, markGap, markGaps, modulesOf, moduleNames, notes, placed, placeOf, slotTable, toConfirm, toPlace } from "../scripts/manifest-reads.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -53,6 +54,38 @@ n = run(manifest("all").replace(/\n/g, "\r\n"));
 ok(n.length === 0, `line ends of Windows are read as Unix's: ${n.join("; ")}`);
 const m = modulesOf(manifest("`tasks/a.md`, `b`", "Not taken: `g.md` (no game; none).\n"));
 ok(m.taken.has("a.md") && m.taken.has("b.md") && m.notTaken.get("g.md") === "no game; none", "names are read with or without the folder and the extension");
+
+// the modules a list neither takes nor leaves out, placed from what is read exactly (#1094)
+{
+  const SHA = "a".repeat(40), GAME = ["computer players"];
+  const kit = (list, more = "", core = `Core: ${CORE} at ${SHA}, copied whole under core/`) => `# Core manifest\n\n${core}\n\nFloor: whole. Modules: ${list}.\n${more}\n## Slots\n\n| Slot | Here |\n| --- | --- |\n| *progress file* | \`docs/PROGRESS.md\` |\n`;
+  const game = text => text.replace("| *progress file*", "| *computer players* | `src/ai/` |\n| *progress file*");
+  const facts = (text, files = []) => factsOf({ manifest: text, files, gameSlots: GAME });
+  const plain = facts(kit("`a.md`"));
+  ok(!plain.game && plain.oneRepository === true && !plain.screen, "a project with no game's row, its copy whole under core/ and no screen's file reads so", JSON.stringify(plain));
+  ok(facts(game(kit("`a.md`"))).game && facts(kit("`a.md`"), ["web/App.tsx"]).screen && !facts(kit("`a.md`"), ["src/a.ts"]).screen, "a game's row and a file a screen is made of are read");
+  ok(facts(kit("`a.md`", "", `Core: ${CORE}, carried by lib/ under lib/core/`)).oneRepository === false && facts(kit("`a.md`", "", "Core: a line no reader knows")).oneRepository === null, "a library that carries the core reads as more than one repository, and a line in neither form as not read");
+  ok(placeOf("game-design.md", plain).take === false && placeOf("game-design.md", { ...plain, game: true }).take === true && !placeOf("game-design.md", plain).choice, "a game's module is placed by the game's row, never asked");
+  ok(placeOf("repositories.md", plain).take === false && placeOf("repositories.md", { ...plain, oneRepository: false }).take === true && placeOf("repositories.md", { ...plain, oneRepository: null }).choice === true, "the module of several repositories is placed by the Core line, and asked where it cannot be read");
+  ok(placeOf("screens.md", { ...plain, screen: true }).take === true && placeOf("screens.md", plain).choice === true && placeOf("planning.md", plain).choice === true, "a screen's file takes the module of screens; with none, and for a module no fact decides, it is taken by choice and asked");
+  const names = ["a.md", "game-design.md", "planning.md", "repositories.md", "x.md"];
+  ok(toPlace(kit("all"), names, plain).length === 0 && toPlace(kit("everything"), names, plain) === null, "a list that says all places nothing, and one that cannot be read gives null, never a guess");
+  const left = toPlace(kit("`a.md`", "Not taken: `x.md`.\n"), names, plain);
+  ok(left.map(l => l.name).join() === "game-design.md,planning.md,repositories.md", "a module the line Not taken names, with no reason too, is never placed", JSON.stringify(left));
+  ok(toPlace(kit("`a.md`"), names, plain, ["planning.md"]).map(l => l.name).join() === "planning.md", "a step places only the modules it names");
+  const text = placed(kit("`a.md`"), toPlace(kit("`a.md`"), names, plain));
+  const read = modulesOf(text);
+  ok(["a.md", "planning.md", "x.md"].every(n => read.taken.has(n)) && !read.taken.has("game-design.md") && read.notTaken.get("game-design.md") === "the project is no game: its manifest holds no game's row" && read.notTaken.has("repositories.md"),
+    "placed, the list takes what it should and the line Not taken leaves out the rest with each reason, both read back by modulesOf", text);
+  ok([...toConfirm(text)].sort().join() === "planning.md,x.md" && toPlace(text, names, plain).length === 0 && new RegExp(`^${CONFIRM} \`planning\\.md\`, \`x\\.md\`\\.$`, "m").test(text), "the modules taken by choice stand on the confirmation's line, and a second placing finds nothing", text);
+  const crlf = kit("`a.md`", "Not taken: `x.md` (none here).\n").replace(/\n/g, "\r\n"), again = placed(crlf, toPlace(crlf, names, plain));
+  ok(!/[^\r]\n/.test(again) && /^Not taken: `x\.md` \(none here\), `game-design\.md` \(the project is no game[^)]*\), `repositories\.md` \([^)]*\)\.\r$/m.test(again) && modulesOf(again).notTaken.get("x.md") === "none here", "a line Not taken that stands is added to, its reasons kept, and Windows' line ends stay", again);
+  let threw = null;
+  try { placed(kit("all"), [{ name: "a.md", take: true }]); } catch (e) { threw = e; }
+  ok(threw && /names no module/.test(threw.message), "a Modules line with no module to add after is never written");
+  const core = moduleNames(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
+  ok(core.includes("game-design.md") && core.includes("claude.md") && core.includes("work-flow.md") && !core.some(n => !n.endsWith(".md")), "the core's modules are read from its folders", core.join());
+}
 
 // a project staged with the core's own files as its copy
 const root = scratchDir("manifest-reads-");

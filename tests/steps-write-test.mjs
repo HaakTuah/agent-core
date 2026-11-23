@@ -172,4 +172,20 @@ for (const l of WHOLE) {
   back();
 }
 
+// ---- the modules a list neither takes nor leaves out: placed by --write from what is read, the manifest's module lines
+// alone written, and the one taken by choice asked of the owner (#1094) ----
+{
+  const [placing, choice, confirm] = [lead("13 November 2026, the modules a project takes"), lead("16 November 2026, how done will be judged"), lead("23 November 2026, the modules a project takes, placed")];
+  STAGES[placing].stage(dir);
+  STAGES[choice].stage(dir);
+  commit("two modules neither taken nor left out");
+  const before = [placing, choice].map(l => missed(l).length), was = read("core-manifest.md");
+  r = write();
+  const now = read("core-manifest.md"), outside = text => text.split("\n").filter(l => !/^(Floor: |Not taken: |Modules to confirm: )/u.test(l)).join("\n");
+  ok(before.join() === "1,1" && r.status === 0 && !missed(placing).length && !missed(choice).length && missed(confirm).length === 1 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``)
+    && /^Not taken: `game-design\.md` \(the project is no game: its manifest holds no game's row\)\.$/m.test(now) && /^Modules to confirm: `done-when\.md`\.$/m.test(now) && /^Floor: whole\. Modules: .*`done-when\.md`/m.test(now) && outside(now) === outside(was),
+    "a module the list misses is placed by --write: left out where a fact decides it, taken and asked of the owner where none does, and nothing of the manifest written but its module lines", `${r.stdout}${r.stderr}\n---\n${now}`);
+  back();
+}
+
 done("the steps' writers");
