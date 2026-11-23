@@ -733,6 +733,9 @@ export async function alongside(configPath, root) {
     console.log(`::warning::The lookup of the packages new to the project did not run: this is a pull request, and its checkout holds no base to read it against. Mend: ${mend}`);
     return exact.status !== 0;
   }
+  // (where the run's network is cut off, as the core's own suites cut it, scripts/offline.sh, no registry answers: the
+  // lookup is left to the step of its own that reaches them, and said so)
+  if (process.env.CORE_OFFLINE) { console.log("ok   the lookup of the packages new to the project is left to its own step: this run's network is cut off (scripts/offline.sh)"); return exact.status !== 0; }
   const { lines, code } = await run(configPath, { root, base: at });
   for (const line of lines) (line.startsWith("FAIL") ? console.error : console.log)(line);
   summarise(lines, false);
