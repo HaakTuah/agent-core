@@ -165,10 +165,9 @@ export function attached(root, { fetched = null } = {}) {
   };
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-attached-"));
   try {
-    let bare = path.join(tmp, "core"), why = "";
+    // (one already fetched is read where it stands: nothing here writes to it)
+    let bare = fetched ?? path.join(tmp, "core"), why = "";
     if (!fetched) { try { fs.mkdirSync(bare); fetchCore(bare); } catch (e) { bare = null; why = ` (${plain(firstLine(e.stderr || e.message), root)})`; } }
-    // (one already fetched is cloned sharing its objects, so what the comparison writes stays out of it)
-    else execFileSync("git", ["clone", "-q", "--bare", "--shared", "--", fetched, bare], { stdio: "ignore" });
     const at = readCore(fs.readFileSync(path.join(root, MANIFEST), "utf8")).path ?? "core/";
     const parts = [["the copy", () => copyAgainstPin(root, bare, why, said)], ["the pointers", () => pointers(root, at, said)], ["the steps", () => steps(root, said)],
       ["a fresh start", () => freshStart(root, said)], ["the manifest", () => projectNotes(root, path.join(root, at)).forEach(n => said.way("the manifest", n))],
