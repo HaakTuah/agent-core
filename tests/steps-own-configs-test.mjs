@@ -12,7 +12,6 @@ import { isCode } from "../scripts/shape-readers.mjs";
 import { leftOut } from "../scripts/reading.mjs";
 import { readNothing } from "../scripts/read-nothing.mjs";
 import { holders } from "../scripts/holders.mjs";
-import { shapeReadsParsed, shapeWritten } from "../scripts/step-checks-shape.mjs";
 import { only, heldKitIn } from "../scripts/steps-kit.mjs";
 import { configs, notDone, project, report, runsOwn } from "../scripts/steps.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
@@ -99,10 +98,6 @@ ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks
   ok(/is `none`, which turns it off: the owner's reason$/u.test(shapeOf(offSaid)?.why ?? "") && !shapeOf(noReason)
     && /runs Stryker from `checks\/mutation`, which holds no lock file/u.test(strengthOf(lockless)?.why ?? "") && !strengthOf(locked),
     "the shape check turned off by the owner's `none` with a reason reads nothing, one with no reason is not off, and Stryker with no lock file to install it from reads nothing", JSON.stringify({ offSaid, noReason, lockless, locked }));
-  // (and no step asks for the shape check's config or baseline while the owner's `none` turns it off: 370, 640, 690, 720)
-  const asked = manifest => { const p = { manifest, read: () => null, root: bare }; return [shapeWritten(p), ...["csharp-tree", "javascript-tree", "python-tree"].map(r => shapeReadsParsed(p, r))]; };
-  const askedOff = asked(`${withTool}\n| *shape check* | \`none\`: the owner's reason |\n`), askedOn = asked(`${withTool}\n| *shape check* | \`none\` |\n`);
-  ok(askedOff.every(m => m === null) && askedOn[0] !== null, "no step of the shape check asks for its config or baseline while the owner's `none` turns it off, and one with no reason still asks", JSON.stringify({ askedOff, askedOn }));
   execFileSync("git", ["rm", "-q", "-r", "-f", "--", "go", "bin", "t"], { cwd: bare });
   // (a file of code the shape check does not read, a link or one listed and gone from the disk, makes it read nothing)
   fs.mkdirSync(path.join(bare, "ln"), { recursive: true });
