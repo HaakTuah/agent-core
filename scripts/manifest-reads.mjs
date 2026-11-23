@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import { logged, unrooted } from "./guards.mjs";
 import { MODULES } from "./reading.mjs";
 import { started } from "./started.mjs";
-import { copyOf, projectAt } from "./core-path.mjs";
+import { copyOf, projectAt, readCore } from "./core-path.mjs";
 
 const plain = s => s.toLowerCase().replace(/[‘’]/gu, "'").replace(/\s+/gu, " ").trim();
 // (a phrase in italics may run over one line break, as a module's text wraps it: "*where the numbers\n  go*"; the
@@ -92,6 +92,73 @@ export function modulesOf(manifest) {
 // beside this file, read them here).
 export const differencesOf = manifest => (/^## Differences\r?\n([\s\S]*?)(?=^## |(?![\s\S]))/mu.exec(String(manifest ?? ""))?.[1] ?? "").split(/\r?\n/u).filter(l => l.trim());
 
+// Where each module a list neither takes nor leaves out goes (#1094): where a fact of the project read exactly decides
+// it, it is taken, or left out with that fact as its reason; where none does, its taking is the owner's choice: it is
+// taken, as the starter kit takes it, and named on the manifest's line "Modules to confirm:", which asks the owner once
+// (the steps of the sync notes 160, 470, 480 and 500 write them, step-writers.mjs's writeModules; that of 23 November
+// 2026 asks the confirmation). A module the line "Not taken:" names, with a reason or without, is never taken.
+//
+// The facts (`factsOf`): `game`, the manifest's slots hold a game's row (one of `gameSlots`, the kit's rows for a game);
+// `oneRepository`, its "Core:" line has the copy whole under core/ (false where a library carries it or it stands
+// elsewhere, null where the line cannot be read); `screen`, the project holds a file a screen is made of (SCREEN_FILE).
+export const CONFIRM = "Modules to confirm:";
+export const SCREEN_FILE = /\.(?:html?|jsx|tsx|vue|svelte|xaml|axaml|razor|cshtml|storyboard|xib)$/iu;
+export function factsOf({ manifest, files = [], gameSlots = [] }) {
+  const slots = new Set(rows(section(String(manifest ?? "").split(/\r?\n/u), "## Slots")).flatMap(([first]) => italics(first)));
+  const core = readCore(manifest);
+  return { game: gameSlots.some(s => slots.has(plain(s))), oneRepository: core.wrong ? null : core.form === "copied" && core.path === "core/", screen: files.some(f => SCREEN_FILE.test(f)) };
+}
+// One module's place from the facts: { take, why } where a fact decides it, { take: true, choice: true } where none does.
+export function placeOf(name, facts) {
+  if (name === "game-design.md") return facts.game ? { take: true, why: "a game's row in the manifest" } : { take: false, why: "the project is no game: its manifest holds no game's row" };
+  if (name === "repositories.md" && facts.oneRepository !== null) return facts.oneRepository ? { take: false, why: "one repository, which no library carries the core into" } : { take: true, why: "its \"Core:\" line names a library or a path other than core/" };
+  if (name === "screens.md" && facts.screen) return { take: true, why: "the project holds a file a screen is made of" };
+  return { take: true, choice: true };
+}
+// Each module of `names` (`only`: of those alone) the manifest's list neither takes nor names on its line "Not taken:",
+// with its place: [{ name, take, why, choice }], in the order of the names; [] where the line says "all"; null where
+// it cannot be read.
+export function toPlace(manifest, names, facts, only = null) {
+  const { taken, notTaken } = modulesOf(manifest);
+  if (taken === "all") return [];
+  if (taken === null) return null;
+  return [...names].sort().filter(n => (!only || only.includes(n)) && !taken.has(n) && !notTaken.has(n)).map(name => ({ name, ...placeOf(name, facts) }));
+}
+// The modules the manifest's line "Modules to confirm:" names.
+export const toConfirm = manifest => new Set([...(new RegExp(`^${CONFIRM}\\s*(.*)$`, "mu").exec(String(manifest ?? ""))?.[1] ?? "").matchAll(/`(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?`/gu)].map(m => `${m[1]}.md`));
+// The manifest with each module of `places` in its place: added to the "Modules:" list, or to the line "Not taken:" with
+// its reason, and each taken by choice to the line "Modules to confirm:" too, a line made under the "Modules:" line
+// where it is not yet; the rest of the text as it stood. Throws where the "Modules:" line holds no module to add after.
+export function placed(manifest, places) {
+  const eol = /\r\n/u.test(manifest) ? "\r\n" : "\n", lines = String(manifest).split(/\r?\n/u);
+  const at = lines.findIndex(l => /\bModules:\s*`/u.test(l));
+  if (at < 0) throw new Error('its "Modules:" line names no module to add to');
+  const named = list => list.map(p => `\`${p.name}\``).join(", ");
+  const take = places.filter(p => p.take), out = places.filter(p => !p.take), chosen = places.filter(p => p.choice);
+  // (a list in order, as the kit writes it, stays in order; any other gains the names at its end)
+  if (take.length) {
+    const [, head, list, tail] = /^(.*?\bModules:\s*)(`.*`)(.*)$/u.exec(lines[at]);
+    const names = [...list.matchAll(/`([^`\n]*)`/gu)].map(m => m[1]);
+    const plainList = list === names.map(n => `\`${n}\``).join(", ");
+    const inOrder = plainList && names.every((n, i) => !i || names[i - 1] <= n);
+    lines[at] = inOrder ? `${head}${named([...names, ...take.map(p => p.name)].sort().map(name => ({ name })))}${tail}`
+      : lines[at].replace(/(`[^`\n]*`)(?![^\n]*`)/u, `$1, ${named(take)}`);
+  }
+  // (a line added to, its last full stop moved after what it gains; "Not taken:" made under the last of the module
+  // lines, and the line to confirm made a paragraph of its own after theirs, so the kit's paragraph stays as it writes it)
+  const add = (head, what) => {
+    const i = lines.findIndex(l => l.startsWith(head));
+    if (i >= 0) { lines[i] = `${lines[i].replace(/\.?\s*$/u, "")}, ${what}.`; return; }
+    let after = at;
+    if (head === CONFIRM) while ((lines[after + 1] ?? "").trim()) after++;
+    else while (/^Not taken:/u.test(lines[after + 1] ?? "")) after++;
+    lines.splice(after + 1, 0, ...(head === CONFIRM ? ["", `${head} ${what}.`] : [`${head} ${what}.`]));
+  };
+  if (out.length) add("Not taken:", out.map(p => `\`${p.name}\` (${p.why})`).join(", "));
+  if (chosen.length) add(CONFIRM, named(chosen));
+  return lines.join(eol);
+}
+
 // What a project's manifest lacks, one note each, with the mend: the modules of `moduleTexts` ({ name: text }) its list
 // neither takes nor leaves out.
 export function notes({ manifest, moduleTexts, where = {} }) {
@@ -109,6 +176,8 @@ export function notes({ manifest, moduleTexts, where = {} }) {
 }
 
 const readDir = dir => Object.fromEntries(fs.readdirSync(dir).filter(f => f.endsWith(".md")).sort().map(f => [f, fs.readFileSync(path.join(dir, f), "utf8")]));
+// The names of the modules of the core, or of a copy of it, at `home`.
+export const moduleNames = home => MODULES.flatMap(d => fs.readdirSync(path.join(home, d)).filter(f => f.endsWith(".md"))).sort();
 
 // The notes of the project at `root` whose copy is at `home`, read against the copy's modules (attached.mjs reads them
 // too); throws where either cannot be read.

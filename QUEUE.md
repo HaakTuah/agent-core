@@ -8,18 +8,15 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #1093, with #1090 | rule builder | |
-| #1092 | rule builder | |
-| #1094 | rule builder | #1092 |
 | #1095, points 2 to 6 | rule builder | #1094 |
-| #1107 | rule builder | |
-| #1134 | rule builder; release 6; the floor (rule 3), `tasks/reviews.md`, the review guidelines, `tools/claude.md`, one PR or more | |
 | #1136 to #1140 | builder; release 7, one PR each | release 6's cut |
 | #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 7, one PR each | release 6's cut |
 | #1123 | rule builder; release 7 | release 6's cut; #974, #1060 (`roles/adviser.md`) |
 | #1112, #1074, #1073, #1098, #1133 | builder; release 7, one PR each | release 6's cut |
 | #1142 | rule builder; release 7; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md` | release 6's cut |
 | #1180, #1181 | rule builder; release 7, one PR each | release 6's cut |
-| #1182 | rule builder; release 7 | #1134 |
+| #1182 | rule builder; release 7 | release 6's cut |
+| #1202 | rule builder; release 7; `AGENTS.md` and what every session here reads at its start | release 6's cut; #1046 and #1052 (`AGENTS.md`, one at a time) |
 | #810 | the orchestrator | the batch's end |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |

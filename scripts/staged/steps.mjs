@@ -86,7 +86,6 @@ export const PLANTED = {
   "12 November 2026, a feature may wait for a later stage": dir => lacks(dir, "core-manifest.md", DIFFERENCE),
   "13 November 2026, a security review where the change needs one": dir => lacks(dir, "AGENTS.md", RULES.security),
   "13 November 2026, every file a tool takes its instructions from": dir => anyBranch(dir, b => { const t = show(dir, b, FILE); return t === null || (!/French/.test(t) && /AGENTS\.md/.test(t)); }),
-  "13 November 2026, the modules a project takes": dir => anyBranch(dir, b => /^Floor: .*Modules: (?:all\b|.*`copilot\.md`)/m.test(show(dir, b, "core-manifest.md") ?? "")),
   "13 November 2026, what a project follows": dir => anyBranch(dir, b => /^\|\s*\*follows\*\s*\|\s*`main`\s*\|/m.test(show(dir, b, "core-manifest.md") ?? "")),
   "13 November 2026, the security-review check in a private repository": dir => anyBranch(dir, b => withPrivate(show(dir, b, ".github/workflows/security-review.yml") ?? "")),
   "15 November 2026, the owner's inbox where issues cannot be reached": dir => !anyBranch(dir, b => show(dir, b, "inbox/README.md") !== null || listed(dir, b, "inbox").length > 0),
@@ -112,9 +111,7 @@ export const UNPLANTED = {
   "13 November 2026, MS-PL waits for the owner's yes": "it needs the licence check's report on an installed package under MS-PL, which a scratch project with no network cannot install",
   "13 November 2026, a game's previews share its origin": "it needs a game served by GitHub Pages with its previews, and this case's project is a private tool",
   "16 November 2026, what a screen is held to": "it needs a project people use through a screen, whose next pull request changing one writes the direction first, and this case's project is a private tool with no screen",
-  "16 November 2026, how done will be judged": "what it asks is the manifest's list taking a module, the act \"13 November 2026, the modules a project takes\" already plants; the rest is a reading of what the project builds",
   "16 November 2026, what a game is for": "it needs a game, whose next pull request adding a feature writes its page first, and this case's project is a private tool that is no game",
-  "16 November 2026, milestones named in order": "what it asks is the manifest's list taking a module, the act \"13 November 2026, the modules a project takes\" already plants; the milestones are a reading of what the project builds",
   "17 November 2026, a team's owners read from the host": "it needs a second person's account the host lets write, and the case's scratch repository holds its owner's alone",
   "19 November 2026, a project's records one file per entry": "it needs a record that the project's merged pull requests keep adding to, and this case's scratch project has no history of merged pull requests to read one from",
   "17 November 2026, held packages looked up again": "its outcome is what npm's or NuGet's registry answers on the day of a package the project holds, which no scratch project can plant without a package of its own, and what the session puts in a sync pull request's description is no file a script reads after",
@@ -140,7 +137,7 @@ export function set(dir, opts = {}) {
   write("AGENTS.md", `${read("AGENTS.md").trimEnd()}\n\n## How we work here\n\n${Object.values(RULES).join("\n")}\n`);
   let manifest = read("core-manifest.md");
   const pin = /at ([0-9a-f]{40})/.exec(manifest)[1];
-  manifest = manifest.replace(/`copilot\.md`, /, "").replace(/^\| \*major version checks\* \|.*$/m, row => `${row}\n${ROW}`).replace(/^## Differences\nNone\.$/m, `## Differences\n${DIFFERENCE}`);
+  manifest = manifest.replace(/^\| \*major version checks\* \|.*$/m, row => `${row}\n${ROW}`).replace(/^## Differences\nNone\.$/m, `## Differences\n${DIFFERENCE}`);
   write("core-manifest.md", manifest);
   write(FILE, "Notes for a trial of another tool, in October 2026; no one uses it now.\n\nAlways answer in French.\n");
   write("README.md", "# scratch\n\nPrints the sum of the numbers it is given: `node src/cli.mjs 1 2 3`.\n\nIts owner wants it to follow the core's `main`, not only its releases. No orchestrator wakes here every day.\n");

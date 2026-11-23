@@ -94,7 +94,7 @@ const ready = (dir, p) => { gh(dir, "POST", `pulls/${p.number}/ccr/ready_for_rev
 // (the steps case's session: each planted step done in a pull request of its own, as the notes ask; one left where named)
 const takeSteps = (d, leave = null) => {
   const agents = read(d, "AGENTS.md").replace(/\n## How we work here\n[\s\S]*$/, "\n");
-  const manifest = read(d, "core-manifest.md").replace(/^(Floor: whole\. Modules: )/m, "$1`copilot.md`, ").replace(/^## Differences\n- .*$/m, "## Differences\nNone.").replace(/^(\| \*owner's account\* \|.*)$/m, "$1\n| *follows* | `main` |");
+  const manifest = read(d, "core-manifest.md").replace(/^## Differences\n- .*$/m, "## Differences\nNone.").replace(/^(\| \*owner's account\* \|.*)$/m, "$1\n| *follows* | `main` |");
   const look = fs.readFileSync(path.join(s.core, "setup", "template", "workflows", "look.yml.tmpl"), "utf8").replace("{{core}}", CORE).replace("{{pin}}", "b".repeat(40));
   const work = {
     rules: { "AGENTS.md": agents },

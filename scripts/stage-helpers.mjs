@@ -10,6 +10,15 @@ import { project } from "./steps.mjs";
 export const at = (dir, f) => path.join(dir, f);
 export const read = (dir, f) => fs.readFileSync(at(dir, f), "utf8");
 export const write = (dir, f, text) => { fs.mkdirSync(path.dirname(at(dir, f)), { recursive: true }); fs.writeFileSync(at(dir, f), text); };
+// The manifest's line "Not taken:" without the module named, the line gone where it names no other.
+export const notTakenWithout = (text, name) => text.replace(/^Not taken: (.*?)\.?(\r?\n|$)/m, (all, items, end) => {
+  const kept = items.split(/, (?=`)/).filter(i => !i.startsWith(`\`${name}\``));
+  return kept.length ? `Not taken: ${kept.join(", ")}.${end}` : "";
+});
+// A module taken off the manifest's "Modules:" list, as a list written before it came stands, and taken back onto it
+// after the list's first name, as the step that places it words its mend (the stages of 470 and 500).
+export const modulesWithout = (text, name) => text.split(`\`${name}\`, `).join("");
+export const modulesWith = (text, name) => text.replace(/^(Floor: whole\. Modules: `[^`]+`)/m, `$1, \`${name}\``);
 export const SLOTS = /^(\| Slot \| Here \|\r?\n\| --- \| --- \|\r?\n)/m;
 
 export const PIN = "0".repeat(40);
