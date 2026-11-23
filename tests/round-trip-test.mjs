@@ -1,7 +1,7 @@
-// Every writer of the core's and each of its readers that reads what it wrote, by a round trip (#1108): in projects the
-// kit writes of each kind the upgrade test holds, each file the kit, a check, a step or a sync writes is read back by each
-// reader of the core's that reads it, to the meaning written. Then the list: each script that writes a file is a writer
-// here, with where its round trip stands, or named with why no reader of the core reads it in a project.
+// The round trips of #1108: in projects the kit writes of each kind the upgrade test holds, each file the kit, a check, a
+// step or a sync writes is read back by each reader of the core's that reads it, to the meaning written. The list:
+// each script that writes a file is a writer here, with where its round trip stands, or named with why no reader of the
+// core reads it in a project.
 //
 //   node tests/round-trip-test.mjs
 import fs from "node:fs";
