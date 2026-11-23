@@ -61,7 +61,12 @@ function rulesetOf(host, rules) {
   const lacks = [["deletion", "deletions restricted"], ["non_fast_forward", "force pushes blocked"], ["pull_request", "a pull request required"]]
     .filter(([type]) => !rules.types.has(type)).map(([, said]) => said);
   if (!rules.checks.has("core / core")) lacks.push("the status check `core / core` required");
-  if (!lacks.length) return given();
+  if (!lacks.length) {
+    // (which of the checks is the project's own CI cannot be read exactly: those required beside the core's are named)
+    const own = [...rules.checks].filter(c => c && c !== "core / core" && c !== "security-review");
+    return own.length ? given(`given, the checks required beside the core's: ${own.map(c => `\`${c}\``).join(", ")} (that they are the project's own CI is the owner's to see)`)
+      : unread("the ruleset holds all the core asks, but no check of the project's own CI is required, and whether the project has CI of its own is not read: where it has, require its checks");
+  }
   const none = rules.types.size ? "" : `no ruleset applies to \`${host.repo.body?.default_branch ?? "the default branch"}\` (a branch protection of the older kind is not read here); `;
   return notGiven(`${none}it lacks ${lacks.join(", ")}`);
 }
@@ -73,33 +78,49 @@ function reviewOf(host, rules, root) {
   const text = fs.lstatSync(file, { throwIfNoEntry: false })?.isFile() ? fs.readFileSync(file, "utf8") : null;
   if (text === null) return apart("the project has no `.github/workflows/security-review.yml`, so nothing posts the status, and a status required that never comes would hold every pull request");
   if (!repo) return unread(host.repo.why);
-  if (repo.private !== false && !/^\s*private:\s*true\s*$/m.test(text)) return apart("in a private repository the check posts its status only where its call is given `with: private: true`, and a status required that never comes would hold every pull request");
+  if (repo.private !== false && !/^\s*(private:\s*true|advisory:\s*false)\s*$/m.test(text)) return apart("in a private repository the check posts its status only where its call is given `with: private: true` or `advisory: false`, and a status required that never comes would hold every pull request");
   if (!rules) return unread(host.rules?.why ?? host.repo.why);
   return rules.checks.has("security-review") ? given() : notGiven();
 }
 
-// The state of each setting, by its id, read from what GitHub answered (`host`: { repo, rules, secrets, actions },
+// The secret PERSONAL_TERMS, by its name alone: from the list of the repository's secrets, and where the list runs past
+// the page read, from GitHub's answer for the secret by name (`host.terms`), which 404 is "not there" once the list
+// itself was readable.
+function termsOf(host) {
+  const list = host.secrets?.body, names = list?.secrets;
+  if (!Array.isArray(names)) return unread(host.secrets?.why ?? host.repo.why);
+  if (names.some(s => s?.name === "PERSONAL_TERMS")) return given("given (its value is not read)");
+  if (!(list.total_count > names.length)) return notGiven();
+  if (host.terms?.body?.name === "PERSONAL_TERMS") return given("given (its value is not read)");
+  if (/answered 404/.test(host.terms?.why ?? "")) return notGiven();
+  return unread(host.terms?.why ?? "the list of secrets runs past the page read, and the secret was not asked by name");
+}
+
+// The state of each setting, by its id, read from what GitHub answered (`host`: { repo, rules, secrets, actions, terms? },
 // each { body } or { why }) and the project's own files at `root`.
 export function statesOf(host, root) {
   const rules = Array.isArray(host.rules?.body) ? rulesOf(host.rules.body) : null;
-  const pinned = host.actions?.body?.sha_pinning_required, names = host.secrets?.body?.secrets;
+  const pinned = host.actions?.body?.sha_pinning_required;
   return {
     "secret-scanning": scanOf(host, "secret_scanning"),
     "push-protection": scanOf(host, "secret_scanning_push_protection"),
     ruleset: rulesetOf(host, rules),
     "security-review-required": reviewOf(host, rules, root),
     "sha-pinning": pinned === true ? given() : pinned === false ? notGiven() : unread(host.actions?.why ?? "GitHub's answer holds no such setting"),
-    "personal-terms": !Array.isArray(names) ? unread(host.secrets?.why ?? host.repo.why) : names.some(s => s?.name === "PERSONAL_TERMS") ? given("given (its value is not read)") : notGiven(),
+    "personal-terms": termsOf(host),
     "reviewer-app": unread("GitHub lists a repository's apps on that page to its admins alone, and to no sign-in a session holds"),
   };
 }
 
-// What GitHub answers for the repository, asked by `ask` (ghAsk, or a stand-in).
+// What GitHub answers for the repository, asked by `ask` (ghAsk, or a stand-in): four reads, and a fifth for the secret
+// by name where the list of secrets runs past its page.
 export function readHost(repo, ask = ghAsk) {
   const host = { repo: ask(`repos/${repo}`) };
   const branch = host.repo.body?.default_branch;
   host.rules = branch ? ask(`repos/${repo}/rules/branches/${encodeURIComponent(branch)}`) : { why: host.repo.why ?? "GitHub named no default branch" };
-  host.secrets = ask(`repos/${repo}/actions/secrets`);
+  host.secrets = ask(`repos/${repo}/actions/secrets?per_page=100`);
+  const list = host.secrets.body;
+  if (Array.isArray(list?.secrets) && list.total_count > list.secrets.length && !list.secrets.some(s => s?.name === "PERSONAL_TERMS")) host.terms = ask(`repos/${repo}/actions/secrets/PERSONAL_TERMS`);
   host.actions = ask(`repos/${repo}/actions/permissions`);
   return host;
 }

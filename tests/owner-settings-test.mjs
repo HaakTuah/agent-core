@@ -30,7 +30,7 @@ try {
   const rules = checks => [{ type: "deletion" }, { type: "non_fast_forward" }, { type: "pull_request" }, { type: "required_status_checks", parameters: { required_status_checks: checks.map(context => ({ context })) } }];
   const all = {
     repo: { body: { private: false, default_branch: "main", security_and_analysis: { secret_scanning: { status: "enabled" }, secret_scanning_push_protection: { status: "enabled" } } } },
-    rules: { body: rules(["core / core", "security-review"]) },
+    rules: { body: rules(["core / core", "security-review", "tests"]) },
     secrets: { body: { secrets: [{ name: "PERSONAL_TERMS" }] } },
     actions: { body: { sha_pinning_required: true } },
   };
@@ -38,6 +38,13 @@ try {
   ok(IDS.filter(id => id !== "reviewer-app").every(id => s[id].given === true), "a project with every setting given reads each as given", JSON.stringify(s));
   ok(s["reviewer-app"].given === null && /not read/.test(s["reviewer-app"].said), "the reviewer's app, which no session's sign-in may list, is said not read, never guessed");
   ok(/its value is not read/.test(s["personal-terms"].said), "the secret is read by its name alone");
+  ok(/beside the core's: `tests`/.test(s.ruleset.said), "the checks required beside the core's are named, since which is the project's own CI cannot be read", s.ruleset.said);
+  s = statesOf({ ...all, rules: { body: rules(["core / core", "security-review"]) } }, root);
+  ok(s.ruleset.given === null && /no check of the project's own CI is required/.test(s.ruleset.said), "a ruleset with the core's checks alone is not ticked: the project's own CI is said not read", s.ruleset.said);
+  const many = { ...all, secrets: { body: { total_count: 31, secrets: [{ name: "OTHER" }] } } };
+  ok(statesOf({ ...many, terms: { body: { name: "PERSONAL_TERMS" } } }, root)["personal-terms"].given === true, "past the page read, the secret asked by name and there: given");
+  ok(statesOf({ ...many, terms: { why: "GitHub answered 404, which it gives an account that may not read it" } }, root)["personal-terms"].given === false, "past the page read, the secret asked by name and not there: not given");
+  ok(statesOf(many, root)["personal-terms"].given === null, "past the page read and not asked by name: not read, never not given");
 
   // none given
   const none = {
@@ -62,6 +69,8 @@ try {
   ok(s["security-review-required"].given === null && /with: private: true/.test(s["security-review-required"].said), "a private repository whose call does not run the check: not asked for", s["security-review-required"].said);
   review("jobs:\n  security-review:\n    uses: x\n    with:\n      private: true\n");
   ok(statesOf(privately, root)["security-review-required"].given === true, "a private repository whose call is given `private: true`: read from the ruleset");
+  review("jobs:\n  security-review:\n    uses: x\n    with:\n      advisory: false\n");
+  ok(statesOf(privately, root)["security-review-required"].given === true, "a private repository whose call is given `advisory: false`, which posts the status: read from the ruleset");
   fs.rmSync(path.join(root, ".github", "workflows", "security-review.yml"));
   if (process.platform !== "win32") { // (a link needs a right of its own on Windows)
     fs.symlinkSync(path.join(at, "elsewhere.yml"), path.join(root, ".github", "workflows", "security-review.yml"));
@@ -77,7 +86,10 @@ try {
   // the questions asked of GitHub, and the checklist
   const asked = [];
   readHost("someone/a game", route => { asked.push(route); return route === "repos/someone/a game" ? all.repo : { body: [] }; });
-  ok(asked.join(" | ") === "repos/someone/a game | repos/someone/a game/rules/branches/main | repos/someone/a game/actions/secrets | repos/someone/a game/actions/permissions", "it asks GitHub four reads, the branch's rules by the default branch GitHub names", asked.join(" | "));
+  ok(asked.join(" | ") === "repos/someone/a game | repos/someone/a game/rules/branches/main | repos/someone/a game/actions/secrets?per_page=100 | repos/someone/a game/actions/permissions", "it asks GitHub four reads, the branch's rules by the default branch GitHub names", asked.join(" | "));
+  asked.length = 0;
+  const host = readHost("someone/a-game", route => { asked.push(route); return route === "repos/someone/a-game" ? all.repo : /secrets\?/.test(route) ? many.secrets : /secrets\//.test(route) ? { body: { name: "PERSONAL_TERMS" } } : { body: [] }; });
+  ok(asked.length === 5 && asked[3] === "repos/someone/a-game/actions/secrets/PERSONAL_TERMS" && host.terms.body.name === "PERSONAL_TERMS", "where the list runs past its page, the secret is asked by name, a fifth read", asked.join(" | "));
   review("jobs:\n  security-review:\n    uses: x\n");
   const list = checklist({ repo: "someone/a-game", states: statesOf(none, root), fresh: ["personal-terms"], script: "core/scripts/owner-settings.mjs" });
   ok(/^The settings only the owner gives, for someone\/a-game \(`core\/scripts\/owner-settings.mjs`[^\n]*: 0 given, 6 not, 1 not read/.test(list), "the checklist opens with its counts", list.split("\n")[0]);
