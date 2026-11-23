@@ -21,6 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyOf } from "./core-path.mjs";
+import { ownFiles } from "./own-files.mjs";
 import { parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 import { measuredCode, toolOf } from "./strength.mjs";
@@ -119,9 +120,10 @@ export function written(manifest, row) {
   return lines.join("\n");
 }
 
-// What the project at `root` holds that the row is read from, its manifest's text `manifest`.
-export function readProject(root, manifest) {
-  const read = f => { try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
+// What the project at `root` holds that the row is read from, its manifest's text `manifest`; its files read by `read`,
+// own-files.mjs's reader by default, which reads only a regular file of the project's own of a bounded size, so that
+// no pipe, device or link out of the project that a project holds stops the steps or the sync (floor topic 5).
+export function readProject(root, manifest, read = ownReader(root)) {
   const at = where(manifest), text = read(at) ?? fs.readFileSync(path.join(HERE, "..", "setup/template/shape.json.tmpl"), "utf8");
   let config;
   try { config = parseConfig(text, at); } catch { return null; }
@@ -129,6 +131,11 @@ export function readProject(root, manifest) {
   const code = measuredCode(config, root).filter(own);
   const tests = config.tests.length > 0 && measuredTests(config, root).some(own);
   return { code, tests, runner: testRunner(read("package.json")), copy };
+}
+
+// own-files.mjs's reader of the project at `root`; where git cannot list its files, one that reads nothing.
+function ownReader(root) {
+  try { return ownFiles(root).read; } catch { return () => null; }
 }
 
 // The test files the config's "tests" name, as strength.mjs lists the code (git's files, tracked or not, none ignored).
@@ -142,7 +149,7 @@ function measuredTests(config, root) {
 // config cannot be read, which step 370's does; else the mend.
 export function named(p) {
   const now = toolOf(p.manifest), line = p.manifest.split(/\r?\n/u).find(l => l.includes(ROW));
-  const project = now && (fillable(p.manifest) || now.command) ? readProject(p.root, p.manifest) : null;
+  const project = now && (fillable(p.manifest) || now.command) ? readProject(p.root, p.manifest, p.read) : null;
   if (!project) return null;
   const row = rowFor(project), yet = reason => /^no (?:tests|code) yet/u.test(reason ?? "");
   const tool = LIST.tools[row.tool], list = tool?.folder && `${tool.folder}/package.json`;

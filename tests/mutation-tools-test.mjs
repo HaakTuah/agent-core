@@ -17,7 +17,7 @@ let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
-const SCRIPT = path.join(ROOT, "scripts/mutation-tools.mjs");
+const SCRIPT = path.join(ROOT, "scripts/mutation-tools.mjs"), SCRIPT_URL = new URL("../scripts/mutation-tools.mjs", import.meta.url).href;
 
 // ---- the list ----
 const floor = fs.readFileSync(path.join(ROOT, "floor/topics/licences.md"), "utf8").split("\n").slice(0, 12).join(" ");
@@ -96,6 +96,13 @@ try {
   ok(r.status === 0 && same(JSON.parse(read("checks/mutation/package.json")), core) && named(p) === null, "--write writes the package list where the list's row already stands, and the check then passes", r.stdout + r.stderr);
   put("checks/mutation/package.json", "{}\n");
   ok(setUp(dir, js).written === null && read("checks/mutation/package.json") === "{}\n" && setUp(dir, { none: NO_TESTS }).written === null, "setUp writes over no package list that stands, and writes none for a row that names no tool");
+  // (a pipe where package.json stands is read as no file, and the read ends: a child, so that a read that hangs fails;
+  // where the system makes no pipe, as Windows, the case is the one without it: a file that reads as none)
+  fs.rmSync(path.join(dir, "package.json"));
+  if (process.platform === "win32" || spawnSync("mkfifo", [path.join(dir, "package.json")]).status !== 0) put("package.json", "{ not json");
+  const piped = spawnSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(SCRIPT_URL)}); console.log(JSON.stringify(m.readProject(${JSON.stringify(dir)}, "")));`], { encoding: "utf8", timeout: 20000 });
+  ok(piped.status === 0 && JSON.parse(piped.stdout || "{}").runner === null, "a pipe where package.json stands is read as none, and the read ends", piped.stdout + piped.stderr + (piped.error?.message ?? ""));
+  fs.rmSync(path.join(dir, "package.json"));
   r = run("--wrte");
   ok(r.status === 1 && /Mend: /.test(r.stderr), "an unknown argument fails with its mend", r.stderr);
 } finally {
