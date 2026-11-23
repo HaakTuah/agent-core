@@ -14,6 +14,7 @@ import { heldKitIn, declare } from "../scripts/steps-kit.mjs";
 import { STEPS, notDone, project, report } from "../scripts/steps.mjs";
 import { READ_MOST } from "../scripts/own-files.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 
 const { ok, done } = tally();
 const tmp = scratchDir("steps-fresh-");
@@ -70,8 +71,8 @@ fs.writeFileSync(holders, heldList);
 // the build and the config's path taken from them, and compared with what the kit writes for them: #1095, point 6)
 const base = differences(project(plainProject), fresh(project(plainProject))).join("\n");
 const callsTo = { preview: path.join(plainProject, ".github/workflows/preview.yml"), versions: path.join(plainProject, ".github/workflows/versions.yml") };
-fs.writeFileSync(callsTo.preview, `on:\n  workflow_run:\n    workflows: ["Build (web)"]\njobs:\n  preview:\n    uses: HaakTuah/agent-core/.github/workflows/preview.yml@${"a".repeat(40)}\n`);
-fs.writeFileSync(callsTo.versions, `on:\n  workflow_dispatch:\njobs:\n  versions:\n    uses: HaakTuah/agent-core/.github/workflows/versions.yml@${"a".repeat(40)}\n    with:\n      config: tools/versions.json\n`);
+fs.writeFileSync(callsTo.preview, `on:\n  workflow_run:\n    workflows: ["Build (web)"]\njobs:\n  preview:\n    uses: ${CORE}/.github/workflows/preview.yml@${"a".repeat(40)}\n`);
+fs.writeFileSync(callsTo.versions, `on:\n  workflow_dispatch:\njobs:\n  versions:\n    uses: ${CORE}/.github/workflows/versions.yml@${"a".repeat(40)}\n    with:\n      config: tools/versions.json\n`);
 const read = kind(project(plainProject)).o;
 const kitted = Object.fromEntries(fresh(project(plainProject)).filter(([to]) => [...Object.values(callsTo), path.join(plainProject, "tools/versions.json")].includes(path.join(plainProject, to))));
 found = differences(project(plainProject), fresh(project(plainProject)));
