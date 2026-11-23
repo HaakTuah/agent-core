@@ -49,10 +49,6 @@ import { fill, oneJob, readyOnly } from "../scripts/init.mjs";
 import { hostSays, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 import { where } from "../scripts/shape.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
-import modulesStep from "../scripts/steps/160-the-modules-a-project-takes.mjs";
-import confirmStep from "../scripts/steps/820-the-modules-a-project-takes-placed-from-what-is-read.mjs";
-import { moduleNames } from "../scripts/manifest-reads.mjs";
-import { MODULES } from "../scripts/reading.mjs";
 import { ruleTexts, wordsKept } from "../scripts/steps-kit.mjs";
 import { BLOCKS, blockOf, whole } from "../scripts/core-owned.mjs";
 import { configs } from "../scripts/check-configs.mjs";
@@ -65,6 +61,7 @@ import { compared } from "../scripts/release-trial.mjs";
 import { evaluate, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
 
 const STEP_LEADS = STEPS.map(s => s.lead);
+const reported = out => out.split("\n").filter(l => l.startsWith("- ")).map(l => STEP_LEADS.find(lead => l.startsWith(`- ${lead}:`) || l.startsWith(`- ${lead} (`))).filter(Boolean);
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -599,12 +596,9 @@ function upgrade(p, from, ownChanges, expect) {
   git(p.dir, "rm", "-q", ".github/workflows/suites.yml");
   git(p.dir, "commit", "-q", "-m", "its own suite elsewhere");
   const steps = () => node(p.dir, "core/scripts/steps.mjs");
-  const reported = out => out.split("\n").filter(l => l.startsWith("- ")).map(l => STEP_LEADS.find(lead => l.startsWith(`- ${lead}:`) || l.startsWith(`- ${lead} (`))).filter(Boolean);
   const clean = () => { git(p.dir, "reset", "-q", "--hard"); git(p.dir, "clean", "-qfd"); };
   const before = leads(notesAt(from.sha, args => git(theCore, ...args))); // (in the file, or in its folder: #750, point 1)
-  // (the modules' step too where the core gained a module since, which that release's sync writes into no list)
-  const had = git(theCore, "ls-tree", "--name-only", from.sha, ...MODULES.map(d => `${d}/`)).split("\n").map(f => path.basename(f));
-  const added = STEP_LEADS.filter(lead => (!before.includes(lead) || lead === modulesStep.lead && moduleNames(root).some(n => !had.includes(n))) && STAGES[lead]);
+  const added = STEP_LEADS.filter(lead => (!before.includes(lead) || STAGES[lead]?.grew?.(from.sha, args => git(theCore, ...args))) && STAGES[lead]);
   // (a step the commit under test adds that asks something of every project, a check's own list to write, the sync
   // alone does not do: it is reported, it alone, and its mend as written, merged as the project's own pull request
   // would be, makes it done)
@@ -615,7 +609,6 @@ function upgrade(p, from, ownChanges, expect) {
   ok(r.status === 0 && asked.every(lead => added.includes(lead) && STAGES[lead].asked), `${p.name}: after the sync, the steps not done are those the release adds that it asks of every project (${asked.length})`, r.out);
   const unmended = git(p.dir, "rev-parse", "HEAD");
   for (const lead of asked) STAGES[lead].mend(p.dir);
-  for (const lead of reported(stepsIn(p.dir).out)) if (lead === confirmStep.lead && asked.includes(modulesStep.lead)) STAGES[lead].mend(p.dir);
   if (asked.length) {
     git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "what the release asks of every project");
     // (the mend is a pull request of the project's own: it passes the copies workflow, where the checks that read a
@@ -675,7 +668,7 @@ function upgrade(p, from, ownChanges, expect) {
   const wrote = STEP_LEADS.filter(l => w.out.split("\n").some(line => line.startsWith(`- ${l}: wrote `) && line.endsWith("; the step is done.")));
   r = stepsIn(p.dir);
   const left = reported(r.out);
-  ok(w.status === 0 && wrote.every(l => !left.includes(l)) && left.every(l => undone.includes(l) || l === confirmStep.lead && wrote.length) && wordsKept(rules, ruleTexts(p.dir)),
+  ok(w.status === 0 && wrote.every(l => !left.includes(l)) && left.every(l => undone.includes(l) || STAGES[l].written && wrote.length) && wordsKept(rules, ruleTexts(p.dir)),
     `${p.name}: --write on them writes ${wrote.length} whole, each reading done after it, no other step undone and no rule file's words changed`, `${w.out}\n---\n${r.out}`);
   git(p.dir, "reset", "-q", "--hard", "HEAD~1");
   clean();
@@ -728,7 +721,7 @@ function asItStood(p) {
     fs.writeFileSync(path.join(p.dir, f), `${was.replace(/(\/\.github\/workflows\/[\w.-]+@)[0-9a-f]{40}/g, `$1${pin}`)}\n`);
   }
   // (and each step that a call written back asks again, made as its mend words it, as the project's agents made it)
-  const steps = stepsIn(p.dir).out.split("\n").filter(l => l.startsWith("- ")).map(l => STEP_LEADS.find(lead => l.startsWith(`- ${lead}:`) || l.startsWith(`- ${lead} (`))).filter(lead => lead && STAGES[lead]);
+  const steps = reported(stepsIn(p.dir).out).filter(lead => STAGES[lead]);
   for (const lead of steps) STAGES[lead].mend(p.dir);
   git(p.dir, "add", "-A");
   git(p.dir, "commit", "-q", "-m", "its calls kept as they were");
