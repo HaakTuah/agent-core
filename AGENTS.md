@@ -247,6 +247,23 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   a new repository of the same kind, and by the copies part's check of
   `scripts/checks.mjs`, in `core.yml`'s job and `copies.yml`'s, which fails a pull request that changes a file or part
   the core marks so that it is not as the core writes it.
+- **The core's checks run in a project's own jobs as they stand** (#1093). By default a script of the core that a
+  project's own job may run takes what it needs from the core itself: run from a copy, it installs the core's packages
+  it needs from the core's lock file (`scripts/packages.mjs`, by `scripts/install.mjs`) once, before it reads, and the
+  licence check, the shape check and the suites' selection (`scripts/select.mjs`) bring what a project's workflow once
+  carried for them, so no step asks a project to edit its own workflow for an install. The one condition that changes it:
+  the install cannot be made (the registry does not answer, the installer is missing); the script then says, as a
+  warning, that it did not run and why, with its mend, and fails nothing. The trigger is a check written or widened
+  that a project's own job may run: whoever builds it has it take what it needs so, and every mend that names an
+  install gives the guarded form (`if [ -f core/scripts/install.mjs ]; then …; fi`). It does not mean that a project's
+  own workflow is rewritten by the core, nor that no step asks where its own lookup stands or what its own suites skip
+  (#1093), nor that the core's own repository installs as it runs: its jobs name what
+  they install, and a package not there fails there. Reason: #1079 turned a project's sync pull request red over
+  nothing it changed, and seven steps asked an agent to edit a project's own workflows by hand. Held by
+  `tests/upgrade-test.mjs` (a project's own job that runs the copy's scripts on a runner with nothing installed passes
+  after the sync with no change of its own) and `tests/packages-test.mjs` (a copy's script with its packages missing,
+  installed first, or, where the install cannot be made, a warning that fails nothing), and, for the guarded form,
+  `tests/mend-test.mjs`.
 - **A writer of the core's and its readers meet in a round trip** (#1108). By default each file the core writes into a
   project (the starter kit, the one process, the sync, and the baselines and records a check or a step writes there) is
   read back in a test by each of the core's own readers that reads it (the YAML and Markdown readers, the readers of
@@ -260,6 +277,25 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   Held by `tests/round-trip-test.mjs`, in `.github/workflows/tests.yml`, which fails a script that writes a file and
   stands in neither of its lists, and a writer whose round trip did not run; that a new reader brings its round trip,
   by none.
+- **The host is read and written by the look** (#1092). By default a step of the sync notes whose state is the host's,
+  not a file's (a label, a setting, the look's own record, an account's right), is told done by a check of what the host
+  answers (its `host` in `scripts/steps/`, `scripts/step-checks-host.mjs`, read through `scripts/host.mjs`), and what a
+  step needs written on the host, the labels of the core's list and the look's issues, the daily look's own job writes
+  with that job's token, each right it uses named in its workflow's `permissions:` with a comment saying what it is for
+  (`.github/workflows/look.yml`, the starter kit's call of it). The one condition that changes it: GitHub refuses the
+  read or the write to that token, or shows a setting to the repository's admins alone; then the step is said not read,
+  never done, and the look files in one issue, "Settings only the owner gives", labelled `needs-owner`, each setting
+  only the owner gives it read as not given, with its link, and each write refused, with the right it would need, naming
+  there too the settings it could not read, which the owner's sitting reads. The trigger is the look's run in a project,
+  each day, and each sync, which prints what `host.mjs` reads and writes nothing. It does not mean that an agent session
+  edits the host for a step with its own sign-in, save where the floor asks it (secret scanning in a public repository,
+  floor topic 9), that the look's token gains a right to give a setting only the owner gives, that the value of the
+  secret `PERSONAL_TERMS` is read (the workflow says only whether it is given), nor that a step not read fails anything.
+  Reason: a step the host holds was left to a session's own sign-in, which reaches past the project and an agent tool's
+  automatic mode may refuse, the step then waiting on the owner. Held by `tests/host-test.mjs`, on a stand-in for the
+  host: each step read done, not done and not read, the host only read where nothing is to be written, the labels made,
+  a write refused said with its right, the issue's text, and each right of the look's workflows named with what it is
+  for.
 - **A release says what it asks, step by step.** Whoever adds an entry to the sync notes (`setup/sync-notes/`)
   gives it a step in `scripts/steps/` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
@@ -268,14 +304,17 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`); each is
   a task the project's agents take (`roles/orchestrator.md`; with no orchestrator, the session that syncs), a step
   only the owner can do labelled so, and each difference kept on purpose declared in the manifest's "Differences".
-  Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
+  Where a script does a step exactly, the sync runs it (`scripts/steps.mjs --write`; #1091): it writes a check's config
+  or baseline or a pointer's path alone, lists it and sets it aside for the session that syncs to commit after the
+  sync's merge, or says why it wrote nothing. Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
   owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps beyond what the core writes (it stays pure), nor
-  that a step not done fails or stops anything. Reason: a step written only in prose is where one is missed, and
-  nothing showed that it was. Held by `tests/steps-test.mjs`, which fails an entry with no step and a step with a
+  that a step not done fails or stops anything, nor that a step that needs judgement is written by a script. Reason: a
+  step written only in prose is where one is missed, and nothing showed that it was. Held by
+  `tests/steps-write-test.mjs` (no rule's words changed), by `tests/steps-test.mjs`, which fails an entry with no step and a step with a
   check that cannot be taken out and mended, and by `tests/upgrade-test.mjs`: after the sync every step reads done,
   but one the release adds that it asks of every project (a check's own list to write), which is reported and done
   by its mend as written; each step added since the release started from, taken out, is reported and its mend as
-  written makes it done, and steps taken out at random are reported, exactly those.
+  written makes it done, and steps taken out at random are reported, exactly those, and done by the writers.
 - **A pull request says what it asks of a project:** one that changes the floor, a module, a script,
   the setup or a workflow has the heading "What it asks of a project", saying what happens in a project that changes
   nothing of its own: nothing, a baseline written, or an ask in the sync notes with its cost. It does not mean that

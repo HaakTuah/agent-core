@@ -27,7 +27,7 @@ const lines = text => String(text ?? "").split(/\r\n|\r|\n/u);
 // opens a pull request writes, takes time in step with its length)
 const indent = l => { let i = 0; while (i < 3 && l[i] === " ") i++; return l.slice(i); };
 const blank = c => c === " " || c === "\t";
-function headingOf(line) {
+export function headingOf(line) {
   const l = indent(line);
   let n = 0;
   while (n < l.length && l[n] === "#") n++;

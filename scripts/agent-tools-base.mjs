@@ -3,7 +3,7 @@
 // (agent-tools-project.mjs, agent-tools-listing.mjs).
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { textAt } from "./git-objects.mjs";
+import { textAt, objectAt as objectIn } from "./git-objects.mjs";
 import { canonical, show, TREE, fold, describe } from "./agent-tools-entries.mjs";
 import { listing, LISTING_MAX } from "./agent-tools-listing.mjs";
 import { whereToolsRead, TOOL_FILES, READS } from "./agent-tools-links.mjs";
@@ -80,8 +80,12 @@ function namedWay(at, text, win = false) {
   }
   return { to: here.join("/") || ".", via };
 }
-// The object git holds at `rev:at`, a folder's or a file's; null where it holds none there.
+// The object git holds at `rev:at`, a folder's or a file's; null where it holds none there. Taken from the long-lived
+// `cat-file --batch-check` where it finds one, else asked of `git rev-parse` alone (the batch says "missing" of a
+// submodule's commit, which rev-parse names).
 function objectAt(root, rev, at) {
+  const held = objectIn(root, rev, at)?.oid;
+  if (held) return held;
   try { return execFileSync("git", ["--no-replace-objects", "rev-parse", "-q", "--verify", `${rev}:${at}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || null; } catch { return null; }
 }
 // Each link the base held where a tool reads its files that the pull request replaced with the very file or folder it

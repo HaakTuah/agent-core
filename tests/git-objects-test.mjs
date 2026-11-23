@@ -1,13 +1,13 @@
 // Tests of git-objects.mjs (#732), the long-lived `git cat-file --batch` the agent-tools check reads a commit's objects
-// through: each answer is what the single call, `git show rev:file`, gave, and where the batch cannot answer so, the
-// single call is made. Each case a made-up repository in a temporary folder. Run by the core's tests workflow
+// through, and the long-lived `git check-ignore --stdin` it asks what git ignores: each answer is what the single call,
+// `git show rev:file` or `git check-ignore -q -- file`, gave, and where the batch cannot answer so, the single call is made. Each case a made-up repository in a temporary folder. Run by the core's tests workflow
 // (.github/workflows/tests.yml).
 //
 //   node tests/git-objects-test.mjs
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { exactPath, forget, objectAt, settle, textAt } from "../scripts/git-objects.mjs";
+import { exactPath, forget, ignoredAt, ignoredDone, objectAt, settle, settleIgnored, textAt } from "../scripts/git-objects.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -176,6 +176,49 @@ ok(past.replies.length === 1 && past.replies[0].body === undefined && past.repli
 ok(textAt(path.relative(process.cwd(), dir), "HEAD", "d/f") === "in a folder\n" && objectAt(path.relative(process.cwd(), dir), "HEAD", "a")?.type === "blob", "a root given as a relative path is read through the batch");
 const printed = execFileSync(process.execPath, ["--input-type=module", "-e", `import { textAt } from ${JSON.stringify(new URL("../scripts/git-objects.mjs", import.meta.url).href)}; console.log(JSON.stringify(textAt(${JSON.stringify(dir)}, "HEAD", "d/f")));`], { encoding: "utf8", env });
 ok(printed.trim() === JSON.stringify("in a folder\n"), "a caller started with --input-type and --eval reads through its worker (a worker that failed would be waited on for two minutes)");
+
+// What git ignores in the working tree is what `git check-ignore -q` says there, run as the check ran it (the machine's own
+// settings as they are): a file or a folder a pattern names, one a negation brings back, a tracked file a pattern
+// names, one no pattern names, a path that holds nothing, one git refuses (beyond a link, in a submodule), each in turn.
+const single = (root, f) => { try { execFileSync("git", ["check-ignore", "-q", "--", f], { cwd: root, stdio: "ignore" }); return true; } catch { return false; } };
+const ign = path.join(base, "ignores");
+fs.mkdirSync(path.join(ign, "out"), { recursive: true });
+fs.mkdirSync(path.join(ign, "in"), { recursive: true });
+git(ign, "init", "-q", "-b", "main");
+fs.writeFileSync(path.join(ign, ".gitignore"), "out/\n*.log\n!keep.log\n");
+for (const f of ["out/a", "a.log", "keep.log", "tracked.log", "in/x", "in/y.log"]) fs.writeFileSync(path.join(ign, f), "x\n");
+git(ign, "add", "-f", ".gitignore", "tracked.log", "in/x");
+git(ign, "commit", "-q", "-m", "ignores");
+const linksHere = process.platform !== "win32";
+if (linksHere) fs.symlinkSync("in", path.join(ign, "via"));
+const asked = ["out/a", "a.log", "keep.log", "tracked.log", "in/x", "in/y.log", "nothing", "out", ...(linksHere ? ["via/x"] : []), "in/x", "a.log"];
+const said = asked.map(f => ignoredAt(ign, f)), singly = asked.map(f => single(ign, f));
+ok(JSON.stringify(said) === JSON.stringify(singly) && said[0] && said[1] && !said[2] && !said[3] && !said[4] && said[5], `each path is ignored or not as git check-ignore -q says, one after another and after a path git refuses (${said.map(Number).join("")})`);
+ok(ignoredAt(ign, "a.log\nb") === single(ign, "a.log\nb") && ignoredAt(ign, "") === single(ign, ""), "a name with a line's end, and an empty one, are asked of the single call");
+ok(ignoredAt(path.join(ign, "in"), "y.log") === single(path.join(ign, "in"), "y.log") && ignoredAt(path.join(ign, "in"), "y.log"), "a root inside the repository asks git from there, as the single call did");
+ignoredDone(path.join(ign, "in"));
+const noRepo = fs.mkdtempSync(path.join(base, "no-repo-"));
+ok(ignoredAt(noRepo, "a.log") === false && ignoredAt(path.join(base, "not-there"), "a.log") === false, "a folder that is no repository, or is not there, ignores nothing");
+// (once a reader is done, a change to the ignore files is read, and the folder can be deleted, on Windows too; until
+// then the one process answers, as the ignore files stood when it read them, which the single call would not)
+fs.writeFileSync(path.join(ign, ".gitignore"), "keep.log\n");
+ok(ignoredAt(ign, "a.log") && !single(ign, "a.log"), "the long-lived process answers, from the ignore files it read");
+ok(roots.every(r => textAt(r, "HEAD", "n") !== null) && ignoredAt(ign, "a.log"), "and is not closed while more than the processes kept are asked");
+ignoredDone(ign);
+ok(ignoredAt(ign, "keep.log") && !ignoredAt(ign, "a.log"), "after ignoredDone the ignore files are read as they stand then");
+ignoredDone(ign);
+ignoredDone(ign);
+let deleted = true;
+try { fs.rmSync(ign, { recursive: true }); } catch { deleted = false; }
+ok(deleted, "and the working tree it ran in can be deleted at once");
+// (check-ignore's answer, given in pieces as a pipe gives it: none before its four fields are all there)
+const fedIgnored = chunks => {
+  const p = { chunks: [] }, replies = [];
+  for (const c of chunks) { p.chunks.push(Buffer.from(c)); settleIgnored(p, r => replies.push(r)); }
+  return replies;
+};
+ok(fedIgnored([".gitignore\0", "1\0out/\0out/a", "\0"]).map(r => r.ignored).join() === "true" && fedIgnored([".gitignore\x003\x00!keep.log\x00keep.log\x00"])[0].ignored === false && fedIgnored(["\0\0\0in/x\0"])[0].ignored === false, "a pattern answers ignored, a negation or none not, once its four fields are there");
+ok(fedIgnored([".gitignore\x001\x00out/\x00out/a"]).length === 0, "and nothing before the last field's end");
 
 // The paths the listing may answer for: written as git reads them.
 ok(["a", "d/f", ".claude/settings.json", "a b", "a\\b", "..a", "a..", ".x/y."].every(exactPath), "a path of plain steps is exact");

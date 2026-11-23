@@ -1,7 +1,8 @@
 // The step of setup/sync-notes/730-a-project-s-own-rules-and-what-holds-them.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { OWN as OWN_HOLDERS } from "../holders.mjs";
+import { OWN as OWN_HOLDERS } from "../holders-own.mjs";
 import { COST } from "../step-checks.mjs";
+import { writeHolders } from "../step-writers.mjs";
 
 export default { lead: "19 November 2026, a project's own rules and what holds them", cost: COST.config,
   // (the list of what holds each of the project's own rules, holders.mjs's OWN, written and readable; what it names
@@ -13,4 +14,5 @@ export default { lead: "19 November 2026, a project's own rules and what holds t
     let holds;
     try { holds = JSON.parse(text)?.holders; } catch { holds = null; }
     return holds && typeof holds === "object" && !Array.isArray(holds) ? null : `\`${OWN_HOLDERS}\` cannot be read as JSON with an object "holders": write it so, or take it out and ${mend}.`;
-  } };
+  },
+  write: writeHolders };

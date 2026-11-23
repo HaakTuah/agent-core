@@ -12,7 +12,7 @@ export class Unread extends Error {}
 export const readable = (p, mentions) => {
   const unread = Object.entries(p.workflows).filter(([, w]) => !w.yaml && mentions(w.text ?? "")).map(([f]) => `.github/workflows/${f}`);
   if (unread.length) throw new Unread(installed("yaml") ? `the core's reader cannot read ${unread.join(", ")}, in a form it does not know`
-    : `the core's packages are not installed, so ${unread.join(", ")} could not be read: run \`node ${corePath(p.root) || "core/"}scripts/install.mjs\`, then this again`);
+    : `the core's packages are not installed, so ${unread.join(", ")} could not be read: run \`if [ -f ${corePath(p.root) || "core/"}scripts/install.mjs ]; then node ${corePath(p.root) || "core/"}scripts/install.mjs; fi\`, then this again`);
 };
 // A project's calls to a workflow of the core's, by the workflow's name: each as [where, job] (its file and its job,
 // with uses and with); `calls` the jobs alone, and `call` the first.

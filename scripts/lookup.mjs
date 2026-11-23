@@ -405,10 +405,16 @@ export async function run(configPath, { root, base, nuget = false, get = fetched
     ...(off ? [`${off} lock entr${off === 1 ? "y" : "ies"} the pull request brings not from npm's registry with an integrity value (floor rule 7)`] : [])], code: failures.length || off ? 1 : 0 };
 }
 
+/** What the lookup printed, for the review, also on the run's summary page, where a reviewer finds it beside the checks. */
+export function summarise(lines, nuget) {
+  if (!process.env.GITHUB_STEP_SUMMARY || lines.length <= 1) return;
+  try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### The lookup${nuget ? " (NuGet)" : ""}\n\n${lines.map((l) => `- ${l.replace(/[<>&`*_[\]|]/gu, "?")}`).join("\n")}\n`); } catch { /* (a summary is a convenience: the log holds every line) */ }
+}
+
 // The pull request's base as its workflow names it (LOOKUP_BASE, from the event's base commit), where the checkout holds
 // that commit: a checkout of the head alone, or of a head that merges main, would read no base, or the pull request's
 // own earlier commit as its first parent.
-function namedBase(root) {
+export function namedBase(root) {
   const sha = process.env.LOOKUP_BASE;
   if (typeof sha !== "string" || !/^[0-9a-f]{40}$/u.test(sha)) return null;
   try { execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd: root, stdio: "ignore" }); return sha; } catch { return null; }
@@ -420,11 +426,9 @@ if (started(import.meta.url)) {
   let root;
   try { root = projectAt(fileURLToPath(new URL(".", import.meta.url))).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim(); }
   catch (e) { console.error(`FAIL: ${logged(e.message)}. Mend: run it from the project's root, a git repository`); process.exit(1); }
-  const { lines, code } = await run(configPath, { root, base: namedBase(root) ?? baseOf(root), nuget: process.argv.includes("--nuget") });
+  const nuget = process.argv.includes("--nuget");
+  const { lines, code } = await run(configPath, { root, base: namedBase(root) ?? baseOf(root), nuget });
   for (const line of lines) (line.startsWith("FAIL") ? console.error : console.log)(line);
-  // (what is printed for the review, also on the run's summary page, where a reviewer finds it beside the checks)
-  if (process.env.GITHUB_STEP_SUMMARY && lines.length > 1) {
-    try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### The lookup${process.argv.includes("--nuget") ? " (NuGet)" : ""}\n\n${lines.map((l) => `- ${l.replace(/[<>&`*_[\]|]/gu, "?")}`).join("\n")}\n`); } catch { /* (a summary is a convenience: the log holds every line) */ }
-  }
+  summarise(lines, nuget);
   process.exit(code);
 }
