@@ -1,8 +1,9 @@
 // Tests where MSBuild's files decide what a file of C# reaches, for the test selection (scripts/select-csharp-project.mjs,
 // through scripts/select-csharp.mjs; #675): a <Using> read in any form, each of its aliases and Static; every file unsure
-// where a <Using> names a property, holds what the reader cannot read, or an <Import> or a Custom…Microsoft… property may
-// bring in a file it never sees, or git cannot be asked; C# of no project; the namespaces outside every project's root;
-// and what git holds beside the texts, a link among them unknown, past the budget Late. The cases: select-csharp-test.mjs.
+// where a <Using> names a property, holds what the reader cannot read, or an <Import> or a property MSBuild imports by
+// may bring in a file it never sees, or git cannot be asked; a .csproj.user and a .pubxml read; C# of no project; the
+// namespaces outside every project's root; and what git holds beside the texts, a link or a Directory.Build.rsp among
+// them unknown, past the budget Late. The cases: select-csharp-test.mjs.
 // Needs the parser (node scripts/install.mjs parser). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/select-csharp-msbuild-test.mjs
@@ -20,10 +21,12 @@ for (const [held, what] of [...["$(Root).App", "@(ExtraUsings)", "%(Ns.Identity)
   ...["$(D)u.xml", "c.proj", "u.props.xml", "a.props;u.xml", "../U.Props", "c.props/u.xml", "u.xml;a.props", "$(X).props", ...["GetPathOfFileAbove('u.xml', 'a.props')", "IO.Path]::ChangeExtension('a.props', '.xml')", "IO.Path]::Combine('a.props', '..', 'u.xml')",
     "String]::Copy('a.props').Replace('.props', '.xml')", "String]::Concat('a.props', '.xml')"].map(f => `$([${f.startsWith("Get") ? "MSBuild]::" : "System."}${f})`)].map(p => [`<Import Project="${p}" />`, `a .props git holds imports ${p}, whose <Using> items it may not hold`]),
   ...["MSBuildMine", "MSBuildAllProjects", "MSBuildProjectExtensionsPath"].map(m => [`<PropertyGroup><${m}>u.xml;a</${m}></PropertyGroup><Import Project="$(${m}).props" />`, `a .props imports $(${m}).props, a property of MSBuild's name that a file can set`]),
-  ...["CustomAfterMicrosoftCommonTargets", "DirectoryBuildTargetsPath", "_DirectoryBuildTargetsFile", "_DirectoryBuildPropsFile", "DirectoryPackagesPropsPath", "LanguageTargets", "MSBuildUserExtensionsPath", "MSBuildExtensionsPath"].map(m => [`<PropertyGroup><${m}>$(MSBuildThisFileDirectory)u.xml</${m}></PropertyGroup>`, `a .props names a file the SDK imports by ${m}`]), [null, "git cannot be asked"]]) {
+  ...["CustomAfterMicrosoftCommonTargets", "DirectoryBuildTargetsPath", "_DirectoryBuildTargetsFile", "_DirectoryBuildPropsFile", "DirectoryPackagesPropsPath", "LanguageTargets", "MSBuildUserExtensionsPath", "MSBuildExtensionsPath", "CustomAfterDirectoryBuildTargets", "CustomBeforeDirectoryBuildProps", "CodeAnalysisTargets", "AfterMicrosoftNETSdkTargets", "AlternateCommonProps", "NuGetBuildTasksPackTargets", "NuGetRestoreTargets", "BeforeTargetFrameworkInferenceTargets", "PublishProfile", "WebPublishProfileFile"].map(m => [`<PropertyGroup><${m}>$(MSBuildThisFileDirectory)u.xml</${m}></PropertyGroup>`, `a .props names a file MSBuild or the SDK imports by ${m}`]), [null, "git cannot be asked"]]) {
   const r = csharpReach(csTexts, undefined, () => held ? { msbuild: [held], cs: {} } : { unknown: true });
   ok(same([...r.unsure].sort(), ["src/A.cs", "tests/T.cs"]), `where ${what}, every file of C# is unsure`, JSON.stringify([...r.unsure]));
 }
+const userFiles = ["src/App.csproj.user", "src/Properties/PublishProfiles/P.pubxml", "src/Properties/PublishProfiles/P.pubxml.user"].filter(f => !same([...csharpReach({ ...csTexts, [f]: "<Project><ItemGroup><Using Include=\"$(Root).App\" /></ItemGroup></Project>" }, undefined, nothing).unsure].sort(), ["src/A.cs", "tests/T.cs"]));
+ok(!userFiles.length, "a .csproj.user, which MSBuild imports beside its .csproj, and a .pubxml or .pubxml.user, which the SDK imports by a publish profile, are read for their <Using> items", userFiles.join(" | "));
 ok(ofNoProject("lib/A.cs", csTexts) && !ofNoProject("src/A.cs", csTexts) && !ofNoProject("A.cs", { "App.csproj": PROJ }), "C# is of no project where no .csproj stands in a folder above it");
 
 const unreadMeta = csharpReach({ ...csTexts, "tests/Tests.csproj": "<Project><ItemGroup><Using Include=\"App\"><!-- <Alias>D</Alias> --></Using></ItemGroup></Project>" }, undefined, nothing);
@@ -70,6 +73,8 @@ ok(!unread.length && rooted("", [group("<RootNamespace>Lib</RootNamespace>")]) &
     const held = heldBeside({ "B.cs": "" }, () => files);
     ok(same(Object.keys(held.cs), ["A.cs"]) && held.msbuild.length === 1, "what git holds of C# and MSBuild beside the texts is read", JSON.stringify(held));
     fs.symlinkSync("Directory.Build.props", path.join(dir, "Link.props"));
+    fs.writeFileSync(path.join(dir, "Directory.Build.rsp"), "-p:CustomAfterMicrosoftCommonTargets=u.xml\n");
+    ok(heldBeside({}, () => [...files, "Directory.Build.rsp"]).unknown, "a Directory.Build.rsp git holds, whose switches may set any property, leaves what git holds unknown, so every file is unsure");
     ok(heldBeside({}, () => [...files, "Link.props"]).unknown, "a link git holds there, which is not followed, leaves what git holds unknown, so every file is unsure");
     add("Big.cs", `// ${"x".repeat(4_000_000)}\n`);
     let thrown;

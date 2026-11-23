@@ -9,7 +9,7 @@
 // any change) where it is unread, holds code the tokens leave out, or finds types unnamed (REFLECTS); every file is,
 // where a <Using> cannot be read whole, a global alias names a hook's attribute, or git cannot be asked. C# git holds
 // that the config does not read links those it reads (select-csharp-project.mjs).
-import { heldBeside, msbuildUsings, outside } from "./select-csharp-project.mjs";
+import { MSBUILD, heldBeside, msbuildUsings, outside } from "./select-csharp-project.mjs";
 import { delegates, join, pairs, word } from "./select-csharp-delegates.mjs";
 import { leftOut } from "./select-csharp-text.mjs";
 import { readCsharp } from "./shape-csharp.mjs";
@@ -197,14 +197,24 @@ function fullNames(x, ix, aliases, pace) {
 
 // The aliases a file sees (x its facts): the global ones and its own, each to what it names, and one whose target "D::"
 // or "D." heads also to what the alias D names ("using D = App;" then "using E = D::Data;" names App.Data, as
-// "using E = D.Data;" does in a namespace's body). `pace` asked for each.
+// "using E = D.Data;" does in a namespace's body), round after round until no alias gains a target, so a chain of
+// either form is read in any order. Each target is cut to the index's depth, past which every reader cuts a name, so
+// the rounds end. `pace` asked for each.
 function aliasesOf(x, ix, pace) {
   const aliases = new Map(ix.aliases), own = new Set();
-  const add = (k, t) => { if (!own.has(k)) { own.add(k); aliases.set(k, new Set(aliases.get(k))); } aliases.get(k).add(t); }; // (the global sets kept as they are)
+  const add = (k, t) => { if (aliases.get(k)?.has(t)) return false; if (!own.has(k)) { own.add(k); aliases.set(k, new Set(aliases.get(k))); } aliases.get(k).add(t); return true; }; // (the global sets kept as they are)
   for (const u of x.usings) if (u.alias && u.target !== null) add(u.alias, u.target);
-  for (const u of [...ix.qualified, ...x.usings]) if (u.alias && u.qual && u.target !== null) for (const t of [...aliases.get(u.qual) ?? []]) { pace(); add(u.alias, join(t, u.target)); }
-  for (const u of x.usings) if (u.alias && !u.qual && u.target !== null) for (const t of [...headed(u.target, aliases)]) { pace(); add(u.alias, t); }
+  const chained = [...ix.qualified, ...x.usings].filter(u => u.alias && u.target !== null && (u.qual || x.usings.includes(u)));
+  for (let more = true; more;) {
+    more = false;
+    for (const u of chained) for (const t of [...(u.qual ? qualified(u, aliases) : headed(u.target, aliases))]) { pace(); if (add(u.alias, t.split(".", ix.depth).join("."))) more = true; }
+  }
   return aliases;
+}
+
+// What a target "D::" heads names: the alias D's targets joined with it, one at a time.
+function* qualified(u, aliases) {
+  for (const t of aliases.get(u.qual) ?? []) yield join(t, u.target);
 }
 
 // What a target names where an alias heads it ("D.Data", or "D" alone), one at a time: the alias's targets joined with
@@ -220,7 +230,7 @@ function* headed(target, aliases) {
 function* targetsOf(x, ix, aliases, pace) {
   yield* ix.globals;
   for (const u of x.usings) if (u.target !== null) yield u.target;
-  for (const u of [...ix.qualified, ...x.usings]) if (u.qual && !u.alias) for (const t of aliases.get(u.qual) ?? []) { pace(); yield join(t, u.target); }
+  for (const u of [...ix.qualified, ...x.usings]) if (u.qual && !u.alias) for (const t of qualified(u, aliases)) { pace(); yield t; }
   for (const u of x.usings) if (!u.alias && !u.qual && u.target !== null) for (const t of headed(u.target, aliases)) { pace(); yield t; }
 }
 
@@ -245,7 +255,7 @@ function reachOf(x, ix, pace) {
 export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   const links = new Map();
   if (!Object.keys(texts).some(f => f.endsWith(".cs"))) return { links, unsure: new Set() };
-  const held = beside(texts), read = Object.entries(texts).filter(([f]) => /\.(csproj|props|targets)$/u.test(f)).map(([, t]) => t);
+  const held = beside(texts), read = Object.entries(texts).filter(([f]) => MSBUILD.test(f)).map(([, t]) => t);
   const msbuild = held.unknown ? null : msbuildUsings([...held.msbuild, ...read], pace);
   const all = { ...held.cs, ...texts }, files = Object.keys(all).filter(f => f.endsWith(".cs"));
   // (where the usings every file holds are untold, every file is unsure)
