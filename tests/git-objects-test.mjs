@@ -196,12 +196,14 @@ const said = asked.map(f => ignoredAt(ign, f)), singly = asked.map(f => single(i
 ok(JSON.stringify(said) === JSON.stringify(singly) && said[0] && said[1] && !said[2] && !said[3] && !said[4] && said[5], `each path is ignored or not as git check-ignore -q says, one after another and after a path git refuses (${said.map(Number).join("")})`);
 ok(ignoredAt(ign, "a.log\nb") === single(ign, "a.log\nb") && ignoredAt(ign, "") === single(ign, ""), "a name with a line's end, and an empty one, are asked of the single call");
 ok(ignoredAt(path.join(ign, "in"), "y.log") === single(path.join(ign, "in"), "y.log") && ignoredAt(path.join(ign, "in"), "y.log"), "a root inside the repository asks git from there, as the single call did");
+ignoredDone(path.join(ign, "in"));
 const noRepo = fs.mkdtempSync(path.join(base, "no-repo-"));
 ok(ignoredAt(noRepo, "a.log") === false && ignoredAt(path.join(base, "not-there"), "a.log") === false, "a folder that is no repository, or is not there, ignores nothing");
 // (once a reader is done, a change to the ignore files is read, and the folder can be deleted, on Windows too; until
 // then the one process answers, as the ignore files stood when it read them, which the single call would not)
 fs.writeFileSync(path.join(ign, ".gitignore"), "keep.log\n");
 ok(ignoredAt(ign, "a.log") && !single(ign, "a.log"), "the long-lived process answers, from the ignore files it read");
+ok(roots.every(r => textAt(r, "HEAD", "n") !== null) && ignoredAt(ign, "a.log"), "and is not closed while more than the processes kept are asked");
 ignoredDone(ign);
 ok(ignoredAt(ign, "keep.log") && !ignoredAt(ign, "a.log"), "after ignoredDone the ignore files are read as they stand then");
 ignoredDone(ign);

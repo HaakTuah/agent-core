@@ -22,8 +22,8 @@ const textMax = () => (Number(process.env.GIT_OBJECTS_TEXT_MAX) > 0 ? Number(pro
 // ---- the worker: one process for each repository and way of asking, a line in and its answer out ----
 function serve({ port, flag }) {
   const live = new Map();
-  const start = (key, args, cwd) => {
-    const child = spawn("git", args, { cwd, stdio: ["pipe", "pipe", "ignore"] }), p = { child, chunks: [], have: 0, head: null, wait: null };
+  const start = (key, args, cwd, ignore) => {
+    const child = spawn("git", args, { cwd, stdio: ["pipe", "pipe", "ignore"] }), p = { child, ignore, chunks: [], have: 0, head: null, wait: null };
     const done = reply => { const w = p.wait; p.wait = null; p.chunks = []; p.have = 0; p.head = null; if (w) w(reply); };
     // (a process that exits leaves the table, if it is still the one the key names: the key may be started again)
     const gone = () => { if (live.get(key) === p) live.delete(key); done({ failed: true }); };
@@ -40,19 +40,22 @@ function serve({ port, flag }) {
     // (each process closed, to be started again when asked: what git read at its start, the objects packed since and the replace objects, is read anew)
     if (close) { for (const other of live.values()) other.child.stdin.end(); live.clear(); return; }
     // (the one process `ended` names stopped, and answered once it has exited: one that runs in a working tree holds
-    // its folder, which Windows will not delete while it runs)
+    // its folder, which Windows will not delete while it runs. Its input is closed, on which git exits, since a kill on
+    // Windows may stop only the launcher `git` is there and leave the git it started; killed only where it has not
+    // exited in ten seconds)
     if (ended) {
       const p = live.get(ended), child = p?.child;
       live.delete(ended);
       if (!child || child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return answer({ ended: true });
-      child.once("exit", () => answer({ ended: true }));
-      return void child.kill();
+      const late = setTimeout(() => child.kill(), 10_000);
+      child.once("exit", () => { clearTimeout(late); answer({ ended: true }); });
+      return void child.stdin.end();
     }
     let p = live.get(key);
-    if (!p) { p = start(key, args, cwd); live.set(key, p); } else { live.delete(key); live.set(key, p); }
-    for (const [k, other] of live) { if (live.size <= OLDEST_KEPT) break; live.delete(k); other.child.stdin.end(); }
+    if (!p) { p = start(key, args, cwd, ignore); live.set(key, p); } else { live.delete(key); live.set(key, p); }
+    // (a process of what git ignores is never closed so: its reader ends it, and waits for it, once it has read)
+    for (const [k, other] of live) { if (live.size <= OLDEST_KEPT) break; if (other.ignore || k === key) continue; live.delete(k); other.child.stdin.end(); }
     p.batch = batch;
-    p.ignore = ignore;
     p.chunks = [];
     p.have = 0;
     p.head = null;
