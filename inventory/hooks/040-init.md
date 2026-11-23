@@ -6,7 +6,7 @@
   `scripts/workflow-calls.mjs`, `scripts/step-paths.mjs`, `scripts/step-commands.mjs`, `scripts/own-runs.mjs`,
   `scripts/steps-stage.mjs`, `scripts/stage-helpers.mjs`, `scripts/stages/`, `scripts/bash-commands.mjs`,
   `scripts/own-files.mjs`, `scripts/runners.mjs`, `scripts/read-nothing.mjs`, `scripts/core-reading.mjs`, `scripts/attached.mjs`,
-  `scripts/owner-settings.mjs`, `scripts/owner-settings.json`, `tests/owner-settings-test.mjs`,
+  `scripts/owner-settings.mjs`, `scripts/owner-settings.json`, `tests/owner-settings-test.mjs`, `scripts/review-caller.mjs`, `tests/review-caller-test.mjs`,
   `setup/sync-notes.md`, `setup/sync-notes/`, `tests/init-dotnet-test.mjs`, `scripts/steps-kit.mjs`,
   `tests/steps-checks-run-test.mjs`, `tests/steps-files-test.mjs`, `tests/steps-tool-files-test.mjs`,
   `tests/steps-slots-test.mjs`, `tests/steps-fresh-test.mjs`, `tests/steps-vendored-test.mjs`,
