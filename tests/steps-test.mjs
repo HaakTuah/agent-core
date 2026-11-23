@@ -13,6 +13,7 @@ import { FOLDER, NOTES, NOTICE, POINTER, entries, notes as notesWhole } from "..
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { only, heldKitIn } from "../scripts/steps-kit.mjs";
 import { COST, STEPS, leads, notDone, project, report } from "../scripts/steps.mjs";
+import { shapeReadsParsed, shapeWritten } from "../scripts/step-checks-shape.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -148,5 +149,13 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
   ok(!notDone(lockProject).length, "and their mends make both done", report(notDone(lockProject)));
 }
 
+
+// ---- no step of the shape check asks for its config or baseline while the owner's `none` turns it off (#1107) ----
+// (370, 640, 690 and 720; a `none` with no reason turns nothing off, so 370 still asks)
+{
+  const asked = row => { const p = { manifest: `# Core manifest\n\n| Slot | Value |\n| --- | --- |\n${row}\n`, read: () => null, root: tmp }; return [shapeWritten(p), ...["csharp-tree", "javascript-tree", "python-tree"].map(r => shapeReadsParsed(p, r))]; };
+  const askedOff = asked("| *shape check* | `none`: the owner's reason |"), askedOn = asked("| *shape check* | `none` |");
+  ok(askedOff.every(m => m === null) && askedOn[0] !== null, "no step of the shape check asks for its config or baseline while the owner's `none` turns it off, and one with no reason still asks", JSON.stringify({ askedOff, askedOn }));
+}
 
 done("steps");
