@@ -46,6 +46,8 @@ ok(same([...rawHole.unsure], ["src/X.cs"]), "a raw interpolated string, whose ho
 ok(!one("namespace Tests;\nclass Y { string s = \"\"\"a\"\"\" + $\"{1}\" + $\"{2,-10:F1}\" + $\"{F(1, 2)}\"; }\n").unsure.size, "a raw string that is not interpolated, an interpolated one that is not raw, an alignment that names nothing and a call's \",\" make none");
 const aligned = ["$\"{1,App.Layout.Width}\"", "$@\"{1,(int)W}\""].filter(e => !one(`namespace Tests;\nclass Y { string s = ${e}; }\n`).unsure.has("src/X.cs"));
 ok(!aligned.length, "an interpolation's alignment that holds a word, which the tokens do not read, makes its file unsure", aligned.join(", "));
+const hidden = ["\"Price: $\" + $\"{1,App.Layout.Width}\"", "/* $\" */ $\"{1,App.Layout.Width}\"", "// $\"\n$\"{1,App.Layout.Width}\"", "'\"' + $\"{1,App.Layout.Width}\"", "@\"a\"\"$\" + $\"{1,App.Layout.Width}\"", "\"\"\"a \" b\"\"\" + $\"{1,App.Layout.Width}\"", "$\"{1 /* } */ ,App.Layout.Width}\""].filter(e => !one(`namespace Tests;\nclass Y { string s = ${e}; }\n`).unsure.has("src/X.cs"));
+ok(!hidden.length, "a \"$\\\"\" in a string, a character or a comment, and a comment in a hole, hide no alignment", hidden.join(" | "));
 const bridged = { ...app, "src/Bridge.cs": "namespace App;\nref class Bridge { public static bool Check() => Rules.Allowed(); }\n", "tests/BridgeTest.cs": "using App;\nnamespace Tests;\nclass BridgeTest { void T() { Bridge.Check(); } }\n" };
 ok(readCsharp(bridged["src/Bridge.cs"]).functions === null && pick(bridged, "src/Rules.cs").tests.includes("tests/BridgeTest.cs"),
   "a file the grammar loses, whose declarations are not known, is reached from every file and unsure, so a test that names it runs", JSON.stringify(pick(bridged, "src/Rules.cs")));
