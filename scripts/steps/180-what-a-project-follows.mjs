@@ -2,4 +2,4 @@
 // of their names.
 import { COST } from "../step-checks.mjs";
 
-export default { lead: "13 November 2026, what a project follows", cost: COST.line, unread: "what the project wants to follow is its own choice; with no row, the default holds" };
+export default { lead: "13 November 2026, what a project follows", cost: COST.line, asks: "nothing", unread: "what the project wants to follow is its own choice; with no row, the default holds" };

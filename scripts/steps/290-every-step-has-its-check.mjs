@@ -2,4 +2,4 @@
 // of their names.
 import { COST } from "../step-checks.mjs";
 
-export default { lead: "15 November 2026, every step has its check", cost: COST.check, unread: "it asks that the steps above be run, which every sync from this one on does by itself" };
+export default { lead: "15 November 2026, every step has its check", cost: COST.check, asks: "nothing", unread: "it asks that the steps above be run, which every sync from this one on does by itself" };

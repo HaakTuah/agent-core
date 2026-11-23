@@ -172,4 +172,64 @@ for (const l of WHOLE) {
   back();
 }
 
+// ---- the modules a list neither takes nor leaves out: placed by --write from what is read, the manifest's module lines
+// alone written, and the one taken by choice asked of the owner (#1094) ----
+{
+  const [placing, choice, confirm] = [lead("13 November 2026, the modules a project takes"), lead("16 November 2026, how done will be judged"), lead("23 November 2026, the modules a project takes, placed")];
+  STAGES[placing].stage(dir);
+  STAGES[choice].stage(dir);
+  commit("two modules neither taken nor left out");
+  const before = [placing, choice].map(l => missed(l).length), was = read("core-manifest.md");
+  r = write();
+  const now = read("core-manifest.md"), outside = text => text.replace(/\n\nModules to confirm: [^\n]*/u, "").split("\n").filter(l => !/^(Floor: |Not taken: |Modules to confirm: )/u.test(l)).join("\n");
+  ok(before.join() === "1,1" && r.status === 0 && !missed(placing).length && !missed(choice).length && missed(confirm).length === 1 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``)
+    && /^Not taken: `game-design\.md` \(the project is no game: its manifest holds no game's row\)\.$/m.test(now) && /\n\nModules to confirm: `done-when\.md`\.\n/u.test(now) && /^Floor: whole\. Modules: .*`done-when\.md`/m.test(now) && outside(now) === outside(was),
+    "a module the list misses is placed by --write: left out where a fact decides it, taken and asked of the owner where none does, and nothing of the manifest written but its module lines", `${r.stdout}${r.stderr}\n---\n${now}`);
+  back();
+  // (at a sync, which moves the manifest's pin before the writers run: the module lines placed and set aside, the
+  // moved pin left in the tree for the sync's pull request, and the stash popped onto that pull request's merge)
+  STAGES[placing].stage(dir);
+  commit("a module neither taken nor left out");
+  const moved = read("core-manifest.md").replace(/^(Core: .*?)\b[0-9a-f]{40}\b/mu, `$1${"c".repeat(40)}`), pin = /^Core: .*$/mu.exec(moved)[0];
+  put("core-manifest.md", moved);
+  r = write("--aside");
+  const left = read("core-manifest.md");
+  ok(r.status === 0 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``) && r.stdout.includes(`set aside in the stash "${ASIDE}"`) && left === moved && dirty() === "M core-manifest.md",
+    "at a sync that moved the manifest's pin, --aside writes its module lines and sets them aside, the moved pin left where the sync put it", `${r.stdout}${r.stderr}\n---\n${left}\n---\n${dirty()}`);
+  commit("the sync's pull request, merged");
+  git("stash", "pop", "-q");
+  ok(!missed(placing).length && read("core-manifest.md").includes(`${pin}\n`), "and the stash, popped once the sync merged, brings the module lines back on the moved pin", read("core-manifest.md"));
+  back();
+  // (the same where git writes the tree's line ends as Windows does, and the manifest gone, which stays busy, and fails nothing)
+  STAGES[placing].stage(dir);
+  commit("a module neither taken nor left out");
+  git("config", "core.autocrlf", "true");
+  put("core-manifest.md", moved.replace(/\r?\n/gu, "\r\n"));
+  r = write();
+  ok(r.status === 0 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``), "and where the tree holds the manifest with Windows line ends", `${r.stdout}${r.stderr}`);
+  git("config", "--unset", "core.autocrlf");
+  back();
+  // (and, where git leaves line ends as they are, a tree with Windows ones over the blob's: the stash leaves the blob's,
+  // and the moved pin is put back with no line end of its own)
+  STAGES[placing].stage(dir);
+  commit("a module neither taken nor left out");
+  put("core-manifest.md", moved.replace(/\r?\n/gu, "\r\n"));
+  r = write("--aside");
+  ok(r.status === 0 && read("core-manifest.md") === moved, "and with --aside, the pin put back on a file whose line ends the stash changed, keeping them", JSON.stringify(read("core-manifest.md").slice(0, 300)));
+  back();
+  STAGES[placing].stage(dir);
+  commit("a module neither taken nor left out");
+  fs.rmSync(path.join(dir, "core-manifest.md"));
+  r = write();
+  ok(r.status === 0 && !r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``) && !fs.existsSync(path.join(dir, "core-manifest.md")), "a manifest taken out and not yet committed is written by none, and --write fails nothing", `${r.stdout}${r.stderr}`);
+  back();
+}
+
+// (the module lines read past in the manifest alone, never in another rule file)
+{
+  const m = "Floor: whole. Modules: `a.md`.\n", t = { "core-manifest.md": m, "AGENTS.md": m };
+  ok(wordsKept(t, { ...t, "core-manifest.md": "Floor: whole. Modules: `a.md`, `b.md`.\n\nModules to confirm: `b.md`.\n" }) && !wordsKept(t, { ...t, "AGENTS.md": "Floor: whole. Modules: `b.md`.\n" }),
+    "the words kept read past the module lines of the manifest, and of no other rule file");
+}
+
 done("the steps' writers");

@@ -2,4 +2,4 @@
 // of their names.
 import { COST } from "../step-checks.mjs";
 
-export default { lead: "20 November 2026, a stack's record says what the core cannot read in it", cost: COST.check, held: "the choice records' check" };
+export default { lead: "20 November 2026, a stack's record says what the core cannot read in it", cost: COST.check, asks: "nothing", held: "the choice records' check" };
