@@ -274,5 +274,27 @@ for (const [args, env, what] of [
   [["--passed", "tests;rm"], {}, "a check's name that is none"],
 ]) { r = run(args, env); ok(r.status === 1 && mended(r.out), `refused, with its mend: ${what}`, r.out); }
 
+// ---- a sync's change: the copy of the core and the pins of calls to its workflows (#1093, point 2) ----
+const sha = "a".repeat(40), pinOf = at => `jobs:\n  core:\n    uses: HaakTuah/agent-core/.github/workflows/core.yml@${at}\n`;
+put("core-manifest.md", `# Manifest\n\nCore: HaakTuah/agent-core at ${sha}, copied whole under core/ (never edited here).\n`);
+put("core/scripts/x.mjs", "export const x = 1;\n"); put("core/setup/notes.md", "notes\n"); put("core/.node-version", "24\n");
+put("test/copy.test.js", "import { spawnSync } from 'node:child_process';\nspawnSync(process.execPath, ['core/scripts/x.mjs']);\n");
+put("test/joined.test.js", "import path from 'node:path';\nexport const at = path.join('core', 'scripts');\n");
+put(".github/workflows/core.yml", pinOf(sha));
+git("add", "-A"); git("commit", "-q", "-m", "a copy");
+put("core/scripts/x.mjs", "export const x = 2;\n"); put("core/setup/notes.md", "more notes\n"); put(".github/workflows/core.yml", pinOf("b".repeat(40)));
+git("add", "-A"); git("commit", "-q", "-m", "a sync");
+r = run([], { SELECT_BASE: "HEAD^1" });
+ok(r.status === 0 && /test\/copy\.test\.js: can run the copy of the core/.test(r.out) && /test\/joined\.test\.js: can run the copy of the core/.test(r.out) && !/test\/rules\.test\.js/.test(r.out) && !/whole suite/.test(r.out),
+  "a sync's change selects the tests that name the copy alone: the rest of the copy, and a workflow in which only a pin moved, select none", r.out);
+put(".github/workflows/core.yml", `${pinOf("c".repeat(40))}    secrets: inherit\n`);
+git("add", "-A"); git("commit", "-q", "-m", "more than a pin");
+r = run([], { SELECT_BASE: "HEAD^1" });
+ok(r.status === 0 && /the whole suite, \d+ tests: \.github\/workflows\/core\.yml is no code/.test(r.out), "a workflow changed beyond its pins runs the whole suite, as any file no reader follows does", r.out);
+put("core/.node-version", "26\n");
+git("add", "-A"); git("commit", "-q", "-m", "a newer Node");
+r = run([], { SELECT_BASE: "HEAD^1" });
+ok(r.status === 0 && /the whole suite, \d+ tests: core\/\.node-version, the Node the suites run on, changed/.test(r.out), "the copy's .node-version runs the whole suite: every test runs on that Node", r.out);
+
 console.log(`${count - failed} of ${count} passed`);
 process.exitCode = failed ? 1 : 0;

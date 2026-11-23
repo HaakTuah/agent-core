@@ -104,11 +104,14 @@ export const callers = p => (readable(p, text => text.toLowerCase().includes(`${
   .filter(([, w]) => { const jobs = Object.values(w.yaml?.jobs ?? {}); return jobs.length > 0 && jobs.every(coreCall); }).map(([f]) => `.github/workflows/${f}`);
 
 // Each workflow of the project's own whose pull-request path filter starts it on a change to such a file alone, as
-// GitHub reads a filter (a path filter sees which files changed, never what changed in them); null where none does.
+// GitHub reads a filter (a path filter sees which files changed, never what changed in them); null where none does. A
+// workflow that selects its suites through the copy's select.mjs is left out: the selection counts the copy's files
+// as the step asks, and a workflow in which only a pin moved as no change (#1093, point 2).
 export function suitesOnPins(p) {
   const pins = callers(p);
   readable(p, text => /paths(-ignore)?\s*:/.test(text));
-  const started = Object.entries(p.workflows).filter(([f]) => !pins.includes(`.github/workflows/${f}`)).flatMap(([f, w]) => {
+  const selects = runFiles(p, "select.mjs");
+  const started = Object.entries(p.workflows).filter(([f]) => !pins.includes(`.github/workflows/${f}`) && !selects.includes(`.github/workflows/${f}`)).flatMap(([f, w]) => {
     const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];
     const by = Array.isArray(only) ? pins.filter(c => pathsLetThrough(only, [c])) : Array.isArray(ignore) ? pins.filter(c => !pathsLetThrough(ignore, [c])) : [];
     return by.length ? [`\`.github/workflows/${shown(f)}\` (${by.map(shown).join(", ")})`] : [];
