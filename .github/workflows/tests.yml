@@ -276,6 +276,9 @@ jobs:
       - name: The NuGet check's whole job, where its restore must succeed (it asks NuGet's registry; #772)
         if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-gate-network-test.mjs ')) }}
         run: node tests/nuget-gate-network-test.mjs
+      - name: The code scan's own logic, which needs no engine (its reading of a description, the files the engine did not read, the verdicts)
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-logic-test.mjs ')) }}
+        run: node tests/code-scan-logic-test.mjs
       - name: The code scan of a private project, its engine fetched by its digest (#546)
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-test.mjs ')) }}
         run: node tests/code-scan-test.mjs
@@ -480,12 +483,18 @@ jobs:
       - name: The security-review workflow's shell, for each kind it branches on
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/security-review-workflow-test.mjs ')) }}
         run: node tests/security-review-workflow-test.mjs
+      - name: The description check's draft and ready branches, run as GitHub runs them (#809)
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/own-description-test.mjs ')) }}
+        run: node tests/own-description-test.mjs
       - name: The proof that a pull request changes only the progress file's lines, each for an issue it may name
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-only-test.mjs ')) }}
         run: node tests/queue-only-test.mjs
       - name: The workflow check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/workflows-test.mjs ')) }}
         run: node tests/workflows-test.mjs
+      - name: The workflow check's glue that runs zizmor and actionlint
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/workflow-tools-test.mjs ')) }}
+        run: node tests/workflow-tools-test.mjs
       - name: The step's shell with the network cut off, and, run under it, that the cut stands (#770)
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/offline-test.mjs ')) }}
         run: node tests/offline-test.mjs
@@ -607,6 +616,9 @@ jobs:
       - name: The words check, the dated records' added lines too
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/general-test.mjs ')) }}
         run: node tests/general-test.mjs
+      - name: The marks check, a rule written read for its reason, its holder and its condition
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pattern-test.mjs ')) }}
+        run: node tests/pattern-test.mjs
       - name: The cap's own check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/size-test.mjs ')) }}
         run: node tests/size-test.mjs
@@ -682,6 +694,9 @@ jobs:
       - name: Which rules each role cites, counted for the state report
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/cited-test.mjs ')) }}
         run: node tests/cited-test.mjs
+      - name: Which files two merged pull requests each added to within a week, for the busy-record step
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/busy-records-test.mjs ')) }}
+        run: node tests/busy-records-test.mjs
       - name: The outcomes the state report leads with, and how a correction is counted
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/outcomes-test.mjs ')) }}
         run: node tests/outcomes-test.mjs

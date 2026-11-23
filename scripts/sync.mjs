@@ -1,6 +1,6 @@
 // The sync (README, "How a project takes the core", point 1): run from a project's root, it brings the project's copy
 // of the core to a newer commit of the core, as a sync PR carries it. It writes the copy whole at that commit, at the path the
-// manifest's "Core:" line names (`core/` as a rule; core-path.mjs), moves that line to it, and moves each call to a core workflow whose workflow changed (as `core.yml` checks),
+// manifest's "Core:" line names (`core/` as a rule; core-path.mjs), with the executable bits the core marks staged in git's index (#1093), moves that line to it, and moves each call to a core workflow whose workflow changed (as `core.yml` checks),
 // listing those calls, and prints what the sync asks of the project beyond the copy (the core's setup/sync-notes.md, the
 // entries it gained between the two commits), then, from the copy it has just written, every step a release asks that
 // is not done, what the steps' writers wrote of them where a script does it exactly, set aside in a stash to be
@@ -28,6 +28,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
+import { recordModes } from "./copy-tree.mjs";
 import { readCore } from "./core-path.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { everyInstall } from "./packages.mjs";
@@ -190,13 +191,14 @@ function sync(tmp) {
   if (!target) return;
   const { pin, release } = target;
   if (!past(pin, "refs/heads/main", tmp)) fail(`${pin} is not a commit of the core's main`);
-  if (pin === old && !first) { console.log(`${at} is already at ${pin}: nothing to sync`); converge(dir, kitsOf(old, tmp)); return; }
+  if (pin === old && !first) { console.log(`${at} is already at ${pin}: nothing to sync`); recordModes(dir, pin, tmp); converge(dir, kitsOf(old, tmp)); return; }
 
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
   execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(tmp, ["archive", pin], { encoding: "buffer", maxBuffer: 1 << 28 }) });
   fs.writeFileSync(manifest, text.replace(lineRe, line => line.replace(old, pin)));
+  recordModes(dir, pin, tmp);
   install(dir);
 
   const { moved, unread } = moveCalls(pin, tmp, own);

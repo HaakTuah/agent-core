@@ -42,7 +42,14 @@ const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encodin
 const write = (dir, f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
 
 // the core: A, then B (the core as it stands, its personal-terms workflow changed since A), and a commit off main
-fs.cpSync(root, theCore, { recursive: true, filter: src => !["/.git", "/node_modules"].some(x => slash(src).endsWith(x)) });
+// (without the folders of scripts and records that no case here reads, which are most of the files each project's copy
+// of the core is written from and committed with, bar the two files the job reads off main: the staged cases' record
+// and the tools they run under)
+const unread = ["scripts", "archive", "inventory", "choices", "setup", "reports", "tests", ".packages"], read = ["scripts/staged-tools.json", "reports/staged-cases.json"];
+fs.cpSync(root, theCore, { recursive: true, filter: src => {
+  const rel = slash(path.relative(root, src));
+  return !(slash(src).endsWith("/.git") || slash(src).endsWith("/node_modules")) && (!unread.includes(rel.split("/")[0]) || read.some(f => f === rel || f.startsWith(`${rel}/`)));
+} });
 git(theCore, "init", "-q", "-b", "main");
 const terms = fs.readFileSync(path.join(theCore, ".github/workflows/personal-terms.yml"), "utf8");
 write(theCore, ".github/workflows/personal-terms.yml", `${terms}# A\n`);
