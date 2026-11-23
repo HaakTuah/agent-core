@@ -5,7 +5,7 @@
 // look's own job, with that job's token and the rights its workflow names (look.mjs): the labels of the core's list
 // (labels.mjs), the steps' issue and the issue "Settings only the owner gives", which lists each such setting not given,
 // with its link, and each write GitHub refused, so that no session's own sign-in edits the host for a step. Run by
-// itself, from a project's root, as each sync runs it, it reads and writes nothing, and prints the steps read on the
+// itself, from a project's root, it reads and writes nothing, and prints the steps read on the
 // host that are not done; it fails nothing (AGENTS.md, "Nothing locks a project"). gh, git and Node's own modules.
 //
 //   node core/scripts/host.mjs     from a project's root: the steps read on the host that are not done, and those not read
@@ -111,7 +111,7 @@ function main() {
   const repo = repoOf(spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout);
   if (!repo) { console.log("The host was not read: the origin is on no github.com, so the steps read on it are left to the project's own host (core/tasks/hosts.md)."); return 0; }
   const root = process.cwd();
-  // (a sync's run reads only: no empty write is sent to learn whether issues can be written, and no answer is that)
+  // (a run by itself reads only: no empty write is sent to learn whether issues can be written, and no answer is that)
   console.log(hostReport(hostSteps(root, readHost(project(root), repo, { post: () => ({ status: null, err: "" }) }))));
   return 0;
 }
