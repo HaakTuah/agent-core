@@ -6,7 +6,9 @@
 //     with no rule file open;
 //   - "held": a check of the project's own, named, fails where the step is not done, and its failure says the mend;
 //   - "unread": no check reads it exactly, and the step says why; the staged case "steps" plants it and reads what a
-//     session did, or says why it cannot (staged/steps.mjs, beside this file).
+//     session did, or says why it cannot (staged/steps.mjs, beside this file). Where a tool fetched at set-up alone reads
+//     it, the step gives as well "fetched", the variables the tool's set-up script sets and the check run where the
+//     session's environment holds each, as "check" is (step-checks-fetched.mjs; #1095, point 4); elsewhere it stays unread.
 // A step only the project's owner can do says so ("owner"): it is advisory, labelled `needs-owner` (labels.json, beside
 // this file), and the rest goes on. A step the project leaves undone on purpose is declared in its manifest's "Differences", on its owner's
 // word, by a line that quotes the step's lead ("13 November 2026, the core has moved"): such a step is not reported.
@@ -75,6 +77,9 @@ export const STEPS = await Promise.all(fs.readdirSync(FOLDER).filter(f => f.ends
 // Whether the manifest declares a step undone on purpose: a line of its "Differences" that quotes the step's lead.
 export const declared = (p, step) => p.differences.some(l => l.includes(`"${step.lead}"`));
 
+// A step's check run where the session fetched its tools ("fetched"), or null where one is not there.
+export const fetched = (step, env = process.env) => step.fetched?.tools.every(t => env[t]) ? step.fetched.check : null;
+
 // The steps not done in the project at `root`: each { lead, owner, cost, mend }. A check that throws is not read as
 // done: it is reported, with what went wrong.
 export function notDone(root, steps = STEPS) {
@@ -84,9 +89,10 @@ export function notDone(root, steps = STEPS) {
   const mine = p.files.filter(f => !f.startsWith(copy)), own = at => mine.some(f => f === at || f.startsWith(`${at}/`));
   const out = [];
   for (const step of steps) {
-    if (!step.check || declared(p, step)) continue;
+    const check = step.check ?? fetched(step);
+    if (!check || declared(p, step)) continue;
     let mend, unread = false;
-    try { mend = step.check(p); } catch (e) { unread = true; mend = `Its check could not read the project (${plain(e.message, root)}): read its entry in \`core/${NOTES_FOLDER}/\` against it.`; }
+    try { mend = check(p); } catch (e) { unread = true; mend = `Its check could not read the project (${plain(e.message, root)}): read its entry in \`core/${NOTES_FOLDER}/\` against it.`; }
     // (the entries and the checks say core/, the starter kit's path for the copy; a project that keeps it elsewhere is
     // told its own: #628. `unread`: its check could not read the project, which attached.mjs counts neither way)
     if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend: mendAt(mend, copy, own), unread });
