@@ -131,7 +131,9 @@ export function check(lockfile, read) {
 // `root`: { status, out, err } (the lines for stdout and stderr). Given `textAt`, which gives a file as the pull
 // request's base held it (or null), a problem the base held word for word stood before: reported on stdout, never failed
 // ("Nothing locks a project" in the core's AGENTS.md), as the licence check runs this beside itself (#1093, point 2).
-export function report(configPath, root = ".", textAt = null) {
+// Given `noBase`, where the licence check found no base to read against, what stands cannot be told from what is new:
+// every problem is reported, never failed, and the lookup's own warning says why.
+export function report(configPath, root = ".", textAt = null, noBase = false) {
   const failed = (message, status = 1) => ({ status, out: [], err: [message] });
   if (!configPath) return failed("usage: node core/scripts/exact-versions.mjs <the licence check's config>", 2);
   let lockfiles;
@@ -141,11 +143,11 @@ export function report(configPath, root = ".", textAt = null) {
   if (outside.length) return failed(`FAIL: ${logged(`"lockfiles" in ${configPath} names a path outside the project: ${outside.join(", ")}`)}. Mend: name each lock file by its path from the project's root, with no ".." that leads above it`);
   const found = lockfiles.flatMap((f) => check(posix.normalize(f), (p) => readFileSync(join(root, p), "utf8")));
   const held = new Set(textAt ? lockfiles.flatMap((f) => check(posix.normalize(f), (p) => { const t = textAt(p); if (t === null) throw new Error("none at the base"); return t; })) : []);
-  const problems = found.filter((p) => !held.has(p)), stood = found.filter((p) => held.has(p));
+  const problems = noBase ? [] : found.filter((p) => !held.has(p)), stood = noBase ? found : found.filter((p) => held.has(p));
   return {
     status: problems.length ? 1 : 0,
-    out: [...stood.map((p) => `REPORT: ${logged(p)} (it stood so at the pull request's base: reported, never failed)`),
-      problems.length ? `${problems.length} dependencies not at one exact version (floor rule 7)` : `ok   every dependency of ${lockfiles.length} lock file${lockfiles.length === 1 ? "" : "s"} is at the one exact version it installs${stood.length ? `, but ${stood.length} that stood so before` : ""}`],
+    out: [...stood.map((p) => `REPORT: ${logged(p)} (${noBase ? "no base to read it against" : "it stood so at the pull request's base"}: reported, never failed)`),
+      problems.length ? `${problems.length} dependencies not at one exact version (floor rule 7)` : `ok   every dependency of ${lockfiles.length} lock file${lockfiles.length === 1 ? "" : "s"} is at the one exact version it installs${stood.length ? `, but ${stood.length} ${noBase ? "reported with no base to read against" : "that stood so before"}` : ""}`],
     err: problems.map((p) => `FAIL: ${logged(p)}`),
   };
 }

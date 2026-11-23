@@ -719,7 +719,7 @@ export async function alongside(configPath, root) {
   const { report } = await import("./exact-versions.mjs");
   const { run, namedBase, summarise } = await import("./lookup.mjs");
   const at = namedBase(root) ?? baseOf(root);
-  const exact = report(resolve(configPath), root, at ? (f) => textAt(root, at, f) : null);
+  const exact = report(resolve(configPath), root, at ? (f) => textAt(root, at, f) : null, !at);
   for (const line of exact.err) console.error(line);
   for (const line of exact.out) console.log(line);
   if (!at && process.env.GITHUB_EVENT_NAME?.startsWith("pull_request")) {

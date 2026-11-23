@@ -175,7 +175,7 @@ try {
   // where it is not; each run is written in `asked`, by the installs it was given)
   const fails = path.join(tmp, "install-fails"), asked = path.join(tmp, "asked"), askedOf = () => (fs.existsSync(asked) ? fs.readFileSync(asked, "utf8") : "");
   fs.renameSync(path.join(copy, "scripts/install.mjs"), path.join(copy, "scripts/install-real.mjs"));
-  fs.writeFileSync(path.join(copy, "scripts/install.mjs"), `import { spawnSync } from "node:child_process";\nimport fs from "node:fs";\nimport { fileURLToPath } from "node:url";\nfs.appendFileSync(${JSON.stringify(asked)}, \`\${process.argv.slice(2).join(" ") || "npm"}\\n\`);\nif (fs.existsSync(${JSON.stringify(fails)})) { console.error("FAIL: the core's packages were not installed: npm could not be started. Mend: install npm beside Node, then run this again"); process.exit(1); }\nprocess.exit(spawnSync(process.execPath, [fileURLToPath(new URL("./install-real.mjs", import.meta.url)), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n`);
+  fs.writeFileSync(path.join(copy, "scripts/install.mjs"), `import { spawnSync } from "node:child_process";\nimport fs from "node:fs";\nimport { fileURLToPath } from "node:url";\nfs.appendFileSync(${JSON.stringify(asked)}, \`\${process.argv.slice(2).join(" ") || "all"}\\n\`);\nif (fs.existsSync(${JSON.stringify(fails)})) { console.error("FAIL: the core's packages were not installed: npm could not be started. Mend: install npm beside Node, then run this again"); process.exit(1); }\nprocess.exit(spawnSync(process.execPath, [fileURLToPath(new URL("./install-real.mjs", import.meta.url)), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n`);
   fs.writeFileSync(fails, "");
   // (each script that loads a package, by the call that loads it; a script that loads one and has no case here fails)
   const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")`, "parse-yaml.mjs": `parseYaml("a: 1\\n")`, "markdown.mjs": "markdownReader()", "runners.mjs": `workflowsIn(".github/workflows")`, "toml.mjs": `parseToml("a = 1\\n")`, "schemas.mjs": `shapeFaults("copies", {})`, "workflows.mjs": `draftHoles("on: pull_request\\njobs: {}\\n")` };
@@ -193,12 +193,12 @@ try {
   for (const f of loads.filter(x => ANSWERS_NULL.has(x))) {
     fs.rmSync(asked, { force: true });
     const r = call(f, callOf(f));
-    ok(r.status === 0 && r.stdout.trim() === "null" && askedOf() === "npm\n", `${f}, with nothing installed beside the copy, runs the copy's installer once, and where it installs nothing answers null for its caller to say, and does not take the project's own package of the name`, `${r.stdout}${r.stderr}${askedOf()}`);
+    ok(r.status === 0 && r.stdout.trim() === "null" && askedOf() === "all\n", `${f}, with nothing installed beside the copy, runs the copy's installer once, and where it installs nothing answers null for its caller to say, and does not take the project's own package of the name`, `${r.stdout}${r.stderr}${askedOf()}`);
   }
   for (const f of loads.filter(x => !ANSWERS_NULL.has(x))) {
     fs.rmSync(asked, { force: true });
     const r = call(f, callOf(f)), out = `${r.stdout}${r.stderr}`;
-    ok(r.status === (THROWS.has(f) ? 1 : 0) && /(?:did not run[^\n]*|^FAIL): the package \S+ could not be installed in \S+: npm could not be started\. Mend: /mu.test(out) && (THROWS.has(f) || /^::warning::/mu.test(r.stderr)) && !r.stdout.trim() && askedOf() === "npm\n" && told(out),
+    ok(r.status === (THROWS.has(f) ? 1 : 0) && /(?:did not run[^\n]*|^FAIL): the package \S+ could not be installed in \S+: npm could not be started\. Mend: /mu.test(out) && (THROWS.has(f) || /^::warning::/mu.test(r.stderr)) && !r.stdout.trim() && askedOf() === "all\n" && told(out),
       `${f}, with nothing installed beside the copy, runs the copy's installer once, and where it installs nothing says it did not run and why, ${THROWS.has(f) ? "to its caller" : "as a warning that fails nothing"}, and does not take the project's own package of the name`, `${r.status} ${out}${askedOf()}`);
   }
   // (the code scan, with its engine not installed, on a change it would read: it did not run, and says how to install)

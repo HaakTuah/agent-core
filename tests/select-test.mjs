@@ -11,6 +11,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { ALL_MS, Late, hurry } from "../scripts/hurry.mjs";
 import { WORDS, mentioned, nameTrie } from "../scripts/name-trie.mjs";
@@ -275,8 +276,8 @@ for (const [args, env, what] of [
 ]) { r = run(args, env); ok(r.status === 1 && mended(r.out), `refused, with its mend: ${what}`, r.out); }
 
 // ---- a sync's change: the copy of the core and the pins of calls to its workflows (#1093, point 2) ----
-const sha = "a".repeat(40), pinOf = at => `jobs:\n  core:\n    uses: HaakTuah/agent-core/.github/workflows/core.yml@${at}\n`;
-put("core-manifest.md", `# Manifest\n\nCore: HaakTuah/agent-core at ${sha}, copied whole under core/ (never edited here).\n`);
+const sha = "a".repeat(40), pinOf = at => `jobs:\n  core:\n    uses: ${CORE}/.github/workflows/core.yml@${at}\n`;
+put("core-manifest.md", `# Manifest\n\nCore: ${CORE} at ${sha}, copied whole under core/ (never edited here).\n`);
 put("core/scripts/x.mjs", "export const x = 1;\n"); put("core/setup/notes.md", "notes\n"); put("core/.node-version", "24\n");
 put("test/copy.test.js", "import { spawnSync } from 'node:child_process';\nspawnSync(process.execPath, ['core/scripts/x.mjs']);\n");
 put("test/joined.test.js", "import path from 'node:path';\nexport const at = path.join('core', 'scripts');\n");

@@ -205,7 +205,9 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
 
 // The checks run beside the licence check (#1093, point 2) read against the base the job names (LOOKUP_BASE), as the
 // lookup does, where the checkout holds the head and not a merge: a range that stood there is reported, never failed;
-// and a base the job names that the checkout does not hold fails, saying its mend, where the lookup would warn.
+// where it names none and the checkout holds none, what stands cannot be told from what is new, so a range is reported,
+// never failed (Codex's review of ea0438a); and a base the job names that the checkout does not hold fails, saying its
+// mend, where the lookup would warn.
 {
   const dir = scratchDir("licences-test-alongside-");
   const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
@@ -214,7 +216,8 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
   const run = async (base) => {
     const lines = [];
     console.log = console.error = (l) => lines.push(String(l));
-    process.env.GITHUB_EVENT_NAME = "pull_request"; process.env.LOOKUP_BASE = base;
+    process.env.GITHUB_EVENT_NAME = "pull_request";
+    if (base === undefined) delete process.env.LOOKUP_BASE; else process.env.LOOKUP_BASE = base;
     try { return { failed: await alongside(join(dir, "c.json"), dir), out: lines.join("\n") }; } finally { console.log = was.log; console.error = was.error; }
   };
   try {
@@ -228,6 +231,9 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
     const named = await run(base);
     ok(!named.failed && /stood so at the pull request's base: reported, never failed/u.test(named.out) && !/^FAIL/mu.test(named.out), "on a checkout of the head, a range that stood at the base the job names is reported, never failed", named.out);
     const lacking = await run("f".repeat(40));
+    const none = await run(undefined);
+    ok(!none.failed && /no base to read it against: reported, never failed/u.test(none.out) && /^::warning::The lookup of the packages new to the project did not run/mu.test(none.out) && !/^FAIL/mu.test(none.out),
+      "where the job names no base and its checkout holds none, a range is reported, never failed, beside the lookup's warning", none.out);
     ok(lacking.failed && /^FAIL: the lookup of the packages new to the project cannot run: the job names the pull request's base \(LOOKUP_BASE\), and its checkout does not hold that commit\. Mend: /mu.test(lacking.out), "a base the job names that its checkout does not hold fails the lookup, saying its mend", lacking.out);
   } finally {
     for (const [k, v] of [["GITHUB_EVENT_NAME", was.event], ["LOOKUP_BASE", was.base]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
