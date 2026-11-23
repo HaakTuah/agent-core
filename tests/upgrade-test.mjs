@@ -564,7 +564,7 @@ function upgrade(p, from, ownChanges, expect) {
   git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "a workflow of its own that runs the core's workflow check");
   const ownRun = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: main1, only: "own-core-checks.yml", ownToo: true });
   const ownOut = ownRun.flatMap(([, r]) => r.steps.map(x => x.out ?? "")).join("\n");
-  ok(started(ownRun).length === 1 && !failures(ownRun) && /this check installed them first/u.test(ownOut) && !/not installed|could not be installed/u.test(ownOut),
+  ok(started(ownRun).length === 1 && !failures(ownRun) && /this check installed them first/u.test(ownOut) && !/::warning::(?!The workflow check did not run (?:zizmor|actionlint): it was not fetched)/u.test(ownOut),
     `${p.name}: a workflow of its own that runs the workflow check with no install step before it passes, the check installing the core's packages itself`, failures(ownRun) || ownOut);
   const unasked = stepsIn(p.dir);
   ok(!unasked.out.includes("the core's packages installed from its lock file:"), `${p.name}: and the steps the sync prints ask no install step of that workflow`, unasked.out);
