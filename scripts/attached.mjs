@@ -8,8 +8,8 @@
 // start, are listed apart, advised, standing in the way of nothing; and what it could not read, and the checks that
 // read nothing here, it says, counted neither way. It
 // reports and fails nothing (AGENTS.md of the core, "Nothing locks a project"), and each part keeps its own check where
-// it stands. The sync prints its line at its end (sync.mjs, beside this file). Reads only: what git writes to compare
-// the copy goes to a temporary folder. Git, tar, gh where pure-sync.mjs asks whose account holds the repository, and
+// it stands. The sync prints its line at its end (sync.mjs, beside this file). Reads only, and writes nothing in the
+// project. Git, tar, gh where pure-sync.mjs asks whose account holds the repository, and
 // Node's own modules.
 //
 //   node core/scripts/attached.mjs                    from a project's root: the line, then what stands in the way
@@ -20,7 +20,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { copyTree, entries } from "./copy-tree.mjs";
+import { copyTree } from "./copy-tree.mjs";
 import { CORE } from "./core-address.mjs";
 import { MANIFEST, readCore } from "./core-path.mjs";
 import { differences, fresh, kind } from "./fresh.mjs";
@@ -32,22 +32,38 @@ import { plain } from "./step-checks.mjs";
 import { notDone, project } from "./steps.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const git = (root, args, env = process.env) => execFileSync("git", args, { cwd: root, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
+const git = (root, args, env = process.env, input) => execFileSync("git", args, { cwd: root, env, input, encoding: "utf8", stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
 const firstLine = text => String(text ?? "").trim().split("\n").filter(Boolean).at(-1) ?? "it said nothing";
 
-// The tree of the copy as it stands in the working folder, the index's tracked files kept and every change taken in, as
-// a commit of it would hold it: built with a copy of the project's index, its objects written to the bare repository
-// `bare` alone (the project's own objects read through it), so the project is left as it was.
-function workingTree(root, at, bare) {
-  const index = path.join(bare, "attached-index"), own = path.resolve(root, git(root, ["rev-parse", "--git-path", "index"]));
-  if (fs.existsSync(own)) fs.copyFileSync(own, index);
-  const env = { ...process.env, GIT_INDEX_FILE: index, GIT_OBJECT_DIRECTORY: path.join(bare, "objects"), GIT_ALTERNATE_OBJECT_DIRECTORIES: path.resolve(root, git(root, ["rev-parse", "--git-path", "objects"])) };
-  git(root, ["add", "-A", "--", at.slice(0, -1)], env);
-  return git(root, ["write-tree", `--prefix=${at}`], env);
+// The copy's entries as they stand in the working folder, as a commit of it would hold them, by path from the copy:
+// each tracked or new file not ignored, its blob's id as git would store it (hash-object, which writes nothing, runs
+// the same filters a commit does: line endings above all), every file's mode 100644 as copy-tree.mjs says.
+function working(root, at) {
+  const out = new Map(), files = [];
+  const listed = git(root, ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", at.slice(0, -1)]).split("\0").filter(Boolean);
+  const staged = new Map(git(root, ["ls-files", "-z", "-s", "--", at.slice(0, -1)]).split("\0").filter(Boolean).map(e => [e.slice(e.indexOf("\t") + 1), e.split(" ")]));
+  for (const f of new Set(listed)) {
+    let stat;
+    try { stat = fs.lstatSync(path.join(root, f)); } catch { continue; } // (a tracked file taken away: missing)
+    const key = f.slice(at.length);
+    if (stat.isSymbolicLink()) out.set(key, `120000 blob ${git(root, ["hash-object", "--no-filters", "--stdin"], process.env, fs.readlinkSync(path.join(root, f)))}`);
+    else if (stat.isFile()) files.push(f);
+    else if (staged.get(f)?.[0] === "160000") out.set(key, `160000 commit ${staged.get(f)[1]}`);
+  }
+  // (a name with a line's end in it cannot be given one to a line: hashed alone)
+  const plainNames = files.filter(f => !/[\r\n]/u.test(f));
+  const ids = plainNames.length ? git(root, ["hash-object", "--stdin-paths"], process.env, `${plainNames.join("\n")}\n`).split("\n") : [];
+  plainNames.forEach((f, i) => out.set(f.slice(at.length), `100644 blob ${ids[i]}`));
+  for (const f of files.filter(f => /[\r\n]/u.test(f))) out.set(f.slice(at.length), `100644 blob ${git(root, ["hash-object", "--", f])}`);
+  return out;
 }
 
+// The core's tree at the pin, as the copy must be (copy-tree.mjs), by the same keys.
+const pinned = (pin, bare) => new Map(inBare(bare, ["ls-tree", "-r", "-z", "--full-tree", copyTree(pin, bare)], { maxBuffer: 1 << 26 }).split("\0").filter(Boolean)
+  .map(e => [e.slice(e.indexOf("\t") + 1), e.slice(0, e.indexOf("\t")).replace(/^100755 blob /u, "100644 blob ")]));
+
 // The copy against its pin: in the way where the line is wrong, the pin is no commit of the core's main, or the copy
-// differs from the core's tree there, entry by entry as copy-tree.mjs compares (and says why).
+// differs from the core's tree there, entry by entry by git's ids and types as copy-tree.mjs compares (and says why).
 function copyAgainstPin(root, bare, why, said) {
   const line = readCore(fs.readFileSync(path.join(root, MANIFEST), "utf8"));
   if (line.wrong) return said.way("the manifest", line.wrong);
@@ -55,8 +71,7 @@ function copyAgainstPin(root, bare, why, said) {
   if (!bare) return said.unread("the copy", `the core could not be fetched${why}, so the copy was not compared with it`);
   if (!past(line.pin, "refs/heads/main", bare)) return said.way("the copy", `${MANIFEST} pins ${line.pin}, which is no commit of the core's main. Mend: sync to a commit of it, \`node ${line.path}scripts/sync.mjs\``);
   if (!fs.existsSync(path.join(root, line.path))) return said.way("the copy", `${line.path} is not there. Mend: run the sync from a clone of the core (\`node <the clone>/scripts/sync.mjs\`), which writes the copy whole at the manifest's pin`);
-  const map = tree => new Map(entries(tree, bare).split("\n").filter(Boolean).map(e => [e.slice(e.indexOf("\t") + 1), e.slice(0, e.indexOf("\t"))]));
-  const want = map(copyTree(line.pin, bare)), have = map(workingTree(root, line.path, bare));
+  const want = pinned(line.pin, bare), have = working(root, line.path);
   const off = [...new Set([...want.keys(), ...have.keys()])].filter(f => want.get(f) !== have.get(f)).sort()
     .map(f => `${line.path}${f} ${!have.has(f) ? "is missing" : !want.has(f) ? "is not the core's" : "is changed"}`);
   if (off.length) said.way("the copy", `${line.path} differs from the core at its pin ${line.pin.slice(0, 7)}: ${off.slice(0, 10).join("; ")}${off.length > 10 ? `; and ${off.length - 10} more` : ""}. Mend: take back each change to the copy (\`git checkout HEAD -- ${line.path}\` where the last commit holds it whole), or delete ${line.path} and run the sync from a clone of the core (\`node <the clone>/scripts/sync.mjs\`), which writes it whole at the pin; a change the project needs goes to the core as an issue`);
