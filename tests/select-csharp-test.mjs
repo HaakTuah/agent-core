@@ -140,6 +140,18 @@ const lambda = one("namespace App;\nclass X { System.Action<int> a = delegate (i
 ok(!lambda.links.get("tests/T.cs")?.has("src/X.cs"), "an anonymous delegate with parameters declares no name");
 const propsRead = csharpReach({ ...globals, "tests/Tests.csproj": PROJ, "Directory.Build.props": "<Project><ItemGroup><Using Include=\"App\" /></ItemGroup></Project>" }, undefined, nothing);
 ok(propsRead.links.get("tests/RulesTest.cs")?.has("src/Rules.cs"), "a .props file the config reads is read for its <Using> too", JSON.stringify([...propsRead.links].map(([f, to]) => [f, [...to]])));
+const aliased = csharpReach({ ...app, "src/Usings.cs": "global using S = App.Data.Store;\n", "tests/AliasTest.cs": "namespace Tests;\nclass AliasTest { S s; }\n" }, undefined, nothing);
+const viaAlias = reached(new Set(["tests/AliasTest.cs"]), aliased.links).get("tests/AliasTest.cs");
+ok(viaAlias.has("src/Store.cs") && !viaAlias.has("src/Rules.cs"), "a global alias is followed, from a file that names it, to the type it names", JSON.stringify([...viaAlias]));
+const qualified = one("namespace App.Testing;\npublic class CustomFactAttribute : System.Attribute { }\n", { "tests/T.cs": "namespace Tests;\nclass T { [App.Testing.CustomFact] void Go() { } }\n" });
+ok(qualified.links.get("tests/T.cs")?.has("src/X.cs"), "an attribute named in full is reached without \"Attribute\" too", JSON.stringify([...qualified.links].map(([f, to]) => [f, [...to]])));
+const receivers = ["[NotNullWhen(true)] this string? s", "ref this int s", "this in int s", "scoped this ref int s"].filter(param =>
+  !one(`namespace App.Ext;\npublic static class E { public static bool Has(${param}) => true; }\n`, { "tests/T.cs": "using App.Ext;\nnamespace Tests;\nclass T { }\n" }).links.get("tests/T.cs")?.has("src/X.cs"));
+ok(!receivers.length, "an extension's receiver is read behind an attribute, ref, in and scoped", receivers.join(", "));
+const deep = Array.from({ length: 400 }, (_, k) => `N${k}`).join(".");
+let asked = 0, stopped = false;
+try { csharpReach({ "src/App.csproj": PROJ, "src/X.cs": `using System;\nnamespace ${deep};\nclass Y { }\n` }, () => { if (++asked > 50) throw new Error("late"); }, nothing); } catch { stopped = true; }
+ok(stopped, "the budget is asked inside the expansion of a deep namespace, so a file of one cannot outlast it", `asked ${asked}`);
 
 console.log(`${count - failed} of ${count} passed`);
 process.exitCode = failed ? 1 : 0;

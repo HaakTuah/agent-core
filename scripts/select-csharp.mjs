@@ -58,13 +58,14 @@ function pastGeneric(toks, k) {
   return k;
 }
 
-// The using directive that opens at toks[i] ("using", or "global using"): { end, target, global }, or null where the
-// tokens there are no directive (a using statement or declaration).
+// The using directive that opens at toks[i] ("using", or "global using"): { end, target, global, alias }, or null where
+// the tokens there are no directive (a using statement or declaration).
 function directive(toks, i) {
   const k = pastHead(toks, i);
   if (k < 0) return null;
-  const { parts, end } = nameAt(toks, k), last = pastGeneric(toks, end);
-  return parts.length && toks[last]?.v === ";" ? { end: last, target: parts.join("."), global: toks[i].v === "global" } : null;
+  const { parts, end } = nameAt(toks, k), last = pastGeneric(toks, end), eq = toks[k - 1]?.v === ":" ? k - 4 : k - 1;
+  return parts.length && toks[last]?.v === ";"
+    ? { end: last, target: parts.join("."), global: toks[i].v === "global", alias: toks[eq]?.v === "=" ? word(toks[eq - 1]) : null } : null;
 }
 
 
@@ -127,9 +128,9 @@ function runsOf(toks) {
   return { runs, usings };
 }
 
-// Whether a file may declare extension members: a parameter "this T", or an extension block ("extension(" or
-// "extension<", whose header the grammar reads as "class _").
-const extending = toks => toks.some((k, i) => (k.v === "this" && toks[i - 1]?.v === "(" && toks[i + 1]?.t === "id")
+// Whether a file may declare extension members: a parameter "this T" (behind an attribute, ref, in or scoped too), or an
+// extension block ("extension(" or "extension<", whose header the grammar reads as "class _").
+const extending = toks => toks.some((k, i) => (k.v === "this" && ["(", "]", "ref", "in", "scoped", "readonly"].includes(toks[i - 1]?.v) && toks[i + 1]?.t === "id")
   || (k.v === "extension" && ["(", "<"].includes(toks[i + 1]?.v)) || (k.v === "class" && toks[i + 1]?.v === "_"));
 // Whether C# or a test framework runs a file with no name: a hook's word, an assembly's or a module's attribute, or
 // TUnit's "Before(Assembly)" and its kin.
@@ -187,9 +188,10 @@ export function ofNoProject(file, texts) {
 
 // Where the project declares each type: { types: Map of a full name to its files, byLast: Map of a type's last word to a
 // Map of its namespace to its files, extensions: Map of a namespace to the files that may extend in it, hooks: the files
-// run with no name, globals: the namespaces global using directives name, unsure: the files lost or that reflect }.
+// run with no name, globals: the namespaces global using directives name, aliases: Map of a global alias to the files
+// that declare it, unsure: the files lost or that reflect }.
 function indexOf(facts) {
-  const ix = { types: new Map(), byLast: new Map(), extensions: new Map(), hooks: [], globals: [], unsure: new Set() };
+  const ix = { types: new Map(), byLast: new Map(), extensions: new Map(), hooks: [], globals: [], aliases: new Map(), unsure: new Set() };
   const declare = (full, file) => {
     const dot = full.lastIndexOf(".");
     into(ix.types, full).add(file);
@@ -201,21 +203,22 @@ function indexOf(facts) {
     if (x.program) declare("Program", f);
     if (x.extensions) for (const ns of x.placed) into(ix.extensions, ns).add(f);
     if (x.hook) ix.hooks.push(f);
-    for (const u of x.usings) if (u.global) ix.globals.push(u.target);
+    for (const u of x.usings.filter(d => d.global)) { if (u.alias) into(ix.aliases, u.alias).add(f); else ix.globals.push(u.target); }
     if (x.lost || x.reflects) ix.unsure.add(f);
   }
   return ix;
 }
 
 // The files one file reaches (x its facts), by the index: the files run with no name; each type a word of its names in
-// a namespace it sees, as itself or as an attribute; each its runs of dotted words name in full, read against the
-// namespaces around it; and the files that may extend in a namespace it sees.
-function reachOf(x, ix) {
-  const around = new Set(["", ...x.r.namespaces.flatMap(prefixes)]), sees = new Set(around);
-  for (const target of [...ix.globals, ...x.usings.map(u => u.target)]) for (const p of around) for (const n of prefixes(join(p, target))) sees.add(n);
+// a namespace it sees, as itself or as an attribute; the files that declare a global alias it names (which link on to
+// what the alias names); each type its runs of dotted words name in full, as itself or as an attribute, read against
+// the namespaces around it; and the files that may extend in a namespace it sees. `pace` is asked in each expansion.
+function reachOf(x, ix, pace) {
+  const around = new Set(["", ...x.r.namespaces.flatMap(n => { pace(); return prefixes(n); })]), sees = new Set(around);
+  for (const target of [...ix.globals, ...x.usings.map(u => u.target)]) for (const p of around) { pace(); for (const n of prefixes(join(p, target))) sees.add(n); }
   const to = new Set(ix.hooks), add = files => { for (const g of files ?? []) to.add(g); };
-  for (const w of x.words) for (const last of [w, `${w}Attribute`]) for (const [ns, files] of ix.byLast.get(last) ?? []) if (sees.has(ns)) add(files);
-  for (const run of x.runs) for (const p of around) for (const name of prefixes(join(p, run))) add(ix.types.get(name));
+  for (const w of x.words) { add(ix.aliases.get(w)); for (const last of [w, `${w}Attribute`]) for (const [ns, files] of ix.byLast.get(last) ?? []) if (sees.has(ns)) add(files); }
+  for (const run of x.runs) for (const p of around) { pace(); for (const name of prefixes(join(p, run))) { add(ix.types.get(name)); add(ix.types.get(`${name}Attribute`)); } }
   for (const ns of sees) add(ix.extensions.get(ns));
   return to;
 }
@@ -234,6 +237,6 @@ export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   const facts = new Map(files.map(f => { pace(); return [f, factsOf(readCsharp(all[f]), all[f])]; }));
   const ix = indexOf(facts);
   ix.globals.push(...msbuild);
-  for (const [f, x] of facts) { pace(); const to = reachOf(x, ix); to.delete(f); links.set(f, to); }
+  for (const [f, x] of facts) { pace(); const to = reachOf(x, ix, pace); to.delete(f); links.set(f, to); }
   return { links, unsure: ix.unsure };
 }
