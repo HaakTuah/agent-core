@@ -37,7 +37,15 @@ export function held(root) {
   if (busy.has(MANIFEST) && pinOnly(root)) busy.delete(MANIFEST);
   return busy;
 }
-export const MANIFEST = "core-manifest.md", PIN_LINE = /^Core: .*$/mu;
+export const MANIFEST = "core-manifest.md";
+const PIN_LINE = /^Core: .*$/mu;
+// The manifest's `Core:` line in the project at `root`, read before setAside (null where it names none), and put back
+// after it, so a pin the sync moved stays in its pull request (#1094).
+export const pinOf = root => { const f = path.join(root, MANIFEST); return fs.existsSync(f) ? PIN_LINE.exec(fs.readFileSync(f, "utf8"))?.[0] ?? null : null; };
+export function pinBack(root, pin) {
+  const f = path.join(root, MANIFEST);
+  if (pin && fs.existsSync(f)) fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace(PIN_LINE, () => pin));
+}
 function pinOnly(root) {
   const at = rev => { try { return execFileSync("git", ["show", `${rev}:${MANIFEST}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; } };
   const head = at("HEAD"), but = t => t?.replace(PIN_LINE, "");

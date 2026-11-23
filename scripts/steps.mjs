@@ -37,7 +37,7 @@ import { started } from "./started.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { copyAt } from "./workflow-calls.mjs";
 import { HERE, mendAt, plain, shown } from "./step-checks.mjs";
-import { MANIFEST, PIN_LINE, held } from "./step-writers.mjs";
+import { MANIFEST, held, pinBack, pinOf } from "./step-writers.mjs";
 
 // What a step reads a project with, and the words of an error with no path of the machine's in them: step-checks.mjs
 // and the files named step-checks-<what it reads>.mjs, beside this file.
@@ -159,18 +159,17 @@ export function writeReport(done, how = null) {
 // Paths are read as written, never as patterns. The manifest's `Core:` line as it stood is put back after either, so a
 // pin the sync moved stays in its pull request (#1094). (`push`, git's own, is given another only by the test, to fail.)
 export function setAside(root, files, push = () => execFileSync("git", ["--literal-pathspecs", "stash", "push", "--include-untracked", "--quiet", "-m", ASIDE, "--", ...files], { cwd: root, stdio: ["ignore", "ignore", "pipe"] })) {
-  const manifest = path.join(root, MANIFEST), pin = files.includes(MANIFEST) ? PIN_LINE.exec(fs.readFileSync(manifest, "utf8"))?.[0] : null;
-  const pinBack = () => { if (pin && fs.existsSync(manifest)) fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8").replace(PIN_LINE, () => pin)); };
+  const pin = files.includes(MANIFEST) ? pinOf(root) : null;
   try {
     push();
-    pinBack();
+    pinBack(root, pin);
     return true;
   } catch {
     const tracked = execFileSync("git", ["--literal-pathspecs", "ls-tree", "-r", "-z", "--name-only", "HEAD", "--", ...files], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
     execFileSync("git", ["--literal-pathspecs", "reset", "-q", "--", ...files], { cwd: root, stdio: "ignore" });
     if (tracked.length) execFileSync("git", ["--literal-pathspecs", "checkout", "-q", "HEAD", "--", ...tracked], { cwd: root, stdio: "ignore" });
     for (const f of files.filter(f => !tracked.includes(f))) fs.rmSync(path.join(root, f), { force: true });
-    pinBack();
+    pinBack(root, pin);
     return false;
   }
 }
