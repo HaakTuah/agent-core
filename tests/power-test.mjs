@@ -62,6 +62,15 @@ const python = setOf(tree({
 }));
 ok(show(python) === ".github/workflows/p.yml, helpers/__init__.py, helpers/net.py, tools/__init__.py, tools/cfg.py, tools/jobs/__init__.py, tools/jobs/run.py, tools/jobs/steps/__init__.py, tools/jobs/steps/one.py, tools/jobs/steps/two.py, tools/shared.py",
   "a Python module run by name brings the __init__.py of each package above it, and the modules it and they import, by an absolute, a relative or a parent-relative name; a module none imports stays out", show(python));
+// a Python import in a form a line does not hold alone, or loaded by a string, joins the set too
+const pythonForms = setOf(tree({
+  ".github/workflows/q.yml": "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: python run.py\n",
+  "run.py": "from pkg import (\n    alpha,  # first\n    beta,\n)\nfrom pkg import gamma, \\\n    delta\nimport os; import lib.mod\nimportlib.import_module('dyn.mod')\n",
+  "pkg/__init__.py": "", "pkg/alpha.py": "", "pkg/beta.py": "", "pkg/gamma.py": "", "pkg/delta.py": "", "pkg/unused.py": "",
+  "lib/__init__.py": "", "lib/mod.py": "", "dyn/__init__.py": "", "dyn/mod.py": "",
+}));
+ok(show(pythonForms) === ".github/workflows/q.yml, dyn/__init__.py, dyn/mod.py, lib/__init__.py, lib/mod.py, pkg/__init__.py, pkg/alpha.py, pkg/beta.py, pkg/delta.py, pkg/gamma.py, run.py",
+  "a Python import over several lines, in brackets or after a backslash, one after a ';', and a module loaded by a plain string join the set; a module none names stays out", show(pythonForms));
 ok(show(bareNames) === ".github/workflows/m.yml, scripts/helper.js, scripts/lib/index.js, scripts/run.cjs, tools/go.py, tools/util.py",
   "a module named without its extension joins the set as its language loads it: helper.js, a folder's index.js, a Python module; one not named stays out", show(bareNames));
 const files = {

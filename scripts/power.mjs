@@ -161,8 +161,15 @@ function namedIn(name, text, all, byBase = new Map()) {
   };
   for (const [, run] of text.matchAll(RUN_MODULE)) python(run, [".py", "/__main__.py", "/__init__.py"], ["", folder, ...moved.at]);
   if (/\.py$/iu.test(name)) {
+    // the statements as Python reads them: a line continued by a backslash or inside the brackets of an import joined,
+    // and each statement after a `;` on a line of its own
+    const statements = text.replace(/\\\r?\n/gu, " ").replace(/\bimport[ \t]*\(([^)]*)\)/gu, (_, list) => `import ${list.replace(/#[^\n]*/gu, "").replace(/\s+/gu, " ")}`)
+      .replace(/;/gu, "\n");
+    // any dotted name, `importlib.import_module("a.b")` or `__import__("a.b")` among them, read as a module that may be
+    // there: a name that is none adds nothing, and one that is adds it on the safe side
+    for (const [dotted] of text.matchAll(/\b[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+/gu)) python(dotted, [".py", "/__init__.py"], [folder, ""]);
     const names = (list) => list.split(",").map((one) => one.trim().split(/[ \t]+/u)[0]).filter((one) => /^\w[\w.]*$/u.test(one));
-    for (const [, dots, from, what, plain] of text.matchAll(PY_IMPORT)) {
+    for (const [, dots, from, what, plain] of statements.matchAll(PY_IMPORT)) {
       if (plain !== undefined) { for (const one of names(plain)) python(one, [".py", "/__init__.py"], [folder, ""]); continue; }
       // a relative import leads from the file's own package, one folder up for each dot past the first
       const at = dots === "" ? [folder, ""] : [path.posix.normalize(path.posix.join(folder, ...Array(dots.length - 1).fill("..")))];
