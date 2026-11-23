@@ -542,6 +542,8 @@ Paths: in the core's files, one into floor/, roles/, tasks/, tools/, scripts/, s
 Floor: whole. Modules: <all, or the list of those taken>.
 Not taken: <where it is a list: each module left out as `name.md` (its reason), one line>.
 
+<while the owner has not yet confirmed them, in a paragraph of its own: Modules to confirm: each module the sync's steps took as a choice, as `name.md`, one line (setup/sync-notes/, 23 November 2026)>
+
 ## Names
 <the project's names for the core's words, one line each>
 

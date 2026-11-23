@@ -78,6 +78,9 @@ ok(m.taken.has("a.md") && m.taken.has("b.md") && m.notTaken.get("g.md") === "no 
   ok(["a.md", "planning.md", "x.md"].every(n => read.taken.has(n)) && !read.taken.has("game-design.md") && read.notTaken.get("game-design.md") === "the project is no game: its manifest holds no game's row" && read.notTaken.has("repositories.md"),
     "placed, the list takes what it should and the line Not taken leaves out the rest with each reason, both read back by modulesOf", text);
   ok([...toConfirm(text)].sort().join() === "planning.md,x.md" && toPlace(text, names, plain).length === 0 && new RegExp(`^${CONFIRM} \`planning\\.md\`, \`x\\.md\`\\.$`, "m").test(text), "the modules taken by choice stand on the confirmation's line, and a second placing finds nothing", text);
+  ok(/^Not taken: [^\n]*\n\nModules to confirm: /m.test(text), "the confirmation's line stands in a paragraph of its own, so the kit's paragraph of the module lines stays as the kit writes it", text);
+  const p = { name: "planning.md", take: true, choice: true };
+  ok(/Modules: `b\.md`, `planning\.md`, `z\.md`\.$/m.test(placed(kit("`b.md`, `z.md`"), [p])) && /Modules: `z\.md`, `b\.md`, `planning\.md`\.$/m.test(placed(kit("`z.md`, `b.md`"), [p])), "a list in order, as the kit writes it, stays in order, and one out of order gains the name at its end");
   const crlf = kit("`a.md`", "Not taken: `x.md` (none here).\n").replace(/\n/g, "\r\n"), again = placed(crlf, toPlace(crlf, names, plain));
   ok(!/[^\r]\n/.test(again) && /^Not taken: `x\.md` \(none here\), `game-design\.md` \(the project is no game[^)]*\), `repositories\.md` \([^)]*\)\.\r$/m.test(again) && modulesOf(again).notTaken.get("x.md") === "none here", "a line Not taken that stands is added to, its reasons kept, and Windows' line ends stay", again);
   let threw = null;

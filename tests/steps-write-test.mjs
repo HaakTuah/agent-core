@@ -181,9 +181,9 @@ for (const l of WHOLE) {
   commit("two modules neither taken nor left out");
   const before = [placing, choice].map(l => missed(l).length), was = read("core-manifest.md");
   r = write();
-  const now = read("core-manifest.md"), outside = text => text.split("\n").filter(l => !/^(Floor: |Not taken: |Modules to confirm: )/u.test(l)).join("\n");
+  const now = read("core-manifest.md"), outside = text => text.replace(/\n\nModules to confirm: [^\n]*/u, "").split("\n").filter(l => !/^(Floor: |Not taken: |Modules to confirm: )/u.test(l)).join("\n");
   ok(before.join() === "1,1" && r.status === 0 && !missed(placing).length && !missed(choice).length && missed(confirm).length === 1 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``)
-    && /^Not taken: `game-design\.md` \(the project is no game: its manifest holds no game's row\)\.$/m.test(now) && /^Modules to confirm: `done-when\.md`\.$/m.test(now) && /^Floor: whole\. Modules: .*`done-when\.md`/m.test(now) && outside(now) === outside(was),
+    && /^Not taken: `game-design\.md` \(the project is no game: its manifest holds no game's row\)\.$/m.test(now) && /\n\nModules to confirm: `done-when\.md`\.\n/u.test(now) && /^Floor: whole\. Modules: .*`done-when\.md`/m.test(now) && outside(now) === outside(was),
     "a module the list misses is placed by --write: left out where a fact decides it, taken and asked of the owner where none does, and nothing of the manifest written but its module lines", `${r.stdout}${r.stderr}\n---\n${now}`);
   back();
 }

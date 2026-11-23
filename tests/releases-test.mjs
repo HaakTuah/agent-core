@@ -14,7 +14,7 @@ import { TRIAL, compared, ownCount, trialAt, trialRecord } from "../scripts/rele
 import { shownAs } from "../scripts/state-report.mjs";
 import { STEPS } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, POINTER, QUIET, entries, notesAt, quietAt } from "../scripts/sync-notes.mjs";
-import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, inBare, followsOf, hostAccount, hostSaid, jumped, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
+import { NOTES, OWN_FILES, RELEASE, asksBetween, asksLeft, elsewhere, fetchCore, inBare, followsOf, hostAccount, hostSaid, jumped, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -130,6 +130,8 @@ ok(asksBetween("f".repeat(40), c3, dir) === null, "notes that cannot be read giv
   const run = args => inBare(bare, args);
   fetchCore(bare, notes);
   ok([...quietAt(quiet, run)].join("|") === three && quietAt(gained, run).size === 0 && quietAt("f".repeat(40), run).size === 0, "the entries that ask nothing are those whose step says so, at the commit read", [...quietAt(quiet, run)].join("|"));
+  const left = asksLeft(filed, quiet, bare);
+  ok(left.asks.length === 0 && left.quiet === 1 && asksLeft(filed, gained, bare).asks.join("|") === three && asksLeft("f".repeat(40), quiet, bare) === null, "the report a sync prints leaves out an entry whose step asks nothing, and counts it; one that cannot be read gives no all-clear", JSON.stringify(left));
   // (the core's own: a step that asks nothing says so in the one form quietAt reads, and has neither a check nor a writer)
   const here = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), stepFiles = fs.readdirSync(path.join(here, "scripts/steps")).filter(f => f.endsWith(".mjs")).sort();
   const wrong = STEPS.filter((st, k) => (st.asks !== undefined && st.asks !== "nothing") || (st.asks === "nothing") !== fs.readFileSync(path.join(here, "scripts/steps", stepFiles[k]), "utf8").includes(QUIET) || (st.asks && (st.check || st.write)));

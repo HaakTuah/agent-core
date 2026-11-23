@@ -135,14 +135,24 @@ export function placed(manifest, places) {
   if (at < 0) throw new Error('its "Modules:" line names no module to add to');
   const named = list => list.map(p => `\`${p.name}\``).join(", ");
   const take = places.filter(p => p.take), out = places.filter(p => !p.take), chosen = places.filter(p => p.choice);
-  if (take.length) lines[at] = lines[at].replace(/(`[^`\n]*`)(?![^\n]*`)/u, `$1, ${named(take)}`);
-  // (a line added to, its last full stop moved after what it gains; a new one made under the last of the module lines)
+  // (a list in order, as the kit writes it, stays in order; any other gains the names at its end)
+  if (take.length) {
+    const [, head, list, tail] = /^(.*?\bModules:\s*)(`.*`)(.*)$/u.exec(lines[at]);
+    const names = [...list.matchAll(/`([^`\n]*)`/gu)].map(m => m[1]);
+    const plainList = list === names.map(n => `\`${n}\``).join(", ");
+    const inOrder = plainList && names.every((n, i) => !i || names[i - 1] <= n);
+    lines[at] = inOrder ? `${head}${named([...names, ...take.map(p => p.name)].sort().map(name => ({ name })))}${tail}`
+      : lines[at].replace(/(`[^`\n]*`)(?![^\n]*`)/u, `$1, ${named(take)}`);
+  }
+  // (a line added to, its last full stop moved after what it gains; "Not taken:" made under the last of the module
+  // lines, and the line to confirm made a paragraph of its own after theirs, so the kit's paragraph stays as it writes it)
   const add = (head, what) => {
     const i = lines.findIndex(l => l.startsWith(head));
     if (i >= 0) { lines[i] = `${lines[i].replace(/\.?\s*$/u, "")}, ${what}.`; return; }
     let after = at;
-    while ([/^Not taken:/u, new RegExp(`^${CONFIRM}`, "u")].some(re => re.test(lines[after + 1] ?? ""))) after++;
-    lines.splice(after + 1, 0, `${head} ${what}.`);
+    if (head === CONFIRM) while ((lines[after + 1] ?? "").trim()) after++;
+    else while (/^Not taken:/u.test(lines[after + 1] ?? "")) after++;
+    lines.splice(after + 1, 0, ...(head === CONFIRM ? ["", `${head} ${what}.`] : [`${head} ${what}.`]));
   };
   if (out.length) add("Not taken:", out.map(p => `\`${p.name}\` (${p.why})`).join(", "));
   if (chosen.length) add(CONFIRM, named(chosen));
