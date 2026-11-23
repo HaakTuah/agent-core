@@ -86,9 +86,9 @@ const report = r.reports[0] ?? "";
 ok(r.failures.length === 0 && r.reports.length === 1, `an old package that exists passes (${JSON.stringify(r)})`);
 for (const fact of ["named by the project", `first published ${ago(800).slice(0, 10)} (800 days ago)`, `last release ${ago(30).slice(0, 10)}`, "repository github.com/invented-org/tidy-moss-format, not archived", "published by owners invented-owner (as PyPI lists them)", "brings 2 packages with it", "provenance: yes, from GitHub invented-org/tidy-moss-format (release.yml), the repository it names"])
   ok(report.includes(fact), `the report says "${fact}" (${report})`);
-ok(!asked.some((u) => u.includes("raw.githubusercontent.com")), "no package.json is asked of a PyPI package's repository");
+ok(!asked.some((u) => new URL(u).hostname === "raw.githubusercontent.com"), "no package.json is asked of a PyPI package's repository");
 r = await one(pkg("Tidy_Moss.Format"));
-ok(r.failures.length === 0 && asked.includes("https://pypi.org/pypi/tidy-moss-format/json"), "a name is asked as pip compares it");
+ok(r.failures.length === 0 && asked.some((u) => u === "https://pypi.org/pypi/tidy-moss-format/json"), "a name is asked as pip compares it");
 r = await one(pkg("elsewhere-moss"));
 ok(r.failures.length === 0 && /provenance: yes, from GitHub someone-else\/fork, not the repository it names/u.test(r.reports[0] ?? ""), `an attestation from another repository than the one it names is said so (${r.reports})`);
 r = await one(pkg("yanked-moss", { version: "2.0.0", brings: 0 }));
