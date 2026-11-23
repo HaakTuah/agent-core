@@ -28,6 +28,9 @@ import { median } from "./wait.mjs";
 
 class Refused extends Error {}
 const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
+// What shape.mjs reads for it (the config: held inside the project, through no link, and in its form), its refusal
+// taken as this script's own, its mend kept.
+const asOwn = read => { try { return read(); } catch (e) { const [what, mend] = String(e?.message).split(". Mend: "); if (mend === undefined) throw e; return refuse(what, mend); } };
 export const COUNT = 30;
 
 // ---- the runs ----
@@ -180,8 +183,8 @@ function main(argv) {
     opts[rest[i]] = rest[i + 1];
   }
   const rules = ["core-manifest.md", "AGENTS.md"].find(f => fs.existsSync(f)), at = named ?? where(rules ? fs.readFileSync(rules, "utf8") : "");
-  if (!fs.existsSync(notLinked(at))) refuse(`there is no shape check's config at ${at}`, "write it as the starter kit does, with the project's test files under \"tests\"");
-  const config = parseConfig(fs.readFileSync(at, "utf8"), at), now = standing(config);
+  if (!fs.existsSync(asOwn(() => notLinked(at)))) refuse(`there is no shape check's config at ${at}`, "write it as the starter kit does, with the project's test files under \"tests\"");
+  const config = asOwn(() => parseConfig(fs.readFileSync(at, "utf8"), at)), now = standing(config);
   let mutation = null;
   if (opts["--mutation"]) try { mutation = JSON.parse(fs.readFileSync(opts["--mutation"], "utf8")); } catch { refuse(`the mutation report ${opts["--mutation"]} could not be read as JSON`, "name the report of a whole run, in the mutation-testing-elements schema"); }
   const ids = [...survey(now.texts, config, now.tests).entries.keys()];

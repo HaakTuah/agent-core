@@ -101,6 +101,7 @@ put("src/a.mjs", "export const a = 1;\n"); put("test/a-test.mjs", "import '../sr
 put("reports/1.xml", '<testcase classname="test/a-test.mjs" name="a" time="1"/><testcase classname="test/e2e-test.mjs" name="e" time="9"/>');
 put("reports/2.xml", '<testcase classname="test/a-test.mjs" name="a" time="3"><failure/></testcase><testcase classname="test/e2e-test.mjs" name="e" time="7"/>');
 put("mutation.json", JSON.stringify({ files: { "src/a.mjs": { mutants: [{ killedBy: ["test/a-test.mjs"] }] } } }));
+put("checks/broken.json", "{");
 const script = fileURLToPath(new URL("../scripts/test-record.mjs", import.meta.url));
 const run = args => { const r = spawnSync(process.execPath, [script, ...args], { cwd: dir, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 let r = run(["checks/shape.json", "--junit", "reports", "--mutation", "mutation.json"]);
@@ -108,7 +109,8 @@ ok(r.status === 0 && /\| `test\/a-test\.mjs` \| 2 \| 2 \| 1 \(2\.xml\) \| 0 \| 1
   && /1 reach a real clock, 2 s of it \(20%\); 1 start another process, 2 s of it \(20%\)/.test(r.out) && /\| `test\/b-test\.mjs` \| 0 .*kept: it guards a stated rule/.test(r.out),
   "a whole run reads the reports, the faults and the tests that open a screen, reach a real clock or start another process, and prints the table", r.out);
 for (const [args, what] of [[["checks/shape.json", "--junit", "nowhere"], "a folder of reports that is not there"], [["checks/shape.json", "--mutation", "reports/1.xml"], "a mutation report that is no JSON"],
-  [["checks/shape.json", "--repo", "o/n"], "a repository with no workflow named"], [["checks/none.json"], "no config"], [["checks/shape.json", "--every"], "a word it does not know"]]) {
+  [["checks/shape.json", "--repo", "o/n"], "a repository with no workflow named"], [["checks/none.json"], "no config"], [["checks/shape.json", "--every"], "a word it does not know"],
+  [["../shape.json"], "a config outside the project"], [["checks/broken.json"], "a config that is no JSON"]]) {
   r = run(args);
   ok(r.status === 1 && mended(r.out), `refused, with its mend: ${what}`, r.out);
 }
