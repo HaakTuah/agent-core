@@ -40,14 +40,16 @@ export const notesAt = (rev, run) => notesFrom(
 export const entries = text => String(text ?? "").split("\n").map(l => l.replace(/\r$/u, "")).filter(l => l.startsWith("- "));
 
 // The entries at commit `rev` (through `run`, as notesAt) whose step says it asks nothing of what stands (#1094): the
-// step's file under scripts/steps/ holds `asks: "nothing"`, and its entry, of the same name, stays in the notes but
-// leaves the report a sync prints. A set of their lines; empty where the commit holds no such step or cannot be read.
+// step's file under scripts/steps/ gives its object the field `asks: "nothing"` (never the words in a comment or in
+// another field's text), and its entry, of the same name, stays in the notes but leaves the report a sync prints. A set
+// of their lines; empty where the commit holds no such step or cannot be read.
 export const QUIET = 'asks: "nothing"';
+export const quiet = text => /^(?!\s*\/\/)[^\n]*?(?:^|[{,])\s*asks:\s*"nothing"\s*(?:,|\}|$)/mu.test(String(text ?? ""));
 export function quietAt(rev, run) {
   let names;
   try { names = run(["ls-tree", "--name-only", `${rev}:scripts/steps`]).split("\n").filter(f => f.endsWith(".mjs")); } catch { return new Set(); }
   const read = f => { try { return run(["cat-file", "blob", `${rev}:${f}`]); } catch { return ""; } };
-  return new Set(names.filter(f => read(`scripts/steps/${f}`).includes(QUIET)).flatMap(f => entries(read(`${FOLDER}/${f.replace(/\.mjs$/u, ".md")}`))));
+  return new Set(names.filter(f => quiet(read(`scripts/steps/${f}`))).flatMap(f => entries(read(`${FOLDER}/${f.replace(/\.mjs$/u, ".md")}`))));
 }
 
 // (run, it reads the core or the copy it stands in, from wherever it is run: a project runs it as core/scripts/...)
