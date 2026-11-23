@@ -83,26 +83,33 @@ function rulesetOf(host, rules) {
   return notGiven(`${none}it lacks ${lacks.join(", ")}`);
 }
 
-// Whether a workflow's triggers (`on`) start it on each of `name`'s events: no filter but its types, and those, where
-// given, holding `kinds`.
-function onEach(on, name, kinds) {
-  if (on === name || (Array.isArray(on) && on.includes(name))) return true;
+// Whether a workflow's triggers (`on`) start it on each of `name`'s events: no filter but its types, and those holding
+// `kinds`, or left to GitHub's own where `byDefault` (GitHub's hold them).
+function onEach(on, name, kinds, byDefault) {
+  if (on === name || (Array.isArray(on) && on.includes(name))) return byDefault;
   const given = on && typeof on === "object" && !Array.isArray(on) && Object.hasOwn(on, name) ? on[name] : undefined;
-  if (given === null) return true;
+  if (given === null) return byDefault;
   if (!given || typeof given !== "object" || Array.isArray(given) || !Object.keys(given).every(k => k === "types")) return false;
-  return given.types === undefined || (Array.isArray(given.types) && kinds.every(t => given.types.includes(t)));
+  return given.types === undefined ? byDefault : Array.isArray(given.types) && kinds.every(t => given.types.includes(t));
 }
 
-// Whether they start it on every pull request as the kit's do: on its own events, and on its comments, through which
-// alone the check posts its status on a pull request from Dependabot or a fork (the core's `security-review.yml`).
-const onEveryPull = on => onEach(on, "pull_request", ["opened", "synchronize"]) && onEach(on, "issue_comment", ["created", "edited"]);
+// Whether they start it on every pull request as the kit's do. A pull request's own events must name the kit's types,
+// since GitHub's own leave out `ready_for_review`, on which alone a draft marked ready gets the status. Its comments are
+// needed too, through which alone the check posts its status on a pull request from Dependabot or a fork (the core's
+// `security-review.yml`).
+const onEveryPull = on => onEach(on, "pull_request", ["opened", "reopened", "synchronize", "ready_for_review"], false)
+  && onEach(on, "issue_comment", ["created", "edited"], true);
+
+// Whether a job's token may write statuses: from its own `permissions`, or else the workflow's; none at all leaves it to
+// the repository's default, which is not read.
+const writes = p => p === "write-all" || (p !== null && typeof p === "object" && !Array.isArray(p) && p.statuses === "write");
 
 // Whether the project's `security-review.yml` (`text`) calls the core's security review so that it posts its status on
 // every pull request: in a public repository whatever its inputs, in a private one (`open` false) only with
 // `private: true` or `advisory: false`. True or false, as GitHub reads its YAML; null where it is no YAML here, calls no
 // such workflow, gives either input of a private one's call a value that is no plain boolean (an expression GitHub reads
-// at its run), starts on some pull requests alone, or runs its call on a condition other than the kit's, since that
-// cannot be told.
+// at its run), starts on some pull requests alone, runs its call on a condition other than the kit's, or grants its job
+// no `statuses: write`, since that cannot be told.
 function callsPosting(text, open) {
   let doc;
   try { doc = parseYaml(text); } catch { return null; }
@@ -112,9 +119,10 @@ function callsPosting(text, open) {
   const everyPull = onEveryPull(doc.on);
   // (its job runs whatever a job it needs did: the kit's condition, or none and no job needed)
   const always = j => j.if === "${{ !cancelled() }}" || (j.if === undefined && j.needs === undefined);
+  const grants = j => writes(Object.hasOwn(j, "permissions") ? j.permissions : doc.permissions);
   const said = calls.map(j => {
     const given = j.with && typeof j.with === "object" ? j.with : {};
-    if (open || given.private === true || given.advisory === false) return everyPull && always(j) ? true : null;
+    if (open || given.private === true || given.advisory === false) return everyPull && always(j) && grants(j) ? true : null;
     return [given.private, given.advisory].every(v => v === undefined || typeof v === "boolean") ? false : null;
   });
   return said.includes(true) ? true : said.includes(null) ? null : false;
@@ -129,7 +137,7 @@ function reviewOf(host, rules, root) {
   if (text === null) return apart("the project has no `.github/workflows/security-review.yml`, so nothing posts the status, and a status required that never comes would hold every pull request");
   if (!repo) return unread(host.repo.why);
   const posts = callsPosting(text, repo.private === false);
-  if (posts === null) return unread("the project's `.github/workflows/security-review.yml` could not be read as YAML, calls no security review of the core's, starts on some pull requests alone, runs its call on a condition other than the kit's, or gives `private` or `advisory` a value read only at its run, so whether its call posts the status on every pull request is not known");
+  if (posts === null) return unread("the project's `.github/workflows/security-review.yml` could not be read as YAML, calls no security review of the core's, starts on some pull requests alone, runs its call on a condition other than the kit's, gives its job no right to write statuses, or gives `private` or `advisory` a value read only at its run, so whether its call posts the status on every pull request is not known");
   if (!posts) return apart("in a private repository the check posts its status only where its call is given `with: private: true` or `advisory: false`, and a status required that never comes would hold every pull request");
   if (!rules) return unread(host.rules?.why ?? host.repo.why);
   return rules.checks.has(CONTEXT) ? given() : notGiven();
