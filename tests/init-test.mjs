@@ -249,11 +249,19 @@ if (p.status === 0) {
   for (const f of ["src", "checks/near.json", "checks/near-baseline.json"]) fs.rmSync(path.join(p.dir, f), { recursive: true, force: true });
   // (the core runs the same check on itself, with its own config and baseline (#339): it passes as the core stands, a
   // copy added fails, and its mend names the path a session types there, with no "core/" before it)
-  // (the core without its own tests/, which are most of the code the check reads and which no case here is about: a run
-  // costs what it reads, so each of the 23 below took about a quarter less; the check on the core whole is the pull request's
-  // own run of it, #812)
+  // (the core without its own tests/ and the scripts the check does not import, which are most of the code it reads and
+  // which no case here is about: a run costs what it reads, so each of the 23 below took about half as long; the check
+  // on the core whole is the pull request's own run of it, #812)
+  const imported = new Set(), queue = ["scripts/copies.mjs"];
+  for (let f; (f = queue.pop()) !== undefined;) {
+    if (imported.has(f)) continue;
+    imported.add(f);
+    for (const [, rel] of fs.readFileSync(path.join(core, f), "utf8").matchAll(/["'](\.{1,2}\/[^"'\n]+\.m?js)["']/g)) queue.push(path.posix.join(path.posix.dirname(f), rel));
+  }
   git(core, "rm", "-rq", "tests");
-  git(core, "commit", "-q", "-m", "without the core's tests");
+  const unread = git(core, "ls-files", "scripts/*.mjs", "scripts/*.sh").split("\n").filter(f => f && !imported.has(f));
+  for (let i = 0; i < unread.length; i += 100) git(core, "rm", "-q", ...unread.slice(i, i + 100)); // a command line is capped on Windows
+  git(core, "commit", "-q", "-m", "without the core's tests and the scripts the copies check does not import");
   const coreRun = run(core, "scripts/copies.mjs", ".github/copies.json");
   const how = path.join(core, "roles/shared/how-to-work.md"), howWas = fs.readFileSync(how, "utf8");
   fs.appendFileSync(how, `\n${fs.readFileSync(path.join(core, "floor/security.md"), "utf8").split(/\r?\n/u).find(l => /^- It is never pushed to/u.test(l))}\n`);
@@ -264,7 +272,7 @@ if (p.status === 0) {
   git(core, "checkout", "-q", "--", ".github/copies-baseline.json");
   ok(coreRun.status === 0 && ownCopy.status === 1 && /a new copy: .*roles\/shared\/how-to-work\.md:.*\. Mend: keep it in the one place/u.test(ownCopy.out) && mended(ownCopy.out)
     && ownNone.status === 1 && /Mend: write the project's first with node scripts\/copies\.mjs \.github\/copies\.json --first/u.test(ownNone.out) && mended(ownNone.out),
-    "the core's own copies check passes on the core without its tests, and fails a copy added there, its mends naming the core's own paths", `${coreRun.out}${ownCopy.out}${ownNone.out}`);
+    "the core's own copies check passes on the core without its tests and the scripts it does not import, and fails a copy added there, its mends naming the core's own paths", `${coreRun.out}${ownCopy.out}${ownNone.out}`);
   // (against the base, the config is held to the base's (#348): a baseline moved, or a file the base's config read and
   // this one does not, fails with its mend, and the mend as worded passes; a config widened passes)
   const cfgAt = path.join(core, ".github/copies.json"), cfgWas = fs.readFileSync(cfgAt, "utf8");
@@ -452,6 +460,9 @@ if (p.status === 0) {
     && movedBaseline.status === 1 && calledInPlace.test(movedBaseline.out) && /moves the baseline from \.github\/copies-baseline\.json to \.github\/moved\.json against main/u.test(movedBaseline.out) && mended(movedBaseline.out)
     && movedWhole.status === 0 && beside.status === 0 && withShape.status === 0,
     "against the base, a config moved with its call is held to the one the base called, narrowed or its baseline moved failing with its mend; moved whole, or beside one still called, or with another check's config moved too, it passes; a call left to the old config, deleted, counts for nothing", `${movedNarrow.out}${narrowDropped.out}${movedBaseline.out}${movedWhole.out}${beside.out}${withShape.out}`);
+  // (the scripts back, for what runs the core's own from here: the kit's second run)
+  git(core, "checkout", "-q", pin, "--", "scripts");
+  git(core, "commit", "-q", "-m", "its scripts again");
   // (a total set when it counted the core's copy too passes, and a note gives the mark to set, even after the core
   // grew past the room that total had left; a total of the project's own says nothing)
   const sizesAt = path.join(p.dir, "checks/sizes.json"), was = fs.readFileSync(sizesAt, "utf8"), own = JSON.parse(was).total;
