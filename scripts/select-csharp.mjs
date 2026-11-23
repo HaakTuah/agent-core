@@ -1,15 +1,15 @@
 // What a file of C# reaches, for the test selection (select.mjs; #675), read on the parser's tokens (shape-csharp.mjs);
 // it never runs the code. A file reaches the files that declare a type it may name: each word it holds as a type (or an
 // attribute's, `[Fact]` naming FactAttribute) in a namespace it sees (its own and those around it, the global one, those
-// its using directives name, global ones from any file and MSBuild's <Using>); each name written in full, an alias
-// that heads it put for what it names; the files that may declare extension members in a namespace it sees; a file of
-// top-level statements, by the name Program; and the files every file reaches: those run with no name (runsUnnamed),
-// those that hold a global using directive, and those the grammar lost. It reads more than a file takes. A file is
-// unsure (a test that reaches it runs on any change) where the grammar lost it, it holds code the tokens leave out, or
-// it finds types unnamed (REFLECTS); every file is, where a <Using> names an MSBuild expression, a
-// global alias a hook's attribute, or git cannot be asked. Files of C# git holds that the config does not read are read
-// too, as links between those it reads (select-csharp-project.mjs).
-import { heldBeside, msbuildUsings } from "./select-csharp-project.mjs";
+// its using directives name, global ones from any file, MSBuild's <Using>, and those declared outside every project's
+// root); each name written in full, an alias that heads it put for what it names; the files that may declare extension
+// members in a namespace it sees; a file of top-level statements, by the name Program; and the files every file
+// reaches: those run unnamed (runsUnnamed), those that hold a global using directive, and those the grammar lost. It
+// reads more than a file takes. A file is unsure (a test that reaches it runs on any change) where the grammar lost it,
+// it holds code the tokens leave out, or it finds types unnamed (REFLECTS); every file is, where a <Using> cannot be
+// read whole, a global alias names a hook's attribute, or git cannot be asked. Files of C# git holds that the config
+// does not read are read too, as links between those it reads (select-csharp-project.mjs).
+import { heldBeside, msbuildUsings, outside } from "./select-csharp-project.mjs";
 import { leftOut } from "./select-csharp-text.mjs";
 import { readCsharp } from "./shape-csharp.mjs";
 
@@ -17,11 +17,12 @@ const TYPE = new Set(["class", "struct", "interface", "enum", "record", "delegat
 const MODIFIER = new Set(["public", "internal", "private", "protected", "static", "sealed", "abstract", "partial", "readonly", "ref", "unsafe", "file", "new", "extern"]);
 // (what C# or a test framework runs unnamed: a file that holds one is reached from every file)
 const HOOKS = new Set(["ModuleInitializer", "AssemblyInitialize", "AssemblyCleanup", "GlobalTestInitialize", "GlobalTestCleanup", "SetUpFixture", "BeforeEvery", "AfterEvery", "IIncrementalGenerator", "ISourceGenerator", "CollectionDefinition"]);
-// (what finds types unnamed: by reflection, a scan of an assembly or the compilation; a word of Assembly(ies) too)
+// (what finds types unnamed: by reflection, a scan of an assembly or the compilation; a word Assembly too)
 const REFLECTS = new Set(["IIncrementalGenerator", "ISourceGenerator", "Activator", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
   "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR"]);
 
 const hookWord = w => HOOKS.has(w.replace(/Attribute$/u, ""));
+const TUNIT = /^(Before|After)(Attribute)?$/u;
 const word = k => k.v.replace(/^@/u, "");
 const ids = toks => toks.filter(k => k.t === "id").map(word);
 // The names that head a dotted name, shortest first, no deeper than `depth` words (a name deeper than every one the
@@ -191,9 +192,9 @@ function runsOf(toks) {
 const extending = toks => toks.some((k, i) => (k.v === "this" && ["(", "]", "ref", "in", "scoped", "readonly"].includes(toks[i - 1]?.v) && (toks[i + 1]?.t === "id" || toks[i + 1]?.v === "("))
   || (k.v === "extension" && ["(", "<"].includes(toks[i + 1]?.v)) || (k.v === "class" && toks[i + 1]?.v === "_"));
 // Whether C# or a test framework runs a file with no name: a hook's word, an assembly's or a module's attribute, or
-// TUnit's "Before(Assembly)" and its kin.
+// TUnit's Before or After beside a word Assembly, TestSession or TestDiscovery.
 const runsUnnamed = (toks, words) => words.some(hookWord) || toks.some((k, i) => k.v === "[" && ["assembly", "module"].includes(toks[i + 1]?.v) && toks[i + 2]?.v === ":")
-  || toks.some((k, i) => ["Before", "After"].includes(k.v) && toks[i + 1]?.v === "(" && ["Assembly", "TestSession", "TestDiscovery"].includes(toks[i + 2]?.v));
+  || (toks.some(k => TUNIT.test(k.v)) && toks.some(k => ["Assembly", "TestSession", "TestDiscovery"].includes(k.v)));
 // Whether a file finds types by reflection or scans an assembly for them; TUnit's "Before(Assembly)" names no scan.
 const hookOf = (toks, i) => toks[i - 1]?.v === "(" && ["Before", "After"].includes(toks[i - 2]?.v);
 const reflecting = (toks, words) => words.some(w => REFLECTS.has(w))
@@ -217,8 +218,7 @@ function factsOf(read, src) {
 
 // Where the project declares each type: { types: Map of a full name to its files, byLast: Map of a type's last word to
 // a Map of its namespace to its files, extensions: Map of a namespace to the files that may extend in it, every: the
-// files every file reaches (those run unnamed, those that hold a global using directive, and those unread, whose
-// declarations are not known), globals: what global using directives name, aliases: Map of a global alias to what it
+// files every file reaches (as the head says), globals: what global using directives name, aliases: Map of a global alias to what it
 // names, unsure: the files unread, holding code the tokens leave out or finding types unnamed, depth: the most words of
 // a declared name }.
 function indexOf(facts, pace) {
@@ -253,7 +253,7 @@ export function undeclared(was, now, pace = () => {}) {
   if (was === null) return null;
   const [before, after] = [was, now].map(src => factsOf(readCsharp(src), src));
   if (before.unread) return "what it declared at the base cannot be read";
-  if (after.unread) return null; // (every file reaches it, and every test that does runs on any change)
+  if (after.unread) return null; // (every file reaches it, so every test runs on any change)
   const marks = x => [...declared(x, pace).map(t => `the type ${t}`), ...(x.extensions ? x.placed.map(ns => `extension members in ${ns || "the global namespace"}`) : []),
     ...(x.hook || x.usings.some(u => u.global) ? ["what every file reaches (code run with no name, or a global using directive)"] : [])];
   const kept = new Set(marks(after)), gone = marks(before).find(m => !kept.has(m));
@@ -276,8 +276,8 @@ function fullNames(x, ix, pace) {
 }
 
 // The files one file reaches (x its facts), by the index: the files every file reaches; each type a word of its names
-// in a namespace it sees, as itself or as an attribute; each type a name it writes in full names (fullNames), as itself
-// or as an attribute, read against the namespaces around it; and the files that may extend in a namespace it sees.
+// in a namespace it sees, and each a name it writes in full names (fullNames) against the namespaces around it, each
+// as itself or as an attribute; and the files that may extend in a namespace it sees.
 // `pace` is asked in each expansion.
 function reachOf(x, ix, pace) {
   const around = new Set([""]);
@@ -300,13 +300,13 @@ export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   const held = beside(texts), read = Object.entries(texts).filter(([f]) => /\.(csproj|props|targets)$/u.test(f)).map(([, t]) => t);
   const msbuild = held.unknown ? null : msbuildUsings([...held.msbuild, ...read], pace);
   const all = { ...held.cs, ...texts }, files = Object.keys(all).filter(f => f.endsWith(".cs"));
-  // (where the usings every file holds cannot be told, every file is unsure)
+  // (where the usings every file holds are untold, every file is unsure)
   if (msbuild === null) return { links, unsure: new Set(files) };
   const facts = new Map(files.map(f => { pace(); return [f, factsOf(readCsharp(all[f]), all[f])]; }));
   const ix = indexOf(facts, pace);
-  globally(ix, msbuild);
-  // (or a global alias names a hook's attribute, which no word of the file that applies it shows)
-  if ([...ix.aliases.values()].some(ts => [...ts].some(t => hookWord(t.split(".").pop())))) return { links, unsure: new Set(files) };
+  globally(ix, [...msbuild, ...outside(texts, facts, pace)]);
+  // (or a global alias names a hook's attribute, unseen where it is applied)
+  if ([...ix.aliases.values()].some(ts => [...ts].some(t => { const w = t.split(".").pop(); return hookWord(w) || TUNIT.test(w); }))) return { links, unsure: new Set(files) };
   for (const [f, x] of facts) { pace(); const to = reachOf(x, ix, pace); to.delete(f); links.set(f, to); }
   return { links, unsure: ix.unsure };
 }

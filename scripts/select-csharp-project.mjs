@@ -7,9 +7,15 @@ import path from "node:path";
 import { CHARACTERS, Late } from "./hurry.mjs";
 import { git } from "./select-passed.mjs";
 
-// An attribute's value in the text of an XML tag, in either quotes, its name in any case (MSBuild's metadata); undefined
-// where the tag has none.
-const attribute = (tag, name) => { const m = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "iu").exec(tag); return m ? m[1] ?? m[2] : undefined; };
+// The attributes of an XML tag's text ({ include: "App" }, each name in lower case: MSBuild's metadata), read as a run
+// of name="value" pairs (either quotes) from its start, so a name in another's value is none; null where anything else
+// stands there.
+function attributes(tag) {
+  const pair = /\s*([\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/uy, out = {};
+  let at = 0;
+  for (let m; (pair.lastIndex = at, m = pair.exec(tag)); at = pair.lastIndex) out[m[1].toLowerCase()] = m[2] ?? m[3];
+  return /^\s*\/?\s*$/u.test(tag.slice(at)) ? out : null;
+}
 
 // The namespaces a project's SDK or test framework imports with no <Using> git holds, where ImplicitUsings is on (the
 // SDKs' own .props, Web, Worker, Windows desktop and Blazor's; xUnit v3's, MSTest's and TUnit's). Each is taken as a
@@ -25,7 +31,7 @@ const IMPLICIT = ["System", "System.Collections.Generic", "System.IO", "System.L
 function children(text, at) {
   const child = /\s*<(\w+)\s*>([^<]*)<\/\1\s*>/uy, out = {};
   for (let m; (child.lastIndex = at, m = child.exec(text)); at = child.lastIndex) out[m[1].toLowerCase()] = m[2];
-  const close = /\s*<\/Using\s*>/uy;
+  const close = /\s*<\/Using\s*>/iuy;
   close.lastIndex = at;
   return close.test(text) ? out : null;
 }
@@ -34,7 +40,8 @@ function children(text, at) {
 export const tooMuch = (what, n, unit = "characters") => new Late(`${what} hold ${n.toLocaleString("en")} ${unit}, past the ${CHARACTERS.toLocaleString("en")} the selection reads, so what each file of C# reaches cannot be told in time`);
 
 // The <Using Include="N"> items of MSBuild's files, each a global using directive ({ target, alias }, an Alias="S" or
-// <Alias>S</Alias> its alias), and the IMPLICIT ones; or null where one holds what MSBuild expands ("$(...)" a property,
+// <Alias>S</Alias> its alias, both where both stand), and the IMPLICIT ones; or null where one holds an Update, a tag
+// that is no run of attributes, or what MSBuild expands ("$(...)" a property,
 // "@(...)" an item, "%" metadata or an escape, "%2E" a "."; "&" an XML reference, "&#46;" a ".") or what the reader
 // cannot tell from its metadata (children), whose value cannot be told here. `pace` is asked for each file; past
 // CHARACTERS of them together, Late.
@@ -43,13 +50,13 @@ export function msbuildUsings(texts, pace) {
   if (n > CHARACTERS) throw tooMuch("the project's MSBuild files", n);
   for (const text of texts) {
     pace();
-    for (const m of text.matchAll(/<Using\b([^<>]*)>/gu)) { // (each try ends at the next "<": linear in the text)
-      const meta = m[1].trimEnd().endsWith("/") ? {} : children(text, m.index + m[0].length);
-      if (meta === null) return null;
-      const [include, alias] = ["Include", "Alias"].map(a => attribute(m[1], a) ?? meta[a.toLowerCase()]);
+    for (const m of text.matchAll(/<Using\b([^<>]*)>/giu)) { // (an item type in any case; each try ends at the next "<": linear)
+      const attrs = attributes(m[1]), meta = !attrs || m[1].trimEnd().endsWith("/") ? {} : children(text, m.index + m[0].length);
+      if (!attrs || meta === null || "update" in attrs) return null; // (an Update changes an item the reader took already)
+      const include = attrs.include ?? meta.include, given = [attrs.alias, meta.alias].map(a => a?.trim()).filter(Boolean);
       if (include === undefined) continue;
-      if (/\$\(|@\(|%|&/u.test(`${include}${alias ?? ""}`)) return null;
-      for (const s of include.split(";")) { const target = s.trim().replace(/^global::/u, ""); if (target) out.push({ target, alias: alias?.trim() || null }); } // (a spread of many outruns the stack)
+      if (/\$\(|@\(|%|&/u.test(`${include}${given.join("")}`)) return null;
+      for (const s of include.split(";")) { const target = s.trim().replace(/^global::/u, ""); if (target) for (const alias of given.length ? given : [null]) out.push({ target, alias }); } // (a spread of many outruns the stack)
     }
   }
   return out;
@@ -71,4 +78,21 @@ export function heldBeside(texts, listed = () => git(["ls-files", "-z", "--", ":
 // out (<Compile Include>), so what reaches it cannot be told.
 export function ofNoProject(file, texts) {
   return !Object.keys(texts).some(f => f.endsWith(".csproj") && file.startsWith(path.posix.dirname(f) === "." ? "" : `${path.posix.dirname(f)}/`));
+}
+
+// Global using directives of each namespace the files of C# declare (facts, a Map of a file to its facts) outside the
+// root namespace of every project (its <RootNamespace>, else its .csproj's name), among `texts`: a package's own .props
+// may import one by a <Using> git does not hold (Aspire's, MAUI's), and one more namespace seen only links more.
+export function outside(texts, facts, pace) {
+  const roots = new Map(), end = Symbol("root"); // (a tree of the roots' words, so a namespace is walked once: linear)
+  for (const [f, t] of Object.entries(texts)) {
+    if (!f.endsWith(".csproj")) continue;
+    let n = roots;
+    for (const w of (/<RootNamespace\s*>\s*([^<$]*?)\s*<\/RootNamespace\s*>/iu.exec(t)?.[1] || path.posix.basename(f, ".csproj")).split(".")) n = n.get(w) ?? n.set(w, new Map()).get(w);
+    n.set(end, true);
+  }
+  const under = ns => { let n = roots; for (const w of ns.split(".")) { n = n.get(w); if (!n) return false; if (n.has(end)) return true; } return false; };
+  const out = new Set();
+  for (const x of facts.values()) for (const ns of x.placed) { pace(); if (ns && !under(ns)) out.add(ns); }
+  return [...out].map(target => ({ target, alias: null }));
 }

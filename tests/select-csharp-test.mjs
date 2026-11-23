@@ -32,7 +32,7 @@ export function pick(texts, changed, was) {
 export const app = {
   "src/App.csproj": PROJ, "tests/Tests.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <ItemGroup>\n    <PackageReference Include=\"xunit\" Version=\"2.9.3\" />\n  </ItemGroup>\n</Project>\n",
   "src/Rules.cs": "namespace App;\npublic static class Rules { public static bool Allowed() => true; }\n",
-  "src/Other/Rules.cs": "namespace Other;\npublic static class Rules { public static bool Allowed() => false; }\n",
+  "src/Other/Rules.cs": "namespace App.Other;\npublic static class Rules { public static bool Allowed() => false; }\n",
   "src/Slow.cs": "namespace App.Marks;\npublic class SlowAttribute : System.Attribute { }\n",
   "src/Handler.cs": "namespace App { public delegate void Handler<T>(T value); }\n",
   "src/Ext.cs": "namespace App.Ext;\npublic static class Twice { public static int Double(this int x) => x * 2; }\n",
@@ -68,7 +68,7 @@ if (started(import.meta.url)) {
   const chosen = f => pick(app, f).tests;
   ok(same(chosen("src/Rules.cs"), ["tests/AliasTest.cs", "tests/InsideTest.cs", "tests/UsingTest.cs"]),
     "a type is reached by its word through a using directive, from inside its namespace, and through using static; a type of the same word in a namespace the test does not see is not", JSON.stringify(chosen("src/Rules.cs")));
-  ok(same(chosen("src/Other/Rules.cs"), []), "a type no test sees selects no test, and a using directive of a package's namespace (Xunit, its package xunit) makes none run on any change", JSON.stringify(chosen("src/Other/Rules.cs")));
+  ok(same(chosen("src/Other/Rules.cs"), []), "a type no test sees selects no test, and a using directive of a package's namespace (Xunit) makes none run on any change", JSON.stringify(chosen("src/Other/Rules.cs")));
   ok(same(chosen("src/Store.cs"), ["tests/AliasTest.cs", "tests/FullTest.cs"]), "a type is reached by its full name, global:: before it, and through an alias", JSON.stringify(chosen("src/Store.cs")));
   ok(same(chosen("src/Slow.cs"), ["tests/MarkTest.cs"]), "an attribute is reached by its name without \"Attribute\"", JSON.stringify(chosen("src/Slow.cs")));
   ok(same(chosen("src/Handler.cs"), ["tests/DelegateTest.cs"]), "a delegate, which the grammar indexes as no type, is reached by its name", JSON.stringify(chosen("src/Handler.cs")));
@@ -120,8 +120,8 @@ if (started(import.meta.url)) {
   ok(tuple.links.get("tests/T.cs")?.has("src/X.cs"), "a delegate that returns a tuple is reached by its name", JSON.stringify([...tuple.links].map(([f, to]) => [f, [...to]])));
   const lambda = one("namespace App;\nclass X { System.Action<int> a = delegate (int n) { }; }\n", { "tests/T.cs": "using App;\nnamespace Tests;\nclass T { n m; }\n" });
   ok(!lambda.links.get("tests/T.cs")?.has("src/X.cs"), "an anonymous delegate with parameters declares no name");
-  const src = "namespace A { namespace B.C { class Q { delegate void Inner(); } } delegate void Outer(); }\nnamespace E { class P { } }\n";
-  const placed = ["using A.B.C;\nnamespace Tests;\nclass T { Inner i; }\n", "using A;\nnamespace Tests;\nclass T { Outer o; }\n", "using E;\nnamespace Tests;\nclass T { Outer o; Inner i; }\n"]
+  const src = "namespace App { namespace B.C { class Q { delegate void Inner(); } } delegate void Outer(); }\nnamespace Tests { class P { } }\n";
+  const placed = ["using App.B.C;\nnamespace Tests;\nclass T { Inner i; }\n", "using App;\nnamespace Tests;\nclass T { Outer o; }\n", "namespace Tests;\nclass T { Outer o; Inner i; }\n"]
     .map(t => !!one(src, { "tests/T.cs": t }).links.get("tests/T.cs")?.has("src/X.cs"));
   ok(same(placed, [true, true, false]), "a delegate is declared in the namespace it stands in, nested ones joined, and in no other of its file's", JSON.stringify(placed));
   const escaped = ["namespace App; class @namespace {} class C { @namespace field; } delegate void D();\n", "@namespace x = null;\nnamespace App { delegate void D(); }\nclass @namespace {}\n", "namespace App { class C { void M() { @namespace.@namespace.Go(); } } delegate void D(); }\nclass @namespace {}\n"]

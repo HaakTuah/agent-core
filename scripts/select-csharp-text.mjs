@@ -1,9 +1,10 @@
 // Whether a file of C# holds code the parser's tokens leave out (csharp-tree.mjs), for the test selection
-// (select-csharp.mjs; #675): a raw interpolated string's holes, or an interpolation's alignment ("{x,App.Width}", whose
-// constant sets the padding). Read in one pass from the file's start, passing over comments, strings, characters and
-// directives as the lexer does, so a "$\"" in one opens nothing; a raw interpolated string's "$\"\"\"" and an odd line
-// end (ODD) count anywhere, and a comment in a hole, or one that runs across an "#if", makes it unsure: it reads more,
-// never less. Linear in the text: each character is read once.
+// (select-csharp.mjs; #675): a raw interpolated string's holes, an interpolation's alignment ("{x,App.Width}", whose
+// constant sets the padding), or a name written with an escape ("R\u0075les"), which the tokens split. Read in one pass
+// from the file's start, passing over comments, strings, characters and directives as the lexer does, so a "$\"" in one
+// opens nothing; a raw interpolated string's "$\"\"\"" and an odd line end (ODD) count anywhere, and a comment in a
+// hole, or one that runs across an "#if", makes it unsure: it reads more, never less. Linear in the text: each character
+// is read once.
 
 // (a raw interpolated string's "$\"\"\"", one "$" of a run; or a line's end other than "\n", "\r\n": "\r", U+0085, U+2028
 // or U+2029, which the scan and the tree read as no end)
@@ -23,12 +24,14 @@ export function leftOut(src) {
 // out, or runs across a directive's line: a comment or string that one branch of an "#if" opens hides what follows it.
 function step(src, i) {
   const end = past(src, i);
-  return end > i && /\n\s*#/u.test(src.slice(i, end)) ? -1 : end; // (the spans do not overlap: linear)
+  return end > i && /\n[^\S\n]*#/u.test(src.slice(i, end)) ? -1 : end; // (the spans do not overlap: linear)
 }
 
 // In code at i: the index of the last character of what begins there (a comment, a directive, a string or a character;
-// i itself where none does), or -1 where an interpolated string there holds what the tokens leave out.
+// i itself where none does), or -1 where an interpolated string there holds what the tokens leave out, or where a
+// name's escape begins (in code a "\" begins nothing else).
 function past(src, i) {
+  if (src[i] === "\\") return -1;
   AT.lastIndex = i;
   const m = AT.exec(src)?.[0];
   if (!m) return i;
@@ -92,11 +95,11 @@ function inHole(src, i, s) {
 }
 
 // Whether what stands at i in a hole is what the tokens leave out: a word in an alignment (a letter, a letter-number
-// such as "Ⅻ", "_" or an escape "\u0041" may begin one), an interpolated, verbatim or raw string's start, or a comment,
-// which may hide where the hole ends.
+// such as "Ⅻ" or "_" may begin one), a name's escape "\u0041", an interpolated, verbatim or raw string's start, or a
+// comment, which may hide where the hole ends.
 function hides(src, i, s) {
   const c = src[i];
-  return (s.align && /[\p{L}\p{Nl}_\\]/u.test(c)) || c === "$" || c === "@" || src.startsWith("\"\"\"", i) || (c === "/" && /[/*]/u.test(src[i + 1] ?? ""));
+  return (s.align && /[\p{L}\p{Nl}_]/u.test(c)) || c === "\\" || c === "$" || c === "@" || src.startsWith("\"\"\"", i) || (c === "/" && /[/*]/u.test(src[i + 1] ?? ""));
 }
 
 // The index of the quote that closes a plain string or a character whose text begins at i (or the line's end).
