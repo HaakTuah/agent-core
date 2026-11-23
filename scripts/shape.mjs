@@ -81,9 +81,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE, append, cycles, lyingUnder, nameTree, resolve } from "./code-shape.mjs";
 import { inProject, logged } from "./guards.mjs";
-import { installed, unreached } from "./packages.mjs";
+import { didNotRun, installStep, installed, notInstalled } from "./packages.mjs";
 import { shapeFaults } from "./schemas.mjs";
-import { CHANGE_MARKS, FIRST_READS, PACKAGE_FILES, REACH, READERS, WHOLE_ON_PARSER, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
+import { CHANGE_MARKS, FIRST_READS, PACKAGE_FILES, REACH, READERS, WHOLE_ON_PARSER, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unreachedReaders } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 import { LARGEST, MOST_NODES } from "./tree-walk.mjs";
 
@@ -172,9 +172,7 @@ function readTogether(systems, at) {
 // Where ajv is not installed the config's shape went unchecked, as readShape says: said as a warning, and the check
 // goes on (the core's AGENTS.md, "Nothing locks a project").
 function unchecked() {
-  if (installed("ajv")) return;
-  console.log(unreached("ajv") ? "::warning::The config's shape was not checked: the package ajv could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault"
-    : `::warning::The config's shape was not checked: the package ajv is not installed beside the core's copy. Mend: in a pull request of its own, add the step node ${path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)))} to this job before the step that runs this check`);
+  if (!installed("ajv")) console.log(didNotRun("The config's shape was not checked", "ajv"));
 }
 
 // The config as the check reads it, every key filled; it throws a Refused, with its mend, for one it cannot hold to.
@@ -963,11 +961,9 @@ function check(config, at, self, found, base, named) {
   const v = verdict({ config, at, self, found, baselineText: fs.readFileSync(config.baseline, "utf8"), base: toldOf(base, named, config) });
   for (const note of v.notes) console.log(`note ${logged(note)}`);
   const skipped = unreachedReaders().filter(r => [...found.readers.values()].includes(r));
-  // (a job of the project's own that names the core's first install alone, written before the parser's came, is told to
-  // name every one; one whose install could not reach the registry, to run again: #719)
-  const unnamed = skipped.length && unnamedReaders().length, install = path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)));
-  const why = unnamed ? "the parser's packages are not installed, this job's install step naming the core's first install alone" : "the core's packages could not be installed, the registry not answering";
-  const mend = unnamed ? `make this job's install step node ${install} all, which installs the parser's packages too` : "run this job again before the pull request merges; if it fails again, file it as a fault";
+  // (why, with its mend, as packages.mjs words it: the registry not answering, or what the copy's installer said where it
+  // ran for this check and did not install the parser's packages; #719, #1093, point 1)
+  const [why, mend] = notInstalled("web-tree-sitter").split(". Mend: ");
   if (skipped.length) console.log(`::warning::The shape check did not read ${skipped.map(r => `${READERS[r]} (the reader ${r})`).join(", ")}: ${why}, so what it would find there on the parser is reported, never failed${v.kept ? `, and the ${plural(v.kept, "entry", "entries")} its baseline lists there (functions, files the grammar cannot read, and all of a file of C# or Python) ${v.kept === 1 ? "is" : "are"} kept as listed, never failed as gone` : ""}; what it reads without the parser is held as ever. Mend: ${mend}`);
   if (!base) console.log("note no base to compare with (set SHAPE_BASE to the branch the work started from), so the baseline was not checked for what joined it, and what the config newly reads is not told from what is new");
   for (const line of v.fail.flat()) console.error(logged(line));
@@ -991,7 +987,7 @@ function main(argv) {
   // is no reason to refuse, so a project with no file a reader on the parser reads writes its own with the parser's
   // packages not installed)
   const skipped = unreachedReaders().filter(r => [...found.readers.values()].includes(r));
-  if (command && skipped.length) refuse(`the core's packages are not installed, so ${skipped.map(r => READERS[r]).join(", ")} cannot be read and a baseline written now would leave out what stands there`, `run node ${path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)))}${unnamedReaders().length ? " all" : ""} until it installs them, then run this again`);
+  if (command && skipped.length) refuse(`the core's packages are not installed, so ${skipped.map(r => READERS[r]).join(", ")} cannot be read and a baseline written now would leave out what stands there`, `run \`${installStep("all")}\` until it installs them, then run this again`);
   if (!command) return check(config, at, self, found, base, named);
   if (command === write && !fs.existsSync(config.baseline)) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} ${at} --first, and commit it`);
   return command(config, at, self, new Map([...found.entries].map(([id, e]) => [id, numbersOf(e.n)])), base, found, named);

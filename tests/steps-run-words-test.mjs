@@ -5,7 +5,6 @@
 //   node tests/steps-run-words-test.mjs
 import { kind } from "../scripts/fresh.mjs";
 import { NPX, CURL, linear, inMemory, stepped, copiesOf, notRead } from "../scripts/steps-kit.mjs";
-import { STEPS } from "../scripts/steps.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -19,8 +18,7 @@ ok(["env -S'node core/scripts/copies.mjs config/c.json'", "env --split-string='n
 ok(copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs '$GITHUB_WORKSPACE/config/c.json'") }) === "$GITHUB_WORKSPACE/config/c.json" && notRead("copies", { "a.yml": stepped("node '$GITHUB_WORKSPACE/core/scripts/copies.mjs' c.json") }),
   "the root's name in single quotes is text, never the root");
 // (the review of 1dd5dbf: a shell's file and that file's arguments are never its own commands; a command that runs no
-// script names it as text; env -S read only as env's; the exact-versions step asks of companions only where the licence
-// check runs)
+// script names it as text; env -S read only as env's)
 ok(["bash -e ./run.sh -c 'node core/scripts/copies.mjs other.json'", "bash -x script.sh -c 'node core/scripts/copies.mjs other.json'", "pwsh -File x.ps1 -Command 'node core/scripts/copies.mjs other.json'"]
   .every(line => notRead("copies", { "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }))
   && ["echo Then run node core/scripts/copies.mjs your.json", "echo env -S 'node core/scripts/copies.mjs x'"]
@@ -28,14 +26,10 @@ ok(["bash -e ./run.sh -c 'node core/scripts/copies.mjs other.json'", "bash -x sc
   "a shell's file given arguments that name the script is not read, never read as the file's; a command that runs no script gives no run");
 const longEnv = linear((n, k) => notRead("copies", { "a.yml": stepped(`env ${"-S ".repeat(n)}'node core/scripts/copies.mjs c.json' # ${k}`) }), 1250, 20000);
 ok(longEnv.right && longEnv.linear, "many of env's options are read in one pass", longEnv.shown);
-const versionsStep = STEPS.find(s => s.lead === "12 November 2026, exact versions");
-ok(versionsStep.check(inMemory({ "a.yml": stepped("cd tools && node scripts/exact-versions.mjs x.json") }, { "package-lock.json": "{}" })) === null, "where the project runs no licence check of its own, a companion run it cannot place asks nothing");
-// (npm known by either lock file it installs from, package-lock.json or npm-shrinkwrap.json: each reads as npm, and the
-// step asks its companion run of each)
-ok(["package-lock.json", "npm-shrinkwrap.json"].every(f => kind({ ...inMemory({}, { [f]: "{}" }), root: tmp }).o.packages === "." && typeof versionsStep.check(inMemory({ "a.yml": stepped("node core/scripts/licences.mjs l.json") }, { [f]: "{}" })) === "string"),
-  "a project holding npm-shrinkwrap.json in place of package-lock.json reads as npm, and the exact-versions step asks of it as of the other");
-ok(["core/package-lock.json", "node_modules/a/npm-shrinkwrap.json", "tools/node_modules/b/package-lock.json"].every(f => versionsStep.check(inMemory({ "a.yml": stepped("node core/scripts/licences.mjs l.json") }, { [f]: "{}" })) === null),
-  "a lock file inside the core's copy or an installed package asks nothing of the project");
+// (npm known by either lock file it installs from, package-lock.json or npm-shrinkwrap.json: each reads as npm; the
+// exact-versions step that asked their companion runs asks nothing from #1093 on, the licence check running that check)
+ok(["package-lock.json", "npm-shrinkwrap.json"].every(f => kind({ ...inMemory({}, { [f]: "{}" }), root: tmp }).o.packages === "."),
+  "a project holding npm-shrinkwrap.json in place of package-lock.json reads as npm");
 // (the review of b6aaf95: a shell's options read so that its -c string is found, and a shell not given a file is not
 // read silently; more commands that run no script; a wrapper that moves the folder)
 ok(["sh -euo pipefail -c 'node core/scripts/copies.mjs config/c.json'", "bash -eo pipefail -c 'node core/scripts/copies.mjs config/c.json'", "pwsh -ep Bypass -Command 'node core/scripts/copies.mjs config/c.json'",
