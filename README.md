@@ -108,8 +108,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    (`setup/sync-notes.md`, each entry a file of `setup/sync-notes/`, read whole by `scripts/sync-notes.mjs`), and its
    step of the same name in `scripts/steps/` tells it done or not (`scripts/steps.mjs`); the sync script prints the entries a sync brings, then every
    step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`), where the owner's
-   inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`) and the line `Read for it:`
-   (`scripts/reading.mjs`), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
+   inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`), the line `Read for it:`
+   (`scripts/reading.mjs`) and, last, one line that says whether the project then holds the core whole and wired,
+   `attached: yes` or `attached: no` with how many things stand in the way (`scripts/attached.mjs`, which lists each with
+   its mend when a session runs it), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
    release says what it asks, step by step"). The core's
    `core.yml`, which the project calls on every PR as a required check, fails one whose `core/` differs from the core at
    its pin, entry by entry by git's object ids and types, as `pure-sync.mjs` compares too: a file's content, a link or a
