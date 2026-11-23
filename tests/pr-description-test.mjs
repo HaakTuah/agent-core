@@ -93,8 +93,8 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   ok(keysAt(".")?.has("218") && keysAt(".")?.has("#1084") && keysAt(scratchDir("pr-head-none-")) === null, "the keys are read from the archive at the root given, both its forms; none where it holds none");
   ok(["TBD", "TODO: the test", "XXX", "FIXME", "(to be added here)", "- to be added", "1. To be added", "Tests: to  be added", "Tests: to be\tadded"].every(t => fails(`The change.\n${t}\n`).length === 1),
     "a placeholder fails: a word of the list in capitals, and \"to be added\" where it opens a bracket, a line or a list item, or follows a colon");
-  ok(["todo", "TODOs", "a line to be added to the list", "`TODO`", "```\nFIXME\n```", "a \"TODO\""].every(t => fails(`The change.\n${t}\n`).length === 0),
-    "  but not the word in small letters or in a longer word, \"to be added\" in a sentence, nor one in code marks or double quotes");
+  ok(["todo", "TODOs", "a line to be added to the list", "`TODO`", "```\nFIXME\n```", "a \"TODO\"", "\"TBD\" first", "`TODO` first", "` to be added"].every(t => fails(`The change.\n${t}\n`).length === 0),
+    "  but not the word in small letters or in a longer word, \"to be added\" in a sentence or after a lone backtick, nor one in code marks or double quotes");
   const all = fails("core archive 263\nTBD\n");
   ok(all.length === 2 && all.every(m => mended(`FAIL ${m}`)) && all[0].includes(HEAD_MEND) && all[1].includes(PLACE_MEND), "each failure says its mend");
   ok(fails("TBD\n").join() === `line 1 of the description holds the placeholder "TBD". ${PLACE_MEND}` && fails("x (to be added)").join() === `line 1 of the description holds the placeholder "to be added". ${PLACE_MEND}` && fails("x\n\ncore archive 263").join() === `line 3 of the description names "core archive 263", which the head's archive does not hold. ${HEAD_MEND}`,
@@ -107,6 +107,10 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
     "a fenced block, of three marks or more, is not read up to the fence that closes it: of its kind, as long or longer, with nothing after but blanks; one indented four or not at a line's start opens none; an archive key in it is read all the same, as one in code marks is");
   ok(lines("a <!-- TBD --> b TODO\n<!--\nFIXME\n-->XXX\nTBD<!-- x -->TBD\n<!-- a --> <!--\nTODO\n-->\n<!-- one\n``` -->TODO\n<!-- XXX-->\n") === "1,4,5,5,10" && lines("  > TBD\na > TBD\n") === "2" && lines("a\"x\"TBD\na`x`TBD\n``TBD``\n`` a ` TBD ``\n") === "1,2",
     "an HTML comment, on a line or over lines, is read around, its place a blank; a line quoted after blanks is not read, one with a \">\" inside is; what quotes and code marks hold, of any length, is not read, and a blank stands for it");
+  ok(lines("Document the `<!--` opening.\nNotes: TBD\nBehind it: core archive 999999\n") === "3,2" && lines("``a`<!--`` TBD\n`a` <!-- TBD --> `b`\n<!-- `x --> TBD `\n`\"` TBD `\"`\n“a “b” TBD\nx \" TBD `\"`\n") === "1,3,4,5,6",
+    "code marks are read before a comment's opening, as whichever opens first: a \"<!--\" in code marks opens no comment, and a backtick in a comment opens no code; a quote mark in code marks opens no quote, and a quote closes at the first closing mark");
+  ok(lines("<!-- -->TBD\"x\"\n<!-- -->\"x\"TBD\nx `\"` TBD `\"`\na`x`\"y\"TBD\na`x`TBD\"y\"\n`TBD` \"y\" `TODO`\n\"`x` TBD\" y\na `b` <!-- TBD --> c\n") === "1,2,3,4,5",
+    "  what is read stays in its place after a comment, a code span or a quote, whichever stands first, one inside another going with it");
   ok(["  to be added", "-  to be added", "12. to be added", "To be added.", "* to be added", "2) to be added", "[to be added]", "<to be added>"].every(t => fails(`The change.\n${t}\n`).length === 1) && fails("x- to be added\nIt is to be added").length === 0,
     "  \"to be added\" after blanks, a list mark of any width, or an opening bracket fails; inside a line it does not");
   ok(headOf("TBD", "").mends.length === 1 && headOf("archive item 99999", "").mends.length === 1 && headOf("archive item 99999", "./").mends.length === 0 && headOf("core archive 99999", "./").mends.length === 1 && headOf("core archive 99999", null).mends.length === 0
@@ -116,8 +120,8 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   ok(headAsked(HEAD_SINCE, "export const HEAD_SINCE") && headAsked("2026-11-24T00:00:00Z", "export const HEAD_SINCE") && !headAsked("2026-11-22T23:59:59Z", "export const HEAD_SINCE") && !headAsked(HEAD_SINCE, "an older copy") && !headAsked(HEAD_SINCE, null) && !headAsked("", "export const HEAD_SINCE"),
     "the line is asked of a pull request opened on or after its day, its base's copy holding it");
   const slow = Date.now();
-  headMends(`${" ".repeat(200000)}x\n- ${" ".repeat(200000)}x\n:${" ".repeat(200000)}x\n${"`".repeat(100000)}\n${"<!--".repeat(50000)}\n${"\"".repeat(100001)}\n${"core archive ".repeat(20000)}\n`, { keys });
-  ok(Date.now() - slow < 2000, "a long description of blanks, marks and quotes is read in no time");
+  headMends(`${" ".repeat(200000)}x\n- ${" ".repeat(200000)}x\n:${" ".repeat(200000)}x\n${"`".repeat(100000)}\n${"<!--".repeat(50000)}\n${"\"".repeat(100001)}\n${"“".repeat(100000)}\n${"“x ".repeat(50000)}\n${"`<!--` ".repeat(30000)}\n${"` ".repeat(100000)}\n${Array.from({ length: 600 }, (_, n) => "`".repeat(n + 1)).join(" ")}\n${"core archive ".repeat(20000)}\n`, { keys });
+  ok(Date.now() - slow < 2000, "a long description of blanks, marks and quotes, opened and never closed, is read in no time");
 }
 // the copy whose history says which lines are asked: where the base's manifest puts the core, never the head's (#455)
 {

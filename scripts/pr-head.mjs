@@ -31,25 +31,58 @@ const CAPS = new RegExp(PLACEHOLDERS.filter(p => p === p.toUpperCase()).map(p =>
 const ADDED = /(?:^\s*(?:(?:[-*+]|\d+[.)])\s+)?|[([<:]\s*)(to\s+be\s+added)\b/giu;
 
 // The description's lines, each with its number and its text, with what is not read taken out (`text`) and, besides,
-// what stands in code marks (`prose`): a fenced block's lines have no prose. A quoted line is left out whole.
+// what stands in code marks (`prose`): a fenced block's lines have no prose. A quoted line is left out whole. Each line
+// is read in one pass, so no text makes the check slow.
 function linesOf(body) {
-  const out = [];
-  let fence = null, comment = false;
+  const out = [], state = { comment: false };
+  let fence = null;
   for (const [i, raw] of String(body ?? "").split(/\r\n|\r|\n/u).entries()) {
     const open = /^ {0,3}(`{3,}|~{3,})/u.exec(raw);
     if (fence) { if (open && open[1][0] === fence[0] && open[1].length >= fence.length && !raw.slice(open[0].length).trim()) fence = null; out.push({ at: i + 1, text: raw, prose: "" }); continue; }
-    if (open && !comment) { fence = open[1]; out.push({ at: i + 1, text: raw, prose: "" }); continue; }
-    // (an HTML comment taken out, one that runs on over lines too)
-    let line = "", rest = raw;
-    while (rest) {
-      if (comment) { const end = rest.indexOf("-->"); if (end < 0) rest = ""; else { comment = false; rest = rest.slice(end + 3); line += " "; } }
-      else { const start = rest.indexOf("<!--"); if (start < 0) { line += rest; rest = ""; } else { line += rest.slice(0, start); rest = rest.slice(start + 4); comment = true; } }
-    }
+    if (open && !state.comment) { fence = open[1]; out.push({ at: i + 1, text: raw, prose: "" }); continue; }
+    const { line, bare, code } = marked(raw, state);
     if (/^\s*>/u.test(line)) continue;
-    const text = line.replace(/"[^"]*"|“[^”]*”/gu, " ");
-    out.push({ at: i + 1, text, prose: text.replace(/(`+)[^`]*?\1/gu, " ") });
+    // (what stands in double quotes, "…" or “…”, outside code marks; one opening mark of each kind is read at a time)
+    const quotes = [...bare.matchAll(/"[^"]*"|“[^“”]*”/gu)].map(m => [m.index, m.index + m[0].length]);
+    out.push({ at: i + 1, text: cut(line, quotes), prose: cut(line, [...quotes, ...code]) });
   }
   return out;
+}
+
+// A line with its HTML comments taken out, one that runs on over lines too (`state.comment`); `bare`, the same with
+// what its code spans hold blanked; and `code`, where each code span stands in it. As CommonMark reads them, whichever
+// opens first wins: a "<!--" in code marks opens no comment, and a run of backticks closes at the next run of the same
+// length or is only text.
+function marked(raw, state) {
+  const runs = spans(raw), code = [];
+  let line = "", bare = "", r = 0, at = 0, opener = -1;
+  while (at < raw.length) {
+    if (state.comment) { const end = raw.indexOf("-->", at); if (end < 0) break; state.comment = false; line += " "; bare += " "; at = end + 3; continue; }
+    while (r < runs.length && runs[r].at < at) r++;
+    if (opener < at) { const next = raw.indexOf("<!--", at); opener = next < 0 ? raw.length : next; }
+    const run = runs[r], stop = Math.min(run?.at ?? raw.length, opener);
+    line += raw.slice(at, stop); bare += raw.slice(at, stop);
+    if (run?.at === stop) {
+      if (run.end > run.at + run.n) code.push([line.length, line.length + run.end - run.at]);
+      line += raw.slice(run.at, run.end); bare += " ".repeat(run.end - run.at); at = run.end;
+    } else { state.comment = stop < raw.length; at = stop + 4; }
+  }
+  return { line, bare, code };
+}
+
+// The runs of backticks of a line, each { at, n, end }: where a code span it opens ends, after the next run of the same
+// length, or, where none follows, the end of the run itself, which is then only text. Read once, from the line's end.
+function spans(raw) {
+  const runs = [...raw.matchAll(/`+/gu)].map(m => ({ at: m.index, n: m[0].length })), after = new Map();
+  for (const run of runs.toReversed()) { run.end = (after.get(run.n) ?? run.at) + run.n; after.set(run.n, run.at); }
+  return runs;
+}
+
+// A line with each range of it ([from, to]) put as one blank; a range inside another goes with it.
+function cut(line, ranges) {
+  let out = "", at = 0;
+  for (const [from, to] of ranges.toSorted((x, y) => x[0] - y[0])) if (from >= at) { out += `${line.slice(at, from)} `; at = to; }
+  return out + line.slice(at);
 }
 
 // What the description names, each with the line it stands on: { keys, placeholders }, each a list of { at, token,
