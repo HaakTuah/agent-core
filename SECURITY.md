@@ -157,7 +157,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      comment in the code asks it to; limits: no size of a file, a file the engine did not scan or stopped on failing
      and one it parsed in part passing, said as read in part, 200 files to a run of the engine, 30 s for a rule on a
      file, 900 s for a run, 256 MB of git's diff of a file, 1 GB of the engine's answer, and the description whole as
-     the host gives it, at most 65,536 characters; hostile tests: `tests/code-scan-logic-test.mjs`.
+     the host gives it, at most 65,536 characters; hostile tests: `tests/code-scan-test.mjs`.
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
    (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are
    tools that only run, each with its licence in its audit (`.github/licences-audit.json`). Among them is Node
