@@ -157,13 +157,17 @@ jobs:
           # GitHub's only under one of them, since one made through GitHub's API takes whatever author its caller names)
           profiles=$(for m in $(git rev-list --max-count=100 --committer='noreply@github.com' "$side"); do
             made "$m" && git log -1 --format='%an <%ae>' "$m"; done | sort -u)
-          form='^(([0-9]+[+])?[a-z0-9][a-z0-9-]{0,38}(\[bot\])?@users[.]noreply[.]github[.]com|noreply@github[.]com|noreply@anthropic[.]com)$'
+          # (the account's no-reply form, and the allowed list: each other no-reply address by name, naming no person)
+          form='^([0-9]+[+])?[a-z0-9][a-z0-9-]{0,38}(\[bot\])?@users[.]noreply[.]github[.]com$'
+          allowed='noreply@github.com
+          noreply@anthropic.com'
+          noreply() { LC_ALL=C grep -q -i -x -E "$form" <<< "$1" || LC_ALL=C grep -q -i -x -F -e "$allowed" <<< "$1"; }
           own= bad=
           for c in $commits; do
             if made "$c" && printf '%s\n' "$profiles" | grep -q -x -F -e "$(git log -1 --format='%an <%ae>' "$c")"; then own+="$c "; continue; fi
             short=$(git rev-parse --short "$c")
-            git log -1 --format='%ae' "$c" | LC_ALL=C grep -q -i -x -E "$form" || bad+="$short author"$'\n'
-            git log -1 --format='%ce' "$c" | LC_ALL=C grep -q -i -x -E "$form" || bad+="$short committer"$'\n'
+            noreply "$(git log -1 --format='%ae' "$c")" || bad+="$short author"$'\n'
+            noreply "$(git log -1 --format='%ce' "$c")" || bad+="$short committer"$'\n'
           done
           echo "made=$own" >> "$GITHUB_OUTPUT"
           rm -rf "$work"
