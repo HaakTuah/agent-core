@@ -23,21 +23,7 @@
       "mcp__claude-code-remote__unwatch_url",
       "mcp__claude-code-remote__unarchive_session",
       "mcp__claude-code-remote__set_session_tags",
-      "mcp__claude-code-remote__set_session_title",
-      "mcp__claude-code-remote__create_trigger",
-      "mcp__claude-code-remote__update_trigger",
-      "mcp__claude-code-remote__delete_trigger",
-      "mcp__claude-code-remote__fire_trigger",
-      "mcp__claude-code-remote__get_trigger",
-      "mcp__claude-code-remote__list_triggers",
-      "mcp__claude-code-remote__list_environments",
-      "mcp__claude-code-remote__archive_session",
-      "mcp__claude-code-remote__interrupt_session",
-      "mcp__claude-code-remote__list_sessions",
-      "mcp__claude-code-remote__list_repos",
-      "mcp__claude-code-remote__create_session",
-      "mcp__claude-code-remote__get_event",
-      "mcp__claude-code-remote__list_events"
+      "mcp__claude-code-remote__set_session_title"
     ]
   },
   "hooks": {
