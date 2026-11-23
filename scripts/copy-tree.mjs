@@ -12,6 +12,7 @@
 // and pure-sync.mjs refuses a bit the core does not mark (`executable`, below), so a sync widens no file's mode beyond
 // the core's. This is the one place that reason is written; core.yml and pure-sync.mjs point here. Git and Node's own modules only; proven by copy-tree-test.mjs.
 import fs from "node:fs";
+import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { inBare } from "./releases.mjs";
 
@@ -48,8 +49,9 @@ export function executable(tree, gitDir) {
  *  both ways: the bit on disk too, since where git reads it (core.fileMode) a later `git add` would stage it back. Where
  *  git refuses, it says so and fails nothing: the copy is written all the same. The sync (sync.mjs) calls it. */
 export function recordModes(dir, pin, gitDir) {
-  // (a plain file alone, read without following a link, so no bit is set or staged beyond the copy)
-  const file = (f) => { try { return fs.lstatSync(f).isFile(); } catch { return false; } };
+  // (a plain file alone, with no link on its path below the copy's folder, so no bit is set or staged beyond the copy)
+  let root; try { root = fs.realpathSync(dir); } catch { /* (no copy: nothing to mark) */ }
+  const file = (f) => { try { return fs.lstatSync(f).isFile() && fs.realpathSync(f) === path.join(root, path.relative(dir, f)); } catch { return false; } };
   const marked = git(["ls-tree", "-r", "-z", pin], gitDir).split("\0").filter((e) => e.startsWith("100755 blob ")).map((e) => `${dir}/${e.slice(e.indexOf("\t") + 1)}`).filter(file);
   // (with core.fsmonitor off, as own-files.mjs reads the index: no command of the project's settings runs)
   const run = (args) => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });

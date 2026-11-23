@@ -8,7 +8,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { KEPT, copyTree, coreIsFolder, entries, executable } from "../scripts/copy-tree.mjs";
+import { KEPT, copyTree, coreIsFolder, entries, executable, recordModes } from "../scripts/copy-tree.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -113,6 +113,21 @@ const treeOf = (...lines) => execFileSync("git", ["mktree", "--missing"], { cwd:
 const plain = treeOf(`100644 blob ${blob}\trun.sh`);
 ok(entries(treeOf(`100755 blob ${blob}\trun.sh`), repo) === entries(plain, repo), "a file the copy records 100644 where the core's is 100755 is the same file: the executable bit is no difference");
 ok(JSON.stringify(executable(modes, repo)) === JSON.stringify(["scripts/run.sh"]) && !executable(plain, repo).length, "  the files a tree marks executable are read from it, the link and every file of 100644 left out (pure-sync.mjs refuses a bit the core does not mark)");
+// the sync records the bits the core marks on a plain file of the copy, never through a link below its folder (#1189)
+if (process.platform !== "win32") {
+  const project = path.join(tmp, "project"), outside = path.join(tmp, "outside");
+  fs.mkdirSync(path.join(project, "core/scripts"), { recursive: true }); fs.mkdirSync(outside);
+  fs.writeFileSync(path.join(project, "core/scripts/run.sh"), "x"); fs.writeFileSync(path.join(outside, "run.sh"), "x");
+  fs.chmodSync(path.join(outside, "run.sh"), 0o644); git(project, "init", "-q");
+  const here = process.cwd(); process.chdir(project);
+  try {
+    recordModes("core", modes, repo);
+    ok((fs.statSync("core/scripts/run.sh").mode & 0o111) && git(project, "ls-files", "-s", "core/scripts/run.sh").startsWith("100755 "), "the sync gives a file the core marks executable its bit, on disk and in the index");
+    fs.rmSync("core/scripts", { recursive: true }); fs.symlinkSync(outside, "core/scripts");
+    recordModes("core", modes, repo);
+    ok(!(fs.statSync(path.join(outside, "run.sh")).mode & 0o111), "  and never through a link to a folder outside the copy, a folder of it that is a link");
+  } finally { process.chdir(here); }
+}
 ok(entries(treeOf(`120000 blob ${blob}\trun.sh`), repo) !== entries(plain, repo), "a link in its place is not");
 ok(entries(treeOf(`160000 commit ${modes}\trun.sh`), repo) !== entries(plain, repo), "nor a submodule");
 ok(entries(treeOf(`100644 blob ${git(core, "hash-object", "-w", "reports/one.md")}\trun.sh`), repo) !== entries(plain, repo), "nor a file of other content");
