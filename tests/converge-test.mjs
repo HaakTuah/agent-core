@@ -75,6 +75,11 @@ try {
       "a workflow of the core's whose check the one job of the core.yml written runs is taken out, where it carries the core's mark or is an earlier kit's text, its pins aside; one the project changed, and one the one job does not run, stay", JSON.stringify(r.remove));
     const untouched = plan(q, kit, older);
     ok(!untouched.remove.length, "  where the core.yml the process ends with folds none, nothing is taken out, though an earlier kit wrote the file", JSON.stringify(untouched.remove));
+    write(p.dir, wf("core"), folds.replace(/\n/g, "\r\n"));
+    const crlf = plan(held(p.dir), one, older);
+    ok(crlf.remove.map(x => x.to).sort().join() === [wf("copies"), wf("pr-description")].sort().join() && !crlf.write.some(w => w.to === wf("core")),
+      "  and where core.yml already stands as written, its line ends alone otherwise (CRLF, as a checkout on Windows holds it), the same are taken out and core.yml is not written", JSON.stringify(crlf));
+    git(p.dir, "checkout", "-q", "--", wf("core"));
     write(p.dir, "core-manifest.md", read(p.dir, "core-manifest.md").replace(/^## Differences\r?\n+None\./m, `## Differences\n\n- "${wf("core")}": the project's own, on the owner's word.`));
     const declared = plan(held(p.dir), one, older);
     ok(!declared.remove.length, "  nor where core.yml is named in \"Differences\", so its one job is never written", JSON.stringify(declared.remove));
@@ -149,6 +154,11 @@ try {
   commit(p.dir, "outside the part");
   const outside = check();
   ok(outside.status === 0, "the check passes a pull request that changes only what is the project's", outside.out);
+  write(p.dir, ".github/workflows/core.yml", read(p.dir, ".github/workflows/core.yml").replace(/\n/g, "\r\n"));
+  commit(p.dir, "line ends alone");
+  const ends = check();
+  ok(ends.status === 0, "  and one that changes a file the core marks in its line ends alone (CRLF, as a checkout on Windows holds it)", ends.out);
+  git(p.dir, "branch", "-f", "base"); // (the base now holds core.yml with CRLF line ends: a change past them is still the pull request's)
   write(p.dir, "AGENTS.md", read(p.dir, "AGENTS.md").replace("@core/roles/builder.md\n", ""));
   write(p.dir, ".github/workflows/core.yml", `${read(p.dir, ".github/workflows/core.yml")}# more\n`);
   commit(p.dir, "inside the part, and a marked workflow");
