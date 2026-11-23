@@ -9,7 +9,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { LIST, NO_TESTS, fillable, leftFor, lineOf, packageList, rowFor, testRunner, written } from "../scripts/mutation-tools.mjs";
+import { LIST, NO_TESTS, fillable, leftFor, lineOf, named, packageList, rowFor, setUp, testRunner, written } from "../scripts/mutation-tools.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 import { toolOf } from "../scripts/strength.mjs";
 
@@ -45,6 +45,9 @@ ok(same(at({ code: ["a.js"], tests: false }), { none: NO_TESTS }) && toolOf(line
   "a project with no tests, or with tests and no code the list knows, gives none, its reason starting so");
 ok(testRunner('{"scripts":{"test":"  node --test tests/"}}') === "node" && testRunner('{"scripts":{}}') === null && testRunner("{ not json") === null && testRunner(null) === null,
   "the test runner is the first word of package.json's test script, or none where it gives none");
+const jest = testRunner('{"scripts":{"test":"node --experimental-vm-modules node_modules/jest/bin/jest.js"}}');
+ok(jest === "node node_modules/jest/bin/jest.js" && at({ code: ["a.mjs"], tests: true, runner: jest }).none?.includes("node_modules/jest/bin/jest.js"),
+  "a test script that runs another runner through node names that runner, and the list's tool is not named for it");
 
 // ---- a row the project wrote is kept ----
 const MANIFEST = row => `# Core manifest\n\n## Slots\n| Slot | Here |\n| --- | --- |\n| *owner's account* | someone |\n${row}\n## Differences\nNone.\n`;
@@ -83,6 +86,16 @@ try {
   put("core-manifest.md", MANIFEST("| *mutation tool* | `none`: the owner keeps the measure off |"));
   r = run("--write");
   ok(r.status === 0 && read("core-manifest.md").includes("the owner keeps the measure off") && r.stdout.includes("is the project's own"), "--write keeps the project's own none", r.stdout + r.stderr);
+  // (the row the list gives, standing with no package list, as an older kit wrote it: the check asks for the list and
+  // --write writes it; setUp writes over nothing that stands)
+  fs.rmSync(path.join(dir, "checks"), { recursive: true, force: true });
+  put("core-manifest.md", MANIFEST(lineOf(js)));
+  const p = { root: dir, manifest: read("core-manifest.md") };
+  ok(/checks\/mutation\/package\.json, the package list it is installed from, is not there\. Mend: run `node core\/scripts\/mutation-tools\.mjs --write`/.test(named(p) ?? ""), "the list's row with no package list is named, its mend the writer", named(p));
+  r = run("--write");
+  ok(r.status === 0 && same(JSON.parse(read("checks/mutation/package.json")), core) && named(p) === null, "--write writes the package list where the list's row already stands, and the check then passes", r.stdout + r.stderr);
+  put("checks/mutation/package.json", "{}\n");
+  ok(setUp(dir, js).written === null && read("checks/mutation/package.json") === "{}\n" && setUp(dir, { none: NO_TESTS }).written === null, "setUp writes over no package list that stands, and writes none for a row that names no tool");
   r = run("--wrte");
   ok(r.status === 1 && /Mend: /.test(r.stderr), "an unknown argument fails with its mend", r.stderr);
 } finally {

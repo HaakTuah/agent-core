@@ -37,11 +37,15 @@ const NO_CODE = "no code yet in a language the core knows by its ending; the too
 const languageOf = file => LIST.languages.find(l => l.endings.includes(path.posix.extname(file)))?.name ?? path.posix.extname(file);
 const toolFor = language => LIST.languages.find(l => l.name === language)?.tool ?? null;
 
-// The first word of the command the project's root package.json runs its tests with, or null where it gives none.
+// What the project's root package.json runs its tests with: the first word of its test script, or null where it gives
+// none; where that word is node and it starts a program of a package (node node_modules/jest/bin/jest.js), that
+// program too, since a runner started through node runs its tests otherwise than node <file> does.
 export function testRunner(packageJson) {
   let test;
   try { test = JSON.parse(packageJson ?? "null")?.scripts?.test; } catch { return null; }
-  return typeof test === "string" && test.trim() ? test.trim().split(/\s+/u)[0] : null;
+  if (typeof test !== "string" || !test.trim()) return null;
+  const words = test.trim().split(/\s+/u), program = words.find(w => /(?:^|[/\\])node_modules[/\\]/u.test(w));
+  return words[0] === "node" && program ? `node ${program}` : words[0];
 }
 
 // The row the list gives a project: { command, tool } or { none } (its reason), from `code` (its files of code that are
@@ -82,6 +86,19 @@ export function packageList(tool) {
   return `${JSON.stringify({ name: "mutation-tool", private: true, devDependencies: { [tool.package]: tool.version }, overrides: tool.overrides }, null, 2)}\n`;
 }
 
+// The folder the row's tool is installed in, set up at `root`: its package list written where there is none, and what
+// is left to do. The starter kit and --write each set it up.
+export function setUp(root, row) {
+  const tool = LIST.tools[row?.tool], list = tool && packageList(tool), at = list && `${tool.folder}/package.json`;
+  let written = null;
+  if (at && !fs.existsSync(path.join(root, at))) {
+    fs.mkdirSync(path.join(root, tool.folder), { recursive: true });
+    fs.writeFileSync(path.join(root, at), list, { flag: "wx" });
+    written = at;
+  }
+  return { written, left: leftFor(tool, f => fs.existsSync(path.join(root, f))) };
+}
+
 // What --write leaves to do for the tool the row names: its lock file and the install in the job that runs the
 // strength check, each worded so a session acts on it with no rule file open.
 export function leftFor(tool, has) {
@@ -120,14 +137,17 @@ function measuredTests(config, root) {
 }
 
 // The step of the sync notes that asks for the row (steps.mjs; the project `p` as it reads it): null where the row is
-// the project's own or what the list gives, the reasons of nothing to measure yet (no tests, no code) read as one; null
-// too where there is no row, which step 420 asks for, or the shape check's config cannot be read, which step 370's does;
-// else the mend.
+// the project's own, or what the list gives with its tool's package list standing, the reasons of nothing to measure
+// yet (no tests, no code) read as one; null too where there is no row, which step 420 asks for, or the shape check's
+// config cannot be read, which step 370's does; else the mend.
 export function named(p) {
-  const now = toolOf(p.manifest), project = now && fillable(p.manifest) ? readProject(p.root, p.manifest) : null;
+  const now = toolOf(p.manifest), line = p.manifest.split(/\r?\n/u).find(l => l.includes(ROW));
+  const project = now && (fillable(p.manifest) || now.command) ? readProject(p.root, p.manifest) : null;
   if (!project) return null;
   const row = rowFor(project), yet = reason => /^no (?:tests|code) yet/u.test(reason ?? "");
-  if (lineOf(row) === p.manifest.split(/\r?\n/u).find(l => l.includes(ROW)) || (yet(row.none) && yet(now.none))) return null;
+  const tool = LIST.tools[row.tool], list = tool?.folder && `${tool.folder}/package.json`;
+  if (line === lineOf(row)) return list && !fs.existsSync(path.join(p.root, list)) ? `The manifest's row *mutation tool* names ${row.tool} from the core's list, and ${list}, the package list it is installed from, is not there. Mend: run \`node ${project.copy}scripts/mutation-tools.mjs --write\`, which writes it, and do what it prints as left to do` : null;
+  if (!fillable(p.manifest) || (yet(row.none) && yet(now.none))) return null;
   return `The manifest's row *mutation tool* is not what the core's list gives this project: ${lineOf(row)}. Mend: run \`node ${project.copy}scripts/mutation-tools.mjs --write\`, which writes it, and do what it prints as left to do (for Stryker, the lock file of checks/mutation/ and its install in the job that runs strength.mjs); to keep the measure off, the owner writes \`none\` with a reason of the owner's own in that row`;
 }
 
@@ -145,9 +165,9 @@ function writeRow(manifest, row) {
   const now = written(manifest, row);
   if (now !== manifest) fs.writeFileSync(MANIFEST, now);
   console.log(now === manifest ? `${MANIFEST} holds that row already.` : `${MANIFEST}: the row written.`);
-  const tool = LIST.tools[row.tool], list = tool && packageList(tool), at = list && `${tool.folder}/package.json`;
-  if (at && !fs.existsSync(at)) { fs.mkdirSync(tool.folder, { recursive: true }); fs.writeFileSync(at, list); console.log(`${at}: written, ${tool.package} at ${tool.version}.`); }
-  for (const left of leftFor(tool, f => fs.existsSync(f))) console.log(`Left to do: ${left}.`);
+  const { written: at, left } = setUp(".", row), tool = LIST.tools[row.tool];
+  if (at) console.log(`${at}: written, ${tool.package} at ${tool.version}.`);
+  for (const l of left) console.log(`Left to do: ${l}.`);
 }
 
 function main(argv) {
@@ -156,7 +176,8 @@ function main(argv) {
   const row = rowFor(p), languages = [...new Set(p.code.map(languageOf))].sort();
   console.log(`Read: ${p.code.length} files of code (${languages.join(", ") || "none"}), ${p.tests ? "tests" : "no tests"}, the tests run by ${p.runner ?? "no script of package.json's"}.`);
   console.log(`The list gives: ${lineOf(row)}`);
-  if (!fillable(manifest)) console.log(`${MANIFEST}'s row is the project's own, and stays: ${manifest.split("\n").find(l => l.includes(ROW))}`);
+  const line = manifest.split(/\r?\n/u).find(l => l.includes(ROW));
+  if (!fillable(manifest) && line !== lineOf(row)) console.log(`${MANIFEST}'s row is the project's own, and stays: ${line}`);
   else if (argv[0] === "--write") writeRow(manifest, row);
   return 0;
 }
