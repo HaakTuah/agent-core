@@ -52,9 +52,13 @@ export function filesFound(p) {
     const hit = compared(p, f) && equalTo(p, byId, f);
     if (hit) found.push(hit);
   }
-  return noneLeft(p, withWhatTheyName(p, found));
+  return withWhatTheyName(p, noneLeft(p, withWhatTheyName(p, found)));
 }
-const compared = (p, f) => !whole(f) && !NOT_COMPARED.test(f) && !SKIP.test(f) && p.own.read(f, true) !== null;
+const compared = (p, f) => !whole(f) && !NOT_COMPARED.test(f) && !SKIP.test(f) && !linked(p, f) && p.own.read(f, true) !== null;
+// A link is never read as the project's own file nor written through: what it leads to may be the copy's.
+const linked = (p, f) => { try { return fs.lstatSync(path.join(p.root, f)).isSymbolicLink(); } catch { return true; } };
+// Whether a file may be run as a program (no such mark where the system keeps none).
+const runnable = file => { try { return (fs.statSync(file).mode & 0o111) !== 0; } catch { return false; } };
 // The file `f` as a finding where it is equal to one of the core's, else null.
 function equalTo(p, byId, f) {
   let buf;
@@ -65,6 +69,7 @@ function equalTo(p, byId, f) {
   const to = [...new Set(kept.map(h => h.at === "the copy" ? h.file : p.moved.has(h.file) ? p.moved.get(h.file) : p.copySet.has(h.file) ? h.file : null))];
   const found = { file: f, core: hits[0].file, at: hits[0].at, to: to.length === 1 && to[0] ? `${p.copy}${to[0]}` : null, text: buf.toString("utf8") };
   if (hits.some(h => FLOOR.test(h.file)) || p.safety.has(f)) Object.assign(found, { to: null, why: "it is the floor's text or a safety rule, which goes only on its owner's word" });
+  else if (found.to && runnable(path.join(p.root, f)) && !runnable(path.join(p.root, found.to))) Object.assign(found, { to: null, why: "it may be run as a program and the copy's file may not" });
   return found;
 }
 // The floor's text (security.md, its topics, the threat model) and the files the project's own AGENTS.md calls safety
@@ -85,32 +90,40 @@ function withWhatTheyName(p, found) {
   }
   return found;
 }
-// A file goes only where every pointer to it can be moved: none is left in a file of the core's the project holds whole.
+// A file goes only where every pointer to it can be moved: none is left in a file the script does not write (one of
+// the core's the project holds whole, a link), and none in a text that still names its path once the pointers it
+// moves are moved (a form it does not read, such as a path further down another's).
 function noneLeft(p, found) {
-  const fixed = textFiles(p).map(t => t.file), kept = p.outside.filter(f => !fixed.includes(f) && !SKIP.test(f) && !found.some(x => x.file === f));
+  const texts = textFiles(p), fixed = texts.map(t => t.file), kept = p.outside.filter(f => !fixed.includes(f) && !SKIP.test(f) && !found.some(x => x.file === f));
   for (const x of found.filter(x => x.to)) {
-    const at = kept.find(f => pointersTo(f, x.file).test(p.own.read(f, true) ?? ""));
-    if (at) Object.assign(x, { to: null, why: `${at}, which the script does not write, names it` });
+    const esc = x.file.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&"), left = new RegExp(`(?<![A-Za-z0-9_-]|${p.copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")})${esc}(?![A-Za-z0-9_/-]|\\.[A-Za-z0-9])`, "u");
+    const at = kept.find(f => pointersTo(f, x.file).test(p.own.read(f, true) ?? ""))
+      ?? texts.find(t => t.file !== x.file && left.test(t.text.replace(pointersTo(t.file, x.file), pointerTo(t.file, x.file, x.to))))?.file;
+    if (at) Object.assign(x, { to: null, why: `${at} names it in a form the script cannot move, or is a file it does not write` });
   }
   return found;
 }
 
 // Each pointer in a text to the path `from`: as the repository's path, as a relative path that opens with ./ or ../,
-// or as a Markdown link's target relative to the file `inFile`.
+// or as a Markdown link's target relative to the file `inFile`; in a workflow, whose commands run from the root, the
+// repository's path opening with ./ too.
 export function pointersTo(inFile, from) {
   const esc = s => s.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&");
   const rel = path.posix.relative(path.posix.dirname(inFile), from), dotted = rel.startsWith(".") ? rel : `./${rel}`;
   const forms = [`(?<![A-Za-z0-9._/-])${esc(from)}`, `(?<![A-Za-z0-9._/-])${esc(dotted)}`, `(?<=\\]\\()${esc(rel)}`];
+  if (WORKFLOW.test(inFile)) forms.push(`(?<![A-Za-z0-9._/-])\\./${esc(from)}`);
   return new RegExp(`(?:${forms.join("|")})(?![A-Za-z0-9_/-]|\\.[A-Za-z0-9])`, "gu");
 }
 // The same pointer to `to`, in the form it stood in.
 export const pointerTo = (inFile, from, to) => hit => {
   if (hit === from) return to;
+  if (WORKFLOW.test(inFile) && hit === `./${from}`) return `./${to}`;
   const rel = path.posix.relative(path.posix.dirname(inFile), to);
   return hit.startsWith("./") && !rel.startsWith(".") ? `./${rel}` : rel;
 };
 
 // The project's own text files that may hold a pointer: outside the copy, the core's whole files and the dated records;
 // a workflow is the core's only where it carries the core's mark.
-export const coreMarked = (p, f) => whole(f) && (!/^\.github\/workflows\//u.test(f) || /^# The core's file:/u.test(p.own.read(f, true) ?? ""));
-export const textFiles = p => p.outside.filter(f => !coreMarked(p, f) && !SKIP.test(f)).flatMap(f => { const t = p.own.read(f, true); return t === null || t.includes("\0") ? [] : [{ file: f, text: t }]; });
+const WORKFLOW = /^\.github\/workflows\//u;
+export const coreMarked = (p, f) => whole(f) && (!WORKFLOW.test(f) || /^# The core's file:/u.test(p.own.read(f, true) ?? ""));
+export const textFiles = p => p.outside.filter(f => !coreMarked(p, f) && !SKIP.test(f) && !linked(p, f)).flatMap(f => { const t = p.own.read(f, true); return t === null || t.includes("\0") ? [] : [{ file: f, text: t }]; });

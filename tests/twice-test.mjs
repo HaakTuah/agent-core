@@ -32,6 +32,7 @@ const B = `// The core's script b, which a reads, and which reads nothing of its
 const C = "// The core's script c, which reads its settings beside it through a template literal, long enough.\nexport const c = () => JSON.parse(require(\"fs\").readFileSync(new URL(`./c.json`, import.meta.url))).v;\n";
 const FLOOR = `# The floor\n\n${"A rule of the floor, which no script takes out of a project without its owner's word. ".repeat(3)}\n`;
 const SAFE = `# Safe\n\n${"A file of the core's that the project's AGENTS.md calls one of its safety rules. ".repeat(3)}\n`;
+const RUN = `#!/bin/sh\n# The core's script run.sh, kept as a plain file by the core, long enough to be compared.\nexec node "$@"\n`;
 const EXTRA = `# Extra\n\n${"A file of the core's that a workflow of the core's, held whole in the project, names. ".repeat(3)}\n`;
 
 // The scratch core: an earlier commit and the pin, on main; the project's copy is the pin's tree.
@@ -39,7 +40,7 @@ const tmp = scratchDir("twice-");
 const core = path.join(tmp, "core-repo");
 fs.mkdirSync(core);
 git(core, "init", "-q", "-b", "main");
-write(core, { "tasks/x.md": `# x\n\n${RULE}\n`, "docs/guide.md": GUIDE_OLD, "old/place.md": PLACE, "scripts/a.mjs": A, "scripts/b.mjs": B, "scripts/c.mjs": C, "scripts/c.json": `{ "v": 1 }\n`, "floor/security.md": FLOOR, "docs/safe.md": SAFE, "docs/extra.md": EXTRA, "gone.md": `${"A file the core took out. ".repeat(6)}\n` });
+write(core, { "tasks/x.md": `# x\n\n${RULE}\n`, "docs/guide.md": GUIDE_OLD, "old/place.md": PLACE, "scripts/a.mjs": A, "scripts/b.mjs": B, "scripts/c.mjs": C, "scripts/c.json": `{ "v": 1 }\n`, "floor/security.md": FLOOR, "docs/safe.md": SAFE, "docs/extra.md": EXTRA, "scripts/run.sh": RUN, "docs/ref.md": "# A reference\n\nThe guide stands at docs/guide.md, for whoever reads this file.\n", "gone.md": `${"A file the core took out. ".repeat(6)}\n` });
 git(core, "add", "-A"); git(core, "commit", "-qm", "earlier");
 const earlier = git(core, "rev-parse", "HEAD");
 fs.rmSync(path.join(core, "gone.md"));
@@ -126,7 +127,7 @@ const fetched = ["--fetched", path.join(core, ".git"), "--since", earlier];
   ok(!found.some(f => /AGENTS\.md:5\b|reports\/|AGENTS\.md:1[01]\b/u.test(f.line)), "a paragraph of its own, a dated record and the core's part of a rule file are not listed", found.map(f => f.line).join("\n"));
   ok(line(/^floor\/security\.md .*the floor's text or a safety rule/u) && !line(/^floor\/security\.md/u).fix && line(/^docs\/safe\.md .*the floor's text or a safety rule/u) && !line(/^docs\/safe\.md/u).fix, "the floor's text, and a file the project's AGENTS.md calls a safety rule, never go, even byte for byte", close.join("\n"));
   ok(line(/^tools\/c\.mjs .*names a file that would not stand beside the copy's/u) && !line(/^tools\/c\.mjs/u).fix, "code that reads a sibling through a template literal stays where the sibling differs", close.join("\n"));
-  ok(line(/^docs\/extra\.md .*\.github\/workflows\/core-made\.yml, which the script does not write, names it/u) && !line(/^docs\/extra\.md/u).fix, "a file a workflow of the core's names stays, since that pointer cannot be moved", close.join("\n"));
+  ok(line(/^docs\/extra\.md .*\.github\/workflows\/core-made\.yml names it in a form the script cannot move, or is a file it does not write/u) && !line(/^docs\/extra\.md/u).fix, "a file a workflow of the core's names stays, since that pointer cannot be moved", close.join("\n"));
   ok(found.filter(f => f.fix).length === 6, "six are exact, the pointers moved counted one by one", exact.join("\n"));
 
   const fixed = run(dir, "--fix", ...fetched);
@@ -141,6 +142,28 @@ const fetched = ["--fetched", path.join(core, ".git"), "--since", earlier];
   ok(read("AGENTS.md") === before && read("reports/2026-11-01.md").includes("core/gone.md"), "no rule's text and no dated record is changed");
   const again = run(dir, ...fetched);
   ok(!/Exact, which/u.test(again.stdout) && /For the auditor/u.test(again.stdout), "run again it finds nothing exact left", again.stdout);
+}
+
+// What --fix cannot follow keeps the file: one run as a program where the copy's is not, one named through a link, and
+// one named in a form it does not move; a workflow's path opening with ./ is moved.
+{
+  const dir = project("more");
+  write(dir, {
+    "tools/run.sh": RUN, ".github/workflows/dot.yml": "name: dot\non: push\njobs:\n  run:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node ./tools/a.mjs && tools/run.sh x\n",
+    "MORE.md": "# More\n\nRun `cat $ROOT/docs/guide.md` to read it.\n",
+  });
+  fs.chmodSync(path.join(dir, "tools/run.sh"), 0o755);
+  fs.symlinkSync("core/docs/ref.md", path.join(dir, "linked.md"));
+  const r = run(dir, "--fix", ...fetched), read = f => fs.readFileSync(path.join(dir, f), "utf8");
+  ok(/tools\/run\.sh is the core's scripts\/run\.sh, byte for byte; it may be run as a program and the copy's file may not/u.test(r.stdout) && fs.existsSync(path.join(dir, "tools/run.sh")), "a file run as a program stays where the copy's is not", r.stdout);
+  ok(read(".github/workflows/dot.yml").includes("node ./core/scripts/a.mjs") && !fs.existsSync(path.join(dir, "tools/a.mjs")), "a workflow's path from the root opening with ./ moves", read(".github/workflows/dot.yml"));
+  ok(/docs\/guide\.md .*(?:MORE\.md|linked\.md) names it in a form the script cannot move/u.test(r.stdout) && fs.existsSync(path.join(dir, "docs/guide.md")), "a file named in a form not moved, or through a link, stays", r.stdout);
+  ok(read("core/docs/ref.md").includes("at docs/guide.md,"), "nothing is written through a link into the copy");
+  const solo = project("linked");
+  fs.rmSync(path.join(solo, "MORE.md"), { force: true });
+  fs.symlinkSync("core/docs/ref.md", path.join(solo, "linked.md"));
+  const s2 = run(solo, "--fix", ...fetched);
+  ok(/docs\/guide\.md .*linked\.md names it/u.test(s2.stdout) && fs.readFileSync(path.join(solo, "core/docs/ref.md"), "utf8").includes("at docs/guide.md,"), "a link's text keeps the file it names, and the copy is not written", s2.stdout);
 }
 
 // A path that held other content at an earlier release moves only as it moved from the old pin, and the command the
