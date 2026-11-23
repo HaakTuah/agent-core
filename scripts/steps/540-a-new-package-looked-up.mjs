@@ -10,7 +10,8 @@ export default { lead: "16 November 2026, a new package looked up", cost: COST.w
     // (a project that calls the core's licences.yml or nuget.yml takes the lookup with the call; one that runs the
     // checks from a workflow of its own, as a private repository does, or a NuGet project whose sources need a
     // sign-in, adds the step beside them: the npm lookup where it runs the exact-versions check, the NuGet lookup
-    // where it runs the NuGet check)
+    // where it runs the NuGet check; from #1093 the licence check looks up npm's itself, and counts as that lookup
+    // where it stands as one would)
     const wrong = Object.entries(p.workflows).flatMap(([f, w]) => {
       const jobs = jobsOf(w, p.read), at = `\`.github/workflows/${shown(f)}\``, copy = copyAt(p);
       // (a workflow this reader cannot read as YAML, whose words name a package check, is said, never taken as done)
@@ -23,7 +24,7 @@ export default { lead: "16 November 2026, a new package looked up", cost: COST.w
       const within = ({ cfg, job }) => (/[$%]/u.test(cfg ?? "") ? [job] : jobs);
       const looked = (flag, at) => within(at).some(j => j.steps.some(st => lookupOf(st, flag, copy, at, j)));
       return [
-        configs("exact-versions.mjs").some(at => !looked(false, at)) ? `in ${at}, for each config \`${copy}scripts/exact-versions.mjs\` is given, add a step that runs \`node ${copy}scripts/lookup.mjs\` with the same config, ${FIRST(copy)}` : null,
+        configs("exact-versions.mjs").some(at => !looked(false, at)) ? `in ${at}, for each config \`${copy}scripts/exact-versions.mjs\` is given, add a step that runs \`node ${copy}scripts/lookup.mjs\` with the same config (or the licence check, \`node ${copy}scripts/licences.mjs\`, with it, which looks up npm's new packages itself), ${FIRST(copy)}` : null,
         configs("nuget.mjs", "nuget-fetch.mjs").some(at => !looked(true, at)) ? `in ${at}, for each config \`${copy}scripts/nuget.mjs\` is given, add a step that runs \`node ${copy}scripts/lookup.mjs\` with the same config and \`--nuget\`, ${FIRST(copy)}` : null,
         jobs.some(j => !j.deep && j.steps.some(st => st.counts && looksUp(st.cmds[0], undefined, copy))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\` and no \`ref:\`` : null,
         ...[...new Set(jobs.flatMap(j => j.unread))].map(f => `in ${at}, the local action \`${shown(f)}\` cannot be read whole (no YAML, or past ${INLINED_MOST} steps in all its actions call), so whether it runs a package check cannot be told: write it as YAML, its actions calling fewer`),

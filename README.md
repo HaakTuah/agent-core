@@ -90,13 +90,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    that no workspace pattern of the project's own package list takes the copy's package list in): the sync runs it after
    it writes the copy, a session's start runs npm's own install where what is installed is not what the lock file names
    and the copy's npm files are `main`'s own (the work-saved hook), and each of the core's workflows a project calls
-   runs it before its checks; a check that finds a package missing says it did not run, with that command (#654). The
+   runs it before its checks; run from the copy in a project's own job, a check installs what it needs itself first,
+   and where that cannot be made says, as a warning, that it did not run and why, failing nothing (#654, #1093). The
    parser's packages, whose grammars carry far more than a reader runs, have a lock file of their own in
    `.packages/parser/`, installed only where a job names it (`install.mjs parser`, or `all`, as the sync runs it and
    the copies check's job, which runs the shape check; #719): a session's start installs the first alone, and a check
-   that needs the parser says so, with its mend; in a project's own job that installs the first alone, the shape check
-   reads nothing of C# or Python, nor any function of JavaScript or TypeScript, and says so as a warning, failing
-   nothing by that. Its
+   that needs the parser installs it itself in a copy, as above; in the core it says so, with its mend. Its
    devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`, which, once the copy
    is written, writes what the core owns by the one process a new project's starter kit uses too (`scripts/converge.mjs`;
    `AGENTS.md`, "One process takes the core in"). A pure sync (only the copy, its pins and what that process writes or takes out, as
@@ -107,7 +106,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    project itself (a row of its manifest, a line of a rule file, a workflow), an entry of the sync notes says so
    (`setup/sync-notes.md`, each entry a file of `setup/sync-notes/`, read whole by `scripts/sync-notes.mjs`), and its
    step of the same name in `scripts/steps/` tells it done or not (`scripts/steps.mjs`); the sync script prints the entries a sync brings, then every
-   step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`), where the owner's
+   step not done, what the steps' writers wrote where a script does a step exactly, set aside in a git stash to commit
+   in a PR of its own once the sync is merged (`scripts/steps.mjs --write --aside`; #1091), every difference from what
+   the starter kit writes today (`scripts/fresh.mjs`), where the owner's
    inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`), the settings only the owner
    gives where the sync brings one the old copy's list did not hold (`scripts/owner-settings.mjs`; "Setting up (the
    owner's part)"), what the project holds twice or against the core (`scripts/twice.mjs`), the line `Read for it:`
@@ -386,7 +387,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      failing a finding its base did not hold, the engine installed from the core's `.packages/requirements.txt` by its hashes in a
      step of that job before it (`node core/scripts/install.mjs pypi`, with the runner's pip), and only where the change
      touches a file the scan reads; where it is not installed, as in a session that has not run that command, the scan
-     fails, saying so. Its Actions settings must allow this repository's workflows, and each check
+     installs it first, and where it cannot, says as a warning that it did not run (#1093). Its Actions settings must allow this repository's workflows, and each check
      there spends paid minutes, which its owner set aside by making it private (so no step waits for the owner's yes
      over them: floor rule 14), so each runs only where a change can affect it and only once a pull request is ready:
      its calls to `core.yml` and `personal-terms.yml`, as the starter kit writes them, also start when a pull request
