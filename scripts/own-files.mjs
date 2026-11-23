@@ -11,9 +11,10 @@ export const READ_MOST = 64 << 20;
 
 // The project at `root`: `listed`, its files as git lists them (committed or not, ignored ones left out); `read(f)`, a
 // file's text, or null where it is not one of its own (`read(f, true)` keeps its line ends); `safe(f)`, whether another
-// script may be given the path; and `unread`, the files left unread for their size.
+// script may be given the path; and `unread`, the files left unread for their size. Git runs with core.fsmonitor off,
+// so that no command a repository's own config names runs when its files are listed.
 export function ownFiles(root) {
-  const listed = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 })
+  const listed = execFileSync("git", ["-c", "core.fsmonitor=false", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 })
     .split("\0").filter(f => f && fs.existsSync(path.join(root, f)));
   // (the files of the library that carries the core, where the manifest's line says it is a submodule, at their paths from
   // here, as git lists them with --recurse-submodules, which it gives for the committed files alone: that library brings
@@ -22,7 +23,7 @@ export function ownFiles(root) {
   if (core?.form === "carried" && fs.existsSync(path.join(root, ".gitmodules"))) {
     try {
       const have = new Set(listed);
-      for (const f of execFileSync("git", ["ls-files", "--cached", "--recurse-submodules", "-z", "--", core.library], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] }).split("\0"))
+      for (const f of execFileSync("git", ["-c", "core.fsmonitor=false", "ls-files", "--cached", "--recurse-submodules", "-z", "--", core.library], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] }).split("\0"))
         if (f && !have.has(f) && fs.existsSync(path.join(root, f))) listed.push(f);
     } catch { /* (a submodule that is not checked out is listed by its commit alone) */ }
   }

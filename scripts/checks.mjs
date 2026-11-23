@@ -34,7 +34,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { MEND } from "./mend.mjs";
-import { installed } from "./packages.mjs";
+import { installStep, installed } from "./packages.mjs";
 import { npmIgnores, npmReadsAll, npmVersion } from "./npm-reads.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
@@ -139,7 +139,7 @@ function callsHere(root) {
 // inputs, a part run once for each distinct call (runsOf), what the command line gives winning.
 export function fromCalls(root, given) {
   // (the calls are read with the YAML package: with it not installed, none could be read, which is no "calls none")
-  if (!installed("yaml")) fail("no part is named, and the project's calls to the core's workflows cannot be read: the core's packages are not installed.", `run node ${path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)))}, then this again, or name a part (${PARTS.join(", ")})`);
+  if (!installed("yaml")) fail("no part is named, and the project's calls to the core's workflows cannot be read: the core's packages are not installed.", `run \`${installStep()}\`, then this again, or name a part (${PARTS.join(", ")})`);
   const runs = [];
   for (const [part, settings] of callsHere(root).flatMap(([which, w]) => FROM[which](w))) {
     const set = Object.fromEntries(Object.entries(settings).filter(([, v]) => v !== undefined && v !== null && v !== "").map(([k, v]) => [k, k === "advisory" ? v === true : String(v)]));
