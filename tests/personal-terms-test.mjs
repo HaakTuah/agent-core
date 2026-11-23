@@ -47,7 +47,8 @@ const [term, other, wide] = [["qz", "vk", "wy"], ["xj", "qq", "zf"], ["zÃ§", "qÃ
 const TERMS = `${term}\n${other}\n${wide}\n`;
 const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$)/i.test(name)));
 Object.assign(env, { GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_DATE: "2026-11-13T12:00:00Z", GIT_COMMITTER_DATE: "2026-11-13T12:00:00Z" });
-// (the host's no-reply domain, and an invented account's address in it, which the address step passes: #460, point 2)
+// (the host's no-reply domain, and an invented account's address in it, which the address step passes: #460, point 2;
+// each address here is invented, by the id 0, which GitHub gives no account, or by a login with "--", which it refuses)
 const NOREPLY = ["users", "noreply", "github", "com"].join(".");
 const MINE = `${["0", "a-scratch-builder"].join("+")}@${NOREPLY}`;
 const ME = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: MINE, GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: MINE };
@@ -210,7 +211,7 @@ const addressFails = (what, repo, line, opts = {}) => {
 };
 const addressPasses = (what, repo) => { for (const terms of ["", TERMS]) passes(`${what}${terms ? "" : ", with no secret set,"}`, repo, { terms }); };
 addressPasses("commits under an account's no-reply address, with its id or without, a bot's, GitHub's own and Claude Code's, any letter case",
-  pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `a-builder@${NOREPLY}`, GIT_COMMITTER_EMAIL: `12+Some-Bot[bot]@${NOREPLY.toUpperCase()}` }],
+  pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `a--scratch-builder@${NOREPLY}`, GIT_COMMITTER_EMAIL: `0+Scratch--Bot[bot]@${NOREPLY.toUpperCase()}` }],
     [{ "c.md": "y\n" }, { GIT_AUTHOR_EMAIL: ["noreply", "anthropic.com"].join("@"), GIT_COMMITTER_EMAIL: ["noreply", "github.com"].join("@") }]]));
 addressFails("an author's address that is no no-reply one", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: personal }]]), "author");
 addressFails("a committer's address that is no no-reply one", pull([[{ "b.md": "x\n" }], [{ "c.md": "y\n" }, { GIT_COMMITTER_EMAIL: personal }]]), "committer");

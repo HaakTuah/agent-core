@@ -91,9 +91,10 @@ export function hostSays(dir, isPrivate) {
   return answers;
 }
 
-// (the address git writes into each scratch commit: an invented account's no-reply one, which the personal-terms
-// check passes in a pull request's commits, as a project's own runs of it see them: #460, point 2)
-const ADDRESS = `t@${["users", "noreply", "github", "com"].join(".")}`;
+// (the address git writes into each scratch commit: an invented account's no-reply one, its id 0, which GitHub gives
+// no account; the personal-terms check passes it in a pull request's commits, as a project's own runs see them: #460,
+// point 2)
+const ADDRESS = `0+t@${["users", "noreply", "github", "com"].join(".")}`;
 
 // `prefix` names the temporary folder. It gives: `tmp`, that folder; `env`, the environment of every call; `git(dir,
 // ...args)` and `run(dir, ...args)`, git and Node run in a folder (run: the script and its arguments, giving its exit
