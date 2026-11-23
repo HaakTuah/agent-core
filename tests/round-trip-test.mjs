@@ -89,7 +89,7 @@ const { tmp, env, git, run, core, pin, project: kitProject } = scratch("round-tr
 const md = await markdownReader();
 const CASES = [
   { args: ["--name", "An npm project", "--npm", "."] },
-  { args: ["--name", "A game (the 2nd): npm in a folder", "--npm", "web", "--game"] },
+  { args: ["--name", "A game (the 2nd), its packages in a folder", "--npm", "web", "--game"] },
   { args: ["--name", "A private .NET project", "--nuget", ".", "--private"], crlf: true },
 ];
 const fenced = text => { let inFence = false; return text.split("\n").map(l => { if (/^ {0,3}(```|~~~)/u.test(l)) { inFence = !inFence; return null; } return inFence ? null : l; }); };
