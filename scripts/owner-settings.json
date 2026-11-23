@@ -9,13 +9,13 @@
     "id": "push-protection",
     "setting": "Secret scanning's push protection (Settings, Advanced Security)",
     "page": "settings/security_analysis",
-    "protects": "GitHub refuses a push that holds a key of a kind it knows, before the key reaches the history, which no check on a pull request can (floor rule 1)"
+    "protects": "GitHub refuses a push that holds a key of a kind it knows, before the key reaches the history, which no check on a pull request can (floor rule 1); in a private repository, where it may be billed, the owner alone switches it on (floor rule 14)"
   },
   {
     "id": "ruleset",
     "setting": "A ruleset on the default branch: deletions restricted, force pushes blocked, a pull request required, the status checks `core / core` and the project's own CI required (Settings, Rules)",
     "page": "settings/rules",
-    "protects": "the default branch changes only by a merged pull request whose checks passed (floor rule 12); a private repository on GitHub's free plan has no rulesets, GitHub Pro gives them"
+    "protects": "the default branch changes only by a merged pull request whose checks passed (floor rule 12); a private repository on GitHub's free plan has no rulesets, and GitHub Pro, which gives them, is a purchase the owner alone makes (floor rule 14)"
   },
   {
     "id": "security-review-required",

@@ -23,6 +23,7 @@ const at = scratchDir("owner-settings-");
 try {
   const root = path.join(at, "project"), env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(at, "none"), GIT_CONFIG_NOSYSTEM: "1" };
   fs.mkdirSync(path.join(root, ".github", "workflows"), { recursive: true });
+  execFileSync("git", ["init", "-q"], { cwd: root, env }); // (its own files are those git lists: own-files.mjs)
   const review = text => fs.writeFileSync(path.join(root, ".github", "workflows", "security-review.yml"), text);
 
   // every setting given, in a public repository

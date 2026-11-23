@@ -45,7 +45,7 @@ const fail = msg => { throw new Failure(msg); };
 // steps not done, the differences from a fresh start, where the inbox is, what the labels lack, the owner's settings
 // where one is new since `old`, and last the line that lists what the sync's own paths outside the copy call for, the
 // pins of the project's workflows above all (reading.mjs, by which the description check reads that line).
-const REPORTS = (kits, old) => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["owner-settings.mjs", "--since", old, "--fetched", path.dirname(kits)], ["reading.mjs", "builder", "--changed", "HEAD", "--line"], ["attached.mjs", "--line", "--fetched", path.dirname(kits)]];
+const REPORTS = (kits, old) => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["owner-settings.mjs", "--since", old, "--fetched", path.dirname(kits), "--report"], ["reading.mjs", "builder", "--changed", "HEAD", "--line"], ["attached.mjs", "--line", "--fetched", path.dirname(kits)]];
 
 // Where the copy stands, as the manifest's "Core:" line names it (tasks/repositories.md; core-path.mjs); null, said,
 // where a library carries the core, which is synced in the library's own repository.
@@ -197,7 +197,7 @@ function sync(tmp) {
   install(dir);
 
   const { moved, unread } = moveCalls(pin, tmp, own);
-  if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); converge(dir, null, true); reportOf(at, dir, "owner-settings.mjs", []); return; }
+  if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); converge(dir, null, true); reportOf(at, dir, "owner-settings.mjs", ["--report"]); return; }
   sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp);
   const kits = kitsOf(old, tmp);
   converge(dir, kits);

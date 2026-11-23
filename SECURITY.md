@@ -68,7 +68,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`, `scripts/releases.mjs`,
      `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`, `scripts/clean-merges.mjs`,
      `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs`, `scripts/stage-order.mjs`,
-     `scripts/tools-offer.mjs` and the scheduled look's reader of the default branch's newest commit, read as a time
+     `scripts/tools-offer.mjs`, the owner's settings (`scripts/owner-settings.mjs`: a repository's settings, its default
+     branch's rules and its secrets' names, never a value) and the scheduled look's reader of the default branch's newest commit, read as a time
      alone (`scripts/look.mjs`, in `scripts/look-pulls.mjs`), and
      an account's rights by the code-review wait (`scripts/code-review-wait.mjs`), the scheduled look
      (`scripts/look.mjs`, in `scripts/look-pulls.mjs` and `scripts/look-checks.mjs`) and the size check
@@ -76,7 +77,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      reader, and a pull request's one file and the issues its lines name, by `scripts/queue-only.mjs`; limits: 1 MB of
      an answer to `core-moved.mjs`, `releases.mjs` and `tools-offer.mjs`, 64 MB or 256 MB to the others, 30 commits and
      30 s each for the green main of `releases.mjs`, 30 merged pull requests for the wait, 50 pages for the stalled
-     look, 200 for the cost, 10 for the merge line, 20 s for the tools' offer, 30 s for the host's account, and for
+     look, 200 for the cost, 10 for the merge line, 20 s for the tools' offer, 30 s for the host's account, 16 MB and 30 s
+     each of at most five reads for the owner's settings, a name it prints being text alone of at most 100 characters,
+     and 20 checks named, and for
      `queue-only.mjs` 16 MB of an issue's answer and 3 pages of its notes, 12 issues, the pull request's answer, the
      first page of its files and the comparison that gives them read whole, at GitHub's own size (its count of one
      file read first), 1 MB of the progress file, 240 characters of a line it adds, 90 s and a job of 3 minutes;
@@ -104,7 +107,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      checks and the reader of where the tests run (`scripts/licences.mjs`, `scripts/exact-versions.mjs`,
      `scripts/nuget.mjs`, `scripts/workflows.mjs`, `scripts/agent-tools.mjs`, `scripts/runners.mjs`), the reader of a
      project's own workflows (`scripts/parse-yaml.mjs`, for `check.mjs`, `own-runs.mjs` and `steps.mjs`) and the
-     sync's move of the pins (`scripts/sync.mjs`); limits: 60 s for each of the workflow check's two tools on one file
+     sync's move of the pins (`scripts/sync.mjs`) and the owner's settings' reader of the project's
+     `security-review.yml` (`scripts/owner-settings.mjs`, only whether a line gives `private: true` or `advisory: false`,
+     through `scripts/own-files.mjs`: 64 MB of it, a file git lists as the project's own, no link followed out of it);
+     limits: 60 s for each of the workflow check's two tools on one file
      (zizmor and actionlint, `scripts/workflow-tools.mjs`, each file run on its own, one a tool stops on or cannot load said
      as a finding with its mend, and neither run in a session), 64 MB of a file for the licence check (256 MB for NuGet's), 1
      MB of an action and 5,000 steps of a workflow, 256 K characters of a workflow for the readers of its YAML (past it,
@@ -126,8 +132,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      time of the same file with no break, and each file that holds one named at a sync; where a base's breaks, read so, leave
      it no YAML to the package for their sake alone (such as a break inside a single-quoted string whose next line is under-indented), what it held behind them cannot be told, and
      what the changed file then shows is noted, not failed (a base no YAML for another reason is read as it stands); in the core's own run each fails), and NuGet's lock file version 2, a newer refused (npm's
-     lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`, and for the
-     reader of where the tests run `tests/runners-test.mjs`.
+     lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`, for the
+     reader of where the tests run `tests/runners-test.mjs`, and for the owner's settings `tests/owner-settings-test.mjs`
+     (the file missing, a link, in a private repository without the line; its size, by `own-files.mjs`'s own readers' tests).
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
