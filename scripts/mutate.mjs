@@ -321,7 +321,7 @@ async function main(argv) {
     const left = await judge(jobs, copies, budget, every);
     fs.writeFileSync(out, `${JSON.stringify(report(texts, jobs))}\n`);
     const count = s => jobs.filter(j => j.status === s).length;
-    if (left.length) console.log(`left out, failing or past ${LONGEST} s as they stand: ${left.join(", ")}`);
+    if (left.length) console.log(`left out, failing or past ${LONGEST} s as they stand: ${left.join(", ")}${process.env.CORE_OFFLINE ? " (the network is cut off here, so a test that reaches it may be among them)" : ""}`);
     console.log(`mutate: ${jobs.length} faults in ${wanted.size} files: ${count("Killed") + count("Timeout")} caught, ${count("Survived") + count("NoCoverage")} survived, ${count("Pending")} not run (the budget); the report is written`);
   } finally { takeAway(copies, scratch); }
   return 0;

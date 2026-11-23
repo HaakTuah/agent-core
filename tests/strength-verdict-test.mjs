@@ -128,5 +128,8 @@ ok(taken.fails && mended(taken.lines.join("\n")), "a pull request that takes out
 const grew = verdict({ faults: [], baseline: b({ "survivor: x": { count: 2 } }), was: b({ "survivor: x": { count: 1 } }), at: "s.json", deleted: [] });
 ok(grew.fails && mended(grew.lines.join("\n")), "an entry that joined with no reason fails, with its mend", grew.lines.join("\n"));
 
+const survivorMend = verdict({ faults: [f(swapped, "Survived")], still: [f(swapped, "Survived")], baseline: b({}), was: b({}), at: "s.json", deleted: [] }).lines.join("\n");
+ok(mended(survivorMend) && /with no network where the run cuts it off/u.test(survivorMend), "a survivor's mend names the cut", survivorMend);
+
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

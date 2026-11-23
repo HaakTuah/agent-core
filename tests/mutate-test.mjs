@@ -50,11 +50,14 @@ try {
   write("test/broken-test.mjs", "import '../src/a.mjs';\nprocess.exit(1);\n");
   git("add", "-A"); git("commit", "-q", "-m", "base");
   const out = path.join(dir, "report.json");
-  const run = spawnSync(process.execPath, [SCRIPT, "--report", out], { cwd: dir, encoding: "utf8" });
+  const run = spawnSync(process.execPath, [SCRIPT, "--report", out], { cwd: dir, encoding: "utf8", env: { ...process.env, CORE_OFFLINE: "" } });
   const got = JSON.parse(fs.readFileSync(out, "utf8")).files;
   const status = (file, line, replacement) => got[file]?.mutants.find(m => m.location.start.line === line && m.replacement === replacement)?.status;
   ok(run.status === 0 && status("src/a.mjs", 1, ">=") === "Survived" && status("src/a.mjs", 2, "!==") === "Killed" && status("src/b.mjs", 1, "false") === "NoCoverage", "a fault a test catches is Killed, one it does not Survived, one no test names NoCoverage", run.stdout + run.stderr);
   ok(run.stdout.includes("test/broken-test.mjs"), "a test that fails as it stands is left out, and the run says so", run.stdout);
+  ok(!run.stdout.includes("the network is cut off here"), "and where the network stands, it does not say a test that reaches it may be among them", run.stdout);
+  const cutRun = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8", env: { ...process.env, CORE_OFFLINE: "1" } });
+  ok(cutRun.stdout.includes("the network is cut off here, so a test that reaches it may be among them"), "where the network is cut off, it says a test that reaches it may be among those left out", cutRun.stdout + cutRun.stderr);
   ok(fs.readFileSync(path.join(dir, "src/a.mjs"), "utf8") === SOURCE && git("worktree", "list").trim().split("\n").length === 1 && git("status", "--porcelain").trim() === "?? report.json", "the project's own files are left as they were, and its working copies taken away", git("status", "--porcelain"));
   // (a link HEAD holds that the working folder has replaced by a file: the copy takes the file, writing nothing through
   // the link; links need a right of their own on Windows, so this case runs elsewhere)
