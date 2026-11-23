@@ -55,16 +55,20 @@ function targets(out, include, given) {
 
 // Whether a text imports a file other than a .props or .targets: git's .xml or .proj may hold a <Using> the reader never
 // sees. Each part of an <Import>'s Project, split at ";" and trimmed, is read as one only where it ends in ".props" or
-// ".targets", in lower case as git lists them, and holds nothing MSBuild expands but $(MSBuild…) (a reserved property,
-// which no file sets) and GetDirectoryNameOfFileAbove of such: a part written whole as GetPathOfFileAbove('….props', …)
-// too. Any other part ($(X).props, whose X may hold ";", or a property function that ends elsewhere) is another file,
-// and so is a Custom{Before,After}Microsoft… property, which the SDK imports by name. (Each regex is anchored, its
-// alternatives start apart: linear.)
-const PATH = String.raw`(?:[^$%@&;'"()]|\$\(MSBuild\w+\))`;
+// ".targets", in lower case as git lists them, and holds nothing MSBuild expands but its reserved path properties
+// ($(MSBuildThisFileDirectory) and its kin, which no file can set, where another $(MSBuild…) can be) and
+// GetDirectoryNameOfFileAbove of such: a part written whole as GetPathOfFileAbove('….props', …) too. Any other part
+// ($(X).props, whose X may hold ";", or a property function that ends elsewhere) is another file, and so is a property
+// that may name a file the SDK imports by it (Custom{Before,After}Microsoft…, any …{Props,Targets}{Path,File} such as
+// DirectoryBuildTargetsPath, LanguageTargets, and the extensions' paths, whose ImportBefore and ImportAfter folders it
+// imports).
+// (Each regex is anchored, its alternatives start apart: linear.)
+const RESERVED = "MSBuild(?:ThisFile(?:Directory(?:NoRoot)?|Extension|FullPath|Name)?|Project(?:Directory(?:NoRoot)?|Extension|File|FullPath|Name)|StartupDirectory)";
+const PATH = String.raw`(?:[^$%@&;'"()]|\$\(${RESERVED}\))`;
 const PART = new RegExp(String.raw`^(?:${PATH}|\$\(\[MSBuild\]::GetDirectoryNameOfFileAbove\((?:${PATH}|'(?:${PATH})*')*\)\))*\.(?:props|targets)$`, "u");
 const ABOVE = new RegExp(String.raw`^\$\(\[MSBuild\]::GetPathOfFileAbove\(\s*'?[^$%@&;'"(),]*\.(?:props|targets)'?\s*(?:,(?:${PATH}|'(?:${PATH})*')*)?\)\)$`, "u");
 function importsOther(text) {
-  if (/<Custom(?:Before|After)Microsoft/iu.test(text)) return true;
+  if (/<(?:Custom(?:Before|After)Microsoft|[\w.]*(?:Props|Targets)(?:Path|File)|LanguageTargets|MSBuild(?:User)?ExtensionsPath)/iu.test(text)) return true;
   for (const m of text.matchAll(/<Import\b([^<>]*)>/giu)) if (!(attributes(m[1])?.project ?? "").split(";").every(p => PART.test(p.trim()) || ABOVE.test(p.trim()))) return true;
   return false;
 }

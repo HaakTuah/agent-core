@@ -91,7 +91,7 @@ function inText(src, i, verbatim, s) {
   const c = src[i];
   if ((c === "\\" && !verbatim) || (c === "{" && src[i + 1] === "{") || (c === "\"" && verbatim && src[i + 1] === "\"")) return i + 1;
   if (c === "\"" || (c === "\n" && !verbatim)) s.end = i + 1;
-  else if (c === "{") Object.assign(s, { nest: 0, align: false });
+  else if (c === "{") Object.assign(s, { nest: 0, align: false, braced: src[i - 1] === "{" }); // (braced: after "{{", an escaped brace)
   return i;
 }
 
@@ -110,10 +110,11 @@ function inHole(src, i, s) {
 
 // Whether what stands at i in a hole is what the tokens leave out: a word in an alignment (a letter, a letter-number
 // such as "Ⅻ" or "_" may begin one), a name's escape "\u0041" or a formatting character, an interpolated, verbatim or raw string's start, a
-// character of a bracket, "," or ":" (which the tokens' recovery of "{{{" counts as code), or a comment, which may hide where the hole ends.
+// character or string in a hole after "{{" (whose text the tokens' recovery of "{{{" may count as code: "+", ")"), or
+// a comment, which may hide where the hole ends.
 function hides(src, i, s) {
   const c = src[i];
-  return (s.align && /[\p{L}\p{Nl}_]/u.test(c)) || (c === "'" && "{}()[],:".includes(src[i + 1])) || named(src, i) || c === "$" || c === "@" || src.startsWith("\"\"\"", i) || (c === "/" && /[/*]/u.test(src[i + 1] ?? ""));
+  return (s.align && /[\p{L}\p{Nl}_]/u.test(c)) || (s.braced && (c === "'" || c === "\"")) || named(src, i) || c === "$" || c === "@" || src.startsWith("\"\"\"", i) || (c === "/" && /[/*]/u.test(src[i + 1] ?? ""));
 }
 
 // The index of the quote that closes a plain string or a character whose text begins at i (or the line's end).

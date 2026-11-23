@@ -196,21 +196,32 @@ function fullNames(x, ix, aliases, pace) {
 }
 
 // The aliases a file sees (x its facts): the global ones and its own, each to what it names, and one whose target "D::"
-// heads also to what the alias D names ("using D = App;" then "using E = D::Data;" names App.Data). `pace` asked for each.
+// or "D." heads also to what the alias D names ("using D = App;" then "using E = D::Data;" names App.Data, as
+// "using E = D.Data;" does in a namespace's body). `pace` asked for each.
 function aliasesOf(x, ix, pace) {
   const aliases = new Map(ix.aliases), own = new Set();
   const add = (k, t) => { if (!own.has(k)) { own.add(k); aliases.set(k, new Set(aliases.get(k))); } aliases.get(k).add(t); }; // (the global sets kept as they are)
   for (const u of x.usings) if (u.alias && u.target !== null) add(u.alias, u.target);
   for (const u of [...ix.qualified, ...x.usings]) if (u.alias && u.qual && u.target !== null) for (const t of [...aliases.get(u.qual) ?? []]) { pace(); add(u.alias, join(t, u.target)); }
+  for (const u of x.usings) if (u.alias && !u.qual && u.target !== null) for (const t of [...headed(u.target, aliases)]) { pace(); add(u.alias, t); }
   return aliases;
 }
 
+// What a target names where an alias heads it ("D.Data", or "D" alone), one at a time: the alias's targets joined with
+// the rest of it.
+function* headed(target, aliases) {
+  const dot = target.indexOf("."), head = dot < 0 ? target : target.slice(0, dot), rest = dot < 0 ? "" : target.slice(dot + 1);
+  for (const t of aliases.get(head) ?? []) yield rest ? join(t, rest) : t;
+}
+
 // The namespaces the global using directives and a file's own name (x its facts), one that "D::" heads also as what
-// the alias D names ("using D = App;" then "using D::Data;" names App.Data), one at a time, `pace` asked for each.
+// the alias D names ("using D = App;" then "using D::Data;" names App.Data), as one of a file's own that "D." heads
+// does, one at a time, `pace` asked for each.
 function* targetsOf(x, ix, aliases, pace) {
   yield* ix.globals;
   for (const u of x.usings) if (u.target !== null) yield u.target;
   for (const u of [...ix.qualified, ...x.usings]) if (u.qual && !u.alias) for (const t of aliases.get(u.qual) ?? []) { pace(); yield join(t, u.target); }
+  for (const u of x.usings) if (!u.alias && !u.qual && u.target !== null) for (const t of headed(u.target, aliases)) { pace(); yield t; }
 }
 
 // The files one file reaches (x its facts), by the index: the files every file reaches; each type a word of its names

@@ -19,7 +19,8 @@ const csTexts = { "src/App.csproj": PROJ, "src/A.cs": "namespace App;\nclass A {
 for (const [held, what] of [...["$(Root).App", "@(ExtraUsings)", "%(Ns.Identity)", "App%2EData", "App&#46;Data"].map(i => [`<Using Include="${i}" />`, `a <Using> of ${i}, which MSBuild expands`]),
   ...["$(D)u.xml", "c.proj", "u.props.xml", "a.props;u.xml", "../U.Props", "c.props/u.xml", "u.xml;a.props", "$(X).props", ...["GetPathOfFileAbove('u.xml', 'a.props')", "IO.Path]::ChangeExtension('a.props', '.xml')", "IO.Path]::Combine('a.props', '..', 'u.xml')",
     "String]::Copy('a.props').Replace('.props', '.xml')", "String]::Concat('a.props', '.xml')"].map(f => `$([${f.startsWith("Get") ? "MSBuild]::" : "System."}${f})`)].map(p => [`<Import Project="${p}" />`, `a .props git holds imports ${p}, whose <Using> items it may not hold`]),
-  ["<PropertyGroup><CustomAfterMicrosoftCommonTargets>u.xml</CustomAfterMicrosoftCommonTargets></PropertyGroup>", "a .props names a file the SDK imports by a Custom…Microsoft… property"], [null, "git cannot be asked"]]) {
+  ...["MSBuildMine", "MSBuildAllProjects", "MSBuildProjectExtensionsPath"].map(m => [`<PropertyGroup><${m}>u.xml;a</${m}></PropertyGroup><Import Project="$(${m}).props" />`, `a .props imports $(${m}).props, a property of MSBuild's name that a file can set`]),
+  ...["CustomAfterMicrosoftCommonTargets", "DirectoryBuildTargetsPath", "_DirectoryBuildTargetsFile", "_DirectoryBuildPropsFile", "DirectoryPackagesPropsPath", "LanguageTargets", "MSBuildUserExtensionsPath", "MSBuildExtensionsPath"].map(m => [`<PropertyGroup><${m}>$(MSBuildThisFileDirectory)u.xml</${m}></PropertyGroup>`, `a .props names a file the SDK imports by ${m}`]), [null, "git cannot be asked"]]) {
   const r = csharpReach(csTexts, undefined, () => held ? { msbuild: [held], cs: {} } : { unknown: true });
   ok(same([...r.unsure].sort(), ["src/A.cs", "tests/T.cs"]), `where ${what}, every file of C# is unsure`, JSON.stringify([...r.unsure]));
 }
