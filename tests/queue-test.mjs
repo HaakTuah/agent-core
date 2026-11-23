@@ -1,8 +1,7 @@
 // Tests of the queue's reader (scripts/queue.mjs; AGENTS.md, "The queue"; #750, point 1): a line whose issue has
 // closed is skipped, waited on no more, cleared together by the next pull request that changes the queue, and fails
-// that pull request while it stands, save where GitHub cannot be read; a project's progress file, a list, read the same
-// way; and the core's queue read for its form, each row its issue first in its header's cells (#552). Node's own
-// modules only; GitHub and the file stand in as functions.
+// that pull request while it stands; a project's progress file, a list, read the same way (where GitHub cannot be read,
+// and the form: queue-form-test.mjs). Node's own modules only; GitHub and the file stand in as functions.
 //
 //   node tests/queue-test.mjs
 import fs from "node:fs";
@@ -92,26 +91,6 @@ ok(/run node core\/scripts\/queue\.mjs --clear/u.test(command("--check", { ...at
 ok(/run node lib\/core\/scripts\/queue\.mjs --clear/u.test(command("--check", { ...at, project: "lib/core/" }).out) && fileAt(slot("lib/core/QUEUE.md"), [], "lib/core/") === null && fileAt(slot("docs/PLAN.md"), [], "lib/core/") === "docs/PLAN.md" && fileAt(slot("lib/core-manifest.md"), [], "lib/") === null && fileAt(slot("Lib/x.md"), [], "lib/") === null, "a copy the manifest places elsewhere is read where it stands: its mend names its path, and the progress file is never inside it, nor inside the library that carries it (Codex's review of c2c351c; the fallback reviewer's check of 3c0720b)");
 r = command("--clear", at);
 ok(r.status === 0 && /took out the lines of #10/u.test(r.out) && file === cleared(queue, closed) && command("--check", at).status === 0, "--clear writes the queue without them, and the check then passes", r.out);
-answer = null;
-r = command("--check", at);
-ok(r.status === 0 && /^note the issues the queue names could not be read \(no answer\).*fails nothing/u.test(r.out), "where GitHub cannot be read, the check says so and fails nothing (#552; #459)", r.out);
-r = command("--clear", at);
-ok(r.status === 1 && mended(r.out) && /could not be read: no answer/u.test(r.out), "--clear, where GitHub cannot be read, fails, saying the mend, and writes nothing", r.out);
-
-// the core's queue in its form (#552): each row of a table names its issue first and holds its header's cells
-const rows = "| Issue | Who | Waits on |\n| --- | --- | --- |\n| #13 | builder | |\n| #14 | builder | a \\| b |\n";
-answer = page([open(13), open(14), open(15)]);
-const form = (text, extra = {}) => command("--check", { ...at, ...extra, read: () => text });
-ok(form(rows).status === 0 && /each row names its issue first/u.test(form(rows).out), "a table whose every row names its issue first in its header's three cells passes, a \"|\" written \"\\|\" inside a cell", form(rows).out);
-r = form(rows + "| #15 | builder | | done on Monday |\n");
-ok(r.status === 1 && mended(r.out) && /holds 4 cells, its table's header 3: \| #15 /u.test(r.out), "a row with more cells than its table's header fails, saying the mend", r.out);
-r = form(rows + "| the menu, #16 | builder | |\n| | builder | |\n");
-ok(r.status === 1 && mended(r.out) && /names no issue first: \| the menu, #16 /u.test(r.out) && /names no issue first: \| \| builder/u.test(r.out), "a row that names no issue first, or none at all, fails, saying the mend", r.out);
-answer = null;
-r = form(rows + "| #15 | builder | | x |\n");
-ok(r.status === 1 && /holds 4 cells/u.test(r.out) && /^note the issues/mu.test(r.out), "where GitHub cannot be read, the form is still read", r.out);
-ok(form(rows + "| #15 | builder | | x |\n", { project: "core/" }).status === 0, "a project's progress file is not read for its form (#552's scope)");
-ok(form("| #13 | builder | |\n| x | y |\n").status === 1, "rows under no header are each read for their issue");
 for (const bad of [command("--other", at), command(undefined, { ...at, read: () => null })]) ok(bad.status === 1 && mended(bad.out), "an option it does not know, or no queue where it runs, fails, saying the mend", bad.out);
 
 // the issues a line names first, read whole in every spelling, a row's and an item's (the fallback reviewer's second
