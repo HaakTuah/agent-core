@@ -7,10 +7,11 @@
 // reaches: those run with no name (an assembly's attribute, a module initializer, a framework's set-up, a source
 // generator, an xUnit collection's definition), those that hold a global using directive, and those the grammar lost.
 // It reads more than a file takes. A file is unsure (a test that reaches it runs on any change) where the
-// grammar lost it, it holds a raw interpolated string, or it reads types by reflection or scans an assembly; every file
+// grammar lost it, it holds code the tokens leave out, or it reads types by reflection or scans an assembly; every file
 // is, where a <Using> names an MSBuild expression or git cannot be asked. Files of C# git holds that the config does not
 // read are read too, as links between those it reads (select-csharp-project.mjs).
 import { heldBeside, msbuildUsings } from "./select-csharp-project.mjs";
+import { leftOut } from "./select-csharp-text.mjs";
 import { readCsharp } from "./shape-csharp.mjs";
 
 const TYPE = new Set(["class", "struct", "interface", "enum", "record", "delegate", "namespace"]);
@@ -21,7 +22,6 @@ const HOOKS = new Set(["ModuleInitializer", "AssemblyInitialize", "AssemblyClean
 const REFLECTS = new Set(["Activator", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
   "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR"]);
 
-const RAW = /\$"""/u; // (one "$", not a run of them: linear in the text)
 const hookWord = w => HOOKS.has(w.replace(/Attribute$/u, ""));
 const word = k => k.v.replace(/^@/u, "");
 const ids = toks => toks.filter(k => k.t === "id").map(word);
@@ -35,13 +35,13 @@ const join = (a, b) => (a ? `${a}.${b}` : b);
 const into = (map, key, made = () => new Set()) => { if (!map.has(key)) map.set(key, made()); return map.get(key); };
 
 // Past the head of a using directive that opens at toks[i] ("using", or "global using", then "static", "unsafe", an
-// alias's "N =" and "global::", each where it stands): the index of its name, or -1 where no directive opens there.
+// alias's "N =" and "global::" or an extern alias's "L::", each where it stands): the index of its name, or -1 where no directive opens there.
 function pastHead(toks, i) {
   let k = toks[i]?.v === "global" ? i + 1 : i;
   if (toks[k]?.v !== "using") return -1;
   for (const v of ["static", "unsafe"]) if (toks[k + 1]?.v === v) k++;
   if (toks[k + 1]?.t === "id" && toks[k + 2]?.v === "=") k += 2;
-  if (["global", ":", ":"].every((v, n) => toks[k + 1 + n]?.v === v)) k += 3;
+  if (qualifies(toks, k + 1)) k += 3;
   return k + 1;
 }
 
@@ -171,8 +171,8 @@ function delegateName(toks, k) {
 
 const qualifies = (toks, i) => toks[i]?.t === "id" && toks[i + 1]?.v === ":" && toks[i + 2]?.v === ":";
 
-// Each run of dotted words in a file (of two words or more, "App.Rules.Allowed"; "D::Data" as "D.Data", a "global::"
-// dropped: qualifies), and its using directives.
+// Each run of dotted words in a file (of two words or more, "App.Rules.Allowed"; "D::Data" as "D.Data" and "Data", a
+// "global::" dropped: qualifies), and its using directives.
 function runsOf(toks) {
   const runs = new Set(), usings = [];
   for (let i = 0; i < toks.length; i++) {
@@ -181,8 +181,8 @@ function runsOf(toks) {
     const q = qualifies(toks, i);
     if (toks[i].t !== "id" || toks[i - 1]?.v === "." || qualifies(toks, i - 3) || (!q && toks[i + 1]?.v !== ".")) continue;
     const { parts } = nameAt(toks, q ? i + 3 : i);
-    if (q && toks[i].v !== "global") parts.unshift(word(toks[i]));
     if (parts.length > 1) runs.add(parts.join("."));
+    if (q && toks[i].v !== "global") runs.add([word(toks[i]), ...parts].join("."));
   }
   return { runs, usings };
 }
@@ -206,15 +206,14 @@ const LITERAL = { t: "str", v: "" };
 // What a file holds that bears on its reach: its own namespaces, the namespaces its types stand in, its words, its runs
 // of dotted words, its using directives, and whether it declares extension members, runs with no name, reads types by
 // reflection, is of top-level statements, was lost by the grammar (unread: what it declares is not known either), or
-// holds code the tokens leave out (a raw interpolated string's holes; any `$"""` counts, a comment's
-// too). A character literal's token keeps its character ('}'), which no scan here takes for punctuation: each reads
+// holds code the tokens leave out (select-csharp-text.mjs). A character literal's token keeps its character ('}'), which no scan here takes for punctuation: each reads
 // the tokens with every literal's value emptied.
 function factsOf(read, src) {
   const toks = (read.toks ?? []).map(k => (k.t === "str" ? LITERAL : k)), r = { ...read, toks };
   const words = ids(toks), placed = new Set(r.namespaces);
   if (!r.namespaces.length || r.types.some(t => !t.includes("."))) placed.add("");
   return { r, words: new Set(words), ...runsOf(toks), placed: [...placed], extensions: extending(toks), hook: runsUnnamed(toks, words),
-    reflects: reflecting(toks, words), unread: r.usings === null || r.functions === null, raw: RAW.test(src), program: topLevel(toks) };
+    reflects: reflecting(toks, words), unread: r.usings === null || r.functions === null, raw: leftOut(src), program: topLevel(toks) };
 }
 
 // Where the project declares each type: { types: Map of a full name to its files, byLast: Map of a type's last word to

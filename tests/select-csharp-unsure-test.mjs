@@ -1,6 +1,6 @@
 // Tests where the test selection cannot tell what reaches a file of C# (scripts/select-csharp.mjs, through
 // scripts/select.mjs; #675): a file lost by the grammar, one that reads types by reflection or scans an assembly, one
-// with a raw interpolated string, every file where a <Using> names a property or git cannot be asked; and the whole
+// with a raw interpolated string or an alignment that names something, every file where a <Using> names a property or git cannot be asked; and the whole
 // suite where a changed file is C# of no project or no longer declares what it declared at the base, a change to a
 // helper among the tests, and the budget, of what git holds beside the texts too. The cases: select-csharp-test.mjs. Needs the parser (node scripts/install.mjs
 // parser). Run by the core's tests workflow (.github/workflows/tests.yml).
@@ -22,7 +22,7 @@ ok(same(pick(scans, "src/Lone.cs").tests, ["tests/WebTest.cs"]), "a test that re
 const reflects = { ...web, "tests/MakeTest.cs": "namespace Tests;\nclass MakeTest { object o = System.Activator.CreateInstance(System.Type.GetType(\"App.Start\")); }\n" };
 ok(pick(reflects, "src/Start.cs").tests.includes("tests/MakeTest.cs"), "and so does one that makes a type by reflection", JSON.stringify(pick(reflects, "src/Start.cs")));
 const csTexts = { "src/App.csproj": PROJ, "src/A.cs": "namespace App;\nclass A { }\n", "tests/T.cs": "namespace Tests;\nclass T { }\n" };
-for (const [beside, what] of [[() => ({ msbuild: ["<Using Include=\"$(Root).App\" />"], cs: {} }), "a <Using> names an MSBuild property"], ...["@(ExtraUsings)", "%(Ns.Identity)", "App%2EData"].map(i => [() => ({ msbuild: [`<Using Include="${i}" />`], cs: {} }), `a <Using> of ${i}, which MSBuild expands`]), [() => ({ unknown: true }), "git cannot be asked"]]) {
+for (const [beside, what] of [[() => ({ msbuild: ["<Using Include=\"$(Root).App\" />"], cs: {} }), "a <Using> names an MSBuild property"], ...["@(ExtraUsings)", "%(Ns.Identity)", "App%2EData", "App&#46;Data"].map(i => [() => ({ msbuild: [`<Using Include="${i}" />`], cs: {} }), `a <Using> of ${i}, which MSBuild expands`]), [() => ({ unknown: true }), "git cannot be asked"]]) {
   const r = csharpReach(csTexts, undefined, beside);
   ok(same([...r.unsure].sort(), ["src/A.cs", "tests/T.cs"]), `where ${what}, every file of C# is unsure`, JSON.stringify([...r.unsure]));
 }
@@ -43,7 +43,9 @@ ok(!one("namespace R;\nclass X { void Go() { var t = x.GetType(); } }\n").unsure
 // ---- what review found (#1159) ----
 const rawHole = one("namespace Tests;\nclass Y { string s = $$\"\"\"a {{App.Rules.Allowed()}}\"\"\"; }\n");
 ok(same([...rawHole.unsure], ["src/X.cs"]), "a raw interpolated string, whose holes the tokens do not read, makes its file unsure", JSON.stringify([...rawHole.unsure]));
-ok(!one("namespace Tests;\nclass Y { string s = \"\"\"a\"\"\" + $\"{1}\"; }\n").unsure.size, "a raw string that is not interpolated, and an interpolated one that is not raw, make none");
+ok(!one("namespace Tests;\nclass Y { string s = \"\"\"a\"\"\" + $\"{1}\" + $\"{2,-10:F1}\" + $\"{F(1, 2)}\"; }\n").unsure.size, "a raw string that is not interpolated, an interpolated one that is not raw, an alignment that names nothing and a call's \",\" make none");
+const aligned = ["$\"{1,App.Layout.Width}\"", "$@\"{1,(int)W}\""].filter(e => !one(`namespace Tests;\nclass Y { string s = ${e}; }\n`).unsure.has("src/X.cs"));
+ok(!aligned.length, "an interpolation's alignment that holds a word, which the tokens do not read, makes its file unsure", aligned.join(", "));
 const bridged = { ...app, "src/Bridge.cs": "namespace App;\nref class Bridge { public static bool Check() => Rules.Allowed(); }\n", "tests/BridgeTest.cs": "using App;\nnamespace Tests;\nclass BridgeTest { void T() { Bridge.Check(); } }\n" };
 ok(readCsharp(bridged["src/Bridge.cs"]).functions === null && pick(bridged, "src/Rules.cs").tests.includes("tests/BridgeTest.cs"),
   "a file the grammar loses, whose declarations are not known, is reached from every file and unsure, so a test that names it runs", JSON.stringify(pick(bridged, "src/Rules.cs")));
