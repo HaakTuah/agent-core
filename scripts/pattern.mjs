@@ -32,8 +32,9 @@ export const MARKS = [
 ];
 const conditions = t => (t.match(/\bthe one condition that changes it\b/giu) ?? []).length;
 
-// The parts of the pattern a rule's own text lacks, each { part, mend }.
-export const lacking = text => MARKS.filter(m => m.lacks(text));
+// The parts of the pattern a rule's own text lacks, each { part, mend }: read with its line breaks and the spaces that
+// indent a list's lines as one space, so a mark wrapped across lines is read whole.
+export const lacking = text => { const t = String(text).replace(/\s+/gu, " "); return MARKS.filter(m => m.lacks(t)); };
 
 // Each rule with its own text: its text without the rules nested in it, which follow it in the same file.
 export function own(all) {
@@ -70,6 +71,9 @@ export function report(head, base, holders, baseRev) {
   return { lines, failed };
 }
 
+// The holders scripts/holders/ under `root` names, keyed by the rule, as judge() takes them.
+export const holdersOf = root => named(root).named;
+
 // The check on `args` (the command line's, after the script): { code, lines }, what it prints and its exit code.
 export function main(args, root = ROOT) {
   const at = args.indexOf("--base");
@@ -78,7 +82,7 @@ export function main(args, root = ROOT) {
   if (at >= 0 && !isCommit(root, baseRev)) return fail(`--base needs a commit of this repository, and "${baseRev ?? ""}" is none. Mend: fetch the base (git fetch origin main) and name its commit after --base`);
   const head = rules(root, { agents: true });
   if (!head.length) return fail("no rule of the floor, the modules or AGENTS.md was read, so the check would pass anything. Mend: run the core's own copy of this script, in a checkout that holds its rule files");
-  const holders = named(root).holders;
+  const holders = holdersOf(root);
   if (!baseRev) {
     const { added } = judge(head, [], holders);
     const counts = MARKS.map(m => `${added.filter(r => r.lacks.includes(m)).length} with ${m.part}`).join(", ");

@@ -9,8 +9,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { entryFile } from "../scripts/holders.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { judge, lacking, main, report } from "../scripts/pattern.mjs";
+import { holdersOf, judge, lacking, main, report } from "../scripts/pattern.mjs";
 import { rulesOf } from "../scripts/rules.mjs";
 
 let failed = 0, count = 0;
@@ -26,6 +27,8 @@ ok(!parts("By default x. The one condition that changes it: w. Reason: z. Held, 
   && !parts("x. Nothing changes it. Reason: z. Held, in the core, by its test.").length
   && !parts("x. Nothing changes it. Reason: z. Held here by `own-description.yml`.").length
   && !parts("x. Nothing changes it. Reason: z. Held by nothing yet.").length, "each form of a holder the rules use is read, and one condition");
+ok(!parts("- **A.** By default x. The one condition that\n  changes it: w. Reason: z. Held\n  by a check.").length && !parts("x. Nothing\nchanges it. Reason: z. Held,\n  in part, by a check.").length,
+  "a mark wrapped across lines, as a list's lines are, is read whole");
 ok(String(parts("By default x. Nothing changes it. Held by a check.")) === "no reason", "a rule with no \"Reason:\" lacks its reason");
 ok(String(parts("By default x. Nothing changes it. Reason: z. Its holder is a check.")) === "no holder"
   && String(parts("By default x. Nothing changes it. Reason: z. Upheld by a check.")) === "no holder", "a rule with no \"Held … by\" lacks its holder");
@@ -77,6 +80,17 @@ const empty = fs.mkdtempSync(path.join(os.tmpdir(), "pattern-"));
 const nothing = main([], empty);
 fs.rmSync(empty, { recursive: true, force: true });
 ok(nothing.code === 1 && mended(nothing.lines.join("\n")) && /no rule of the floor/u.test(nothing.lines[0]), "where no rule is read it fails, since it would pass anything, with its mend");
+
+// the holders the check reads from a project's scripts/holders/, as main() reads them: a lead marked "describes" there
+// is not read
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "pattern-"));
+fs.mkdirSync(path.join(scratch, "scripts/holders"), { recursive: true });
+fs.writeFileSync(path.join(scratch, "scripts/holders", entryFile(`${file}: Describes`)), JSON.stringify({ rule: `${file}: Describes`, holder: "describes" }));
+const read = holdersOf(scratch);
+fs.rmSync(scratch, { recursive: true, force: true });
+ok(read[`${file}: Describes`] === "describes" && !judge(head, base, read).added.some(r => r.lead === "Describes")
+  && judge(head, base, {}).added.length === judge(head, base, read).added.length,
+  "the holders are read from scripts/holders/ as main() reads them, and a lead marked \"describes\" there is not read");
 
 console.log(`${count} assertions on the marks check`);
 if (failed) { console.error(`${failed} failed`); process.exit(1); }
