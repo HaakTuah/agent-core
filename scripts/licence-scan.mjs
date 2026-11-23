@@ -245,6 +245,10 @@ function byKind(c, f, text) {
   else if (other) scanOther(c, f);
   return c.others;
 }
+/** What the scan reads in the file `f`, holding `text`, as fetched by another fetcher that no entry of `entries` audits
+ *  by hand, and nothing else it says of it: the step that lists what stood so reads it (step-checks-packages.mjs). */
+export const unauditedIn = (settings, entries, auditPath, f, text) =>
+  byKind({ settings, entries, auditPath, binary: new Set(), locks: [], fail() {}, reports: [] }, f, text);
 
 /** How the scan reads the file `f` holding `text` (scanned, above): `other`, in a language it cannot read; `runs`, as
  *  shell, JavaScript or a page. */
