@@ -192,6 +192,26 @@ try { extPrinted = JSON.parse(extOut.stdout); } catch { /* (read below) */ }
 ok(extOut.status === 0 && JSON.stringify(extPrinted) === JSON.stringify({ power: ["helper"], light: [extThird] }),
   "a commit that changes a file with no extension beside a seed is not light, read from its own tree: the readme's after it is", extOut.stdout + extOut.stderr);
 
+// A submodule's pointer (a gitlink), read from a commit, may run beside a seed whatever its name ends in; a commit that
+// moves it is not light.
+const sub = path.join(tmp, "sub");
+fs.mkdirSync(sub);
+git(sub, "init", "-q", "-b", "main");
+write(sub, ".github/workflows/p.yml", "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node vendor/tool.md/run.mjs\n");
+write(sub, "README.md", "one\n");
+git(sub, "add", "-A");
+git(sub, "update-index", "--add", "--cacheinfo", `160000,${sha(1)},vendor/tool.md`);
+git(sub, "commit", "-q", "-m", "base");
+const subBase = git(sub, "rev-parse", "HEAD");
+git(sub, "update-index", "--cacheinfo", `160000,${sha(2)},vendor/tool.md`);
+git(sub, "commit", "-q", "-m", "the submodule moved");
+const subMoved = git(sub, "rev-parse", "HEAD");
+const subWhy = new Map(), subSet = setOf(gitTree(subMoved, sub), subWhy);
+const subChanged = (parent, at) => git(sub, "diff-tree", "-r", "--no-renames", "--name-only", parent, at).split("\n").filter(Boolean);
+ok(subWhy.get("vendor/tool.md") === "runs" && !subSet.has("README.md")
+  && lightOf([commit(subBase, sha(0)), commit(subMoved, subBase)], { setAt: (at) => setOf(gitTree(at, sub)), changed: subChanged }).length === 0,
+  "a submodule's pointer joins the set beside a seed, read from a commit, whatever its name ends in, and a commit that moves it is not light", JSON.stringify([...subWhy]));
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${count - failed} of ${count} passed`);
 process.exit(failed ? 1 : 0);

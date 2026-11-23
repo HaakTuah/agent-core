@@ -95,17 +95,20 @@ const unextended = (name) => path.posix.extname(name) === "";
 const placed = (name) => ACTION.test(name) || name.startsWith(".claude/") || RUNS_TOO.test(name);
 // whether a path is one that may run: any but text, data and pictures
 export const runnable = (name) => ACTION.test(name) || !INERT.test(name);
+// whether a path may run with power, read by its name alone: where the set could not be read (security-review.mjs)
+export const mayRun = (name) => placed(name) || runnable(name);
 
 // The set of a tree: `paths`, every file's path; `read(path)`, its text, or null where it cannot be read or is too large;
+// `links`, where given, the paths of its submodules, each code another repository holds, which may run;
 // `copy`, the folder of the core's copy as the manifest names it, left out (only a sync changes it, its code reviewed in
 // the core's own pull request; a repository whose manifest names none, the core's own among them, leaves out nothing).
 // `why`, where given, is filled with what brought each path in.
-export function setOf({ paths, read: raw, copy }, why = new Map()) {
+export function setOf({ paths, read: raw, copy, links = new Set() }, why = new Map()) {
   const read = (name) => lf(raw(name));
   const own = paths.filter((name) => typeof name === "string" && !(typeof copy === "string" && copy !== "" && name.startsWith(copy)));
   const found = new Map();
   for (const name of own) { const seed = seedOf(name, read); if (seed) found.set(name, seed); }
-  if (found.size) for (const name of own) if (runnable(name) && !found.has(name)) found.set(name, "runs");
+  if (found.size) for (const name of own) if ((runnable(name) || links.has(name)) && !found.has(name)) found.set(name, "runs");
   for (const [name, from] of found) why.set(name, from);
   return new Set(found.keys());
 }
@@ -138,14 +141,16 @@ export function diskTree(root) {
 }
 
 const git = (args, cwd, input) => execFileSync("git", args, { cwd, input, encoding: "utf8", stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"], maxBuffer: 1 << 28 });
-// A tree of a commit in the git repository at `cwd`, its texts read in one call of git's, never checked out.
+// A tree of a commit in the git repository at `cwd`, its texts read in one call of git's, never checked out; a
+// submodule's pointer (a gitlink) is a path of it, among its `links`.
 export function gitTree(commit, cwd) {
   const entries = git(["ls-tree", "-r", "-z", "--full-tree", "-l", commit], cwd).split("\0").filter(Boolean).map((line) => {
     const [meta, name] = line.split("\t");
     const [, type, sha, size] = meta.split(/ +/u);
     return { name, type, sha, size: Number(size) };
-  }).filter((entry) => entry.type === "blob");
-  const wanted = entries.filter((entry) => WORKFLOW.test(entry.name) || SCRIPT.test(entry.name) || unextended(entry.name) || placed(entry.name));
+  });
+  const links = new Set(entries.filter((entry) => entry.type === "commit").map((entry) => entry.name));
+  const wanted = entries.filter((entry) => entry.type === "blob").filter((entry) => WORKFLOW.test(entry.name) || SCRIPT.test(entry.name) || unextended(entry.name) || placed(entry.name));
   const texts = new Map();
   const small = wanted.filter((entry) => entry.size <= LARGEST);
   if (small.length) {
@@ -158,7 +163,7 @@ export function gitTree(commit, cwd) {
       at = end + 1 + size + 1;
     }
   }
-  return { paths: entries.map((entry) => entry.name), read: (name) => texts.get(name) ?? null };
+  return { paths: entries.filter((entry) => entry.type === "blob" || entry.type === "commit").map((entry) => entry.name), read: (name) => texts.get(name) ?? null, links };
 }
 
 // The paths of a pull request's files (`files`, as GitHub's API gives them, a moved file by both its names) in any of `sets`.

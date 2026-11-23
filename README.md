@@ -360,7 +360,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `pure-sync.mjs` on its head, and so does a pull request of the *progress file* alone that a job of the caller's proves with
      `queue-only.mjs`, whose token may read issues, handing the head to the input `queue` (the core's own caller does;
      #750); where the pull request changes what runs with power beyond its pins (`power.mjs`; where it read
-     nothing, each workflow and each file that may run changed), both, or two such
+     nothing, each workflow, each file that may run and each that runs by itself changed), both, or two such
      comments (floor rule 3), or one holding what `comment-only.mjs` printed on the head. Where a summary of Codex's is
      there but its state cannot be read, a form nobody documents having changed, the status says so, the run warns, and
      the check waits or passes as it would with no summary (a summary whose first line itself changed is not known as

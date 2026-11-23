@@ -200,6 +200,8 @@ ok(is(powered([script], null), false, "second") && is(powered([file("docs/x.md",
   "where the set could not be read, each changed script asks two, and a document, or a script of the copy, asks one");
 ok(is(powered([file("bin/deploy", patch(["a", "b"]))], null), false, "second") && is(powered([file("bin/deploy", patch(["a", "b"]))], new Set()), true, "has run"),
   "where the set could not be read, a changed file with no extension asks two, as power.mjs reads it runnable; given the set, only where it is in it");
+ok(["src/App.cs", ".codex/config.toml", "package.json", ".kiro/settings.json"].every((name) => is(powered([file(name, patch(["a", "b"]))], null), false, "second")) && is(powered([file("config/x.json", patch(["a", "b"]))], null), true, "has run"),
+  "where the set could not be read, a compiled language's source, an agent tool's config and an install file each ask two; a JSON file of data asks one");
 // each status that waits says its mend, whole, within GitHub's 140 characters
 const waits = [judge(pull, []), judge(pull, [summary(open)], [finding("2026-11-12T10:30:00Z")]), judge(pull, [summary(open)]), judge(pull, [late, said("Security review: x")], [finding("2026-11-12T10:30:00Z")]),
   judge(pull, [summary(running), early]), two([summary(done)], [stepChange])];
