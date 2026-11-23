@@ -18,7 +18,7 @@ ok(HEADING === "The rule's reasons" && guide && forms.every(f => under(f, HEADIN
 ok(forms.every(f => !namesRule(ownWords(f)) && under(ownWords(f), HEADING) === "") && ownWords(`${R}\n${guide}\nmine`).endsWith("mine"),
   "a form's own lines are not the filer's: unchanged, it names no rule and says nothing under the heading; the filer's lines stay");
 
-ok(namesRule("see `core/tasks/updates.md`") && namesRule("On roles/shared/inbox.md.") && namesRule("Floor rule 3 reads two ways") && namesRule("floor/topics/workflows.md"),
+ok(namesRule("see `core/tasks/updates.md`") && namesRule("On roles/shared/inbox.md.") && namesRule("Floor rule 3 reads two ways") && namesRule("floor rule 12, its second point") && namesRule("floor/topics/workflows.md"),
   "a rule is named by a rule file's path, with core/ before it or not, a file of a subfolder too, or as a floor rule");
 ok(!namesRule("tasks/nothere.md, core/scripts/labels.mjs, xtasks/updates.md, tasks/updates.mdx, tasks/updates.md.bak") && !namesRule("```\ntasks/updates.md\n```") && !namesRule("<!-- floor rule 3 -->") && !namesRule("the rule on updates"),
   "no rule file, a file that is no rule file, a path inside a longer word, one in a fenced block or a comment, and a rule named by words alone are not");
@@ -43,10 +43,12 @@ const filed = [
   { number: 59, user: me, labels: ["by:project"], body: `On tasks/updates.md.\n\n${said}`, created_at: late },
   { number: 60, user: other, labels: L("needs-owner"), body: forms[1].replace(/^The idea in a line or two.*$/mu, "A dry run for `scripts/sync.mjs`."), created_at: late },
   { number: 61, user: other, labels: L("needs-owner"), body: forms[1].replace(/^The file and section, if there is one.*$/mu, "`core/tasks/updates.md`, its first rule."), created_at: late },
+  { number: 62, body: "On tasks/updates.md, the day the rule came.", created_at: since },
+  { number: 63, user: me, labels: [null, "by:project"], body: "On tasks/updates.md.", created_at: late },
 ];
 const got = reasonsUnsaid({ issues: filed, owner, since });
-ok(got.length === 1 && got[0].items.join() === "#50,#51,#56,#61",
-  "an issue from a project (by:project, or another account that is no bot) that names a rule in its own words, with the heading left out, empty or as the form gives it, is reported; one that says them, a bot's, an agent's own, one that names no rule (the form's guidance naming one) and one from before the rule are not",
+ok(got.length === 1 && got[0].items.join() === "#50,#51,#56,#61,#62,#63",
+  "an issue from a project (by:project, its labels as names or objects, or another account that is no bot, or none given) that names a rule in its own words, with the heading left out, empty or as the form gives it, from the day the rule came, is reported; one that says them, a bot's, an agent's own, one that names no rule (the form's guidance naming one) and one from before the rule are not",
   JSON.stringify(got));
 ok(got[0]?.what.includes("reasons.mjs") && got[0].what.includes(HEADING) && /owner's account filed it, edit the issue/.test(got[0].what) && /ask its filer/.test(got[0].what),
   "its mend names the heading, the script that prints the reasons, and who adds them");
