@@ -8,7 +8,8 @@
 //     or of another of the project's, or reads close to one (twice-text.mjs, beside this file); listed;
 //   - a file outside the copy equal byte for byte to one of the core's, at the copy or, with the core fetched, at an
 //     earlier copy (the old pin and each release); it goes, its pointers moved to the copy's file, where one file of
-//     the copy stands for it and no pointer to it is left that cannot be moved; else it is listed;
+//     the copy stands for it and no pointer to it is left that cannot be moved, and it is neither the floor's text nor a
+//     file the project's AGENTS.md calls a safety rule; else it is listed;
 //   - a job that calls one of the core's workflows that another job calls too: the second of two in one workflow, the
 //     same in all but its name and named in no `needs:`, goes from a workflow of the project's own; any other is listed;
 //   - a pointer, in the project's own text, to a path of the copy that is not there: with the core fetched, one the
@@ -16,101 +17,28 @@
 //     any other is listed.
 // The dated records (reports/, archive/) are not read, nor changed. It fails nothing (AGENTS.md of the core, "Nothing
 // locks a project"); in the core's own repository, which holds no copy, it reads nothing. Node's own modules, git and
-// the YAML reader (parse-yaml.mjs).
+// the YAML reader (parse-yaml.mjs); the files and pointers are read in twice-files.mjs, the text in twice-text.mjs.
 //
 //   node core/scripts/twice.mjs                         from a project's root: each finding, exact or for the auditor
 //   node core/scripts/twice.mjs --fix                   and correct what is exact, for a pull request of its own
 //   node core/scripts/twice.mjs --all                   every finding for the auditor, past the first MOST too
-//   ... --fetched <dir> [--since <sha>]                 with the core fetched into the bare repository <dir> (the sync
-//                                                       gives it), and the copy's pin before the sync
-import crypto from "node:crypto";
+//   ... --since <sha> [--fetched <dir>]                 with the copy's pin before the sync, the core fetched (into the
+//                                                       bare repository <dir> where the sync gives it), for the earlier copies
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { CORE } from "./core-address.mjs";
 import { whole } from "./core-owned.mjs";
 import { MANIFEST, readCore } from "./core-path.mjs";
 import { ownFiles } from "./own-files.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
-import { inBare, releasesIn } from "./releases.mjs";
+import { fetchCore, inBare, releasesIn } from "./releases.mjs";
 import { started } from "./started.mjs";
+import { SKIP, filesFound, listTree, pointerTo, pointersTo, safetyOf, textFiles } from "./twice-files.mjs";
 import { textFound } from "./twice-text.mjs";
 
-const SKIP = /^(?:reports|archive|words)\//u;
-const NOT_COMPARED = /(?:^|\/)(?:LICEN[CS]E|NOTICE|COPYING)[^/]*$|(?:^|\/)\.git(?:ignore|attributes|keep)$/iu;
-const SMALLEST = 100; // (a file of fewer bytes, an empty one above all, matches by chance)
+export { blobId, filesFound, pointerTo, pointersTo } from "./twice-files.mjs"; // (the tests' way in)
 
-// A blob's id as git names it, so that a file is matched to one of an earlier copy's by its id alone.
-export const blobId = buf => crypto.createHash("sha1").update(`blob ${buf.length}\0`).update(buf).digest("hex");
-
-// Each file of the copy and of the earlier copies by its blob's id: the paths of the core's that hold it.
-function coreBlobs(p) {
-  const byId = new Map();
-  const add = (id, file, at) => { if (!byId.has(id)) byId.set(id, []); byId.get(id).push({ file, at }); };
-  for (const f of p.copyFiles) if (!f.startsWith("setup/template/")) add(blobId(fs.readFileSync(path.join(p.copyDir, f))), f, "the copy");
-  for (const sha of p.earlier) {
-    for (const e of listTree(p.bare, sha)) if (!e.file.startsWith("setup/template/")) add(e.id, e.file, sha.slice(0, 7));
-  }
-  return byId;
-}
-const listTree = (bare, sha) => inBare(bare, ["ls-tree", "-r", "-z", sha], { maxBuffer: 1 << 28 }).split("\0").flatMap(l => { const m = /^\d+ blob ([0-9a-f]{40})\t(.+)$/su.exec(l); return m ? [{ id: m[1], file: m[2] }] : []; });
-
-const CODE = /\.(?:mjs|cjs|js|ts|py|sh|ps1)$/iu;
-// The relative paths a code file names in quotes (its imports, the files it reads), resolved from its folder.
-const named = (text, file) => [...text.matchAll(/["'](\.\.?\/[^"'\s]+)["']/gu)].map(m => path.posix.normalize(path.posix.join(path.posix.dirname(file), m[1])));
-
-// The files outside the copy equal byte for byte to one of the core's: { file, core, at, to }, `to` the copy's file
-// that stands for it, or null where none does, more than one does, or, for code, where it is not the copy's own (an
-// earlier version runs otherwise) or a file it names would not stand beside the copy's as it stands beside this one.
-export function filesFound(p) {
-  const byId = coreBlobs(p), found = [];
-  for (const f of p.outside) {
-    const hit = compared(p, f) && equalTo(p, byId, f);
-    if (hit) found.push(hit);
-  }
-  return withWhatTheyName(found);
-}
-const compared = (p, f) => !whole(f) && !NOT_COMPARED.test(f) && !SKIP.test(f) && p.own.read(f, true) !== null;
-// The file `f` as a finding where it is equal to one of the core's, else null.
-function equalTo(p, byId, f) {
-  let buf;
-  try { buf = fs.readFileSync(path.join(p.root, f)); } catch { return null; }
-  const hits = buf.length < SMALLEST ? null : byId.get(blobId(buf));
-  if (!hits) return null;
-  const kept = CODE.test(f) ? hits.filter(h => h.at === "the copy") : hits;
-  const to = [...new Set(kept.map(h => h.at === "the copy" ? h.file : p.moved.get(h.file) ?? (p.copySet.has(h.file) ? h.file : null)))];
-  return { file: f, core: hits[0].file, at: hits[0].at, to: to.length === 1 && to[0] ? `${p.copy}${to[0]}` : null, text: buf.toString("utf8") };
-}
-// Code goes only with every file it names: each goes too, to the copy's file at the same place beside it.
-function withWhatTheyName(found) {
-  let dropped = true;
-  while (dropped) {
-    dropped = false;
-    const going = new Map(found.filter(x => x.to).map(x => [x.file, x.to]));
-    for (const x of found.filter(x => x.to && CODE.test(x.file))) {
-      const ok = named(x.text, x.file).every(n => going.get(n) === path.posix.normalize(path.posix.join(path.posix.dirname(x.to), path.posix.relative(path.posix.dirname(x.file), n))));
-      if (!ok) { x.to = null; x.why = "it names a file that would not stand beside the copy's as it stands beside it"; dropped = true; }
-    }
-  }
-  return found;
-}
-
-// Each pointer in a text to the path `from`: as the repository's path, as a relative path that opens with ./ or ../,
-// or as a Markdown link's target relative to the file `inFile`.
-export function pointersTo(inFile, from) {
-  const esc = s => s.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&");
-  const rel = path.posix.relative(path.posix.dirname(inFile), from), dotted = rel.startsWith(".") ? rel : `./${rel}`;
-  const forms = [`(?<![A-Za-z0-9._/-])${esc(from)}`, `(?<![A-Za-z0-9._/-])${esc(dotted)}`, `(?<=\\]\\()${esc(rel)}`];
-  return new RegExp(`(?:${forms.join("|")})(?![A-Za-z0-9_/-]|\\.[A-Za-z0-9])`, "gu");
-}
-// The same pointer to `to`, in the form it stood in.
-export const pointerTo = (inFile, from, to) => hit => {
-  if (hit === from) return to;
-  const rel = path.posix.relative(path.posix.dirname(inFile), to);
-  return hit.startsWith("./") && !rel.startsWith(".") ? `./${rel}` : rel;
-};
-
-// The project's own text files that may hold a pointer: outside the copy, the core's whole files and the dated records.
-const textFiles = p => p.outside.filter(f => !whole(f) && !SKIP.test(f)).flatMap(f => { const t = p.own.read(f, true); return t === null || t.includes("\0") ? [] : [{ file: f, text: t }]; });
 
 // The pointers to paths of the copy that are not there: { file, line, path, to } where `to` is where the core moved it
 // unchanged (null where it did not, or it cannot be read).
@@ -121,7 +49,7 @@ export function pointersFound(p) {
     for (const m of text.matchAll(re)) {
       const at = m[1].replace(/\/$/u, "");
       if (p.copySet.has(at) || p.copyFolders.has(at)) continue;
-      found.push({ file, line: text.slice(0, m.index).split("\n").length, path: `${p.copy}${at}`, to: p.moved.has(at) ? `${p.copy}${p.moved.get(at)}` : null });
+      found.push({ file, line: text.slice(0, m.index).split("\n").length, path: `${p.copy}${at}`, to: p.moved.get(at) ? `${p.copy}${p.moved.get(at)}` : null });
     }
   }
   return found;
@@ -180,23 +108,28 @@ export function projectOf(root, { fetched = null, since = null } = {}) {
   const markdown = outside.filter(f => /\.md$/iu.test(f) && !whole(f) && !SKIP.test(f));
   const coreMarkdown = copyFiles.filter(f => /\.md$/iu.test(f) && !/^(?:setup\/template|archive|reports|words|inventory|choices)\//u.test(f));
   const readCopy = f => { try { return fs.readFileSync(path.join(copyDir, f), "utf8"); } catch { return null; } };
-  const p = { root, own, copy, copyDir, copyFiles, copySet, copyFolders, outside, markdown, coreMarkdown, readCopy, bare: fetched, earlier: [], moved: new Map() };
+  const p = { root, own, copy, copyDir, copyFiles, copySet, copyFolders, outside, markdown, coreMarkdown, readCopy, bare: fetched, earlier: [], moved: new Map(), safety: safetyOf(own) };
   if (fetched && line.pin) history(p, line.pin, since);
   return p;
 }
 const listCopy = dir => fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter(e => e.isFile() && !/(?:^|[\\/])(?:\.packages|node_modules)(?:[\\/]|$)/u.test(e.parentPath ?? e.path)).map(e => path.relative(dir, path.join(e.parentPath ?? e.path, e.name)).split(path.sep).join("/"));
 
-// The earlier copies (the old pin and each release before the pin) and the files the core moved unchanged since them.
+// The earlier copies (the old pin and each release before the pin) and the files the core moved unchanged since them: a
+// path the old pin held moves only as it moved from there; any other only where every earlier copy moved it alike, else
+// to null (moved, but where cannot be told).
 function history(p, pin, since) {
   let earlier = [];
   try { earlier = [...new Set([since, ...releasesIn(p.bare).map(r => r.sha)])].filter(s => s && s !== pin && /^[0-9a-f]{40}$/u.test(s)); } catch { return; }
+  const atSince = new Set();
   for (const sha of earlier) {
     let out;
     try { out = inBare(p.bare, ["diff", "--name-status", "-z", "--find-renames=100%", sha, pin], { maxBuffer: 1 << 28 }); } catch { continue; }
     p.earlier.push(sha);
+    if (sha === since) listTree(p.bare, sha).forEach(e => atSince.add(e.file));
     const parts = out.split("\0");
     for (let i = 0; i < parts.length; i++) {
-      if (/^R100$/u.test(parts[i]) && p.copySet.has(parts[i + 2])) p.moved.set(parts[i + 1], parts[i + 2]);
+      const [from, to] = [parts[i + 1], parts[i + 2]];
+      if (/^R100$/u.test(parts[i]) && p.copySet.has(to) && (sha === since || !atSince.has(from))) p.moved.set(from, p.moved.has(from) && p.moved.get(from) !== to ? null : to);
       if (/^[RC]\d*$/u.test(parts[i])) i += 2; else if (/^[ADMT]$/u.test(parts[i])) i += 1;
     }
   }
@@ -243,25 +176,31 @@ export function fix(p, found) {
 
 // What the command prints; past MOST lines for the auditor, the count of the rest, unless `all`.
 export const MOST = 40;
-export function report(found, copy, fixed = null, all = false) {
+export function report(found, copy, fixed = null, all = false, since = null) {
   const head = `What the project holds twice, or against the core (${copy}tasks/cleaning.md, "The reading asks what a project holds twice"):`;
   if (!found.length) return `${head} nothing the scripts read.`;
   const exact = found.filter(f => f.fix), close = found.filter(f => !f.fix);
   const lines = [head];
   if (fixed) lines.push(fixed.length ? `Corrected, for a pull request of its own that the usual reviews read:\n  ${fixed.join("\n  ")}` : "Nothing was corrected.");
-  else if (exact.length) lines.push(`Exact, which \`node ${copy}scripts/twice.mjs --fix\` corrects, in a pull request of its own that the usual reviews read, the project's tests run before it is ready:\n  ${exact.map(f => f.line).join("\n  ")}`);
+  else if (exact.length) lines.push(`Exact, which \`node ${copy}scripts/twice.mjs --fix${since ? ` --since ${since}` : ""}\` corrects${since ? " (the core fetched again, for its earlier copies)" : ""}, in a pull request of its own that the usual reviews read, the project's tests run before it is ready:\n  ${exact.map(f => f.line).join("\n  ")}`);
   const shown = all ? close : close.slice(0, MOST), more = close.length - shown.length;
   if (close.length) lines.push(`For the auditor, by meaning (the same, stricter or narrower, different, contradicting, or unsure), none corrected:\n  ${shown.map(f => f.line).join("\n  ")}${more ? `\n  and ${more} more: \`node ${copy}scripts/twice.mjs --all\` lists every one` : ""}`);
   return lines.join("\n");
 }
 
+// With --since and no --fetched, the core is fetched into a temporary folder, removed however the run ends; where it
+// cannot be, what the earlier copies would find is not read, and the run says so.
 if (started(import.meta.url)) {
   const arg = n => { const i = process.argv.indexOf(n); return i < 0 ? null : process.argv[i + 1]; };
-  const fetched = arg("--fetched");
-  const p = projectOf(process.cwd(), { fetched: fetched && path.resolve(fetched), since: arg("--since") });
-  if (!p) console.log("No copy of the core stands here (the core's own repository, or no manifest's \"Core:\" line names a copy that stands): nothing is read.");
-  else {
-    const found = findings(p);
-    console.log(report(found, p.copy, process.argv.includes("--fix") ? fix(p, found) : null, process.argv.includes("--all")));
-  }
+  const since = arg("--since"), tmp = since && !arg("--fetched") ? fs.mkdtempSync(path.join(os.tmpdir(), "core-twice-")) : null;
+  try {
+    let fetched = arg("--fetched") && path.resolve(arg("--fetched"));
+    if (tmp) { try { fetchCore(tmp); fetched = tmp; } catch (e) { console.log(`The core could not be fetched (${String(e.stderr || e.message).trim().split("\n")[0]}): what an earlier copy would show is not read.`); } }
+    const p = projectOf(process.cwd(), { fetched, since });
+    if (!p) console.log("No copy of the core stands here (the core's own repository, or no manifest's \"Core:\" line names a copy that stands): nothing is read.");
+    else {
+      const found = findings(p);
+      console.log(report(found, p.copy, process.argv.includes("--fix") ? fix(p, found) : null, process.argv.includes("--all"), p.earlier.length ? since : null));
+    }
+  } finally { if (tmp) fs.rmSync(tmp, { recursive: true, force: true }); }
 }

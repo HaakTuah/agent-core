@@ -29,13 +29,17 @@ const GUIDE_NEW = `# A guide\n\n${"The core's guide, as the copy holds it now, l
 const PLACE = `# A place\n\n${"A file the core moved from one folder to another, its bytes unchanged by the move. ".repeat(3)}\n`;
 const A = `// The core's script a, which reads its sibling b and nothing else at all, long enough.\nimport { b } from "./b.mjs";\nexport const a = () => b() + 1;\n`;
 const B = `// The core's script b, which a reads, and which reads nothing of its own at all here.\nexport const b = () => 41;\n`;
+const C = "// The core's script c, which reads its settings beside it through a template literal, long enough.\nexport const c = () => JSON.parse(require(\"fs\").readFileSync(new URL(`./c.json`, import.meta.url))).v;\n";
+const FLOOR = `# The floor\n\n${"A rule of the floor, which no script takes out of a project without its owner's word. ".repeat(3)}\n`;
+const SAFE = `# Safe\n\n${"A file of the core's that the project's AGENTS.md calls one of its safety rules. ".repeat(3)}\n`;
+const EXTRA = `# Extra\n\n${"A file of the core's that a workflow of the core's, held whole in the project, names. ".repeat(3)}\n`;
 
 // The scratch core: an earlier commit and the pin, on main; the project's copy is the pin's tree.
 const tmp = scratchDir("twice-");
 const core = path.join(tmp, "core-repo");
 fs.mkdirSync(core);
 git(core, "init", "-q", "-b", "main");
-write(core, { "tasks/x.md": `# x\n\n${RULE}\n`, "docs/guide.md": GUIDE_OLD, "old/place.md": PLACE, "scripts/a.mjs": A, "scripts/b.mjs": B, "gone.md": `${"A file the core took out. ".repeat(6)}\n` });
+write(core, { "tasks/x.md": `# x\n\n${RULE}\n`, "docs/guide.md": GUIDE_OLD, "old/place.md": PLACE, "scripts/a.mjs": A, "scripts/b.mjs": B, "scripts/c.mjs": C, "scripts/c.json": `{ "v": 1 }\n`, "floor/security.md": FLOOR, "docs/safe.md": SAFE, "docs/extra.md": EXTRA, "gone.md": `${"A file the core took out. ".repeat(6)}\n` });
 git(core, "add", "-A"); git(core, "commit", "-qm", "earlier");
 const earlier = git(core, "rev-parse", "HEAD");
 fs.rmSync(path.join(core, "gone.md"));
@@ -56,7 +60,7 @@ function project(name) {
   execFileSync("tar", ["-x", "-f", "-", "-C", (fs.mkdirSync(path.join(dir, "core")), path.join(dir, "core"))], { input: execFileSync("git", ["archive", pin], { cwd: core }) });
   write(dir, {
     "core-manifest.md": `# The core manifest\n\nCore: ${CORE} at ${pin}, copied whole under core/\n`,
-    "AGENTS.md": `# The project\n\n${NEAR}\n\n${OTHER}\n\n${TWICE}\n\n${BEGIN}\n${RULE}\n${END}\n`,
+    "AGENTS.md": `# The project\n\n${NEAR}\n\n${OTHER}\n\n${TWICE}\n\n${BEGIN}\n${RULE}\n${END}\n\nSafety rules: \`docs/safe.md\`.\n`,
     "CLAUDE.md": `# Claude\n\n${TWICE}\n\nIt reads core/old/place.md, core/gone.md and core/tasks/x.md, and docs/guide.md.\n`,
     "SECURITY.md": `# Security\n\n${RULE}\n`,
     "README.md": `# Read me\n\nThe guide: [the guide](docs/guide.md); the old place: core/old/place.md.\n`,
@@ -66,6 +70,10 @@ function project(name) {
     "lib/a.mjs": A, "lib/b.mjs": B.replace("41", "42"),
     "run.mjs": `import { a } from "./tools/a.mjs";\nimport { a as c } from "./lib/a.mjs";\nconsole.log(a(), c());\n`,
     ".github/workflows/own.yml": WORKFLOW,
+    ".github/workflows/build.yml": "name: build\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node tools/a.mjs\n",
+    ".github/workflows/core-made.yml": "# The core's file: a workflow it holds whole.\nname: made\non: push\njobs:\n  read:\n    runs-on: ubuntu-latest\n    steps:\n      - run: cat docs/extra.md\n",
+    "floor/security.md": FLOOR, "docs/safe.md": SAFE, "docs/extra.md": EXTRA,
+    "tools/c.mjs": C, "tools/c.json": `{ "v": 2 }\n`,
     "reports/2026-11-01.md": `# A report\n\n${RULE}\n\nIt names core/gone.md.\n`,
   });
   return dir;
@@ -116,6 +124,9 @@ const fetched = ["--fetched", path.join(core, ".git"), "--since", earlier];
   ok(line(/^AGENTS\.md:3 reads close to core\/tasks\/x\.md:3 \(\d+% of its runs of words shared\), the core's text/u), "a rule that reads close to the core's is listed");
   ok(line(/^AGENTS\.md:7 is a copy of CLAUDE\.md:3, the project's own/u), "the same rule twice in the project's own files is listed");
   ok(!found.some(f => /AGENTS\.md:5\b|reports\/|AGENTS\.md:1[01]\b/u.test(f.line)), "a paragraph of its own, a dated record and the core's part of a rule file are not listed", found.map(f => f.line).join("\n"));
+  ok(line(/^floor\/security\.md .*the floor's text or a safety rule/u) && !line(/^floor\/security\.md/u).fix && line(/^docs\/safe\.md .*the floor's text or a safety rule/u) && !line(/^docs\/safe\.md/u).fix, "the floor's text, and a file the project's AGENTS.md calls a safety rule, never go, even byte for byte", close.join("\n"));
+  ok(line(/^tools\/c\.mjs .*names a file that would not stand beside the copy's/u) && !line(/^tools\/c\.mjs/u).fix, "code that reads a sibling through a template literal stays where the sibling differs", close.join("\n"));
+  ok(line(/^docs\/extra\.md .*\.github\/workflows\/core-made\.yml, which the script does not write, names it/u) && !line(/^docs\/extra\.md/u).fix, "a file a workflow of the core's names stays, since that pointer cannot be moved", close.join("\n"));
   ok(found.filter(f => f.fix).length === 6, "six are exact, the pointers moved counted one by one", exact.join("\n"));
 
   const fixed = run(dir, "--fix", ...fetched);
@@ -123,12 +134,35 @@ const fetched = ["--fetched", path.join(core, ".git"), "--since", earlier];
   const read = f => fs.existsSync(path.join(dir, f)) ? fs.readFileSync(path.join(dir, f), "utf8") : null;
   ok(read("docs/guide.md") === null && read("tools/a.mjs") === null && read("tools/b.mjs") === null && read("lib/a.mjs") === A, "the exact files went, and the one for the auditor stayed");
   ok(read("README.md").includes("[the guide](core/docs/guide.md)") && read("README.md").includes("core/new/place.md") && read("docs/notes.md").includes("[the guide](../core/docs/guide.md) and [again](../core/docs/guide.md)"), "their pointers moved, each in its form", read("README.md") + read("docs/notes.md"));
+  ok(read(".github/workflows/build.yml").includes("run: node core/scripts/a.mjs") && read("floor/security.md") === FLOOR && read("docs/safe.md") === SAFE, "a workflow of the project's own that runs code that went runs the copy's; the floor and a safety rule stay", read(".github/workflows/build.yml"));
   ok(read("run.mjs").includes(`from "./core/scripts/a.mjs"`) && read("run.mjs").includes(`from "./lib/a.mjs"`), "an import of code that went names the copy's", read("run.mjs"));
   ok(!read(".github/workflows/own.yml").includes("  two:") && read(".github/workflows/own.yml").includes("  three:"), "the second call went, the other stayed");
   ok(read("CLAUDE.md").includes("core/new/place.md") && read("CLAUDE.md").includes("core/gone.md") && read("CLAUDE.md").includes("core/docs/guide.md."), "a pointer moved, one to a file gone stays", read("CLAUDE.md"));
   ok(read("AGENTS.md") === before && read("reports/2026-11-01.md").includes("core/gone.md"), "no rule's text and no dated record is changed");
   const again = run(dir, ...fetched);
   ok(!/Exact, which/u.test(again.stdout) && /For the auditor/u.test(again.stdout), "run again it finds nothing exact left", again.stdout);
+}
+
+// A path that held other content at an earlier release moves only as it moved from the old pin, and the command the
+// report gives keeps the old pin, so --fix reads the same history.
+{
+  const hist = path.join(tmp, "hist-core");
+  fs.mkdirSync(hist);
+  git(hist, "init", "-q", "-b", "main");
+  const [CA, CB] = ["first", "second"].map(w => `${`The ${w} content that stood at old/check.json, long enough to be told apart. `.repeat(3)}\n`);
+  write(hist, { "old/check.json": CA }); git(hist, "add", "-A"); git(hist, "commit", "-qm", "release 1"); git(hist, "tag", "release-1");
+  fs.mkdirSync(path.join(hist, "new")); fs.renameSync(path.join(hist, "old/check.json"), path.join(hist, "new/a.json"));
+  write(hist, { "old/check.json": CB }); git(hist, "add", "-A"); git(hist, "commit", "-qm", "release 2"); git(hist, "tag", "release-2");
+  const since = git(hist, "rev-parse", "HEAD");
+  fs.renameSync(path.join(hist, "old/check.json"), path.join(hist, "new/b.json")); git(hist, "add", "-A"); git(hist, "commit", "-qm", "pin");
+  const at = git(hist, "rev-parse", "HEAD"), dir = path.join(tmp, "hist");
+  fs.mkdirSync(path.join(dir, "core"), { recursive: true });
+  execFileSync("tar", ["-x", "-f", "-", "-C", path.join(dir, "core")], { input: execFileSync("git", ["archive", at], { cwd: hist }) });
+  write(dir, { "core-manifest.md": `# The core manifest\n\nCore: ${CORE} at ${at}, copied whole under core/\n`, "CLAUDE.md": "# Claude\n\nIt reads core/old/check.json.\n" });
+  git(dir, "init", "-q", "-b", "main"); git(dir, "add", "-A");
+  const args = ["--fetched", path.join(hist, ".git"), "--since", since], r = run(dir, ...args);
+  ok(/core\/old\/check\.json, .*moved it unchanged to core\/new\/b\.json/u.test(r.stdout), "a path moves as it moved from the old pin, not as an older release moved other content", r.stdout);
+  ok(r.stdout.includes(`twice.mjs --fix --since ${since}\``), "the command the report gives keeps the old pin", r.stdout);
 }
 
 // Without the core fetched: what an earlier copy held is not found, and a pointer to a path left is listed alone.

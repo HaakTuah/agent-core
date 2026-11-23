@@ -38,7 +38,7 @@ export function closeness(a, b) {
 }
 
 // The project's own Markdown, as the text is compared: the core's part of a rule file blanked, its lines kept.
-function ownText(own, f) {
+export function ownText(own, f) {
   const t = own.read(f);
   if (t === null) return null;
   const b = t.indexOf(BEGIN), e = t.indexOf(END);
