@@ -83,6 +83,16 @@ function rulesetOf(host, rules) {
   return notGiven(`${none}it lacks ${lacks.join(", ")}`);
 }
 
+// Whether a workflow's triggers (`on`) start it on every pull request: no filter of branches or paths, and its types,
+// where given, holding the kit's opened and synchronize; any other is read only at its run.
+function onEveryPull(on) {
+  if (on === "pull_request" || (Array.isArray(on) && on.includes("pull_request"))) return true;
+  const pulls = on && typeof on === "object" && !Array.isArray(on) && Object.hasOwn(on, "pull_request") ? on.pull_request : undefined;
+  if (pulls === null) return true;
+  if (!pulls || typeof pulls !== "object" || Array.isArray(pulls) || !Object.keys(pulls).every(k => k === "types")) return false;
+  return pulls.types === undefined || (Array.isArray(pulls.types) && ["opened", "synchronize"].every(t => pulls.types.includes(t)));
+}
+
 // Whether the project's `security-review.yml` (`text`) calls the core's security review with `private: true` or
 // `advisory: false`, which makes it post its status in a private repository: true or false, as GitHub reads its YAML;
 // null where it is no YAML here, calls no such workflow, gives either input a value that is no plain boolean (an
@@ -94,13 +104,8 @@ function callsPosting(text) {
   const jobs = doc?.jobs && typeof doc.jobs === "object" && !Array.isArray(doc.jobs) ? doc.jobs : {};
   const calls = Object.values(jobs).filter(j => typeof j?.uses === "string" && /\/\.github\/workflows\/security-review\.yml@/.test(j.uses));
   if (!calls.length) return null;
-  // (it runs on every pull request only where the workflow starts on each one, with no filter of branches or paths and
-  // its types, where given, holding the kit's opened and synchronize, and where the job runs whatever a job it needs
-  // did: the kit's condition, or none and no job needed; any other is read only at its run)
-  const on = doc.on, pulls = on && typeof on === "object" && !Array.isArray(on) && Object.hasOwn(on, "pull_request") ? on.pull_request : undefined;
-  const everyPull = on === "pull_request" || (Array.isArray(on) && on.includes("pull_request")) || pulls === null
-    || (pulls && typeof pulls === "object" && !Array.isArray(pulls) && Object.keys(pulls).every(k => k === "types")
-      && (pulls.types === undefined || (Array.isArray(pulls.types) && ["opened", "synchronize"].every(t => pulls.types.includes(t)))));
+  const everyPull = onEveryPull(doc.on);
+  // (its job runs whatever a job it needs did: the kit's condition, or none and no job needed)
   const always = j => j.if === "${{ !cancelled() }}" || (j.if === undefined && j.needs === undefined);
   const said = calls.map(j => {
     const given = j.with && typeof j.with === "object" ? j.with : {};
