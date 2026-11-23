@@ -622,9 +622,17 @@ export function rowToken(text, label) {
   if (row === undefined) return null;
   const rest = row.slice(row.indexOf(label) + label.length), token = /`([^`]*)`/u.exec(rest);
   if (!token) return null;
-  const after = rest.slice(token.index + token[0].length).replace(/^[\s:|,;-]+|[\s|]+$/gu, "");
+  const after = trimTail(rest.slice(token.index + token[0].length).replace(/^[\s:|,;-]+/u, ""));
   return { said: token[1].trim(), reason: /[\p{L}\p{N}]/u.test(after) ? after : "" };
 }
+
+// `text` with its trailing spaces and table bars taken off, in one pass from its end (a pattern anchored at the end
+// alone would try each start in turn).
+const trimTail = text => {
+  let end = text.length;
+  while (end > 0 && /[\s|]/u.test(text[end - 1])) end -= 1;
+  return text.slice(0, end);
+};
 
 // Whether the manifest's *shape check* row turns the check off (tasks/code-shape.md, "Only the owner turns the shape
 // check off"; #1107, point 3): the reason given after a `none` that is the row's first text in backticks, "" where it
