@@ -1,13 +1,7 @@
-// Every writer of the core's and each of its own readers that reads what it wrote, by a round trip (#1108): from
-// projects the starter kit writes of each kind the upgrade test holds (npm at the root, npm in a folder for a game, NuGet
-// in a private repository as Windows holds it, its lines ending CRLF), each file the kit writes
-// read back by the core's YAML reader, its Markdown reader, the readers of the checks' configs, the manifest's readers,
-// the one process and the comparison with a fresh kit, each to the meaning the kit wrote; each baseline or record a
-// check or step writes in a project (copies, shape, the dose's audit, the project's own holders, the reading against
-// the core) written there and read back by its own reader; the inbox file the scheduled look writes read as the inbox
-// reads it; and a sync's new pin and moved calls read back. Then the list: each script of the core that writes a file
-// is a writer here, with where its round trip stands, or named with why it writes nothing a reader of the core reads
-// in a project. Git and Node's own modules, and the core's packages its readers need.
+// Every writer of the core's and each of its readers that reads what it wrote, by a round trip (#1108): in projects the
+// kit writes of each kind the upgrade test holds, each file the kit, a check, a step or a sync writes is read back by each
+// reader of the core's that reads it, to the meaning written. Then the list: each script that writes a file is a writer
+// here, with where its round trip stands, or named with why no reader of the core reads it in a project.
 //
 //   node tests/round-trip-test.mjs
 import fs from "node:fs";
@@ -36,7 +30,7 @@ const { ok, done } = tally();
 
 // ---- the list: each script that writes a file, and where its round trip stands ----
 // `here`: this test; else the test that holds it. Each is read back by the reader named.
-export const WRITERS = {
+const WRITERS = {
   "init.mjs": ["here", "the starter kit's files, read by the YAML, Markdown and JSON readers, the manifest's, the configs', the one process and the fresh comparison"],
   "converge.mjs": ["here", "the one process's files, the kit's as it renders them, which its own plan reads back as nothing to write"],
   "sync.mjs": ["here", "the manifest's Core: line and the calls' pins, read by the manifest's reader and the calls' reader"],
@@ -51,13 +45,14 @@ export const WRITERS = {
   "strength.mjs": ["tests/strength-test.mjs", "the strength baseline --whole and --lower write, read by the check"],
 };
 // The scripts that write a file no reader of the core reads in a project, each with why.
-export const ELSEWHERE = {
+const ELSEWHERE = {
   "agent-tools-scratch.mjs": "a scratch project for a test", "stage-helpers.mjs": "a test's stage", "steps-kit.mjs": "a test's kit project",
   "licence-scan-stage.mjs": "a test's stage", "nuget-gate-scratch.mjs": "a test's scratch project", "scratch-core.mjs": "a test's scratch folders",
   "check.mjs": "the verdicts, to a file outside every repository, read by release-trial.mjs in the core",
   "checks.mjs": "a job's output (GITHUB_OUTPUT)", "install.mjs": "a job's environment (GITHUB_ENV)", "select.mjs": "a job's output",
   "tests-parts.mjs": "a job's output", "lookup.mjs": "a job's summary", "look.mjs": "a job's output and summary",
-  "workflow-run.mjs": "a workflow's run for a test, into its scratch folder",
+  "workflow-run.mjs": "a workflow's run for a test, into its scratch folder", "workflow-install.mjs": "an install set aside for a test's runner",
+  "attached.mjs": "a link to the packages, for a verdict run",
   "code-scan.mjs": "a scan's files in a temporary folder", "hostile.mjs": "files in a temporary folder", "links.mjs": "a temporary folder",
   "workflows.mjs": "a temporary folder", "pure-sync.mjs": "the base it renders, in a temporary folder",
   "core-moved.mjs": "an issue's text, handed to gh", "helper-call.mjs": "a helper's mark, read by nothing of a project's",
@@ -69,7 +64,7 @@ export const ELSEWHERE = {
 };
 // (and every staged case, which writes its scratch project: scripts/staged/)
 const STAGED = "staged/";
-const WRITES = /\b(?:writeFileSync|appendFileSync|writeFile|createWriteStream)\s*\(/u;
+const WRITES = /\b(?:writeFileSync|appendFileSync|writeFile|createWriteStream|copyFileSync|cpSync|symlinkSync|linkSync)\s*\(/u;
 const scripts = dir => fs.readdirSync(path.join(root, dir), { withFileTypes: true })
   .flatMap(e => e.isDirectory() ? scripts(path.posix.join(dir, e.name)) : e.name.endsWith(".mjs") ? [path.posix.join(dir, e.name)] : []);
 const writing = scripts("scripts").filter(f => WRITES.test(fs.readFileSync(path.join(root, f), "utf8"))).map(f => f.slice("scripts/".length));
@@ -152,6 +147,14 @@ for (const c of CASES) {
   ok(at.unread.length === 0 && at.licences === KIT_CONFIGS.licences && at.copies === KIT_CONFIGS.copies && at.sizes === KIT_CONFIGS.sizes && at.baseline === KIT_CONFIGS.baseline && at.audit === KIT_CONFIGS.audit,
     `${o.name}: the configs' readers find each config where the kit wrote it`, JSON.stringify(at));
   ok(at.packages === (o.packages ?? undefined) || (o.packages === undefined && at.packages === null), `  the signature check's folder read as the kit was given it`, `${at.packages} / ${o.packages}`);
+  // each config read by the check that reads it: the licence check (its config and the audit it names), the agent tools'
+  // (the tools' settings and hooks the kit writes: .claude/settings.json, .codex/hooks.json, .kiro/hooks/) and the size marks'
+  for (const [script, file, what] of [["licences.mjs", at.licences, "the licence check reads its config and the audit it names"],
+    ["agent-tools.mjs", at.licences, "the agent tools' check reads the tools' settings and hooks the kit wrote, each listed"],
+    ["reading-size.mjs", at.sizes, "the size marks' check reads its marks"]]) {
+    const read = run(p.dir, `core/scripts/${script}`, file);
+    ok(read.status === 0, `  ${what}`, read.out);
+  }
 
   // the manifest's readers: the kit's options, its pin, its copy, its modules
   const k = kind(held);
@@ -190,7 +193,7 @@ for (const c of CASES) {
   ok(shape.status === 0 && shapeRead.status === 0 && baseline, `  the shape baseline written is read by the shape check and its reader`, `${shape.out}\n${shapeRead.out}\n${why}`);
   ran.add("shape.mjs");
   const dose = run(p.dir, "core/scripts/dose.mjs", "--audited");
-  let r = null;
+  let r = null; why = "";
   try { r = reading(held.manifest, p.dir); } catch (e) { why = e.message; }
   const last = auditOf(r?.baseline?.audited);
   ok(dose.status === 0 && last !== null && last.listed === r.listed && last.read === r.read && run(p.dir, "core/scripts/shape.mjs", "checks/shape.json").status === 0,
@@ -202,10 +205,11 @@ for (const c of CASES) {
   ok(holders.status === 0 && key && h.wrong.length === 0 && h.list, `  the project's own holders written are read back, its own rule named`, `${holders.out}\n${JSON.stringify(h.wrong)}`);
   ran.add("holders-own.mjs");
   const recorded = run(p.dir, "core/scripts/core-reading.mjs", "--recorded");
-  const record = recordOf(fs.readFileSync(path.join(p.dir, "checks/core-reading.json"), "utf8"));
+  let record = null;
+  try { record = recordOf(fs.readFileSync(path.join(p.dir, "checks/core-reading.json"), "utf8")); } catch (e) { why = e.message; }
   const due = run(p.dir, "core/scripts/core-reading.mjs");
-  ok(recorded.status === 0 && record?.day === last?.day && record.marks.size > 0 && due.status === 0 && /^No reading of the project against the core is due/mu.test(due.out),
-    `  the reading against the core recorded is read back: nothing is due`, `${recorded.out}\n${due.out}`);
+  ok(recorded.status === 0 && record?.day === last?.day && record?.marks?.size > 0 && due.status === 0 && /^No reading of the project against the core is due/mu.test(due.out),
+    `  the reading against the core recorded is read back: nothing is due`, `${recorded.out}\n${due.out}\n${why}`);
   ran.add("core-reading.mjs");
   first ??= p;
 }

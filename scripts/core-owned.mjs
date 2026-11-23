@@ -19,6 +19,7 @@ export const OWN = new Set(["core-manifest.md", "SECURITY.md", "docs/threat-mode
 const WHOLE = [".github/dependabot.yml", ".github/ISSUE_TEMPLATE/bug_report.md", ".github/ISSUE_TEMPLATE/feature_request.md", ".claude/settings.json", ".codex/hooks.json", ".kiro/steering/core.md", ".kiro/hooks/work-saved.json", ".agents/rules/core.md"];
 export const whole = to => /^\.github\/workflows\/[^/]+\.yml$/u.test(to) || WHOLE.includes(to);
 
+// line ends alone never count, as git makes them one: safe while every whole file is YAML, JSON or Markdown
 export const lf = t => t.replace(/\r\n/gu, "\n");
 // (a file as the comparison reads it: its line ends made one, the core's mark taken out and every pin made one, since
 // the sync and Dependabot move pins)

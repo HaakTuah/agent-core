@@ -77,8 +77,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   audit (#259) and a change to a rule that keeps its meaning (#886, point 2) join without the owner's word: the design
   check of the PR that builds such a change states it, as `roles/shared/review-guidelines.md` says of the floor ("A
   change that keeps the meaning is stated so"), and where it does not, that PR waits for the owner's yes, held for the
-  floor and the guidelines by `scripts/meaning-kept.mjs` and for any other rule by nothing yet. A bug waits for no
-  line, as that module says. A line does not leave in the PR that closes its issue: the readers of the file skip the
+  floor and the guidelines by `scripts/meaning-kept.mjs` and for any other rule by nothing yet. A line does not leave in the PR that
+  closes its issue: the readers of the file skip the
   line of a closed issue, and the next PR that changes the file takes such lines out together (`node scripts/queue.mjs
   --clear`; #750, point 1), as that module says, since PRs merging side by side collided on it. Held here by `own-description.yml`, which fails a ready PR that changes the
   file and leaves one.
@@ -153,14 +153,10 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that say the mend, the labels and the queue, the daily look and the monthly state report, which lists the core
   beside the projects. Its audit and cleaning share is set by the state its own code is in, as any project's is, and
   the staged cases run on its repository. An issue here is done only when the core's own repository meets it.
-- **Whoever builds a change finishes it,** the design session and a builder alike: the branch, the draft PR and the
-  push after every commit, then ready, its reviews, their findings fixed and the merge, as `roles/shared/work-flow.md`
+- **Whoever builds a change finishes it,** the design session and a builder alike, as `roles/shared/work-flow.md`
   says ("Git and GitHub", and point 1). A PR that changes a rule says what it changes in every project.
 - **Every PR gets Codex's code and security reviews,** save one of queue lines alone that `scripts/queue-only.mjs`
-  proves (floor rule 8; `tasks/reviews.md`, point 3); one that changes the floor or the review guidelines needs the
-  owner's yes in it, save one that keeps the meaning as floor rule 3 says: that of its queued issue ("Queued
-  means wanted"), or, for one that goes beyond it, a new yes, for which it waits unmerged while its builder takes the
-  next line.
+  proves (floor rule 8; `tasks/reviews.md`, point 3).
 - **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`).
   By default what a role reads at its start, as its file under `roles/` names it, stays under that role's cap, so
   whoever adds a rule there replaces text. Where a fresh session has read all the rules for room and found too little,
