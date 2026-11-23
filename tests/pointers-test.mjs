@@ -1,5 +1,6 @@
 // Checks the pointer check (scripts/pointers.mjs) on a small project made for it: its rule files with either
-// line ending, a pointer that leads nowhere, a project with no SECURITY.md yet, and its agent tools' files. Run by the
+// line ending, a pointer that leads nowhere, a project with no SECURITY.md yet, its agent tools' files, and the names in
+// its descriptions (scripts/names.mjs). Run by the
 // core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/pointers-test.mjs
@@ -18,7 +19,7 @@ const here = fileURLToPath(new URL("../scripts/", import.meta.url));
 // record of the install and the package itself, from the core's own install, which its tests' job runs)
 const carry = core => {
   fs.mkdirSync(path.join(core, "scripts"), { recursive: true });
-  for (const f of ["pointers.mjs", "links.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(core, "scripts", f));
+  for (const f of ["pointers.mjs", "links.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "names.mjs"]) fs.copyFileSync(path.join(here, f), path.join(core, "scripts", f));
   for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/marked"]) fs.cpSync(path.join(here, "../.packages", f), path.join(core, ".packages", f), { recursive: true });
 };
 const FILES = {
@@ -166,6 +167,62 @@ try {
     ok(t.status === 0 && !/EISDIR/.test(t.out), "a link to a folder in a tool's folder is passed over, failing nothing", t.out);
   }
 } finally { fs.rmSync(tools, { recursive: true, force: true }); }
+// the names in the descriptions (#460, point 4): a file's name or a package script's that stands nowhere fails where
+// the pull request's base did not hold it, is noted where it did (or its list held it), and with no base; a name the
+// check cannot resolve exactly is left alone
+const desc = scratchDir("pointers-test-names-");
+try {
+  const put = (f, body) => { fs.mkdirSync(path.join(desc, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(desc, f), body); };
+  const g = (...args) => execFileSync("git", args, { cwd: desc, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  const commit = () => { g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "c"); return g("rev-parse", "HEAD").trim(); };
+  for (const [f, body] of Object.entries(FILES)) put(f, body);
+  carry(path.join(desc, "core"));
+  put("src/app.ts", "export const report = 'out/report.json', record = 'records/log.json';\n");
+  put("package.json", JSON.stringify({ scripts: { build: "tsc" } }));
+  put(".gitignore", "out/\n");
+  const OLD = "# A project\n\nRun `npm run build`; the code is `src/app.ts` (or `app.ts`), and it was `src/old.ts`.\n";
+  put("README.md", OLD);
+  g("init", "-q");
+  const base = commit();
+  const check = (env = {}, args = []) => { const r = spawnSync(process.execPath, [path.join(desc, "core/scripts/pointers.mjs"), ...args], { cwd: desc, encoding: "utf8", env: { ...process.env, POINTERS_BASE: "", ...env } }); return { status: r.status, out: r.stdout + r.stderr }; };
+  let t = check();
+  ok(t.status === 0 && /^note a name in a description that stands nowhere: README\.md:3: `src\/old\.ts` names no file the project tracks \(with no base to read against, so it fails nothing/m.test(t.out) && !/`src\/app\.ts`|`app\.ts`|npm run build/.test(t.out), "with no base, a name that stands nowhere is noted and fails nothing, and the names that stand pass", t.out);
+  t = check({ POINTERS_BASE: base });
+  ok(t.status === 0 && /^note a name in a description that stands nowhere: README\.md:3: `src\/old\.ts` .*the pull request's base held it/m.test(t.out), "one the pull request's base held is noted, and fails nothing", t.out);
+  put("README.md", `${OLD}\nNow \`npm run lint\` checks \`lib/gone.ts\` and \`gone.ts\`.\n\nLeft alone: \`npm run lint -w a\`, \`notes.xyz\`, \`src/*.ts\`, \`node src/new.ts\`, \`<file>.ts\`; standing elsewhere: \`out/report.json\` (ignored) and \`records/log.json\` (the code names it).\n`);
+  commit();
+  t = check({ POINTERS_BASE: base });
+  ok(t.status === 1 && mended(t.out) && /^FAIL: a broken pointer: README\.md:5: `npm run lint` names no script of the package file at the project's root\. Mend: /m.test(t.out) && /^FAIL: a broken pointer: README\.md:5: `lib\/gone\.ts` names no file/m.test(t.out) && /^FAIL: a broken pointer: README\.md:5: `gone\.ts` names no file/m.test(t.out)
+    && !/FAIL.*(old\.ts|-w a|notes\.xyz|\*|new\.ts|<file>|report\.json|log\.json)/.test(t.out) && /README\.md:3: `src\/old\.ts` .*base held it/.test(t.out),
+    "a name the base did not hold fails, a file's or a package script's, with its mend; one it held is still noted, and a name it cannot resolve exactly, one git ignores and one the code names pass", t.out);
+  // (the list: written once, it is what the base holds; it is only lowered, never grown)
+  t = check({}, ["--write-names"]);
+  const list = () => JSON.parse(fs.readFileSync(path.join(desc, "checks/names.json"), "utf8")).names.map(x => x.name).sort().join(",");
+  ok(t.status === 0 && list() === "`gone.ts`,`lib/gone.ts`,`npm run lint`,`src/old.ts`".replaceAll("`", ""), "--write-names writes the list of the names that stand nowhere", t.out);
+  put("README.md", OLD.replace("`src/old.ts`", "`src/new.ts`") + "\nAs `lib/gone.ts` and `npm run lint` say.\n");
+  t = check({}, ["--write-names"]);
+  ok(t.status === 0 && list() === "lib/gone.ts,npm run lint", "written again, it keeps of its names those that still stand nowhere and adds none", list());
+  const listed = commit();
+  put("README.md", `${OLD.replace("`src/old.ts`", "`src/new.ts`")}\nAs \`lib/gone.ts\`, \`npm run lint\` and \`docs/gone.md\` say.\n`);
+  put("src/new.ts", "export {};\n");
+  commit();
+  t = check({ POINTERS_BASE: listed });
+  ok(t.status === 1 && /^FAIL: a broken pointer: README\.md:5: `docs\/gone\.md`/m.test(t.out) && /^note .*`lib\/gone\.ts` .*base held it/m.test(t.out) && /^note .*`npm run lint` .*base held it/m.test(t.out), "where the base holds a list, a name it lists is noted and one it does not fails", t.out);
+  // (the manifest's row *descriptions* names what is read: a folder's Markdown files; one naming none is said)
+  put("docs/guide.md", "# Guide\n\nSee `src/older.ts`.\n");
+  put("core-manifest.md", "# Manifest\n\n| Slot | Value |\n| --- | --- |\n| *descriptions* | `docs/` |\n");
+  g("add", "-A");
+  t = check();
+  ok(t.status === 0 && /`src\/older\.ts`/.test(t.out) && !/README\.md:5/.test(t.out), "the manifest's row *descriptions* names what is read, a folder's Markdown files among it", t.out);
+  put("core-manifest.md", "# Manifest\n\n| Slot | Value |\n| --- | --- |\n| *descriptions* | the project's README and `AGENTS.md` |\n");
+  g("add", "-A");
+  t = check();
+  ok(t.status === 0 && /^note .*README\.md:\d+: `lib\/gone\.ts`/m.test(t.out) && !/`src\/older\.ts`/.test(t.out), "the row as the starter kit writes it, \"the project's README\" outside code marks, reads the README at the root", t.out);
+  put("core-manifest.md", "# Manifest\n\n| Slot | Value |\n| --- | --- |\n| *descriptions* | the rulebook |\n");
+  g("add", "-A");
+  t = check();
+  ok(t.status === 0 && /^note the manifest's row \*descriptions\* names no tracked file or folder in code marks, nor the README, so no names in the descriptions were read/m.test(t.out), "a row that names no tracked file reads none, and says so", t.out);
+} finally { fs.rmSync(desc, { recursive: true, force: true }); }
 // the core's own run: there it fails
 const coreDir = scratchDir("pointers-test-core-");
 try {
@@ -200,6 +257,16 @@ try {
   const backwards = core("tasks/a.md", "# A module\n\nAs core archive 1 to 0 says.\n");
   ok(backwards.status === 1 && /core archive 1 to 0/.test(backwards.out), "a range written backwards leads nowhere, and is named", backwards.out);
   put("tasks/a.md", "# A module\n\nNothing cited.\n");
+  // (the core's description is its README: a name under core/ is the core's own, one under a folder it does not hold a
+  // project's, left alone, and one that stands nowhere fails)
+  const readme = core("README.md", "# The core\n\nIt holds `core/tasks/a.md` and `floor/topics.md`; a project holds `docs/PROGRESS.md`.\n");
+  ok(readme.status === 0 && /and [1-9]\d* names in the descriptions lead somewhere/.test(readme.out), "in the core's own run its README's names are read: core/ is the core, and a folder it does not hold a project's", readme.out);
+  const gone = core("README.md", "# The core\n\nIt holds `tasks/b.md`.\n");
+  ok(gone.status === 1 && mended(gone.out) && /FAIL: a broken pointer: README\.md:3: `tasks\/b\.md` names no file the project tracks\. Mend: /.test(gone.out), "and a name there that stands nowhere fails", gone.out);
+  fs.rmSync(path.join(coreDir, "README.md"));
+  execFileSync("git", ["add", "-A"], { cwd: coreDir, stdio: "ignore" });
+  const listless = spawnSync(process.execPath, [path.join(coreDir, "scripts/pointers.mjs"), "--core", "--write-names"], { cwd: coreDir, encoding: "utf8" });
+  ok(listless.status === 1 && mended(listless.stdout + listless.stderr), "the core keeps no list of names", listless.stdout + listless.stderr);
   // (the core's own agent tools' files are read too, and there a broken pointer fails)
   const steering = core(".agents/rules/core.md", "# The core, for a tool\n\nAs \"Running it\" in `tasks/a.md` says.\n");
   ok(steering.status === 1 && mended(steering.out) && /FAIL: a broken pointer: \.agents\/rules\/core\.md:3: "running it" is no heading/.test(steering.out), "in the core's own run an agent tool's file is read, and a broken pointer in it fails", steering.out);
