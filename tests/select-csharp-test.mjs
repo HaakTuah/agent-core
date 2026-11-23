@@ -127,6 +127,9 @@ if (started(import.meta.url)) {
   const escaped = ["namespace App; class @namespace {} class C { @namespace field; } delegate void D();\n", "@namespace x = null;\nnamespace App { delegate void D(); }\nclass @namespace {}\n", "namespace App { class C { void M() { @namespace.@namespace.Go(); } } delegate void D(); }\nclass @namespace {}\n"]
     .map(s => !!one(s, { "tests/T.cs": "using App;\nclass T { D d; }\n" }).links.get("tests/T.cs")?.has("src/X.cs"));
   ok(same(escaped, [true, true, true]), "an escaped @namespace heads no namespace: not in a type, not as a statement, not after a dot", JSON.stringify(escaped));
+  const chars = ["namespace App { namespace Data { class C { char c = '}'; } delegate void D(); } }\n", "namespace App.Data { class C { char c = '('; } delegate (int X, int Y) D(); }\n"]
+    .map(s => !!one(s, { "tests/T.cs": "class T { App.Data.D d; }\n" }).links.get("tests/T.cs")?.has("src/X.cs"));
+  ok(same(chars, [true, true]), "a character literal is no brace or bracket to the scans", JSON.stringify(chars));
   const propsRead = csharpReach({ ...globals, "tests/Tests.csproj": PROJ, "Directory.Build.props": "<Project><ItemGroup><Using Include=\"App\" /></ItemGroup></Project>" }, undefined, nothing);
   ok(propsRead.links.get("tests/RulesTest.cs")?.has("src/Rules.cs"), "a .props file the config reads is read for its <Using> too", JSON.stringify([...propsRead.links].map(([f, to]) => [f, [...to]])));
   const aliased = csharpReach({ ...app, "src/Usings.cs": "global using S = App.Data.Store;\n", "tests/AliasTest.cs": "namespace Tests;\nclass AliasTest { S s; }\n" }, undefined, nothing);

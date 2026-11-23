@@ -108,7 +108,7 @@ function pairs(toks) {
 // those around it, and a file-scoped one's to the end. Each scan goes on where the last stopped (pairs): linear in the
 // tokens, and a namespace's full name is made once, where a delegate stands in it.
 function delegates(r) {
-  const toks = r.toks ?? [], out = [], within = namespaces(toks, new Set(r.namespaces));
+  const toks = r.toks, out = [], within = namespaces(toks, new Set(r.namespaces));
   for (let i = 0; i < toks.length; i++) {
     const next = within.step(i);
     if (next !== i) { i = next; continue; }
@@ -196,13 +196,17 @@ const reflecting = (toks, words) => words.some(w => REFLECTS.has(w))
   || toks.some((k, i) => k.t === "id" && /Assembl(y|ies)/u.test(word(k)) && !hookWord(word(k)) && !hookOf(toks, i))
   || toks.some((k, i) => k.v === "GetType" && toks[i + 1]?.v === "(" && toks[i + 2]?.v !== ")");
 
+const LITERAL = { t: "str", v: "" };
+
 // What a file holds that bears on its reach: its own namespaces, the namespaces its types stand in, its words, its runs
 // of dotted words, its using directives, and whether it declares extension members, runs with no name, reads types by
 // reflection, is of top-level statements, was lost by the grammar (unread: what it declares is not known either), or
 // holds code the tokens leave out (a raw interpolated string's holes; any `$"""` counts, a comment's
-// too).
-function factsOf(r, src) {
-  const toks = r.toks ?? [], words = ids(toks), placed = new Set(r.namespaces);
+// too). A character literal's token keeps its character ('}'), which no scan here takes for punctuation: each reads
+// the tokens with every literal's value emptied.
+function factsOf(read, src) {
+  const toks = (read.toks ?? []).map(k => (k.t === "str" ? LITERAL : k)), r = { ...read, toks };
+  const words = ids(toks), placed = new Set(r.namespaces);
   if (!r.namespaces.length || r.types.some(t => !t.includes("."))) placed.add("");
   return { r, words: new Set(words), ...runsOf(toks), placed: [...placed], extensions: extending(toks), hook: runsUnnamed(toks, words),
     reflects: reflecting(toks, words), unread: r.usings === null || r.functions === null, raw: RAW.test(src), program: topLevel(toks) };
