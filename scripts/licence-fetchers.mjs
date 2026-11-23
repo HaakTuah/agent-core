@@ -50,14 +50,17 @@ export const WINDOWS_FETCHER = (() => {
 // Each fetch in text by a fetcher the scan cannot read, as the two readers above find them: their matches, each place
 // once, in the order they stand.
 const matches = (text) => [...new Map([OTHER_FETCHER, WINDOWS_FETCHER].flatMap((re) => [...text.matchAll(new RegExp(re.source, `${re.flags}g`))]).map((m) => [m.index, m])).values()].sort((a, b) => a.index - b.index);
-// The line in text that holds the place i, with the lines it runs on to (after a "\\" or PowerShell's "`" at a line's end).
+// The line in text that holds the place i, with the lines that run on to it and those it runs on to (after a "\\" or
+// PowerShell's "`" at a line's end).
 function runOn(text, i) {
-  let end = text.indexOf("\n", i);
-  while (end !== -1 && /[\\`]\r?$/u.test(text.slice(text.lastIndexOf("\n", end - 1) + 1, end))) end = text.indexOf("\n", end + 1);
-  return text.slice(text.lastIndexOf("\n", i - 1) + 1, end === -1 ? text.length : end);
+  const goesOn = (line) => /[\\`]\r?$/u.test(line);
+  let start = text.lastIndexOf("\n", i - 1), end = text.indexOf("\n", i);
+  while (start > 0 && goesOn(text.slice(text.lastIndexOf("\n", start - 1) + 1, start))) start = text.lastIndexOf("\n", start - 1);
+  while (end !== -1 && goesOn(text.slice(text.lastIndexOf("\n", end - 1) + 1, end))) end = text.indexOf("\n", end + 1);
+  return text.slice(start + 1, end === -1 ? text.length : end);
 }
 /** Each fetch in text by a fetcher the scan cannot read, in the order they stand: the line it stands in and the lines
- *  it runs on to, spaces run together, so that one fetch is told from another by its source and its words
+ *  that run on to it or it runs on to, spaces run together, so that one fetch is told from another by its source and its words
  *  (licence-scan.mjs's `unaudited`). A source held in a variable set on another line is not part of it. */
 export const otherFetches = (text) => matches(text).map((m) => runOn(text, m.index + Math.max(0, m[0].search(/\S/u))).replace(/\s+/gu, " ").trim());
 // The fetchers among those that download a file by its address, a program among them: curl and wget, and PowerShell's.

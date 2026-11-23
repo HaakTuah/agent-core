@@ -149,8 +149,8 @@ function fetches(c, text, f, literal = false) {
   if (!byHand(c, f)) c.others.push(...otherFetches(text));
 }
 
-// The fetches `found` in the file `f` that the scan cannot read and no entry audits (byKind), each its line and the
-// lines it runs on to, fail, but where each stood word for word at the pull request's base, unaudited by the base's own
+// The fetches `found` in the file `f` that the scan cannot read and no entry audits (byKind), each its line with those
+// that run on to it or it runs on to, fail, but where each stood word for word at the pull request's base, unaudited by the base's own
 // audit, which are reported (AGENTS.md, "Nothing locks a project": a reader that reads more turns no file red that
 // stood; #1074); with no base, as in a run by hand, they fail. A fetch changed, or added, fails: the base allows what
 // it held, not as many others. A source held in a variable set on another line is not read, as `heldAtBase` reads none.
