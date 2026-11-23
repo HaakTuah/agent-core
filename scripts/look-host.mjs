@@ -10,13 +10,14 @@ import { staleFinding } from "./look-checks.mjs";
 
 // What GitHub answers for the repository, read once in a project (host.mjs), with the record as this run writes it, so
 // the steps that read the record (330, 600, 820) read this run; and, in GitHub's job, the labels of the core's list made
-// first, each write refused said: { host (null where it was not read), refused }.
-export function hostOf(ctx, reach) {
+// first, each write refused said: { host (null where it was not read), refused }. `gh` and `ask` are labels.mjs's and
+// host.mjs's ways to GitHub, or a test's stand-ins.
+export function hostOf(ctx, reach, { gh = ghApi, ask, root = process.cwd() } = {}) {
   const { repo, manifest, job, dry, at, say } = ctx, refused = [];
-  if (job && !dry && reach.yes) { try { makeLabels(repo, ghApi, () => {}); } catch (e) { refused.push(refusal("The labels of the core's list", e, "issues: write")); } }
+  if (job && !dry && reach.yes) { try { makeLabels(repo, gh, say); } catch (e) { refused.push(refusal("The labels of the core's list", e, "issues: write")); } }
   refused.forEach(r => say(r));
   if (manifest === null) return { host: null, refused };
-  try { return { host: readHost(project(process.cwd()), repo, { reach, record: { body: recordBody({ ...ctx, hostRead: at }) }, at, looking: true }), refused }; } catch { return { host: null, refused }; }
+  try { return { host: readHost(project(root), repo, { ...(ask ? { ask } : {}), reach, record: { body: recordBody({ ...ctx, hostRead: at }) }, at, looking: true }), refused }; } catch (e) { say(`The host was not read here (${e?.name ?? "an error"} in core/scripts/host.mjs), so the steps read on it are left out of this run.`); return { host: null, refused }; }
 }
 
 // What the look finds, kind by kind, each { title, what, unread }; and `stepsLeft`, the count of a release's steps not

@@ -74,13 +74,22 @@ export function scanning(p, h) {
   const on = bodyOf(h.repo, "the repository").security_and_analysis ?? {};
   const states = ["secret_scanning", "secret_scanning_push_protection"].map(k => on[k]?.status);
   if (states.some(s => s !== "enabled" && s !== "disabled")) throw new Unread("GitHub shows secret scanning to the repository's admins alone, or the repository has none");
-  return states.every(s => s === "enabled") ? null : `Secret scanning or its push protection is off: the owner switches both on (Settings, Advanced Security${where(h) ? `: ${where(h)}settings/security_analysis` : ""}), in the sitting of \`core/scripts/owner-settings.mjs\`, or declares in the manifest's "Differences" that the owner does not want it.`;
+  if (states.every(s => s === "enabled")) return null;
+  const page = `Settings, Advanced Security${where(h) ? `: ${where(h)}settings/security_analysis` : ""}`;
+  // (floor topic 9: in a public repository, where GitHub gives it free, a session may switch it on; in a private one,
+  // where it may be billed, the owner alone)
+  return bodyOf(h.repo, "the repository").private === false
+    ? `Secret scanning or its push protection is off in this public repository, where GitHub gives it free: a session whose sign-in may change the repository's settings switches both on (${page}; \`core/floor/topics/weaknesses.md\`, topic 9), or else files it for the owner, labelled \`needs-owner\`.`
+    : `Secret scanning or its push protection is off: the owner switches both on (${page}), in the sitting of \`core/scripts/owner-settings.mjs\`, or declares in the manifest's "Differences" that the owner does not want it.`;
 }
 
 // Step 560: no account the call to `security-review.yml` names in `reviewers` is one the host lets write
 // (security-review.mjs's writersOf, from `h.rights`, each login's answer).
+// The accounts the project's calls to the core's security-review.yml name in `reviewers`, as written (host.mjs reads
+// their rights by these).
+export const reviewersNamed = p => [...new Set(given(p, "security-review.yml", "reviewers").flatMap(({ value }) => reviewersOf(value)))];
 export function reviewers(p, h) {
-  const named = [...new Set(given(p, "security-review.yml", "reviewers").flatMap(({ value }) => reviewersOf(value)))];
+  const named = reviewersNamed(p);
   const unread = named.filter(n => !(h.rights?.[n.toLowerCase()] && "body" in h.rights[n.toLowerCase()]));
   if (unread.length) throw new Unread(`GitHub gave no answer on the rights of ${unread.length} account${unread.length === 1 ? "" : "s"} the call names`);
   const writers = writersOf(named.map(n => h.rights[n.toLowerCase()].body));

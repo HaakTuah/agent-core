@@ -3,4 +3,4 @@
 import { COST } from "../step-checks.mjs";
 import { scanning } from "../step-checks-host.mjs";
 
-export default { lead: "16 November 2026, secret scanning with push protection", cost: COST.owner, owner: true, host: scanning };
+export default { lead: "16 November 2026, secret scanning with push protection", cost: COST.read, host: scanning };

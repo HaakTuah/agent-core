@@ -13,6 +13,7 @@ import { hostReport, hostSteps, readHost, refusal, settingsOf, settingsTask } fr
 import { LIST, makeLabels } from "../scripts/labels.mjs";
 import { BOT, RECORD, lastRun, recordBody } from "../scripts/look-keep.mjs";
 import { Unread } from "../scripts/workflow-calls.mjs";
+import { hostOf } from "../scripts/look-host.mjs";
 import { HOST_READ, LOOKED, correction, daily, hostRead, inbox, labels, lookedUp, privateReview, reviewers, scanning } from "../scripts/step-checks-host.mjs";
 import { STEPS, notDone, project } from "../scripts/steps.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -80,8 +81,9 @@ const reviewRule = { type: "required_status_checks", parameters: { required_stat
 // ---- step 390: secret scanning ----
 {
   const p = project(scratch()), on = s => ({ name: "o/r", repo: { body: { security_and_analysis: { secret_scanning: { status: s }, secret_scanning_push_protection: { status: "enabled" } } } } });
-  ok(scanning(p, on("enabled")) === null && /the owner switches both on.*o\/r\/settings\/security_analysis/.test(scanning(p, on("disabled")) ?? "") && unread(() => scanning(p, { repo: { body: {} } })),
-    "step 390: on is done; off is the owner's, with its link; shown to admins alone, it is not read");
+  const pub = s => { const h = on(s); h.repo.body.private = false; return h; };
+  ok(scanning(p, on("enabled")) === null && /the owner switches both on.*o\/r\/settings\/security_analysis/.test(scanning(p, on("disabled")) ?? "") && /a session whose sign-in may change the repository's settings switches both on.*topic 9/.test(scanning(p, pub("disabled")) ?? "") && unread(() => scanning(p, { repo: { body: {} } })),
+    "step 390: on is done; off is a session's in a public repository (floor topic 9) and the owner's otherwise, with its link; shown to admins alone, it is not read");
 }
 
 // ---- step 560: the accounts `reviewers` names ----
@@ -161,6 +163,23 @@ const reviewRule = { type: "required_status_checks", parameters: { required_stat
   let said = null;
   try { makeLabels("o/r", (...a) => { if (a[0] === "-X") throw new Error("gh: Resource not accessible by integration (HTTP 403)"); return "[]"; }, () => {}); } catch (e) { said = refusal("The labels of the core's list", e, "issues: write"); }
   ok(/answered 403/.test(said ?? "") && /`issues: write`/.test(said ?? "") && !/integration/.test(said ?? ""), "a write GitHub refuses is said with the right the job needs, never with gh's own words", said);
+}
+
+// ---- the look's reading of the host (look-host.mjs): a label set anew said with what it was, in GitHub's job alone ----
+{
+  const dir = scratch(), lines = [], writes = [];
+  const gh = (...a) => { if (a[0] === "-X") { writes.push(a[2]); return "{}"; } return JSON.stringify(a[0].includes("page=1") ? [...every.filter(l => l.name !== "queued"), { name: "Queued", color: "123456", description: "the project's own" }] : []); };
+  const ask = route => route === "repos/o/r" ? { body: { default_branch: "main", private: false } } : { why: "GitHub answered 403" };
+  const ctx = { repo: "o/r", manifest: "", job: true, dry: false, at, say: l => lines.push(l) };
+  const { host, refused } = hostOf(ctx, { yes: true }, { gh, ask, root: dir });
+  ok(host?.name === "o/r" && host.looking === true && HOST_READ.exec(host.record.body)?.[1] === at && !refused.length && writes.length === 1 && lines.some(l => /^Setting queued: it was Queued, colour 123456, "the project's own"\./.test(l)),
+    "the look makes the labels first, saying what a label it sets anew was, and reads the host with the record as this run writes it", lines.join("\n"));
+  writes.length = 0;
+  const outside = hostOf({ ...ctx, job: false }, { yes: true }, { gh, ask, root: dir }), wroteOutside = writes.length;
+  const none = hostOf({ ...ctx, manifest: null }, { yes: true }, { gh, ask, root: dir });
+  const broken = hostOf(ctx, { yes: true }, { gh, ask: () => { throw new TypeError("x"); }, root: dir });
+  ok(!wroteOutside && outside.host?.name === "o/r" && none.host === null && broken.host === null && lines.some(l => /^The host was not read here \(TypeError/.test(l)),
+    "outside GitHub's job no label is written; with no manifest the host is not read; a reading that throws is said, not hidden", lines.join("\n"));
 }
 
 // ---- each right of the look's workflows named with what it is for ----
