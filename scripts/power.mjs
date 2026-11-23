@@ -56,6 +56,8 @@ const PERMISSIONS = /(?:^|\n)permissions[ \t]*:/u;
 export const CALLS = /\bfetch[ \t]*\(|\bnode:(?:https?|http2|net|tls|dgram)\b|\brequire\([ \t]*["'](?:https?|http2|net|tls|dgram)["']|\bXMLHttpRequest\b|\bWebSocket\b|\bcurl\b|\bwget\b|\bInvoke-(?:WebRequest|RestMethod)\b|\burllib\b|\brequests\.(?:get|post|put|patch|delete|request)\b|\bgh[ \t]+(?:api|pr|issue|release|run|repo|workflow|auth|secret|label|search)\b|["']gh["']|api\.github\.com|\bGH_TOKEN\b|\bGITHUB_TOKEN\b|\bgit[ \t]+(?:push|fetch|clone|pull|ls-remote)\b|["'](?:push|fetch|clone|pull|ls-remote)["']/u;
 // a module loaded by a name built at run time: an import( or require( whose argument is no plain string
 const BUILT = /(?:^|\n)[ \t]*(?!\/\/|\*|#)[^\n]*?\b(?:import|require)[ \t]*\([ \t]*(?!["'][^"'\n$]*["'][ \t]*[,)])/u;
+// a module's code that starts another process, whose names lead from the working directory as well
+const SPAWNS = /\b(?:child_process|execa(?:Sync)?|(?:exec|execFile|spawn)(?:Sync)?|fork)\b|\bDeno\.(?:run|Command)\b|\bBun\.spawn/u;
 // a module's own code, whose names lead from its own folder alone (a root-relative path in it is text it prints)
 const MODULE = /\.(?:[cm]?[jt]sx?)$/iu;
 // a module's code with its strings left empty and its comments out, for BUILT to read (a template with a `${` stays
@@ -68,7 +70,7 @@ const JS_ENDS = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".jsx", ".tsx"];
 const RESOLVES = [[MODULE, [...JS_ENDS, ...JS_ENDS.map((end) => `/index${end}`)]], [/\.py$/iu, [".py", "/__init__.py"]]];
 // a folder a text moves to before it runs what it names: a step's `working-directory:`, a shell's `cd` or `pushd`, a
 // tool's `-C`, `--prefix` or `--cwd` (each name as written, a quoted one unquoted)
-const MOVES = /\bworking-directory[ \t]*:[ \t]*["']?([^\s"'#]+)|(?:^|[\s;&|(`"'])(?:cd|pushd)[ \t]+["']?([^\s"';&|)`]+)|[ \t](?:-C|--prefix|--cwd)(?:[ \t]+|=)["']?([^\s"';&|)`]+)/gu;
+const MOVES = /\bworking-directory[ \t]*:[ \t]*["']?([^\s"'#]+)|(?:^|[\s;&|(`"'])(?:cd|pushd)[ \t]+["']?([^\s"';&|)`]+)|[ \t](?:-C|--prefix|--cwd)(?:[ \t]+|=)["']?([^\s"';&|)`]+)|\bcwd[ \t]*[:=][ \t]*(["'])?([^\s"'`,;})]+)/gu;
 // a Python module run by its name (`python -m tools.job`)
 const RUN_MODULE = /(?:^|[\s"'])-m[ \t]+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)/gu;
 // a Python file's own imports: `import a.b, c as d`, `from a.b import c`, `from . import c`, `from ..a import (c, d)`
@@ -128,8 +130,9 @@ function movesOf(text, folder) {
   const at = new Set();
   let anywhere = false;
   for (const match of text.matchAll(MOVES)) {
-    const to = match[1] ?? match[2] ?? match[3];
-    if (/[$~`]|^-/u.test(to)) { anywhere = true; continue; }
+    const to = match[1] ?? match[2] ?? match[3] ?? match[5];
+    // a process's `cwd` that is no plain string is a folder built at run time
+    if (/[$~`]|^-/u.test(to) || (match[5] !== undefined && match[4] === undefined)) { anywhere = true; continue; }
     for (const from of ["", folder]) at.add(path.posix.normalize(path.posix.join(from, to)));
   }
   return { at: [...at].filter((name) => !name.startsWith("..")), anywhere };
@@ -151,8 +154,9 @@ function namedIn(name, text, all, byBase = new Map()) {
     if (moved.anywhere) for (const end of tries) anyFolder(path.posix.normalize(bare + end));
   };
   const tries = ["", ...(RESOLVES.find(([kind]) => kind.test(name))?.[1] ?? [])];
-  // (a module's own code names a path from its own folder alone; a root-relative one in it is text it prints)
-  const bases = [folder, ...moved.at, ...(MODULE.test(name) ? [] : [""])];
+  // (a module's own code names a path from its own folder alone, a root-relative one in it being text it prints, save
+  // where it starts a process, which runs from the working directory, the root as a workflow's step starts it)
+  const bases = [folder, ...moved.at, ...(MODULE.test(name) && !SPAWNS.test(text) ? [] : [""])];
   for (const [token] of text.matchAll(TOKENS)) resolve(token.replace(/^\/+/u, "").replace(/[.]+$/u, "").replace(/^(?:\.\/)+/u, ""), tries, bases);
   // a Python module by its dotted name, with each package above it, whose `__init__.py` Python runs first
   const python = (dotted, ends, at) => {
