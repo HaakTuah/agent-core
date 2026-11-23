@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SETTINGS, checklist, forReport, idsAt, readHost, statesOf } from "../scripts/owner-settings.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -23,10 +24,12 @@ const at = scratchDir("owner-settings-");
 try {
   const root = path.join(at, "project"), env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(at, "none"), GIT_CONFIG_NOSYSTEM: "1" };
   fs.mkdirSync(path.join(root, ".github", "workflows"), { recursive: true });
+  fs.mkdirSync(path.join(root, "core", "scripts"), { recursive: true }); // (the core a call's root holds)
+  for (const f of [".node-version", "scripts/security-review.mjs"]) fs.writeFileSync(path.join(root, "core", f), "");
   execFileSync("git", ["init", "-q"], { cwd: root, env }); // (its own files are those git lists: own-files.mjs)
   const review = text => fs.writeFileSync(path.join(root, ".github", "workflows", "security-review.yml"), text);
 
-  const call = w => `on:\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\n  issue_comment:\n    types: [created, edited]\njobs:\n  queue:\n    permissions:\n      contents: read\n      pull-requests: read\n      issues: read\n    uses: someone/agent-core/.github/workflows/queue-only.yml@${"a".repeat(40)}\n  security-review:\n    needs: queue\n    if: \${{ !cancelled() }}\n    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n    uses: someone/agent-core/.github/workflows/security-review.yml@${"a".repeat(40)} # the pin\n${w}`;
+  const call = w => `on:\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\n  issue_comment:\n    types: [created, edited]\njobs:\n  queue:\n    permissions:\n      contents: read\n      pull-requests: read\n      issues: read\n    uses: ${CORE}/.github/workflows/queue-only.yml@${"a".repeat(40)}\n  security-review:\n    needs: queue\n    if: \${{ !cancelled() }}\n    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n    uses: ${CORE}/.github/workflows/security-review.yml@${"a".repeat(40)} # the pin\n${w}`;
 
   // every setting given, in a public repository
   review(call(""));
@@ -66,61 +69,15 @@ try {
   fs.rmSync(path.join(root, ".github", "workflows", "security-review.yml"));
   s = statesOf(all, root);
   ok(s["security-review-required"].given === null && /does not apply here: the project has no/.test(s["security-review-required"].said), "no security-review workflow: the status is not asked for, since one never posted would hold every pull request");
-  review(`jobs:\n  security-review:\n    uses: someone/agent-core/.github/workflows/security-review.yml@${"a".repeat(40)}\n`);
+  review(`jobs:\n  security-review:\n    uses: ${CORE}/.github/workflows/security-review.yml@${"a".repeat(40)}\n`);
   const privately = { ...all, repo: { body: { ...all.repo.body, private: true } } };
   s = statesOf(privately, root);
   ok(s["security-review-required"].given === null && /with: private: true/.test(s["security-review-required"].said), "a private repository whose call does not run the check: not asked for", s["security-review-required"].said);
-  for (const [w, said] of [["    with:\n      private: true\n", "`private: true`"], ["    with:\n      advisory: false\n", "`advisory: false`, which posts the status"],
-    ["    with: { private: true }\n", "`private: true` in a flow mapping"], ["    with:\n      private: true # runs in a private repository\n", "`private: true` with a comment"],
-    ["    with:\n      advisory: false  # enforce review\n", "`advisory: false` with a comment"]]) {
-    review(call(w));
-    ok(statesOf(privately, root)["security-review-required"].given === true, `a private repository whose call is given ${said}: read from the ruleset`);
-    review(call(w).replace("  issue_comment:\n    types: [created, edited]\n", "  issue_comment:\n").replace("    needs: queue\n    if: ${{ !cancelled() }}\n    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n", "").replace("jobs:", "permissions: write-all\njobs:"));
-    ok(statesOf(privately, root)["security-review-required"].given === true, `a private repository whose call is given ${said}: read from the ruleset`);
-  }
-  const perms = "    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n", ons = /on:\n  pull_request:\n.*\n  issue_comment:\n.*\n/;
-  for (const [text, said] of [[call("    with:\n      private: ${{ vars.PRIVATE }}\n"), "an input read only at its run"], ["jobs: [\n", "no YAML"],
-    ["jobs:\n  other:\n    uses: x/y/.github/workflows/z.yml@b\n    with:\n      private: true\n", "no call of the core's security review"],
-    [call("    with:\n      private: true\n").replace(/^  (queue|security-review):\n    /gm, "  - "), "jobs as a list, which GitHub refuses"],
-    [call("    with:\n      private: true\n").replace(perms, ""), "no permissions given, left to the repository's default"],
-    [call("    with:\n      private: true\n").replace(perms, "").replace("jobs:", "permissions: {}\njobs:"), "a workflow that grants nothing"],
-    [call("    with:\n      private: true\n").replace(/  queue:\n[\s\S]*?(?=  security-review:)/, ""), "a job needed that is not there"],
-    [`# private: true\n${call("    with:\n      private: false\n")}`, "only a comment that says it, not the call"]]) {
-    review(text);
-    const st = statesOf(privately, root)["security-review-required"];
-    ok(said.startsWith("only") ? st.given === null && /^does not apply/.test(st.said) : st.given === null && /^not read: /.test(st.said), `a private repository whose call holds ${said}: ${said.startsWith("only") ? "not asked for" : "said not read, never not for it"}`, st.said);
-  }
-  // each break of a call that would post, in a private repository giving private: true and in a public one
-  for (const [change, said] of [[t => t.replace("if: ${{ !cancelled() }}", "if: false"), "a condition on its call other than the kit's"],
-    [t => t.replace(ons, "on: [push]\n"), "no pull request among its triggers"],
-    [t => t.replace("types: [opened, reopened, synchronize, ready_for_review]", "types: [closed]"), "a pull request's types the kit's do not hold"],
-    [t => t.replace("types: [opened, reopened, synchronize, ready_for_review]", "types: [opened, reopened, synchronize]"), "a pull request's types without a draft marked ready"],
-    [t => t.replace(ons, "on: [pull_request, issue_comment]\n"), "GitHub's own types of a pull request, which leave out a draft marked ready"],
-    [t => t.replace("    types:", "    branches: [release]\n    types:"), "a filter of branches"],
-    [t => t.replace("    types:", "    paths: ['docs/**']\n    types:"), "a filter of paths"],
-    [t => t.replace(/  issue_comment:\n.*\n/, ""), "no comment among its triggers, through which alone a pull request of Dependabot's or a fork's gets the status"],
-    [t => t.replace("types: [created, edited]", "types: [deleted]"), "a comment's types the kit's do not hold"],
-    [t => t.replace("      statuses: write\n", "      statuses: read\n"), "a job given no right to write statuses"],
-    [t => t.replace(perms, "    permissions:\n      statuses: write\n"), "a call granted statuses alone, less than the review asks"],
-    [t => t.replace("      contents: read\n      pull-requests: read\n      issues: read\n", "      contents: none\n"), "a queue's call granted less than it asks"],
-    [t => t.replace("    needs: queue\n", "    needs: [queue, build]\n"), "a job needed that is not there"],
-    [t => t.replace("queue-only.yml", "other.yml"), "a call of another workflow, whose asks are not read"],
-    [t => t.replace("jobs:", "concurrency:\n  group: x\n  cancel-in-progress: true\njobs:"), "a concurrency, by which a later run may cancel the one that posts"],
-    [t => t.replace("    needs: queue\n", "    needs: queue\n    concurrency: { group: x, cancel-in-progress: true }\n"), "a concurrency on its call"],
-    [t => t.replace(/(queue-only\.yml@a+\n)/, "$1    with:\n      advisroy: false\n"), "an input its workflow does not define"],
-    [t => t.replace(/(queue-only\.yml@a+\n)/, "$1    with:\n      private: 'yes'\n"), "an input not of its type"],
-    [t => t.replace(/(queue-only\.yml@a+\n)/, "$1    secrets: inherit\n"), "a secret passed"], [t => t.replace(/(queue-only\.yml@a+\n)/, "$1    runs-on: x\n"), "a call with a runner"],
-    [t => t.replace("  queue:\n", "  queue:\n    needs: security-review\n"), "jobs that need each other"], [t => t.replace("needs: queue", "needs: [queue, security-review]"), "a job that needs itself"],
-    [t => t.replace("jobs:\n", "jobs:\n  build:\n    runs-on: x\n    steps: [{ run: echo }]\n"), "a job not a call, which may wait on a runner or an approval"],
-    [t => t.replace("jobs:", "bogus: 1\njobs:"), "a key at its top not the kit's"], [t => t.replace("  queue:\n", "  1q:\n").replace("needs: queue", "needs: 1q"), "a job named as GitHub refuses"],
-    [t => t.replace("    if: ${{ !cancelled() }}\n", ""), "a job it needs and no condition, so skipped where that job fails"]]) {
-    for (const [w, answers, where] of [["    with:\n      private: true\n", privately, "private"], ["", none, "public"]]) {
-      const broken = change(call(w));
-      review(broken);
-      const st = statesOf(answers, root)["security-review-required"];
-      ok(broken !== call(w) && st.given === null && /^not read: /.test(st.said), `a ${where} repository whose call holds ${said}: said not read, never asked for`, st.said);
-    }
-  }
+  review(call("    with:\n      private: true\n"));
+  ok(statesOf(privately, root)["security-review-required"].given === true, "a private repository whose call is given `private: true`: read from the ruleset");
+  review(call("").replace("if: ${{ !cancelled() }}", "if: false"));
+  s = statesOf(none, root)["security-review-required"];
+  ok(s.given === null && /^not read: /.test(s.said), "a call not read as posting (review-caller-test.mjs tries each): said not read, never asked for", s.said);
   fs.rmSync(path.join(root, ".github", "workflows", "security-review.yml"));
   if (process.platform !== "win32") { // (a link needs a right of its own on Windows)
     fs.symlinkSync(path.join(at, "elsewhere.yml"), path.join(root, ".github", "workflows", "security-review.yml"));
