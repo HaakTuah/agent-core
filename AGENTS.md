@@ -268,14 +268,17 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`); each is
   a task the project's agents take (`roles/orchestrator.md`; with no orchestrator, the session that syncs), a step
   only the owner can do labelled so, and each difference kept on purpose declared in the manifest's "Differences".
-  Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
+  Where a script does a step exactly, the sync runs it (`scripts/steps.mjs --write`; #1091): it writes a check's config
+  or baseline or a pointer's path alone, lists it and sets it aside for the session that syncs to commit after the
+  sync's merge, or says why it wrote nothing. Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
   owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps beyond what the core writes (it stays pure), nor
-  that a step not done fails or stops anything. Reason: a step written only in prose is where one is missed, and
-  nothing showed that it was. Held by `tests/steps-test.mjs`, which fails an entry with no step and a step with a
+  that a step not done fails or stops anything, nor that a step that needs judgement is written by a script. Reason: a
+  step written only in prose is where one is missed, and nothing showed that it was. Held by
+  `tests/steps-write-test.mjs` (no rule's words changed), by `tests/steps-test.mjs`, which fails an entry with no step and a step with a
   check that cannot be taken out and mended, and by `tests/upgrade-test.mjs`: after the sync every step reads done,
   but one the release adds that it asks of every project (a check's own list to write), which is reported and done
   by its mend as written; each step added since the release started from, taken out, is reported and its mend as
-  written makes it done, and steps taken out at random are reported, exactly those.
+  written makes it done, and steps taken out at random are reported, exactly those, and done by the writers.
 - **A pull request says what it asks of a project:** one that changes the floor, a module, a script,
   the setup or a workflow has the heading "What it asks of a project", saying what happens in a project that changes
   nothing of its own: nothing, a baseline written, or an ask in the sync notes with its cost. It does not mean that

@@ -3,7 +3,8 @@
 // manifest's "Core:" line names (`core/` as a rule; core-path.mjs), moves that line to it, and moves each call to a core workflow whose workflow changed (as `core.yml` checks),
 // listing those calls, and prints what the sync asks of the project beyond the copy (the core's setup/sync-notes.md, the
 // entries it gained between the two commits), then, from the copy it has just written, every step a release asks that
-// is not done, every difference from a fresh start, where the owner's inbox is and what its labels and openers lack, and
+// is not done, what the steps' writers wrote of them where a script does it exactly, set aside in a stash to be
+// committed after the merge (steps.mjs --write --aside; #1091), every difference from a fresh start, where the owner's inbox is and what its labels and openers lack, and
 // what the project holds twice or against the core (steps.mjs, fresh.mjs, inbox.mjs, labels.mjs and twice.mjs, beside this file), the settings only the owner gives where the sync
 // brings one the old copy's list did not hold, and at the first copy all of them (owner-settings.mjs; #1085), and at its end the one line that says whether the
 // project then holds the core whole and wired (attached.mjs, beside this file; #1081), for the sync PR's description, having written what the core owns, from the new copy's kit, by the one process that writes it for a new project too (converge.mjs, beside this file; #1083): they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
@@ -43,9 +44,11 @@ const fail = msg => { throw new Failure(msg); };
 // What a sync prints for its pull request's description, each a script of the new copy with its arguments (`kits`:
 // the folder of the earlier starter kits, beside the bare repository of the core; `old`, the copy's pin before): the
 // steps not done, the differences from a fresh start, where the inbox is, what the labels lack, the owner's settings
-// where one is new since `old`, what the project holds twice or against the core (#1087), and last the line that lists what the sync's own paths outside the copy call for, the
-// pins of the project's workflows above all (reading.mjs, by which the description check reads that line).
-const REPORTS = (kits, old) => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["owner-settings.mjs", "--since", old, "--fetched", path.dirname(kits), "--report"], ["twice.mjs", "--fetched", path.dirname(kits), "--since", old], ["reading.mjs", "builder", "--changed", "HEAD", "--line"], ["attached.mjs", "--line", "--fetched", path.dirname(kits)]];
+// where one is new since `old`, what the project holds twice or against the core (#1087), the line that lists what the sync's own paths outside the copy call for, the
+// pins of the project's workflows above all (reading.mjs, by which the description check reads that line), then what the
+// steps' writers wrote, set aside in a stash for a pull request of its own after the sync's, which stays pure (steps.mjs
+// --write --aside; #1091), and last the line attached.mjs prints.
+const REPORTS = (kits, old) => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["owner-settings.mjs", "--since", old, "--fetched", path.dirname(kits), "--report"], ["twice.mjs", "--fetched", path.dirname(kits), "--since", old], ["reading.mjs", "builder", "--changed", "HEAD", "--line"], ["steps.mjs", "--write", "--aside"], ["attached.mjs", "--line", "--fetched", path.dirname(kits)]];
 
 // Where the copy stands, as the manifest's "Core:" line names it (tasks/repositories.md; core-path.mjs); null, said,
 // where a library carries the core, which is synced in the library's own repository.

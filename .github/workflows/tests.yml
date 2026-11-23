@@ -643,6 +643,9 @@ jobs:
       - name: The configs a project's own workflows give its checks, as the steps and the fresh start read them
         if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-own-configs-test.mjs ')) }}
         run: node tests/steps-own-configs-test.mjs
+      - name: The steps' writers, each step a script does whole written and read done after it, the rule files' words kept
+        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-write-test.mjs ')) }}
+        run: node tests/steps-write-test.mjs
       - name: The reading of a run's configs, from its script, its argument and every source of a config
         if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-configs-test.mjs ')) }}
         run: node tests/steps-run-configs-test.mjs
