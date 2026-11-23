@@ -1,19 +1,15 @@
-// What a file of C# reaches, for the test selection (select.mjs, beside this file; #675): each file of the project's
-// whose type it may name, read word by word on the parser's tokens (shape-csharp.mjs). It never runs the code.
-//
-// A file reaches the files that declare a type it may name: each word it holds, as a type (or the type of an attribute,
-// `[Fact]` naming FactAttribute) in a namespace it sees (each it declares and those around it, the global one, each its
-// using directives name, global ones from any file and from <Using> in a .csproj, .props or .targets, each read against
-// the namespaces around it, and the namespaces those hold); each name written out in full, as App.Rules, an alias that
-// heads it put for what it names; the files that may declare extension members in a namespace it sees; each file of
-// top-level statements, by the name Program that its tests give it; and the files every file reaches: those C# or a test
-// framework runs with no name (an assembly's attribute, a module initializer, an assembly's or a session's set-up, a
-// source generator, an xUnit collection's definition, which its tests find by a string), those that hold a global using directive, and those the grammar lost, whose declarations are not
-// known. It reads more than a file takes, never less. Where reach cannot be told, a file is unsure (a test that reaches
-// it runs on any change): where the grammar lost it, where it holds a raw interpolated string, where it reads types by
-// reflection or scans an assembly for them, and, every file of C#, where a <Using> names an MSBuild property or git
-// cannot be asked. The files of C# git holds that the config does not read (a folder of migrations it leaves out)
-// are read here too, as links between the files it reads. Node's own modules and git.
+// What a file of C# reaches, for the test selection (select.mjs, beside this file; #675), read word by word on the
+// parser's tokens (shape-csharp.mjs); it never runs the code. A file reaches the files that declare a type it may name:
+// each word it holds as a type (or an attribute's, `[Fact]` naming FactAttribute) in a namespace it sees (its own and
+// those around it, the global one, those its using directives name, global ones from any file and from <Using> in MSBuild's
+// files); each name written out in full, an alias that heads it put for what it names; the files that may declare
+// extension members in a namespace it sees; a file of top-level statements, by the name Program; and the files every file
+// reaches: those run with no name (an assembly's attribute, a module initializer, a framework's set-up, a source
+// generator, an xUnit collection's definition), those that hold a global using directive, and those the grammar lost.
+// It reads more than a file takes, never less. A file is unsure (a test that reaches it runs on any change) where the
+// grammar lost it, it holds a raw interpolated string, or it reads types by reflection or scans an assembly; every file
+// is, where a <Using> names an MSBuild property or git cannot be asked. Files of C# git holds that the config does not
+// read are read too, as links between those it reads. Node's own modules and git.
 import fs from "node:fs";
 import path from "node:path";
 import { CHARACTERS, Late } from "./hurry.mjs";
@@ -107,11 +103,9 @@ function closings(toks) {
   return close;
 }
 
-// The delegates a file declares, by their names: `delegate` then a return type, the name the last word before "(" at the
-// top level of the type's "<>" (an anonymous delegate, "delegate {" or "delegate (…) {", and a function pointer,
-// "delegate*", declare none; "delegate (int X, int Y) Pair()" returns a tuple). Each token is read once, so a file of many
-// `delegate` (or `@delegate`, a name the tokens give without its "@") is read in time linear in its tokens: a scan goes
-// on from where the last one stopped, and the parentheses are matched in one pass beforehand.
+// The delegates a file declares, by their names: `delegate` then a return type (an anonymous delegate, "delegate {" or
+// "delegate (…) {", and a function pointer, "delegate*", declare none; "delegate (int X, int Y) Pair()" returns a
+// tuple). Each scan goes on where the last stopped, the parentheses matched once: linear in the tokens.
 function delegates(toks) {
   const out = [];
   let close = null;
@@ -119,20 +113,26 @@ function delegates(toks) {
     if (toks[i].v !== "delegate" || ["{", "*"].includes(toks[i + 1]?.v)) continue;
     const start = toks[i + 1]?.v === "(" ? ((close ??= closings(toks)).get(i + 1) ?? toks.length - 1) + 1 : i + 1;
     if (toks[start]?.v === "{") continue;
-    let depth = 0, name = null, k = start;
-    for (; k < toks.length && toks[k].v !== ";" && toks[k].v !== "{"; k++) {
-      const v = toks[k].v;
-      if (v === "<") depth++;
-      else if (v === ">") depth--;
-      else if (v === "(" && depth === 0) break;
-      else if (toks[k].t === "id" && depth === 0) name = word(toks[k]);
-    }
+    const { name, end } = delegateName(toks, start);
     if (name) out.push(name);
-    i = Math.max(i, k - 1);
+    i = Math.max(i, end - 1);
   }
   return out;
 }
 
+// A delegate's name, from its return type at `k` on (the last word before "(" outside the type's "<>"), and where
+// the scan ended.
+function delegateName(toks, k) {
+  let depth = 0, name = null;
+  for (; k < toks.length && toks[k].v !== ";" && toks[k].v !== "{"; k++) {
+    const v = toks[k].v;
+    if (v === "<") depth++;
+    else if (v === ">") depth--;
+    else if (v === "(" && depth === 0) break;
+    else if (toks[k].t === "id" && depth === 0) name = word(toks[k]);
+  }
+  return { name, end: k };
+}
 
 // Each run of dotted words in a file (of two words or more, "App.Rules.Allowed"), and its using directives.
 function runsOf(toks) {
@@ -189,7 +189,7 @@ function msbuildUsings(texts, pace) {
       const [include, alias] = ["Include", "Alias"].map(a => attribute(m[1], a));
       if (include === undefined) continue;
       if (`${include}${alias ?? ""}`.includes("$(")) return null;
-      for (const s of include.split(";")) { const target = s.trim().replace(/^global::/u, ""); if (target) out.push({ target, alias: alias?.trim() || null }); } // (one by one: a spread of many outruns the stack)
+      for (const s of include.split(";")) { const target = s.trim().replace(/^global::/u, ""); if (target) out.push({ target, alias: alias?.trim() || null }); } // one by one: a spread of many outruns the stack
     }
   }
   return out;
