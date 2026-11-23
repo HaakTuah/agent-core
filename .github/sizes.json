@@ -16,21 +16,13 @@
       "why": "One runner of a workflow as GitHub runs it: its expression evaluator and job runner, read by their headings, found by searching; its YAML reader is split out (parse-yaml.mjs, #1056), and no other part stands alone for a reader of either."
     },
     "scripts/copies.mjs": { "mark": 34376, "why": "the question of a split is asked in #1102" },
+    "tasks/cleaning.md": { "mark": 22805, "why": "the question of a split is asked in #1132" },
     "scripts/init.mjs": { "mark": 30906, "why": "the question of a split is asked in #1098" },
     "tests/check-test.mjs": { "mark": 28691, "why": "the question of a split is asked in #1073" },
     "tests/code-scan-test.mjs": { "mark": 22506, "why": "the question of a split is asked in #1073" },
-    "scripts/check.mjs": {
-      "mark": 26892,
-      "why": "the question of a split is asked in #1064"
-    },
-    "scripts/checks.mjs": {
-      "mark": 24179,
-      "why": "the question of a split is asked in #1064"
-    },
-    "scripts/code-scan.mjs": {
-      "mark": 20998,
-      "why": "the question of a split is asked in #1064"
-    },
+    "scripts/check.mjs": { "mark": 26892, "why": "the question of a split is asked in #1064" },
+    "scripts/checks.mjs": { "mark": 24179, "why": "the question of a split is asked in #1064" },
+    "scripts/code-scan.mjs": { "mark": 20998, "why": "the question of a split is asked in #1064" },
     ".github/workflows/core.yml": {
       "mark": 32543,
       "why": "One job that each project calls pinned, holding the core's checks that need no secret as its steps (#376, #377): GitHub reads a job as one file, and a split into a second called workflow would start a second job, which bills a whole minute on a private repository's free plan"
@@ -187,14 +179,8 @@
       "mark": 39601,
       "why": "Split by the reader each case tests in #852: its archive cases apart from the rest, and a project's own rules and share apart from the core's."
     },
-    "tests/hostile-configs-test.mjs": {
-      "mark": 24643,
-      "why": "Split by the reader each case tests in #852."
-    },
-    "tests/hostile-pr-changes-test.mjs": {
-      "mark": 44725,
-      "why": "Split by the reader each case tests in #852."
-    },
+    "tests/hostile-configs-test.mjs": { "mark": 24643, "why": "Split by the reader each case tests in #852." },
+    "tests/hostile-pr-changes-test.mjs": { "mark": 44725, "why": "Split by the reader each case tests in #852." },
     "tests/init-test.mjs": {
       "mark": 61827,
       "why": "Its cases run on the one scratch project it writes from the starter kit; split, each file would write it again, adding to the suite's time (tasks/tests.md), and every case reads that setup."
@@ -203,22 +189,10 @@
       "mark": 25234,
       "why": "One script's cases (issue-terms.mjs): its texts, edits and terms file, all on the one fake host it sets up; split, each file would set that host up again, and a session changing the script reads every case of it."
     },
-    "tests/look-test.mjs": {
-      "mark": 37770,
-      "why": "Split into the look's tests and the state report's in #852."
-    },
-    "tests/reading-test.mjs": {
-      "mark": 31106,
-      "why": "Split by the part of reading.mjs each case tests in #852."
-    },
-    "tests/shape-readers-test.mjs": {
-      "mark": 41453,
-      "why": "#884: by language, each reader's cases apart."
-    },
-    "tests/shape-test.mjs": {
-      "mark": 91943,
-      "why": "#884: along its sections, in step with scripts/shape.mjs."
-    },
+    "tests/look-test.mjs": { "mark": 37770, "why": "Split into the look's tests and the state report's in #852." },
+    "tests/reading-test.mjs": { "mark": 31106, "why": "Split by the part of reading.mjs each case tests in #852." },
+    "tests/shape-readers-test.mjs": { "mark": 41453, "why": "#884: by language, each reader's cases apart." },
+    "tests/shape-test.mjs": { "mark": 91943, "why": "#884: along its sections, in step with scripts/shape.mjs." },
     "tests/releases-test.mjs": {
       "mark": 32922,
       "why": "One module's cases (releases.mjs, and release.mjs that cuts one) on the one scratch core it sets up with its release tags; split, each file would set it up again, adding to the suite's time (tasks/tests.md), and a session changing the module reads every case."

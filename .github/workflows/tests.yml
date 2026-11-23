@@ -614,6 +614,9 @@ jobs:
       - name: The copies check on the agent tools' files, what stood there noted until it is listed
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/copies-tools-test.mjs ')) }}
         run: node tests/copies-tools-test.mjs
+      - name: What a project holds twice, or against the core, listed and its exact part corrected
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/twice-test.mjs ')) }}
+        run: node tests/twice-test.mjs
       - name: The pointers in the core's own floor and modules lead somewhere, and their Markdown links and the headings they name, by lychee
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/pointers.mjs --core
