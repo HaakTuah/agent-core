@@ -16,7 +16,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1095, points 2 to 6 | rule builder | #1094 |
 | #1107 | rule builder | |
 | #1108 | rule builder | |
-| #1134 | rule builder; release 7, first; the floor (rule 3), the review guidelines and `tasks/reviews.md`, #1134's record relayed as the owner's yes (floor rule 3) | release 6's cut |
+| #1134 | rule builder; release 6; the floor (rule 3), `tasks/reviews.md`, `roles/shared/review-guidelines.md`, `tools/claude.md`, one PR or more; #1134's record relayed as the owner's yes (floor rule 3) | #1087 (the auditor's start, one at a time) |
 | #1136 to #1140 | builder; release 7, one PR each | release 6's cut |
 | #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 7, one PR each | release 6's cut |
 | #1123 | rule builder; release 7 | release 6's cut; #974, #1060 (`roles/adviser.md`) |
@@ -27,8 +27,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #772 | builder; `tests.yml` | |
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #584 | rule builder | |
-| #589 | builder | |
-| #590 | builder | |
+| #589, #590 | builder; one PR each | |
 | #591 | builder | #589 |
 | #587 | rule builder; it may change the floor's topics and what every role reads at its start | #530 |
 | #308, #309, #318, #310, #325, #314, #457 | rule builder; one PR each | |
@@ -47,8 +46,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #650 | rule builder | |
 | #679 to #682 | rule builder; one PR each | |
 | #707 | rule builder | |
-| #701 | builder | |
-| #716 | builder | |
+| #701, #716 | builder; one PR each | |
 | #739 | rule builder; it changes the game module (`tasks/game-design.md`) | |
 | #786 | rule builder; it changes the floor (the threat model) | |
 | #831 | rule builder; a page for owners beside the floor, with the rule and check that keep it in step; the floor's wording unchanged | |
@@ -73,9 +71,7 @@ They read and change no rule.
 | --- | --- | --- |
 | #732 | builder; a faster check | |
 | #550 | builder; a case a PR | |
-| #765 | builder | |
-| #809 | builder | |
-| #552 | builder | |
+| #765, #809, #552 | builder; one PR each | |
 | #553 | builder | #552 |
 | #554 | builder | #553 |
 | #555 | builder | #534's tools, and #554 |
