@@ -557,21 +557,24 @@ function upgrade(p, from, ownChanges, expect) {
   const tall = checks(p, "pull_request", taller, { baseSha: main1, only: copiesIn(p) }).filter(([, r]) => !r.passed);
   ok(tall.length === 1 && tall[0][1].steps.some(x => /1 function passes a mark[\s\S]*Mend: split each by what it does/.test(x.out)), `${p.name}: a pull request that adds a function past a mark fails, and its failure says the mend`, failures(tall) || "it passed");
 
-  // a workflow of the project's own that runs the core's workflow check with no install step before it (#1079): on a runner
-  // with no packages, the check says it did not run and fails nothing, and the step the sync prints is the guarded one
+  // a workflow of the project's own that runs the core's workflow check with no install step before it (#1079; #1093,
+  // point 3): on a runner with nothing installed, the check installs the core's packages itself and passes, with no
+  // change of the project's own, and the sync asks no install step of it
   git(p.dir, "checkout", "-q", "-B", "own-run", main1);
   fs.mkdirSync(path.join(p.dir, ".github/workflows"), { recursive: true });
   fs.writeFileSync(path.join(p.dir, ".github/workflows/own-core-checks.yml"), "name: own-core-checks\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  own:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: node core/scripts/workflows.mjs\n");
   git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "a workflow of its own that runs the core's workflow check");
   const ownRun = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: main1, only: "own-core-checks.yml", ownToo: true });
-  ok(started(ownRun).length === 1 && !failures(ownRun) && ownRun.every(([, r]) => r.steps.some(x => /the package yaml is not installed[\s\S]*Mend:/.test(x.out))),
-    `${p.name}: a workflow of its own that runs the workflow check with no install step before it passes, the check saying it did not run, with its mend`, failures(ownRun) || ownRun.map(([, r]) => r.steps.map(x => x.out).join("\n")).join("\n"));
-  const unguarded = stepsIn(p.dir);
-  ok(unguarded.out.includes("if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi"), `${p.name}: the step the sync prints for that workflow gives the guarded install`, unguarded.out);
+  const ownOut = ownRun.flatMap(([, r]) => r.steps.map(x => x.out ?? "")).join("\n");
+  ok(started(ownRun).length === 1 && !failures(ownRun) && /this check installed them first/u.test(ownOut) && !/::warning::(?!The workflow check did not run (?:zizmor|actionlint): it was not fetched)/u.test(ownOut),
+    `${p.name}: a workflow of its own that runs the workflow check with no install step before it passes, the check installing the core's packages itself`, failures(ownRun) || ownOut);
+  const unasked = stepsIn(p.dir);
+  ok(!unasked.out.includes("the core's packages installed from its lock file:"), `${p.name}: and the steps the sync prints ask no install step of that workflow`, unasked.out);
   const bare = path.join(tmp, `${p.name}-core-run`);
   git(tmp, "clone", "-q", "--branch", "own-run", p.dir, bare);
-  const coreRun = spawnSync(process.execPath, ["core/scripts/workflows.mjs", "--core"], { cwd: bare, env: base, encoding: "utf8" });
-  ok(coreRun.status === 1 && /the package yaml is not installed[\s\S]*Mend:/.test(`${coreRun.stdout}${coreRun.stderr}`), `${p.name}: the same check run as the core's own (--core) still fails where the package is missing, saying its mend`, `${coreRun.stdout}${coreRun.stderr}`);
+  // (where its install cannot reach the registry, it says it did not run and why, as a warning, and fails nothing)
+  const unreachedRun = spawnSync(process.execPath, ["core/scripts/workflows.mjs"], { cwd: bare, env: { ...base, CORE_PACKAGES_UNREACHED: "1" }, encoding: "utf8" });
+  ok(unreachedRun.status === 0 && /::warning::[^\n]*did not run[^\n]*could not be installed[^\n]*Mend:/u.test(`${unreachedRun.stdout}${unreachedRun.stderr}`), `${p.name}: where the install cannot reach the registry, the check says it did not run and why, failing nothing`, `${unreachedRun.status}: ${unreachedRun.stdout}${unreachedRun.stderr}`);
   git(p.dir, "checkout", "-q", "main");
 
   // every step a release asks reads done; each step the commit under test adds, taken out, is reported and mended
@@ -666,10 +669,10 @@ function upgrade(p, from, ownChanges, expect) {
 }
 
 // A project with C# whose own job runs the shape check after the core's first install alone, as it stood before the
-// parser's packages had a lock of their own (#719): synced, its pull request passes, the shape check reading no function
-// of C# and saying so as a warning whose mend names every install; and with that mend, it reads them again, warning
-// nothing. Its config and baseline written as a session writes them, every install there.
-const PARSER_LEAD = "19 November 2026, the parser's packages installed where the shape check runs";
+// parser's packages had a lock of their own (#719): synced, its pull request passes, the shape check installing the
+// parser's packages itself and reading C#'s functions, warning nothing, with no change of the project's own (#1093,
+// point 3). Its config and baseline written as a session writes them, every install there.
+const SHAPE_STAGED = "name: shape-staged\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\n      - run: node core/scripts/shape.mjs\n";
 function parserUnnamed(p) {
   git(p.dir, "checkout", "-q", "main");
   const at = where(fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8"));
@@ -683,14 +686,10 @@ function parserUnnamed(p) {
   const main0 = git(p.dir, "rev-parse", "HEAD");
   const pr = (from, what, change) => { git(p.dir, "checkout", "-q", "-B", "change", from); change(p.dir); git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", what); return git(p.dir, "rev-parse", "HEAD"); };
   const shapeOut = results => results.flatMap(([, r]) => r.steps.map(x => x.out ?? "")).join("\n");
-  const unnamed = pr(main0, "its own job that runs the shape check", dir => { STAGES[PARSER_LEAD].stage(dir); write(dir, "src/App/More.cs", "class More { void M(bool x) { if (x) { } } }\r\n"); });
-  const warned = checks(p, "pull_request", unnamed, { baseSha: main0, only: "shape-staged.yml", ownToo: true });
-  ok(!failures(warned) && warned.some(([, r]) => r.ran) && /^::warning::The shape check did not read (?:JavaScript and TypeScript, their functions by the parser \(the reader javascript-tree\), )?C#, by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone.*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(shapeOut(warned)),
-    `${p.name}: its own job that runs the shape check after the first install alone passes, reading nothing of C# and saying so as a warning with the mend`, `${failures(warned)}\n${shapeOut(warned).slice(-1500)}`);
-  const mended = pr(unnamed, "the mend as the warning words it", dir => STAGES[PARSER_LEAD].mend(dir));
-  const read = checks(p, "pull_request", mended, { baseSha: main0, only: "shape-staged.yml", ownToo: true });
+  const unnamed = pr(main0, "its own job that runs the shape check", dir => { write(dir, ".github/workflows/shape-staged.yml", SHAPE_STAGED); write(dir, "src/App/More.cs", "class More { void M(bool x) { if (x) { } } }\r\n"); });
+  const read = checks(p, "pull_request", unnamed, { baseSha: main0, only: "shape-staged.yml", ownToo: true });
   ok(!failures(read) && read.some(([, r]) => r.ran) && !/::warning::The shape check did not read/u.test(shapeOut(read)),
-    `${p.name}: and with its install step naming every install, as the mend says, it reads C#'s functions again, warning nothing`, `${failures(read)}\n${shapeOut(read).slice(-1500)}`);
+    `${p.name}: its own job that runs the shape check after the first install alone passes, the check installing the parser's packages itself and reading C#'s functions, warning nothing`, `${failures(read)}\n${shapeOut(read).slice(-1500)}`);
   git(p.dir, "checkout", "-q", "main"); git(p.dir, "branch", "-q", "-D", "change");
 }
 
@@ -1300,11 +1299,11 @@ function preRelease(name, { windows }) {
 
   // the steps and the differences name the configs where the project holds them, and read no comment as a run
   git(dir, "checkout", "-q", "main");
-  // (with nothing installed, as its own old sync script left it, the steps that read its workflows say so and go on;
-  // then installed, as the sync installs, the parser's packages with the rest, they read them)
+  // (with nothing installed, as its own old sync script left it, the steps install the core's packages themselves and
+  // read its workflows (#1093, point 1); then installed, as the sync installs, the parser's packages with the rest)
   const bare = node(dir, "core/scripts/steps.mjs");
-  ok(bare.status === 0 && /the core's packages are not installed, so \.github\/workflows\/\S+ could not be read: run `node core\/scripts\/install\.mjs`/u.test(bare.out),
-    `${name}: with the core's packages not installed, the steps that read its workflows say so, with the install as the mend, and the rest go on`, bare.out);
+  ok(bare.status === 0 && /this check installed them first/u.test(bare.out) && !/packages are not installed|could not be read/u.test(bare.out),
+    `${name}: with the core's packages not installed, the steps install them first and read its workflows`, bare.out);
   const installed = node(dir, "core/scripts/install.mjs", "all");
   const steps = node(dir, "core/scripts/steps.mjs"), fresh = node(dir, "core/scripts/fresh.mjs");
   const tools = steps.out.split("\n").find(l => l.startsWith("- 16 November 2026, an agent's own tools listed:")) ?? "";

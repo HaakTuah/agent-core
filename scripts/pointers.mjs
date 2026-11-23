@@ -43,19 +43,17 @@ import { corePath, projectAt } from "./core-path.mjs";
 import { logged } from "./guards.mjs";
 import { checkRules } from "./links.mjs";
 import { markdownReader } from "./markdown.mjs";
-import { installed, unreached } from "./packages.mjs";
+import { didNotRun, installed } from "./packages.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
-// (in a project, where the package is not installed, the check did not run, said as a warning that fails nothing: a job
-// of the project's own that ran it before the core's packages came installs nothing yet, and the sync never turns it
-// red (AGENTS.md of the core, "Nothing locks a project"; steps.mjs asks the step), nor does a registry that did not
-// answer (#654, point 4); in the core's own run a package not installed fails, saying the mend: packages.mjs)
+// (in a project, the package is installed first where it is not (packages.mjs; #1093, point 1); where it cannot be, the
+// check did not run, said as a warning that fails nothing (AGENTS.md of the core, "Nothing locks a project"; #654, point
+// 4); in the core's own run a package not installed fails, saying the mend: packages.mjs)
 if (!process.argv.includes("--core") && !installed("marked")) {
-  console.log(unreached("marked") ? "::warning::The pointer check did not run: the package marked could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault"
-    : `::warning::The pointer check did not run: the package marked is not installed beside the core's copy. Mend: in a pull request of its own, add the step node ${corePath(".") || "core/"}scripts/install.mjs to this job before the step that runs this check`);
+  console.log(didNotRun("The pointer check did not run", "marked"));
   process.exit(0);
 }
 const readMarkdown = await markdownReader();

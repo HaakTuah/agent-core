@@ -207,7 +207,7 @@ for (const f of ["archive.mjs", "core-address.mjs", "core-path.mjs", "guards.mjs
 fs.writeFileSync(path.join(failing, "scripts", "staged.mjs"), "export const CASES = [];\n");
 fs.writeFileSync(path.join(failing, "scripts", "outcomes.mjs"), "export const NUMBER = /^$/u;\n");
 const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.mjs")], { encoding: "utf8" });
-ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`) && /^::warning::The form of scripts\/holders\/ was not checked: the package ajv is not installed\. Mend: run node scripts\/install\.mjs/mu.test(run.stdout),
+ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`) && /^::warning::The form of scripts\/holders\/ was not checked: the package ajv is not installed in \S+ as \S+ names it\. Mend: run `if \[ -f \S*scripts\/install\.mjs \]; then node \S*scripts\/install\.mjs; fi`/mu.test(run.stdout),
   "where an entry is wrong the check fails, each failure saying its mend; on a copy with no packages its form goes unchecked, said as a warning with its mend, and the rest is read as ever", `${run.stdout}${run.stderr}`);
 
 // ---- the share a check holds in a project (#459, point 3) ----
