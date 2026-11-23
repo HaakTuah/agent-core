@@ -9,9 +9,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { lycheeReads, readable, run as linksOn } from "./links.mjs";
 import { ruleFiles, toolFiles } from "./rule-files.mjs";
-import { reads } from "./workflows.mjs";
+import { keysTwice, reads } from "./workflows.mjs";
 import { run as toolsOn } from "./workflow-tools.mjs";
-import { copyAt } from "./workflow-calls.mjs";
+import { copyAt, readable as yamlRead } from "./workflow-calls.mjs";
 import { shown } from "./step-checks.mjs";
 
 // The most findings a mend names, the rest counted, so that a project with many keeps a report a session reads whole.
@@ -19,9 +19,14 @@ export const NAMED = 20;
 const listed = (all, each) => `${all.slice(0, NAMED).map(each).join("; ")}${all.length > NAMED ? `; and ${all.length - NAMED} more, which the check's run lists` : ""}`;
 
 // zizmor's and actionlint's findings on the project's own workflows and actions (programs from `env`), or null where
-// they find none; a file a tool could not read is a finding too, as the check's run fails it.
+// they find none; a file a tool could not read is a finding too, as the check's run fails it. What another step reads
+// already is its own: a key given twice is step 460's, its line left out, and a workflow the core's reader cannot read
+// for another reason throws, so the step is reported as not read, as each step that reads it is (workflow-calls.mjs).
 export function workflowFindings(p, env = process.env) {
-  const found = toolsOn(p.root, reads(p.files, copyAt(p)), { zizmor: env.ZIZMOR || "", actionlint: env.ACTIONLINT || "" }).found;
+  const twiceIn = text => keysTwice(text).filter(k => k.key !== null);
+  yamlRead(p, text => !twiceIn(text).length);
+  const files = reads(p.files, copyAt(p)), twice = new Set(files.flatMap(f => twiceIn(p.read(f) ?? "").map(k => `${f}:${k.line}`)));
+  const found = toolsOn(p.root, files, { zizmor: env.ZIZMOR || "", actionlint: env.ACTIONLINT || "" }).found.filter(f => !(f.rule === "syntax-check" && twice.has(`${f.file}:${f.line}`)));
   return found.length ? listed(found, f => `\`${shown(f.file)}\`:${f.line} ${f.tool}'s ${shown(f.rule)}`) : null;
 }
 

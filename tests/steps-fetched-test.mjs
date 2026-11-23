@@ -48,6 +48,18 @@ if (process.platform !== "win32") {
   ok(counted?.mend.includes(`; and ${2 * (NAMED + 4) - NAMED} more, which the check's run lists`), `past ${NAMED} findings the rest are counted, not named`, counted?.mend);
   for (const f of [flow, ...many]) fs.rmSync(f);
   ok(!ran(env, WORKFLOWS), "once the workflow is mended, the step reads done again");
+  // (what another step reads already is its own: a key given twice, step 460's, and a workflow the core's reader cannot
+  // read, which every step that reads the workflows reports as not read)
+  const twice = tool("actionlint-twice", `echo '[{"kind":"syntax-check","message":"key duplicated","line":8},{"kind":"syntax-check","message":"unknown key","line":3}]'; exit 1`);
+  fs.writeFileSync(flow, "on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo a\n        if: always()\n        if: always()\n");
+  const left = ran({ ...env, ACTIONLINT: twice }, WORKFLOWS);
+  ok(left?.mend.includes("`.github/workflows/own.yml`:3 actionlint's syntax-check") && !left.mend.includes("own.yml`:8"),
+    "a key given twice, which its own step reports, is left out of the tools' findings; another finding of their syntax check stays", left?.mend);
+  fs.writeFileSync(flow, "on: push\nenv: [A\njobs: {}\n");
+  const unreadable = ran(env, WORKFLOWS);
+  ok(unreadable?.unread && unreadable.mend.includes("could not read the project") && unreadable.mend.includes("own.yml"),
+    "a workflow the core's reader cannot read is reported as not read, as by every step that reads the workflows", unreadable?.mend);
+  fs.rmSync(flow);
 
   const agents = path.join(d, "AGENTS.md"), text = fs.readFileSync(agents, "utf8");
   fs.writeFileSync(agents, `${text}\nSee [the notes](docs/gone.md).\n`);
