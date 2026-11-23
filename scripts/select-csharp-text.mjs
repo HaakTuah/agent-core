@@ -1,11 +1,11 @@
 // Whether a file of C# holds code the parser's tokens leave out (csharp-tree.mjs), for the test selection
 // (select-csharp.mjs; #675): a raw interpolated string's holes, an interpolation's alignment ("{x,App.Width}", whose
 // constant sets the padding), or a name written with an escape ("R\u0075les") or a formatting character (U+200C), which
-// the tokens split: 2 in code, where it may be a name a file declares, else 1 (0 where none). Read in one pass
-// from the file's start, passing over comments, strings, characters and directives as the lexer does, so a "$\"" in one
-// opens nothing; a raw interpolated string's "$\"\"\"" and an odd line end (ODD) count anywhere, and a comment in a
-// hole, or one that runs across an "#if", makes it unsure: it reads more, never less. Linear in the text: each character
-// is read once.
+// the tokens split. 2 where the file may hide a name it declares: such a name in code, or anywhere once the scan cannot
+// keep in step, or a comment or string across an "#if"'s line; else 1 (0 where none). Read in one pass from the file's
+// start, passing over comments, strings, characters and directives as the lexer does, so a "$\"" in one opens nothing; a
+// raw interpolated string's "$\"\"\"" and an odd line end (ODD) count anywhere, and a comment in a hole, or one across
+// another directive, makes it unsure: it reads more, never less. Linear in the text: each character is read once.
 
 // (a raw interpolated string's "$\"\"\"", one "$" of a run; or a line's end other than "\n", "\r\n": "\r", U+0085, U+2028
 // or U+2029, which the scan and the tree read as no end)
@@ -14,22 +14,26 @@ const AT = /\/\/|\/\*|\$@?"|@\$"|@"|"{3,}|["'#]/uy; // (what begins at a place i
 
 export function leftOut(text) {
   const src = text.replace(/^\uFEFF/u, ""); // (a byte order mark, the one formatting character a file may begin with)
-  if (ODD.test(src)) return 1;
-  for (let i = 0; i < src.length; i++) {
+  let found = ODD.test(src) ? 1 : 0;
+  for (let i = 0; !found && i < src.length; i++) {
     i = step(src, i);
-    if (i < 0) return -i;
+    if (i < 0) found = -i;
   }
-  return 0;
+  return found === 1 && SPLIT.test(src) ? 2 : found; // (out of step, a split name is sought anywhere: it reads more)
 }
+
+// (a name's escape, "\u" or "\U", the only escape C# code holds, or a formatting character: in a string or not)
+const SPLIT = /\\[uU]|\p{Cf}/u;
 
 // Whether a name's escape or a formatting character stands at i (in code a "\" begins nothing else).
 const named = (src, i) => src[i] === "\\" || /^\p{Cf}/u.test(src.slice(i, i + 2));
 
 // In code at i: the index of the last character of what begins there (past), or -1 or -2 where it holds what the tokens
-// leave out, or -1 where it runs across a directive's line: a comment or string that one branch of an "#if" opens hides what follows it.
+// leave out, or where it runs across a directive's line: -2 across an "#if", "#elif", "#else" or "#endif", since a comment
+// or string one branch opens may hide a declaration from the tokens, else -1.
 function step(src, i) {
-  const end = past(src, i);
-  return end > i && /\n[^\S\n]*#/u.test(src.slice(i, end)) ? -1 : end; // (the spans do not overlap: linear)
+  const end = past(src, i), span = end > i ? src.slice(i, end) : ""; // (the spans do not overlap: linear)
+  return /\n[^\S\n]*#[^\S\n]*(?:if|elif|else|endif)\b/u.test(span) ? -2 : /\n[^\S\n]*#/u.test(span) ? -1 : end;
 }
 
 // In code at i: the index of the last character of what begins there (a comment, a directive, a string or a character;

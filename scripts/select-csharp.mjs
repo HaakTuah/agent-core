@@ -195,11 +195,11 @@ const extending = toks => toks.some((k, i) => (k.v === "this" && ["(", "]", "ref
 // TUnit's Before or After beside a word Assembly, TestSession or TestDiscovery.
 const runsUnnamed = (toks, words) => words.some(hookWord) || toks.some((k, i) => k.v === "[" && ["assembly", "module"].includes(toks[i + 1]?.v) && toks[i + 2]?.v === ":")
   || (toks.some(k => TUNIT.test(k.v)) && toks.some(k => ["Assembly", "TestSession", "TestDiscovery"].includes(k.v)));
-// Whether a file finds types by reflection or scans an assembly for them; TUnit's "Before(Assembly)" names no scan.
+// Whether a file reflects (each GetType but "GetType()") or scans an assembly for types; "Before(Assembly)" scans none.
 const hookOf = (toks, i) => toks[i - 1]?.v === "(" && ["Before", "After"].includes(toks[i - 2]?.v);
 const reflecting = (toks, words) => words.some(w => REFLECTS.has(w) || w.startsWith("CreateInstance"))
   || toks.some((k, i) => k.t === "id" && /Assembl(y|ies)/u.test(word(k)) && !hookWord(word(k)) && !hookOf(toks, i))
-  || toks.some((k, i) => k.v === "GetType" && toks[i + 1]?.v === "(" && toks[i + 2]?.v !== ")");
+  || toks.some((k, i) => k.v === "GetType" && !(toks[i + 1]?.v === "(" && toks[i + 2]?.v === ")"));
 
 const LITERAL = { t: "str", v: "" };
 

@@ -81,19 +81,30 @@ export function ofNoProject(file, texts) {
 }
 
 // Global using directives of each namespace the files of C# declare (facts, a Map of a file to its facts) outside the
-// root namespace of every project (its <RootNamespace>, else its .csproj's name), among `texts`: a package's own .props
-// may import one by a <Using> git does not hold (Aspire's, MAUI's), and one more namespace seen only links more.
+// root namespace of every project, among `texts`: a package's own .props may import one by a <Using> git does not hold
+// (Aspire's, MAUI's), and one more namespace seen only links more. None is a root where a .props or .targets sets one.
 export function outside(texts, facts, pace) {
   const roots = new Map(), end = Symbol("root"); // (a tree of the roots' words, so a namespace is walked once: linear)
-  for (const [f, t] of Object.entries(texts)) {
-    if (!f.endsWith(".csproj")) continue;
+  const msbuild = Object.entries(texts).filter(([f]) => /\.(csproj|props|targets)$/u.test(f));
+  const shared = msbuild.some(([f, t]) => !f.endsWith(".csproj") && ROOT.test(t));
+  for (const [f, t] of shared ? [] : msbuild.filter(([f]) => f.endsWith(".csproj"))) {
+    const words = rootOf(f, t);
+    if (!words) continue;
     let n = roots;
-    const given = /<RootNamespace\s*>([^<]*)<\/RootNamespace\s*>/iu.exec(t)?.[1].trim(); // (no two runs share a space: linear)
-    for (const w of (given && !/[$%&]/u.test(given) ? given : path.posix.basename(f, ".csproj")).split(".")) n = n.get(w) ?? n.set(w, new Map()).get(w);
+    for (const w of words) { pace(); n = n.get(w) ?? n.set(w, new Map()).get(w); }
     n.set(end, true);
   }
   const under = ns => { let n = roots; for (const w of ns.split(".")) { n = n.get(w); if (!n) return false; if (n.has(end)) return true; } return false; };
   const out = new Set();
   for (const x of facts.values()) for (const ns of x.placed) { pace(); if (ns && !under(ns)) out.add(ns); }
   return [...out].map(target => ({ target, alias: null }));
+}
+
+const ROOT = /<RootNamespace[\s/>]/iu;
+// The words of a .csproj's root namespace (its <RootNamespace>, else its name), or null where its <RootNamespace> is not
+// one plain element of words: it then adds no root, and more is outside.
+function rootOf(f, t) {
+  const given = /<RootNamespace\s*>([^<]*)<\/RootNamespace\s*>/iu.exec(t)?.[1].trim(); // (no two runs share a space: linear)
+  const tags = t.match(/<RootNamespace[\s/>]/giu)?.length ?? 0;
+  return tags > 1 || (tags && !/^[\p{L}\p{N}_.]+$/u.test(given ?? "")) ? null : (given ?? path.posix.basename(f, ".csproj")).split(".");
 }
