@@ -4,15 +4,18 @@
 //
 //   node tests/reasons-said-test.mjs
 import fs from "node:fs";
-import { HEADING, formGuidance, namesRule, reasonsUnsaid, under } from "../scripts/reasons-said.mjs";
+import { HEADING, namesRule, ownWords, reasonsUnsaid, under } from "../scripts/reasons-said.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
 
+const R = `**${HEADING}**`;
 const forms = ["question.md", "feature_request.md"].map(f => fs.readFileSync(new URL(`../.github/ISSUE_TEMPLATE/${f}`, import.meta.url), "utf8"));
 const guide = under(forms[0], HEADING);
-ok(HEADING === "The rule's reasons" && guide && forms.every(f => under(f, HEADING) === guide && namesRule(f)) && formGuidance().size === 1,
+ok(HEADING === "The rule's reasons" && guide && forms.every(f => under(f, HEADING) === guide && namesRule(f)),
   "the question and idea forms hold the heading, with the same guidance, which names the rule", guide);
+ok(forms.every(f => !namesRule(ownWords(f)) && under(ownWords(f), HEADING) === "") && ownWords(`${R}\n${guide}\nmine`).endsWith("mine"),
+  "a form's own lines are not the filer's: unchanged, it names no rule and says nothing under the heading; the filer's lines stay");
 
 ok(namesRule("see `core/tasks/updates.md`") && namesRule("On roles/shared/inbox.md.") && namesRule("Floor rule 3 reads two ways") && namesRule("floor/topics/workflows.md"),
   "a rule is named by a rule file's path, with core/ before it or not, a file of a subfolder too, or as a floor rule");
@@ -23,7 +26,7 @@ ok(under(`**${HEADING}**\nx\n  y\n\nFound while: z\n**Next**\nw`, HEADING) === "
 
 const owner = "someone", me = { login: "Someone" }, other = { login: "another" }, bot = { login: "github-actions[bot]", type: "Bot" };
 const late = "2026-12-01T10:00:00Z", early = "2026-11-01T10:00:00Z", since = "2026-11-16T00:00:00Z";
-const L = (...n) => n.map(name => ({ name })), R = `**${HEADING}**`;
+const L = (...n) => n.map(name => ({ name }));
 const said = `${R}\nIts reason, one review a change, does not hold: the project has one contributor.`;
 const filed = [
   { number: 50, user: me, labels: L("needs-owner", "by:project"), body: "**The rule**\n`core/tasks/updates.md`, its first rule.", created_at: late },
@@ -36,17 +39,19 @@ const filed = [
   { number: 57, user: other, labels: L("needs-owner"), body: "On tasks/updates.md, filed before the rule.", created_at: early },
   { number: 58, user: other, labels: L("needs-owner"), body: forms[1], created_at: late },
   { number: 59, user: me, labels: ["by:project"], body: `On tasks/updates.md.\n\n${said}`, created_at: late },
+  { number: 60, user: other, labels: L("needs-owner"), body: forms[1].replace(/^The idea in a line or two.*$/mu, "A dry run for `scripts/sync.mjs`."), created_at: late },
+  { number: 61, user: other, labels: L("needs-owner"), body: forms[1].replace(/^The file and section, if there is one.*$/mu, "`core/tasks/updates.md`, its first rule."), created_at: late },
 ];
 const got = reasonsUnsaid({ issues: filed, owner, since });
-ok(got.length === 1 && got[0].items.join() === "#50,#51,#56,#58",
-  "an issue from a project (by:project, or another account that is no bot) that names a rule, with the heading left out, empty or as the form gives it, is reported; one that says them, a bot's, an agent's own, one that names no rule and one from before the rule are not",
+ok(got.length === 1 && got[0].items.join() === "#50,#51,#56,#61",
+  "an issue from a project (by:project, or another account that is no bot) that names a rule in its own words, with the heading left out, empty or as the form gives it, is reported; one that says them, a bot's, an agent's own, one that names no rule (the form's guidance naming one) and one from before the rule are not",
   JSON.stringify(got));
 ok(got[0]?.what.includes("reasons.mjs") && got[0].what.includes(HEADING) && /owner's account filed it, edit the issue/.test(got[0].what) && /ask its filer/.test(got[0].what),
   "its mend names the heading, the script that prints the reasons, and who adds them");
 ok(reasonsUnsaid({ issues: filed.slice(2, 5), owner, since }).length === 0 && reasonsUnsaid({ issues: null, owner, since }).length === 0, "nothing to mend: nothing reported");
 
 const t0 = Date.now();
-namesRule(`${"tasks/".repeat(30000)}x`); namesRule(`${"core/floor/a".repeat(20000)}.md`); under(`${R}\n${"**x\n".repeat(30000)}`, HEADING); under(`${"#".repeat(65000)} x\n${R}`, HEADING);
+namesRule(`${"tasks/".repeat(30000)}x`); namesRule(`${"core/floor/a".repeat(20000)}.md`); under(`${R}\n${"**x\n".repeat(30000)}`, HEADING); under(`${"#".repeat(65000)} x\n${R}`, HEADING); ownWords(`${"**x\n".repeat(30000)}`);
 ok(Date.now() - t0 < 2000, "a body of any shape, the longest GitHub keeps, is read in time in step with its length", `${Date.now() - t0} ms`);
 
 console.log(failed ? `${failed} of ${count} failed` : `${count} of ${count} passed`);
