@@ -303,7 +303,7 @@ export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   if (msbuild === null) return { links, unsure: new Set(files) };
   const facts = new Map(files.map(f => { pace(); return [f, factsOf(readCsharp(all[f]), all[f])]; }));
   const ix = indexOf(facts, pace);
-  globally(ix, [...msbuild, ...outside(texts, facts, pace)]);
+  globally(ix, [...msbuild, ...outside(texts, facts, pace, held.msbuild)]);
   // (or a global alias names a hook's attribute, unseen where it is applied)
   if ([...ix.aliases.values()].some(ts => [...ts].some(t => { const w = t.split(".").pop(); return hookWord(w) || TUNIT.test(w); }))) return { links, unsure: new Set(files) };
   for (const [f, x] of facts) { pace(); const to = reachOf(x, ix, pace); to.delete(f); links.set(f, to); }

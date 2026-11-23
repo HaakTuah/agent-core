@@ -25,8 +25,9 @@ export function leftOut(text) {
 
 // (a name's escape, "\u" or "\U", the only escape C# code holds, or a formatting character, in a string or not; or an
 // "#if", "#elif", "#else" or "#endif" line, where a comment or string one branch opens may hide a declaration)
-const SPLIT = /\\[uU]|\p{Cf}|(?<![^\n\r\u0085\u2028\u2029])[^\S\n\r\u2028\u2029]*#[^\S\n\r\u2028\u2029]*(?:if|elif|else|endif)\b/u;
-// (a line begins past any of C#'s line ends; the spaces before a "#" hold none, so no two tries share one: linear)
+const SPLIT = /\\[uU]|\p{Cf}|(?<![^\n\r\u0085\u2028\u2029])[\t\v\f\x1A\p{Zs}]*#[\t\v\f\x1A\p{Zs}]*(?:if|elif|else|endif)\b/u;
+// (a line begins past any of C#'s line ends; C#'s spaces, as step reads them, hold none, so no two tries share one:
+// linear; U+FEFF, a space there too, is a formatting character)
 
 // Whether a name's escape or a formatting character stands at i (in code a "\" begins nothing else).
 const named = (src, i) => src[i] === "\\" || /^\p{Cf}/u.test(src.slice(i, i + 2));
@@ -36,8 +37,9 @@ const named = (src, i) => src[i] === "\\" || /^\p{Cf}/u.test(src.slice(i, i + 2)
 // or string one branch opens may hide a declaration from the tokens, else -1.
 function step(src, i) {
   const end = past(src, i), span = end > i ? src.slice(i, end) : ""; // (the spans do not overlap: linear)
-  return /\n[^\S\n]*#[^\S\n]*(?:if|elif|else|endif)\b/u.test(span) ? -2 : /\n[^\S\n]*#/u.test(span) ? -1 : end;
+  return /\n[\t\v\f\r\x1A\uFEFF\p{Zs}]*#[\t\v\f\x1A\uFEFF\p{Zs}]*(?:if|elif|else|endif)\b/u.test(span) ? -2 : /\n[\t\v\f\r\x1A\uFEFF\p{Zs}]*#/u.test(span) ? -1 : end;
 }
+// (C#'s spaces: a tab, U+000B, U+000C, U+001A, U+FEFF and each of Zs; a "\r" too, which reads more)
 
 // In code at i: the index of the last character of what begins there (a comment, a directive, a string or a character;
 // i itself where none does), or -1 where an interpolated string there holds what the tokens leave out, -2 where a name's

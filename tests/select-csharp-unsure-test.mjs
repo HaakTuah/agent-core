@@ -69,7 +69,7 @@ const split = [["src/Rules.cs", "namespace App;\npublic static class R\\u0075les
     `namespace App;\npublic static class ${n} { static string s = ${e};\n public static bool Allowed() => true; }\n`, "tests/UsingTest.cs"])),
   // (and a plain name a comment one branch of an "#if" opens hides from the tokens, there too after what the scan cannot
   // keep in step with)
-  ...["", "// $\"\"\"\n", "static class K { static string s = $\"{1,K.W}\"; const int W = 1; }\n"].map(e => ["src/Rules.cs", `namespace App;\n${e}#if NEVER\n/*\n#endif\npublic static class Rules { public static bool Allowed() => true; }\n// */\n`, "tests/UsingTest.cs"])].filter(([f, text, test]) => !pick({ ...app, [f]: text }, "src/Rules.cs").tests.includes(test));
+  ...["", "// $\"\"\"\n", "static class K { static string s = $\"{1,K.W}\"; const int W = 1; }\n", "/*\n#region r\n*/\n"].flatMap(e => ["#endif", "\x1A#endif", "#\x1Aendif"].map(d => [e, d])).map(([e, d]) => ["src/Rules.cs", `namespace App;\n${e}#if NEVER\n/*\n${d}\npublic static class Rules { public static bool Allowed() => true; }\n// */\n`, "tests/UsingTest.cs"])].filter(([f, text, test]) => !pick({ ...app, [f]: text }, "src/Rules.cs").tests.includes(test));
 ok(!split.length, "a file where an escape or a formatting character may split a name it declares or names, or an \"#if\" may hide one, is reached from every file", split.map(c => c[0]).join(", "));
 ok(!pick({ ...app, "tests/OtherTest.cs": `\uFEFF${app["tests/OtherTest.cs"]}` }, "src/Rules.cs").tests.includes("tests/OtherTest.cs"), "a byte order mark at a file's start splits no name");
 const implicit = one("namespace System;\npublic static class Ext { public static bool Allowed(this string s) => true; }\n", { "tests/T.cs": "namespace Tests;\nclass T { bool b = \"x\".Allowed(); }\n" });
@@ -94,11 +94,14 @@ ok(tunit.unsure.has("tests/T.cs") && session.links.get("tests/T.cs")?.has("src/X
   JSON.stringify([[...tunit.unsure], [...session.links.get("tests/T.cs") ?? []]]));
 const used = { "tests/T.cs": "namespace Tests;\nclass T { bool b = \"x\".Allowed(); }\n" }, ext = ns => one(`namespace ${ns};\npublic static class Ext { public static bool Allowed(this string s) => true; }\n`, used).links.get("tests/T.cs")?.has("src/X.cs");
 ok(ext("Aspire.Hosting") && !ext("App.Inner"), "a namespace declared outside every project's root, which a package's own .props may import, is seen by every file; one under a root is not");
-const rooted = (x, f = "src/App.csproj") => one("namespace App.Inner;\npublic static class Ext { public static bool Allowed(this string s) => true; }\n", { ...used, [f]: `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>${x}</PropertyGroup></Project>` }).links.get("tests/T.cs")?.has("src/X.cs");
-const unread = ["Lib&#46;Core", "Lib%2ECore", "$(Company).App", "<![CDATA[App]]>", "App<!-- c -->"].map(v => `<RootNamespace>${v}</RootNamespace>`)
-  .concat("<RootNamespace Condition=\"'$(A)' == ''\">App</RootNamespace>", "<RootNamespace>App</RootNamespace><RootNamespace>Lib</RootNamespace>").filter(x => !rooted(x));
-ok(!unread.length && rooted("<RootNamespace>Lib</RootNamespace>", "Directory.Build.props") && !rooted("<RootNamespace> App </RootNamespace>"),
-  "a project whose <RootNamespace> cannot be read plainly, or where a .props sets one, adds no root, so its namespaces are seen by every file; a plain one is a root", unread.join(" | "));
+const ext2 = "namespace App.Inner;\npublic static class Ext { public static bool Allowed(this string s) => true; }\n", group = x => `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>${x}</PropertyGroup></Project>`;
+const rooted = (x, beside = []) => csharpReach({ "src/App.csproj": group(x), "src/X.cs": ext2, ...used }, undefined, () => ({ msbuild: beside, cs: {} })).links.get("tests/T.cs")?.has("src/X.cs");
+const unread = ["Lib&#46;Core", "Lib%2ECore", "$(Company).App", "<![CDATA[App]]>", "App<!-- c -->", " Lib "].map(v => `<RootNamespace>${v}</RootNamespace>`)
+  .concat("<RootNamespace Condition=\"'$(A)' == ''\">App</RootNamespace>", "<RootNamespace>App</RootNamespace><RootNamespace>Lib</RootNamespace>", "<!-- <RootNamespace>Lib</RootNamespace> -->",
+    "</PropertyGroup><PropertyGroup Condition=\"false\"><RootNamespace>Lib</RootNamespace>", "</PropertyGroup><ProjectExtensions><RootNamespace>Lib</RootNamespace></ProjectExtensions><PropertyGroup>",
+    "</PropertyGroup><Import Project=\"root.xml\" /><PropertyGroup>").filter(x => !rooted(x));
+ok(!unread.length && rooted("", [group("<RootNamespace>Lib</RootNamespace>")]) && !rooted(""),
+  "a project that names a <RootNamespace> anywhere or imports a file, or beside a .props or .targets git holds that names one, adds no root, so its namespaces are seen by every file; its name is a root", unread.join(" | "));
 const bridged = { ...app, "src/Bridge.cs": "namespace App;\nref class Bridge { public static bool Check() => Rules.Allowed(); }\n", "tests/BridgeTest.cs": "using App;\nnamespace Tests;\nclass BridgeTest { void T() { Bridge.Check(); } }\n" };
 ok(readCsharp(bridged["src/Bridge.cs"]).functions === null && pick(bridged, "src/Rules.cs").tests.includes("tests/BridgeTest.cs"),
   "a file the grammar loses, whose declarations are not known, is reached from every file and unsure, so a test that names it runs", JSON.stringify(pick(bridged, "src/Rules.cs")));
