@@ -66,6 +66,22 @@ fs.writeFileSync(holders, '{ "about": {} }\n');
 found = differences(project(plainProject), fresh(project(plainProject)));
 ok(lost && found.includes('checks/holders.json: lacks the key "holders"'), "the list of what holds the project's own rules, missing or lacking its key, is listed", found.join("\n"));
 fs.writeFileSync(holders, heldList);
+// (a game's previews and the versions check, read from the project's calls to the core's preview.yml and versions.yml,
+// the build and the config's path taken from them, and compared with what the kit writes for them: #1095, point 6)
+const base = differences(project(plainProject), fresh(project(plainProject))).join("\n");
+const callsTo = { preview: path.join(plainProject, ".github/workflows/preview.yml"), versions: path.join(plainProject, ".github/workflows/versions.yml") };
+fs.writeFileSync(callsTo.preview, `on:\n  workflow_run:\n    workflows: ["Build (web)"]\njobs:\n  preview:\n    uses: HaakTuah/agent-core/.github/workflows/preview.yml@${"a".repeat(40)}\n`);
+fs.writeFileSync(callsTo.versions, `on:\n  workflow_dispatch:\njobs:\n  versions:\n    uses: HaakTuah/agent-core/.github/workflows/versions.yml@${"a".repeat(40)}\n    with:\n      config: tools/versions.json\n`);
+const read = kind(project(plainProject)).o;
+const kitted = Object.fromEntries(fresh(project(plainProject)).filter(([to]) => Object.values(callsTo).includes(path.join(plainProject, to))));
+found = differences(project(plainProject), fresh(project(plainProject)));
+ok(read.pages === "Build (web)" && read.versions === "tools/versions.json" && found.some(d => d.startsWith(".github/workflows/preview.yml: lacks") && d.includes("pull-requests: write")) && found.some(d => d.startsWith(".github/workflows/versions.yml: lacks") && d.includes("issues: write")),
+  "a project that calls the core's preview.yml or versions.yml is read as one, its build and config taken from the call, and a line of the kit's its call lacks is listed", found.join("\n"));
+for (const [to, text] of Object.entries(kitted)) fs.writeFileSync(path.join(plainProject, to), text);
+found = differences(project(plainProject), fresh(project(plainProject)));
+ok(Object.keys(kitted).length === 2 && found.join("\n") === base && kitted[".github/workflows/versions.yml"].includes("config: tools/versions.json"), "and once it holds what the kit writes for them, nothing more is listed", found.join("\n"));
+for (const f of Object.values(callsTo)) fs.rmSync(f);
+ok(differences(project(plainProject), fresh(project(plainProject))).join("\n") === base && kind(project(plainProject)).o.pages === undefined, "a project that calls neither is asked for neither");
 const secWorkflow = path.join(plainProject, ".github/workflows/security-review.yml");
 fs.writeFileSync(secWorkflow, fs.readFileSync(secWorkflow, "utf8").replace(/^jobs:/m, "env: [SAMPLE\n\njobs:"));
 const unread = notDone(plainProject);
