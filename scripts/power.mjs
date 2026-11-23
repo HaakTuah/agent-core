@@ -156,7 +156,7 @@ export function gitTree(commit, cwd) {
     const [, type, sha, size] = meta.split(/ +/u);
     return { name, type, sha, size: Number(size) };
   }).filter((entry) => entry.type === "blob");
-  const wanted = entries.filter((entry) => WORKFLOW.test(entry.name) || SCRIPT.test(entry.name) || placed(entry.name));
+  const wanted = entries.filter((entry) => WORKFLOW.test(entry.name) || SCRIPT.test(entry.name) || unextended(entry.name) || placed(entry.name));
   const texts = new Map();
   const small = wanted.filter((entry) => entry.size <= LARGEST);
   if (small.length) {

@@ -8,7 +8,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { lightOf, powered, setOf } from "../scripts/power.mjs";
+import { diskTree, gitTree, lightOf, powered, setOf } from "../scripts/power.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 
@@ -152,6 +152,38 @@ const list = run(["--list", checkout]);
 ok(list.status === 0 && list.stdout === ".github/workflows/w.yml\tpower\nscripts/run.mjs\t.github/workflows/w.yml\n", "--list prints a folder's set, each path with what brought it in", list.stdout + list.stderr);
 const nowhere = run(["--list", path.join(tmp, "nowhere")]);
 ok(nowhere.status === 1 && mended(nowhere.stderr), "--list of a folder that is not there fails, saying the mend", nowhere.stderr);
+
+// An executable with no extension, read from a commit as from disk: a powered workflow runs `./deploy`, which runs
+// `./helper`, and `bin/publish` calls `git push` after its `#!` line.
+const ext = path.join(tmp, "ext");
+fs.mkdirSync(ext);
+git(ext, "init", "-q", "-b", "main");
+write(ext, ".github/workflows/d.yml", "on: push\npermissions:\n  issues: write\njobs:\n  a:\n    steps:\n      - run: ./deploy\n");
+write(ext, "deploy", "#!/bin/sh\n./helper\n");
+write(ext, "helper", "#!/bin/sh\necho 1\n");
+write(ext, "bin/publish", "#!/usr/bin/env bash\ngit push origin HEAD\n");
+write(ext, "README", "one\n");
+const extBase = save(ext, "base");
+const fromGit = setOf(gitTree(extBase, ext)), fromDisk = setOf(diskTree(ext));
+ok(["deploy", "helper", "bin/publish"].every((f) => fromGit.has(f)) && !fromGit.has("README") && show(fromGit) === show(fromDisk),
+  "read from a commit, files with no extension join the set as on disk: what a powered workflow runs, what that runs, and a #! script that pushes", `${show(fromGit)} | ${show(fromDisk)}`);
+git(ext, "checkout", "-q", "-b", "pr");
+write(ext, "README", "two\n");
+const extFirst = save(ext, "the readme");
+write(ext, "helper", "#!/bin/sh\necho 2\n");
+const extSecond = save(ext, "the helper");
+write(ext, "README", "three\n");
+const extThird = save(ext, "the readme again");
+const extCheckout = path.join(tmp, "ext-checkout");
+git(tmp, "clone", "-q", "--branch", "main", ext, extCheckout);
+write(tmp, "ext-pull.json", JSON.stringify({ head: { sha: extThird }, base: { sha: extBase } }));
+write(tmp, "ext-commits.json", JSON.stringify([[extFirst, extSecond, extThird].map((s) => ({ sha: s, parents: [{ sha: git(ext, "rev-parse", `${s}^`) }] }))]));
+write(tmp, "ext-files.json", JSON.stringify([[{ filename: "helper" }, { filename: "README" }]]));
+const extOut = spawnSync(process.execPath, [script, path.join(tmp, "ext-pull.json"), path.join(tmp, "ext-commits.json"), path.join(tmp, "ext-files.json"), extCheckout], { cwd: ext, env, encoding: "utf8" });
+let extPrinted = null;
+try { extPrinted = JSON.parse(extOut.stdout); } catch { /* (read below) */ }
+ok(extOut.status === 0 && JSON.stringify(extPrinted) === JSON.stringify({ power: ["helper"], light: [extThird] }),
+  "a commit that changes an executable with no extension, run by what a powered workflow runs, is not light, read from its own tree: the readme's after it is", extOut.stdout + extOut.stderr);
 
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${count - failed} of ${count} passed`);
