@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { LIST, SENDERS, SEVERAL, SINCE, STATES, byAgent, cameOn, check, found, namesRule, opens, report, strayViews, toMake, under } from "../scripts/labels.mjs";
+import { LIST, SENDERS, SEVERAL, SINCE, STATES, byAgent, cameOn, check, found, opens, report, strayViews, toMake } from "../scripts/labels.mjs";
 import { SENDERS as FILE_SENDERS, STATES as FILE_STATES } from "../scripts/inbox.mjs";
 import { shapeFaults } from "../scripts/schemas.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -61,7 +61,7 @@ ok(strayViews("**The session's view (not a decision)**\nA builder may weigh it."
   "a heading that names a view is the fixed one; a view named in a sentence is not a heading");
 
 const t0 = Date.now(), long = `# a${" ".repeat(65000)}#${" ".repeat(65000)}x`;
-strayViews(long); strayViews(`**${" ".repeat(65000)}`); namesRule(`${"tasks/".repeat(30000)}x`); namesRule(`${"core/floor/a".repeat(20000)}.md`); under(`**${LIST.headings.reasons}**\n${"**x\n".repeat(30000)}`, LIST.headings.reasons); found("\n".repeat(65000)); opens(`The stand-in's verdict${" \t".repeat(32000)}x`); opens(`The stand-in's verdict${"*".repeat(65000)}x`); byAgent(`${"_ ".repeat(40000)}\n`.repeat(2));
+strayViews(long); strayViews(`**${" ".repeat(65000)}`); found("\n".repeat(65000)); opens(`The stand-in's verdict${" \t".repeat(32000)}x`); opens(`The stand-in's verdict${"*".repeat(65000)}x`); byAgent(`${"_ ".repeat(40000)}\n`.repeat(2));
 ok(Date.now() - t0 < 2000, "a body of any shape, the longest GitHub keeps, is read in time in step with its length", `${Date.now() - t0} ms`);
 
 const have = [{ name: "Queued", color: "0e8a16", description: LIST.state.queued.description }, { name: "later", color: "000000", description: LIST.state.later.description },
@@ -126,31 +126,6 @@ const marked = check({ owner, have: all, notes: new Map([[8, [yes]], [9, [yes, {
   issues: [8, 9, 10, 11].map(number => ({ number, user: me, labels: L("queued", "by:builder", ...(number === 9 || number === 11 ? ["stand-in-yes"] : [])), body: "x", created_at: early })) });
 ok(!check({ owner, have: all, notes: new Map([[8, [yes]]]), issues: [{ number: 8, user: me, labels: L("queued", "by:builder"), body: "x", created_at: early }], core: true }).some(f => f.what.includes("stand-in-yes")),
   "in the core's own repository, where no verdict queues an issue, the mark is not asked");
-// (the core alone: an issue filed from a project that names a rule of the core says which of its reasons does not hold; #765)
-{
-  const R = `**${LIST.headings.reasons}**`, said = `${R}\nIts reason, one review a change, does not hold: the project has one contributor.`;
-  const forms = ["question.md", "feature_request.md"].map(f => fs.readFileSync(new URL(`../.github/ISSUE_TEMPLATE/${f}`, import.meta.url), "utf8"));
-  const guide = under(forms[0], LIST.headings.reasons);
-  ok(guide && forms.every(f => under(f, LIST.headings.reasons) === guide && namesRule(f)), "the question and idea forms hold the heading, with the same guidance, which names the rule", guide);
-  const bot = { login: "github-actions[bot]", type: "Bot" }, P = (...n) => L("needs-owner", "by:project", ...n);
-  const filed = [
-    { number: 50, user: me, labels: P(), body: "**The rule**\n`core/tasks/updates.md`, its first rule.", created_at: late },
-    { number: 51, user: other, labels: L("needs-owner"), body: `**The rule**\nfloor rule 3\n\n${R}\n${guide}`, created_at: late },
-    { number: 52, user: other, labels: L("needs-owner"), body: `About roles/shared/inbox.md.\n\n${said}`, created_at: late },
-    { number: 53, user: bot, labels: L("needs-owner", "by:look"), body: "A look's issue on tasks/updates.md.", created_at: late },
-    { number: 54, user: me, labels: L("queued", "by:builder"), body: `A builder's idea on tasks/updates.md.${sig}`, created_at: late },
-    { number: 55, user: me, labels: P(), body: "On tasks/nothere.md and core/scripts/labels.mjs.\n```\ntasks/updates.md\n```\n<!-- floor rule 3 -->", created_at: late },
-    { number: 56, user: other, labels: L("needs-owner"), body: `On \`tasks/updates.md\`.\n\n${R}\n<!-- nothing yet -->\n\n**The kind of project**\nprivate`, created_at: late },
-    { number: 57, user: other, labels: L("needs-owner"), body: "On tasks/updates.md, filed before the rule.", created_at: early },
-    { number: 58, user: other, labels: L("needs-owner"), body: forms[1], created_at: late },
-  ];
-  const found = core => check({ owner, have: all, issues: filed, core }).find(f => f.what.includes(LIST.headings.reasons));
-  ok(found(true)?.items.join() === "#50,#51,#56,#58",
-    "in the core, an issue filed from a project (by:project, or another account that is no bot) that names a rule of the core by its file or as a floor rule, with the reasons' heading left out, empty or as the form gives it, is reported; one that says them, a bot's, an agent's own, one that names no rule file outside a comment or a fenced block, and one from before the rule are not",
-    JSON.stringify(found(true)));
-  ok(found(true)?.what.includes("reasons.mjs") && /owner's account filed it, edit the issue/.test(found(true).what) && /ask its filer/.test(found(true).what), "its mend names the script that prints the reasons, and who adds them");
-  ok(found(false) === undefined, "in a project, which files no question with itself, it is not read");
-}
 const named = note("2026-11-14T03:30:00Z", `${chat} The description above is updated in the same step and is the issue's current text.`);
 const dated = check({ owner, have: all, issues: [{ number: 12, user: me, labels: L("queued", "by:chat"), body: "x", created_at: early }],
   notes: new Map([[12, [note("2026-11-14T01:00:00Z", chat), note("2026-11-14T02:00:00Z", chat), note("2026-11-14T03:00:00Z", chat), named, note("2026-11-14T04:00:00Z", chat)]]]) });

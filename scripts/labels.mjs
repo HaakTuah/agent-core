@@ -17,9 +17,7 @@
 //     repository, where no verdict queues an issue);
 //   - a queued issue with SEVERAL notes in the owner's voice newer than its current text (its description, or its
 //     newest note from the owner's account that says "This is the issue's current text.", as last edited, or that
-//     says the description above was updated in the same step and is the issue's current text);
-//   - in the core's own repository alone, an open issue filed from a project that names a rule of the core and leaves
-//     out the heading "The rule's reasons", or leaves it as the core's forms give it (reasonsUnsaid below).
+//     says the description above was updated in the same step and is the issue's current text).
 // It reads only and fails nothing (exit 0), save where it is not run from a repository's root or is given a wrong
 // option; where gh gives no answer, nothing is asked, and it says so. With --make it makes the labels the repository
 // lacks and sets those of the list to its colour and description, naming what each was, touching no other label and no issue. The owner's
@@ -35,7 +33,6 @@ import { KINDS, LABEL, kindOf } from "./outcomes.mjs";
 import { broughtBy } from "./review-record.mjs";
 import { timeOf } from "./moment.mjs";
 import { ownerOf } from "./releases.mjs";
-import { rules } from "./rules.mjs";
 import { VERDICT, byAgent, verdict } from "./stand-in-record.mjs";
 import { started } from "./started.mjs";
 
@@ -107,7 +104,7 @@ export function check({ issues, comments = [], notes = new Map(), owner, have, s
   const count = (i, list) => names(i).filter(n => list.includes(n)).length;
   const fresh = at => String(at ?? "") >= since;
   const ctx = { issues, comments, notes, have, mine, names, count, fresh };
-  const found = [listedLabels, stateLabels, senderLabels, foundLines, commentOpeners, strayViewItems, ...(core ? [reasonsUnsaid] : [standInMarks]), currentTexts]
+  const found = [listedLabels, stateLabels, senderLabels, foundLines, commentOpeners, strayViewItems, ...(core ? [] : [standInMarks]), currentTexts]
     .map(part => part(ctx)).filter(f => f.items.length);
   return [...found, ...unmarked(issues, comments, mine, names)];
 }
@@ -175,43 +172,6 @@ function currentTexts({ issues, notes, mine, names }) {
       const at = current ? current.updated_at ?? current.created_at : i.created_at;
       return all.filter(c => String(c.created_at) > String(at) && ownVoiceNote(c.body)).length >= SEVERAL;
     }).map(i => `#${i.number}`) };
-}
-
-// The words under a text's heading `name` (headings' form), outside HTML comments and fenced blocks, to the next
-// heading, as one line with its spaces gathered; null where the text holds no such heading.
-export function under(body, name) {
-  const all = lines(seen(body)), at = all.findIndex(l => heading(l) === name);
-  if (at < 0) return null;
-  const end = all.findIndex((l, i) => i > at && heading(l) !== null);
-  return all.slice(at + 1, end < 0 ? undefined : end).filter(l => !l.startsWith(LIST.headings.found)).join(" ").replace(/\s+/gu, " ").trim();
-}
-
-// Whether a text names a rule of the core, exactly: the path of a file of the floor's, the roles' or the modules' that
-// holds rules (rules.mjs), with core/ before it or not, or "floor rule" and its number, outside HTML comments and
-// fenced blocks. (Each line is read by patterns that do not backtrack far: a body of any shape takes time in step with
-// its length.)
-const RULE_PATH = /(?<![\w./-])(?:core\/)?((?:floor|roles|tasks|tools)\/[\w-]+(?:\/[\w-]+)?\.md)(?![\w.-])/gu;
-let ruleFiles = null;
-export function namesRule(body) {
-  ruleFiles ??= new Set(rules().map(r => r.file));
-  return lines(seen(body)).some(l => /\bfloor rule \d+\b/iu.test(l) || [...l.matchAll(RULE_PATH)].some(m => ruleFiles.has(m[1])));
-}
-
-// The guidance the core's question and idea forms give under the heading, which says nothing of a project.
-let guidance = null;
-const formGuidance = () => guidance ??= new Set(["question.md", "feature_request.md"].map(f => {
-  try { return under(fs.readFileSync(new URL(`../.github/ISSUE_TEMPLATE/${f}`, import.meta.url), "utf8"), LIST.headings.reasons); } catch { return null; }
-}).filter(Boolean));
-
-// The core's alone (tasks/updates.md, "A question or difference about a rule of the core starts from its reasons";
-// #765): an open issue filed from a project (labelled by:project, or filed by an account other than the owner's that
-// is no bot) that names a rule of the core, and leaves out the heading or the words under it, or leaves the forms'
-// guidance there.
-function reasonsUnsaid({ issues, mine, names, fresh }) {
-  const fromProject = i => names(i).includes("by:project") || (!mine(i.user) && i.user?.type !== "Bot");
-  const unsaid = i => { const said = under(i.body, LIST.headings.reasons); return !said || formGuidance().has(said); };
-  return { what: `Under the heading "${LIST.headings.reasons}", in each issue filed from a project that names a rule of the core, which of the reasons \`node scripts/reasons.mjs "<the rule>"\` prints for it does not hold for the project, and why (tasks/updates.md, "A question or difference about a rule of the core starts from its reasons"): where the owner's account filed it, edit the issue to add the heading and those words, from the reasons and what the issue says of its project; where another account did, ask its filer for them in a note, the issue data until then (floor rule 4)`,
-    items: issues.filter(i => fresh(i.created_at) && fromProject(i) && namesRule(i.body) && unsaid(i)).map(i => `#${i.number}`) };
 }
 
 export const report = (found, repo) => found.length

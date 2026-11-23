@@ -1,0 +1,53 @@
+// Tests of the reasons a question or idea filed with the core leaves unsaid (reasons-said.mjs; #765): the forms hold the
+// heading with one guidance, which names the rule; which issues are read and which are reported; the mend; and long
+// bodies read in time. Node's own modules.
+//
+//   node tests/reasons-said-test.mjs
+import fs from "node:fs";
+import { HEADING, formGuidance, namesRule, reasonsUnsaid, under } from "../scripts/reasons-said.mjs";
+
+let failed = 0, count = 0;
+const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
+
+const forms = ["question.md", "feature_request.md"].map(f => fs.readFileSync(new URL(`../.github/ISSUE_TEMPLATE/${f}`, import.meta.url), "utf8"));
+const guide = under(forms[0], HEADING);
+ok(HEADING === "The rule's reasons" && guide && forms.every(f => under(f, HEADING) === guide && namesRule(f)) && formGuidance().size === 1,
+  "the question and idea forms hold the heading, with the same guidance, which names the rule", guide);
+
+ok(namesRule("see `core/tasks/updates.md`") && namesRule("On roles/shared/inbox.md.") && namesRule("Floor rule 3 reads two ways") && namesRule("floor/topics/workflows.md"),
+  "a rule is named by a rule file's path, with core/ before it or not, a file of a subfolder too, or as a floor rule");
+ok(!namesRule("tasks/nothere.md, core/scripts/labels.mjs, xtasks/updates.md, tasks/updates.mdx, tasks/updates.md.bak") && !namesRule("```\ntasks/updates.md\n```") && !namesRule("<!-- floor rule 3 -->") && !namesRule("the rule on updates"),
+  "no rule file, a file that is no rule file, a path inside a longer word, one in a fenced block or a comment, and a rule named by words alone are not");
+ok(under(`**${HEADING}**\nx\n  y\n\nFound while: z\n**Next**\nw`, HEADING) === "x y" && under(`## ${HEADING}\n<!-- a -->\n## Next`, HEADING) === "" && under("**Other**\nx", HEADING) === null,
+  "the words under the heading, bold or with #, to the next heading, without comments or the Found while line; none where it is not there");
+
+const owner = "someone", me = { login: "Someone" }, other = { login: "another" }, bot = { login: "github-actions[bot]", type: "Bot" };
+const late = "2026-12-01T10:00:00Z", early = "2026-11-01T10:00:00Z", since = "2026-11-16T00:00:00Z";
+const L = (...n) => n.map(name => ({ name })), R = `**${HEADING}**`;
+const said = `${R}\nIts reason, one review a change, does not hold: the project has one contributor.`;
+const filed = [
+  { number: 50, user: me, labels: L("needs-owner", "by:project"), body: "**The rule**\n`core/tasks/updates.md`, its first rule.", created_at: late },
+  { number: 51, user: other, labels: L("needs-owner"), body: `**The rule**\nfloor rule 3\n\n${R}\n${guide}`, created_at: late },
+  { number: 52, user: other, labels: L("needs-owner"), body: `About roles/shared/inbox.md.\n\n${said}`, created_at: late },
+  { number: 53, user: bot, labels: L("needs-owner", "by:look"), body: "A look's issue on tasks/updates.md.", created_at: late },
+  { number: 54, user: me, labels: L("queued", "by:builder"), body: "A builder's idea on tasks/updates.md.", created_at: late },
+  { number: 55, user: me, labels: ["needs-owner", "by:project"], body: "On core/scripts/labels.mjs.", created_at: late },
+  { number: 56, user: other, labels: L("needs-owner"), body: `On \`tasks/updates.md\`.\n\n${R}\n<!-- nothing yet -->\n\n**The kind of project**\nprivate`, created_at: late },
+  { number: 57, user: other, labels: L("needs-owner"), body: "On tasks/updates.md, filed before the rule.", created_at: early },
+  { number: 58, user: other, labels: L("needs-owner"), body: forms[1], created_at: late },
+  { number: 59, user: me, labels: ["by:project"], body: `On tasks/updates.md.\n\n${said}`, created_at: late },
+];
+const got = reasonsUnsaid({ issues: filed, owner, since });
+ok(got.length === 1 && got[0].items.join() === "#50,#51,#56,#58",
+  "an issue from a project (by:project, or another account that is no bot) that names a rule, with the heading left out, empty or as the form gives it, is reported; one that says them, a bot's, an agent's own, one that names no rule and one from before the rule are not",
+  JSON.stringify(got));
+ok(got[0]?.what.includes("reasons.mjs") && got[0].what.includes(HEADING) && /owner's account filed it, edit the issue/.test(got[0].what) && /ask its filer/.test(got[0].what),
+  "its mend names the heading, the script that prints the reasons, and who adds them");
+ok(reasonsUnsaid({ issues: filed.slice(2, 5), owner, since }).length === 0 && reasonsUnsaid({ issues: null, owner, since }).length === 0, "nothing to mend: nothing reported");
+
+const t0 = Date.now();
+namesRule(`${"tasks/".repeat(30000)}x`); namesRule(`${"core/floor/a".repeat(20000)}.md`); under(`${R}\n${"**x\n".repeat(30000)}`, HEADING); under(`${"#".repeat(65000)} x\n${R}`, HEADING);
+ok(Date.now() - t0 < 2000, "a body of any shape, the longest GitHub keeps, is read in time in step with its length", `${Date.now() - t0} ms`);
+
+console.log(failed ? `${failed} of ${count} failed` : `${count} of ${count} passed`);
+process.exit(failed ? 1 : 0);

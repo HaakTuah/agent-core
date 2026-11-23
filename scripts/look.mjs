@@ -19,7 +19,8 @@
 //     findings inline of the last LATE_DAYS days made after their pull request merged, with no reply from an account
 //     the host lets write.
 //   - Steps of a release not done (steps.mjs), in a project.
-//   - Labels and openers to mend (labels.mjs).
+//   - Labels and openers to mend (labels.mjs); in the core, beside them, a question or idea from a project that names a
+//     rule of the core and leaves its reasons unsaid (reasons-said.mjs).
 //   - The scheduled look missed a run: where its record shows no run for longer than MISSED hours. The look never
 //     closes this one: a session closes it once it has found why.
 //   - What the dose makes due (dose.mjs; tasks/cleaning.md): cleaning, while the codebase is not in standard, and an
@@ -56,6 +57,7 @@ import { report as outcomesReport } from "./outcomes-read.mjs";
 import { auditIsDue, cleaningDue } from "./dose.mjs";
 import { asked, FOLDER, repoOf } from "./inbox.mjs";
 import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
+import { reasonsUnsaid } from "./reasons-said.mjs";
 import { pathIn } from "./reading.mjs";
 import { ownerOf } from "./releases.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
@@ -161,7 +163,12 @@ function findingsOf({ repo, manifest, owner, at }, reach, last) {
   }
   // labels and openers
   if (reach.yes) {
-    try { const since = sinceHere(), found = check({ ...gather(repo, since), owner, since, core: manifest === null }); add(TITLES.labels, found.length ? labelsReport(found, repo) : null); }
+    try {
+      const since = sinceHere(), got = gather(repo, since), core = manifest === null;
+      // (in the core alone, beside them: a question or idea from a project that names a rule says which reasons do not hold)
+      const found = [...check({ ...got, owner, since, core }), ...(core ? reasonsUnsaid({ issues: got.issues, owner, since }) : [])];
+      add(TITLES.labels, found.length ? labelsReport(found, repo) : null);
+    }
     catch { add(TITLES.labels, null, "the labels and openers could not be read"); }
   }
   // a missed run
