@@ -147,6 +147,16 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
   for (const lead of Object.keys(STAGES).filter(l => pair.includes(l))) STAGES[lead].mend(lockProject);
   for (const lead of pair) STAGES[lead].after?.(lockProject);
 }
+// (two whose stages both write the manifest's row *mutation tool*, taken out together: each still reported, and their
+// mends make both done, as the upgrade test's random draw takes them, #1107)
+{
+  const pair = ["16 November 2026, how strong the tests are", "23 November 2026, the mutation tool named from the core's list"];
+  for (const lead of pair) STAGES[lead].stage(lockProject);
+  const together = notDone(lockProject);
+  ok(JSON.stringify(together.map(m => m.lead)) === JSON.stringify(pair), "how strong the tests are and the mutation tool named from the list, taken out together, are each reported, exactly those", report(together));
+  for (const lead of Object.keys(STAGES).filter(l => pair.includes(l))) STAGES[lead].mend(lockProject);
+  ok(!notDone(lockProject).length, "and their mends make both done", report(notDone(lockProject)));
+}
 
 
 done("steps");
