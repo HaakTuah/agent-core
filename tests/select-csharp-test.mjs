@@ -125,7 +125,7 @@ const heads = [["extern alias", "extern alias Old;\nusing App;\nvar x = 1;\n"], 
   ["a global using", "global using App;\nvar x = 1;\n"], ["an attribute of the assembly", "using App;\n[assembly: A]\n[assembly: B]\nvar x = 1;\n"]];
 const notProgram = heads.filter(([, src]) => !named(src)).map(([w]) => w);
 ok(!notProgram.length, "a file of top-level statements is Program past its using directives, extern aliases, generic aliases and attributes", notProgram.join(", "));
-const declares = ["public", "internal", "private", "protected", "static", "sealed", "abstract", "partial", "readonly", "ref", "unsafe", "file", "new", "extern"].map(m => [m, `using App;\n${m} class X { }\n`])
+const declares = ["public", "internal", "private", "protected", "static", "sealed", "abstract", "partial", "readonly", "ref", "unsafe", "file", "new", "extern"].map(m => [m, `using App;\n${m} ${m === "ref" ? "struct" : "class"} X { }\n`])
   .concat(["struct", "interface", "enum", "record"].map(t => [t, `using App;\n${t} X { }\n`]), [["delegate", "using App;\npublic delegate void X();\n"], ["namespace", "using App;\nnamespace H { class X { } }\n"]]);
 const asProgram = declares.filter(([, src]) => named(src)).map(([w]) => w);
 ok(!asProgram.length, "a file that declares a type, behind any modifier, is no Program", asProgram.join(", "));
@@ -145,9 +145,25 @@ const viaAlias = reached(new Set(["tests/AliasTest.cs"]), aliased.links).get("te
 ok(viaAlias.has("src/Store.cs") && !viaAlias.has("src/Rules.cs"), "a global alias is followed, from a file that names it, to the type it names", JSON.stringify([...viaAlias]));
 const qualified = one("namespace App.Testing;\npublic class CustomFactAttribute : System.Attribute { }\n", { "tests/T.cs": "namespace Tests;\nclass T { [App.Testing.CustomFact] void Go() { } }\n" });
 ok(qualified.links.get("tests/T.cs")?.has("src/X.cs"), "an attribute named in full is reached without \"Attribute\" too", JSON.stringify([...qualified.links].map(([f, to]) => [f, [...to]])));
-const receivers = ["[NotNullWhen(true)] this string? s", "ref this int s", "this in int s", "scoped this ref int s"].filter(param =>
+const receivers = ["[NotNullWhen(true)] this string? s", "ref this int s", "this in int s", "scoped this ref int s", "this (int X, int Y) v"].filter(param =>
   !one(`namespace App.Ext;\npublic static class E { public static bool Has(${param}) => true; }\n`, { "tests/T.cs": "using App.Ext;\nnamespace Tests;\nclass T { }\n" }).links.get("tests/T.cs")?.has("src/X.cs"));
-ok(!receivers.length, "an extension's receiver is read behind an attribute, ref, in and scoped", receivers.join(", "));
+ok(!receivers.length, "an extension's receiver is read behind an attribute, ref, in and scoped, and as a tuple", receivers.join(", "));
+ok(same(pick(viaFile, "tests/Usings.cs").tests, ["tests/RulesTest.cs", "tests/Usings.cs"]), "a file that holds a global using directive is reached from every file, since a change to it bears on each", JSON.stringify(pick(viaFile, "tests/Usings.cs")));
+const suffixed = ["System.Runtime.CompilerServices.ModuleInitializerAttribute", "AssemblyInitializeAttribute"].filter(w => {
+  const r = one(`namespace H;\nclass X { [${w}] static void Go() { } }\n`);
+  return !r.links.get("tests/T.cs")?.has("src/X.cs") || r.unsure.size;
+});
+ok(!suffixed.length, "a hook written with \"Attribute\" is a hook too, and no scan of an assembly", suffixed.join(", "));
+const bridged = { ...app, "src/Bridge.cs": "namespace App;\nref class Bridge { public static bool Check() => Rules.Allowed(); }\n", "tests/BridgeTest.cs": "using App;\nnamespace Tests;\nclass BridgeTest { void T() { Bridge.Check(); } }\n" };
+ok(readCsharp(bridged["src/Bridge.cs"]).functions === null && pick(bridged, "src/Rules.cs").tests.includes("tests/BridgeTest.cs"),
+  "a file the grammar loses, whose declarations are not known, is reached from every file and unsure, so a test that names it runs", JSON.stringify(pick(bridged, "src/Rules.cs")));
+const nsAlias = one("namespace App.Data;\npublic class Store { }\n", { "tests/T.cs": "using D = App;\nnamespace Tests;\nclass T { object s = new D.Data.Store(); }\n" });
+ok(nsAlias.links.get("tests/T.cs")?.has("src/X.cs"), "a namespace alias that heads a name in full is put for what it names", JSON.stringify([...nsAlias.links].map(([f, to]) => [f, [...to]])));
+const items = ["<Using Include=\"App.Data.Store\" Alias=\"S\" />", "<Using Include=\"App.Data.Store\" Static=\"true\" />"].filter(item => !csharpReach({
+  "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npublic class Store { public static void Go() { } }\n",
+  "tests/Tests.csproj": `<Project><ItemGroup>${item}</ItemGroup></Project>`, "tests/T.cs": "namespace Tests;\nclass T { S s; void M() { Go(); } }\n",
+}, undefined, nothing).links.get("tests/T.cs")?.has("src/Store.cs"));
+ok(!items.length, "a <Using> with an Alias, or Static, reaches the type it names from every file", items.join(", "));
 const deep = Array.from({ length: 400 }, (_, k) => `N${k}`).join(".");
 let asked = 0, stopped = false;
 try { csharpReach({ "src/App.csproj": PROJ, "src/X.cs": `using System;\nnamespace ${deep};\nclass Y { }\n` }, () => { if (++asked > 50) throw new Error("late"); }, nothing); } catch { stopped = true; }
