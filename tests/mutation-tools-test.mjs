@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LIST, NO_TESTS, NPMRC, fillable, leftFor, lineOf, named, packageList, readProject, rowFor, setUp, testRunner, written } from "../scripts/mutation-tools.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { scratch, scratchDir } from "../scripts/scratch-core.mjs";
 import { toolOf } from "../scripts/strength.mjs";
 
 let failed = 0, count = 0;
@@ -151,6 +151,34 @@ try {
   ok(r.status === 1 && /Mend: /.test(r.stderr), "an unknown argument fails with its mend", r.stderr);
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });
+}
+
+// ---- the round trip (#1108): in a project the starter kit writes of each kind the upgrade test holds, once it holds code and
+// tests, what --write writes is read back by the strength check's reader and the step's ----
+{
+  const { git, run: runIn, project: kitProject } = scratch("mutation-tools-round-trip-");
+  const kinds = [
+    { name: "An npm project", args: ["--npm", "."], code: ["src/app.js", "export const one = () => 1;\n"], test: ["tests/app.test.js", "import { one } from \"../src/app.js\";\nif (one() !== 1) process.exit(1);\n"] },
+    { name: "A private .NET project", args: ["--nuget", ".", "--private"], crlf: true, code: ["src/App.cs", "public static class App { public static int One() => 1; }\n"], test: ["tests/AppTests.cs", "public class AppTests { }\n"] },
+  ];
+  for (const k of kinds) {
+    const p = kitProject(k.name.replace(/\W+/gu, "-"), "--owner", "the-owner", "--name", k.name, ...k.args);
+    ok(p.status === 0, `round trip, ${k.name}: the starter kit writes a project`, p.out);
+    for (const [f, text] of [k.code, k.test]) { fs.mkdirSync(path.dirname(path.join(p.dir, f)), { recursive: true }); fs.writeFileSync(path.join(p.dir, f), text); }
+    git(p.dir, "add", "-A");
+    git(p.dir, "commit", "-q", "-m", "the kit, code and tests");
+    if (k.crlf) {
+      git(p.dir, "config", "core.autocrlf", "true");
+      const at = path.join(p.dir, "core-manifest.md");
+      fs.writeFileSync(at, fs.readFileSync(at, "utf8").replace(/\r?\n/g, "\r\n"));
+    }
+    const done = runIn(p.dir, "core/scripts/mutation-tools.mjs", "--write");
+    const manifest = fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8"), tool = toolOf(manifest), step = named({ root: p.dir, manifest });
+    const row = k.crlf ? tool?.none !== undefined && tool.none.length > 0 && !/^no (?:tests|code) yet/u.test(tool.none) : tool?.command?.[1] === "core/scripts/stryker.mjs";
+    const folder = path.join(p.dir, stryker.folder), kept = fs.existsSync(path.join(folder, "package.json"));
+    ok(done.status === 0 && row && step === null && (k.crlf ? !kept : JSON.parse(fs.readFileSync(path.join(folder, "package.json"), "utf8")).devDependencies?.[stryker.package] === stryker.version && fs.readFileSync(path.join(folder, ".npmrc"), "utf8") === NPMRC),
+      `round trip, ${k.name}: the row and the package list written are read back by the strength check's reader and the step's`, `${done.out}\n${JSON.stringify(tool)}\n${step}`);
+  }
 }
 
 console.log(`\n${count - failed}/${count} passed`);

@@ -4,8 +4,9 @@ Most changes to the core reach a project by the copy and what the core's one pro
 sync (`core/scripts/converge.mjs`). An entry stands here when a project must change something
 of its own for a change to hold: a row of its manifest, a line of a rule file, a workflow, an audit.
 `core/scripts/sync.mjs` prints the entries a sync brings, then every step not done, a standing one too, by
-`core/scripts/steps.mjs`, where each entry has a step that tells it done exactly, and every difference from what the
-starter kit writes today (`core/scripts/fresh.mjs`); an orchestrator gives each a lane (`core/roles/orchestrator.md`). Each is done in a PR of its own once the sync PR is merged (a pure sync holds the
+`core/scripts/steps.mjs`, where each entry has a step that tells it done exactly, what the steps' writers wrote where
+a script does a step exactly (a check's config or baseline, a pointer's path, never a word of a rule; #1091), set
+aside in a stash that the PR after the sync's commits, and every difference from what the starter kit writes today (`core/scripts/fresh.mjs`); an orchestrator gives each a lane (`core/roles/orchestrator.md`). Each is done in a PR of its own once the sync PR is merged (a pure sync holds the
 copy, its pins and what that process writes alone: floor rule 8), or filed for the *progress file*'s queue where it is large; none waits for the owner beyond what
 the floor names. Each entry says how to tell it is done, and its step reads it, so a
 project unsure where it stands runs `node core/scripts/steps.mjs`, and one already done asks nothing.

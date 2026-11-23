@@ -1,5 +1,13 @@
 {
   "rule": "AGENTS.md: A release says what it asks, step by step",
-  "holder": ["check: tests/steps-test.mjs", "check: tests/upgrade-test.mjs"],
-  "behind": [215]
+  "holder": [
+    "check: tests/steps-test.mjs",
+    "check: tests/upgrade-test.mjs",
+    "check: tests/steps-write-test.mjs"
+  ],
+  "behind": [
+    215,
+    "#1091"
+  ],
+  "number": "check fires; outcome: robust"
 }
