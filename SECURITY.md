@@ -110,8 +110,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      sync's move of the pins (`scripts/sync.mjs`) and the owner's settings' reader of the project's
      `security-review.yml` (`scripts/owner-settings.mjs`, only whether its call of the core's security review runs
      on every pull request and on its comments, as the kit's (no filter of branches or paths; a pull request's types named, holding the
-     kit's four, and a comment's holding created and edited; its job run whatever the job it needs did and given
-     `statuses: write`), in a private repository giving `private: true` or `advisory: false`, through `scripts/own-files.mjs`: 64 MB of it, a file
+     kit's four, and a comment's holding created and edited; its job run whatever the job it needs did; each call of
+     the core's in the file granted what that workflow asks, no call of another's, each job needed there, no
+     `concurrency`), in a private repository giving `private: true` or `advisory: false`, through `scripts/own-files.mjs`: 64 MB of it, a file
      git lists as the project's own, no link followed out of it, and read as YAML by `scripts/parse-yaml.mjs`, at most its 256 K characters, what it
      cannot read said unread, never not for the project);
      limits: 60 s for each of the workflow check's two tools on one file
@@ -139,7 +140,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`, for the
      reader of where the tests run `tests/runners-test.mjs`, and for the owner's settings `tests/owner-settings-test.mjs`
      (the file missing, a link, no YAML, jobs as a list, no call of the core's, an input read only at its run, a
-     condition on the call, a job needed with none, no pull request among its triggers or only some, GitHub's own types, no comment trigger, no right to write statuses, a comment on the line, each in a public repository and a private one; its
+     condition on the call, a job needed with none, no pull request among its triggers or only some, GitHub's own types, no comment trigger, no right to write statuses, a call granted less than it asks, a job needed that is not there, a call of another's, a concurrency, a comment on the line, each in a public repository and a private one; its
      size, by `own-files.mjs`'s and `parse-yaml.mjs`'s own readers' tests).
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
