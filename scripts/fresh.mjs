@@ -208,8 +208,10 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES), { kitOnly = fal
     const { nuget, ...licence } = licences(o, () => false);
     const licenceFiles = nuget && at.nuget !== at.licences ? [[at.licences, json(licence)], [at.nuget, json({ nuget })]] : [[at.licences, json({ ...licence, ...(nuget ? { nuget } : {}) })]];
     // (and the list of what holds the project's own rules, which the kit writes with each named "none": its key alone,
-    // the rules being the project's; #1095, point 6)
-    return [...kit, [at.sizes, json(marks)], ...licenceFiles, [at.baseline, json({ windows: {} })], [shapeBaseline(p), json({ reads: Object.keys(READERS), listed: {} })], [OWN_HOLDERS, json({ holders: {} })]].filter(([to]) => to !== null);
+    // the rules being the project's; and the versions check's config, where its call names it, by the key the check
+    // reads, the entries being the project's; #1095, point 6)
+    const versions = o.versions === undefined ? [] : [[o.versions, json({ entries: [] })]];
+    return [...kit, [at.sizes, json(marks)], ...licenceFiles, [at.baseline, json({ windows: {} })], [shapeBaseline(p), json({ reads: Object.keys(READERS), listed: {} })], [OWN_HOLDERS, json({ holders: {} })], ...versions].filter(([to]) => to !== null);
   } catch (e) {
     if (!older) throw e;
     return [];

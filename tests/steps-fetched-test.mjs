@@ -57,6 +57,15 @@ if (process.platform !== "win32") {
   ok(stopped?.unread && stopped.mend.includes("lychee could not run on the rule files"), "where lychee cannot run, the step is reported as not read, never done", stopped?.mend);
   fs.writeFileSync(agents, text);
   ok(!ran(env, LINKS), "once the link is mended, the step reads done again");
+  // (a rule file SECURITY.md names that links out of the project is left out, as the project's reader leaves it:
+  // floor topic 5)
+  const model = path.join(d, "docs/threat-model.md"), held = fs.readFileSync(model, "utf8"), outside = path.join(scratchDir("steps-fetched-out-"), "out.md");
+  fs.writeFileSync(outside, "See [the notes](gone.md).\n");
+  fs.rmSync(model);
+  fs.symlinkSync(outside, model);
+  ok(!ran(env, LINKS), "a rule file that is a link out of the project is not read, nor given to lychee");
+  fs.rmSync(model);
+  fs.writeFileSync(model, held);
 }
 
 done("the steps read by a tool fetched at set-up");

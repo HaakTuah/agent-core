@@ -27,12 +27,13 @@ export function workflowFindings(p, env = process.env) {
 
 // lychee's findings on the project's rule files (the program from `env`), as the pointer check reads them: a link to no
 // file or folder git tracks, one out of the project, a heading that is not there; or null where it finds none. Where
-// lychee could not run, or the rule files cannot be named, it throws, and the step is reported as not read.
+// lychee could not run, or the rule files cannot be named, it throws, and the step is reported as not read. A rule file
+// the project's reader would not read (a link out of the project, past its size: own-files.mjs, `safe`) is left out.
 export function linkFindings(p, env = process.env) {
   const read = f => p.read(f), under = dir => p.files.filter(f => f.startsWith(`${dir}/`));
   const own = ruleFiles(read, under), rules = [...new Set([...own, ...toolFiles(read, under)])];
   const folders = new Set(p.files.flatMap(f => f.split("/").slice(0, -1).map((_, i, s) => `${s.slice(0, i + 1).join("/")}/`)));
-  const files = rules.filter(f => p.files.includes(f) && lycheeReads(f) && readable(fs.readFileSync(path.join(p.root, f))));
+  const files = rules.filter(f => p.files.includes(f) && p.safe(f) && lycheeReads(f) && readable(fs.readFileSync(path.join(p.root, f))));
   const r = linksOn({ program: env.LYCHEE, root: fs.realpathSync(p.root), files, tracked: new Set(p.files), folders, text: read });
   if (r.unread) throw new Error(`lychee could not run on the rule files: ${r.unread}`);
   return r.found.length ? listed(r.found, f => `\`${shown(f.file)}\`:${f.line} to ${shown(f.to)}`) : null;
