@@ -73,6 +73,8 @@ function noneLeft(p, found) {
   for (const x of found.filter(x => x.to)) {
     const end = ends.find(e => e.to === "" || x.file === e.to || x.file.startsWith(`${e.to}/`));
     if (end) { Object.assign(x, { to: null, why: `the link ${end.file} leads to it, which the script does not move` }); continue; }
+    const away = linksOut(p, x);
+    if (away) { Object.assign(x, { to: null, why: `its link to ${away} leads elsewhere from the copy's file` }); continue; }
     const esc = x.file.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&"), left = new RegExp(`(?<![A-Za-z0-9_-]|${p.copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")})${esc}(?![A-Za-z0-9_/-]|\\.[A-Za-z0-9])`, "u");
     const has = exists(p), moved = t => t.text.replace(pointersTo(t.file, x.file, has), pointerTo(t.file, x.file, x.to));
     const at = kept.find(f => pointersTo(f, x.file).test(p.own.read(f, true) ?? ""))
@@ -81,6 +83,23 @@ function noneLeft(p, found) {
     if (at) Object.assign(x, { to: null, why: `${at} names it in a form the script cannot move, or is a file it does not write` });
   }
   return found;
+}
+
+// The first relative target of a link in the file `x` that, read from the copy's file `x.to`, leads to other bytes than
+// read from `x.file` (or to nothing, or to a folder): a Markdown link, a reference's definition, an HTML href or src.
+// One with a scheme, from the root (/) or to an anchor alone reads the same from both.
+function linksOut(p, x) {
+  const text = p.own.read(x.file, true) ?? "";
+  const targets = [...text.matchAll(/\]\(\s*<?([^)\s>]+)|^\s{0,3}\[[^\]]+\]:\s*<?([^\s>]+)|\b(?:href|src)\s*=\s*["']([^"']+)/gmu)].map(m => m[1] ?? m[2] ?? m[3]);
+  const bytes = f => { try { return fs.readFileSync(path.join(p.root, f)); } catch { return null; } };
+  for (const t of targets) {
+    if (/^(?:[a-z][a-z0-9+.-]*:|\/|#)/iu.test(t)) continue;
+    let rel = t.replace(/[?#].*$/su, "");
+    try { rel = decodeURIComponent(rel); } catch { return t; }
+    const [a, b] = [x.file, x.to].map(f => bytes(path.posix.join(path.posix.dirname(f), rel)));
+    if (!a || !b || !a.equals(b)) return t;
+  }
+  return null;
 }
 
 // A workflow's command may name a file from another folder (a working-directory, a cd): its name, left where no folder

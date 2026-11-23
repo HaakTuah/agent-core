@@ -1,15 +1,15 @@
 // Tests what --fix of what a project holds twice cannot follow, and so keeps (scripts/twice.mjs, scripts/twice-files.mjs;
 // tasks/cleaning.md, "The reading asks what a project holds twice"; #1087): a file that is no Markdown, one a tool may
-// look for where it stands, one named in a form the script does not move, through a link, from another folder, from a
-// folder that holds a file of that path of its own, or in bytes not UTF-8, and one a link leads to; a call a workflow's
-// outputs name; and a workflow's path opening with ./, which it does move. On the scratch core and project of
-// scripts/twice-scratch.mjs. Node's own modules and git.
+// look for where it stands, one whose relative link leads elsewhere from the copy's file, one named in a form the
+// script does not move, through a link, from another folder, from a folder that holds a file of that path of its own,
+// or in bytes not UTF-8, and one a link leads to; a call a workflow's outputs name; and a workflow's path opening with
+// ./, which it does move. On the scratch core and project of scripts/twice-scratch.mjs. Node's own modules and git.
 //
 //   node tests/twice-kept-test.mjs
 import fs from "node:fs";
 import path from "node:path";
 import { tally } from "../scripts/scratch-core.mjs";
-import { CALL, GUIDE_NEW, RUN, fetched, project, run, write } from "../scripts/twice-scratch.mjs";
+import { CALL, FAR, GUIDE_NEW, LINKS, RUN, fetched, project, run, write } from "../scripts/twice-scratch.mjs";
 
 const { ok, done } = tally();
 const reader = dir => f => fs.readFileSync(path.join(dir, f), "utf8");
@@ -73,6 +73,16 @@ const reader = dir => f => fs.readFileSync(path.join(dir, f), "utf8");
   fs.writeFileSync(path.join(dir, "data.bin"), bin);
   const r = run(dir, "--fix", ...fetched);
   ok(/docs\/guide\.md .*data\.bin names it/u.test(r.stdout) && fs.readFileSync(path.join(dir, "data.bin")).equals(bin), "a file named in bytes not UTF-8 stays, and those bytes are not written", r.stdout);
+}
+
+// A file whose relative link leads elsewhere from the copy's file stays; one whose links lead out of the repository,
+// or to an anchor, goes.
+{
+  const dir = project("outgoing");
+  write(dir, { "docs/links.md": LINKS, "docs/far.md": FAR, "config/settings.json": `{ "v": 2 }\n`, "LINKS.md": "# Pages\n\nSee docs/links.md and docs/far.md.\n" });
+  const r = run(dir, "--fix", ...fetched), has = f => fs.existsSync(path.join(dir, f));
+  ok(/docs\/links\.md .*its link to \.\.\/config\/settings\.json leads elsewhere from the copy's file/u.test(r.stdout) && has("docs/links.md") && reader(dir)("LINKS.md").includes(" docs/links.md "), "a file whose relative link leads elsewhere from the copy's stays, and so do its pointers", r.stdout);
+  ok(!has("docs/far.md") && reader(dir)("LINKS.md").includes("core/docs/far.md"), "a file whose links lead out of the repository, or to an anchor, goes", r.stdout);
 }
 
 // A path that, read from the folder of the file that holds it, names a file of that folder's own is no pointer to the

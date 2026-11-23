@@ -8,9 +8,9 @@
 //     or of another of the project's, or reads close to one (twice-text.mjs, beside this file); listed;
 //   - a file outside the copy equal byte for byte to one of the core's, at the copy or, with the core fetched, at an
 //     earlier copy (the old pin and each release); it goes, its pointers moved to the copy's file, where it is Markdown
-//     a tool does not look for where it stands, one file of the copy stands for it, no pointer to it is left that cannot
-//     be moved, and it is neither the floor's text nor a file the project's AGENTS.md calls a safety rule; else it is
-//     listed;
+//     a tool does not look for where it stands, one file of the copy stands for it, each relative link in it leads to the
+//     same bytes from the copy's file, no pointer to it is left that cannot be moved, and it is neither the floor's text
+//     nor a file the project's AGENTS.md calls a safety rule; else it is listed;
 //   - a job that calls one of the core's workflows that another job calls too: the second of two in one workflow, the
 //     same in all but its name and named in no `needs:`, goes from a workflow of the project's own; any other is listed;
 //   - a pointer, in the project's own text, to a path of the copy that is not there: with the core fetched, one the

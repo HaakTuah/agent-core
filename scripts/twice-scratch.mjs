@@ -24,6 +24,8 @@ export const C = "// The core's script c, which reads its settings beside it thr
 export const FLOOR = `# The floor\n\n${"A rule of the floor, which no script takes out of a project without its owner's word. ".repeat(3)}\n`;
 export const SAFE = `# Safe\n\n${"A file of the core's that the project's AGENTS.md calls one of its safety rules. ".repeat(3)}\n`;
 export const RUN = `#!/bin/sh\n# The core's script run.sh, kept as a plain file by the core, long enough to be compared.\nexec node "$@"\n`;
+export const LINKS = `# Links\n\n${"A page of the core's that links to what stands beside it, long enough to be compared. ".repeat(2)}[the settings](../config/settings.json), [the site](https://example.com/x.md) and [the top](#links).\n`;
+export const FAR = `# Far\n\n${"A page of the core's that links only out of the repository, long enough to be compared. ".repeat(2)}[the site](https://example.com/x.md), [mail](mailto:x@example.invalid) and [the top](#far).\n`;
 export const EXTRA = `# Extra\n\n${"A file of the core's that a workflow of the core's, held whole in the project, names. ".repeat(3)}\n`;
 
 // The scratch core: an earlier commit and the pin, on main; the project's copy is the pin's tree.
@@ -31,7 +33,7 @@ export const tmp = scratchDir("twice-");
 export const core = path.join(tmp, "core-repo");
 fs.mkdirSync(core);
 git(core, "init", "-q", "-b", "main");
-write(core, { "tasks/x.md": `# x\n\n${RULE}\n`, "docs/guide.md": GUIDE_OLD, "old/place.md": PLACE, "scripts/a.mjs": A, "scripts/b.mjs": B, "scripts/c.mjs": C, "scripts/c.json": `{ "v": 1 }\n`, "floor/security.md": FLOOR, "docs/safe.md": SAFE, "docs/extra.md": EXTRA, "scripts/run.sh": RUN, "docs/ref.md": "# A reference\n\nThe guide stands at docs/guide.md, for whoever reads this file.\n", "gone.md": `${"A file the core took out. ".repeat(6)}\n` });
+write(core, { "tasks/x.md": `# x\n\n${RULE}\n`, "docs/guide.md": GUIDE_OLD, "old/place.md": PLACE, "scripts/a.mjs": A, "scripts/b.mjs": B, "scripts/c.mjs": C, "scripts/c.json": `{ "v": 1 }\n`, "floor/security.md": FLOOR, "docs/safe.md": SAFE, "docs/extra.md": EXTRA, "scripts/run.sh": RUN, "docs/links.md": LINKS, "docs/far.md": FAR, "docs/ref.md": "# A reference\n\nThe guide stands at docs/guide.md, for whoever reads this file.\n", "gone.md": `${"A file the core took out. ".repeat(6)}\n` });
 git(core, "add", "-A"); git(core, "commit", "-qm", "earlier");
 export const earlier = git(core, "rev-parse", "HEAD");
 fs.rmSync(path.join(core, "gone.md"));
