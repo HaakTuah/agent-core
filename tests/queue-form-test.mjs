@@ -6,17 +6,23 @@
 //   node tests/queue-form-test.mjs
 import { mended } from "../scripts/mend.mjs";
 import { LARGEST, command, statesOf } from "../scripts/queue.mjs";
-import { unformed } from "../scripts/queue-form.mjs";
+import { CUT, SHOWN, unformed } from "../scripts/queue-form.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
-const rows = "| Issue | Who | Waits on |\n| --- | --- | --- |\n| #13 | builder | |\n| #14 | builder | a \\| b |\n";
+const rows = "| Issue | Who | Waits on |\n| --- | --- | --- |\n| #13 | builder | |\n| #14 | builder | #13 |\n";
 let answer = JSON.stringify([13, 14, 15].map(n => ({ number: n, state: "open" }))), file = rows;
 const at = { read: () => file, write: text => { file = text; }, closed: () => statesOf("o/r", () => { if (answer === null) throw new Error("no answer"); return answer; }) };
 const check = (text, extra = {}) => command("--check", { ...at, ...extra, read: () => text });
 
 let r = check(rows);
-ok(r.status === 0 && /^ok /u.test(r.out) && unformed(rows).length === 0, "a table whose every row names its issue first in its header's three cells passes, a \"|\" written \"\\|\" inside a cell", r.out);
+ok(r.status === 0 && /^ok /u.test(r.out) && unformed(rows).length === 0, "a table whose every row names its issue first in its header's three cells passes", r.out);
+r = check(rows + "| #15 | builder | #5 \\| #6 |\n");
+ok(r.status === 1 && /holds 4 cells/u.test(r.out) && /no "\|" inside a cell/u.test(r.out), "a \"|\" inside a cell, even written \"\\|\", is a cell more, as the reader splits it, and fails", r.out);
+r = check(rows + "| x |\n".repeat(SHOWN + 5) + "| y\u0007" + "z".repeat(CUT * 2) + " |\n");
+ok(r.status === 1 && r.out.split("\n").length === SHOWN + 1 && /holds 6 more rows out of their form, not shown\. Mend: /u.test(r.out), "past the first rows out of form, the rest are counted, not shown, so a hostile queue prints a few lines", r.out.slice(0, 300));
+r = check(rows + "| y\u0007" + "z".repeat(CUT * 2) + " |\n");
+ok(r.status === 1 && r.out.includes("| y\\u0007z") && !r.out.includes("\u0007") && r.out.includes(" .... Mend: ") && r.out.length < CUT + 600, "a row shown is cut short, its control characters written out", r.out);
 r = check(rows + "| #15 | builder | | done on Monday |\n");
 ok(r.status === 1 && mended(r.out) && /holds 4 cells, its table's header 3: \| #15 /u.test(r.out), "a row with more cells than its table's header fails, saying the mend", r.out);
 r = check(rows + "| the menu, #16 | builder | |\n| | builder | |\n");

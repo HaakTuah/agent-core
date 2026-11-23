@@ -5,9 +5,10 @@
 
 // The rows out of their form: { text, why } for each row of a table, past its header and the line under it, that names
 // no issue first ("#n", as the readers read it, so no reader takes it as a line) or holds more cells than its header (a
-// note, which the file never holds). A cell is split at each "|" Markdown splits it at, one written "\|" kept whole; each
-// pattern reads a line in one pass, whatever it holds (SECURITY.md, rule 5).
-const cellsOf = row => row.trim().replace(/^\|/u, "").replace(/(?<!\\)\|$/u, "").split(/(?<!\\)\|/u);
+// note, which the file never holds). A cell is split at each "|", as queue.mjs's reader splits it, so a "|" inside a
+// cell makes a cell more and is read as out of form; each pattern reads a line in one pass, whatever it holds
+// (SECURITY.md, rule 5).
+const cellsOf = row => row.trim().replace(/^\|/u, "").replace(/\|$/u, "").split("|");
 export function unformed(text) {
   const all = String(text ?? "").split("\n").map(l => l.replace(/\r$/u, "")), out = [];
   for (let at = 0; at < all.length; at++) {
@@ -23,5 +24,13 @@ export function unformed(text) {
   return out;
 }
 
-// Each such row's failure, with its mend.
-export const formFails = (FILE, text) => unformed(text).map(r => `FAIL: ${FILE} holds a row that ${r.why}: ${r.text}. Mend: give each line of ${FILE} its issue first as "#n" and its three cells, issue, who builds it and what it waits on, a "|" inside a cell written "\\|", and put any note in the description of the line's pull request (AGENTS.md, "The file holds no note")`);
+// Each such row's failure, with its mend: the first SHOWN rows, each cut to CUT characters with its control characters
+// written out (\u0007), then a count of the rest, so a hostile queue prints a few lines whatever it holds.
+export const SHOWN = 20, CUT = 120;
+const shown = text => [...text.slice(0, CUT)].map(c => /[\p{Cc}\p{Cf}]/u.test(c) ? `\\u${c.codePointAt(0).toString(16).padStart(4, "0")}` : c).join("") + (text.length > CUT ? " ..." : "");
+export function formFails(FILE, text) {
+  const rows = unformed(text), mend = `Mend: give each line of ${FILE} its issue first as "#n" and its three cells, issue, who builds it and what it waits on, with no "|" inside a cell, and put any note in the description of the line's pull request (AGENTS.md, "The file holds no note")`;
+  const out = rows.slice(0, SHOWN).map(r => `FAIL: ${FILE} holds a row that ${r.why}: ${shown(r.text)}. ${mend}`);
+  if (rows.length > SHOWN) out.push(`FAIL: ${FILE} holds ${rows.length - SHOWN} more rows out of their form, not shown. ${mend}`);
+  return out;
+}
