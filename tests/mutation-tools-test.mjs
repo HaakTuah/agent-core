@@ -49,8 +49,9 @@ ok(testRunner('{"scripts":{"test":"  node --test tests/"}}') === "node" && testR
 // ---- a row the project wrote is kept ----
 const MANIFEST = row => `# Core manifest\n\n## Slots\n| Slot | Here |\n| --- | --- |\n| *owner's account* | someone |\n${row}\n## Differences\nNone.\n`;
 ok(fillable(MANIFEST("")) && fillable(MANIFEST(lineOf({ none: NO_TESTS }))) && fillable(MANIFEST("| *mutation tool* | `none`: no tests yet; the builder who adds the first names the tool here (`core/tasks/code-shape.md`) |"))
-  && fillable(MANIFEST(lineOf(at({ code: ["a.cs"], tests: true })))) && fillable(MANIFEST(lineOf(at({ code: ["a.js"], tests: true, runner: "jest" })))),
-  "a row that is not there, or holds a reason the kit or the list gives, an older kit's included, is filled again");
+  && fillable(MANIFEST(lineOf(at({ code: ["a.cs"], tests: true })))) && fillable(MANIFEST(lineOf(at({ code: ["a.js"], tests: true, runner: "jest" }))))
+  && fillable(MANIFEST("| *mutation tool* | `none` |")),
+  "a row that is not there, says `none` with no reason, or holds a reason the kit or the list gives, an older kit's included, is filled again");
 ok(!fillable(MANIFEST("| *mutation tool* | `none`: the owner keeps the measure off for this prototype |")) && !fillable(MANIFEST("| *mutation tool* | `npx stryker run` |")),
   "a command, or a `none` with the project's own reason, is the project's and stays (#1107, point 3)");
 const filled = written(MANIFEST(lineOf({ none: NO_TESTS })), js);

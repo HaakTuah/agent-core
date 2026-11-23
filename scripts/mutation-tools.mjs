@@ -8,8 +8,8 @@
 // floor's list (floor/topics/licences.md, rule 10) and its exact version pinned where the core gives a command for
 // it, as its test holds.
 //
-// A row the project wrote is never written over: --write fills one that is not there, or one that holds a reason this
-// script or the starter kit gave (`none`: no tests yet, or a reason of the list's), so a project's owner turns the
+// A row the project wrote is never written over: --write fills one that is not there, a `none` with no reason, or one
+// that holds a reason this script or the starter kit gave (`none`: no tests yet, or a reason of the list's), so a project's owner turns the
 // measure off with `none` and a reason of the owner's own, and nothing else does (#1107, point 3).
 //
 //   node core/scripts/mutation-tools.mjs           what it read, and the row the list gives the project
@@ -63,12 +63,14 @@ export function rowFor({ code, tests, runner, copy }) {
 // The row's line in the manifest.
 export const lineOf = row => (row.command ? `| ${ROW} | \`${row.command}\`: ${row.tool}, from the core's list (\`mutation-tools.json\`) |` : `| ${ROW} | \`none\`: ${row.none} |`);
 
-// Whether the row the manifest holds is the kit's or this script's to fill again: none there, or a `none` with a reason
-// the kit, this script or the list gives. A command, or a `none` of the project's own, is the project's.
+// Whether the row the manifest holds is the kit's or this script's to fill again: none there, a `none` with no reason,
+// which turns nothing off (the owner's `none` gives the owner's reason), or a `none` with a reason the kit, this script
+// or the list gives. A command, or a `none` with a reason of the project's own, is the project's.
 export function fillable(manifest) {
   const now = toolOf(manifest);
   if (!now) return true;
   if (now.none === undefined) return false;
+  if (!now.none) return true;
   const ours = [NO_TESTS, NO_CODE, ...Object.values(LIST.tools).map(t => t.none).filter(Boolean)];
   return /^no (?:tests|code) yet/u.test(now.none) || ours.includes(now.none) || /^its (?:code (?:holds|is in)|tests run by) /u.test(now.none);
 }
