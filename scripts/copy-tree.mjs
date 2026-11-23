@@ -43,15 +43,20 @@ export function executable(tree, gitDir) {
 
 /** Records in git's index, run from the project's root, the executable bit of each file of the copy at `dir` as the
  *  core's commit `pin` in `gitDir` marks it (#1093): a copy written on Windows records none, so a workflow that runs a
- *  script of it by its path would fail with "Permission denied". Each file the core marks so is staged with its bit, and
- *  one the index marks so that the core does not, without it. Where git refuses, it says so and fails nothing: the copy
- *  is written all the same. The sync (sync.mjs) calls it. */
+ *  script of it by its path would fail with "Permission denied". Each file the core marks so is given its bit on disk,
+ *  where the file system keeps one, and staged with it, and one the index marks so that the core does not loses it
+ *  both ways: the bit on disk too, since where git reads it (core.fileMode) a later `git add` would stage it back. Where
+ *  git refuses, it says so and fails nothing: the copy is written all the same. The sync (sync.mjs) calls it. */
 export function recordModes(dir, pin, gitDir) {
   const marked = git(["ls-tree", "-r", "-z", pin], gitDir).split("\0").filter((e) => e.startsWith("100755 blob ")).map((e) => `${dir}/${e.slice(e.indexOf("\t") + 1)}`).filter((f) => fs.existsSync(f));
   // (with core.fsmonitor off, as own-files.mjs reads the index: no command of the project's settings runs)
   const run = (args) => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
+  // (x wherever r, as git checks out a 100755 file; a file system that keeps no bit leaves it to the index)
+  const chmod = (f, on) => { try { const m = fs.statSync(f).mode & 0o777; fs.chmodSync(f, on ? m | ((m & 0o444) >> 2) : m & ~0o111); } catch { /* (no bit kept) */ } };
   try {
     const stray = run(["ls-files", "-s", "-z", "--", dir]).split("\0").filter((e) => e.startsWith("100755 ")).map((e) => e.slice(e.indexOf("\t") + 1)).filter((f) => !marked.includes(f) && fs.existsSync(f));
+    for (const f of marked) chmod(f, true);
+    for (const f of stray) chmod(f, false);
     if (marked.length) run(["update-index", "--add", "--chmod=+x", "--", ...marked]);
     if (stray.length) run(["update-index", "--chmod=-x", "--", ...stray]);
   } catch (e) {

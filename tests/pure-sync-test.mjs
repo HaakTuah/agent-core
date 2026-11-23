@@ -316,14 +316,17 @@ drops("  a deletion of the licence check, which the one job does not run", () =>
 // a file's executable bit: one the core marks, lost, is no difference to either (a copy made on Windows by a sync from
 // before #1093 records none); one the core does not mark is none to the core's check, which reads no bit, but the proof
 // refuses it; and the sync run again at the same pin, where git records no bit (core.fileMode off, as on Windows),
-// records the core's in the index, a stray one taken off, and is pure (#1093)
+// records the core's in the index, a stray one taken off, and is pure, and where git reads the bit from the disk, a
+// later `git add` keeps them, the files' own bits set too (#1093)
 const mode = f => git(p, "ls-files", "-s", f).slice(0, 6);
 git(p, "update-index", "--chmod=-x", "core/scripts/work-saved.sh");
+fs.chmodSync(path.join(p, "core/scripts/work-saved.sh"), 0o644);
 git(p, "commit", "-q", "-m", "a bit lost");
 const lost = pure();
 ok(lost.status === 0 && mode("core/scripts/work-saved.sh") === "100644", "a copy that lost an executable bit the core marks, as one made on Windows by an older sync, is still pure", lost.out);
 ok(coreCheck().passed, "  and the core's own check of the copy passes it");
 git(p, "update-index", "--chmod=+x", "core/README.md");
+fs.chmodSync(path.join(p, "core/README.md"), 0o755);
 git(p, "commit", "-q", "-m", "a bit added");
 const added = pure();
 ok(added.status === 1 && /NOT PURE core\/README\.md is marked executable, which the core at [0-9a-f]{40} does not mark it/.test(added.out), "a copy that marks executable a file the core does not mark: not pure", added.out);
@@ -334,6 +337,7 @@ git(p, "config", "core.fileMode", "true");
 ok(again.status === 0 && mode("core/scripts/work-saved.sh") === "100755" && mode("core/README.md") === "100644" && mode("core/scripts/sync.mjs") === "100644",
   "the sync run again at the same pin, where git records no executable bit, stages each the core marks and takes off one it does not, read from the core's tree", `${again.out}\n${git(p, "ls-files", "-s", "core/scripts")}`);
 git(p, "add", "-A");
+if (process.platform !== "win32") ok(mode("core/scripts/work-saved.sh") === "100755" && mode("core/README.md") === "100644", "  and a `git add` after it, where git reads the bit from the disk, keeps them", git(p, "ls-files", "-s", "core/scripts/work-saved.sh", "core/README.md"));
 git(p, "commit", "-q", "-m", "the bits recorded");
 const recorded = pure();
 ok(recorded.status === 0, "  and that sync is pure", recorded.out);
