@@ -14,7 +14,7 @@ import { LIST, makeLabels } from "../scripts/labels.mjs";
 import { BOT, RECORD, lastRun, recordBody } from "../scripts/look-keep.mjs";
 import { Unread } from "../scripts/workflow-calls.mjs";
 import { hostOf } from "../scripts/look-host.mjs";
-import { HOST_READ, LOOKED, correction, daily, hostRead, inbox, labels, lookedUp, privateReview, reviewers, scanning } from "../scripts/step-checks-host.mjs";
+import { HOST_READ, LOOKED, correction, daily, hostRead, inbox, labels, lookedUp, privateReview, reviewers, scanning, scanningOwner } from "../scripts/step-checks-host.mjs";
 import { STEPS, notDone, project } from "../scripts/steps.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -130,6 +130,9 @@ const reviewRule = { type: "required_status_checks", parameters: { required_stat
   ok(given.reach.yes === false && given.record.body === "x" && given.looking === true && given.termsGiven === null, "readHost takes what the look gives it: the reach, the record and that it is the look reading");
 
   // the steps with a host and without: host steps run only with one, and one not read is listed, not reported
+  const marked = priv => notDone(dir, [{ lead: "s", host: () => "m", owner: scanningOwner }], { repo: { body: { private: priv } } });
+  ok(marked(true)[0]?.owner === true && marked(false)[0]?.owner === false && /\(the owner's\)/.test(hostReport(marked(true))) && !/\(the owner's\)/.test(hostReport(marked(false))),
+    "a step whose owner depends on the host (step 390) is the owner's in a private repository and a session's in a public one");
   const without = notDone(dir, STEPS), withHost = hostSteps(dir, { ...h, rights: {} });
   const hostLeads = STEPS.filter(s => s.host).map(s => s.lead);
   ok(!without.some(m => hostLeads.includes(m.lead)) && without.hostUnread.length === 0, "without a host, no step read on the host runs");

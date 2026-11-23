@@ -70,6 +70,9 @@ export function daily(p, h) {
 }
 
 // Step 390: secret scanning and its push protection on, where GitHub's answer shows them (to an admin alone).
+// Whose step 390 is: a session's in a public repository (floor topic 9), the owner's otherwise.
+export const scanningOwner = h => h?.repo?.body?.private !== false;
+
 export function scanning(p, h) {
   const on = bodyOf(h.repo, "the repository").security_and_analysis ?? {};
   const states = ["secret_scanning", "secret_scanning_push_protection"].map(k => on[k]?.status);

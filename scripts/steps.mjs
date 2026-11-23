@@ -97,7 +97,7 @@ export function notDone(root, steps = STEPS, host = null) {
     }
     // (the entries and the checks say core/, the starter kit's path for the copy; a project that keeps it elsewhere is
     // told its own: #628. `unread`: its check could not read the project, which attached.mjs counts neither way)
-    if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend: mendAt(mend, copy, own), unread });
+    if (mend) out.push({ lead: step.lead, owner: typeof step.owner === "function" ? !!step.owner(host) : !!step.owner, cost: step.cost, mend: mendAt(mend, copy, own), unread });
   }
   out.unread = p.unread;
   out.hostUnread = hostUnread;
