@@ -16,6 +16,10 @@
       "why": "One runner of a workflow as GitHub runs it: its expression evaluator and job runner, read by their headings, found by searching; its YAML reader is split out (parse-yaml.mjs, #1056), and no other part stands alone for a reader of either."
     },
     "scripts/copies.mjs": { "mark": 34376, "why": "the question of a split is asked in #1102" },
+    ".github/sizes.json": { "mark": 20901, "why": "a list a script reads, each entry looked up by its path; no split lets anyone read less" },
+    "scripts/licences.mjs": { "mark": 52937, "why": "the question of a split is asked in #1151" },
+    "scripts/packages.mjs": { "mark": 25772, "why": "the question of a split is asked in #1151" },
+    "tests/exact-versions-test.mjs": { "mark": 20990, "why": "the question of a split is asked in #1151" },
     "scripts/init.mjs": { "mark": 30906, "why": "the question of a split is asked in #1098" },
     "tests/check-test.mjs": { "mark": 28691, "why": "the question of a split is asked in #1073" },
     "tests/code-scan-test.mjs": { "mark": 22506, "why": "the question of a split is asked in #1073" },
@@ -60,7 +64,7 @@
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {
-      "mark": 52604,
+      "mark": 66390,
       "why": "Its rules that only some tasks break move to modules read on need in #845."
     },
     "scripts/licence-scan.mjs": {
