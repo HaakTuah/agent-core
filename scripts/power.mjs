@@ -38,7 +38,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { RUNS_TOO, WORKFLOW } from "./comment-only.mjs";
+import { RUNS_TOO } from "./comment-only.mjs";
 import { started } from "./started.mjs";
 
 const SHA = /^[0-9a-f]{40}$/u;
@@ -46,6 +46,7 @@ const SHA = /^[0-9a-f]{40}$/u;
 const INERT = /\.(?:md|markdown|txt|rst|adoc|json|jsonc|ya?ml|csv|tsv|png|jpe?g|gif|svg|webp|ico|bmp|pdf)$/iu;
 // a script or a compiled language's source, by its name: a file whose text is read for a call that makes it a seed
 export const SCRIPT = /\.(?:[cm]?[jt]sx?|sh|bash|zsh|py|ps1|psm1|rb|pl|php|lua|bat|cmd|go|rs|java|kts?|scala|groovy|cs|fs|vb|swift|dart|exs?|r|jl|c|cc|cpp|h|hpp)$/iu;
+export const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u; // a workflow of the host's, by its path
 const ACTION = /(?:^|\/)action\.ya?ml$/iu;
 // what a workflow's line says of power, comment lines aside, in any letters: a write permission (`<scope>: write`, the
 // scope quoted or not, the value after a tag or an anchor, or on the next line), write-all, or the secrets in any form

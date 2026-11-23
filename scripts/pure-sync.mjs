@@ -31,7 +31,7 @@ import { readCore } from "./core-path.mjs";
 import { followsOf, hostSaid, inBare, releasesIn } from "./releases.mjs";
 import { asEarlier, plan, unformed } from "./converge.mjs";
 import { BLOCKS, CORE_YML, whole } from "./core-owned.mjs";
-import { WORKFLOW } from "./comment-only.mjs";
+import { WORKFLOW } from "./power.mjs";
 import { fresh, kind } from "./fresh.mjs";
 import { privateOf } from "./host-private.mjs";
 import { project } from "./steps.mjs";
