@@ -119,7 +119,10 @@ const tmp = scratchDir("copy-left-out-test-");
 // (no sign-in reaches a staged check: any variable named as a token, secret, password, credential, key or npm's auth
 // is left out)
 const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$|PR_|BASE_SHA$|CALLER$|CORE_AT$)|_BASE$|TOKEN|SECRET|PASSWORD|CREDENTIAL|_KEY$|_AUTH|^NPM_CONFIG_.*AUTH/iu.test(name)));
-Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid",
+// (an invented account's no-reply address, its id 0, which GitHub gives no account; the personal-terms workflow's
+// pair passes it: #460, point 2)
+const address = `0+t@${["users", "noreply", "github", "com"].join(".")}`;
+Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: address, GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: address,
   GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "core.autocrlf", GIT_CONFIG_VALUE_0: "false" });
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const put = (dir, files) => { for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); } };

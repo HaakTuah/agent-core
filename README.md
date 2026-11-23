@@ -633,6 +633,9 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   saying how the session takes it out (core archive 207); only the random id of a link to a Claude Code session, which
   can hold a short term by chance, is left unread (#261), and `LICENSE` and `NOTICE`, at the root and in `core/`,
   while they keep the shape the check's header gives, so a copyright holder may stand there (floor rule 11; #257).
+  It fails too a commit of the pull request's own whose author's or committer's address is no no-reply one (the
+  account's, `noreply@github.com` or `noreply@anthropic.com`), with or without the secret, save one GitHub made, and
+  reads no commit `main` already holds (#460, point 2).
 - Where another tool is to take a role, any one of: the tool that runs the agents side by side (below); its plug-in in
   the orchestrator's tool, installed and signed in on the machine the sessions run on (for Codex in Claude Code,
   `/codex:setup` says whether it is); or another way, which the manifest's "Tools" table names (how the tool is handed

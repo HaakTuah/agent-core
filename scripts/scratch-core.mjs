@@ -91,6 +91,11 @@ export function hostSays(dir, isPrivate) {
   return answers;
 }
 
+// (the address git writes into each scratch commit: an invented account's no-reply one, its id 0, which GitHub gives
+// no account; the personal-terms check passes it in a pull request's commits, as a project's own runs see them: #460,
+// point 2)
+const ADDRESS = `0+t@${["users", "noreply", "github", "com"].join(".")}`;
+
 // `prefix` names the temporary folder. It gives: `tmp`, that folder; `env`, the environment of every call; `git(dir,
 // ...args)` and `run(dir, ...args)`, git and Node run in a folder (run: the script and its arguments, giving its exit
 // status and what it printed); `core`, the scratch copy of the core, `pin`, its one commit, and `script`, its
@@ -101,7 +106,7 @@ export function scratch(prefix) {
   hostSays();
   const tmp = scratchDir(prefix);
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
-  Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" });
+  Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: ADDRESS, GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: ADDRESS, GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" });
   const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
   const run = (dir, ...args) => { const r = spawnSync(process.execPath, args, { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
   const core = path.join(tmp, "the-core");
@@ -179,7 +184,7 @@ export function scratchEnv(theCore, tmp, { findsBare = false } = {}) {
   hostSays();
   const url = `https://github.com/${CORE}`;
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$|CLAUDE_|GH_|NPM_|NUGET_|DOTNET_CLI_HOME$)|^npm_|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(name)));
-  Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid",
+  Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: ADDRESS, GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: ADDRESS,
     GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_ALLOW_PROTOCOL: "file",
     GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_0: url, GIT_CONFIG_KEY_1: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_1: `${url}.git` });
   if (!findsBare) Object.assign(env, { GIT_CONFIG_COUNT: "3", GIT_CONFIG_KEY_2: "safe.bareRepository", GIT_CONFIG_VALUE_2: "explicit" });
