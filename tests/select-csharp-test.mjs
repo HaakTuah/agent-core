@@ -120,6 +120,10 @@ if (started(import.meta.url)) {
   ok(tuple.links.get("tests/T.cs")?.has("src/X.cs"), "a delegate that returns a tuple is reached by its name", JSON.stringify([...tuple.links].map(([f, to]) => [f, [...to]])));
   const lambda = one("namespace App;\nclass X { System.Action<int> a = delegate (int n) { }; }\n", { "tests/T.cs": "using App;\nnamespace Tests;\nclass T { n m; }\n" });
   ok(!lambda.links.get("tests/T.cs")?.has("src/X.cs"), "an anonymous delegate with parameters declares no name");
+  const src = "namespace A { namespace B.C { class Q { delegate void Inner(); } } delegate void Outer(); }\nnamespace E { class P { } }\n";
+  const placed = ["using A.B.C;\nnamespace Tests;\nclass T { Inner i; }\n", "using A;\nnamespace Tests;\nclass T { Outer o; }\n", "using E;\nnamespace Tests;\nclass T { Outer o; Inner i; }\n"]
+    .map(t => !!one(src, { "tests/T.cs": t }).links.get("tests/T.cs")?.has("src/X.cs"));
+  ok(same(placed, [true, true, false]), "a delegate is declared in the namespace it stands in, nested ones joined, and in no other of its file's", JSON.stringify(placed));
   const propsRead = csharpReach({ ...globals, "tests/Tests.csproj": PROJ, "Directory.Build.props": "<Project><ItemGroup><Using Include=\"App\" /></ItemGroup></Project>" }, undefined, nothing);
   ok(propsRead.links.get("tests/RulesTest.cs")?.has("src/Rules.cs"), "a .props file the config reads is read for its <Using> too", JSON.stringify([...propsRead.links].map(([f, to]) => [f, [...to]])));
   const aliased = csharpReach({ ...app, "src/Usings.cs": "global using S = App.Data.Store;\n", "tests/AliasTest.cs": "namespace Tests;\nclass AliasTest { S s; }\n" }, undefined, nothing);

@@ -102,20 +102,54 @@ function pairs(toks) {
   return paired.get(toks);
 }
 
-// The delegates a file declares, by their names: `delegate` then a return type (an anonymous delegate, "delegate {" or
-// "delegate (…) {", and a function pointer, "delegate*", declare none; "delegate (int X, int Y) Pair()" returns a
-// tuple). Each scan goes on where the last stopped (pairs): linear in the tokens.
+// The delegates a file declares, by their full names: `delegate` then a return type (an anonymous delegate, "delegate {"
+// or "delegate (…) {", and a function pointer, "delegate*", declare none; "delegate (int X, int Y) Pair()" returns a
+// tuple), each in the namespace it stands in, read from the tokens as they go: a block's within its braces, inside
+// those around it, and a file-scoped one's to the end. Each scan goes on where the last stopped (pairs): linear in the
+// tokens, and a namespace's full name is made once, where a delegate stands in it.
 function delegates(toks) {
-  const out = [];
+  const out = [], within = namespaces(toks);
   for (let i = 0; i < toks.length; i++) {
+    const next = within.step(i);
+    if (next !== i) { i = next; continue; }
     if (toks[i].v !== "delegate" || ["{", "*"].includes(toks[i + 1]?.v)) continue;
     const start = toks[i + 1]?.v === "(" ? (pairs(toks).get(i + 1) ?? toks.length - 1) + 1 : i + 1;
     if (toks[start]?.v === "{") continue;
     const { name, end } = delegateName(toks, start);
-    if (name) out.push(name);
+    if (name) out.push(join(within.name(), name));
     i = Math.max(i, end - 1);
   }
   return out;
+}
+
+// The namespace a scan of a file's tokens stands in: step(i) reads the token at i, a brace or a namespace's head, and
+// gives where the scan goes on (i, or past the head); name() the full name where it stands.
+function namespaces(toks) {
+  const open = [];
+  let depth = 0, file = { name: "" };
+  const full = f => f.full ?? (f.full = f.up ? join(full(f.up), f.name) : f.name);
+  return {
+    name: () => full(open.at(-1) ?? file),
+    step(i) {
+      const v = toks[i].v;
+      if (v === "{") depth++;
+      else if (v === "}") { depth--; while (open.at(-1)?.depth > depth) open.pop(); }
+      else if (v === "namespace") {
+        const { name, end } = dotted(toks, i + 1);
+        if (toks[end]?.v === ";") file = { name };
+        else if (toks[end]?.v === "{") open.push({ name, up: open.at(-1) ?? file, depth: ++depth });
+        return end;
+      }
+      return i;
+    },
+  };
+}
+
+// A dotted name from `k` on ("App.Rules"), and where it ended.
+function dotted(toks, k) {
+  const parts = [];
+  for (; toks[k]?.t === "id"; k += 2) { parts.push(word(toks[k])); if (toks[k + 1]?.v !== ".") { k++; break; } }
+  return { name: parts.join("."), end: k };
 }
 
 // A delegate's name, from its return type at `k` on (the last word before "(" outside the type's "<>"), and where
@@ -197,9 +231,9 @@ function indexOf(facts) {
   return ix;
 }
 
-// The full names of the types a file declares (x its facts): those the grammar indexes, its delegates in each namespace
-// its types stand in, and Program for top-level statements.
-const declared = x => [...x.r.types, ...delegates(x.r.toks ?? []).flatMap(d => x.placed.map(ns => join(ns, d))), ...(x.program ? ["Program"] : [])];
+// The full names of the types a file declares (x its facts): those the grammar indexes, its delegates, and Program for
+// top-level statements.
+const declared = x => [...x.r.types, ...delegates(x.r.toks ?? []), ...(x.program ? ["Program"] : [])];
 
 // What a changed file of C# no longer does that a test may have reached it by, `was` its text at the base (null where
 // it was not there) and `now` its text: a type it declared there and declares no more (a test that named it may now
