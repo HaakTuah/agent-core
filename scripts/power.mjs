@@ -46,10 +46,11 @@ const SHA = /^[0-9a-f]{40}$/u;
 export const SCRIPT = /\.(?:[cm]?[jt]sx?|sh|bash|zsh|py|ps1|psm1|rb|pl|php|lua|bat|cmd)$/iu;
 const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u;
 const ACTION = /(?:^|\/)action\.ya?ml$/iu;
-// what a workflow's line says of power, comment lines aside: a write permission (`<scope>: write`), write-all, or the
+// what a workflow's line says of power, comment lines aside: a write permission (`<scope>: write`, the scope quoted or
+// not), write-all, or the
 // secrets in any form (`secrets.NAME`, an index, `inherit`, a declared one, `toJSON(secrets)`) but the token the job's
 // own permissions bound (secrets.GITHUB_TOKEN)
-const POWERED = /(?:^|\n)[ \t]*[^#\n][^\n]*?(?:\bwrite-all\b|\b[a-z-]+[ \t]*:[ \t]*["']?write["']?[ \t]*(?:[,}#]|\n|$)|\bsecrets\b(?!\.GITHUB_TOKEN\b))/u;
+const POWERED = /(?:^|\n)[ \t]*[^#\n][^\n]*?(?:\bwrite-all\b|\b[a-z-]+["']?[ \t]*:[ \t]*["']?write["']?[ \t]*(?:[,}#]|\n|$)|\bsecrets\b(?!\.GITHUB_TOKEN\b))/u;
 const PERMISSIONS = /(?:^|\n)permissions[ \t]*:/u;
 // a call to GitHub, the network or `git push`, as a script's text shows it
 export const CALLS = /\bfetch[ \t]*\(|\bnode:(?:https?|http2|net|tls|dgram)\b|\brequire\([ \t]*["'](?:https?|http2|net|tls|dgram)["']|\bXMLHttpRequest\b|\bWebSocket\b|\bcurl\b|\bwget\b|\bInvoke-(?:WebRequest|RestMethod)\b|\burllib\b|\brequests\.(?:get|post|put|patch|delete|request)\b|\bgh[ \t]+(?:api|pr|issue|release|run|repo|workflow|auth|secret|label|search)\b|["']gh["']|api\.github\.com|\bGH_TOKEN\b|\bGITHUB_TOKEN\b|\bgit[ \t]+(?:push|fetch|clone|pull|ls-remote)\b|["'](?:push|fetch|clone|pull|ls-remote)["']/u;
@@ -183,21 +184,34 @@ function namedIn(name, text, all, byBase = new Map()) {
 
 // What a script that loads a module by a name it builds may load: the scripts directly in each folder of the tree that a
 // string names (from the root, or from the script's own folder) on a line that loads so, or on the line that sets a
-// name such a line uses (`const FOLDER = ...`). A built name that holds no such string comes from what calls the script,
+// name such a line uses (`const FOLDER = ...`), and where a template builds the rest of the name (`./steps/${name}.mjs`),
+// every script under the folder its fixed start names. A built name that holds no such string comes from what calls the script,
 // which names the module itself, or from a package installed by what is in the set by its place.
+// A string on such a line as a folder from where it stands: the whole of a plain one, a template's fixed start up to the
+// last folder it names whole; none for a plain string that names a variable (`$DIR`) or for an empty start.
+function folderOf(quoted) {
+  const built = quoted.indexOf("${");
+  if (built === -1 && quoted.includes("$")) return null;
+  const bare = (built === -1 ? quoted : quoted.slice(0, quoted.lastIndexOf("/", built) + 1)).replace(/^(?:\.\/)+|\/+$/gu, "");
+  return bare === "" || bare === "." ? null : { bare, built: built !== -1 };
+}
+
 function loadable(name, text, own) {
   const folder = path.posix.dirname(name), folders = new Set(own.map((other) => path.posix.dirname(other)));
   const lines = text.split("\n"), loading = lines.filter((line) => BUILT.test(line));
   const used = new Set(loading.flatMap((line) => line.match(/[A-Za-z_$][\w$]*/gu) ?? []));
   const setting = lines.filter((line) => [...line.matchAll(/\b(?:const|let|var)[ \t]+([A-Za-z_$][\w$]*)[ \t]*=/gu)].some(([, id]) => used.has(id)));
-  const named = new Set();
+  const named = new Set(), under = new Set();
   for (const line of [...loading, ...setting]) {
-    for (const [, quoted] of line.matchAll(/["'`]([^"'`\s$]+)["'`]/gu)) {
-      const bare = quoted.replace(/^(?:\.\/)+|\/+$/gu, "");
-      for (const at of [path.posix.normalize(path.posix.join(folder, bare)), bare]) if (at !== "." && at !== folder && folders.has(at)) named.add(at);
+    for (const [, quoted] of line.matchAll(/["'`]([^"'`\s]+)["'`]/gu)) {
+      const start = folderOf(quoted);
+      if (start === null) continue;
+      for (const at of [path.posix.normalize(path.posix.join(folder, start.bare)), start.bare]) {
+        if (start.built) { if (at !== "." && at !== ".." && !at.startsWith("../")) under.add(at); } else if (at !== "." && at !== folder && folders.has(at)) named.add(at);
+      }
     }
   }
-  return own.filter((other) => SCRIPT.test(other) && named.has(path.posix.dirname(other)));
+  return own.filter((other) => SCRIPT.test(other) && (named.has(path.posix.dirname(other)) || [...under].some((at) => other.startsWith(`${at}/`))));
 }
 
 // A tree on disk: every file under `root`, .git and node_modules aside.

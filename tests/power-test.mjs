@@ -71,6 +71,14 @@ const pythonForms = setOf(tree({
 }));
 ok(show(pythonForms) === ".github/workflows/q.yml, dyn/__init__.py, dyn/mod.py, lib/__init__.py, lib/mod.py, pkg/__init__.py, pkg/alpha.py, pkg/beta.py, pkg/delta.py, pkg/gamma.py, run.py",
   "a Python import over several lines, in brackets or after a backslash, one after a ';', and a module loaded by a plain string join the set; a module none names stays out", show(pythonForms));
+// a write permission whose scope is quoted, and a module loaded by a template whose folder is fixed, join the set too
+const quotedAndTemplate = setOf(tree({
+  ".github/workflows/r.yml": "on: push\npermissions: { \"contents\": \"write\" }\njobs:\n  a:\n    steps:\n      - run: node scripts/load.mjs\n",
+  "scripts/load.mjs": "const name = process.argv[2];\nawait import(`./tasks/${name}.mjs`);\n",
+  "scripts/tasks/one.mjs": "", "scripts/tasks/deep/two.mjs": "", "scripts/other.mjs": "",
+}));
+ok(show(quotedAndTemplate) === ".github/workflows/r.yml, scripts/load.mjs, scripts/tasks/deep/two.mjs, scripts/tasks/one.mjs",
+  "a workflow whose write permission names its scope in quotes is powered, and a template's fixed folder brings in every script under it; another folder stays out", show(quotedAndTemplate));
 ok(show(bareNames) === ".github/workflows/m.yml, scripts/helper.js, scripts/lib/index.js, scripts/run.cjs, tools/go.py, tools/util.py",
   "a module named without its extension joins the set as its language loads it: helper.js, a folder's index.js, a Python module; one not named stays out", show(bareNames));
 const files = {
