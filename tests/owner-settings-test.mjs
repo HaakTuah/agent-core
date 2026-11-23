@@ -78,48 +78,42 @@ try {
     review(call(w).replace("  issue_comment:\n    types: [created, edited]\n", "  issue_comment:\n").replace("    needs: queue\n    if: ${{ !cancelled() }}\n    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n", "").replace("jobs:", "permissions: write-all\njobs:"));
     ok(statesOf(privately, root)["security-review-required"].given === true, `a private repository whose call is given ${said}: read from the ruleset`);
   }
+  const perms = "    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n", ons = /on:\n  pull_request:\n.*\n  issue_comment:\n.*\n/;
   for (const [text, said] of [[call("    with:\n      private: ${{ vars.PRIVATE }}\n"), "an input read only at its run"], ["jobs: [\n", "no YAML"],
     ["jobs:\n  other:\n    uses: x/y/.github/workflows/z.yml@b\n    with:\n      private: true\n", "no call of the core's security review"],
     [call("    with:\n      private: true\n").replace(/^  (queue|security-review):\n    /gm, "  - "), "jobs as a list, which GitHub refuses"],
-    [call("    with:\n      private: true\n").replace("if: ${{ !cancelled() }}", "if: false"), "a condition on its call other than the kit's"],
-    [call("    with:\n      private: true\n").replace(/on:\n  pull_request:\n.*\n  issue_comment:\n.*\n/, "on: [push]\n"), "no pull request among its triggers"],
-    [call("    with:\n      private: true\n").replace("types: [opened, reopened, synchronize, ready_for_review]", "types: [closed]"), "a pull request's types the kit's do not hold"],
-    [call("    with:\n      private: true\n").replace("    types:", "    branches: [release]\n    types:"), "a filter of branches"],
-    [call("    with:\n      private: true\n").replace(/  issue_comment:\n.*\n/, ""), "no comment among its triggers, through which alone a pull request of Dependabot's or a fork's gets the status"],
-    [call("    with:\n      private: true\n").replace("types: [created, edited]", "types: [deleted]"), "a comment's types the kit's do not hold"],
-    [call("    with:\n      private: true\n").replace(/on:\n  pull_request:\n.*\n  issue_comment:\n.*\n/, "on: [pull_request, issue_comment]\n"), "GitHub's own types of a pull request, which leave out a draft marked ready"],
-    [call("    with:\n      private: true\n").replace("types: [opened, reopened, synchronize, ready_for_review]", "types: [opened, reopened, synchronize]"), "a pull request's types without a draft marked ready"],
-    [call("    with:\n      private: true\n").replace("      statuses: write\n", "      statuses: read\n"), "a job given no right to write statuses"],
-    [call("    with:\n      private: true\n").replace("    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n", ""), "no permissions given, left to the repository's default"],
-    [call("    with:\n      private: true\n").replace("    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n", "").replace("jobs:", "permissions: {}\njobs:"), "a workflow that grants nothing"],
-    [call("    with:\n      private: true\n").replace("    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n", "    permissions:\n      statuses: write\n"), "a call granted statuses alone, less than the review asks"],
-    [call("    with:\n      private: true\n").replace("      contents: read\n      pull-requests: read\n      issues: read\n", "      contents: none\n"), "a queue's call granted less than it asks"],
+    [call("    with:\n      private: true\n").replace(perms, ""), "no permissions given, left to the repository's default"],
+    [call("    with:\n      private: true\n").replace(perms, "").replace("jobs:", "permissions: {}\njobs:"), "a workflow that grants nothing"],
     [call("    with:\n      private: true\n").replace(/  queue:\n[\s\S]*?(?=  security-review:)/, ""), "a job needed that is not there"],
-    [call("    with:\n      private: true\n").replace("queue-only.yml", "other.yml"), "a call of another workflow, whose asks are not read"],
-    [call("    with:\n      private: true\n").replace("jobs:", "concurrency:\n  group: x\n  cancel-in-progress: true\njobs:"), "a concurrency, by which a later run may cancel the one that posts"],
-    [call("    with:\n      private: true\n").replace("    types:", "    paths: ['docs/**']\n    types:"), "a filter of paths"],
-    [call("    with:\n      private: true\n").replace("    if: ${{ !cancelled() }}\n", ""), "a job it needs and no condition, so skipped where that job fails"],
     [`# private: true\n${call("    with:\n      private: false\n")}`, "only a comment that says it, not the call"]]) {
     review(text);
     const st = statesOf(privately, root)["security-review-required"];
     ok(said.startsWith("only") ? st.given === null && /^does not apply/.test(st.said) : st.given === null && /^not read: /.test(st.said), `a private repository whose call holds ${said}: ${said.startsWith("only") ? "not asked for" : "said not read, never not for it"}`, st.said);
   }
-  for (const [text, said] of [[call("").replace("if: ${{ !cancelled() }}", "if: false"), "a condition on its call other than the kit's"],
-    [call("").replace(/on:\n  pull_request:\n.*\n  issue_comment:\n.*\n/, "on: [push]\n"), "no pull request among its triggers"],
-    [call("").replace("    types:", "    branches: [release]\n    types:"), "a filter of branches"],
-    [call("").replace(/  issue_comment:\n.*\n/, ""), "no comment among its triggers"],
-    [call("").replace("    if: ${{ !cancelled() }}\n", ""), "a job it needs and no condition"],
-    [call("").replace("types: [opened, reopened, synchronize, ready_for_review]", "types: [closed]"), "a pull request's types the kit's do not hold"],
-    [call("").replace("    types:", "    paths: ['docs/**']\n    types:"), "a filter of paths"],
-    [call("").replace(/on:\n  pull_request:\n.*\n  issue_comment:\n.*\n/, "on: [pull_request, issue_comment]\n"), "GitHub's own types of a pull request"],
-    [call("").replace("      statuses: write\n", "      statuses: read\n"), "a job given no right to write statuses"],
-    [call("").replace("    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n", "    permissions:\n      statuses: write\n"), "a call granted statuses alone"],
-    [call("").replace("      contents: read\n      pull-requests: read\n      issues: read\n", "      contents: none\n"), "a queue's call granted less than it asks"],
-    [call("").replace("    needs: queue\n", "    needs: [queue, build]\n"), "a job needed that is not there"],
-    [call("").replace("    needs: queue\n", "    needs: queue\n    concurrency: { group: x, cancel-in-progress: true }\n"), "a concurrency on its call"]]) {
-    review(text);
-    const st = statesOf(none, root)["security-review-required"];
-    ok(st.given === null && /^not read: /.test(st.said), `a public repository whose call holds ${said}: said not read, never asked for`, st.said);
+  // each break of a call that would post, in a private repository giving private: true and in a public one
+  for (const [change, said] of [[t => t.replace("if: ${{ !cancelled() }}", "if: false"), "a condition on its call other than the kit's"],
+    [t => t.replace(ons, "on: [push]\n"), "no pull request among its triggers"],
+    [t => t.replace("types: [opened, reopened, synchronize, ready_for_review]", "types: [closed]"), "a pull request's types the kit's do not hold"],
+    [t => t.replace("types: [opened, reopened, synchronize, ready_for_review]", "types: [opened, reopened, synchronize]"), "a pull request's types without a draft marked ready"],
+    [t => t.replace(ons, "on: [pull_request, issue_comment]\n"), "GitHub's own types of a pull request, which leave out a draft marked ready"],
+    [t => t.replace("    types:", "    branches: [release]\n    types:"), "a filter of branches"],
+    [t => t.replace("    types:", "    paths: ['docs/**']\n    types:"), "a filter of paths"],
+    [t => t.replace(/  issue_comment:\n.*\n/, ""), "no comment among its triggers, through which alone a pull request of Dependabot's or a fork's gets the status"],
+    [t => t.replace("types: [created, edited]", "types: [deleted]"), "a comment's types the kit's do not hold"],
+    [t => t.replace("      statuses: write\n", "      statuses: read\n"), "a job given no right to write statuses"],
+    [t => t.replace(perms, "    permissions:\n      statuses: write\n"), "a call granted statuses alone, less than the review asks"],
+    [t => t.replace("      contents: read\n      pull-requests: read\n      issues: read\n", "      contents: none\n"), "a queue's call granted less than it asks"],
+    [t => t.replace("    needs: queue\n", "    needs: [queue, build]\n"), "a job needed that is not there"],
+    [t => t.replace("queue-only.yml", "other.yml"), "a call of another workflow, whose asks are not read"],
+    [t => t.replace("jobs:", "concurrency:\n  group: x\n  cancel-in-progress: true\njobs:"), "a concurrency, by which a later run may cancel the one that posts"],
+    [t => t.replace("    needs: queue\n", "    needs: queue\n    concurrency: { group: x, cancel-in-progress: true }\n"), "a concurrency on its call"],
+    [t => t.replace("    if: ${{ !cancelled() }}\n", ""), "a job it needs and no condition, so skipped where that job fails"]]) {
+    for (const [w, answers, where] of [["    with:\n      private: true\n", privately, "private"], ["", none, "public"]]) {
+      const broken = change(call(w));
+      review(broken);
+      const st = statesOf(answers, root)["security-review-required"];
+      ok(broken !== call(w) && st.given === null && /^not read: /.test(st.said), `a ${where} repository whose call holds ${said}: said not read, never asked for`, st.said);
+    }
   }
   fs.rmSync(path.join(root, ".github", "workflows", "security-review.yml"));
   if (process.platform !== "win32") { // (a link needs a right of its own on Windows)
