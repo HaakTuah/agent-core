@@ -1,5 +1,5 @@
 // Checks the description check (scripts/pr-description.mjs): a part is there only as a heading that starts
-// with its words. Run by the core's tests workflow (.github/workflows/tests.yml).
+// with its words, and what a description names that its head does not hold (#1136). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/pr-description-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { asked, copyAtBase, doneAsked, DONE_SINCE, missing, PARTS } from "../scripts/pr-description.mjs";
 import { costMend, NO_COST } from "../scripts/pr-cost.mjs";
+import { HEAD_MEND, headMends, keysAt } from "../scripts/pr-head.mjs";
 import { numberMend } from "../scripts/pr-number.mjs";
 import { reasonsMend } from "../scripts/pr-reasons.mjs";
 import { heldAt, waitsMend, waitsOn } from "../scripts/pr-waits.mjs";
@@ -20,7 +21,7 @@ const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); i
 const whole = "The change.\n\n## What the owner can try\n\nOpen it.\n\n## Readings taken\n\nNone.\n";
 
 // the names pr-description.mjs exported before its split (#888)
-ok(["CHANGED_SINCE", "COST_SINCE", "DONE_SINCE", "HOLDS", "MANIFEST_MAX", "NO_COST", "NUMBER_SINCE", "PARTS", "PLAN_SINCE", "READS_SINCE", "REASONS", "REASONS_SINCE", "UNREADABLE", "WAITS", "WAITS_SINCE", "YES_SINCE", "asked", "calledFor", "copyAtBase", "costMend", "differencesAdded", "doneAsked", "heldAt", "missing", "numberMend", "planAsked", "reasonsMend", "waitsMend", "waitsOn"].every(n => n in facade), "pr-description.mjs still exports each name it exported before its split");
+ok(["CHANGED_SINCE", "COST_SINCE", "DONE_SINCE", "HEAD_SINCE", "HOLDS", "MANIFEST_MAX", "NO_COST", "NUMBER_SINCE", "PARTS", "PLAN_SINCE", "READS_SINCE", "REASONS", "REASONS_SINCE", "UNREADABLE", "WAITS", "WAITS_SINCE", "YES_SINCE", "asked", "calledFor", "copyAtBase", "costMend", "differencesAdded", "doneAsked", "headMends", "heldAt", "missing", "numberMend", "planAsked", "reasonsMend", "waitsMend", "waitsOn"].every(n => n in facade), "pr-description.mjs still exports each name it exported before its split");
 ok(missing(whole).length === 0, "a description with both headings passes");
 ok(missing("### What the owner can try\nx\n###### readings TAKEN (the unsure first)\nx\n").length === 0, "any level of heading, any case, and words after the part's own");
 ok(missing("## What the owner can try: nothing yet\r\n## Readings taken, the unsure first\r\n").length === 0, "a mark after the part's words, and lines that end both ways");
@@ -78,6 +79,28 @@ const slow = Date.now();
 missing(`${"#".repeat(300000)} x\n${"## ".repeat(100000)}\n${" ".repeat(300000)}# Readings taken\n`.repeat(3));
 numberMend(`## What holds it\n- Number: x${".".repeat(64000)}y${" ".repeat(64000)}\n`);
 ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in no time, its line \"Number:\" too");
+// what the description names that its head does not hold (pr-head.mjs; #1136): an archive key, a placeholder
+{
+  const keys = new Set(["218", "262", "#733.2", "#1084"]);
+  const fails = (body, own = true) => headMends(body, { keys, own }).mends;
+  ok(fails("Behind it: core archive 218, Core archive #733.2 and archive item #1084; archive item 262.\n").length === 0, "a key the head's archive holds passes, by number or by issue, in any case");
+  ok(fails("Adds archive item #1136, and core archive 263.\n\n`archive item 264`\n").map(m => /^line (\d+) .*"(.*)"/u.exec(m).slice(1).join(" ")).join() === "1 archive item #1136,1 core archive 263,3 archive item 264",
+    "a key it does not hold fails, by line and as written, in code marks too");
+  ok(fails("archive item 263", false).length === 0 && fails("core archive 263", false).length === 1, "in a project, whose own archive may key its items otherwise, only \"core archive N\" is read");
+  ok(fails("> a finding: archive item 263 is taken\nIt read \"core archive 999\" and “core archive 998” as examples.\n<!-- core archive 997 -->\n<!--\nTBD\n-->\n").length === 0,
+    "a quoted line, words in double quotes and an HTML comment, one over lines too, are not read");
+  ok(headMends("core archive 263", { keys: null }).mends.length === 0 && /not read here: no archive could be read/u.test(headMends("core archive 263", { keys: null }).notes.join()), "where no archive can be read, no key is asked, and it says so");
+  ok(keysAt(".")?.has("218") && keysAt(".")?.has("#1084") && keysAt(scratchDir("pr-head-none-")) === null, "the keys are read from the archive at the root given, both its forms; none where it holds none");
+  ok(["TBD", "TODO: the test", "XXX", "FIXME", "(to be added here)", "- to be added", "1. To be added", "Tests: to  be added"].every(t => fails(`The change.\n${t}\n`).length === 1),
+    "a placeholder fails: a word of the list in capitals, and \"to be added\" where it opens a bracket, a line or a list item, or follows a colon");
+  ok(["todo", "TODOs", "a line to be added to the list", "`TODO`", "```\nFIXME\n```", "a \"TODO\""].every(t => fails(`The change.\n${t}\n`).length === 0),
+    "  but not the word in small letters or in a longer word, \"to be added\" in a sentence, nor one in code marks or double quotes");
+  const all = fails("core archive 263\nTBD\n");
+  ok(all.length === 2 && all.every(m => mended(`FAIL ${m}`) && m.includes(HEAD_MEND)), "each failure says its mend");
+  const slow = Date.now();
+  headMends(`${" ".repeat(200000)}x\n- ${" ".repeat(200000)}x\n:${" ".repeat(200000)}x\n${"`".repeat(100000)}\n${"<!--".repeat(50000)}\n${"\"".repeat(100001)}\n${"core archive ".repeat(20000)}\n`, { keys });
+  ok(Date.now() - slow < 2000, "a long description of blanks, marks and quotes is read in no time");
+}
 // the copy whose history says which lines are asked: where the base's manifest puts the core, never the head's (#455)
 {
   const tmp = scratchDir("pr-description-copy-");

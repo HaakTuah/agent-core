@@ -11,7 +11,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    shape and refuse where it fails, as floor topic 5 asks, its hostile tests trying each case. Each answers in 5 s at
    most, as its hostile tests time it (`scripts/hostile.mjs`), and each JSON it parses is nested 200 deep at most
    (`scripts/guards.mjs`); its limits name what it reads beyond that.
-   - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the lines it asks in `scripts/pr-waits.mjs`, `scripts/pr-cost.mjs`, `scripts/pr-number.mjs` and `scripts/pr-reasons.mjs`, and the line
+   - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the lines it asks in `scripts/pr-waits.mjs`, `scripts/pr-cost.mjs`, `scripts/pr-number.mjs`, `scripts/pr-reasons.mjs` and `scripts/pr-head.mjs`, and the line
      "Read for it:" by `scripts/reading.mjs`, and the line "Never needed:" by `scripts/read-total.mjs`, line by line);
      limits: none of its own on the text, which GitHub holds to 65,536 characters; 100 commits, one page; 8 s for the
      reading list's calls; hostile tests: `tests/hostile-pr-text-test.mjs`.
