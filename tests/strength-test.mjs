@@ -22,6 +22,10 @@ const SCRIPT = fileURLToPath(new URL("../scripts/strength.mjs", import.meta.url)
 // ---- the row, the baseline's place, the lines ----
 ok(same(toolOf("| *mutation tool* | `mutator run --mutate {lines}` |"), { command: ["mutator", "run", "--mutate", "{lines}"] }) && same(toolOf("| *mutation tool* | `none`: no tool reads GDScript |"), { none: "no tool reads GDScript" }) && toolOf("| *dose* | `in debt` |") === null && toolOf("| *mutation tool* | soon |") === null,
   "the row names the tool's command, or none with its reason; a project with no row, or a row with nothing in backticks, has none named");
+// (a row of any length is read in one pass: a reason of 400,000 spaces then a word, read far inside the time a reading
+// that tries each start in turn would take; #1107)
+{ const at = Date.now(), long = toolOf(`| *mutation tool* | \`none\`: r${" ".repeat(400000)}a${" ".repeat(1000)}|`);
+  ok(long?.none?.length === 400002 && Date.now() - at < 2000, "a row of any length is read in one pass", `${Date.now() - at} ms`); }
 ok(baselineOf({ baseline: "checks/shape-baseline.json" }) === "checks/strength-baseline.json" && baselineOf({ baseline: ".github/shape-baseline.json" }) === ".github/strength-baseline.json", "the baseline stands beside the shape check's");
 ok(linesArg(new Map([["a.js", new Set([3, 1, 2, 7])], ["b.js", new Set([5])]])) === "a.js:1-3,a.js:7-7,b.js:5-5", "the lines are told as runs, <file>:<first>-<last>, joined by commas");
 

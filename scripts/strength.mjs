@@ -38,7 +38,7 @@ import path from "node:path";
 import { CODE, OTHER } from "./code-shape.mjs";
 import { logged, parseBounded } from "./guards.mjs";
 import { pathIn } from "./reading.mjs";
-import { notLinked, parseBaseline, parseConfig, where } from "./shape.mjs";
+import { notLinked, parseBaseline, parseConfig, rowToken, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 import { Refused, SURVIVED, counted, faultsOf, refuse } from "./strength-report.mjs";
 import { again, kindOf, lowered, needed, recordsWhole, verdict, watched } from "./strength-verdict.mjs";
@@ -63,12 +63,9 @@ export function rulesHere(root = ".") {
 // The row that names the mutation tool: { command } (its words), { none } (the reason given), or null where there is
 // no row. The command is the row's first text in backticks.
 export function toolOf(rules) {
-  const line = String(rules ?? "").split(/\r?\n/u).find(l => l.includes(ROW));
-  if (!line) return null;
-  const said = /`([^`]+)`/u.exec(line.slice(line.indexOf(ROW) + ROW.length))?.[1]?.trim();
-  if (!said) return null;
-  if (said === "none") return { none: line.slice(line.indexOf("`none`") + 6).replace(/^[\s:|,;-]+|[\s|]+$/gu, "") };
-  return { command: said.split(/\s+/u) };
+  const token = rowToken(rules, ROW);
+  if (!token?.said) return null;
+  return token.said === "none" ? { none: token.reason } : { command: token.said.split(/\s+/u) };
 }
 
 // Where the baseline stands: beside the shape check's.

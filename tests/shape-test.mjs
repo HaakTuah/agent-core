@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { fileOf, groupOf, LONG, MARKS, notLinked, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
+import { fileOf, groupOf, LONG, MARKS, notLinked, offBy, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
 import { READERS } from "../scripts/shape-readers.mjs";
 import { LARGEST } from "../scripts/tree-walk.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -492,9 +492,21 @@ put("README.md", "A scratch project.\n");
 commit("a project");
 let r = run([]);
 ok(r.status === 0 && /has not written its config of the shape check yet/.test(r.out) && /nothing was held/.test(r.out), "a project with no config and no base passes, and says that nothing was held", r.out);
+put("core-manifest.md", "| *shape check* | `none` |\n"); r = run([]);
+let noReason = /turns nothing off/.test(r.out) && /nothing was held/.test(r.out);
+put("core-manifest.md", "| *shape check* | `none ` |\n"); r = run([]);
+noReason &&= /turns nothing off/.test(r.out) && /nothing was held/.test(r.out); // (padded inside its backticks, no reason all the same)
 git("branch", "before");
 r = run([], { SHAPE_BASE: "before" });
 ok(r.status === 0 && /nothing new in how the code is put together against before, by the starter kit's config/.test(r.out), "with a base, a project with no config is held to the starter kit's, the base as its baseline: what stood passes", r.out);
+put("core-manifest.md", "| *shape check* | `none`: . |\n"); r = run([]);
+noReason &&= /turns nothing off/.test(r.out); // (a reason with no letter or digit is none)
+put("core-manifest.md", "| *shape check* | `none`: kept off |\n"); r = run([], { SHAPE_BASE: "before" });
+const turning = r.status === 0 && /::warning::this pull request turns the shape check off .*kept off.*so it runs here/.test(r.out) && /nothing new in how the code is put together/.test(r.out);
+commit("off"); git("branch", "off"); git("reset", "-q", "HEAD~1"); // (a base that is off, the commit taken back out of the branch's history)
+r = run([], { SHAPE_BASE: "off" });
+ok(noReason && turning && r.status === 0 && /^ok {3}the shape check is off: .*kept off/m.test(r.out) && !/nothing new/.test(r.out), "only a `none` with a reason that its base holds too turns the check off: one this pull request writes runs, saying so, and one with no reason turns nothing off, padded or not", r.out);
+fs.rmSync(path.join(dir, "core-manifest.md"));
 put("src/rules/more.js", long("another", 61));
 put("src/rules/more.test.js", long("inATest", 200));
 put("core/scripts/copied.js", long("theCores", 200));
@@ -610,6 +622,37 @@ put("checks/new.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf
 r = run(["checks/new.json"], { SHAPE_BASE: "base" });
 ok(r.status === 1 && mended(r.out) && /raises or drops 1 mark/.test(r.out), "a config named anew on the command line is compared with the one the base's rules name", r.out);
 fs.rmSync(path.join(dir, "checks/new.json"));
+// (a pull request that turns the check off keeps the config's path of the project's own in the row, which the config's
+// other readers read, and runs on it: Codex's findings on #1188)
+git("mv", "checks/shape.json", "checks/other.json");
+put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/other.json` |\n");
+commit("the config at a path of the project's own"); git("branch", "named");
+put("core-manifest.md", "| *shape check* | `none`: kept off |\n");
+r = run([], { SHAPE_BASE: "named" });
+ok(r.status === 1 && mended(r.out) && /no longer names the config at checks\/other\.json/.test(r.out) && /config `checks\/other\.json`/.test(r.out),
+  "a pull request that turns the check off and drops the config's path its base names fails, its mend keeping the path in the row", r.out);
+put("core-manifest.md", "| *shape check* | `none`: kept off; config `checks/other.json` |\n");
+r = run([], { SHAPE_BASE: "named" });
+ok(r.status === 0 && /::warning::this pull request turns the shape check off/.test(r.out) && /nothing new in how the code is put together/.test(r.out) && where(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8")) === "checks/other.json",
+  "a pull request that turns the check off and keeps the config's path in the row runs on that config, which the other readers read too", r.out);
+// (and so does one a pull request later, once the check is off, and a path the reason quotes is not taken for the config
+// nor the path for part of the reason: round 5 of #1188's review)
+commit("turned off, the path kept"); git("branch", "-f", "named");
+put("core-manifest.md", "| *shape check* | `none`: kept off |\n");
+r = run([], { SHAPE_BASE: "named" });
+ok(r.status === 1 && mended(r.out) && /no longer names the config at checks\/other\.json/.test(r.out),
+  "a pull request that drops the config's path where its base turned the check off fails all the same, with the mend", r.out);
+put("core-manifest.md", "| *shape check* | `none`: kept off, as `old.json` said; config `checks/other.json` |\n");
+r = run([], { SHAPE_BASE: "named" });
+ok(r.status === 0 && /ok {3}the shape check is off: the manifest's \*shape check\* row says `none`: kept off, as `old\.json` said \(/.test(r.out) && where(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8")) === "checks/other.json" && offBy("| *shape check* | `none`; config `checks/other.json` |") === "",
+  "in a row that says `none`, the config is the path after \"config\", and the reason stops before it", r.out);
+git("reset", "-q", "--hard", "base"); git("branch", "-D", "-q", "named");
+// (a reason of any length is read in one pass: 400,000 spaces then a word, read far inside the time a reading that
+// tries each start in turn would take; #1107)
+{ const at = Date.now(), long = offBy(`| *shape check* | \`none\`: r${" ".repeat(400000)}a |`), path = offBy("| *shape check* | `none`: r;  config `x.json` |"), not = offBy("| *shape check* | `none`: r; myconfig `x.json` |");
+  ok(long?.length === 400002 && path === "r" && not === "r; myconfig `x.json`" && Date.now() - at < 2000, "a reason of any length is read in one pass, and only a path after the word \"config\" is taken off it", `${Date.now() - at} ms`); }
+{ const row = "| *shape check* | `none`: config `a.json` broke; config `b.json` |";
+  ok(where(row) === "b.json" && offBy(row) === "config `a.json` broke", "the config is the path the reason ends with, the one taken off it, where the reason names another", `${where(row)} / ${offBy(row)}`); }
 
 if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)
   fs.renameSync(path.join(dir, "checks/shape-baseline.json"), path.join(dir, "elsewhere.json"));
