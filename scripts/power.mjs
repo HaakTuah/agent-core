@@ -44,8 +44,8 @@ import { started } from "./started.mjs";
 const SHA = /^[0-9a-f]{40}$/u;
 // a file of text, data or a picture, which runs nothing by itself (an action's own action.yml aside)
 const INERT = /\.(?:md|markdown|txt|rst|adoc|json|jsonc|ya?ml|csv|tsv|png|jpe?g|gif|svg|webp|ico|bmp|pdf)$/iu;
-// a script, by its name: a file whose text is read for a call that makes it a seed
-export const SCRIPT = /\.(?:[cm]?[jt]sx?|sh|bash|zsh|py|ps1|psm1|rb|pl|php|lua|bat|cmd)$/iu;
+// a script or a compiled language's source, by its name: a file whose text is read for a call that makes it a seed
+export const SCRIPT = /\.(?:[cm]?[jt]sx?|sh|bash|zsh|py|ps1|psm1|rb|pl|php|lua|bat|cmd|go|rs|java|kts?|scala|groovy|cs|fs|vb|swift|dart|exs?|r|jl|c|cc|cpp|h|hpp)$/iu;
 const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u;
 const ACTION = /(?:^|\/)action\.ya?ml$/iu;
 // what a workflow's line says of power, comment lines aside, in any letters: a write permission (`<scope>: write`, the
@@ -55,7 +55,7 @@ const ACTION = /(?:^|\/)action\.ya?ml$/iu;
 const POWERED = /(?:^|\n)[ \t]*[^#\n][^\n]*?(?:\bwrite-all\b|\b[a-z-]+["']?[ \t]*:(?:[ \t]*#[^\n]*)?\s*(?:[!&][^\s]*\s+)*["']?write["']?[ \t]*(?:[,}#]|\n|$)|\bsecrets\b(?!\.GITHUB_TOKEN\b))/iu;
 const PERMISSIONS = /(?:^|\n)permissions[ \t]*:/u;
 // a call to GitHub, the network or `git push`, as a script's text shows it
-export const CALLS = /\bfetch[ \t]*\(|\bnode:(?:https?|http2|net|tls|dgram)\b|\b(?:require\([ \t]*|from[ \t]+|import[ \t]+)["'](?:https?|http2|net|tls|dgram)["']|\bXMLHttpRequest\b|\bWebSocket\b|\bcurl\b|\bwget\b|\bInvoke-(?:WebRequest|RestMethod)\b|\burllib\b|\brequests\.(?:get|post|put|patch|delete|request)\b|\bgh[ \t]+(?:api|pr|issue|release|run|repo|workflow|auth|secret|label|search)\b|["']gh["']|api\.github\.com|\bGH_TOKEN\b|\bGITHUB_TOKEN\b|\bgit[ \t]+(?:push|fetch|clone|pull|ls-remote)\b|["'](?:push|fetch|clone|pull|ls-remote)["']/u;
+export const CALLS = /\bfetch[ \t]*\(|\bnode:(?:https?|http2|net|tls|dgram)\b|\b(?:require\([ \t]*|from[ \t]+|import[ \t]+)["'](?:https?|http2|net|tls|dgram)["']|\bXMLHttpRequest\b|\bWebSocket\b|\bcurl\b|\bwget\b|\bInvoke-(?:WebRequest|RestMethod)\b|\burllib\b|\bsocket\b|\bhttp\.client\b|\bhttpx\b|\baiohttp\b|\bNet::HTTP\b|["']net\/http["']|\bjava\.net\b|\bSystem\.Net\b|\bHttpClient\b|\breqwest\b|\bURLSession\b|\b(?:ssh|scp|rsync|nc)[ \t]+|\brequests\.(?:get|post|put|patch|delete|request)\b|\bgh[ \t]+(?:api|pr|issue|release|run|repo|workflow|auth|secret|label|search)\b|["']gh["']|api\.github\.com|\bGH_TOKEN\b|\bGITHUB_TOKEN\b|\bgit[ \t]+(?:push|fetch|clone|pull|ls-remote)\b|["'](?:push|fetch|clone|pull|ls-remote)["']/u;
 // a module a script loads by a name written whole (`import x from "y"`, `import "y"`, `export * from "y"`, `import("y")`,
 // `require("y")`, `module.require("y")`, `require 'y'`), the name a string of its own (one inside another string, a
 // test's fixture, loads nothing), or by a name built at run time that does not start as a path; and Node's own modules
@@ -145,8 +145,8 @@ const git = (args, cwd, input) => execFileSync("git", args, { cwd, input, encodi
 // submodule's pointer (a gitlink) is a path of it, among its `links`.
 export function gitTree(commit, cwd) {
   const entries = git(["ls-tree", "-r", "-z", "--full-tree", "-l", commit], cwd).split("\0").filter(Boolean).map((line) => {
-    const [meta, name] = line.split("\t");
-    const [, type, sha, size] = meta.split(/ +/u);
+    const tab = line.indexOf("\t"), name = line.slice(tab + 1);
+    const [, type, sha, size] = line.slice(0, tab).split(/ +/u);
     return { name, type, sha, size: Number(size) };
   });
   const links = new Set(entries.filter((entry) => entry.type === "commit").map((entry) => entry.name));

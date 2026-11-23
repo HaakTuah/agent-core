@@ -74,6 +74,17 @@ const seeds = {
   "a script that loads a package": ["x.mjs", "import axios from \"axios\";\n"],
   "a #! file that pushes": ["publish", "#!/bin/sh\ngit push\n"],
   "a script that cannot be read": ["x.sh", null],
+  "a Python script on a socket": ["x.py", "import socket\nsocket.create_connection((host, 80))\n"],
+  "a Python script on http.client": ["x.py", "import http.client\n"],
+  "a Python script on httpx": ["x.py", "import httpx\n"],
+  "a Python script on aiohttp": ["x.py", "import aiohttp\n"],
+  "a Ruby script on Net::HTTP": ["x.rb", "Net::HTTP.get(uri)\n"],
+  "a Go file on net/http": ["x.go", "import \"net/http\"\n"],
+  "a C# file on HttpClient": ["X.cs", "using System.Net.Http;\nnew HttpClient();\n"],
+  "a Java file on java.net": ["X.java", "import java.net.URL;\n"],
+  "a Rust file on reqwest": ["x.rs", "reqwest::get(url)\n"],
+  "a shell script on ssh": ["x.sh", "ssh host true\n"],
+  "a shell script on rsync": ["x.sh", "rsync -a out/ host:out/\n"],
 };
 for (const [what, [seed, text]] of Object.entries(seeds)) {
   const got = setOf(tree({ [seed]: text, "scripts/a.mjs": "", "tools/b.sh": "", "README.md": "", "data.json": "{}" }));
@@ -199,6 +210,7 @@ fs.mkdirSync(sub);
 git(sub, "init", "-q", "-b", "main");
 write(sub, ".github/workflows/p.yml", "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node vendor/tool.md/run.mjs\n");
 write(sub, "README.md", "one\n");
+write(sub, "scripts/a\tb.sh", "echo 1\n");
 git(sub, "add", "-A");
 git(sub, "update-index", "--add", "--cacheinfo", `160000,${sha(1)},vendor/tool.md`);
 git(sub, "commit", "-q", "-m", "base");
@@ -208,6 +220,7 @@ git(sub, "commit", "-q", "-m", "the submodule moved");
 const subMoved = git(sub, "rev-parse", "HEAD");
 const subWhy = new Map(), subSet = setOf(gitTree(subMoved, sub), subWhy);
 const subChanged = (parent, at) => git(sub, "diff-tree", "-r", "--no-renames", "--name-only", parent, at).split("\n").filter(Boolean);
+ok(subWhy.get("scripts/a\tb.sh") === "runs" && !subSet.has("scripts/a"), "a name with a tab in it is read whole from a commit's tree", JSON.stringify([...subWhy]));
 ok(subWhy.get("vendor/tool.md") === "runs" && !subSet.has("README.md")
   && lightOf([commit(subBase, sha(0)), commit(subMoved, subBase)], { setAt: (at) => setOf(gitTree(at, sub)), changed: subChanged }).length === 0,
   "a submodule's pointer joins the set beside a seed, read from a commit, whatever its name ends in, and a commit that moves it is not light", JSON.stringify([...subWhy]));
