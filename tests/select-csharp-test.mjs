@@ -105,5 +105,30 @@ const r = csharpReach({ ...csTexts, "src/Lost.cs": "namespace App;\nclass Lost {
 ok(same([...r.unsure], ["src/Lost.cs"]), "a file the grammar loses is unsure, and no other", JSON.stringify([...r.unsure]));
 ok(readCsharp(app["src/Rules.cs"]) === readCsharp(app["src/Rules.cs"]), "a text read once is not parsed again");
 
+// ---- each word of the lists, and each head of a file before its statements ----
+const one = (src, extra = {}) => csharpReach({ "src/App.csproj": PROJ, "tests/T.cs": "namespace Tests;\nclass T { }\n", "src/X.cs": src, ...extra }, undefined, nothing);
+const hooks = ["ModuleInitializer", "AssemblyInitialize", "AssemblyCleanup", "GlobalTestInitialize", "GlobalTestCleanup", "SetUpFixture", "BeforeEvery", "AfterEvery"]
+  .map(w => [w, `namespace H;\nclass X { [${w}] void Go() { } }\n`])
+  .concat(["IIncrementalGenerator", "ISourceGenerator"].map(w => [w, `namespace H;\nclass X : ${w} { }\n`]),
+    ["Assembly", "TestSession", "TestDiscovery"].map(w => [`Before(${w})`, `namespace H;\nclass X { [Before(${w})] void Go() { } }\n`]),
+    [["[module: …]", "[module: System.Security.UnverifiableCode]\nnamespace H;\nclass X { }\n"], ["After(Assembly)", "namespace H;\nclass X { [After(Assembly)] void Go() { } }\n"]]);
+const runs = hooks.filter(([, src]) => !one(src).links.get("tests/T.cs")?.has("src/X.cs") || one(src).unsure.size).map(([w]) => w);
+ok(!runs.length, "each hook's word, a generator's interface, TUnit's Before and After of the assembly, the session and discovery, and a module's attribute make a file reached from every file, and none unsure", runs.join(", "));
+ok(!one("namespace H;\nclass X { [Before(Test)] void Go() { } }\n").links.get("tests/T.cs")?.has("src/X.cs"), "a hook of each test is no hook of the assembly");
+const reflectWords = ["Activator.CreateInstance(t)", "a.GetTypes()", "a.ExportedTypes", "a.DefinedTypes", "s.AddControllers()", "s.AddControllersWithViews()", "s.AddMvc()", "s.AddMvcCore()",
+  "s.AddRazorPages()", "a.MapControllers()", "a.MapRazorPages()", "a.MapRazorComponents()", "m.AddApplicationPart(a)", "s.AddAutoMapper(a)", "s.AddMediatR(a)", "GetAssemblies()", "Type.GetType(n)", "typeof(X).Assembly"];
+const missed = reflectWords.filter(w => !same([...one(`namespace R;\nclass X { void Go() { var r = ${w}; } }\n`).unsure], ["src/X.cs"]));
+ok(!missed.length, "each word that finds types by reflection or scans an assembly makes its file unsure, and no other", missed.join(", "));
+ok(!one("namespace R;\nclass X { void Go() { var t = x.GetType(); } }\n").unsure.size, "a GetType of an object, not of Type, makes no file unsure");
+const named = (src, test = "namespace Tests;\nclass T { object f = new Factory<Program>(); }\n") => one(src, { "tests/T.cs": test }).links.get("tests/T.cs")?.has("src/X.cs");
+const heads = [["extern alias", "extern alias Old;\nusing App;\nvar x = 1;\n"], ["a generic alias", "using L = System.Collections.Generic.List<System.Collections.Generic.List<int>>;\nvar x = new L();\n"],
+  ["a global using", "global using App;\nvar x = 1;\n"], ["an attribute of the assembly", "using App;\n[assembly: A]\n[assembly: B]\nvar x = 1;\n"]];
+const notProgram = heads.filter(([, src]) => !named(src)).map(([w]) => w);
+ok(!notProgram.length, "a file of top-level statements is Program past its using directives, extern aliases, generic aliases and attributes", notProgram.join(", "));
+const declares = ["public", "internal", "private", "protected", "static", "sealed", "abstract", "partial", "readonly", "ref", "unsafe", "file", "new", "extern"].map(m => [m, `using App;\n${m} class X { }\n`])
+  .concat(["struct", "interface", "enum", "record"].map(t => [t, `using App;\n${t} X { }\n`]), [["delegate", "using App;\npublic delegate void X();\n"], ["namespace", "using App;\nnamespace H { class X { } }\n"]]);
+const asProgram = declares.filter(([, src]) => named(src)).map(([w]) => w);
+ok(!asProgram.length, "a file that declares a type, behind any modifier, is no Program", asProgram.join(", "));
+
 console.log(`${count - failed} of ${count} passed`);
 process.exitCode = failed ? 1 : 0;

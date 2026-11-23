@@ -125,8 +125,10 @@ const extending = toks => toks.some((k, i) => (k.v === "this" && toks[i - 1]?.v 
 // TUnit's "Before(Assembly)" and its kin.
 const runsUnnamed = (toks, words) => words.some(w => HOOKS.has(w)) || toks.some((k, i) => k.v === "[" && ["assembly", "module"].includes(toks[i + 1]?.v) && toks[i + 2]?.v === ":")
   || toks.some((k, i) => ["Before", "After"].includes(k.v) && toks[i + 1]?.v === "(" && ["Assembly", "TestSession", "TestDiscovery"].includes(toks[i + 2]?.v));
-// Whether a file finds types by reflection or scans an assembly for them.
-const reflecting = (toks, words) => words.some(w => REFLECTS.has(w) || (/Assembl(y|ies)/u.test(w) && !HOOKS.has(w)))
+// Whether a file finds types by reflection or scans an assembly for them; TUnit's "Before(Assembly)" names no scan.
+const hookOf = (toks, i) => toks[i - 1]?.v === "(" && ["Before", "After"].includes(toks[i - 2]?.v);
+const reflecting = (toks, words) => words.some(w => REFLECTS.has(w))
+  || toks.some((k, i) => k.t === "id" && /Assembl(y|ies)/u.test(word(k)) && !HOOKS.has(word(k)) && !hookOf(toks, i))
   || toks.some((k, i) => k.v === "Type" && toks[i + 1]?.v === "." && toks[i + 2]?.v === "GetType");
 
 // What a file holds that bears on its reach: its own namespaces, the namespaces its types stand in, its words, its runs
