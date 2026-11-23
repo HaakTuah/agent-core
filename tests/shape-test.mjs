@@ -647,6 +647,10 @@ r = run([], { SHAPE_BASE: "named" });
 ok(r.status === 0 && /ok {3}the shape check is off: the manifest's \*shape check\* row says `none`: kept off, as `old\.json` said \(/.test(r.out) && where(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8")) === "checks/other.json" && offBy("| *shape check* | `none`; config `checks/other.json` |") === "",
   "in a row that says `none`, the config is the path after \"config\", and the reason stops before it", r.out);
 git("reset", "-q", "--hard", "base"); git("branch", "-D", "-q", "named");
+// (a reason of any length is read in one pass: 400,000 spaces then a word, read far inside the time a reading that
+// tries each start in turn would take; #1107)
+{ const at = Date.now(), long = offBy(`| *shape check* | \`none\`: r${" ".repeat(400000)}a |`), path = offBy("| *shape check* | `none`: r;  config `x.json` |"), not = offBy("| *shape check* | `none`: r; myconfig `x.json` |");
+  ok(long?.length === 400002 && path === "r" && not === "r; myconfig `x.json`" && Date.now() - at < 2000, "a reason of any length is read in one pass, and only a path after the word \"config\" is taken off it", `${Date.now() - at} ms`); }
 
 if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)
   fs.renameSync(path.join(dir, "checks/shape-baseline.json"), path.join(dir, "elsewhere.json"));

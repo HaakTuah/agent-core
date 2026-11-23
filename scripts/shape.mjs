@@ -646,9 +646,19 @@ const trimTail = text => {
 export function offBy(manifest) {
   const token = rowToken(manifest, "*shape check*");
   if (token?.said !== "none") return null;
-  const reason = token.reason.replace(/[\s;,]*\bconfig `[^`]*`\s*$/u, ""); // (the config's path is no part of the reason)
+  const reason = withoutConfig(token.reason);
   return /[\p{L}\p{N}]/u.test(reason) ? reason : "";
 }
+
+// A reason with the config's path it ends with (`; config \`<path>\``) taken off, which is no part of it: the path
+// found from the end, then the separators before it, in one pass (a pattern that started at each place would not).
+const withoutConfig = reason => {
+  const at = reason.lastIndexOf("config `");
+  if (at < 0 || /\w/u.test(reason[at - 1] ?? "") || !/^config `[^`]*`$/u.test(reason.slice(at))) return reason;
+  let end = at;
+  while (end > 0 && /[\s;,]/u.test(reason[end - 1])) end -= 1;
+  return reason.slice(0, end);
+};
 
 // ---- the verdict ----
 
