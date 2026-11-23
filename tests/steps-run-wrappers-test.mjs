@@ -4,7 +4,7 @@
 //
 //   node tests/steps-run-wrappers-test.mjs
 import { linear, inMemory, stepped, coreCall, copiesOf, notRead } from "../scripts/steps-kit.mjs";
-import { STEPS, Unread, configs, runsOwn } from "../scripts/steps.mjs";
+import { configs, runsOwn } from "../scripts/steps.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -79,13 +79,9 @@ ok(["sudo -u bot node --no-warnings core/scripts/copies.mjs config/c.json", "sud
 ok(copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs >|log config/c.json") }) === "config/c.json" && copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs {fd}>log config/c.json") }) === "config/c.json",
   "a redirection that writes over a file, or names its descriptor, takes no argument");
 // (Codex's review of 2240d78: a node run of the copy's script behind any word the reader does not know is not read; a
-// brace expansion is filled when it runs; a companion run the reader cannot place proves nothing)
+// brace expansion is filled when it runs)
 ok(notRead("copies", { "a.yml": stepped("timeout 60s node core/scripts/copies.mjs config/c.json") }) && notRead("copies", { "a.yml": stepped("node core/scripts/copies.mjs config/{copies,other}.json") })
   && copiesOf({ "a.yml": stepped('node core/scripts/copies.mjs "config/{c}.json"') }) === "config/{c}.json",
   "a node run of the script behind a word the reader does not know, and an unquoted brace expansion, are not read; a quoted brace is text");
-const companion = STEPS.find(s => s.lead === "12 November 2026, exact versions");
-let companionThrew = null;
-try { companion.check(inMemory({ "a.yml": stepped("node core/scripts/licences.mjs l.json\ncd tools && node scripts/exact-versions.mjs l.json") }, { "package-lock.json": "{}" })); } catch (e) { companionThrew = e; }
-ok(companionThrew instanceof Unread, "a companion run the reader cannot place is not read as the core's", String(companionThrew));
 
 done("steps-run-wrappers");
