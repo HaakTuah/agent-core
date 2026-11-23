@@ -12,10 +12,10 @@
 // word, by a line that quotes the step's lead ("13 November 2026, the core has moved"): such a step is not reported.
 // The sync runs this from the copy it has just written (sync.mjs, beside this file), so a sync reports every step
 // not done, a standing one too, and never fails over one: nothing waits on a step, and running it twice changes
-// nothing. It reads only, but where it is told to write: a step whose work is exact, a check's own config or baseline,
-// a pointer's path, or the manifest's module lines placed from what is read (#1094), has a writer ("write",
-// step-writers.mjs beside this file; #1091), which --write runs where its step is not done, never on a file with changes
-// not yet committed, and lists what it wrote; a step that needs judgement has none. Node's own modules and git only.
+// nothing. It reads only, but where it is told to write: a step whose work is exact, a check's own config or baseline
+// or a pointer's path, has a writer ("write", step-writers.mjs beside this file; #1091), which --write runs where its step
+// is not done, never on a file with changes not yet committed, and lists what it wrote; a step that needs judgement has
+// none. Node's own modules and git only.
 //
 //   node core/scripts/steps.mjs                  from a project's root: the steps not done, each with its mend; nothing else
 //   node core/scripts/steps.mjs --write          each writer of a step not done run, and what it wrote listed, for a pull
@@ -137,7 +137,7 @@ export function written(root, steps = STEPS) {
 // `how` "aside" where they stand in the stash ASIDE, "put back" where git could not make one and each was put back.
 export function writeReport(done, how = null) {
   if (!done.length) return "No step left a script could write (`core/scripts/steps.mjs --write`).";
-  const kept = " No word of a rule's text is written, but a pointer's path and the manifest's module lines.", later = "once this sync's pull request merges, on a fresh branch from `main`,";
+  const kept = " No word of a rule's text is written, but a pointer's path.", later = "once this sync's pull request merges, on a fresh branch from `main`,";
   const head = !done.some(d => d.wrote?.length) ? "The steps' writers wrote nothing (`core/scripts/steps.mjs --write`)."
     : how === "aside" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), then set aside in the stash "${ASIDE}", so this sync stays a pure one: ${later} run \`git stash list\` and \`git stash pop stash@{N}\`, N the number it gives the stash "${ASIDE}" (or \`node core/scripts/steps.mjs --write\` again, which writes the same) and commit them in a pull request of its own, with the usual reviews.${kept}`
     : how === "put back" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), and put back as they stood, since git could not set them aside, so this sync stays a pure one: ${later} run \`node core/scripts/steps.mjs --write\` and commit what it writes in a pull request of its own, with the usual reviews.${kept}`
