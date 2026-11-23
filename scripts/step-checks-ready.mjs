@@ -106,7 +106,8 @@ export const callers = p => (readable(p, text => text.toLowerCase().includes(`${
 // Each workflow of the project's own whose pull-request path filter starts it on a change to such a file alone, as
 // GitHub reads a filter (a path filter sees which files changed, never what changed in them); null where none does. A
 // workflow that selects its suites through the copy's select.mjs is left out: the selection counts the copy's files
-// as the step asks, and a workflow in which only a pin moved as no change (#1093, point 2).
+// as the step asks, and a workflow in which only a pin moved as no change (#1093, point 2). It is left out whole, since
+// which of its jobs runs a suite no reader tells exactly: the step's `partly` leaves another job's to the review.
 export function suitesOnPins(p) {
   const pins = callers(p);
   readable(p, text => /paths(-ignore)?\s*:/.test(text));

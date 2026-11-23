@@ -711,19 +711,24 @@ if (started(import.meta.url)) {
 
 // The exact-versions check (exact-versions.mjs) and the lookup of each package new to the project in npm's registry
 // (lookup.mjs), run beside the licence check on the config at `configPath`, each printing its lines: whether either
-// failed. What stood at the pull request's base before the exact-versions check came is reported, never failed, and a
-// pull request whose checkout holds no base has its lookup said as a warning that it did not run, failing nothing
-// ("Nothing locks a project" in the core's AGENTS.md).
-async function alongside(configPath, root) {
+// failed. The base is the one the job names (LOOKUP_BASE), else the merge's first parent. What stood there before the
+// exact-versions check came is reported, never failed, and a pull request whose checkout holds no base has its lookup
+// said as a warning that it did not run, failing nothing ("Nothing locks a project" in the core's AGENTS.md), save
+// where the job names a base its checkout lacks, as the core's licences.yml does, which fails as lookup.mjs does.
+export async function alongside(configPath, root) {
   const { report } = await import("./exact-versions.mjs");
   const { run, namedBase, summarise } = await import("./lookup.mjs");
-  const base = baseOf(root);
-  const exact = report(resolve(configPath), root, base ? (f) => textAt(root, base, f) : null);
+  const at = namedBase(root) ?? baseOf(root);
+  const exact = report(resolve(configPath), root, at ? (f) => textAt(root, at, f) : null);
   for (const line of exact.err) console.error(line);
   for (const line of exact.out) console.log(line);
-  const at = namedBase(root) ?? base;
   if (!at && process.env.GITHUB_EVENT_NAME?.startsWith("pull_request")) {
-    console.log("::warning::The lookup of the packages new to the project did not run: this is a pull request, and its checkout holds no base to read it against. Mend: give the job's checkout fetch-depth: 2 (the pull request merged into its base, with both parents)");
+    const mend = "give the job's checkout fetch-depth: 2 (the pull request merged into its base, with both parents)";
+    if (/^[0-9a-f]{40}$/u.test(process.env.LOOKUP_BASE ?? "")) {
+      console.error(`FAIL: the lookup of the packages new to the project cannot run: the job names the pull request's base (LOOKUP_BASE), and its checkout does not hold that commit. Mend: ${mend}`);
+      return true;
+    }
+    console.log(`::warning::The lookup of the packages new to the project did not run: this is a pull request, and its checkout holds no base to read it against. Mend: ${mend}`);
     return exact.status !== 0;
   }
   const { lines, code } = await run(configPath, { root, base: at });

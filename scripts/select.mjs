@@ -154,13 +154,13 @@ function copyChange(f, { add, wholes, copy, copyTests }) {
   return null;
 }
 
-// The tests that reach a file naming the copy's folder: as a path ("core/scripts/x.mjs"), its last folder so too, or as
-// a quoted piece of one (path.join("core", ...)). A test that imports the copy's scripts is one whose imports the
-// readers cannot follow, which reaches every file (wholes); a test that neither names the copy nor imports from it
-// cannot run it.
+// The tests that reach a file naming the copy's folder: as a path ("core/scripts/x.mjs", or with backslashes as Windows
+// writes one), its last folder so too, or as a quoted piece of one (path.join("core", ...)). A test that imports the
+// copy's scripts is one whose imports the readers cannot follow, which reaches every file (wholes); a test that neither
+// names the copy nor imports from it cannot run it.
 function copyReaching(texts, reaches, copy) {
   const esc = t => t.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&"), folder = copy.replace(/\/$/u, "");
-  const naming = new RegExp(`(?:^|[^\\w.-])(?:${esc(folder)}|${esc(folder.split("/").pop())})(?:/|["'\`])`, "u");
+  const naming = new RegExp(`(?:^|[^\\w.-])(?:${esc(folder).replace(/\//gu, "[\\\\/]+")}|${esc(folder.split("/").pop())})(?:[\\\\/]|["'\`])`, "u");
   const names = new Set(Object.keys(texts).filter(t => naming.test(texts[t])));
   return [...reaches].filter(([, files]) => [...files].some(x => names.has(x))).map(([t]) => t);
 }

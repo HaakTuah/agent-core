@@ -324,7 +324,7 @@ function writeKit(o, here, pin, out) {
   if (fs.existsSync(installer)) {
     // (every install of the copy's, an older pin's (--at) as its installer knows them: #719)
     const r = spawnSync(process.execPath, [installer, ...everyInstall(path.join(here, "core"))], { cwd: here, encoding: "utf8" });
-    if (r.status !== 0) console.log(`note the core's packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node core/scripts/install.mjs before running a check`);
+    if (r.status !== 0) console.log(`note the core's packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: none is needed for the checks, which install them themselves before they read (#1093); to install them now, run \`if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\``);
   }
   const made = [];
   if (!there("checks/sizes.json")) { write("checks/sizes.json", `${JSON.stringify(sizes(Object.fromEntries(startOf(Object.fromEntries(out)).filter(there).map(f => [f, sizeOf(path.join(here, f))]))), null, 2)}\n`); made.push("checks/sizes.json"); }

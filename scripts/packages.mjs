@@ -245,6 +245,8 @@ export function installStep(which = FIRST) {
 // nothing (didNotRun()): in a copy, wherever it is not installed once its install was tried (#1093, point 1); in the
 // core, only where the job was told its install could not reach the registry, in a pull request (install.mjs; #654,
 // point 4). A script that can go on without the package checks this first, keeping every failure it found without it.
+// In a copy this takes in an install the installer refused, its lock file changed among them: a warning, not a failure,
+// rests on core.yml's step "The copy is the core at its pin", which fails a changed copy; a change there weighs this too.
 export function unreached(name) {
   return !installed(name) && (process.env.CORE_PACKAGES_UNREACHED === "1" || (!own && installOf(name) !== null));
 }

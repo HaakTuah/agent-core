@@ -230,7 +230,7 @@ function install(dir) {
   // (every install of the copy's, the parser's too, for the session that works in the project: #719)
   const r = spawnSync(process.execPath, [script, ...everyInstall(dir)], { encoding: "utf8" });
   process.stdout.write(r.stdout ?? "");
-  if (r.status !== 0) console.log(`note the copy is written, but its packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node ${path.relative(process.cwd(), script)} before running a check`);
+  if (r.status !== 0) console.log(`note the copy is written, but its packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: none is needed for the checks, which install them themselves before they read (#1093); to install them now, run \`if [ -f ${path.relative(process.cwd(), script)} ]; then node ${path.relative(process.cwd(), script)}; fi\``);
 }
 
 // The core is fetched into a temporary folder, removed however the sync ends.

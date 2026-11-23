@@ -280,13 +280,14 @@ put("core-manifest.md", `# Manifest\n\nCore: HaakTuah/agent-core at ${sha}, copi
 put("core/scripts/x.mjs", "export const x = 1;\n"); put("core/setup/notes.md", "notes\n"); put("core/.node-version", "24\n");
 put("test/copy.test.js", "import { spawnSync } from 'node:child_process';\nspawnSync(process.execPath, ['core/scripts/x.mjs']);\n");
 put("test/joined.test.js", "import path from 'node:path';\nexport const at = path.join('core', 'scripts');\n");
+put("test/windows.test.js", "import { spawnSync } from 'node:child_process';\nspawnSync(process.execPath, ['core\\\\scripts\\\\x.mjs']);\n");
 put(".github/workflows/core.yml", pinOf(sha));
 git("add", "-A"); git("commit", "-q", "-m", "a copy");
 put("core/scripts/x.mjs", "export const x = 2;\n"); put("core/setup/notes.md", "more notes\n"); put(".github/workflows/core.yml", pinOf("b".repeat(40)));
 git("add", "-A"); git("commit", "-q", "-m", "a sync");
 r = run([], { SELECT_BASE: "HEAD^1" });
-ok(r.status === 0 && /test\/copy\.test\.js: can run the copy of the core/.test(r.out) && /test\/joined\.test\.js: can run the copy of the core/.test(r.out) && !/test\/rules\.test\.js/.test(r.out) && !/whole suite/.test(r.out),
-  "a sync's change selects the tests that name the copy alone: the rest of the copy, and a workflow in which only a pin moved, select none", r.out);
+ok(r.status === 0 && /test\/copy\.test\.js: can run the copy of the core/.test(r.out) && /test\/joined\.test\.js: can run the copy of the core/.test(r.out) && /test\/windows\.test\.js: can run the copy of the core/.test(r.out) && !/test\/rules\.test\.js/.test(r.out) && !/whole suite/.test(r.out),
+  "a sync's change selects the tests that name the copy alone, by a path Windows writes too: the rest of the copy, and a workflow in which only a pin moved, select none", r.out);
 put(".github/workflows/core.yml", `${pinOf("c".repeat(40))}    secrets: inherit\n`);
 git("add", "-A"); git("commit", "-q", "-m", "more than a pin");
 r = run([], { SELECT_BASE: "HEAD^1" });

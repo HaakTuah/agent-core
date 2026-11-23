@@ -9,7 +9,7 @@
 import { readable } from "../scripts/licence-yes.mjs";
 import { installed } from "../scripts/packages.mjs";
 import { keysOf } from "../scripts/schemas.mjs";
-import { actionLists, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
+import { actionLists, alongside, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
 import { execFileSync } from "node:child_process";
 import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -201,6 +201,38 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
         apart.slice(0, 5).map((x) => JSON.stringify(x)).join("\n"));
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+// The checks run beside the licence check (#1093, point 2) read against the base the job names (LOOKUP_BASE), as the
+// lookup does, where the checkout holds the head and not a merge: a range that stood there is reported, never failed;
+// and a base the job names that the checkout does not hold fails, saying its mend, where the lookup would warn.
+{
+  const dir = scratchDir("licences-test-alongside-");
+  const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+  const git = (...args) => execFileSync("git", args, { cwd: dir, env: gitEnv, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  const was = { log: console.log, error: console.error, event: process.env.GITHUB_EVENT_NAME, base: process.env.LOOKUP_BASE };
+  const run = async (base) => {
+    const lines = [];
+    console.log = console.error = (l) => lines.push(String(l));
+    process.env.GITHUB_EVENT_NAME = "pull_request"; process.env.LOOKUP_BASE = base;
+    try { return { failed: await alongside(join(dir, "c.json"), dir), out: lines.join("\n") }; } finally { console.log = was.log; console.error = was.error; }
+  };
+  try {
+    git("init", "-q");
+    writeFileSync(join(dir, "c.json"), JSON.stringify({ ships: ["package.json"], lockfiles: ["package-lock.json"] }));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", dependencies: { a: "^1.2.3" } }));
+    writeFileSync(join(dir, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": { name: "p", dependencies: { a: "^1.2.3" } }, "node_modules/a": { version: "1.2.3", license: "MIT", resolved: "https://registry.npmjs.org/a/-/a-1.2.3.tgz" } } }));
+    git("add", "-A"); git("commit", "-q", "-m", "base");
+    const base = git("rev-parse", "HEAD");
+    writeFileSync(join(dir, "x.txt"), "x"); git("add", "-A"); git("commit", "-q", "-m", "head");
+    const named = await run(base);
+    ok(!named.failed && /stood so at the pull request's base: reported, never failed/u.test(named.out) && !/^FAIL/mu.test(named.out), "on a checkout of the head, a range that stood at the base the job names is reported, never failed", named.out);
+    const lacking = await run("f".repeat(40));
+    ok(lacking.failed && /^FAIL: the lookup of the packages new to the project cannot run: the job names the pull request's base \(LOOKUP_BASE\), and its checkout does not hold that commit\. Mend: /mu.test(lacking.out), "a base the job names that its checkout does not hold fails the lookup, saying its mend", lacking.out);
+  } finally {
+    for (const [k, v] of [["GITHUB_EVENT_NAME", was.event], ["LOOKUP_BASE", was.base]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 process.exit(failed ? 1 : 0);
