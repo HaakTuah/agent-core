@@ -41,23 +41,28 @@ const headText = [
   "**Stood bare.** By default x, worded anew.", "",
   "**Added bare.** By default x. The one condition that changes it: a. The one condition that changes it: b.", "",
   `**Added whole.** ${whole}`, "",
+  "**Added plain.** By default x. Reason: z. Held by a check.", "",
   "**Describes.** See elsewhere, and more.", "",
   "**Points elsewhere.** See the other file.", "",
-  `- **Parent.** ${whole}`, "  - **Nested.** By default x.", "",
+  "- **Parent.** By default x. The one condition that changes it: a. Reason: z. Held by a check.",
+  "  - **Nested.** By default x. The one condition that changes it: b.", "",
 ].join("\n");
 const head = [...rulesOf(file, headText), ...rulesOf("tasks/y.md", "**Moved.** By default x.\n")];
 const holders = { [`${file}: Points elsewhere`]: "describes", [`${file}: Describes`]: "describes", [`${file}: Nested`]: ["describes", "audit"], [`${file}: Added bare`]: "check: scripts/describes.mjs" };
 const { added, changed } = judge(head, base, holders);
 const leads = list => list.map(r => r.lead).sort().join(", ");
-ok(leads(added) === "Added bare, Added whole, Nested, Parent", "the rules a change adds are those whose lead the base holds nowhere; one moved to another file is not added, one marked \"describes\" alone not read, and one a check of that name holds is read");
+ok(leads(added) === "Added bare, Added plain, Added whole, Nested, Parent", "the rules a change adds are those whose lead the base holds nowhere; one moved to another file is not added, one marked \"describes\" alone not read, and one a check of that name holds is read");
 ok(String(added.find(r => r.lead === "Added bare").lacks.map(m => m.part)) === "no reason,no holder,two conditions", "a rule added is read for every mark it lacks");
-ok(String(added.find(r => r.lead === "Nested").lacks.map(m => m.part)) === "no reason,no holder,no condition"
+ok(String(added.find(r => r.lead === "Nested").lacks.map(m => m.part)) === "no reason,no holder"
   && !added.find(r => r.lead === "Parent").lacks.length, "a rule's own text leaves out a rule nested in it, which is read on its own");
 ok(leads(changed) === "Moved, Stood bare", "a rule worded anew, or moved, that lacks a mark is reported; one unchanged, or whole, is not");
 const out = report(head, base, holders, "base");
 ok(out.failed === 6 && out.lines.filter(l => l.startsWith("FAIL")).length === 6 && mended(out.lines.join("\n")), "each mark a rule added lacks fails, by its file and lead, with its mend");
+const mends = out.lines.filter(l => l.startsWith("FAIL")).map(l => l.slice(l.indexOf("Mend: ")));
+ok(["'Reason: …'", "'Held by nothing yet.'", "'Nothing changes it.'", "keep one 'The one condition"].every(w => mends.some(m => m.includes(w))),
+  "each mark's mend says what to write");
 ok(out.lines.some(l => /^tasks\/x\.md: "Stood bare" is worded anew and lacks: no reason, no holder, no condition; reported/u.test(l)), "a rule worded anew is reported with the marks it lacks, and fails nothing");
-ok(report(head.filter(r => !r.lead.startsWith("Added") && r.lead !== "Nested"), base, holders, "base").failed === 0, "a change that adds no rule lacking a mark passes");
+ok(report(head.filter(r => !r.lead.startsWith("Added") && r.lead !== "Nested" && r.lead !== "Parent"), base, holders, "base").failed === 0, "a change that adds no rule lacking a mark passes");
 
 // the check itself, on this repository, as size.yml runs it
 const same = main(["--base", "HEAD"], root);
