@@ -292,6 +292,18 @@ ok(byApp.every((v) => names(v, "(?:the )?fallback(?: reviewer)?")) && unread.why
 ok(byOwn.every((v) => names(v, "your (?:security )?reviewer") && !/Mend: (?:the )?fallback/u.test(v.why)), `elsewhere it names the project's own security reviewer first: ${byOwn.map((v) => status(v, false).description).join(" | ")}`);
 ok(is(across(twice, [summary(onOld), said(`Security review: on ${MID}`)], [HEAD]), true, "posted on an earlier commit, only updates from main since") && is(across(updated, [said(`Security review: on ${HEAD}`)], []), true, "is posted on the pull request") && is(across(updated, [summary(onOld)], { [HEAD]: true }), false, "merge aaaaaaa unproved"), "a review of the merge where it stops, or of the head, stands; a list that is no list proves none");
 ok(is(across(updated, [summary(onOld)], undefined), true, "only updates from main since") && across(updated, [summary(onOld)], [], false).done === true && across(updated, [summary(onOld)], [], false).why.startsWith("before this check came, so not waited for: Codex's review saw ccccccc; merge aaaaaaa"), "given no list of the merges proved (an older workflow) the parents alone are read, as before; a pull request from before the check is told, never held");
+// A light commit (#1134, point 1: one that touches nothing that runs with power, as power.mjs reads it) carries over a
+// review that found nothing blocking; one not light, a review with a blocking finding, and a list not given do not
+{
+  const light = (comments, given, commits = pushed) => judge({ ...pull, commits: commits.length }, comments, [], commits, undefined, true, { light: given });
+  ok(is(light([summary(onOld)], [HEAD]), true, "(on ccccccc, earlier than the head aaaaaaa, only light commits or updates from main since)") && is(light([said(`Security review: on ${OLD}\nBlocking findings: 0.\nOther findings: 1.`)], [HEAD]), true, "only light commits or updates from main since"),
+    "Codex's review that found nothing open, or a posted one that declares nothing blocking, of a commit light commits alone follow, stands for the head");
+  ok(is(light([summary(onOld)], []), false, "Codex saw ccccccc, not head") && is(light([summary(onOld)], undefined), false, "Codex saw") && is(light([said(`Security review: on ${OLD}\nBlocking findings: 1.\nOther findings: 0.`)], [HEAD]), false, "review not on head") && is(light([said(`Security review: on ${OLD}`)], [HEAD]), false, "review not on head"),
+    "a commit not light, no list, or a review with a blocking finding or none declared, asks a review of the head");
+  ok(is(light([summary(onOld)], [HEAD], [step(OLD, "e".repeat(40)), step(HEAD, "f".repeat(40))]), false, "Codex saw") && is(light([summary({ ...open, commit_sha: OLD })], [HEAD]), false, "Codex open finding hidden"),
+    "a light commit whose parent is no commit of the pull request's carries nothing, and Codex's open finding is still answered");
+  ok(status(light([summary(onOld)], [HEAD]), true).description.length <= 140, "its status's words fit GitHub's 140 characters");
+}
 
 // A pure sync (#99): pure-sync.mjs, which the workflow runs, proves it, and it needs no review unless one began by itself.
 const pure = (comments, files) => judge(files === undefined ? pull : counted(pull, files), comments, [], [], files, true, { pure: true });

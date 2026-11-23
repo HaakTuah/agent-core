@@ -77,6 +77,7 @@ const NOT_CHECKS = {
   "nuget-look.sh": "the NuGet check's first look, a part of the row nuget.mjs, which leaves the copy out as that row does",
   "nuget-fetch.mjs": "the NuGet check's fetch, a part of the row nuget.mjs, from the lock files that row reads",
   "clean-merges.mjs": "it reads the pull request's merge commits, never a file of the tree",
+  "power.mjs": "it reads which of the pull request's own commits touch what runs with power, the copy left out, and fails no pull request: where it reads none, each review is asked of the head as before",
   "queue-only.yml": "it runs queue-only.mjs, which fails no pull request: one it does not prove is reviewed as any other",
   "queue-only.mjs": "it reads the pull request's patch, its issues and the default branch's progress file, never the copy, and fails no pull request: one it does not prove is reviewed as any other",
   "core-moved.mjs": "it runs on the daily schedule (look.yml) and fails no pull request",
@@ -89,7 +90,7 @@ const NOT_CHECKS = {
   "signatures.yml": "its one step runs checks.mjs signatures, the row `checks.mjs signatures`",
   "nuget.yml": "its one step runs checks.mjs nuget, whose scripts are the row nuget.mjs and named here",
   "licences.yml": "its steps run licences.mjs, exact-versions.mjs, lookup.mjs and agent-tools.mjs, each a row or named here",
-  "security-review.yml": "its steps run security-review.mjs, pure-sync.mjs, clean-merges.mjs and code-review-wait.mjs, each a row or named here",
+  "security-review.yml": "its steps run security-review.mjs, pure-sync.mjs, clean-merges.mjs, power.mjs and code-review-wait.mjs, each a row or named here",
   "delete-merged-branches.yml": "it deletes merged branches on the host and checks nothing",
   "look.yml": "it runs on the daily schedule and fails no pull request",
 };
