@@ -1,0 +1,128 @@
+// The settings only a project's owner can give (#1085; README.md, "Setting up (the owner's part)"), in one checklist:
+// each setting of owner-settings.json, beside this file, with its state where GitHub lets it be read, a direct link to
+// where it is set and what it protects. The owner takes it in one sitting, a session the owner starts in person, which
+// applies each setting the owner approves, reads it back by running this again and says what is left. It is asked at a
+// project's first taking of the core (init.mjs, and the first copy sync.mjs writes) and again only where a sync brings
+// a setting the list at the old pin did not hold (`--since`, which sync.mjs gives). It reads, and writes nothing, on
+// the host or in the project; it reports and fails nothing (AGENTS.md of the core, "Nothing locks a project"). Git, gh
+// and Node's own modules.
+//
+//   node core/scripts/owner-settings.mjs                                   from a project's root: the checklist
+//   node core/scripts/owner-settings.mjs --since <SHA> --fetched <dir>     the checklist where a setting is new since
+//                                                                          that commit of the core, read from the
+//                                                                          bare repository <dir>; else one line
+import fs from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { repoOf } from "./inbox.mjs";
+import { inBare } from "./releases.mjs";
+import { started } from "./started.mjs";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+export const SETTINGS = JSON.parse(fs.readFileSync(path.join(HERE, "owner-settings.json"), "utf8"));
+const LIST = "scripts/owner-settings.json";
+
+// gh's answer for a route of GitHub's API: { body } or { why }, never a throw. (No gh, no network, a route the account
+// signed in here may not read: each is no answer, said as such.)
+export function ghAsk(route) {
+  const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 24, timeout: 30000 });
+  if (r.status === 0) { try { return { body: JSON.parse(r.stdout) }; } catch { return { why: "GitHub's answer was no JSON" }; } }
+  const code = /\bHTTP (\d{3})\b/.exec(`${r.stderr}`)?.[1];
+  return { why: code ? `GitHub answered ${code}${code === "403" || code === "404" ? ", which it gives an account that may not read it" : ""}` : "gh gave no answer here" };
+}
+
+// Each state: { given: true | false | null, said }; null where it could not be read or does not apply.
+const given = said => ({ given: true, said: said ?? "given" });
+const notGiven = said => ({ given: false, said: `not given${said ? `: ${said}` : ""}` });
+const unread = why => ({ given: null, said: `not read: ${why}` });
+const apart = why => ({ given: null, said: `does not apply here: ${why}` });
+
+// What the rules of the default branch hold (GitHub's rules for a branch, every ruleset's that applies to it).
+function rulesOf(rules) {
+  const types = new Set(rules.map(r => r?.type));
+  const checks = new Set(rules.filter(r => r?.type === "required_status_checks").flatMap(r => r?.parameters?.required_status_checks ?? []).map(c => c?.context));
+  return { types, checks };
+}
+
+// The state of each setting, read from what GitHub answered (`host`: { repo, rules, secrets, actions }, each { body } or
+// { why }) and the project's own files at `root`.
+export function statesOf(host, root) {
+  const repo = host.repo.body, out = {};
+  const scan = key => {
+    if (!repo) return unread(host.repo.why);
+    const status = repo.security_and_analysis?.[key]?.status;
+    if (status === "enabled") return given();
+    if (status === "disabled") return notGiven();
+    return unread("GitHub's answer holds no such setting: the repository has none, or the account signed in here may not see its security settings");
+  };
+  out["secret-scanning"] = scan("secret_scanning");
+  out["push-protection"] = scan("secret_scanning_push_protection");
+  const rules = Array.isArray(host.rules?.body) ? rulesOf(host.rules.body) : null;
+  const branch = repo?.default_branch ?? "the default branch";
+  if (!rules) out.ruleset = unread(host.rules?.why ?? host.repo.why);
+  else {
+    const lacks = [["deletion", "deletions restricted"], ["non_fast_forward", "force pushes blocked"], ["pull_request", "a pull request required"]]
+      .filter(([type]) => !rules.types.has(type)).map(([, said]) => said);
+    if (!rules.checks.has("core / core")) lacks.push("the status check `core / core` required");
+    out.ruleset = lacks.length ? notGiven(`${rules.types.size ? "" : `no ruleset applies to \`${branch}\` (a branch protection of the older kind is not read here); `}it lacks ${lacks.join(", ")}`) : given();
+  }
+  const review = path.join(root, ".github", "workflows", "security-review.yml");
+  // (a regular file of the project's own alone: a link could lead out of it)
+  const text = fs.lstatSync(review, { throwIfNoEntry: false })?.isFile() ? fs.readFileSync(review, "utf8") : null;
+  if (text === null) out["security-review-required"] = apart("the project has no `.github/workflows/security-review.yml`, so nothing posts the status, and a status required that never comes would hold every pull request");
+  else if (repo?.private !== false && !/^\s*private:\s*true\s*$/m.test(text)) out["security-review-required"] = repo ? apart("in a private repository the check posts its status only where its call is given `with: private: true`, and a status required that never comes would hold every pull request") : unread(host.repo.why);
+  else out["security-review-required"] = rules ? (rules.checks.has("security-review") ? given() : notGiven()) : unread(host.rules?.why ?? host.repo.why);
+  const pinned = host.actions?.body?.sha_pinning_required;
+  out["sha-pinning"] = pinned === true ? given() : pinned === false ? notGiven() : unread(host.actions?.why ?? "GitHub's answer holds no such setting");
+  const names = host.secrets?.body?.secrets;
+  out["personal-terms"] = Array.isArray(names) ? (names.some(s => s?.name === "PERSONAL_TERMS") ? given("given (its value is not read)") : notGiven()) : unread(host.secrets?.why ?? host.repo.why);
+  out["reviewer-app"] = unread("GitHub lists a repository's apps on that page to its admins alone, and to no sign-in a session holds");
+  return out;
+}
+
+// What GitHub answers for the repository, asked by `ask` (ghAsk, or a stand-in).
+export function readHost(repo, ask = ghAsk) {
+  const host = { repo: ask(`repos/${repo}`) };
+  const branch = host.repo.body?.default_branch;
+  host.rules = branch ? ask(`repos/${repo}/rules/branches/${encodeURIComponent(branch)}`) : { why: host.repo.why ?? "GitHub named no default branch" };
+  host.secrets = ask(`repos/${repo}/actions/secrets`);
+  host.actions = ask(`repos/${repo}/actions/permissions`);
+  return host;
+}
+
+// The checklist, for `repo` ("owner/name", or null where the origin is on no github.com), the settings `fresh` names
+// marked new; `script` is how a session runs this file from the project's root.
+export function checklist({ repo, states, fresh = null, script }) {
+  const counts = [true, false, null].map(v => SETTINGS.filter(s => states[s.id]?.given === v).length);
+  const head = [
+    `The settings only the owner gives${repo ? `, for ${repo}` : ""} (\`${script}\`; the core's README, "Setting up (the owner's part)"): ${counts[0]} given, ${counts[1]} not, ${counts[2]} not read or not for this repository. Nothing waits on them (the core's AGENTS.md, "Nothing locks a project").`,
+    `Taken in one sitting: the owner starts a session in person, which applies each setting the owner approves, as the owner's own word allows what an agent tool's automatic mode refuses, never one without it; it reads each back by running \`${script}\` again and says what is left.${repo ? "" : " The origin is on no github.com, so nothing was read and no link made: on another host its own protection of the default branch stands in for the ruleset (the core's tasks/hosts.md)."}`,
+  ];
+  const rows = SETTINGS.map(s => `- [${states[s.id]?.given === true ? "x" : " "}] ${s.setting}${fresh?.includes(s.id) ? " (new since the copy before)" : ""}: ${states[s.id]?.said ?? "not read"}. Protects: ${s.protects}.${repo ? ` Set at: https://github.com/${repo}/${s.page}` : ""}`);
+  return [...head, ...rows].join("\n");
+}
+
+// The ids of the list at `sha` of the core, read from the bare repository `bare`; [] where that commit has none.
+export function idsAt(sha, bare) {
+  try { return JSON.parse(inBare(bare, ["show", `${sha}:${LIST}`])).map(s => s.id); } catch { return []; }
+}
+
+function main(argv) {
+  const root = process.cwd(), script = path.relative(root, fileURLToPath(import.meta.url)).split(path.sep).join("/");
+  const since = argv.indexOf("--since"), fetched = argv.indexOf("--fetched");
+  let fresh = null;
+  if (since >= 0) {
+    if (!/^[0-9a-f]{40}$/.test(argv[since + 1] ?? "") || fetched < 0 || !argv[fetched + 1]) { console.error("FAIL: give --since a full SHA of the core and --fetched the bare repository that holds it. Mend: run it as sync.mjs does, or with no argument for the checklist"); return 1; }
+    const old = idsAt(argv[since + 1], path.resolve(argv[fetched + 1]));
+    fresh = SETTINGS.map(s => s.id).filter(id => !old.includes(id));
+    if (!fresh.length) { console.log(`No setting only the owner gives is new since ${argv[since + 1].slice(0, 7)}: the sitting is not asked again (\`${script}\` prints the checklist).`); return 0; }
+  }
+  const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { cwd: root, encoding: "utf8" });
+  const repo = repoOf(origin.stdout);
+  const host = repo ? readHost(repo) : { repo: { why: "the origin is on no github.com" }, rules: null, secrets: null, actions: null };
+  console.log(checklist({ repo, states: statesOf(host, root), fresh, script }));
+  return 0;
+}
+
+if (started(import.meta.url)) process.exitCode = main(process.argv.slice(2));
