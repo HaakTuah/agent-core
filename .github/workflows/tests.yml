@@ -519,6 +519,9 @@ jobs:
       - name: The labels and openers, and their check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/labels-test.mjs ')) }}
         run: node tests/labels-test.mjs
+      - name: A question or idea from a project that names a rule says which of its reasons does not hold
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/reasons-said-test.mjs ')) }}
+        run: node tests/reasons-said-test.mjs
       - name: The settings only the owner gives, in one checklist
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/owner-settings-test.mjs ')) }}
         run: node tests/owner-settings-test.mjs

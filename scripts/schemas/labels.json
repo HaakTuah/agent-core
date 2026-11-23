@@ -84,16 +84,17 @@
     },
     "headings": {
       "type": "object",
-      "mend": "write it as { \"word\", \"design\", \"view\", \"found\", \"current\" }, each a heading as a non-empty string",
+      "mend": "write it as { \"word\", \"design\", \"view\", \"found\", \"current\", \"reasons\" }, each a heading as a non-empty string",
       "mendFor": {
-        "additionalProperties": "take it out; \"headings\" holds \"word\", \"design\", \"view\", \"found\" and \"current\" alone"
+        "additionalProperties": "take it out; \"headings\" holds \"word\", \"design\", \"view\", \"found\", \"current\" and \"reasons\" alone"
       },
       "required": [
         "word",
         "design",
         "view",
         "found",
-        "current"
+        "current",
+        "reasons"
       ],
       "additionalProperties": false,
       "properties": {
@@ -114,6 +115,10 @@
           "minLength": 1
         },
         "current": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reasons": {
           "type": "string",
           "minLength": 1
         }

@@ -19,7 +19,9 @@
 //     findings inline of the last LATE_DAYS days made after their pull request merged, with no reply from an account
 //     the host lets write.
 //   - Steps of a release not done (steps.mjs), in a project.
-//   - Labels and openers to mend (labels.mjs); in GitHub's job, the labels of the core's list made first (#1092).
+//   - Labels and openers to mend (labels.mjs); in GitHub's job, the labels of the core's list made first (#1092); in
+//     the core, beside them, a question or idea from a project that names a rule of the core and leaves its reasons
+//     unsaid (reasons-said.mjs).
 //   - In a project, the settings only the owner gives that the job's token reads as not given (host.mjs), with each
 //     write GitHub refused the job, labelled needs-owner; the host is read once, and the steps read on it run with
 //     the rest.
@@ -61,6 +63,7 @@ import { asked, FOLDER, repoOf } from "./inbox.mjs";
 import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
 import { settingsOf, settingsTask } from "./host.mjs";
 import { hostOf, recordRead, staleOf } from "./look-host.mjs";
+import { reasonsUnsaid } from "./reasons-said.mjs";
 import { pathIn } from "./reading.mjs";
 import { ownerOf } from "./releases.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
@@ -172,7 +175,12 @@ function findingsOf(ctx, reach, last) {
   }
   // labels and openers
   if (reach.yes) {
-    try { const since = sinceHere(), found = check({ ...gather(repo, since), owner, since, core: manifest === null }); add(TITLES.labels, found.length ? labelsReport(found, repo) : null); }
+    try {
+      const since = sinceHere(), got = gather(repo, since), core = manifest === null;
+      // (in the core alone, beside them: a question or idea from a project that names a rule says which reasons do not hold)
+      const found = [...check({ ...got, owner, since, core }), ...(core ? reasonsUnsaid({ issues: got.issues, owner, since }) : [])];
+      add(TITLES.labels, found.length ? labelsReport(found, repo) : null);
+    }
     catch { add(TITLES.labels, null, "the labels and openers could not be read"); }
   }
   // a missed run
