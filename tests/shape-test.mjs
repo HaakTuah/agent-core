@@ -622,6 +622,16 @@ put("checks/new.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf
 r = run(["checks/new.json"], { SHAPE_BASE: "base" });
 ok(r.status === 1 && mended(r.out) && /raises or drops 1 mark/.test(r.out), "a config named anew on the command line is compared with the one the base's rules name", r.out);
 fs.rmSync(path.join(dir, "checks/new.json"));
+// (a pull request that turns the check off runs on the config where its base's manifest names it, at a path of the
+// project's own: Codex's finding on #1188)
+git("mv", "checks/shape.json", "checks/other.json");
+put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/other.json` |\n");
+commit("the config at a path of the project's own"); git("branch", "named");
+put("core-manifest.md", "| *shape check* | `none`: kept off |\n");
+r = run([], { SHAPE_BASE: "named" });
+ok(r.status === 0 && /::warning::this pull request turns the shape check off/.test(r.out) && /nothing new in how the code is put together/.test(r.out),
+  "a pull request that turns the check off where its base names the config at a path of its own runs on that config", r.out);
+git("reset", "-q", "--hard", "base"); git("branch", "-D", "-q", "named");
 
 if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)
   fs.renameSync(path.join(dir, "checks/shape-baseline.json"), path.join(dir, "elsewhere.json"));

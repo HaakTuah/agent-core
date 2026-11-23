@@ -939,9 +939,11 @@ function baseOf() {
 }
 
 // Where the config is: the one named, else the one the project's rules name (its manifest; in the core, its
-// AGENTS.md), else the kit's; null where the project has none yet.
+// AGENTS.md), else the kit's; null where the project has none yet. A row that says `none` and still runs (no reason, or
+// one its base does not hold) names no config, so the check reads the one the base's rules name.
 function configAt(named, self, base) {
-  const at = named ?? where(tolerant(() => fs.readFileSync("core-manifest.md", "utf8")) ?? tolerant(() => fs.readFileSync("AGENTS.md", "utf8")));
+  const manifest = tolerant(() => fs.readFileSync("core-manifest.md", "utf8"));
+  const at = named ?? (base && offBy(manifest) !== null ? baseFiles(base, null).at : where(manifest ?? tolerant(() => fs.readFileSync("AGENTS.md", "utf8"))));
   if (fs.existsSync(notLinked(at))) return aFile(at);
   if (named) refuse(`there is no config at ${at}`, `write it as the starter kit does (core/setup/template/shape.json.tmpl), then node ${self} ${at} --first`);
   const was = base ? baseFiles(base, named) : null; // (where the base's own manifest places it, if this one moved it)
