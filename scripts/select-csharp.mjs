@@ -25,6 +25,7 @@ const HOOKS = new Set(["ModuleInitializer", "AssemblyInitialize", "AssemblyClean
 const REFLECTS = new Set(["Activator", "GetTypes", "ExportedTypes", "DefinedTypes", "AddControllers", "AddControllersWithViews", "AddMvc", "AddMvcCore", "AddRazorPages",
   "MapControllers", "MapRazorPages", "MapRazorComponents", "AddApplicationPart", "AddAutoMapper", "AddMediatR"]);
 
+const RAW = /\$+"""/u;
 const word = k => k.v.replace(/^@/u, "");
 const ids = toks => toks.filter(k => k.t === "id").map(word);
 const prefixes = name => name.split(".").map((_, k, parts) => parts.slice(0, k + 1).join("."));
@@ -83,15 +84,24 @@ function topLevel(toks) {
   return i < toks.length && !TYPE.has(toks[i].v);
 }
 
+// The token past the ")" that closes the "(" at toks[k].
+function pastParens(toks, k) {
+  let depth = 0;
+  for (; k < toks.length; k++) if (toks[k].v === "(") depth++; else if (toks[k].v === ")" && --depth === 0) return k + 1;
+  return k;
+}
+
 // The delegates a file declares, by their names: `delegate` then a return type, the name the last word before "(" at the
-// top level of the type's "<>" (an anonymous delegate, "delegate (" or "delegate {", and a function pointer, "delegate*",
-// declare none).
+// top level of the type's "<>" (an anonymous delegate, "delegate {" or "delegate (…) {", and a function pointer,
+// "delegate*", declare none; "delegate (int X, int Y) Pair()" returns a tuple).
 function delegates(toks) {
   const out = [];
   for (let i = 0; i < toks.length; i++) {
-    if (toks[i].v !== "delegate" || ["(", "{", "*"].includes(toks[i + 1]?.v)) continue;
+    if (toks[i].v !== "delegate" || ["{", "*"].includes(toks[i + 1]?.v)) continue;
+    const start = toks[i + 1]?.v === "(" ? pastParens(toks, i + 1) : i + 1;
+    if (toks[start]?.v === "{") continue;
     let depth = 0, name = null;
-    for (let k = i + 1; k < toks.length && toks[k].v !== ";" && toks[k].v !== "{"; k++) {
+    for (let k = start; k < toks.length && toks[k].v !== ";" && toks[k].v !== "{"; k++) {
       const v = toks[k].v;
       if (v === "<") depth++;
       else if (v === ">") depth--;
@@ -133,12 +143,13 @@ const reflecting = (toks, words) => words.some(w => REFLECTS.has(w))
 
 // What a file holds that bears on its reach: its own namespaces, the namespaces its types stand in, its words, its runs
 // of dotted words, its using directives, and whether it declares extension members, runs with no name, reads types by
-// reflection, is of top-level statements, or was lost by the grammar.
-function factsOf(r) {
+// reflection, is of top-level statements, or was lost by the grammar or holds code the tokens leave out (a raw
+// interpolated string's holes, which they do not read; any text of `$"""` counts, a comment's too, which reads more).
+function factsOf(r, src) {
   const toks = r.toks ?? [], words = ids(toks), placed = new Set(r.namespaces);
   if (!r.namespaces.length || r.types.some(t => !t.includes("."))) placed.add("");
   return { r, words: new Set(words), ...runsOf(toks), placed: [...placed], extensions: extending(toks), hook: runsUnnamed(toks, words),
-    reflects: reflecting(toks, words), lost: r.usings === null || r.functions === null, program: topLevel(toks) };
+    reflects: reflecting(toks, words), lost: r.usings === null || r.functions === null || RAW.test(src), program: topLevel(toks) };
 }
 
 // The <Using Include="N"> items of MSBuild's files: their namespaces, or null where one names a property ("$(...)"),
@@ -215,12 +226,12 @@ function reachOf(x, ix) {
 export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   const links = new Map();
   if (!Object.keys(texts).some(f => f.endsWith(".cs"))) return { links, unsure: new Set() };
-  const held = beside(texts), projects = Object.entries(texts).filter(([f]) => f.endsWith(".csproj")).map(([, t]) => t);
-  const msbuild = held.unknown ? null : msbuildUsings([...held.msbuild, ...projects]);
+  const held = beside(texts), read = Object.entries(texts).filter(([f]) => /\.(csproj|props|targets)$/u.test(f)).map(([, t]) => t);
+  const msbuild = held.unknown ? null : msbuildUsings([...held.msbuild, ...read]);
   const all = { ...held.cs, ...texts }, files = Object.keys(all).filter(f => f.endsWith(".cs"));
   // (where the usings every file holds cannot be told, every file is unsure)
   if (msbuild === null) return { links, unsure: new Set(files) };
-  const facts = new Map(files.map(f => { pace(); return [f, factsOf(readCsharp(all[f]))]; }));
+  const facts = new Map(files.map(f => { pace(); return [f, factsOf(readCsharp(all[f]), all[f])]; }));
   const ix = indexOf(facts);
   ix.globals.push(...msbuild);
   for (const [f, x] of facts) { pace(); const to = reachOf(x, ix); to.delete(f); links.set(f, to); }

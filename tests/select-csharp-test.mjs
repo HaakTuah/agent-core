@@ -130,5 +130,16 @@ const declares = ["public", "internal", "private", "protected", "static", "seale
 const asProgram = declares.filter(([, src]) => named(src)).map(([w]) => w);
 ok(!asProgram.length, "a file that declares a type, behind any modifier, is no Program", asProgram.join(", "));
 
+// ---- what review found (#1159) ----
+const rawHole = one("namespace Tests;\nclass Y { string s = $$\"\"\"a {{App.Rules.Allowed()}}\"\"\"; }\n");
+ok(same([...rawHole.unsure], ["src/X.cs"]), "a raw interpolated string, whose holes the tokens do not read, makes its file unsure", JSON.stringify([...rawHole.unsure]));
+ok(!one("namespace Tests;\nclass Y { string s = \"\"\"a\"\"\" + $\"{1}\"; }\n").unsure.size, "a raw string that is not interpolated, and an interpolated one that is not raw, make none");
+const tuple = one("namespace App;\npublic delegate (int X, int Y) Pair();\n", { "tests/T.cs": "using App;\nnamespace Tests;\nclass T { Pair p; }\n" });
+ok(tuple.links.get("tests/T.cs")?.has("src/X.cs"), "a delegate that returns a tuple is reached by its name", JSON.stringify([...tuple.links].map(([f, to]) => [f, [...to]])));
+const lambda = one("namespace App;\nclass X { System.Action<int> a = delegate (int n) { }; }\n", { "tests/T.cs": "using App;\nnamespace Tests;\nclass T { n m; }\n" });
+ok(!lambda.links.get("tests/T.cs")?.has("src/X.cs"), "an anonymous delegate with parameters declares no name");
+const propsRead = csharpReach({ ...globals, "tests/Tests.csproj": PROJ, "Directory.Build.props": "<Project><ItemGroup><Using Include=\"App\" /></ItemGroup></Project>" }, undefined, nothing);
+ok(propsRead.links.get("tests/RulesTest.cs")?.has("src/Rules.cs"), "a .props file the config reads is read for its <Using> too", JSON.stringify([...propsRead.links].map(([f, to]) => [f, [...to]])));
+
 console.log(`${count - failed} of ${count} passed`);
 process.exitCode = failed ? 1 : 0;
