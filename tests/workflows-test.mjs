@@ -414,7 +414,7 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
   const suites = lists(tests.jobs.suites.strategy.matrix.include), upgrades = lists(tests.jobs.upgrade.strategy.matrix.include);
   const only = (l, os) => l.length > 0 && l.every(x => x.os === os);
   const NETWORK = "suites-network";
-  const WINDOWS = ["suites-projects", "suites-sync", "suites-kit", "suites-core", "suites-core-places", "suites-licences", "suites-rest", "suites-tools"];
+  const WINDOWS = ["suites-projects", "suites-sync", "suites-converge", "suites-hostile", "suites-kit", "suites-steps", "suites-writes", "suites-core", "suites-core-places", "suites-licences", "suites-scans", "suites-rest", "suites-rest-two", "suites-rest-three", "suites-tools"];
   const named = l => [...new Set(l.map(x => x.suite))].sort().join();
   ok(suites && Object.keys(tests.jobs.suites.strategy.matrix).join() === "include" && suites.every(l => l.every(x => x.node && x.suite && x.os && x.parts))
     && only(suites[0], "ubuntu-latest") && only(suites[1].filter(x => x.suite !== NETWORK), "windows-latest") && named(suites[1].filter(x => x.suite !== NETWORK)) === [...WINDOWS].sort().join()
