@@ -115,6 +115,8 @@ ok(notDone(project({ ".claude/settings.json": withPlugins({ "helper@example-mark
 const weigh = notDone(project({ ".claude/settings.json": withHook(MAIN_HOOK) }), step)[0]?.mend ?? "";
 ok(weigh.includes("whether it does is a security judgement, not a mend") && weigh.includes(MAIN_HOOK) && weigh.includes("never taking one out before then") && !weigh.includes("else take it out"),
   "and gives a hook outside the kit's form to a task weighed by a security judgement, never a mend that takes it out", weigh);
+const bypass = notDone(project({ ".claude/settings.json": { ...JSON.parse(KIT), permissions: { defaultMode: "bypassPermissions" } } }), step)[0]?.mend ?? "";
+ok(bypass.includes("take it out of the project's files") && !bypass.includes("never taking one out"), "while a setting of a kind no kit writes, as a bypass mode, keeps the check's own mend, to take it out", bypass);
 ok(!notDone(project({ ".claude/settings.json": withHook(MAIN_HOOK), ...listing({ kind: "hook", name: `PostToolUse: ${MAIN_HOOK}`, publisher: "this project", from: "the working tree" }) }), step).length, "and reads done once such a hook is marked");
 ok(listed({ lockfiles: [] }, "c") === null, "a config with no \"agentTools\" holds no list");
 passes(run(project({ ".gitignore": ".claude/settings.local.json\n", ".claude/settings.local.json": { enabledPlugins: { "helper@example-market": true } }, ...listing() })), "a settings.local.json git ignores is a person's own, and not read");

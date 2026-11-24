@@ -108,21 +108,24 @@ export const callers = p => (readable(p, text => text.toLowerCase().includes(`${
 // workflow that selects its suites through the copy's select.mjs is left out: the selection counts the copy's files
 // as the step asks, and a workflow in which only a pin moved as no change (#1093, point 2). It is left out whole, since
 // which of its jobs runs a suite no reader tells exactly: the step's `partly` leaves another job's to the review. A
-// stand-in is left out too: a workflow whose `paths` are, as a set, another's `paths-ignore`, so that a check a ruleset
-// asks for reports where the suite is skipped (#1248, point 3); it is meant to start where the suite does not.
+// stand-in is left out too: a workflow whose `paths` are, as a set, another's `paths-ignore`, and whose jobs, by the
+// names they report as checks, are that one's, so that a check a ruleset asks for reports where the suite is skipped
+// (#1248, point 3); it is meant to start where the suite does not. A workflow that mirrors the filter under jobs of other
+// names is no stand-in, and is read as any other.
 export function suitesOnPins(p) {
   const pins = callers(p);
   readable(p, text => /paths(-ignore)?\s*:/.test(text));
   const selects = runFiles(p, "select.mjs");
   const filter = (w, key) => { const list = w.yaml?.on?.pull_request?.[key]; return Array.isArray(list) ? [...new Set(list.map(String))].sort().join("\n") : null; };
-  const ignored = Object.entries(p.workflows).map(([f, w]) => [f, filter(w, "paths-ignore")]).filter(([, l]) => l !== null);
-  const standsIn = (f, w) => filter(w, "paths") !== null && ignored.some(([g, l]) => g !== f && l === filter(w, "paths"));
+  const checks = w => { const jobs = w.yaml?.jobs; return jobs && typeof jobs === "object" ? [...new Set(Object.entries(jobs).map(([k, j]) => String(j?.name ?? k)))].sort().join("\n") : null; };
+  const ignored = Object.entries(p.workflows).map(([f, w]) => [f, filter(w, "paths-ignore"), checks(w)]).filter(([, l]) => l !== null);
+  const standsIn = (f, w) => filter(w, "paths") !== null && ignored.some(([g, l, c]) => g !== f && l === filter(w, "paths") && c !== null && c === checks(w));
   const started = Object.entries(p.workflows).filter(([f, w]) => !pins.includes(`.github/workflows/${f}`) && !selects.includes(`.github/workflows/${f}`) && !standsIn(f, w)).flatMap(([f, w]) => {
     const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];
     const by = Array.isArray(only) ? pins.filter(c => pathsLetThrough(only, [c])) : Array.isArray(ignore) ? pins.filter(c => !pathsLetThrough(ignore, [c])) : [];
     return by.length ? [`\`.github/workflows/${shown(f)}\` (${by.map(shown).join(", ")})`] : [];
   });
-  return started.length ? `A sync that only moves the pin of a call to the core's workflows starts no suite of the project's own: each workflow named lists in its \`paths-ignore\`, beside \`core/**\` and \`core-manifest.md\`, each file that holds only such calls by its exact path, or, where it filters with \`paths\`, takes each out with \`!<its path>\` after its patterns (\`core.yml\` checks those pins on every pull request); a workflow that stands in for such a suite, its \`paths\` the suite's \`paths-ignore\` so that a check a ruleset asks for reports where the suite is skipped, gains the same paths under its \`paths\`. Started by such a file alone: ${started.join("; ")}.` : null;
+  return started.length ? `A sync that only moves the pin of a call to the core's workflows starts no suite of the project's own: each workflow named lists in its \`paths-ignore\`, beside \`core/**\` and \`core-manifest.md\`, each file that holds only such calls by its exact path, or, where it filters with \`paths\`, takes each out with \`!<its path>\` after its patterns (\`core.yml\` checks those pins on every pull request); a workflow that stands in for such a suite, its \`paths\` the suite's \`paths-ignore\` and its jobs named as the suite's, so that a check a ruleset asks for reports where the suite is skipped, gains the same paths under its \`paths\`. Started by such a file alone: ${started.join("; ")}.` : null;
 }
 
 // A call to one of the core's pull-request checks whose job is skipped on a draft, or which skips a draft by itself (the

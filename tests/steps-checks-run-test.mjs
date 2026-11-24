@@ -68,12 +68,14 @@ ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths:
   // suite is skipped, is left out; one whose `paths` differ is a suite: #1248, point 3)
   const list = order => `[${order.map(p => `'${p}'`).join(", ")}]`, kept = ["core/**", "core-manifest.md", ".github/workflows/core.yml"];
   const standIn = path.join(lockProject, ".github/workflows/stand-in.yml"), named = () => notDone(lockProject, only(SUITE_LEAD)).find(m => m.lead === SUITE_LEAD)?.mend ?? "";
-  const put = paths => fs.writeFileSync(standIn, `name: s\non:\n  pull_request:\n    paths: ${paths}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo stand-in\n`);
+  const put = (paths, job = "t") => fs.writeFileSync(standIn, `name: s\non:\n  pull_request:\n    paths: ${paths}\njobs:\n  ${job}:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo stand-in\n`);
   suiteBy(`    paths-ignore: ${list(kept)}`);
   put(list([...kept].reverse()));
   const left = !named().includes("stand-in.yml");
+  put(list([...kept].reverse()), "other-tests");
+  const otherJobs = named().includes("stand-in.yml");
   put(list([...kept, "src/**"]));
-  ok(left && named().includes("stand-in.yml") && /gains the same paths under its `paths`/.test(named()), "a workflow whose `paths` are a suite's `paths-ignore` stands in for it and is left out, and one whose `paths` differ is reported, the mend saying what a stand-in gains", named());
+  ok(left && otherJobs && named().includes("stand-in.yml") && /gains the same paths under its `paths`/.test(named()), "a workflow whose `paths` are a suite's `paths-ignore`, its jobs the suite's, stands in for it and is left out; one whose jobs or `paths` differ is reported, the mend saying what a stand-in gains", named());
   fs.rmSync(standIn);
 }
 fs.rmSync(suiteFile);
