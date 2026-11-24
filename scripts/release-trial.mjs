@@ -22,9 +22,9 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 // it adds may not fail what stood (AGENTS.md, "Nothing locks a project"); stopped after, behind another's failure,
 // which measured nothing of it (point 2); ran after alone, passed; ran before alone, passed, and failed before alone,
 // which an update may fold into another's steps; and unrun after, on another system or wanting a program this machine
-// lacks (points 8 and 9), apart where it ran before, since the update then kept it from being measured. A job stopped or unrun before ran not then, and one whose place a job stopped after holds is
+// lacks (points 8 and 9), apart where it ran before, since the update then kept it from being measured. A job stopped or unrun before ran not then, and one whose place a job stopped or unread after holds, or that holds such a job, is
 // counted with that one. What check.mjs could not read is not measured (#1263, point 2, as #1257 sets it): unread after
-// where it ran before, by its key or a place that holds it or that it holds, a whole file unread after counted with its
+// where it ran before (`ranThen`), a whole file unread after counted with its
 // jobs of before; unread before and failed after, where its own key, or a place before that holds it, was unread, or
 // failed whole where the run after gives its jobs, as an older check.mjs wrote a file it could not read, that place
 // before counted with them, never as failed before; and unread after where it ran not before, read in neither run.
@@ -36,9 +36,8 @@ export function compared(before, after) {
   const { wholes, unreadThen } = unreadBefore(before, after);
   const out = Object.fromEntries(COUNTS.map(k => [k, []]));
   const was = Object.fromEntries(Object.entries(ranIn(before)).filter(([job]) => !wholes.includes(job)));
-  const ranThen = job => Object.keys(was).some(k => k === job || within(job, k) || within(k, job));
   out.stoppedAfter = stopped;
-  for (const job of unreadNow) out[ranThen(job) ? "unreadAfter" : "unreadNeither"].push(job);
+  for (const job of unreadNow) out[ranThen(before, wholes, job) ? "unreadAfter" : "unreadNeither"].push(job);
   for (const [job] of later.filter(([, v]) => v === "unrun")) out[was[job] ? "unrunAfterRan" : "unrunAfter"].push(job);
   for (const [job, v] of Object.entries(was)) if (!Object.hasOwn(after ?? {}, job) && !lost(job)) out[v === "passed" ? "ranBeforeAlone" : "failedBeforeAlone"].push(job);
   for (const [job, v] of Object.entries(ranIn(after))) out[v === "failed" && unreadThen(job) ? "unreadBefore" : ranClass(v, was[job])].push(job);
@@ -48,6 +47,9 @@ export function compared(before, after) {
 // A run's jobs, [place, verdict] each, the key that says where check.mjs ran from left out; those that ran, by place.
 const jobsOf = run => Object.entries(run ?? {}).filter(([job]) => job !== RUN_FROM);
 const ranIn = run => Object.fromEntries(jobsOf(run).filter(([, v]) => v === "passed" || v === "failed"));
+// Whether a job ran before, by its key or a place that holds it or that it holds; a job or a call failed before is read
+// as run, since its key cannot say which it was, and a whole file failed before, among `wholes`, as not.
+const ranThen = (before, wholes, job) => Object.keys(ranIn(before)).some(k => (k.includes("/") || !wholes.includes(k)) && (k === job || within(job, k) || within(k, job)));
 // Whether a job's place lies under another's: a job of its file or call, or, with `matrix`, a combination of its matrix.
 const within = (job, place, matrix = true) => job.startsWith(`${place}/`) || (matrix && job.startsWith(`${place} (`));
 

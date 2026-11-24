@@ -87,6 +87,9 @@ jobs:
   ok(c.unreadAfter.join() === "own.yml/a,gone.yml,m2.yml/grid (two)" && c.unreadNeither.join() === "ci.yml/gate,own.yml/d,new.yml/n" && c.unreadBefore.join() === "ci.yml/test,own.yml/b,m.yml/grid (one)" && c.ranAfterAlone.join() === "ci.yml/lint,own.yml/c"
     && !c.failedBoth.length && !c.failedBeforeAlone.length && !c.failedAfterAlone.length && !c.ranBeforeAlone.length,
     "a job that ran before, by its key, its file or its matrix, and is unread after is not measured after; one unread after that ran not before, unread then too, new, or in a file an older check.mjs could not read whole, is not measured in either run; one unread before that fails after is not measured either; none is failed both, nor the release's", JSON.stringify(c));
+  const job = compared({ "a.yml/x": "failed", "b.yml": "failed" }, { "a.yml/x/y": "unread", "b.yml/z": "unread" });
+  ok(job.unreadAfter.join() === "a.yml/x/y" && job.unreadNeither.join() === "b.yml/z" && !job.failedBeforeAlone.length,
+    "  a job, or a call, failed before is read as run then, so one unread under it after holds the cut, never the record's guess that it measured nothing; only a whole file failed before is read so", JSON.stringify(job));
   const record = trialRecord(SHA("d"), "2026-11-24", [[{ "ci.yml/gate": "passed" }, { "ci.yml/lint": "passed", "ci.yml/gate": "unread" }]]);
   const at = trialAt(SHA("d"), args => (args[0] === "show" ? JSON.stringify(record) : ""));
   ok(record.unreadAfter === 1 && record.failedBoth === 0 && record.failedBeforeAlone === 0 && /1 check was not measured in the trial on a real project, 1 of them run before and not read after the update and 0 not read before it and failed after[\s\S]*Mend: teach the core's workflow runner/u.test(at.held ?? "") && /1 run before and not read after it and 0 not read before it and failed after \(not measured\)/u.test(at.said),
