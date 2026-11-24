@@ -33,7 +33,7 @@ import { readCore } from "./core-path.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { everyInstall } from "./packages.mjs";
 import { started } from "./started.mjs";
-import { NOTES, asksLeft, fetchCore, followsOf, greenMain, hostSaid, inBare, jumped, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
+import { NOTES, asksLeft, fetchCore, followsOf, greenMain, hostSaid, inBare, jumped, newestRelease, past, releasesIn, staysAt, untar } from "./releases.mjs";
 import { FOLDER } from "./sync-notes.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
@@ -151,7 +151,7 @@ function kitsOf(old, tmp) {
   for (const sha of new Set([old, ...releasesIn(tmp).map(r => r.sha)])) {
     const to = path.join(kits, sha);
     fs.mkdirSync(to, { recursive: true });
-    try { execFileSync("tar", ["-x", "-f", "-", "-C", to], { input: inBare(tmp, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 }) }); }
+    try { untar(to, inBare(tmp, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 })); }
     catch { fs.rmSync(to, { recursive: true, force: true }); } // (a commit from before the starter kit: no kit to compare)
   }
   return kits;
@@ -198,8 +198,7 @@ function sync(tmp) {
 
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
-  // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
-  execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(tmp, ["archive", pin], { encoding: "buffer", maxBuffer: 1 << 28 }) });
+  untar(dir, inBare(tmp, ["archive", pin], { encoding: "buffer", maxBuffer: 1 << 28 }));
   fs.writeFileSync(manifest, text.replace(lineRe, line => line.replace(old, pin)));
   recordModes(dir, pin, tmp);
   install(dir);

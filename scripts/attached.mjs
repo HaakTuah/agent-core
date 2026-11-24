@@ -26,7 +26,7 @@ import { MANIFEST, readCore } from "./core-path.mjs";
 import { differences, fresh, kind } from "./fresh.mjs";
 import { projectNotes } from "./manifest-reads.mjs";
 import { saidOf } from "./read-nothing.mjs";
-import { fetchCore, followsOf, hostSaid, inBare, past, releasesIn } from "./releases.mjs";
+import { fetchCore, followsOf, hostSaid, inBare, past, releasesIn, untar } from "./releases.mjs";
 import { started } from "./started.mjs";
 import { plain } from "./step-checks.mjs";
 import { notDone, project } from "./steps.mjs";
@@ -152,7 +152,7 @@ function sideOf(root, at, bare, { pin, main }, said) {
 // never floor rule 8's proof, which pure-sync.mjs gives run from the core's own checkout.)
 function unpack(root, at, bare, side, dir) {
   fs.mkdirSync(dir);
-  execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(bare, ["archive", side], { encoding: "buffer", maxBuffer: 1 << 28 }) });
+  untar(dir, inBare(bare, ["archive", side], { encoding: "buffer", maxBuffer: 1 << 28 }));
   for (const install of [".packages", ".packages/parser"]) {
     const lock = f => { try { return fs.readFileSync(path.join(f, install, "package-lock.json"), "utf8"); } catch { return null; } };
     const mine = path.join(root, at, install, "node_modules");

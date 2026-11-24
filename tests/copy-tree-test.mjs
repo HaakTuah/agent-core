@@ -9,6 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KEPT, copyTree, coreIsFolder, entries, executable, recordModes } from "../scripts/copy-tree.mjs";
+import { untar } from "../scripts/releases.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -169,6 +170,19 @@ ok(lines.includes("/tests export-ignore") && astray.length === 0, "every test of
 const tool = (file) => /^tests\/mutation\/(?:package\.json|package-lock\.json|\.npmrc)$/.test(file);
 const strays = tracked.filter((file) => file.startsWith("tests/") && !/^tests\/[^/]+-test\.mjs$/.test(file) && !tool(file));
 ok(strays.length === 0, "tests/ holds the core's tests alone, and the package files of the core's own mutation tool, so nothing a project runs can lean on a file the copy leaves out (#614)", strays.join(" "));
+
+// the core's archive unpacked into a folder whose path tar would misread were it given: GNU tar unquotes a backslash's
+// escape in it (`kits\now` as Windows writes the path, a line's end), and Windows' own tar knows no --force-local (#1212)
+{
+  const tmp = scratchDir("untar-"), from = path.join(tmp, "from");
+  fs.mkdirSync(from);
+  fs.writeFileSync(path.join(from, "f"), "unpacked\n");
+  const into = process.platform === "win32" ? path.join(tmp, "kits", "now") : path.join(tmp, "kits\\now", "a:b");
+  fs.mkdirSync(into, { recursive: true });
+  let read = null;
+  try { untar(into, execFileSync("tar", ["-c", "-f", "-", "f"], { cwd: from })); read = fs.readFileSync(path.join(into, "f"), "utf8"); } catch (e) { read = String(e.stderr ?? e); }
+  ok(read === "unpacked\n", "an archive is unpacked into a folder whose path holds a backslash's escape and a colon", read);
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);

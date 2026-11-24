@@ -42,7 +42,9 @@ fs.cpSync(root, theCore, { recursive: true, filter: src => !["/.git", "/node_mod
 git(theCore, "init", "-q", "-b", "main");
 const NOTE_LINE = "- **13 November 2026, a note for the test.** Done when nothing: an entry that B gains over A.\n";
 const terms = read(theCore, ".github/workflows/personal-terms.yml");
-const commit = (message) => { git(theCore, "add", "-A"); git(theCore, "commit", "-q", "--allow-empty", "-m", message); return git(theCore, "rev-parse", "HEAD"); };
+// (the core's bits, none on Windows' disk)
+const x = git(root, "ls-files", "-s", "-z").split("\0").filter(e => e.startsWith("100755 ")).map(e => e.slice(50));
+const commit = (message) => { git(theCore, "add", "-A"); git(theCore, "update-index", "--chmod=+x", "--", ...x); git(theCore, "commit", "-q", "--allow-empty", "-m", message); return git(theCore, "rev-parse", "HEAD"); };
 write(theCore, "z.md", "only in Z\n");
 write(theCore, ".github/workflows/personal-terms.yml", `${terms}# Z\n`);
 const Z = commit("Z");
@@ -331,9 +333,10 @@ git(p, "commit", "-q", "-m", "a bit added");
 const added = pure();
 ok(added.status === 1 && /NOT PURE core\/README\.md is marked executable, which the core at [0-9a-f]{40} does not mark it/.test(added.out), "a copy that marks executable a file the core does not mark: not pure", added.out);
 ok(coreCheck().passed, "  though the core's own check of the copy, which reads no bit, passes it");
+const fm = git(p, "config", "core.fileMode");
 git(p, "config", "core.fileMode", "false");
 const again = node(p, "core/scripts/sync.mjs", B);
-git(p, "config", "core.fileMode", "true");
+git(p, "config", "core.fileMode", fm);
 ok(again.status === 0 && mode("core/scripts/work-saved.sh") === "100755" && mode("core/README.md") === "100644" && mode("core/scripts/sync.mjs") === "100644",
   "the sync run again at the same pin, where git records no executable bit, stages each the core marks and takes off one it does not, read from the core's tree", `${again.out}\n${git(p, "ls-files", "-s", "core/scripts")}`);
 git(p, "add", "-A");

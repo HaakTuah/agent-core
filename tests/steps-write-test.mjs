@@ -21,7 +21,7 @@ const dir = kitIn(scratchDir("steps-write-"))("an-npm-project", { packages: "." 
 const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: dir, encoding: "utf8" });
 const commit = what => { git("add", "-A"); git("commit", "-q", "--allow-empty", "-m", what); };
 const write = (...args) => spawnSync(process.execPath, ["core/scripts/steps.mjs", "--write", ...args], { cwd: dir, encoding: "utf8" });
-const read = f => fs.readFileSync(path.join(dir, f), "utf8");
+const crlf = text => text.replace(/\r?\n/gu, "\r\n"), raw = f => fs.readFileSync(path.join(dir, f), "utf8"), read = f => raw(f).replace(/\r\n/gu, "\n");
 const put = (f, text) => fs.writeFileSync(path.join(dir, f), text);
 const missed = lead => notDone(dir).filter(m => m.lead === lead);
 const dirty = () => git("status", "--porcelain", "--untracked-files=all").trim();
@@ -187,36 +187,36 @@ for (const l of WHOLE) {
     && /^Not taken: `game-design\.md` \(the project is no game: its manifest holds no game's row\)\.$/m.test(now) && /\n\nModules to confirm: `done-when\.md`\.\n/u.test(now) && /^Floor: whole\. Modules: .*`done-when\.md`/m.test(now) && outside(now) === outside(was),
     "a module the list misses is placed by --write: left out where a fact decides it, taken and asked of the owner where none does, and nothing of the manifest written but its module lines", `${r.stdout}${r.stderr}\n---\n${now}`);
   back();
-  // (at a sync, which moves the manifest's pin before the writers run: the module lines placed and set aside, the
-  // moved pin left in the tree for the sync's pull request, and the stash popped onto that pull request's merge)
+  // (at a sync, which moves the pin first: the module lines set aside, the moved pin left for the sync's pull request,
+  // and the stash popped onto its merge)
   STAGES[placing].stage(dir);
   commit("a module neither taken nor left out");
-  const moved = read("core-manifest.md").replace(/^(Core: .*?)\b[0-9a-f]{40}\b/mu, `$1${"c".repeat(40)}`), pin = /^Core: .*$/mu.exec(moved)[0];
+  const moved = raw("core-manifest.md").replace(/^(Core: .*?)\b[0-9a-f]{40}\b/mu, `$1${"c".repeat(40)}`), pin = /^Core: .*$/mu.exec(moved)[0];
   put("core-manifest.md", moved);
   r = write("--aside");
-  const left = read("core-manifest.md");
+  const left = raw("core-manifest.md");
   ok(r.status === 0 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``) && r.stdout.includes(`set aside in the stash "${ASIDE}"`) && left === moved && dirty() === "M core-manifest.md",
     "at a sync that moved the manifest's pin, --aside writes its module lines and sets them aside, the moved pin left where the sync put it", `${r.stdout}${r.stderr}\n---\n${left}\n---\n${dirty()}`);
   commit("the sync's pull request, merged");
   git("stash", "pop", "-q");
   ok(!missed(placing).length && read("core-manifest.md").includes(`${pin}\n`), "and the stash, popped once the sync merged, brings the module lines back on the moved pin", read("core-manifest.md"));
   back();
-  // (the same where git writes the tree's line ends as Windows does, and the manifest gone, which stays busy, and fails nothing)
+  // (the same where git writes the tree with Windows line ends: the manifest keeps them)
   STAGES[placing].stage(dir);
   commit("a module neither taken nor left out");
   git("config", "core.autocrlf", "true");
-  put("core-manifest.md", moved.replace(/\r?\n/gu, "\r\n"));
+  put("core-manifest.md", crlf(moved));
   r = write();
-  ok(r.status === 0 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``), "and where the tree holds the manifest with Windows line ends", `${r.stdout}${r.stderr}`);
+  ok(r.status === 0 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``) && /^([^\n]*\r\n)+$/u.test(raw("core-manifest.md")), "and where the tree holds the manifest with Windows line ends", `${r.stdout}${r.stderr}`);
   git("config", "--unset", "core.autocrlf");
   back();
   // (and, where git leaves line ends as they are, a tree with Windows ones over the blob's: the stash leaves the blob's,
   // and the moved pin is put back with no line end of its own)
   STAGES[placing].stage(dir);
   commit("a module neither taken nor left out");
-  put("core-manifest.md", moved.replace(/\r?\n/gu, "\r\n"));
+  put("core-manifest.md", crlf(moved));
   r = write("--aside");
-  ok(r.status === 0 && read("core-manifest.md") === moved, "and with --aside, the pin put back on a file whose line ends the stash changed, keeping them", JSON.stringify(read("core-manifest.md").slice(0, 300)));
+  ok(r.status === 0 && raw("core-manifest.md") === moved, "and with --aside, the pin put back on a file whose line ends the stash changed, keeping them", JSON.stringify(read("core-manifest.md").slice(0, 300)));
   back();
   STAGES[placing].stage(dir);
   commit("a module neither taken nor left out");
