@@ -57,8 +57,8 @@ jobs:
 
   # (the upgrade test on Windows in five jobs side by side, each a part of it under its own time mark in .github/shape.json,
   # "upgrade-" and the part's name, and well inside the job's time: a project kind of the older of the last two releases,
-  # of the newer, and the copy older than the first; one project of either kind takes about a quarter of an hour on
-  # Windows, and the two parts of two projects each ran past 30 minutes; #304, #515, #715, #1240)
+  # of the newer, and the copy older than the first; a part takes 7 to 17 minutes on Windows, where the two parts of two
+  # projects each ran past 30; #304, #515, #715, #1240)
   upgrade:
     needs: main
     if: ${{ github.event_name != 'schedule' || needs.main.outputs.public == 'true' }}

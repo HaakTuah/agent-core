@@ -31,11 +31,11 @@
     "suites-tools": { "win32": 450 },
     "suites-network": { "linux": 240, "win32": 600 },
     "upgrade": { "linux": 240 },
-    "upgrade-older-npm": { "win32": 1000 },
-    "upgrade-older-dotnet": { "win32": 1000 },
-    "upgrade-older-pre": { "win32": 300 },
-    "upgrade-newer-npm": { "win32": 1000 },
-    "upgrade-newer-dotnet": { "win32": 1000 },
+    "upgrade-older-npm": { "win32": 1200 },
+    "upgrade-older-dotnet": { "win32": 900 },
+    "upgrade-older-pre": { "win32": 500 },
+    "upgrade-newer-npm": { "win32": 1200 },
+    "upgrade-newer-dotnet": { "win32": 900 },
     "staged": { "linux": 240, "win32": 900 }
   }
 }
