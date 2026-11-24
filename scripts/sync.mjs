@@ -44,12 +44,13 @@ const fail = msg => { throw new Failure(msg); };
 
 // What a sync prints for its pull request's description, each a script of the new copy with its arguments (`kits`:
 // the folder of the earlier starter kits, beside the bare repository of the core; `old`, the copy's pin before): the
-// steps not done, the differences from a fresh start, where the inbox is, what the labels lack, the steps read on the host (host.mjs; #1092), the owner's settings
+// steps not done, the differences from a fresh start, where the inbox is, what the labels lack, the steps read on the host (host.mjs; #1092), the
+// packages gone stale (held.mjs; #1095), the owner's settings
 // where one is new since `old`, what the project holds twice or against the core (#1087), the line that lists what the sync's own paths outside the copy call for, the
 // pins of the project's workflows above all (reading.mjs, by which the description check reads that line), then what the
 // steps' writers wrote, set aside in a stash for a pull request of its own after the sync's, which stays pure (steps.mjs
 // --write --aside; #1091), and last the line attached.mjs prints.
-const REPORTS = (kits, old) => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["host.mjs"], ["owner-settings.mjs", "--since", old, "--fetched", path.dirname(kits), "--report"], ["twice.mjs", "--fetched", path.dirname(kits), "--since", old], ["reading.mjs", "builder", "--changed", "HEAD", "--line"], ["steps.mjs", "--write", "--aside"], ["attached.mjs", "--line", "--fetched", path.dirname(kits)]];
+const REPORTS = (kits, old) => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["host.mjs"], ["held.mjs"], ["owner-settings.mjs", "--since", old, "--fetched", path.dirname(kits), "--report"], ["twice.mjs", "--fetched", path.dirname(kits), "--since", old], ["reading.mjs", "builder", "--changed", "HEAD", "--line"], ["steps.mjs", "--write", "--aside"], ["attached.mjs", "--line", "--fetched", path.dirname(kits)]];
 
 // Where the copy stands, as the manifest's "Core:" line names it (tasks/repositories.md; core-path.mjs); null, said,
 // where a library carries the core, which is synced in the library's own repository.

@@ -2,8 +2,8 @@
 // writes in a scratch folder, committed: each step a writer does whole, taken out, reads done after `--write`, the
 // project's rule files keeping their words; the step of the rules' move and that of the agent tools' files written as far
 // as they are exact, the rest left to their mends; a file with changes not yet committed, a writer that cannot run, a
-// step the manifest declares undone on purpose, a file git ignores and a run outside the copy write nothing; and `--aside` sets what it
-// wrote aside in a stash, which brings it back. Node's own modules and git.
+// step the manifest declares undone on purpose, a file git ignores and a run outside the copy write nothing; `--aside` sets what it
+// wrote aside in a stash, which brings it back; and the key merge of the checks' configs (#1095, point 5). Node's own modules and git.
 //
 //   node tests/steps-write-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -14,6 +14,7 @@ import { declare, kitIn, ruleTexts, wordsKept } from "../scripts/steps-kit.mjs";
 import { ASIDE, MOVED_GLOB, MOVED_GLOBS, STEPS, notDone, report, setAside, writeReport } from "../scripts/steps.mjs";
 import { OLD_PATHS, Unwritten, oldPathsIn, writable } from "../scripts/step-writers.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { MERGED } from "../scripts/converge.mjs";
 
 const { ok, done } = tally();
 const dir = kitIn(scratchDir("steps-write-"))("an-npm-project", { packages: "." });
@@ -230,6 +231,41 @@ for (const l of WHOLE) {
   const m = "Floor: whole. Modules: `a.md`.\n", t = { "core-manifest.md": m, "AGENTS.md": m };
   ok(wordsKept(t, { ...t, "core-manifest.md": "Floor: whole. Modules: `a.md`, `b.md`.\n\nModules to confirm: `b.md`.\n" }) && !wordsKept(t, { ...t, "AGENTS.md": "Floor: whole. Modules: `b.md`.\n" }),
     "the words kept read past the module lines of the manifest, and of no other rule file");
+}
+
+// ---- the key merge (converge.mjs, `merged`; #1095, point 5) ----
+{
+  const json = f => JSON.parse(read(f)), copies = json("checks/copies.json"), shape = json("checks/shape.json"), lic = json("checks/licences.json");
+  delete copies.proseFromSecurity;
+  delete copies.code;
+  copies.prose = ["docs/*.md"];
+  delete shape.tests;
+  delete shape.systems;
+  delete lic.scan.skip;
+  delete lic.ships;
+  delete lic.scan.served;
+  put("checks/copies.json", `${JSON.stringify(copies, null, 4)}\n`);
+  put("checks/shape.json", `${JSON.stringify(shape, null, 2)}\n`);
+  put("checks/licences.json", `${JSON.stringify(lic, null, 2)}\n`);
+  commit("configs that lack keys of the kit's and hold values of the project's");
+  r = write();
+  const [c, s, l] = ["checks/copies.json", "checks/shape.json", "checks/licences.json"].map(json);
+  ok(r.status === 0 && r.stdout.includes(`- ${MERGED}: wrote `) && ["copies", "shape", "licences"].every(n => r.stdout.includes(`checks/${n}.json`))
+    && Array.isArray(c.code) && !c.code.length && c.prose.join() === "docs/*.md" && read("checks/copies.json").startsWith('{\n    "')
+    && s.systems && !Object.keys(s.systems).length && Array.isArray(l.scan.skip) && !l.scan.skip.length,
+  "--write adds the kit's keys a config lacks whose value reads nothing, at any depth, keeping the project's values and indent", `${r.stdout}${r.stderr}`);
+  ok(!("proseFromSecurity" in c) && !("tests" in s) && !("ships" in l) && !("served" in l.scan), "a key that has a check read more, or whose absence fails (what ships or is served), is not added", JSON.stringify([c, s, l]));
+  r = write();
+  ok(r.status === 0 && !r.stdout.includes(MERGED), "run again, it writes nothing more", r.stdout);
+  back();
+  put("checks/copies.json", `${JSON.stringify({ ...json("checks/copies.json"), code: undefined }, null, 2)}\n`);
+  put("checks/shape.json", "[]\n");
+  commit("a config that lacks a key, and one that is no JSON object");
+  put("checks/copies.json", `${read("checks/copies.json")} `);
+  r = write();
+  ok(r.status === 0 && r.stdout.includes("checks/copies.json` has changes not yet committed") && r.stdout.includes("`checks/shape.json` is no JSON object") && read("checks/shape.json") === "[]\n" && !("code" in json("checks/copies.json")),
+    "a config with changes not committed, or no JSON object, is left, and the report says why", r.stdout);
+  back();
 }
 
 done("the steps' writers");

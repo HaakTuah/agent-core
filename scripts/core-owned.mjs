@@ -84,3 +84,33 @@ function partConverged(now, want, older) {
   if (at?.lines && ![want, ...older].some(t => runOf(t) === at.lines.join("\n"))) return { text, left: "held a run of the kit's imports that no kit writes as it stood (one taken out or moved): the core's part is written over it as this kit writes it, so check that no import the project took out on purpose came back" };
   return { text };
 }
+
+// A check's config after the key-merge mode (#1095, point 5): the kit's keys the project's config lacks added, at any
+// depth of an object both hold, after the project's own, and every value the project holds kept, an array or a value of
+// another kind than the kit's among them; `now` and `want` JSON texts. Only a key whose value reads nothing is added (an
+// empty list, mapping or text, false or null), as its absence reads, so that no check reads more than it did: one that
+// would (a lock file named, the security file's prose read) is the step's to ask, and so is each key `asks` names at its
+// depth ({ required, keys }, as schemas.mjs `requiredOf` reads them), whose absence its check fails, asking a judgement
+// (what ships, what is served). { text } where a key is added, {} where none is, and { left } where the project's is no
+// JSON object, left as it is. The text keeps the project's indent and line ends.
+export function keysMerged(now, want, asks = null) {
+  let have, kit;
+  try { have = JSON.parse(now); } catch { return { left: "is no JSON, so the kit's keys cannot be added: left as it is" }; }
+  if (!plainObject(have)) return { left: "is no JSON object, so the kit's keys cannot be added: left as it is" };
+  try { kit = JSON.parse(want); } catch { return {}; }
+  const added = { count: 0 }, merged = into(have, kit, added, asks);
+  if (!added.count) return {};
+  const indent = /^([ \t]+)"/mu.exec(now)?.[1] ?? "  ", eol = now.includes("\r\n") ? "\r\n" : "\n";
+  return { text: `${JSON.stringify(merged, null, indent).replaceAll("\n", eol)}${/\r?\n$/u.test(now) ? eol : ""}` };
+}
+const plainObject = v => v !== null && typeof v === "object" && !Array.isArray(v);
+const readsNothing = v => v === null || v === false || v === "" || (Array.isArray(v) ? !v.length : plainObject(v) && !Object.keys(v).length);
+function into(have, kit, added, asks) {
+  if (!plainObject(have) || !plainObject(kit)) return have;
+  const out = { ...have };
+  for (const [key, value] of Object.entries(kit)) {
+    if (Object.hasOwn(have, key)) out[key] = into(have[key], value, added, asks?.keys?.[key]);
+    else if (readsNothing(value) && !asks?.required?.includes(key)) { out[key] = value; added.count++; }
+  }
+  return out;
+}

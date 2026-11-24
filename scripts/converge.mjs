@@ -25,6 +25,10 @@
 //   node core/scripts/converge.mjs --write [--older <dir>]  writes it, and takes out (<dir>: a folder of earlier kits, each a folder
 //                                                           holding setup/template/, as sync.mjs gives fresh.mjs)
 //   ... --first                                             at the first copy (sync.mjs): the project's own files too
+// Its key-merge mode (#1095, point 5), `merged` below, adds to each check's config that stands the kit's keys it lacks,
+// keeping every value of the project's; a config being the project's own, the steps' writers run it after a sync
+// (steps.mjs --write), never the sync's own pull request, which stays pure (floor rule 8).
+//
 //   node core/scripts/converge.mjs --check --base <rev>     the check (checks.mjs runs it in the copies part, in
 //                                                           core.yml's job and copies.yml's, the base in CONVERGE_BASE):
 //                                                           fails where the pull request changed a file or part the
@@ -35,11 +39,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyAt } from "./workflow-calls.mjs";
 import { fresh, kind } from "./fresh.mjs";
-import { BLOCKS, CORE_YML, FOLDED, blockOf, converged, dropped, lf, marked, whole } from "./core-owned.mjs";
+import { BLOCKS, CORE_YML, FOLDED, blockOf, converged, dropped, keysMerged, lf, marked, whole } from "./core-owned.mjs";
 import { NAME, TEMPLATES, linked, named } from "./init.mjs";
-import { project } from "./steps.mjs";
+import { configs, plain, project } from "./steps.mjs";
+import { where as shapeAt } from "./shape.mjs";
+import { Unwritten, writable } from "./step-writers.mjs";
 import { inside } from "./step-paths.mjs";
 import { started } from "./started.mjs";
+import { requiredOf } from "./schemas.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/u;
@@ -122,6 +129,40 @@ export function kits(p, older, k = kind(p)) {
 // Only what is written comes from the kit at the pin. `opts`: fresh.mjs's.
 export function asEarlier(p, templates, k, opts = {}) {
   return [fresh(p, templates, { ...opts, k }), ...(k.o.private ? [fresh(p, templates, { ...opts, k: { ...k, o: { ...k.o, private: undefined } } })] : [])];
+}
+
+// The key-merge mode (#1095, point 5): each check's config that stands in the project at `root` (the copies check's, the
+// shape check's, the licence check's, its audit's, and the NuGet check's where it is a file of its own, each at the path
+// the project runs it with), the kit's keys it lacks added and the project's values kept (core-owned.mjs, `keysMerged`),
+// as steps.mjs --write runs it, in the form of its writers' report: { lead, wrote } where it wrote, { lead, why } where
+// it could not; none where every config holds the kit's keys. A config not there, or one a check reads from a file
+// that cannot be told (check-configs.mjs, Unread), is left to its step; one with changes not yet committed (`busy`), no
+// regular file of the project's own, or no JSON object, is never written. The kind is read with no question to the host:
+// no config the kit writes differs by whether the repository is private.
+export const MERGED = "the kit's keys in the checks' configs (#1095, point 5)";
+// (a key whose absence its check fails is never added, at any depth: it asks a judgement, as the licence check's "ships"
+// and "scan"'s "served", what reaches users, do, and stays its step's to ask; read from each check's schema, the audit's
+// "entries" from licences.mjs, `auditEntries`, which no schema holds)
+const asksOf = which => which === "audit" ? { required: ["entries"], keys: {} } : requiredOf(which);
+export function merged(root, busy) {
+  const p = project(root), k = kind(p, {}), at = configs(p);
+  // (each path with the schema its config is held to, the NuGet check's being the licence check's; a path two configs of
+  // different checks name, the audit's the licences file's own, say, is merged by neither: whose keys it asks cannot be told)
+  const named = [[at.copies, "copies"], [shapeAt(p.manifest), "shape"], [at.audit, "audit"], [at.licences, "licences"], [at.nuget, "licences"]].filter(([f]) => f);
+  const which = new Map(), out = [], wrote = [];
+  for (const [f, w] of named) which.set(f, which.has(f) && which.get(f) !== w ? null : w);
+  for (const [to, want] of fresh(p, undefined, { k }).filter(([f]) => which.has(f) && !p.differences.some(l => l.includes(`"${f}"`)))) {
+    const now = p.read(to, true);
+    if (now === null) continue;
+    if (!which.get(to)) { if (!out.some(o => o.why?.startsWith(`\`${to}\` is named`))) out.push({ lead: MERGED, why: `\`${to}\` is named as the config of two checks, so the kit's keys are not added: left as it is` }); continue; }
+    const r = keysMerged(now, want, asksOf(which.get(to)));
+    if (r.left) { out.push({ lead: MERGED, why: `\`${to}\` ${r.left}` }); continue; }
+    if (!r.text) continue;
+    try { writable(p, to, busy); } catch (e) { if (!(e instanceof Unwritten)) throw e; out.push({ lead: MERGED, why: plain(e.message, root) }); continue; }
+    fs.writeFileSync(path.join(root, to), r.text);
+    wrote.push(to);
+  }
+  return wrote.length ? [{ lead: MERGED, wrote, mend: null }, ...out] : out;
 }
 
 function run(argv) {

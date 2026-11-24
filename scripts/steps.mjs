@@ -6,7 +6,9 @@
 //     with no rule file open;
 //   - "held": a check of the project's own, named, fails where the step is not done, and its failure says the mend;
 //   - "unread": no check reads it exactly, and the step says why; the staged case "steps" plants it and reads what a
-//     session did, or says why it cannot (staged/steps.mjs, beside this file);
+//     session did, or says why it cannot (staged/steps.mjs, beside this file). Where a tool fetched at set-up alone reads
+//     it, the step gives as well "fetched", the variables the tool's set-up script sets and the check run where the
+//     session's environment holds each, as "check" is (step-checks-fetched.mjs; #1095, point 4); elsewhere it stays unread;
 //   - "host": its state is GitHub's, not a file's, and a check reads it from what GitHub answered (host.mjs and
 //     step-checks-host.mjs, beside this file; #1092), run where the host was read (the daily look, and host.mjs at a
 //     sync) and left out elsewhere; one GitHub gave no answer for is said not read, never done or missing.
@@ -39,6 +41,7 @@ import { parseYaml } from "./parse-yaml.mjs";
 import { copyAt } from "./workflow-calls.mjs";
 import { HERE, mendAt, plain, shown } from "./step-checks.mjs";
 import { MANIFEST, held, pinBack, pinOf } from "./step-writers.mjs";
+import { installed, listed, notInstalled } from "./packages.mjs";
 
 // What a step reads a project with, and the words of an error with no path of the machine's in them: step-checks.mjs
 // and the files named step-checks-<what it reads>.mjs, beside this file.
@@ -79,6 +82,9 @@ export const STEPS = await Promise.all(fs.readdirSync(FOLDER).filter(f => f.ends
 // Whether the manifest declares a step undone on purpose: a line of its "Differences" that quotes the step's lead.
 export const declared = (p, step) => p.differences.some(l => l.includes(`"${step.lead}"`));
 
+// A step's check run where the session fetched its tools ("fetched"), or null where one is not there.
+export const fetched = (step, env = process.env) => step.fetched?.tools.every(t => env[t]) ? step.fetched.check : null;
+
 // The steps not done in the project at `root`: each { lead, owner, cost, mend }. A check that throws is not read as
 // done: it is reported, with what went wrong. `host`, what GitHub answered (host.mjs's readHost), runs the steps read on
 // the host too; one of those that cannot read what it needs is listed in `hostUnread`, { lead, why }, and not reported.
@@ -89,11 +95,11 @@ export function notDone(root, steps = STEPS, host = null) {
   const mine = p.files.filter(f => !f.startsWith(copy)), own = at => mine.some(f => f === at || f.startsWith(`${at}/`));
   const out = [], hostUnread = [];
   for (const step of steps) {
-    const read = step.check ?? (host && step.host ? q => step.host(q, host) : null);
+    const local = step.check ?? fetched(step), read = local ?? (host && step.host ? q => step.host(q, host) : null);
     if (!read || declared(p, step)) continue;
     let mend, unread = false;
     try { mend = read(p); } catch (e) {
-      if (!step.check) { hostUnread.push({ lead: step.lead, why: plain(e.message, root) }); continue; }
+      if (!local) { hostUnread.push({ lead: step.lead, why: plain(e.message, root) }); continue; }
       unread = true; mend = `Its check could not read the project (${plain(e.message, root)}): read its entry in \`core/${NOTES_FOLDER}/\` against it.`;
     }
     // (the entries and the checks say core/, the starter kit's path for the copy; a project that keeps it elsewhere is
@@ -125,7 +131,9 @@ function steps(missed) {
 // each { lead, wrote (the files it wrote), mend (what is left of the step, null where it is done now) } or { lead, why }
 // where it wrote nothing (it could not run, or its check could not read the project). A step the manifest declares
 // undone on purpose, or done already, is left; a file with changes not yet committed when the run began is never written.
-export function written(root, steps = STEPS) {
+// `merge`, last, the one process's key-merge mode (converge.mjs, `merged`; #1095, point 5), given so, since that script
+// reads the project with this one.
+export function written(root, steps = STEPS, merge = null) {
   const busy = held(root), copy = copyAt(project(root)), out = [];
   // (a writer runs the copy's own scripts and reads what the copy holds: this script must be the copy's)
   if (path.resolve(root, copy) !== HERE) throw new Error(`the writers run only as the copy's own script, from the project's root: node ${copy}scripts/steps.mjs --write`);
@@ -140,7 +148,7 @@ export function written(root, steps = STEPS) {
     try { mend = step.check ? step.check(project(root)) : null; } catch (e) { mend = `its check could not read the project after it (${plain(e.message, root)})`; }
     out.push({ lead: step.lead, wrote, mend: mend && mendAt(mend, copy, own) });
   }
-  return out;
+  return merge ? [...out, ...merge(root, busy)] : out;
 }
 
 // What --write prints: each step written, with its files and what is left of it, and each it could not write, with why;
@@ -177,14 +185,26 @@ export function setAside(root, files, push = () => execFileSync("git", ["--liter
 const lower = text => text.replace(/^[A-Z](?=[a-z ])/u, c => c.toLowerCase());
 export const ASIDE = "the steps' writes (#1091)";
 
-if (started(import.meta.url) && process.argv.includes("--write")) {
-  try {
-    const root = process.cwd(), done = written(root), aside = process.argv.includes("--aside"), files = [...new Set(done.flatMap(d => d.wrote ?? []))];
+// The one line said in place of the steps where the core's packages their readers load are not there, installed first in
+// a copy (packages.mjs), or null where each is: the steps are then read by none, never each said unread for want of one
+// (#1095, point 2).
+export function packagesFirst() {
+  const lacking = listed().find(n => !installed(n));
+  return lacking ? `The steps were not read: ${notInstalled(lacking).replace(/\.$/u, "")}.` : null;
+}
+
+// (the key-merge mode's script reads the project with this one, so it is loaded once this one has run, never awaited
+// while it runs, which would wait on itself)
+const stop = started(import.meta.url) ? packagesFirst() : null;
+if (stop) { if (!process.argv.includes("--aside")) console.log(stop); } // (the sync's run of the writers, after the steps', does not say it twice)
+else if (started(import.meta.url) && process.argv.includes("--write")) {
+  import("./converge.mjs").then(({ merged }) => {
+    const root = process.cwd(), done = written(root, STEPS, merged), aside = process.argv.includes("--aside"), files = [...new Set(done.flatMap(d => d.wrote ?? []))];
     console.log(writeReport(done, !aside || !files.length ? null : setAside(root, files) ? "aside" : "put back"));
-  } catch (e) {
+  }).catch(e => {
     console.error(`FAIL: the steps' writers could not run here (${plain(e.message)}). Mend: run it as the copy's own script, node core/scripts/steps.mjs --write, from the project's root, a git repository`);
     process.exitCode = 1;
-  }
+  });
 } else if (started(import.meta.url)) {
   try {
     console.log(report(notDone(process.cwd())));

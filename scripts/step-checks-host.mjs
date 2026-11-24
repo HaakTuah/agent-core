@@ -100,10 +100,11 @@ export function reviewers(p, h) {
   return now.length ? `The call to the core's \`security-review.yml\` names in \`reviewers\` ${now.map(n => `\`${n}\``).join(", ")}, whom the host lets write and the check now counts by itself: take ${now.length === 1 ? "it" : "them"} out of \`reviewers\`, a workflow's change with its two security reviews.` : null;
 }
 
-// Step 600: the look's record shows the packages looked up (look-keep.mjs's line "Packages looked up:").
+// Step 600: the look's record shows the packages looked up (look-keep.mjs's line "Packages looked up:"); at the sync,
+// the sync looks them up itself (sync.mjs's reports; #1095).
 export const LOOKED = /^Packages looked up: (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)/m;
 export function lookedUp(p, h) {
-  return LOOKED.test(recordOf(h)) ? null : "The scheduled look has not looked up the packages the project holds since this sync: it does so on its next run (`core/scripts/look.mjs`) and keeps the issue \"Packages gone stale\"; where no look runs, run `node core/scripts/held.mjs` and file each package it names as a task.";
+  return LOOKED.test(recordOf(h)) ? null : "The scheduled look has not looked up the packages the project holds since this sync: the sync printed what `core/scripts/held.mjs` found, each package it names a task; the look does so again on its next run (`core/scripts/look.mjs`) and keeps the issue \"Packages gone stale\"; where no look runs, run `node core/scripts/held.mjs` once a month and file each package it names as a task.";
 }
 
 // Step 820: the look has read the host (look-keep.mjs's line "Host read:").

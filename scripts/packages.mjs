@@ -53,6 +53,9 @@ function installOf(name) {
   return null;
 }
 const dirOf = install => path.join(root, INSTALLS[install]);
+// The packages the first install's list names, which every job installs: what a script that reads with all of them asks
+// for first (steps.mjs; #1095, point 2).
+export const listed = () => Object.keys(listOf(FIRST).dependencies ?? {});
 const needs = {};
 const need = install => (needs[install] ??= createRequire(path.join(dirOf(install), "package.json")));
 
