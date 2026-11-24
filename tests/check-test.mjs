@@ -21,6 +21,7 @@ import { npmOnce } from "../scripts/npm-once.mjs";
 import { trialRecord } from "../scripts/release-trial.mjs";
 
 const { ok, done } = tally();
+const win = process.platform === "win32";
 const { tmp, git, core, project } = scratch("check-test-");
 // (the core's packages installed by the real npm once, and linked into each job's clone after: npm-once.mjs; the real
 // npm reading a copy of the machine's cache first, so no job reaches the registry: scratch-core.mjs, npmWithCache, #772)
@@ -47,8 +48,8 @@ if (process.argv[2] === "ci") fs.mkdirSync("node_modules", { recursive: true });
 `);
   // (the fake is handed to npmOnce as the real one, so it needs no name of npm's, and this file stays one the licence
   // scan reads)
-  const realFake = path.join(fake, process.platform === "win32" ? "logger.cmd" : "logger");
-  if (process.platform === "win32") fs.writeFileSync(realFake, `@"${process.execPath}" "${logger}" %*\r\n`);
+  const realFake = path.join(fake, win ? "logger.cmd" : "logger");
+  if (win) fs.writeFileSync(realFake, `@"${process.execPath}" "${logger}" %*\r\n`);
   else fs.writeFileSync(realFake, `#!/bin/sh\nexec '${process.execPath}' '${logger}' "$@"\n`, { mode: 0o755 });
   // (from the scratch environment, which leaves the runner's npm settings and credentials out, so a failure prints none)
   const base = scratchEnv(core, tmp);
@@ -59,7 +60,7 @@ if (process.argv[2] === "ci") fs.mkdirSync("node_modules", { recursive: true });
   for (const [f, body] of Object.entries(files)) for (const d of [work, again, other]) fs.writeFileSync(path.join(d, f), f === "package-lock.json" && d === other ? body.replace("3", "4") : body);
   const asked = [["view", "left-pad", "version"], ["ci", "--ignore-scripts", "--no-audit"]];
   // (on Windows a .cmd runs through cmd.exe, so its path is quoted, as npm-once.mjs quotes the real npm's)
-  const runShim = (args, cwd) => spawnSync(process.platform === "win32" ? `"${shim}"` : shim, args, { cwd, env: probed, stdio: "ignore", shell: process.platform === "win32" });
+  const runShim = (args, cwd) => spawnSync(win ? `"${shim}"` : shim, args, { cwd, env: probed, stdio: "ignore", shell: win });
   for (const args of asked) runShim(args, work);
   runShim(asked[1], again); runShim(asked[1], other);
   const got = fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim().split("\n").map(l => JSON.parse(l)) : [];
@@ -91,7 +92,7 @@ let r = check(dir);
 ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && /ok {3}copies\.yml\/copies/.test(r.out), "a project as the kit writes it passes on a push to main, its copy and its copies checked", r.out);
 // (with --own, the project's own workflows run too, its jobs that call no workflow, after the core's; with --verdicts,
 // each job's verdict that ran is written by its place: #1084)
-fs.writeFileSync(path.join(dir, ".github/workflows/own.yml"), "name: own\non:\n  push:\n    branches: [main]\njobs:\n  fine:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo fine\n  broken:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo broken && exit 3\n  later:\n    if: github.event_name == 'pull_request'\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 4\n  deploy:\n    environment: production\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 5\n  secret:\n    runs-on: ubuntu-latest\n    steps:\n      - run: test -z \"${{ secrets.PERSONAL_TERMS }}\"\n  mac:\n    runs-on: macos\n    steps: [{run: ':'}]\n");
+fs.writeFileSync(path.join(dir, ".github/workflows/own.yml"), "name: own\non:\n  push:\n    branches: [main]\njobs:\n  fine:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo fine\n  broken:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo broken && exit 3\n  later:\n    if: github.event_name == 'pull_request'\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 4\n  deploy:\n    environment: production\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 5\n  secret:\n    runs-on: ubuntu-latest\n    steps:\n      - run: test -z \"${{ secrets.PERSONAL_TERMS }}\"\n  mac:\n    runs-on: " + (process.platform === "darwin" ? "windows" : "macos") + "\n    steps: [{run: ':'}]\n");
 commit(dir, "a workflow of its own");
 const verdictsFile = path.join(tmp, "verdicts.json");
 const without = check(dir);
@@ -116,12 +117,12 @@ git(dir, "reset", "-q", "--hard", "HEAD~1");
 // (programs named as those the checks start, committed at the change's root, never run in their place: on Windows a
 // program started by its bare name is looked for in its folder first, unless told not to, so the test's own git is
 // told so too, while check.mjs is given an environment that does not tell it; #513)
-if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
-const planted = process.platform === "win32" ? ["bash.exe", "git.exe"] : ["bash", "git"];
+if (win) process.env.NoDefaultCurrentDirectoryInExePath = "1";
+const planted = win ? ["bash.exe", "git.exe"] : ["bash", "git"];
 // (elsewhere each leaves a mark where it runs, so a run the check's outcome would not show is seen too)
 const ranMark = path.join(tmp, "planted-ran");
 for (const f of planted) {
-  if (process.platform === "win32") fs.copyFileSync(path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "whoami.exe"), path.join(dir, f));
+  if (win) fs.copyFileSync(path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "whoami.exe"), path.join(dir, f));
   else fs.writeFileSync(path.join(dir, f), `#!/bin/sh\necho "$0" >> '${ranMark}'\nexit 3\n`, { mode: 0o755 });
 }
 commit(dir, "programs named as the checks' own");
@@ -142,7 +143,7 @@ ok(!/owner's account\* \|/u.test(fs.readFileSync(path.join(dir, "core-manifest.m
 git(dir, "reset", "-q", "--hard", "HEAD~2");
 // (and bash is taken from the PATH as the system takes it: on POSIX, a file of that name the user may not run, in a
 // folder ahead on the PATH, is passed over for the one it may)
-if (process.platform !== "win32") {
+if (!win) {
   const ahead = path.join(tmp, "ahead");
   fs.mkdirSync(ahead, { recursive: true });
   fs.writeFileSync(path.join(ahead, "bash"), "#!/bin/sh\nexit 3\n", { mode: 0o644 });
