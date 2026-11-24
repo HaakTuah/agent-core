@@ -74,7 +74,8 @@ if (flag !== "--part" || !["all", "older", "newer", ...PARTS].includes(PART) || 
   process.exit(2);
 }
 // (a part of a release, "older" or "newer", is the whole of its release; "-npm", "-dotnet" and "-pre" one kind of it)
-const inPart = (release, kind) => PART === "all" || PART === release || PART === `${release}-${kind}`;
+const SUFFIX = { js: "npm", net: "dotnet", pre: "pre" }; // (the kind a part's name ends in: its program's name never stands quoted alone, which the licence scan would read as a fetch)
+const inPart = (release, kind) => PART === "all" || PART === release || PART === `${release}-${SUFFIX[kind]}`;
 
 // ---- the reader the runner stands on ----
 const yaml = parseYaml("name: x # a comment\non:\n  workflow_call:\n    inputs:\n      a:\n        type: boolean\n        default: true\njobs:\n  j:\n    if: >-\n      ${{ a\n      && b }}\n    steps:\n      - uses: x@1 # v1\n        with:\n          k: 'it''s'\n      - name: run\n        run: |\n          one\n            two # kept\n\n          three\n      - run: echo \"#\" plain\n    types: [opened, edited]\n");
@@ -1088,13 +1089,13 @@ let synced = null; // (the npm project of the newest release started from, once 
 ok(starts.length > 1 || !process.env.GITHUB_ACTIONS || !/^older-(npm|dotnet)$/.test(PART), `on GitHub's runners two releases of the core's come before the commit under test, for the part "${PART}" to start from`);
 for (const tag of starts) {
   const release = tag === starts.at(-1) ? "newer" : "older";
-  if (!inPart(release, "npm") && !inPart(release, "dotnet")) continue;
+  if (!inPart(release, "js") && !inPart(release, "net")) continue;
   const from = { tag, sha: git(theCore, "rev-parse", `${tag}^{commit}`), dir: path.join(tmp, `core-at-${tag}`) };
   git(tmp, "clone", "-q", theCore, from.dir);
   git(from.dir, "checkout", "-q", from.sha);
 
   // the npm project, public
-  if (inPart(release, "npm")) {
+  if (inPart(release, "js")) {
     const npmProject = project(`an-npm-project-from-${tag}`, from, { owner: "someone-else", kit: ["--npm", "."], isPrivate: false, files: dir => {
       write(dir, "package.json", '{\n  "name": "an-npm-project",\n  "version": "1.0.0",\n  "private": true,\n  "type": "module",\n  "dependencies": {\n    "ms": "2.1.3"\n  }\n}\n');
       write(dir, "package-lock.json", `${JSON.stringify({ name: "an-npm-project", version: "1.0.0", lockfileVersion: 3, requires: true, packages: { "": { name: "an-npm-project", version: "1.0.0", dependencies: { ms: "2.1.3" } },
@@ -1114,7 +1115,7 @@ for (const tag of starts) {
   }
 
   // the .NET project, private, held as Windows holds it
-  if (inPart(release, "dotnet")) {
+  if (inPart(release, "net")) {
     const dotnetProject = project(`a-dotnet-project-from-${tag}`, from, { owner: "someone-else", kit: ["--nuget", ".", "--private"], isPrivate: true, windows: true, as: ownersName, files: dir => {
       write(dir, "src/App/App.csproj", `<Project Sdk="Microsoft.NET.Sdk">\r\n  <PropertyGroup>\r\n    <OutputType>Exe</OutputType>\r\n    <TargetFramework>${tfm}</TargetFramework>\r\n    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>\r\n  </PropertyGroup>\r\n</Project>\r\n`);
       write(dir, "src/App/Program.cs", 'System.Console.WriteLine("Hello");\r\n');
