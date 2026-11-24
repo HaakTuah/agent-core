@@ -66,7 +66,7 @@ try {
   const run1 = fake({ "test/a-test.mjs": { result: "failed", took: 1 }, "test/b-test.mjs": { result: "passed", took: 2 }, "test/b-test.mjs with": { result: "failed", took: 1 } });
   const caught = await dispatch(map, "7", run1);
   ok(caught === 1 && same(calls, [["test/a-test.mjs", 60, "as it stands"], ["test/b-test.mjs", 60, "as it stands"], ["test/b-test.mjs", limitOf(2), "with the fault"]]),
-    "a test is run as it stands first, and left out where it fails there; with the fault in, it is held to mutate.mjs's limit, and its failing catches the fault", JSON.stringify(calls));
+    "a test runs as it stands first, left out where it fails there; with the fault in, it is held to mutate.mjs's limit, its failing catching the fault", JSON.stringify(calls));
   calls.length = 0;
   ok(await dispatch(map, "7", fake({ "test/b-test.mjs with": { result: "passed", took: 2 } })) === 0 && same(calls, [["test/b-test.mjs", limitOf(2), "with the fault"]]),
     "a test is run as it stands once for the whole run, and a fault no test fails on survives", JSON.stringify(calls));
@@ -132,8 +132,8 @@ try {
   // ---- tests vitest runs (#1274) ----
   const vt = path.join(scratch, "vt"), pkg = path.join(vt, "node_modules/vitest"), V = "node_modules/vitest/v.mjs";
   const vitestIs = bin => { fs.mkdirSync(pkg, { recursive: true }); fs.writeFileSync(`${pkg}/package.json`, JSON.stringify({ bin })); fs.writeFileSync(`${pkg}/v.mjs`, ""); return vitestAt(vt); };
-  ok(vitestIs({ vitest: "./v.mjs" }) === V && vitestIs("v.mjs") === V && vitestIs({ vitest: "../../outside.mjs" }) === null && vitestIs({ vitest: "missing.mjs" }) === null && vitestAt(path.join(scratch, "none")) === null,
-    "the project's vitest is the program its package.json names, inside its folder, or none");
+  ok(vitestIs({ vitest: "./v.mjs" }) === V && vitestIs("v.mjs") === V && vitestIs({ vitest: "../../outside.mjs" }) === null && vitestIs({ vitest: "missing.mjs" }) === null && vitestIs(".") === null && vitestAt(path.join(scratch, "none")) === null,
+    "the project's vitest is the file its package.json names, inside its folder, or none");
   if (process.platform !== "win32") { fs.symlinkSync(SCRIPT, `${pkg}/l.mjs`); ok(vitestIs("l.mjs") === null, "nor one a link leads out of it"); }
   const jest = spawnSync(process.execPath, [SCRIPT, "--tool", ".", "--runner", "jest", "--report", "r.json"], { encoding: "utf8" }).stderr;
   ok(/told to run its tests with jest.*--runner vitest/.test(jest) && mended(jest), "another runner is refused, saying the mend", jest);
@@ -166,7 +166,7 @@ try {
     write("test/a-test.mjs", `${fs.readFileSync(path.join(dir, "test/a-test.mjs"), "utf8")}await new Promise(r => setTimeout(r, 4000));\n`);
     const slow = spawnSync(process.execPath, [SCRIPT, "--tool", TOOL, "--report", out, "--budget", "6", "src/a.mjs:1-2"], { cwd: dir, encoding: "utf8" });
     const late = faults();
-    ok(slow.status === 0 && late.some(m => m.status === "Pending") && JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].source === SOURCE && /not run \(the budget\)/.test(slow.stdout), "past its budget, Stryker is stopped and the faults it did not run written as not run", `${slow.stdout}${slow.stderr}`);
+    ok(slow.status === 0 && late.some(m => m.status === "Pending") && JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].source === SOURCE && /not run \(the budget\)/.test(slow.stdout), "past its budget, Stryker is stopped and the faults not run are written so", `${slow.stdout}${slow.stderr}`);
     // (a run stopped by a signal stops Stryker and all it started before it takes its working copy away, off Windows)
     if (process.platform !== "win32") {
       const strykers = () => spawnSync("pgrep", ["-f", `${TOOL}/node_modules/@stryker-mutator/core/bin/stryker.js run`], { encoding: "utf8" }).stdout.trim();
