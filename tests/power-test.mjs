@@ -117,9 +117,8 @@ const env = scratchEnv(tmp, tmp);
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const write = (dir, f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
 const save = (dir, message) => { git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", message); return git(dir, "rev-parse", "HEAD"); };
-const repo = path.join(tmp, "repo");
-fs.mkdirSync(repo);
-git(repo, "init", "-q", "-b", "main");
+const init = (name) => { git(tmp, "init", "-q", "-b", "main", name); return path.join(tmp, name); };
+const repo = init("repo");
 write(repo, ".github/workflows/w.yml", "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node scripts/run.mjs\n");
 write(repo, "scripts/run.mjs", "console.log(1);\n");
 write(repo, "README.md", "one\n");
@@ -164,9 +163,7 @@ ok(nowhere.status === 1 && mended(nowhere.stderr), "--list of a folder that is n
 
 // Files with no extension, read from a commit as from disk: beside a powered workflow, `./deploy`, `./helper` and
 // `bin/publish` may run.
-const ext = path.join(tmp, "ext");
-fs.mkdirSync(ext);
-git(ext, "init", "-q", "-b", "main");
+const ext = init("ext");
 write(ext, ".github/workflows/d.yml", "on: push\npermissions:\n  issues: write\njobs:\n  a:\n    steps:\n      - run: ./deploy\n");
 write(ext, "deploy", "#!/bin/sh\n./helper\n");
 write(ext, "helper", "#!/bin/sh\necho 1\n");
@@ -195,19 +192,16 @@ ok(extOut.status === 0 && JSON.stringify(extPrinted) === JSON.stringify({ power:
   "a commit that changes a file with no extension beside a seed is not light, read from its own tree: the readme's after it is", extOut.stdout + extOut.stderr);
 
 // A submodule's pointer (a gitlink), read from a commit, may run beside a seed whatever its name ends in; a commit that
-// moves it is not light.
-const sub = path.join(tmp, "sub");
-fs.mkdirSync(sub);
-git(sub, "init", "-q", "-b", "main");
+// moves it is not light. A tab's name, in the index alone (Windows refuses one).
+const sub = init("sub");
 write(sub, ".github/workflows/p.yml", "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node vendor/tool.md/run.mjs\n");
 write(sub, "README.md", "one\n");
-write(sub, "scripts/a\tb.sh", "echo 1\n");
 git(sub, "add", "-A");
-git(sub, "update-index", "--add", "--cacheinfo", `160000,${sha(1)},vendor/tool.md`);
+git(sub, "-c", "core.protectNTFS=false", "update-index", "--add", "--cacheinfo", `160000,${sha(1)},vendor/tool.md`, "--cacheinfo", `100644,${git(sub, "rev-parse", ":README.md")},scripts/a\tb.sh`);
 git(sub, "commit", "-q", "-m", "base");
 const subBase = git(sub, "rev-parse", "HEAD");
 git(sub, "update-index", "--cacheinfo", `160000,${sha(2)},vendor/tool.md`);
-git(sub, "commit", "-q", "-m", "the submodule moved");
+git(sub, "commit", "-q", "-m", "moved");
 const subMoved = git(sub, "rev-parse", "HEAD");
 const subWhy = new Map(), subSet = setOf(gitTree(subMoved, sub), subWhy);
 const subChanged = (parent, at) => git(sub, "diff-tree", "-r", "--no-renames", "--name-only", parent, at).split("\n").filter(Boolean);
