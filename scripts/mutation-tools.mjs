@@ -65,24 +65,31 @@ export function testRunner(packageJson) {
   return words[0] === "node" && program ? `node ${program}` : words[0];
 }
 
-// The row the list gives a project: { command, tool } or { none } (its reason), from `code` (its files of code that are
-// no test), `tests` (whether it has any), `runner` (testRunner's word) and `copy` (the copy's path, "core/").
+// The row the list gives a project: { command, tool, rest } or { none } (its reason), from `code` (its files of code that
+// are no test), `tests` (whether it has any), `runner` (testRunner's word) and `copy` (the copy's path, "core/"). Code in
+// the languages of more than one tool, or of one the list knows none for, is measured in its main language, that of the
+// tool whose languages hold the most of its files, and `rest` names the others, not measured (#1247, point 5); where
+// two lead with as many files, none, since its main language cannot be told.
 export function rowFor({ code, tests, runner, copy }) {
   if (!tests) return { none: NO_TESTS };
   if (!code.length) return { none: NO_CODE };
-  const languages = [...new Set(code.map(languageOf))].sort();
-  const unknown = languages.filter(l => !toolFor(l));
-  if (unknown.length) return { none: `its code holds files ending ${unknown.join(", ")}, of a language the core's list gives no mutation tool for (\`${copy}scripts/mutation-tools.json\`)` };
-  const tools = [...new Set(languages.map(toolFor))];
-  if (tools.length > 1) return { none: `its code is in ${languages.map(l => `${l} (${toolFor(l)})`).join(" and ")}, and the row names one tool` };
-  const tool = LIST.tools[tools[0]];
+  const groups = new Map();
+  for (const f of code) {
+    const l = languageOf(f), key = toolFor(l) ?? l, g = groups.get(key) ?? { files: 0, languages: new Set() };
+    groups.set(key, { files: g.files + 1, languages: g.languages.add(l) });
+  }
+  const ranked = [...groups].map(([key, g]) => ({ key, files: g.files, languages: [...g.languages].sort() })).sort((a, b) => b.files - a.files || a.key.localeCompare(b.key));
+  const [lead] = ranked, tied = ranked.filter(g => g.files === lead.files);
+  if (tied.length > 1) return { none: `its code is in ${tied.map(g => `${g.languages.join(", ")} (${toolFor(g.languages[0]) ?? "no tool"})`).join(" and ")}, ${lead.files} file${lead.files === 1 ? "" : "s"} each, and the row names one tool` };
+  if (!toolFor(lead.languages[0])) return { none: `its code holds files ending ${lead.key}, of a language the core's list gives no mutation tool for (\`${copy}scripts/mutation-tools.json\`)` };
+  const tool = LIST.tools[lead.key], rest = ranked.slice(1).flatMap(g => g.languages).sort();
   if (tool.none) return { none: tool.none };
-  if (tool.runner && runner && runner !== tool.runner) return { none: `its tests run by \`${runner}\` (package.json's test script), and the core runs ${tools[0]} only on tests run by \`${tool.runner} <file>\` (\`${copy}scripts/stryker.mjs\`)` };
-  return { tool: tools[0], command: tool.command.replaceAll("{copy}", copy) };
+  if (tool.runner && runner && runner !== tool.runner) return { none: `its tests run by \`${runner}\` (package.json's test script), and the core runs ${lead.key} only on tests run by \`${tool.runner} <file>\` (\`${copy}scripts/stryker.mjs\`)` };
+  return { tool: lead.key, command: tool.command.replaceAll("{copy}", copy), ...(rest.length ? { rest } : {}) };
 }
 
-// The row's line in the manifest.
-export const lineOf = row => (row.command ? `| ${ROW} | \`${row.command}\`: ${row.tool}, from the core's list (\`mutation-tools.json\`) |` : `| ${ROW} | \`none\`: ${row.none} |`);
+// The row's line in the manifest, naming the code of the languages its tool does not measure.
+export const lineOf = row => (row.command ? `| ${ROW} | \`${row.command}\`: ${row.tool}, from the core's list (\`mutation-tools.json\`)${row.rest ? `; its ${row.rest.join(" and ")} code not measured` : ""} |` : `| ${ROW} | \`none\`: ${row.none} |`);
 
 // Whether the row the manifest holds is the kit's or this script's to fill again: none there, a `none` with no reason,
 // which turns nothing off (the owner's `none` gives the owner's reason), or a `none` with a reason the kit, this script

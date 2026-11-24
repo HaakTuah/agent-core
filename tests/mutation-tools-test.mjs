@@ -48,8 +48,10 @@ ok(at({ code: ["a.js"], tests: true }).command?.startsWith("node core/") && at({
 ok(at({ code: ["a.js"], tests: true, runner: "jest" }).none?.includes("`jest`"), "tests run by another runner give none, naming that runner");
 ok(at({ code: ["a.cs"], tests: true }).none === LIST.tools["Stryker.NET"].none && at({ code: ["a.py"], tests: true }).none === LIST.tools.mutmut.none,
   "C# and Python give none with the reason the list gives for their tool");
-ok(at({ code: ["a.js", "b.py"], tests: true }).none?.includes("one tool") && at({ code: ["a.go"], tests: true }).none?.includes(".go"),
-  "code in languages of two tools, or of one the list does not know, gives none with why");
+const two = at({ code: ["a.ts", "b.ts", "c.py", "d.go"], tests: true }), tie = at({ code: ["a.js", "b.py"], tests: true }).none;
+ok(two.tool === "Stryker" && same(two.rest, [".go", "Python"]) && lineOf(two).endsWith("; its .go and Python code not measured |") && same(toolOf(lineOf(two)).command, toolOf(lineOf(js)).command)
+  && tie?.includes("1 file each") && fillable(lineOf({ none: tie })) && at({ code: ["a.go", "b.go", "c.js"], tests: true }).none?.includes(".go"),
+  "code in the languages of more tools, or of one the list does not know, is measured in its main one, the rest named; a tie gives none");
 ok(same(at({ code: ["a.js"], tests: false }), { none: NO_TESTS }) && toolOf(lineOf({ none: NO_TESTS })).none.startsWith("no tests yet") && at({ code: [], tests: true }).none?.startsWith("no code yet"),
   "a project with no tests, or with tests and no code the list knows, gives none, its reason starting so");
 ok(testRunner('{"scripts":{"test":"  node --test tests/"}}') === "node" && testRunner('{"scripts":{}}') === null && testRunner("{ not json") === null && testRunner(null) === null,
