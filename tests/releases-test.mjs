@@ -310,7 +310,7 @@ ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[
   ok(/has not run for/.test(none.said) && /Mend: try the release on a copy of a project/.test(none.held ?? ""), "with no record, the release says the trial has not run, and the cut is held, saying its mend");
   const record = r => commit({ [TRIAL]: `${JSON.stringify(r)}\n` }, "the trial's record");
   const passed = trialRecord(tried, "2026-11-22", [[{ "a.yml/x": "passed", "a.yml/y": "failed" }, { "a.yml/x": "passed", "a.yml/y": "failed" }]]);
-  ok(passed.projects === 1 && passed.passedAfter === 1 && passed.failedBoth === 1 && passed.failedAfter === 0 && passed.ranBeforeAlone === 0 && Object.keys(passed).join() === "commit,day,projects,passedAfter,failedBoth,failedAfter,ranBeforeAlone", "the record holds the commit, the day and counts alone, nothing of the project");
+  ok(passed.projects === 1 && passed.passedAfter === 1 && passed.failedBoth === 1 && Object.keys(passed).join() === "commit,day,projects,passedAfter,failedBoth,failedAfter,stoppedAfter,ranBeforeAlone,baselineFromClone", "the record holds the commit, the day and counts alone, nothing of the project");
   let at = record(passed);
   let r = trialAt(at, read);
   ok(r.held === null && /in 1 project: 1 check passed after the update, 1 failed before and after \(standing before the release\), 0 passed before and failed after/.test(r.said), "a record of the commit before, which the release changes by the record alone, stands, and one failing both does not hold the cut", r.said);

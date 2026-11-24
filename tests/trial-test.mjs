@@ -1,0 +1,147 @@
+// Tests of check.mjs as a release's trial runs it, and of the trial's record (#1245, #1244; AGENTS.md, "A release is
+// cut on the owner's word"): a workflow's jobs run in their `needs` order with the needs context; the checkout stand-in
+// takes a commit's id and a ref written whole as they are; the setup-node stand-in says where the machine's Node is not
+// the one a step asks; a sync's calls are its own, and the base's it leaves out; jobs stopped behind a failure are
+// counted, and hold the cut, as a baseline taken from a clone of the core is; and a sync to a commit of the core's main
+// past its newest release, as a trial makes, is said to need nothing. On scratch repositories alone, so no call reaches
+// the network. Git and Node's own modules.
+//
+//   node tests/trial-test.mjs
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { RUN_FROM } from "../scripts/check.mjs";
+import { sameNode, standIns } from "../scripts/check-actions.mjs";
+import { movesForward, syncCalls } from "../scripts/check-calls.mjs";
+import { compared, RUNS, trialAt, trialRecord } from "../scripts/release-trial.mjs";
+import { sideOf } from "../scripts/attached.mjs";
+import { notInstalled } from "../scripts/packages.mjs";
+import { mended } from "../scripts/mend.mjs";
+import { runWorkflow, withAbsolutePath } from "../scripts/workflow-run.mjs";
+import { tally } from "../scripts/scratch-core.mjs";
+
+const { ok, done } = tally();
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trial-test-"));
+const env = { ...withAbsolutePath(process.env), GIT_AUTHOR_NAME: "Tester", GIT_AUTHOR_EMAIL: "tester@example.invalid", GIT_COMMITTER_NAME: "Tester", GIT_COMMITTER_EMAIL: "tester@example.invalid", GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: path.join(tmp, "gitconfig") };
+fs.writeFileSync(env.GIT_CONFIG_GLOBAL, "[init]\n\tdefaultBranch = main\n[commit]\n\tgpgsign = false\n");
+const git = (cwd, ...args) => execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+const commit = (dir, file, text) => { fs.writeFileSync(path.join(dir, file), text); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", file); return git(dir, "rev-parse", "HEAD"); };
+const SHA = n => String(n).repeat(40);
+
+try {
+  // (point 3: the jobs in their needs order, each with the results and outputs of those it needs, as GitHub gives them)
+  const ws = fs.mkdtempSync(path.join(tmp, "ws-"));
+  const run = text => runWorkflow(text, { github: { event_name: "pull_request" }, base: env, temp: tmp, workspace: () => ws, uses: {} });
+  const gated = run(`on: pull_request
+jobs:
+  late:
+    needs: [early]
+    if: needs.early.outputs.go == 'yes' && needs.early.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo late ran
+  skipped:
+    needs: early
+    if: needs.early.outputs.go == 'no'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo skipped ran
+  early:
+    runs-on: ubuntu-latest
+    outputs:
+      go: \${{ steps.s.outputs.go }}
+    steps:
+      - id: s
+        run: echo "go=yes" >> "$GITHUB_OUTPUT"
+`);
+  ok(gated.map(j => `${j.job}:${j.ran}`).join() === "early:true,late:true,skipped:false" && gated.every(j => j.passed), "a job runs after the jobs it needs, its condition reading their outputs and results (#1245, point 3)", JSON.stringify(gated.map(j => [j.job, j.ran, j.passed])));
+  const after = run(`on: pull_request
+jobs:
+  first:
+    runs-on: ubuntu-latest
+    steps:
+      - run: exit 1
+  next:
+    needs: first
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo next ran
+  always:
+    needs: first
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo always ran
+`);
+  ok(after.map(j => `${j.job}:${j.ran}:${j.passed}`).join() === "first:true:false,next:false:true,always:true:true", "a job whose need failed is skipped, as GitHub skips it, and one that asks always() runs", JSON.stringify(after.map(j => [j.job, j.ran, j.passed])));
+  const refused = text => { try { run(text); return ""; } catch (e) { return e.message; } };
+  ok(/need each other in a loop/u.test(refused("on: push\njobs:\n  a:\n    needs: b\n    runs-on: x\n    steps: [{run: 'true'}]\n  b:\n    needs: a\n    runs-on: x\n    steps: [{run: 'true'}]\n")) && /needs c, which is no job/u.test(refused("on: push\njobs:\n  a:\n    needs: c\n    runs-on: x\n    steps: [{run: 'true'}]\n")),
+    "a loop of needs, or a need that names no job, is refused, as GitHub refuses the workflow");
+
+  // (point 4: the checkout stand-in takes a full commit's id, and a ref written whole, as they are; a bare name is a branch)
+  const origin = path.join(tmp, "origin");
+  fs.mkdirSync(origin); git(origin, "init", "-q");
+  const first = commit(origin, "a.md", "a\n");
+  git(origin, "checkout", "-q", "-b", "feature"); const onBranch = commit(origin, "b.md", "b\n");
+  git(origin, "checkout", "-q", "main"); const pulled = commit(origin, "c.md", "c\n");
+  git(origin, "update-ref", "refs/pull/1/head", pulled); git(origin, "reset", "-q", "--hard", first);
+  const clone = path.join(tmp, "clone");
+  git(tmp, "clone", "-q", origin, clone);
+  const checkout = standIns({ git: (cwd, ...a) => git(cwd, ...a), say: () => {}, tmp })["actions/checkout"];
+  const at = ref => { checkout({ ref }, clone); return git(clone, "rev-parse", "HEAD"); };
+  ok(at(first) === first && at("refs/pull/1/head") === pulled && at("feature") === onBranch, "the checkout stand-in checks out a commit's id and a ref written whole as they are, and a bare name as the origin's branch (#1245, point 4)");
+  ok(standIns({ git, say: () => {}, tmp })["some/action"]() === false, "  and any other action is the host's own, not run");
+
+  // (point 5: setup-node installs nothing, and says once where the step asks a Node other than the machine's)
+  const have = process.versions.node, major = have.split(".")[0];
+  ok(sameNode(major, have) && sameNode(`${major}.x`, have) && sameNode(have, have) && sameNode("1.2.3", have) === false && sameNode("lts/*", have) === null, "the machine's Node is matched against the one a step asks, part by part");
+  const said = [], setup = standIns({ git, say: s => said.push(s), tmp })["actions/setup-node"];
+  setup({ "node-version": "1.2.3" }, ws); setup({ "node-version": "1.2.3" }, ws); setup({ "node-version": `v${have}` }, ws);
+  fs.writeFileSync(path.join(ws, ".node-version"), "lts/*\n"); setup({ "node-version-file": ".node-version" }, ws);
+  ok(said.length === 2 && /asks Node 1\.2\.3 .*runs Node .*a verdict may differ/u.test(said[0]) && /asks Node lts\/\* .*cannot match/u.test(said[1]), "the setup-node stand-in says, once a version, where the machine's Node is not the one asked, and where it cannot tell (#1245, point 5)", said.join("\n"));
+
+  // (point 1: a sync, the pin moved forward along the core's main, runs its own calls, and the base's it leaves out)
+  const past = (older, newer) => ({ [`${SHA(1)} ${SHA(2)}`]: true, [`${SHA(2)} refs/heads/main`]: true, [`${SHA(3)} refs/heads/main`]: true })[`${older} ${newer}`] ?? false;
+  ok(movesForward(SHA(1), SHA(2), past) && !movesForward(SHA(2), SHA(1), past) && !movesForward(SHA(1), SHA(1), past) && !movesForward(SHA(1), SHA(3), past) && !movesForward(null, SHA(2), past),
+    "a change is a sync where it moves the pin forward along the core's main, and no other (#1245, point 1)");
+  const calls = job => Boolean(job?.uses);
+  const base = [{ file: "core.yml", wf: { jobs: { core: { uses: "old" }, gone: { uses: "old" }, own: { steps: [] } } } }, { file: "left.yml", wf: { jobs: { x: { uses: "old" } } } }];
+  const head = [{ file: "core.yml", wf: { jobs: { core: { uses: "new" } } } }];
+  const merged = syncCalls(base, head, calls);
+  ok(merged.length === 3 && merged[0].wf.jobs.core.uses === "new" && Object.keys(merged[1].wf.jobs).join() === "gone" && merged[2].file === "left.yml", "  its own calls run, and each call of the base's it leaves out runs as the base holds it", JSON.stringify(merged));
+
+  // (point 2 and #1244: jobs stopped after count apart and hold the cut; a baseline from a clone of the core is counted)
+  const before = { [RUN_FROM]: "a clone of the core", "core.yml/core": "passed", "core.yml/tests (a)": "passed", "own.yml/lint": "passed", "own.yml/gone": "passed" };
+  const afterRun = { "core.yml/core": "failed", "core.yml/tests": "stopped", "own.yml": "stopped" };
+  const c = compared(before, afterRun);
+  ok(c.failedAfter.join() === "core.yml/core" && c.stoppedAfter.join() === "core.yml/tests,own.yml" && c.ranBeforeAlone.length === 0 && c.passedAfter.length === 0, "a job stopped after a failure is counted apart, with the jobs of its place before, and the key that says where check.mjs ran from is no job (#1245, point 2)", JSON.stringify(c));
+  const record = trialRecord(SHA("a"), "2026-11-24", [[before, afterRun], [{ "x.yml/y": "passed" }, { "x.yml/y": "passed" }]]);
+  ok(record.stoppedAfter === 2 && record.baselineFromClone === 1 && record.projects === 2, "the record counts the jobs stopped after, and the baselines taken from a clone of the core (#1244)", JSON.stringify(record));
+  const showing = r => args => { if (args[0] === "show") return JSON.stringify(r); if (args[0] === "diff") return ""; return ""; };
+  const stopped = trialAt(SHA("a"), showing({ ...record, failedAfter: 0 }));
+  ok(/2 checks did not run after the update/u.test(stopped.held) && mended(`FAIL ${stopped.held}`) && stopped.held.includes(RUNS) && /2 stopped after it behind a failure.*1 of the baselines taken by the release's check\.mjs from a clone of the core/u.test(stopped.said),
+    "a trial with jobs stopped after holds the cut, its mend naming how the runs are taken, the baseline from a clone of the core among them", `${stopped.said}\n${stopped.held}`);
+  const clean = trialAt(SHA("a"), showing({ ...record, failedAfter: 0, stoppedAfter: 0 }));
+  ok(clean.held === null, "  and with none stopped or failed after, it holds nothing", clean.held);
+  ok(trialAt(SHA("a"), showing({ ...record, baselineFromClone: 3 })).held !== null, "  and a record with more baselines from a clone than projects is in no form it writes");
+
+  // (point 6: run from a clone of the core with its packages missing, check.mjs says so with the command that installs them)
+  ok(mended(`FAIL no workflow can be read here: ${notInstalled("yaml")}`) && /install\.mjs/u.test(notInstalled("yaml")), "a package missing is said with the command that installs it (#1245, point 6)", notInstalled("yaml"));
+
+  // (point 7: a sync to a commit of the core's main past its newest release, as a trial makes, needs nothing)
+  const core = path.join(tmp, "core");
+  fs.mkdirSync(core); git(core, "init", "-q");
+  const released = commit(core, "one.md", "1\n"); git(core, "tag", "release-1"); const unreleased = commit(core, "two.md", "2\n");
+  const bare = path.join(tmp, "core.git"); git(tmp, "clone", "-q", "--bare", core, bare);
+  const project = path.join(tmp, "project");
+  fs.mkdirSync(project); git(project, "init", "-q"); commit(project, "core-manifest.md", "| *follows* | `releases` |\n");
+  const sideSaid = [];
+  const sayer = { way: (part, text) => sideSaid.push(["way", part, text]), unread: (part, text) => sideSaid.push(["unread", part, text]) };
+  const side = sideOf(project, "core/", bare, { pin: unreleased, main: "HEAD" }, sayer);
+  ok(side === null && sideSaid.length === 1 && sideSaid[0][0] === "unread" && /not yet a release: in a release's trial .*nothing is to be done/u.test(sideSaid[0][2]), "a sync to a commit of main past the newest release, as a trial makes, is said to need nothing in a trial, and is counted neither way (#1245, point 7)", JSON.stringify(sideSaid));
+  ok(sideOf(project, "core/", bare, { pin: released, main: "HEAD" }, sayer) === released, "  and a sync to a release runs from that release");
+} finally {
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+done("check.mjs as a release's trial runs it");

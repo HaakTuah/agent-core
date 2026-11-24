@@ -3,12 +3,12 @@
 // calls, as GitHub would run it for a pull request into main (`--base`, the commit it merges into) or for a push to main
 // (none given), on the commit checked out (for a pull request, merged into its base, as GitHub merges it, the base its first
 // parent): each step's own shell, through workflow-run.mjs, so that no check is written
-// twice. The calls are the base's (on a push, main's own), so a change cannot leave a check out by taking its call out:
-// the project's .github/workflows, or, where it has none, as on another host, the starter kit's in the base's copy,
+// twice. The calls are the base's (on a push, main's own), so a change cannot leave a check out by taking its call out,
+// save a sync's, which runs its own (check-calls.mjs): the project's .github/workflows, or, where it has none, as on another host, the starter kit's in the base's copy,
 // each with the inputs the kit gives them (a template the kit fills in with more than the core's address and pin is
 // left out, and said so). core.yml runs first, and where the copy of the core is not the core at its pin no other check
 // runs, since each runs the copy's scripts (the steps core.yml runs after its own, given its inputs, among them: a step of
-// its own that fails stops the rest here, as a run cancelled there; #376); with no call to core.yml, or none run, it fails. Each called workflow is
+// its own that fails stops the rest here, as a run cancelled there; #376), each stopped so said; with no call to core.yml, or none run, it fails. Each called workflow is
 // read from the core at the call's pin, fetched from the core's address by git, as GitHub reads it, never from the
 // copy under core/, which the change may have edited; and a pipeline runs this script itself from a clone of the core,
 // not from that copy (tasks/hosts.md). It runs in a scratch clone of the commit, removed at its end, so it changes
@@ -20,9 +20,9 @@
 // each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed.
 // With --own it runs the project's own jobs too (#1084), each job of its own workflows that calls no workflow and names
 // no environment, as the change itself holds them, given no secret, after the core's and only where the copy is the core; with
-// --verdicts it writes each job's verdict that ran, "passed" or "failed", by its place, to a file, so that a run before
-// an update and one after can be set side by side (release-trial.mjs, compared).
-// Git, bash and Node's own modules, and gh where the manifest has no owner's row and no workflow's event says whose
+// --verdicts it writes each job's verdict, "passed", "failed" or "stopped" behind core.yml's failure, by its place, to a file, and
+// RUN_FROM where this script lies outside the project, so that a run before an update and one after can be set side by side (release-trial.mjs, compared).
+// Git, bash and Node's own modules, the core's packages (packages.mjs), and gh where the manifest has no owner's row and no workflow's event says whose
 // account holds the repository (releases.mjs, hostAccount).
 //
 //   node core/scripts/check.mjs [--base <commit>] [--title <the pull request's title>] [--description <a file>]
@@ -31,15 +31,18 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { movesForward, syncCalls, triggered } from "./check-calls.mjs";
+import { standIns } from "./check-actions.mjs";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { carriedAt, readCore } from "./core-path.mjs";
 import { MEND } from "./mend.mjs";
 import { hostSaid, plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
 import { leadsOut } from "./guards.mjs";
+import { installed, notInstalled } from "./packages.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
-import { evaluate, pathsLetThrough, runWorkflow, withAbsolutePath } from "./workflow-run.mjs";
+import { evaluate, runWorkflow, withAbsolutePath } from "./workflow-run.mjs";
 
 // The core's workflows a project calls that only the host can run, each with why: check-test.mjs holds that every
 // workflow the starter kit calls is run here or named here.
@@ -52,6 +55,9 @@ export const HOST_OWN = {
   "versions.yml": "it is started by the host's schedule",
   "preview.yml": "it is started by the host once a game's build has run, and publishes a preview, checking nothing",
 };
+
+// What --verdicts adds where this script lies outside the project (#1244): no job's place, which names a file.
+export const RUN_FROM = "(run from)";
 
 // (the caller's environment, its PATH held to absolute folders: an empty or relative entry is the folder a program
 // starts in, which the change under check fills, on any system; #513)
@@ -97,6 +103,8 @@ function main() {
   if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
   for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
   const o = options();
+  // (a clone of the core installs none itself, as a copy does: #1245, point 6)
+  if (!installed("yaml")) { const [what, mend] = notInstalled("yaml").split(" Mend: "); fail(`no workflow can be read here: ${what}.`, mend); }
   const p = { ...project(o), own: o.own, verdicts: o.verdicts === null ? null : path.resolve(o.verdicts) };
   if (p.verdicts !== null) outside(p, o.verdicts);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
@@ -122,7 +130,8 @@ function writeVerdicts(p, given) {
   outside(p, given);
   try {
     fs.rmSync(p.verdicts, { force: true });
-    fs.writeFileSync(p.verdicts, `${JSON.stringify(verdicts, null, 2)}\n`, { flag: "wx" });
+    const from = leadsOut(p.root, fileURLToPath(import.meta.url)) ? { [RUN_FROM]: "a clone of the core" } : {};
+    fs.writeFileSync(p.verdicts, `${JSON.stringify({ ...verdicts, ...from }, null, 2)}\n`, { flag: "wx" });
   } catch (e) { fail(`--verdicts ${given} could not be written (${e.code ?? e.message}).`, "give a file in a scratch folder outside every repository that nothing else writes to, and run the check again."); }
 }
 
@@ -136,12 +145,18 @@ function calledJobs(p, tmp) {
 }
 
 // Runs those jobs, then, with --own, the project's own, where the copy is the core: how many ran, and how many failed.
+// Where it is not, each job left that would run is written stopped (#1245, point 2).
 function runAll(p, run, jobs) {
   let failed = 0, ran = 0;
-  for (const j of jobs) {
+  for (const [i, j] of jobs.entries()) {
     const r = run(j.file, j.id, j.job);
     failed += r.failed; ran += r.ran;
-    if (j.name === "core.yml" && (r.copy ?? r.failed > 0)) { warn(`FAIL the copy of the core is not the core at its pin, so no other check runs: each would run the copy's scripts. ${MEND}mend what core.yml says above, commit, and run this check again.`); return { failed, ran }; }
+    if (j.name !== "core.yml" || !(r.copy ?? r.failed > 0)) continue;
+    warn(`FAIL the copy of the core is not the core at its pin, so no other check runs: each would run the copy's scripts. ${MEND}mend what core.yml says above, commit, and run this check again.`);
+    const left = [...jobs.slice(i + 1).filter(l => !HOST_OWN[l.name] && (l.name !== "pr-description.yml" || p.described)).map(l => `${l.file}/${l.id}`),
+      ...(p.own ? ownWorkflows(p).flatMap(o => (o.wf === null ? [o.file] : Object.keys(o.wf.jobs).map(id => `${o.file}/${id}`))) : [])];
+    for (const at of left) { verdicts[at] = "stopped"; say(`stop ${at}: not run, behind the failure above`); }
+    return { failed, ran };
   }
   if (p.own) for (const o of ownWorkflows(p)) { const r = run.own(o); failed += r.failed; ran += r.ran; }
   return { failed, ran };
@@ -194,17 +209,22 @@ function project({ base: baseArg, title, description, branch }) {
 }
 
 // The project's calls to the core's workflows, as the base the change merges into holds them (on a push, main's own),
-// so a change cannot leave a check out by taking its call out: from its .github/workflows; where it has none, the
-// starter kit's, from the core itself at the pin the base's manifest holds (never from a copy a change could edit).
+// so a change cannot leave a check out by taking its call out, or, of a sync, its own (check-calls.mjs): from its
+// .github/workflows; where it has none, the starter kit's, from the core itself at the pin the manifest holds (never
+// from a copy a change could edit).
 function callers({ root, show, head, base }, tmp) {
-  const at = base || head;
-  const pin = pinAt(show(at, "core-manifest.md") ?? "", root, at, show).pin ?? "";
-  const listed = dir => { try { return git(root, "ls-tree", "-z", "--name-only", `${at}:${dir}`).split("\0").filter(Boolean); } catch { return []; } };
-  const own = listed(".github/workflows").filter(f => /\.ya?ml$/.test(f)).map(f => readable(f, show(at, `.github/workflows/${f}`))).filter(Boolean);
-  if (own.some(c => Object.values(c.wf.jobs ?? {}).some(job => call.test(String(job?.uses ?? ""))))) return own;
+  const pinOf = rev => pinAt(show(rev, "core-manifest.md") ?? "", root, rev, show).pin ?? "";
+  const sync = base && movesForward(pinOf(base), pinOf(head), (a, b) => { try { coreGit(tmp, "merge-base", "--is-ancestor", a, b); return true; } catch { return false; } });
+  if (sync) say(`note the change moves the core's pin forward along its main (${pinOf(base).slice(0, 7)} to ${pinOf(head).slice(0, 7)}), a sync: its own calls run, as GitHub runs them`);
+  const at = sync ? head : base || head, pin = pinOf(at);
+  const calls = job => call.test(String(job?.uses ?? ""));
+  const listed = rev => { try { return git(root, "ls-tree", "-z", "--name-only", `${rev}:.github/workflows`).split("\0").filter(f => /\.ya?ml$/.test(f)); } catch { return []; } };
+  const read = rev => listed(rev).map(f => readable(f, show(rev, `.github/workflows/${f}`))).filter(Boolean);
+  const own = sync ? syncCalls(read(base), read(head), calls) : read(at);
+  if (own.some(c => Object.values(c.wf.jobs ?? {}).some(calls))) return own;
   const kit = [];
   const templates = coreFile(tmp, pin, "setup/template/workflows", true);
-  if (templates === null) fail(`the base's manifest pins the core at ${pin || "no commit"}, where the starter kit's calls cannot be read.`, "write the manifest's \"Core:\" line as the sync writes it, in the base the change merges into.");
+  if (templates === null) fail(`the manifest pins the core at ${pin || "no commit"}, where the starter kit's calls cannot be read.`, "write the manifest's \"Core:\" line as the sync writes it.");
   for (const f of templates.split("\n").filter(f => f.endsWith(".yml.tmpl"))) {
     const text = coreFile(tmp, pin, `setup/template/workflows/${f}`).replaceAll("{{core}}", CORE).replaceAll("{{pin}}", pin);
     const left = text.match(/\{\{[a-z]+\}\}/);
@@ -223,26 +243,6 @@ function readable(file, text) {
     say(`note .github/workflows/${file} is written in a form this check does not read (${e.message}); it calls none of the core's workflows, so nothing is left unrun`);
     return null;
   }
-}
-
-// Whether a workflow's triggers start it on this pull request or push, as GitHub reads them.
-function triggered(on, { event, base, changed }) {
-  const trigger = triggerOf(on, event);
-  if (trigger === null) return false;
-  // (a branch filter is a list of patterns, as GitHub reads it: main must pass the patterns and none of the ignored)
-  if (trigger.branches && !pathsLetThrough(trigger.branches, ["main"])) return false;
-  if (trigger["branches-ignore"] && pathsLetThrough(trigger["branches-ignore"], ["main"])) return false;
-  if (!base) return true;
-  if (trigger.types && !trigger.types.includes("synchronize") && !trigger.types.includes("opened")) return false;
-  if (trigger.paths && !pathsLetThrough(trigger.paths, changed)) return false;
-  return !(trigger["paths-ignore"] && changed.every(f => pathsLetThrough(trigger["paths-ignore"], [f])));
-}
-
-// The trigger a workflow's "on" gives an event: its settings, {} where it names the event bare, null where none.
-function triggerOf(on, event) {
-  if (typeof on === "string") return on === event ? {} : null;
-  if (Array.isArray(on)) return on.includes(event) ? {} : null;
-  return on?.[event] === undefined ? null : on[event] ?? {};
 }
 
 // GitHub's context for the run: a pull request numbered 0 from the branch "change" into main, or a push to main.
@@ -270,6 +270,8 @@ function runner(p, tmp) {
   git(tmp, "--git-dir", bare, "update-ref", "refs/heads/main", p.base || p.head);
   git(tmp, "--git-dir", bare, "update-ref", "refs/heads/change", p.head);
   const at = p.base ? merged(p, tmp, bare) : p.head;
+  // (and the pull request's own refs, which a checkout may name: #1245, point 4)
+  if (p.base) for (const [ref, sha] of [["merge", at], ["head", p.head]]) git(tmp, "--git-dir", bare, "update-ref", `refs/pull/0/${ref}`, sha);
   let runs = 0;
   const workspace = () => {
     const ws = path.join(tmp, "ws", String(++runs));
@@ -277,8 +279,7 @@ function runner(p, tmp) {
     git(ws, "checkout", "-q", "--detach", at);
     return ws;
   };
-  // (the checkouts and Node's setup stand in here; any other action is the host's own, not run and said so)
-  const uses = new Proxy({ "actions/checkout": checkout(tmp), "actions/setup-node": () => {} }, { get: (known, action) => known[action] ?? (() => false) });
+  const uses = standIns({ git, say, tmp });
   const github = context(p);
   const terms = process.env.PERSONAL_TERMS ?? "";
   const home = path.join(tmp, "home");
@@ -360,12 +361,16 @@ function undescribed(name, inputs, described, where) {
 // A file of the core at a commit (with `list`, the names in a folder), from a clone of the core's address made once (never from the project's copy, which
 // the change under check may have edited: GitHub too runs a called workflow as the core holds it at the call's pin).
 function coreFile(tmp, sha, file, list = false) {
+  if (!/^[0-9a-f]{40}$/.test(sha)) return null;
+  try { return list ? coreGit(tmp, "ls-tree", "--name-only", `${sha}:${file}`) : coreGit(tmp, "show", `${sha}:${file}`); } catch { return null; }
+}
+// git in that clone, made at the first call.
+function coreGit(tmp, ...args) {
   if (!coreClone) {
     coreClone = path.join(tmp, "core.git");
     try { git(tmp, "clone", "-q", "--bare", `https://github.com/${CORE}`, coreClone); } catch (e) { fail(`the core could not be fetched from https://github.com/${CORE} (${String(e.stderr ?? e.message).trim().split("\n").pop().replace(/:\/\/[^/\s]*@/g, "://")}).`, `let this machine reach github.com, or point git at a copy of the core it can reach (git config url.<the copy>.insteadOf https://github.com/${CORE}), and run this check again.`); }
   }
-  if (!/^[0-9a-f]{40}$/.test(sha)) return null;
-  try { return list ? git(tmp, "--git-dir", coreClone, "ls-tree", "--name-only", `${sha}:${file}`) : git(tmp, "--git-dir", coreClone, "show", `${sha}:${file}`); } catch { return null; }
+  return git(tmp, "--git-dir", coreClone, ...args);
 }
 
 // The commit a pull request's checks run on, as GitHub makes it: the head merged into its base, the base its first
@@ -386,18 +391,6 @@ function merged(p, tmp, bare) {
   const sha = behind ? git(ws, ...who, "commit-tree", `${p.base}^{tree}`, "-p", p.base, "-p", nothing(), "-m", "A change of nothing merged into its base") : git(ws, "rev-parse", "HEAD");
   git(ws, "push", "-q", "origin", `${sha}:refs/heads/core-check-merge`); // (a branch, so each job's clone holds it)
   return sha;
-}
-
-// The stand-in for actions/checkout: the job's own checkout is the scratch clone; the core is fetched from its address.
-function checkout(tmp) {
-  return (w, ws) => {
-    if (!w.repository) { if (w.ref) git(ws, "checkout", "-q", "--detach", git(ws, "rev-parse", `origin/${w.ref}`)); return; }
-    if (w.repository.toLowerCase() !== CORE.toLowerCase()) throw new Error(`a checkout of another repository than the core: ${w.repository}`);
-    const to = path.resolve(ws, w.path || ".");
-    if (to === ws || !to.startsWith(ws + path.sep)) throw new Error(`a checkout into ${w.path || "."}, which is not a folder inside the job's own`);
-    git(tmp, "clone", "-q", "--no-checkout", `https://github.com/${CORE}`, to);
-    git(to, "checkout", "-q", "--detach", w.ref || "main");
-  };
 }
 
 // Prints each job's verdict, each step the host alone runs, and each failing step with what it printed, every term of

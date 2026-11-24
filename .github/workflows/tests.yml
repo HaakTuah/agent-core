@@ -569,6 +569,9 @@ jobs:
       - name: The core's releases, what a project follows, and cutting one
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/releases-test.mjs ')) }}
         run: node tests/releases-test.mjs
+      - name: check.mjs as a release's trial runs it, and the trial's record
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-test.mjs ')) }}
+        run: node tests/trial-test.mjs
       - name: The jobs a start by hand that names parts runs alone
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/tests-parts-test.mjs ')) }}
         run: node tests/tests-parts-test.mjs

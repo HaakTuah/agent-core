@@ -175,8 +175,8 @@ const outputsOf = file => {
 };
 
 /**
- * Runs each job of a called workflow (its text) as GitHub would for one event, and gives each job's result:
- * { job, ran, passed, steps: [{ name, ran, passed, out }] }. `inputs` and `secrets` are what the call passes (defaults
+ * Runs each job of a called workflow (its text) as GitHub would for one event, each after the jobs it needs, and gives
+ * each job's result: { job, ran, passed, steps: [{ name, ran, passed, out }], declared: its own outputs }. `inputs` and `secrets` are what the call passes (defaults
  * filled in here); `github` the github context; `base` the environment every step starts from; `workspace(job)` a
  * fresh folder for a job's runner; `uses` maps an action (its name before @) to a handler (step `with`, filled in;
  * the job's folder; the job's env) that does its part, or returns false where it stands for a step not run here.
@@ -288,14 +288,37 @@ export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, wor
   const wf = parseYaml(text);
   const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp, once, installed };
   const given = callInputs(wf, inputs, secrets);
-  const results = [];
-  for (const [id, job] of Object.entries(wf.jobs ?? {})) {
-    const top = { github, inputs: given, secrets, vars: {} };
-    if (!holds(job.if, top, { failed: false })) { results.push({ job: id, ran: false, passed: true, steps: [], outputs: {} }); continue; }
+  const results = [], done = {};
+  for (const [id, job] of inNeedsOrder(wf.jobs ?? {})) {
+    // (the needs context, each job it needs with its result and outputs; a job whose condition asks no status of its own
+    // is skipped where one of them did not succeed, as GitHub skips it: #1245, point 3)
+    const needs = Object.fromEntries(needsOf(job).map(n => [n, done[n]]));
+    const top = { github, inputs: given, secrets, vars: {}, needs };
+    if (!holds(job.if, top, { failed: Object.values(needs).some(n => n.result !== "success") })) { results.push({ job: id, ran: false, passed: true, steps: [], outputs: {} }); done[id] = { result: "skipped", outputs: {} }; continue; }
+    const from = results.length;
     // (a matrix makes a job of each of its combinations, each one billed, named by its values as GitHub names it)
     for (const matrix of combinations(job.strategy?.matrix, top)) runMatrixJob(rt, job, id, top, matrix, results);
+    const mine = results.slice(from);
+    done[id] = { result: mine.every(r => r.passed) ? "success" : "failure", outputs: Object.assign({}, ...mine.map(r => r.declared)) };
   }
   return results;
+}
+
+// The jobs a job's `needs:` names, one or a list.
+const needsOf = job => [job?.needs ?? []].flat().map(str);
+
+// The jobs in the order GitHub may run them: each after every job it needs, and otherwise as written. A need that names
+// no job of the workflow, or a loop of needs, throws, as GitHub refuses the workflow.
+function inNeedsOrder(jobs) {
+  const left = Object.entries(jobs), order = [], placed = new Set();
+  for (const [id, job] of left) for (const n of needsOf(job)) if (!Object.hasOwn(jobs, n)) throw new Error(`the job ${id} needs ${n}, which is no job of the workflow`);
+  while (left.length) {
+    const at = left.findIndex(([, job]) => needsOf(job).every(n => placed.has(n)));
+    if (at < 0) throw new Error(`the jobs ${left.map(([id]) => id).join(", ")} need each other in a loop`);
+    const [entry] = left.splice(at, 1);
+    order.push(entry); placed.add(entry[0]);
+  }
+  return order;
 }
 
 // One job of a workflow for one combination of its matrix (null for none): its runner folder made, the job run, the folder removed.
@@ -303,9 +326,14 @@ function runMatrixJob(rt, job, id, top, matrix, results) {
   const tmp = fs.mkdtempSync(path.join(rt.temp, "runner-temp-"));
   const ctx = { ...top, runner: { temp: tmp, os: "Linux", ...rt.runner }, env: {}, steps: {}, matrix: matrix ?? {} };
   const state = { failed: false };
-  const result = { job: matrix ? `${id} (${Object.values(matrix).map(str).join(", ")})` : id, ran: true, passed: true, steps: [], outputs: ctx.steps };
+  const result = { job: matrix ? `${id} (${Object.values(matrix).map(str).join(", ")})` : id, ran: true, passed: true, steps: [], outputs: ctx.steps, declared: {} };
   results.push(result);
-  try { if (!rt.dry) runJob({ rt, job, id, ctx, state, result, tmp }); } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+  try {
+    if (rt.dry) return;
+    runJob({ rt, job, id, ctx, state, result, tmp });
+    // (the job's own outputs, as its `outputs:` fills them in from its steps, for the jobs that need it)
+    result.declared = fillValues(job.outputs, ctx, state);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 }
 
 // A map's values, each with its `${{ }}` filled in as text.

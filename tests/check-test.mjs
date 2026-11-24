@@ -245,9 +245,9 @@ git(dir, "reset", "-q", "--hard", "base");
 fs.rmSync(path.join(dir, ".github", "workflows", "core.yml"));
 fs.writeFileSync(path.join(dir, "core", "README.md"), "edited here\n");
 commit(dir, "the copy edited, and its check's call taken out");
-r = check(dir, "--base", "base");
-ok(r.status === 1 && r.out.includes("core/ differs from the core at its pin") && r.out.includes("so no other check runs") && !/ok {3}copies\.yml/.test(r.out) && mended(r.out),
-  "a change that takes out its call to core.yml is still checked by the base's call, and a copy that fails it runs no other check", r.out);
+r = check(dir, "--base", "base", "--verdicts", path.join(tmp, "s.json"));
+ok(r.status === 1 && r.out.includes("core/ differs from the core at its pin") && r.out.includes("so no other check runs") && !/ok {3}copies\.yml/.test(r.out) && mended(r.out) && /"stopped"/.test(fs.readFileSync(path.join(tmp, "s.json"))),
+  "a change that takes out its call to core.yml is still checked by the base's call, and a copy that fails it runs no other check, each said stopped", r.out);
 git(dir, "branch", "-q", "-f", "nocore");
 r = check(dir, "--base", "nocore");
 ok(r.status === 1 && r.out.includes("no call to the core's core.yml") && mended(r.out), "a base that calls no core.yml fails, saying its mend", r.out);
