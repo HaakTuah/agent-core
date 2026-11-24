@@ -32,6 +32,10 @@ const kit = git("rev-parse", "HEAD").trim(), rules = ruleTexts(dir);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const back = () => { git("reset", "-q", "--hard", kit); git("clean", "-qfd"); };
 
+// (the reading of a rule file's words: two pull-ins that now lead to one file read as one, a pull-in dropped as words changed)
+ok(wordsKept({ "A.md": "@core/modules/work-flow.md\n@core/x.md\n@core/modules/git.md\n" }, { "A.md": "@core/roles/shared/work-flow.md\n@core/x.md\n" })
+  && !wordsKept({ "A.md": "@AGENTS.md\n@core/floor/security.md\n@core/roles/builder.md\n" }, { "A.md": "@AGENTS.md\n@core/roles/builder.md\n" }), "a rule file's words: two pull-ins the move makes one are kept, a pull-in dropped is not");
+
 // ---- a project with every step done: nothing written ----
 let r = write();
 ok(r.status === 0 && r.stdout.startsWith("No step left a script could write") && !dirty(), "on the starter kit's project, every step done, --write writes nothing and says so", `${r.stdout}${r.stderr}`);

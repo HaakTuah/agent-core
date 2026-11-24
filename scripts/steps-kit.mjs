@@ -9,6 +9,7 @@ import { CORE } from "./core-address.mjs";
 import { differences, fresh, kind, report as freshReport } from "./fresh.mjs";
 import { notes as manifestNotes } from "./manifest-reads.mjs";
 import { STEPS, configs, notDone, project, report } from "./steps.mjs";
+import { moved } from "./step-checks-moved.mjs";
 import { hookCommands, readCore } from "./core-path.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { READERS } from "./shape-readers.mjs";
@@ -160,9 +161,12 @@ export function ruleTexts(dir) {
 export const wordsKept = (before, after) => {
   // (the module lines read past in the manifest alone, where the writers write them)
   const modules = text => text.replace(/^(.*\bModules: ).*$/mu, "$1-").replace(/\r?\n(?:\r?\n)?(?:Not taken|Modules to confirm): [^\r\n]*/gu, "");
-  // (a pointer's path read as one word, and a pull-in of the core's files that another above makes read once, since the
-  // rules' move makes two that lead to one file one: #1248, point 5)
-  const once = text => text.split("\n").filter((l, i, all) => !(/^\s*(?:@|#\[\[file:)core\/-/u.test(l) && all.indexOf(l) < i)).join("\n");
-  const words = (text, f) => (text === null || text === undefined ? null : (f === "core-manifest.md" ? modules : t => t)(once(text.replace(/core\/[\w./-]+/gu, "core/-")).replace(/^Paths: .*$/mu, "Paths: -")));
+  // (a pointer's path read as one word; and a pull-in of the core's files read once where one above pulls in the same
+  // file, each old path read as the file it now is, since the rules' move makes two that lead to one file one: #1248,
+  // point 5. A pull-in of another file, dropped or added, still reads as words changed)
+  const map = moved(), apart = moved.apart(), now = old => map[old] && !map[old].endsWith("/") && !(apart[old]?.length) ? map[old] : old;
+  const once = text => text.split("\n").map(l => l.replace(/^(\s*(?:@|#\[\[file:)core\/)([\w./-]+)/u, (_, lead, f) => `${lead}${now(f)}`))
+    .filter((l, i, all) => !(/^\s*(?:@|#\[\[file:)core\//u.test(l) && all.indexOf(l) < i)).join("\n");
+  const words = (text, f) => (text === null || text === undefined ? null : (f === "core-manifest.md" ? modules : t => t)(once(text).replace(/core\/[\w./-]+/gu, "core/-").replace(/^Paths: .*$/mu, "Paths: -")));
   return Object.keys({ ...before, ...after }).every(f => words(before[f], f) === words(after[f], f));
 };
