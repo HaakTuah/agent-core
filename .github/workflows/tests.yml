@@ -575,6 +575,9 @@ jobs:
       - name: check.mjs as a release's trial runs it, and the trial's record
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-test.mjs ')) }}
         run: node tests/trial-test.mjs
+      - name: A job the workflow runner cannot read, and the trial's not measured
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/unread-test.mjs ')) }}
+        run: node tests/unread-test.mjs
       - name: The jobs a start by hand that names parts runs alone
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/tests-parts-test.mjs ')) }}
         run: node tests/tests-parts-test.mjs
