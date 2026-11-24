@@ -2,19 +2,21 @@
 // scripts/steps-stage.mjs loads it, in the order of the names.
 import { read, write } from "../stage-helpers.mjs";
 
-const FILE = "core/roles/builder.md";
+// (two files the part imports: the builder's role, which a kit from before the role files did not name, and the floor,
+// which no other stage takes out of the part, so the step is reported where another takes the role's import out)
+const FILES = ["core/roles/builder.md", "core/floor/security.md"];
 
 export default {
   // (asked of every project whose marks predate the role files the core's part imports, which a sync does not write)
   asked: true,
-  // (the size marks of a project whose kit predates the role files: the builder's role, which the core's part of
-  // AGENTS.md imports, not under "read"; the mend names it there at the marks' "each", as the step words it)
+  // (the size marks of a project whose kit predates the role files, those files not under "read"; the mend names each
+  // there at the marks' "each", as the step words it)
   stage: dir => {
-    const m = JSON.parse(read(dir, "checks/sizes.json")), { [FILE]: _, ...rest } = m.read;
+    const m = JSON.parse(read(dir, "checks/sizes.json")), rest = Object.fromEntries(Object.entries(m.read).filter(([f]) => !FILES.includes(f)));
     write(dir, "checks/sizes.json", `${JSON.stringify({ ...m, read: rest }, null, 2)}\n`);
   },
   mend: dir => {
     const m = JSON.parse(read(dir, "checks/sizes.json"));
-    write(dir, "checks/sizes.json", `${JSON.stringify({ ...m, read: { ...m.read, [FILE]: m.each } }, null, 2)}\n`);
+    write(dir, "checks/sizes.json", `${JSON.stringify({ ...m, read: { ...m.read, ...Object.fromEntries(FILES.map(f => [f, m.each])) } }, null, 2)}\n`);
   },
 };

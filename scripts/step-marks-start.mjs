@@ -3,9 +3,9 @@
 // reading-size check counts the start whole. steps/824-… names both; steps.mjs, beside this file, runs them. Node's
 // own modules.
 import { marksConfig } from "./check-configs.mjs";
-import { BLOCKS, blockOf } from "./core-owned.mjs";
+import { BLOCKS } from "./core-owned.mjs";
 import { pulledIn } from "./init.mjs";
-import { moved } from "./step-checks-moved.mjs";
+import { cut, moved } from "./step-checks-moved.mjs";
 import { copyAt } from "./workflow-calls.mjs";
 import { marksWritten } from "./step-writers.mjs";
 import { shown } from "./step-checks.mjs";
@@ -19,9 +19,18 @@ function uncounted(p) {
   let json = null;
   try { json = JSON.parse(text ?? "null"); } catch { /* (read below as not in the check's form) */ }
   if (!json?.read || typeof json.read !== "object" || Array.isArray(json.read) || !Number.isInteger(json.each)) throw new Error(`\`${shown(marks)}\` is no regular file the reading-size check reads, holding "each" and "read"`);
-  const files = new Set(p.files), parts = BLOCKS.map(f => blockOf(p.read(f) ?? "") ?? ""), map = moved(), copy = copyAt(p);
+  const files = new Set(p.files), map = moved(), copy = copyAt(p), parts = BLOCKS.map(f => partOf(p.read(f) ?? "", copy, f));
   const named = new Set(Object.keys(json.read).flatMap(f => [f, ...(f.startsWith(copy) && map[f.slice(copy.length)] ? [`${copy}${map[f.slice(copy.length)]}`] : [])]));
   return { marks, json, missing: [...new Set(pulledIn(parts))].filter(f => files.has(f) && p.safe(f) && !named.has(f)) };
+}
+
+// The core's part of a rule file's text: within its marks; where it has none, as a kit wrote it before the marks
+// (#1083), its lines that import a file of the copy. Marks that stand apart or more than once throw: which part is the
+// core's cannot be told, and the step is then said not read.
+function partOf(crlf, copy, f) {
+  const text = crlf.replace(/\r\n/gu, "\n"), c = cut(text);
+  if (!c) throw new Error(`\`${f}\` holds the core's marks apart or more than once`);
+  return c.length === 3 ? c[1] : text.split(/\r?\n/u).filter(l => l.startsWith(`@${copy}`)).join("\n");
 }
 
 // The step's check: the mend, naming each file, or null where "read" names every one.
