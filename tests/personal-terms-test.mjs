@@ -382,6 +382,13 @@ const otherSystem = path.join(tmp, "plan9");
 fs.mkdirSync(otherSystem);
 fs.writeFileSync(path.join(otherSystem, "uname"), `#!/bin/sh\ncase "$1" in -s) echo Plan9 ;; -m) echo 386 ;; *) echo Plan9 ;; esac\n`, { mode: 0o755 });
 unfetched("where no pin stands for the machine's system", { more: otherSystem }, "no pin stands in this check for Plan9/386");
+// (where the folder the address step works in cannot be made, as Git for Windows' mkdir could not make it with a mode,
+// #1211, the step fails, saying the mend, and reads nothing; a mkdir of the test's own stands in for one that fails)
+const noFolder = path.join(tmp, "no-folder");
+fs.mkdirSync(noFolder);
+fs.writeFileSync(path.join(noFolder, "mkdir"), `#!/bin/sh\ncase "$*" in *commit-addresses*) echo "mkdir: cannot create directory: Permission denied" >&2; exit 1 ;; esac\ncommand -p mkdir "$@"\n`, { mode: 0o755 });
+const unmade = check(pull([[{ "b.md": "Words.\n" }]]), { more: noFolder });
+ok(!unmade.passed && mended(unmade.out) && unmade.out.includes("could not be made, so no commit's address was read"), "where the address step's folder cannot be made, it fails, saying the mend", unmade.out);
 const sum = /Linux\/x86_64\) file=\S+ archive=[0-9a-f]{64} sum=([0-9a-f]{64})/.exec(workflow)?.[1], version = /version=(\S+)/.exec(workflow)?.[1];
 const keptTool = path.join(tmp, "kept"), keptDir = path.join(keptTool, "agent-core-tools", `betterleaks-${version}`), ran = path.join(tmp, "kept-ran");
 fs.mkdirSync(keptDir, { recursive: true });

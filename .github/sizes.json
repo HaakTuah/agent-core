@@ -254,7 +254,7 @@
       "why": "#943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
     },
     ".github/shape-baseline.json": {
-      "mark": 21237,
+      "mark": 27000,
       "why": "A baseline the shape check reads and writes whole (--write), in the form every project's baseline takes; 'grown' gives the reason for some of the keys 'listed' holds, so a split along the two parts would make two files to keep in step, and none along who reads it was found."
     },
     "tests/staged-test.mjs": {
@@ -268,6 +268,10 @@
     "tests/workflows-test.mjs": {
       "mark": 70465,
       "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md). The cases of workflow-tools.mjs, a script of its own, stand in tests/workflow-tools-test.mjs (#1017)."
+    },
+    "tests/nuget-fetch-test.mjs": {
+      "mark": 27539,
+      "why": "One feature's cases (the fetch before the NuGet check's restore) on the scratch project and the package files they share, each case reading what the one before committed; split, each file would write that project again and add to the suite's time"
     }
   }
 }

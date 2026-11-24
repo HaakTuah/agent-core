@@ -34,7 +34,7 @@ function ownRuleFiles(root) {
   const read = f => { try { const at = path.join(root, f); return inProject(f) && !leadsOut(root, at) && fs.statSync(at).isFile() ? fs.readFileSync(at, "utf8") : null; } catch { return null; } };
   // (the core's copy where the manifest places it, core/ by default: its rules are the core's, never the project's)
   const copy = copyOf(root), mine = f => !`${path.posix.normalize(f)}/`.startsWith(copy) && read(f) !== null;
-  const list = dir => { try { return execFileSync("git", ["-C", root, "ls-files", "-z", "--", dir], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean); } catch { return []; } };
+  const list = dir => { try { return execFileSync("git", ["-C", root, "ls-files", "-z", "--", dir], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean); } catch { return []; } };
   const pulled = ["AGENTS.md", "CLAUDE.md"].flatMap(f => [...(read(f) ?? "").matchAll(/^@(\S+\.md)[ \t]*\r?$/gmu)].map(m => path.posix.normalize(m[1])));
   let listed;
   try { listed = ruleFiles(read, list, { tools: true }); } catch { listed = [...FLOOR, ...toolFiles(read, list)]; }
