@@ -1,7 +1,8 @@
 - `scripts/workflows.mjs`, `scripts/workflow-tools.mjs`, `scripts/workflow-tools.sh`, `scripts/zizmor.yml`,
-  `scripts/actionlint.yml`, `scripts/yaml-keys.mjs`: fails a workflow or action in which the word `pull_request_target`
+  `scripts/actionlint.yml`, `scripts/yaml-keys.mjs`, `scripts/unnamed.sh`: fails a workflow or action in which the word `pull_request_target`
   stands, and runs zizmor and actionlint on each, fetched at set-up (`workflow-tools.sh`) with the core's policy as
-  their configs, a finding the base held noted (#580); `yaml-keys.mjs` reads a key given twice for the sync's steps
+  their configs, a finding the base held noted (#580); `unnamed.sh`, which `lychee.sh` sources too, names the temporary
+  and home folders in the log a failed fetch shows (#1223); `yaml-keys.mjs` reads a key given twice for the sync's steps
   alone, and, run with `--core`, the check fails one that is no YAML to the core's own reader. *Runs:* the word, the
   draft's calls and the core's reader in any session; the two tools on the runners alone, where the job's set-up
   fetches them, a session saying it did not run them. *Else:* zizmor (MIT, a program for each system, its audit

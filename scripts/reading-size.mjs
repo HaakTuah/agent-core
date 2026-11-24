@@ -14,8 +14,9 @@
 //     merge) and binary files are not counted.
 // A PR that crosses a mark moves the mark in the config only as roles/shared/review-guidelines.md says ("A mark on what
 // every session reads", and "What blocks"). The PR's changes are those against SIZES_BASE (set by the copies workflow,
-// .github/workflows/copies.yml, which runs this), else where HEAD left origin/main; in CI that is the base's tip
-// against the PR's merge commit, so a run after the base moves on counts its new changes too. Node's own modules only.
+// .github/workflows/copies.yml, which runs this), else where HEAD left origin/main; in CI that is HEAD^1, the first
+// parent of the PR's merge commit, given as a commit (scripts/checks.mjs; #1217): the base's tip as GitHub made that
+// merge, so a run after the base moves on counts its new changes too. Node's own modules only.
 // A file's size is its bytes without each carriage return before a line feed (file-size.mjs, beside this file), so it
 // is the same on a machine where git converts line endings on checkout as on GitHub.
 // It checks the project it lies in (core/scripts/ there), whatever the directory it is started from; the config's own
