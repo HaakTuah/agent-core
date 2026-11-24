@@ -1,6 +1,6 @@
 // Tests the steps' writers (steps.mjs --write, step-writers.mjs; #1091) on a project the starter kit of this commit
 // writes in a scratch folder, committed: each step a writer does whole, taken out, reads done after `--write`, the
-// project's rule files keeping their words; the step of the rules' move and that of the agent tools' files written as far
+// project's rule files keeping their words, a baseline skipped by the size marks; the step of the rules' move and that of the agent tools' files written as far
 // as they are exact, the rest left to their mends; a file with changes not yet committed, a writer that cannot run, a
 // step the manifest declares undone on purpose, a file git ignores and a run outside the copy write nothing; `--aside` sets what it
 // wrote aside in a stash, which brings it back; and the key merge of the checks' configs (#1095, point 5). Node's own modules and git.
@@ -42,8 +42,10 @@ for (const l of WHOLE) {
   commit(`staged: ${l}`);
   const before = missed(l).length;
   r = write();
-  ok(before === 1 && r.status === 0 && !missed(l).length && r.stdout.includes(`- ${l}: wrote `) && r.stdout.includes("the step is done") && wordsKept(rules, ruleTexts(dir)),
-    `"${l}", taken out, is written by --write: it reads done after it, and no rule file's words changed`, `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
+  // (the shape check's baseline named under the size marks' "skip": #1247, point 2)
+  const skipped = l !== WHOLE[1] || JSON.parse(read("checks/sizes.json")).skip.includes("checks/shape-baseline.json");
+  ok(before === 1 && r.status === 0 && !missed(l).length && r.stdout.includes(`- ${l}: wrote `) && r.stdout.includes("the step is done") && wordsKept(rules, ruleTexts(dir)) && skipped,
+    `"${l}", taken out, is written by --write: it reads done after it, no rule file's words changed, and a baseline skipped by the size marks`, `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
   back();
 }
 
@@ -82,9 +84,10 @@ for (const l of WHOLE) {
   const staged = { agents: read("AGENTS.md"), manifest: read("core-manifest.md"), record: read("docs/records/2026-01-05.md") };
   r = write();
   const left = missed(l)[0]?.mend ?? "";
-  ok(r.stdout.includes(`- ${l}: wrote \`checks/copies.json\`; still to do: `) && read("AGENTS.md") === staged.agents && read("core-manifest.md") === staged.manifest && read("docs/records/2026-01-05.md") === staged.record
+  const marks = JSON.parse(read("checks/sizes.json")).read;
+  ok(r.stdout.includes(`- ${l}: wrote \`checks/copies.json\`, \`checks/sizes.json\`; still to do: `) && marks["core/roles/shared/work-flow.md"] === 20480 && !Object.keys(marks).some(f => f.includes("modules/")) && read("AGENTS.md") === staged.agents && read("core-manifest.md") === staged.manifest && read("docs/records/2026-01-05.md") === staged.record
     && left.includes("core/modules/git.md") && left.includes('"Paths:"') && !left.includes(MOVED_GLOB),
-    "the rules' move, where a path needs judgement: --write writes the copies config alone, leaves the rule files and a dated record as they stand, and the step asks the rest", `${r.stdout}${r.stderr}\n---\n${left}`);
+    "the rules' move, where a path needs judgement: --write writes the copies config and the size marks, two old paths merged, leaves the rule files and a dated record as they stand, and the step asks the rest", `${r.stdout}${r.stderr}\n---\n${left}`);
   back();
 }
 

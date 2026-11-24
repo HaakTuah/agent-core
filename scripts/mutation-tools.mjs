@@ -15,8 +15,9 @@
 //   node core/scripts/mutation-tools.mjs           what it read, and the row the list gives the project
 //   node core/scripts/mutation-tools.mjs --write   that row written into core-manifest.md, where it is not the project's own,
 //                                                  and the package list and npm config of the folder the tool is installed
-//                                                  in, each where none stands, with what is left to do: its lock file, the
-//                                                  licence check's entries for both, and the job's install and step
+//                                                  in, each where none stands, and its lock file under the size marks'
+//                                                  "skip", with what is left to do: its lock file, the licence check's
+//                                                  entries for both and its data packages, and the job's install and step
 // Run from the project's root. Reads the project; --write writes the row and those two files, each through no link.
 // git and Node's own modules.
 import fs from "node:fs";
@@ -137,16 +138,21 @@ export function folderOf(command) {
   return words.some(w => /(?:^|\/)scripts\/stryker\.mjs$/u.test(w)) && at >= 0 && words[at + 1] ? words[at + 1] : null;
 }
 
-// What is left to do for the tool the row names, `has(f)` whether the project holds a file and `config` its licence
-// check's config (null where none can be read): the lock file, the config's entries for it and the npm config, and the
-// job's install and step, each worded so a session acts on it with no rule file open. Nothing once all stand.
-export function leftFor(tool, has, config = null) {
+// What is left to do for the tool the row names, `has(f)` whether the project holds a file, `config` its licence
+// check's config (null where none can be read) and `at` that config's path, as the project's licence check is given it
+// (null where it cannot be read: #1247, point 3): the lock file, the config's entries for it, for the npm config and for
+// the packages of data the lock brings (`data` in the list: CC-BY, which floor rule 10 allows for data and assets, so
+// the check reads each so named under that list, as the core's own config does; #1247, point 1), and the job's install
+// and step, each worded so a session acts on it with no rule file open. Nothing once all stand.
+export function leftFor(tool, has, config = null, at = "checks/licences.json") {
   if (!tool?.folder) return [];
   const lock = `${tool.folder}/package-lock.json`, npmrc = `${tool.folder}/.npmrc`, names = (key, f) => Array.isArray(config?.[key]) && config[key].includes(f);
+  const data = (tool.data ?? []).filter(n => !names("data", n)), it = at ? `the licence check's config (${at})` : "the config the project's licence check is given";
   const left = [];
   if (!has(lock)) left.push(`commit ${tool.folder}/package.json with its lock file, written from it with no install scripts by npm install --package-lock-only --ignore-scripts --prefix ${tool.folder}`);
-  if (!names("lockfiles", lock)) left.push(`name ${lock} under "lockfiles" in the licence check's config (checks/licences.json, as the starter kit writes it), so that check reads the licence of every package it installs (floor rule 10)`);
+  if (!names("lockfiles", lock)) left.push(`name ${lock} under "lockfiles" in ${it}, so that check reads the licence of every package it installs (floor rule 10)`);
   if (!names("ignoreScriptsIn", npmrc)) left.push(`name ${npmrc} under "ignoreScriptsIn" in that config, so that check holds it to ignore-scripts=true and min-release-age=7 (floor rules 7 and 15)`);
+  if (data.length) left.push(`name ${data.join(", ")} under "data" in that config: ${data.length > 1 ? "packages" : "a package"} of data the lock brings under CC-BY, which floor rule 10 allows for data and assets, so that check reads ${data.length > 1 ? "each" : "it"} under that list`);
   if (!has(lock)) left.push(`in the project's own job that runs its tests on a pull request, after them, add two steps: the install, ${installIn(tool.folder)}, and node core/scripts/strength.mjs with STRENGTH_BASE set to the pull request's base (origin/<its base branch>, fetched first). A change to a workflow, it passes two security reviews (floor rule 3); until it is made the strength check reports that it did not measure, and fails nothing`);
   return left;
 }
@@ -232,14 +238,20 @@ function readHere(argv) {
   return { manifest, read, project };
 }
 
-// The licence check's config, as the starter kit writes it (checks/licences.json), or null where it cannot be read.
-function licencesOf(read) {
-  try { return JSON.parse(read("checks/licences.json") ?? "null"); } catch { return null; }
+// The licence check's config as the project's licence check is given it (check-configs.mjs), { at, config }: `at` null
+// where its path cannot be read, `config` null where it cannot be read as JSON. The steps' reader of the project is
+// loaded once the row is to be written, since the steps load this script.
+async function licencesOf() {
+  const [{ project }, { licenceConfig }] = await Promise.all([import("./steps.mjs"), import("./check-configs.mjs")]), p = project(".");
+  let at = null, config = null;
+  try { at = licenceConfig(p); config = JSON.parse(p.read(at) ?? "null"); } catch { /* (said in what is left: the config the check is given) */ }
+  return { p, at, config };
 }
 
 // The row and the tool's folder written, each through no link, and what is left said; 1 where the manifest is reached
-// through a link by now.
-function writeRow(manifest, read, row) {
+// through a link by now. The tool's lock file, which a package manager writes and only a script reads, is named under
+// "skip" in the size marks where they can be written (step-writers.mjs, `skipWritten`; #1247, point 2).
+async function writeRow(manifest, row) {
   const now = written(manifest, row);
   if (now !== manifest) {
     const { at, fail } = manifestAt();
@@ -247,22 +259,27 @@ function writeRow(manifest, read, row) {
     fs.writeFileSync(at, now);
   }
   console.log(now === manifest ? `${MANIFEST} holds that row already.` : `${MANIFEST}: the row written.`);
-  const { written: made, blocked } = setUp(".", row), tool = LIST.tools[row.tool];
+  const { written: made, blocked } = setUp(".", row), tool = LIST.tools[row.tool], { p, at, config } = await licencesOf();
   for (const f of made) console.log(f.endsWith("package.json") ? `${f}: written, ${tool.package} at ${tool.version}.` : `${f}: written, no install script and no release under a week old.`);
-  for (const l of [blocked, ...leftFor(tool, f => fs.existsSync(path.join(".", f)), licencesOf(read))].filter(Boolean)) console.log(`Left to do: ${l}.`);
+  if (tool?.folder) {
+    const { held, skipWritten } = await import("./step-writers.mjs");
+    for (const f of skipWritten(p, [`${tool.folder}/package-lock.json`], held("."))) console.log(`${f}: ${tool.folder}/package-lock.json named under "skip", a lock file no split lets anyone read less.`);
+  }
+  for (const l of [blocked, ...leftFor(tool, f => fs.existsSync(path.join(".", f)), config, at)].filter(Boolean)) console.log(`Left to do: ${l}.`);
   return 0;
 }
 
-function main(argv) {
-  const { fail, manifest, read, project: p } = readHere(argv);
+async function main(argv) {
+  const { fail, manifest, project: p } = readHere(argv);
   if (fail) { console.error(`FAIL: ${fail}`); return 1; }
   const row = rowFor(p), languages = [...new Set(p.code.map(languageOf))].sort();
   console.log(`Read: ${p.code.length} files of code (${languages.join(", ") || "none"}), ${p.tests ? "tests" : "no tests"}, the tests run by ${p.runner ?? "no script of package.json's"}.`);
   console.log(`The list gives: ${lineOf(row)}`);
   const line = manifest.split(/\r?\n/u).find(l => l.includes(ROW));
   if (!fillable(manifest) && line !== lineOf(row)) console.log(`${MANIFEST}'s row is the project's own, and stays: ${line}`);
-  else if (argv[0] === "--write") return writeRow(manifest, read, row);
+  else if (argv[0] === "--write") return writeRow(manifest, row);
   return 0;
 }
 
-if (started(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+// (no top-level await: the steps' reader, loaded while the row is written, loads this script again, which must have ended)
+if (started(import.meta.url)) main(process.argv.slice(2)).then(code => { process.exitCode = code; });

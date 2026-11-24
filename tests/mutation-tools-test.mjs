@@ -2,8 +2,9 @@
 // mutation-tools.json; #1107): the list's tools on the floor's list of licences and Stryker at the version the core's
 // own runs pin; the row read from a project's code, tests and test runner; a row the project wrote kept, and one the kit
 // or the script gave filled again, its reasons matched whole; and --write in a scratch repository, which writes the row,
-// the tool's package list and its npm config, each through no link, and says what is left: the lock file, the licence
-// check's entries and the job's install and step. Run by the core's tests workflow (.github/workflows/tests.yml).
+// the tool's package list and its npm config, each through no link, names the lock under the size marks' "skip", and
+// says what is left: the lock file, the entries of the licence check's config at the path the project's call gives it,
+// the data packages among them, and the job's install and step. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/mutation-tools-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -12,6 +13,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LIST, NO_TESTS, NPMRC, fillable, leftFor, lineOf, named, packageList, readProject, rowFor, setUp, testRunner, written } from "../scripts/mutation-tools.mjs";
 import { scratch, scratchDir } from "../scripts/scratch-core.mjs";
+import { licenceOk, policy } from "../scripts/licences.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { toolOf } from "../scripts/strength.mjs";
 
 let failed = 0, count = 0;
@@ -28,6 +31,10 @@ const core = JSON.parse(fs.readFileSync(path.join(ROOT, "tests/mutation/package.
 const stryker = LIST.tools.Stryker;
 ok(core.devDependencies[stryker.package] === stryker.version && same(core.overrides, stryker.overrides) && same(JSON.parse(packageList(stryker)), core),
   "Stryker stands in the list at the version and overrides the core's own runs pin, and the package list it writes is the core's own");
+// (the packages of the core's lock the tools' list takes only as data are the list's "data", named so by the core's config)
+const pol = policy({}), as = (v, kind) => licenceOk(v.license, pol.allowedFor("", false, kind));
+const asData = [...new Set(Object.entries(JSON.parse(fs.readFileSync(path.join(ROOT, "tests/mutation/package-lock.json"), "utf8")).packages).filter(([k, v]) => k && !as(v) && as(v, "data")).map(([k]) => k.split("node_modules/").pop()))].sort();
+ok(asData.length && same(asData, [...stryker.data].sort()) && asData.every(n => JSON.parse(fs.readFileSync(path.join(ROOT, ".github/licences.json"), "utf8")).data.includes(n)), "Stryker's lock's data packages are the list's \"data\", as the core's config names them (#1247, point 1)", asData);
 ok(NPMRC === fs.readFileSync(path.join(ROOT, "tests/mutation/.npmrc"), "utf8"), "the npm config written beside it is the core's own folder's: no install script, no release under a week old");
 ok(Object.values(LIST.tools).every(t => (t.command ? !t.none && /^[\w.-]+$/.test(t.version) : !!t.none)), "each tool gives a command, its version exact, or the reason the core names it for none");
 
@@ -89,10 +96,21 @@ try {
     && /Left to do: commit checks\/mutation\/package\.json with its lock file/.test(r.stdout) && /Left to do: name checks\/mutation\/package-lock\.json under "lockfiles"/.test(r.stdout)
     && /Left to do: name checks\/mutation\/\.npmrc under "ignoreScriptsIn"/.test(r.stdout) && /Left to do: in the project's own job .*node core\/scripts\/strength\.mjs .*two security reviews/.test(r.stdout),
     "once there are tests, --write names Stryker, writes its package list and npm config, and says the lock file, the licence check's entries and the job's two steps are left", r.stdout + r.stderr);
+  // (the licence check's config where the project's call gives it, and the lock named under the size marks' "skip": #1247, points 3 and 2)
+  fs.rmSync(path.join(dir, "checks/mutation"), { recursive: true });
+  put(".github/workflows/licences.yml", `on: pull_request\njobs:\n  licences:\n    uses: ${CORE}/.github/workflows/licences.yml@${"0".repeat(40)}\n    with:\n      config: policy/licences.json\n`);
+  put("policy/licences.json", '{"lockfiles":[]}');
+  put("checks/sizes.json", '{"each":1,"read":{},"total":1,"split":1,"skip":["docs/"]}\n');
+  sh("add", "-A");
+  sh("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--no-gpg-sign", "-m", "the project");
+  r = run("--write");
+  const skip = () => same(JSON.parse(read("checks/sizes.json")).skip, ["docs/", "checks/mutation/package-lock.json"]);
+  ok(r.status === 0 && /"lockfiles" in the licence check's config \(policy\/licences\.json\)/.test(r.stdout) && /under "data" in that config/.test(r.stdout) && skip() && run("--write").status === 0 && skip(),
+    "--write reads the licence check's config at the path the project's call gives, asks its data packages, and names the lock under the size marks' \"skip\", once", r.stdout + r.stderr);
   put("checks/mutation/package-lock.json", "{}");
-  const has = f => fs.existsSync(path.join(dir, f)), config = { lockfiles: ["checks/mutation/package-lock.json"], ignoreScriptsIn: ["checks/mutation/.npmrc"] };
-  ok(leftFor(stryker, has, config).length === 0 && leftFor(stryker, has, { lockfiles: config.lockfiles }).length === 1 && leftFor(undefined, () => false).length === 0,
-    "nothing is left once the lock file stands and the licence check's config names it and the npm config, and each entry it lacks is asked; nothing for a row that names no tool");
+  const has = f => fs.existsSync(path.join(dir, f)), config = { lockfiles: ["checks/mutation/package-lock.json"], ignoreScriptsIn: ["checks/mutation/.npmrc"], data: stryker.data };
+  ok(leftFor(stryker, has, config).length === 0 && leftFor(stryker, has, { lockfiles: config.lockfiles, data: config.data }).length === 1 && leftFor(undefined, () => false).length === 0,
+    "nothing is left once the lock file stands and the licence check's config names it, the npm config and the data packages, and each entry it lacks is asked; nothing for a row that names no tool");
   fs.writeFileSync(path.join(dir, "checks/mutation/package.json"), packageList({ ...stryker, version: "9.0.0" }));
   ok(/names @stryker-mutator\/core at 9\.0\.0, where the core's list gives 10\.1\.1\. Mend: take checks\/mutation\/package\.json out and run/.test(named({ root: dir, manifest: read("core-manifest.md") }) ?? ""),
     "a package list behind the list's version is named, its mend the writer");

@@ -137,9 +137,24 @@ export function writeTotal(p, busy) {
   return to === null ? [] : marksWritten(p, r, json => { json.total = to; }, busy);
 }
 
+// Each of `files`, which a script of the core's writes and only a script reads (a lock file a package manager writes,
+// a check's baseline), named under "skip" in the size marks where neither "skip" nor "past" names it, so that no pull
+// request that changes one fails the split mark, which no split of it answers (#1247, point 2): the marks' path where
+// it wrote them, else none. Where the marks cannot be read as a JSON object or written, it writes nothing, and the size
+// check's own failure says the mend.
+export function skipWritten(p, files, busy) {
+  let marks, json;
+  try { marks = marksConfig(p); json = JSON.parse(p.read(marks) ?? "null"); } catch { return []; }
+  const skip = Array.isArray(json?.skip) ? json.skip : [], past = json?.past && typeof json.past === "object" ? json.past : {};
+  const add = files.filter(f => !skip.some(s => typeof s === "string" && s && f.startsWith(s)) && !Object.hasOwn(past, f));
+  if (!add.length) return [];
+  try { return marksWritten(p, { marks, json }, j => { j.skip = [...skip, ...add]; }, busy); } catch (e) { if (e instanceof Unwritten) return []; throw e; }
+}
+
 // 16, 18 and 19 November 2026: the shape check's config, where none stands, as the starter kit writes it, which the
 // check holds the project to until then; its first baseline where none stands; else the baseline written again, which
-// names every reader. The parser's packages not installed, the check refuses to write, and so does this.
+// names every reader; and the baseline under the size marks' "skip" (skipWritten). The parser's packages not installed,
+// the check refuses to write, and so does this.
 export function writeShape(p, busy) {
   const at = shapeAt(p.manifest), wrote = [];
   let text = p.read(at);
@@ -158,7 +173,7 @@ export function writeShape(p, busy) {
     for (const f of wrote) fs.rmSync(path.join(p.root, f)); // (the config it wrote for the run taken out again: it wrote nothing)
     throw e;
   }
-  return [...wrote, config.baseline];
+  return [...wrote, config.baseline, ...skipWritten(p, [config.baseline], busy)];
 }
 
 // 16 November 2026: each copy an agent tool's files held before the copies check read them, listed in its baseline by
@@ -205,10 +220,11 @@ export function writeBreaks(p, busy) {
 
 // 16 November 2026: each path of a file the rules left (core/modules/, floor/topics.md) in the project's own files the
 // step reads, as the step's check finds it there, written as the file it now is; a copies config that reads the old
-// folder alone given the new folders' patterns beside it; and the manifest's "Paths:" line, where it is word for word the
-// one the starter kit of releases 1 to 5 wrote, written as the kit writes it now. Where a move is no exact one (the old
-// path leads to a folder, a rule of its file stands elsewhere since, or the file would name one file twice), that file
-// is left as it stands, and so is a "Paths:" line of the project's own words, for the step's mend.
+// folder alone given the new folders' patterns beside it; the size marks' "read" (marksMoved); and the manifest's
+// "Paths:" line, where it is word for word the one the starter kit of releases 1 to 5 wrote, written as the kit writes
+// it now. Where a move is no exact one (the old path leads to a folder, a rule of its file stands elsewhere since, or
+// the file would name one file twice), that file is left as it stands, and so is a "Paths:" line of the project's own
+// words, for the step's mend.
 export const OLD_PATHS = "Paths: in the core's files, one into floor/, modules/, scripts/, setup/ or archive/ is under core/; any other is ours.";
 const quoted = f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 // The old paths of `map` as a pattern: `core/<old>` alone, never inside a longer name (`hardcore/`, `<old>.bak`).
@@ -216,9 +232,11 @@ export const oldPathsIn = map => Object.keys(map).length ? new RegExp(`(?<![\\w-
 export function writeMoved(p, busy) {
   const map = moved(), copy = copyAt(p), writes = [];
   const oldPath = oldPathsIn(map);
+  let marks = null;
+  try { marks = marksConfig(p); } catch { /* (marks whose path cannot be read are read as any other file) */ }
   for (const f of namers(p)) {
     const text = p.read(f) ?? "";
-    let next = movedIn(text, map, oldPath);
+    let next = movedIn(f === marks ? marksMoved(text, map) : text, map, oldPath);
     if (oldPath && readsOldAlone(p, f, copy)) next = next.split(atCopy(MOVED_GLOB, copy)).join(atCopy(`${MOVED_GLOB}, ${MOVED_GLOBS}`, copy));
     if (next !== text) writes.push([f, next]);
   }
@@ -235,6 +253,22 @@ function movedIn(text, map, oldPath) {
   const twice = named.some(a => named.some(b => a !== b && map[a] === map[b]) || text.includes(`core/${map[a]}`));
   const exact = old => !map[old].endsWith("/") && !(apart[old]?.length);
   return !named.length || twice || !named.every(exact) ? text : text.replace(oldPath, (all, old) => `core/${map[old]}`);
+}
+
+// The size marks' text with each file under "read" at an old path that leads to one file named as that file, two that
+// now lead to one merged at the larger mark, since a key named twice is no JSON a reader reads one way (#1247, point
+// 4); its own line ends kept. Marks that are no JSON object with "read" stand as they are.
+function marksMoved(text, map) {
+  let json;
+  try { json = JSON.parse(text); } catch { return text; }
+  if (!json?.read || typeof json.read !== "object" || Array.isArray(json.read)) return text;
+  const apart = moved.apart(), read = {};
+  for (const [f, mark] of Object.entries(json.read)) {
+    const old = /^core\/(.+)$/u.exec(f)?.[1], to = old && map[old] && !map[old].endsWith("/") && !(apart[old]?.length) ? `core/${map[old]}` : f;
+    read[to] = Object.hasOwn(read, to) && Number.isInteger(read[to]) && Number.isInteger(mark) ? Math.max(read[to], mark) : mark;
+  }
+  if (JSON.stringify(read) === JSON.stringify(json.read)) return text;
+  return `${JSON.stringify({ ...json, read }, null, 2)}\n`.replace(/\n/gu, /\r\n/u.test(text) ? "\r\n" : "\n");
 }
 
 // The manifest's "Paths:" line of releases 1 to 5, word for word, written as the kit writes it now, into `writes`.

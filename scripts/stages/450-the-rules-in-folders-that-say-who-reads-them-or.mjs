@@ -15,6 +15,8 @@ export default {
     write(dir, "docs/records/2026-01-05.md", "# 5 January 2026\n\nRead that day: `core/modules/git.md`.\n");
     write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/^(Paths:.*?)tasks\/, tools\/, /m, "$1"));
     write(dir, "checks/copies.json", read(dir, "checks/copies.json").split(`${MOVED_GLOB}, ${MOVED_GLOBS}`).join(MOVED_GLOB));
+    // (the size marks reading the two old paths that now lead to one file, under "read": #1247, point 4)
+    write(dir, "checks/sizes.json", read(dir, "checks/sizes.json").replace('"core/roles/shared/work-flow.md": 20480', '"core/modules/work-flow.md": 20480,\n    "core/modules/git.md": 20480'));
   },
   mend: dir => {
     const map = moved(at(dir, "core")), names = Object.keys(map).sort((a, b) => b.length - a.length);
@@ -24,7 +26,9 @@ export default {
       if (f.startsWith("docs/records/")) continue;
       const text = read(dir, f), next = names.reduce((t, old) => t.split(`core/${old}`).join(`core/${map[old].endsWith("/") ? `${map[old]}input.md` : map[old]}`), apart.reduce((t, [was, now]) => t.split(was).join(now), text)).split(`${MOVED_GLOB}, ${MOVED_GLOBS}`).join(MOVED_GLOB).split(MOVED_GLOB).join(`${MOVED_GLOB}, ${MOVED_GLOBS}`);
       // (two lines that now pull in the one file are one line)
-      const once = next.split("\n").filter((l, i, all) => !(l === all[i - 1] && /^(@|#\[\[file:)/.test(l))).join("\n");
+      const lines = next.split("\n").filter((l, i, all) => !(l === all[i - 1] && /^(@|#\[\[file:)/.test(l))).join("\n");
+      // (and the size marks naming that file once)
+      const once = f === "checks/sizes.json" && lines !== text ? `${JSON.stringify(JSON.parse(lines), null, 2)}\n` : lines;
       if (once !== text) write(dir, f, once);
     }
     const manifest = read(dir, "core-manifest.md"), want = /^Paths: .*$/m.exec(read(dir, "core/setup/template/core-manifest.md.tmpl"))[0];
