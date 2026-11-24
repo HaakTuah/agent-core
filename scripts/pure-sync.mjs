@@ -142,8 +142,9 @@ function provedOwned(dir) {
     const kit = fresh(p, join(kits, "now", "setup", "template"), { kitOnly: true, k });
     if (!kit.length) { unproved(`the kit at ${pin} gives no file this checkout of the core can render`); return; }
     // (whether an import's path is there, as the sync reads it with the copy at the new pin: a path in the copy, from the
-    // core at the pin, since the project here is written without it; any other, from the project)
-    const exists = (f) => { if (!f.startsWith(at)) return existsSync(join(base_, f)); try { inBare(dir, ["cat-file", "-e", `${pin}:${f.slice(at.length)}`]); return true; } catch { return false; } };
+    // core at the pin, since the project here is written without it; any other, from the project; each path asked once)
+    const seen = new Map(), there = (f) => { if (!f.startsWith(at)) return existsSync(join(base_, f)); try { inBare(dir, ["cat-file", "-e", `${pin}:${f.slice(at.length)}`]); return true; } catch { return false; } };
+    const exists = (f) => { if (!seen.has(f)) seen.set(f, there(f)); return seen.get(f); };
     const { write, remove } = plan(p, kit, older.flatMap((at) => asEarlier(p, join(at, "setup", "template"), k, { kitOnly: true })), { exists });
     provedGone(dir, write, remove);
     const onMain = (f) => { try { raw(["cat-file", "-e", `${base}:${f}`]); return true; } catch { return false; } };

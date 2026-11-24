@@ -113,6 +113,7 @@ try {
       "  an import an earlier kit wrote whose path is gone is taken out with it, and run again nothing changes", JSON.stringify(gone));
     ok(kept.text?.includes("@core/modules/claude.md\n@docs/own.md\n") && kept.text.split("@AGENTS.md").length === 2, "  and one whose path is there is the project's, kept", JSON.stringify(kept));
     ok(!Object.keys(converged("CLAUDE.md", `${want}~~~\n\`\`\`\n@AGENTS.md\n~~~\n`, want, [earlier], () => false)).length, "  and a line of a fenced example is no import: kept");
+    ok(!Object.keys(converged("CLAUDE.md", `~~~\n${want}@core/modules/claude.md\n~~~\n`, want, [earlier], () => false)).length, "  so is one round the part");
   }
   ok(partIn("@a.md\n\n@b.md\n", new Set(["@a.md", "@b.md"])) === "many" && partIn(`${BEGIN}\n${BEGIN}\n${END}\n`, new Set()) === "many", "  where it cannot tell which run of imports is the core's, it says so, and takes none");
   git(p.dir, "checkout", "-q", "--", ".");
