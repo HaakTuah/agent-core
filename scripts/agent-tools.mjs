@@ -42,7 +42,7 @@ import { parseBounded, logged } from "./guards.mjs";
 import { notInstalled, unreached } from "./packages.mjs";
 import { started } from "./started.mjs";
 import { configured } from "./agent-tools-configured.mjs";
-import { describe, show, TREE, listed } from "./agent-tools-entries.mjs";
+import { describe, show, MAIN, listed } from "./agent-tools-entries.mjs";
 import { listings, shown, modules, notFile, listing, shownNotBlob } from "./agent-tools-listing.mjs";
 import { readProject } from "./agent-tools-project.mjs";
 import { configAtBase, mendedBase, heldBy, heldBefore, sortPins, sortSources, sortBehind, sortUnlisted } from "./agent-tools-base.mjs";
@@ -77,8 +77,9 @@ export function kitHooks(template = kitTemplate, core = null) {
 // not listed where there is a list, as [key, problem] (the caller holds them against a base too), the third each listed tool whose configuration pins it
 // otherwise than its entry, or fetches it at no fixed version, as [key, problem], the fourth, as [key, problem], each
 // hook that takes a file of the project from the working tree and whose entry does not say so, and the fifth those
-// whose entry says so ("from": "the working tree"), as [key, what is said of it], the baseline, which the caller holds
-// to what its base held. `head` is configured()'s answer, `list` listed()'s or null, `kit` kitHooks()'s, `installs`
+// whose entry says so ("from": "the working tree", or "main" where its command fetches from main), as [key, what is
+// said of it, its mend, the mark], the baseline, which the caller holds to what its base held. `head` is configured()'s
+// answer, `list` listed()'s or null, `kit` kitHooks()'s, `installs`
 // each key a way's part names on its line "*Installs:*" to that way's name (installedBy()): such a tool is no
 // project's own, so it is never unlisted, and `installed` names each configured one, as [key, way], to be printed.
 export function check(head, list, kit, file, installs = new Map()) {
@@ -119,10 +120,15 @@ function sourcesOf(head, list, file, problems) {
   const sources = [], marked = [];
   for (const [k, { why, how }] of head.sources ?? []) {
     const said = `${describe(k)}, configured in ${head.tools.get(k)}, ${why}, so nothing shows that it runs its copy on main, where floor rule 3 has what an agent tool starts by itself run from its copy on main, and not the working tree's, which the branch it runs on can change`;
-    if (list?.from?.has(k)) marked.push([k, said, how]);
+    if (list?.from?.has(k)) marked.push([k, said, how, list.from.get(k)]);
     else sources.push([k, `${said}. Mend: ${how}, in this pull request`]);
   }
-  for (const k of list?.from ?? []) if (head.tools.has(k) && !head.sources?.has(k)) problems.push(`${file}: "agentTools" says of ${describe(k)} "from": ${show(TREE)}, but its command is the starter kit's form, which runs its copy on main. Mend: take "from" out of its entry, in this pull request`);
+  for (const [k, mark] of list?.from ?? []) {
+    if (!head.tools.has(k)) continue;
+    if (!head.sources?.has(k)) problems.push(`${file}: "agentTools" says of ${describe(k)} "from": ${show(mark)}, but its command is the starter kit's form, which runs its copy on main. Mend: take "from" out of its entry, in this pull request`);
+    // (a hook marked as run from main whose command fetches no file from main: the mark fits not what it reads; #1273)
+    else if (mark === MAIN && !head.sources.get(k).main) problems.push(`${file}: "agentTools" says of ${describe(k)} "from": ${show(MAIN)}, but its command fetches no file from main (\`git show refs/remotes/origin/main:<the file>\`), so what it runs is read from the working tree. Mend: write "from": "the working tree" in its entry, in this pull request`);
+  }
   return { sources, marked };
 }
 // The whole check, from the project's root: { fail, notes }.
