@@ -231,13 +231,13 @@ function converge(dir, kits, first = false) {
 // The new copy's packages, installed from its lock file by its own install script, into its .packages/node_modules/,
 // which git does not track (#654); a copy from before it has none. One that fails twice leaves the copy written and says so, with the
 // command to run again: the sync's pull request holds the copy alone, and no registry's silence fails it.
-function install(dir) {
+export function install(dir) {
   const script = path.join(dir, "scripts", "install.mjs");
   if (!fs.existsSync(script)) return;
   // (every install of the copy's, the parser's too, for the session that works in the project: #719)
   const r = spawnSync(process.execPath, [script, ...everyInstall(dir)], { encoding: "utf8" });
   process.stdout.write(r.stdout ?? "");
-  if (r.status !== 0) console.log(`note the copy is written, but its packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: none is needed for the checks, which install them themselves before they read (#1093); to install them now, run \`if [ -f ${path.relative(process.cwd(), script)} ]; then node ${path.relative(process.cwd(), script)}; fi\``);
+  if (r.status !== 0) console.log(`note the copy is written, but its packages are not installed (the installer's own words are left out of this note: a line of them can name a path on this machine; to read them, run the command below). Mend: none is needed for the checks, which install them themselves before they read (#1093); to install them now, run \`if [ -f ${path.relative(process.cwd(), script)} ]; then node ${path.relative(process.cwd(), script)}; fi\``);
 }
 
 // The core is fetched into a temporary folder, removed however the sync ends.
