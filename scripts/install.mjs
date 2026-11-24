@@ -56,34 +56,36 @@ const PACKAGE_FILES = new Set(["package.json", "package-lock.json", ".npmrc", "n
 // A file in an install's folder beside the core's own (in .packages/, the nested installs' folders too): a shrinkwrap,
 // which npm reads first, or any other, such as one npm would read as its own settings where a command names the folder.
 // The failure's words with its mend; null where none stands.
+// (a path is shown from the copy's root: a refusal is read back into pull request text, which holds no path of the machine)
+const rel = f => path.relative(root, f).split(path.sep).join("/") || ".";
 function strays(dir, at) {
-  if (fs.existsSync(at("npm-shrinkwrap.json"))) return `${at("npm-shrinkwrap.json")} stands beside the lock file, and would be installed from in its place. Mend: take it out; the core's packages are named in its lock files alone`;
+  if (fs.existsSync(at("npm-shrinkwrap.json"))) return `${rel(at("npm-shrinkwrap.json"))} stands beside the lock file, and would be installed from in its place. Mend: take it out; the core's packages are named in its lock files alone`;
   const extra = fs.readdirSync(dir).filter(f => !PACKAGE_FILES.has(f) && !(dir === packages && NESTED.includes(f) && fs.lstatSync(path.join(dir, f)).isDirectory()));
-  return extra.length ? `${dir} holds ${extra.map(f => JSON.stringify(f)).join(", ")} beside the package list, lock file, .npmrc and install. Mend: take ${extra.length === 1 ? "it" : "them"} out; the folder holds those alone` : null;
+  return extra.length ? `${rel(dir)} holds ${extra.map(f => JSON.stringify(f)).join(", ")} beside the package list, lock file, .npmrc and install. Mend: take ${extra.length === 1 ? "it" : "them"} out; the folder holds those alone` : null;
 }
 function refusal(name) {
   const { folder: own, lock, into } = REGISTRIES[name];
   const dir = path.join(root, own), at = f => path.join(dir, f);
   const folder = path.join(root, into.replace(/\/$/u, "")); // (no "/" after it, which would read the link's target)
   // (a link first, before anything is read through it: .packages/, the install's own folder, and its node_modules/)
-  for (const f of [...new Set([packages, dir]), folder]) if (fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()) return `${f} is a link, which the install would write through, or empty. Mend: remove the link, then run this again`;
+  for (const f of [...new Set([packages, dir]), folder]) if (fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()) return `${rel(f)} is a link, which the install would write through, or empty. Mend: remove the link, then run this again`;
   // (and files git tracks in the install's folder, which it would replace, for every install, PyPI's too)
   let tracked = "";
   try { tracked = spawnSync("git", ["ls-files", "--", into], { cwd: root, encoding: "utf8" }).stdout ?? ""; } catch { /* (no git: nothing tracked) */ }
-  if (tracked.trim()) return `${folder} holds files git tracks, which the install would replace. Mend: take them out of git (git rm -r --cached ${into}), then run this again`;
+  if (tracked.trim()) return `${rel(folder)} holds files git tracks, which the install would replace. Mend: take them out of git (git rm -r --cached ${into}), then run this again`;
   if (REGISTRIES[name].pip) return null; // (what follows is npm's: pip reads the hashes in its lock file alone)
   // (what the package list and lock file hold, read before npm runs: the npm that comes with the least Node fetches
   // whatever source a spec names, and runs its prepare script, whatever setting says otherwise)
   let faults;
   try { faults = lockFaults(JSON.parse(fs.readFileSync(at("package.json"), "utf8")), JSON.parse(fs.readFileSync(at("package-lock.json"), "utf8")), { overrides: Object.hasOwn(OWN_ONLY, name) }); }
-  catch (e) { faults = [`${lock} or ${own}/package.json cannot be read (${e.message})`]; }
+  catch (e) { faults = [`${lock} or ${own}/package.json cannot be read`]; }
   if (faults.length) return `${faults[0]}${faults.length > 1 ? `, and ${faults.length - 1} more` : ""}. Mend: write the package list and lock file as npm's own install from its registry writes them, with no other source`;
   const stray = strays(dir, at);
   if (stray) return stray;
   let npmrc = "";
   try { npmrc = fs.readFileSync(at(".npmrc"), "utf8"); } catch { /* (none: npm's own registry) */ }
   const others = npmrcOthers(npmrc);
-  if (others.length) return `${at(".npmrc")} holds ${others.length === 1 ? "a line" : `${others.length} lines`} beside the core's own two settings (the first: ${JSON.stringify(others[0].slice(0, 80))}), which npm would read: a registry, a host's token, a proxy or a certificate would send the install elsewhere. Mend: take ${others.length === 1 ? "that line" : "those lines"} out; the core's .npmrc holds ignore-scripts=true and min-release-age alone`;
+  if (others.length) return `${rel(at(".npmrc"))} holds ${others.length === 1 ? "a line" : `${others.length} lines`} beside the core's own two settings, which npm would read: a registry, a host's token, a proxy or a certificate would send the install elsewhere. Mend: take ${others.length === 1 ? "that line" : "those lines"} out; the core's .npmrc holds ignore-scripts=true and min-release-age alone`;
   return null;
 }
 

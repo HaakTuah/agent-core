@@ -562,7 +562,7 @@ try {
     plant();
     const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), ...names], { cwd: project, encoding: "utf8", timeout: 300000, env });
     unplant();
-    ok(r.status === 1 && said.test(r.stderr) && told(r.stderr), `install.mjs installs nothing where ${what}, saying the mend`, `${r.status} ${r.stdout}${r.stderr}`);
+    ok(r.status === 1 && said.test(r.stderr) && !r.stderr.includes(tmp) && told(r.stderr), `install.mjs installs nothing where ${what}, saying the mend`, `${r.status} ${r.stdout}${r.stderr}`);
   };
   fs.rmSync(path.join(pk, "node_modules"), { recursive: true, force: true });
   refuses("a shrinkwrap stands beside the lock file", () => fs.copyFileSync(path.join(pk, "package-lock.json"), path.join(pk, "npm-shrinkwrap.json")), () => fs.rmSync(path.join(pk, "npm-shrinkwrap.json")), /npm-shrinkwrap\.json stands beside the lock file/u);
