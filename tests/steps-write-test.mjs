@@ -17,6 +17,7 @@ import { MANIFEST, pinsBack, pinsOf } from "../scripts/sync-pins.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 import { MERGED } from "../scripts/converge.mjs";
+import { scanMend } from "../scripts/shape.mjs";
 
 const { ok, done } = tally();
 const dir = kitIn(scratchDir("steps-write-"))("an-npm-project", { packages: "." });
@@ -51,8 +52,11 @@ for (const l of WHOLE) {
   r = write();
   // (the shape check's baseline named under the size marks' "skip": #1247, point 2)
   const skipped = l !== WHOLE[1] || JSON.parse(read("checks/sizes.json")).skip.includes("checks/shape-baseline.json");
-  ok(before === 1 && r.status === 0 && !missed(l).length && r.stdout.includes(`- ${l}: wrote `) && r.stdout.includes("the step is done") && wordsKept(rules, ruleTexts(dir)) && skipped,
-    `"${l}", taken out, is written by --write: it reads done after it, no rule file's words changed, and a baseline skipped by the size marks`, `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
+  // (its line names what a project's own scan of paths named does about the baseline, which the core cannot read: #1289)
+  const line = r.stdout.split("\n").find(x => x.startsWith(`- ${l}: wrote `)) ?? "";
+  const scan = l !== WHOLE[1] || line.includes(`the step is done; left to the project: ${scanMend("checks/shape-baseline.json")}.`);
+  ok(before === 1 && r.status === 0 && !missed(l).length && line && r.stdout.includes("the step is done") && wordsKept(rules, ruleTexts(dir)) && skipped && scan,
+    `"${l}", taken out, is written by --write: it reads done after it, no rule file's words changed, a baseline skipped by the size marks, and the shape baseline's line naming what a project's own scan of paths does about it`, `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
   back();
 }
 

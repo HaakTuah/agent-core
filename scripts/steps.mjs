@@ -21,7 +21,8 @@
 // a pointer's path, or the manifest's module lines placed from what is read (#1094), has a writer ("write",
 // step-writers.mjs beside this file; #1091), which --write runs where its step is not done, never on a file with changes
 // not yet committed but the manifest changed in its `Core:` line alone, as a sync leaves it (held), and lists what it
-// wrote; a step that needs judgement has none. Node's own modules and git only.
+// wrote, with what its "left" says is left to the project once it wrote, which no check of the core's reads (#1289); a
+// step that needs judgement has none. Node's own modules and git only.
 //
 //   node core/scripts/steps.mjs                  from a project's root: the steps not done, each with its mend; nothing else
 //   node core/scripts/steps.mjs --write          each writer of a step not done run, and what it wrote listed, for a pull
@@ -139,7 +140,7 @@ function steps(missed) {
 }
 
 // Each writer of a step not done in the project at `root` run, in the steps' order, and the step read again after it:
-// each { lead, wrote (the files it wrote), mend (what is left of the step, null where it is done now) } or { lead, why }
+// each { lead, wrote (the files it wrote), mend (what is left of the step, null where it is done now), left (what the step's `left` says is left to the project, or null) } or { lead, why }
 // where it wrote nothing (it could not run, or its check could not read the project). A step the manifest declares
 // undone on purpose, or done already, is left; a file with changes not yet committed when the run began is never written.
 // `merge`, last, the one process's key-merge mode (converge.mjs, `merged`; #1095, point 5), given so, since that script
@@ -157,7 +158,9 @@ export function written(root, steps = STEPS, merge = null) {
     if (!wrote.length) continue;
     let mend;
     try { mend = step.check ? step.check(project(root)) : null; } catch (e) { mend = `its check could not read the project after it (${plain(e.message, root)})`; }
-    out.push({ lead: step.lead, wrote, mend: mend && mendAt(mend, copy, own) });
+    let left = null;
+    try { left = step.left?.(project(root)) ?? null; } catch { /* (a config it cannot read again: its check's mend says so) */ }
+    out.push({ lead: step.lead, wrote, mend: mend && mendAt(mend, copy, own), left });
   }
   return merge ? [...out, ...merge(root, busy)] : out;
 }
@@ -176,7 +179,7 @@ export function writeReport(done, how = null, name = ASIDE) {
     : how === "aside" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), then set aside in the stash "${name}", so this sync stays a pure one: ${later} run \`git stash list\` and \`git stash pop stash@{N}\`, N the number it gives the stash "${name}", never another of the writers' from an earlier run (or \`node core/scripts/steps.mjs --write\` again, which writes the same) and commit them in a pull request of its own, with the usual reviews.${kept}`
     : how === "put back" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), and put back as they stood, since git could not set them aside, so this sync stays a pure one: ${later} run \`node core/scripts/steps.mjs --write\` and commit what it writes in a pull request of its own, with the usual reviews.${kept}`
     : `Written by the steps' writers (\`core/scripts/steps.mjs --write\`): commit them in a pull request of their own, with the usual reviews.${kept}`;
-  return [head, ...done.map(d => d.why ? `- ${d.lead}: wrote nothing, since ${d.why}.` : `- ${d.lead}: wrote ${d.wrote.map(f => `\`${shown(f)}\``).join(", ")}${d.mend ? `; still to do: ${d.mend}` : "; the step is done"}.`)].join("\n");
+  return [head, ...done.map(d => d.why ? `- ${d.lead}: wrote nothing, since ${d.why}.` : `- ${d.lead}: wrote ${d.wrote.map(f => `\`${shown(f)}\``).join(", ")}${d.mend ? `; still to do: ${d.mend}` : "; the step is done"}${d.left ? `; left to the project: ${d.left}` : ""}.`)].join("\n");
 }
 // What the writers wrote set aside in a stash, so the tree stands as it stood before them; where git cannot make one (no
 // name to make it under, a file it refuses), each file put back as it stood, and false: a file git holds taken back from
