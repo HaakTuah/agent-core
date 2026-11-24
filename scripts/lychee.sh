@@ -13,17 +13,8 @@
 # below) well inside the five minutes the jobs give this step, and the jobs let the step fail without failing them, so
 # a stalled fetch only leaves it unfetched. A new pin moves the version and every sum at once. Always exits 0.
 temp="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
-# (a log's lines with the temporary and home folders named, never written out: on a runner on the owner's own computer
-# each holds the account's name; #1223)
-unnamed() {
-  local l t=$1 h=${HOME:-} tw= hw=
-  if command -v cygpath > /dev/null 2>&1; then tw=$(cygpath -w "$t" 2> /dev/null); hw=$(cygpath -w "$h" 2> /dev/null); fi
-  while IFS= read -r l || [ -n "$l" ]; do
-    [ "${#t}" -gt 1 ] && l=${l//"$t"/'<temp>'}; [ "${#tw}" -gt 3 ] && l=${l//"$tw"/'<temp>'}
-    [ "${#h}" -gt 1 ] && l=${l//"$h"/'~'}; [ "${#hw}" -gt 3 ] && l=${l//"$hw"/'~'}
-    printf '%s\n' "$l"
-  done
-}
+# (a log shown with the temporary and home folders named, never written out; where that is not beside it, not shown)
+. "$(dirname "$0")/unnamed.sh" 2> /dev/null || unnamed() { cat > /dev/null; echo "(not shown: scripts/unnamed.sh is not beside this script)"; }
 digest() { { sha256sum < "$1" || shasum -a 256 < "$1"; } 2> /dev/null | cut -c1-64; }
 version=0.24.2 exe=
 case $(uname -s)/$(uname -m) in

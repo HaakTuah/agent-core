@@ -92,7 +92,7 @@ jobs:
           # that name takes nothing in; a new copy written to a file of its own first, never through a name made before)
           owned() { [ -d "$1" ] && [ ! -L "$1" ] && [ -O "$1" ] || { echo "$1 is not a folder of this user's own" >&2; return 1; }; }
           # (a log's lines with the temporary and home folders named, never written out: on a runner on the owner's own computer
-          # each holds the account's name; #1223)
+          # each holds the account's name; #1223. A copy of scripts/unnamed.sh, since this runs in a project's checkout)
           unnamed() {
             local l t=$1 h=${HOME:-} tw= hw=
             if command -v cygpath > /dev/null 2>&1; then tw=$(cygpath -w "$t" 2> /dev/null); hw=$(cygpath -w "$h" 2> /dev/null); fi

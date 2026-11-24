@@ -512,4 +512,9 @@ if (process.platform !== "win32") {
   }
 }
 
+{
+  const body = text => (/^\s*unnamed\(\) \{\n[\s\S]*?^\s*\}$/mu.exec(text)?.[0] ?? "").split("\n").map(l => l.trim()).join("\n");
+  const shared = body(fs.readFileSync(path.join(core, "scripts/unnamed.sh"), "utf8")), copy = body(fs.readFileSync(path.join(core, ".github/workflows/personal-terms.yml"), "utf8"));
+  ok(shared.length > 0 && shared === copy, "personal-terms.yml's copy of unnamed() is scripts/unnamed.sh's, line for line (#1223)", `${shared}\n---\n${copy}`);
+}
 process.exit(failed ? 1 : 0);
