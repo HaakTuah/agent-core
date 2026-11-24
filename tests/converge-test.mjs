@@ -1,8 +1,9 @@
 // Tests of the one process that takes the core into a repository (scripts/converge.mjs; #1083), run as a project runs
 // it, in projects the starter kit writes from a scratch copy of the core: a new project has nothing more to write, and
 // run twice the process changes nothing; a project at a kit from before the marks gets its whole files and its parts of
-// AGENTS.md and CLAUDE.md written, every byte outside the parts kept; a workflow of the project's own, a file the
-// manifest's "Differences" names and a rule file whose run of imports holds a line of its own are never written over;
+// AGENTS.md and CLAUDE.md written, every byte outside the parts kept but an import the part holds, or one an earlier
+// kit wrote whose path is gone (#1246, point 4); a workflow of the project's own, a file the manifest's "Differences"
+// names and a rule file's own lines in a run of imports that holds one are never written over;
 // a value out of its form writes nothing and says the mend; the kind is read from the host (whether the repository is
 // private: from GitHub's event in a job, from gh, or GitHub's API with no sign-in, in a session: host-private-test.mjs),
 // never from the workflows that stand, and with no answer the process writes nothing and says the mend; and the check fails a pull request that makes a file or
@@ -13,7 +14,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { BEGIN, END, partIn } from "../scripts/core-owned.mjs";
+import { BEGIN, END, converged, partIn } from "../scripts/core-owned.mjs";
 import { kits, merged, plan } from "../scripts/converge.mjs";
 import { kind } from "../scripts/fresh.mjs";
 import { privateOf } from "../scripts/host-private.mjs";
@@ -101,8 +102,17 @@ try {
   commit(p.dir, "a difference declared, and a run of imports with a line of the project's own");
   const own = converge(p.dir, "--write");
   ok(!fs.existsSync(path.join(p.dir, ".github/workflows/delete-merged-branches.yml")), "a file the manifest's \"Differences\" names is the project's: never written", own.out);
-  ok(read(p.dir, "CLAUDE.md").startsWith("# Claude's part\n\n@AGENTS.md\n@docs/the-project-s-own.md\n@core/tools/claude.md\n") && read(p.dir, "CLAUDE.md").endsWith(`${END}\n`),
-    "  a run of imports that holds a line of the project's own stays whole, and the core's part goes after it", read(p.dir, "CLAUDE.md"));
+  const claudeMd = read(p.dir, "CLAUDE.md");
+  ok(claudeMd.startsWith("# Claude's part\n\n@docs/the-project-s-own.md\n\n") && claudeMd.endsWith(`${END}\n`) && claudeMd.split("@AGENTS.md\n").length === 2 && /CLAUDE\.md held @AGENTS\.md, @core\/tools\/claude\.md outside the core's part/.test(own.out),
+    "  a run of imports that holds a line of the project's own keeps that line, the kit's lines taken out of it and named, and the core's part goes after it, each import once (#1246, point 4)", `${claudeMd}\n${own.out}`);
+  // (an import of an earlier layout, which an earlier kit wrote and whose path is gone, is taken out; one whose path is there, kept)
+  {
+    const want = `# C\n\n${BEGIN}\n@AGENTS.md\n@core/tools/claude.md\n${END}\n`, earlier = "# C\n\n@AGENTS.md\n@core/modules/claude.md\n", stood = "# C\n\n@AGENTS.md\n@core/modules/claude.md\n@docs/own.md\n";
+    const gone = converged("CLAUDE.md", stood, want, [earlier], f => f === "docs/own.md"), kept = converged("CLAUDE.md", stood, want, [earlier], () => true);
+    ok(gone.text === `# C\n\n@docs/own.md\n\n${BEGIN}\n@AGENTS.md\n@core/tools/claude.md\n${END}\n` && /held @AGENTS\.md, @core\/modules\/claude\.md/.test(gone.left) && !Object.keys(converged("CLAUDE.md", gone.text, want, [earlier], f => f === "docs/own.md")).length,
+      "  an import an earlier kit wrote whose path is gone is taken out with it, and run again nothing changes", JSON.stringify(gone));
+    ok(kept.text?.includes("@core/modules/claude.md\n@docs/own.md\n") && kept.text.split("@AGENTS.md").length === 2, "  and one whose path is there is the project's, kept", JSON.stringify(kept));
+  }
   ok(partIn("@a.md\n\n@b.md\n", new Set(["@a.md", "@b.md"])) === "many" && partIn(`${BEGIN}\n${BEGIN}\n${END}\n`, new Set()) === "many", "  where it cannot tell which run of imports is the core's, it says so, and takes none");
   git(p.dir, "checkout", "-q", "--", ".");
 

@@ -88,7 +88,7 @@ export function plan(p, kit, older = [], { first = false } = {}) {
     try { there = !!fs.lstatSync(path.join(p.root, to)); } catch { /* (not there) */ }
     const now = there ? p.read(to, true) : null;
     if (there && now === null) { left.push({ to, why: "is no regular file the process can read: left as it is" }); continue; }
-    const r = converged(to, now, want, older.map(k => k.find(([f]) => f === to)?.[1]).filter(t => t !== undefined));
+    const r = converged(to, now, want, older.map(k => k.find(([f]) => f === to)?.[1]).filter(t => t !== undefined), f => fs.existsSync(path.join(p.root, path.dirname(to), f)));
     if (r.text !== undefined) write.push({ to, text: r.text });
     if (r.left) left.push({ to, why: r.left });
   }

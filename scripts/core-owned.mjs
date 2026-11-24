@@ -48,9 +48,9 @@ export function partIn(text, kitLines) {
 
 // One file after the process, from what stands, `now` (null where nothing does), the kit's text `want` and the earlier
 // kits' (`older`): { text } to write, {} where it is left as it stands, and `left` where it is left as the project's.
-export function converged(to, now, want, older = []) {
+export function converged(to, now, want, older = [], there = () => true) {
   if (now === null) return { text: want };
-  if (BLOCKS.includes(to)) return partConverged(now, want, older);
+  if (BLOCKS.includes(to)) return partConverged(now, want, older, there);
   if (!whole(to)) return {};
   const core = (marked(to) && /^# The core's file:/u.test(now)) || [want, ...older].some(t => t && plainOf(t) === plainOf(now));
   if (!core) return { left: "is not the core's (no mark of the core's, and not what a starter kit writes for the project): left as it is" };
@@ -68,21 +68,28 @@ export const FOLDED = { ".github/workflows/copies.yml": "copies", ".github/workf
 // project's and stays.
 export const dropped = (to, now, older) => whole(to) && ((marked(to) && /^# The core's file:/u.test(now)) || older.some(t => plainOf(t) === plainOf(now)));
 
-// A rule file of the project's own after the process: its core's part written where it stands, or at its end.
-function partConverged(now, want, older) {
+// A rule file of the project's own after the process: its core's part written where it stands, or at its end. Outside
+// the part, an import line the part holds is taken out, so none stands twice, and so is one an earlier kit wrote whose
+// path (`there`, from the rule file's folder) is not there, an import of an earlier layout that the part replaces, as
+// in a run of imports that holds a line of the project's own, which is no part of the core's (#1246, point 4).
+function partConverged(now, want, older, there) {
   const part = blockOf(want);
   if (part === null) return {};
-  const kitLines = new Set([want, ...older].flatMap(t => (blockOf(t) ?? t).split("\n").map(l => l.replace(/\r$/u, "")).filter(imports)));
+  const lines = t => (blockOf(t) ?? t).split("\n").map(l => l.replace(/\r$/u, "")).filter(imports);
+  const kitLines = new Set([want, ...older].flatMap(lines)), partLines = new Set(lines(want));
   const at = partIn(now, kitLines);
   if (at === "many") return { left: "its part of the core cannot be told apart (the core's marks stand more than once or apart, or more than one run of import lines is the kit's): left as it is" };
-  const eol = now.includes("\r\n") ? "\r\n" : "\n", block = part.replaceAll("\n", eol);
-  const text = at === null ? `${now}${now.endsWith("\n") || now === "" ? "" : eol}${eol}${block}${eol}` : `${now.slice(0, at.at)}${block}${now.slice(at.end)}`;
+  const eol = now.includes("\r\n") ? "\r\n" : "\n", block = part.replaceAll("\n", eol), gone = [];
+  const outside = t => t.split("\n").filter(l => { const bare = l.replace(/\r$/u, ""); const out = partLines.has(bare) || (kitLines.has(bare) && !there(bare.slice(1))); if (out) gone.push(bare); return !out; }).join("\n");
+  const rest = at === null ? outside(now) : null;
+  const text = at === null ? `${rest}${rest.endsWith("\n") || rest === "" ? "" : eol}${eol}${block}${eol}` : `${outside(now.slice(0, at.at))}${block}${outside(now.slice(at.end))}`;
   if (text === now) return {};
+  const said = gone.length ? `held ${gone.join(", ")} outside the core's part, which holds ${gone.length > 1 ? "what replaces each" : "what replaces it"}: taken out, so check that none was the project's on purpose` : "";
   // (a run of imports from before the marks that no kit wrote as it stands, one the project took an import out of or
   // reordered, is written as the kit writes it all the same, and named, so the change to its rule file is seen)
-  const runOf = t => (blockOf(t) ?? t).split("\n").map(l => l.replace(/\r$/u, "")).filter(imports).join("\n");
-  if (at?.lines && ![want, ...older].some(t => runOf(t) === at.lines.join("\n"))) return { text, left: "held a run of the kit's imports that no kit writes as it stood (one taken out or moved): the core's part is written over it as this kit writes it, so check that no import the project took out on purpose came back" };
-  return { text };
+  const runOf = t => lines(t).join("\n");
+  if (at?.lines && ![want, ...older].some(t => runOf(t) === at.lines.join("\n"))) return { text, left: ["held a run of the kit's imports that no kit writes as it stood (one taken out or moved): the core's part is written over it as this kit writes it, so check that no import the project took out on purpose came back", said].filter(Boolean).join("; it also ") };
+  return said ? { text, left: said } : { text };
 }
 
 // A check's config after the key-merge mode (#1095, point 5): the kit's keys the project's config lacks added, at any
