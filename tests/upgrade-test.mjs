@@ -1235,22 +1235,22 @@ function preRelease(name, { windows }) {
   // its own old sync script, run as its rules say, with no SHA: the core's newest main, which no release holds
   git(theCore, "commit", "-q", "--allow-empty", "-m", "a commit of main past the newest release");
   git(dir, "checkout", "-q", "-B", "sync", main0);
+  // (what its sync wrote is committed only where it wrote something: where it wrote nothing, the case below fails with the sync's own words, never with git's "nothing to commit", #1225)
+  const commitWhatItWrote = message => { git(dir, "add", "-A"); const wrote = git(dir, "status", "--porcelain") !== ""; if (wrote) git(dir, "commit", "-q", "-m", message); return wrote; };
   let s = node(dir, "core/scripts/sync.mjs");
-  git(dir, "add", "-A");
-  git(dir, "commit", "-q", "-m", "Sync the core");
-  let pure = node(dir, path.join(theCore, "scripts", "pure-sync.mjs"));
-  ok(s.status === 0 && fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8").includes(git(theCore, "rev-parse", "HEAD")) && pure.status === 1 && /is no release of the core/.test(pure.out),
+  const wrote = commitWhatItWrote("Sync the core");
+  let pure = wrote ? node(dir, path.join(theCore, "scripts", "pure-sync.mjs")) : { status: null, out: "(no sync commit to read: the sync wrote nothing)" };
+  ok(wrote && s.status === 0 && fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8").includes(git(theCore, "rev-parse", "HEAD")) && pure.status === 1 && /is no release of the core/.test(pure.out),
     `${name}: its own old sync script, with no SHA, takes the core's main, a commit no release holds, and pure-sync.mjs refuses it`, `${s.out}\n${pure.out}`);
 
   // with the release's full SHA, as the top of the sync notes says
   git(dir, "checkout", "-q", "-B", "sync", main0);
   s = node(dir, "core/scripts/sync.mjs", head);
-  git(dir, "add", "-A");
-  git(dir, "commit", "-q", "-m", `Sync the core to ${carrying}`);
+  const wroteToRelease = commitWhatItWrote(`Sync the core to ${carrying}`);
   git(dir, "push", "-q", "-f", "origin", "sync");
   const syncHead = git(dir, "rev-parse", "HEAD");
   pure = provePure(p);
-  ok(s.status === 0 && pure.status === 0 && pure.out.includes(`sha=${syncHead}`), `${name}: with the release's full SHA its own old sync script makes a pure sync to ${carrying}`, `${s.out}\n${pure.out}`);
+  ok(wroteToRelease && s.status === 0 && pure.status === 0 && pure.out.includes(`sha=${syncHead}`), `${name}: with the release's full SHA its own old sync script makes a pure sync to ${carrying}`, `${s.out}\n${pure.out}`);
   const onSync = checks(p, "pull_request", syncHead, { baseSha: main0, title: `Sync the core to ${carrying}`, ownToo: true });
   ok(!failures(onSync) && onSync.some(([w, r]) => w.startsWith("checks.yml/") && r.ran), `${name}: every check passes on the sync's pull request, its own workflow's scripts from the new copy too (${started(onSync).length} jobs)`, failures(onSync));
   // its own suite skips core/** and the manifest, but the sync moves its callers' pins too: with that filter alone the
