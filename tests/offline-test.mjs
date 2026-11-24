@@ -38,27 +38,27 @@ else {
     const file = path.join(tmp, `step-${count}.sh`);
     fs.writeFileSync(file, text);
     const r = spawnSync("bash", [script, file], { encoding: "utf8", cwd: tmp, env: { ...process.env, CORE_OFFLINE: "", TMPDIR: temps, PATH: `${bin}${path.delimiter}${process.env.PATH}`, ...env } });
-    return { status: r.status, said: `${r.stdout}${r.stderr}` };
+    return { status: r.status, said: `${r.stdout}${r.stderr}`, saw: `status ${r.status}${r.signal ? ` (signal ${r.signal})` : ""}${r.error ? `, error ${r.error.message}` : ""}, output: ${JSON.stringify(`${r.stdout}${r.stderr}`)}` };
   };
   const marker = path.join(tmp, "ran");
 
-  const passes = run('[ "$CORE_OFFLINE" = 1 ]\n[ "$KEPT" = "a b\nc=d" ]\nenv | grep -qx "A-B=x"\n[ "$PWD" = "$EXPECTED_PWD" ]\necho step ran\n', { KEPT: "a b\nc=d", "A-B": "x", EXPECTED_PWD: fs.realpathSync(tmp) });
+  const passes = run('[ "$CORE_OFFLINE" = 1 ]\n[ "$KEPT" = "a b\nc=d" ]\nenv | grep -x "A-B=x" > /dev/null\n[ "$PWD" = "$EXPECTED_PWD" ]\necho step ran\n', { KEPT: "a b\nc=d", "A-B": "x", EXPECTED_PWD: fs.realpathSync(tmp) });
   ok(passes.status === 0 && passes.said.includes("step ran") && !/FAIL/.test(passes.said),
-    "a step's script runs with the environment and folder it was started with, exactly, a name bash cannot export among it, CORE_OFFLINE set, and passes as it would", passes.said);
+    "a step's script runs with the environment and folder it was started with, exactly, a name bash cannot export among it, CORE_OFFLINE set, and passes as it would", passes.saw);
 
   const strict = run("false | true\necho past the pipe\nfalse\necho past the failure\n");
   ok(strict.status !== 0 && !strict.said.includes("past the pipe") && !strict.said.includes("past the failure"),
-    "the script runs as GitHub's bash runs it: a failed command, or one in a pipe, stops it", strict.said);
+    "the script runs as GitHub's bash runs it: a failed command, or one in a pipe, stops it", strict.saw);
 
   const reached = run('echo "npm error request to https://registry.npmjs.org/a failed, reason: getaddrinfo EAI_AGAIN registry.npmjs.org"\nexit 3\n');
   ok(reached.status === 3 && mended(reached.said) && reached.said.includes('"EAI_AGAIN"') && /move its step to the part network/.test(reached.said),
-    "a step that fails reaching the network keeps its status and says so, with what its output shows, and its mend", reached.said);
+    "a step that fails reaching the network keeps its status and says so, with what its output shows, and its mend", reached.saw);
   const others = [["git", "fatal: unable to access 'https://github.com/a/b/': Could not resolve host: github.com"], [".NET", "Resource temporarily unavailable (api.nuget.org:443)"], ["curl", "curl: (7) Failed to connect to 1.1.1.1 port 443: Network is unreachable"], ["Node's fetch", "TypeError: fetch failed"], ["output holding a NUL", "\\0 EAI_AGAIN"]];
   const seen = others.map(([who, line]) => [who, run(`printf '%b\\n' "${line}" >&2\nexit 1\n`)]);
   ok(seen.every(([, r]) => r.status === 1 && mended(r.said)), "and so it is where git, .NET, curl or Node's fetch words the fetch the cut refused, and where the output holds a byte that is no text", seen.filter(([, r]) => !mended(r.said)).map(([who, r]) => `${who}: ${r.said}`).join(" | "));
 
   const plain = run('echo "FAIL a test of its own"\nexit 2\n');
-  ok(plain.status === 2 && !plain.said.includes("reached the network"), "a step that fails for any other reason keeps its status and says nothing of the network", plain.said);
+  ok(plain.status === 2 && !plain.said.includes("reached the network"), "a step that fails for any other reason keeps its status and says nothing of the network", plain.saw);
 
   for (const [why, env] of [["sudo asks a password", { STUB_SUDO_FAILS: "1" }], ["the loopback cannot be brought up", { STUB_IP_FAILS: "1" }]]) {
     const r = run(`touch "${marker}"\n`, env);
