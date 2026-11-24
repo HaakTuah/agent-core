@@ -13,6 +13,8 @@
 # below) well inside the five minutes the jobs give this step, and the jobs let the step fail without failing them, so
 # a stalled fetch only leaves it unfetched. A new pin moves the version and every sum at once. Always exits 0.
 temp="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+# (a log shown with the temporary and home folders named, never written out; where that is not beside it, not shown)
+. "$(dirname "$0")/unnamed.sh" 2> /dev/null || unnamed() { cat > /dev/null; echo "(not shown: scripts/unnamed.sh is not beside this script)"; }
 digest() { { sha256sum < "$1" || shasum -a 256 < "$1"; } 2> /dev/null | cut -c1-64; }
 version=0.24.2 exe=
 case $(uname -s)/$(uname -m) in
@@ -37,6 +39,6 @@ if (cd "$a" && curl -fsSL --proto =https --proto-redir =https --connect-timeout 
   echo "LYCHEE=$a/$bin"
 else
   echo "lychee $version is not fetched: its release for $(uname -s)/$(uname -m) could not be downloaded or differs from its sum here. Of the fetch:" >&2
-  tail -n 5 "$a/log" >&2; echo "the archive's SHA-256: $(digest "$a/$got")" >&2
+  tail -n 5 "$a/log" | unnamed "$temp" >&2; echo "the archive's SHA-256: $(digest "$a/$got")" >&2
 fi
 exit 0
