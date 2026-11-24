@@ -328,8 +328,9 @@ function runMatrixJob(rt, job, id, top, matrix, results) {
 
 // The system a job's `runs-on` names where it is not `platform` (process.platform's), or null (#1245, point 8).
 function elsewhere(on, platform) {
-  const labels = [on?.labels ?? on].flat().map(str).join(" ");
-  const os = [["Windows", /windows/iu, "win32"], ["macOS", /mac/iu, "darwin"], ["Linux", /ubuntu|linux/iu, "linux"]].find(([, re]) => re.test(labels));
+  // (a label read whole, or by its first part, as windows-latest or macOS: a runner's own name such as machine-2 is none)
+  const labels = [on?.labels ?? on].flat().map(l => str(l).split("-")[0].toLowerCase());
+  const os = [["Windows", ["windows"], "win32"], ["macOS", ["macos", "mac"], "darwin"], ["Linux", ["ubuntu", "linux"], "linux"]].find(([, names]) => labels.some(l => names.includes(l)));
   return os?.[2] !== platform ? os?.[0] ?? null : null;
 }
 

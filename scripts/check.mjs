@@ -109,11 +109,12 @@ function main() {
   if (p.verdicts !== null) outside(p, o.verdicts);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
-  const { failed, ran } = runAll(p, runner(p, tmp), calledJobs(p, tmp));
+  const { failed, ran, unrun } = runAll(p, runner(p, tmp), calledJobs(p, tmp));
   if (p.verdicts !== null) writeVerdicts(p, o.verdicts);
-  if (!failed && !ran) fail("no check of the core ran on this change.", "call the core's workflows in the base the change merges into, as the starter kit writes them.");
-  say(failed ? `${failed} of the core's checks failed` : `ok   every check of the core that runs from plain git passed (${ran})`);
-  process.exitCode = failed ? 1 : 0;
+  if (!failed && !ran && !unrun) fail("no check of the core ran on this change.", "call the core's workflows in the base the change merges into, as the starter kit writes them.");
+  if (unrun) warn(`FAIL ${unrun} job(s) skipped above could not run here, so proved nothing. ${MEND}run them where each skip line says, or mend the command it names.`);
+  say(failed || unrun ? `${failed} of the core's checks failed, ${unrun} not run` : `ok   every check of the core that runs from plain git passed (${ran})`);
+  process.exitCode = failed || unrun ? 1 : 0;
 }
 
 // --verdicts names a file outside the project's repository, and no link: leadsOut reads a link to nothing as leading
@@ -147,10 +148,10 @@ function calledJobs(p, tmp) {
 // Runs those jobs, then, with --own, the project's own, where the copy is the core: how many ran, and how many failed.
 // Where it is not, each job left that would run is written stopped (#1245, point 2).
 function runAll(p, run, jobs) {
-  let failed = 0, ran = 0;
+  let failed = 0, ran = 0, unrun = 0;
   for (const [i, j] of jobs.entries()) {
     const r = run(j.file, j.id, j.job);
-    failed += r.failed; ran += r.ran;
+    failed += r.failed; ran += r.ran; unrun += r.unrun | 0;
     if (j.name !== "core.yml" || !(r.copy ?? r.failed > 0) && !r.unrun) continue;
     // (core.yml unrun here proves nothing of the copy, so it stops the rest as its failure does)
     if (!r.failed) failed++;
@@ -158,10 +159,10 @@ function runAll(p, run, jobs) {
     const left = [...jobs.slice(i + 1).filter(l => !HOST_OWN[l.name] && (l.name !== "pr-description.yml" || p.described)).map(l => `${l.file}/${l.id}`),
       ...(p.own ? ownWorkflows(p).flatMap(o => (o.wf === null ? [o.file] : Object.keys(o.wf.jobs).map(id => `${o.file}/${id}`))) : [])];
     for (const at of left) { verdicts[at] = "stopped"; say(`stop ${at}: not run, behind the failure above`); }
-    return { failed, ran };
+    return { failed, ran, unrun };
   }
-  if (p.own) for (const o of ownWorkflows(p)) { const r = run.own(o); failed += r.failed; ran += r.ran; }
-  return { failed, ran };
+  if (p.own) for (const o of ownWorkflows(p)) { const r = run.own(o); failed += r.failed; ran += r.ran; unrun += r.unrun | 0; }
+  return { failed, ran, unrun };
 }
 
 // The options given, each checked.

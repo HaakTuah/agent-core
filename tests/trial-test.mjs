@@ -13,7 +13,7 @@ import path from "node:path";
 import { RUN_FROM } from "../scripts/check.mjs";
 import { sameNode, standIns } from "../scripts/check-actions.mjs";
 import { movesForward, ownJobs, syncCalls, triggered } from "../scripts/check-calls.mjs";
-import { COUNTS, compared, RUNS, trialAt, trialRecord } from "../scripts/release-trial.mjs";
+import { COUNTS, compared, trialAt, trialRecord } from "../scripts/release-trial.mjs";
 import { sideOf } from "../scripts/attached.mjs";
 import { notInstalled } from "../scripts/packages.mjs";
 import { mended } from "../scripts/mend.mjs";
@@ -134,14 +134,18 @@ jobs:
     runs-on: [self-hosted, linux]
     steps:
       - run: echo here ran
+  named:
+    runs-on: [self-hosted, machine-2]
+    steps:
+      - run: echo named ran
   lacking:
     runs-on: ubuntu-latest
     steps:
       - run: no-such-program-of-the-trial --version
 `, { github: { event_name: "pull_request" }, base: env, temp: tmp, workspace: () => ws, uses: {}, machine: "linux" });
-  const [win, here, lacking] = ["win", "here", "lacking"].map(id => away.find(j => j.job === id));
-  ok(win.ran === false && /^it runs on Windows, which this machine is not$/u.test(win.unrun) && here.ran && here.passed && lacking.ran,
-    "with the machine named, a job whose runs-on names another system is unrun and says which; one on this system runs (#1245, point 8)", JSON.stringify(away.map(j => [j.job, j.ran, j.unrun])));
+  const [win, here, named, lacking] = ["win", "here", "named", "lacking"].map(id => away.find(j => j.job === id));
+  ok(win.ran === false && /^it runs on Windows, which this machine is not$/u.test(win.unrun) && here.ran && here.passed && named.ran && named.passed && lacking.ran,
+    "with the machine named, a job whose runs-on names another system is unrun and says which; one on this system runs, and so does one whose runner's own name holds a system's only in part (#1245, point 8)", JSON.stringify(away.map(j => [j.job, j.ran, j.unrun])));
   ok(!lacking.passed && lacking.steps.find(s => !s.passed)?.missing === "no-such-program-of-the-trial", "a step that wants a program this machine lacks names it, for check.mjs to leave the job unrun (#1245, point 9)", JSON.stringify(lacking.steps));
 
   // (point 10: each job in its class, the record counting each, and a job failed after alone holding the cut as the release's)
@@ -156,10 +160,10 @@ jobs:
 
   const lost = trialRecord(SHA("c"), "2026-11-24", [[{ "a.yml/x": "passed" }, { "a.yml/x": "unrun" }]]);
   const lostAt = trialAt(SHA("c"), args => (args[0] === "show" ? JSON.stringify(lost) : ""));
-  ok(lost.unrunAfterRan === 1 && /^1 check that ran before the update could not run after it/u.test(lostAt.held) && mended(`FAIL ${lostAt.held}`),
-    "  a job that ran before and was unrun after holds the cut, since the trial measured nothing of it, saying its mend", lostAt.held);
+  ok(lost.unrunAfterRan === 1 && lostAt.held === null && /Read before the release workflow is started: 1 check measured nothing after the update, 0 stopped behind a failure and 1 that ran before not run after/u.test(lostAt.said),
+    "  a job that ran before and was unrun after is named beside the counts, to be read before the release starts, and holds nothing", `${lostAt.said}\n${lostAt.held}`);
 
-  // (point 2 and #1244: jobs stopped after count apart and hold the cut; a baseline from a clone of the core is counted)
+  // (point 2 and #1244: jobs stopped after count apart and are named beside the counts; a baseline from a clone of the core is counted)
   const before = { [RUN_FROM]: "a clone of the core", "core.yml/core": "passed", "core.yml/tests (a)": "passed", "own.yml/lint": "passed", "own.yml/gone": "passed" };
   const afterRun = { "core.yml/core": "failed", "core.yml/tests": "stopped", "own.yml": "stopped" };
   const c = compared(before, afterRun);
@@ -168,10 +172,11 @@ jobs:
   ok(record.stoppedAfter === 2 && record.baselineFromClone === 1 && record.projects === 2, "the record counts the jobs stopped after, and the baselines taken from a clone of the core (#1244)", JSON.stringify(record));
   const showing = r => args => { if (args[0] === "show") return JSON.stringify(r); if (args[0] === "diff") return ""; return ""; };
   const stopped = trialAt(SHA("a"), showing({ ...record, failedAfter: 0 }));
-  ok(/2 checks did not run after the update/u.test(stopped.held) && mended(`FAIL ${stopped.held}`) && stopped.held.includes(RUNS) && /2 stopped after it behind a failure.*1 of the baselines taken by the release's check\.mjs from a clone of the core/u.test(stopped.said),
-    "a trial with jobs stopped after holds the cut, its mend naming how the runs are taken, the baseline from a clone of the core among them", `${stopped.said}\n${stopped.held}`);
+  ok(stopped.held === null && /2 stopped after it behind a failure.*1 of the baselines taken by the release's check\.mjs from a clone of the core.*Read before the release workflow is started: 2 checks measured nothing after the update, 2 stopped behind a failure/u.test(stopped.said),
+    "a trial with jobs stopped after names them beside the counts and holds nothing, the baseline from a clone of the core counted", `${stopped.said}\n${stopped.held}`);
   const clean = trialAt(SHA("a"), showing({ ...record, failedAfter: 0, stoppedAfter: 0 }));
-  ok(clean.held === null, "  and with none stopped or failed after, it holds nothing", clean.held);
+  ok(clean.held === null && !/Read before/u.test(clean.said), "  and with none stopped, unrun or failed after, it names none and holds nothing", clean.said);
+  ok(trialAt(SHA("a"), showing(record)).held !== null, "  where one failed after, it holds the cut");
   ok(trialAt(SHA("a"), showing({ ...record, baselineFromClone: 3 })).held !== null, "  and a record with more baselines from a clone than projects is in no form it writes");
 
   // (point 6: run from a clone of the core with its packages missing, check.mjs says so with the command that installs them)

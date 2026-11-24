@@ -91,14 +91,14 @@ let r = check(dir);
 ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && /ok {3}copies\.yml\/copies/.test(r.out), "a project as the kit writes it passes on a push to main, its copy and its copies checked", r.out);
 // (with --own, the project's own workflows run too, its jobs that call no workflow, after the core's; with --verdicts,
 // each job's verdict that ran is written by its place: #1084)
-fs.writeFileSync(path.join(dir, ".github/workflows/own.yml"), "name: own\non:\n  push:\n    branches: [main]\njobs:\n  fine:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo fine\n  broken:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo broken && exit 3\n  later:\n    if: github.event_name == 'pull_request'\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 4\n  deploy:\n    environment: production\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 5\n  secret:\n    runs-on: ubuntu-latest\n    steps:\n      - run: test -z \"${{ secrets.PERSONAL_TERMS }}\"\n");
+fs.writeFileSync(path.join(dir, ".github/workflows/own.yml"), "name: own\non:\n  push:\n    branches: [main]\njobs:\n  fine:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo fine\n  broken:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo broken && exit 3\n  later:\n    if: github.event_name == 'pull_request'\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 4\n  deploy:\n    environment: production\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 5\n  secret:\n    runs-on: ubuntu-latest\n    steps:\n      - run: test -z \"${{ secrets.PERSONAL_TERMS }}\"\n  mac:\n    runs-on: macos\n    steps: [{run: ':'}]\n");
 commit(dir, "a workflow of its own");
 const verdictsFile = path.join(tmp, "verdicts.json");
 const without = check(dir);
 r = check(dir, "--own", "--verdicts", verdictsFile);
 const verdicts = JSON.parse(fs.readFileSync(verdictsFile, "utf8"));
-ok(without.status === 0 && !/own\.yml/.test(without.out) && r.status === 1 && /ok {3}own\.yml\/fine/.test(r.out) && /FAIL own\.yml\/broken: its step "echo broken && exit 3" failed/.test(r.out) && /skip own\.yml\/later/.test(r.out),
-  "with --own the project's own jobs run too, a failing one failing the check, one whose condition does not hold skipped; without it, none", `${without.out}\n${r.out}`);
+ok(without.status === 0 && !/own\.yml/.test(without.out) && r.status === 1 && /ok {3}own\.yml\/fine/.test(r.out) && /FAIL own\.yml\/broken: its step "echo broken && exit 3" failed/.test(r.out) && /skip own\.yml\/later/.test(r.out) && /FAIL 1 job\(s\) skipped above/.test(r.out),
+  "with --own the project's own jobs run too, one failing or not run here failing it, one whose condition does not hold skipped; without it, none", `${without.out}\n${r.out}`);
 ok(/host own\.yml\/deploy: it names an environment/.test(r.out) && !("own.yml/deploy" in verdicts) && verdicts["own.yml/secret"] === "passed",
   "a job of its own that names an environment, which deploys, is the host's own and not run, and its own jobs are given no secret", r.out);
 const inside = check(dir, "--own", "--verdicts", path.join(dir, "verdicts.json"));
@@ -109,7 +109,7 @@ let linked = true;
 try { fs.symlinkSync(path.join(dir, "linked.json"), dangling, "file"); } catch { linked = false; }
 const through = linked ? check(dir, "--verdicts", dangling) : null;
 ok(!linked || (through.status === 1 && mended(through.out) && /--verdicts .* is a link/.test(through.out) && !fs.existsSync(path.join(dir, "linked.json"))), "--verdicts that is a link to nothing in the project's repository is refused, saying its mend, and nothing is written there", through?.out);
-ok(verdicts["own.yml/fine"] === "passed" && verdicts["own.yml/broken"] === "failed" && !("own.yml/later" in verdicts) && verdicts["core.yml/core/core"] === "passed" && Object.values(verdicts).every(v => v === "passed" || v === "failed"),
+ok(verdicts["own.yml/fine"] === "passed" && verdicts["own.yml/broken"] === "failed" && !("own.yml/later" in verdicts) && verdicts["core.yml/core/core"] === "passed" && verdicts["own.yml/mac"] === "unrun" && Object.values(verdicts).every(v => /^(pass|fail|unrun)/.test(v)),
   "and --verdicts writes each job's verdict that ran, the core's and the project's own, by its place", JSON.stringify(verdicts));
 git(dir, "reset", "-q", "--hard", "HEAD~1");
 
@@ -266,7 +266,8 @@ fs.writeFileSync(path.join(dir, "notes.md"), "A plain note.\n");
 commit(dir, "a plain note");
 const terms = { ...env, PERSONAL_TERMS: `${term}\n` };
 r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), "--base", "base", "--branch", `fix-${term.toLowerCase()}`], { cwd: dir, env: terms, encoding: "utf8" });
-ok(r.status === 1 && /FAIL personal-terms\.yml\/check\/check/.test(`${r.stdout}${r.stderr}`), "a listed term in the branch's own name fails the change", `${r.stdout}${r.stderr}`);
+r.out = `${r.stdout}${r.stderr}`;
+ok(r.status === 1 && /FAIL personal-terms\.yml\/check\/check/.test(r.out), "a listed term in the branch's own name fails the change", r.out);
 
 // a path filter reads each name as it is, one beyond ASCII too, and a workflow of the project's own in a form this
 // reader does not know, calling none of the core's, leaves every check run
@@ -281,7 +282,8 @@ fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
 fs.writeFileSync(path.join(dir, "docs", `${String.fromCodePoint(0xe9)}.md`), `Naming ${term}.\n`);
 commit(dir, "a doc whose name git quotes");
 r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), "--base", "filtered"], { cwd: dir, env: { ...env, PERSONAL_TERMS: `${term}\n` }, encoding: "utf8" });
-ok(r.status === 1 && /FAIL docs-terms\.yml\/terms\/check/.test(`${r.stdout}${r.stderr}`) && /note \.github\/workflows\/build\.yml is written in a form/.test(`${r.stdout}${r.stderr}`), "a call filtered by path runs where the change's file name lies beyond ASCII, and a workflow of the project's own this reader cannot read is passed over, said so", `${r.stdout}${r.stderr}`);
+r.out = `${r.stdout}${r.stderr}`;
+ok(r.status === 1 && /FAIL docs-terms\.yml\/terms\/check/.test(r.out) && /note \.github\/workflows\/build\.yml is written in a form/.test(r.out), "a call filtered by path runs where the change's file name lies beyond ASCII, and a workflow of the project's own this reader cannot read is passed over, said so", r.out);
 
 // a listed term in a workflow's own name is masked wherever it is printed, and a wildcard branch filter still runs
 git(dir, "reset", "-q", "--hard", "base");
@@ -300,7 +302,8 @@ ok(r.status === 1 && /FAIL \*\*\*-terms\.yml\/check\/check/.test(masked) && !mas
 git(dir, "reset", "-q", "--hard", "base");
 const away = { ...env, GIT_CONFIG_KEY_0: `url.${path.join(tmp, "nowhere").replace(/\\/g, "/")}.insteadOf`, GIT_CONFIG_KEY_1: `url.${path.join(tmp, "nowhere").replace(/\\/g, "/")}.insteadOf` };
 r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs")], { cwd: dir, env: away, encoding: "utf8" });
-ok(r.status === 1 && `${r.stdout}${r.stderr}`.includes("the core could not be fetched") && mended(`${r.stdout}${r.stderr}`) && !`${r.stderr}`.includes("    at "), "a core that cannot be reached fails with its mend, and no stack", `${r.stdout}${r.stderr}`);
+r.out = `${r.stdout}${r.stderr}`;
+ok(r.status === 1 && r.out.includes("the core could not be fetched") && mended(r.out) && !r.stderr.includes("    at "), "a core that cannot be reached fails with its mend, and no stack", r.out);
 
 // a check that keeps a baseline reads the base: the change is checked on its merge into the base, as GitHub checks it
 git(dir, "reset", "-q", "--hard", "base");
