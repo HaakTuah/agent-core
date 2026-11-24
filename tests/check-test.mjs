@@ -21,6 +21,7 @@ import { npmOnce } from "../scripts/npm-once.mjs";
 import { trialRecord } from "../scripts/release-trial.mjs";
 
 const { ok, done } = tally();
+const win = process.platform === "win32";
 const { tmp, git, core, project } = scratch("check-test-");
 // (the core's packages installed by the real npm once, and linked into each job's clone after: npm-once.mjs; the real
 // npm reading a copy of the machine's cache first, so no job reaches the registry: scratch-core.mjs, npmWithCache, #772)
@@ -47,8 +48,8 @@ if (process.argv[2] === "ci") fs.mkdirSync("node_modules", { recursive: true });
 `);
   // (the fake is handed to npmOnce as the real one, so it needs no name of npm's, and this file stays one the licence
   // scan reads)
-  const realFake = path.join(fake, process.platform === "win32" ? "logger.cmd" : "logger");
-  if (process.platform === "win32") fs.writeFileSync(realFake, `@"${process.execPath}" "${logger}" %*\r\n`);
+  const realFake = path.join(fake, win ? "logger.cmd" : "logger");
+  if (win) fs.writeFileSync(realFake, `@"${process.execPath}" "${logger}" %*\r\n`);
   else fs.writeFileSync(realFake, `#!/bin/sh\nexec '${process.execPath}' '${logger}' "$@"\n`, { mode: 0o755 });
   // (from the scratch environment, which leaves the runner's npm settings and credentials out, so a failure prints none)
   const base = scratchEnv(core, tmp);
@@ -59,7 +60,7 @@ if (process.argv[2] === "ci") fs.mkdirSync("node_modules", { recursive: true });
   for (const [f, body] of Object.entries(files)) for (const d of [work, again, other]) fs.writeFileSync(path.join(d, f), f === "package-lock.json" && d === other ? body.replace("3", "4") : body);
   const asked = [["view", "left-pad", "version"], ["ci", "--ignore-scripts", "--no-audit"]];
   // (on Windows a .cmd runs through cmd.exe, so its path is quoted, as npm-once.mjs quotes the real npm's)
-  const runShim = (args, cwd) => spawnSync(process.platform === "win32" ? `"${shim}"` : shim, args, { cwd, env: probed, stdio: "ignore", shell: process.platform === "win32" });
+  const runShim = (args, cwd) => spawnSync(win ? `"${shim}"` : shim, args, { cwd, env: probed, stdio: "ignore", shell: win });
   for (const args of asked) runShim(args, work);
   runShim(asked[1], again); runShim(asked[1], other);
   const got = fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim().split("\n").map(l => JSON.parse(l)) : [];
@@ -91,14 +92,14 @@ let r = check(dir);
 ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && /ok {3}copies\.yml\/copies/.test(r.out), "a project as the kit writes it passes on a push to main, its copy and its copies checked", r.out);
 // (with --own, the project's own workflows run too, its jobs that call no workflow, after the core's; with --verdicts,
 // each job's verdict that ran is written by its place: #1084)
-fs.writeFileSync(path.join(dir, ".github/workflows/own.yml"), "name: own\non:\n  push:\n    branches: [main]\njobs:\n  fine:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo fine\n  broken:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo broken && exit 3\n  later:\n    if: github.event_name == 'pull_request'\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 4\n  deploy:\n    environment: production\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 5\n  secret:\n    runs-on: ubuntu-latest\n    steps:\n      - run: test -z \"${{ secrets.PERSONAL_TERMS }}\"\n");
+fs.writeFileSync(path.join(dir, ".github/workflows/own.yml"), "name: own\non:\n  push:\n    branches: [main]\njobs:\n  fine:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo fine\n  broken:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo broken && exit 3\n  later:\n    if: github.event_name == 'pull_request'\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 4\n  deploy:\n    environment: production\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 5\n  secret:\n    runs-on: ubuntu-latest\n    steps:\n      - run: test -z \"${{ secrets.PERSONAL_TERMS }}\"\n  mac:\n    runs-on: " + (process.platform === "darwin" ? "windows" : "macos") + "\n    steps: [{run: ':'}]\n");
 commit(dir, "a workflow of its own");
 const verdictsFile = path.join(tmp, "verdicts.json");
 const without = check(dir);
 r = check(dir, "--own", "--verdicts", verdictsFile);
 const verdicts = JSON.parse(fs.readFileSync(verdictsFile, "utf8"));
-ok(without.status === 0 && !/own\.yml/.test(without.out) && r.status === 1 && /ok {3}own\.yml\/fine/.test(r.out) && /FAIL own\.yml\/broken: its step "echo broken && exit 3" failed/.test(r.out) && /skip own\.yml\/later/.test(r.out),
-  "with --own the project's own jobs run too, a failing one failing the check, one whose condition does not hold skipped; without it, none", `${without.out}\n${r.out}`);
+ok(without.status === 0 && !/own\.yml/.test(without.out) && r.status === 1 && /ok {3}own\.yml\/fine/.test(r.out) && /FAIL own\.yml\/broken: its step "echo broken && exit 3" failed/.test(r.out) && /skip own\.yml\/later/.test(r.out) && /FAIL 1 job/.test(r.out),
+  "with --own the project's own jobs run too, one failing or not run here failing it, one whose condition does not hold skipped; without it, none", `${without.out}\n${r.out}`);
 ok(/host own\.yml\/deploy: it names an environment/.test(r.out) && !("own.yml/deploy" in verdicts) && verdicts["own.yml/secret"] === "passed",
   "a job of its own that names an environment, which deploys, is the host's own and not run, and its own jobs are given no secret", r.out);
 const inside = check(dir, "--own", "--verdicts", path.join(dir, "verdicts.json"));
@@ -109,19 +110,19 @@ let linked = true;
 try { fs.symlinkSync(path.join(dir, "linked.json"), dangling, "file"); } catch { linked = false; }
 const through = linked ? check(dir, "--verdicts", dangling) : null;
 ok(!linked || (through.status === 1 && mended(through.out) && /--verdicts .* is a link/.test(through.out) && !fs.existsSync(path.join(dir, "linked.json"))), "--verdicts that is a link to nothing in the project's repository is refused, saying its mend, and nothing is written there", through?.out);
-ok(verdicts["own.yml/fine"] === "passed" && verdicts["own.yml/broken"] === "failed" && !("own.yml/later" in verdicts) && verdicts["core.yml/core/core"] === "passed" && Object.values(verdicts).every(v => v === "passed" || v === "failed"),
+ok(verdicts["own.yml/fine"] === "passed" && verdicts["own.yml/broken"] === "failed" && !("own.yml/later" in verdicts) && verdicts["core.yml/core/core"] === "passed" && verdicts["own.yml/mac"] === "unrun" && Object.values(verdicts).every(v => /^(pass|fail)ed$|^unrun$/.test(v)),
   "and --verdicts writes each job's verdict that ran, the core's and the project's own, by its place", JSON.stringify(verdicts));
 git(dir, "reset", "-q", "--hard", "HEAD~1");
 
 // (programs named as those the checks start, committed at the change's root, never run in their place: on Windows a
 // program started by its bare name is looked for in its folder first, unless told not to, so the test's own git is
 // told so too, while check.mjs is given an environment that does not tell it; #513)
-if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
-const planted = process.platform === "win32" ? ["bash.exe", "git.exe"] : ["bash", "git"];
+if (win) process.env.NoDefaultCurrentDirectoryInExePath = "1";
+const planted = win ? ["bash.exe", "git.exe"] : ["bash", "git"];
 // (elsewhere each leaves a mark where it runs, so a run the check's outcome would not show is seen too)
 const ranMark = path.join(tmp, "planted-ran");
 for (const f of planted) {
-  if (process.platform === "win32") fs.copyFileSync(path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "whoami.exe"), path.join(dir, f));
+  if (win) fs.copyFileSync(path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "whoami.exe"), path.join(dir, f));
   else fs.writeFileSync(path.join(dir, f), `#!/bin/sh\necho "$0" >> '${ranMark}'\nexit 3\n`, { mode: 0o755 });
 }
 commit(dir, "programs named as the checks' own");
@@ -142,7 +143,7 @@ ok(!/owner's account\* \|/u.test(fs.readFileSync(path.join(dir, "core-manifest.m
 git(dir, "reset", "-q", "--hard", "HEAD~2");
 // (and bash is taken from the PATH as the system takes it: on POSIX, a file of that name the user may not run, in a
 // folder ahead on the PATH, is passed over for the one it may)
-if (process.platform !== "win32") {
+if (!win) {
   const ahead = path.join(tmp, "ahead");
   fs.mkdirSync(ahead, { recursive: true });
   fs.writeFileSync(path.join(ahead, "bash"), "#!/bin/sh\nexit 3\n", { mode: 0o644 });
@@ -245,9 +246,9 @@ git(dir, "reset", "-q", "--hard", "base");
 fs.rmSync(path.join(dir, ".github", "workflows", "core.yml"));
 fs.writeFileSync(path.join(dir, "core", "README.md"), "edited here\n");
 commit(dir, "the copy edited, and its check's call taken out");
-r = check(dir, "--base", "base");
-ok(r.status === 1 && r.out.includes("core/ differs from the core at its pin") && r.out.includes("so no other check runs") && !/ok {3}copies\.yml/.test(r.out) && mended(r.out),
-  "a change that takes out its call to core.yml is still checked by the base's call, and a copy that fails it runs no other check", r.out);
+r = check(dir, "--base", "base", "--verdicts", path.join(tmp, "s.json"));
+ok(r.status === 1 && r.out.includes("core/ differs from the core at its pin") && r.out.includes("so no other check runs") && !/ok {3}copies\.yml/.test(r.out) && mended(r.out) && /"stopped"/.test(fs.readFileSync(path.join(tmp, "s.json"))),
+  "a change that takes out its call to core.yml is still checked by the base's call, and a copy that fails it runs no other check, each said stopped", r.out);
 git(dir, "branch", "-q", "-f", "nocore");
 r = check(dir, "--base", "nocore");
 ok(r.status === 1 && r.out.includes("no call to the core's core.yml") && mended(r.out), "a base that calls no core.yml fails, saying its mend", r.out);
@@ -266,7 +267,8 @@ fs.writeFileSync(path.join(dir, "notes.md"), "A plain note.\n");
 commit(dir, "a plain note");
 const terms = { ...env, PERSONAL_TERMS: `${term}\n` };
 r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), "--base", "base", "--branch", `fix-${term.toLowerCase()}`], { cwd: dir, env: terms, encoding: "utf8" });
-ok(r.status === 1 && /FAIL personal-terms\.yml\/check\/check/.test(`${r.stdout}${r.stderr}`), "a listed term in the branch's own name fails the change", `${r.stdout}${r.stderr}`);
+r.out = `${r.stdout}${r.stderr}`;
+ok(r.status === 1 && /FAIL personal-terms\.yml\/check\/check/.test(r.out), "a listed term in the branch's own name fails the change", r.out);
 
 // a path filter reads each name as it is, one beyond ASCII too, and a workflow of the project's own in a form this
 // reader does not know, calling none of the core's, leaves every check run
@@ -281,7 +283,8 @@ fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
 fs.writeFileSync(path.join(dir, "docs", `${String.fromCodePoint(0xe9)}.md`), `Naming ${term}.\n`);
 commit(dir, "a doc whose name git quotes");
 r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), "--base", "filtered"], { cwd: dir, env: { ...env, PERSONAL_TERMS: `${term}\n` }, encoding: "utf8" });
-ok(r.status === 1 && /FAIL docs-terms\.yml\/terms\/check/.test(`${r.stdout}${r.stderr}`) && /note \.github\/workflows\/build\.yml is written in a form/.test(`${r.stdout}${r.stderr}`), "a call filtered by path runs where the change's file name lies beyond ASCII, and a workflow of the project's own this reader cannot read is passed over, said so", `${r.stdout}${r.stderr}`);
+r.out = `${r.stdout}${r.stderr}`;
+ok(r.status === 1 && /FAIL docs-terms\.yml\/terms\/check/.test(r.out) && /note \.github\/workflows\/build\.yml is written in a form/.test(r.out), "a call filtered by path runs where the change's file name lies beyond ASCII, and a workflow of the project's own this reader cannot read is passed over, said so", r.out);
 
 // a listed term in a workflow's own name is masked wherever it is printed, and a wildcard branch filter still runs
 git(dir, "reset", "-q", "--hard", "base");
@@ -300,7 +303,8 @@ ok(r.status === 1 && /FAIL \*\*\*-terms\.yml\/check\/check/.test(masked) && !mas
 git(dir, "reset", "-q", "--hard", "base");
 const away = { ...env, GIT_CONFIG_KEY_0: `url.${path.join(tmp, "nowhere").replace(/\\/g, "/")}.insteadOf`, GIT_CONFIG_KEY_1: `url.${path.join(tmp, "nowhere").replace(/\\/g, "/")}.insteadOf` };
 r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs")], { cwd: dir, env: away, encoding: "utf8" });
-ok(r.status === 1 && `${r.stdout}${r.stderr}`.includes("the core could not be fetched") && mended(`${r.stdout}${r.stderr}`) && !`${r.stderr}`.includes("    at "), "a core that cannot be reached fails with its mend, and no stack", `${r.stdout}${r.stderr}`);
+r.out = `${r.stdout}${r.stderr}`;
+ok(r.status === 1 && r.out.includes("the core could not be fetched") && mended(r.out) && !r.stderr.includes("    at "), "a core that cannot be reached fails with its mend, and no stack", r.out);
 
 // a check that keeps a baseline reads the base: the change is checked on its merge into the base, as GitHub checks it
 git(dir, "reset", "-q", "--hard", "base");
@@ -323,7 +327,7 @@ r = check(dir, "--base", "large", "--verdicts", baseline);
 const before = JSON.parse(fs.readFileSync(baseline, "utf8"));
 ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && before["copies.yml/copies/copies"] === "passed" && r.out.includes("note the head is its base, so the change is read as none against the base"), "a head that is its base passes the copies checks, read against the base itself, and says so", r.out);
 const read = trialRecord("0".repeat(40), "2026-11-24", [[before, before]]);
-ok(Object.keys(before).length > 0 && read.passedAfter === Object.keys(before).length && read.failedAfter === 0 && read.failedBoth === 0 && read.ranBeforeAlone === 0, "and the trial's record reads that run as its baseline, every job that ran passed and none the update's", JSON.stringify(read));
+ok(Object.keys(before).length > 0 && read.passedBoth === Object.keys(before).length && read.failedAfter === 0 && read.failedBoth === 0 && read.ranBeforeAlone === 0, "and the trial's record reads that run as its baseline, every job that ran passed and none the update's", JSON.stringify(read));
 git(dir, "reset", "-q", "--hard", "base");
 r = check(dir, "--base", "large");
 ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && r.out.includes("note the head is behind its base"), "a head behind its base passes the copies checks, read against the base, not the head, and says so", r.out);

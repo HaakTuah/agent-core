@@ -508,9 +508,9 @@ function upgrade(p, from, ownChanges, expect) {
   git(p.dir, "checkout", "-q", "main");
   for (const [event, said] of trial ? [["push", "a push to main"], ["pr", `a pull request of its own that ${ownChanges[0][0]}`]] : []) {
     const c = compared(baseline[event].verdicts, afterSync[event].verdicts);
-    ok(afterSync[event].verdicts["own-checks.yml/own"] === "passed" && Object.keys(afterSync[event].verdicts).some(j => j.startsWith("core.yml/")) && !c.failedAfter.length,
-      `${p.name}: on ${said}, check.mjs runs its own workflows with the core's, and no check that passed before the sync fails after it (${c.passedAfter.length} passed, ${c.failedBoth.length} failed both)`,
-      `${c.failedAfter.join("\n")}\n${JSON.stringify(afterSync[event].verdicts)}\n${afterSync[event].out.slice(-2500)}`);
+    ok(afterSync[event].verdicts["own-checks.yml/own"] === "passed" && Object.keys(afterSync[event].verdicts).some(j => j.startsWith("core.yml/")) && !c.failedAfter.length && !c.failedAfterAlone.length,
+      `${p.name}: on ${said}, check.mjs runs its own workflows with the core's, and no check that passed before the sync fails after it (${c.passedBoth.length} passed, ${c.failedBoth.length} failed both)`,
+      `${[...c.failedAfter, ...c.failedAfterAlone].join("\n")}\n${JSON.stringify(afterSync[event].verdicts)}\n${afterSync[event].out.slice(-2500)}`);
   }
   // (the workflow taken out again on main, so the steps read below find the project as before: sync step 610 would ask it
   // for the install step, which the case of #1079 leaves out on purpose)
@@ -521,7 +521,7 @@ function upgrade(p, from, ownChanges, expect) {
     // (and a new repository of its kind, as the kit at the commit under test writes it: every check passes)
     git(p.newDir, "commit", "-q", "-m", "the starter kit");
     const fresh = verdictsOf({ name: `${p.name}-new`, dir: p.newDir });
-    ok(Object.keys(fresh.verdicts).length > 0 && !compared({}, fresh.verdicts).failedAfter.length, `${p.name}: in a new repository of its kind, check.mjs runs every check, and each passes (${Object.keys(fresh.verdicts).length} jobs)`, `${JSON.stringify(fresh.verdicts)}\n${fresh.out.slice(-2500)}`);
+    ok(Object.keys(fresh.verdicts).length > 0 && !compared({}, fresh.verdicts).failedAfterAlone.length, `${p.name}: in a new repository of its kind, check.mjs runs every check, and each passes (${Object.keys(fresh.verdicts).length} jobs)`, `${JSON.stringify(fresh.verdicts)}\n${fresh.out.slice(-2500)}`);
   }
   if (process.platform !== "win32") { // (the run is GitHub's, on Linux; its script starts gh as a program, which a stand-in on Windows cannot be)
     const daily = checks(p, "schedule", main1);

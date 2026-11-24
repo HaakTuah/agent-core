@@ -1,7 +1,7 @@
 // Tests the steps' writers (steps.mjs --write, step-writers.mjs; #1091) on a project the starter kit of this commit
 // writes in a scratch folder, committed: each step a writer does whole, taken out, reads done after `--write`, the
-// project's rule files keeping their words; the step of the rules' move and that of the agent tools' files written as far
-// as they are exact, the rest left to their mends; a file with changes not yet committed, a writer that cannot run, a
+// project's rule files keeping their words, a baseline skipped by the size marks; the step of the rules' move and that of the agent tools' files written as far
+// as they are exact, the rest left to their mends; a file with changes not yet committed (but the pins a sync moved), a writer that cannot run, a
 // step the manifest declares undone on purpose, a file git ignores and a run outside the copy write nothing; `--aside` sets what it
 // wrote aside in a stash, which brings it back; and the key merge of the checks' configs (#1095, point 5). Node's own modules and git.
 //
@@ -12,7 +12,9 @@ import path from "node:path";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { declare, kitIn, ruleTexts, wordsKept } from "../scripts/steps-kit.mjs";
 import { ASIDE, MOVED_GLOB, MOVED_GLOBS, STEPS, notDone, report, setAside, writeReport } from "../scripts/steps.mjs";
-import { OLD_PATHS, Unwritten, oldPathsIn, writable } from "../scripts/step-writers.mjs";
+import { OLD_PATHS, Unwritten, held, oldPathsIn, writable } from "../scripts/step-writers.mjs";
+import { MANIFEST, pinsBack, pinsOf } from "../scripts/sync-pins.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 import { MERGED } from "../scripts/converge.mjs";
 
@@ -27,7 +29,12 @@ const missed = lead => notDone(dir).filter(m => m.lead === lead);
 const dirty = () => git("status", "--porcelain", "--untracked-files=all").trim();
 commit("the starter kit");
 const kit = git("rev-parse", "HEAD").trim(), rules = ruleTexts(dir);
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const back = () => { git("reset", "-q", "--hard", kit); git("clean", "-qfd"); };
+
+// (the reading of a rule file's words: two pull-ins that now lead to one file read as one, a pull-in dropped as words changed)
+ok(wordsKept({ "A.md": "@core/modules/work-flow.md\n@core/x.md\n@core/modules/git.md\n" }, { "A.md": "@core/roles/shared/work-flow.md\n@core/x.md\n" })
+  && !wordsKept({ "A.md": "@AGENTS.md\n@core/floor/security.md\n@core/roles/builder.md\n" }, { "A.md": "@AGENTS.md\n@core/roles/builder.md\n" }), "a rule file's words: two pull-ins the move makes one are kept, a pull-in dropped is not");
 
 // ---- a project with every step done: nothing written ----
 let r = write();
@@ -42,8 +49,10 @@ for (const l of WHOLE) {
   commit(`staged: ${l}`);
   const before = missed(l).length;
   r = write();
-  ok(before === 1 && r.status === 0 && !missed(l).length && r.stdout.includes(`- ${l}: wrote `) && r.stdout.includes("the step is done") && wordsKept(rules, ruleTexts(dir)),
-    `"${l}", taken out, is written by --write: it reads done after it, and no rule file's words changed`, `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
+  // (the shape check's baseline named under the size marks' "skip": #1247, point 2)
+  const skipped = l !== WHOLE[1] || JSON.parse(read("checks/sizes.json")).skip.includes("checks/shape-baseline.json");
+  ok(before === 1 && r.status === 0 && !missed(l).length && r.stdout.includes(`- ${l}: wrote `) && r.stdout.includes("the step is done") && wordsKept(rules, ruleTexts(dir)) && skipped,
+    `"${l}", taken out, is written by --write: it reads done after it, no rule file's words changed, and a baseline skipped by the size marks`, `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
   back();
 }
 
@@ -76,15 +85,21 @@ for (const l of WHOLE) {
     "the rules' move, where each path leads to one file: --write writes each as the kit does now, and the step reads done", `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
   back();
   // (the step's own stage: two old paths that lead to one file, a rule that left its file, and a "Paths:" line in no
-  // kit's words; only the copies config is written, and the step still asks the rest)
+  // kit's words; the rule file written as the step's mend writes it, each path on its own, even marked generated, but
+  // another file git's attributes mark so, and the step still asks the "Paths:" line: #1248, point 5)
   STAGES[l].stage(dir);
+  put(".gitattributes", "gen/** linguist-generated\nAGENTS.md linguist-generated\n");
+  fs.mkdirSync(path.join(dir, "gen"));
+  put("gen/out.md", "From `core/modules/git.md`.\n");
   commit("the paths the step's stage plants");
-  const staged = { agents: read("AGENTS.md"), manifest: read("core-manifest.md"), record: read("docs/records/2026-01-05.md") };
+  const staged = { manifest: read("core-manifest.md"), record: read("docs/records/2026-01-05.md"), gen: read("gen/out.md") };
   r = write();
-  const left = missed(l)[0]?.mend ?? "";
-  ok(r.stdout.includes(`- ${l}: wrote \`checks/copies.json\`; still to do: `) && read("AGENTS.md") === staged.agents && read("core-manifest.md") === staged.manifest && read("docs/records/2026-01-05.md") === staged.record
-    && left.includes("core/modules/git.md") && left.includes('"Paths:"') && !left.includes(MOVED_GLOB),
-    "the rules' move, where a path needs judgement: --write writes the copies config alone, leaves the rule files and a dated record as they stand, and the step asks the rest", `${r.stdout}${r.stderr}\n---\n${left}`);
+  const left = missed(l)[0]?.mend ?? "", wrote = read("AGENTS.md"), kept = [read("core-manifest.md"), read("gen/out.md")].join() === [staged.manifest, staged.gen].join();
+  const marks = JSON.parse(read("checks/sizes.json")).read;
+  STAGES[l].mend(dir);
+  ok(r.stdout.includes(`- ${l}: wrote \`AGENTS.md\`, \`checks/copies.json\`, \`checks/sizes.json\`; still to do: `) && marks["core/roles/shared/work-flow.md"] === 20480 && !Object.keys(marks).some(f => f.includes("modules/")) && read("AGENTS.md") === wrote && kept && read("docs/records/2026-01-05.md") === staged.record
+    && !left.includes("core/modules/") && left.includes('"Paths:"') && !left.includes(MOVED_GLOB),
+    "the rules' move: --write writes each path on its own as the mend does, two pull-ins of one file made one, the size marks merged, a dated record and a generated file left, and the step asks the rest", `${r.stdout}${r.stderr}\n---\n${left}\n---\n${wrote}`);
   back();
 }
 
@@ -223,6 +238,27 @@ for (const l of WHOLE) {
   fs.rmSync(path.join(dir, "core-manifest.md"));
   r = write();
   ok(r.status === 0 && !r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``) && !fs.existsSync(path.join(dir, "core-manifest.md")), "a manifest taken out and not yet committed is written by none, and --write fails nothing", `${r.stdout}${r.stderr}`);
+  back();
+}
+
+// (a workflow the sync changed in its calls' pins alone is let through to the writers, and its moved pin put back after
+// they are set aside (scripts/sync-pins.mjs); one changed beyond them is held: #1248, point 4)
+{
+  const wf = ".github/workflows/own.yml", calls = (sha, note) => `# ${note}\njobs:\n  core:\n    uses: ${CORE.toLowerCase()}/.github/workflows/core.yml@${sha}\n`;
+  fs.mkdirSync(path.join(dir, ".github/workflows"), { recursive: true });
+  put(wf, calls("a".repeat(40), "see core/x.md"));
+  commit("a call to the core");
+  put(wf, calls("c".repeat(40), "see core/x.md"));
+  const through = !held(dir).has(wf);
+  put(wf, calls("c".repeat(40), "see core/y.md"));
+  ok(through && held(dir).has(wf) && setAside(dir, [wf]) && read(wf) === calls("c".repeat(40), "see core/x.md") && dirty() === `M ${wf}`,
+    "a workflow whose calls' pins alone the sync moved is written, its write set aside and the moved pin put back; one changed beyond them is held", read(wf));
+  git("stash", "drop", "-q");
+  // (the manifest's first `Core:` line alone is its pin; a file whose count of pins changed is left and named)
+  put(MANIFEST, "Core: a\nCore: b\n");
+  const pins = pinsOf(dir, [MANIFEST, wf]);
+  put(wf, calls("d".repeat(40), "two").replace("jobs:", `# ${CORE}/.github/workflows/x.yml@${"e".repeat(40)}\njobs:`));
+  ok(same(pins[MANIFEST], ["Core: a"]) && same(pinsBack(dir, pins), [wf]) && read(wf).includes("d".repeat(40)), "the manifest's first `Core:` line is its pin, and a file whose pins changed in count is left and named", JSON.stringify(pins));
   back();
 }
 

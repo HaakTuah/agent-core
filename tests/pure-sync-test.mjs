@@ -444,8 +444,8 @@ git(p, "checkout", "-q", "-B", "unreleased", other);
 const toC = node(p, "core/scripts/sync.mjs", C);
 git(p, "add", "-A"); git(p, "commit", "-q", "-m", "to C");
 const unreleased = pure();
-ok(toC.status === 0 && read(p, "core-manifest.md") === manifest("someone-else", C) && unreleased.status === 1 && unreleased.out.includes(`${C} is no release of the core: the sync is reviewed like any PR`) && unreleased.out.includes(`node core/scripts/sync.mjs ${B}\` (release-2, the newest)`),
-  "a sync to a commit that is no release, in a project that follows the releases, is made, and is no pure sync: it is reviewed like any PR, or made again with the newest release's full SHA, which the refusal names", `${toC.out}\n${unreleased.out}`);
+ok(toC.status === 0 && read(p, "core-manifest.md") === manifest("someone-else", C) && unreleased.status === 1 && unreleased.out.includes(`${C} is no release of the core: the sync is reviewed like any PR`) && unreleased.out.includes(`node core/scripts/sync.mjs ${B}\` (release-2, the newest)`) && /not yet a release, and nothing/.test(unreleased.out),
+  "a sync to a commit no release, where the releases are followed, is no pure sync: it is reviewed, or made again at the newest release, and in a trial needs nothing", `${toC.out}\n${unreleased.out}`);
 // (and a manifest that does not say what it follows, two rows of it, is read as following nothing: no sync to a commit
 // that is no release is pure there either)
 git(p, "checkout", "-q", "-B", "unclear", other);
