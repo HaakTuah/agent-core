@@ -130,7 +130,12 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -z "$BASE" ]; then echo "Not a pull request, so no commit's address was read."; exit 0; fi
-          work="$RUNNER_TEMP/commit-addresses"; rm -rf "$work"; mkdir -p -m 700 "$work" || exit 1
+          # (its folders made under a mask that keeps them this run's alone where the system sets modes, as the step
+          # after makes its own; on Windows, where Git's mkdir refuses a mode and the mask sets none, they are only as
+          # private as the runner's temp folder, which holds the keyring below)
+          umask 077
+          work="$RUNNER_TEMP/commit-addresses"; rm -rf "$work"
+          mkdir -p "$work" || { echo "FAIL the folder this step works in, $work, could not be made, so no commit's address was read. Mend: run the check again; where it fails again, give the account the runner runs as the right to write in the runner's temp folder (RUNNER_TEMP) and run it once more."; exit 1; }
           # (the pull request's own commits, as the step after takes them: GitHub's merge of it into its base checked
           # out, whose first parent is the base's side and is left out, with that merge itself)
           side=$BASE head=HEAD; if git rev-parse -q --verify 'HEAD^2' > /dev/null; then side=HEAD^1 head=HEAD^2; fi
@@ -139,7 +144,7 @@ jobs:
           # only where its committer is GitHub and an OpenPGP signature on it is good by a key of that keyring, named
           # by its fingerprint; git's other signature formats, which may carry their own certificate, are read by no
           # program, so one written by hand to look so does not)
-          keys="$work/github-keys"; mkdir -p -m 700 "$keys"
+          keys="$work/github-keys"; mkdir -p "$keys"
           if ! curl -fsS --max-time 30 --retry 3 https://github.com/web-flow.gpg | GNUPGHOME="$keys" gpg -q --batch --import 2> /dev/null; then
             echo "::notice::GitHub's signing key could not be fetched, so no commit is taken for one GitHub made: re-run the check"
           fi
