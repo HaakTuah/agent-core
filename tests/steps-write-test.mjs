@@ -79,16 +79,21 @@ for (const l of WHOLE) {
     "the rules' move, where each path leads to one file: --write writes each as the kit does now, and the step reads done", `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
   back();
   // (the step's own stage: two old paths that lead to one file, a rule that left its file, and a "Paths:" line in no
-  // kit's words; only the copies config is written, and the step still asks the rest)
+  // kit's words; the rule file written as the step's mend writes it, each path on its own, but a file git's attributes
+  // mark as generated, and the step still asks the "Paths:" line: #1248, point 5)
   STAGES[l].stage(dir);
+  put(".gitattributes", "gen/** linguist-generated\n");
+  fs.mkdirSync(path.join(dir, "gen"));
+  put("gen/out.md", "From `core/modules/git.md`.\n");
   commit("the paths the step's stage plants");
-  const staged = { agents: read("AGENTS.md"), manifest: read("core-manifest.md"), record: read("docs/records/2026-01-05.md") };
+  const staged = { manifest: read("core-manifest.md"), record: read("docs/records/2026-01-05.md"), gen: read("gen/out.md") };
   r = write();
-  const left = missed(l)[0]?.mend ?? "";
+  const left = missed(l)[0]?.mend ?? "", wrote = read("AGENTS.md"), kept = [read("core-manifest.md"), read("gen/out.md")].join() === [staged.manifest, staged.gen].join();
   const marks = JSON.parse(read("checks/sizes.json")).read;
-  ok(r.stdout.includes(`- ${l}: wrote \`checks/copies.json\`, \`checks/sizes.json\`; still to do: `) && marks["core/roles/shared/work-flow.md"] === 20480 && !Object.keys(marks).some(f => f.includes("modules/")) && read("AGENTS.md") === staged.agents && read("core-manifest.md") === staged.manifest && read("docs/records/2026-01-05.md") === staged.record
-    && left.includes("core/modules/git.md") && left.includes('"Paths:"') && !left.includes(MOVED_GLOB),
-    "the rules' move, where a path needs judgement: --write writes the copies config and the size marks, two old paths merged, leaves the rule files and a dated record as they stand, and the step asks the rest", `${r.stdout}${r.stderr}\n---\n${left}`);
+  STAGES[l].mend(dir);
+  ok(r.stdout.includes(`- ${l}: wrote \`AGENTS.md\`, \`checks/copies.json\`, \`checks/sizes.json\`; still to do: `) && marks["core/roles/shared/work-flow.md"] === 20480 && !Object.keys(marks).some(f => f.includes("modules/")) && read("AGENTS.md") === wrote && kept && read("docs/records/2026-01-05.md") === staged.record
+    && !left.includes("core/modules/") && left.includes('"Paths:"') && !left.includes(MOVED_GLOB),
+    "the rules' move: --write writes each path on its own as the mend does, two pull-ins of one file made one, the size marks merged, a dated record and a generated file left, and the step asks the rest", `${r.stdout}${r.stderr}\n---\n${left}\n---\n${wrote}`);
   back();
 }
 

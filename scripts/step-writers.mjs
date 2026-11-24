@@ -207,9 +207,9 @@ export function writeBreaks(p, busy) {
 // step reads, as the step's check finds it there, written as the file it now is; a copies config that reads the old
 // folder alone given the new folders' patterns beside it; the size marks' "read" (marksMoved); and the manifest's
 // "Paths:" line, where it is word for word the one the starter kit of releases 1 to 5 wrote, written as the kit writes
-// it now. Where a move is no exact one (the old path leads to a folder, a rule of its file stands elsewhere since, or
-// the file would name one file twice), that file is left as it stands, and so is a "Paths:" line of the project's own
-// words, for the step's mend.
+// it now. Each path is written on its own (#1248, point 5): one whose move is no exact one (it leads to a folder, or a
+// rule of its file stands elsewhere since and the line does not name that rule by its lead) is left as it stands for
+// the step's mend, and so is a "Paths:" line of the project's own words.
 export const OLD_PATHS = "Paths: in the core's files, one into floor/, modules/, scripts/, setup/ or archive/ is under core/; any other is ours.";
 const quoted = f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 // The old paths of `map` as a pattern: `core/<old>` alone, never inside a longer name (`hardcore/`, `<old>.bak`).
@@ -231,13 +231,17 @@ export function writeMoved(p, busy) {
   return writes.map(([f]) => f);
 }
 
-// A file's text with each old path it names written as the file it now is, or as it stands where a move is no exact one.
+// A file's text with each old path it names written as the file it now is, where its move is an exact one; a rule that
+// left its file named with its lead, `core/<old>`, "<lead>", as the step words it, named where it stands now; and two
+// lines this writes into one pull-in of the same file (an import, Kiro's `#[[file:`) made one line.
 function movedIn(text, map, oldPath) {
-  const apart = moved.apart();
-  const named = oldPath ? [...new Set([...text.matchAll(oldPath)].map(m => m[1]))] : [];
-  const twice = named.some(a => named.some(b => a !== b && map[a] === map[b]) || text.includes(`core/${map[a]}`));
-  const exact = old => !map[old].endsWith("/") && !(apart[old]?.length);
-  return !named.length || twice || !named.every(exact) ? text : text.replace(oldPath, (all, old) => `core/${map[old]}`);
+  if (!oldPath) return text;
+  const apart = moved.apart(), exact = old => !map[old].endsWith("/") && !(apart[old]?.length);
+  const led = Object.entries(apart).reduce((t, [old, parts]) => parts.reduce((u, a) => u.split(`\`core/${old}\`, "${a.lead}"`).join(`\`core/${a.to}\`, "${a.lead}"`), t), text);
+  const next = led.replace(oldPath, (all, old) => exact(old) ? `core/${map[old]}` : all);
+  if (next === text) return text;
+  const was = text.split("\n"), now = next.split("\n");
+  return now.filter((l, i) => !(i && l === now[i - 1] && (l !== was[i] || now[i - 1] !== was[i - 1]) && /^\s*(?:@|#\[\[file:)/u.test(l))).join("\n");
 }
 
 // The size marks' text with each file under "read" at an old path that leads to one file named as that file, two that
