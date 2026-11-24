@@ -237,9 +237,10 @@ for (const l of WHOLE) {
 {
   const json = f => JSON.parse(read(f)), copies = json("checks/copies.json"), shape = json("checks/shape.json"), lic = json("checks/licences.json");
   delete copies.proseFromSecurity;
-  copies.code = ["src/own.js"];
+  delete copies.code;
+  copies.prose = ["docs/*.md"];
   delete shape.tests;
-  shape.systems = { rules: { paths: ["src/"] } };
+  delete shape.systems;
   delete lic.scan.skip;
   lic.scan.served = ["site/"];
   put("checks/copies.json", `${JSON.stringify(copies, null, 4)}\n`);
@@ -249,19 +250,19 @@ for (const l of WHOLE) {
   r = write();
   const [c, s, l] = ["checks/copies.json", "checks/shape.json", "checks/licences.json"].map(json);
   ok(r.status === 0 && r.stdout.includes(`- ${MERGED}: wrote `) && ["copies", "shape", "licences"].every(n => r.stdout.includes(`checks/${n}.json`))
-    && c.proseFromSecurity === true && c.code.join() === "src/own.js" && read("checks/copies.json").startsWith('{\n    "')
-    && Array.isArray(s.tests) && s.tests.length > 0 && s.systems.rules.paths.join() === "src/"
-    && Array.isArray(l.scan.skip) && l.scan.served.join() === "site/",
-  "--write adds the kit's keys a config lacks, at any depth, keeping the project's values and indent", `${r.stdout}${r.stderr}`);
+    && Array.isArray(c.code) && !c.code.length && c.prose.join() === "docs/*.md" && read("checks/copies.json").startsWith('{\n    "')
+    && s.systems && !Object.keys(s.systems).length && Array.isArray(l.scan.skip) && !l.scan.skip.length && l.scan.served.join() === "site/",
+  "--write adds the kit's keys a config lacks whose value reads nothing, at any depth, keeping the project's values and indent", `${r.stdout}${r.stderr}`);
+  ok(!("proseFromSecurity" in c) && !("tests" in s), "a key whose value would have a check read more (the security file's prose, the tests' paths) is not added", JSON.stringify([c, s]));
   r = write();
   ok(r.status === 0 && !r.stdout.includes(MERGED), "run again, it writes nothing more", r.stdout);
   back();
-  put("checks/copies.json", `${JSON.stringify({ ...json("checks/copies.json"), proseFromSecurity: undefined, code: ["src/own.js"] }, null, 2)}\n`);
+  put("checks/copies.json", `${JSON.stringify({ ...json("checks/copies.json"), code: undefined }, null, 2)}\n`);
   put("checks/shape.json", "[]\n");
   commit("a config that lacks a key, and one that is no JSON object");
   put("checks/copies.json", `${read("checks/copies.json")} `);
   r = write();
-  ok(r.status === 0 && r.stdout.includes("checks/copies.json` has changes not yet committed") && r.stdout.includes("`checks/shape.json` is no JSON object") && read("checks/shape.json") === "[]\n" && !("proseFromSecurity" in json("checks/copies.json")),
+  ok(r.status === 0 && r.stdout.includes("checks/copies.json` has changes not yet committed") && r.stdout.includes("`checks/shape.json` is no JSON object") && read("checks/shape.json") === "[]\n" && !("code" in json("checks/copies.json")),
     "a config with changes not committed, or no JSON object, is left, and the report says why", r.stdout);
   back();
 }

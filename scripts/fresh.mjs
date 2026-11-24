@@ -32,10 +32,9 @@ import { KIT as SHAPE, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 import { KIT_CONFIGS, packagesFolder } from "./check-configs.mjs";
-import { Unread, copyAt, folded } from "./workflow-calls.mjs";
+import { Unread, callers, copyAt, folded } from "./workflow-calls.mjs";
 import { atCopy } from "./step-checks.mjs";
 import { privateOf } from "./host-private.mjs";
-import { CORE } from "./core-address.mjs";
 import { OWN as OWN_HOLDERS } from "./holders-own.mjs";
 import { call as callOf, configs, plain, project } from "./steps.mjs";
 
@@ -45,13 +44,12 @@ const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const call = (p, name) => { try { return callOf(p, name); } catch { return null; } };
 // What the project's first call to the core's workflow `name` passes as its input `key`: undefined where it calls none
 // or its workflows cannot be read, null where the call passes none.
-const calledWith = (p, name, key) => { try { const c = call(p, name); return c ? c.with?.[key] ?? null : undefined; } catch { return undefined; } };
+const calledWith = (p, name, key) => { const c = call(p, name); return c ? c.with?.[key] ?? null : undefined; };
 // The build a game's previews run after: the one name of the workflow_run of the file that calls the core's
 // preview.yml, in the form the kit writes it (init.mjs, BUILD); undefined where none calls it or the name is another.
 function previewBuild(p) {
-  if (calledWith(p, "preview.yml", "none") === undefined) return undefined;
-  const calling = Object.values(p.workflows).find(({ yaml }) => Object.values(yaml?.jobs ?? {}).some(j => typeof j?.uses === "string" && j.uses.toLowerCase().startsWith(`${CORE}/.github/workflows/preview.yml@`.toLowerCase())));
-  const after = calling?.yaml?.on?.workflow_run?.workflows;
+  let first; try { [first] = callers(p, "preview.yml"); } catch { return undefined; }
+  const after = first && p.workflows[first.slice(".github/workflows/".length)]?.yaml?.on?.workflow_run?.workflows;
   const one = Array.isArray(after) && after.length === 1 ? after[0] : after;
   return typeof one === "string" && BUILD.test(one) ? one : undefined;
 }

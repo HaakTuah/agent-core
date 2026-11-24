@@ -5,6 +5,7 @@
 // actionlint and lychee. Node's own modules and git.
 //
 //   node tests/steps-fetched-test.mjs
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { STEPS, fetched, notDone } from "../scripts/steps.mjs";
@@ -60,6 +61,17 @@ if (process.platform !== "win32") {
   ok(unreadable?.unread && unreadable.mend.includes("could not read the project") && unreadable.mend.includes("own.yml"),
     "a workflow the core's reader cannot read is reported as not read, as by every step that reads the workflows", unreadable?.mend);
   fs.rmSync(flow);
+  const gone = ran({ ZIZMOR: path.join(bin, "none"), ACTIONLINT }, WORKFLOWS);
+  ok(gone?.unread && gone.mend.includes("zizmor could not start"), "where a tool named cannot start, the step is reported as not read, never done or not done", gone?.mend);
+  // (an action that is a link out of the project is given to neither tool, as the project's reader leaves it: floor topic 5)
+  const far = path.join(scratchDir("steps-fetched-far-"), "action.yml"), action = path.join(d, "x/action.yml");
+  fs.writeFileSync(far, "runs:\n  using: composite\n  steps: []\n# FINDME\n");
+  fs.mkdirSync(path.dirname(action));
+  fs.symlinkSync(far, action);
+  execFileSync("git", ["add", "x/action.yml"], { cwd: d });
+  ok(!ran(env, WORKFLOWS), "an action that is a link out of the project is not read, nor given to the tools");
+  execFileSync("git", ["rm", "-q", "--cached", "x/action.yml"], { cwd: d });
+  fs.rmSync(path.dirname(action), { recursive: true });
 
   const agents = path.join(d, "AGENTS.md"), text = fs.readFileSync(agents, "utf8");
   fs.writeFileSync(agents, `${text}\nSee [the notes](docs/gone.md).\n`);

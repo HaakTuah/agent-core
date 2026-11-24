@@ -239,8 +239,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   setting is changed, a difference it keeps on purpose lost, a check that nothing else runs taken out, or what only the
   owner can do done; nor that the manifest,
   `SECURITY.md`, the threat model, the progress file, the choice records or a check's config is written where it
-  stands, nor after the first copy where it does not: each is then a step's to ask, with what it needs beside it, save the keys of the kit's a check's config lacks, which
-  it adds with every value of the project's kept (#1095, point 5). Reason: a release asked 63 things of each project, 19 of them workflow changes each with two security
+  stands, nor after the first copy where it does not: each is then a step's to ask, with what it needs beside it, save the keys of the kit's a check's config lacks whose value
+  reads nothing (an empty list or mapping, false), which the steps' writers add after the sync with every value of the
+  project's kept (#1095, point 5). Reason: a release asked 63 things of each project, 19 of them workflow changes each with two security
   reviews, built by hand from the notes, and a project of another owner held 25 differences from what the kit writes
   for a new one. Held by `tests/converge-test.mjs` and `tests/pure-sync-test.mjs` (a render that differs, a word outside
   the core's part changed, a value out of its form, a deletion the one job does not cover, each refused), by `tests/upgrade-test.mjs`, which takes
@@ -315,7 +316,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   which the owner answers once while nothing waits. An entry whose step asks nothing of what stands (`asks: "nothing"`)
   stays in the notes and leaves the report a sync prints. Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
   owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps beyond what the core writes (it stays pure), nor
-  that a step not done fails or stops anything, nor that a step that needs judgement is written by a script, nor that a module the line "Not taken:" names is
+  that a step not done fails or stops anything, nor that a step is told done that no check reads, nor that a step that needs judgement is written by a script, nor that a module the line "Not taken:" names is
   taken without the owner's word. Reason: a
   step written only in prose is where one is missed, and nothing showed that it was; modules placed by hand took a
   judgement a fact settles, and entries that ask nothing hid those that ask. Held by

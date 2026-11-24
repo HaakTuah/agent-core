@@ -59,11 +59,11 @@ const fail = msg => { throw new Failure(msg); };
 
 // A game's build workflow, by the name its preview.yml runs after (#1095, point 6): written into that file in double
 // quotes, so its form keeps it one YAML string that no expression or quote can leave.
-export const BUILD_FORM = "the name of its build workflow: at most 100 letters, digits and blanks, with . _ ( ) - where it needs them, beginning with a letter or digit";
+const BUILD_FORM = "the name of its build workflow: at most 100 letters, digits and blanks, with . _ ( ) - where it needs them, beginning with a letter or digit";
 export const BUILD = /^[A-Za-z0-9][A-Za-z0-9 ._()-]{0,99}$/;
 // The versions check's config, where the kit writes it and its versions.yml names it.
 export const VERSIONS = "checks/versions.json";
-export const VERSIONS_START = { about: "The versions this project pins that Dependabot cannot see, read by the core's scripts/versions.mjs from where each is written (its header gives an entry's form); the monthly versions.yml opens an enhancement issue for each one behind.", entries: [] };
+const VERSIONS_START = { about: "The versions this project pins that Dependabot cannot see, read by the core's scripts/versions.mjs from where each is written (its header gives an entry's form); the monthly versions.yml opens an enhancement issue for each one behind.", entries: [] };
 
 // Each template and the file it becomes, with when it is written (left out: always). One line a file, so the kit is
 // read here whole: setup/starter-kit.md says only how a template is written.
