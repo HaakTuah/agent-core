@@ -30,6 +30,12 @@ export const plainEnv = () => Object.fromEntries(Object.entries(process.env).fil
 // that makes such a repository (fetchCore, sync.mjs, pure-sync.mjs, release.mjs) reaches it through this alone.
 export const inBare = (dir, args, options = {}) =>
   execFileSync("git", [`--git-dir=${dir}`, ...args], { cwd: dir, env: plainEnv(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], ...options });
+// An archive git wrote (`input`), unpacked into the folder `dir`, which the caller has just made and which holds nothing yet, never a project's checkout. Tar is run in that folder and
+// never given its path: GNU tar, as Git for Windows carries it, unquotes a backslash's escape in the path -C names
+// (`kits\now`, a line's end), and Windows' own tar, which the PATH may find first, knows no --force-local (#1212).
+// ("-f -": Windows' own reads a tape drive unless told to read its input.) Every script that unpacks an archive of the
+// core's does it through this alone.
+export const untar = (dir, input) => execFileSync("tar", ["-x", "-f", "-"], { cwd: dir, input });
 const git = (args, dir) => inBare(dir, args).trim();
 const holds = (args, dir) => { try { git(args, dir); return true; } catch { return false; } };
 
