@@ -373,13 +373,21 @@ function coreFile(tmp, sha, file, list = false) {
 }
 
 // The commit a pull request's checks run on, as GitHub makes it: the head merged into its base, the base its first
-// parent and the head its second, so a check that reads its base from HEAD^1 finds it.
+// parent and the head its second, so a check that reads its base from HEAD^1 finds it. A head that is its base, or
+// behind it (the release trial's run before the update; #1231), merges nothing, and git makes no commit: it is written
+// as the merge of a change of nothing on the base, so HEAD^1 is the base and HEAD^2, by which some checks tell a pull
+// request from a push, is there.
 function merged(p, tmp, bare) {
   const ws = path.join(tmp, "merge");
+  const who = ["-c", "user.name=core-check", "-c", "user.email=core-check@example.invalid"];
   git(tmp, "clone", "-q", "--no-checkout", pathToFileURL(bare).href, ws);
   git(ws, "checkout", "-q", "--detach", p.base);
-  try { git(ws, "-c", "user.name=core-check", "-c", "user.email=core-check@example.invalid", "merge", "-q", "--no-ff", "--no-edit", p.head); } catch { fail("the change does not merge into its base without a conflict.", "bring the branch up to date with its base, resolve the conflict, commit, and run this check again."); }
-  const sha = git(ws, "rev-parse", "HEAD");
+  let behind = true;
+  try { git(ws, "merge-base", "--is-ancestor", p.head, p.base); } catch { behind = false; }
+  if (behind) say(`note the head ${p.head === p.base ? "is its base" : "is behind its base"}, so the change is read as none against the base`);
+  else try { git(ws, ...who, "merge", "-q", "--no-ff", "--no-edit", p.head); } catch { fail("the change does not merge into its base without a conflict.", "bring the branch up to date with its base, resolve the conflict, commit, and run this check again."); }
+  const nothing = () => git(ws, ...who, "commit-tree", `${p.base}^{tree}`, "-p", p.base, "-m", "A change of nothing");
+  const sha = behind ? git(ws, ...who, "commit-tree", `${p.base}^{tree}`, "-p", p.base, "-p", nothing(), "-m", "A change of nothing merged into its base") : git(ws, "rev-parse", "HEAD");
   git(ws, "push", "-q", "origin", `${sha}:refs/heads/core-check-merge`); // (a branch, so each job's clone holds it)
   return sha;
 }
