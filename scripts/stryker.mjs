@@ -20,7 +20,9 @@
 //
 //   node core/scripts/stryker.mjs --tool <folder> --report <file> [--budget <seconds>] [<file>[:<first>-<last>],...]
 //       the faults on those lines, or with no file named every file of the config's "code" that is no test; the
-//       config is the one the shape check reads (shape.mjs, where()). The budget, where none is given, is
+//       config is the one the shape check reads (shape.mjs, where()). A file of a language the core's list does not
+//       give Stryker (mutation-tools.json, beside this file) is left out, and the run says so, since a project in
+//       more than one is measured in its main language alone (#1247, point 5). The budget, where none is given, is
 //       MUTATE_BUDGET's, else none.
 // Reads the project; writes the report, and its working copy, which it takes away. git, Node's own modules and
 // Stryker.
@@ -166,20 +168,40 @@ function setUp(scratch, { wanted, named, texts, testTexts, report }) {
   return { configAt, asIs };
 }
 
+// The report of a run that measured nothing, in the open form strength.mjs reads.
+const EMPTY = `${JSON.stringify({ schemaVersion: "1", thresholds: { high: 80, low: 60 }, files: {} })}\n`;
 // What the run says once it ends: the tests left out, and the counts.
 function said(report, { asIs, ended, files }) {
-  if (!fs.existsSync(report)) fs.writeFileSync(report, `${JSON.stringify({ schemaVersion: "1", thresholds: { high: 80, low: 60 }, files: {} })}\n`);
+  if (!fs.existsSync(report)) fs.writeFileSync(report, EMPTY);
   const c = counted(JSON.parse(fs.readFileSync(report, "utf8"))), all = Object.values(c).reduce((a, b) => a + b, 0), left = leftOut(asIs);
   if (left.length) console.log(`left out, failing or past ${LONGEST} s as they stand: ${left.join(", ")}`);
   if (!ended && !all) console.log("the budget ran out before Stryker had planned its faults: nothing was measured");
   console.log(`stryker: ${all} faults in ${files} files: ${(c.Killed ?? 0) + (c.Timeout ?? 0)} caught, ${(c.Survived ?? 0) + (c.NoCoverage ?? 0)} survived, ${c.Pending ?? 0} not run${ended ? "" : " (the budget)"}; the report is written`);
 }
 
+// Of the files named (`named`, as the command line gives them) and of the code (`code`), those Stryker measures, of the
+// endings the core's list gives it, and `left` the others: { named, code, left }. Where files were named and none is
+// Stryker's, `named` is null: there is nothing to measure.
+const ENDINGS = JSON.parse(fs.readFileSync(path.join(HERE, "mutation-tools.json"), "utf8")).languages.filter(l => l.tool === "Stryker").flatMap(l => l.endings);
+export function strykers(named, code, endings = ENDINGS) {
+  const fileOf = part => /^(.+?)(?::\d+-\d+)?$/u.exec(part)[1], ours = f => endings.includes(path.posix.extname(f));
+  const parts = named.flatMap(a => a.split(",")).filter(Boolean), mine = parts.filter(p => ours(fileOf(p)));
+  const left = [...new Set((parts.length ? parts.map(fileOf) : code).filter(f => !ours(f)))];
+  return { named: parts.length && !mine.length ? null : mine, code: code.filter(ours), left };
+}
+
 async function main(argv) {
   const t = argv.indexOf("--tests");
   if (t >= 0) return dispatch(JSON.parse(fs.readFileSync(argv[t + 1], "utf8")), process.env[ACTIVE]);
-  const { out, bin, budget, named } = askedOf(argv), until = Date.now() + budget * 1000;
-  const { code, texts, testTexts } = projectOf(), wanted = wantedOf(named, code);
+  const { out, bin, budget, named: asked } = askedOf(argv), until = Date.now() + budget * 1000;
+  const project = projectOf(), { named, code, left } = strykers(asked, project.code), { texts, testTexts } = project;
+  if (left.length) console.log(`left out, of languages the core's list does not give Stryker: ${left.join(", ")}`);
+  if (named === null || !code.length) {
+    fs.writeFileSync(out, EMPTY);
+    console.log("stryker: no file of a language Stryker measures, so nothing was measured; the report is written");
+    return 0;
+  }
+  const wanted = wantedOf(named, code);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "stryker-")), copies = [];
   const stop = () => { stopStryker(); stopTests(path.join(scratch, "groups")); stopAll(); takeAway(copies, scratch); process.exit(130); };
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, stop);
