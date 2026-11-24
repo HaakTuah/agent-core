@@ -14,11 +14,12 @@ import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 const { ok, done } = tally();
 const tmp = scratchDir("host-private-");
 const repo = "someone-else/a-hosted-clone", hosted = path.join(tmp, "clone");
-// (a clone as git reads it: its HEAD, its folders and its origin, which is all that is asked of it)
+// (a clone as git reads it: its HEAD, its folders and its origin, which is all that is asked of it; a backslash in a
+// config value is an escape, so a Windows path is written with each doubled, as git writes it)
 const clone = (at, origin) => {
   for (const d of ["objects", "refs/heads"]) fs.mkdirSync(path.join(at, ".git", d), { recursive: true });
   fs.writeFileSync(path.join(at, ".git", "HEAD"), "ref: refs/heads/main\n");
-  fs.writeFileSync(path.join(at, ".git", "config"), `[core]\n\trepositoryformatversion = 0\n\tbare = false\n[remote "origin"]\n\turl = ${origin}\n`);
+  fs.writeFileSync(path.join(at, ".git", "config"), `[core]\n\trepositoryformatversion = 0\n\tbare = false\n[remote "origin"]\n\turl = ${origin.replaceAll("\\", "\\\\")}\n`);
 };
 clone(hosted, `https://github.com/${repo}.git`);
 
