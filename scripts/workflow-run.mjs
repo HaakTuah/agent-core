@@ -176,14 +176,14 @@ const outputsOf = file => {
 
 /**
  * Runs each job of a called workflow (its text) as GitHub would for one event, each after the jobs it needs, and gives
- * each job's result: { job, ran, passed, steps: [{ name, ran, passed, out }], declared: its own outputs }. `inputs` and `secrets` are what the call passes (defaults
+ * each job's result: { job, ran, passed, steps: [{ name, ran, passed, out, missing }], declared: its own outputs, unrun }. `inputs` and `secrets` are what the call passes (defaults
  * filled in here); `github` the github context; `base` the environment every step starts from; `workspace(job)` a
  * fresh folder for a job's runner; `uses` maps an action (its name before @) to a handler (step `with`, filled in;
  * the job's folder; the job's env) that does its part, or returns false where it stands for a step not run here.
  * With `dry`, it only says which jobs would start: each one that starts is a job the repository's owner pays for.
  * With `until`, a job stops after the step of that id (each job's `outputs` hold its steps' outputs). With `stop`, a
  * step that fails where `stop(its name)` holds cancels the rest of its job, as a run cancelled there: a step that runs
- * where `!cancelled()` runs no more. Each job's own
+ * where `!cancelled()` runs no more. With `machine`, a job on another system is unrun. Each job's own
  * temporary folder is made under `temp` and removed when the job ends.
  */
 // Whether a trigger's `paths:` filter lets a change through, as GitHub's cheat sheet reads one: `*` (no slash), `**`
@@ -284,14 +284,13 @@ function callInputs(wf, inputs, secrets) {
 // runs the core's install.mjs puts the packages into the workspace, so it runs once for each text, env and set of lock
 // files; every later job takes its result and a hard-linked copy of what the first one installed (each node_modules/ and
 // pypi/ below the core's .packages/), as the first run left it.
-export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir(), once = null, installed = null }) {
+export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir(), once = null, installed = null, machine = null }) {
   const wf = parseYaml(text);
-  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp, once, installed };
+  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp, once, installed, machine };
   const given = callInputs(wf, inputs, secrets);
   const results = [], done = {};
   for (const [id, job] of inNeedsOrder(wf.jobs ?? {})) {
-    // (the needs context, each job it needs with its result and outputs; a job whose condition asks no status of its own
-    // is skipped where one of them did not succeed, as GitHub skips it: #1245, point 3)
+    // (the needs context; a job whose condition asks no status is skipped where a need did not succeed: #1245, point 3)
     const needs = Object.fromEntries(needsOf(job).map(n => [n, done[n]]));
     const top = { github, inputs: given, secrets, vars: {}, needs };
     if (!holds(job.if, top, { failed: Object.values(needs).some(n => n.result !== "success") })) { results.push({ job: id, ran: false, passed: true, steps: [], outputs: {} }); done[id] = { result: "skipped", outputs: {} }; continue; }
@@ -330,10 +329,19 @@ function runMatrixJob(rt, job, id, top, matrix, results) {
   results.push(result);
   try {
     if (rt.dry) return;
+    const away = rt.machine && elsewhere(fill(job["runs-on"], ctx, state), rt.machine);
+    if (away) { Object.assign(result, { ran: false, unrun: `it runs on ${away}, which this machine is not` }); return; }
     runJob({ rt, job, id, ctx, state, result, tmp });
     // (the job's own outputs, as its `outputs:` fills them in from its steps, for the jobs that need it)
     result.declared = fillValues(job.outputs, ctx, state);
   } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+}
+
+// The system a job's `runs-on` names where it is not `platform` (process.platform's), or null (#1245, point 8).
+function elsewhere(on, platform) {
+  const labels = [on?.labels ?? on].flat().map(str).join(" ");
+  const os = [["Windows", /windows/iu, "win32"], ["macOS", /mac/iu, "darwin"], ["Linux", /ubuntu|linux/iu, "linux"]].find(([, re]) => re.test(labels));
+  return os?.[2] !== platform ? os?.[0] ?? null : null;
 }
 
 // A map's values, each with its `${{ }}` filled in as text.
@@ -456,7 +464,9 @@ function runScript(jr, step, name, env) {
   if (kept) rt.once.store.set(kept, { passed, out, outputs, env: readIf(path.join(tmp, "env")) });
   keepInstall(rt, install, { passed, out, outputs, env: readIf(path.join(tmp, "env")) });
   carryEnv(path.join(tmp, "env"), ctx.env, id);
-  result.steps.push({ name, ran: true, passed, out });
+  // (a program this machine lacks, as bash says it: #1245, point 9)
+  const missing = r.status === 127 ? /: ([^\s:]+): (?:command )?not found/u.exec(out)?.[1] : undefined;
+  result.steps.push({ name, ran: true, passed, out, ...missing && { missing } });
   outcome(ctx, step, passed, outputs);
   if (!passed) failed(state, result, rt.stop, name);
 }

@@ -9,27 +9,26 @@
 //   node tests/trial-test.mjs
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { RUN_FROM } from "../scripts/check.mjs";
 import { sameNode, standIns } from "../scripts/check-actions.mjs";
-import { movesForward, syncCalls } from "../scripts/check-calls.mjs";
-import { compared, RUNS, trialAt, trialRecord } from "../scripts/release-trial.mjs";
+import { movesForward, syncCalls, triggered } from "../scripts/check-calls.mjs";
+import { COUNTS, compared, RUNS, trialAt, trialRecord } from "../scripts/release-trial.mjs";
 import { sideOf } from "../scripts/attached.mjs";
 import { notInstalled } from "../scripts/packages.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { runWorkflow, withAbsolutePath } from "../scripts/workflow-run.mjs";
-import { tally } from "../scripts/scratch-core.mjs";
+import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trial-test-"));
+const tmp = scratchDir("trial-test-");
 const env = { ...withAbsolutePath(process.env), GIT_AUTHOR_NAME: "Tester", GIT_AUTHOR_EMAIL: "tester@example.invalid", GIT_COMMITTER_NAME: "Tester", GIT_COMMITTER_EMAIL: "tester@example.invalid", GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: path.join(tmp, "gitconfig") };
 fs.writeFileSync(env.GIT_CONFIG_GLOBAL, "[init]\n\tdefaultBranch = main\n[commit]\n\tgpgsign = false\n");
 const git = (cwd, ...args) => execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const commit = (dir, file, text) => { fs.writeFileSync(path.join(dir, file), text); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", file); return git(dir, "rev-parse", "HEAD"); };
 const SHA = n => String(n).repeat(40);
 
-try {
+{
   // (point 3: the jobs in their needs order, each with the results and outputs of those it needs, as GitHub gives them)
   const ws = fs.mkdtempSync(path.join(tmp, "ws-"));
   const run = text => runWorkflow(text, { github: { event_name: "pull_request" }, base: env, temp: tmp, workspace: () => ws, uses: {} });
@@ -111,11 +110,45 @@ jobs:
   const merged = syncCalls(base, head, calls);
   ok(merged.length === 3 && merged[0].wf.jobs.core.uses === "new" && Object.keys(merged[1].wf.jobs).join() === "gone" && merged[2].file === "left.yml", "  its own calls run, and each call of the base's it leaves out runs as the base holds it", JSON.stringify(merged));
 
+  // (point 8: a push that names tags alone starts on no push to main, and a job on another system is left unrun, said so;
+  // point 9: a step that wants a program this machine lacks says which)
+  ok(!triggered({ push: { tags: ["v*"] } }, { event: "push" }) && triggered({ push: { tags: ["v*"], branches: ["main"] } }, { event: "push" }) && triggered({ push: null }, { event: "push" }),
+    "a push that names tags and no branch is no push to main; one that names main beside its tags, or nothing, is (#1245, point 8)");
+  const away = runWorkflow(`on: pull_request
+jobs:
+  win:
+    runs-on: windows-latest
+    steps:
+      - run: echo win ran
+  here:
+    runs-on: [self-hosted, linux]
+    steps:
+      - run: echo here ran
+  lacking:
+    runs-on: ubuntu-latest
+    steps:
+      - run: no-such-program-of-the-trial --version
+`, { github: { event_name: "pull_request" }, base: env, temp: tmp, workspace: () => ws, uses: {}, machine: "linux" });
+  const [win, here, lacking] = ["win", "here", "lacking"].map(id => away.find(j => j.job === id));
+  ok(win.ran === false && /^it runs on Windows, which this machine is not$/u.test(win.unrun) && here.ran && here.passed && lacking.ran,
+    "with the machine named, a job whose runs-on names another system is unrun and says which; one on this system runs (#1245, point 8)", JSON.stringify(away.map(j => [j.job, j.ran, j.unrun])));
+  ok(!lacking.passed && lacking.steps.find(s => !s.passed)?.missing === "no-such-program-of-the-trial", "a step that wants a program this machine lacks names it, for check.mjs to leave the job unrun (#1245, point 9)", JSON.stringify(lacking.steps));
+
+  // (point 10: each job in its class, the record counting each, and a job failed after alone holding the cut as the release's)
+  const all = compared({ p: "passed", f: "failed", pf: "passed", ff: "failed", gone: "passed", lost: "failed", was: "stopped", off: "unrun" },
+    { p: "passed", f: "passed", pf: "failed", ff: "failed", newp: "passed", newf: "failed", was: "passed", off: "unrun", w: "unrun" });
+  ok(Object.keys(all).join() === COUNTS.join() && Object.values(all).map(j => j.join()).join(";") === "p;f;ff;pf;newf;;newp,was;gone;lost;off,w",
+    "passed both, fixed after, failed both, failed after, failed after alone, stopped after, ran after alone, ran before alone, failed before alone and unrun after are each counted as named (#1245, point 10)", JSON.stringify(all));
+  const alone = trialRecord(SHA("b"), "2026-11-24", [[{}, { "new.yml/x": "failed", "w.yml/x": "unrun" }]]);
+  const aloneAt = trialAt(SHA("b"), args => (args[0] === "show" ? JSON.stringify(alone) : ""));
+  ok(alone.failedAfterAlone === 1 && alone.unrunAfter === 1 && /1 check failed after the release .*0 of them passing before it and 1 not run before/u.test(aloneAt.held) && /and 1 not run after on this machine/u.test(aloneAt.said),
+    "  a job that ran after alone and failed holds the cut as the release's, and one unrun after is said and holds nothing", `${aloneAt.said}\n${aloneAt.held}`);
+
   // (point 2 and #1244: jobs stopped after count apart and hold the cut; a baseline from a clone of the core is counted)
   const before = { [RUN_FROM]: "a clone of the core", "core.yml/core": "passed", "core.yml/tests (a)": "passed", "own.yml/lint": "passed", "own.yml/gone": "passed" };
   const afterRun = { "core.yml/core": "failed", "core.yml/tests": "stopped", "own.yml": "stopped" };
   const c = compared(before, afterRun);
-  ok(c.failedAfter.join() === "core.yml/core" && c.stoppedAfter.join() === "core.yml/tests,own.yml" && c.ranBeforeAlone.length === 0 && c.passedAfter.length === 0, "a job stopped after a failure is counted apart, with the jobs of its place before, and the key that says where check.mjs ran from is no job (#1245, point 2)", JSON.stringify(c));
+  ok(c.failedAfter.join() === "core.yml/core" && c.stoppedAfter.join() === "core.yml/tests,own.yml" && c.ranBeforeAlone.length === 0 && c.passedBoth.length === 0, "a job stopped after a failure is counted apart, with the jobs of its place before, and the key that says where check.mjs ran from is no job (#1245, point 2)", JSON.stringify(c));
   const record = trialRecord(SHA("a"), "2026-11-24", [[before, afterRun], [{ "x.yml/y": "passed" }, { "x.yml/y": "passed" }]]);
   ok(record.stoppedAfter === 2 && record.baselineFromClone === 1 && record.projects === 2, "the record counts the jobs stopped after, and the baselines taken from a clone of the core (#1244)", JSON.stringify(record));
   const showing = r => args => { if (args[0] === "show") return JSON.stringify(r); if (args[0] === "diff") return ""; return ""; };
@@ -141,7 +174,5 @@ jobs:
   const side = sideOf(project, "core/", bare, { pin: unreleased, main: "HEAD" }, sayer);
   ok(side === null && sideSaid.length === 1 && sideSaid[0][0] === "unread" && /not yet a release: in a release's trial .*nothing is to be done/u.test(sideSaid[0][2]), "a sync to a commit of main past the newest release, as a trial makes, is said to need nothing in a trial, and is counted neither way (#1245, point 7)", JSON.stringify(sideSaid));
   ok(sideOf(project, "core/", bare, { pin: released, main: "HEAD" }, sayer) === released, "  and a sync to a release runs from that release");
-} finally {
-  fs.rmSync(tmp, { recursive: true, force: true });
 }
 done("check.mjs as a release's trial runs it");

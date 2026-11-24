@@ -16,19 +16,27 @@ export const TRIAL = "reports/release-trial.json";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-// A run of check.mjs --verdicts before an update set beside one after it, each job by its place: failed both, standing
-// before the update; failed after where it passed before or did not run, the update's; passed after, whatever it
-// was before (both, as a rule), since nothing of it is the update's; and stopped after, behind another's failure, which
-// measured nothing of it (#1245, point 2). A job that ran before alone is counted apart, and holds nothing: an update may
-// fold it into another's steps; one stopped before ran in neither, and one whose place a job stopped after holds is
+// A run of check.mjs --verdicts before an update set beside one after it, each job by its place, in a class of COUNTS
+// (#1245, point 10): passed both; fixed after, failed before; failed both, standing before the update; failed after,
+// where it passed before, the update's; failed after alone, where it did not run before, the update's too, since a check
+// it adds may not fail what stood (AGENTS.md, "Nothing locks a project"); stopped after, behind another's failure,
+// which measured nothing of it (point 2); ran after alone, passed; ran before alone, passed, and failed before alone,
+// which an update may fold into another's steps; and unrun after, on another system or wanting a program this machine
+// lacks (points 8 and 9). A job stopped or unrun before ran not then, and one whose place a job stopped after holds is
 // counted with that one.
+export const COUNTS = ["passedBoth", "fixedAfter", "failedBoth", "failedAfter", "failedAfterAlone", "stoppedAfter", "ranAfterAlone", "ranBeforeAlone", "failedBeforeAlone", "unrunAfter"];
 export function compared(before, after) {
   const jobs = run => Object.entries(run ?? {}).filter(([job]) => job !== RUN_FROM);
+  const ran = run => Object.fromEntries(jobs(run).filter(([, v]) => v === "passed" || v === "failed"));
   const stopped = jobs(after).filter(([, v]) => v === "stopped").map(([job]) => job);
   const under = job => stopped.some(s => job.startsWith(`${s}/`) || job.startsWith(`${s} (`));
-  const out = { passedAfter: [], failedBoth: [], failedAfter: [], stoppedAfter: stopped,
-    ranBeforeAlone: jobs(before).filter(([job, v]) => v !== "stopped" && !Object.hasOwn(after ?? {}, job) && !under(job)).map(([job]) => job) };
-  for (const [job, v] of jobs(after).filter(([, x]) => x !== "stopped")) out[v !== "failed" ? "passedAfter" : before?.[job] === "failed" ? "failedBoth" : "failedAfter"].push(job);
+  const out = Object.fromEntries(COUNTS.map(k => [k, []]));
+  const was = ran(before), now = ran(after);
+  out.stoppedAfter = stopped;
+  out.unrunAfter = jobs(after).filter(([, v]) => v === "unrun").map(([job]) => job);
+  for (const [job, v] of Object.entries(was)) if (!Object.hasOwn(after ?? {}, job) && !under(job)) out[v === "passed" ? "ranBeforeAlone" : "failedBeforeAlone"].push(job);
+  const passedBy = { passed: "passedBoth", failed: "fixedAfter" }, failedBy = { passed: "failedAfter", failed: "failedBoth" };
+  for (const [job, v] of Object.entries(now)) out[(v === "passed" ? passedBy : failedBy)[was[job]] ?? (v === "passed" ? "ranAfterAlone" : "failedAfterAlone")].push(job);
   return out;
 }
 
@@ -36,7 +44,7 @@ export function compared(before, after) {
 // the release's check.mjs took from a clone of the core, where the copy's could not (#1244); no pair where no project
 // that takes the core allowed one.
 export function trialRecord(sha, day, pairs) {
-  const counts = { passedAfter: 0, failedBoth: 0, failedAfter: 0, stoppedAfter: 0, ranBeforeAlone: 0 };
+  const counts = Object.fromEntries(COUNTS.map(k => [k, 0]));
   for (const [before, after] of pairs) for (const [k, jobs] of Object.entries(compared(before, after))) counts[k] += jobs.length;
   return { commit: sha, day, projects: pairs.length, ...counts, baselineFromClone: pairs.filter(([before]) => Object.hasOwn(before ?? {}, RUN_FROM)).length };
 }
@@ -44,7 +52,7 @@ export function trialRecord(sha, day, pairs) {
 // Whether a record is in the form --trial writes: the commit, the day, and counts, all none where no project was tried.
 function formed(r) {
   if (r === null || typeof r !== "object") return false;
-  const counts = [r.passedAfter, r.failedBoth, r.failedAfter, r.stoppedAfter, r.ranBeforeAlone, r.baselineFromClone];
+  const counts = [...COUNTS, "baselineFromClone"].map(k => r[k]);
   return /^[0-9a-f]{40}$/.test(String(r.commit)) && /^\d{4}-\d\d-\d\d$/.test(String(r.day)) && [r.projects, ...counts].every(n => Number.isInteger(n) && n >= 0)
     && (r.projects > 0 || counts.every(n => n === 0)) && r.baselineFromClone <= r.projects;
 }
@@ -55,7 +63,8 @@ export const RUNS = "in a clone of the project, `node core/scripts/check.mjs --b
 
 // What the trial's record says of the release at `sha`, read through `git` (its arguments give its output), and why it
 // holds the cut, or null: the record stands for the commit where it names it, or one before it from which the release
-// changes the record alone; it holds the cut where it does not stand, and where a check passed before and failed after.
+// changes the record alone; it holds the cut where it does not stand, where a check failed after the update that passed
+// before it or did not run then, and where one stopped after.
 export function trialAt(sha, git) {
   let r = null;
   try { r = JSON.parse(git(["show", `${sha}:${TRIAL}`])); } catch { /* (not there, or not read) */ }
@@ -66,7 +75,7 @@ export function trialAt(sha, git) {
   if (more === null || more.length) return { said: `The trial on a real project ran on ${r.commit.slice(0, 7)}, and this commit changes more since.`, held: `the trial's record stands for ${r.commit.slice(0, 7)}, and ${sha.slice(0, 7)} ${more ? `changes more than the record since (${more.slice(0, 3).join(", ")}${more.length > 3 ? ", …" : ""})` : "does not follow it"}. Mend: ${again}` };
   return {
     said: trialSaid(r),
-    held: r.projects === 0 ? null : r.failedAfter ? `${plural(r.failedAfter, "check")} passed before the release and failed after it in the trial on a real project. Mend: find the release's fault from the trial's run after the update, mend it in the core in a pull request of its own, and ${again}`
+    held: r.projects === 0 ? null : r.failedAfter + r.failedAfterAlone ? `${plural(r.failedAfter + r.failedAfterAlone, "check")} failed after the release in the trial on a real project, ${r.failedAfter} of them passing before it and ${r.failedAfterAlone} not run before. Mend: find the release's fault from the trial's run after the update, mend it in the core in a pull request of its own, and ${again}`
       : r.stoppedAfter ? `${plural(r.stoppedAfter, "check")} did not run after the update in the trial on a real project, stopped behind a failure, so the trial measured nothing of ${r.stoppedAfter === 1 ? "it" : "them"}. Mend: find what stopped them from the trial's run after the update, mend it in the core in a pull request of its own where it is the release's, and ${again}` : null,
   };
 }
@@ -74,7 +83,7 @@ export function trialAt(sha, git) {
 // What a record in its form says.
 const trialSaid = r => (r.projects === 0
   ? `No project that takes the core allowed a trial of this release (${TRIAL}, ${r.day}), so none ran.`
-  : `The trial on a real project ran on ${r.commit.slice(0, 7)} on ${r.day}, in ${plural(r.projects, "project")}: ${plural(r.passedAfter, "check")} passed after the update, ${r.failedBoth} failed before and after (standing before the release), ${r.failedAfter} passed before and failed after (the release's), ${r.stoppedAfter} stopped after it behind a failure, and ${r.ranBeforeAlone} ran before the update alone; ${r.baselineFromClone} of the baselines taken by the release's check.mjs from a clone of the core, the copy's holding none that writes verdicts.`);
+  : `The trial on a real project ran on ${r.commit.slice(0, 7)} on ${r.day}, in ${plural(r.projects, "project")}: ${plural(r.passedBoth, "check")} passed before and after the update, ${r.fixedAfter} failed before and passed after, ${r.failedBoth} failed before and after (standing before the release), ${r.failedAfter} passed before and failed after (the release's), ${r.failedAfterAlone} ran after alone and failed (the release's too), ${r.stoppedAfter} stopped after it behind a failure, ${r.ranAfterAlone} ran after alone and passed, ${r.ranBeforeAlone} ran before alone and passed, ${r.failedBeforeAlone} ran before alone and failed, and ${r.unrunAfter} not run after on this machine; ${r.baselineFromClone} of the baselines taken by the release's check.mjs from a clone of the core, the copy's holding none that writes verdicts.`);
 
 // How many of the owner's own projects take the core, as scripts/state-report.mjs --projects lists them (a line each,
 // another owner's named as such), or null where it could not read them.
@@ -98,7 +107,7 @@ export function trial([sha, ...files], fail) {
   if (!files.length) { const own = ownProjects(); if (own === null || own > 0) return fail(own === null ? "which of the owner's projects take the core could not be read (scripts/state-report.mjs --projects), and nothing read is not none found. Mend: run it where gh answers for the owner's account, then --trial again" : `${plural(own, "project")} of the owner's take the core, as scripts/state-report.mjs --projects finds them. Mend: try the release on one of them, and record its runs before and after`); }
   const pairs = [];
   for (let i = 0; i < files.length; i += 2) {
-    const verdict = ([job, x]) => (job === RUN_FROM ? typeof x === "string" : ["passed", "failed", "stopped"].includes(x));
+    const verdict = ([job, x]) => (job === RUN_FROM ? typeof x === "string" : ["passed", "failed", "stopped", "unrun"].includes(x));
     const read = f => { try { const v = JSON.parse(fs.readFileSync(f, "utf8")); return v && typeof v === "object" && !Array.isArray(v) && Object.entries(v).every(verdict) ? v : null; } catch { return null; } };
     const pair = [read(files[i]), read(files[i + 1])];
     if (pair.includes(null)) return fail(`${pair[0] === null ? files[i] : files[i + 1]} is no run's verdicts: give the files check.mjs --verdicts wrote`);

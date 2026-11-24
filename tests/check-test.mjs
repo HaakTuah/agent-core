@@ -323,7 +323,7 @@ r = check(dir, "--base", "large", "--verdicts", baseline);
 const before = JSON.parse(fs.readFileSync(baseline, "utf8"));
 ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && before["copies.yml/copies/copies"] === "passed" && r.out.includes("note the head is its base, so the change is read as none against the base"), "a head that is its base passes the copies checks, read against the base itself, and says so", r.out);
 const read = trialRecord("0".repeat(40), "2026-11-24", [[before, before]]);
-ok(Object.keys(before).length > 0 && read.passedAfter === Object.keys(before).length && read.failedAfter === 0 && read.failedBoth === 0 && read.ranBeforeAlone === 0, "and the trial's record reads that run as its baseline, every job that ran passed and none the update's", JSON.stringify(read));
+ok(Object.keys(before).length > 0 && read.passedBoth === Object.keys(before).length && read.failedAfter === 0 && read.failedBoth === 0 && read.ranBeforeAlone === 0, "and the trial's record reads that run as its baseline, every job that ran passed and none the update's", JSON.stringify(read));
 git(dir, "reset", "-q", "--hard", "base");
 r = check(dir, "--base", "large");
 ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && r.out.includes("note the head is behind its base"), "a head behind its base passes the copies checks, read against the base, not the head, and says so", r.out);

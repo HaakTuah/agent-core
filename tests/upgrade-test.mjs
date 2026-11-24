@@ -505,7 +505,7 @@ function upgrade(p, from, ownChanges, expect) {
   for (const [event, said] of trial ? [["push", "a push to main"], ["pr", `a pull request of its own that ${ownChanges[0][0]}`]] : []) {
     const c = compared(baseline[event].verdicts, afterSync[event].verdicts);
     ok(afterSync[event].verdicts["own-checks.yml/own"] === "passed" && Object.keys(afterSync[event].verdicts).some(j => j.startsWith("core.yml/")) && !c.failedAfter.length,
-      `${p.name}: on ${said}, check.mjs runs its own workflows with the core's, and no check that passed before the sync fails after it (${c.passedAfter.length} passed, ${c.failedBoth.length} failed both)`,
+      `${p.name}: on ${said}, check.mjs runs its own workflows with the core's, and no check that passed before the sync fails after it (${c.passedBoth.length} passed, ${c.failedBoth.length} failed both)`,
       `${c.failedAfter.join("\n")}\n${JSON.stringify(afterSync[event].verdicts)}\n${afterSync[event].out.slice(-2500)}`);
   }
   // (the workflow taken out again on main, so the steps read below find the project as before: sync step 610 would ask it
