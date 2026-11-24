@@ -120,9 +120,9 @@ ok(bypass.includes("take it out of the project's files") && !bypass.includes("ne
 ok(!notDone(project({ ".claude/settings.json": withHook(MAIN_HOOK), ...listing({ kind: "hook", name: `PostToolUse: ${MAIN_HOOK}`, publisher: "this project", from: "the working tree" }) }), step).length, "and reads done once such a hook is marked");
 // (the way out fits what the hook's command reads: "from": "main" for one that fetches its file from main, as a hook run
 // from main's copy does, "the working tree" for one that fetches nothing from it; each, followed, reads done; #1273, point 2)
-ok(weigh.includes(`${MAIN_HOOK}" ("from": "main")`) && !weigh.includes('"from": "the working tree"'), "a hook that fetches its file from main is given \"from\": \"main\" as its way out, never \"the working tree\"", weigh);
+ok(/PostToolUse: git show refs\/remotes\/origin\/main:scripts\/format\.sh \| bash", [^;]* \("from": "main"\)\.$/u.test(weigh) && !weigh.includes('("from": "the working tree")'), "a hook that fetches its file from main is given \"from\": \"main\" as its way out, never \"the working tree\"", weigh);
 const treeWeigh = notDone(project({ ".claude/settings.json": withHook(TREE_HOOK) }), step)[0]?.mend ?? "";
-ok(treeWeigh.includes(`${TREE_HOOK}" ("from": "the working tree")`) && !treeWeigh.includes('"from": "main"'), "and one that fetches nothing from main, \"the working tree\"", treeWeigh);
+ok(/PostToolUse: bash scripts\/format\.sh", [^;]* \("from": "the working tree"\)\.$/u.test(treeWeigh) && !treeWeigh.includes('("from": "main")'), "and one that fetches nothing from main, \"the working tree\"", treeWeigh);
 ok(!notDone(project({ ".claude/settings.json": withHook(MAIN_HOOK), ...listing({ kind: "hook", name: `PostToolUse: ${MAIN_HOOK}`, publisher: "this project", from: "main" }) }), step).length
   && !notDone(project({ ".claude/settings.json": withHook(TREE_HOOK), ...listing({ kind: "hook", name: `PostToolUse: ${TREE_HOOK}`, publisher: "this project", from: "the working tree" }) }), step).length, "and each, marked as its way out says, reads done");
 ok(listed({ lockfiles: [] }, "c") === null, "a config with no \"agentTools\" holds no list");

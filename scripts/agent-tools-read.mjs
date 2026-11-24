@@ -7,7 +7,7 @@
 // shows it does not run the working tree's copy, which the branch it runs on can change. One that stood before is listed
 // in the baseline, its entry saying "from": "the working tree", and noted; the baseline only shrinks: a new hook marked
 // so fails, and so does a mark taken out while its hook stands, or a mark on a hook in the kit's form.
-import { fetchedBy, libraryOf } from "./hook-source.mjs";
+import { fetchedBy, fetchesMain, libraryOf } from "./hook-source.mjs";
 import { show, canonical, fold } from "./agent-tools-entries.mjs";
 
 // (the starter kit's hooks: each file it writes in a project, by the template it writes it from, beside this copy)
@@ -133,8 +133,9 @@ export function readCommands(state, file, settings) {
     addHook(state, file, { tool: "", event: key, matcher: "", hook: value, runs: true, text: command, commands: [command], setting: true });
   }
 }
-// Each hook with a command that is not the starter kit's form, into `state.sources` as { why, how }, why nothing shows it
-// runs its copy on main (hook-source.mjs) and its mend; so too where the file the kit's form fetches the project holds as
+// Each hook with a command that is not the starter kit's form, into `state.sources` as { why, how, main }, why nothing
+// shows it runs its copy on main (hook-source.mjs), its mend, and whether each command it may run fetches a file from
+// main all the same, which the mark of its entry follows ("from": "main", else "the working tree"); so too where the file the kit's form fetches the project holds as
 // a link (`linked`), whose target's name main gives in the script's place, a file the branch can change, and where a
 // library's commit main pins holds the file it reads there as anything but a plain file (`inLibrary`: git prints a link's
 // target, which bash then runs). Where the library's objects are not at hand, the file is not read: said, never failed.
@@ -142,7 +143,7 @@ function readSource(state, name, commands) {
   for (const command of commands) {
     const at = fetchedBy(command);
     if (command === NO_KIT) return void state.sources.set(name, { why: NO_KIT_WHY, how: NO_KIT_HOW });
-    if (at === null) return void state.sources.set(name, { why: NOT_KIT_WHY, how: HOW });
+    if (at === null) return void state.sources.set(name, { why: NOT_KIT_WHY, how: HOW, main: commands.every(fetchesMain) });
     // (the command in the kit's form already, its mend is the fetched file's)
     if (state.linked(at)) return void state.sources.set(name, { why: `fetches ${show(at)} from main, which the project holds as no plain file (a link, a folder or a submodule), so main gives no script but what git prints of it`, how: `make ${show(at)} a plain file committed in the project, the script itself in place of the link, folder or submodule, so main gives it` });
     const from = libraryOf(command), held = from && state.inLibrary(from.library, from.rest);

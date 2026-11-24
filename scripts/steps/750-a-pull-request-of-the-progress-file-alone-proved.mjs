@@ -29,21 +29,25 @@ function queueTaken(job, w) {
   const proves = coreUses(queue, "queue-only.yml") && pinOf(queue) === pinOf(job) && readsIssues(queue.permissions ?? w.yaml.permissions);
   return proves && [job.needs ?? []].flat().includes(from) && runsOnSkip(job.if) ? from : null;
 }
+// (what one workflow `w`, at `f`, lacks: into `lacking` each review's call that takes no proof's head, into `idle` each
+// proof's job no review's call takes, and into `hoisted` the workflow where its own `permissions:` gives a right to
+// write beside two jobs, or one to which the job `queue` is to be added)
+function readCaller(f, w, { lacking, idle, hoisted }) {
+  const jobs = w.yaml?.jobs && typeof w.yaml.jobs === "object" ? Object.entries(w.yaml.jobs) : [];
+  const taken = new Set(), reviews = jobs.filter(([, job]) => coreUses(job, "security-review.yml"));
+  for (const [, job] of reviews) {
+    const from = queueTaken(job, w);
+    if (from) taken.add(from);
+    else lacking.push(`\`.github/workflows/${shown(f)}\` (at \`${shown(pinOf(job))}\`)`);
+  }
+  if (reviews.length && writesAll(w.yaml.permissions) && (jobs.length > 1 || !taken.size)) hoisted.push(`\`.github/workflows/${shown(f)}\``);
+  idle.push(...jobs.filter(([name, job]) => coreUses(job, "queue-only.yml") && !taken.has(name)).map(([name]) => `\`${shown(name)}\` in \`.github/workflows/${shown(f)}\``));
+}
 function queueFirst(p) {
   readable(p, text => /\/\.github\/workflows\/(?:security-review|queue-only)\.yml@/iu.test(text));
-  const lacking = [], idle = [], hoisted = [];
-  for (const [f, w] of Object.entries(p.workflows)) {
-    const jobs = w.yaml?.jobs && typeof w.yaml.jobs === "object" ? Object.entries(w.yaml.jobs) : [];
-    const taken = new Set(), reviews = jobs.filter(([, job]) => coreUses(job, "security-review.yml"));
-    for (const [, job] of reviews) {
-      const from = queueTaken(job, w);
-      if (from) taken.add(from);
-      else lacking.push(`\`.github/workflows/${shown(f)}\` (at \`${shown(pinOf(job))}\`)`);
-    }
-    // (beside two jobs, or one to which the job `queue` is to be added)
-    if (reviews.length && writesAll(w.yaml.permissions) && (jobs.length > 1 || !taken.size)) hoisted.push(`\`.github/workflows/${shown(f)}\``);
-    idle.push(...jobs.filter(([name, job]) => coreUses(job, "queue-only.yml") && !taken.has(name)).map(([name]) => `\`${shown(name)}\` in \`.github/workflows/${shown(f)}\``));
-  }
+  const found = { lacking: [], idle: [], hoisted: [] };
+  for (const [f, w] of Object.entries(p.workflows)) readCaller(f, w, found);
+  const { lacking, idle, hoisted } = found;
   if (!lacking.length && !idle.length && !hoisted.length) return null;
   const add = lacking.length ? `In one small pull request, in ${lacking.join(", ")}, add beside the job that calls the core's \`security-review.yml\` a job \`queue\` that calls the core's \`queue-only.yml\` at that call's pin (\`uses: ${CORE}/.github/workflows/queue-only.yml@<the pin>\`), with \`permissions:\` \`contents: read\`, \`pull-requests: read\` and \`issues: read\`, and give the review's job \`needs: queue\`, \`if: \${{ !cancelled() }}\` and, under its \`with:\`, \`queue: \${{ needs.queue.outputs.head }}\`, as \`core/setup/template/workflows/security-review.yml.tmpl\` has it: a pull request that changes only the progress file is then proved by a script and needs no review of its own, where left as it is such a pull request is reviewed as any other. In a private repository the job runs only where its call is given \`with: private: true\`, the owner's choice, each run there a billed job.` : "";
   const hand = idle.length ? `The job ${idle.join(", ")} calls the core's \`queue-only.yml\` and hands its head to no call of the core's \`security-review.yml\` in its workflow: give that call \`needs:\` it, \`if: \${{ !cancelled() }}\` and, under its \`with:\`, \`queue: \${{ needs.<the job>.outputs.head }}\`, at the same pin, or take the job out.` : "";

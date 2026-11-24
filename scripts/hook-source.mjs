@@ -9,6 +9,7 @@
 //   fetchedBy(command) -> the path of the project it fetches from main, or null where it is in neither form
 //   libraryOf(command) -> { library, rest } where it reads the script from the commit main pins of a library, at `rest`
 //                         there, or null
+//   fetchesMain(command) -> whether, in any form, it has git show a file of the remote's main (#1273, point 2)
 
 // The starter kit's two forms of a hook's command, as setup/'s templates write them: its script fetched from main into
 // "$f" and run, perhaps with plain words after it, and nothing else, the second after one or more tests that a file is
@@ -52,3 +53,9 @@ export function libraryOf(command) {
   const found = matched(command);
   return found?.library === undefined ? null : { library: found.library, rest: found.rest };
 }
+// Whether a command, in the kit's form or one of its own, has git show a file of the remote's `main`
+// (`git … show refs/remotes/origin/main:<path>`, the ref perhaps quoted): what a hook run from main's copy fetches, read
+// from its words alone. It does not show that what is fetched is what runs: a hook so read is only marked as it stands
+// ("from": "main", agent-tools-entries.mjs), and whether it runs main's copy stays a security judgement.
+const FROM_MAIN = /\bgit\b[^;&|\n]*?\sshow\s+["']?refs\/remotes\/origin\/main:[\w-]/u;
+export const fetchesMain = command => FROM_MAIN.test(String(command));
