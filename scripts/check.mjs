@@ -368,12 +368,10 @@ function coreFile(tmp, sha, file, list = false) {
 }
 
 // The commit a pull request's checks run on, as GitHub makes it: the head merged into its base, the base its first
-// parent and the head its second, so a check that reads its base from HEAD^1 finds it. A head that is the base, or
-// behind it (a project's main checked out against itself, as the release trial's run before the update has it; #1231),
-// merges nothing, and git then makes no commit, so HEAD^1 would name the base's parent, or nothing: the commit is
-// written as the merge of a change of nothing, the base's own tree, its first parent the base and its second a commit
-// of the base's tree on the base, so the change reads as none against its base, and a check that tells a pull request
-// from a push by HEAD^2 (licences.mjs's baseOf, weakened.mjs, personal-terms.yml) still reads a pull request.
+// parent and the head its second, so a check that reads its base from HEAD^1 finds it. A head that is its base, or
+// behind it (the release trial's run before the update; #1231), merges nothing, and git makes no commit: it is written
+// as the merge of a change of nothing on the base, so HEAD^1 is the base and HEAD^2, by which some checks tell a pull
+// request from a push, is there.
 function merged(p, tmp, bare) {
   const ws = path.join(tmp, "merge");
   const who = ["-c", "user.name=core-check", "-c", "user.email=core-check@example.invalid"];
