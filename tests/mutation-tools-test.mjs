@@ -75,8 +75,9 @@ ok(/^its tests run by `vitest` \(package\.json's test script\), and no package-l
 ok(fillable(MANIFEST("| *mutation tool* | `none`: its tests run by `vitest` (package.json's test script), and the core runs Stryker only on tests run by `node <file>` (`core/scripts/stryker.mjs`) |"))
   && /only on tests run by `node <file>` or `vitest run <file>`/.test(at({ code: ["a.js"], tests: true, runner: "jest" }).none ?? ""),
   "the reason written before #1274 for a vitest project is filled again, and another runner's names both the core runs");
-ok(testRunner('{"scripts":{"test":"vitest run"}}') === "vitest" && testRunner('{"scripts":{"test":"npx vitest run --coverage"}}') === "vitest" && testRunner('{"scripts":{"test":"npx --yes vitest"}}') === "npx",
-  "a test script that starts vitest, itself or through npx, is read as vitest; npx with its own flags first is not read past");
+const optioned = at({ code: ["src/a.ts"], tests: true, runner: "vitest", locked: true, plain: false }).none;
+ok(/^its tests run by `vitest` \(package\.json's test script\) with more than `vitest run`, which the core does not give each test's run: .*vitest's config/.test(optioned ?? "") && fillable(MANIFEST(lineOf({ none: optioned }))),
+  "a vitest test script with options of its own (--globals, say), which each test's run would lose, gives none, saying the mend, a reason filled again", optioned);
 ok(!fillable(MANIFEST("| *mutation tool* | `none`: the owner keeps the measure off for this prototype |")) && !fillable(MANIFEST("| *mutation tool* | `node checks/mutate.mjs {lines}` |")),
   "a command, or a `none` with the project's own reason, is the project's and stays (#1107, point 3)");
 ok(!fillable(MANIFEST("| *mutation tool* | `none`: no tests yet worth measuring, a prototype |")) && !fillable(MANIFEST("| *mutation tool* | `none`: its code is in flux, the owner's call |")),
@@ -163,6 +164,9 @@ try {
   const unlockedProject = readProject(dir, "");
   ok(locked?.runner === "vitest" && locked.locked === true && nested?.locked === false && broken?.locked === false && unlockedProject?.locked === false,
     "vitest is read as installed where the root's npm lock file holds it at the root, and not where it holds it deeper, cannot be read or is not there", JSON.stringify({ locked, nested, broken, unlockedProject }));
+  const plainOf = script => { put("package.json", JSON.stringify({ scripts: { test: script } })); return readProject(dir, "")?.plain; };
+  ok(plainOf("vitest run") === true && plainOf(" vitest ") === true && plainOf("vitest run --globals") === false && plainOf("vitest run && node x.mjs") === false && plainOf("node --test") === true,
+    "a vitest test script is plain where it holds vitest, or vitest run, alone; another runner's is not read for it");
   fs.rmSync(path.join(dir, "package.json"));
   // (a link where checks/ stands, to a folder outside the project: nothing is written through it, and what is left says
   // so; where the system makes no link, the case is the one of a file where the folder should be)
