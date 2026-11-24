@@ -65,7 +65,7 @@ fs.mkdirSync(stubs);
 // archive, and hands any other fetch to the machine's own curl, save where a case has it fail)
 const isFile = f => { try { return fs.statSync(f).isFile(); } catch { return false; } };
 const realCurl = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(Boolean).flatMap(d => ["curl", "curl.exe"].map(c => path.join(d, c))).find(isFile);
-fs.writeFileSync(path.join(stubs, "curl"), `#!/bin/sh\ncase "$*" in *web-flow.gpg*) [ -f "$STAND_IN_KEY" ] || exit 22; cat "$STAND_IN_KEY"; exit 0 ;; esac\n[ -z "$FETCH_FAILS" ] || exit 22\n${ARCHIVE_SERVER}exec '${(realCurl ?? "curl").replace(/\\/g, "/")}' "$@"\n`, { mode: 0o755 });
+fs.writeFileSync(path.join(stubs, "curl"), `#!/bin/sh\ncase "$*" in *web-flow.gpg*) [ -f "$STAND_IN_KEY" ] || exit 22; cat "$STAND_IN_KEY"; exit 0 ;; esac\n[ -z "$FETCH_FAILS" ] || { o=; for a; do [ "$o" = -o ] && o=$a && break; o=$a; done; echo "curl: (23) Failed writing to the file $o" >&2; exit 22; }\n${ARCHIVE_SERVER}exec '${(realCurl ?? "curl").replace(/\\/g, "/")}' "$@"\n`, { mode: 0o755 });
 const makeKey = (home, who) => { fs.mkdirSync(home, { mode: 0o700 }); return bash(`gpg -q --batch --pinentry-mode loopback --passphrase '' --quick-gen-key '${who}' ed25519 sign never`, { GNUPGHOME: home }).status === 0; };
 const signedBy = (home, key) => ({ GNUPGHOME: home, GIT_CONFIG_COUNT: "3", GIT_CONFIG_KEY_0: "commit.gpgSign", GIT_CONFIG_VALUE_0: "true", GIT_CONFIG_KEY_1: "gpg.program", GIT_CONFIG_VALUE_1: "gpg", GIT_CONFIG_KEY_2: "user.signingKey", GIT_CONFIG_VALUE_2: key });
 process.on("exit", () => { for (const home of [signer, stranger]) bash("gpgconf --kill all", { GNUPGHOME: home }); });
@@ -116,7 +116,7 @@ function check({ dir, first }, { terms = TERMS, title = "A change", body = "Word
   const PATH = env.PATH ?? env.Path ?? "";
   const base = { ...env, ...ME, ...(locale ? { LC_ALL: locale } : {}), ...(store ? { TMPDIR: store } : {}), ...(fetchFails ? { FETCH_FAILS: "1" } : {}), STAND_IN_KEY: key, PATH: `${more ? `${more}${path.delimiter}` : ""}${stubs}${path.delimiter}${PATH}` };
   const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {} }, temp: tmp });
-  return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
+  return { passed: job.passed, out: job.steps.map(s => s.out).join(""), outputs: job.outputs };
 }
 // (never printed in any case: GitHub's masking of the secret matches its case exactly)
 const fails = (what, repo, opts) => { const r = check(repo, opts); ok(!r.passed && mended(r.out) && ![term, other, wide].some(t => r.out.toLowerCase().includes(t.toLowerCase())), `${what} fails, and the term is never printed`, r.out); };
@@ -411,10 +411,12 @@ if (process.platform !== "win32") {
   fs.mkdirSync(fresh);
   const fetched = check(pull([[{ "b.md": "Words.\n" }]]), { store: fresh });
   ok(fetched.passed && fetched.out.includes("TMPDIR/agent-core-tools/betterleaks-") && !fetched.out.includes(fresh), "the program fetched is named under TMPDIR, never by its full path (#1223)", fetched.out);
+  const given = fetched.outputs.betterleaks?.outputs?.path ?? "";
+  ok(/^agent-core-tools\/betterleaks-[^/]+\/betterleaks(\.exe)?$/.test(given), "the scan step is given the program's path from the temporary folder, which the runner prints in its log, never the full path (#1223)", given);
   const unfetchedStore = path.join(tmp, "unfetched-store");
   fs.mkdirSync(unfetchedStore);
   const failedFetch = check(pull([[{ "b.md": "Words.\n" }]]), { store: unfetchedStore, fetchFails: true });
-  ok(!failedFetch.passed && failedFetch.out.includes("Of the fetch:") && !failedFetch.out.includes(unfetchedStore), "a failed download's log writes out no temporary folder (#1223)", failedFetch.out);
+  ok(!failedFetch.passed && failedFetch.out.includes("Failed writing to the file archive.") && !failedFetch.out.includes(unfetchedStore), "a failed download's log names the archive as curl was given it, from the fetch's own folder, never writing out the temporary folder (#1223)", failedFetch.out);
 }
 const tooLong = check(pull([[{ "b.md": "x\n" }]]), { terms: `${term}\n${"q".repeat(2001)}\n` });
 ok(!tooLong.passed && mended(tooLong.out) && tooLong.out.includes("longer than 2,000 bytes") && !tooLong.out.includes(term), "a term longer than the check can read whole fails, saying the mend, never hanging", tooLong.out);

@@ -527,6 +527,23 @@ if (process.platform !== "win32") {
     ok(run.status === 0 && err.includes("<temp>/") && err.includes("~/.cache") && !err.includes(runnerTemp) && !err.includes(home),
       `${script} shows a failed fetch's log with the temporary and home folders named, never written out (#1223)`, err);
   }
+  // (where cygpath stands, as in Git for Windows, each form a Windows tool writes is named too, letter case aside: a
+  // stand-in for cygpath gives each form under a drive of its own making)
+  const win = scratchDir("fetch-win-");
+  fs.writeFileSync(path.join(win, "cygpath"), String.raw`#!/bin/sh
+case $1 in -w) printf 'C:%s\n' "$2" | tr / '\\' ;; -m) printf 'C:%s\n' "$2" ;; -u) printf '/c%s\n' "$2" ;; *) exit 1 ;; esac
+`, { mode: 0o755 });
+  const forms = String.raw`#!/bin/sh
+w=$(cygpath -w "$PWD"); printf '%s\n' "at $w, $(cygpath -m "$PWD"), $(cygpath -u "$HOME"), $(printf %s "$w" | tr A-Z a-z) and $(cygpath -w "$HOME" | sed 's/\\/\\\\/g')\\x" >&2
+exit 1
+`;
+  for (const name of ["python3", "python", "curl"]) fs.writeFileSync(path.join(win, name), forms, { mode: 0o755 });
+  for (const script of ["workflow-tools.sh", "lychee.sh"]) {
+    const run = spawnSync("bash", [path.join(core, "scripts", script)], { encoding: "utf8", env: { ...process.env, RUNNER_TEMP: runnerTemp, HOME: home, PATH: `${win}:${process.env.PATH}` } });
+    const err = (run.stderr || "").toLowerCase(), names = [runnerTemp, home].map(p => path.basename(p).toLowerCase());
+    ok(run.status === 0 && err.includes("at <temp>") && names.every(n => !err.includes(n)),
+      `${script} names the temporary and home folders in each form Windows writes them, letter case aside (#1223)`, run.stderr);
+  }
 }
 
 process.exit(failed ? 1 : 0);
