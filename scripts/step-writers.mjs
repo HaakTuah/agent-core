@@ -252,6 +252,9 @@ export const writePlaced = opts => (p, busy) => {
   const left = places(p, opts);
   if (!left.length) return [];
   writable(p, "core-manifest.md", busy);
-  put(p, "core-manifest.md", placed(p.manifest, left));
+  // (its own line ends kept: the manifest is read as LF, and a file the tree holds with Windows ones, as git writes it
+  // with core.autocrlf, would otherwise be written whole in LF, every line of it changed; #1227)
+  const raw = p.read("core-manifest.md", true) ?? "", crlf = /\r\n/u.test(raw) && !/(^|[^\r])\n/u.test(raw), text = placed(p.manifest, left);
+  put(p, "core-manifest.md", crlf ? text.replace(/\n/gu, "\r\n") : text);
   return ["core-manifest.md"];
 };
