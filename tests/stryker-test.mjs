@@ -127,13 +127,13 @@ try {
   const bare = spawnSync(process.execPath, [SCRIPT, "--report", path.join(scratch, "r.json")], { encoding: "utf8" });
   const none = spawnSync(process.execPath, [SCRIPT, "--tool", path.join(scratch, "none"), "--report", path.join(scratch, "r.json")], { encoding: "utf8" });
   ok(bare.status === 1 && mended(bare.stderr) && none.status === 1 && /Stryker is not installed in/.test(none.stderr) && mended(none.stderr) && /npm ci --ignore-scripts/.test(none.stderr),
-    "a run not told where Stryker is, or told a folder it is not installed in, fails, saying the mend", `${bare.stderr}\n${none.stderr}`);
+    "a run not told where Stryker is, or told a folder without it, fails, saying the mend", `${bare.stderr}\n${none.stderr}`);
 
   // ---- tests vitest runs (#1274) ----
   const vt = path.join(scratch, "vt"), pkg = path.join(vt, "node_modules/vitest"), V = "node_modules/vitest/v.mjs";
-  const vitestIs = bin => { fs.mkdirSync(pkg, { recursive: true }); fs.writeFileSync(`${pkg}/package.json`, JSON.stringify({ bin })); fs.writeFileSync(`${pkg}/v.mjs`, ""); return vitestAt(vt); };
-  ok(vitestIs({ vitest: "./v.mjs" }) === V && vitestIs("v.mjs") === V && vitestIs({ vitest: "../../outside.mjs" }) === null && vitestIs({ vitest: "missing.mjs" }) === null && vitestIs(".") === null && vitestAt(path.join(scratch, "none")) === null,
-    "the project's vitest is the file its package.json names, inside its folder, or none");
+  const vitestIs = bin => { fs.mkdirSync(`${pkg}/sub`, { recursive: true }); fs.writeFileSync(`${pkg}/package.json`, JSON.stringify({ bin })); fs.writeFileSync(`${pkg}/v.mjs`, ""); return vitestAt(vt); };
+  ok(vitestIs({ vitest: "./v.mjs" }) === V && vitestIs("v.mjs") === V && vitestIs({ vitest: "../../outside.mjs" }) === null && vitestIs({ vitest: "missing.mjs" }) === null && vitestIs("sub") === null && vitestAt(path.join(scratch, "none")) === null,
+    "the project's vitest is the file its package.json names in its folder, or none");
   if (process.platform !== "win32") { fs.symlinkSync(SCRIPT, `${pkg}/l.mjs`); ok(vitestIs("l.mjs") === null, "nor one a link leads out of it"); }
   const jest = spawnSync(process.execPath, [SCRIPT, "--tool", ".", "--runner", "jest", "--report", "r.json"], { encoding: "utf8" }).stderr;
   ok(/told to run its tests with jest.*--runner vitest/.test(jest) && mended(jest), "another runner is refused, saying the mend", jest);
@@ -183,14 +183,14 @@ try {
     v.git("add", "-A"); v.git("commit", "-q", "-m", "base");
     const log = path.join(scratch, "asked.log"), vrun = () => spawnSync(process.execPath, [SCRIPT, "--tool", TOOL, "--runner", "vitest", "--report", out], { cwd: v.dir, encoding: "utf8", env: { ...process.env, ASKED: log } });
     const missing = vrun().stderr;
-    ok(/node_modules\/vitest at the project's root names no program/.test(missing) && mended(missing), "tests vitest runs, with no vitest installed, fail, saying the mend", missing);
+    ok(/node_modules\/vitest at the project's root names no program/.test(missing) && mended(missing), "tests vitest runs fail with no vitest installed, saying the mend", missing);
     v.write("node_modules/vitest/package.json", JSON.stringify({ type: "module", bin: { vitest: "./vitest.mjs" } }));
     v.write("node_modules/vitest/vitest.mjs", "import fs from 'node:fs';\nimport cp from 'node:child_process';\nconst [, , how, file] = process.argv;\nfs.appendFileSync(process.env.ASKED, `${how} ${file}\\n`);\nprocess.exit(cp.spawnSync(process.execPath, [file]).status);\n");
     fs.rmSync(out, { force: true });
     const vran = vrun(), asked = fs.existsSync(log) ? [...new Set(fs.readFileSync(log, "utf8").trim().split("\n"))] : [];
     got = faults();
     ok(vran.status === 0 && on(1, "Survived") && on(2, "Killed") && same(asked, ["run test/a.test.mjs"]),
-      "tests vitest runs are each run through the project's vitest, and measured", `${vran.stdout}${vran.stderr}\nasked: ${asked}`);
+      "tests vitest runs are each run through the project's vitest and measured", `${vran.stdout}${vran.stderr}\nasked: ${asked}`);
   } else console.log("note the run with Stryker itself needs --tool <its folder>, which the tests workflow gives where it installs Stryker");
 } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 
