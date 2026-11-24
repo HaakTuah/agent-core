@@ -11,7 +11,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { LIST, NO_TESTS, NPMRC, fillable, leftFor, lineOf, named, packageList, readProject, rowFor, setUp, testRunner, written } from "../scripts/mutation-tools.mjs";
+import { LIST, NO_TESTS, NPMRC, fillable, folderOf, leftFor, lineOf, named, packageList, readProject, rowFor, setUp, testRunner, written } from "../scripts/mutation-tools.mjs";
 import { scratch, scratchDir } from "../scripts/scratch-core.mjs";
 import { licenceOk, policy } from "../scripts/licences.mjs";
 import { CORE } from "../scripts/core-address.mjs";
@@ -66,6 +66,17 @@ ok(fillable(MANIFEST("")) && fillable(MANIFEST(lineOf({ none: NO_TESTS }))) && f
   && fillable(MANIFEST(lineOf(at({ code: ["a.cs"], tests: true })))) && fillable(MANIFEST(lineOf(at({ code: ["a.js"], tests: true, runner: "jest" }))))
   && fillable(MANIFEST("| *mutation tool* | `none` |")),
   "a row that is not there, says `none` with no reason, or holds a reason the kit or the list gives, an older kit's included, is filled again");
+// (tests vitest runs, installed as the root's npm lock file shows it, name Stryker with each test run by vitest: #1274)
+const vi = at({ code: ["src/a.ts"], tests: true, runner: "vitest", locked: true }), unlocked = at({ code: ["src/a.ts"], tests: true, runner: "vitest", locked: false }).none;
+ok(vi.tool === "Stryker" && vi.command === "node core/scripts/stryker.mjs --tool checks/mutation --runner vitest --report {report} {lines}" && folderOf(toolOf(lineOf(vi)).command) === "checks/mutation",
+  "tests vitest runs, the root's npm lock file holding vitest, name Stryker with its tests run by vitest, installed where the list says (#1274)");
+ok(/^its tests run by `vitest` \(package\.json's test script\), and no package-lock\.json at the project's root holds vitest, which is read to know it is installed: .*commit the lock file/.test(unlocked ?? "") && fillable(MANIFEST(lineOf({ none: unlocked }))),
+  "where no npm lock file at the root shows vitest installed, none, saying what to commit, a reason filled again once it is", unlocked);
+ok(fillable(MANIFEST("| *mutation tool* | `none`: its tests run by `vitest` (package.json's test script), and the core runs Stryker only on tests run by `node <file>` (`core/scripts/stryker.mjs`) |"))
+  && /only on tests run by `node <file>` or `vitest run <file>`/.test(at({ code: ["a.js"], tests: true, runner: "jest" }).none ?? ""),
+  "the reason written before #1274 for a vitest project is filled again, and another runner's names both the core runs");
+ok(testRunner('{"scripts":{"test":"vitest run"}}') === "vitest" && testRunner('{"scripts":{"test":"npx vitest run --coverage"}}') === "vitest" && testRunner('{"scripts":{"test":"npx --yes vitest"}}') === "npx",
+  "a test script that starts vitest, itself or through npx, is read as vitest; npx with its own flags first is not read past");
 ok(!fillable(MANIFEST("| *mutation tool* | `none`: the owner keeps the measure off for this prototype |")) && !fillable(MANIFEST("| *mutation tool* | `node checks/mutate.mjs {lines}` |")),
   "a command, or a `none` with the project's own reason, is the project's and stays (#1107, point 3)");
 ok(!fillable(MANIFEST("| *mutation tool* | `none`: no tests yet worth measuring, a prototype |")) && !fillable(MANIFEST("| *mutation tool* | `none`: its code is in flux, the owner's call |")),
@@ -138,6 +149,20 @@ try {
   if (process.platform === "win32" || spawnSync("mkfifo", [path.join(dir, "package.json")]).status !== 0) put("package.json", "{ not json");
   const piped = spawnSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(SCRIPT_URL)}); console.log(JSON.stringify(m.readProject(${JSON.stringify(dir)}, "")));`], { encoding: "utf8", timeout: 20000 });
   ok(piped.status === 0 && JSON.parse(piped.stdout || "{}").runner === null, "a pipe where package.json stands is read as none, and the read ends", piped.stdout + piped.stderr + (piped.error?.message ?? ""));
+  fs.rmSync(path.join(dir, "package.json"));
+  // (vitest, as the test script names it, read as installed only where the root's npm lock file holds it there: #1274)
+  put("package.json", '{"scripts":{"test":"vitest run"}}\n');
+  const lockOf = packages => put("package-lock.json", JSON.stringify({ lockfileVersion: 3, packages: { "": {}, ...packages } }));
+  lockOf({ "node_modules/vitest": { version: "3.2.4", dev: true } });
+  const locked = readProject(dir, "");
+  lockOf({ "node_modules/other/node_modules/vitest": { version: "3.2.4" } });
+  const nested = readProject(dir, "");
+  put("package-lock.json", "{ not json");
+  const broken = readProject(dir, "");
+  fs.rmSync(path.join(dir, "package-lock.json"));
+  const unlockedProject = readProject(dir, "");
+  ok(locked?.runner === "vitest" && locked.locked === true && nested?.locked === false && broken?.locked === false && unlockedProject?.locked === false,
+    "vitest is read as installed where the root's npm lock file holds it at the root, and not where it holds it deeper, cannot be read or is not there", JSON.stringify({ locked, nested, broken, unlockedProject }));
   fs.rmSync(path.join(dir, "package.json"));
   // (a link where checks/ stands, to a folder outside the project: nothing is written through it, and what is left says
   // so; where the system makes no link, the case is the one of a file where the folder should be)
