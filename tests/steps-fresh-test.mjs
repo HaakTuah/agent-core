@@ -181,5 +181,23 @@ const lacks = fresh(p1, older);
 ok(lacks.length === olderKit.length - 1 && !lacks.some(([to]) => to === "docs/choices.md") && differences(p1, fresh(p1), [lacks]).length === 2,
   "an earlier kit that lacks a template added since still gives its other files to compare", lacks.map(([to]) => to).join());
 
+// ---- a paragraph or line the kit rewords past where its label is cut: one line that shows what differs (#1265, point 2) ----
+const reworded = path.join(tmp, "reworded", "setup", "template");
+fs.cpSync(path.join(root, TEMPLATES), reworded, { recursive: true });
+const NOW_WORDS = "any other tool: open each file named):", OLD_WORDS = "any other tool: open each file, by name,):";
+const NOW_LINE = "(core/tasks/updates.md)", OLD_LINE = "(core/tasks/updates.md, point 2)";
+const reword = (at, from, to) => { const was = fs.readFileSync(at, "utf8"), now = was.replaceAll(from, to); ok(now !== was, `${path.basename(at)} is reworded as the earlier kit wrote it`); fs.writeFileSync(at, now); };
+reword(path.join(reworded, "AGENTS.md.tmpl"), NOW_WORDS, OLD_WORDS);
+for (const f of fs.readdirSync(reworded).filter(n => /^dependabot.*\.tmpl$/.test(n))) reword(path.join(reworded, f), NOW_LINE, OLD_LINE);
+const third = kit("a-third-npm-project", { packages: "." }, { held: false });
+reword(path.join(third, "AGENTS.md"), NOW_WORDS, OLD_WORDS);
+reword(path.join(third, ".github/dependabot.yml"), NOW_LINE, OLD_LINE);
+const p3 = project(third);
+found = differences(p3, fresh(p3), [fresh(p3, reworded)]);
+const differs = file => found.filter(d => d.startsWith(`${file}:`));
+const [para] = differs("AGENTS.md"), [line] = differs(".github/dependabot.yml");
+ok(found.length === 2 && /^AGENTS\.md: differs in the paragraph "This project takes the shared rules/.test(para) && para.includes("open each file named") && para.includes("open each file, by name,")
+  && /^\.github\/dependabot\.yml: differs in the line "update-types/.test(line) && line.includes("updates.md, point 2)") && line.includes("updates.md)"),
+  "a paragraph and a line an earlier kit wrote, reworded by the kit past where a label is cut, give one line each, which shows the words that differ", found.join("\n"));
 
 done("steps-fresh");
