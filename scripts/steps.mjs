@@ -21,8 +21,7 @@
 // a pointer's path, or the manifest's module lines placed from what is read (#1094), has a writer ("write",
 // step-writers.mjs beside this file; #1091), which --write runs where its step is not done, never on a file with changes
 // not yet committed but the manifest changed in its `Core:` line alone, as a sync leaves it (held), and lists what it
-// wrote, with what its "left" says is left to the project once it wrote, which no check of the core's reads (#1289); a
-// step that needs judgement has none. Node's own modules and git only.
+// wrote; a step that needs judgement has none. Node's own modules and git only.
 //
 //   node core/scripts/steps.mjs                  from a project's root: the steps not done, each with its mend; nothing else
 //   node core/scripts/steps.mjs --write          each writer of a step not done run, and what it wrote listed, for a pull
@@ -140,11 +139,11 @@ function steps(missed) {
 }
 
 // Each writer of a step not done in the project at `root` run, in the steps' order, and the step read again after it:
-// each { lead, wrote (the files it wrote), mend (what is left of the step, null where it is done now), left (what the step's `left` says is left to the project, or null) } or { lead, why }
-// where it wrote nothing (it could not run, or its check could not read the project). A step the manifest declares
-// undone on purpose, or done already, is left; a file with changes not yet committed when the run began is never written.
-// `merge`, last, the one process's key-merge mode (converge.mjs, `merged`; #1095, point 5), given so, since that script
-// reads the project with this one.
+// each { lead, wrote (the files it wrote), mend (what is left of the step, null where it is done now), left (its step's
+// `left`, which no check reads, or null; #1289) } or { lead, why } where it wrote nothing (it could not run, or its
+// check could not read the project). A step the manifest declares undone on purpose, or done already, is left; a file
+// with changes not yet committed when the run began is never written. `merge`, last, the one process's key-merge mode
+// (converge.mjs, `merged`; #1095, point 5), given so, since that script reads the project with this one.
 export function written(root, steps = STEPS, merge = null) {
   const busy = held(root), copy = copyAt(project(root)), out = [];
   // (a writer runs the copy's own scripts and reads what the copy holds: this script must be the copy's)
@@ -159,7 +158,7 @@ export function written(root, steps = STEPS, merge = null) {
     let mend;
     try { mend = step.check ? step.check(project(root)) : null; } catch (e) { mend = `its check could not read the project after it (${plain(e.message, root)})`; }
     let left = null;
-    try { left = step.left?.(project(root)) ?? null; } catch { /* (a config it cannot read again: its check's mend says so) */ }
+    try { left = step.left?.(project(root)) ?? null; } catch { /* (its check's mend says so) */ }
     out.push({ lead: step.lead, wrote, mend: mend && mendAt(mend, copy, own), left });
   }
   return merge ? [...out, ...merge(root, busy)] : out;
