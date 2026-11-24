@@ -86,7 +86,7 @@ function readHelper(state, file, key, value) {
   addHook(state, file, { tool: "", event: key, matcher: "", hook: value, runs: true, text: value, commands: [value], setting: true });
 }
 // What no starter kit writes, given as a command so it is never read as the kit's form, and its failure's mend.
-export const NO_KIT = "(no form of the starter kit's)", NO_KIT_WHY = "is of a kind no starter kit writes";
+export const NO_KIT = "(no form of the starter kit's)", NO_KIT_WHY = "is of a kind no starter kit writes", NOT_KIT_WHY = "is not in the starter kit's form";
 const NO_KIT_HOW = "take it out of the project's files, the owner setting it in the tool's own configuration on the machine where it is wanted; or move what it runs into a hook of .claude/settings.json in the starter kit's form";
 // A marketplace that runs a command by itself, to print the headers it is fetched with, or as a plug-in's source: read
 // whole, as a setting no starter kit writes, so one the pull request adds or changes is new.
@@ -142,7 +142,7 @@ function readSource(state, name, commands) {
   for (const command of commands) {
     const at = fetchedBy(command);
     if (command === NO_KIT) return void state.sources.set(name, { why: NO_KIT_WHY, how: NO_KIT_HOW });
-    if (at === null) return void state.sources.set(name, { why: "is not in the starter kit's form", how: HOW });
+    if (at === null) return void state.sources.set(name, { why: NOT_KIT_WHY, how: HOW });
     // (the command in the kit's form already, its mend is the fetched file's)
     if (state.linked(at)) return void state.sources.set(name, { why: `fetches ${show(at)} from main, which the project holds as no plain file (a link, a folder or a submodule), so main gives no script but what git prints of it`, how: `make ${show(at)} a plain file committed in the project, the script itself in place of the link, folder or submodule, so main gives it` });
     const from = libraryOf(command), held = from && state.inLibrary(from.library, from.rest);

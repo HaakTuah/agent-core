@@ -11,7 +11,7 @@
       "scripts/licence-commands.mjs",
       "scripts/licence-npm.mjs",
       "scripts/licence-scan-stage.mjs",
-      "scripts/stages/820-pip-s-download-and-wheel-read-as-its-install.mjs",
+      "scripts/stages/821-pip-s-download-and-wheel-read-as-its-install.mjs",
       "tests/licence-scan-test.mjs",
       "tests/licence-yes-test.mjs",
       "tests/licence-scan-limits-test.mjs",

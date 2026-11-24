@@ -14,7 +14,7 @@ import { mended } from "../scripts/mend.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
 import { STEPS, notDone } from "../scripts/steps.mjs";
 import { listed } from "../scripts/agent-tools-entries.mjs";
-import { run, project, withPlugins, listing, PLUGIN, KIT, pr, git, asserting } from "../scripts/agent-tools-scratch.mjs";
+import { run, project, withPlugins, withHook, listing, PLUGIN, KIT, MAIN_HOOK, pr, git, asserting } from "../scripts/agent-tools-scratch.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -110,6 +110,14 @@ ok(!notDone(project({ ...elsewhere, ".github/workflows/licences-own.yml": `${own
 const byVariable = notDone(project({ ".github/workflows/licences-own.yml": `${ownRun.replace("checks/licences.json", '"$CONFIG"')}      - run: node core/scripts/agent-tools.mjs "$CONFIG"\n` }), step);
 ok(byVariable.length === 1 && byVariable[0].mend.includes("could not read the project") && byVariable[0].mend.includes("$CONFIG"), "and says it cannot read one the workflow passes by a variable, never read as done", JSON.stringify(byVariable));
 ok(notDone(project({ ".claude/settings.json": withPlugins({ "helper@example-market": true }) }), step)[0]?.mend.includes('the plug-in "helper@example-market"'), "and not done where a tool is configured and the list is not written");
+// (a hook outside the kit's form that does run main's copy: its mend is a task weighed by a security judgement, never
+// that it be taken out; marked, the step reads done; #1248, point 6)
+const weigh = notDone(project({ ".claude/settings.json": withHook(MAIN_HOOK) }), step)[0]?.mend ?? "";
+ok(weigh.includes("whether it does is a security judgement, not a mend") && weigh.includes(MAIN_HOOK) && weigh.includes("never taking one out before then") && !weigh.includes("else take it out"),
+  "and gives a hook outside the kit's form to a task weighed by a security judgement, never a mend that takes it out", weigh);
+const bypass = notDone(project({ ".claude/settings.json": { ...JSON.parse(KIT), permissions: { defaultMode: "bypassPermissions" } } }), step)[0]?.mend ?? "";
+ok(bypass.includes("take it out of the project's files") && !bypass.includes("never taking one out"), "while a setting of a kind no kit writes, as a bypass mode, keeps the check's own mend, to take it out", bypass);
+ok(!notDone(project({ ".claude/settings.json": withHook(MAIN_HOOK), ...listing({ kind: "hook", name: `PostToolUse: ${MAIN_HOOK}`, publisher: "this project", from: "the working tree" }) }), step).length, "and reads done once such a hook is marked");
 ok(listed({ lockfiles: [] }, "c") === null, "a config with no \"agentTools\" holds no list");
 passes(run(project({ ".gitignore": ".claude/settings.local.json\n", ".claude/settings.local.json": { enabledPlugins: { "helper@example-market": true } }, ...listing() })), "a settings.local.json git ignores is a person's own, and not read");
 fails(run(pr(project({ ".mcp.json": { mcpServers: { files: { command: "files-server" } } }, ...listing({ kind: "server", name: "files", publisher: "Example Tools", version: "2.0.0" }) }), { "checks/licences.json": { lockfiles: [] } })),

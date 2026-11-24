@@ -4,7 +4,7 @@
 // 470, 480 and 500 name the modules they place, written by step-writers.mjs's `writePlaced`; that of 23 November 2026,
 // the confirmation. It reads only. Node's own modules only.
 import { GAME_ROWS } from "./init.mjs";
-import { CONFIRM, factsOf, moduleNames, placed, toConfirm, toPlace } from "./manifest-reads.mjs";
+import { CONFIRM, factsOf, moduleNames, modulesOf, toConfirm, toPlace } from "./manifest-reads.mjs";
 import { HERE, shown } from "./step-checks.mjs";
 import { Unread } from "./workflow-calls.mjs";
 
@@ -13,8 +13,11 @@ const MANIFEST = "core-manifest.md";
 // manifest neither takes nor leaves out, each with its place; Unread where its "Modules:" line cannot be read.
 export function places(p, { only = null, except = [] } = {}) {
   const facts = factsOf({ manifest: p.manifest, files: p.files, gameSlots: GAME_ROWS.map(([slot]) => slot) });
-  const left = toPlace(p.manifest, moduleNames(HERE).filter(n => !except.includes(n)), facts, only);
-  if (left === null) throw new Unread(`\`${MANIFEST}\` has no "Modules:" line to read`);
+  const known = moduleNames(HERE), left = toPlace(p.manifest, known.filter(n => !except.includes(n)), facts, only, known);
+  if (left === null) {
+    const { line } = modulesOf(p.manifest);
+    throw new Unread(line ? `the "Modules:" line of \`${MANIFEST}\` ("${line.slice(0, 120)}") is neither "all" nor a list of the core's modules, each by its name, parted by commas` : `\`${MANIFEST}\` has no "Modules:" line to read`);
+  }
   return left;
 }
 export const named = list => list.map(p => `\`${shown(p.name)}\``).join(", ");

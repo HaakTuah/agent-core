@@ -47,7 +47,10 @@ const x = git(root, "ls-files", "-s", "-z").split("\0").filter(e => e.startsWith
 const commit = (message) => { git(theCore, "add", "-A"); git(theCore, "update-index", "--chmod=+x", "--", ...x); git(theCore, "commit", "-q", "--allow-empty", "-m", message); return git(theCore, "rev-parse", "HEAD"); };
 write(theCore, "z.md", "only in Z\n");
 write(theCore, ".github/workflows/personal-terms.yml", `${terms}# Z\n`);
+const bugTmpl = read(theCore, "setup/template/issue-bug.md.tmpl"), Z_LINE = "<!-- as Z's kit writes it -->\n";
+write(theCore, "setup/template/issue-bug.md.tmpl", `${bugTmpl}${Z_LINE}`); // (Z's kit writes a file of the core's otherwise: #1246, point 5)
 const Z = commit("Z");
+write(theCore, "setup/template/issue-bug.md.tmpl", bugTmpl);
 fs.rmSync(path.join(theCore, "z.md"));
 write(theCore, ".github/workflows/personal-terms.yml", `${terms}# A\n`);
 const A = commit("A");
@@ -269,10 +272,20 @@ ok(mends.status === 0 && read(p, "AGENTS.md").includes("@core/roles/builder.md\n
 const silent = path.join(tmp, "gh-silent");
 fs.mkdirSync(silent, { recursive: true });
 fs.writeFileSync(path.join(silent, "gh"), "#!/bin/sh\necho 'gh: not signed in' >&2\nexit 1\n", { mode: 0o755 });
-git(p, "remote", "set-url", "origin", GH_ORIGIN);
-const standIn = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, CORE_HOST_ANSWERS: hostSays(), [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
-git(p, "remote", "set-url", "origin", origin);
-ok(standIn.status === 1 && /NOT PURE[^\n]*AGENTS\.md: the project's kind or values cannot be read/.test(`${standIn.stdout}${standIn.stderr}`), "  and with only the test's stand-in for the host answering, which the proof does not honour, it is not proved", `${standIn.stdout}${standIn.stderr}`);
+// (the read with no sign-in sent to a proxy that is not there, so it gives no answer and nothing leaves this machine;
+// a stranger's repository of the stand-in's name never answers for it; #1246)
+const offline = { HTTPS_PROXY: "http://127.0.0.1:9", https_proxy: "http://127.0.0.1:9", NO_PROXY: "", no_proxy: "" };
+const unanswered = given => {
+  git(p, "remote", "set-url", "origin", GH_ORIGIN);
+  try {
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, ...offline, ...given, [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
+    return `${r.status}\n${r.stdout}${r.stderr}`;
+  } finally { git(p, "remote", "set-url", "origin", origin); }
+};
+for (const [given, what] of [[{ CORE_HOST_ANSWERS: hostSays() }, "the test's stand-in for the host"], [{ CORE_PRIVATE: "false" }, "an answer given as CORE_PRIVATE"]]) {
+  const out = unanswered(given);
+  ok(/^1\n/.test(out) && /NOT PURE[^\n]*AGENTS\.md: the project's kind or values cannot be read/.test(out), `  and with only ${what} answering, which the proof does not honour, it is not proved`, out);
+}
 git(p, "push", "-q", "-f", "origin", `${base}:main`);
 git(p, "checkout", "-q", "sync");
 git(p, "reset", "-q", "--hard", LEGIT);
@@ -362,6 +375,45 @@ const off = node(p, "core/scripts/sync.mjs", SIDE);
 ok(off.status === 1 && off.out.includes("not a commit of the core's main") && git(p, "status", "--porcelain") === "", "so is one off the core's main", off.out);
 const same = node(p, "core/scripts/sync.mjs", A);
 ok(same.status === 0 && same.out.includes("already at") && git(p, "status", "--porcelain") === "", "at the pin already, there is nothing to sync", same.out);
+// (#1246, point 1: a copy an older sync script moved got the copy and the pins alone; the run at the same pin gives the
+// rest, what the sync asks since the pin before, read from the project's own history, and every report)
+ok(/could not be read from the history of core-manifest\.md[\s\S]*For the sync PR's description[\s\S]*Steps not done/.test(same.out) && /The settings only the owner gives|setting only the owner gives/.test(same.out),
+  "  and does all else a sync does, saying where no pin before it stands in the manifest's history, and listing every setting only the owner gives", same.out);
+for (const [how, at] of [["committed", LEGIT], ["left in the working tree by an older script", base]]) {
+  git(p, "checkout", "-q", "-B", "again", at);
+  if (at === base) { git(p, "checkout", "-q", LEGIT, "--", "core"); write(p, "core-manifest.md", manifest(OWNER, B)); }
+  const rerun = node(p, "core/scripts/sync.mjs", B);
+  ok(rerun.status === 0 && rerun.out.includes("already at") && rerun.out.includes("a note for the test") && /For the sync PR's description[\s\S]*Steps not done[\s\S]*Beside a fresh start[\s\S]*\nattached: /.test(rerun.out),
+    `  a sync at the same pin, ${how}, prints what the sync asks since the pin before, read from the manifest's history, and every report`, rerun.out);
+  git(p, "reset", "-q", "--hard");
+  git(p, "clean", "-qfd");
+  git(p, "stash", "clear");
+}
+// (#1246, point 5: a file of the core's an earlier kit wrote, at a pin no release holds and no sync wrote again, is
+// known by the kit of each pin the manifest's history names)
+git(p, "checkout", "-q", "-B", "earlier", LEGIT);
+const BUG = ".github/ISSUE_TEMPLATE/bug_report.md", bugB = read(p, BUG);
+write(p, BUG, `${bugB}${Z_LINE}`);
+git(p, "commit", "-qam", "as Z's kit wrote it");
+const unknown = node(p, "core/scripts/sync.mjs", B);
+for (const pin of [Z, B]) { write(p, "core-manifest.md", manifest(OWNER, pin)); git(p, "commit", "-qam", `the manifest at ${SHA(pin)}`); }
+const known = node(p, "core/scripts/sync.mjs", B);
+ok(unknown.out.includes(`${BUG} is not the core's`) && read(p, BUG) === bugB && !known.out.includes(`${BUG} is not the core's`),
+  "a file as the kit of a pin the manifest's history names wrote it, and no release's, is the core's, written again as the kit writes it", `${unknown.out}\n${known.out}`);
+// (and the proof knows it by the same kits, read from the history of the project's main: a main whose manifest named Z
+// before A, the file as Z's kit wrote it, synced to B, is a pure sync)
+git(p, "reset", "-q", "--hard");
+git(p, "checkout", "-q", "-B", "earlier-main", base);
+write(p, BUG, `${bugB}${Z_LINE}`);
+for (const pin of [Z, A]) { write(p, "core-manifest.md", manifest(OWNER, pin)); git(p, "commit", "-qam", `the manifest at ${SHA(pin)}, the file as Z's kit wrote it`); }
+git(p, "push", "-q", "-f", "origin", "HEAD:main");
+const fromZ = node(p, "core/scripts/sync.mjs", B);
+git(p, "stash", "clear"); git(p, "add", "-A"); git(p, "commit", "-qm", "sync, the file as Z's kit wrote it");
+const provedZ = pure();
+ok(fromZ.status === 0 && read(p, BUG) === bugB && provedZ.status === 0 && provedZ.out.includes("a pure sync"),
+  "  and the proof renders it by the same kits, read from the history of the project's main, so the sync is pure", `${fromZ.out}\n---\n${provedZ.out}`);
+git(p, "reset", "-q", "--hard");
+git(p, "checkout", "-q", "more");
 write(p, "core-manifest.md", manifest("someone-else"));
 git(p, "commit", "-q", "-am", "another owner");
 const other = git(p, "rev-parse", "HEAD");

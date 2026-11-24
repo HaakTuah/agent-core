@@ -1,5 +1,5 @@
 // Which files two merged pull requests each added to within a week, over the last month (#860): the reading the sync
-// note setup/sync-notes/740-a-project-s-records-one-file-per-entry.md asks for, to find the records a project splits
+// note setup/sync-notes/741-a-project-s-records-one-file-per-entry.md asks for, to find the records a project splits
 // into a folder of one file per entry (core/tasks/planning.md, "Each entry of a busy record stands in a file of its
 // own"). It reads the host's record of each pull request merged into the default branch and the files it added lines
 // to, never the clone's history, so a shallow clone, a squash, a merge commit and a rebase merge's several commits all
