@@ -12,7 +12,7 @@ import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
-const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
+const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}${!cond && detail ? `\n     ${detail}` : ""}`); if (!cond) failed++; };
 const here = fileURLToPath(new URL("../scripts/", import.meta.url));
 // (the check's scripts, and the package its Markdown is read with as the core's install leaves it: the lock file, npm's
 // record of the install and the package itself, from the core's own install, which its tests' job runs)
