@@ -246,7 +246,8 @@ function movedIn(text, map, oldPath) {
 
 // The size marks' text with each file under "read" at an old path that leads to one file named as that file, two that
 // now lead to one merged at the larger mark, since a key named twice is no JSON a reader reads one way (#1247, point
-// 4); its own line ends kept. Marks that are no JSON object with "read" stand as they are.
+// 4); its own line ends kept, the rest laid out as `marksWritten` lays it out, two spaces deep, so a file kept in another
+// layout is written whole where a key moves. Marks that are no JSON object with "read" stand as they are.
 function marksMoved(text, map) {
   let json;
   try { json = JSON.parse(text); } catch { return text; }
