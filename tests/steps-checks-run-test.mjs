@@ -63,6 +63,21 @@ const suiteFile = path.join(lockProject, ".github/workflows/suites-filtered.yml"
 const suiteBy = filter => { fs.writeFileSync(suiteFile, `name: s\non:\n  pull_request:\n${filter}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`); return notDone(lockProject, only(SUITE_LEAD)).some(m => m.lead === SUITE_LEAD); };
 ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths: ['.github/workflows/co+re.yml']") && !suiteBy("    paths: ['.github/workflows/core\\?.yml']")
   && suiteBy("    paths-ignore: ['core/**']") && !suiteBy("    paths: ['src/**']"), "a suite whose filter starts on a call's file alone is reported, its `?` and `+` read as GitHub reads them");
+{
+  // (a stand-in, its `paths` a suite's `paths-ignore` in another order, so that a check a ruleset asks for reports where the
+  // suite is skipped, is left out; one whose `paths` differ is a suite: #1248, point 3)
+  const list = order => `[${order.map(p => `'${p}'`).join(", ")}]`, kept = ["core/**", "core-manifest.md", ".github/workflows/core.yml"];
+  const standIn = path.join(lockProject, ".github/workflows/stand-in.yml"), named = () => notDone(lockProject, only(SUITE_LEAD)).find(m => m.lead === SUITE_LEAD)?.mend ?? "";
+  const put = (paths, job = "t") => fs.writeFileSync(standIn, `name: s\non:\n  pull_request:\n    paths: ${paths}\njobs:\n  ${job}:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo stand-in\n`);
+  suiteBy(`    paths-ignore: ${list(kept)}`);
+  put(list([...kept].reverse()));
+  const left = !named().includes("stand-in.yml");
+  put(list([...kept].reverse()), "other-tests");
+  const otherJobs = named().includes("stand-in.yml");
+  put(list([...kept, "src/**"]));
+  ok(left && otherJobs && named().includes("stand-in.yml") && /gains the same paths under its `paths`/.test(named()), "a workflow whose `paths` are a suite's `paths-ignore`, its jobs the suite's, stands in for it and is left out; one whose jobs or `paths` differ is reported, the mend saying what a stand-in gains", named());
+  fs.rmSync(standIn);
+}
 fs.rmSync(suiteFile);
 ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.yml"]) && pathsLetThrough(["a[b.yml"], ["a[b.yml"])
   && pathsLetThrough(["c]d.yml"], ["c]d.yml"]) && pathsLetThrough(["dir/+e"], ["dir//e"]) && !pathsLetThrough(["a[b.yml"], ["ab.yml"]),

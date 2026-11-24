@@ -62,7 +62,8 @@ export function writable(p, f, busy) {
   if (path.posix.normalize(f) !== f || f.startsWith(copyAt(p)) || leadsOut(p.root, at)) throw new Unwritten(`\`${shown(f)}\` is no file of the project's own outside the copy`);
   const st = fs.lstatSync(at, { throwIfNoEntry: false });
   if (st && !st.isFile()) throw new Unwritten(`\`${shown(f)}\` is no regular file`);
-  if (busy.has(f)) throw new Unwritten(`\`${shown(f)}\` has changes not yet committed: commit them or set them aside, then run it again`);
+  // (the manifest's, beyond its `Core:` line, which a sync's move alone `held` lets through: #1248, point 2)
+  if (busy.has(f)) throw new Unwritten(`\`${shown(f)}\` has changes not yet committed${f === MANIFEST ? " beyond its `Core:` line, whose move by the sync alone is let through" : ""}: commit them or set them aside, then run it again`);
   if (spawnSync("git", ["check-ignore", "-q", "--", f], { cwd: p.root }).status === 0) throw new Unwritten(`git ignores \`${shown(f)}\`: take it out of the ignore list and commit it, then run it again`);
 }
 
