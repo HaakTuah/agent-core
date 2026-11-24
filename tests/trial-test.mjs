@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { RUN_FROM } from "../scripts/check.mjs";
 import { sameNode, standIns } from "../scripts/check-actions.mjs";
-import { movesForward, ownJobs, syncCalls, triggered } from "../scripts/check-calls.mjs";
+import { closing, movesForward, ownJobs, syncCalls, triggered } from "../scripts/check-calls.mjs";
 import { COUNTS, compared, trialAt, trialRecord } from "../scripts/release-trial.mjs";
 import { sideOf } from "../scripts/attached.mjs";
 import { notInstalled } from "../scripts/packages.mjs";
@@ -146,6 +146,11 @@ jobs:
   const [win, here, named, lacking] = ["win", "here", "named", "lacking"].map(id => away.find(j => j.job === id));
   ok(win.ran === false && /^it runs on Windows, which this machine is not$/u.test(win.unrun) && here.ran && here.passed && named.ran && named.passed && lacking.ran,
     "with the machine named, a job whose runs-on names another system is unrun and says which; one on this system runs, and so does one whose runner's own name holds a system's only in part (#1245, point 8)", JSON.stringify(away.map(j => [j.job, j.ran, j.unrun])));
+  const linux = runWorkflow("on: pull_request\njobs:\n  linux:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo linux ran\n", { github: { event_name: "pull_request" }, base: env, temp: tmp, workspace: () => ws, uses: {}, machine: "win32" });
+  ok(linux[0].ran && linux[0].passed && !linux[0].unrun, "  a Linux job runs on a machine of another system, as the core's own jobs do", JSON.stringify(linux));
+  const lines = [], close = counts => closing(counts, l => lines.push(l), l => lines.push(l));
+  ok(close({ failed: 0, ran: 3, unrun: 1 }) === 1 && mended(lines[0]) && /^FAIL 1 job\(s\) skipped above could not run here/u.test(lines[0]) && close({ failed: 0, ran: 3, unrun: 0 }) === 0 && close({ failed: 1, ran: 3, unrun: 0 }) === 1,
+    "a job unrun alone fails the run, saying its mend; with none unrun or failed it passes (#1245, points 8 and 9)", lines.join("\n"));
   ok(!lacking.passed && lacking.steps.find(s => !s.passed)?.missing === "no-such-program-of-the-trial", "a step that wants a program this machine lacks names it, for check.mjs to leave the job unrun (#1245, point 9)", JSON.stringify(lacking.steps));
 
   // (point 10: each job in its class, the record counting each, and a job failed after alone holding the cut as the release's)

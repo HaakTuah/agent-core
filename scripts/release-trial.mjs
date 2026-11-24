@@ -64,7 +64,7 @@ export const RUNS = "in a clone of the project, `node core/scripts/check.mjs --b
 // What the trial's record says of the release at `sha`, read through `git` (its arguments give its output), and why it
 // holds the cut, or null: the record stands for the commit where it names it, or one before it from which the release
 // changes the record alone; it holds the cut where it does not stand, where a check failed after the update that passed
-// before it or did not run then, where one stopped after, and where one that ran before was unrun after.
+// before it or did not run then; one stopped after, or unrun after though it ran before, is named beside the counts.
 export function trialAt(sha, git) {
   let r = null;
   try { r = JSON.parse(git(["show", `${sha}:${TRIAL}`])); } catch { /* (not there, or not read) */ }

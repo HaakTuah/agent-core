@@ -97,7 +97,7 @@ const verdictsFile = path.join(tmp, "verdicts.json");
 const without = check(dir);
 r = check(dir, "--own", "--verdicts", verdictsFile);
 const verdicts = JSON.parse(fs.readFileSync(verdictsFile, "utf8"));
-ok(without.status === 0 && !/own\.yml/.test(without.out) && r.status === 1 && /ok {3}own\.yml\/fine/.test(r.out) && /FAIL own\.yml\/broken: its step "echo broken && exit 3" failed/.test(r.out) && /skip own\.yml\/later/.test(r.out) && /FAIL 1 job\(s\) skipped above/.test(r.out),
+ok(without.status === 0 && !/own\.yml/.test(without.out) && r.status === 1 && /ok {3}own\.yml\/fine/.test(r.out) && /FAIL own\.yml\/broken: its step "echo broken && exit 3" failed/.test(r.out) && /skip own\.yml\/later/.test(r.out) && /FAIL 1 job/.test(r.out),
   "with --own the project's own jobs run too, one failing or not run here failing it, one whose condition does not hold skipped; without it, none", `${without.out}\n${r.out}`);
 ok(/host own\.yml\/deploy: it names an environment/.test(r.out) && !("own.yml/deploy" in verdicts) && verdicts["own.yml/secret"] === "passed",
   "a job of its own that names an environment, which deploys, is the host's own and not run, and its own jobs are given no secret", r.out);
@@ -109,7 +109,7 @@ let linked = true;
 try { fs.symlinkSync(path.join(dir, "linked.json"), dangling, "file"); } catch { linked = false; }
 const through = linked ? check(dir, "--verdicts", dangling) : null;
 ok(!linked || (through.status === 1 && mended(through.out) && /--verdicts .* is a link/.test(through.out) && !fs.existsSync(path.join(dir, "linked.json"))), "--verdicts that is a link to nothing in the project's repository is refused, saying its mend, and nothing is written there", through?.out);
-ok(verdicts["own.yml/fine"] === "passed" && verdicts["own.yml/broken"] === "failed" && !("own.yml/later" in verdicts) && verdicts["core.yml/core/core"] === "passed" && verdicts["own.yml/mac"] === "unrun" && Object.values(verdicts).every(v => /^(pass|fail|unrun)/.test(v)),
+ok(verdicts["own.yml/fine"] === "passed" && verdicts["own.yml/broken"] === "failed" && !("own.yml/later" in verdicts) && verdicts["core.yml/core/core"] === "passed" && verdicts["own.yml/mac"] === "unrun" && Object.values(verdicts).every(v => /^(pass|fail)ed$|^unrun$/.test(v)),
   "and --verdicts writes each job's verdict that ran, the core's and the project's own, by its place", JSON.stringify(verdicts));
 git(dir, "reset", "-q", "--hard", "HEAD~1");
 

@@ -17,10 +17,10 @@
 // here and is named: that is the host's part, and where a host has none, what stands in is in its
 // part (tasks/hosts.md). The personal-terms list is read from the environment (PERSONAL_TERMS), never from a file, as
 // the host keeps it among its secrets, and each of its terms is printed as *** wherever a step prints it, in any case. It prints
-// each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed.
+// each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed or could not run here.
 // With --own it runs the project's own jobs too (#1084), each job of its own workflows that calls no workflow and names
 // no environment, as the change itself holds them, given no secret, after the core's and only where the copy is the core; with
-// --verdicts it writes each job's verdict, "passed", "failed" or "stopped" behind core.yml's failure, by its place, to a file, and
+// --verdicts it writes each job's verdict, "passed", "failed", "unrun" or "stopped" behind a failure, by its place, to a file, and
 // RUN_FROM where this script lies outside the project, so that a run before an update and one after can be set side by side (release-trial.mjs, compared).
 // Git, bash and Node's own modules, the core's packages (packages.mjs), and gh where the manifest has no owner's row and no workflow's event says whose
 // account holds the repository (releases.mjs, hostAccount).
@@ -32,7 +32,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { movesForward, ownJobs, readable, syncCalls, triggered } from "./check-calls.mjs";
+import { closing, movesForward, ownJobs, readable, syncCalls, triggered } from "./check-calls.mjs";
 import { standIns } from "./check-actions.mjs";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { carriedAt, readCore } from "./core-path.mjs";
@@ -109,12 +109,10 @@ function main() {
   if (p.verdicts !== null) outside(p, o.verdicts);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
-  const { failed, ran, unrun } = runAll(p, runner(p, tmp), calledJobs(p, tmp));
+  const counts = runAll(p, runner(p, tmp), calledJobs(p, tmp));
   if (p.verdicts !== null) writeVerdicts(p, o.verdicts);
-  if (!failed && !ran && !unrun) fail("no check of the core ran on this change.", "call the core's workflows in the base the change merges into, as the starter kit writes them.");
-  if (unrun) warn(`FAIL ${unrun} job(s) skipped above could not run here, so proved nothing. ${MEND}run them where each skip line says, or mend the command it names.`);
-  say(failed || unrun ? `${failed} of the core's checks failed, ${unrun} not run` : `ok   every check of the core that runs from plain git passed (${ran})`);
-  process.exitCode = failed || unrun ? 1 : 0;
+  if (!counts.failed && !counts.ran && !counts.unrun) fail("no check of the core ran on this change.", "call the core's workflows in the base the change merges into, as the starter kit writes them.");
+  process.exitCode = closing(counts, say, warn);
 }
 
 // --verdicts names a file outside the project's repository, and no link: leadsOut reads a link to nothing as leading

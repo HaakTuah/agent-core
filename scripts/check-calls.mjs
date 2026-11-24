@@ -6,6 +6,7 @@
 // own calls leave out runs as the base holds it, and each they call otherwise runs too, so a sync leaves no check out. Also the reading of the project's
 // own workflows. Node's own modules, the core's address, its YAML reader and the runner's path filter.
 import { CORE } from "./core-address.mjs";
+import { MEND } from "./mend.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { needsOf } from "./workflow-needs.mjs";
 import { pathsLetThrough } from "./workflow-run.mjs";
@@ -89,4 +90,13 @@ export function ownJobs({ file, wf }, say) {
     return [id, { ...job, needs: needs.filter(n => ids.has(n)) }];
   });
   return kept.length ? [{ file, wf: { ...wf, jobs: Object.fromEntries(kept) } }] : [];
+}
+
+// The run's last lines, through `say` and `warn`, and its exit code. A job not run here proved nothing, so it fails the
+// run as a failed one does: where check.mjs is the gate, a broken command or a job of another system would pass
+// otherwise (#1245, points 8 and 9); its verdict still says unrun.
+export function closing({ failed, ran, unrun }, say, warn) {
+  if (unrun) warn(`FAIL ${unrun} job(s) skipped above could not run here, so proved nothing. ${MEND}run them where each skip line says, or mend the command it names.`);
+  say(failed || unrun ? `${failed} of the core's checks failed, ${unrun} not run` : `ok   every check of the core that runs from plain git passed (${ran})`);
+  return failed || unrun ? 1 : 0;
 }

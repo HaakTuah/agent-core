@@ -326,12 +326,14 @@ function runMatrixJob(rt, job, id, top, matrix, results) {
   } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 }
 
-// The system a job's `runs-on` names where it is not `platform` (process.platform's), or null (#1245, point 8).
+// The system a job's `runs-on` names where it is not `platform` (process.platform's), or null (#1245, point 8): Windows
+// or macOS alone, since a Linux runner's steps (the core's own jobs among them) run wherever bash and Node are, as they
+// did before, a program the machine lacks said so (point 9). A label is read whole or by its first part, as
+// windows-latest or macOS: a runner's own name such as machine-2 is none.
 function elsewhere(on, platform) {
-  // (a label read whole, or by its first part, as windows-latest or macOS: a runner's own name such as machine-2 is none)
   const labels = [on?.labels ?? on].flat().map(l => str(l).split("-")[0].toLowerCase());
-  const os = [["Windows", ["windows"], "win32"], ["macOS", ["macos", "mac"], "darwin"], ["Linux", ["ubuntu", "linux"], "linux"]].find(([, names]) => labels.some(l => names.includes(l)));
-  return os?.[2] !== platform ? os?.[0] ?? null : null;
+  const os = [["Windows", ["windows"], "win32"], ["macOS", ["macos", "mac"], "darwin"]].find(([, names]) => labels.some(l => names.includes(l)));
+  return os && os[2] !== platform ? os[0] : null;
 }
 
 // A map's values, each with its `${{ }}` filled in as text.
