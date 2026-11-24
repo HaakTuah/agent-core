@@ -140,7 +140,7 @@ function steps(missed) {
 
 // Each writer of a step not done in the project at `root` run, in the steps' order, and the step read again after it:
 // each { lead, wrote (the files it wrote), mend (what is left of the step, null where it is done now), left (its step's
-// `left`, which no check reads, or null; #1289) } or { lead, why } where it wrote nothing (it could not run, or its
+// `left`, which no check reads and never throws; #1289) } or { lead, why } where it wrote nothing (it could not run, or its
 // check could not read the project). A step the manifest declares undone on purpose, or done already, is left; a file
 // with changes not yet committed when the run began is never written. `merge`, last, the one process's key-merge mode
 // (converge.mjs, `merged`; #1095, point 5), given so, since that script reads the project with this one.
@@ -157,9 +157,7 @@ export function written(root, steps = STEPS, merge = null) {
     if (!wrote.length) continue;
     let mend;
     try { mend = step.check ? step.check(project(root)) : null; } catch (e) { mend = `its check could not read the project after it (${plain(e.message, root)})`; }
-    let left = null;
-    try { left = step.left?.(project(root)) ?? null; } catch { /* (its check's mend says so) */ }
-    out.push({ lead: step.lead, wrote, mend: mend && mendAt(mend, copy, own), left });
+    out.push({ lead: step.lead, wrote, mend: mend && mendAt(mend, copy, own), left: step.left?.(project(root)) });
   }
   return merge ? [...out, ...merge(root, busy)] : out;
 }
