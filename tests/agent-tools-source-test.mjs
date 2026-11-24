@@ -96,6 +96,15 @@ ok([MAIN_HOOK, KIT_HOOK, `bash -c 'git -C "$CLAUDE_PROJECT_DIR" show "refs/remot
     // the file fetched only to be thrown away while the working tree's copy runs)
     "echo git show refs/remotes/origin/main:a.sh; bash a.sh", "bash a.sh # git show refs/remotes/origin/main:a.sh",
     "git show refs/remotes/origin/main:./a.sh | bash", "git show refs/remotes/origin/main:../a.sh | bash",
-    "bash -c 'git show refs/remotes/origin/main:scripts/format.sh >/dev/null; bash scripts/format.sh'"].some(fetchesMain),
-  "a command that has git show a file of the remote's main is read as fetching from main, whatever its form, a path under a dot folder too; one that shows another ref, no file, no git's, a path from the folder it runs in, or output sent to a file, is not");
+    "bash -c 'git show refs/remotes/origin/main:scripts/format.sh >/dev/null; bash scripts/format.sh'",
+    'git show "refs/remotes/origin/main:a.sh" >/dev/null; bash a.sh', "git show refs/remotes/origin/main:a.sh &>/dev/null; bash a.sh",
+    "git show refs/remotes/origin/main:a.sh 1>/dev/null; bash a.sh",
+    // (past the length a hook's command takes, read as fetching nothing, the safe mark, and at once)
+    `git show refs/remotes/origin/main:a.sh | bash # ${"x".repeat(5000)}`].some(fetchesMain),
+  "a command that has git show a file of the remote's main is read as fetching from main, whatever its form, a path under a dot folder too; one that shows another ref, no file, no git's, a path from the folder it runs in, output sent to a file right after the path, or a command past the length a hook's takes, is not");
+// (the forms a hook written by hand takes: git on a line of its own, in a group, after then or exec, or after variables)
+ok(["cd x\ngit show refs/remotes/origin/main:a.sh | bash", "{ git show refs/remotes/origin/main:a.sh; } | bash",
+  "if true; then git show refs/remotes/origin/main:a.sh | bash; fi", "exec git show refs/remotes/origin/main:a.sh | bash",
+  "GIT_PAGER=cat git show refs/remotes/origin/main:a.sh | bash"].every(fetchesMain),
+  "git where a command starts, on a later line, in a group, after then or exec or variables set before it, is read as fetching from main");
 done("where each hook's command comes from");

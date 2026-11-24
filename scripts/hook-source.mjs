@@ -53,11 +53,14 @@ export function libraryOf(command) {
   const found = matched(command);
   return found?.library === undefined ? null : { library: found.library, rest: found.rest };
 }
-// Whether a command, in the kit's form or one of its own, has git show a file of the remote's `main`
-// (`git … show refs/remotes/origin/main:<path>`, the ref perhaps quoted), read from its words alone: git where a command
-// starts (never in an echo's words or a comment), the path from the repository's root (never ./ or ../, which git reads
-// from the folder it runs in), and its output not sent to a file. It does not show that what is fetched is what runs: a
-// hook so read is only marked as it stands ("from": "main", agent-tools-entries.mjs), and whether it runs main's copy
-// stays a security judgement.
-const FROM_MAIN = /(?:^|[;&|(`'"])\s*git\b[^;&|\n#]*?\sshow\s+["']?refs\/remotes\/origin\/main:(?!\.{1,2}\/)(?=([^\s;&|"'`)]+))\1["']?(?!\s*>)/u;
-export const fetchesMain = command => FROM_MAIN.test(String(command));
+// Whether a command, in the kit's form or one of its own, has git show a file of the remote's `main` (`git … show
+// refs/remotes/origin/main:<path>`, the ref perhaps quoted), read from its words alone: git where a command starts
+// (after a line's start, a separator, a brace, a quote, then, do, else or exec, or variables set before it; never in an
+// echo's words or a comment), the path from the repository's root (never ./ or ../, which git reads from the folder it
+// runs in), and no redirection of its output (`>`, `1>` or `&>`, never `2>`, which sends only errors aside) right after
+// the path. A command past MAIN_MAX characters reads as fetching nothing (the safe mark), so a crafted one costs no
+// long match. It does not show that what is fetched is what runs: a hook so read is only marked as it stands ("from":
+// "main", agent-tools-entries.mjs), and whether it runs main's copy stays a security judgement.
+const MAIN_MAX = 4096;
+const FROM_MAIN = /(?:^|[\n;&|({`'"]|\b(?:then|do|else|exec)(?=\s))(?:\s*\w+=[^\s;&|]*)*\s*git\b[^;&|\n#]{0,512}?\sshow\s{1,16}["']?refs\/remotes\/origin\/main:(?!\.{1,2}\/)(?=([^\s;&|"'`)]+))\1(?!["']?\s*(?:1|&)?>)/u;
+export const fetchesMain = command => String(command).length <= MAIN_MAX && FROM_MAIN.test(String(command));
