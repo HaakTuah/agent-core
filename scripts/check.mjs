@@ -56,13 +56,12 @@ export const HOST_OWN = {
 // (the caller's environment, its PATH held to absolute folders: an empty or relative entry is the folder a program
 // starts in, which the change under check fills, on any system; #513)
 const env = withAbsolutePath(plainEnv());
-// What the steps run with, since they run the change's own code (its copy's scripts, its packages' restore): only what
-// a program needs to start and reach the network, by name (on Windows the system's folders too, which NuGet reads by
-// name; #1239), a scratch home folder with the user's own folders and NuGet's machine-wide one in it, no system git
-// settings, and of git's settings only the rewrites of an address (url.*.insteadOf), so no token in this environment or
-// in git's settings reaches them. They still run as the caller's own user, so a pipeline runs this where no sign-in is
-// held (tasks/hosts.md).
-const KEPT = /^(PATH|LANG|LC_[A-Z]+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|PROGRAM(DATA|FILES(\(X86\))?)|HTTPS?_PROXY|NO_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|GIT_ALLOW_PROTOCOL)$/i;
+// What the steps run with, since they run the change's own code (its scripts, its packages' restore): only what a
+// program needs to start and reach the network, by name (on Windows ProgramFiles too, for NuGet; #1239), a scratch home
+// folder holding the user's folders and the machine's NuGet reads configs from, no system git settings, and of git's
+// settings only the rewrites of an address (url.*.insteadOf), so no token in this environment or in git's settings
+// reaches them. They still run as the caller's user, so a pipeline runs this where no sign-in is held (tasks/hosts.md).
+const KEPT = /^(PATH|LANG|LC_[A-Z]+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|PROGRAMFILES|HTTPS?_PROXY|NO_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|GIT_ALLOW_PROTOCOL)$/i;
 export function stepEnv(home) {
   const kept = Object.fromEntries(Object.entries(env).filter(([name]) => KEPT.test(name)));
   const rewrites = [];
@@ -72,8 +71,8 @@ export function stepEnv(home) {
     if (/^url\..+\.insteadof$/i.test(key) && !/:\/\/[^/]*@/.test(key)) rewrites.push([key, env[`GIT_CONFIG_VALUE_${i}`] ?? ""]);
   }
   const git = Object.fromEntries(rewrites.flatMap(([key, value], i) => [[`GIT_CONFIG_KEY_${i}`, key], [`GIT_CONFIG_VALUE_${i}`, value]]));
-  const own = { APPDATA: "Roaming", LOCALAPPDATA: "Local", NUGET_COMMON_APPLICATION_DATA: "Common" };
-  for (const d in own) fs.mkdirSync(own[d] = path.join(home, "AppData", own[d]), { recursive: true });
+  const own = { APPDATA: "Roaming", LOCALAPPDATA: "Local", ProgramData: "Data", "ProgramFiles(x86)": "x86", NUGET_COMMON_APPLICATION_DATA: "Common" };
+  for (const d in own) fs.mkdirSync(own[d] = path.join(home, own[d]), { recursive: true });
   return { ...kept, ...git, GIT_CONFIG_COUNT: String(rewrites.length), GIT_CONFIG_NOSYSTEM: "1", HOME: home, USERPROFILE: home, ...own };
 }
 let coreClone = null; // (the clone of the core's address, made at the first call: coreFile)
