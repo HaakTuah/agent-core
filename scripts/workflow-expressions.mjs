@@ -1,6 +1,6 @@
 // GitHub's expressions (`${{ }}`), as the workflow runner (workflow-run.mjs) and check.mjs read them: contexts,
-// literals, ! == != && || < > <= >= and the functions the core's workflows use. A context, function or sign it does not
-// know throws, so a form GitHub reads and this does not is named rather than read other than GitHub would. Node alone.
+// literals, ! == != && || < > <= >=, the object filter `*` and the functions the core's workflows and the projects' use
+// (#1263). A context, function or sign it does not know throws, so a form GitHub reads and this does not is named rather than read other than GitHub would. Node alone.
 
 const truthy = v => !(v === false || v === null || v === undefined || v === 0 || v === "" || Number.isNaN(v));
 export const str = v => (v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v));
@@ -28,7 +28,7 @@ function tokenize(expr) {
     let m;
     if ((m = /^\s+/.exec(rest))) { k += m[0].length; continue; }
     if ((m = /^'(?:[^']|'')*'/.exec(rest))) tokens.push({ s: m[0].slice(1, -1).replace(/''/g, "'") });
-    else if ((m = /^(==|!=|&&|\|\||<=|>=|[!()[\],.<>])/.exec(rest))) tokens.push({ op: m[0] });
+    else if ((m = /^(==|!=|&&|\|\||<=|>=|[!()[\],.<>*])/.exec(rest))) tokens.push({ op: m[0] });
     else if ((m = /^-?\d+(\.\d+)?/.exec(rest))) tokens.push({ n: Number(m[0]) });
     else if ((m = /^[A-Za-z_][\w-]*/.exec(rest))) tokens.push({ id: m[0] });
     else throw new Error(`an expression this reader does not know: ${expr}`);
@@ -44,9 +44,37 @@ function expressionFunctions(state) {
     endswith: (a, b) => str(a).toLowerCase().endsWith(str(b).toLowerCase()),
     contains: (a, b) => (Array.isArray(a) ? a.some(x => equal(x, b)) : str(a).toLowerCase().includes(str(b).toLowerCase())),
     fromjson: a => JSON.parse(str(a)), tojson: a => JSON.stringify(a ?? null),
+    join: (a, sep) => joined(a, sep),
     format: (f, ...args) => str(f).replace(/\{\{|\}\}|\{(\d+)\}/g, (m, k) => (m === "{{" ? "{" : m === "}}" ? "}" : str(args[Number(k)]))),
     always: () => true, cancelled: () => !!state.cancelled, success: () => !state.failed, failure: () => state.failed,
   };
+}
+
+// join as GitHub's page on expressions defines it: a list's values, or a text, cast to text and joined by the separator,
+// `,` where none is given. A value the page does not say it casts (a list or an object inside the list, a value that is
+// neither) stops the test, to be taught.
+function joined(a, sep) {
+  const list = typeof a === "string" ? [a] : Array.isArray(a) ? a : null;
+  if (!list || list.some(x => x !== null && typeof x === "object")) throw new Error(`a join this reader does not know: of ${JSON.stringify(a)}`);
+  return list.map(str).join(sep === undefined ? "," : str(sep));
+}
+
+// What an object filter `*` gives (#1263): a list of each item of a collection, an object's values or a list's items, and
+// after it a property of each item, as GitHub's page on expressions defines it. What the page leaves undefined (a filter
+// over what is no collection, an item without the property, an index after a filter) stops the test, to be taught.
+class Filtered extends Array {}
+const itemsOf = (v, expr) => {
+  if (Array.isArray(v)) return v;
+  if (v !== null && typeof v === "object") return Object.values(v);
+  throw new Error(`an object filter over what is no collection: ${JSON.stringify(v)} (in ${expr})`);
+};
+function filtered(v, key, expr) {
+  if (key === "*") return Filtered.from(v instanceof Filtered ? v.flatMap(x => itemsOf(x, expr)) : itemsOf(v, expr));
+  if (!(v instanceof Filtered)) return v?.[key] ?? null;
+  return Filtered.from(v.map(x => {
+    if (x === null || typeof x !== "object" || Array.isArray(x) || !Object.hasOwn(x, key)) throw new Error(`an object filter over an item without ${key}: ${JSON.stringify(x)} (in ${expr})`);
+    return x[key];
+  }));
 }
 
 // The parser `ps` holds the expression, its tokens, the place it stands at, its contexts and its functions.
@@ -79,7 +107,8 @@ function primaryExpr(ps) {
 function postfixExpr(ps) {
   let v = primaryExpr(ps);
   for (;;) {
-    if (peek(ps, ".")) { ps.p++; const t = ps.tokens[ps.p++]; if (!t?.id) throw new Error(`a property name expected in: ${ps.expr}`); v = v?.[t.id] ?? null; }
+    if (peek(ps, ".")) { ps.p++; const t = ps.tokens[ps.p++]; if (!t?.id && t?.op !== "*") throw new Error(`a property name expected in: ${ps.expr}`); v = filtered(v, t.id ?? "*", ps.expr); }
+    else if (peek(ps, "[") && v instanceof Filtered) throw new Error(`an index after an object filter, which this reader does not know: ${ps.expr}`);
     else if (peek(ps, "[")) { ps.p++; const k = orExpr(ps); take(ps, "]"); v = v?.[k] ?? null; }
     else return v;
   }
