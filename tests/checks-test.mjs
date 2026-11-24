@@ -181,7 +181,7 @@ if (process.platform !== "win32") {
   const under = version => run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base, NPM_STANDS_AS: version, PATH: `${bin}${path.delimiter}${env.PATH}` });
   for (const v of ["10.9.9", "11.14.1", ""]) {
     const old = under(v);
-    ok(old.status === 1 && !/^ran npm ci/m.test(old.out) && /^FAIL .*--allow-remote.*Mend: /m.test(old.out) && mended(old.out) && npmRefused(old.out) === (v ? "11.15.0" : null), `signatures: under npm ${v || "whose version cannot be read"} it installs nothing and fails, saying the mend${v ? ", in the words check.mjs reads to leave the job unrun on this machine" : ", which check.mjs leaves failed, since the change may be why"} (#1262)`, old.out);
+    ok(old.status === 1 && !/^ran npm ci/m.test(old.out) && /^FAIL .*--allow-remote.*Mend: /m.test(old.out) && mended(old.out) && npmRefused(old.out) === (v ? "11.15.0" : null) && (!v || old.out.includes(`--ignore-scripts npm@${npmRefused(old.out)}`)), `signatures: under npm ${v || "whose version cannot be read"} it installs nothing and fails, saying the mend${v ? ", in the words check.mjs reads to leave the job unrun on this machine" : ", which check.mjs leaves failed, since the change may be why"} (#1262)`, old.out);
     // (#1262: a job failed by that refusal alone is unrun on this machine, naming the least version of npm, as check.mjs writes
     // its verdict; one with another failure beside it, or a passed job, is not)
     const jobOf = (...outs) => ({ passed: false, ran: true, steps: [{ passed: true, ran: true, out: "" }, ...outs.map((out, i) => ({ name: i ? "A step of the change" : "The signature check", passed: false, ran: true, out }))] });
