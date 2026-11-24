@@ -30,8 +30,12 @@ fs.writeFileSync(event, JSON.stringify({ repository: { full_name: repo, private:
 ok(privateOf(hosted, { env: { GITHUB_EVENT_PATH: event }, ask: notAsked, bare: notAsked }).private === false, "GitHub's job reads it from the event it runs on, and asks nothing else");
 fs.writeFileSync(event, JSON.stringify({ repository: { full_name: "someone-else/another", private: false } }));
 const refused = privateOf(hosted, { env: { GITHUB_EVENT_PATH: event }, ask: noGh, bare: bare({ status: 404 }) });
-ok(/could not be read: GitHub gave gh no answer \(gh: Not Found \(HTTP 404\)\), nor a read with no sign-in \(HTTP 404, as for a private repository or one not there\)\. Mend: for a public repository, .*for a private one, read the host's answer in a step of its own.*CORE_PRIVATE/.test(refused.unread ?? "") && refused.private === undefined && bareRoutes.join() === `repos/${repo}`,
+ok(/could not be read: GitHub gave gh no answer \(gh: Not Found \(HTTP 404\)\), nor a read with no sign-in \(HTTP 404, as for a private repository or one not there\)\. Mend: .*CORE_PRIVATE.*/.test(refused.unread ?? "") && refused.private === undefined && bareRoutes.join() === `repos/${repo}`,
   "an event of another repository is not read, and where gh and a read with no sign-in give no answer, it says so with the mend, a refusal never read as private", JSON.stringify(refused));
+
+// (a public repository whose visibility the session read another way is offered CORE_PRIVATE=false too: #1265, point 1)
+ok(/read in a step of its own that runs none of the project's code: .*for a private repository, `true`.*for a public one, `false`, where the session read it so another way/.test(refused.unread ?? ""),
+  "the mend offers CORE_PRIVATE for a public repository too, false as read in a step that runs none of the project's code, beside true for a private one", refused.unread);
 
 // ---- where gh is not signed in (#1246, point 2) ----
 const asked = answer => privateOf(hosted, { env: {}, ask: noGh, bare: answer });
