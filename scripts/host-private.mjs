@@ -83,7 +83,8 @@ function fromEvent(env, repo) {
 }
 
 // What gh says of `repo`, else GitHub's API with no sign-in, else the host's answer a session read in a step of its own
-// and gave as CORE_PRIVATE (`true` or `false`), or why none could, with the mend.
+// and gave as CORE_PRIVATE (`true` or `false`, for a public repository as for a private one; #1265, point 1), or why
+// none could, with the mend.
 function fromGh(ask, bare, repo, env) {
   let why = "";
   try { const r = JSON.parse(ask(`repos/${repo}`)); if (typeof r?.private === "boolean") return { private: r.private }; } catch (e) { why = ` (${String(e.message).split("\n")[0].slice(0, 120)})`; }
@@ -92,5 +93,5 @@ function fromGh(ask, bare, repo, env) {
   if (open.status === 200 && typeof open.private === "boolean") return { private: open.private };
   if (/^(true|false)$/.test(env.CORE_PRIVATE ?? "")) return { private: env.CORE_PRIVATE === "true" };
   const plain = `HTTP ${Number(open.status) || "none"}${open.status === 404 ? ", as for a private repository or one not there" : open.status === 403 ? ", refused or past the limit for readers with no sign-in" : ""}`;
-  return { unread: `whether ${repo} is private could not be read: GitHub gave gh no answer${why}, nor a read with no sign-in (${plain}). Mend: for a public repository, run it again once this machine reaches api.github.com and is not past GitHub's limit for readers with no sign-in; for a private one, read the host's answer in a step of its own, which runs none of the project's code (\`gh api repos/${repo} --jq .private\`, where gh is signed in for an account that can read it), and run it again with CORE_PRIVATE set to what that printed, \`true\` or \`false\`` };
+  return { unread: `whether ${repo} is private could not be read: GitHub gave gh no answer${why}, nor a read with no sign-in (${plain}). Mend: run it again with CORE_PRIVATE set to the host's answer, read in a step of its own that runs none of the project's code: for a private repository, \`true\`, as \`gh api repos/${repo} --jq .private\` prints it where gh is signed in for an account that can read it; for a public one, \`false\`, where the session read it so another way (that command, or the repository's page on github.com, which says "Public" beside its name), or run it again with nothing set once this machine reaches api.github.com and is not past GitHub's limit for readers with no sign-in` };
 }
