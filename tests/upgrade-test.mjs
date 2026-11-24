@@ -1235,7 +1235,8 @@ function preRelease(name, { windows }) {
   // its own old sync script, run as its rules say, with no SHA: the core's newest main, which no release holds
   git(theCore, "commit", "-q", "--allow-empty", "-m", "a commit of main past the newest release");
   git(dir, "checkout", "-q", "-B", "sync", main0);
-  // (what its sync wrote is committed only where it wrote something: where it wrote nothing, the case below fails with the sync's own words, never with git's "nothing to commit", #1225)
+  // (what its sync wrote is committed only where it wrote something: where it wrote nothing, the case fails
+  // with the sync's own words, never with git's "nothing to commit"; #1225)
   const commitWhatItWrote = message => { git(dir, "add", "-A"); const wrote = git(dir, "status", "--porcelain") !== ""; if (wrote) git(dir, "commit", "-q", "-m", message); return wrote; };
   let s = node(dir, "core/scripts/sync.mjs");
   const wrote = commitWhatItWrote("Sync the core");
@@ -1263,10 +1264,9 @@ function preRelease(name, { windows }) {
   git(dir, "commit", "-q", "-am", "its suite skips its callers of the core's workflows too");
   const remedied = git(dir, "rev-parse", "HEAD");
   s = node(dir, "core/scripts/sync.mjs", head);
-  git(dir, "add", "-A");
-  git(dir, "commit", "-q", "-m", `Sync the core to ${carrying}`);
+  const wroteForRemedy = commitWhatItWrote(`Sync the core to ${carrying}`);
   const onRemedied = started(checks(p, "pull_request", git(dir, "rev-parse", "HEAD"), { baseSha: remedied, title: `Sync the core to ${carrying}`, dry: true }));
-  ok(s.status === 0 && !onRemedied.includes("suite.yml/tests") && onRemedied.every(w => before.includes(w)), `${name}: with each caller listed in its suite's paths-ignore, the sync starts no job of its own suite, nor any it did not start before`, onRemedied.join("\n"));
+  ok(wroteForRemedy && s.status === 0 && !onRemedied.includes("suite.yml/tests") && onRemedied.every(w => before.includes(w)), `${name}: with each caller listed in its suite's paths-ignore, the sync starts no job of its own suite, nor any it did not start before`, `${s.out}\n${onRemedied.join("\n")}`);
 
   git(dir, "checkout", "-q", "main");
   git(dir, "merge", "-q", "--no-ff", "-m", "Merge the sync", "sync");
