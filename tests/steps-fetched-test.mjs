@@ -5,7 +5,6 @@
 // actionlint and lychee. Node's own modules and git.
 //
 //   node tests/steps-fetched-test.mjs
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { STEPS, fetched, notDone } from "../scripts/steps.mjs";
@@ -68,9 +67,7 @@ if (process.platform !== "win32") {
   fs.writeFileSync(far, "runs:\n  using: composite\n  steps: []\n# FINDME\n");
   fs.mkdirSync(path.dirname(action));
   fs.symlinkSync(far, action);
-  execFileSync("git", ["add", "x/action.yml"], { cwd: d });
   ok(!ran(env, WORKFLOWS), "an action that is a link out of the project is not read, nor given to the tools");
-  execFileSync("git", ["rm", "-q", "--cached", "x/action.yml"], { cwd: d });
   fs.rmSync(path.dirname(action), { recursive: true });
 
   const agents = path.join(d, "AGENTS.md"), text = fs.readFileSync(agents, "utf8");
