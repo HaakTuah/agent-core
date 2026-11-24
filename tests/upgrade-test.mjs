@@ -105,6 +105,44 @@ ok(matrixed.map(r => r.job).join() === "analyze (a, x),analyze (a, y),analyze (b
 let threw = 0;
 for (const bad of ["vars.X == 1", "hashFiles('x')", "a ~ b"]) { try { evaluate(bad, c); } catch { threw++; } }
 ok(threw === 3, "a context, function or sign it does not know stops the test, to be taught, rather than read other than GitHub would");
+// (#1263: the object filter `*` and join, as GitHub's page on expressions defines them, its own examples among them)
+{
+  const f = { needs: { lint: { result: "success", outputs: {} }, test: { result: "failure", outputs: {} } },
+    fruits: [{ name: "apple", quantity: 1 }, { name: "orange", quantity: 2 }, { name: "pear", quantity: 1 }],
+    vegetables: { scallions: { ediblePortions: ["roots", "stalks"] }, beets: { ediblePortions: ["hearts", "stems", "leaves"] }, artichokes: { ediblePortions: ["roots", "stems", "leaves"] } } };
+  const read = e => { try { return evaluate(e, f); } catch (err) { return `threw: ${err.message}`; } };
+  ok(read("join(needs.*.result, ' ')") === "success failure" && read("contains(needs.*.result, 'FAILURE')") === true && JSON.stringify(read("fruits.*.name")) === '["apple","orange","pear"]'
+    && JSON.stringify(read("vegetables.*.ediblePortions")) === '[["roots","stalks"],["hearts","stems","leaves"],["roots","stems","leaves"]]',
+    "an object filter over an object or a list gives a list of each item's property, which join and contains read", [read("join(needs.*.result, ' ')"), JSON.stringify(read("fruits.*.name")), JSON.stringify(read("vegetables.*.ediblePortions"))].join(" | "));
+  ok(read("join(fruits.*.name)") === "apple,orange,pear" && read("join('one')") === "one" && read("join(fromJSON('[1, true, null]'), '-')") === "1-true-",
+    "join takes a list or a text, `,` where no separator is given, each value cast to text", [read("join(fruits.*.name)"), read("join('one')"), read("join(fromJSON('[1, true, null]'), '-')")].join(" | "));
+  ok(["fruits.*.colour", "needs.*['result']", "join(needs)"].every(e => String(read(e)).startsWith("threw:")),
+    "what the page leaves undefined (a property an item lacks, an index after a filter, join of an object) stops the test, to be taught", ["fruits.*.colour", "needs.*['result']", "join(needs)"].map(read).join(" | "));
+}
+// (#1263: a matrix's include and exclude, as GitHub's workflow syntax defines them, its own examples)
+{
+  const jobs = (matrix, inputs = "") => {
+    try { return runWorkflow(`on:\n  workflow_call:${inputs}\njobs:\n  j:\n    strategy:\n      matrix:\n${matrix}    steps: []\n`, { github: {}, dry: true }).map(r => r.job.replace(/^j \((.*)\)$/u, "$1")); } catch (e) { return [`threw: ${e.message}`]; }
+  };
+  const worked = jobs("        fruit: [apple, pear]\n        animal: [cat, dog]\n        include:\n          - color: green\n          - color: pink\n            animal: cat\n          - fruit: apple\n            shape: circle\n          - fruit: banana\n          - fruit: banana\n            animal: cat\n");
+  ok(worked.join(" | ") === "apple, cat, pink, circle | apple, dog, green, circle | pear, cat, pink | pear, dog, green | banana | banana, cat",
+    "an include adds its values to each original combination it overwrites no original value of, else stands as a combination of its own", worked.join(" | "));
+  const adding = jobs("        os: [macos-latest, windows-latest, ubuntu-latest]\n        version: [12, 14, 16]\n        include:\n          - os: windows-latest\n            version: 17\n");
+  const only = jobs("        include:\n          - site: production\n            datacenter: site-a\n          - site: staging\n            datacenter: site-b\n");
+  ok(adding.length === 10 && adding[9] === "windows-latest, 17" && only.join(" | ") === "production, site-a | staging, site-b",
+    "an include that fits no combination adds one, and a matrix of include alone runs each entry", [adding.join(" | "), only.join(" | ")].join(" || "));
+  const excluded = jobs("        os: [macos-latest, windows-latest]\n        version: [12, 14, 16]\n        environment: [staging, production]\n        exclude:\n          - os: macos-latest\n            version: 12\n            environment: production\n          - os: windows-latest\n            version: 16\n");
+  ok(excluded.length === 9 && !excluded.includes("macos-latest, 12, production") && !excluded.some(j => j.startsWith("windows-latest, 16")),
+    "an exclude takes out each combination it matches in part", excluded.join(" | "));
+  const back = jobs("        os: [a, b]\n        exclude: ${{ fromJSON(inputs.out) }}\n        include:\n          - os: b\n", "\n    inputs:\n      out:\n        type: string\n        default: '[{\"os\": \"b\"}]'\n");
+  ok(back.join(" | ") === "a | b", "include is read after exclude, so it adds back what exclude took out, and either may be an expression", back.join(" | "));
+  ok(jobs("        os: [a]\n        exclude:\n          - shell: bash\n")[0].startsWith("threw:") && jobs("        include: [a]\n")[0].startsWith("threw:"),
+    "an exclude of a key the matrix lacks, and an include that is no mapping, stop the test, to be taught");
+  ok(jobs("        os: [a, b]\n        include:\n          - constructor: c\n").join(" | ") === "a, c | b, c" && jobs("        os: [a, b]\n        exclude:\n          - toString: c\n")[0].startsWith("threw:"),
+    "a key named as an object's own (constructor, toString) is a matrix key like any other, never one the matrix seems to have", jobs("        os: [a, b]\n        include:\n          - constructor: c\n").join(" | "));
+  ok(["        os: [a]\n        include:\n          - __proto__: {x: y}\n", "        include: []\n", "        os: []\n"].every(m => jobs(m).join("").startsWith("threw:")),
+    "a key __proto__, and a matrix that makes no job, which the page does not define, stop the test, to be taught");
+}
 
 // ---- the core: its history, with the commit under test as main, cut as a release ----
 const tmp = scratchDir("upgrade-test-");

@@ -35,7 +35,7 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { MEND } from "./mend.mjs";
 import { installStep, installed } from "./packages.mjs";
-import { npmIgnores, npmReadsAll, npmVersion } from "./npm-reads.mjs";
+import { npmIgnores, npmReadsAll, npmRefusal, npmVersion } from "./npm-reads.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 
@@ -200,7 +200,7 @@ function unread(cwd) {
   const version = npmVersion(cwd), ignored = npmIgnores(version, ALLOWS);
   if (!ignored.length) return false;
   const least = npmReadsAll(ALLOWS);
-  console.log(`FAIL npm ${version || "here, whose version could not be read,"} reads none of ${ignored.map(s => `--${s}`).join(", ")}, which npm reads from ${least} on, so its install would fetch any git, web or file source the lock file names, and nothing was installed. ${MEND}run this check under the core's own Node, the version in its .node-version, whose npm reads them, as the signatures job does, or update npm here to ${least} or later`);
+  console.log(`FAIL ${npmRefusal(version, ignored, least)} ${MEND}run this check under the core's own Node, the version in its .node-version, whose npm reads them, as the signatures job does, or update npm here to ${least} or later`);
   return true;
 }
 const install = cwd => !unread(cwd) && passed(process.platform === "win32"

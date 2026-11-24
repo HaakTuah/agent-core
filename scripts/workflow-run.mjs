@@ -1,145 +1,25 @@
 // What the upgrade test stands on (upgrade-test.mjs): it runs a workflow of the core's as GitHub would run it for a
 // project, job by job and step by step, so that the test runs each check's own shell and not a copy of it. It reads
-// the workflow's YAML with parse-yaml.mjs, evaluates GitHub's expressions (`${{ }}`: contexts, literals,
-// ! == != && || and the functions the core's workflows use), and runs each job whose `if` holds, a job for each
-// combination of its matrix: each `run` step in bash as GitHub runs it (with -e, and pipefail where its shell is named
-// bash), its env and its expressions filled in, its outputs read from GITHUB_OUTPUT; each `uses` step by a handler the
-// caller gives for that action, or not at all, said so. A context or function it does not know throws, so a workflow
-// the core changes in a way this cannot read fails the test, and is taught here, rather than running other than GitHub
-// would. Its runner is run by the tests, and by check.mjs, which runs the core's checks from plain git where no GitHub
-// runs them (tasks/hosts.md); no workflow of the core's runs it. Node's own modules, the YAML reader (parse-yaml.mjs) and the install step's copies (workflow-install.mjs).
+// the workflow's YAML with parse-yaml.mjs, evaluates GitHub's expressions with workflow-expressions.mjs, and runs each
+// job whose `if` holds, a job for each combination of its matrix, its include and exclude read as GitHub's page on the
+// workflow syntax defines them (#1263): each `run` step in bash as GitHub runs it (with -e, and pipefail where its shell
+// is named bash), its env and its expressions filled in, its outputs read from GITHUB_OUTPUT; each `uses` step by a handler the caller gives for that action, or not at all, said so. A context,
+// function or matrix it does not know throws, so a workflow the core changes in a way this cannot read fails the test,
+// and is taught here, rather than running other than GitHub would. Its runner is run by the tests, and by check.mjs,
+// which runs the core's checks from plain git where no GitHub runs them (tasks/hosts.md); no workflow of the core's
+// runs it. Node's own modules, the YAML reader (parse-yaml.mjs), the expressions' (workflow-expressions.mjs) and the
+// install step's copies (workflow-install.mjs).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { parseYaml } from "./parse-yaml.mjs";
+import { evaluate, fill, holds, str } from "./workflow-expressions.mjs";
 import { installKey, keepInstall, takeInstall } from "./workflow-install.mjs";
 import { inNeedsOrder, needsOf } from "./workflow-needs.mjs";
 
-// ---- GitHub's expressions ----
-
-const truthy = v => !(v === false || v === null || v === undefined || v === 0 || v === "" || Number.isNaN(v));
-const str = v => (v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v));
-const num = v => (v === null || v === undefined ? 0 : v === true ? 1 : v === false ? 0 : v === "" ? 0 : Number(v));
-const equal = (a, b) => {
-  a ??= null; b ??= null;
-  if (typeof a === "string" && typeof b === "string") return a.toLowerCase() === b.toLowerCase();
-  if (typeof a === typeof b) return a === b;
-  if (a === null || b === null) return false;
-  return num(a) === num(b);
-};
-
-/** The value of an expression (without its `${{ }}`), in the contexts given and the job's state so far. */
-export function evaluate(expr, contexts, state = { failed: false }) {
-  const ps = { expr, contexts, tokens: tokenize(expr), p: 0, fns: expressionFunctions(state) };
-  const out = orExpr(ps);
-  if (ps.p !== ps.tokens.length) throw new Error(`an expression this reader does not know: ${expr}`);
-  return out;
-}
-
-function tokenize(expr) {
-  const tokens = [];
-  for (let k = 0; k < expr.length;) {
-    const rest = expr.slice(k);
-    let m;
-    if ((m = /^\s+/.exec(rest))) { k += m[0].length; continue; }
-    if ((m = /^'(?:[^']|'')*'/.exec(rest))) tokens.push({ s: m[0].slice(1, -1).replace(/''/g, "'") });
-    else if ((m = /^(==|!=|&&|\|\||<=|>=|[!()[\],.<>])/.exec(rest))) tokens.push({ op: m[0] });
-    else if ((m = /^-?\d+(\.\d+)?/.exec(rest))) tokens.push({ n: Number(m[0]) });
-    else if ((m = /^[A-Za-z_][\w-]*/.exec(rest))) tokens.push({ id: m[0] });
-    else throw new Error(`an expression this reader does not know: ${expr}`);
-    k += m[0].length;
-  }
-  return tokens;
-}
-
-// The functions an expression may call, by their lower-case names.
-function expressionFunctions(state) {
-  return {
-    startswith: (a, b) => str(a).toLowerCase().startsWith(str(b).toLowerCase()),
-    endswith: (a, b) => str(a).toLowerCase().endsWith(str(b).toLowerCase()),
-    contains: (a, b) => (Array.isArray(a) ? a.some(x => equal(x, b)) : str(a).toLowerCase().includes(str(b).toLowerCase())),
-    fromjson: a => JSON.parse(str(a)), tojson: a => JSON.stringify(a ?? null),
-    format: (f, ...args) => str(f).replace(/\{\{|\}\}|\{(\d+)\}/g, (m, k) => (m === "{{" ? "{" : m === "}}" ? "}" : str(args[Number(k)]))),
-    always: () => true, cancelled: () => !!state.cancelled, success: () => !state.failed, failure: () => state.failed,
-  };
-}
-
-// The parser `ps` holds the expression, its tokens, the place it stands at, its contexts and its functions.
-const peek = (ps, op) => ps.tokens[ps.p]?.op === op;
-const take = (ps, op) => { if (!peek(ps, op)) throw new Error(`"${op}" expected in: ${ps.expr}`); ps.p++; };
-
-function callExpr(ps, name) {
-  const fn = ps.fns[name.toLowerCase()];
-  if (!fn) throw new Error(`a function this reader does not know: ${name}`);
-  take(ps, "(");
-  const args = [];
-  while (!peek(ps, ")")) { args.push(orExpr(ps)); if (!peek(ps, ")")) take(ps, ","); }
-  take(ps, ")");
-  return fn(...args);
-}
-
-function primaryExpr(ps) {
-  const t = ps.tokens[ps.p++];
-  if (!t) throw new Error(`an expression ends too soon: ${ps.expr}`);
-  if (t.op === "(") { const v = orExpr(ps); take(ps, ")"); return v; }
-  if ("s" in t) return t.s;
-  if ("n" in t) return t.n;
-  if (t.id === "true" || t.id === "false") return t.id === "true";
-  if (t.id === "null") return null;
-  if (t.id && peek(ps, "(")) return callExpr(ps, t.id);
-  if (t.id) { if (!(t.id in ps.contexts)) throw new Error(`a context this test does not give: ${t.id} (in ${ps.expr})`); return ps.contexts[t.id]; }
-  throw new Error(`an expression this reader does not know: ${ps.expr}`);
-}
-
-function postfixExpr(ps) {
-  let v = primaryExpr(ps);
-  for (;;) {
-    if (peek(ps, ".")) { ps.p++; const t = ps.tokens[ps.p++]; if (!t?.id) throw new Error(`a property name expected in: ${ps.expr}`); v = v?.[t.id] ?? null; }
-    else if (peek(ps, "[")) { ps.p++; const k = orExpr(ps); take(ps, "]"); v = v?.[k] ?? null; }
-    else return v;
-  }
-}
-
-const unaryExpr = ps => (peek(ps, "!") ? (ps.p++, !truthy(unaryExpr(ps))) : postfixExpr(ps));
-
-const ordered = { "<": (a, b) => a < b, ">": (a, b) => a > b, "<=": (a, b) => a <= b, ">=": (a, b) => a >= b };
-function compareExpr(ps) {
-  let v = unaryExpr(ps);
-  while (["<", ">", "<=", ">="].includes(ps.tokens[ps.p]?.op)) { const op = ps.tokens[ps.p++].op, w = unaryExpr(ps); v = ordered[op](num(v), num(w)); }
-  return v;
-}
-
-function eqExpr(ps) {
-  let v = compareExpr(ps);
-  while (peek(ps, "==") || peek(ps, "!=")) { const op = ps.tokens[ps.p++].op, w = compareExpr(ps); v = op === "==" ? equal(v, w) : !equal(v, w); }
-  return v;
-}
-
-function andExpr(ps) {
-  let v = eqExpr(ps);
-  while (peek(ps, "&&")) { ps.p++; const w = eqExpr(ps); v = truthy(v) ? w : v; }
-  return v;
-}
-
-function orExpr(ps) {
-  let v = andExpr(ps);
-  while (peek(ps, "||")) { ps.p++; const w = andExpr(ps); v = truthy(v) ? v : w; }
-  return v;
-}
-
-/** A text with each `${{ }}` in it filled in. */
-export const fill = (text, contexts, state) => (typeof text === "string" ? text.replace(/\$\{\{([\s\S]*?)\}\}/g, (_, e) => str(evaluate(e, contexts, state))) : text);
-/** Whether an `if` holds: a whole `${{ }}`, or an expression written bare. Left out: success(). */
-export function holds(cond, contexts, state) {
-  if (cond === undefined || cond === null) return !state.failed;
-  if (typeof cond === "boolean") return cond && !state.failed;
-  const t = String(cond).trim();
-  // (as GitHub reads it: a condition that asks no status of its own is read as success() && it)
-  if (!/\b(?:success|failure|always|cancelled)\s*\(/u.test(t) && state.failed) return false;
-  const whole = /^\$\{\{([\s\S]*)\}\}$/.exec(t);
-  return truthy(whole ? evaluate(whole[1], contexts, state) : t.includes("${{") ? fill(t, contexts, state) : evaluate(t, contexts, state));
-}
+// (the expressions, for those that import them from the runner, check.mjs among them)
+export { evaluate, fill, holds };
 
 // ---- running a called workflow ----
 
@@ -148,20 +28,51 @@ const valueOf = (v, contexts) => {
   const whole = typeof v === "string" && /^\s*\$\{\{([\s\S]*)\}\}\s*$/.exec(v);
   return whole ? evaluate(whole[1], contexts) : v;
 };
-// A job's matrix as its combinations ([null] for a job with none): each key's list, in GitHub's order. An include or an
-// exclude, which this has no need of yet, stops the test, to be taught.
+// A job's matrix as its combinations ([null] for a job with none), as GitHub's page on the workflow syntax defines
+// `jobs.<job_id>.strategy.matrix` (#1263): each key's list, in the order the keys are written; then each `exclude` entry
+// takes out every combination it matches in part; then each `include` entry, in order, adds its values to every original
+// combination where it overwrites no original value (an added one it may), and where it fits none stands as a
+// combination of its own, which no later entry extends. A matrix of include alone runs each entry. What the page leaves
+// undefined (an exclude of a key the matrix lacks, an entry that is no mapping, a key `__proto__`, a matrix that makes
+// no job) stops the test, to be taught.
 function combinations(matrix, contexts) {
   if (matrix === undefined || matrix === null) return [null];
   const m = valueOf(matrix, contexts);
-  if (!m || typeof m !== "object" || Array.isArray(m) || "include" in m || "exclude" in m) throw new Error(`a matrix this runner does not know: ${JSON.stringify(matrix)}`);
-  let list = [{}];
-  for (const [key, raw] of Object.entries(m)) {
+  if (!isMapping(m) || Object.hasOwn(m, "__proto__")) throw new Error(`a matrix this runner does not know: ${JSON.stringify(matrix)}`);
+  const { include = [], exclude = [], ...vars } = m;
+  const known = k => Object.hasOwn(vars, k);
+  let list = Object.keys(vars).length ? [{}] : [];
+  for (const [key, raw] of Object.entries(vars)) {
     const values = valueOf(raw, contexts);
     if (!Array.isArray(values)) throw new Error(`a matrix this runner does not know: ${key}`);
     list = list.flatMap(c => values.map(v => ({ ...c, [key]: v })));
   }
+  for (const entry of entries(exclude, "exclude", contexts)) {
+    const lacking = Object.keys(entry).find(k => !known(k));
+    if (lacking) throw new Error(`a matrix's exclude names ${lacking}, which the matrix lacks: this runner does not know what GitHub does with it`);
+    list = list.filter(c => !Object.entries(entry).every(([k, v]) => same(c[k], v)));
+  }
+  const added = [];
+  for (const entry of entries(include, "include", contexts)) {
+    const fits = list.filter(c => Object.entries(entry).every(([k, v]) => !known(k) || same(c[k], v)));
+    for (const c of fits) Object.assign(c, entry);
+    if (!fits.length) added.push({ ...entry });
+  }
+  const all = [...list, ...added];
+  if (!all.length) throw new Error(`a matrix that makes no job, which this runner does not know: ${JSON.stringify(matrix)}`);
+  return all;
+}
+
+const isMapping = v => v !== null && typeof v === "object" && !Array.isArray(v);
+// A matrix's include or exclude: a list of mappings, written so or given by an expression.
+function entries(raw, what, contexts) {
+  const list = valueOf(raw, contexts);
+  if (!Array.isArray(list) || !list.every(e => isMapping(e) && !Object.hasOwn(e, "__proto__"))) throw new Error(`a matrix's ${what} this runner does not know: ${JSON.stringify(raw)}`);
   return list;
 }
+// Whether two of a matrix's values are the same: equal as written, a mapping or list by each of its values.
+const same = (a, b) => (isMapping(a) && isMapping(b) ? Object.keys(a).length === Object.keys(b).length && Object.keys(a).every(k => same(a[k], b[k]))
+  : Array.isArray(a) && Array.isArray(b) ? a.length === b.length && a.every((x, k) => same(x, b[k])) : a === b);
 
 const outputsOf = file => {
   const out = {};
