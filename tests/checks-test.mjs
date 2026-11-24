@@ -76,6 +76,31 @@ const run = (dir, args, extra = {}) => {
   ok(r.status === 1 && [...r.out.matchAll(/^ran (\S+)/gm)].length === COPIES.length && /^FAIL --base origin\/nowhere is no commit here/m.test(r.out) && mended(r.out),
     "a base that cannot be fetched fails as a check of its own, saying its mend, and each of the seven checks still runs", r.out);
 }
+// (#674) in a checkout as the workflows make one, the merge commit and its parents with no branch of origin's, whose
+// origin refuses a fetch with no token as a private repository's does: origin/main cannot be had, and HEAD^1, which the
+// workflows give, is had with no fetch and given to each check as its commit
+{
+  const origin = project();
+  git(origin, "switch", "-q", "-c", "change");
+  fs.writeFileSync(path.join(origin, "a.txt"), "a\n");
+  git(origin, "add", "-A");
+  git(origin, "commit", "-q", "-m", "change");
+  git(origin, "switch", "-q", "main");
+  git(origin, "merge", "-q", "--no-ff", "--no-edit", "change");
+  const base = git(origin, "rev-parse", "HEAD^1");
+  const ws = path.join(tmp, "checkout");
+  git(tmp, "init", "-q", ws);
+  git(ws, "remote", "add", "origin", path.join(tmp, "refuses.git")); // (no repository there: every fetch fails)
+  git(ws, "fetch", "-q", "--depth=2", "--no-tags", `file://${origin}`, git(origin, "rev-parse", "HEAD"));
+  git(ws, "checkout", "-q", "--detach", "FETCH_HEAD");
+  const refused = run(ws, ["copies", "--copies", "c.json", "--sizes", "s.json", "--base", "origin/main"]);
+  ok(refused.status === 1 && /^FAIL --base origin\/main is no commit here, and could not be fetched/m.test(refused.out) && mended(refused.out),
+    "where origin refuses a fetch, the base given as origin/<branch> cannot be had, which the workflows gave before #674", refused.out);
+  const r = run(ws, ["copies", "--copies", "c.json", "--sizes", "s.json", "--base", "HEAD^1"]);
+  const given = [...r.out.matchAll(/^ran \S+ \[[^\]]*\] (\w+_BASE)=([^,\s]*)/gm)];
+  ok(r.status === 0 && given.length === COPIES.filter(([, , , v]) => v).length && given.every(m => m[2] === base),
+    "the base given as HEAD^1, the merge's first parent, is had with no fetch, and each check is given it as its commit", r.out);
+}
 // with no part named: what the project's calls run, folded into core.yml, or each in its own
 {
   const folded = project({ ".github/workflows/core.yml": CALLS("    with:\n      copies: checks/copies.json\n      sizes: checks/sizes.json\n      description: true\n      nuget: checks/licences.json\n") });

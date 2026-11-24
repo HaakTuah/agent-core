@@ -49,8 +49,9 @@ const MARKED = /GH(?:EXPR|GLOB)\d+Z/u;
 // (how long the grammar may take on a step's text, every reading of it together, in milliseconds: its recovery from an
 // error grows faster than the text, and no step holds a text it cannot read in that time but to hide what it holds.
 // Such a step is not read at all, never read in parts, since a line read alone misreads a quote or a continued line
-// that runs over it)
-const WHOLE = 500;
+// that runs over it). A test of a reader on a loaded machine gives a longer time in CORE_BASH_PARSE_MS, read when the
+// parser's thread starts, so that a text it reads within its time elsewhere is not lost to a busy runner (#1163)
+const WHOLE = Number(process.env.CORE_BASH_PARSE_MS) > 0 ? Number(process.env.CORE_BASH_PARSE_MS) : 500;
 
 /** The commands of `run`, read with the parser's `parse` (in its thread: bashCommands, above); null where the grammar
  *  cannot read it within its time. */
