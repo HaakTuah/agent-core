@@ -25,7 +25,7 @@ ok(!fetched(step(WORKFLOWS), {}) && !fetched(step(WORKFLOWS), { ZIZMOR: "z" }) &
 if (process.platform !== "win32") {
   // (stand-ins: zizmor and actionlint that find one thing in a workflow that holds "FINDME", else nothing; lychee that
   // lists each [text](path) of a file as its --dump does, and reports no heading)
-  const bin = scratchDir("steps-fetched-tools-"), tool = (name, body) => { fs.writeFileSync(path.join(bin, name), `#!/bin/sh\n${body}\n`, { mode: 0o755 }); return path.join(bin, name); };
+  const bin = scratchDir("steps-fetched-tools-"), tool = (name, body) => { fs.writeFileSync(path.join(bin, name), `#!/bin/sh\n[ "$1" = --version ] && exit 0\n${body}\n`, { mode: 0o755 }); return path.join(bin, name); };
   const last = 'for a; do f="$a"; done';
   const ZIZMOR = tool("zizmor", `${last}\nif grep -q FINDME "$f"; then echo '[{"ident":"template-injection","desc":"code injection","url":"","locations":[{"symbolic":{"kind":"Primary"},"concrete":{"location":{"start_point":{"row":2}}}}]}]'; else echo '[]'; fi`);
   const ACTIONLINT = tool("actionlint", `${last}\nif grep -q FINDME "$f"; then echo '[{"kind":"expression","message":"no such context","line":4}]'; exit 1; fi; echo '[]'`);
@@ -62,6 +62,10 @@ if (process.platform !== "win32") {
   fs.rmSync(flow);
   const gone = ran({ ZIZMOR: path.join(bin, "none"), ACTIONLINT }, WORKFLOWS);
   ok(gone?.unread && gone.mend.includes("zizmor could not start"), "where a tool named cannot start, the step is reported as not read, never done or not done", gone?.mend);
+  const dead = path.join(bin, "dead");
+  fs.writeFileSync(dead, "#!/bin/sh\nexit 3\n", { mode: 0o755 });
+  const died = ran({ ZIZMOR, ACTIONLINT: dead }, WORKFLOWS);
+  ok(died?.unread && died.mend.includes("actionlint could not start (exit 3)"), "and so where it starts and fails before it reads anything", died?.mend);
   // (an action that is a link out of the project is given to neither tool, as the project's reader leaves it: floor topic 5)
   const far = path.join(scratchDir("steps-fetched-far-"), "action.yml"), action = path.join(d, "x/action.yml");
   fs.writeFileSync(far, "runs:\n  using: composite\n  steps: []\n# FINDME\n");

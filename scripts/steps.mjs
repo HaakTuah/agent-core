@@ -196,7 +196,7 @@ export function packagesFirst() {
 // (the key-merge mode's script reads the project with this one, so it is loaded once this one has run, never awaited
 // while it runs, which would wait on itself)
 const stop = started(import.meta.url) ? packagesFirst() : null;
-if (stop && !process.argv.includes("--aside")) console.log(stop); // (the sync's run of the writers, after the steps', does not say it twice)
+if (stop) { if (!process.argv.includes("--aside")) console.log(stop); } // (the sync's run of the writers, after the steps', does not say it twice)
 else if (started(import.meta.url) && process.argv.includes("--write")) {
   import("./converge.mjs").then(({ merged }) => {
     const root = process.cwd(), done = written(root, STEPS, merged), aside = process.argv.includes("--aside"), files = [...new Set(done.flatMap(d => d.wrote ?? []))];

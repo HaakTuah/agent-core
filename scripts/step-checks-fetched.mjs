@@ -29,11 +29,11 @@ export function workflowFindings(p, env = process.env) {
   const tools = { zizmor: env.ZIZMOR || "", actionlint: env.ACTIONLINT || "" };
   for (const [name, program] of Object.entries(tools)) {
     const r = spawnSync(program, ["--version"], { encoding: "utf8", timeout: 30_000, windowsHide: true });
-    if (r.error) throw new Error(`${name} could not start (${r.error.code})`);
+    if (r.error || r.status !== 0) throw new Error(`${name} could not start (${r.error?.code ?? r.signal ?? `exit ${r.status}`})`);
   }
   const twiceIn = text => keysTwice(text).filter(k => k.key !== null);
   yamlRead(p, text => !twiceIn(text).length);
-  const files = reads(p.files, copyAt(p)).filter(f => p.files.includes(f) && p.safe(f));
+  const files = reads(p.files, copyAt(p)).filter(f => p.safe(f));
   const twice = new Set(files.flatMap(f => twiceIn(p.read(f) ?? "").map(k => `${f}:${k.line}`)));
   const found = toolsOn(p.root, files, tools).found.filter(f => !(f.rule === "syntax-check" && twice.has(`${f.file}:${f.line}`)));
   return found.length ? listed(found, f => `\`${shown(f.file)}\`:${f.line} ${f.tool}'s ${shown(f.rule)}`) : null;

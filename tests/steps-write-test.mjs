@@ -242,6 +242,7 @@ for (const l of WHOLE) {
   delete shape.tests;
   delete shape.systems;
   delete lic.scan.skip;
+  delete lic.ships;
   lic.scan.served = ["site/"];
   put("checks/copies.json", `${JSON.stringify(copies, null, 4)}\n`);
   put("checks/shape.json", `${JSON.stringify(shape, null, 2)}\n`);
@@ -253,7 +254,7 @@ for (const l of WHOLE) {
     && Array.isArray(c.code) && !c.code.length && c.prose.join() === "docs/*.md" && read("checks/copies.json").startsWith('{\n    "')
     && s.systems && !Object.keys(s.systems).length && Array.isArray(l.scan.skip) && !l.scan.skip.length && l.scan.served.join() === "site/",
   "--write adds the kit's keys a config lacks whose value reads nothing, at any depth, keeping the project's values and indent", `${r.stdout}${r.stderr}`);
-  ok(!("proseFromSecurity" in c) && !("tests" in s), "a key whose value would have a check read more (the security file's prose, the tests' paths) is not added", JSON.stringify([c, s]));
+  ok(!("proseFromSecurity" in c) && !("tests" in s) && !("ships" in l), "a key that has a check read more, or asks a judgement (what ships), is not added", JSON.stringify([c, s, l]));
   r = write();
   ok(r.status === 0 && !r.stdout.includes(MERGED), "run again, it writes nothing more", r.stdout);
   back();

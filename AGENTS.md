@@ -240,8 +240,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   owner can do done; nor that the manifest,
   `SECURITY.md`, the threat model, the progress file, the choice records or a check's config is written where it
   stands, nor after the first copy where it does not: each is then a step's to ask, with what it needs beside it, save the keys of the kit's a check's config lacks whose value
-  reads nothing (an empty list or mapping, false), which the steps' writers add after the sync with every value of the
-  project's kept (#1095, point 5). Reason: a release asked 63 things of each project, 19 of them workflow changes each with two security
+  reads nothing (an empty list, mapping or text, false or null) and whose absence the check does not fail, which the
+  steps' writers add after the sync with every value of the project's kept (#1095, point 5). Reason: a release asked 63 things of each project, 19 of them workflow changes each with two security
   reviews, built by hand from the notes, and a project of another owner held 25 differences from what the kit writes
   for a new one. Held by `tests/converge-test.mjs` and `tests/pure-sync-test.mjs` (a render that differs, a word outside
   the core's part changed, a value out of its form, a deletion the one job does not cover, each refused), by `tests/upgrade-test.mjs`, which takes
