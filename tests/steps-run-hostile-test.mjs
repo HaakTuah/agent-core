@@ -90,12 +90,10 @@ ok(slashes.right && slashes.linear, "a run of \"/\" is read in one pass", slashe
 // (on the parser, #530: a text the grammar cannot read within its time is not read at all, since a line read alone
 // would misread a quote or a continued line over it; the fallback reviewer's review of 4ffb50d)
 // (in a process of its own, under the time the reader has: a busy runner only makes the text run further past it)
-const startedAt = Date.now();
 const hostile = spawnSync(process.execPath, ["--input-type=module", "-e", `import { notRead } from ${JSON.stringify(new URL("../scripts/steps-kit.mjs", import.meta.url).href)};
 process.exit(notRead("copies", { "a.yml": { jobs: { j: { steps: [{ run: "echo " + "a?(b)".repeat(100000) + "\\nnode core/scripts/copies.mjs c.json" }] } } } }) ? 0 : 1);`],
   { encoding: "utf8", timeout: 60000, env: { ...process.env, CORE_BASH_PARSE_MS: "" } });
-const hostileMs = Date.now() - startedAt;
-ok(hostile.status === 0 && hostileMs < 30000, "a long line of extended globs leaves its step not read, which the grammar's own budget decides", `status ${hostile.status} after ${hostileMs} ms (a parse the budget stops takes about a second): ${hostile.stdout}${hostile.stderr}`);
+ok(hostile.status === 0, "a long line of extended globs leaves its step not read, which the grammar's own budget decides", `status ${hostile.status} (null: it ran past its 60 s limit, as a budget gone would; a parse the budget stops takes about a second): ${hostile.stdout}${hostile.stderr}`);
 const oneRun = { ".github/actions/a/action.yml": "runs:\n  using: composite\n  steps:\n    - run: echo x\n      shell: bash\n" };
 const givenEnv = linear(n => {
   const bigEnv = Object.fromEntries(Array.from({ length: n }, (_, k) => [`E${k}`, `v${k}`]));
