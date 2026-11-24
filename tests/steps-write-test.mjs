@@ -22,6 +22,8 @@ const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.e
 const commit = what => { git("add", "-A"); git("commit", "-q", "--allow-empty", "-m", what); };
 const write = (...args) => spawnSync(process.execPath, ["core/scripts/steps.mjs", "--write", ...args], { cwd: dir, encoding: "utf8" });
 const read = f => fs.readFileSync(path.join(dir, f), "utf8");
+// (as the project's files read: where git writes the tree with Windows line ends, core.autocrlf, a file git wrote reads with them)
+const lf = f => read(f).replace(/\r\n/gu, "\n");
 const put = (f, text) => fs.writeFileSync(path.join(dir, f), text);
 const missed = lead => notDone(dir).filter(m => m.lead === lead);
 const dirty = () => git("status", "--porcelain", "--untracked-files=all").trim();
@@ -154,7 +156,7 @@ for (const l of WHOLE) {
   commit("two names a pattern would mix up");
   put("a[b].json", "{ }\n");
   put("ab.json", "{ }\n");
-  ok(setAside(dir, ["a[b].json"]) && dirty() === "M ab.json" && read("a[b].json") === "{}\n", "a name with [ or * is set aside as written, never as a pattern that takes another file", dirty());
+  ok(setAside(dir, ["a[b].json"]) && dirty() === "M ab.json" && lf("a[b].json") === "{}\n", "a name with [ or * is set aside as written, never as a pattern that takes another file", dirty());
   git("stash", "drop", "-q");
   back();
   const old = oldPathsIn({ "rules/git.md": "floor/topics/git.md" }), hits = t => [...t.matchAll(old)].map(m => m[1]);
@@ -182,9 +184,9 @@ for (const l of WHOLE) {
   commit("two modules neither taken nor left out");
   const before = [placing, choice].map(l => missed(l).length), was = read("core-manifest.md");
   r = write();
-  const now = read("core-manifest.md"), outside = text => text.replace(/\n\nModules to confirm: [^\n]*/u, "").split("\n").filter(l => !/^(Floor: |Not taken: |Modules to confirm: )/u.test(l)).join("\n");
+  const now = lf("core-manifest.md"), outside = text => text.replace(/\n\nModules to confirm: [^\n]*/u, "").split("\n").filter(l => !/^(Floor: |Not taken: |Modules to confirm: )/u.test(l)).join("\n");
   ok(before.join() === "1,1" && r.status === 0 && !missed(placing).length && !missed(choice).length && missed(confirm).length === 1 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``)
-    && /^Not taken: `game-design\.md` \(the project is no game: its manifest holds no game's row\)\.$/m.test(now) && /\n\nModules to confirm: `done-when\.md`\.\n/u.test(now) && /^Floor: whole\. Modules: .*`done-when\.md`/m.test(now) && outside(now) === outside(was),
+    && /^Not taken: `game-design\.md` \(the project is no game: its manifest holds no game's row\)\.$/m.test(now) && /\n\nModules to confirm: `done-when\.md`\.\n/u.test(now) && /^Floor: whole\. Modules: .*`done-when\.md`/m.test(now) && outside(now) === outside(was.replace(/\r\n/gu, "\n")) && !/\r\n/u.test(was) === !/\r\n/u.test(read("core-manifest.md")),
     "a module the list misses is placed by --write: left out where a fact decides it, taken and asked of the owner where none does, and nothing of the manifest written but its module lines", `${r.stdout}${r.stderr}\n---\n${now}`);
   back();
   // (at a sync, which moves the manifest's pin before the writers run: the module lines placed and set aside, the
@@ -199,7 +201,7 @@ for (const l of WHOLE) {
     "at a sync that moved the manifest's pin, --aside writes its module lines and sets them aside, the moved pin left where the sync put it", `${r.stdout}${r.stderr}\n---\n${left}\n---\n${dirty()}`);
   commit("the sync's pull request, merged");
   git("stash", "pop", "-q");
-  ok(!missed(placing).length && read("core-manifest.md").includes(`${pin}\n`), "and the stash, popped once the sync merged, brings the module lines back on the moved pin", read("core-manifest.md"));
+  ok(!missed(placing).length && lf("core-manifest.md").includes(`${pin}\n`), "and the stash, popped once the sync merged, brings the module lines back on the moved pin", read("core-manifest.md"));
   back();
   // (the same where git writes the tree's line ends as Windows does, and the manifest gone, which stays busy, and fails nothing)
   STAGES[placing].stage(dir);
@@ -207,7 +209,7 @@ for (const l of WHOLE) {
   git("config", "core.autocrlf", "true");
   put("core-manifest.md", moved.replace(/\r?\n/gu, "\r\n"));
   r = write();
-  ok(r.status === 0 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``), "and where the tree holds the manifest with Windows line ends", `${r.stdout}${r.stderr}`);
+  ok(r.status === 0 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``) && /\r\n/u.test(read("core-manifest.md")) && !/(^|[^\r])\n/u.test(read("core-manifest.md")), "and where the tree holds the manifest with Windows line ends, it is written with them, no line changed but the module lines", `${r.stdout}${r.stderr}`);
   git("config", "--unset", "core.autocrlf");
   back();
   // (and, where git leaves line ends as they are, a tree with Windows ones over the blob's: the stash leaves the blob's,
