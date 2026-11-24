@@ -13,8 +13,8 @@
 // from the project: its owner and name from the manifest and AGENTS.md, npm and NuGet from its calls to the core's
 // signature and NuGet checks and from a lock file or a project file of its own, a private repository from its host
 // (host-private.mjs; #1095, point 1), never from which workflows stand, a game from the manifest's line "Modules:
-// all", and a game's previews and the versions check from its calls to the core's preview.yml and versions.yml. Where the host cannot say whether it is private, nothing is compared, and the report says so with the mend. Given earlier kits (the sync gives the kit of the project's old pin and of every release of the
-// core's), it lists too what the project still holds of theirs that the kit no longer writes: the wording the core
+// all", and a game's previews and the versions check from its calls to the core's preview.yml and versions.yml. Where the host cannot say whether it is private, nothing is compared, and the report says so with the mend. Given earlier kits (the sync gives the kit of each pin the project's manifest
+// named and of every release of the core's), it lists too what the project still holds of theirs that the kit no longer writes: the wording the core
 // has left. It reads only and fails nothing. Node's own modules and git only.
 //
 //   node core/scripts/fresh.mjs                   from a project's root: the differences, or that there are none

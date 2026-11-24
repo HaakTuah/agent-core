@@ -153,10 +153,10 @@ function sayAsks({ at, old, pin }, tmp) {
 }
 
 // The folder of the earlier starter kits, each in a folder named for its commit.
-// (fresh.mjs is given the starter kit of the old pin and of every release, to find the wording the core has left)
-function kitsOf(old, tmp) {
+// (fresh.mjs is given the starter kit of each pin the manifest named and of every release, to find the wording the core has left)
+function kitsOf(pins, tmp) {
   const kits = path.join(tmp, "kits");
-  for (const sha of new Set([old, ...releasesIn(tmp).map(r => r.sha)])) {
+  for (const sha of new Set([...pins, ...releasesIn(tmp).map(r => r.sha)])) {
     const to = path.join(kits, sha);
     fs.mkdirSync(to, { recursive: true });
     try { untar(to, inBare(tmp, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 })); }
@@ -214,7 +214,7 @@ function sync(tmp) {
   const { moved, unread } = moveCalls(pin, tmp, own);
   if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); converge(dir, null, true); reportOf(at, dir, "owner-settings.mjs", ["--report"]); return; }
   sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp);
-  const kits = kitsOf(old, tmp);
+  const kits = kitsOf([old, ...pinsBefore(manifest, pin, tmp)], tmp);
   converge(dir, kits);
   report(at, dir, kits, old);
 }
@@ -227,26 +227,27 @@ function samePin({ at, dir, pin, manifest }, tmp) {
   console.log(`${at} is already at ${pin}: nothing to move`);
   recordModes(dir, pin, tmp);
   install(dir);
-  const before = pinBefore(manifest, pin, tmp);
+  const pins = pinsBefore(manifest, pin, tmp), before = pins[0] ?? null;
   if (before) sayAsks({ at, old: before, pin }, tmp);
   else console.log(`The pin before ${pin.slice(0, 7)} could not be read from the history of ${manifest} (no commit of it names another pin of the core's main), so what the last sync asks beyond the copy is not listed: read the entries of ${at}${FOLDER}/ dated on or after the day of the project's sync before it, and every setting only the owner gives is listed below.`);
-  const kits = kitsOf(before ?? pin, tmp);
+  const kits = kitsOf([pin, ...pins], tmp);
   converge(dir, kits);
   report(at, dir, kits, before);
 }
 
-// The pin the manifest named before `pin`, read from the project's own history: the newest commit of it, HEAD first,
-// whose "Core:" line names another commit of the core's main; null where none does.
-function pinBefore(manifest, pin, tmp) {
+// The pins the manifest named before `pin`, read from the project's own history, newest first, HEAD first: each other
+// commit of the core's main a "Core:" line of it named, the first the pin before. Their kits are how the one process
+// knows a file an earlier kit wrote and no sync since wrote again, as one before the process came (#1246, point 5).
+function pinsBefore(manifest, pin, tmp) {
   const run = args => { const r = spawnSync("git", args, { encoding: "utf8", env: plainEnv(), maxBuffer: 1 << 26 }); return r.status === 0 ? r.stdout : null; };
-  const commits = (run(["log", "--format=%H", "-n", "200", "HEAD", "--", manifest]) ?? "").split("\n").filter(Boolean);
+  const commits = (run(["log", "--format=%H", "-n", "200", "HEAD", "--", manifest]) ?? "").split("\n").filter(Boolean), pins = [];
   for (const c of ["HEAD", ...commits]) {
     const text = run(["show", `${c}:${manifest}`]);
     let was = null;
     try { was = text === null ? null : readCore(text).pin; } catch { /* (a line out of its form names no pin) */ }
-    if (was && was !== pin && /^[0-9a-f]{40}$/.test(was) && past(was, "refs/heads/main", tmp)) return was;
+    if (was && was !== pin && !pins.includes(was) && /^[0-9a-f]{40}$/.test(was) && past(was, "refs/heads/main", tmp)) pins.push(was);
   }
-  return null;
+  return pins;
 }
 
 // What the core owns, written from the new copy's own kit by the one process (#1083; converge.mjs, beside this file),

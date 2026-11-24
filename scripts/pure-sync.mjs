@@ -134,9 +134,10 @@ function provedOwned(dir) {
     execFileSync("git", ["init", "-q"], { cwd: base_ });
     tracked(base, base_);
     writeFileSync(join(base_, "core-manifest.md"), raw(["show", `${head}:core-manifest.md`]));
-    // (whether it is private, as the host says it of the checkout's repository, from GitHub's event or gh alone:
-    // host-private.mjs; never from a test's stand-in, which this gate, that waives the reviews, does not honour)
-    const p = project(base_), k = kind(p, privateOf(process.cwd(), { env: { ...process.env, CORE_HOST_ANSWERS: "" } })), bad = unformed(p, k);
+    // (whether it is private, as the host says it of the checkout's repository, from GitHub's event, gh or a read with
+    // no sign-in alone: host-private.mjs; never from a test's stand-in or an answer given as CORE_PRIVATE, which this
+    // gate, that waives the reviews, does not honour)
+    const p = project(base_), k = kind(p, privateOf(process.cwd(), { env: { ...process.env, CORE_HOST_ANSWERS: "", CORE_PRIVATE: "" } })), bad = unformed(p, k);
     if (bad.length) { unproved(`the project's kind or values cannot be read in their forms, so it is not proved what the core's process writes: ${bad.join("; ")}`); return; }
     const kit = fresh(p, join(kits, "now", "setup", "template"), { kitOnly: true, k });
     if (!kit.length) { unproved(`the kit at ${pin} gives no file this checkout of the core can render`); return; }

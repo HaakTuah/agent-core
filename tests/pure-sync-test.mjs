@@ -47,7 +47,10 @@ const x = git(root, "ls-files", "-s", "-z").split("\0").filter(e => e.startsWith
 const commit = (message) => { git(theCore, "add", "-A"); git(theCore, "update-index", "--chmod=+x", "--", ...x); git(theCore, "commit", "-q", "--allow-empty", "-m", message); return git(theCore, "rev-parse", "HEAD"); };
 write(theCore, "z.md", "only in Z\n");
 write(theCore, ".github/workflows/personal-terms.yml", `${terms}# Z\n`);
+const bugTmpl = read(theCore, "setup/template/issue-bug.md.tmpl"), Z_LINE = "<!-- as Z's kit writes it -->\n";
+write(theCore, "setup/template/issue-bug.md.tmpl", `${bugTmpl}${Z_LINE}`); // (Z's kit writes a file of the core's otherwise: #1246, point 5)
 const Z = commit("Z");
+write(theCore, "setup/template/issue-bug.md.tmpl", bugTmpl);
 fs.rmSync(path.join(theCore, "z.md"));
 write(theCore, ".github/workflows/personal-terms.yml", `${terms}# A\n`);
 const A = commit("A");
@@ -376,6 +379,18 @@ for (const [how, at] of [["committed", LEGIT], ["left in the working tree by an 
   git(p, "clean", "-qfd");
   git(p, "stash", "clear");
 }
+// (#1246, point 5: a file of the core's an earlier kit wrote, at a pin no release holds and no sync wrote again, is
+// known by the kit of each pin the manifest's history names)
+git(p, "checkout", "-q", "-B", "earlier", LEGIT);
+const BUG = ".github/ISSUE_TEMPLATE/bug_report.md", bugB = read(p, BUG);
+write(p, BUG, `${bugB}${Z_LINE}`);
+git(p, "commit", "-qam", "as Z's kit wrote it");
+const unknown = node(p, "core/scripts/sync.mjs", B);
+for (const pin of [Z, B]) { write(p, "core-manifest.md", manifest(OWNER, pin)); git(p, "commit", "-qam", `the manifest at ${SHA(pin)}`); }
+const known = node(p, "core/scripts/sync.mjs", B);
+ok(unknown.out.includes(`${BUG} is not the core's`) && read(p, BUG) === bugB && !known.out.includes(`${BUG} is not the core's`),
+  "a file as the kit of a pin the manifest's history names wrote it, and no release's, is the core's, written again as the kit writes it", `${unknown.out}\n${known.out}`);
+git(p, "reset", "-q", "--hard");
 git(p, "checkout", "-q", "more");
 write(p, "core-manifest.md", manifest("someone-else"));
 git(p, "commit", "-q", "-am", "another owner");
