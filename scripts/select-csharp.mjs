@@ -12,6 +12,7 @@
 import { CS, MSBUILD, heldBeside, msbuildUsings, outside } from "./select-csharp-project.mjs";
 import { delegates, join, pairs, word } from "./select-csharp-delegates.mjs";
 import { leftOut } from "./select-csharp-text.mjs";
+import { plainText } from "./nuget.mjs";
 import { readCsharp } from "./shape-csharp.mjs";
 
 const TYPE = new Set(["class", "struct", "interface", "enum", "record", "delegate", "namespace"]);
@@ -256,8 +257,9 @@ export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   const links = new Map();
   if (!Object.keys(texts).some(f => CS.test(f))) return { links, unsure: new Set() };
   const held = beside(texts, pace), read = Object.entries(texts).filter(([f]) => MSBUILD.test(f));
-  // (an MSBuild text read as UTF-8 that was not, UTF-16 say, holds a NUL or U+FFFD: MSBuild reads what this cannot)
-  const msbuild = held.unknown || read.some(([, t]) => /[\0\uFFFD]/u.test(t)) ? null : msbuildUsings([...Object.entries(held.msbuild), ...read], pace);
+  // (an MSBuild text read as UTF-8 that was not, UTF-16 say, holds a NUL or U+FFFD; one whose XML declaration names
+  // another encoding, Latin-1 say, MSBuild reads by it, as plainText says of a held one: MSBuild reads what this cannot)
+  const msbuild = held.unknown || read.some(([, t]) => /[\0\uFFFD]/u.test(t) || plainText(Buffer.from(t, "utf8")) === null) ? null : msbuildUsings([...Object.entries(held.msbuild), ...read], pace);
   const all = { ...held.cs, ...texts }, files = Object.keys(all).filter(f => CS.test(f));
   // (where the usings every file holds are untold, every file is unsure)
   if (msbuild === null) return { links, unsure: new Set(files) };

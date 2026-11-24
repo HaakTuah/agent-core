@@ -60,7 +60,7 @@ const outsideImports = ["../../shared/GlobalUsings.props", "b.props", "$(MSBuild
   "$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory)%2E%2E, a.props))/a.props", "$([MSBuild]::GetPathOfFileAbove('tests/a.props'))", "$([MSBuild]::GetPathOfFileAbove('..'))"]
   .filter(p => store(imported(p), heldProps).unsure.size !== 2);
 const windowsNames = ["C:a.props", "a*.props", "a?.props", "a|.props"].filter(n => store(imported(`$([MSBuild]::GetPathOfFileAbove('${n}'))`), { ...heldProps, [n]: "<Project />" }).unsure.size !== 2);
-ok(!windowsNames.length, "a search above for a name Windows reads otherwise (a drive's, a wildcard's) makes every file unsure, though git holds a file of that name", windowsNames.join(" | "));
+ok(!windowsNames.length, "a search above for a name Windows reads otherwise (a drive's, a wildcard) makes every file unsure, though git holds it", windowsNames.join(" | "));
 ok(!outsideImports.length, "an <Import> of a .props outside the checkout, of one git does not hold, or found above a folder this cannot tell (an escape in its start or name, a name that is a path, a rest after the folder found that opens with no separator or is no .props), makes every file unsure", outsideImports.join(" | "));
 let paced = 0;
 const many = msbuildUsings([["Directory.Build.props", `<Project><ItemGroup><Using Include="${"A;".repeat(1000)}" Alias="D"><Alias>E</Alias></Using></ItemGroup></Project>`]], () => paced++);
@@ -72,21 +72,23 @@ const upper = { "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npu
 const viaUpper = csharpReach(upper, undefined, () => ({ msbuild: {}, cs: { "tests/Usings.CS": "global using App.Data;\n", "tests/Helper.CS": "namespace Tests;\nclass Helper { }\n" } }));
 ok(viaUpper.links.get("tests/T.cs")?.has("src/Store.cs") && viaUpper.links.get("tests/T.cs")?.has("tests/Helper.CS"), "a file of C# git holds beside the texts is read in any case of its extension: its global using, and the type it declares", JSON.stringify([...viaUpper.links]));
 const usings = "<Project><ItemGroup><Using Include=\"App.Data\" /></ItemGroup></Project>";
-const wide = csharpReach({ ...upper, "tests/Tests.csproj": Buffer.from(`\ufeff${usings}`, "utf16le").toString("utf8") }, undefined, nothing);
-ok(same([...wide.unsure].sort(), ["src/Store.cs", "tests/T.cs"]), "a .csproj among the texts in UTF-16, read as UTF-8 and so not as MSBuild reads it, makes every file unsure", JSON.stringify([...wide.unsure]));
+const misread = t => [...csharpReach({ ...upper, "tests/Tests.csproj": t }, undefined, nothing).unsure].sort(), all = ["src/Store.cs", "tests/T.cs"];
+const wide = misread(Buffer.from(`\ufeff${usings}`, "utf16le").toString("utf8")), latin = misread(`<?xml version="1.0" encoding="iso-8859-1"?>${usings.replace("Data", "Dat\u00ea")}`);
+ok(same(wide, all) && same(latin, all), "a .csproj among the texts in UTF-16, or declared Latin-1 over bytes not ASCII, which MSBuild reads otherwise than UTF-8, makes every file unsure", JSON.stringify([wide, latin]));
 const heldUpper = csharpReach(upper, undefined, () => ({ msbuild: { "tests/Tests.CSPROJ": usings }, cs: {} }));
-ok(heldUpper.links.get("tests/T.cs")?.has("src/Store.cs"), "a project git holds beside the texts, a .CSPROJ say, is read for its <Using> items", JSON.stringify([...heldUpper.links]));
-const siblings = n => [...Array(n)].map((_, i) => [`${"d/".repeat(600)}s${i}/x.props`, "<Project><Import Project=\"$([MSBuild]::GetPathOfFileAbove('a.props'))\" /></Project>"]).concat([["a.props", "<Project />"]]);
+ok(heldUpper.links.get("tests/T.cs")?.has("src/Store.cs"), "a .CSPROJ git holds beside the texts is read for its <Using> items", JSON.stringify([...heldUpper.links]));
+const above1 = "<Project><Import Project=\"$([MSBuild]::GetPathOfFileAbove('a.props'))\" /></Project>";
+const siblings = n => [...Array(n)].map((_, i) => [`${"d/".repeat(600)}s${i}/x.props`, above1]).concat([["a.props", "<Project />"]]);
 let one300 = 0, all300 = 0;
 msbuildUsings(siblings(300).map(([f, t]) => [f, f === "a.props" ? t : "<Project />"]), () => one300++);
 msbuildUsings(siblings(300), () => all300++);
-ok(all300 - one300 < 2000, "searches from sibling folders climb what they share once: each folder climbed keeps its answer", `${all300 - one300}`);
+ok(all300 - one300 < 2000, "searches from sibling folders climb what they share once", `${all300 - one300}`);
 const deep = [[`${"d/".repeat(600)}x.props`, `<Project>${`<Import Project="$([MSBuild]::GetPathOfFileAbove('a.props'))" />`.repeat(500)}</Project>`], ["a.props", "<Project />"]];
 let climbed = 0, late = 0, once = 0;
 const found = msbuildUsings(deep, () => climbed++);
-msbuildUsings([[deep[0][0], "<Project><Import Project=\"$([MSBuild]::GetPathOfFileAbove('a.props'))\" /></Project>"], deep[1]], () => once++);
+msbuildUsings([[deep[0][0], above1], deep[1]], () => once++);
 try { msbuildUsings(deep, () => { if (++late > 100) throw new Late("past the budget"); }); } catch (e) { late = e; }
-ok(found !== null && once >= 600 && climbed - once >= 499 && climbed < 3000 && late instanceof Late, "the budget is asked at each folder an import's search climbs and at each part, and a search made once is not made again", `${climbed} ${once} ${late}`);
+ok(found !== null && once >= 600 && climbed - once >= 499 && climbed < 3000 && late instanceof Late, "the budget is asked at each folder a search climbs and at each part, and a search is made once", `${climbed} ${once} ${late}`);
 const untold = ["<Using Include=\"App\" /><Using Update=\"App\" Alias=\"D\" />", "<Using Include=\"App\" Alias=\"D\" Note=\"a\"b\" />", "<Using Include=\"App.Data.Store[]\" Alias=\"D\" />", "<Using Include=\"App.Data.Store?\" Alias=\"D\" />", "<Using Include=\"App\" Alias=\"D-x\" />",
   "<Using Include=\"App\" Alias=\"D\" /></ItemGroup><Import Project=\"u.xml\" /><ItemGroup>", "</ItemGroup><ItemDefinitionGroup><Using Alias=\"D\" /></ItemDefinitionGroup><ItemGroup><Using Include=\"App\" />"].filter(item => store(item).unsure.size !== 2);
 ok(!untold.length, "a <Using> that updates another or defines an item's metadata, whose tag is no run of attributes, or whose target or alias is no plain name, or a .csproj that imports an .xml, makes every file unsure", untold.join(" | "));
