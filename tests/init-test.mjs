@@ -159,7 +159,7 @@ if (p.status === 0) {
   // list at all the check fails saying so, with its mend: #1204; the index is put back after each)
   const indexAt = path.join(p.dir, ".git/index"), indexWas = fs.readFileSync(indexAt);
   const blob = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: p.dir, input: "", encoding: "utf8" }).stdout.trim();
-  spawnSync("git", ["update-index", "--add", "--index-info"], { cwd: p.dir, input: Array.from({ length: 30000 }, (_, i) => `100644 ${blob} 0\tgenerated/folder-${i}/a-file-with-a-path-of-fifty-characters-${i}.txt\n`).join("") });
+  spawnSync("git", ["update-index", "--add", "--index-info"], { cwd: p.dir, input: Array.from({ length: 30000 }, (_, i) => `100644 ${blob}\t0\tgenerated/folder-${i}/a-file-with-a-path-of-fifty-characters-${i}.txt\n`).join("") });
   const longList = sizeCheck();
   fs.writeFileSync(indexAt, "not an index");
   const noList = sizeCheck();
