@@ -39,10 +39,10 @@ export const keysOf = name => Object.keys(schemaOf(name).properties ?? {});
 export const requiredOf = name => {
   const schema = schemaOf(name), at = node => {
     if (!node?.$ref) return node ?? {};
-    if (!node.$ref.startsWith("#/$defs/") || !schema.$defs?.[node.$ref.slice(8)]) throw new Error(`${name}'s schema refers to ${node.$ref}, which requiredOf cannot follow`);
+    if (!node.$ref.startsWith("#/$defs/") || !schema.$defs?.[node.$ref.slice(8)] || Object.keys(node).some(k => !["$ref", "mend", "mendFor"].includes(k))) throw new Error(`${name}'s schema refers to ${node.$ref}, or holds keys beside it, which requiredOf cannot follow`);
     return schema.$defs[node.$ref.slice(8)];
   };
-  const asked = n => [...(n.required ?? []), ...Object.values({ ...n.dependencies, ...n.dependentRequired }).flatMap(v => Array.isArray(v) ? v : at(v).required ?? []),
+  const asked = n => [...(n.required ?? []), ...[n.dependencies, n.dependentRequired, n.dependentSchemas].flatMap(d => Object.values(d ?? {})).flatMap(v => Array.isArray(v) ? v : asked(at(v))),
     ...[...(n.allOf ?? []), ...(n.anyOf ?? []), ...(n.oneOf ?? []), n.then, n.else].filter(Boolean).flatMap(v => asked(at(v)))];
   const tree = node => { const n = at(node); return { required: asked(n), keys: Object.fromEntries(Object.entries(n.properties ?? {}).map(([k, v]) => [k, tree(v)])) }; };
   return tree(schema);

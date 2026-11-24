@@ -151,11 +151,10 @@ export function merged(root, busy) {
   const named = [[at.copies, "copies"], [shapeAt(p.manifest), "shape"], [at.audit, "audit"], [at.licences, "licences"], [at.nuget, "licences"]].filter(([f]) => f);
   const which = new Map(), out = [], wrote = [];
   for (const [f, w] of named) which.set(f, which.has(f) && which.get(f) !== w ? null : w);
-  for (const [f, w] of which) if (!w) out.push({ lead: MERGED, why: `\`${f}\` is named as the config of two checks, so the kit's keys are not added: left as it is` });
-  const targets = new Set([...which].filter(([, w]) => w).map(([f]) => f));
-  for (const [to, want] of fresh(p, undefined, { k }).filter(([f]) => targets.has(f) && !p.differences.some(l => l.includes(`"${f}"`)))) {
+  for (const [to, want] of fresh(p, undefined, { k }).filter(([f]) => which.has(f) && !p.differences.some(l => l.includes(`"${f}"`)))) {
     const now = p.read(to, true);
     if (now === null) continue;
+    if (!which.get(to)) { out.push({ lead: MERGED, why: `\`${to}\` is named as the config of two checks, so the kit's keys are not added: left as it is` }); continue; }
     const r = keysMerged(now, want, asksOf(which.get(to)));
     if (r.left) { out.push({ lead: MERGED, why: `\`${to}\` ${r.left}` }); continue; }
     if (!r.text) continue;
