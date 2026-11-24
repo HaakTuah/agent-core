@@ -2,8 +2,9 @@
 // 2): with sayUnread, each job it can read runs and keeps its own verdict, a gate over join(needs.*.result) among them,
 // and a job it cannot read, a job behind one and a matrix it cannot read are each unread by their own key; without it,
 // such a form still throws. In the trial's record, what was not read is not measured, a class of its own that holds the
-// cut, never failed both nor the release's. check.mjs writing "unread" for each such job: tests/check-test.mjs. Node's
-// own modules, the runner and the trial's record.
+// cut, never failed both nor the release's; and a job that ran before and was stopped or not run after holds it too,
+// one that ran in neither run holding nothing (#1257). check.mjs writing "unread" for each such job:
+// tests/check-test.mjs. Node's own modules, the runner and the trial's record.
 //
 //   node tests/unread-test.mjs
 import fs from "node:fs";
@@ -100,5 +101,20 @@ jobs:
   const neitherAt = trialAt(SHA("d"), args => (args[0] === "show" ? JSON.stringify(neither) : ""));
   ok(neither.unreadNeither === 2 && neither.unreadAfter === 0 && neither.failedBoth === 0 && neitherAt.held === null && /2 read in neither run \(not measured, holding nothing\)/u.test(neitherAt.said),
     "  a job read in neither run is counted and said, never failed both, and holds nothing, as #1257 says of a check that ran neither before nor after", `${neitherAt.said}\n${neitherAt.held}`);
+
+  // (#1257: a check that ran before and was stopped after, or not run after, holds the cut, its mend the trial run again
+  // once what stopped it is mended; one stopped after that ran not before ran in neither run and holds nothing)
+  const s = compared({ "a.yml/x": "passed", "b.yml/y": "unrun", "c.yml/z": "stopped", "e.yml/k": "failed" },
+    { "a.yml/f": "failed", "a.yml/x": "stopped", "b.yml/y": "stopped", "c.yml/z": "stopped", "d.yml": "stopped", "e.yml": "stopped" });
+  ok(s.stoppedAfter.join() === "a.yml/x,e.yml" && s.stoppedNeither?.join() === "b.yml/y,c.yml/z,d.yml" && !s.failedBeforeAlone.length && !s.ranBeforeAlone.length,
+    "a job stopped after that ran before, by its key or under its file, is stopped after; one that ran not before, stopped or unrun then too, or new, ran in neither run (#1257)", JSON.stringify(s));
+  const stopped = trialRecord(SHA("e"), "2026-11-24", [[{ "a.yml/x": "passed", "a.yml/y": "passed", "b.yml/n": "unrun" }, { "a.yml/x": "failed", "a.yml/y": "stopped", "b.yml/n": "stopped" }]]);
+  const held = trialAt(SHA("e"), args => (args[0] === "show" ? JSON.stringify({ ...stopped, failedAfter: 0 }) : ""));
+  ok(stopped.stoppedAfter === 1 && stopped.stoppedNeither === 1 && /1 check that ran before measured nothing after the update in the trial on a real project, 1 stopped behind a failure and 0 not run on the trial's machine[\s\S]*Mend: find from the trial's run after the update what stopped it, mend that[\s\S]*try the release/u.test(held.held ?? "") && /1 stopped after it that ran not before \(holding nothing\)/u.test(held.said),
+    "  the record counts each, and release.mjs reads one that ran before and was stopped after as holding the cut, with its mend: the trial run again once what stopped it is mended", `${held.said}\n${held.held}`);
+  const unrun = trialAt(SHA("e"), args => (args[0] === "show" ? JSON.stringify({ ...stopped, failedAfter: 0, stoppedAfter: 0, unrunAfterRan: 2 }) : ""));
+  ok(/2 checks that ran before measured nothing after the update[\s\S]*0 stopped behind a failure and 2 not run on the trial's machine/u.test(unrun.held ?? ""), "  one that ran before and was not run after holds it too", unrun.held);
+  const neitherStopped = trialAt(SHA("e"), args => (args[0] === "show" ? JSON.stringify({ ...stopped, failedAfter: 0, stoppedAfter: 0 }) : ""));
+  ok(neitherStopped.held === null && /0 ran before and stopped after it behind a failure, 1 stopped after it that ran not before \(holding nothing\)/u.test(neitherStopped.said), "  and one stopped after that ran not before holds nothing, as #1257 says of a check that ran neither before nor after", `${neitherStopped.said}\n${neitherStopped.held}`);
 }
 done("a job the runner cannot read, and the trial's not measured");

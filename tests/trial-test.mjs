@@ -156,8 +156,8 @@ jobs:
   // (point 10: each job in its class, the record counting each, and a job failed after alone holding the cut as the release's)
   const all = compared({ p: "passed", f: "failed", pf: "passed", ff: "failed", gone: "passed", lost: "failed", was: "stopped", off: "unrun", ranThen: "passed" },
     { p: "passed", f: "passed", pf: "failed", ff: "failed", newp: "passed", newf: "failed", was: "passed", off: "unrun", w: "unrun", ranThen: "unrun" });
-  ok(Object.keys(all).join() === COUNTS.join() && Object.values(all).map(j => j.join()).join(";") === "p;f;ff;pf;newf;;newp,was;gone;lost;off,w;ranThen;;;",
-    "passed both, fixed after, failed both, failed after, failed after alone, stopped after, ran after alone, ran before alone, failed before alone, unrun after, and unrun after where it ran before are each counted as named (#1245, point 10)", JSON.stringify(all));
+  ok(Object.keys(all).join() === COUNTS.join() && Object.values(all).map(j => j.join()).join(";") === "p;f;ff;pf;newf;;;newp,was;gone;lost;off,w;ranThen;;;",
+    "passed both, fixed after, failed both, failed after, failed after alone, stopped after, stopped in neither run, ran after alone, ran before alone, failed before alone, unrun after, and unrun after where it ran before are each counted as named (#1245, point 10)", JSON.stringify(all));
   const alone = trialRecord(SHA("b"), "2026-11-24", [[{}, { "new.yml/x": "failed", "w.yml/x": "unrun" }]]);
   const aloneAt = trialAt(SHA("b"), args => (args[0] === "show" ? JSON.stringify(alone) : ""));
   ok(alone.failedAfterAlone === 1 && alone.unrunAfter === 1 && /1 check failed after the release .*0 of them passing before it and 1 not run before/u.test(aloneAt.held) && /1 not run after on this machine, and 0 not run after it there though they ran before/u.test(aloneAt.said),
@@ -165,8 +165,8 @@ jobs:
 
   const lost = trialRecord(SHA("c"), "2026-11-24", [[{ "a.yml/x": "passed" }, { "a.yml/x": "unrun" }]]);
   const lostAt = trialAt(SHA("c"), args => (args[0] === "show" ? JSON.stringify(lost) : ""));
-  ok(lost.unrunAfterRan === 1 && lostAt.held === null && /Read before the release workflow is started: 1 check measured nothing after the update, 0 stopped behind a failure and 1 that ran before not run after/u.test(lostAt.said),
-    "  a job that ran before and was unrun after is named beside the counts, to be read before the release starts, and holds nothing", `${lostAt.said}\n${lostAt.held}`);
+  ok(lost.unrunAfterRan === 1 && /1 check that ran before measured nothing after the update in the trial on a real project, 0 stopped behind a failure and 1 not run on the trial's machine/u.test(lostAt.held ?? "") && /1 not run after it there though they ran before/u.test(lostAt.said),
+    "  a job that ran before and was unrun after holds the cut, saying its mend (#1257)", `${lostAt.said}\n${lostAt.held}`);
 
   // (point 2 and #1244: jobs stopped after count apart and are named beside the counts; a baseline from a clone of the core is counted)
   const before = { [RUN_FROM]: "a clone of the core", "core.yml/core": "passed", "core.yml/tests (a)": "passed", "own.yml/lint": "passed", "own.yml/gone": "passed" };
@@ -177,10 +177,10 @@ jobs:
   ok(record.stoppedAfter === 2 && record.baselineFromClone === 1 && record.projects === 2, "the record counts the jobs stopped after, and the baselines taken from a clone of the core (#1244)", JSON.stringify(record));
   const showing = r => args => { if (args[0] === "show") return JSON.stringify(r); if (args[0] === "diff") return ""; return ""; };
   const stopped = trialAt(SHA("a"), showing({ ...record, failedAfter: 0 }));
-  ok(stopped.held === null && /2 stopped after it behind a failure.*1 of the baselines taken by the release's check\.mjs from a clone of the core.*Read before the release workflow is started: 2 checks measured nothing after the update, 2 stopped behind a failure/u.test(stopped.said),
-    "a trial with jobs stopped after names them beside the counts and holds nothing, the baseline from a clone of the core counted", `${stopped.said}\n${stopped.held}`);
+  ok(/2 checks that ran before measured nothing after the update in the trial on a real project, 2 stopped behind a failure/u.test(stopped.held ?? "") && /2 ran before and stopped after it behind a failure.*1 of the baselines taken by the release's check\.mjs from a clone of the core/u.test(stopped.said),
+    "a trial with jobs that ran before and were stopped after holds the cut (#1257), the baseline from a clone of the core counted", `${stopped.said}\n${stopped.held}`);
   const clean = trialAt(SHA("a"), showing({ ...record, failedAfter: 0, stoppedAfter: 0 }));
-  ok(clean.held === null && !/Read before/u.test(clean.said), "  and with none stopped, unrun or failed after, it names none and holds nothing", clean.said);
+  ok(clean.held === null && /0 ran before and stopped after it behind a failure/u.test(clean.said), "  and with none stopped, unrun or failed after, it holds nothing", clean.said);
   ok(trialAt(SHA("a"), showing(record)).held !== null, "  where one failed after, it holds the cut");
   ok(trialAt(SHA("a"), showing({ ...record, baselineFromClone: 3 })).held !== null, "  and a record with more baselines from a clone than projects is in no form it writes");
 

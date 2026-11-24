@@ -300,7 +300,7 @@ ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[
 // where it does not stand for the commit, or where a check passed before and failed after
 {
   const c = compared({ "a.yml/x": "passed", "a.yml/y": "failed", "a.yml/z": "passed", "a.yml/gone": "failed" }, { "a.yml/x": "passed", "a.yml/y": "failed", "a.yml/z": "failed", "b.yml/new": "failed", "b.yml/more": "passed" });
-  ok(Object.values(c).join(";") === "a.yml/x;;a.yml/y;a.yml/z;b.yml/new;;b.yml/more;;a.yml/gone;;;;;", "each job is in its class of COUNTS: passed both, failed both (standing before), failed after where it passed before or did not run (the update's), ran after alone, and failed before alone", JSON.stringify(c));
+  ok(Object.values(c).join(";") === "a.yml/x;;a.yml/y;a.yml/z;b.yml/new;;;b.yml/more;;a.yml/gone;;;;;", "each job is in its class of COUNTS: passed both, failed both (standing before), failed after where it passed before or did not run (the update's), ran after alone, and failed before alone", JSON.stringify(c));
   const t = path.join(tmp, "trial");
   git(tmp, "init", "-q", "-b", "main", t);
   const commit = (files, msg) => { for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(t, f)), { recursive: true }); fs.writeFileSync(path.join(t, f), text); } git(t, "add", "-A"); git(t, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", msg); return git(t, "rev-parse", "HEAD"); };
