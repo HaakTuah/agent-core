@@ -14,6 +14,7 @@ import os from "node:os";
 import path from "node:path";
 import { parseYaml } from "./parse-yaml.mjs";
 import { installKey, keepInstall, takeInstall } from "./workflow-install.mjs";
+import { inNeedsOrder, needsOf } from "./workflow-needs.mjs";
 
 // ---- GitHub's expressions ----
 
@@ -176,7 +177,7 @@ const outputsOf = file => {
 
 /**
  * Runs each job of a called workflow (its text) as GitHub would for one event, each after the jobs it needs, and gives
- * each job's result: { job, ran, passed, steps: [{ name, ran, passed, out, missing }], declared: its own outputs, unrun }. `inputs` and `secrets` are what the call passes (defaults
+ * each job's result: { job, ran, passed, steps: [{ name, ran, passed, out, missing }], declared: its own outputs, unrun, stopped: behind a failed need }. `inputs` and `secrets` are what the call passes (defaults
  * filled in here); `github` the github context; `base` the environment every step starts from; `workspace(job)` a
  * fresh folder for a job's runner; `uses` maps an action (its name before @) to a handler (step `with`, filled in;
  * the job's folder; the job's env) that does its part, or returns false where it stands for a step not run here.
@@ -288,12 +289,17 @@ export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, wor
   const wf = parseYaml(text);
   const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp, once, installed, machine };
   const given = callInputs(wf, inputs, secrets);
-  const results = [], done = {};
+  const results = [], done = {}, stopped = new Set();
   for (const [id, job] of inNeedsOrder(wf.jobs ?? {})) {
-    // (the needs context; a job whose condition asks no status is skipped where a need did not succeed: #1245, point 3)
+    // (the needs context; a job whose condition asks no status is skipped where a need did not succeed, and is
+    // `stopped` where one failed or was stopped and its own condition held: #1245, points 2 and 3)
     const needs = Object.fromEntries(needsOf(job).map(n => [n, done[n]]));
     const top = { github, inputs: given, secrets, vars: {}, needs };
-    if (!holds(job.if, top, { failed: Object.values(needs).some(n => n.result !== "success") })) { results.push({ job: id, ran: false, passed: true, steps: [], outputs: {} }); done[id] = { result: "skipped", outputs: {} }; continue; }
+    if (!holds(job.if, top, { failed: Object.values(needs).some(n => n.result !== "success") })) {
+      const behind = needsOf(job).some(n => done[n].result === "failure" || stopped.has(n)) && holds(job.if, top, { failed: false });
+      if (behind) stopped.add(id);
+      results.push({ job: id, ran: false, passed: true, steps: [], outputs: {}, ...behind && { stopped: true } }); done[id] = { result: "skipped", outputs: {} }; continue;
+    }
     const from = results.length;
     // (a matrix makes a job of each of its combinations, each one billed, named by its values as GitHub names it)
     for (const matrix of combinations(job.strategy?.matrix, top)) runMatrixJob(rt, job, id, top, matrix, results);
@@ -301,23 +307,6 @@ export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, wor
     done[id] = { result: mine.every(r => r.passed) ? "success" : "failure", outputs: Object.assign({}, ...mine.map(r => r.declared)) };
   }
   return results;
-}
-
-// The jobs a job's `needs:` names, one or a list.
-const needsOf = job => [job?.needs ?? []].flat().map(str);
-
-// The jobs in the order GitHub may run them: each after every job it needs, and otherwise as written. A need that names
-// no job of the workflow, or a loop of needs, throws, as GitHub refuses the workflow.
-function inNeedsOrder(jobs) {
-  const left = Object.entries(jobs), order = [], placed = new Set();
-  for (const [id, job] of left) for (const n of needsOf(job)) if (!Object.hasOwn(jobs, n)) throw new Error(`the job ${id} needs ${n}, which is no job of the workflow`);
-  while (left.length) {
-    const at = left.findIndex(([, job]) => needsOf(job).every(n => placed.has(n)));
-    if (at < 0) throw new Error(`the jobs ${left.map(([id]) => id).join(", ")} need each other in a loop`);
-    const [entry] = left.splice(at, 1);
-    order.push(entry); placed.add(entry[0]);
-  }
-  return order;
 }
 
 // One job of a workflow for one combination of its matrix (null for none): its runner folder made, the job run, the folder removed.

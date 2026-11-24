@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { RUN_FROM } from "../scripts/check.mjs";
 import { sameNode, standIns } from "../scripts/check-actions.mjs";
-import { movesForward, syncCalls, triggered } from "../scripts/check-calls.mjs";
+import { movesForward, ownJobs, syncCalls, triggered } from "../scripts/check-calls.mjs";
 import { COUNTS, compared, RUNS, trialAt, trialRecord } from "../scripts/release-trial.mjs";
 import { sideOf } from "../scripts/attached.mjs";
 import { notInstalled } from "../scripts/packages.mjs";
@@ -73,7 +73,8 @@ jobs:
     steps:
       - run: echo always ran
 `);
-  ok(after.map(j => `${j.job}:${j.ran}:${j.passed}`).join() === "first:true:false,next:false:true,always:true:true", "a job whose need failed is skipped, as GitHub skips it, and one that asks always() runs", JSON.stringify(after.map(j => [j.job, j.ran, j.passed])));
+  ok(after.map(j => `${j.job}:${j.ran}:${j.passed}:${!!j.stopped}`).join() === "first:true:false:false,next:false:true:true,always:true:true:false" && !gated.some(j => j.stopped),
+    "a job whose need failed is skipped as stopped, for check.mjs to write so, and one that asks always() runs; one skipped by its own condition is not stopped (#1245, point 2)", JSON.stringify(after));
   const refused = text => { try { run(text); return ""; } catch (e) { return e.message; } };
   ok(/need each other in a loop/u.test(refused("on: push\njobs:\n  a:\n    needs: b\n    runs-on: x\n    steps: [{run: 'true'}]\n  b:\n    needs: a\n    runs-on: x\n    steps: [{run: 'true'}]\n")) && /needs c, which is no job/u.test(refused("on: push\njobs:\n  a:\n    needs: c\n    runs-on: x\n    steps: [{run: 'true'}]\n")),
     "a loop of needs, or a need that names no job, is refused, as GitHub refuses the workflow");
@@ -107,11 +108,17 @@ jobs:
   const calls = job => Boolean(job?.uses);
   const base = [{ file: "core.yml", wf: { jobs: { core: { uses: "old" }, gone: { uses: "old" }, own: { steps: [] } } } }, { file: "left.yml", wf: { jobs: { x: { uses: "old" } } } }];
   const head = [{ file: "core.yml", wf: { jobs: { core: { uses: "new" } } } }];
-  const merged = syncCalls(base, head, calls);
-  ok(merged.length === 3 && merged[0].wf.jobs.core.uses === "new" && Object.keys(merged[1].wf.jobs).join() === "gone" && merged[2].file === "left.yml", "  its own calls run, and each call of the base's it leaves out runs as the base holds it", JSON.stringify(merged));
+  const merged = syncCalls(base, head, calls, uses => uses.replace("old", "new"));
+  ok(merged.length === 3 && merged[0].wf.jobs.core.uses === "new" && Object.keys(merged[1].wf.jobs).join() === "gone" && merged[1].wf.jobs.gone.uses === "old" && merged[2].file === "left.yml", "  its own calls run, and each call of the base's it leaves out runs as the base holds it", JSON.stringify(merged));
+  const weak = syncCalls([{ file: "c.yml", wf: { jobs: { copies: { uses: "c@old", with: { a: 1, b: 2 } }, same: { with: { b: 2, a: 1 }, uses: "s@old" } } } }], [{ file: "c.yml", wf: { jobs: { copies: { uses: "core@new" }, same: { uses: "s@new", with: { a: 1, b: 2 } } } } }], calls, uses => uses.replace("old", "new"));
+  ok(weak.length === 2 && Object.keys(weak[1].wf.jobs).join() === "copies (as the base calls it)" && weak[1].wf.jobs["copies (as the base calls it)"].uses === "c@new" && weak[1].wf.jobs["copies (as the base calls it)"].with.b === 2,
+    "  and a call the sync changes in more than its pin runs too as the base calls it, at the new pin, so no check is dropped by a weakened call", JSON.stringify(weak));
 
   // (point 8: a push that names tags alone starts on no push to main, and a job on another system is left unrun, said so;
   // point 9: a step that wants a program this machine lacks says which)
+  const notes = [], own = ownJobs({ file: "o.yml", wf: { jobs: { core: { uses: "x" }, deploy: { environment: "e", steps: [] }, mine: { needs: ["core", "deploy"], steps: [] }, after: { needs: "mine", steps: [] } } } }, m => notes.push(m));
+  ok(Object.keys(own[0].wf.jobs).join() === "mine,after" && own[0].wf.jobs.mine.needs.length === 0 && own[0].wf.jobs.after.needs === "mine" && notes.some(n => /mine needs core, deploy, not run here/u.test(n)),
+    "a job of the project's own that needs a job not run here runs without it, said so, and one that needs a kept job keeps its need", JSON.stringify({ own, notes }));
   ok(!triggered({ push: { tags: ["v*"] } }, { event: "push" }) && triggered({ push: { tags: ["v*"], branches: ["main"] } }, { event: "push" }) && triggered({ push: null }, { event: "push" }),
     "a push that names tags and no branch is no push to main; one that names main beside its tags, or nothing, is (#1245, point 8)");
   const away = runWorkflow(`on: pull_request
