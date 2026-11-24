@@ -148,10 +148,11 @@ jobs:
   # hostile in the second, which keeps the name of the suite that was whole and so its mark, lowered; and rest, steps,
   # fresh, writes, second and third, the steps run once on Linux, in the third (#529). Each part is sized by its steps'
   # times on the slow runner, which takes half as long again as another, so that it ends within its mark there too, no
-  # mark raised, and well within the job's limit: on Windows, by a run on 25ec6a5 of every Windows part on both Nodes
-  # (#1213), about 520 of 600 (projects), 276 of 300 (sync), 330 of 450 (converge), 180 of 300 (hostile), 455 of 600
-  # (kit with fresh), 380 of 450 (steps), 375 of 450 (writes), 290 of 450 (core with faults), 430 of 450 (core with
-  # places and terms), 360 of 450 (licences), 280 of 450 (scans), and the rest's three, 335, 370 and 250 of 480 seconds.
+  # mark raised, and well within the job's limit: on Windows, by a run of every part on both Nodes (run 45339915083, #1213),
+  # the longer of the two, of 600 (projects) 481, of 300 (sync) 228 and (hostile) 164, of 600 (kit with fresh) 488, of
+  # 450 (converge) 239, (steps) 352, (writes) 354, (core with faults) 95, (core with places and terms) 380, (licences)
+  # 329, (scans) 329 and (tools with packages) 280, and the rest's three of 480, 325, 369 and 253 seconds (a part with a
+  # test failing for another cause may end early, so the figures of such a part are read again when it passes).
   # Beside them the upgrade job, which takes longer; #387, #405, #411, #424, #425, #489, #504, #540, #514, #1213)
   suites:
     name: suites (${{ matrix.os }}, ${{ matrix.parts }}${{ matrix.node == '.node-least' && ', the least Node' || '' }})
