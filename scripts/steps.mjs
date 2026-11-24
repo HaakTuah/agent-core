@@ -41,10 +41,9 @@ import { readNothing, saidOf } from "./read-nothing.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { copyAt } from "./workflow-calls.mjs";
-import { readCore } from "./core-path.mjs";
 import { HERE, mendAt, plain, shown } from "./step-checks.mjs";
 import { Busy, held } from "./step-writers.mjs";
-import { pinsBack, pinsOf } from "./sync-pins.mjs";
+import { ASIDE, asideName, pinsBack, pinsOf, stashed } from "./sync-pins.mjs";
 import { installed, listed, notInstalled } from "./packages.mjs";
 
 // What a step reads a project with, and the words of an error with no path of the machine's in them: step-checks.mjs
@@ -201,16 +200,8 @@ export function setAside(root, files, push = stashed(root, files, ASIDE)) {
     return false;
   }
 }
-const stashed = (root, files, name) => () => execFileSync("git", ["--literal-pathspecs", "stash", "push", "--include-untracked", "--quiet", "-m", name, "--", ...files], { cwd: root, stdio: ["ignore", "ignore", "pipe"] });
-// The name of the stash a run of the writers at a sync makes: ASIDE, the pin the manifest names and the time, so that a
-// sync run again, at the same pin too, leaves stashes that differ in name, and the report says which to pop (#1264, point 1).
-export const asideName = (root, at = new Date()) => {
-  let pin = null;
-  try { pin = readCore(project(root).manifest).pin ?? null; } catch { /* (no manifest to read: the time alone) */ }
-  return `${ASIDE}${pin ? ` at ${pin.slice(0, 7)}` : ""}, ${at.toISOString()}`;
-};
 const lower = text => text.replace(/^[A-Z](?=[a-z ])/u, c => c.toLowerCase());
-export const ASIDE = "the steps' writes (#1091)";
+export { ASIDE };
 
 // The one line said in place of the steps where the core's packages their readers load are not there, installed first in
 // a copy (packages.mjs), or null where each is: the steps are then read by none, never each said unread for want of one
