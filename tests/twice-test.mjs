@@ -94,6 +94,7 @@ if (process.platform !== "win32") {
 // Where git cannot hash a file (one gone since the copy was listed), the rest are hashed from the disk, and it is said.
 {
   const dir = project("gone"), p = projectOf(dir), said = [], warn = console.error;
+  for (const f of ["core/docs/zephyr-notes.md", "notes/zephyr-notes.md"]) fs.writeFileSync(path.join(dir, f), fs.readFileSync(path.join(dir, f), "utf8").replace(/\r\n/gu, "\n")); // (the disk's bytes alike, whatever line ends git writes)
   fs.rmSync(path.join(dir, "core", p.copyFiles.find(f => f !== "docs/zephyr-notes.md" && f.endsWith(".md"))));
   console.error = m => said.push(m);
   let found;
