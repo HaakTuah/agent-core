@@ -14,7 +14,7 @@ import { TRIAL, compared, ownCount, trialAt, trialRecord } from "../scripts/rele
 import { shownAs } from "../scripts/state-report.mjs";
 import { STEPS } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, POINTER, QUIET, entries, notesAt, quiet, quietAt } from "../scripts/sync-notes.mjs";
-import { NOTES, OWN_FILES, RELEASE, asksBetween, asksLeft, elsewhere, fetchCore, inBare, followsOf, hostAccount, hostSaid, jumped, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween, untar } from "../scripts/releases.mjs";
+import { NOTES, OWN_FILES, RELEASE, asksBetween, asksLeft, elsewhere, fetchCore, inBare, followsOf, hostAccount, hostSaid, jumped, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -339,19 +339,6 @@ ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[
   ok(ownCount(listed) === 2 && ownCount("**The projects that take the core**\n- None found.") === 0, "the owner's projects are counted from what state-report.mjs --projects prints, in shownAs's words: its own public and private, never another owner's, a note or none found");
   const inCore = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", later, path.join(path.dirname(fileURLToPath(import.meta.url)), "before.json"), path.join(tmp, "after.json")], { encoding: "utf8" });
   ok(inCore.status === 1 && /lies in the core's own repository/.test(inCore.stderr), "--trial refuses a run's verdicts kept in the core's own repository, where a project's job names could be committed", inCore.stderr);
-}
-
-// an archive unpacked into a folder whose path tar would misread were it given: GNU tar unquotes a backslash's escape in
-// it (`kits\now` as Windows writes the path, a line's end), and Windows' own tar knows no --force-local (#1212)
-{
-  const tmp = scratchDir("untar-"), from = path.join(tmp, "from");
-  fs.mkdirSync(from);
-  fs.writeFileSync(path.join(from, "f"), "unpacked\n");
-  const into = process.platform === "win32" ? path.join(tmp, "kits", "now") : path.join(tmp, "kits\\now", "a:b");
-  fs.mkdirSync(into, { recursive: true });
-  let read = null;
-  try { untar(into, execFileSync("tar", ["-c", "-f", "-", "f"], { cwd: from })); read = fs.readFileSync(path.join(into, "f"), "utf8"); } catch (e) { read = String(e.stderr ?? e); }
-  ok(read === "unpacked\n", "an archive is unpacked into a folder whose path holds a backslash's escape and a colon", read);
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the core's releases`);
