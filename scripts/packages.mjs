@@ -230,7 +230,7 @@ function selfInstall(install, done) {
 // without the mark a job reads.
 function lastWords(r) {
   const lines = `${r.stdout ?? ""}\n${r.stderr ?? ""}`.split("\n").map(l => l.trim()).filter(Boolean);
-  const said = lines.filter(l => /^(?:FAIL: |::warning::)/u.test(l)).pop() ?? `the installer ended with ${r.status ?? r.signal}; its words are in the log`;
+  const said = lines.filter(l => /^(?:FAIL: |::warning::)/u.test(l)).pop() ?? `the installer ended with ${r.status ?? r.signal ?? "no status"}, printing no failure line; to read its words, run \`node ${shownPath(INSTALLER)}\``;
   return said.replace(/^(?:FAIL: |::warning::)/u, "").replace(/^the core's packages were not installed: /u, "");
 }
 // A path as a step of a job names it, from where the script runs, with "/" between its parts on any system.
