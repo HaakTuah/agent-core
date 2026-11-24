@@ -190,11 +190,11 @@ ok(strays.length === 0, "tests/ holds the core's tests alone, and the package fi
 {
   const dir = path.join(tmp, "install-copy");
   fs.mkdirSync(path.join(dir, "scripts"), { recursive: true });
-  fs.writeFileSync(path.join(dir, "scripts", "install.mjs"), 'console.error("npm error A complete log of this run can be found in: /home/someone/.npm/_logs/x-debug-0.log"); process.exit(1);\n');
+  fs.writeFileSync(path.join(dir, "scripts", "install.mjs"), 'console.error("install error A complete log of this run can be found in: /home/someone/.npm/_logs/x-debug-0.log"); process.exit(1);\n');
   const said = []; const log = console.log; console.log = (...a) => said.push(a.join(" "));
   try { install(dir); } finally { console.log = log; }
   const note = said.join("\n");
-  ok(/not installed/.test(note) && / Mend: .*install\.mjs/.test(note) && !/someone|_logs|npm error/.test(note), "a failing install leaves the installer's own line, and the path in it, out of the sync's note, which still says it failed and its mend", note);
+  ok(/not installed/.test(note) && / Mend: .*install\.mjs/.test(note) && !/someone|_logs|install error/.test(note), "a failing install leaves the installer's own line, and the path in it, out of the sync's note, which still says it failed and its mend", note);
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
