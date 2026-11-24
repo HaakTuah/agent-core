@@ -143,6 +143,7 @@ for (const name of named.length ? named : [first]) {
     // check that needs a package says it did not run, and the job is run again before the merge)
     if (!own && unanswered(r.stderr) && /^pull_request/u.test(process.env.GITHUB_EVENT_NAME ?? "") && process.env.GITHUB_ENV) {
       fs.appendFileSync(process.env.GITHUB_ENV, "CORE_PACKAGES_UNREACHED=1\n");
+      console.error(`note the second install from ${lock} failed too: ${why}`); // (the log alone: the warning below reaches the pull request)
       const said = `The core's packages could not be installed from ${lock}, twice, so each check that needs one did not run (the installer's own words stay in this job's log, never in this note, which reaches the pull request). Mend: run this job again before the pull request merges and read the log; if it fails again, file it as a fault`;
       console.log(`::warning::${said}`);
       if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `- Did not run: ${said.replace(/[<>&`*_[\]|]/gu, "?")}\n`);
