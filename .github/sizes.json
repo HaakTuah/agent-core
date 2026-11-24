@@ -104,7 +104,7 @@
       "why": "#441: the game rules split into a base and a file for each kind (#484, points 6 and 7)."
     },
     "tests/upgrade-test.mjs": {
-      "mark": 98773,
+      "mark": 123888,
       "why": "One flow over the projects it builds: each case takes a project as the one before left it (written, synced, merged, its own pull requests after), so a file of its own would build them again; and tests/ holds test files alone (#614), so no module beside it can hold a part. A session reads the case it changes, found by its section's heading."
     },
     "scripts/read-total.mjs": {
