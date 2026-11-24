@@ -13,6 +13,8 @@ import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
 import { COPIES } from "../scripts/checks.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { npmRefused } from "../scripts/npm-reads.mjs";
+import { unrunWhy } from "../scripts/check-calls.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -179,7 +181,12 @@ if (process.platform !== "win32") {
   const under = version => run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base, NPM_STANDS_AS: version, PATH: `${bin}${path.delimiter}${env.PATH}` });
   for (const v of ["10.9.9", "11.13.0", ""]) {
     const old = under(v);
-    ok(old.status === 1 && !/^ran npm ci/m.test(old.out) && /^FAIL .*--allow-remote.*Mend: /m.test(old.out) && mended(old.out), `signatures: under npm ${v || "whose version cannot be read"} it installs nothing and fails, saying the mend`, old.out);
+    ok(old.status === 1 && !/^ran npm ci/m.test(old.out) && /^FAIL .*--allow-remote.*Mend: /m.test(old.out) && mended(old.out) && npmRefused(old.out) === (v ? "11.14.0" : null), `signatures: under npm ${v || "whose version cannot be read"} it installs nothing and fails, saying the mend${v ? ", in the words check.mjs reads to leave the job unrun on this machine" : ", which check.mjs leaves failed, since the change may be why"} (#1262)`, old.out);
+    // (#1262: a job failed by that refusal alone is unrun on this machine, naming the least version of npm, as check.mjs writes
+    // its verdict; one with another failure beside it, or a passed job, is not)
+    const jobOf = (...outs) => ({ passed: false, ran: true, steps: [{ passed: true, ran: true, out: "" }, ...outs.map((out, i) => ({ name: i ? "A step of the change" : "The signature check", passed: false, ran: true, out }))] });
+    if (v === "10.9.9") ok(/^it needs npm 11\.14\.0 or later, .*\.node-version.*, which this machine lacks$/u.test(unrunWhy(jobOf(old.out)) ?? "") && unrunWhy(jobOf(old.out, "a real fault\n")) === null && unrunWhy(jobOf("a real fault\n")) === null && unrunWhy({ ...jobOf(old.out), passed: true }) === null && [`${old.out}FAIL a real fault\n`, `FAIL: a real fault\n${old.out}`, `assertion failed\n${old.out}`, old.out.replace(/^FAIL npm/mu, "a real fault\rFAIL npm")].every(o => npmRefused(o) === null) && unrunWhy({ ...jobOf(old.out), steps: [{ name: "A step of the change", passed: false, ran: true, out: old.out }] }) === null,
+      "  and check.mjs writes a job failed by it alone unrun on this machine, naming the least version of npm; one with another failure beside it, in its step or another, or such words printed by another step, stays failed", unrunWhy(jobOf(old.out)));
   }
   const now = under("11.14.0");
   ok(now.status === 0 && /^ran npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none$/m.test(now.out) && /^ran npm audit signatures$/m.test(now.out), "and under npm 11.14.0, which reads them all, it installs and checks the signatures", now.out);

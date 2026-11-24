@@ -109,7 +109,7 @@ jobs:
   const base = [{ file: "core.yml", wf: { jobs: { core: { uses: "old" }, gone: { uses: "old" }, own: { steps: [] } } } }, { file: "left.yml", wf: { jobs: { x: { uses: "old" } } } }];
   const head = [{ file: "core.yml", wf: { jobs: { core: { uses: "new" } } } }];
   const merged = syncCalls(base, head, calls, uses => uses.replace("old", "new"));
-  ok(merged.length === 3 && merged[0].wf.jobs.core.uses === "new" && Object.keys(merged[1].wf.jobs).join() === "gone" && merged[1].wf.jobs.gone.uses === "old" && merged[2].file === "left.yml", "  its own calls run, and each call of the base's it leaves out runs as the base holds it", JSON.stringify(merged));
+  ok(merged.length === 3 && merged[0].wf.jobs.core.uses === "new" && Object.keys(merged[1].wf.jobs).join() === "gone" && merged[1].wf.jobs.gone.uses === "new" && merged[2].file === "left.yml", "  its own calls run, and each call of the base's it leaves out runs, moved to its pin (#1258)", JSON.stringify(merged));
   const weak = syncCalls([{ file: "c.yml", wf: { jobs: { copies: { uses: "c@old", with: { a: 1, b: 2 } }, same: { with: { b: 2, a: 1 }, uses: "s@old" } } } }], [{ file: "c.yml", wf: { jobs: { copies: { uses: "core@new" }, same: { uses: "s@new", with: { a: 1, b: 2 } } } } }], calls, uses => uses.replace("old", "new"));
   ok(weak.length === 2 && Object.keys(weak[1].wf.jobs).join() === "copies (as the base calls it)" && weak[1].wf.jobs["copies (as the base calls it)"].uses === "c@new" && weak[1].wf.jobs["copies (as the base calls it)"].with.b === 2,
     "  and a call the sync changes in more than its pin runs too as the base calls it, at the new pin, so no check is dropped by a weakened call", JSON.stringify(weak));
