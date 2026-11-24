@@ -63,7 +63,7 @@ const env = withAbsolutePath(plainEnv());
 // in this environment or in git's settings reaches them. They still run as the caller's own user, so a pipeline runs
 // this where no sign-in is held (tasks/hosts.md).
 const KEPT = /^(PATH|LANG|LC_[A-Z]+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|HTTPS?_PROXY|NO_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|GIT_ALLOW_PROTOCOL)$/i;
-function stepEnv(home) {
+export function stepEnv(home) {
   const kept = Object.fromEntries(Object.entries(env).filter(([name]) => KEPT.test(name)));
   const rewrites = [];
   for (let i = 0; i < Number(env.GIT_CONFIG_COUNT ?? 0); i++) {
@@ -86,7 +86,7 @@ const warn = text => console.error(mask(text));
 const fail = (what, mend) => { warn(`FAIL ${what} ${MEND}${mend}`); process.exit(1); };
 const call = new RegExp(`^${CORE_SOURCE}/\\.github/workflows/([\\w.-]+)@([0-9a-f]{40})$`, "i");
 
-// It runs only as a command; check-test.mjs imports it for HOST_OWN alone.
+// It runs only as a command; check-test.mjs imports it for HOST_OWN alone, and nuget-gate-test.mjs for stepEnv.
 if (started(import.meta.url)) main();
 
 function main() {

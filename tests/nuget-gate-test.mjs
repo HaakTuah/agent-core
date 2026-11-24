@@ -19,6 +19,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
+import { stepEnv } from "../scripts/check.mjs";
 import { nugetScratch } from "../scripts/nuget-gate-scratch.mjs";
 import { root, tally } from "../scripts/scratch-core.mjs";
 import { CORE } from "../scripts/core-address.mjs";
@@ -47,7 +48,8 @@ const START = {
 };
 let n = 0;
 // The step's answer on a pull request that changes `files` (null removes one) from a project that starts as `start`.
-function gate(files, { start = {}, base = true, caller = "nuget.yml", link = null } = {}) {
+// With `steps`, the look runs in the environment check.mjs gives the steps it runs (stepEnv), not the scratch's own.
+function gate(files, { start = {}, base = true, caller = "nuget.yml", link = null, steps = false } = {}) {
   const dir = path.join(tmp, `repo-${++n}`);
   fs.mkdirSync(dir);
   git(dir, "init", "-q", "-b", "main");
@@ -63,7 +65,8 @@ function gate(files, { start = {}, base = true, caller = "nuget.yml", link = nul
   git(dir, "commit", "-q", "--allow-empty", "-m", "a change");
   const output = path.join(tmp, `look-${n}`);
   fs.writeFileSync(output, "");
-  const r = spawnSync("bash", ["-e", "core/scripts/nuget-look.sh"], { cwd: dir, encoding: "utf8", env: { ...env, BASE: base ? baseSha : "", CONFIG: "checks/licences.json",
+  const from = steps ? { ...stepEnv(path.join(tmp, `step-home-${n}`)), MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_USE_MSBUILD_SERVER: "0" } : env;
+  const r = spawnSync("bash", ["-e", "core/scripts/nuget-look.sh"], { cwd: dir, encoding: "utf8", env: { ...from, BASE: base ? baseSha : "", CONFIG: "checks/licences.json",
     CALLER: `someone/project/.github/workflows/${caller}@refs/pull/1/merge`, GITHUB_REPOSITORY: "someone/project", CORE_AT: "core/", NUGET_PACKAGES: path.join(tmp, `look-packages-${n}`),
     GITHUB_OUTPUT: output, DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_NOLOGO: "1", EnableWindowsTargeting: "true" } });
   const said = /^run=(.*)$/m.exec(fs.readFileSync(output, "utf8"))?.[1]?.trim();
@@ -94,6 +97,14 @@ if (!sdk) console.log("skip NuGet's own word: no .NET SDK here");
 else {
   skips("a pull request that changes only a doc", { "README.md": "# A project\n\nMore.\n" });
   skips("one that changes only another workflow", { ".github/workflows/other.yml": "name: other\n" });
+  // (as check.mjs runs it, which hands its steps only the variables it keeps: on Windows NuGet reads the system's and
+  // the user's folders from the environment, and a restore with one missing failed with no code of its own; #1239)
+  skips("a pull request that changes only a doc, the look run in the environment check.mjs gives its steps", { "README.md": "# A project\n\nMore.\n" }, { steps: true });
+  // (a restore that fails with no code of NuGet's prints its error lines whole, so the cause is seen; #1239)
+  const failing = "a failure of the project's own, with no code, printed whole to its last word";
+  const own = restores("a pull request that changes only a doc, in a project whose restore fails with no code of NuGet's", { "README.md": "# A project\n\nMore.\n" },
+    { start: { "Directory.Build.targets": `<Project>\n  <Target Name="Fails" BeforeTargets="Restore">\n    <Error Text="${failing}" />\n  </Target>\n</Project>\n` } });
+  ok(own.out.includes("src/App/App.csproj: the restore failed with no error NuGet names. It printed:") && new RegExp(`^  .*error.*${failing}`, "m").test(own.out), "and the look prints the restore's error line whole, behind two spaces", own.out);
   // (a NuGet.Config that maps every package to the registry, against a confusion of sources: the empty source the look
   // restores from is mapped to none, which NuGet names as its own error, NU1100, not as a package not found; #380)
   const MAPPED = '<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <packageSources>\n    <clear />\n    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />\n  </packageSources>\n  <packageSourceMapping>\n    <packageSource key="nuget.org">\n      <package pattern="*" />\n    </packageSource>\n  </packageSourceMapping>\n</configuration>\n';

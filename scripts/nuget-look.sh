@@ -41,7 +41,10 @@ holds() {
     out=$(dotnet restore --locked-mode --configfile "$config" --source "$empty" "-p:RestorePackagesPath=$NUGET_PACKAGES" \
       -p:NuGetLockFilePath= "./$project" < /dev/null 2>&1) && continue
     codes=$(printf '%s\n' "$out" | grep -oE 'error [A-Z]+[0-9]+' | sort -u)
-    [ -n "$codes" ] || { echo "$project: the restore failed with no error NuGet names"; return 1; }
+    # (its error lines, whole and each behind two spaces, so the next reader sees the cause and none starts a workflow
+    # command; where none says error, all it printed; #1239)
+    [ -n "$codes" ] || { echo "$project: the restore failed with no error NuGet names. It printed:"
+      { printf '%s\n' "$out" | grep -iw error || printf '%s\n' "$out"; } | tr -d '\r' | sed 's/^/  /'; return 1; }
     if printf '%s\n' "$codes" | grep -qvE '^error NU110[123]$'; then echo "$project:" $codes; return 1; fi
     while IFS= read -r id; do
       printf '%s\n' "$id" | grep -qxE "$PACKS" && continue
