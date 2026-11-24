@@ -12,13 +12,18 @@ import { Unread } from "./workflow-calls.mjs";
 const MANIFEST = "core-manifest.md";
 // Each name of the "Modules:" list, as written (`raw`), that is no module of `known` and that the core moved (`movedTo`):
 // { raw, name, to (the path its text went to), module (the module that holds it now, or null where it went to a file no
-// project takes as a module, a role's) } (#1259, point 1).
+// project takes as a module, a role's), out (that module stands on the line "Not taken:", where the owner left it) }
+// (#1259, point 1).
 function movedOn(manifest, known, movedTo) {
-  const at = String(manifest).split(/\r?\n/u).find(l => /\bModules:/u.test(l)), list = at === undefined ? null : listOf(at);
-  return (list?.items ?? []).filter(i => i.name && !known.includes(i.name) && Object.hasOwn(movedTo, i.name)).map(i => ({ raw: i.raw.trim(), name: i.name, to: movedTo[i.name], module: heldIn(movedTo[i.name], known) }));
+  const at = String(manifest).split(/\r?\n/u).find(l => /\bModules:/u.test(l)), list = at === undefined ? null : listOf(at), { notTaken } = modulesOf(manifest);
+  return (list?.items ?? []).filter(i => i.name && !known.includes(i.name) && Object.hasOwn(movedTo, i.name)).map(i => {
+    const module = heldIn(movedTo[i.name], known);
+    return { raw: i.raw.trim(), name: i.name, to: movedTo[i.name], module, out: module !== null && notTaken.has(module) };
+  });
 }
 // The manifest with each name of `moved` (movedOn) on its "Modules:" list put as the module its text went to, in the
-// list's own form, or taken out where it went to no module or that module stands there already; the rest as it stood.
+// list's own form, or taken out where it went to no module, that module stands there already or the line "Not taken:"
+// names it; the rest as it stood.
 function unmoved(manifest, moved) {
   if (!moved.length) return manifest;
   const eol = /\r\n/u.test(manifest) ? "\r\n" : "\n", lines = String(manifest).split(/\r?\n/u);
@@ -27,7 +32,7 @@ function unmoved(manifest, moved) {
   for (const i of items) {
     const m = moved.find(x => x.name === i.name);
     if (!m) { raws.push(i.raw.trim()); continue; }
-    if (!m.module || has.has(m.module)) continue;
+    if (!m.module || m.out || has.has(m.module)) continue;
     has.add(m.module);
     raws.push(/\.md$/u.test(i.raw.trim()) ? m.module : m.module.replace(/\.md$/u, ""));
   }
@@ -66,7 +71,7 @@ export const placing = opts => p => {
   const take = left.filter(l => l.take && !l.choice), out = left.filter(l => !l.take), chosen = left.filter(l => l.choice);
   const line = /^.*\bModules:.*$/mu.exec(rewritten(p, opts))?.[0] ?? "";
   return [`In one small pull request, bring the "Modules:" list of \`${MANIFEST}\` to the core's modules as \`node core/scripts/steps.mjs --write\` writes it:`,
-    moved.length && `${moved.map(m => `\`${shown(m.raw)}\` is no module of the core now: its text moved to \`core/${shown(m.to)}\`${m.module ? `, so \`${shown(m.module)}\` takes its place` : ", a file no project takes as a module, so the name goes"}`).join("; ")};`,
+    moved.length && `${moved.map(m => `\`${shown(m.raw)}\` is no module of the core now: its text moved to \`core/${shown(m.to)}\`${!m.module ? ", a file no project takes as a module, so the name goes" : m.out ? `, and \`${shown(m.module)}\` stands on the line "Not taken:", so the name goes` : `, so \`${shown(m.module)}\` takes its place`}`).join("; ")};`,
     left.length && "place each module the list neither takes nor leaves out:",
     take.length && `add ${named(take)} to the "Modules:" list, which what the project holds calls for (${take.map(l => `${l.name}: ${l.why}`).join("; ")});`,
     out.length && `add ${out.map(l => `\`${l.name}\` (${l.why})`).join(", ")} to the line "Not taken:";`,

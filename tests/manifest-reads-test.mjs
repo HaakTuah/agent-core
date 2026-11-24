@@ -110,6 +110,10 @@ ok(m.taken.has("a.md") && m.taken.has("b.md") && m.notTaken.get("g.md") === "no 
     "a bare list holding names the core moved is read, the step naming each with where its text went and quoting the line as the writer writes it", said);
   ok(/\bwork-flow\b/u.test(line(wrote)) && !/\bgit\b|orchestrating/u.test(line(wrote)) && !/`git\.md`/u.test(line(twice)) && (line(twice).match(/work-flow/gu) ?? []).length === 1 && !/`git`/u.test(modules.check({ manifest: twice, files: [] }) ?? ""),
     "the writer puts the module a moved name's text went to in its place, once, and takes out one whose text went to no module, in backticks too", `${line(wrote)}\n${line(twice)}`);
+  // (a moved name whose module the line "Not taken:" names is taken out, never put back in its place: the owner left it out)
+  const outList = kit("`cleaning.md`, `git.md`", "Not taken: `work-flow.md` (the owner's reason).\n"), outSaid = modules.check({ manifest: outList, files: [] }) ?? "", outWrote = rewritten({ manifest: outList, files: [] }, MODS);
+  ok(!/work-flow|`git\.md`/u.test(line(outWrote)) && /^Not taken: `work-flow\.md`/mu.test(outWrote) && /`git\.md`[^;]*"Not taken:"[^;]*the name goes/u.test(outSaid),
+    "a moved name whose module the line \"Not taken:\" names goes, its module left out as it was", `${line(outWrote)}\n${outSaid}`);
   ok(/`whatever`[^.]*no module of the core/u.test(unread(kit("cleaning, whatever"))), "a line that cannot be read names each name that is no module of the core", unread(kit("cleaning, whatever")));
   let refused = "";
   try { writable({ root: scratchDir("manifest-reads-writable-"), manifest: kit("all") }, "core-manifest.md", new Set(["core-manifest.md"])); } catch (e) { refused = e.message; }
