@@ -32,7 +32,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { calledKeys, closing, gates, movesForward, ownJobs, readable, syncCalls, triggered, unrunWhy } from "./check-calls.mjs";
+import { calledKeys, closing, gates, movesForward, ownFailed, ownJobs, readable, syncCalls, triggered, unrunWhy } from "./check-calls.mjs";
 import { standIns } from "./check-actions.mjs";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { carriedAt, readCore } from "./core-path.mjs";
@@ -151,7 +151,7 @@ function runAll(p, run, jobs, tmp) {
   for (const [i, j] of jobs.entries()) {
     const r = run(j.file, j.id, j.job);
     n.failed += r.failed; n.ran += r.ran; n.unrun += r.unrun | 0;
-    proved ||= j.name === "core.yml" && !j.base && !r.failed && !r.unrun && r.ran > 0;
+    proved ||= j.name === "core.yml" && !j.base && !r.failed && (r.unrun ? r.held : r.ran > 0);
     if (!gates(j, r, proved)) continue;
     // (core.yml unrun here proves nothing of the copy, so it stops the rest as its failure does)
     if (!r.failed) n.failed++;
@@ -386,13 +386,15 @@ function merged(p, tmp, bare) {
 }
 
 // Prints each job's verdict, each step the host alone runs, and each failing step with what it printed, every term of
-// the personal-terms list masked; gives how many of its jobs ran, failed and were unrun, and whether a step of core.yml's own failed.
+// the personal-terms list masked; gives how many of its jobs ran, failed and were unrun, whether a step of core.yml's own failed, and
+// whether those of each unrun passed (`held`; #1262).
 function report(where, results, event) {
-  let failed = 0, ran = 0, copy = false, unrun = 0;
+  let failed = 0, ran = 0, copy = false, unrun = 0, held = true;
   for (const r of results) {
     const at = `${where}/${r.job}`;
     const why = unrunWhy(r);
-    if (why) { verdicts[at] = "unrun"; unrun++; }
+    const own = ownFailed(r);
+    if (why) { verdicts[at] = "unrun"; unrun++; held &&= own.held; }
     if (r.stopped) { verdicts[at] = "stopped"; say(`stop ${at}: not run, behind the failure of a job it needs`); continue; }
     if (!r.ran || why) { say(`skip ${at}: ${why ?? `its condition does not hold for this ${event === "push" ? "push" : "pull request"}`}`); continue; }
     ran++;
@@ -400,13 +402,11 @@ function report(where, results, event) {
     for (const s of r.steps.filter(s => s.ran === false && s.out)) say(`host ${at}: "${s.name}" is the host's own, not run here`);
     if (r.passed) { say(`ok   ${at}`); continue; }
     failed++;
-    // (a failure of core.yml's own steps, before those it runs of the copy's scripts, which begin where it reads where the copy stands)
-    const parts = r.steps.findIndex(s => s.name.startsWith("Where the core's copy stands"));
-    if (r.steps.some((s, i) => !s.passed && (parts < 0 || i < parts))) copy = true;
+    if (own.failed) copy = true;
     for (const s of r.steps.filter(s => !s.passed)) {
       warn(`FAIL ${at}: its step "${s.name}" failed, as it printed below. ${MEND}do what its own failure below says, commit, and run this check again.`);
       warn(s.out.trim().split("\n").map(l => `  ${l}`).join("\n"));
     }
   }
-  return { failed, ran, copy, unrun };
+  return { failed, ran, copy, unrun, held };
 }

@@ -98,9 +98,19 @@ export function ownJobs({ file, wf }, say) {
 }
 
 // Whether a job's outcome stops the rest: core.yml's, where a step of its own failed (`r.copy`, or any failure where
-// that is not said) or it did not run here; but a sync's call of the base's (`j.base`, from syncCalls) never once the
-// sync's own core.yml passed (`proved`), which proved the copy (#1258, point 1).
-export const gates = (j, r, proved) => j.name === "core.yml" && !(j.base && proved) && Boolean((r.copy ?? r.failed > 0) || r.unrun);
+// that is not said) or it did not run here, save where every step of its own passed first (`r.held`: an npm refused
+// after them; #1262); but a sync's call of the base's (`j.base`, from syncCalls) never once the sync's own core.yml
+// proved the copy (`proved`; #1258, point 1).
+export const gates = (j, r, proved) => j.name === "core.yml" && !(j.base && proved) && Boolean((r.copy ?? r.failed > 0) || (r.unrun && !r.held));
+
+// Of a job's results: whether a step of core.yml's own failed, before those it runs of the copy's scripts, which begin
+// where it reads where the copy stands (any step, where none reads that); and `held`, where one does and none failed,
+// so the copy is proved even where a later step left the job unrun (#1262).
+export function ownFailed(r) {
+  const parts = r.steps.findIndex(s => String(s.name ?? "").startsWith("Where the core's copy stands"));
+  const failed = r.steps.some((s, i) => !s.passed && (parts < 0 || i < parts));
+  return { failed, held: parts > 0 && !failed };
+}
 
 // The keys a job that calls a workflow of the core's is written under, as check.mjs writes a verdict: one for each job
 // of the workflow it calls, whose text `read(uses)` gives; its own place where that cannot be read (#1258, point 2).
