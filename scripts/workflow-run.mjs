@@ -196,28 +196,50 @@ function callInputs(wf, inputs, secrets) {
 // runs the core's install.mjs puts the packages into the workspace, so it runs once for each text, env and set of lock
 // files; every later job takes its result and a hard-linked copy of what the first one installed (each node_modules/ and
 // pypi/ below the core's .packages/), as the first run left it.
-export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir(), once = null, installed = null, machine = null }) {
+//
+// `sayUnread`, for check.mjs (#1263, point 1): a job, or a combination of its matrix, that this cannot read is given
+// `unread`, why, in place of throwing, and the other jobs run on, each keeping its own verdict; a job that needs one
+// unread measured nothing, and is unread too, never given a guessed result. Without it, it throws, as above.
+export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir(), once = null, installed = null, machine = null, sayUnread = false }) {
   const wf = parseYaml(text);
-  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp, once, installed, machine };
+  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp, once, installed, machine, sayUnread };
   const given = callInputs(wf, inputs, secrets);
-  const results = [], done = {}, stopped = new Set();
+  const results = [], done = {}, stopped = new Set(), unread = new Set();
   for (const [id, job] of inNeedsOrder(wf.jobs ?? {})) {
-    // (the needs context; a job whose condition asks no status is skipped where a need did not succeed, and is
-    // `stopped` where one failed or was stopped and its own condition held: #1245, points 2 and 3)
-    const needs = Object.fromEntries(needsOf(job).map(n => [n, done[n]]));
-    const top = { github, inputs: given, secrets, vars: {}, needs };
-    if (!holds(job.if, top, { failed: Object.values(needs).some(n => n.result !== "success") })) {
-      const behind = needsOf(job).some(n => done[n].result === "failure" || stopped.has(n)) && holds(job.if, top, { failed: false });
-      if (behind) stopped.add(id);
-      results.push({ job: id, ran: false, passed: true, steps: [], outputs: {}, ...behind && { stopped: true } }); done[id] = { result: "skipped", outputs: {} }; continue;
+    const lost = needsOf(job).filter(n => unread.has(n));
+    if (lost.length) { unread.add(id); results.push(unreadJob(id, `it needs ${lost.join(", ")}, which this runner could not read`)); continue; }
+    try {
+      runOne(rt, { id, job, given, secrets, done, stopped }, results);
+    } catch (e) {
+      if (!sayUnread) throw e;
+      unread.add(id);
+      results.push(unreadJob(id, e.message));
     }
-    const from = results.length;
-    // (a matrix makes a job of each of its combinations, each one billed, named by its values as GitHub names it)
-    for (const matrix of combinations(job.strategy?.matrix, top)) runMatrixJob(rt, job, id, top, matrix, results);
-    const mine = results.slice(from);
-    done[id] = { result: mine.every(r => r.passed) ? "success" : "failure", outputs: Object.assign({}, ...mine.map(r => r.declared)) };
+    if (results.some(r => r.unread && (r.job === id || r.job.startsWith(`${id} (`)))) unread.add(id);
   }
   return results;
+}
+
+// A job this runner could not read: it ran not, and measured nothing.
+const unreadJob = (job, why) => ({ job, ran: false, passed: false, steps: [], outputs: {}, unread: why });
+
+// One job of the workflow, a job for each combination of its matrix, its result and outputs put in `done` for the jobs
+// that need it.
+function runOne(rt, { id, job, given, secrets, done, stopped }, results) {
+  // (the needs context; a job whose condition asks no status is skipped where a need did not succeed, and is
+  // `stopped` where one failed or was stopped and its own condition held: #1245, points 2 and 3)
+  const needs = Object.fromEntries(needsOf(job).map(n => [n, done[n]]));
+  const top = { github: rt.github, inputs: given, secrets, vars: {}, needs };
+  if (!holds(job.if, top, { failed: Object.values(needs).some(n => n.result !== "success") })) {
+    const behind = needsOf(job).some(n => done[n].result === "failure" || stopped.has(n)) && holds(job.if, top, { failed: false });
+    if (behind) stopped.add(id);
+    results.push({ job: id, ran: false, passed: true, steps: [], outputs: {}, ...behind && { stopped: true } }); done[id] = { result: "skipped", outputs: {} }; return;
+  }
+  const from = results.length;
+  // (a matrix makes a job of each of its combinations, each one billed, named by its values as GitHub names it)
+  for (const matrix of combinations(job.strategy?.matrix, top)) runMatrixJob(rt, job, id, top, matrix, results);
+  const mine = results.slice(from);
+  done[id] = { result: mine.every(r => r.passed) ? "success" : "failure", outputs: Object.assign({}, ...mine.map(r => r.declared)) };
 }
 
 // One job of a workflow for one combination of its matrix (null for none): its runner folder made, the job run, the folder removed.
@@ -234,6 +256,10 @@ function runMatrixJob(rt, job, id, top, matrix, results) {
     runJob({ rt, job, id, ctx, state, result, tmp });
     // (the job's own outputs, as its `outputs:` fills them in from its steps, for the jobs that need it)
     result.declared = fillValues(job.outputs, ctx, state);
+  } catch (e) {
+    // (with sayUnread, a combination this cannot run as GitHub would is unread alone, the others kept)
+    if (!rt.sayUnread) throw e;
+    Object.assign(result, { ran: false, passed: false, unread: e.message, declared: {} });
   } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 }
 

@@ -21,6 +21,7 @@
   "grown": {
     "process: tests/steps-run-hostile-test.mjs -> node:child_process": "The grammar's time for a step's text (bash-commands.mjs; #1163) is what the case guards, and it is read when the parser's thread starts, so the case that a text past it is not read runs in a process of its own at the default time, the other cases in this one under a longer.",
     "timed: tests/nuget-fetch-test.mjs -> setTimeout": "The one real registry is tried three times with a wait between (#543): that nuget.org answers after a moment is what the wait is for, and only a clock gives it.",
+    "process: tests/npm-mend-test.mjs -> node:child_process": "A mend followed as worded is what it guards (#1262), and no other way holds it: the mend is a command a session runs, so npm itself must run it, installing the version it names from the registry, and the check must run as a project runs it, from a scratch project that git commits, its exit code and what it prints with its mend being what the cases read; checks-test.mjs's stand-in npm reads the refusal's words, but runs no install.",
     "process: tests/check-sync-test.mjs -> node:child_process": "Split from tests/check-test.mjs (#1258), which starts the same processes: a scratch project the starter kit writes and git commits, synced along a scratch core's main, which only git writes, and check.mjs run as a project runs it, its exit code, what it prints with its mend and the verdicts it writes being what the cases guard.",
     "process: tests/trial-test.mjs -> node:child_process": "What it guards is read through git (#1245): the checkout stand-in checks out a commit, a ref written whole and a branch of a scratch origin, and a sync's side reads a scratch core's release tags and main, which only git writes; each workflow's steps run as workflow-run.mjs runs them, under bash, the needs order being what the cases guard.",
     "process: tests/power-test.mjs -> node:child_process": "The script is run as security-review.yml runs it (#1134): in a scratch git repository, whose commits it reads through git ls-tree and git cat-file, never checked out; its exit code, what it prints and its failures with their mend are what the cases guard.",
@@ -92,6 +93,7 @@
     "process: tests/agent-tools-test.mjs -> node:child_process": true,
     "process: tests/agent-tools-tree-test.mjs -> node:child_process": true,
     "process: tests/check-sync-test.mjs -> node:child_process": true,
+    "process: tests/npm-mend-test.mjs -> node:child_process": true,
     "process: tests/check-test.mjs -> node:child_process": true,
     "process: tests/checks-test.mjs -> node:child_process": true,
     "process: tests/choices-check-test.mjs -> node:child_process": true,

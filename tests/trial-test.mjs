@@ -151,12 +151,15 @@ jobs:
   const lines = [], close = counts => closing(counts, l => lines.push(l), l => lines.push(l));
   ok(close({ failed: 0, ran: 3, unrun: 1 }) === 1 && mended(lines[0]) && /^FAIL 1 job\(s\) skipped above could not run here/u.test(lines[0]) && close({ failed: 0, ran: 3, unrun: 0 }) === 0 && close({ failed: 1, ran: 3, unrun: 0 }) === 1,
     "a job unrun alone fails the run, saying its mend; with none unrun or failed it passes (#1245, points 8 and 9)", lines.join("\n"));
+  lines.length = 0;
+  ok(close({ failed: 1, ran: 3, unrun: 0 }) === 1 && lines[0] === "1 of the jobs run here failed, 0 not run (the core's checks that run from plain git and, with --own, the project's own jobs)" && close({ failed: 0, ran: 3, unrun: 0 }) === 0 && lines[1] === "ok   every job run here passed (3: the core's checks that run from plain git and, with --own, the project's own jobs)",
+    "the summary names the project's own jobs beside the core's checks, never counting them as the core's (#1275, point 2)", lines.join("\n"));
   ok(!lacking.passed && lacking.steps.find(s => !s.passed)?.missing === "no-such-program-of-the-trial", "a step that wants a program this machine lacks names it, for check.mjs to leave the job unrun (#1245, point 9)", JSON.stringify(lacking.steps));
 
   // (point 10: each job in its class, the record counting each, and a job failed after alone holding the cut as the release's)
   const all = compared({ p: "passed", f: "failed", pf: "passed", ff: "failed", gone: "passed", lost: "failed", was: "stopped", off: "unrun", ranThen: "passed" },
     { p: "passed", f: "passed", pf: "failed", ff: "failed", newp: "passed", newf: "failed", was: "passed", off: "unrun", w: "unrun", ranThen: "unrun" });
-  ok(Object.keys(all).join() === COUNTS.join() && Object.values(all).map(j => j.join()).join(";") === "p;f;ff;pf;newf;;newp,was;gone;lost;off,w;ranThen",
+  ok(Object.keys(all).join() === COUNTS.join() && Object.values(all).map(j => j.join()).join(";") === "p;f;ff;pf;newf;;newp,was;gone;lost;off,w;ranThen;;;",
     "passed both, fixed after, failed both, failed after, failed after alone, stopped after, ran after alone, ran before alone, failed before alone, unrun after, and unrun after where it ran before are each counted as named (#1245, point 10)", JSON.stringify(all));
   const alone = trialRecord(SHA("b"), "2026-11-24", [[{}, { "new.yml/x": "failed", "w.yml/x": "unrun" }]]);
   const aloneAt = trialAt(SHA("b"), args => (args[0] === "show" ? JSON.stringify(alone) : ""));
@@ -186,6 +189,8 @@ jobs:
 
   // (point 6: run from a clone of the core with its packages missing, check.mjs says so with the command that installs them)
   ok(mended(`FAIL no workflow can be read here: ${notInstalled("yaml")}`) && /install\.mjs/u.test(notInstalled("yaml")), "a package missing is said with the command that installs it (#1245, point 6)", notInstalled("yaml"));
+  const [what, mend] = notInstalled("yaml").split(". Mend: "), yaml = `FAIL no workflow can be read here: ${what}. Mend: ${mend}`;
+  ok(!/\.\./u.test(yaml) && mended(yaml) && mend?.startsWith("run "), "and in one full stop before its mend, as check.mjs splits and words it (#1275, point 3)", yaml);
 
   // (point 7: a sync to a commit of the core's main past its newest release, as a trial makes, needs nothing)
   const core = path.join(tmp, "core");

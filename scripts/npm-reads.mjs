@@ -8,8 +8,9 @@ import { spawnSync } from "node:child_process";
 
 // The npm settings that keep an install to the registry, and to a release a week old, each with the first npm that reads
 // it, as npm's own docs/content/using-npm/config.md of each version lists it: an older npm, npm 10 that Node 22 brings
-// among them, ignores each without a word (#704).
-export const NPM_READS = { "allow-git": "11.9.0", "allow-remote": "11.14.0", "allow-file": "11.14.0", "allow-directory": "11.14.0", "min-release-age": "11.10.0" };
+// among them, ignores each without a word (#704). --allow-remote is counted from 11.15.0: npm 11.14 lists it, but under
+// --allow-remote=none it refuses the registry's own packages too, so an install from a lock file fails there (#1262).
+export const NPM_READS = { "allow-git": "11.9.0", "allow-remote": "11.15.0", "allow-file": "11.14.0", "allow-directory": "11.14.0", "min-release-age": "11.10.0" };
 // Whether npm's version `a` ("10.9.9") comes before `b`: by its three numbers, then a pre-release ("11.14.0-pre.0")
 // before its release, as npm orders them; one that names no version comes before every other.
 const parts = v => /^(\d+)\.(\d+)\.(\d+)(-)?/u.exec(v ?? "")?.slice(1).map((p, i) => (i < 3 ? Number(p) : p ? 0 : 1)) ?? null;

@@ -33,8 +33,8 @@
     ".github/workflows/security-review.yml": { "mark": 29919, "why": "One job that each project calls pinned, its shell inline so that nothing the pull request checks out runs with its token; a session reads the step it changes, found by its name, and a second called workflow would start a second job, billed a whole minute on a private repository's free plan" },
     "scripts/staged.mjs": { "mark": 30534, "why": "the question of a split is asked in #1157" },
     "scripts/init.mjs": { "mark": 30906, "why": "the question of a split is asked in #1098" },
-    "tests/check-test.mjs": { "mark": 28691, "why": "the question of a split is asked in #1073" },
-    "scripts/check.mjs": { "mark": 26892, "why": "the question of a split is asked in #1064" },
+    "tests/check-test.mjs": { "mark": 36799, "why": "the question of a split is asked in #1073" },
+    "scripts/check.mjs": { "mark": 33867, "why": "the question of a split is asked in #1064" },
     "scripts/checks.mjs": { "mark": 24179, "why": "the question of a split is asked in #1064" },
     "scripts/code-scan.mjs": { "mark": 20998, "why": "the question of a split is asked in #1064" },
     ".github/workflows/core.yml": {
@@ -208,7 +208,7 @@
     "tests/shape-readers-test.mjs": { "mark": 41453, "why": "#884: by language, each reader's cases apart." },
     "tests/shape-test.mjs": { "mark": 91943, "why": "#884: along its sections, in step with scripts/shape.mjs." },
     "tests/releases-test.mjs": {
-      "mark": 32922,
+      "mark": 41671,
       "why": "One module's cases (releases.mjs, and release.mjs that cuts one) on the one scratch core it sets up with its release tags; split, each file would set it up again, adding to the suite's time (tasks/tests.md), and a session changing the module reads every case."
     },
     "tests/code-review-wait-test.mjs": {

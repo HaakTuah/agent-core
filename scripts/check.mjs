@@ -20,7 +20,8 @@
 // each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed or could not run here.
 // With --own it runs the project's own jobs too (#1084), each job of its own workflows that calls no workflow and names
 // no environment, as the change itself holds them, given no secret, after the core's and only where the copy is the core; with
-// --verdicts it writes each job's verdict, "passed", "failed", "unrun" or "stopped" behind a failure, by its place (a stopped one by the key it runs under), to a file, and
+// --verdicts it writes each job's verdict, "passed", "failed", "unrun", "stopped" behind a failure, or "unread" where this cannot read it (#1263; the jobs it can read run
+// on, each with its own; a whole file "unread" only where none could run), by its place (a stopped one by the key it runs under), to a file, and
 // RUN_FROM where this script lies outside the project, so that a run before an update and one after can be set side by side (release-trial.mjs, compared).
 // Git, bash and Node's own modules, the core's packages (packages.mjs), and gh where the manifest has no owner's row and no workflow's event says whose
 // account holds the repository (releases.mjs, hostAccount).
@@ -104,7 +105,7 @@ function main() {
   for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
   const o = options();
   // (a clone of the core installs none itself, as a copy does: #1245, point 6)
-  if (!installed("yaml")) { const [what, mend] = notInstalled("yaml").split(" Mend: "); fail(`no workflow can be read here: ${what}.`, mend); }
+  if (!installed("yaml")) { const [what, mend] = notInstalled("yaml").split(". Mend: "); fail(`no workflow can be read here: ${what}.`, mend); }
   const p = { ...project(o), own: o.own, verdicts: o.verdicts === null ? null : path.resolve(o.verdicts) };
   if (p.verdicts !== null) outside(p, o.verdicts);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
@@ -299,9 +300,9 @@ function runner(p, tmp) {
     undescribed(name, inputs, p.described, `${file}/${id}`);
     const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, value(v, { PERSONAL_TERMS: terms })]));
     try {
-      return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp, machine: process.platform, stop: name === "core.yml" ? ownSteps(called) : null }), p.event);
+      return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp, machine: process.platform, sayUnread: true, stop: name === "core.yml" ? ownSteps(called) : null }), p.event);
     } catch (e) {
-      verdicts[`${file}/${id}`] = "failed";
+      verdicts[`${file}/${id}`] = "unread";
       warn(`FAIL ${file}/${id}: ${name} cannot be run from plain git here (${e.message}). ${MEND}run that check on the host meanwhile, and report it to the core (core/README.md, "Reporting to the core").`);
       return { failed: 1, ran: 0 };
     }
@@ -310,14 +311,14 @@ function runner(p, tmp) {
   // change's own code, given no secret, not even the personal-terms list the calls are given)
   byCall.own = ({ file, wf, error }) => {
     if (wf === null) {
-      verdicts[file] = "failed";
+      verdicts[file] = "unread";
       warn(`FAIL ${file}: this workflow of the project's own is written in a form this check cannot read (${error}), so none of its jobs ran. ${MEND}write it in plain YAML, or run it on the host meanwhile and report the form to the core (core/README.md, "Reporting to the core").`);
       return { failed: 1, ran: 0 };
     }
     try {
-      return report(file, runWorkflow(JSON.stringify(wf), { secrets: {}, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp, machine: process.platform }), p.event);
+      return report(file, runWorkflow(JSON.stringify(wf), { secrets: {}, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp, machine: process.platform, sayUnread: true }), p.event);
     } catch (e) {
-      verdicts[file] = "failed";
+      verdicts[file] = "unread";
       warn(`FAIL ${file}: this workflow of the project's own cannot be run from plain git here (${e.message}). ${MEND}run it on the host meanwhile, and where what it uses is GitHub's own, report it to the core (core/README.md, "Reporting to the core").`);
       return { failed: 1, ran: 0 };
     }
@@ -386,12 +387,18 @@ function merged(p, tmp, bare) {
 }
 
 // Prints each job's verdict, each step the host alone runs, and each failing step with what it printed, every term of
-// the personal-terms list masked; gives how many of its jobs ran, failed and were unrun, whether a step of core.yml's own failed, and
-// whether those of each unrun passed (`held`; #1262).
+// the personal-terms list masked; gives how many of its jobs ran, failed (a job not read among them: it proved nothing)
+// and were unrun, whether a step of core.yml's own failed or a job of it was not read, and whether those of each unrun
+// passed (`held`; #1262).
 function report(where, results, event) {
   let failed = 0, ran = 0, copy = false, unrun = 0, held = true;
   for (const r of results) {
     const at = `${where}/${r.job}`;
+    if (r.unread) {
+      verdicts[at] = "unread"; failed++; copy = true;
+      warn(`FAIL ${at}: this runner cannot read it (${r.unread}), so it measured nothing; the jobs it can read ran. ${MEND}run it on the host meanwhile, and report the form to the core (core/README.md, "Reporting to the core").`);
+      continue;
+    }
     const why = unrunWhy(r);
     const own = ownFailed(r);
     if (why) { verdicts[at] = "unrun"; unrun++; held &&= own.held; }

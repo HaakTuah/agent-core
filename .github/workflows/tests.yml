@@ -279,6 +279,9 @@ jobs:
       - name: The NuGet check's whole job, where its restore must succeed (it asks NuGet's registry; #772)
         if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-gate-network-test.mjs ')) }}
         run: node tests/nuget-gate-network-test.mjs
+      - name: The signature check's mend for an npm too old for it, followed as worded (it installs npm and a package from npm's registry; #1262)
+        if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/npm-mend-test.mjs ')) }}
+        run: node tests/npm-mend-test.mjs
       - name: The code scan's own logic, which needs no engine (its reading of a description, the files the engine did not read, the verdicts)
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-logic-test.mjs ')) }}
         run: node tests/code-scan-logic-test.mjs
@@ -575,6 +578,9 @@ jobs:
       - name: check.mjs as a release's trial runs it, and the trial's record
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-test.mjs ')) }}
         run: node tests/trial-test.mjs
+      - name: A job the workflow runner cannot read, and the trial's not measured
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/unread-test.mjs ')) }}
+        run: node tests/unread-test.mjs
       - name: The jobs a start by hand that names parts runs alone
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/tests-parts-test.mjs ')) }}
         run: node tests/tests-parts-test.mjs

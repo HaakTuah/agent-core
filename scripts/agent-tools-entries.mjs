@@ -4,15 +4,20 @@ import { exact } from "./exact-versions.mjs";
 
 const KINDS = { plugin: "the plug-in", server: "the tool server", skill: "the skill", hook: "the hook" };
 const PINNED = new Set(["plugin", "server"]); // (the kinds that must give a version: neither is a file of the project's)
-// (what an entry's "from" may say: that its hook takes a file of the project from the working tree, as the base held it)
-export const TREE = "the working tree";
+// (what an entry's "from" may say of a hook not in the kit's form, as the base held it: that it takes a file of the
+// project from the working tree, or, where its command has git show a file of main in a form of its own, from main: a
+// mark of what the command names, never that main's copy is what runs, which stays a judgement; #1273)
+export const TREE = "the working tree", MAIN = "main";
+// (the mark that fits a hook's source, as agent-tools-read.mjs reads it)
+export const markOf = source => (source?.main ? MAIN : TREE);
 export const show = value => JSON.stringify(value) ?? String(value);
 // The list a config holds: { keys, versions, from, problems }, keys the "kind name" of each well-formed entry, versions
-// its version by the same key, from the keys of the hooks whose entry says "from": "the working tree" (the baseline of
-// those that stood before the check read where a hook's command comes from); null where the config holds no "agentTools".
+// its version by the same key, from the keys of the hooks whose entry says "from" to what it says, "the working tree" or
+// "main" (the baseline of those that stood before the check read where a hook's command comes from); null where the
+// config holds no "agentTools".
 export function listed(config, file) {
   if (!config || !Object.hasOwn(config, "agentTools")) return null;
-  const list = config.agentTools, keys = new Set(), versions = new Map(), from = new Set(), problems = [];
+  const list = config.agentTools, keys = new Set(), versions = new Map(), from = new Map(), problems = [];
   if (!Array.isArray(list)) return { keys, versions, from, problems: [`${file}: "agentTools" is no list. Mend: write it as a list of entries, each { "kind", "name", "publisher", "version" }`] };
   list.forEach((entry, i) => {
     const at = `${file}: "agentTools" entry ${i + 1}${typeof entry?.name === "string" ? ` (${show(entry.name)})` : ""}`;
@@ -22,7 +27,7 @@ export function listed(config, file) {
     if (bad.length) return;
     keys.add(`${entry.kind} ${entry.name}`);
     versions.set(`${entry.kind} ${entry.name}`, entry.version);
-    if (entry.from === TREE) from.add(`${entry.kind} ${entry.name}`);
+    if (Object.hasOwn(entry, "from")) from.set(`${entry.kind} ${entry.name}`, entry.from);
   });
   return { keys, versions, from, problems };
 }
@@ -34,8 +39,8 @@ function entryProblems(entry) {
   if (typeof entry.publisher !== "string" || !entry.publisher.trim()) bad.push(`it names no publisher. Mend: write who publishes it, "this project" for a file of its own`);
   if (version === undefined ? PINNED.has(entry.kind) : !(exact(version) || /^[0-9a-f]{40}$/u.test(version)))
     bad.push(`${version === undefined ? "it gives no version" : `its version ${show(version)} is not one exact version`}. Mend: write the one it is taken at, such as 1.2.3, or the full 40-character commit`);
-  if (Object.hasOwn(entry, "from") && (entry.from !== TREE || entry.kind !== "hook"))
-    bad.push(`its "from" is ${show(entry.from)}, where only a hook's entry may say "from", and only ${show(TREE)}. Mend: take "from" out of the entry`);
+  if (Object.hasOwn(entry, "from") && (![TREE, MAIN].includes(entry.from) || entry.kind !== "hook"))
+    bad.push(`its "from" is ${show(entry.from)}, where only a hook's entry may say "from", and only ${show(TREE)} or ${show(MAIN)}. Mend: take "from" out of the entry`);
   return bad;
 }
 // A value as JSON with every object's keys in order, so that a hook is the same whichever order its keys are written in.
