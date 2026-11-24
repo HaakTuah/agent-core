@@ -268,6 +268,10 @@
     "tests/workflows-test.mjs": {
       "mark": 70465,
       "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md). The cases of workflow-tools.mjs, a script of its own, stand in tests/workflow-tools-test.mjs (#1017)."
+    },
+    "tests/nuget-fetch-test.mjs": {
+      "mark": 27539,
+      "why": "One feature's cases (the fetch before the NuGet check's restore) on the scratch project and the package files they share, each case reading what the one before committed; split, each file would write that project again and add to the suite's time"
     }
   }
 }
