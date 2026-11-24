@@ -98,6 +98,12 @@ for (const f of ["tests/hostile/link.test.mjs", "src/peer.mjs"]) fs.rmSync(path.
   put("AGENTS.md", "# A project\n\n@core/roles/shared/work-flow.md\n"); put("config/sizes.json", `${JSON.stringify({ read: ["core/roles/shared/how-to-work.md"] })}\n`);
   put("config/copies.json", `{\n  "prose": [\n    "core/floor/*.md",\n    ${MOVED_GLOB},\n    ${NEW_GLOBS.join(",\n    ")}\n  ]\n}\n`);
   ok(step.check(project(moveDir)) === null, "and it is done once each is named by its new path and the copies config reads the new folders beside the old, however its patterns are laid out", step.check(project(moveDir)) ?? "");
+  // (many files of the project's that still name an old path, none marked by its attributes: their attributes are read
+  // once, so the step answers within SECURITY.md item 5's 5 s; #1272, point 3)
+  for (let i = 0; i < 1000; i += 1) put(`docs/n${i}.md`, "Read `core/modules/inbox.md`.\n");
+  const t0 = Date.now(), many = step.check(project(moveDir)) ?? "", ms = Date.now() - t0;
+  ok(ms < 5000 && many.includes("`docs/n999.md`") && many.includes("leaves"), `the step reads 1,000 files that name an old path, none marked, in ${ms} ms, and names each as left`, many.slice(0, 300));
+  fs.rmSync(path.join(moveDir, "docs"), { recursive: true });
 }
 // (the same where the copy stands at another path: the paths the step names, and the patterns of a copies config it reads,
 // are that path's, in what it says too: #628)

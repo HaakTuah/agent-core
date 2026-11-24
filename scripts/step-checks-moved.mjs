@@ -132,7 +132,7 @@ export function movedPaths(p) {
   const globs = Object.keys(map).length > 0 ? namers(p).filter(f => readsOldAlone(p, f, copyAt(p))) : [];
   if (globs.length) wrong.push(`after the pattern ${MOVED_GLOB} add the patterns ${MOVED_GLOBS}, leaving it where it is, since a copies config may read more and never less (in ${said(globs)})`);
   if (!/^Paths:.*\btasks\/.*\btools\//mu.test(p.manifest)) wrong.push('the "Paths:" line of `core-manifest.md` reads "one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/"');
-  const named = [...new Set([...found.values()].flat())], unsure = named.filter(f => !sure(p, named).includes(f));
+  const named = [...new Set([...found.values()].flat())], written = new Set(sure(p, named)), unsure = named.filter(f => !written.has(f));
   const marks = unsure.length ? ` The step's writer (\`node core/scripts/steps.mjs --write\`) leaves ${said(unsure)}, since until the project's \`.gitattributes\` gives a file \`linguist-generated\` or \`linguist-vendored\` it cannot tell a tool's output from the project's own source: add to it the line \`* -linguist-generated\`, after it mark each folder a tool writes \`linguist-generated\` (or \`linguist-vendored\`), and run it again.` : "";
   return wrong.length ? `${first(found)} one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.${marks}` : null;
 }
