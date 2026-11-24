@@ -23,8 +23,8 @@ const gh = route => { const r = spawnSync("gh", ["api", route], { encoding: "utf
 const ANONYMOUS = `fetch(process.env.CORE_READ_URL, { headers: { "user-agent": "agent-core", accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(20000) })
   .then(async r => process.stdout.write(JSON.stringify({ status: r.status, private: r.status === 200 ? (await r.json())?.private : undefined })))
   .catch(e => process.stdout.write(JSON.stringify({ status: 0, why: String(e?.cause?.code ?? e?.name ?? "no answer") })));`;
-const anonymous = route => {
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(GH|GITHUB)_(TOKEN|ENTERPRISE_TOKEN)$/i.test(k)));
+const anonymous = (route, given = process.env) => {
+  const env = Object.fromEntries(Object.entries(given).filter(([k]) => !/^(GH|GITHUB)_(TOKEN|ENTERPRISE_TOKEN)$/i.test(k)));
   const r = spawnSync(process.execPath, ["-e", ANONYMOUS], { encoding: "utf8", timeout: 30000, env: { ...env, CORE_READ_URL: `https://api.github.com/${route}`, NODE_USE_ENV_PROXY: "1", NODE_NO_WARNINGS: "1" } });
   try { return JSON.parse(r.stdout); } catch { return { status: 0, why: r.error?.code ?? "no answer" }; }
 };
@@ -49,12 +49,15 @@ export function privateOf(root, { env = process.env, ask = gh, bare = anonymous 
 const originUrl = root => spawnSync("git", ["config", "--get", "remote.origin.url"], { cwd: root, encoding: "utf8" }).stdout?.trim() ?? "";
 // The origin that names the repository: where a clone was made from a folder (check.mjs's scratch clone, a clone of
 // the project's working copy; #1246, point 6), that folder's own origin, a few clones deep, so the repository is the
-// one its first clone names, read and never guessed; else the clone's own origin.
+// one its first clone names, read and never guessed; else the clone's own origin. A folder that is not itself a clone
+// names none.
 function originOf(root, origin) {
   let at = root, url = origin;
   for (let hop = 0; hop < 4 && url && !repoOf(url); hop++) {
     const local = /^file:\/\//i.test(url) ? decodeURIComponent(url.replace(/^file:\/\/(localhost)?/i, "")) : /^[a-z][\w+.-]*:\/\/|^[^/\\]+@[^:]+:/i.test(url) ? null : path.resolve(at, url);
-    if (!local || !fs.existsSync(local)) break;
+    // (a folder that is itself a clone, its .git there or a bare one's HEAD and objects; never one inside another
+    // clone, whose origin git would find by searching upward)
+    if (!local || !(fs.existsSync(path.join(local, ".git")) || (fs.existsSync(path.join(local, "HEAD")) && fs.existsSync(path.join(local, "objects"))))) break;
     at = local;
     url = originUrl(at);
   }
@@ -85,7 +88,7 @@ function fromGh(ask, bare, repo, env) {
   let why = "";
   try { const r = JSON.parse(ask(`repos/${repo}`)); if (typeof r?.private === "boolean") return { private: r.private }; } catch (e) { why = ` (${String(e.message).split("\n")[0].slice(0, 120)})`; }
   let open = {};
-  try { open = bare(`repos/${repo}`) ?? {}; } catch { /* (no answer) */ }
+  try { open = bare(`repos/${repo}`, env) ?? {}; } catch { /* (no answer) */ }
   if (open.status === 200 && typeof open.private === "boolean") return { private: open.private };
   if (/^(true|false)$/.test(env.CORE_PRIVATE ?? "")) return { private: env.CORE_PRIVATE === "true" };
   const plain = `HTTP ${Number(open.status) || "none"}${open.status === 404 ? ", as for a private repository or one not there" : open.status === 403 ? ", refused or past the limit for readers with no sign-in" : ""}`;

@@ -47,11 +47,19 @@ ok(asked(bare({ status: 404 })).unread && privateOf(hosted, { env: { CORE_PRIVAT
 
 // ---- a clone made from a folder, as check.mjs's scratch clone is (#1246, point 6) ----
 const scratch = path.join(tmp, "scratch"), deeper = path.join(tmp, "deeper"), loose = path.join(tmp, "loose");
-clone(scratch, hosted); clone(deeper, `file://${scratch}`); clone(loose, path.join(tmp, "not-there"));
+const inside = path.join(tmp, "inside");
+clone(scratch, hosted); clone(deeper, `file://${scratch}`); clone(loose, path.join(tmp, "not-there")); clone(inside, path.join(hosted, "sub"));
+fs.mkdirSync(path.join(hosted, "sub"));
 bareRoutes.length = 0;
 ok([scratch, deeper].every(at => privateOf(at, { env: {}, ask: noGh, bare: bare({ status: 200, private: false }) }).private === false) && bareRoutes.every(r => r === `repos/${repo}`) && bareRoutes.length === 2,
   "a clone made from a folder, or from a clone of one, names the repository its first clone's origin names", bareRoutes.join());
-ok(/names no repository on github\.com, nor does the origin of the clone it was made from/.test(privateOf(loose, { env: {}, ask: notAsked, bare: notAsked }).unread ?? ""),
-  "a clone whose folder is not there names none, and asks nothing");
+ok([loose, inside].every(at => /names no repository on github\.com, nor does the origin of the clone it was made from/.test(privateOf(at, { env: {}, ask: notAsked, bare: notAsked }).unread ?? "")),
+  "a clone whose folder is not there, or is a folder inside another clone and no clone itself, names none, and asks nothing");
+
+// ---- the read with no sign-in itself, its own process run, sent to a proxy that is not there ----
+// (the environment the reader is given, never this process's: here a proxy that is not there, so nothing leaves)
+const offline = { PATH: process.env.PATH, HTTPS_PROXY: "http://127.0.0.1:9", https_proxy: "http://127.0.0.1:9", NO_PROXY: "", no_proxy: "" };
+const unsent = privateOf(hosted, { env: offline, ask: noGh });
+ok(/nor a read with no sign-in \(HTTP none\)/.test(unsent.unread ?? "") && unsent.private === undefined, "the read with no sign-in runs in its own process, through the proxy its environment names, and with no answer reads nothing", JSON.stringify(unsent));
 
 done("whether the repository is private");

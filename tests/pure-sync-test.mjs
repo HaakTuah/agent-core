@@ -272,10 +272,20 @@ ok(mends.status === 0 && read(p, "AGENTS.md").includes("@core/roles/builder.md\n
 const silent = path.join(tmp, "gh-silent");
 fs.mkdirSync(silent, { recursive: true });
 fs.writeFileSync(path.join(silent, "gh"), "#!/bin/sh\necho 'gh: not signed in' >&2\nexit 1\n", { mode: 0o755 });
-git(p, "remote", "set-url", "origin", GH_ORIGIN);
-const standIn = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, CORE_HOST_ANSWERS: hostSays(), [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
-git(p, "remote", "set-url", "origin", origin);
-ok(standIn.status === 1 && /NOT PURE[^\n]*AGENTS\.md: the project's kind or values cannot be read/.test(`${standIn.stdout}${standIn.stderr}`), "  and with only the test's stand-in for the host answering, which the proof does not honour, it is not proved", `${standIn.stdout}${standIn.stderr}`);
+// (the read with no sign-in sent to a proxy that is not there, so it gives no answer and nothing leaves this machine;
+// a stranger's repository of the stand-in's name never answers for it; #1246)
+const offline = { HTTPS_PROXY: "http://127.0.0.1:9", https_proxy: "http://127.0.0.1:9", NO_PROXY: "", no_proxy: "" };
+const unanswered = given => {
+  git(p, "remote", "set-url", "origin", GH_ORIGIN);
+  try {
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, ...offline, ...given, [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
+    return `${r.status}\n${r.stdout}${r.stderr}`;
+  } finally { git(p, "remote", "set-url", "origin", origin); }
+};
+for (const [given, what] of [[{ CORE_HOST_ANSWERS: hostSays() }, "the test's stand-in for the host"], [{ CORE_PRIVATE: "false" }, "an answer given as CORE_PRIVATE"]]) {
+  const out = unanswered(given);
+  ok(/^1\n/.test(out) && /NOT PURE[^\n]*AGENTS\.md: the project's kind or values cannot be read/.test(out), `  and with only ${what} answering, which the proof does not honour, it is not proved`, out);
+}
 git(p, "push", "-q", "-f", "origin", `${base}:main`);
 git(p, "checkout", "-q", "sync");
 git(p, "reset", "-q", "--hard", LEGIT);
