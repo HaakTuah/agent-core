@@ -154,7 +154,7 @@ export function merged(root, busy) {
   for (const [to, want] of fresh(p, undefined, { k }).filter(([f]) => which.has(f) && !p.differences.some(l => l.includes(`"${f}"`)))) {
     const now = p.read(to, true);
     if (now === null) continue;
-    if (!which.get(to)) { out.push({ lead: MERGED, why: `\`${to}\` is named as the config of two checks, so the kit's keys are not added: left as it is` }); continue; }
+    if (!which.get(to)) { if (!out.some(o => o.why?.startsWith(`\`${to}\` is named`))) out.push({ lead: MERGED, why: `\`${to}\` is named as the config of two checks, so the kit's keys are not added: left as it is` }); continue; }
     const r = keysMerged(now, want, asksOf(which.get(to)));
     if (r.left) { out.push({ lead: MERGED, why: `\`${to}\` ${r.left}` }); continue; }
     if (!r.text) continue;

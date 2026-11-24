@@ -191,8 +191,8 @@ try {
   write(m.dir, "checks/licences.json", JSON.stringify({ ...lic, audit: "checks/licences.json" }));
   commit(m.dir, "the licences file named as its own audit");
   const both = merged(m.dir, new Set());
-  ok(!both.some(r => r.wrote) && both.some(r => r.why?.includes("`checks/licences.json` is named as the config of two checks")) && !("ships" in JSON.parse(read(m.dir, "checks/licences.json"))),
-    "  and a file named as the licence config and its audit is left as it is, the report saying why", JSON.stringify(both));
+  ok(!both.some(r => r.wrote) && both.filter(r => r.why?.includes("`checks/licences.json` is named as the config of two checks")).length === 1 && !("ships" in JSON.parse(read(m.dir, "checks/licences.json"))),
+    "  and a file named as the licence config and its audit is left as it is, the report saying why once", JSON.stringify(both));
   const asks = requiredOf("licences");
   ok(asks.required.includes("ships") && asks.required.includes("audit") && asks.keys.scan.required.includes("served"), "  the keys a check asks are read from its schema, at each depth and from its dependencies", JSON.stringify(asks));
 } finally {
