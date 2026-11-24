@@ -78,7 +78,8 @@ export function kitHooks(template = kitTemplate, core = null) {
 // otherwise than its entry, or fetches it at no fixed version, as [key, problem], the fourth, as [key, problem], each
 // hook that takes a file of the project from the working tree and whose entry does not say so, and the fifth those
 // whose entry says so ("from": "the working tree", or "main" where its command fetches from main), as [key, what is
-// said of it, its mend, the mark], the baseline, which the caller holds to what its base held. `head` is configured()'s answer, `list` listed()'s or null, `kit` kitHooks()'s, `installs`
+// said of it, its mend, the mark], the baseline, which the caller holds to what its base held. `head` is configured()'s
+// answer, `list` listed()'s or null, `kit` kitHooks()'s, `installs`
 // each key a way's part names on its line "*Installs:*" to that way's name (installedBy()): such a tool is no
 // project's own, so it is never unlisted, and `installed` names each configured one, as [key, way], to be printed.
 export function check(head, list, kit, file, installs = new Map()) {

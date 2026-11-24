@@ -135,10 +135,11 @@ export function readCommands(state, file, settings) {
 }
 // Each hook with a command that is not the starter kit's form, into `state.sources` as { why, how, main }, why nothing
 // shows it runs its copy on main (hook-source.mjs), its mend, and whether each command it may run fetches a file from
-// main all the same, which the mark of its entry follows ("from": "main", else "the working tree"); so too where the file the kit's form fetches the project holds as
-// a link (`linked`), whose target's name main gives in the script's place, a file the branch can change, and where a
-// library's commit main pins holds the file it reads there as anything but a plain file (`inLibrary`: git prints a link's
-// target, which bash then runs). Where the library's objects are not at hand, the file is not read: said, never failed.
+// main all the same, which the mark of its entry follows ("from": "main", else "the working tree"); so too where the
+// file the kit's form fetches the project holds as a link (`linked`), whose target's name main gives in the script's
+// place, a file the branch can change, and where a library's commit main pins holds the file it reads there as anything
+// but a plain file (`inLibrary`: git prints a link's target, which bash then runs). Where the library's objects are not
+// at hand, the file is not read: said, never failed.
 function readSource(state, name, commands) {
   for (const command of commands) {
     const at = fetchedBy(command);
