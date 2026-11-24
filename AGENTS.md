@@ -239,7 +239,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   setting is changed, a difference it keeps on purpose lost, a check that nothing else runs taken out, or what only the
   owner can do done; nor that the manifest,
   `SECURITY.md`, the threat model, the progress file, the choice records or a check's config is written where it
-  stands, nor after the first copy where it does not: each is then a step's to ask, with what it needs beside it, save the keys of the kit's the copies, shape and licence checks' configs lack whose value
+  stands, nor after the first copy where it does not: each is then a step's to ask, with what it needs beside it, save the keys of the kit's that the copies, shape and licence checks' configs lack whose value
   reads nothing (an empty list, mapping or text, false or null) and whose absence fails no check (a missing "ships" does), which the
   steps' writers add after the sync with every value of the project's kept (#1095, point 5). Reason: a release asked 63 things of each project, 19 of them workflow changes each with two security
   reviews, built by hand from the notes, and a project of another owner held 25 differences from what the kit writes

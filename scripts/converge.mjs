@@ -143,15 +143,20 @@ export const MERGED = "the kit's keys in the checks' configs (#1095, point 5)";
 // (a key whose absence its check fails is never added, at any depth: it asks a judgement, as the licence check's "ships"
 // and "scan"'s "served", what reaches users, do, and stays its step's to ask; read from each check's schema, the audit's
 // "entries" from licences.mjs, `auditEntries`, which no schema holds)
-const asksOf = (to, at) => to === at.audit ? { required: ["entries"], keys: {} } : requiredOf(to === at.copies ? "copies" : to === at.licences || to === at.nuget ? "licences" : "shape");
+const asksOf = which => which === "audit" ? { required: ["entries"], keys: {} } : requiredOf(which);
 export function merged(root, busy) {
   const p = project(root), k = kind(p, {}), at = configs(p);
-  const targets = new Set([at.copies, shapeAt(p.manifest), at.audit, at.licences, at.nuget].filter(Boolean));
-  const out = [], wrote = [];
+  // (each path with the schema its config is held to, the NuGet check's being the licence check's; a path two configs of
+  // different checks name, the audit's the licences file's own, say, is merged by neither: whose keys it asks cannot be told)
+  const named = [[at.copies, "copies"], [shapeAt(p.manifest), "shape"], [at.audit, "audit"], [at.licences, "licences"], [at.nuget, "licences"]].filter(([f]) => f);
+  const which = new Map(), out = [], wrote = [];
+  for (const [f, w] of named) which.set(f, which.has(f) && which.get(f) !== w ? null : w);
+  for (const [f, w] of which) if (!w) out.push({ lead: MERGED, why: `\`${f}\` is named as the config of two checks, so the kit's keys are not added: left as it is` });
+  const targets = new Set([...which].filter(([, w]) => w).map(([f]) => f));
   for (const [to, want] of fresh(p, undefined, { k }).filter(([f]) => targets.has(f) && !p.differences.some(l => l.includes(`"${f}"`)))) {
     const now = p.read(to, true);
     if (now === null) continue;
-    const r = keysMerged(now, want, asksOf(to, at));
+    const r = keysMerged(now, want, asksOf(which.get(to)));
     if (r.left) { out.push({ lead: MERGED, why: `\`${to}\` ${r.left}` }); continue; }
     if (!r.text) continue;
     try { writable(p, to, busy); } catch (e) { if (!(e instanceof Unwritten)) throw e; out.push({ lead: MERGED, why: plain(e.message, root) }); continue; }

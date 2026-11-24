@@ -14,10 +14,11 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { BEGIN, END, partIn } from "../scripts/core-owned.mjs";
-import { kits, plan } from "../scripts/converge.mjs";
+import { kits, merged, plan } from "../scripts/converge.mjs";
 import { kind } from "../scripts/fresh.mjs";
 import { privateOf } from "../scripts/host-private.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { requiredOf } from "../scripts/schemas.mjs";
 import { scratch } from "../scripts/scratch-core.mjs";
 import { project as held } from "../scripts/steps.mjs";
 
@@ -179,6 +180,21 @@ try {
   ok(env2.status === 1, "  as the copies part of checks.mjs runs it, its base in CONVERGE_BASE", `${env2.stdout}${env2.stderr}`);
   const noBase = spawnSync(process.execPath, ["core/scripts/converge.mjs"], { cwd: p.dir, env: { ...env, CONVERGE_BASE: "" }, encoding: "utf8" });
   ok(noBase.status === 0 && noBase.stdout.includes("on a pull request alone"), "  with no base (a push to main), it reads nothing and fails nothing", noBase.stdout);
+  // ---- the key merge (`merged`; #1095, point 5): a key whose absence its check fails is never added, and a path two
+  // checks' configs name is merged by neither ----
+  const m = project("a-merge-project", "--owner", "the-owner", "--npm", "."), lic = JSON.parse(read(m.dir, "checks/licences.json"));
+  write(m.dir, "checks/licences-audit.json", "{}\n");
+  commit(m.dir, "an audit with no entries");
+  ok(!merged(m.dir, new Set()).some(r => r.wrote) && read(m.dir, "checks/licences-audit.json") === "{}\n", "the key merge never adds the audit's \"entries\", whose absence its check fails");
+  delete lic.ships;
+  delete lic.scan.served;
+  write(m.dir, "checks/licences.json", JSON.stringify({ ...lic, audit: "checks/licences.json" }));
+  commit(m.dir, "the licences file named as its own audit");
+  const both = merged(m.dir, new Set());
+  ok(!both.some(r => r.wrote) && both.some(r => r.why?.includes("`checks/licences.json` is named as the config of two checks")) && !("ships" in JSON.parse(read(m.dir, "checks/licences.json"))),
+    "  and a file named as the licence config and its audit is left as it is, the report saying why", JSON.stringify(both));
+  const asks = requiredOf("licences");
+  ok(asks.required.includes("ships") && asks.required.includes("audit") && asks.keys.scan.required.includes("served"), "  the keys a check asks are read from its schema, at each depth and from its dependencies", JSON.stringify(asks));
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }

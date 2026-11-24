@@ -33,10 +33,18 @@ function checker(name) {
  *  own file from another's by them. */
 export const keysOf = name => Object.keys(schemaOf(name).properties ?? {});
 /** The keys the schema `name` asks at each depth, read from the schema alone: { required, keys: { <key>: the same of its
- *  value } }, for a writer that must never add a key whose absence the check fails (converge.mjs, `merged`). */
+ *  value } }, for a writer that must never add a key whose absence the check fails (converge.mjs, `merged`). A key any
+ *  branch or dependency may ask counts as asked, so it reads more than ajv would, never less; a reference it cannot
+ *  follow throws. */
 export const requiredOf = name => {
-  const schema = schemaOf(name), at = node => node?.$ref ? schema.$defs?.[node.$ref.replace("#/$defs/", "")] : node;
-  const tree = node => ({ required: at(node)?.required ?? [], keys: Object.fromEntries(Object.entries(at(node)?.properties ?? {}).map(([k, v]) => [k, tree(v)])) });
+  const schema = schemaOf(name), at = node => {
+    if (!node?.$ref) return node ?? {};
+    if (!node.$ref.startsWith("#/$defs/") || !schema.$defs?.[node.$ref.slice(8)]) throw new Error(`${name}'s schema refers to ${node.$ref}, which requiredOf cannot follow`);
+    return schema.$defs[node.$ref.slice(8)];
+  };
+  const asked = n => [...(n.required ?? []), ...Object.values({ ...n.dependencies, ...n.dependentRequired }).flatMap(v => Array.isArray(v) ? v : at(v).required ?? []),
+    ...[...(n.allOf ?? []), ...(n.anyOf ?? []), ...(n.oneOf ?? []), n.then, n.else].filter(Boolean).flatMap(v => asked(at(v)))];
+  const tree = node => { const n = at(node); return { required: asked(n), keys: Object.fromEntries(Object.entries(n.properties ?? {}).map(([k, v]) => [k, tree(v)])) }; };
   return tree(schema);
 };
 
