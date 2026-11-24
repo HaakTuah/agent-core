@@ -27,7 +27,8 @@
 //                                     check.mjs --verdicts wrote before the update and the one after, each outside
 //                                     every repository, counted; none where no project that takes the core allowed a
 //                                     trial, which it refuses where scripts/state-report.mjs --projects finds one of
-//                                     the owner's own
+//                                     the owner's own; where the trial holds the cut, it says how the runs are taken,
+//                                     the baseline from a clone of the core where the copy cannot (#1244)
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -146,6 +147,7 @@ function told({ name, sha, before, asks }, dir) {
   console.log(staged.said);
   const trialed = trialAt(sha, rev => inBare(dir, rev));
   console.log(trialed.said);
+  if (trialed.held) console.log(`Until then it is not cut: ${trialed.held}.`);
   return { staged, trialed };
 }
 

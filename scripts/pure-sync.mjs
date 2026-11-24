@@ -189,7 +189,7 @@ try {
   if (pin && follows !== "main" && !releasesIn(dir).some((r) => r.sha === pin)) {
     // (and how to take a release instead: a copy older than release-1 lands here, its own sync script taking main; #365)
     const [newest] = releasesIn(dir);
-    fail.push(`the project ${follows === "releases" ? "follows the core's releases" : "does not say what it follows"}, and ${pin} is no release of the core: the sync is reviewed like any PR${newest ? `, or made again from the project's main to a release with its full SHA, \`node ${at}scripts/sync.mjs ${newest.sha}\` (${newest.name}, the newest), as a copy older than release-1, whose sync script takes the core's main, must` : ""}`);
+    fail.push(`the project ${follows === "releases" ? "follows the core's releases" : "does not say what it follows"}, and ${pin} is no release of the core: the sync is reviewed like any PR${newest ? `, or made again from the project's main to a release with its full SHA, \`node ${at}scripts/sync.mjs ${newest.sha}\` (${newest.name}, the newest), as a copy older than release-1, whose sync script takes the core's main, must` : ""}${newest && inCore(["merge-base", "--is-ancestor", newest.sha, pin]) ? `; in a release's trial on a copy of a project (the core's AGENTS.md, "Each release is tried on a real project first"), ${pin} is a commit of main past the newest release, not yet a release, and nothing is to be done (#1245, point 12)` : ""}`);
   }
   if (pin && oldPin && inCore(["merge-base", "--is-ancestor", pin, "refs/heads/main"])) provedOwned(dir);
   else if (later.length || gone.length) fail.push(`${[...later, ...gone].join(", ")}: no file outside the copy is proved where the pin is not a commit of the core's main`);
