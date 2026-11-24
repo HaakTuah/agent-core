@@ -3,7 +3,7 @@
 // and a job it cannot read, a job behind one and a matrix it cannot read are each unread by their own key; without it,
 // such a form still throws. In the trial's record, what was not read is not measured, a class of its own that holds the
 // cut, never failed both nor the release's; and a job that ran before and was stopped or not run after holds it too,
-// one that ran in neither run holding nothing (#1257). check.mjs writing "unread" for each such job:
+// one that ran in neither run, stopped or unrun, holding nothing (#1257). check.mjs writing "unread" for each such job:
 // tests/check-test.mjs. Node's own modules, the runner and the trial's record.
 //
 //   node tests/unread-test.mjs
@@ -116,5 +116,8 @@ jobs:
   ok(/2 checks that ran before measured nothing after the update[\s\S]*0 stopped behind a failure and 2 not run on the trial's machine/u.test(unrun.held ?? ""), "  one that ran before and was not run after holds it too", unrun.held);
   const neitherStopped = trialAt(SHA("e"), args => (args[0] === "show" ? JSON.stringify({ ...stopped, failedAfter: 0, stoppedAfter: 0 }) : ""));
   ok(neitherStopped.held === null && /0 ran before and stopped after it behind a failure, 1 stopped after it that ran not before \(holding nothing\)/u.test(neitherStopped.said), "  and one stopped after that ran not before holds nothing, as #1257 says of a check that ran neither before nor after", `${neitherStopped.said}\n${neitherStopped.held}`);
+  const unrunBoth = trialRecord(SHA("e"), "2026-11-24", [[{ "w.yml/x": "unrun" }, { "w.yml/x": "unrun", "a.yml/y": "passed" }]]);
+  const unrunBothAt = trialAt(SHA("e"), args => (args[0] === "show" ? JSON.stringify(unrunBoth) : ""));
+  ok(unrunBoth.unrunAfter === 1 && unrunBoth.unrunAfterRan === 0 && unrunBothAt.held === null, "  and one unrun in both runs, a suite for another system's runner, holds nothing, as #1257 says", `${JSON.stringify(unrunBoth)}\n${unrunBothAt.held}`);
 }
 done("a job the runner cannot read, and the trial's not measured");

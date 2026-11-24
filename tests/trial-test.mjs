@@ -171,7 +171,7 @@ jobs:
   ok(lost.unrunAfterRan === 1 && /1 check that ran before measured nothing after the update in the trial on a real project, 0 stopped behind a failure and 1 not run on the trial's machine/u.test(lostAt.held ?? "") && /1 not run after it there though they ran before/u.test(lostAt.said),
     "  a job that ran before and was unrun after holds the cut, saying its mend (#1257)", `${lostAt.said}\n${lostAt.held}`);
 
-  // (point 2 and #1244: jobs stopped after count apart and are named beside the counts; a baseline from a clone of the core is counted)
+  // (point 2 and #1244: jobs stopped after count apart, and hold the cut where they ran before (#1257); a baseline from a clone of the core is counted)
   const before = { [RUN_FROM]: "a clone of the core", "core.yml/core": "passed", "core.yml/tests (a)": "passed", "own.yml/lint": "passed", "own.yml/gone": "passed" };
   const afterRun = { "core.yml/core": "failed", "core.yml/tests": "stopped", "own.yml": "stopped" };
   const c = compared(before, afterRun);
