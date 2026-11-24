@@ -15,7 +15,7 @@ import { READ_MOST } from "./own-files.mjs";
 import { parseConfig, where as shapeAt } from "./shape.mjs";
 import { copiesConfig, marksConfig } from "./check-configs.mjs";
 import { atCopy } from "./core-path.mjs";
-import { MOVED_GLOB, MOVED_GLOBS, moved, namers, readsOldAlone } from "./step-checks-moved.mjs";
+import { MOVED_GLOB, MOVED_GLOBS, cut, moved, namers, readsOldAlone, sure } from "./step-checks-moved.mjs";
 import { rewritten } from "./step-checks-modules.mjs";
 import { MANIFEST, pinsOnly } from "./sync-pins.mjs";
 import { HERE, plain, shown } from "./step-checks.mjs";
@@ -94,7 +94,7 @@ export const totalNoted = run => {
 };
 
 // The marks file written again with `change` made to its JSON, its own line ends kept.
-function marksWritten(p, run, change, busy) {
+export function marksWritten(p, run, change, busy) {
   writable(p, run.marks, busy);
   if (!run.json || typeof run.json !== "object" || Array.isArray(run.json)) throw new Unwritten(`${run.marks} is no JSON object to write a mark in`);
   const json = structuredClone(run.json);
@@ -211,7 +211,8 @@ export function writeBreaks(p, busy) {
 // "Paths:" line, where it is word for word the one the starter kit of releases 1 to 5 wrote, written as the kit writes
 // it now. Each path is written on its own (#1248, point 5): one whose move is no exact one (it leads to a folder, or a
 // rule of its file stands elsewhere since and the line does not name that rule by its lead) is left as it stands for
-// the step's mend, and so is a "Paths:" line of the project's own words.
+// the step's mend, and so is a "Paths:" line of the project's own words. Never written: the core's part, the one
+// process's, or a file whose part cannot be told apart; nor a file the writer cannot tell is the project's own (sure).
 export const OLD_PATHS = "Paths: in the core's files, one into floor/, modules/, scripts/, setup/ or archive/ is under core/; any other is ours.";
 const quoted = f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 // The old paths of `map` as a pattern: `core/<old>` alone, never inside a longer name (`hardcore/`, `<old>.bak`).
@@ -221,9 +222,10 @@ export function writeMoved(p, busy) {
   const oldPath = oldPathsIn(map);
   let marks = null;
   try { marks = marksConfig(p); } catch { /* (marks whose path cannot be read are read as any other file) */ }
-  for (const f of namers(p)) {
-    const text = p.read(f) ?? "";
-    let next = movedIn(f === marks ? marksMoved(text, map) : text, map, oldPath);
+  for (const f of sure(p, namers(p))) {
+    const text = p.read(f) ?? "", c = cut(text), own = t => movedIn(f === marks ? marksMoved(t, map) : t, map, oldPath, c?.[1]?.split("\n").map(l => l.replace(/\r$/u, "")));
+    if (!c) continue;
+    let next = c.length === 3 ? `${own(c[0])}${c[1]}${own(c[2])}` : own(text);
     if (oldPath && readsOldAlone(p, f, copy)) next = next.split(atCopy(MOVED_GLOB, copy)).join(atCopy(`${MOVED_GLOB}, ${MOVED_GLOBS}`, copy));
     if (next !== text) writes.push([f, next]);
   }
@@ -235,15 +237,17 @@ export function writeMoved(p, busy) {
 
 // A file's text with each old path it names written as the file it now is, where its move is an exact one; a rule that
 // left its file named with its lead, `core/<old>`, "<lead>", as the step words it, named where it stands now; and a
-// pull-in (an import, Kiro's `#[[file:`) this writes into one that a line above already makes left out.
-function movedIn(text, map, oldPath) {
+// pull-in (an import, Kiro's `#[[file:`) this writes into one that a line above, or the core's part (`part`, its lines),
+// already makes left out.
+function movedIn(text, map, oldPath, part = []) {
   if (!oldPath) return text;
   const apart = moved.apart(), exact = old => !map[old].endsWith("/") && !(apart[old]?.length);
   const led = Object.entries(apart).reduce((t, [old, parts]) => parts.reduce((u, a) => u.split(`\`core/${old}\`, "${a.lead}"`).join(`\`core/${a.to}\`, "${a.lead}"`), t), text);
   const next = led.replace(oldPath, (all, old) => exact(old) ? `core/${map[old]}` : all);
   if (next === text) return text;
   const was = text.split("\n"), now = next.split("\n");
-  return now.filter((l, i) => !(/^\s*(?:@|#\[\[file:)/u.test(l) && now.indexOf(l) < i && !(was[i] === l && was.indexOf(l) < i))).join("\n");
+  const twice = (l, i) => (now.indexOf(l) < i && !(was[i] === l && was.indexOf(l) < i)) || (was[i] !== l && part.includes(l.replace(/\r$/u, "")));
+  return now.filter((l, i) => !(/^\s*(?:@|#\[\[file:)/u.test(l) && twice(l, i))).join("\n");
 }
 
 // The size marks' text with each file under "read" at an old path that leads to one file named as that file, two that

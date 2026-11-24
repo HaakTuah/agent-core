@@ -1,6 +1,7 @@
 // What the core owns of a project's files, and how the one process takes each (#1083; converge.mjs, init.mjs): the
 // marks that say a file or a part of one is the core's, the kinds of file, and, of one file, what the process makes of
-// what stands. No file is read or written here. Node's own language only.
+// what stands. No file is read or written here. Node's own path module alone.
+import path from "node:path";
 
 // The first line of each workflow and Dependabot config the kit writes, which says the file is the core's, and the two
 // lines that hold the core's part of a rule file of the project's own (AGENTS.md, CLAUDE.md), as their templates write them.
@@ -46,11 +47,26 @@ export function partIn(text, kitLines) {
   return core.length === 1 ? core[0] : core.length ? "many" : null;
 }
 
+// What a moved stub of the core's leads to (a file whose first line opens "# Moved:"; its "holds these rules now" link,
+// each "Now in" link and each import it holds), as imports in a rule file of the folder `from` name them: the import `f`
+// there names the stub; `read` gives a file's text from the project's root, null where it is none. Null where it is no
+// stub. `seen` keeps each file's answer, so that a file many imports name is read once.
+export function stubOf(read, from, f, seen = new Map()) {
+  const at = path.posix.normalize(path.posix.join(from, f)), key = `${from}\n${at}`;
+  if (!seen.has(key)) seen.set(key, leadsTo(at.startsWith("../") || path.posix.isAbsolute(at) ? null : read(at), at, from));
+  return seen.get(key);
+}
+function leadsTo(text, at, from) {
+  if (!text || !/^# Moved:/u.test(text)) return null;
+  const links = [/^\[`[^`\s]+`\]\(([^)\s#]+)[^)\s]*\) holds these rules now/gmu, /^Now in \[`[^`\s]+`\]\(([^)\s#]+)[^)\s]*\)/gmu, /^@(\S+)$/gmu].flatMap(r => [...text.matchAll(r)].map(m => m[1]));
+  return [...new Set(links.map(l => path.posix.relative(from, path.posix.join(path.posix.dirname(at), l))))];
+}
+
 // One file after the process, from what stands, `now` (null where nothing does), the kit's text `want` and the earlier
 // kits' (`older`): { text } to write, {} where it is left as it stands, and `left` where it is left as the project's.
-export function converged(to, now, want, older = [], there = () => true) {
+export function converged(to, now, want, older = [], there = () => true, stub = () => null) {
   if (now === null) return { text: want };
-  if (BLOCKS.includes(to)) return partConverged(now, want, older, there);
+  if (BLOCKS.includes(to)) return partConverged(now, want, older, there, stub);
   if (!whole(to)) return {};
   const core = (marked(to) && /^# The core's file:/u.test(now)) || [want, ...older].some(t => t && plainOf(t) === plainOf(now));
   if (!core) return { left: "is not the core's (no mark of the core's, and not what a starter kit writes for the project): left as it is" };
@@ -71,13 +87,16 @@ export const dropped = (to, now, older) => whole(to) && ((marked(to) && /^# The 
 // A rule file of the project's own after the process: its core's part written where it stands, or at its end. Outside
 // the part, an import line the part holds is taken out, so none stands twice, and so is one an earlier kit wrote whose
 // path (`there`, from the rule file's folder) is not there, an import of an earlier layout that the part replaces, as
-// in a run of imports that holds a line of the project's own, which is no part of the core's (#1246, point 4).
-function partConverged(now, want, older, there) {
+// in a run of imports that holds a line of the project's own, which is no part of the core's (#1246, point 4); and so is
+// one of a moved stub (`stub`: what it leads to, from the rule file's folder) whose every target the part imports, which
+// it replaces (#1272, point 2).
+function partConverged(now, want, older, there, stub) {
   const part = blockOf(want);
   if (part === null) return {};
   const lines = t => (blockOf(t) ?? t).split("\n").map(l => l.replace(/\r$/u, "")).filter(imports);
   const kitLines = new Set([want, ...older].flatMap(lines)), partLines = new Set(lines(want));
-  const at = partIn(now, kitLines);
+  const at = partIn(now, kitLines), stubs = new Map();
+  const replaced = l => { if (!stubs.has(l)) { const to = imports(l) ? stub(l.slice(1)) : null; stubs.set(l, !!to?.length && to.every(t => partLines.has(`@${t}`))); } return stubs.get(l); };
   if (at === "many") return { left: "its part of the core cannot be told apart (the core's marks stand more than once or apart, or more than one run of import lines is the kit's): left as it is" };
   const eol = now.includes("\r\n") ? "\r\n" : "\n", block = part.replaceAll("\n", eol), gone = [];
   // (a line inside a fenced block is an example, never an import: kept; a fence open before the part stays open after it)
@@ -85,7 +104,7 @@ function partConverged(now, want, older, there) {
   const outside = t => t.split("\n").filter(l => {
     const bare = l.replace(/\r$/u, ""), mark = (fence === null ? /^ {0,3}(`{3,}|~{3,})/u : /^ {0,3}(`{3,}|~{3,}) *$/u).exec(bare)?.[1];
     if (mark && (fence === null || (mark[0] === fence[0] && mark.length >= fence.length))) { fence = fence === null ? mark : null; return true; }
-    const out = fence === null && (partLines.has(bare) || (kitLines.has(bare) && !there(bare.slice(1)))); if (out) gone.push(bare); return !out; }).join("\n");
+    const out = fence === null && (partLines.has(bare) || (kitLines.has(bare) && !there(bare.slice(1))) || replaced(bare)); if (out) gone.push(bare); return !out; }).join("\n");
   const rest = at === null ? outside(now) : null;
   const text = at === null ? `${rest}${rest.endsWith("\n") || rest === "" ? "" : eol}${eol}${block}${eol}` : `${outside(now.slice(0, at.at))}${block}${outside(now.slice(at.end))}`;
   if (text === now) return {};

@@ -108,9 +108,13 @@ const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseli
 // in on a line of its own, and the part for every tool but Claude beside Claude's: the reading-size check's marks. For
 // the kit as it stands it is READ.
 export function startOf(written) {
-  const pulled = [...`${written["AGENTS.md"] ?? ""}\n${written["CLAUDE.md"] ?? ""}`.matchAll(/^@(core\/[\w./-]+\.md)[ \t]*$/gmu)].map(m => m[1]);
-  const claude = pulled.find(f => f.endsWith("/claude.md"));
-  return [...new Set([...READ.filter(f => !f.startsWith("core/")), ...pulled, ...(claude ? [claude.replace(/claude\.md$/u, "other-builders.md")] : [])])];
+  return [...new Set([...READ.filter(f => !f.startsWith("core/")), ...pulledIn([written["AGENTS.md"] ?? "", written["CLAUDE.md"] ?? ""]).filter(f => f.startsWith("core/"))])];
+}
+// What rule files at the root pull in, from the root, and the core's file for every other tool beside Claude's part,
+// which Claude reads too: the size marks' step reads it of the core's part (step-marks-start.mjs; #1272, point 4).
+export function pulledIn(texts) {
+  const pulled = [...texts.join("\n").matchAll(/^@([\w./-]+\.md)[ \t]*$/gmu)].map(m => m[1]), claude = pulled.find(f => f.endsWith("/claude.md"));
+  return [...pulled, ...(claude ? [claude.replace(/claude\.md$/u, "other-builders.md")] : [])];
 }
 // The files every session reads at its start, as the AGENTS.md template of the kit as it stands imports them, and of
 // the core's own (those under core/) what the core's cap counts (size.mjs).

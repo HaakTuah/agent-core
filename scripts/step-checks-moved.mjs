@@ -5,6 +5,8 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { copiesConfig, marksConfig } from "./check-configs.mjs";
+import { BEGIN, END } from "./core-owned.mjs";
 import { atCopy } from "./core-path.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { copyAt } from "./workflow-calls.mjs";
@@ -49,9 +51,11 @@ const dated = f => /\.(md|txt)$/u.test(f) && (/(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.t
 // root whose name, or whose folder's, opens with a dot, where tools keep what they read, whatever its name; and every
 // other file of text that is no dated record. Left out: what git's attributes mark as a tool's output (`generated`),
 // save a rule file, which a tool reads all the same.
+const rulesOf = p => {
+  try { return ruleFiles(p.read, dir => p.files.filter(f => f.startsWith(`${dir}/`)), { tools: true }); } catch { return []; } // (no list of rule files yet: the files of text alone)
+};
 export function namers(p) {
-  let rules = [];
-  try { rules = ruleFiles(p.read, dir => p.files.filter(f => f.startsWith(`${dir}/`)), { tools: true }); } catch { /* (no list of rule files yet: the files of text alone) */ }
+  const rules = rulesOf(p);
   const some = p.files.filter(f => !f.startsWith(copyAt(p)) && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
   const made = generated(p.root, some);
   return some.filter(f => rules.includes(f) || !made.has(f));
@@ -69,10 +73,38 @@ function generated(root, files) {
   return out;
 }
 
-// Of those, the files that name each old path: Map(old path -> [file]).
+// A file's text cut round the core's part, which the one process writes (converge.mjs) and no step's writer does (#1272,
+// point 1): [before, part, after] where its marks stand once each, in order; [text] where it has none; null where they
+// stand more than once or apart, so that which part is the core's cannot be told.
+export function cut(text) {
+  const b = text.indexOf(BEGIN), e = text.indexOf(END);
+  if (b < 0 && e < 0) return [text];
+  return b < 0 || e < b || text.includes(BEGIN, b + 1) || text.includes(END, e + 1) ? null : [text.slice(0, b), text.slice(b, e + END.length), text.slice(e + END.length)];
+}
+// (a file's own text: what lies outside the core's part, the whole where the part cannot be told apart)
+const ownText = text => { const c = cut(text); return c?.length === 3 ? `${c[0]}\n${c[2]}` : text; };
+
+// Whether the project's git attributes say which of its files a tool writes: a .gitattributes of its own that names
+// linguist-generated or linguist-vendored for any pattern, set, unset or given a value, as GitHub reads them.
+const toolsMarked = p => p.files.some(f => /(?:^|\/)\.gitattributes$/u.test(f) && !f.startsWith(copyAt(p)) && (p.read(f) ?? "").split(/\r?\n/u)
+  .some(l => !/^\s*#/u.test(l) && l.trim().split(/\s+/u).slice(1).some(a => /^[-!]?linguist-(?:generated|vendored)(?:=|$)/u.test(a))));
+// The step's own configs, which its writer writes as the step words them: the size marks, the copies check's config and
+// the manifest, each where it can be read.
+const configs = p => new Set(["core-manifest.md", ...[marksConfig, copiesConfig].flatMap(c => { try { return [c(p)]; } catch { return []; } })]);
+// Of `files`, those the step's writer writes (step-writers.mjs, writeMoved): each rule file, each at the root under a
+// dot and each of the step's configs; any other only where the project's git attributes say which files a tool writes,
+// since until then a tool's output cannot be told from the project's own source (#1272, point 3).
+export function sure(p, files) {
+  if (toolsMarked(p)) return files;
+  const rules = new Set(rulesOf(p)), own = configs(p);
+  // (floor rule 3's rule files in any folder, even where SECURITY.md gives no list yet)
+  return files.filter(f => rules.has(f) || /(?:^|\/)(?:AGENTS|CLAUDE|GEMINI)\.md$/u.test(f) || /^\.[^/]/u.test(f) || own.has(f));
+}
+
+// Of those, the files that name each old path outside the core's part: Map(old path -> [file]).
 function namedStill(p, map) {
   const found = new Map(), old = new RegExp(`core/(${Object.keys(map).map(f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("|")})(?![\\w/-])`, "gu");
-  for (const f of namers(p)) for (const m of (p.read(f) ?? "").matchAll(old)) found.set(m[1], [...new Set([...(found.get(m[1]) ?? []), f])]);
+  for (const f of namers(p)) for (const m of ownText(p.read(f) ?? "").matchAll(old)) found.set(m[1], [...new Set([...(found.get(m[1]) ?? []), f])]);
   return found;
 }
 
@@ -97,5 +129,7 @@ export function movedPaths(p) {
   const globs = Object.keys(map).length > 0 ? namers(p).filter(f => readsOldAlone(p, f, copyAt(p))) : [];
   if (globs.length) wrong.push(`after the pattern ${MOVED_GLOB} add the patterns ${MOVED_GLOBS}, leaving it where it is, since a copies config may read more and never less (in ${said(globs)})`);
   if (!/^Paths:.*\btasks\/.*\btools\//mu.test(p.manifest)) wrong.push('the "Paths:" line of `core-manifest.md` reads "one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/"');
-  return wrong.length ? `${first(found)} one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.` : null;
+  const named = [...new Set([...found.values()].flat())], unsure = named.filter(f => !sure(p, named).includes(f));
+  const marks = unsure.length ? ` The step's writer (\`node core/scripts/steps.mjs --write\`) leaves ${said(unsure)}, since until \`.gitattributes\` says which files a tool writes it cannot tell one from the project's own source: mark each folder a tool writes \`linguist-generated\` (or \`linguist-vendored\`) there, or, where no tool writes any, add the line \`* -linguist-generated\`, and run it again.` : "";
+  return wrong.length ? `${first(found)} one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.${marks}` : null;
 }

@@ -4,7 +4,8 @@
 // project, a number out of range, and nothing at all; each fails with its mend or reads the input as not there, and
 // reads and writes nothing outside the project. The readers: copies.mjs and reading-size.mjs, run from a scratch
 // project's copy of the core; shape.mjs's parseConfig and where; size.mjs's capsOf, answered and --raise;
-// manifest-reads.mjs's notes; step-checks-modules.mjs's step of the modules and rewritten; licences.mjs's loadConfig; steps.mjs's notDone with the step for rule 5's inputs;
+// manifest-reads.mjs's notes; step-checks-modules.mjs's step of the modules and rewritten; core-owned.mjs's converged,
+// on a rule file's imports of a moved stub; licences.mjs's loadConfig; steps.mjs's notDone with the step for rule 5's inputs;
 // read-nothing.mjs's readNothing (#459); and
 // sync.mjs and look.mjs, run from the copy, on a manifest that is a link out of the project. Test
 // data is made up. Run by the core's tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
@@ -13,6 +14,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { BEGIN, END, converged, stubOf } from "../scripts/core-owned.mjs";
 import { loadConfig } from "../scripts/licences.mjs";
 import { notes } from "../scripts/manifest-reads.mjs";
 import { rewritten } from "../scripts/step-checks-modules.mjs";
@@ -203,6 +205,16 @@ ok(said.length === BIG + 1 && ms < 5000, `manifest-reads.mjs: notes reads a mani
   ok(!said.startsWith("raw") && ms < 5000, `step-checks-modules.mjs: the step of the modules reads ${BIG} names, half of them moved, in ${ms} ms`);
   [said, ms] = timed(() => thrown(() => rewritten(many, { except: ["done-when.md", "planning.md", "repositories.md"] })));
   ok(!said.startsWith("raw") && ms < 5000, `step-checks-modules.mjs: rewritten writes ${BIG} names, half of them moved, in ${ms} ms`);
+}
+// (a rule file of the project's whose imports name one moved stub of the core's in many spellings, the stub holding many
+// links, read by the one process within the limit, the stub read once; #1272, point 2)
+{
+  const stub = `# Moved: x\n\n${Array.from({ length: 4 * BIG }, (_, i) => `@../t${i}.md`).join("\n")}`, want = `# C\n\n${BEGIN}\n@AGENTS.md\n@core/tools/claude.md\n${END}\n`;
+  const rule = `${Array.from({ length: BIG }, (_, i) => `@core/${"./".repeat(i % 50)}modules/${"x/../".repeat(Math.floor(i / 50) % 20)}claude.md`).join("\n")}\n${"@core/modules/claude.md\n".repeat(BIG)}${want}`;
+  let reads = 0;
+  const seen = new Map(), stubAt = f => stubOf(g => { reads += 1; return g === "core/modules/claude.md" ? stub : null; }, ".", f, seen);
+  [said, ms] = timed(() => thrown(() => converged("CLAUDE.md", rule, want, [], () => true, stubAt)));
+  ok(!said.startsWith("raw") && reads === 1 && ms < 5000, `core-owned.mjs: a rule file of ${2 * BIG} imports of a moved stub of ${4 * BIG} links is read in ${ms} ms, the stub read once`);
 }
 // (a number has no place in the manifest's lines this reader reads: no case of one out of range applies)
 

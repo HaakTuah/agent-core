@@ -42,7 +42,7 @@ ok(r.status === 0 && r.stdout.startsWith("No step left a script could write") &&
 
 // ---- each step a writer does whole, taken out: done after --write, the rule files' words kept ----
 const lead = n => STEPS.find(s => s.lead.startsWith(n)).lead;
-const WHOLE = ["14 November 2026, the size marks' total", "16 November 2026, how code is put together", "18 November 2026, the shape check reads C#", "19 November 2026, the shape check reads the functions of JavaScript", "19 November 2026, the shape check reads the functions of Python", "19 November 2026, a project's own rules", "20 November 2026, no workflow holds a line break"].map(lead);
+const WHOLE = ["14 November 2026, the size marks' total", "16 November 2026, how code is put together", "18 November 2026, the shape check reads C#", "19 November 2026, the shape check reads the functions of JavaScript", "19 November 2026, the shape check reads the functions of Python", "19 November 2026, a project's own rules", "20 November 2026, no workflow holds a line break", "24 November 2026, the size marks read what"].map(lead);
 ok(WHOLE.every(l => STEPS.find(s => s.lead === l).write && STAGES[l]), "each step a writer does whole has its writer and its stage", WHOLE.join("\n"));
 for (const l of WHOLE) {
   STAGES[l].stage(dir);
@@ -75,7 +75,7 @@ for (const l of WHOLE) {
 {
   const l = lead("16 November 2026, the rules in folders"), agents = read("AGENTS.md"), copies = read("checks/copies.json"), manifest = read("core-manifest.md");
   ok(agents.includes("@core/roles/shared/how-to-work.md") && copies.includes(`${MOVED_GLOB}, ${MOVED_GLOBS}`) && /^Paths: .*$/mu.test(manifest), "the kit's project names how-to-work.md, the copies config's patterns and the manifest's line the case moves");
-  put("AGENTS.md", agents.replace("@core/roles/shared/how-to-work.md", "@core/modules/how-to-work.md"));
+  put("AGENTS.md", agents.replace("<!-- The core's part:", "@core/modules/how-to-work.md\n<!-- The core's part:"));
   put("checks/copies.json", copies.split(`${MOVED_GLOB}, ${MOVED_GLOBS}`).join(MOVED_GLOB));
   put("core-manifest.md", manifest.replace(/^Paths: .*$/mu, OLD_PATHS));
   commit("the paths before the move");
@@ -100,6 +100,36 @@ for (const l of WHOLE) {
   ok(r.stdout.includes(`- ${l}: wrote \`AGENTS.md\`, \`checks/copies.json\`, \`checks/sizes.json\`; still to do: `) && marks["core/roles/shared/work-flow.md"] === 20480 && !Object.keys(marks).some(f => f.includes("modules/")) && read("AGENTS.md") === wrote && kept && read("docs/records/2026-01-05.md") === staged.record
     && !left.includes("core/modules/") && left.includes('"Paths:"') && !left.includes(MOVED_GLOB),
     "the rules' move: --write writes each path on its own as the mend does, two pull-ins of one file made one, the size marks merged, a dated record and a generated file left, and the step asks the rest", `${r.stdout}${r.stderr}\n---\n${left}\n---\n${wrote}`);
+  back();
+  // (the core's part is never written: an old import above it, whose new path the part holds, is taken out, and an old
+  // path inside it stays for the one process to write; #1272, point 1)
+  const claude = read("CLAUDE.md"), stale = claude.replace("@core/tools/claude.md\n<!-- The core's part ends.", "@core/modules/claude.md\n<!-- The core's part ends.");
+  put("CLAUDE.md", claude.replace("<!-- The core's part:", "@core/modules/claude.md\n<!-- The core's part:"));
+  commit("an old import above the core's part");
+  r = write();
+  ok(read("CLAUDE.md") === claude && r.stdout.includes("wrote `CLAUDE.md`") && !(missed(l)[0]?.mend ?? "").includes("CLAUDE.md"),
+    "the rules' move: an old import outside the core's part, whose new path the part holds, is taken out, the part as it stands (#1272, point 1)", `${r.stdout}${r.stderr}\n---\n${read("CLAUDE.md")}`);
+  put("CLAUDE.md", stale);
+  commit("an old path inside the core's part");
+  r = write();
+  ok(read("CLAUDE.md") === stale, "  and an old path inside the part is the one process's to write: left as it stands", `${r.stdout}${r.stderr}\n---\n${read("CLAUDE.md")}`);
+  back();
+  // (a file of the project's that is no rule file, no file at the root under a dot and none of the step's configs is
+  // written only once .gitattributes says which files a tool writes, and one marked so is left: #1272, point 3)
+  fs.mkdirSync(path.join(dir, "notes"));
+  fs.mkdirSync(path.join(dir, "gen"));
+  put("notes/design.md", "See `core/modules/git.md`.\n");
+  put("gen/design.md", "See `core/modules/git.md`.\n");
+  commit("old paths in a folder no attribute marks");
+  r = write();
+  const unmarked = missed(l)[0]?.mend ?? "";
+  ok(read("notes/design.md").includes("core/modules/git.md") && read("gen/design.md").includes("core/modules/git.md") && unmarked.includes("`notes/design.md`") && unmarked.includes("`gen/design.md`") && unmarked.includes("linguist-generated") && unmarked.includes(".gitattributes"),
+    "the rules' move: with no .gitattributes that says which files a tool writes, --write leaves the project's other files, and the mend asks for the marks (#1272, point 3)", `${r.stdout}${r.stderr}\n---\n${unmarked}`);
+  put(".gitattributes", "gen/** linguist-generated\n");
+  commit("the generated folder marked");
+  r = write();
+  ok(read("notes/design.md") === "See `core/roles/shared/work-flow.md`.\n" && read("gen/design.md") === "See `core/modules/git.md`.\n" && !missed(l).length,
+    "  and once it does, --write writes the unmarked folder's file, the marked one left, and the step reads done", `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
   back();
 }
 

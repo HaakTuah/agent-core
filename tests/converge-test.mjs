@@ -114,9 +114,26 @@ try {
     ok(kept.text?.includes("@core/modules/claude.md\n@docs/own.md\n") && kept.text.split("@AGENTS.md").length === 2, "  and one whose path is there is the project's, kept", JSON.stringify(kept));
     ok(!Object.keys(converged("CLAUDE.md", `${want}~~~\n\`\`\`\n@AGENTS.md\n~~~\n`, want, [earlier], () => false)).length, "  and a line of a fenced example is no import: kept");
     ok(!Object.keys(converged("CLAUDE.md", `~~~\n${want}@core/modules/claude.md\n~~~\n`, want, [earlier], () => false)).length, "  so is one round the part");
+    // (an import of a moved stub whose every target the part imports counts as replaced, wherever it came from; one
+    // whose target the part does not import, kept: #1272, point 2)
+    const stub = f => ({ "core/modules/claude.md": ["core/tools/claude.md"], "core/modules/x.md": ["core/tools/x.md"] })[f] ?? null;
+    const stubbed = converged("CLAUDE.md", `# C\n\n@core/modules/claude.md\n@core/modules/x.md\n\n${want.slice(5)}`, want, [], () => true, stub);
+    ok(stubbed.text === `# C\n\n@core/modules/x.md\n\n${want.slice(5)}` && /held @core\/modules\/claude\.md outside/.test(stubbed.left ?? ""),
+      "  an import of a moved stub whose target the part imports is taken out and named, one whose target it does not, kept (#1272, point 2)", JSON.stringify(stubbed));
   }
   ok(partIn("@a.md\n\n@b.md\n", new Set(["@a.md", "@b.md"])) === "many" && partIn(`${BEGIN}\n${BEGIN}\n${END}\n`, new Set()) === "many", "  where it cannot tell which run of imports is the core's, it says so, and takes none");
   git(p.dir, "checkout", "-q", "--", ".");
+  // (the trial's case on the core's own stub: CLAUDE.md that imports core/modules/claude.md above the part, which pulls
+  // in what the part's core/tools/claude.md is, loses it; core/modules/git.md, whose target CLAUDE.md's part does not
+  // import, stays: #1272, point 2)
+  {
+    const kitText = read(p.dir, "core/setup/template/CLAUDE.md.tmpl");
+    write(p.dir, "CLAUDE.md", kitText.replace(BEGIN, `@core/modules/claude.md\n@core/modules/git.md\n${BEGIN}`));
+    const stubbed = converge(p.dir, "--write");
+    ok(read(p.dir, "CLAUDE.md") === kitText.replace(BEGIN, `@core/modules/git.md\n${BEGIN}`) && /CLAUDE\.md held @core\/modules\/claude\.md outside the core's part/.test(stubbed.out),
+      "  the one process takes out an import of the core's moved stub whose target the part imports, and names it; a stub whose target it does not import stays", `${read(p.dir, "CLAUDE.md")}\n${stubbed.out}`);
+    git(p.dir, "checkout", "-q", "--", ".");
+  }
 
   // ---- a value out of its form ----
   const named = read(p.dir, "AGENTS.md");
