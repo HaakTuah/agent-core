@@ -162,7 +162,8 @@ if (p.status === 0) {
   // (the form is "mode SP sha SP stage TAB path": a tab before the stage names a path with a tab, which Windows refuses, and the
   // refusals, 30000 lines, kill git past the buffer and leave index.lock behind: #1234)
   const added = spawnSync("git", ["update-index", "--add", "--index-info"], { cwd: p.dir, encoding: "utf8", input: Array.from({ length: 30000 }, (_, i) => `100644 ${blob} 0\tgenerated/folder-${i}/a-file-with-a-path-of-fifty-characters-${i}.txt\n`).join("") });
-  ok(added.status === 0, "the 30000 tracked paths the listing test needs are written to the index", `${added.error ?? ""} ${String(added.stderr).slice(0, 300)}`);
+  const firstAt = "generated/folder-0/a-file-with-a-path-of-fifty-characters-0.txt";
+  ok(added.status === 0 && spawnSync("git", ["ls-files", "--", firstAt], { cwd: p.dir, encoding: "utf8" }).stdout.trim() === firstAt, "the 30000 tracked paths the listing test needs are written to the index, each as the path it names", `${added.error ?? ""} ${String(added.stderr).slice(0, 300)}`);
   const longList = sizeCheck();
   fs.writeFileSync(indexAt, "not an index");
   const noList = sizeCheck();
