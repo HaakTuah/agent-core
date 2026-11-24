@@ -138,7 +138,7 @@ jobs:
   # process and each writer's round trip (converge); the starter kit (kit) and the steps' tests on a fresh start (fresh),
   # the rest of the steps' tests in two (steps, writes); the check of the core's copy (core.yml) on scratch projects
   # (core), on Windows in two halves of its test, the faults it names and where the copy stands (faults, places); the
-  # personal-terms check's own job (terms); the NuGet check's own steps (licences); the licence, lookup and scan checks,
+  # personal-terms check's own job (terms); the NuGet check's own steps with the checks of the core's own packages and tools list (licences); the licence, lookup and scan checks,
   # with the hostile tests of build files and packages (scans); the core's packages from its lock file (packages); the
   # agent-tools check (tools), on Windows alone, since its cases outgrew the licences' mark there (#603); the tests that
   # reach the network, in a job of their own on each system once an hour (network); and the rest, in three (rest,
@@ -197,7 +197,7 @@ jobs:
         shell: bash
         run: node scripts/install.mjs all
       - name: zizmor and actionlint, which the workflow check and its test run, fetched at their pins outside the repository (scripts/workflow-tools.sh; #580)
-        if: ${{ contains(matrix.parts, 'second') }}
+        if: ${{ contains(matrix.parts, 'second') || contains(matrix.parts, 'third') }}
         timeout-minutes: 5
         continue-on-error: true
         shell: bash
@@ -230,9 +230,9 @@ jobs:
         timeout-minutes: 5
         shell: bash
         run: bash scripts/test-downloads.sh archives >> "$GITHUB_ENV"
-      # (only the part projects: the system's temp folder, a short name under the home folder on another drive than the
-      # checkout, is what the other Windows parts still test their scripts against; #882)
-      - name: Scratch folders of the part projects on the runner's own drive, where git writes a tree three times faster than under the system's temp folder (#951)
+      # (only the parts projects and hostile: the system's temp folder, a short name under the home folder on another drive
+      # than the checkout, is what the other Windows parts still test their scripts against; #882)
+      - name: Scratch folders of the parts projects and hostile on the runner's own drive, where git writes a tree three times faster than under the system's temp folder (#951)
         if: ${{ runner.os == 'Windows' && (contains(matrix.parts, 'projects') || contains(matrix.parts, 'hostile')) }}
         run: echo "TEMP=$RUNNER_TEMP" >> "$GITHUB_ENV" && echo "TMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: The second the suites start at, for their time mark
