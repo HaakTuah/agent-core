@@ -18,6 +18,7 @@ import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { npmWithCache, root, scratch, scratchEnv, tally } from "../scripts/scratch-core.mjs";
 import { npmOnce } from "../scripts/npm-once.mjs";
+import { trialRecord } from "../scripts/release-trial.mjs";
 
 const { ok, done } = tally();
 const { tmp, git, core, project } = scratch("check-test-");
@@ -307,6 +308,37 @@ fs.writeFileSync(path.join(dir, ".mcp.json"), JSON.stringify({ mcpServers: { unl
 commit(dir, "an agent's tool no list names");
 r = check(dir, "--base", "base");
 ok(r.status === 1 && /FAIL licences\.yml\/licences\/licences: its step "Every tool the agents load listed/.test(r.out) && mended(r.out), "a tool the agents load that no list names fails the agent-tools check on a pull request, its base read from the merge's first parent", r.out);
+
+// a head that is its base, or behind it, merges nothing: the change reads as none against that base, never against the
+// base's parent (#1231), as the release trial's run before the update has it, its project's main checked out against
+// itself; the base here adds a file past the split mark, which the reading-size check, read against the base's parent,
+// would find changed
+git(dir, "reset", "-q", "--hard", "base");
+fs.mkdirSync(path.join(dir, "data"), { recursive: true });
+fs.writeFileSync(path.join(dir, "data", "big.txt"), Array.from({ length: 5000 }, (_, i) => `${i} ${(i * 2654435761) % 4294967296}\n`).join(""));
+commit(dir, "a file past the split mark, on the base");
+git(dir, "branch", "-q", "-f", "large");
+const baseline = path.join(tmp, "baseline.json");
+r = check(dir, "--base", "large", "--verdicts", baseline);
+const before = JSON.parse(fs.readFileSync(baseline, "utf8"));
+ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && before["copies.yml/copies/copies"] === "passed", "a head that is its base passes the copies checks, read against the base itself", r.out);
+const read = trialRecord("0".repeat(40), "2026-11-24", [[before, before]]);
+ok(Object.keys(before).length > 0 && read.passedAfter === Object.keys(before).length && read.failedAfter === 0 && read.failedBoth === 0 && read.ranBeforeAlone === 0, "and the trial's record reads that run as its baseline, every job that ran passed and none the update's", JSON.stringify(read));
+git(dir, "reset", "-q", "--hard", "base");
+r = check(dir, "--base", "large");
+ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out), "a head behind its base passes the copies checks, read against the base, not the head", r.out);
+git(dir, "reset", "-q", "--hard", "large");
+fs.appendFileSync(path.join(dir, "data", "big.txt"), "one more line\n");
+commit(dir, "the file past the split mark changed");
+r = check(dir, "--base", "large");
+ok(r.status === 1 && /past the 51200-byte mark, and this PR changes it/.test(r.out) && mended(r.out), "and a head ahead of that base that changes the file is still read against it, and fails", r.out);
+{
+  const one = project("a-one-commit-project", "--owner", "someone");
+  ok(one.status === 0, "the starter kit writes a project for a repository of one commit", one.out);
+  commit(one.dir, "the starter kit");
+  r = check(one.dir, "--base", "HEAD");
+  ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out), "and in a repository of one commit, a head that is its base passes the copies checks, its base read", r.out);
+}
 
 // another host: no .github/workflows, so the kit's calls are run, read from the core itself
 git(dir, "reset", "-q", "--hard", "base");
