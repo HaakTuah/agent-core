@@ -92,7 +92,7 @@ ok(stoppedAt["copies.yml/copies/copies"] === "stopped" && !("copies.yml/copies" 
   "  and each job left is said stopped by the key it runs under", JSON.stringify(stoppedAt));
 // (#1262: core.yml failed only by the signature check's refusal of this machine's npm, after its own steps proved the
 // copy, is unrun here, and stops nothing: every other check runs, and the run still fails, as for any unrun job)
-fs.writeFileSync(coreYml, stands.replace("      - name: The NuGet check, last", `      - name: The signature check, as a stand-in that refuses this machine's npm\n        run: |\n          echo 'FAIL ${npmRefusal("10.9.9", ["allow-git"], "11.14.0")}'\n          exit 1\n      - name: The NuGet check, last`));
+fs.writeFileSync(coreYml, stands.replace("      - name: The NuGet check, last", `      - name: The signature check, as a stand-in that refuses this machine's npm\n        run: |\n          echo 'FAIL ${npmRefusal("10.9.9", ["allow-git"], "11.15.0")}'\n          exit 1\n      - name: The NuGet check, last`));
 git(core, "commit", "-q", "-am", "core.yml whose signature check refuses this machine's npm");
 syncTo(git(core, "rev-parse", "HEAD"));
 fs.copyFileSync(coreYml, path.join(dir, "core", ".github", "workflows", "core.yml"));
@@ -100,7 +100,7 @@ commit(dir, "its copy of the core at that pin");
 const refused = path.join(tmp, "refused.json");
 r = check(dir, "--base", "before-sync", "--verdicts", refused);
 const refusedAt = JSON.parse(fs.readFileSync(refused, "utf8"));
-ok(r.status === 1 && r.out.includes("it needs npm 11.14.0 or later") && !r.out.includes("so no other check runs") && refusedAt["core.yml/core/core"] === "unrun" && refusedAt["copies.yml/copies/copies"] === "passed" && !Object.values(refusedAt).includes("stopped"),
+ok(r.status === 1 && r.out.includes("it needs npm 11.15.0 or later") && !r.out.includes("so no other check runs") && refusedAt["core.yml/core/core"] === "unrun" && refusedAt["copies.yml/copies/copies"] === "passed" && !Object.values(refusedAt).includes("stopped"),
   "core.yml failed only by the signature check's refusal of this machine's npm, its own steps passed, is unrun and stops no other check", `${r.out}\n${JSON.stringify(refusedAt)}`);
 
 done("a sync's calls in the core's checks from plain git");

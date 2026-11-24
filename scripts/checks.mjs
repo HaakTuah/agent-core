@@ -200,7 +200,7 @@ function unread(cwd) {
   const version = npmVersion(cwd), ignored = npmIgnores(version, ALLOWS);
   if (!ignored.length) return false;
   const least = npmReadsAll(ALLOWS);
-  console.log(`FAIL ${npmRefusal(version, ignored, least)} ${MEND}run this check under the core's own Node, the version in its .node-version, whose npm reads them, as the signatures job does, or update npm here to ${least} or later`);
+  console.log(`FAIL ${npmRefusal(version, ignored, least)} ${MEND}from a folder outside the repository, install npm ${least} into a folder of its own, running no install script: \`npm install --global --prefix <its folder> --ignore-scripts npm@${least}\`; then put that folder's bin (on Windows, the folder itself) first on the PATH and run this check again`);
   return true;
 }
 const install = cwd => !unread(cwd) && passed(process.platform === "win32"

@@ -279,6 +279,9 @@ jobs:
       - name: The NuGet check's whole job, where its restore must succeed (it asks NuGet's registry; #772)
         if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-gate-network-test.mjs ')) }}
         run: node tests/nuget-gate-network-test.mjs
+      - name: The signature check's mend for an npm too old for it, followed as worded (it installs npm and a package from npm's registry; #1262)
+        if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/npm-mend-test.mjs ')) }}
+        run: node tests/npm-mend-test.mjs
       - name: The code scan's own logic, which needs no engine (its reading of a description, the files the engine did not read, the verdicts)
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-logic-test.mjs ')) }}
         run: node tests/code-scan-logic-test.mjs

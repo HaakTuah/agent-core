@@ -426,7 +426,7 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
   const steps = tests.jobs.suites.steps.filter(s => /contains\(matrix\.parts, 'network'\)/.test(String(s.if))).map(s => s.run).sort();
   const nets = l => l.filter(x => x.parts.split(" ").includes("network"));
   ok(suites && nets(suites[0]).length === 0 && nets(suites[1]).length === 4 && nets(suites[1]).every(x => x.suite === NETWORK && x.parts === "network") && ["ubuntu-latest", "windows-latest"].every(os => [".node-version", ".node-least"].every(n => nets(suites[1]).some(x => x.os === os && x.node === n))) && nets(suites[2]).length === 4
-    && steps.join() === ["node tests/init-dotnet-test.mjs", "node tests/nuget-fetch-test.mjs", "node tests/nuget-gate-network-test.mjs"].join(),
+    && steps.join() === ["node tests/init-dotnet-test.mjs", "node tests/npm-mend-test.mjs", "node tests/nuget-fetch-test.mjs", "node tests/nuget-gate-network-test.mjs"].join(),
     "the tests that reach the network run in no pull request's run nor a push's, and once an hour and by hand in a job of their own on each system and Node (point 9)", steps.join(", "));
   // (#770: on Linux, but in the part network, each step runs with the network cut off, and those that must reach it
   // name their shell, bash, each listed here with why; #772 made the last tests self-contained)
