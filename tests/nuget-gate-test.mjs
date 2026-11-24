@@ -105,6 +105,16 @@ else {
   const own = restores("a pull request that changes only a doc, in a project whose restore fails with no code of NuGet's", { "README.md": "# A project\n\nMore.\n" },
     { start: { "Directory.Build.targets": `<Project>\n  <Target Name="Fails" BeforeTargets="Restore">\n    <Error Text="${failing}" />\n  </Target>\n</Project>\n` } });
   ok(own.out.includes("src/App/App.csproj: the restore failed with no error NuGet names. It printed:") && new RegExp(`^  .*error.*${failing}`, "m").test(own.out), "and the look prints the restore's error line whole, behind two spaces", own.out);
+  // (nor does a NuGet call in a step that names no config of its own, as the restore from the lock files does, read a
+  // machine-wide config of the caller's, which may name a source with its sign-in: that folder is the step's own; #1239)
+  const machine = path.join(tmp, "machine"), work = path.join(tmp, "machine-work");
+  for (const d of [path.join(machine, "NuGet", "Config"), work]) fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(machine, "NuGet", "Config", "planted.config"), '<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <packageSources>\n    <add key="planted" value="https://planted.invalid/v3/index.json" />\n  </packageSources>\n</configuration>\n');
+  const planted = { ...env, ...Object.fromEntries(["PROGRAMFILES(X86)", "PROGRAMDATA", "NUGET_COMMON_APPLICATION_DATA"].map(k => [Object.keys(env).find(e => e.toUpperCase() === k) ?? k, machine])) };
+  const sources = from => spawnSync("dotnet", ["nuget", "list", "source"], { cwd: work, env: from, encoding: "utf8" }).stdout ?? "";
+  const given = spawnSync(process.execPath, ["--input-type=module", "-e", `import { stepEnv } from ${JSON.stringify(new URL("../scripts/check.mjs", import.meta.url).href)}; console.log(JSON.stringify(stepEnv(${JSON.stringify(path.join(tmp, "machine-home"))})));`], { env: planted, encoding: "utf8" });
+  const read = sources(planted), inStep = given.status === 0 ? sources(JSON.parse(given.stdout)) : given.stderr;
+  ok(read.includes("planted") && given.status === 0 && !inStep.includes("planted") && /nuget\.org|No sources/i.test(inStep), "a NuGet call in a step reads no machine-wide config of the caller's, where the caller's own call reads it", `${read}\n${inStep}`);
   // (a NuGet.Config that maps every package to the registry, against a confusion of sources: the empty source the look
   // restores from is mapped to none, which NuGet names as its own error, NU1100, not as a package not found; #380)
   const MAPPED = '<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <packageSources>\n    <clear />\n    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />\n  </packageSources>\n  <packageSourceMapping>\n    <packageSource key="nuget.org">\n      <package pattern="*" />\n    </packageSource>\n  </packageSourceMapping>\n</configuration>\n';
