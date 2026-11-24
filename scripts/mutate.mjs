@@ -106,11 +106,12 @@ export function wantedOf(args, code) {
   return out;
 }
 
-// The tests that name a file: the test files whose text holds its name, not as the end of a longer one; its own
-// (<name>-test or <name>.test) first, so that a fault is mostly caught by the first test it runs.
+// The tests that name a file: the test files whose text holds its name, not as the end of a longer one, or that import
+// it by a path ending in its name without its ending, or with a JavaScript one, as TypeScript's imports are written
+// (#1274); its own (<name>-test or <name>.test) first, so that a fault is mostly caught by the first test it runs.
 export function testsOf(file, tests) {
   const stem = path.posix.basename(file).replace(/\.[^.]+$/u, ""), name = path.posix.basename(file).replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-  const named = new RegExp(`(^|[^\\w-])${name}`, "u"), own = t => new RegExp(`(^|/)${stem.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}[-.]test\\.`, "u").test(t);
+  const bare = stem.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), named = new RegExp(`(^|[^\\w-])${name}|/${bare}(\\.[cm]?jsx?)?["'\`]`, "u"), own = t => new RegExp(`(^|/)${stem.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}[-.]test\\.`, "u").test(t);
   return Object.keys(tests).filter(t => named.test(tests[t])).sort((x, y) => Number(own(y)) - Number(own(x)) || x.localeCompare(y));
 }
 
@@ -134,12 +135,13 @@ function jobsOf({ wanted, texts, tests, testTexts, config, every }) {
 const live = new Set();
 export const stopAll = () => { for (const stop of live) stop(); };
 
-// One run of a test file in a working copy: "passed", "failed" or "timeout", and how long it took, in seconds.
+// One run of a test file in a working copy: "passed", "failed" or "timeout", and how long it took, in seconds. `test`
+// is the file node runs, or the words node is given (a runner's program, its words and the file: stryker.mjs, argsOf).
 // `started` is told the test's process id as it starts (off Windows, its group's too).
 export function run(test, cwd, limit, env = process.env, started = () => {}) {
   return new Promise(done => {
     // (in a group of its own off Windows, so that a test past its time is stopped with what it started)
-    const start = Date.now(), group = process.platform !== "win32", child = spawn(process.execPath, [test], { cwd, env, stdio: "ignore", detached: group });
+    const start = Date.now(), group = process.platform !== "win32", child = spawn(process.execPath, [test].flat(), { cwd, env, stdio: "ignore", detached: group });
     const stop = () => { try { if (group) process.kill(-child.pid, "SIGKILL"); else child.kill("SIGKILL"); } catch { /* (it ended) */ } };
     if (child.pid) started(child.pid);
     live.add(stop);
