@@ -36,10 +36,11 @@
 // .NET SDK too, which takes nothing from the network for a project with no package, while npm takes one small package
 // from the registry. On Linux and on Windows. Git, tar, bash, npm, the .NET SDK where there is one, and Node's own
 // modules.
-// A part of it can run alone, where the whole runs past its time mark (on Windows, in the tests workflow): the older of
-// the two releases with the copy older than the first, or the newer release with the release that asks no sync.
+// A part of it can run alone, where the whole runs past its time mark (on Windows, in the release workflow, a job each,
+// #1240): the older of the two releases, the newer, or one project kind of either, with the copy older than the first
+// beside the older and the release that asks no sync beside the newer's npm project.
 //
-//   node tests/upgrade-test.mjs [--part all | older | newer]
+//   node tests/upgrade-test.mjs [--part all | older | newer | older-npm | older-dotnet | older-pre | newer-npm | newer-dotnet]
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -67,11 +68,13 @@ const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   $
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // The part asked for: all of it where none is named.
 const [flag = "--part", PART = "all", ...more] = process.argv.slice(2);
-if (flag !== "--part" || !["all", "older", "newer"].includes(PART) || more.length) {
-  console.error("FAIL: the upgrade test takes --part all, older or newer, and nothing else. Mend: run node tests/upgrade-test.mjs, or name one of those parts after --part");
+const PARTS = ["older-npm", "older-dotnet", "older-pre", "newer-npm", "newer-dotnet"];
+if (flag !== "--part" || !["all", "older", "newer", ...PARTS].includes(PART) || more.length) {
+  console.error(`FAIL: the upgrade test takes --part all, older, newer or one of ${PARTS.join(", ")}, and nothing else. Mend: run node tests/upgrade-test.mjs, or name one of those parts after --part`);
   process.exit(2);
 }
-const inPart = part => PART === "all" || PART === part;
+// (a part of a release, "older" or "newer", is the whole of its release; "-npm", "-dotnet" and "-pre" one kind of it)
+const inPart = (release, kind) => PART === "all" || PART === release || PART === `${release}-${kind}`;
 
 // ---- the reader the runner stands on ----
 const yaml = parseYaml("name: x # a comment\non:\n  workflow_call:\n    inputs:\n      a:\n        type: boolean\n        default: true\njobs:\n  j:\n    if: >-\n      ${{ a\n      && b }}\n    steps:\n      - uses: x@1 # v1\n        with:\n          k: 'it''s'\n      - name: run\n        run: |\n          one\n            two # kept\n\n          three\n      - run: echo \"#\" plain\n    types: [opened, edited]\n");
@@ -1081,51 +1084,57 @@ function againstSdk(p, dir) {
 }
 
 let synced = null; // (the npm project of the newest release started from, once synced)
-for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newer" : "older"))) {
+for (const tag of starts) {
+  const release = tag === starts.at(-1) ? "newer" : "older";
+  if (!inPart(release, "npm") && !inPart(release, "dotnet")) continue;
   const from = { tag, sha: git(theCore, "rev-parse", `${tag}^{commit}`), dir: path.join(tmp, `core-at-${tag}`) };
   git(tmp, "clone", "-q", theCore, from.dir);
   git(from.dir, "checkout", "-q", from.sha);
 
   // the npm project, public
-  const npmProject = project(`an-npm-project-from-${tag}`, from, { owner: "someone-else", kit: ["--npm", "."], isPrivate: false, files: dir => {
-    write(dir, "package.json", '{\n  "name": "an-npm-project",\n  "version": "1.0.0",\n  "private": true,\n  "type": "module",\n  "dependencies": {\n    "ms": "2.1.3"\n  }\n}\n');
-    write(dir, "package-lock.json", `${JSON.stringify({ name: "an-npm-project", version: "1.0.0", lockfileVersion: 3, requires: true, packages: { "": { name: "an-npm-project", version: "1.0.0", dependencies: { ms: "2.1.3" } },
-      "node_modules/ms": { version: "2.1.3", resolved: "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz", integrity: "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==", license: "MIT" } } }, null, 2)}\n`);
-    write(dir, "README.md", "# An npm project\n");
-    // (the patterns a project's own .gitignore commonly holds, which the folder of packages the core's copy carries
-    // overrides, so that the sync commits it whole; and a package.json that makes .js a module, which its own overrides)
-    write(dir, ".gitignore", "node_modules/\ndist/\nbuild/\nlib/\nvendor/\n");
-  } });
-  seed(npmProject, "\n");
-  synced = npmProject;
-  upgrade(npmProject, from, [["touches only its docs", dir => write(dir, "README.md", "# An npm project\n\nMore words.\n")],
-    ["touches its package list", dir => write(dir, "package.json", fs.readFileSync(path.join(dir, "package.json"), "utf8").replace('"private": true,', '"private": true,\n  "description": "a project",'))]],
-  (results, what) => [[jobRan(results, "security-review.yml"), "a public repository's security-review check runs as before"],
-    [ran(results, "signatures.yml", "Install from the lock file, from the registry alone, running no package's install script") === what.includes("package"), "the signature check installs only where the package list changed"]]);
-  readersAgainstTools(npmProject); // (the readers of its set-up against git and bash: #629)
+  if (inPart(release, "npm")) {
+    const npmProject = project(`an-npm-project-from-${tag}`, from, { owner: "someone-else", kit: ["--npm", "."], isPrivate: false, files: dir => {
+      write(dir, "package.json", '{\n  "name": "an-npm-project",\n  "version": "1.0.0",\n  "private": true,\n  "type": "module",\n  "dependencies": {\n    "ms": "2.1.3"\n  }\n}\n');
+      write(dir, "package-lock.json", `${JSON.stringify({ name: "an-npm-project", version: "1.0.0", lockfileVersion: 3, requires: true, packages: { "": { name: "an-npm-project", version: "1.0.0", dependencies: { ms: "2.1.3" } },
+        "node_modules/ms": { version: "2.1.3", resolved: "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz", integrity: "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==", license: "MIT" } } }, null, 2)}\n`);
+      write(dir, "README.md", "# An npm project\n");
+      // (the patterns a project's own .gitignore commonly holds, which the folder of packages the core's copy carries
+      // overrides, so that the sync commits it whole; and a package.json that makes .js a module, which its own overrides)
+      write(dir, ".gitignore", "node_modules/\ndist/\nbuild/\nlib/\nvendor/\n");
+    } });
+    seed(npmProject, "\n");
+    synced = npmProject;
+    upgrade(npmProject, from, [["touches only its docs", dir => write(dir, "README.md", "# An npm project\n\nMore words.\n")],
+      ["touches its package list", dir => write(dir, "package.json", fs.readFileSync(path.join(dir, "package.json"), "utf8").replace('"private": true,', '"private": true,\n  "description": "a project",'))]],
+    (results, what) => [[jobRan(results, "security-review.yml"), "a public repository's security-review check runs as before"],
+      [ran(results, "signatures.yml", "Install from the lock file, from the registry alone, running no package's install script") === what.includes("package"), "the signature check installs only where the package list changed"]]);
+    readersAgainstTools(npmProject); // (the readers of its set-up against git and bash: #629)
+  }
 
   // the .NET project, private, held as Windows holds it
-  const dotnetProject = project(`a-dotnet-project-from-${tag}`, from, { owner: "someone-else", kit: ["--nuget", ".", "--private"], isPrivate: true, windows: true, as: ownersName, files: dir => {
-    write(dir, "src/App/App.csproj", `<Project Sdk="Microsoft.NET.Sdk">\r\n  <PropertyGroup>\r\n    <OutputType>Exe</OutputType>\r\n    <TargetFramework>${tfm}</TargetFramework>\r\n    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>\r\n  </PropertyGroup>\r\n</Project>\r\n`);
-    write(dir, "src/App/Program.cs", 'System.Console.WriteLine("Hello");\r\n');
-    write(dir, "src/App/packages.lock.json", `{\r\n  "version": 1,\r\n  "dependencies": {\r\n    "${tfm}": {}\r\n  }\r\n}\r\n`);
-    write(dir, "README.md", "# A .NET project\r\n");
-    write(dir, ".gitignore", "bin/\r\nobj/\r\n**/[Pp]ackages/*\r\n[Dd]ist/\r\n");
-  } });
-  const config = path.join(dotnetProject.dir, "checks/licences.json");
-  fs.writeFileSync(config, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(config, "utf8")), nuget: { ships: ["src/App/packages.lock.json"], tools: [] } }, null, 2)}\n`);
-  git(dotnetProject.dir, "add", "-A");
-  ok(git(dotnetProject.dir, "ls-files", "-s").split("\n").every(l => l.startsWith("100644 ")), `${dotnetProject.name}: every file it holds is 100644, as on Windows, the copy of the core's scripts too`);
-  seed(dotnetProject, "\r\n");
-  upgrade(dotnetProject, from, [["touches only its docs", dir => write(dir, "README.md", "# A .NET project\r\n\r\nMore words.\r\n")],
-    ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
-  (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
-    ...(sdk ? [[["nuget.yml", "core.yml"].some(f => ran(results, f, "Restore each project file from its lock file alone")) === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
-  readersAgainstTools(dotnetProject); // (and against the .NET SDK, held as Windows holds it)
-  asItStood(dotnetProject);
-  nugetInPrivate(dotnetProject);
-  parserUnnamed(dotnetProject);
-  if (tag === starts.at(-1)) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); } // (the kit's calls are the same from either release)
+  if (inPart(release, "dotnet")) {
+    const dotnetProject = project(`a-dotnet-project-from-${tag}`, from, { owner: "someone-else", kit: ["--nuget", ".", "--private"], isPrivate: true, windows: true, as: ownersName, files: dir => {
+      write(dir, "src/App/App.csproj", `<Project Sdk="Microsoft.NET.Sdk">\r\n  <PropertyGroup>\r\n    <OutputType>Exe</OutputType>\r\n    <TargetFramework>${tfm}</TargetFramework>\r\n    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>\r\n  </PropertyGroup>\r\n</Project>\r\n`);
+      write(dir, "src/App/Program.cs", 'System.Console.WriteLine("Hello");\r\n');
+      write(dir, "src/App/packages.lock.json", `{\r\n  "version": 1,\r\n  "dependencies": {\r\n    "${tfm}": {}\r\n  }\r\n}\r\n`);
+      write(dir, "README.md", "# A .NET project\r\n");
+      write(dir, ".gitignore", "bin/\r\nobj/\r\n**/[Pp]ackages/*\r\n[Dd]ist/\r\n");
+    } });
+    const config = path.join(dotnetProject.dir, "checks/licences.json");
+    fs.writeFileSync(config, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(config, "utf8")), nuget: { ships: ["src/App/packages.lock.json"], tools: [] } }, null, 2)}\n`);
+    git(dotnetProject.dir, "add", "-A");
+    ok(git(dotnetProject.dir, "ls-files", "-s").split("\n").every(l => l.startsWith("100644 ")), `${dotnetProject.name}: every file it holds is 100644, as on Windows, the copy of the core's scripts too`);
+    seed(dotnetProject, "\r\n");
+    upgrade(dotnetProject, from, [["touches only its docs", dir => write(dir, "README.md", "# A .NET project\r\n\r\nMore words.\r\n")],
+      ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
+    (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
+      ...(sdk ? [[["nuget.yml", "core.yml"].some(f => ran(results, f, "Restore each project file from its lock file alone")) === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
+    readersAgainstTools(dotnetProject); // (and against the .NET SDK, held as Windows holds it)
+    asItStood(dotnetProject);
+    nugetInPrivate(dotnetProject);
+    parserUnnamed(dotnetProject);
+    if (tag === starts.at(-1)) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); } // (the kit's calls are the same from either release)
+  }
 }
 
 // A project's own workspaces that take in every folder take in none of the copy once synced (#654): the copy's package
@@ -1133,7 +1142,7 @@ for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newe
 // npm wrote with no step taken first, passes, and npm finds no workspace; the same list in core/ itself it would take
 // in, and fail. In a folder of its own beside the synced project, with its copy, since the core's licence check asks a
 // project to name each workspace by its path.
-if (synced) {
+if (synced && PART !== "older" && PART !== "older-npm") { // (the newest release's project, which the older part's npm project is not)
   const probe = path.join(tmp, "workspaces-probe");
   fs.cpSync(path.join(synced.dir, "core"), path.join(probe, "core"), { recursive: true, filter: src => !slash(src).endsWith("/node_modules") });
   const own = { name: "a-project", version: "1.0.0", private: true, workspaces: ["*", "**", "core/*"] };
@@ -1154,7 +1163,7 @@ if (synced) {
 // A release that brings nothing a project takes asks no sync of it (#242, #342): with the copy it has just taken, the
 // project stays at the release that carries the change while the next one changes only the core's own files, and
 // syncs at the one after, whatever that changes: a jump of two, which this test proves from either of the last two.
-if (synced && inPart("newer")) {
+if (synced && inPart("newer", "npm")) {
   const p = synced;
   let n = Math.max(number(carrying), ...releases.map(number));
   const ownOnly = (...own) => {
@@ -1323,11 +1332,13 @@ function preRelease(name, { windows }) {
   ok(fresh.status === 0 && !/^- checks\/(copies|copies-baseline|licences|licences-audit|sizes)\.json:/m.test(fresh.out) && !/^- config\/[\w-]+\.json: missing/m.test(fresh.out),
     `${name}: fresh.mjs compares the configs where the project holds them, and calls none at the starter kit's paths missing`, fresh.out);
 }
-if (inPart("older")) {
+if (inPart("older", "pre")) {
   preRelease("a-project-older-than-release-1", { windows: false });
   preRelease("a-windows-project-older-than-release-1", { windows: true });
 }
 
-const proven = { all: "a project of each of the last two releases", older: `the part "older": ${starts.length > 1 ? "a project of the older of the last two releases, and one" : "a project"} older than the first`, newer: "the part \"newer\": a project of the newer of the last two releases" }[PART];
+const OF = { npm: "an npm project", dotnet: "a .NET project", pre: "a project older than the first release" };
+const proven = { all: "a project of each of the last two releases", older: `the part "older": ${starts.length > 1 ? "a project of the older of the last two releases, and one" : "a project"} older than the first`, newer: "the part \"newer\": a project of the newer of the last two releases" }[PART]
+  ?? `the part "${PART}": ${OF[PART.split("-")[1]]}${PART === "older-pre" ? "" : ` of the ${PART.split("-")[0]} of the last two releases`}`;
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions: ${proven}, synced to this commit, passes every check unchanged`);
 process.exitCode = failed ? 1 : 0;
