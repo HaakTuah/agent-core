@@ -371,8 +371,9 @@ function coreFile(tmp, sha, file, list = false) {
 // parent and the head its second, so a check that reads its base from HEAD^1 finds it. A head that is the base, or
 // behind it (a project's main checked out against itself, as the release trial's run before the update has it; #1231),
 // merges nothing, and git then makes no commit, so HEAD^1 would name the base's parent, or nothing: the commit is
-// written as the merge of nothing, the base's own tree, the base its first parent (and the head its second, where it
-// is not the base itself), so the change reads as none against its base.
+// written as the merge of a change of nothing, the base's own tree, its first parent the base and its second a commit
+// of the base's tree on the base, so the change reads as none against its base, and a check that tells a pull request
+// from a push by HEAD^2 (licences.mjs's baseOf, weakened.mjs, personal-terms.yml) still reads a pull request.
 function merged(p, tmp, bare) {
   const ws = path.join(tmp, "merge");
   const who = ["-c", "user.name=core-check", "-c", "user.email=core-check@example.invalid"];
@@ -380,9 +381,10 @@ function merged(p, tmp, bare) {
   git(ws, "checkout", "-q", "--detach", p.base);
   let behind = true;
   try { git(ws, "merge-base", "--is-ancestor", p.head, p.base); } catch { behind = false; }
-  if (!behind) try { git(ws, ...who, "merge", "-q", "--no-ff", "--no-edit", p.head); } catch { fail("the change does not merge into its base without a conflict.", "bring the branch up to date with its base, resolve the conflict, commit, and run this check again."); }
-  const parents = p.head === p.base ? ["-p", p.base] : ["-p", p.base, "-p", p.head];
-  const sha = behind ? git(ws, ...who, "commit-tree", `${p.base}^{tree}`, ...parents, "-m", "Nothing to merge: the change is its base, or behind it") : git(ws, "rev-parse", "HEAD");
+  if (behind) say(`note the head ${p.head === p.base ? "is its base" : "is behind its base"}, so the change is read as none against the base`);
+  else try { git(ws, ...who, "merge", "-q", "--no-ff", "--no-edit", p.head); } catch { fail("the change does not merge into its base without a conflict.", "bring the branch up to date with its base, resolve the conflict, commit, and run this check again."); }
+  const nothing = () => git(ws, ...who, "commit-tree", `${p.base}^{tree}`, "-p", p.base, "-m", "A change of nothing");
+  const sha = behind ? git(ws, ...who, "commit-tree", `${p.base}^{tree}`, "-p", p.base, "-p", nothing(), "-m", "A change of nothing merged into its base") : git(ws, "rev-parse", "HEAD");
   git(ws, "push", "-q", "origin", `${sha}:refs/heads/core-check-merge`); // (a branch, so each job's clone holds it)
   return sha;
 }

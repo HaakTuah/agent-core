@@ -321,23 +321,31 @@ git(dir, "branch", "-q", "-f", "large");
 const baseline = path.join(tmp, "baseline.json");
 r = check(dir, "--base", "large", "--verdicts", baseline);
 const before = JSON.parse(fs.readFileSync(baseline, "utf8"));
-ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && before["copies.yml/copies/copies"] === "passed", "a head that is its base passes the copies checks, read against the base itself", r.out);
+ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && before["copies.yml/copies/copies"] === "passed" && r.out.includes("note the head is its base, so the change is read as none against the base"), "a head that is its base passes the copies checks, read against the base itself, and says so", r.out);
 const read = trialRecord("0".repeat(40), "2026-11-24", [[before, before]]);
 ok(Object.keys(before).length > 0 && read.passedAfter === Object.keys(before).length && read.failedAfter === 0 && read.failedBoth === 0 && read.ranBeforeAlone === 0, "and the trial's record reads that run as its baseline, every job that ran passed and none the update's", JSON.stringify(read));
 git(dir, "reset", "-q", "--hard", "base");
 r = check(dir, "--base", "large");
-ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out), "a head behind its base passes the copies checks, read against the base, not the head", r.out);
+ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && r.out.includes("note the head is behind its base"), "a head behind its base passes the copies checks, read against the base, not the head, and says so", r.out);
 git(dir, "reset", "-q", "--hard", "large");
 fs.appendFileSync(path.join(dir, "data", "big.txt"), "one more line\n");
 commit(dir, "the file past the split mark changed");
 r = check(dir, "--base", "large");
 ok(r.status === 1 && /past the 51200-byte mark, and this PR changes it/.test(r.out) && mended(r.out), "and a head ahead of that base that changes the file is still read against it, and fails", r.out);
+git(dir, "reset", "-q", "--hard", "base");
+fs.mkdirSync(path.join(dir, "data"), { recursive: true });
+fs.writeFileSync(path.join(dir, "data", "big.txt"), "another file in its place\n");
+commit(dir, "the same file, written otherwise");
+r = check(dir, "--base", "large");
+ok(r.status === 1 && r.out.includes("does not merge into its base without a conflict") && mended(r.out), "a head that does not merge into its base without a conflict is refused, saying its mend", r.out);
 {
   const one = project("a-one-commit-project", "--owner", "someone");
   ok(one.status === 0, "the starter kit writes a project for a repository of one commit", one.out);
+  // (a workflow of the project's own that reads the commit as a pull request's merge, its second parent a change of nothing)
+  fs.writeFileSync(path.join(one.dir, ".github", "workflows", "parents.yml"), "on: [pull_request]\njobs:\n  parents:\n    runs-on: ubuntu-latest\n    steps:\n      - run: git rev-parse -q --verify 'HEAD^2' && git diff --quiet 'HEAD^1' 'HEAD^2' && git diff --quiet 'HEAD^1' HEAD\n");
   commit(one.dir, "the starter kit");
-  r = check(one.dir, "--base", "HEAD");
-  ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out), "and in a repository of one commit, a head that is its base passes the copies checks, its base read", r.out);
+  r = check(one.dir, "--base", "HEAD", "--own");
+  ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && /ok {3}parents\.yml\/parents/.test(r.out), "and in a repository of one commit, a head that is its base passes the copies checks, its base read, the commit a merge of two parents that adds nothing to it", r.out);
 }
 
 // another host: no .github/workflows, so the kit's calls are run, read from the core itself
