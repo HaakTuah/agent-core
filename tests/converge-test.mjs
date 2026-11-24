@@ -112,6 +112,7 @@ try {
     ok(gone.text === `# C\n\n@docs/own.md\n\n${BEGIN}\n@AGENTS.md\n@core/tools/claude.md\n${END}\n` && /held @AGENTS\.md, @core\/modules\/claude\.md/.test(gone.left) && !Object.keys(converged("CLAUDE.md", gone.text, want, [earlier], f => f === "docs/own.md")).length,
       "  an import an earlier kit wrote whose path is gone is taken out with it, and run again nothing changes", JSON.stringify(gone));
     ok(kept.text?.includes("@core/modules/claude.md\n@docs/own.md\n") && kept.text.split("@AGENTS.md").length === 2, "  and one whose path is there is the project's, kept", JSON.stringify(kept));
+    ok(!Object.keys(converged("CLAUDE.md", `${want}~~~\n\`\`\`\n@AGENTS.md\n~~~\n`, want, [earlier], () => false)).length, "  and a line of a fenced example is no import: kept");
   }
   ok(partIn("@a.md\n\n@b.md\n", new Set(["@a.md", "@b.md"])) === "many" && partIn(`${BEGIN}\n${BEGIN}\n${END}\n`, new Set()) === "many", "  where it cannot tell which run of imports is the core's, it says so, and takes none");
   git(p.dir, "checkout", "-q", "--", ".");

@@ -49,8 +49,11 @@ write(theCore, "z.md", "only in Z\n");
 write(theCore, ".github/workflows/personal-terms.yml", `${terms}# Z\n`);
 const bugTmpl = read(theCore, "setup/template/issue-bug.md.tmpl"), Z_LINE = "<!-- as Z's kit writes it -->\n";
 write(theCore, "setup/template/issue-bug.md.tmpl", `${bugTmpl}${Z_LINE}`); // (Z's kit writes a file of the core's otherwise: #1246, point 5)
+const claudeTmpl = read(theCore, "setup/template/CLAUDE.md.tmpl"), KEPT = "@core/tasks/tools.md\n";
+write(theCore, "setup/template/CLAUDE.md.tmpl", claudeTmpl.replace("@core/tools/claude.md\n", `@core/tools/claude.md\n${KEPT}`)); // (and imports a file A's and B's do not: point 4)
 const Z = commit("Z");
 write(theCore, "setup/template/issue-bug.md.tmpl", bugTmpl);
+write(theCore, "setup/template/CLAUDE.md.tmpl", claudeTmpl);
 fs.rmSync(path.join(theCore, "z.md"));
 write(theCore, ".github/workflows/personal-terms.yml", `${terms}# A\n`);
 const A = commit("A");
@@ -405,6 +408,9 @@ ok(unknown.out.includes(`${BUG} is not the core's`) && read(p, BUG) === bugB && 
 git(p, "reset", "-q", "--hard");
 git(p, "checkout", "-q", "-B", "earlier-main", base);
 write(p, BUG, `${bugB}${Z_LINE}`);
+// (and its CLAUDE.md holds Z's part and, outside it, an import Z's kit wrote whose path B's copy holds: the sync keeps
+// it, and so does the proof, which reads a path in the copy from the core at the pin, not from the project; point 4)
+write(p, "CLAUDE.md", read(p, "CLAUDE.md").replace("@core/tools/claude.md\n", `@core/tools/claude.md\n${KEPT}`).replace("<!-- The core's part:", `${KEPT}\n<!-- The core's part:`));
 for (const pin of [Z, A]) { write(p, "core-manifest.md", manifest(OWNER, pin)); git(p, "commit", "-qam", `the manifest at ${SHA(pin)}, the file as Z's kit wrote it`); }
 git(p, "push", "-q", "-f", "origin", "HEAD:main");
 const fromZ = node(p, "core/scripts/sync.mjs", B);
@@ -412,6 +418,8 @@ git(p, "stash", "clear"); git(p, "add", "-A"); git(p, "commit", "-qm", "sync, th
 const provedZ = pure();
 ok(fromZ.status === 0 && read(p, BUG) === bugB && provedZ.status === 0 && provedZ.out.includes("a pure sync"),
   "  and the proof renders it by the same kits, read from the history of the project's main, so the sync is pure", `${fromZ.out}\n---\n${provedZ.out}`);
+ok(read(p, "CLAUDE.md").startsWith(`# Claude's part\n`) && read(p, "CLAUDE.md").split(KEPT).length === 2 && read(p, "CLAUDE.md").includes(`${KEPT}\n<!-- The core's part:`) && provedZ.status === 0,
+  "  and an earlier kit's import outside the core's part, its path in the copy, is kept by the sync and by the proof (#1246, point 4)", read(p, "CLAUDE.md"));
 git(p, "reset", "-q", "--hard");
 git(p, "checkout", "-q", "more");
 write(p, "core-manifest.md", manifest("someone-else"));

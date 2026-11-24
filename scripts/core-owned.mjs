@@ -80,7 +80,11 @@ function partConverged(now, want, older, there) {
   const at = partIn(now, kitLines);
   if (at === "many") return { left: "its part of the core cannot be told apart (the core's marks stand more than once or apart, or more than one run of import lines is the kit's): left as it is" };
   const eol = now.includes("\r\n") ? "\r\n" : "\n", block = part.replaceAll("\n", eol), gone = [];
-  const outside = t => t.split("\n").filter(l => { const bare = l.replace(/\r$/u, ""); const out = partLines.has(bare) || (kitLines.has(bare) && !there(bare.slice(1))); if (out) gone.push(bare); return !out; }).join("\n");
+  // (a line inside a fenced block is an example, never an import: kept)
+  const outside = t => { let fence = null; return t.split("\n").filter(l => {
+    const bare = l.replace(/\r$/u, ""), mark = (fence === null ? /^ {0,3}(`{3,}|~{3,})/u : /^ {0,3}(`{3,}|~{3,}) *$/u).exec(bare)?.[1];
+    if (mark && (fence === null || (mark[0] === fence[0] && mark.length >= fence.length))) { fence = fence === null ? mark : null; return true; }
+    const out = fence === null && (partLines.has(bare) || (kitLines.has(bare) && !there(bare.slice(1)))); if (out) gone.push(bare); return !out; }).join("\n"); };
   const rest = at === null ? outside(now) : null;
   const text = at === null ? `${rest}${rest.endsWith("\n") || rest === "" ? "" : eol}${eol}${block}${eol}` : `${outside(now.slice(0, at.at))}${block}${outside(now.slice(at.end))}`;
   if (text === now) return {};

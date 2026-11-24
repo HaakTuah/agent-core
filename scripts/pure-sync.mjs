@@ -22,7 +22,7 @@
 // repository (releases.mjs, hostAccount); it changes nothing.
 import "./whole-output.mjs";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { copyTree, coreIsFolder, entries, executable } from "./copy-tree.mjs";
@@ -141,7 +141,10 @@ function provedOwned(dir) {
     if (bad.length) { unproved(`the project's kind or values cannot be read in their forms, so it is not proved what the core's process writes: ${bad.join("; ")}`); return; }
     const kit = fresh(p, join(kits, "now", "setup", "template"), { kitOnly: true, k });
     if (!kit.length) { unproved(`the kit at ${pin} gives no file this checkout of the core can render`); return; }
-    const { write, remove } = plan(p, kit, older.flatMap((at) => asEarlier(p, join(at, "setup", "template"), k, { kitOnly: true })));
+    // (whether an import's path is there, as the sync reads it with the copy at the new pin: a path in the copy, from the
+    // core at the pin, since the project here is written without it; any other, from the project)
+    const exists = (f) => { if (!f.startsWith(at)) return existsSync(join(base_, f)); try { inBare(dir, ["cat-file", "-e", `${pin}:${f.slice(at.length)}`]); return true; } catch { return false; } };
+    const { write, remove } = plan(p, kit, older.flatMap((at) => asEarlier(p, join(at, "setup", "template"), k, { kitOnly: true })), { exists });
     provedGone(dir, write, remove);
     const onMain = (f) => { try { raw(["cat-file", "-e", `${base}:${f}`]); return true; } catch { return false; } };
     for (const f of later) {
