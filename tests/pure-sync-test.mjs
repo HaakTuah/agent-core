@@ -42,7 +42,9 @@ fs.cpSync(root, theCore, { recursive: true, filter: src => !["/.git", "/node_mod
 git(theCore, "init", "-q", "-b", "main");
 const NOTE_LINE = "- **13 November 2026, a note for the test.** Done when nothing: an entry that B gains over A.\n";
 const terms = read(theCore, ".github/workflows/personal-terms.yml");
-const commit = (message) => { git(theCore, "add", "-A"); git(theCore, "commit", "-q", "--allow-empty", "-m", message); return git(theCore, "rev-parse", "HEAD"); };
+// (the bits the core marks, which git on Windows reads from no disk)
+const x = git(root, "ls-files", "-s", "-z").split("\0").filter(e => e.startsWith("100755 ")).map(e => e.slice(50));
+const commit = (message) => { git(theCore, "add", "-A"); git(theCore, "update-index", "--chmod=+x", "--", ...x); git(theCore, "commit", "-q", "--allow-empty", "-m", message); return git(theCore, "rev-parse", "HEAD"); };
 write(theCore, "z.md", "only in Z\n");
 write(theCore, ".github/workflows/personal-terms.yml", `${terms}# Z\n`);
 const Z = commit("Z");
