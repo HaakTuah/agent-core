@@ -577,7 +577,8 @@ exit 1
     fs.cpSync(path.join(core, ".packages"), path.join(caller, "core/.packages"), { recursive: true });
     for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: caller, stdio: "ignore" });
     const checked = spawnSync(process.execPath, [path.join(caller, "core/scripts/workflows.mjs")], { cwd: caller, encoding: "utf8", env: { ...process.env, WORKFLOWS_BASE: "" } });
-    ok(checked.status === 0 && !/zizmor's/.test(checked.stdout + checked.stderr), "and once its mend is made as the step words it, the workflow check, zizmor and actionlint included, passes it, no write right at the workflow's level beside two jobs", checked.stdout + checked.stderr);
+    // (no base, so a finding of either tool is a note, never a failure: none is to stand, nor a tool that did not run)
+    ok(checked.status === 0 && !/^(?:note|FAIL) |did not run/m.test(checked.stdout + checked.stderr), "and once its mend is made as the step words it, the workflow check, zizmor and actionlint included, passes it, no write right at the workflow's level beside two jobs", checked.stdout + checked.stderr);
   } else console.log("ok   (not run here: zizmor and actionlint are fetched by the job's set-up on the runners alone, where this case runs)");
 }
 
