@@ -1,4 +1,4 @@
-// The stage of scripts/steps/820-the-modules-a-project-takes-placed-from-what-is-read.mjs: how a project that missed that step holds it, and its mend as the step words it.
+// The stage of scripts/steps/823-the-modules-a-project-takes-placed-from-what-is-read.mjs: how a project that missed that step holds it, and its mend as the step words it.
 // scripts/steps-stage.mjs loads it, in the order of the names.
 import { read, write } from "../stage-helpers.mjs";
 import s160 from "../steps/160-the-modules-a-project-takes.mjs";
