@@ -13,7 +13,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { syncCalls } from "../scripts/check-calls.mjs";
+import { proves, syncCalls } from "../scripts/check-calls.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { npmRefusal } from "../scripts/npm-reads.mjs";
 import { npmWithCache, scratch, scratchEnv, tally } from "../scripts/scratch-core.mjs";
@@ -36,6 +36,12 @@ const stale = syncCalls([{ file: "core.yml", wf: { on: "pull_request", jobs: { c
 const kept = stale.slice(3).map(c => `${c.file}:${c.wf.on}:${Object.entries(c.wf.jobs).map(([id, j]) => `${id}=${j.uses}${j.with ? JSON.stringify(j.with) : ""}`).join()}`).join(";");
 ok(stale.length === 6 && kept === 'core.yml:pull_request:core (as the base calls it)=core@new,gone=terms@new,kept=lic@older;t.yml:pull_request:t (as the base calls it)=terms@new;c.yml:pull_request:c (as the base calls it)=core@new{"copies":true}' && stale.slice(3).every(c => c.base) && !stale.slice(0, 3).some(c => c.base),
   "of the base's calls on a sync, whatever pin each held, one the sync calls alike is left to it; one it calls otherwise, from a trigger that starts on no change, or at another commit, runs as the base calls it at the sync's pin; one it leaves out runs at the sync's pin, or where its workflow is not there, as the base holds it (#1258, point 1)", kept);
+
+// (only the sync's own call of core.yml at the manifest's pin, its own steps passed, proves the copy, so a base's call
+// of core.yml stops nothing behind it; one the change points at another commit never does)
+const own = { name: "core.yml", base: false, job: { uses: "o/c/.github/workflows/core.yml@P" } }, passed = { failed: 0, ran: 1, unrun: 0 };
+ok(proves(own, passed, "P") && proves(own, { failed: 0, ran: 0, unrun: 1, held: true }, "P") && ![[{ ...own, job: { uses: "o/c/.github/workflows/core.yml@Q" } }, passed], [{ ...own, base: true }, passed], [own, { failed: 1, ran: 1, unrun: 0 }], [own, { failed: 0, ran: 0, unrun: 1, held: false }], [own, { failed: 0, ran: 0, unrun: 0 }]].some(([j, r]) => proves(j, r, "P")),
+  "only the sync's own call of core.yml at the manifest's pin, its own steps passed, proves the copy; one at another commit, the base's, one failed, or one unrun before its own steps passed never does");
 
 // a project the starter kit writes, at the scratch core's commit
 const p = project("a-project", "--owner", "someone");
@@ -86,7 +92,7 @@ ok(stoppedAt["copies.yml/copies/copies"] === "stopped" && !("copies.yml/copies" 
   "  and each job left is said stopped by the key it runs under", JSON.stringify(stoppedAt));
 // (#1262: core.yml failed only by the signature check's refusal of this machine's npm, after its own steps proved the
 // copy, is unrun here, and stops nothing: every other check runs, and the run still fails, as for any unrun job)
-fs.writeFileSync(coreYml, stands.replace("      - name: The NuGet check, last", `      - name: A stand-in for the signature check, refusing this machine's npm\n        run: |\n          echo 'FAIL ${npmRefusal("10.9.9", ["allow-git"], "11.14.0")}'\n          exit 1\n      - name: The NuGet check, last`));
+fs.writeFileSync(coreYml, stands.replace("      - name: The NuGet check, last", `      - name: The signature check, as a stand-in that refuses this machine's npm\n        run: |\n          echo 'FAIL ${npmRefusal("10.9.9", ["allow-git"], "11.14.0")}'\n          exit 1\n      - name: The NuGet check, last`));
 git(core, "commit", "-q", "-am", "core.yml whose signature check refuses this machine's npm");
 syncTo(git(core, "rev-parse", "HEAD"));
 fs.copyFileSync(coreYml, path.join(dir, "core", ".github", "workflows", "core.yml"));

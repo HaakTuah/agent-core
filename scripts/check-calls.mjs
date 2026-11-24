@@ -112,6 +112,11 @@ export function ownFailed(r) {
   return { failed, held: parts > 0 && !failed };
 }
 
+// Whether a job proves the copy the core, so that a base's call of core.yml stops nothing after it: the sync's own call
+// of core.yml, at the manifest's pin (`pin`), never one the change points elsewhere, its own steps passed, run whole or
+// left unrun after them (`held`) (#1258, point 1; #1262).
+export const proves = (j, r, pin) => j.name === "core.yml" && !j.base && String(j.job?.uses ?? "").endsWith(`@${pin}`) && !r.failed && (r.unrun ? Boolean(r.held) : r.ran > 0);
+
 // The keys a job that calls a workflow of the core's is written under, as check.mjs writes a verdict: one for each job
 // of the workflow it calls, whose text `read(uses)` gives; its own place where that cannot be read (#1258, point 2).
 export function calledKeys({ file, id, job }, read) {
@@ -121,10 +126,11 @@ export function calledKeys({ file, id, job }, read) {
 }
 
 // Why a job was not run here, or null: on another system, or each failed step wanting a program this machine lacks
-// (#1245, points 8 and 9), or an npm, where the signature check refused the machine's as too old to read its settings,
+// (#1245, points 8 and 9), or an npm, where core.yml's signature check refused the machine's as too old to read its settings,
 // its own words read exactly (npm-reads.mjs; #1262): a verdict of the machine's, not the change's.
 export function unrunWhy(r) {
-  const wants = r.passed ? [] : r.steps.filter(s => !s.passed).map(s => s.missing ?? (npmRefused(s.out) && `npm ${npmRefused(s.out)} or later, which the core's own Node (its .node-version) brings`));
+  const refused = s => String(s.name ?? "").startsWith("The signature check") && npmRefused(s.out);
+  const wants = r.passed ? [] : r.steps.filter(s => !s.passed).map(s => s.missing ?? (refused(s) && `npm ${refused(s)} or later, which the core's own Node (its .node-version) brings`));
   const lacks = wants.length > 0 && wants.every(Boolean) && [...new Set(wants)].join(", ");
   return lacks ? `it needs ${lacks}, which this machine lacks` : r.unrun ?? null;
 }

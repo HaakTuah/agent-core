@@ -32,7 +32,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { calledKeys, closing, gates, movesForward, ownFailed, ownJobs, readable, syncCalls, triggered, unrunWhy } from "./check-calls.mjs";
+import { calledKeys, closing, gates, movesForward, ownFailed, ownJobs, proves, readable, syncCalls, triggered, unrunWhy } from "./check-calls.mjs";
 import { standIns } from "./check-actions.mjs";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { carriedAt, readCore } from "./core-path.mjs";
@@ -151,7 +151,7 @@ function runAll(p, run, jobs, tmp) {
   for (const [i, j] of jobs.entries()) {
     const r = run(j.file, j.id, j.job);
     n.failed += r.failed; n.ran += r.ran; n.unrun += r.unrun | 0;
-    proved ||= j.name === "core.yml" && !j.base && !r.failed && (r.unrun ? r.held : r.ran > 0);
+    proved ||= proves(j, r, p.pin);
     if (!gates(j, r, proved)) continue;
     // (core.yml unrun here proves nothing of the copy, so it stops the rest as its failure does)
     if (!r.failed) n.failed++;
