@@ -22,9 +22,9 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 // it adds may not fail what stood (AGENTS.md, "Nothing locks a project"); stopped after, behind another's failure,
 // which measured nothing of it (point 2); ran after alone, passed; ran before alone, passed, and failed before alone,
 // which an update may fold into another's steps; and unrun after, on another system or wanting a program this machine
-// lacks (points 8 and 9). A job stopped or unrun before ran not then, and one whose place a job stopped after holds is
+// lacks (points 8 and 9), apart where it ran before, since the update then kept it from being measured. A job stopped or unrun before ran not then, and one whose place a job stopped after holds is
 // counted with that one.
-export const COUNTS = ["passedBoth", "fixedAfter", "failedBoth", "failedAfter", "failedAfterAlone", "stoppedAfter", "ranAfterAlone", "ranBeforeAlone", "failedBeforeAlone", "unrunAfter"];
+export const COUNTS = ["passedBoth", "fixedAfter", "failedBoth", "failedAfter", "failedAfterAlone", "stoppedAfter", "ranAfterAlone", "ranBeforeAlone", "failedBeforeAlone", "unrunAfter", "unrunAfterRan"];
 export function compared(before, after) {
   const jobs = run => Object.entries(run ?? {}).filter(([job]) => job !== RUN_FROM);
   const ran = run => Object.fromEntries(jobs(run).filter(([, v]) => v === "passed" || v === "failed"));
@@ -33,7 +33,7 @@ export function compared(before, after) {
   const out = Object.fromEntries(COUNTS.map(k => [k, []]));
   const was = ran(before), now = ran(after);
   out.stoppedAfter = stopped;
-  out.unrunAfter = jobs(after).filter(([, v]) => v === "unrun").map(([job]) => job);
+  for (const [job] of jobs(after).filter(([, v]) => v === "unrun")) out[was[job] ? "unrunAfterRan" : "unrunAfter"].push(job);
   for (const [job, v] of Object.entries(was)) if (!Object.hasOwn(after ?? {}, job) && !under(job)) out[v === "passed" ? "ranBeforeAlone" : "failedBeforeAlone"].push(job);
   const passedBy = { passed: "passedBoth", failed: "fixedAfter" }, failedBy = { passed: "failedAfter", failed: "failedBoth" };
   for (const [job, v] of Object.entries(now)) out[(v === "passed" ? passedBy : failedBy)[was[job]] ?? (v === "passed" ? "ranAfterAlone" : "failedAfterAlone")].push(job);
@@ -64,7 +64,7 @@ export const RUNS = "in a clone of the project, `node core/scripts/check.mjs --b
 // What the trial's record says of the release at `sha`, read through `git` (its arguments give its output), and why it
 // holds the cut, or null: the record stands for the commit where it names it, or one before it from which the release
 // changes the record alone; it holds the cut where it does not stand, where a check failed after the update that passed
-// before it or did not run then, and where one stopped after.
+// before it or did not run then, where one stopped after, and where one that ran before was unrun after.
 export function trialAt(sha, git) {
   let r = null;
   try { r = JSON.parse(git(["show", `${sha}:${TRIAL}`])); } catch { /* (not there, or not read) */ }
@@ -76,14 +76,15 @@ export function trialAt(sha, git) {
   return {
     said: trialSaid(r),
     held: r.projects === 0 ? null : r.failedAfter + r.failedAfterAlone ? `${plural(r.failedAfter + r.failedAfterAlone, "check")} failed after the release in the trial on a real project, ${r.failedAfter} of them passing before it and ${r.failedAfterAlone} not run before. Mend: find the release's fault from the trial's run after the update, mend it in the core in a pull request of its own, and ${again}`
-      : r.stoppedAfter ? `${plural(r.stoppedAfter, "check")} did not run after the update in the trial on a real project, stopped behind a failure, so the trial measured nothing of ${r.stoppedAfter === 1 ? "it" : "them"}. Mend: find what stopped them from the trial's run after the update, mend it in the core in a pull request of its own where it is the release's, and ${again}` : null,
+      : r.stoppedAfter ? `${plural(r.stoppedAfter, "check")} did not run after the update in the trial on a real project, stopped behind a failure, so the trial measured nothing of ${r.stoppedAfter === 1 ? "it" : "them"}. Mend: find what stopped them from the trial's run after the update, mend it in the core in a pull request of its own where it is the release's, and ${again}`
+      : r.unrunAfterRan ? `${plural(r.unrunAfterRan, "check")} that ran before the update could not run after it on the trial's machine (another system, or a program it lacks), so the trial measured nothing of ${r.unrunAfterRan === 1 ? "it" : "them"}. Mend: find from the trial's run after the update what it needs, mend it in the core in a pull request of its own where the release brought it, or run the trial on a machine that has it, and ${again}` : null,
   };
 }
 
 // What a record in its form says.
 const trialSaid = r => (r.projects === 0
   ? `No project that takes the core allowed a trial of this release (${TRIAL}, ${r.day}), so none ran.`
-  : `The trial on a real project ran on ${r.commit.slice(0, 7)} on ${r.day}, in ${plural(r.projects, "project")}: ${plural(r.passedBoth, "check")} passed before and after the update, ${r.fixedAfter} failed before and passed after, ${r.failedBoth} failed before and after (standing before the release), ${r.failedAfter} passed before and failed after (the release's), ${r.failedAfterAlone} ran after alone and failed (the release's too), ${r.stoppedAfter} stopped after it behind a failure, ${r.ranAfterAlone} ran after alone and passed, ${r.ranBeforeAlone} ran before alone and passed, ${r.failedBeforeAlone} ran before alone and failed, and ${r.unrunAfter} not run after on this machine; ${r.baselineFromClone} of the baselines taken by the release's check.mjs from a clone of the core, the copy's holding none that writes verdicts.`);
+  : `The trial on a real project ran on ${r.commit.slice(0, 7)} on ${r.day}, in ${plural(r.projects, "project")}: ${plural(r.passedBoth, "check")} passed before and after the update, ${r.fixedAfter} failed before and passed after, ${r.failedBoth} failed before and after (standing before the release), ${r.failedAfter} passed before and failed after (the release's), ${r.failedAfterAlone} ran after alone and failed (the release's too), ${r.stoppedAfter} stopped after it behind a failure, ${r.ranAfterAlone} ran after alone and passed, ${r.ranBeforeAlone} ran before alone and passed, ${r.failedBeforeAlone} ran before alone and failed, ${r.unrunAfter} not run after on this machine, and ${r.unrunAfterRan} not run after it there though they ran before; ${r.baselineFromClone} of the baselines taken by the release's check.mjs from a clone of the core, the copy's holding none that writes verdicts.`);
 
 // How many of the owner's own projects take the core, as scripts/state-report.mjs --projects lists them (a line each,
 // another owner's named as such), or null where it could not read them.

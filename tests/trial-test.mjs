@@ -135,14 +135,19 @@ jobs:
   ok(!lacking.passed && lacking.steps.find(s => !s.passed)?.missing === "no-such-program-of-the-trial", "a step that wants a program this machine lacks names it, for check.mjs to leave the job unrun (#1245, point 9)", JSON.stringify(lacking.steps));
 
   // (point 10: each job in its class, the record counting each, and a job failed after alone holding the cut as the release's)
-  const all = compared({ p: "passed", f: "failed", pf: "passed", ff: "failed", gone: "passed", lost: "failed", was: "stopped", off: "unrun" },
-    { p: "passed", f: "passed", pf: "failed", ff: "failed", newp: "passed", newf: "failed", was: "passed", off: "unrun", w: "unrun" });
-  ok(Object.keys(all).join() === COUNTS.join() && Object.values(all).map(j => j.join()).join(";") === "p;f;ff;pf;newf;;newp,was;gone;lost;off,w",
-    "passed both, fixed after, failed both, failed after, failed after alone, stopped after, ran after alone, ran before alone, failed before alone and unrun after are each counted as named (#1245, point 10)", JSON.stringify(all));
+  const all = compared({ p: "passed", f: "failed", pf: "passed", ff: "failed", gone: "passed", lost: "failed", was: "stopped", off: "unrun", ranThen: "passed" },
+    { p: "passed", f: "passed", pf: "failed", ff: "failed", newp: "passed", newf: "failed", was: "passed", off: "unrun", w: "unrun", ranThen: "unrun" });
+  ok(Object.keys(all).join() === COUNTS.join() && Object.values(all).map(j => j.join()).join(";") === "p;f;ff;pf;newf;;newp,was;gone;lost;off,w;ranThen",
+    "passed both, fixed after, failed both, failed after, failed after alone, stopped after, ran after alone, ran before alone, failed before alone, unrun after, and unrun after where it ran before are each counted as named (#1245, point 10)", JSON.stringify(all));
   const alone = trialRecord(SHA("b"), "2026-11-24", [[{}, { "new.yml/x": "failed", "w.yml/x": "unrun" }]]);
   const aloneAt = trialAt(SHA("b"), args => (args[0] === "show" ? JSON.stringify(alone) : ""));
-  ok(alone.failedAfterAlone === 1 && alone.unrunAfter === 1 && /1 check failed after the release .*0 of them passing before it and 1 not run before/u.test(aloneAt.held) && /and 1 not run after on this machine/u.test(aloneAt.said),
+  ok(alone.failedAfterAlone === 1 && alone.unrunAfter === 1 && /1 check failed after the release .*0 of them passing before it and 1 not run before/u.test(aloneAt.held) && /1 not run after on this machine, and 0 not run after it there though they ran before/u.test(aloneAt.said),
     "  a job that ran after alone and failed holds the cut as the release's, and one unrun after is said and holds nothing", `${aloneAt.said}\n${aloneAt.held}`);
+
+  const lost = trialRecord(SHA("c"), "2026-11-24", [[{ "a.yml/x": "passed" }, { "a.yml/x": "unrun" }]]);
+  const lostAt = trialAt(SHA("c"), args => (args[0] === "show" ? JSON.stringify(lost) : ""));
+  ok(lost.unrunAfterRan === 1 && /^1 check that ran before the update could not run after it/u.test(lostAt.held) && mended(`FAIL ${lostAt.held}`),
+    "  a job that ran before and was unrun after holds the cut, since the trial measured nothing of it, saying its mend", lostAt.held);
 
   // (point 2 and #1244: jobs stopped after count apart and hold the cut; a baseline from a clone of the core is counted)
   const before = { [RUN_FROM]: "a clone of the core", "core.yml/core": "passed", "core.yml/tests (a)": "passed", "own.yml/lint": "passed", "own.yml/gone": "passed" };
