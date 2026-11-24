@@ -18,6 +18,7 @@ import { CORE } from "../scripts/core-address.mjs";
 import { keysOnce } from "../scripts/step-checks-workflow-text.mjs";
 import { LONGEST, twice, uncommented } from "../scripts/yaml-keys.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
+import { STAGES } from "../scripts/steps-stage.mjs";
 
 let failed = 0;
 const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}${cond || !detail ? "" : `\n     ${String(detail).slice(0, 1200)}`}`); if (!cond) failed++; };
@@ -220,11 +221,13 @@ ok(noYaml.fails.length === 4 && /^FAIL a\.yml:4:\d+: the core's reader cannot re
   "a file the core's reader throws on fails with its file, line and column and a mend (a \": \" in an unquoted step name says to quote it), a quoted name, which parses, does not, and a key given twice is left to actionlint, which says it, but two keys the package reads as one (true and True) are failed here", noYaml.fails.join("\n"));
 ok(unparsed([]).fails.length === 0 && own.every(f => unparsed([{ file: f, text: fs.readFileSync(`${core}.github/workflows/${f}`, "utf8") }]).fails.length === 0), "the core's own workflows each parse");
 
+// the workflow check's own files, which a scratch project's copy of the core holds
+const CHECK_FILES = ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "parse-yaml.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"];
 // run on a scratch project: each failure says its mend
 const tmp = scratchDir("workflows-test-");
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "parse-yaml.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
+  for (const f of CHECK_FILES) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
   // (the install with the lock file it is read against)
   fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(tmp, "core/.packages"), { recursive: true });
   fs.writeFileSync(path.join(tmp, "core/.gitignore"), "/.packages/node_modules/\n"); // (as the copy holds it)
@@ -287,7 +290,7 @@ const vend = scratchDir("workflows-vendored-");
 try {
   const at = "vendor/core/", put = (f, text) => { fs.mkdirSync(path.dirname(path.join(vend, f)), { recursive: true }); fs.writeFileSync(path.join(vend, f), text); };
   fs.mkdirSync(path.join(vend, at, "scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "parse-yaml.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(vend, at, "scripts", f));
+  for (const f of CHECK_FILES) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(vend, at, "scripts", f));
   fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(vend, at, ".packages"), { recursive: true });
   put("core-manifest.md", `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${at} (never edited here).\n`);
   put(`${at}tools/action.yml`, "on:\n  pull_request_target:\n"); // (the copy's own, which the core's run holds)
@@ -555,6 +558,28 @@ exit 1
   // (with no mapfile, as in macOS's own bash, 3.2, the folders are named all the same)
   const old = spawnSync("bash", ["-c", 'enable -n mapfile; . "$1"; printf "%s\\n" "$2/x $HOME/y" | unnamed "$2"', "-", path.join(core, "scripts", "unnamed.sh"), runnerTemp], { encoding: "utf8", env: { ...process.env, HOME: home } });
   ok(old.stdout === "<temp>/x ~/y\n" && !old.stderr, "unnamed() names the folders with no mapfile, as in macOS's own bash (#1223)", old.stdout + old.stderr);
+}
+
+// ---- the queue job's step followed as worded on the caller the kits before it wrote, its rights at the workflow's
+// level: the workflow check, zizmor included, finds nothing in what the mend leaves (#1273, point 1) ----
+{
+  const QUEUE_LEAD = "19 November 2026, a pull request of the progress file alone proved by a script", caller = scratchDir("workflows-queue-");
+  fs.mkdirSync(path.join(caller, ".github/workflows"), { recursive: true });
+  fs.writeFileSync(path.join(caller, ".github/workflows/security-review.yml"), fs.readFileSync(path.join(core, TEMPLATES, "workflows/security-review.yml.tmpl"), "utf8").replace(/\{\{core\}\}/g, CORE).replace(/\{\{pin\}\}/g, "0".repeat(40)));
+  STAGES[QUEUE_LEAD].stage(caller);
+  const staged = parseYaml(fs.readFileSync(path.join(caller, ".github/workflows/security-review.yml"), "utf8"));
+  ok(staged.permissions?.statuses === "write" && Object.keys(staged.jobs).length === 1, "the stage holds the caller as the kits before the queue job wrote it, its rights at the workflow's level", JSON.stringify(staged));
+  STAGES[QUEUE_LEAD].mend(caller);
+  if (process.env.ZIZMOR && process.env.ACTIONLINT) {
+    // (the workflow check whole, as the copies job runs it, from the project's copy of the core)
+    fs.mkdirSync(path.join(caller, "core/scripts"), { recursive: true });
+    for (const f of CHECK_FILES) fs.copyFileSync(path.join(core, "scripts", f), path.join(caller, "core/scripts", f));
+    fs.cpSync(path.join(core, ".packages"), path.join(caller, "core/.packages"), { recursive: true });
+    for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: caller, stdio: "ignore" });
+    const checked = spawnSync(process.execPath, [path.join(caller, "core/scripts/workflows.mjs")], { cwd: caller, encoding: "utf8", env: { ...process.env, WORKFLOWS_BASE: "" } });
+    // (no base, so a finding of either tool is a note, never a failure: none is to stand, nor a tool that did not run)
+    ok(checked.status === 0 && !/^(?:note|FAIL) |did not run/m.test(checked.stdout + checked.stderr), "and once its mend is made as the step words it, the workflow check, zizmor and actionlint included, passes it, no write right at the workflow's level beside two jobs", checked.stdout + checked.stderr);
+  } else console.log("ok   (not run here: zizmor and actionlint are fetched by the job's set-up on the runners alone, where this case runs)");
 }
 
 process.exit(failed ? 1 : 0);

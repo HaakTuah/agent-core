@@ -107,7 +107,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    (`setup/sync-notes.md`, each entry a file of `setup/sync-notes/`, read whole by `scripts/sync-notes.mjs`), and its
    step of the same name in `scripts/steps/` tells it done or not (`scripts/steps.mjs`); the sync script prints the entries a sync brings, then every
    step not done, what the steps' writers wrote where a script does a step exactly, set aside in a git stash to commit
-   in a PR of its own once the sync is merged (`scripts/steps.mjs --write --aside`; #1091), every difference from what
+   in a PR of its own once the sync is merged (`scripts/steps.mjs --write --aside`; #1091), or, where a file a writer
+   writes holds what the sync changed, put back with the command to run once it merges (#1259), every difference from what
    the starter kit writes today (`scripts/fresh.mjs`), where the owner's
    inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`), the settings only the owner
    gives where the sync brings one the old copy's list did not hold (`scripts/owner-settings.mjs`; "Setting up (the
@@ -228,10 +229,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `STRENGTH_BASE` the pull request's base: it runs the project's mutation tool (the *mutation tool*) on the lines
      the pull request changes and shows how many faults put in on purpose a test caught; once a whole run at an audit
      has written its baseline, beside the shape check's, a fault that survives there unlisted fails
-     (`tasks/code-shape.md`). For code run by Node with tests that are files run by `node`, `stryker.mjs` runs
-     Stryker as such a tool, installed from a lock file of the project's (the core's own, in `tests/mutation/`), and
-     `mutate.mjs` is a tool the core wrote, with fewer kinds of fault, which with `--every` names each test that catches
-     one.
+     (`tasks/code-shape.md`). For code run by Node with tests that are files run by `node`, or by the project's own
+     vitest (`--runner vitest`), `stryker.mjs` runs Stryker as such a tool, installed from a lock file of the project's
+     (the core's own, in `tests/mutation/`), and `mutate.mjs` is a tool the core wrote, with fewer kinds of fault, which
+     with `--every` names each test that catches one.
    - **What the tests cost** (`tasks/tests.md`): `select.mjs`, a step of the same job before the tests, with
      `SELECT_BASE` the pull request's base, selects the tests the change can reach, with the project's proof, never
      selected out, and the whole suite where a changed file's reach cannot be told, the changed files, or the

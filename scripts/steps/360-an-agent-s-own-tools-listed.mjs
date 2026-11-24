@@ -1,7 +1,7 @@
 // The step of setup/sync-notes/360-an-agent-s-own-tools-listed.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
 import { coreOf, kitHooks, check as toolsCheck } from "../agent-tools.mjs";
-import { listed } from "../agent-tools-entries.mjs";
+import { listed, markOf, show } from "../agent-tools-entries.mjs";
 import { NOT_KIT_WHY } from "../agent-tools-read.mjs";
 import { readProject } from "../agent-tools-project.mjs";
 import { installed } from "../packages.mjs";
@@ -34,7 +34,7 @@ export default { lead: "16 November 2026, an agent's own tools listed", cost: CO
     if (own.length && !beside) wrong.push(`the workflow that runs the licence check, ${own.join(", ")}, runs \`node ${copyAt(p)}scripts/agent-tools.mjs ${file}\` beside it, as the core's \`licences.yml\` does`);
     // (a hook whose command is not the kit's form may still run its copy on main, which no check reads exactly: whether it
     // does, and what becomes of it, is a security judgement, never a mend; it is marked, which fails nothing, and given to
-    // a task; #1248, point 6)
-    const judged = toWeigh.length ? `Each hook below runs a command not in the starter kit's form, so nothing the check reads shows that it runs its copy on main (floor rule 3); whether it does is a security judgement, not a mend: list it under "agentTools" in \`${file}\` with "from": "the working tree", which marks it as standing before and fails nothing, and file one task, an issue, for a session at the strongest tier to weigh each, with the security reviews of a change to what runs with power, before it is rewritten in the starter kit's form or taken out, never taking one out before then: ${toWeigh.map(([, problem]) => problem.replace(/\. Mend: [^]*$/u, "")).join("; ")}.` : "";
+    // a task; #1248, point 6; its mark read from its command, #1273, point 2)
+    const judged = toWeigh.length ? `Each hook below runs a command not in the starter kit's form, so nothing the check reads shows that it runs its copy on main (floor rule 3); whether it does is a security judgement, not a mend: list it under "agentTools" in \`${file}\` with the "from" named after it, "main" where its command has git show its file from main (\`git show refs/remotes/origin/main:<the file>\`), which marks what the command names and never shows that main's copy is what runs, else "the working tree", which marks it as standing before and fails nothing, and file one task, an issue, for a session at the strongest tier to weigh each, with the security reviews of a change to what runs with power, before it is rewritten in the starter kit's form or taken out, never taking one out before then: ${toWeigh.map(([k, problem]) => `${problem.replace(/\. Mend: [^]*$/u, "")} ("from": ${show(markOf(head.sources.get(k)))})`).join("; ")}.` : "";
     return wrong.length || judged ? [wrong.length ? `List under "agentTools" in \`${file}\` every plug-in, tool server, skill and hook the project configures for its agents beyond the starter kit's hooks, each as { "kind", "name", "publisher", "version" }, a plug-in or tool server at one exact version, the one its configuration pins where it can pin one, or take out what nobody meant to configure; and see that its check runs: ${wrong.join("; ")}` : "", judged].filter(Boolean).join(" ") : null;
   } };
