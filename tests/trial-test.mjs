@@ -16,7 +16,7 @@ import { closing, movesForward, ownJobs, syncCalls, triggered } from "../scripts
 import { COUNTS, compared, trialAt, trialRecord } from "../scripts/release-trial.mjs";
 import { sideOf } from "../scripts/attached.mjs";
 import { notInstalled } from "../scripts/packages.mjs";
-import { mended } from "../scripts/mend.mjs";
+import { mended, splitMend } from "../scripts/mend.mjs";
 import { runWorkflow, withAbsolutePath } from "../scripts/workflow-run.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 
@@ -151,6 +151,9 @@ jobs:
   const lines = [], close = counts => closing(counts, l => lines.push(l), l => lines.push(l));
   ok(close({ failed: 0, ran: 3, unrun: 1 }) === 1 && mended(lines[0]) && /^FAIL 1 job\(s\) skipped above could not run here/u.test(lines[0]) && close({ failed: 0, ran: 3, unrun: 0 }) === 0 && close({ failed: 1, ran: 3, unrun: 0 }) === 1,
     "a job unrun alone fails the run, saying its mend; with none unrun or failed it passes (#1245, points 8 and 9)", lines.join("\n"));
+  lines.length = 0;
+  ok(close({ failed: 0, ran: 3, unrun: 0, own: { failed: 1, ran: 2, unrun: 0 } }) === 1 && lines.some(l => l.startsWith("0 of the core's checks failed, 0 not run; of the project's own jobs, 1 failed, 0 not run")) && close({ failed: 0, ran: 3, unrun: 0, own: { failed: 0, ran: 2, unrun: 0 } }) === 0 && lines.at(-1) === "ok   every check of the core that runs from plain git passed (3), and every job of the project's own run here (2)",
+    "the summary counts the core's checks and the project's own jobs apart, and either failing fails the run (#1275, point 2)", lines.join("\n"));
   ok(!lacking.passed && lacking.steps.find(s => !s.passed)?.missing === "no-such-program-of-the-trial", "a step that wants a program this machine lacks names it, for check.mjs to leave the job unrun (#1245, point 9)", JSON.stringify(lacking.steps));
 
   // (point 10: each job in its class, the record counting each, and a job failed after alone holding the cut as the release's)
@@ -186,6 +189,8 @@ jobs:
 
   // (point 6: run from a clone of the core with its packages missing, check.mjs says so with the command that installs them)
   ok(mended(`FAIL no workflow can be read here: ${notInstalled("yaml")}`) && /install\.mjs/u.test(notInstalled("yaml")), "a package missing is said with the command that installs it (#1245, point 6)", notInstalled("yaml"));
+  const [what, mend] = splitMend(notInstalled("yaml")), yaml = `FAIL no workflow can be read here: ${what}. Mend: ${mend}`;
+  ok(!/\.\./u.test(yaml) && mended(yaml) && mend.startsWith("run "), "and in one full stop before its mend, as check.mjs words it (#1275, point 3)", yaml);
 
   // (point 7: a sync to a commit of the core's main past its newest release, as a trial makes, needs nothing)
   const core = path.join(tmp, "core");

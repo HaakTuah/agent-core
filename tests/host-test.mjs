@@ -141,6 +141,9 @@ const reviewRule = { type: "required_status_checks", parameters: { required_stat
     "with a host, the steps read on it run, and one whose answer is missing is listed as not read, never reported", JSON.stringify(withHost.hostUnread));
   ok(/Steps read on the host not done/.test(hostReport(withHost)) && /Not read on the host here/.test(hostReport(withHost)) && /Every step read on the host is done/.test(hostReport(Object.assign([], { hostUnread: [] }))),
     "the report names the steps not done and those not read");
+  const unread = hostReport(Object.assign([], { hostUnread: [{ lead: "a step", why: "gh answered for no account" }, { lead: "another", why: "gh answered for no account" }] }));
+  ok(!/Every step read on the host is done/.test(unread) && /^No step read on the host here is left undone, but 2 of them were not read here/.test(unread) && /gh answered for no account/.test(unread),
+    "where steps were not read, the report never says every one is done, and says how many were not read and why (#1275, point 1)", unread);
 }
 
 // ---- the issue "Settings only the owner gives" ----

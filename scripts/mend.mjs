@@ -6,7 +6,7 @@
 // files, the lines), read with it. Each check's own test reads its failures here (tests/mend-test.mjs holds that it
 // does). Node's own modules only.
 //
-//   import { mended, unmended } from "./mend.mjs";
+//   import { mended, splitMend, unmended } from "./mend.mjs";
 export const MEND = "Mend: ";
 const FAILURE = /^(?:::[a-z]+(?: [^:\r\n]*)?::)?(?:FAIL\b|Waiting: )/u;
 // a mend of at least two words after the marker, so that "Mend: " alone, or one word, is none
@@ -26,4 +26,11 @@ export function unmended(output) {
 // that fails.
 export function mended(output) {
   return failures(output).length > 0 && unmended(output).length === 0;
+}
+
+// A failure's words split at its mend: what is wrong, without its last full stop, and the mend, for a check that words
+// them anew around its own (#1275, point 3: check.mjs once kept the stop and added another).
+export function splitMend(text) {
+  const at = String(text).indexOf(` ${MEND}`);
+  return at < 0 ? [String(text).replace(/\.$/u, ""), ""] : [String(text).slice(0, at).replace(/\.$/u, ""), String(text).slice(at + MEND.length + 1)];
 }

@@ -36,7 +36,7 @@ import { calledKeys, closing, gates, movesForward, ownFailed, ownJobs, proves, r
 import { standIns } from "./check-actions.mjs";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { carriedAt, readCore } from "./core-path.mjs";
-import { MEND } from "./mend.mjs";
+import { MEND, splitMend } from "./mend.mjs";
 import { hostSaid, plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
 import { leadsOut } from "./guards.mjs";
@@ -104,7 +104,7 @@ function main() {
   for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
   const o = options();
   // (a clone of the core installs none itself, as a copy does: #1245, point 6)
-  if (!installed("yaml")) { const [what, mend] = notInstalled("yaml").split(" Mend: "); fail(`no workflow can be read here: ${what}.`, mend); }
+  if (!installed("yaml")) { const [what, mend] = splitMend(notInstalled("yaml")); fail(`no workflow can be read here: ${what}.`, mend); }
   const p = { ...project(o), own: o.own, verdicts: o.verdicts === null ? null : path.resolve(o.verdicts) };
   if (p.verdicts !== null) outside(p, o.verdicts);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
@@ -143,7 +143,8 @@ function calledJobs(p, tmp) {
   return jobs;
 }
 
-// Runs those jobs, then, with --own, the project's own, where the copy is the core: how many ran, and how many failed.
+// Runs those jobs, then, with --own, the project's own, where the copy is the core: how many ran, failed and were unrun,
+// the project's own counted apart (`own`; #1275, point 2).
 // Where it is not, each job left that would run is written stopped (#1245, point 2).
 function runAll(p, run, jobs, tmp) {
   const n = { failed: 0, ran: 0, unrun: 0 };
@@ -158,7 +159,8 @@ function runAll(p, run, jobs, tmp) {
     stopBehind(p, r, jobs.slice(i + 1), tmp);
     return n;
   }
-  if (p.own) for (const o of ownWorkflows(p)) { const r = run.own(o); n.failed += r.failed; n.ran += r.ran; n.unrun += r.unrun | 0; }
+  if (p.own) n.own = { failed: 0, ran: 0, unrun: 0 };
+  for (const o of p.own ? ownWorkflows(p) : []) { const r = run.own(o); n.own.failed += r.failed; n.own.ran += r.ran; n.own.unrun += r.unrun | 0; }
   return n;
 }
 
