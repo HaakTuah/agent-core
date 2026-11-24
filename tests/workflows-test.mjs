@@ -498,4 +498,21 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     [...fetches.filter(l => !l.includes("--no-auto-maintenance")), ...checkouts.filter(s => !off(s)).map(s => s.with.path)].join(" | "));
 }
 
+// (#674: the copies checks read the base the change merges into; their checkout keeps no token, so in a private
+// repository a fetch of origin/<branch> after it fails. Each job that runs them gives HEAD^1, the merge's first parent,
+// from a checkout of the project that holds the merge's parents)
+for (const file of ["copies.yml", "core.yml"]) {
+  const wf = parseYaml(fs.readFileSync(path.join(wfDir, file), "utf8"));
+  const jobs = Object.values(wf.jobs).filter(j => (j.steps ?? []).some(s => /scripts\/checks\.mjs copies\b/.test(String(s.run ?? ""))));
+  const bad = jobs.flatMap(j => {
+    const own = j.steps.find(s => String(s.uses ?? "").startsWith("actions/checkout@") && !s.with?.repository && !s.with?.path);
+    const runs = j.steps.filter(s => /scripts\/checks\.mjs copies\b/.test(String(s.run ?? "")));
+    return [
+      ...(Number(own?.with?.["fetch-depth"]) >= 2 && own?.with?.["persist-credentials"] === false ? [] : ["its checkout of the project: fetch-depth 2 or more, persist-credentials false"]),
+      ...runs.filter(s => s.env?.BASE !== "${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}").map(s => `BASE ${s.env?.BASE}`),
+    ];
+  });
+  ok(jobs.length === 1 && bad.length === 0, `${file}: the copies checks read their base as HEAD^1 of a checkout that holds it, with no fetch that would need a token (#674)`, bad.join(" | "));
+}
+
 process.exit(failed ? 1 : 0);
