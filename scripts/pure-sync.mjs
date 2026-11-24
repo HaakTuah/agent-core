@@ -145,8 +145,14 @@ function provedOwned(dir) {
     // core at the pin, since the project here is written without it; any other, from the project; each path asked once)
     const seen = new Map(), there = (f) => { if (!f.startsWith(at)) return existsSync(join(base_, f)); try { inBare(dir, ["cat-file", "-e", `${pin}:${f.slice(at.length)}`]); return true; } catch { return false; } };
     const exists = (f) => { if (!seen.has(f)) seen.set(f, there(f)); return seen.get(f); };
-    // (a moved stub's text, read as the sync reads it, from the core at the pin; a path outside the copy is no stub)
-    const stubText = (g) => { if (!g.startsWith(at)) return null; try { return inBare(dir, ["show", `${pin}:${g.slice(at.length)}`], { maxBuffer: 1 << 26 }).toString(); } catch { return null; } };
+    // (a moved stub's text, read as the sync reads it, from the core at the pin; a path outside the copy is no stub, nor
+    // one the pin's tree, listed once, does not hold, so a project's many imports start no process each)
+    let pinned;
+    const stubText = (g) => {
+      pinned ??= new Set(inBare(dir, ["ls-tree", "-r", "-z", "--name-only", pin], { maxBuffer: 1 << 26 }).toString().split("\0"));
+      if (!g.startsWith(at) || !pinned.has(g.slice(at.length))) return null;
+      try { return inBare(dir, ["show", `${pin}:${g.slice(at.length)}`], { maxBuffer: 1 << 26 }).toString(); } catch { return null; }
+    };
     const { write, remove } = plan(p, kit, older.flatMap((at) => asEarlier(p, join(at, "setup", "template"), k, { kitOnly: true })), { exists, stubText });
     provedGone(dir, write, remove);
     const onMain = (f) => { try { raw(["cat-file", "-e", `${base}:${f}`]); return true; } catch { return false; } };
