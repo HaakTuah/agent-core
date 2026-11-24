@@ -104,7 +104,11 @@ else {
   const failing = "a failure of the project's own, with no code, printed whole to its last word";
   const own = restores("a pull request that changes only a doc, in a project whose restore fails with no code of NuGet's", { "README.md": "# A project\n\nMore.\n" },
     { start: { "Directory.Build.targets": `<Project>\n  <Target Name="Fails" BeforeTargets="Restore">\n    <Error Text="${failing}" />\n  </Target>\n</Project>\n` } });
-  ok(own.out.includes("src/App/App.csproj: the restore failed with no error NuGet names. It printed:") && new RegExp(`^  .*error.*${failing}`, "m").test(own.out), "and the look prints the restore's error line whole, behind two spaces", own.out);
+  ok(own.out.includes("src/App/App.csproj: the restore failed with no error NuGet names. It printed:") && new RegExp(`^  \\| .*error.*${failing}`, "m").test(own.out), "and the look prints the restore's error line whole, behind \"  | \"", own.out);
+  // (and none of its lines is read as a workflow command: neither "::" after leading spaces nor "##[" anywhere)
+  const commands = restores("a project whose restore fails with no code, printing what reads as workflow commands", { "README.md": "# A project\n\nMore.\n" },
+    { start: { "Directory.Build.targets": `<Project>\n  <Target Name="Fails" BeforeTargets="Restore">\n    <Message Importance="high" Text="::error::two" />\n    <Error Text="planted ##[error]one" />\n  </Target>\n</Project>\n` } });
+  ok(/planted/.test(commands.out) && /two/.test(commands.out) && !commands.out.includes("##[") && !/^\s*::/m.test(commands.out), "and none of the lines it prints is read as a workflow command", commands.out);
   // (nor does a NuGet call in a step that names no config of its own, as the restore from the lock files does, read a
   // machine-wide config of the caller's, which may name a source with its sign-in: that folder is the step's own; #1239)
   const machine = path.join(tmp, "machine"), work = path.join(tmp, "machine-work");
