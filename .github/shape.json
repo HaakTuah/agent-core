@@ -30,7 +30,7 @@
     "suites-scans": { "win32": 450 },
     "suites-tools": { "win32": 450 },
     "suites-network": { "linux": 240, "win32": 600 },
-    "upgrade": { "linux": 240 },
+    "upgrade": { "linux": 240, "win32": 700 },
     "upgrade-older-npm": { "win32": 1200 },
     "upgrade-older-dotnet": { "win32": 900 },
     "upgrade-older-pre": { "win32": 500 },
