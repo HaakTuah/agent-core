@@ -4,6 +4,7 @@
 // 470, 480 and 500 name the modules they place, written by step-writers.mjs's `writePlaced`; that of 23 November 2026,
 // the confirmation. It reads only. Node's own modules only.
 import { GAME_ROWS } from "./init.mjs";
+import { oneLine } from "./guards.mjs";
 import { CONFIRM, factsOf, heldIn, listOf, moduleNames, modulesOf, placed, toConfirm, toPlace } from "./manifest-reads.mjs";
 import { HERE, shown } from "./step-checks.mjs";
 import { movedModules } from "./step-checks-moved.mjs";
@@ -76,7 +77,7 @@ export const placing = opts => p => {
     take.length && `add ${named(take)} to the "Modules:" list, which what the project holds calls for (${take.map(l => `${l.name}: ${l.why}`).join("; ")});`,
     out.length && `add ${out.map(l => `\`${l.name}\` (${l.why})`).join(", ")} to the line "Not taken:";`,
     chosen.length && `add ${named(chosen)} to the "Modules:" list, as the starter kit takes them, and to the line "${CONFIRM}", which asks the owner once whether each fits.`,
-    moved.length && `The line then reads "${line.replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?")}".`]
+    moved.length && `The line then reads "${oneLine(line)}".`]
     .filter(Boolean).join(" ");
 };
 // The confirmation's check: null where the manifest has no line "Modules to confirm:" or it names none.

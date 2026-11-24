@@ -114,6 +114,12 @@ ok(m.taken.has("a.md") && m.taken.has("b.md") && m.notTaken.get("g.md") === "no 
   const outList = kit("`cleaning.md`, `git.md`", "Not taken: `work-flow.md` (the owner's reason).\n"), outSaid = modules.check({ manifest: outList, files: [] }) ?? "", outWrote = rewritten({ manifest: outList, files: [] }, MODS);
   ok(!/work-flow|`git\.md`/u.test(line(outWrote)) && /^Not taken: `work-flow\.md`/mu.test(outWrote) && /`git\.md`[^;]*"Not taken:"[^;]*the name goes/u.test(outSaid),
     "a moved name whose module the line \"Not taken:\" names goes, its module left out as it was", `${line(outWrote)}\n${outSaid}`);
+  // (a list the move empties, its names all gone to a role or to a module left out, is read as taking none, and the writer
+  // places each module on it: the step neither throws nor leaves "Modules: .")
+  const emptied = l => { try { return line(rewritten({ manifest: l, files: [] }, MODS)); } catch (e) { return `threw: ${e.message}`; } };
+  const roleOnly = emptied(kit("orchestrating")), outOnly = emptied(kit("`git.md`", "Not taken: `work-flow.md` (the owner's reason).\n"));
+  ok([roleOnly, outOnly].every(l => /Modules: .*\bcleaning\b/u.test(l) && !/orchestrating|\bgit\b|threw/u.test(l)) && !/work-flow/u.test(outOnly),
+    "a list the move empties is read as taking no module, and the writer places each module on it", `${roleOnly}\n${outOnly}`);
   ok(/`whatever`[^.]*no module of the core/u.test(unread(kit("cleaning, whatever"))), "a line that cannot be read names each name that is no module of the core", unread(kit("cleaning, whatever")));
   let refused = "";
   try { writable({ root: scratchDir("manifest-reads-writable-"), manifest: kit("all") }, "core-manifest.md", new Set(["core-manifest.md"])); } catch (e) { refused = e.message; }

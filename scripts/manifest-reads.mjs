@@ -77,34 +77,41 @@ export function markGaps(readme, stands) {
   return out;
 }
 
+// The modules the manifest's line "Not taken:" leaves out, each with its reason ("" where it names none).
+function notTakenOf(manifest) {
+  const notTaken = new Map(), nt = /^Not taken:\s*(.*)$/mu.exec(String(manifest))?.[1] ?? "";
+  for (const m of nt.matchAll(/`(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?`(?:\s*\(([^)]*)\))?/gu)) notTaken.set(`${m[1]}.md`, (m[2] ?? "").trim());
+  return notTaken;
+}
+
 // What the manifest's "Modules:" line takes: "all", the names of a list, or null where it is neither. And the modules
 // it leaves out, each with its reason ("" where it names none), and the names its list holds, as written, that are
 // neither in `known` nor in `movedTo` (`unknown`). A list names its modules in backticks, with or without their folder
 // and ".md"; or bare, parted by commas, read only where each name is in `known` (the core's modules, as `<name>.md`) or
 // `movedTo` (the modules the core moved, by their old name: step-checks-moved.mjs, `movedModules`), so that a line of
-// words is never read as a list (#1248, point 1); in either form a name the core moved is read as one (#1259, point 1).
+// words is never read as a list (#1248, point 1); in either form a name the core moved is read as one, and an empty
+// list as taking no module (#1259, point 1).
 export function modulesOf(manifest, known = null, movedTo = {}) {
-  const line = /\bModules:\s*([^\n]*)/u.exec(String(manifest))?.[1].trim() ?? "";
+  const at = /\bModules:\s*([^\n]*)/u.exec(String(manifest)), line = at?.[1].trim() ?? "";
   const names = text => [...text.matchAll(/`(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?`/gu)].map(m => `${m[1]}.md`);
-  const items = listOf(`Modules: ${line}`)?.items ?? [], read = n => known?.includes(n) || Object.hasOwn(movedTo, n);
-  const bare = !line.includes("`") && known ? items.map(i => i.name) : null;
+  const list = at ? listOf(`Modules: ${line}`) : null, items = list?.items ?? [], read = n => known?.includes(n) || Object.hasOwn(movedTo, n);
+  const bare = !line.includes("`") && known && list ? items.map(i => i.name) : null;
   const taken = /^all\b/iu.test(line) ? "all" : names(line).length ? new Set(names(line))
-    : bare?.length && bare.every(read) ? new Set(bare) : null;
-  const notTaken = new Map();
-  const nt = /^Not taken:\s*(.*)$/mu.exec(String(manifest))?.[1] ?? "";
-  for (const m of nt.matchAll(/`(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?`(?:\s*\(([^)]*)\))?/gu)) notTaken.set(`${m[1]}.md`, (m[2] ?? "").trim());
-  return { taken, notTaken, line, unknown: known ? items.filter(i => i.name && !read(i.name)).map(i => i.raw.trim()) : [] };
+    : bare && bare.every(read) ? new Set(bare) : null;
+  return { taken, notTaken: notTakenOf(manifest), line, unknown: known ? items.filter(i => i.name && !read(i.name)).map(i => i.raw.trim()) : [] };
 }
 // The module that holds a moved module's text now (`to`, the path it went to), or null where it went to a file no
 // project takes as a module, a role's (#1259, point 1).
 export const heldIn = (to, known) => { const base = path.posix.basename(to); return MODULES.some(d => to === `${d}/${base}`) && known.includes(base) ? base : null; };
 // A "Modules:" line's list as it is written: the line's text before it (`head`) and after it (`tail`), and each name, as
-// written (`raw`) and as a module's file (`name`), with whether they stand in backticks; null where the line holds no
-// such list ("all", nothing, or a bare name that is no plain name).
+// written (`raw`) and as a module's file (`name`), with whether they stand in backticks; an empty list where the line
+// names nothing, as one a moved name's move empties (#1259, point 1); null where it holds no such list ("all", or a
+// bare name that is no plain name).
 const MODULE_NAME = /^(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?$/u;
 export function listOf(line) {
   const [, head, body] = /^(.*?\bModules:\s*)(.*)$/u.exec(line) ?? [];
   if (body === undefined || /^all\b/iu.test(body)) return null;
+  if (/^\.?\s*$/u.test(body)) return { head, list: "", tail: body, ticks: false, items: [] };
   const ticks = body.includes("`");
   const [, list, tail] = (ticks ? /^(.*`)(.*)$/u : /^(.*?)(\.?\s*)$/u).exec(body);
   const raws = ticks ? [...list.matchAll(/`([^`\n]*)`/gu)].map(m => m[1]) : list.split(/\s*,\s*(?:and\s+)?|\s+and\s+/u);

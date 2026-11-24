@@ -62,6 +62,9 @@ write(theCore, "setup/sync-notes/999-a-note-for-the-test.md", NOTE_LINE); // (an
 // (and one whose step reads it done, which the sync gives by its lead alone: #1264, point 2)
 write(theCore, "setup/sync-notes/998-a-done-note.md", "- **13 November 2026, a done note.** Done when its step reads so, as it always does.\n");
 write(theCore, "scripts/steps/998-a-done-note.mjs", 'import { COST } from "../step-checks.mjs";\n\nexport default { lead: "13 November 2026, a done note", cost: COST.line, check: () => null };\n');
+// (and one whose check passes but leaves a part to the review, `partly`, which stays in full: what is left is still asked)
+write(theCore, "setup/sync-notes/997-a-partly-note.md", "- **13 November 2026, a partly note.** Its check reads one half; the review reads the other half.\n");
+write(theCore, "scripts/steps/997-a-partly-note.mjs", 'import { COST } from "../step-checks.mjs";\n\nexport default { lead: "13 November 2026, a partly note", cost: COST.line, check: () => null, partly: "the other half, read by the review" };\n');
 const B = commit("B");
 const SIDE = git(theCore, "commit-tree", `${B}^{tree}`, "-p", B, "-m", "off main");
 // (packed once: every later fetch, clone and archive of the core reuses the pack, where the loose objects each time are compressed again, which was about half of a run's time in them; #812)
@@ -109,6 +112,7 @@ ok(s.status === 0 && s.out.includes(`${SHA(A)} -> ${SHA(B)}`) && read(p, "core-m
 ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) && s.out.includes("personal-terms.yml"), "  it moves a call whose workflow changed, and leaves one whose workflow did not", calls);
 ok(s.out.includes("Done when nothing: an entry that B gains over A."), "  and prints the sync notes the core gained between the two pins", s.out);
 ok(s.out.includes("- 13 November 2026, a done note: done here, as its step reads.") && !s.out.includes("as it always does"), "  each whose step the new copy reads done here by its lead alone (#1264)", s.out);
+ok(s.out.includes("the review reads the other half") && !s.out.includes("a partly note: done here"), "  one whose check leaves a part to the review in full, though its check passes (#1264)", s.out);
 ok(/The core's files and parts written[\s\S]*\.github\/workflows\/look\.yml[\s\S]*For the sync PR's description[\s\S]*Steps not done[\s\S]*Beside a fresh start/.test(s.out),
   "  then, from the copy it wrote, what the core owns written by the one process (#1083), and every step not done, a standing one too, and every difference from a fresh start, for the PR's description", s.out);
 ok(/\n(No setting only the owner gives is new since [0-9a-f]{7}: the sitting is not asked again|The settings only the owner gives)/.test(s.out), "  and asks the owner's settings again only where one is new since the old pin, saying so where none is (owner-settings.mjs; #1085)", s.out);

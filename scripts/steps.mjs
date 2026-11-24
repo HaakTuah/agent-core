@@ -121,7 +121,7 @@ export function notDone(root, steps = STEPS, host = null) {
 // by no check, is none, and its entry is given in full.
 export function doneLeads(root, steps = STEPS) {
   const p = project(root), missed = new Set(notDone(root, steps).map(m => m.lead));
-  return steps.filter(s => declared(p, s) || ((s.check ?? fetched(s)) && !missed.has(s.lead))).map(s => s.lead);
+  return steps.filter(s => declared(p, s) || ((s.check ?? fetched(s)) && !s.partly && !missed.has(s.lead))).map(s => s.lead);
 }
 
 // The report a sync prints for its pull request's description: the steps not done, and nothing where all are; and the
