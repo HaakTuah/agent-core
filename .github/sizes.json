@@ -48,7 +48,7 @@
       "why": "One job that every project calls pinned, its step holding the secret: its shell stays inline so that nothing the pull request checks out runs beside the terms, and a local action or script would be the caller's checkout, not the core's. A session reads the part it changes by its comment, found by searching."
     },
     "tests/personal-terms-test.mjs": {
-      "mark": 38816,
+      "mark": 49085,
       "why": "#929: the cases of how Betterleaks reads apart from what the check reads."
     },
     ".github/shape-baseline.json": {
