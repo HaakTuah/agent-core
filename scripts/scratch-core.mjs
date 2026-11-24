@@ -143,16 +143,26 @@ export function npmCacheCopy(tmp, env = process.env) {
  *  as it did. The settings are the wrapper's, set where npm starts, so npm-once.mjs, which the licence scan passes
  *  over, passes on the environment it was given as before (#772). */
 export function npmWithCache(tmp, env = process.env) {
-  const windows = process.platform === "win32", program = `npm${windows ? ".cmd" : ""}`, key = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
-  const real = (env[key] ?? "").split(path.delimiter).filter(d => path.isAbsolute(d)).map(d => path.join(d, program)).find(f => fs.existsSync(f));
+  const windows = process.platform === "win32", program = `npm${windows ? ".cmd" : ""}`;
+  const real = machineNpm(env);
   const cache = real && npmCacheCopy(tmp, env);
   if (!cache) return undefined;
   const dir = path.join(tmp, "npm-cached"), wrapper = path.join(dir, program);
   fs.mkdirSync(dir);
   if (windows) fs.writeFileSync(wrapper, `@set "npm_config_cache=${cache}"\r\n@set "npm_config_prefer_offline=true"\r\n@set "npm_config_fetch_retries=0"\r\n@call "${real}" %*\r\n`);
-  else fs.writeFileSync(wrapper, `#!/bin/sh\nnpm_config_cache='${cache.replace(/'/g, "'\\''")}' npm_config_prefer_offline=true npm_config_fetch_retries=0 exec '${real.replace(/'/g, "'\\''")}' "$@"\n`, { mode: 0o755 });
+  else fs.writeFileSync(wrapper, `#!/bin/sh\nnpm_config_cache=${shWord(cache)} npm_config_prefer_offline=true npm_config_fetch_retries=0 exec ${shWord(real)} "$@"\n`, { mode: 0o755 });
   return wrapper;
 }
+
+/** This machine's npm: the first on the PATH of `env`, by an absolute entry alone, so no folder a test starts in is
+ *  searched; undefined where none is there. */
+export function machineNpm(env = process.env) {
+  const program = `npm${process.platform === "win32" ? ".cmd" : ""}`, key = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
+  return (env[key] ?? "").split(path.delimiter).filter(d => path.isAbsolute(d)).map(d => path.join(d, program)).find(f => fs.existsSync(f));
+}
+
+/** `text` as one word of a POSIX shell script, in single quotes, so nothing in it expands. */
+export const shWord = text => `'${text.replace(/'/g, "'\\''")}'`;
 
 /** The lines of a stand-in for curl (a shell script on a scratch PATH) that serve Betterleaks' release from a folder: where
  *  the fetched address is one of that project's releases on github.com and CORE_ARCHIVES names a folder holding a file
