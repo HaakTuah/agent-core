@@ -160,6 +160,18 @@ try {
   config({ twice: { [OTHER]: "said long ago" } });
   r = check({ COPIES_BASE: base });
   ok(r.status === 0 && r.out.includes(`note checks/copies.json's "twice" names ${OTHER.slice(0, 12)}..., which no longer stands in two files: take it out of "twice"`), "a value said that no longer stands twice is noted, failing nothing", r.out);
+  // (a config git does not list yet, named by another spelling of the project's folder than git's root, as Windows' short
+  // names are of its long ones (RUNNER~1): its own exclusion still points inside the project, not above it; #1224)
+  const spelled = path.join(path.dirname(dir), `${path.basename(dir)}-link`);
+  try {
+    fs.symlinkSync(dir, spelled, process.platform === "win32" ? "junction" : "dir");
+    g("rm", "-q", "--cached", "checks/copies.json");
+    const s = spawnSync(process.execPath, ["core/scripts/copies.mjs", path.join(spelled, "checks/copies.json")], { cwd: dir, encoding: "utf8", env: { ...process.env, COPIES_BASE: base } });
+    ok(s.status === 0 && !/outside repository|could not read the values/.test(`${s.stdout}${s.stderr}`), "a config git does not list, named through another spelling of the project's folder, is excluded from the values by its path inside the project", `${s.stdout}${s.stderr}`);
+    g("add", "-A");
+  } catch (e) {
+    ok(false, "a config named through another spelling of the project's folder could be tried", String(e.message));
+  } finally { fs.rmSync(spelled, { recursive: true, force: true }); }
   // (a pathspec git cannot read fails with its mend, never a stack)
   config({ tests: [":(bogus)test/"] });
   r = check({ COPIES_BASE: base });
