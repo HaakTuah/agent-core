@@ -96,7 +96,7 @@ if (base) {
   // (a submodule's files show here only as its path: a file of a library that carries the core, changed when the pull
   // request moves the library, is not seen as changed, which leaves its split mark unheld, as before such files were read)
   let changed;
-  try { changed = new Set(git(["diff", "--name-only", base]).split("\n")); } catch (e) { if (e.code === "ENOBUFS") { console.error("FAIL: git could not read the changed paths: more than the 256 MB the check reads. Mend: split the pull request, or bring its base nearer (set SIZES_BASE to a later commit of the default branch)"); process.exit(1); } console.error(`FAIL: ${base} is not a commit here. Mend: fetch it (git fetch origin ${base}), or set SIZES_BASE to the pull request's base`); process.exit(1); }
+  try { changed = new Set(git(["diff", "--name-only", base]).split("\n")); } catch (e) { if (e.code === "ENOBUFS") { console.error("FAIL: git could not read the changed paths: more than the 256 MB the check reads. Mend: split the pull request, or bring its branch up to date with the default branch, then run this again"); process.exit(1); } console.error(`FAIL: ${base} is not a commit here. Mend: fetch it (git fetch origin ${base}), or set SIZES_BASE to the pull request's base`); process.exit(1); }
   // (the base's own lines of "past", where its config can be read there: a line the base did not hold is this PR's)
   let basePast = {};
   try { const was = JSON.parse(git(["show", `${base}:${path.relative(real(process.cwd()), MARKS_AT).split(path.sep).join("/")}`])); if (was?.past && typeof was.past === "object") basePast = was.past; } catch { /* (no config on the base: every line is this PR's) */ }
