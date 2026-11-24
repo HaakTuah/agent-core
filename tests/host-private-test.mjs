@@ -7,6 +7,7 @@
 //   node tests/host-private-test.mjs
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { privateOf } from "../scripts/host-private.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 
@@ -52,7 +53,7 @@ ok(asked(bare({ status: 404 })).unread && privateOf(hosted, { env: { CORE_PRIVAT
 // ---- a clone made from a folder, as check.mjs's scratch clone is (#1246, point 6) ----
 const scratch = path.join(tmp, "scratch"), deeper = path.join(tmp, "deeper"), loose = path.join(tmp, "loose");
 const inside = path.join(tmp, "inside");
-clone(scratch, hosted); clone(deeper, `file://${scratch}`); clone(loose, path.join(tmp, "not-there")); clone(inside, path.join(hosted, "sub"));
+clone(scratch, hosted); clone(deeper, pathToFileURL(scratch).href); clone(loose, path.join(tmp, "not-there")); clone(inside, path.join(hosted, "sub"));
 fs.mkdirSync(path.join(hosted, "sub"));
 bareRoutes.length = 0;
 ok([scratch, deeper].every(at => privateOf(at, { env: {}, ask: noGh, bare: bare({ status: 200, private: false }) }).private === false) && bareRoutes.every(r => r === `repos/${repo}`) && bareRoutes.length === 2,

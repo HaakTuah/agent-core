@@ -15,6 +15,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { repoOf } from "./inbox.mjs";
 
 const gh = route => { const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 24 }); if (r.status !== 0) throw new Error(`${r.stderr || r.error || "no answer"}`.trim()); return r.stdout; };
@@ -54,7 +55,7 @@ const originUrl = root => spawnSync("git", ["config", "--get", "remote.origin.ur
 function originOf(root, origin) {
   let at = root, url = origin;
   for (let hop = 0; hop < 4 && url && !repoOf(url); hop++) {
-    const local = /^file:\/\//i.test(url) ? decodeURIComponent(url.replace(/^file:\/\/(localhost)?/i, "")) : /^[a-z][\w+.-]*:\/\/|^[^/\\]+@[^:]+:/i.test(url) ? null : path.resolve(at, url);
+    const local = /^file:\/\//i.test(url) ? fileFolder(url) : /^[a-z][\w+.-]*:\/\/|^[^/\\]+@[^:]+:/i.test(url) ? null : path.resolve(at, url);
     // (a folder that is itself a clone, its .git there or a bare one's HEAD and objects; never one inside another
     // clone, whose origin git would find by searching upward)
     if (!local || !(fs.existsSync(path.join(local, ".git")) || (fs.existsSync(path.join(local, "HEAD")) && fs.existsSync(path.join(local, "objects"))))) break;
@@ -63,6 +64,10 @@ function originOf(root, origin) {
   }
   return url;
 }
+
+// The folder a file:// URL names, as node reads it for the machine (a Windows drive's `file:///D:/x` is `D:\x`, never
+// `/D:/x`); null where it is no URL node can map.
+const fileFolder = url => { try { return fileURLToPath(url); } catch { return null; } };
 
 // A test's answer for the project, by its root or by its origin, which each clone of it shares; else null.
 function answered(env, root, origin) {
