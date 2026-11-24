@@ -621,6 +621,13 @@ const rowNames = manifest => {
 };
 export const where = manifest => rowNames(manifest) ?? KIT;
 
+// What a project's own scan does about the baseline at `baseline`, whose entries name the project's files by path, where
+// that scan counts a path named in its tracked text as a use of that code and fails on it (#1289): the core cannot know
+// a project's own scans, so `--first` and the step's writer say it.
+export const scanMend = baseline => `where a scan of the project's own that counts a path named in its tracked text as a use of that code (an unused-code or reference check) fails on \`${baseline}\`, which names the project's files by path, have the scan leave \`${baseline}\` out, as a file the shape check writes, and never take out an entry of the scan's own list for it`;
+// Printed where `--first` or `--write` wrote a path into the baseline that it did not name before.
+const noteScan = baseline => console.log(`note ${baseline} names the project's files by path. Mend: ${scanMend(baseline)}`);
+
 // A manifest row's first text in backticks after its name `label`: { said } (trimmed) and { reason }, where `said` is
 // `none`, what follows that token as it stands (padded or not), "" where it holds no letter or digit, which gives no
 // reason; null where the row or the token is not there. The rows *shape check* and *mutation tool* (strength.mjs) read
@@ -927,6 +934,7 @@ function first(config, at, self, numbers) {
   fs.mkdirSync(path.dirname(config.baseline), { recursive: true });
   fs.writeFileSync(config.baseline, written(numbers, {}, null));
   console.log(`${config.baseline}: the first baseline, ${plural(numbers.size, "entry", "entries")} that stand today, to be cleaned over time`);
+  noteScan(config.baseline);
   return 0;
 }
 
@@ -948,6 +956,7 @@ function write(config, at, self, numbers, base, found, named) {
   const grown = Object.fromEntries(Object.entries(old.grown).filter(([id]) => kept.has(id) || id.startsWith("mark: ")));
   fs.writeFileSync(config.baseline, written(kept, grown, old.audited));
   console.log(`${config.baseline}: ${plural(kept.size, "entry", "entries")} listed, ${old.listed.size} before`);
+  if ([...kept.keys()].some(id => !old.listed.has(id))) noteScan(config.baseline);
   return 0;
 }
 

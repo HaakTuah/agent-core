@@ -4,7 +4,7 @@
 // none runs by itself. It reads only. Node's own modules and git only.
 import fs from "node:fs";
 import path from "node:path";
-import { offBy, parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
+import { offBy, parseBaseline, parseConfig, scanMend, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { HERE, plain } from "./step-checks.mjs";
 
@@ -58,4 +58,11 @@ export function shapeReadsParsed(p, reader) {
   let reads = [];
   try { reads = parseBaseline(baseline, config.baseline, "").reads; } catch { /* (read as naming no reader) */ }
   return readersNamed({ at: shapeAt(p.manifest), config, reads }, [reader]);
+}
+
+// What is left to the project once a step's writer wrote the baseline (each step that writes it gives it as its `left`):
+// its own scans of paths named, which the core cannot read (#1289); none where the config cannot be read again, which
+// the step's check then says.
+export function shapeLeft(p) {
+  try { const at = shapeAt(p.manifest); return scanMend(parseConfig(p.read(at), at).baseline); } catch { return null; }
 }
