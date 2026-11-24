@@ -12,7 +12,7 @@ import path from "node:path";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { declare, kitIn, ruleTexts, wordsKept } from "../scripts/steps-kit.mjs";
 import { ASIDE, MOVED_GLOB, MOVED_GLOBS, STEPS, notDone, report, setAside, writeReport } from "../scripts/steps.mjs";
-import { OLD_PATHS, Unwritten, held, oldPathsIn, writable } from "../scripts/step-writers.mjs";
+import { OLD_PATHS, Unwritten, held, oldPathsIn, writable, writeShape } from "../scripts/step-writers.mjs";
 import { MANIFEST, pinsBack, pinsOf } from "../scripts/sync-pins.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
@@ -52,11 +52,12 @@ for (const l of WHOLE) {
   r = write();
   // (the shape check's baseline named under the size marks' "skip": #1247, point 2)
   const skipped = l !== WHOLE[1] || JSON.parse(read("checks/sizes.json")).skip.includes("checks/shape-baseline.json");
-  // (its line names what a project's own scan of paths named does about the baseline, which the core cannot read: #1289)
+  // (each step that writes the shape baseline names on its line what a project's own scan of paths named does about it,
+  // which the core cannot read: #1289)
   const line = r.stdout.split("\n").find(x => x.startsWith(`- ${l}: wrote `)) ?? "";
-  const scan = l !== WHOLE[1] || line.includes(`the step is done; left to the project: ${scanMend("checks/shape-baseline.json")}.`);
+  const scan = STEPS.find(s => s.lead === l).write !== writeShape || line.includes(`the step is done; left to the project: ${scanMend("checks/shape-baseline.json")}.`);
   ok(before === 1 && r.status === 0 && !missed(l).length && line && r.stdout.includes("the step is done") && wordsKept(rules, ruleTexts(dir)) && skipped && scan,
-    `"${l}", taken out, is written by --write: it reads done after it, no rule file's words changed, a baseline skipped by the size marks, and the shape baseline's line naming what a project's own scan of paths does about it`, `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
+    `"${l}", taken out, is written by --write: it reads done after it, no rule file's words changed, a baseline skipped by the size marks, and each shape baseline's writer's line naming what a project's own scan of paths does about it`, `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
   back();
 }
 
