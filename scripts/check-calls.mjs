@@ -5,8 +5,9 @@
 // a copy the new one leaves otherwise as differing (#1245, point 1); of the base's, a call of a workflow the sync calls
 // too runs only where it moves to the sync's pin, and there only where the sync calls it otherwise, never as the copy's
 // gate behind the sync's own core.yml passed (#1258); and every call of a workflow the sync calls not at all runs as the base
-// holds it, so a sync leaves no check out. Also the reading of the project's
-// own workflows. Node's own modules, the core's address, its YAML reader and the runner's path filter.
+// holds it, so a sync leaves no check out. Also the reading of the project's own workflows, which job stops the rest,
+// and the keys and reasons its verdicts are written under. Node's own modules, the core's address, its YAML reader and
+// the runner's path filter.
 import { CORE } from "./core-address.mjs";
 import { MEND } from "./mend.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
@@ -99,6 +100,25 @@ export function ownJobs({ file, wf }, say) {
     return [id, { ...job, needs: needs.filter(n => ids.has(n)) }];
   });
   return kept.length ? [{ file, wf: { ...wf, jobs: Object.fromEntries(kept) } }] : [];
+}
+
+// Whether a job's outcome stops the rest: core.yml's, where a step of its own failed (`r.copy`, or any failure where
+// that is not said) or it did not run here; but a sync's call of the base's (`j.base`, from syncCalls) never once the
+// sync's own core.yml passed (`proved`), which proved the copy (#1258, point 1).
+export const gates = (j, r, proved) => j.name === "core.yml" && !(j.base && proved) && Boolean((r.copy ?? r.failed > 0) || r.unrun);
+
+// The keys a job that calls a workflow of the core's is written under, as check.mjs writes a verdict: one for each job
+// of the workflow it calls, whose text `read(uses)` gives; its own place where that cannot be read (#1258, point 2).
+export function calledKeys({ file, id, job }, read) {
+  let ids = [];
+  try { ids = Object.keys(parseYaml(read(String(job?.uses ?? "")) ?? "")?.jobs ?? {}); } catch { /* (not read: its own place) */ }
+  return ids.length ? ids.map(called => `${file}/${id}/${called}`) : [`${file}/${id}`];
+}
+
+// Why a job was not run here, or null: on another system, or each failed step wanting a program this machine lacks (#1245, points 8 and 9).
+export function unrunWhy(r) {
+  const lacks = !r.passed && r.steps.every(s => s.passed || s.missing) && [...new Set(r.steps.map(s => s.missing).filter(Boolean))].join(", ");
+  return lacks ? `it needs ${lacks}, which this machine lacks` : r.unrun ?? null;
 }
 
 // The run's last lines, through `say` and `warn`, and its exit code. A job not run here proved nothing, so it fails the

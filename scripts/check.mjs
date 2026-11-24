@@ -20,7 +20,7 @@
 // each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed or could not run here.
 // With --own it runs the project's own jobs too (#1084), each job of its own workflows that calls no workflow and names
 // no environment, as the change itself holds them, given no secret, after the core's and only where the copy is the core; with
-// --verdicts it writes each job's verdict, "passed", "failed", "unrun" or "stopped" behind a failure, by its place, to a file, and
+// --verdicts it writes each job's verdict, "passed", "failed", "unrun" or "stopped" behind a failure, by its place (a stopped one by the key it runs under), to a file, and
 // RUN_FROM where this script lies outside the project, so that a run before an update and one after can be set side by side (release-trial.mjs, compared).
 // Git, bash and Node's own modules, the core's packages (packages.mjs), and gh where the manifest has no owner's row and no workflow's event says whose
 // account holds the repository (releases.mjs, hostAccount).
@@ -32,7 +32,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { closing, movesForward, ownJobs, readable, syncCalls, triggered } from "./check-calls.mjs";
+import { calledKeys, closing, gates, movesForward, ownJobs, readable, syncCalls, triggered, unrunWhy } from "./check-calls.mjs";
 import { standIns } from "./check-actions.mjs";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { carriedAt, readCore } from "./core-path.mjs";
@@ -109,7 +109,7 @@ function main() {
   if (p.verdicts !== null) outside(p, o.verdicts);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
-  const counts = runAll(p, runner(p, tmp), calledJobs(p, tmp));
+  const counts = runAll(p, runner(p, tmp), calledJobs(p, tmp), tmp);
   if (p.verdicts !== null) writeVerdicts(p, o.verdicts);
   if (!counts.failed && !counts.ran && !counts.unrun) fail("no check of the core ran on this change.", "call the core's workflows in the base the change merges into, as the starter kit writes them.");
   process.exitCode = closing(counts, say, warn);
@@ -144,26 +144,31 @@ function calledJobs(p, tmp) {
 }
 
 // Runs those jobs, then, with --own, the project's own, where the copy is the core: how many ran, and how many failed.
-// Where it is not, each job left that would run is written stopped (#1245, point 2), by the key it runs under (#1258,
-// point 2). A sync's call of the base's (check-calls.mjs, syncCalls) is no gate once the sync's own core.yml passed,
-// which proved the copy (#1258, point 1).
-function runAll(p, run, jobs) {
-  let failed = 0, ran = 0, unrun = 0, proved = false;
+// Where it is not, each job left that would run is written stopped (#1245, point 2).
+function runAll(p, run, jobs, tmp) {
+  const n = { failed: 0, ran: 0, unrun: 0 };
+  let proved = false;
   for (const [i, j] of jobs.entries()) {
     const r = run(j.file, j.id, j.job);
-    failed += r.failed; ran += r.ran; unrun += r.unrun | 0;
-    if (j.name === "core.yml" && !j.base && !r.failed && !r.unrun && r.ran) proved = true;
-    if (j.name !== "core.yml" || (j.base && proved) || !(r.copy ?? r.failed > 0) && !r.unrun) continue;
+    n.failed += r.failed; n.ran += r.ran; n.unrun += r.unrun | 0;
+    proved ||= j.name === "core.yml" && !j.base && !r.failed && !r.unrun && r.ran > 0;
+    if (!gates(j, r, proved)) continue;
     // (core.yml unrun here proves nothing of the copy, so it stops the rest as its failure does)
-    if (!r.failed) failed++;
-    warn(`FAIL the copy of the core is ${r.failed ? "not the core at its pin" : "not proved the core, core.yml not run here"}, so no other check runs: each would run the copy's scripts. ${MEND}${r.failed ? "mend what core.yml says above, commit," : "run core.yml as its skip line above says,"} and run this check again.`);
-    const left = [...jobs.slice(i + 1).filter(l => !HOST_OWN[l.name] && (l.name !== "pr-description.yml" || p.described)).flatMap(l => run.keys(l.file, l.id, l.job)),
-      ...(p.own ? ownWorkflows(p).flatMap(o => (o.wf === null ? [o.file] : Object.keys(o.wf.jobs).map(id => `${o.file}/${id}`))) : [])];
-    for (const at of left) { verdicts[at] = "stopped"; say(`stop ${at}: not run, behind the failure above`); }
-    return { failed, ran, unrun };
+    if (!r.failed) n.failed++;
+    stopBehind(p, r, jobs.slice(i + 1), tmp);
+    return n;
   }
-  if (p.own) for (const o of ownWorkflows(p)) { const r = run.own(o); failed += r.failed; ran += r.ran; unrun += r.unrun | 0; }
-  return { failed, ran, unrun };
+  if (p.own) for (const o of ownWorkflows(p)) { const r = run.own(o); n.failed += r.failed; n.ran += r.ran; n.unrun += r.unrun | 0; }
+  return n;
+}
+
+// Says why the rest stop, and writes each job left that would run stopped, by the key it is written under where it runs
+// (#1258, point 2): a call's, one for each job of the workflow it calls, as report() writes them.
+function stopBehind(p, r, rest, tmp) {
+  warn(`FAIL the copy of the core is ${r.failed ? "not the core at its pin" : "not proved the core, core.yml not run here"}, so no other check runs: each would run the copy's scripts. ${MEND}${r.failed ? "mend what core.yml says above, commit," : "run core.yml as its skip line above says,"} and run this check again.`);
+  const left = [...rest.filter(l => !HOST_OWN[l.name] && (l.name !== "pr-description.yml" || p.described)).flatMap(l => calledKeys(l, uses => { const [, name, pin] = call.exec(uses) ?? []; return name ? coreFile(tmp, pin, `.github/workflows/${name}`) : null; })),
+    ...(p.own ? ownWorkflows(p).flatMap(o => (o.wf === null ? [o.file] : Object.keys(o.wf.jobs).map(id => `${o.file}/${id}`))) : [])];
+  for (const at of left) { verdicts[at] = "stopped"; say(`stop ${at}: not run, behind the failure above`); }
 }
 
 // The options given, each checked.
@@ -301,14 +306,6 @@ function runner(p, tmp) {
       return { failed: 1, ran: 0 };
     }
   };
-  // (the keys a job that calls a workflow of the core's is written under, one for each job of the workflow it calls, as
-  // report() writes them where it runs; its own place where that workflow cannot be read: #1258, point 2)
-  byCall.keys = (file, id, job) => {
-    const [, name, pin] = call.exec(String(job?.uses ?? "")) ?? [];
-    let ids = [];
-    try { ids = Object.keys(parseYaml(coreFile(tmp, pin, `.github/workflows/${name}`) ?? "").jobs ?? {}); } catch { /* (not read: its own place) */ }
-    return ids.length ? ids.map(called => `${file}/${id}/${called}`) : [`${file}/${id}`];
-  };
   // (a workflow of the project's own, its jobs that call no workflow alone, run as the calls' jobs are, its steps the
   // change's own code, given no secret, not even the personal-terms list the calls are given)
   byCall.own = ({ file, wf, error }) => {
@@ -386,12 +383,6 @@ function merged(p, tmp, bare) {
   const sha = behind ? git(ws, ...who, "commit-tree", `${p.base}^{tree}`, "-p", p.base, "-p", nothing(), "-m", "A change of nothing merged into its base") : git(ws, "rev-parse", "HEAD");
   git(ws, "push", "-q", "origin", `${sha}:refs/heads/core-check-merge`); // (a branch, so each job's clone holds it)
   return sha;
-}
-
-// Why a job was not run here, or null: on another system, or each failed step wanting a program this machine lacks (#1245, points 8 and 9).
-function unrunWhy(r) {
-  const lacks = !r.passed && r.steps.every(s => s.passed || s.missing) && [...new Set(r.steps.map(s => s.missing).filter(Boolean))].join(", ");
-  return lacks ? `it needs ${lacks}, which this machine lacks` : r.unrun ?? null;
 }
 
 // Prints each job's verdict, each step the host alone runs, and each failing step with what it printed, every term of
