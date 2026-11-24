@@ -363,13 +363,20 @@ function writeKit(o, here, pin, out) {
   if (o.versions && !there(VERSIONS)) { write(VERSIONS, `${JSON.stringify(VERSIONS_START, null, 2)}\n`); made.push(VERSIONS); }
   let config = null;
   if (!there("checks/licences.json")) {
-    config = licences(o, there);
-    if (mutation?.folder && there(`${mutation.folder}/.npmrc`)) config.ignoreScriptsIn = [...(config.ignoreScriptsIn ?? []), `${mutation.folder}/.npmrc`];
+    config = withTool(licences(o, there), mutation, there);
     write("checks/licences.json", `${JSON.stringify(config, null, 2)}\n`); made.push("checks/licences.json");
   }
   git(["add", "--", ...written, ...made, "core"], here, guarded());
   // (what is left for the tool: where the licence check's config stood, the project's own, each entry it would name is asked)
   return { written, left, made: [...made, ...firstBaselines(here)], tool: [tool.blocked, ...leftFor(mutation, there, config)].filter(Boolean) };
+}
+
+// The licence check's first config with what the mutation tool needs of it: its npm config, where it stands, and the
+// packages of data its lock brings under CC-BY, which floor rule 10 allows for data (#1247, point 1).
+function withTool(config, tool, there) {
+  if (tool?.folder && there(`${tool.folder}/.npmrc`)) config.ignoreScriptsIn = [...(config.ignoreScriptsIn ?? []), `${tool.folder}/.npmrc`];
+  if (tool?.data?.length) config.data = [...new Set([...(config.data ?? []), ...tool.data])];
+  return config;
 }
 
 // What the kit wrote, and what it leaves for the project and for the owner.

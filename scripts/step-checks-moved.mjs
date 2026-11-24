@@ -44,13 +44,14 @@ const dated = f => /\.(md|txt)$/u.test(f) && (/(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.t
 // The project's own files that may name a file of the core and that a check, a tool or a session reads as they stand
 // now: each rule file and each file a tool takes its instructions from, whatever its name or folder; every file at the
 // root whose name, or whose folder's, opens with a dot, where tools keep what they read, whatever its name; and every
-// other file of text that is no dated record. Left out: what git's attributes mark as a tool's output (`generated`).
+// other file of text that is no dated record. Left out: what git's attributes mark as a tool's output (`generated`),
+// save a rule file, which a tool reads all the same.
 export function namers(p) {
   let rules = [];
   try { rules = ruleFiles(p.read, dir => p.files.filter(f => f.startsWith(`${dir}/`)), { tools: true }); } catch { /* (no list of rule files yet: the files of text alone) */ }
   const some = p.files.filter(f => !f.startsWith(copyAt(p)) && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
   const made = generated(p.root, some);
-  return some.filter(f => !made.has(f));
+  return some.filter(f => rules.includes(f) || !made.has(f));
 }
 
 // Of `files`, those the project's git attributes mark `linguist-generated` or `linguist-vendored`, as GitHub reads them:

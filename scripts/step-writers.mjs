@@ -232,8 +232,8 @@ export function writeMoved(p, busy) {
 }
 
 // A file's text with each old path it names written as the file it now is, where its move is an exact one; a rule that
-// left its file named with its lead, `core/<old>`, "<lead>", as the step words it, named where it stands now; and two
-// lines this writes into one pull-in of the same file (an import, Kiro's `#[[file:`) made one line.
+// left its file named with its lead, `core/<old>`, "<lead>", as the step words it, named where it stands now; and a
+// pull-in (an import, Kiro's `#[[file:`) this writes into one that a line above already makes left out.
 function movedIn(text, map, oldPath) {
   if (!oldPath) return text;
   const apart = moved.apart(), exact = old => !map[old].endsWith("/") && !(apart[old]?.length);
@@ -241,7 +241,7 @@ function movedIn(text, map, oldPath) {
   const next = led.replace(oldPath, (all, old) => exact(old) ? `core/${map[old]}` : all);
   if (next === text) return text;
   const was = text.split("\n"), now = next.split("\n");
-  return now.filter((l, i) => !(i && l === now[i - 1] && (l !== was[i] || now[i - 1] !== was[i - 1]) && /^\s*(?:@|#\[\[file:)/u.test(l))).join("\n");
+  return now.filter((l, i) => !(/^\s*(?:@|#\[\[file:)/u.test(l) && now.indexOf(l) < i && !(was[i] === l && was.indexOf(l) < i))).join("\n");
 }
 
 // The size marks' text with each file under "read" at an old path that leads to one file named as that file, two that

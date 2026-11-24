@@ -160,6 +160,9 @@ export function ruleTexts(dir) {
 export const wordsKept = (before, after) => {
   // (the module lines read past in the manifest alone, where the writers write them)
   const modules = text => text.replace(/^(.*\bModules: ).*$/mu, "$1-").replace(/\r?\n(?:\r?\n)?(?:Not taken|Modules to confirm): [^\r\n]*/gu, "");
-  const words = (text, f) => (text === null || text === undefined ? null : (f === "core-manifest.md" ? modules : t => t)(text.replace(/core\/[\w./-]+/gu, "core/-").replace(/^Paths: .*$/mu, "Paths: -")));
+  // (a pointer's path read as one word, and a pull-in of the core's files that another above makes read once, since the
+  // rules' move makes two that lead to one file one: #1248, point 5)
+  const once = text => text.split("\n").filter((l, i, all) => !(/^\s*(?:@|#\[\[file:)core\/-/u.test(l) && all.indexOf(l) < i)).join("\n");
+  const words = (text, f) => (text === null || text === undefined ? null : (f === "core-manifest.md" ? modules : t => t)(once(text.replace(/core\/[\w./-]+/gu, "core/-")).replace(/^Paths: .*$/mu, "Paths: -")));
   return Object.keys({ ...before, ...after }).every(f => words(before[f], f) === words(after[f], f));
 };

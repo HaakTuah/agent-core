@@ -7,15 +7,16 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { CORE_SOURCE as A } from "./core-address.mjs";
+import { WORKFLOW } from "./power.mjs";
 
 export const MANIFEST = "core-manifest.md";
-const PIN_LINE = /^Core: .*$/gmu;
+// (the manifest's first `Core:` line alone, as pure-sync.mjs reads its pin; each call to the core's workflows)
+const PIN_LINE = /^Core: .*$/mu;
 // (any case, as GitHub reads a call's address, and as pure-sync.mjs reads it)
 const CALL = new RegExp(`(?<![\\w./-])(${A}\\/\\.github\\/workflows\\/[\\w.-]+@)([0-9a-f]{40})(?![\\w./-])`, "giu");
-const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u;
 // The form of the pins `f` may hold, or null where a sync moves none in it.
 const pinsIn = f => f === MANIFEST ? PIN_LINE : WORKFLOW.test(f) ? CALL : null;
-const lf = t => t.replace(/\r\n/gu, "\n");
+const lf = t => t.replace(/\r\n/gu, "\n"), all = (t, re) => re.global ? [...t.matchAll(re)] : [re.exec(t)].filter(Boolean);
 
 // Whether `f`, in the project at `root`, differs from its last commit, in the index and in the tree, in its pins alone
 // (line ends read as one, as git with core.autocrlf writes a tree the blob holds with LF alone).
@@ -34,21 +35,23 @@ export function pinsOf(root, files) {
   const out = {};
   for (const f of files) {
     const re = pinsIn(f), at = path.join(root, f);
-    if (re && fs.existsSync(at)) out[f] = [...fs.readFileSync(at, "utf8").matchAll(re)].map(m => m[0]);
+    if (re && fs.existsSync(at)) out[f] = all(fs.readFileSync(at, "utf8"), re).map(m => m[0]);
   }
   return out;
 }
 
 // Each file's pins put back where `pinsOf` read them, in their order, once its writes were set aside; a file whose
-// count of pins changed meanwhile is left as it stands, since which pin is which can no longer be told.
+// count of pins changed meanwhile is left as it stands, since which pin is which can no longer be told, and returned.
 export function pinsBack(root, pins) {
+  const left = [];
   for (const [f, list] of Object.entries(pins)) {
     const at = path.join(root, f);
     if (!fs.existsSync(at)) continue;
-    const text = fs.readFileSync(at, "utf8"), now = [...text.matchAll(pinsIn(f))];
-    if (now.length !== list.length) continue;
+    const text = fs.readFileSync(at, "utf8");
+    if (all(text, pinsIn(f)).length !== list.length) { left.push(f); continue; }
     let i = 0;
     const next = text.replace(pinsIn(f), () => list[i++]);
     if (next !== text) fs.writeFileSync(at, next);
   }
+  return left;
 }

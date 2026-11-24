@@ -169,17 +169,19 @@ export function writeReport(done, how = null) {
 // Paths are read as written, never as patterns. The pins as they stood, the manifest's `Core:` line and each call to the
 // core's workflows, are put back after either, so a pin the sync moved stays in its pull request (#1094; #1248, point 4). (`push`, git's own, is given another only by the test, to fail.)
 export function setAside(root, files, push = () => execFileSync("git", ["--literal-pathspecs", "stash", "push", "--include-untracked", "--quiet", "-m", ASIDE, "--", ...files], { cwd: root, stdio: ["ignore", "ignore", "pipe"] })) {
-  const pins = pinsOf(root, files);
+  const pins = pinsOf(root, files), back = () => {
+    for (const f of pinsBack(root, pins)) console.log(`note ${f}: the sync's pins in it were not put back, since the writers changed how many it holds. Mend: set its \`Core:\` line and each call to the core's workflows to the commit the sync moved the core's copy to, before the sync's pull request is committed`);
+  };
   try {
     push();
-    pinsBack(root, pins);
+    back();
     return true;
   } catch {
     const tracked = execFileSync("git", ["--literal-pathspecs", "ls-tree", "-r", "-z", "--name-only", "HEAD", "--", ...files], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
     execFileSync("git", ["--literal-pathspecs", "reset", "-q", "--", ...files], { cwd: root, stdio: "ignore" });
     if (tracked.length) execFileSync("git", ["--literal-pathspecs", "checkout", "-q", "HEAD", "--", ...tracked], { cwd: root, stdio: "ignore" });
     for (const f of files.filter(f => !tracked.includes(f))) fs.rmSync(path.join(root, f), { force: true });
-    pinsBack(root, pins);
+    back();
     return false;
   }
 }

@@ -13,6 +13,7 @@ import { STAGES } from "../scripts/steps-stage.mjs";
 import { declare, kitIn, ruleTexts, wordsKept } from "../scripts/steps-kit.mjs";
 import { ASIDE, MOVED_GLOB, MOVED_GLOBS, STEPS, notDone, report, setAside, writeReport } from "../scripts/steps.mjs";
 import { OLD_PATHS, Unwritten, held, oldPathsIn, writable } from "../scripts/step-writers.mjs";
+import { MANIFEST, pinsBack, pinsOf } from "../scripts/sync-pins.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 import { MERGED } from "../scripts/converge.mjs";
@@ -28,6 +29,7 @@ const missed = lead => notDone(dir).filter(m => m.lead === lead);
 const dirty = () => git("status", "--porcelain", "--untracked-files=all").trim();
 commit("the starter kit");
 const kit = git("rev-parse", "HEAD").trim(), rules = ruleTexts(dir);
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const back = () => { git("reset", "-q", "--hard", kit); git("clean", "-qfd"); };
 
 // ---- a project with every step done: nothing written ----
@@ -79,10 +81,10 @@ for (const l of WHOLE) {
     "the rules' move, where each path leads to one file: --write writes each as the kit does now, and the step reads done", `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
   back();
   // (the step's own stage: two old paths that lead to one file, a rule that left its file, and a "Paths:" line in no
-  // kit's words; the rule file written as the step's mend writes it, each path on its own, but a file git's attributes
-  // mark as generated, and the step still asks the "Paths:" line: #1248, point 5)
+  // kit's words; the rule file written as the step's mend writes it, each path on its own, even marked generated, but
+  // another file git's attributes mark so, and the step still asks the "Paths:" line: #1248, point 5)
   STAGES[l].stage(dir);
-  put(".gitattributes", "gen/** linguist-generated\n");
+  put(".gitattributes", "gen/** linguist-generated\nAGENTS.md linguist-generated\n");
   fs.mkdirSync(path.join(dir, "gen"));
   put("gen/out.md", "From `core/modules/git.md`.\n");
   commit("the paths the step's stage plants");
@@ -248,6 +250,11 @@ for (const l of WHOLE) {
   ok(through && held(dir).has(wf) && setAside(dir, [wf]) && read(wf) === calls("c".repeat(40), "see core/x.md") && dirty() === `M ${wf}`,
     "a workflow whose calls' pins alone the sync moved is written, its write set aside and the moved pin put back; one changed beyond them is held", read(wf));
   git("stash", "drop", "-q");
+  // (the manifest's first `Core:` line alone is its pin; a file whose count of pins changed is left and named)
+  put(MANIFEST, "Core: a\nCore: b\n");
+  const pins = pinsOf(dir, [MANIFEST, wf]);
+  put(wf, calls("d".repeat(40), "two").replace("jobs:", `# ${CORE}/.github/workflows/x.yml@${"e".repeat(40)}\njobs:`));
+  ok(same(pins[MANIFEST], ["Core: a"]) && same(pinsBack(dir, pins), [wf]) && read(wf).includes("d".repeat(40)), "the manifest's first `Core:` line is its pin, and a file whose pins changed in count is left and named", JSON.stringify(pins));
   back();
 }
 
