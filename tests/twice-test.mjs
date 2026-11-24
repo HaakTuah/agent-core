@@ -71,6 +71,16 @@ const { ok, done } = tally();
   ok(!/Exact, which/u.test(again.stdout) && /For the auditor/u.test(again.stdout), "run again it finds nothing exact left", again.stdout);
 }
 
+// Where git writes CRLF to the disk (core.autocrlf, as on Windows), the copy unpacked from the core's archive holds CRLF
+// and the project's file LF: equal all the same, as git stores both (#1221).
+{
+  const dir = project("crlf"), note = path.join(dir, "core/docs/zephyr-notes.md");
+  git(dir, "config", "core.autocrlf", "true");
+  fs.writeFileSync(note, fs.readFileSync(note, "utf8").replace(/\r?\n/gu, "\r\n"));
+  const found = findings(projectOf(dir)).filter(f => f.fix).map(f => f.line);
+  ok(found.some(l => /^notes\/zephyr-notes\.md is the core's docs\/zephyr-notes\.md, byte for byte: no file names it, so it goes$/u.test(l)), "a file equal to one of the copy's as git stores both, the copy's with CRLF on the disk, goes", found.join("\n"));
+}
+
 // A path that held other content at an earlier release moves only as it moved from the old pin, and the command the
 // report gives keeps the old pin, so --fix reads the same history.
 {

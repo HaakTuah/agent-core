@@ -201,8 +201,11 @@ fs.mkdirSync(sub);
 git(sub, "init", "-q", "-b", "main");
 write(sub, ".github/workflows/p.yml", "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node vendor/tool.md/run.mjs\n");
 write(sub, "README.md", "one\n");
-write(sub, "scripts/a\tb.sh", "echo 1\n");
 git(sub, "add", "-A");
+// (a tab, which no name on Windows' disk may hold, so its file stands in the index alone)
+fs.writeFileSync(path.join(sub, "blob"), "echo 1\n");
+git(sub, "update-index", "--add", "--cacheinfo", `100644,${git(sub, "hash-object", "-w", "blob")},scripts/a\tb.sh`);
+fs.rmSync(path.join(sub, "blob"));
 git(sub, "update-index", "--add", "--cacheinfo", `160000,${sha(1)},vendor/tool.md`);
 git(sub, "commit", "-q", "-m", "base");
 const subBase = git(sub, "rev-parse", "HEAD");
