@@ -85,25 +85,19 @@ function importsOther(text, f, { known, folders, found }, pace) {
   }
   const inside = at => at !== null && at !== "" && known.has(at);
   // (the folder at or above `start` that holds the file `name`, as git lists it: "" the top; null where none does, where
-  // `start` is no folder a file of `folders` lies in, or `name` is more than a file's name; each search kept in `found`,
-  // and `pace` asked at each folder it climbs, each a slice of the last: linear in the folders climbed)
+  // `start` is no folder a file of `folders` lies in, or `name` is more than a file's name, or one Windows reads otherwise (`C:a.props`, a wildcard); the answer kept in `found` for
+  // each folder climbed, and `pace` asked at each, each a slice of the last: each folder climbed once a name)
   const above = (start, name) => {
     const s = start === undefined ? "$(MSBuildThisFileDirectory)" : start.trim().replace(/^'|'$/gu, "").trim();
     let d = /^\$\(MSBuildThisFileDirectory\)/iu.test(s) && !s.includes("%") ? importPath(f, `${s}/.`, { anchored: true }) : null;
-    if (d === null || d === "" || !/^[^\s$%@&;'"(),/\\]+$/u.test(name) || name === "." || name === "..") return null;
+    if (d === null || d === "" || !/^[^\s$%@&;'"(),/\\:*?<>|]+$/u.test(name) || name === "." || name === "..") return null;
     if (d === ".") d = "";
     if (!folders.has(d)) return null;
-    const key = `${d}\0${name}`;
-    if (!found.has(key)) found.set(key, (() => {
-      for (; ; d = d.slice(0, Math.max(d.lastIndexOf("/"), 0))) {
-        pace();
-        if (known.has(d ? `${d}/${name}` : name)) return d;
-        if (d === "") return null;
-      }
-    })());
-    return found.get(key);
+    return climb(d, name, { known, found }, pace);
   };
+  // (`pace` asked for each part, so a part whose search `found` already keeps asks it too)
   const leads = p => {
+    pace();
     const a = ABOVE.exec(p), n = !a && NAME_ABOVE.exec(p);
     if (a) return above(a[2], a[1]) !== null;
     // (MSBuild writes the folder found with no separator after it, and the rest straight on: only a rest that opens with
@@ -113,6 +107,23 @@ function importsOther(text, f, { known, folders, found }, pace) {
   };
   for (const m of text.matchAll(/<Import\b([^<>]*)>/giu)) if (!(attributes(m[1])?.project ?? "").split(";").every(p => leads(p.trim()))) return true;
   return false;
+}
+
+// The folder at or above `d` that holds `name` among `known`, or null: climbed a folder at a time, each a slice of the
+// last, until one whose answer `found` keeps, which then keeps the answer for each folder climbed.
+function climb(d, name, { known, found }, pace) {
+  const climbed = [];
+  let at = null;
+  for (; ; d = d.slice(0, Math.max(d.lastIndexOf("/"), 0))) {
+    pace();
+    const k = `${d}\0${name}`;
+    if (found.has(k)) { at = found.get(k); break; }
+    climbed.push(k);
+    if (known.has(d ? `${d}/${name}` : name)) { at = d; break; }
+    if (d === "") break;
+  }
+  for (const k of climbed) found.set(k, at);
+  return at;
 }
 
 // Each folder a file of `known` lies in, or one above it, "" the top: the only folders a search above can start from.
@@ -153,14 +164,14 @@ export const CS = /\.cs$/iu; // (a file of C#, in any case, as MSBuild compiles 
 // The texts MSBuild reads as a project's: a .csproj and what it imports by name or beside it.
 export const MSBUILD = /\.(?:csproj|props|targets|csproj\.user|pubxml|pubxml\.user)$/iu; // (in any case, as MSBuild finds them on Windows)
 
-// What git holds that the config does not read and C# compiles with: { msbuild: { path: text } of each .props, .targets,
-// .csproj.user, which MSBuild imports beside its .csproj, and .pubxml and .pubxml.user, which the SDK imports by a
+// What git holds that the config does not read and C# compiles with: { msbuild: { path: text } of each .csproj (one in
+// another case, say, which MSBuild builds on Windows), .props, .targets, .csproj.user, which MSBuild imports beside its .csproj, and .pubxml and .pubxml.user, which the SDK imports by a
 // publish profile, cs: { path: text } of each file of C# }; { unknown: true } where git cannot be asked, a file cannot
 // be read or is not UTF-8 (nuget.mjs's plainText: UTF-16, say, which MSBuild and the compiler read and this would not),
 // a link among them (never followed) too, or a Directory.Build.rsp stands, whose switches may set any property with no
 // element to read; past CHARACTERS bytes of them, Late. `pace` is asked before each file is read; `listed`
 // gives the files git holds of those kinds.
-export function heldBeside(texts, pace = () => {}, listed = () => git(["ls-files", "-z", "--", ...["*.props", "*.targets", "*.csproj.user", "*.pubxml", "*.pubxml.user", "Directory.Build.rsp", "*.cs"].map(p => `:(glob,icase)**/${p}`)]).split("\0")) {
+export function heldBeside(texts, pace = () => {}, listed = () => git(["ls-files", "-z", "--", ...["*.csproj", "*.props", "*.targets", "*.csproj.user", "*.pubxml", "*.pubxml.user", "Directory.Build.rsp", "*.cs"].map(p => `:(glob,icase)**/${p}`)]).split("\0")) {
   let n = 0;
   try {
     const held = listed().filter(f => f && !(f in texts));

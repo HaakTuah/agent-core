@@ -262,8 +262,19 @@ export function importPath(from, project, { anchored = false } = {}) {
   if (here) p = p.replace(/^\/+/u, "");
   if (/[$@%&*?]/u.test(p)) return null;
   if (p.startsWith("/") || /^[A-Za-z]:/u.test(p)) return "";
-  const at = posix.normalize(posix.join(posix.dirname(from), p));
+  const at = normalized(p ? `${posix.dirname(from)}/${p}` : posix.dirname(from));
   return at === ".." || at.startsWith("../") ? "" : at;
+}
+// A relative path's segments resolved by hand, as path.posix.normalize resolves them, in time linear in its length
+// where normalize takes time quadratic in a run of "../".
+function normalized(p) {
+  const parts = [];
+  for (const w of p.split("/")) {
+    if (w === "" || w === ".") continue;
+    if (w === ".." && parts.length && parts.at(-1) !== "..") parts.pop();
+    else parts.push(w);
+  }
+  return (parts.join("/") || ".") + (p.endsWith("/") ? "/" : "");
 }
 /**
  * A build file's bytes as text, where they are plain UTF-8 as MSBuild would read them too: null for one MSBuild reads

@@ -256,7 +256,8 @@ export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   const links = new Map();
   if (!Object.keys(texts).some(f => CS.test(f))) return { links, unsure: new Set() };
   const held = beside(texts, pace), read = Object.entries(texts).filter(([f]) => MSBUILD.test(f));
-  const msbuild = held.unknown ? null : msbuildUsings([...Object.entries(held.msbuild), ...read], pace);
+  // (an MSBuild text read as UTF-8 that was not, UTF-16 say, holds a NUL or U+FFFD: MSBuild reads what this cannot)
+  const msbuild = held.unknown || read.some(([, t]) => /[\0\uFFFD]/u.test(t)) ? null : msbuildUsings([...Object.entries(held.msbuild), ...read], pace);
   const all = { ...held.cs, ...texts }, files = Object.keys(all).filter(f => CS.test(f));
   // (where the usings every file holds are untold, every file is unsure)
   if (msbuild === null) return { links, unsure: new Set(files) };
