@@ -73,7 +73,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      - the repository named by the clone's origin, or, where that is a folder that is itself a clone, by that folder's
        origin, at most four deep;
      - limits: 16 MB of gh's answer; 20 s for the read with no sign-in, and 30 s for its process; of each answer only a
-       boolean field `private` is taken, from the read with no sign-in only with status 200, all else reading nothing.
+       boolean field `private` is taken, from the read with no sign-in only with status 200, all else reading nothing;
+     - hostile tests: `tests/host-private-test.mjs`.
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository (the
      workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`, `scripts/releases.mjs`,
      `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`, `scripts/clean-merges.mjs`,
