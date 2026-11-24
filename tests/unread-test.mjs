@@ -80,17 +80,22 @@ jobs:
   try { runWorkflow(text, opts); } catch (e) { strict = e.message; }
   ok(/does not know/u.test(strict ?? ""), "  without sayUnread, a form it cannot read still throws, so a test of the core's own workflows fails and teaches it", strict);
 
-  // (#1263, point 2: what cannot be read is not measured, a class of its own that holds the cut (#1257), never failed both)
-  const c = compared({ "ci.yml": "failed", "own.yml/a": "passed", "own.yml/b": "unread", "own.yml/c": "unread", "gone.yml/x": "passed", "m.yml/grid": "unread" },
-    { "ci.yml/lint": "passed", "ci.yml/test": "failed", "ci.yml/gate": "unread", "own.yml/a": "unread", "own.yml/b": "failed", "own.yml/c": "passed", "gone.yml": "unread", "m.yml/grid (one)": "failed" });
-  ok(c.unreadAfter.join() === "ci.yml/gate,own.yml/a,gone.yml" && c.unreadBefore.join() === "ci.yml/test,own.yml/b,m.yml/grid (one)" && c.ranAfterAlone.join() === "ci.yml/lint,own.yml/c"
+  // (#1263, point 2, as #1257 sets it: a job that ran before and could not be read after holds the cut, never failed both;
+  // one read in neither run is not measured, a class of its own that holds nothing)
+  const c = compared({ "ci.yml": "failed", "own.yml/a": "passed", "own.yml/b": "unread", "own.yml/c": "unread", "own.yml/d": "unread", "gone.yml/x": "passed", "m.yml/grid": "unread", "m2.yml/grid": "passed" },
+    { "ci.yml/lint": "passed", "ci.yml/test": "failed", "ci.yml/gate": "unread", "own.yml/a": "unread", "own.yml/b": "failed", "own.yml/c": "passed", "own.yml/d": "unread", "new.yml/n": "unread", "gone.yml": "unread", "m.yml/grid (one)": "failed", "m2.yml/grid (two)": "unread" });
+  ok(c.unreadAfter.join() === "own.yml/a,gone.yml,m2.yml/grid (two)" && c.unreadNeither.join() === "ci.yml/gate,own.yml/d,new.yml/n" && c.unreadBefore.join() === "ci.yml/test,own.yml/b,m.yml/grid (one)" && c.ranAfterAlone.join() === "ci.yml/lint,own.yml/c"
     && !c.failedBoth.length && !c.failedBeforeAlone.length && !c.failedAfterAlone.length && !c.ranBeforeAlone.length,
-    "a job unread after is not measured, whatever it was before; one unread before, or in a file an older check.mjs could not read whole, that fails after is not measured either; none is failed both, nor the release's, and a whole file unread after counts its jobs of before with it", JSON.stringify(c));
-  const record = trialRecord(SHA("d"), "2026-11-24", [[{ "ci.yml": "failed" }, { "ci.yml/lint": "passed", "ci.yml/gate": "unread" }]]);
+    "a job that ran before, by its key, its file or its matrix, and is unread after is not measured after; one unread after that ran not before, unread then too, new, or in a file an older check.mjs could not read whole, is not measured in either run; one unread before that fails after is not measured either; none is failed both, nor the release's", JSON.stringify(c));
+  const record = trialRecord(SHA("d"), "2026-11-24", [[{ "ci.yml/gate": "passed" }, { "ci.yml/lint": "passed", "ci.yml/gate": "unread" }]]);
   const at = trialAt(SHA("d"), args => (args[0] === "show" ? JSON.stringify(record) : ""));
-  ok(record.unreadAfter === 1 && record.failedBoth === 0 && record.failedBeforeAlone === 0 && /1 check was not measured in the trial on a real project, 1 of them not read after the update and 0 not read before it and failed after[\s\S]*Mend: teach the core's workflow runner/u.test(at.held ?? "") && /1 not read after it and 0 not read before it and failed after \(not measured\)/u.test(at.said),
+  ok(record.unreadAfter === 1 && record.failedBoth === 0 && record.failedBeforeAlone === 0 && /1 check was not measured in the trial on a real project, 1 of them run before and not read after the update and 0 not read before it and failed after[\s\S]*Mend: teach the core's workflow runner/u.test(at.held ?? "") && /1 run before and not read after it and 0 not read before it and failed after \(not measured\)/u.test(at.said),
     "  and the record counts it, and release.mjs reads the class as holding the cut, saying its mend", `${at.said}\n${at.held}`);
   const before = trialAt(SHA("d"), args => (args[0] === "show" ? JSON.stringify({ ...record, unreadAfter: 0, unreadBefore: 2 }) : ""));
-  ok(/2 checks were not measured[\s\S]*0 of them not read after the update and 2 not read before it and failed after[\s\S]*take the run before the update again with the release's check\.mjs/u.test(before.held ?? ""), "  one not read before and failed after holds it too, its mend the run before taken again by the release's check.mjs", before.held);
+  ok(/2 checks were not measured[\s\S]*0 of them run before and not read after the update and 2 not read before it and failed after[\s\S]*take the run before the update again with the release's check\.mjs/u.test(before.held ?? ""), "  one not read before and failed after holds it too, its mend the run before taken again by the release's check.mjs", before.held);
+  const neither = trialRecord(SHA("d"), "2026-11-24", [[{ "ci.yml": "failed", "own.yml/d": "unread" }, { "ci.yml/lint": "passed", "ci.yml/gate": "unread", "own.yml/d": "unread" }]]);
+  const neitherAt = trialAt(SHA("d"), args => (args[0] === "show" ? JSON.stringify(neither) : ""));
+  ok(neither.unreadNeither === 2 && neither.unreadAfter === 0 && neither.failedBoth === 0 && neitherAt.held === null && /2 read in neither run \(not measured, holding nothing\)/u.test(neitherAt.said),
+    "  a job read in neither run is counted and said, never failed both, and holds nothing, as #1257 says of a check that ran neither before nor after", `${neitherAt.said}\n${neitherAt.held}`);
 }
 done("a job the runner cannot read, and the trial's not measured");
