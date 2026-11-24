@@ -91,7 +91,19 @@ jobs:
           # (the store kept only in folders of this user's own, no link, so that another account's folder or link at
           # that name takes nothing in; a new copy written to a file of its own first, never through a name made before)
           owned() { [ -d "$1" ] && [ ! -L "$1" ] && [ -O "$1" ] || { echo "$1 is not a folder of this user's own" >&2; return 1; }; }
-          tools="${TMPDIR:-/tmp}/agent-core-tools" store="${TMPDIR:-/tmp}/agent-core-tools/betterleaks-$version" bl="betterleaks$exe" got="archive.${file#*.}"
+          # (a log's lines with the temporary and home folders named, never written out: on a runner on the owner's own computer
+          # each holds the account's name; #1223)
+          unnamed() {
+            local l t=$1 h=${HOME:-} tw= hw=
+            if command -v cygpath > /dev/null 2>&1; then tw=$(cygpath -w "$t" 2> /dev/null); hw=$(cygpath -w "$h" 2> /dev/null); fi
+            while IFS= read -r l || [ -n "$l" ]; do
+              [ "${#t}" -gt 1 ] && l=${l//"$t"/'<temp>'}; [ "${#tw}" -gt 3 ] && l=${l//"$tw"/'<temp>'}
+              [ "${#h}" -gt 1 ] && l=${l//"$h"/'~'}; [ "${#hw}" -gt 3 ] && l=${l//"$hw"/'~'}
+              printf '%s\n' "$l"
+            done
+          }
+          tmp="${TMPDIR:-/tmp}"
+          tools="$tmp/agent-core-tools" store="$tmp/agent-core-tools/betterleaks-$version" bl="betterleaks$exe" got="archive.${file#*.}"
           # (one kept from an earlier run is taken only where it holds its sum; otherwise it is fetched again, into a
           # folder of this run's own, the archive and then the program checked before it is kept)
           if [ "$(digest "$store/$bl")" != "$sum" ]; then
@@ -109,12 +121,12 @@ jobs:
               && cp "$bl" "$new" && chmod 755 "$new" && mv -f "$new" "$store/$bl") > "$dir/log" 2>&1; then :
             else
               echo "Betterleaks $version is not fetched: its release for $(uname -s)/$(uname -m) could not be downloaded, differs from its sum here, or could not be kept. Of the fetch:"
-              tail -n 5 "$dir/log" 2> /dev/null; echo "the archive's SHA-256: $(digest "$dir/$got")"
+              tail -n 5 "$dir/log" 2> /dev/null | unnamed "$tmp"; echo "the archive's SHA-256: $(digest "$dir/$got")"
               rm -rf "$dir"; exit 0
             fi
             rm -rf "$dir"
           fi
-          echo "Betterleaks $version: $store/$bl, its SHA-256 $sum"
+          echo "Betterleaks $version: TMPDIR/agent-core-tools/betterleaks-$version/$bl, its SHA-256 $sum"
           { echo "path=$store/$bl"; echo "sum=$sum"; } >> "$GITHUB_OUTPUT"
       # (the address in each commit's author and committer line (floor rule 11; #460, point 2): of the pull request's
       # own commits, as the step after reads them, each address is the host's no-reply one, the account's
@@ -135,7 +147,7 @@ jobs:
           # private as the runner's temp folder, which holds the keyring below)
           umask 077
           work="$RUNNER_TEMP/commit-addresses"; rm -rf "$work"
-          mkdir -p "$work" || { echo "FAIL the folder this step works in, $work, could not be made, so no commit's address was read. Mend: run the check again; where it fails again, give the account the runner runs as the right to write in the runner's temp folder (RUNNER_TEMP) and run it once more."; exit 1; }
+          mkdir -p "$work" 2> /dev/null || { echo "FAIL the folder this step works in, RUNNER_TEMP/commit-addresses, could not be made, so no commit's address was read. Mend: run the check again; where it fails again, give the account the runner runs as the right to write in the runner's temp folder (RUNNER_TEMP) and run it once more."; exit 1; }
           # (the pull request's own commits, as the step after takes them: GitHub's merge of it into its base checked
           # out, whose first parent is the base's side and is left out, with that merge itself)
           side=$BASE head=HEAD; if git rev-parse -q --verify 'HEAD^2' > /dev/null; then side=HEAD^1 head=HEAD^2; fi

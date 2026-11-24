@@ -498,4 +498,18 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     [...fetches.filter(l => !l.includes("--no-auto-maintenance")), ...checkouts.filter(s => !off(s)).map(s => s.with.path)].join(" | "));
 }
 
+// (#1223) the two fetch scripts name the temporary and home folders where they show a failed fetch's log, never write
+// them out: on a runner on the owner's own computer each holds the account's name
+if (process.platform !== "win32") {
+  const runnerTemp = scratchDir("fetch-temp-"), home = scratchDir("fetch-home-"), stubs = scratchDir("fetch-stubs-");
+  const fail = `#!/bin/sh\necho "could not write to $PWD/x and $HOME/.cache/x" >&2\necho "args: $*"\nexit 1\n`;
+  for (const name of ["python3", "python", "curl"]) fs.writeFileSync(path.join(stubs, name), fail, { mode: 0o755 });
+  for (const script of ["workflow-tools.sh", "lychee.sh"]) {
+    const run = spawnSync("bash", [path.join(core, "scripts", script)], { encoding: "utf8", env: { ...process.env, RUNNER_TEMP: runnerTemp, HOME: home, PATH: `${stubs}:${process.env.PATH}` } });
+    const err = run.stderr || "";
+    ok(run.status === 0 && err.includes("<temp>/") && err.includes("~/.cache") && !err.includes(runnerTemp) && !err.includes(home),
+      `${script} shows a failed fetch's log with the temporary and home folders named, never written out (#1223)`, err);
+  }
+}
+
 process.exit(failed ? 1 : 0);

@@ -389,6 +389,7 @@ fs.mkdirSync(noFolder);
 fs.writeFileSync(path.join(noFolder, "mkdir"), `#!/bin/sh\ncase "$*" in *commit-addresses*) echo "mkdir: cannot create directory: Permission denied" >&2; exit 1 ;; esac\ncommand -p mkdir "$@"\n`, { mode: 0o755 });
 const unmade = check(pull([[{ "b.md": "Words.\n" }]]), { more: noFolder });
 ok(!unmade.passed && mended(unmade.out) && unmade.out.includes("could not be made, so no commit's address was read"), "where the address step's folder cannot be made, it fails, saying the mend", unmade.out);
+ok(!unmade.out.includes(tmp) && !unmade.out.includes("cannot create directory"), "that failure names the runner's temporary folder, never writing out its path (#1223)", unmade.out);
 const sum = /Linux\/x86_64\) file=\S+ archive=[0-9a-f]{64} sum=([0-9a-f]{64})/.exec(workflow)?.[1], version = /version=(\S+)/.exec(workflow)?.[1];
 const keptTool = path.join(tmp, "kept"), keptDir = path.join(keptTool, "agent-core-tools", `betterleaks-${version}`), ran = path.join(tmp, "kept-ran");
 fs.mkdirSync(keptDir, { recursive: true });
@@ -402,6 +403,14 @@ fs.mkdirSync(elsewhere);
 if (process.platform !== "win32") {
   fs.symlinkSync(elsewhere, path.join(linked, "agent-core-tools"));
   unfetched("where the store's folder is a link", { store: linked }, "is not a folder of this user's own", () => fs.readdirSync(elsewhere).length === 0);
+  const linkedOut = check(pull([[{ "b.md": "Words.\n" }]]), { store: linked }).out;
+  ok(linkedOut.includes("<temp>/agent-core-tools") && !linkedOut.includes(linked), "the store's log is shown with its temporary folder named, never written out (#1223)", linkedOut);
+}
+{
+  const fresh = path.join(tmp, "fresh-store");
+  fs.mkdirSync(fresh);
+  const fetched = check(pull([[{ "b.md": "Words.\n" }]]), { store: fresh });
+  ok(fetched.passed && fetched.out.includes("TMPDIR/agent-core-tools/betterleaks-") && !fetched.out.includes(fresh), "the program fetched is named under TMPDIR, never by its full path (#1223)", fetched.out);
 }
 const tooLong = check(pull([[{ "b.md": "x\n" }]]), { terms: `${term}\n${"q".repeat(2001)}\n` });
 ok(!tooLong.passed && mended(tooLong.out) && tooLong.out.includes("longer than 2,000 bytes") && !tooLong.out.includes(term), "a term longer than the check can read whole fails, saying the mend, never hanging", tooLong.out);

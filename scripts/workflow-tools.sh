@@ -16,6 +16,17 @@
 # A new pin moves the version and every sum at once (zizmor's in requirements.txt). Always exits 0.
 core=$(cd "$(dirname "$0")/.." && pwd) || exit 0
 temp="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+# (a log's lines with the temporary and home folders named, never written out: on a runner on the owner's own computer
+# each holds the account's name; #1223)
+unnamed() {
+  local l t=$1 h=${HOME:-} tw= hw=
+  if command -v cygpath > /dev/null 2>&1; then tw=$(cygpath -w "$t" 2> /dev/null); hw=$(cygpath -w "$h" 2> /dev/null); fi
+  while IFS= read -r l || [ -n "$l" ]; do
+    [ "${#t}" -gt 1 ] && l=${l//"$t"/'<temp>'}; [ "${#tw}" -gt 3 ] && l=${l//"$tw"/'<temp>'}
+    [ "${#h}" -gt 1 ] && l=${l//"$h"/'~'}; [ "${#hw}" -gt 3 ] && l=${l//"$hw"/'~'}
+    printf '%s\n' "$l"
+  done
+}
 digest() { { sha256sum < "$1" || shasum -a 256 < "$1"; } 2> /dev/null | cut -c1-64; }
 
 # (zizmor: its lines alone of the lock file, so that the code scan's engine beside it is not installed for this)
@@ -26,7 +37,7 @@ elif ! awk '/^zizmor==/ { on = 1 } on { print; if ($0 !~ /\\$/) exit }' "$core/.
   echo "zizmor is not fetched: the core's .packages/requirements.txt names no version of it." >&2
 elif ! "$python" -I -m pip install --require-hashes --no-deps --only-binary=:all: --no-compile --no-input --disable-pip-version-check --timeout 30 --retries 1 \
     --target "$z/pypi" -r "$z/zizmor.txt" > "$z/log" 2>&1; then
-  echo "zizmor is not fetched: pip could not install it from PyPI by the sums the core names. Of the install:" >&2; tail -n 5 "$z/log" >&2
+  echo "zizmor is not fetched: pip could not install it from PyPI by the sums the core names. Of the install:" >&2; tail -n 5 "$z/log" | unnamed "$temp" >&2
 else
   for bin in "$z/pypi/bin/zizmor" "$z/pypi/bin/zizmor.exe"; do [ -f "$bin" ] && { echo "ZIZMOR=$bin"; break; }; done
   [ -f "$z/pypi/bin/zizmor" ] || [ -f "$z/pypi/bin/zizmor.exe" ] || echo "zizmor is not fetched: its wheel held no program where pip puts one." >&2
@@ -57,6 +68,6 @@ if (cd "$a" && curl -fsSL --proto =https --proto-redir =https --connect-timeout 
   echo "ACTIONLINT=$a/$bin"
 else
   echo "actionlint $version is not fetched: its release for $(uname -s)/$(uname -m) could not be downloaded or differs from its sum here. Of the fetch:" >&2
-  tail -n 5 "$a/log" >&2; echo "the archive's SHA-256: $(digest "$a/$got")" >&2
+  tail -n 5 "$a/log" | unnamed "$temp" >&2; echo "the archive's SHA-256: $(digest "$a/$got")" >&2
 fi
 exit 0
