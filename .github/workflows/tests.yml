@@ -592,6 +592,9 @@ jobs:
       - name: The core's checks from plain git (check.mjs), on scratch projects
         if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/check-test.mjs ')) }}
         run: node tests/check-test.mjs
+      - name: The core's checks from plain git (check.mjs) on a sync, its own calls run and the base's left at an older pin
+        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/check-sync-test.mjs ')) }}
+        run: node tests/check-sync-test.mjs
       - name: What a project's checks leave out for the core's copy, held to README.md's list
         if: ${{ !cancelled() && contains(matrix.parts, 'hostile') && (env.RUN == 'all' || contains(env.RUN, ' tests/copy-left-out-test.mjs ')) }}
         run: node tests/copy-left-out-test.mjs
