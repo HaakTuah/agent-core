@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "./core-address.mjs";
 import { BEGIN, END } from "./core-owned.mjs";
+import { untar } from "./releases.mjs";
 import { root, scratchDir } from "./scratch-core.mjs";
 
 export const git = (cwd, ...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd, encoding: "utf8" }).trim();
@@ -52,7 +53,7 @@ export function project(name) {
   const dir = path.join(tmp, name);
   fs.mkdirSync(dir);
   git(dir, "init", "-q", "-b", "main");
-  execFileSync("tar", ["-x", "-f", "-", "-C", (fs.mkdirSync(path.join(dir, "core")), path.join(dir, "core"))], { input: execFileSync("git", ["archive", pin], { cwd: core }) });
+  untar((fs.mkdirSync(path.join(dir, "core")), path.join(dir, "core")), execFileSync("git", ["archive", pin], { cwd: core }));
   write(dir, {
     "core-manifest.md": `# The core manifest\n\nCore: ${CORE} at ${pin}, copied whole under core/\n`,
     "AGENTS.md": `# The project\n\n${NEAR}\n\n${OTHER}\n\n${TWICE}\n\n${BEGIN}\n${RULE}\n${END}\n\nSafety rules: \`docs/safe.md\`.\n`,

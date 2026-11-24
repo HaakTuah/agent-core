@@ -14,6 +14,7 @@ import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
 import { closeness, unitsOf } from "../scripts/twice-text.mjs";
 import { findings, projectOf, report, withoutJob } from "../scripts/twice.mjs";
+import { untar } from "../scripts/releases.mjs";
 import { root, tally } from "../scripts/scratch-core.mjs";
 import { A, FLOOR, GUIDE_OLD, NEAR, OTHER, RULE, SAFE, WORKFLOW, core, earlier, fetched, git, project, run, tmp, write } from "../scripts/twice-scratch.mjs";
 
@@ -84,7 +85,7 @@ const { ok, done } = tally();
   fs.renameSync(path.join(hist, "old/check.json"), path.join(hist, "new/b.json")); git(hist, "add", "-A"); git(hist, "commit", "-qm", "pin");
   const at = git(hist, "rev-parse", "HEAD"), dir = path.join(tmp, "hist");
   fs.mkdirSync(path.join(dir, "core"), { recursive: true });
-  execFileSync("tar", ["-x", "-f", "-", "-C", path.join(dir, "core")], { input: execFileSync("git", ["archive", at], { cwd: hist }) });
+  untar(path.join(dir, "core"), execFileSync("git", ["archive", at], { cwd: hist }));
   write(dir, { "core-manifest.md": `# The core manifest\n\nCore: ${CORE} at ${at}, copied whole under core/\n`, "CLAUDE.md": "# Claude\n\nIt reads core/old/check.json.\n" });
   git(dir, "init", "-q", "-b", "main"); git(dir, "add", "-A");
   const args = ["--fetched", path.join(hist, ".git"), "--since", since], r = run(dir, ...args);

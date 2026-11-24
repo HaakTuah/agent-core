@@ -28,7 +28,7 @@ import { dirname, join } from "node:path";
 import { copyTree, coreIsFolder, entries, executable } from "./copy-tree.mjs";
 import { CORE as ADDRESS, CORE_SOURCE as A } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
-import { followsOf, hostSaid, inBare, releasesIn } from "./releases.mjs";
+import { followsOf, hostSaid, inBare, releasesIn, untar } from "./releases.mjs";
 import { asEarlier, plan, unformed } from "./converge.mjs";
 import { BLOCKS, CORE_YML, whole } from "./core-owned.mjs";
 import { WORKFLOW } from "./power.mjs";
@@ -125,7 +125,7 @@ function provedOwned(dir) {
   const unproved = (why) => { for (const f of later) { if (WORKFLOW.test(f)) pinsOnly(f); else fail.push(`${f}: ${why}`); } for (const f of gone) fail.push(`${f}: deleted, ${why}`); };
   const tmp = mkdtempSync(join(tmpdir(), "core-render-")), kits = join(tmp, "kits"), base_ = join(tmp, "project");
   try {
-    const tree = (sha, to) => { mkdirSync(to, { recursive: true }); execFileSync("tar", ["-x", "-f", "-", "-C", to], { input: inBare(dir, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 }) }); };
+    const tree = (sha, to) => { mkdirSync(to, { recursive: true }); untar(to, inBare(dir, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 })); };
     // (a pin whose core holds no kit, or one git cannot read, proves no file outside the copy: never a crash)
     try { tree(pin, join(kits, "now")); } catch { unproved(`the core at ${pin} holds no starter kit to render, so it is not proved what the core's process writes`); return; }
     const older = [...new Set([oldPin, ...releasesIn(dir).map((r) => r.sha)])].flatMap((sha) => { try { tree(sha, join(kits, sha)); return [join(kits, sha)]; } catch { return []; } });

@@ -37,7 +37,7 @@ import { CORE } from "./core-address.mjs";
 import { sizeOf } from "./file-size.mjs";
 import { everyInstall } from "./packages.mjs";
 import { MODULES } from "./reading.mjs";
-import { plainEnv } from "./releases.mjs";
+import { plainEnv, untar } from "./releases.mjs";
 import { started } from "./started.mjs";
 import { MARK, converged, marked } from "./core-owned.mjs";
 import { privateOf } from "./host-private.mjs";
@@ -342,8 +342,7 @@ function writeKit(o, here, pin, out) {
   }
   // the first copy, as the sync makes every copy: the core's tree at the pin, without what it keeps to itself
   fs.mkdirSync(path.join(here, "core"));
-  // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
-  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: here, input: execFileSync("git", ["archive", pin], { cwd: ROOT, env: plainEnv(), maxBuffer: 1 << 28 }) });
+  untar(path.join(here, "core"), execFileSync("git", ["archive", pin], { cwd: ROOT, env: plainEnv(), maxBuffer: 1 << 28 }));
   // (and its packages, installed from its lock file as the sync installs them, into core/.packages/node_modules/, which the copy's
   // own .gitignore keeps out of the commit; a failure leaves the kit written and says the mend: #654)
   const installer = path.join(here, "core", "scripts", "install.mjs");
