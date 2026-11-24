@@ -484,7 +484,8 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
   // (#1240: the parts the release workflow's job runs on Windows are each a part the test takes and a suite with its own mark,
   // and together they hold what the whole of it does, one release or one project kind of it each)
   const shape = JSON.parse(fs.readFileSync(path.join(wfDir, "..", "shape.json"), "utf8")), parts = release.jobs.upgrade?.strategy?.matrix?.part ?? [];
-  ok(parts.join() === "older-npm,older-dotnet,older-pre,newer-npm,newer-dotnet" && /--suite "upgrade-\$PART" -- node tests\/upgrade-test\.mjs --part "\$PART"$/.test(upgradeStep?.run ?? "")
+  const declared = /const PARTS = (\[[^\]]*\]);/.exec(fs.readFileSync(path.join(wfDir, "..", "..", "tests", "upgrade-test.mjs"), "utf8"));
+  ok(declared && parts.join() === JSON.parse(declared[1]).join() && parts.length === 5 && /--suite "upgrade-\$PART" -- node tests\/upgrade-test\.mjs --part "\$PART"$/.test(upgradeStep?.run ?? "")
     && parts.every(x => shape.suites[`upgrade-${x}`]?.win32 > 0) && release.jobs.upgrade["timeout-minutes"] <= 30,
     "the upgrade test's Windows job in the release workflow is five parts, a release's project kind each and the copy older than the first, each its own suite with a mark in .github/shape.json, inside its job's time", JSON.stringify(parts));
 }

@@ -82,7 +82,7 @@ jobs:
           node-version-file: .node-version # the one exact Node, as the cut's
       - name: The core's packages, installed from their lock files before the upgrade test on Windows, the parser's among them (#654, #719)
         run: node scripts/install.mjs all # (the steps the test reads run the shape check, which reads on the parser; as tests.yml installs them)
-      - name: A project of each of the last two releases, or of the one this job's part names, synced to this commit, passes every check unchanged
+      - name: A project of the kind and release this job's part names, or the copy older than the first, synced to this commit, passes every check unchanged
         env:
           PART: ${{ matrix.part }}
         run: node scripts/shape.mjs .github/shape.json --suite "upgrade-$PART" -- node tests/upgrade-test.mjs --part "$PART"

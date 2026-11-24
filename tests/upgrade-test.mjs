@@ -1084,6 +1084,8 @@ function againstSdk(p, dir) {
 }
 
 let synced = null; // (the npm project of the newest release started from, once synced)
+// (a part of the older release, where only one release comes before the commit under test, would prove nothing it names)
+ok(starts.length > 1 || !process.env.GITHUB_ACTIONS || !/^older-(npm|dotnet)$/.test(PART), `on GitHub's runners two releases of the core's come before the commit under test, for the part "${PART}" to start from`);
 for (const tag of starts) {
   const release = tag === starts.at(-1) ? "newer" : "older";
   if (!inPart(release, "npm") && !inPart(release, "dotnet")) continue;
@@ -1103,7 +1105,7 @@ for (const tag of starts) {
       write(dir, ".gitignore", "node_modules/\ndist/\nbuild/\nlib/\nvendor/\n");
     } });
     seed(npmProject, "\n");
-    synced = npmProject;
+    if (release === "newer") synced = npmProject;
     upgrade(npmProject, from, [["touches only its docs", dir => write(dir, "README.md", "# An npm project\n\nMore words.\n")],
       ["touches its package list", dir => write(dir, "package.json", fs.readFileSync(path.join(dir, "package.json"), "utf8").replace('"private": true,', '"private": true,\n  "description": "a project",'))]],
     (results, what) => [[jobRan(results, "security-review.yml"), "a public repository's security-review check runs as before"],
@@ -1142,7 +1144,7 @@ for (const tag of starts) {
 // npm wrote with no step taken first, passes, and npm finds no workspace; the same list in core/ itself it would take
 // in, and fail. In a folder of its own beside the synced project, with its copy, since the core's licence check asks a
 // project to name each workspace by its path.
-if (synced && PART !== "older" && PART !== "older-npm") { // (the newest release's project, which the older part's npm project is not)
+if (synced) {
   const probe = path.join(tmp, "workspaces-probe");
   fs.cpSync(path.join(synced.dir, "core"), path.join(probe, "core"), { recursive: true, filter: src => !slash(src).endsWith("/node_modules") });
   const own = { name: "a-project", version: "1.0.0", private: true, workspaces: ["*", "**", "core/*"] };
@@ -1163,7 +1165,7 @@ if (synced && PART !== "older" && PART !== "older-npm") { // (the newest release
 // A release that brings nothing a project takes asks no sync of it (#242, #342): with the copy it has just taken, the
 // project stays at the release that carries the change while the next one changes only the core's own files, and
 // syncs at the one after, whatever that changes: a jump of two, which this test proves from either of the last two.
-if (synced && inPart("newer", "npm")) {
+if (synced) {
   const p = synced;
   let n = Math.max(number(carrying), ...releases.map(number));
   const ownOnly = (...own) => {
