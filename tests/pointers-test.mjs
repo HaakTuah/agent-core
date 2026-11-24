@@ -59,7 +59,7 @@ ok(r.code === 1 && mended(r.out) && /docs\/developing\.md could not be read as M
 // no mend: #1204. The paths are made cheaply, entries of the index that point at the empty blob, no file written)
 r = run(FILES, { prepare: dir => {
   const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: dir, input: "", encoding: "utf8" }).trim();
-  const entries = Array.from({ length: 30000 }, (_, i) => `100644 ${blob}\t0\tgenerated/folder-${i}/a-file-with-a-path-of-fifty-characters-${i}.txt\n`).join("");
+  const entries = Array.from({ length: 30000 }, (_, i) => `100644 ${blob} 0\tgenerated/folder-${i}/a-file-with-a-path-of-fifty-characters-${i}.txt\n`).join("");
   execFileSync("git", ["update-index", "--add", "--index-info"], { cwd: dir, input: entries });
   ok(execFileSync("git", ["ls-files", "-z"], { cwd: dir, maxBuffer: 1 << 28 }).length > (1 << 20), "the scratch project's tracked paths list past 1 MB");
 } });

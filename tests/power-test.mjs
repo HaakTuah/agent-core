@@ -192,16 +192,16 @@ ok(extOut.status === 0 && JSON.stringify(extPrinted) === JSON.stringify({ power:
   "a commit that changes a file with no extension beside a seed is not light, read from its own tree: the readme's after it is", extOut.stdout + extOut.stderr);
 
 // A submodule's pointer (a gitlink), read from a commit, may run beside a seed whatever its name ends in; a commit that
-// moves it is not light. A tab's name, in the index alone (none on Windows' disk).
+// moves it is not light. A tab's name, in the index alone (Windows refuses one).
 const sub = init("sub");
 write(sub, ".github/workflows/p.yml", "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node vendor/tool.md/run.mjs\n");
 write(sub, "README.md", "one\n");
 git(sub, "add", "-A");
-git(sub, "update-index", "--add", "--cacheinfo", `160000,${sha(1)},vendor/tool.md`, "--cacheinfo", `100644,${git(sub, "rev-parse", ":README.md")},scripts/a\tb.sh`);
+git(sub, "-c", "core.protectNTFS=false", "update-index", "--add", "--cacheinfo", `160000,${sha(1)},vendor/tool.md`, "--cacheinfo", `100644,${git(sub, "rev-parse", ":README.md")},scripts/a\tb.sh`);
 git(sub, "commit", "-q", "-m", "base");
 const subBase = git(sub, "rev-parse", "HEAD");
 git(sub, "update-index", "--cacheinfo", `160000,${sha(2)},vendor/tool.md`);
-git(sub, "commit", "-q", "-m", "the submodule moved");
+git(sub, "commit", "-q", "-m", "moved");
 const subMoved = git(sub, "rev-parse", "HEAD");
 const subWhy = new Map(), subSet = setOf(gitTree(subMoved, sub), subWhy);
 const subChanged = (parent, at) => git(sub, "diff-tree", "-r", "--no-renames", "--name-only", parent, at).split("\n").filter(Boolean);
