@@ -74,8 +74,9 @@ if (flag !== "--part" || !["all", "older", "newer", ...PARTS].includes(PART) || 
   process.exit(2);
 }
 // (a part of a release, "older" or "newer", is the whole of its release; "-npm", "-dotnet" and "-pre" one kind of it)
-const SUFFIX = { js: "npm", net: "dotnet", pre: "pre" }; // (the kind a part's name ends in: its program's name never stands quoted alone, which the licence scan would read as a fetch)
-const inPart = (release, kind) => PART === "all" || PART === release || PART === `${release}-${SUFFIX[kind]}`;
+// (the kinds a part's name ends in, read from the names: a program's name never stands quoted alone in this file, which the licence scan would read as a fetch)
+const [KIND_JS, KIND_NET, KIND_PRE] = [...new Set(PARTS.map(x => x.split("-")[1]))];
+const inPart = (release, kind) => PART === "all" || PART === release || PART === `${release}-${kind}`;
 
 // ---- the reader the runner stands on ----
 const yaml = parseYaml("name: x # a comment\non:\n  workflow_call:\n    inputs:\n      a:\n        type: boolean\n        default: true\njobs:\n  j:\n    if: >-\n      ${{ a\n      && b }}\n    steps:\n      - uses: x@1 # v1\n        with:\n          k: 'it''s'\n      - name: run\n        run: |\n          one\n            two # kept\n\n          three\n      - run: echo \"#\" plain\n    types: [opened, edited]\n");
@@ -1089,13 +1090,13 @@ let synced = null; // (the npm project of the newest release started from, once 
 ok(starts.length > 1 || !process.env.GITHUB_ACTIONS || !/^older-(npm|dotnet)$/.test(PART), `on GitHub's runners two releases of the core's come before the commit under test, for the part "${PART}" to start from`);
 for (const tag of starts) {
   const release = tag === starts.at(-1) ? "newer" : "older";
-  if (!inPart(release, "js") && !inPart(release, "net")) continue;
+  if (!inPart(release, KIND_JS) && !inPart(release, KIND_NET)) continue;
   const from = { tag, sha: git(theCore, "rev-parse", `${tag}^{commit}`), dir: path.join(tmp, `core-at-${tag}`) };
   git(tmp, "clone", "-q", theCore, from.dir);
   git(from.dir, "checkout", "-q", from.sha);
 
   // the npm project, public
-  if (inPart(release, "js")) {
+  if (inPart(release, KIND_JS)) {
     const npmProject = project(`an-npm-project-from-${tag}`, from, { owner: "someone-else", kit: ["--npm", "."], isPrivate: false, files: dir => {
       write(dir, "package.json", '{\n  "name": "an-npm-project",\n  "version": "1.0.0",\n  "private": true,\n  "type": "module",\n  "dependencies": {\n    "ms": "2.1.3"\n  }\n}\n');
       write(dir, "package-lock.json", `${JSON.stringify({ name: "an-npm-project", version: "1.0.0", lockfileVersion: 3, requires: true, packages: { "": { name: "an-npm-project", version: "1.0.0", dependencies: { ms: "2.1.3" } },
@@ -1115,7 +1116,7 @@ for (const tag of starts) {
   }
 
   // the .NET project, private, held as Windows holds it
-  if (inPart(release, "net")) {
+  if (inPart(release, KIND_NET)) {
     const dotnetProject = project(`a-dotnet-project-from-${tag}`, from, { owner: "someone-else", kit: ["--nuget", ".", "--private"], isPrivate: true, windows: true, as: ownersName, files: dir => {
       write(dir, "src/App/App.csproj", `<Project Sdk="Microsoft.NET.Sdk">\r\n  <PropertyGroup>\r\n    <OutputType>Exe</OutputType>\r\n    <TargetFramework>${tfm}</TargetFramework>\r\n    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>\r\n  </PropertyGroup>\r\n</Project>\r\n`);
       write(dir, "src/App/Program.cs", 'System.Console.WriteLine("Hello");\r\n');
@@ -1335,7 +1336,7 @@ function preRelease(name, { windows }) {
   ok(fresh.status === 0 && !/^- checks\/(copies|copies-baseline|licences|licences-audit|sizes)\.json:/m.test(fresh.out) && !/^- config\/[\w-]+\.json: missing/m.test(fresh.out),
     `${name}: fresh.mjs compares the configs where the project holds them, and calls none at the starter kit's paths missing`, fresh.out);
 }
-if (inPart("older", "pre")) {
+if (inPart("older", KIND_PRE)) {
   preRelease("a-project-older-than-release-1", { windows: false });
   preRelease("a-windows-project-older-than-release-1", { windows: true });
 }
