@@ -112,9 +112,9 @@ export const callers = p => (readable(p, text => text.toLowerCase().includes(`${
 // reports a check that one reports, by a name read exactly, so that a check a ruleset asks for reports where the suite
 // is skipped (#1248, point 3; #1260); it is meant to start where the suite does not. A name is read exactly where it is
 // the job's `name` or key with no expression in it and the job has no matrix, which adds to the name GitHub reports. A
-// workflow with `paths` that shares a check with a suite, or may (a name not read exactly), and is no stand-in is still
-// reported, with the mend that makes it one, never `!<its path>`, which could leave that check unreported: "Nothing
-// locks a project".
+// workflow with `paths` that shares a check with a suite, or may (a name not read exactly whose start a suite's check
+// has, or a suite whose names are not read exactly), and is no stand-in is still reported, with the mend that makes it
+// one, never `!<its path>`, which could leave that check unreported: "Nothing locks a project".
 export function suitesOnPins(p) {
   const pins = callers(p);
   readable(p, text => /paths(-ignore)?\s*:/.test(text));
@@ -122,13 +122,18 @@ export function suitesOnPins(p) {
   const filter = (w, key) => { const list = w.yaml?.on?.pull_request?.[key]; return Array.isArray(list) ? new Set(list.map(String)) : null; };
   // (each job's check name, or null where one is not read exactly)
   const names = w => { const jobs = w.yaml?.jobs; return jobs && typeof jobs === "object" ? Object.entries(jobs).map(([k, j]) => { const n = String(j?.name ?? k); return n.includes("${{") || j?.strategy?.matrix !== undefined ? null : n; }) : []; };
-  const suites = Object.entries(p.workflows).map(([f, w]) => [f, filter(w, "paths-ignore"), new Set(names(w).filter(n => n !== null))]).filter(([, l]) => l !== null);
+  // (the start of each name not read exactly as GitHub reports it: an expression's literal part before it, or a matrix
+  // job's name and " (", which GitHub follows with the matrix's values)
+  const starts = w => Object.entries(w.yaml?.jobs ?? {}).map(([k, j]) => String(j?.name ?? k)).filter((n, i) => names(w)[i] === null).map(n => n.includes("${{") ? n.slice(0, n.indexOf("${{")) : `${n} (`);
+  const suites = Object.entries(p.workflows).map(([f, w]) => [f, filter(w, "paths-ignore"), new Set(names(w).filter(n => n !== null)), names(w).includes(null)]).filter(([, l]) => l !== null);
   const shares = (f, w) => suites.filter(([g, , c]) => g !== f && names(w).some(n => n !== null && c.has(n)));
+  // (a suite one of whose checks a name not read exactly may be: one it reports starts so, or one it reports is not read)
+  const mayShare = (f, w) => suites.some(([g, , c, unread]) => g !== f && starts(w).some(at => unread || [...c].some(n => n.startsWith(at))));
   const standsIn = (f, w) => { const own = filter(w, "paths"), n = names(w); return own !== null && n.length > 0 && shares(f, w).some(([, l, c]) => [...l].every(x => own.has(x)) && n.every(x => x !== null && c.has(x))); };
   const started = Object.entries(p.workflows).filter(([f, w]) => !pins.includes(`.github/workflows/${f}`) && !selects.includes(`.github/workflows/${f}`) && !standsIn(f, w)).flatMap(([f, w]) => {
     const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];
     const by = Array.isArray(only) ? pins.filter(c => pathsLetThrough(only, [c])) : Array.isArray(ignore) ? pins.filter(c => !pathsLetThrough(ignore, [c])) : [];
-    return by.length ? [[`\`.github/workflows/${shown(f)}\` (${by.map(shown).join(", ")})`, Array.isArray(only) && (shares(f, w).length > 0 || (names(w).includes(null) && suites.some(([g]) => g !== f)))]] : [];
+    return by.length ? [[`\`.github/workflows/${shown(f)}\` (${by.map(shown).join(", ")})`, Array.isArray(only) && (shares(f, w).length > 0 || mayShare(f, w))]] : [];
   });
   if (!started.length) return null;
   const suite = started.filter(([, s]) => !s).map(([t]) => t), standing = started.filter(([, s]) => s).map(([t]) => t);

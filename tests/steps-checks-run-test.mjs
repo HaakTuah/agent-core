@@ -93,6 +93,15 @@ ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths:
   const expression = named().includes("stand-in.yml");
   ok(oneOfSeveral && covers && short.includes("stand-in.yml") && matrix && expression && /gains the same paths under its `paths`, never `!<its path>`/.test(short),
     "a stand-in reporting one check of a suite of several, its `paths` covering the suite's `paths-ignore`, is left out; one that leaves a path out, or whose job's name is a matrix's or an expression's, is reported, the mend never taking a stand-in's path out", short);
+  // (a matrix job whose names GitHub reports, `test (…)`, no check of the suite's can share is a suite, its mend the
+  // ordinary one that does the step; an expression's name may be any, so it may still stand in: #1260, a review's finding)
+  suiteJobs(["lint"]);
+  fs.writeFileSync(standIn, `name: s\non:\n  pull_request:\n    paths: ['src/**', '.github/workflows/**']\njobs:\n  test:\n    strategy:\n      matrix:\n        os: [ubuntu-latest]\n    runs-on: \${{ matrix.os }}\n    steps:\n      - run: echo t\n`);
+  const unshared = named();
+  fs.writeFileSync(standIn, `name: s\non:\n  pull_request:\n    paths: ['src/**', '.github/workflows/**']\njobs:\n  test:\n    name: \${{ github.workflow }}\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`);
+  const anyName = named();
+  ok(/takes each out with `!<its path>`[^]*stand-in\.yml/u.test(unshared) && !/may stand in[^]*stand-in\.yml/u.test(unshared) && /may stand in[^]*stand-in\.yml/u.test(anyName),
+    "a workflow with `paths` whose matrix job no check of a suite's can share gets the mend that does the step; one whose job's name is an expression may still stand in", `${unshared}\n${anyName}`);
   fs.rmSync(standIn);
 }
 fs.rmSync(suiteFile);

@@ -29,9 +29,9 @@ function unmoved(manifest, moved) {
   if (!moved.length) return manifest;
   const eol = /\r\n/u.test(manifest) ? "\r\n" : "\n", lines = String(manifest).split(/\r?\n/u);
   const at = lines.findIndex(l => /\bModules:/u.test(l)), { head, tail, ticks, items } = listOf(lines[at]);
-  const has = new Set(items.filter(i => !moved.some(m => m.name === i.name)).map(i => i.name)), raws = [];
+  const byName = new Map(moved.map(m => [m.name, m])), has = new Set(items.filter(i => !byName.has(i.name)).map(i => i.name)), raws = [];
   for (const i of items) {
-    const m = moved.find(x => x.name === i.name);
+    const m = byName.get(i.name);
     if (!m) { raws.push(i.raw.trim()); continue; }
     if (!m.module || m.out || has.has(m.module)) continue;
     has.add(m.module);

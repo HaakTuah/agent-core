@@ -116,12 +116,12 @@ export function notDone(root, steps = STEPS, host = null) {
   return out;
 }
 
-// The leads of the steps a check of the project's own reads done at `root`, or whose undoing its manifest declares: the
-// sync gives each such entry of the notes by its lead alone (sync.mjs; #1264, point 2). A step read on the host alone, or
-// by no check, is none, and its entry is given in full.
+// The leads of the steps a check of the project's own reads done at `root`: the sync gives each such entry of the notes
+// by its lead alone (sync.mjs; #1264, point 2). A step read on the host alone, by no check, by one that leaves a part to
+// a review (`partly`), or that the manifest's "Differences" leaves undone, is none, and its entry is given in full.
 export function doneLeads(root, steps = STEPS) {
   const p = project(root), missed = new Set(notDone(root, steps).map(m => m.lead));
-  return steps.filter(s => declared(p, s) || ((s.check ?? fetched(s)) && !s.partly && !missed.has(s.lead))).map(s => s.lead);
+  return steps.filter(s => !declared(p, s) && (s.check ?? fetched(s)) && !s.partly && !missed.has(s.lead)).map(s => s.lead);
 }
 
 // The report a sync prints for its pull request's description: the steps not done, and nothing where all are; and the
