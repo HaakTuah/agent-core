@@ -131,10 +131,9 @@ function readAs(to, text) {
 }
 const named = u => u.row !== undefined ? `the row "${u.row}"` : u.para !== undefined ? `the paragraph "${short(u.para)}"` : u.key !== undefined ? `the key "${u.key}"` : `the line "${short(u.line)}"`;
 
-// Of the paragraphs and lines the project lacks (`lacking`) and those it still holds of an earlier kit's that the kit no
-// longer writes (`held`), each pair that is one paragraph or line reworded (#1265, point 2): of the same kind, opening
-// with the same words for at least OPENING characters, each lacked one paired with the held one it shares the longest
-// opening with, so one line says what differs where two would read alike, their labels cut before the change.
+// Of the paragraphs and lines the project lacks (`lacking`) and those of an earlier kit's it still holds (`held`), each
+// pair that is one reworded (#1265, point 2): of one kind, sharing at least OPENING characters of opening, each lacked
+// one with the held one it shares most with, so one line says what differs where two labels, cut, read alike.
 const OPENING = 30;
 const textOf = u => u.para ?? u.line;
 const opening = (a, b) => { let i = 0; while (i < a.length && a[i] === b[i]) i++; return i; };
@@ -149,8 +148,8 @@ function reworded(lacking, held) {
   const paired = new Set(pairs.map(([w]) => w));
   return { pairs, lacks: lacking.filter(u => !paired.has(u)), left: held.filter(u => free.has(u)) };
 }
-// What differs between the kit's words `want` and the project's `had`: the stretch each holds between the opening and
-// the ending they share, with a few words of each around it, whole words, each cut to a length a line can show.
+// What differs between the kit's words `want` and the project's `had`: the stretch between the opening and ending they
+// share, with a few whole words around it, cut to a length a line can show.
 function changed(want, had) {
   const start = opening(want, had);
   let end = 0;
