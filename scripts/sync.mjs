@@ -35,7 +35,7 @@ import { readCore } from "./core-path.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { everyInstall } from "./packages.mjs";
 import { started } from "./started.mjs";
-import { NOTES, asksLeft, fetchCore, followsOf, greenMain, hostSaid, inBare, jumped, newestRelease, past, plainEnv, releasesIn, staysAt, untar } from "./releases.mjs";
+import { NOTES, asksLeft, fetchCore, followsOf, greenMain, hostSaid, inBare, jumped, newestRelease, past, pinsBefore, plainEnv, releasesIn, staysAt, untar } from "./releases.mjs";
 import { FOLDER } from "./sync-notes.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
@@ -233,21 +233,6 @@ function samePin({ at, dir, pin, manifest }, tmp) {
   const kits = kitsOf([pin, ...pins], tmp);
   converge(dir, kits);
   report(at, dir, kits, before);
-}
-
-// The pins the manifest named before `pin`, read from the project's own history, newest first, HEAD first: each other
-// commit of the core's main a "Core:" line of it named, the first the pin before. Their kits are how the one process
-// knows a file an earlier kit wrote and no sync since wrote again, as one before the process came (#1246, point 5).
-function pinsBefore(manifest, pin, tmp) {
-  const run = args => { const r = spawnSync("git", args, { encoding: "utf8", env: plainEnv(), maxBuffer: 1 << 26 }); return r.status === 0 ? r.stdout : null; };
-  const commits = (run(["log", "--format=%H", "-n", "200", "HEAD", "--", manifest]) ?? "").split("\n").filter(Boolean), pins = [];
-  for (const c of ["HEAD", ...commits]) {
-    const text = run(["show", `${c}:${manifest}`]);
-    let was = null;
-    try { was = text === null ? null : readCore(text).pin; } catch { /* (a line out of its form names no pin) */ }
-    if (was && was !== pin && !pins.includes(was) && /^[0-9a-f]{40}$/.test(was) && past(was, "refs/heads/main", tmp)) pins.push(was);
-  }
-  return pins;
 }
 
 // What the core owns, written from the new copy's own kit by the one process (#1083; converge.mjs, beside this file),

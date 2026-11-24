@@ -390,6 +390,18 @@ for (const pin of [Z, B]) { write(p, "core-manifest.md", manifest(OWNER, pin)); 
 const known = node(p, "core/scripts/sync.mjs", B);
 ok(unknown.out.includes(`${BUG} is not the core's`) && read(p, BUG) === bugB && !known.out.includes(`${BUG} is not the core's`),
   "a file as the kit of a pin the manifest's history names wrote it, and no release's, is the core's, written again as the kit writes it", `${unknown.out}\n${known.out}`);
+// (and the proof knows it by the same kits, read from the history of the project's main: a main whose manifest named Z
+// before A, the file as Z's kit wrote it, synced to B, is a pure sync)
+git(p, "reset", "-q", "--hard");
+git(p, "checkout", "-q", "-B", "earlier-main", base);
+write(p, BUG, `${bugB}${Z_LINE}`);
+for (const pin of [Z, A]) { write(p, "core-manifest.md", manifest(OWNER, pin)); git(p, "commit", "-qam", `the manifest at ${SHA(pin)}, the file as Z's kit wrote it`); }
+git(p, "push", "-q", "-f", "origin", "HEAD:main");
+const fromZ = node(p, "core/scripts/sync.mjs", B);
+git(p, "stash", "clear"); git(p, "add", "-A"); git(p, "commit", "-qm", "sync, the file as Z's kit wrote it");
+const provedZ = pure();
+ok(fromZ.status === 0 && read(p, BUG) === bugB && provedZ.status === 0 && provedZ.out.includes("a pure sync"),
+  "  and the proof renders it by the same kits, read from the history of the project's main, so the sync is pure", `${fromZ.out}\n---\n${provedZ.out}`);
 git(p, "reset", "-q", "--hard");
 git(p, "checkout", "-q", "more");
 write(p, "core-manifest.md", manifest("someone-else"));

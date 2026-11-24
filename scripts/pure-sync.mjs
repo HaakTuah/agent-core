@@ -28,7 +28,7 @@ import { dirname, join } from "node:path";
 import { copyTree, coreIsFolder, entries, executable } from "./copy-tree.mjs";
 import { CORE as ADDRESS, CORE_SOURCE as A } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
-import { followsOf, hostSaid, inBare, releasesIn, untar } from "./releases.mjs";
+import { followsOf, hostSaid, inBare, pinsBefore, releasesIn, untar } from "./releases.mjs";
 import { asEarlier, plan, unformed } from "./converge.mjs";
 import { BLOCKS, CORE_YML, whole } from "./core-owned.mjs";
 import { WORKFLOW } from "./power.mjs";
@@ -128,7 +128,7 @@ function provedOwned(dir) {
     const tree = (sha, to) => { mkdirSync(to, { recursive: true }); untar(to, inBare(dir, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 })); };
     // (a pin whose core holds no kit, or one git cannot read, proves no file outside the copy: never a crash)
     try { tree(pin, join(kits, "now")); } catch { unproved(`the core at ${pin} holds no starter kit to render, so it is not proved what the core's process writes`); return; }
-    const older = [...new Set([oldPin, ...releasesIn(dir).map((r) => r.sha)])].flatMap((sha) => { try { tree(sha, join(kits, sha)); return [join(kits, sha)]; } catch { return []; } });
+    const older = [...new Set([oldPin, ...pinsBefore("core-manifest.md", pin, dir, base), ...releasesIn(dir).map((r) => r.sha)])].flatMap((sha) => { try { tree(sha, join(kits, sha)); return [join(kits, sha)]; } catch { return []; } });
     // (the project as its main holds it, the copy left out, its manifest the head's, whose one change is the pin, read above)
     mkdirSync(base_);
     execFileSync("git", ["init", "-q"], { cwd: base_ });
