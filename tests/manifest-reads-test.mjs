@@ -83,6 +83,14 @@ ok(m.taken.has("a.md") && m.taken.has("b.md") && m.notTaken.get("g.md") === "no 
   ok(/Modules: `b\.md`, `planning\.md`, `z\.md`\.$/m.test(placed(kit("`b.md`, `z.md`"), [p])) && /Modules: `z\.md`, `b\.md`, `planning\.md`\.$/m.test(placed(kit("`z.md`, `b.md`"), [p])), "a list in order, as the kit writes it, stays in order, and one out of order gains the name at its end");
   const crlf = kit("`a.md`", "Not taken: `x.md` (none here).\n").replace(/\n/g, "\r\n"), again = placed(crlf, toPlace(crlf, names, plain));
   ok(!/[^\r]\n/.test(again) && /^Not taken: `x\.md` \(none here\), `game-design\.md` \(the project is no game[^)]*\), `repositories\.md` \([^)]*\)\.\r$/m.test(again) && modulesOf(again).notTaken.get("x.md") === "none here", "a line Not taken that stands is added to, its reasons kept, and Windows' line ends stay", again);
+  // (a list of bare names, as the README's format writes the line, is read where each is a module, and gains names in
+  // the form its names stand in: #1248, points 1 and 2)
+  const bare = modulesOf(kit("tasks/a.md, planning and x"), names), words = modulesOf(kit("a, the rest"), names);
+  ok([...bare.taken].sort().join() === "a.md,planning.md,x.md" && words.taken === null && modulesOf(kit("a, planning")).taken === null && toPlace(kit("a, planning"), names, plain).length === 3,
+    "a bare list is read where each name is a module of the core, never where a name is no module or no module is known", JSON.stringify([...bare.taken ?? []]));
+  ok(/Modules: a, planning, z\.$/m.test(placed(kit("a, z"), [p])) && /Modules: `a`, `planning`, `z`\.$/m.test(placed(kit("`a`, `z`"), [p])) && /Modules: a\.md, planning\.md\.$/m.test(placed(kit("a.md"), [p]))
+    && /Modules: `z`, `a`, `planning`\.$/m.test(placed(kit("`z`, `a`"), [p])), "a name added takes the list's own form: bare or in backticks, with \".md\" only where a name there has it", placed(kit("a, z"), [p]));
+  ok(notes({ manifest: kit("a, planning"), moduleTexts: { "a.md": "", "planning.md": "" } }).length === 0 && has(notes({ manifest: kit("a, whatever"), moduleTexts: { "a.md": "" } }), "or by its bare name"), "the notes read a bare list too, and say how a list is written where one cannot be read");
   let threw = null;
   try { placed(kit("all"), [{ name: "a.md", take: true }]); } catch (e) { threw = e; }
   ok(threw && /names no module/.test(threw.message), "a Modules line with no module to add after is never written");

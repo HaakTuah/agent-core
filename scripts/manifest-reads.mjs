@@ -77,15 +77,32 @@ export function markGaps(readme, stands) {
 }
 
 // What the manifest's "Modules:" line takes: "all", the names of a list, or null where it is neither. And the modules
-// it leaves out, each with its reason ("" where it names none).
-export function modulesOf(manifest) {
+// it leaves out, each with its reason ("" where it names none). A list names its modules in backticks, with or without
+// their folder and ".md"; or bare, parted by commas, read only where `known` (the core's modules, as `<name>.md`) holds
+// each, so that a line of words is never read as a list (#1248, point 1).
+export function modulesOf(manifest, known = null) {
   const line = /\bModules:\s*([^\n]*)/u.exec(String(manifest))?.[1].trim() ?? "";
   const names = text => [...text.matchAll(/`(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?`/gu)].map(m => `${m[1]}.md`);
-  const taken = /^all\b/iu.test(line) ? "all" : names(line).length ? new Set(names(line)) : null;
+  const bare = !line.includes("`") && known ? listOf(`Modules: ${line}`)?.items.map(i => i.name) : null;
+  const taken = /^all\b/iu.test(line) ? "all" : names(line).length ? new Set(names(line))
+    : bare?.length && bare.every(n => known.includes(n)) ? new Set(bare) : null;
   const notTaken = new Map();
   const nt = /^Not taken:\s*(.*)$/mu.exec(String(manifest))?.[1] ?? "";
   for (const m of nt.matchAll(/`(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?`(?:\s*\(([^)]*)\))?/gu)) notTaken.set(`${m[1]}.md`, (m[2] ?? "").trim());
   return { taken, notTaken, line };
+}
+// A "Modules:" line's list as it is written: the line's text before it (`head`) and after it (`tail`), and each name, as
+// written (`raw`) and as a module's file (`name`), with whether they stand in backticks; null where the line holds no
+// such list ("all", nothing, or a bare name that is no plain name).
+const MODULE_NAME = /^(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?$/u;
+function listOf(line) {
+  const [, head, body] = /^(.*?\bModules:\s*)(.*)$/u.exec(line) ?? [];
+  if (body === undefined || /^all\b/iu.test(body)) return null;
+  const ticks = body.includes("`");
+  const [, list, tail] = (ticks ? /^(.*`)(.*)$/u : /^(.*?)(\.?\s*)$/u).exec(body);
+  const raws = ticks ? [...list.matchAll(/`([^`\n]*)`/gu)].map(m => m[1]) : list.split(/\s*,\s*(?:and\s+)?|\s+and\s+/u);
+  const items = raws.map(raw => ({ raw, name: (m => m && `${m[1]}.md`)(MODULE_NAME.exec(raw.trim())) }));
+  return items.length && (ticks || items.every(i => i.name)) ? { head, list, tail, ticks, items } : null;
 }
 
 // The lines of the manifest's "Differences", each that holds more than space (steps.mjs and the description check,
@@ -117,9 +134,9 @@ export function placeOf(name, facts) {
 }
 // Each module of `names` (`only`: of those alone) the manifest's list neither takes nor names on its line "Not taken:",
 // with its place: [{ name, take, why, choice }], in the order of the names; [] where the line says "all"; null where
-// it cannot be read.
-export function toPlace(manifest, names, facts, only = null) {
-  const { taken, notTaken } = modulesOf(manifest);
+// it cannot be read. `known`: the core's modules, by which a bare list is read (modulesOf).
+export function toPlace(manifest, names, facts, only = null, known = names) {
+  const { taken, notTaken } = modulesOf(manifest, known);
   if (taken === "all") return [];
   if (taken === null) return null;
   return [...names].sort().filter(n => (!only || only.includes(n)) && !taken.has(n) && !notTaken.has(n)).map(name => ({ name, ...placeOf(name, facts) }));
@@ -128,21 +145,22 @@ export function toPlace(manifest, names, facts, only = null) {
 export const toConfirm = manifest => new Set([...(new RegExp(`^${CONFIRM}\\s*(.*)$`, "mu").exec(String(manifest ?? ""))?.[1] ?? "").matchAll(/`(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?`/gu)].map(m => `${m[1]}.md`));
 // The manifest with each module of `places` in its place: added to the "Modules:" list, or to the line "Not taken:" with
 // its reason, and each taken by choice to the line "Modules to confirm:" too, a line made under the "Modules:" line
-// where it is not yet; the rest of the text as it stood. Throws where the "Modules:" line holds no module to add after.
+// where it is not yet; the rest of the text as it stood. A name added to the list takes the form the names there take,
+// in backticks or bare, with ".md" or, where none has it, without (#1248, point 2). Throws where the "Modules:" line
+// holds no list to add to.
 export function placed(manifest, places) {
   const eol = /\r\n/u.test(manifest) ? "\r\n" : "\n", lines = String(manifest).split(/\r?\n/u);
-  const at = lines.findIndex(l => /\bModules:\s*`/u.test(l));
-  if (at < 0) throw new Error('its "Modules:" line names no module to add to');
+  const at = lines.findIndex(l => /\bModules:/u.test(l)), list = at < 0 ? null : listOf(lines[at]);
+  if (!list) throw new Error('its "Modules:" line names no module to add to');
   const named = list => list.map(p => `\`${p.name}\``).join(", ");
   const take = places.filter(p => p.take), out = places.filter(p => !p.take), chosen = places.filter(p => p.choice);
   // (a list in order, as the kit writes it, stays in order; any other gains the names at its end)
   if (take.length) {
-    const [, head, list, tail] = /^(.*?\bModules:\s*)(`.*`)(.*)$/u.exec(lines[at]);
-    const names = [...list.matchAll(/`([^`\n]*)`/gu)].map(m => m[1]);
-    const plainList = list === names.map(n => `\`${n}\``).join(", ");
-    const inOrder = plainList && names.every((n, i) => !i || names[i - 1] <= n);
-    lines[at] = inOrder ? `${head}${named([...names, ...take.map(p => p.name)].sort().map(name => ({ name })))}${tail}`
-      : lines[at].replace(/(`[^`\n]*`)(?![^\n]*`)/u, `$1, ${named(take)}`);
+    const { head, tail, ticks, items } = list, noExt = items.every(i => !/\.md$/u.test(i.raw.trim()));
+    const shown = names => names.map(n => ticks ? `\`${n}\`` : n).join(", ");
+    const raws = items.map(i => i.raw), added = take.map(p => noExt ? p.name.replace(/\.md$/u, "") : p.name);
+    const inOrder = list.list === shown(raws) && raws.every((n, i) => !i || raws[i - 1] <= n);
+    lines[at] = `${head}${inOrder ? shown([...raws, ...added].sort()) : `${list.list}, ${shown(added)}`}${tail}`;
   }
   // (a line added to, its last full stop moved after what it gains; "Not taken:" made under the last of the module
   // lines, and the line to confirm made a paragraph of its own after theirs, so the kit's paragraph stays as it writes it)
@@ -163,9 +181,9 @@ export function placed(manifest, places) {
 // neither takes nor leaves out.
 export function notes({ manifest, moduleTexts, where = {} }) {
   const out = [];
-  const { taken, notTaken, line } = modulesOf(manifest);
   const names = Object.keys(moduleTexts).sort();
-  if (taken === null) out.push(`core-manifest.md: its "Modules:" line (${line ? `"${line}"` : "none found"}) is neither "all" nor a list of modules as \`<name>.md\` in backticks, so the modules it takes cannot be read; write it as the README's "The manifest's format" has it ("Modules: all." or a list)`);
+  const { taken, notTaken, line } = modulesOf(manifest, names);
+  if (taken === null) out.push(`core-manifest.md: its "Modules:" line (${line ? `"${line}"` : "none found"}) is neither "all" nor a list of the core's modules, each as \`<name>.md\` in backticks or by its bare name, parted by commas, so the modules it takes cannot be read; write it as the README's "The manifest's format" has it ("Modules: all." or a list)`);
   if (taken instanceof Set) {
     for (const n of [...taken].filter(n => !names.includes(n)).sort()) out.push(`core-manifest.md: its "Modules:" line names ${n}, which is no module of the core (${MODULES.map(d => `core/${d}/`).join(", ")}); take it out of the line`);
     for (const n of names.filter(n => !taken.has(n) && !notTaken.get(n))) {
