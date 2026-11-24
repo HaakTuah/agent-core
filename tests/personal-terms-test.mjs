@@ -404,13 +404,17 @@ if (process.platform !== "win32") {
   fs.symlinkSync(elsewhere, path.join(linked, "agent-core-tools"));
   unfetched("where the store's folder is a link", { store: linked }, "is not a folder of this user's own", () => fs.readdirSync(elsewhere).length === 0);
   const linkedOut = check(pull([[{ "b.md": "Words.\n" }]]), { store: linked }).out;
-  ok(linkedOut.includes("<temp>/agent-core-tools") && !linkedOut.includes(linked), "the store's log is shown with its temporary folder named, never written out (#1223)", linkedOut);
+  ok(linkedOut.includes("../agent-core-tools is not a folder of this user's own") && !linkedOut.includes(linked), "the store's log names its folders from the fetch's own, never writing out the temporary folder (#1223)", linkedOut);
 }
 {
   const fresh = path.join(tmp, "fresh-store");
   fs.mkdirSync(fresh);
   const fetched = check(pull([[{ "b.md": "Words.\n" }]]), { store: fresh });
   ok(fetched.passed && fetched.out.includes("TMPDIR/agent-core-tools/betterleaks-") && !fetched.out.includes(fresh), "the program fetched is named under TMPDIR, never by its full path (#1223)", fetched.out);
+  const unfetchedStore = path.join(tmp, "unfetched-store");
+  fs.mkdirSync(unfetchedStore);
+  const failedFetch = check(pull([[{ "b.md": "Words.\n" }]]), { store: unfetchedStore, fetchFails: true });
+  ok(!failedFetch.passed && failedFetch.out.includes("Of the fetch:") && !failedFetch.out.includes(unfetchedStore), "a failed download's log writes out no temporary folder (#1223)", failedFetch.out);
 }
 const tooLong = check(pull([[{ "b.md": "x\n" }]]), { terms: `${term}\n${"q".repeat(2001)}\n` });
 ok(!tooLong.passed && mended(tooLong.out) && tooLong.out.includes("longer than 2,000 bytes") && !tooLong.out.includes(term), "a term longer than the check can read whole fails, saying the mend, never hanging", tooLong.out);

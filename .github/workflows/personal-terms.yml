@@ -91,37 +91,29 @@ jobs:
           # (the store kept only in folders of this user's own, no link, so that another account's folder or link at
           # that name takes nothing in; a new copy written to a file of its own first, never through a name made before)
           owned() { [ -d "$1" ] && [ ! -L "$1" ] && [ -O "$1" ] || { echo "$1 is not a folder of this user's own" >&2; return 1; }; }
-          # (a log's lines with the temporary and home folders named, never written out: on a runner on the owner's own computer
-          # each holds the account's name; #1223. A copy of scripts/unnamed.sh, since this runs in a project's checkout)
-          unnamed() {
-            local l t=$1 h=${HOME:-} tw= hw=
-            if command -v cygpath > /dev/null 2>&1; then tw=$(cygpath -w "$t" 2> /dev/null); hw=$(cygpath -w "$h" 2> /dev/null); fi
-            while IFS= read -r l || [ -n "$l" ]; do
-              [ "${#t}" -gt 1 ] && l=${l//"$t"/'<temp>'}; [ "${#tw}" -gt 3 ] && l=${l//"$tw"/'<temp>'}
-              [ "${#h}" -gt 1 ] && l=${l//"$h"/'~'}; [ "${#hw}" -gt 3 ] && l=${l//"$hw"/'~'}
-              printf '%s\n' "$l"
-            done
-          }
           tmp="${TMPDIR:-/tmp}"
-          tools="$tmp/agent-core-tools" store="$tmp/agent-core-tools/betterleaks-$version" bl="betterleaks$exe" got="archive.${file#*.}"
+          store="$tmp/agent-core-tools/betterleaks-$version" bl="betterleaks$exe" got="archive.${file#*.}"
           # (one kept from an earlier run is taken only where it holds its sum; otherwise it is fetched again, into a
-          # folder of this run's own, the archive and then the program checked before it is kept)
+          # folder of this run's own, the archive and then the program checked before it is kept; each path in its log
+          # written from that folder, `..` the temporary folder, and PowerShell's own words kept out, so the log shows
+          # no temporary or home folder, which on a runner on the owner's own computer holds the account's name; #1223)
           if [ "$(digest "$store/$bl")" != "$sum" ]; then
-            dir=$(mktemp -d) || { echo "Betterleaks $version is not fetched: no temporary folder could be made."; exit 0; }
+            dir=$(mktemp -d "$tmp/betterleaks.XXXXXX") || { echo "Betterleaks $version is not fetched: no temporary folder could be made."; exit 0; }
             if (cd "$dir" && curl -fsSL --proto =https --proto-redir =https --connect-timeout 30 --max-time 300 --retry 2 -o "$got" \
                 "https://github.com/betterleaks/betterleaks/releases/download/v$version/betterleaks_${version}_$file" \
               && [ "$(digest "$got")" = "$archive" ] \
               && case $file in
                    *.zip) if command -v unzip > /dev/null 2>&1; then unzip -q "$got" "$bl"
-                          else powershell -NoProfile -NonInteractive -Command "Expand-Archive -LiteralPath $got -DestinationPath out" && mv out/"$bl" .; fi ;;
+                          else powershell -NoProfile -NonInteractive -Command "Expand-Archive -LiteralPath $got -DestinationPath out" > /dev/null 2>&1 \
+                            && mv out/"$bl" . || { echo "PowerShell's Expand-Archive could not unpack $got, or $bl was not in it"; false; }; fi ;;
                    *) tar -xzf "$got" "$bl" ;;
                  esac \
               && [ "$(digest "$bl")" = "$sum" ] \
-              && mkdir -p "$tools" && owned "$tools" && mkdir -p "$store" && owned "$store" && new=$(mktemp "$store/new.XXXXXX") \
-              && cp "$bl" "$new" && chmod 755 "$new" && mv -f "$new" "$store/$bl") > "$dir/log" 2>&1; then :
+              && t=../agent-core-tools && s="$t/betterleaks-$version" && mkdir -p "$t" && owned "$t" && mkdir -p "$s" && owned "$s" \
+              && new=$(mktemp "$s/new.XXXXXX") && cp "$bl" "$new" && chmod 755 "$new" && mv -f "$new" "$s/$bl") > "$dir/log" 2>&1; then :
             else
               echo "Betterleaks $version is not fetched: its release for $(uname -s)/$(uname -m) could not be downloaded, differs from its sum here, or could not be kept. Of the fetch:"
-              tail -n 5 "$dir/log" 2> /dev/null | unnamed "$tmp"; echo "the archive's SHA-256: $(digest "$dir/$got")"
+              tail -n 5 "$dir/log" 2> /dev/null; echo "the archive's SHA-256: $(digest "$dir/$got")"
               rm -rf "$dir"; exit 0
             fi
             rm -rf "$dir"

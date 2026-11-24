@@ -5,7 +5,8 @@
 #
 #   tail -n 5 "$log" | unnamed "$temp" >&2
 #
-# personal-terms.yml holds its own copy, since it runs in a project's checkout, where the core's scripts are not.
+# (personal-terms.yml, which runs in a project's checkout where the core's scripts are not, writes no such path to its
+# log instead: its fetch names each from the folder it works in)
 unnamed() {
   local l t=$1 h=${HOME:-} tw= hw=
   if command -v cygpath > /dev/null 2>&1; then tw=$(cygpath -w "$t" 2> /dev/null); hw=$(cygpath -w "$h" 2> /dev/null); fi
