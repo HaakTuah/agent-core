@@ -137,24 +137,27 @@ function writeVerdicts(p, given) {
 // The jobs that call a workflow of the core's and start on this change, core.yml's first; it fails where none is core.yml.
 function calledJobs(p, tmp) {
   const jobs = callers(p, tmp).filter(({ wf }) => triggered(wf.on, p))
-    .flatMap(({ file, wf }) => Object.entries(wf.jobs ?? {}).map(([id, job]) => ({ file, id, job, name: call.exec(String(job?.uses ?? ""))?.[1] })))
+    .flatMap(({ file, wf, base }) => Object.entries(wf.jobs ?? {}).map(([id, job]) => ({ file, id, job, base: Boolean(base), name: call.exec(String(job?.uses ?? ""))?.[1] })))
     .filter(j => j.name).sort((a, b) => (b.name === "core.yml") - (a.name === "core.yml"));
   if (!jobs.some(j => j.name === "core.yml")) fail("no call to the core's core.yml starts on this change, so nothing proves the copy of the core is the core.", "call it on every pull request and push to main, as the starter kit's .github/workflows/core.yml does, in the base the change merges into.");
   return jobs;
 }
 
 // Runs those jobs, then, with --own, the project's own, where the copy is the core: how many ran, and how many failed.
-// Where it is not, each job left that would run is written stopped (#1245, point 2).
+// Where it is not, each job left that would run is written stopped (#1245, point 2), by the key it runs under (#1258,
+// point 2). A sync's call of the base's (check-calls.mjs, syncCalls) is no gate once the sync's own core.yml passed,
+// which proved the copy (#1258, point 1).
 function runAll(p, run, jobs) {
-  let failed = 0, ran = 0, unrun = 0;
+  let failed = 0, ran = 0, unrun = 0, proved = false;
   for (const [i, j] of jobs.entries()) {
     const r = run(j.file, j.id, j.job);
     failed += r.failed; ran += r.ran; unrun += r.unrun | 0;
-    if (j.name !== "core.yml" || !(r.copy ?? r.failed > 0) && !r.unrun) continue;
+    if (j.name === "core.yml" && !j.base && !r.failed && !r.unrun && r.ran) proved = true;
+    if (j.name !== "core.yml" || (j.base && proved) || !(r.copy ?? r.failed > 0) && !r.unrun) continue;
     // (core.yml unrun here proves nothing of the copy, so it stops the rest as its failure does)
     if (!r.failed) failed++;
     warn(`FAIL the copy of the core is ${r.failed ? "not the core at its pin" : "not proved the core, core.yml not run here"}, so no other check runs: each would run the copy's scripts. ${MEND}${r.failed ? "mend what core.yml says above, commit," : "run core.yml as its skip line above says,"} and run this check again.`);
-    const left = [...jobs.slice(i + 1).filter(l => !HOST_OWN[l.name] && (l.name !== "pr-description.yml" || p.described)).map(l => `${l.file}/${l.id}`),
+    const left = [...jobs.slice(i + 1).filter(l => !HOST_OWN[l.name] && (l.name !== "pr-description.yml" || p.described)).flatMap(l => run.keys(l.file, l.id, l.job)),
       ...(p.own ? ownWorkflows(p).flatMap(o => (o.wf === null ? [o.file] : Object.keys(o.wf.jobs).map(id => `${o.file}/${id}`))) : [])];
     for (const at of left) { verdicts[at] = "stopped"; say(`stop ${at}: not run, behind the failure above`); }
     return { failed, ran, unrun };
@@ -223,7 +226,7 @@ function callers({ root, show, head, base }, tmp) {
   const read = rev => listed(rev).map(f => readable(f, show(rev, `.github/workflows/${f}`), { say, fail })).filter(Boolean);
   // (a base's call moved to the head's pin where the workflow it calls stands there)
   const moved = uses => { const m = call.exec(String(uses)); return m && m[2] === pinOf(base) && coreFile(tmp, pin, `.github/workflows/${m[1]}`) !== null ? String(uses).replace(/@[0-9a-f]{40}$/u, `@${pin}`) : uses; };
-  const own = sync ? syncCalls(read(base), read(head), calls, moved) : read(at);
+  const own = sync ? syncCalls(read(base), read(head), calls, moved, uses => call.exec(String(uses))?.[1] ?? null) : read(at);
   if (own.some(c => Object.values(c.wf.jobs ?? {}).some(calls))) return own;
   const kit = [];
   const templates = coreFile(tmp, pin, "setup/template/workflows", true);
@@ -297,6 +300,14 @@ function runner(p, tmp) {
       warn(`FAIL ${file}/${id}: ${name} cannot be run from plain git here (${e.message}). ${MEND}run that check on the host meanwhile, and report it to the core (core/README.md, "Reporting to the core").`);
       return { failed: 1, ran: 0 };
     }
+  };
+  // (the keys a job that calls a workflow of the core's is written under, one for each job of the workflow it calls, as
+  // report() writes them where it runs; its own place where that workflow cannot be read: #1258, point 2)
+  byCall.keys = (file, id, job) => {
+    const [, name, pin] = call.exec(String(job?.uses ?? "")) ?? [];
+    let ids = [];
+    try { ids = Object.keys(parseYaml(coreFile(tmp, pin, `.github/workflows/${name}`) ?? "").jobs ?? {}); } catch { /* (not read: its own place) */ }
+    return ids.length ? ids.map(called => `${file}/${id}/${called}`) : [`${file}/${id}`];
   };
   // (a workflow of the project's own, its jobs that call no workflow alone, run as the calls' jobs are, its steps the
   // change's own code, given no secret, not even the personal-terms list the calls are given)

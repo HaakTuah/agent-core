@@ -116,6 +116,15 @@ jobs:
   const narrowed = syncCalls([{ file: "c.yml", wf: { on: { pull_request: null }, jobs: { c: { uses: "c@old" } } } }], [{ file: "c.yml", wf: { on: { workflow_dispatch: null }, jobs: { c: { uses: "c@new" } } } }], calls, uses => uses.replace("old", "new"));
   ok(narrowed.length === 2 && narrowed[1].wf.on.pull_request === null && narrowed[1].wf.jobs["c (as the base calls it)"].uses === "c@new",
     "  and so does a call whose file's triggers the sync changes, run on the base's triggers", JSON.stringify(narrowed));
+  // (#1258, point 1: with each call's workflow named, a base call of a workflow the sync calls too, left at a pin the
+  // sync calls it at nowhere, runs not; one moved to the sync's pin runs as before; one of a workflow the sync calls
+  // not at all runs as the base holds it; and each of the base's is marked so)
+  const nameOf = uses => /^(\w+)@/u.exec(uses)?.[1] ?? null, move = uses => uses.replace(/@old$/u, "@new");
+  const stale = syncCalls([{ file: "core.yml", wf: { jobs: { core: { uses: "core@older" }, moved: { uses: "lic@old", with: { a: 1 } }, renamed: { uses: "copies@old" }, renamedStale: { uses: "copies@older" }, gone: { uses: "terms@old" } } } }],
+    [{ file: "core.yml", wf: { jobs: { core: { uses: "core@new", with: { added: true } }, moved: { uses: "lic@new" }, copies: { uses: "copies@new" } } } }], calls, move, nameOf);
+  const kept = stale.slice(1).map(c => Object.entries(c.wf.jobs).map(([id, j]) => `${id}=${j.uses}`).join()).join();
+  ok(stale.length === 2 && kept === "moved (as the base calls it)=lic@new,renamed=copies@new,gone=terms@old" && stale[1].base === true && !stale[0].base,
+    "  and a base call of a workflow the sync calls too, at a pin the sync calls it at nowhere, runs not; one the sync's file leaves out runs at the sync's pin where it moves there; one of a workflow the sync calls not at all runs as the base holds it (#1258, point 1)", JSON.stringify(stale));
 
   // (point 8: a push that names tags alone starts on no push to main, and a job on another system is left unrun, said so;
   // point 9: a step that wants a program this machine lacks says which)

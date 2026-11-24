@@ -247,11 +247,57 @@ fs.rmSync(path.join(dir, ".github", "workflows", "core.yml"));
 fs.writeFileSync(path.join(dir, "core", "README.md"), "edited here\n");
 commit(dir, "the copy edited, and its check's call taken out");
 r = check(dir, "--base", "base", "--verdicts", path.join(tmp, "s.json"));
-ok(r.status === 1 && r.out.includes("core/ differs from the core at its pin") && r.out.includes("so no other check runs") && !/ok {3}copies\.yml/.test(r.out) && mended(r.out) && /"stopped"/.test(fs.readFileSync(path.join(tmp, "s.json"))),
-  "a change that takes out its call to core.yml is still checked by the base's call, and a copy that fails it runs no other check, each said stopped", r.out);
+const stoppedAt = JSON.parse(fs.readFileSync(path.join(tmp, "s.json"), "utf8"));
+ok(r.status === 1 && r.out.includes("core/ differs from the core at its pin") && r.out.includes("so no other check runs") && !/ok {3}copies\.yml/.test(r.out) && mended(r.out) && stoppedAt["copies.yml/copies/copies"] === "stopped" && !("copies.yml/copies" in stoppedAt),
+  "a change that takes out its call to core.yml is still checked by the base's call, and a copy that fails it runs no other check, each said stopped by the key it runs under (#1258, point 2)", `${r.out}\n${JSON.stringify(stoppedAt)}`);
 git(dir, "branch", "-q", "-f", "nocore");
 r = check(dir, "--base", "nocore");
 ok(r.status === 1 && r.out.includes("no call to the core's core.yml") && mended(r.out), "a base that calls no core.yml fails, saying its mend", r.out);
+
+// a sync along the core's main runs as GitHub runs its merge: its own calls at the new pin, and the base's call of
+// core.yml, left at a pin whose core.yml compares the copy leaving out less, neither runs nor gates, though the sync
+// gives the call an input the kit adds (#1258, point 1); the same change, its pin moved to a commit off the core's
+// main, is no sync, and the base's calls run, so a change cannot drop a check by taking its call out
+{
+  git(dir, "reset", "-q", "--hard", "base");
+  const at = /^Core: \S+ at ([0-9a-f]{40})/m.exec(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8"))[1];
+  const coreYml = path.join(core, ".github", "workflows", "core.yml"), stands = fs.readFileSync(coreYml, "utf8");
+  ok(stands.includes("for kept in reports words tests; do"), "core.yml leaves reports, words and tests out of the copy it compares, as the test reads it");
+  fs.writeFileSync(coreYml, stands.replace("for kept in reports words tests; do", "for kept in reports words; do"));
+  git(core, "commit", "-q", "-am", "an older core.yml, which compares the copy leaving out less");
+  const older = git(core, "rev-parse", "HEAD");
+  fs.writeFileSync(coreYml, stands);
+  git(core, "commit", "-q", "-am", "core.yml as it stands");
+  const newer = git(core, "rev-parse", "HEAD");
+  git(core, "branch", "-q", "off-main", git(core, "commit-tree", `${newer}^{tree}`, "-p", newer, "-m", "a commit off the core's main"));
+  const offMain = git(core, "rev-parse", "off-main");
+  const workflows = path.join(dir, ".github", "workflows"), caller = path.join(workflows, "core.yml");
+  // (the base: its call of core.yml left at the older pin, as an older sync left it, its manifest at its own)
+  fs.writeFileSync(caller, fs.readFileSync(caller, "utf8").replace(`core.yml@${at}`, `core.yml@${older}`));
+  commit(dir, "a call of core.yml left at an older pin");
+  git(dir, "branch", "-q", "-f", "before-sync");
+  const syncTo = pin => {
+    git(dir, "reset", "-q", "--hard", "before-sync");
+    for (const f of ["core-manifest.md", ...fs.readdirSync(workflows).map(w => path.join(".github", "workflows", w))]) {
+      const file = path.join(dir, f);
+      fs.writeFileSync(file, fs.readFileSync(file, "utf8").replaceAll(at, pin).replaceAll(older, pin));
+    }
+    fs.appendFileSync(caller, "    with:\n      description: false\n");
+    commit(dir, `the sync to ${pin.slice(0, 7)}`);
+  };
+  syncTo(newer);
+  const synced = path.join(tmp, "synced.json");
+  r = check(dir, "--base", "before-sync", "--verdicts", synced);
+  const after = JSON.parse(fs.readFileSync(synced, "utf8"));
+  ok(r.status === 0 && r.out.includes("a sync: its own calls run") && !r.out.includes("differs from the core at its pin") && !r.out.includes("as the base calls it") && /ok {3}core\.yml\/core\/core/.test(r.out) && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && Object.values(after).every(v => v === "passed"),
+    "a sync runs its own calls at the new pin, and the base's call of core.yml at an older pin, which reads a copy that leaves out more as differing, neither runs nor stops the rest", `${r.out}\n${JSON.stringify(after)}`);
+  syncTo(offMain);
+  r = check(dir, "--base", "before-sync");
+  ok(r.status === 1 && !r.out.includes("a sync") && r.out.includes("so no other check runs") && mended(r.out),
+    "  and the same change, its pin moved to a commit off the core's main, is no sync: the base's calls run, its call of core.yml at the older pin among them", r.out);
+  git(core, "reset", "-q", "--hard", at);
+  git(core, "branch", "-q", "-D", "off-main");
+}
 
 // a listed personal term is found and never printed
 git(dir, "reset", "-q", "--hard", "base");
