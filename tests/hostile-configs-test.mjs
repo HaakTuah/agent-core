@@ -4,7 +4,7 @@
 // project, a number out of range, and nothing at all; each fails with its mend or reads the input as not there, and
 // reads and writes nothing outside the project. The readers: copies.mjs and reading-size.mjs, run from a scratch
 // project's copy of the core; shape.mjs's parseConfig and where; size.mjs's capsOf, answered and --raise;
-// manifest-reads.mjs's notes; licences.mjs's loadConfig; steps.mjs's notDone with the step for rule 5's inputs;
+// manifest-reads.mjs's notes; step-checks-modules.mjs's step of the modules and rewritten; licences.mjs's loadConfig; steps.mjs's notDone with the step for rule 5's inputs;
 // read-nothing.mjs's readNothing (#459); and
 // sync.mjs and look.mjs, run from the copy, on a manifest that is a link out of the project. Test
 // data is made up. Run by the core's tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
@@ -15,6 +15,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { loadConfig } from "../scripts/licences.mjs";
 import { notes } from "../scripts/manifest-reads.mjs";
+import { rewritten } from "../scripts/step-checks-modules.mjs";
+import modules from "../scripts/steps/160-the-modules-a-project-takes.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { OWNER, scratchDir, root } from "../scripts/scratch-core.mjs";
 import { parseConfig, survey, where, KIT } from "../scripts/shape.mjs";
@@ -193,6 +195,15 @@ ok(read("Modules: `../../etc/passwd`, `/etc/x.md`.\n").some(l => l.includes("can
 ok(read("Modules: <img src=x onerror=alert(1)>.\n").some(l => l.includes("cannot be read")), "manifest-reads.mjs: notes reads markup on the Modules line as no module, and only quotes it");
 [said, ms] = timed(() => read(`Modules: ${Array.from({ length: BIG }, (_, i) => `\`m${i}.md\``).join(", ")}.\n${"*x ".repeat(1 << 20)}`));
 ok(said.length === BIG + 1 && ms < 5000, `manifest-reads.mjs: notes reads a manifest of ${BIG} names and 3 MB in ${ms} ms, each name no module`);
+// (a list of names the core moved and modules it keeps, each many times over, read by the step that places every
+// module and written by its writer, each within the limit; #1259, point 1)
+{
+  const many = { manifest: `Modules: ${Array.from({ length: BIG }, (_, i) => i % 2 ? "git" : "cleaning").join(", ")}.\n`, files: [] };
+  [said, ms] = timed(() => thrown(() => modules.check(many)));
+  ok(!said.startsWith("raw") && ms < 5000, `step-checks-modules.mjs: the step of the modules reads ${BIG} names, half of them moved, in ${ms} ms`);
+  [said, ms] = timed(() => thrown(() => rewritten(many, { except: ["done-when.md", "planning.md", "repositories.md"] })));
+  ok(!said.startsWith("raw") && ms < 5000, `step-checks-modules.mjs: rewritten writes ${BIG} names, half of them moved, in ${ms} ms`);
+}
 // (a number has no place in the manifest's lines this reader reads: no case of one out of range applies)
 
 // ---- sync.mjs and look.mjs: core-manifest.md, read as the steps read it (own-files.mjs; #446) ----

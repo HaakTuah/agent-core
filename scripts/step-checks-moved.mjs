@@ -23,6 +23,9 @@ export function moved(core = HERE) {
   }
   return out;
 }
+// The modules that left modules/, by their old name, each to the path its text went to: { "<name>.md": path }, which
+// names a manifest's "Modules:" line may still hold (#1259, point 1).
+export const movedModules = (core = HERE) => Object.fromEntries(Object.entries(moved(core)).filter(([old]) => old.startsWith("modules/")).map(([old, to]) => [old.slice("modules/".length), to]));
 // What a file at an old path says stands elsewhere than the rest of it, in its lines "Now in [`<path>`](..): **<lead>**.":
 // { old path: [{ lead, to }] }.
 moved.apart = (core = HERE) => Object.fromEntries(Object.keys(moved(core)).map(old => {

@@ -159,7 +159,7 @@ export function merged(root, busy) {
     const r = keysMerged(now, want, asksOf(which.get(to)));
     if (r.left) { out.push({ lead: MERGED, why: `\`${to}\` ${r.left}` }); continue; }
     if (!r.text) continue;
-    try { writable(p, to, busy); } catch (e) { if (!(e instanceof Unwritten)) throw e; out.push({ lead: MERGED, why: plain(e.message, root) }); continue; }
+    try { writable(p, to, busy); } catch (e) { if (!(e instanceof Unwritten)) throw e; out.push({ lead: MERGED, why: plain(e.message, root), ...(e.file ? { busy: e.file } : {}) }); continue; }
     fs.writeFileSync(path.join(root, to), r.text);
     wrote.push(to);
   }

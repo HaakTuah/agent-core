@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { CORE_SOURCE as A } from "./core-address.mjs";
+import { readCore } from "./core-path.mjs";
 import { WORKFLOW } from "./power.mjs";
 
 export const MANIFEST = "core-manifest.md";
@@ -55,3 +56,14 @@ export function pinsBack(root, pins) {
   }
   return left;
 }
+
+// The stash a run of the writers at a sync sets its writes aside in (steps.mjs, `setAside`), named ASIDE, the pin the
+// manifest names and the time, so that a sync run again, at the same pin too, leaves stashes whose names differ, and its
+// report says which to pop (#1264, point 1).
+export const ASIDE = "the steps' writes (#1091)";
+export const asideName = (root, at = new Date()) => {
+  let pin = null;
+  try { pin = readCore(fs.readFileSync(path.join(root, MANIFEST), "utf8")).pin ?? null; } catch { /* (no manifest to read: the time alone) */ }
+  return `${ASIDE}${pin ? ` at ${pin.slice(0, 7)}` : ""}, ${at.toISOString()}`;
+};
+export const stashed = (root, files, name) => () => execFileSync("git", ["--literal-pathspecs", "stash", "push", "--include-untracked", "--quiet", "-m", name, "--", ...files], { cwd: root, stdio: ["ignore", "ignore", "pipe"] });

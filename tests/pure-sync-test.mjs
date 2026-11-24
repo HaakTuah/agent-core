@@ -59,6 +59,15 @@ write(theCore, ".github/workflows/personal-terms.yml", `${terms}# A\n`);
 const A = commit("A");
 write(theCore, ".github/workflows/personal-terms.yml", terms);
 write(theCore, "setup/sync-notes/999-a-note-for-the-test.md", NOTE_LINE); // (an entry is a file of the folder: #750, point 1)
+// (and one whose step reads it done, which the sync gives by its lead alone: #1264, point 2)
+write(theCore, "setup/sync-notes/998-a-done-note.md", "- **13 November 2026, a done note.** Done when its step reads so, as it always does.\n");
+write(theCore, "scripts/steps/998-a-done-note.mjs", 'import { COST } from "../step-checks.mjs";\n\nexport default { lead: "13 November 2026, a done note", cost: COST.line, check: () => null };\n');
+// (and one whose check passes but leaves a part to the review, `partly`, which stays in full: what is left is still asked)
+write(theCore, "setup/sync-notes/997-a-partly-note.md", "- **13 November 2026, a partly note.** Its check reads one half; the review reads the other half.\n");
+write(theCore, "scripts/steps/997-a-partly-note.mjs", 'import { COST } from "../step-checks.mjs";\n\nexport default { lead: "13 November 2026, a partly note", cost: COST.line, check: () => null, partly: "the other half, read by the review" };\n');
+// (and one the manifest's "Differences" leaves undone on purpose, which no check reads done, so it stays in full)
+write(theCore, "setup/sync-notes/996-a-declared-note.md", "- **13 November 2026, a declared note.** Asked of every project; this one leaves it undone on purpose.\n");
+write(theCore, "scripts/steps/996-a-declared-note.mjs", 'import { COST } from "../step-checks.mjs";\n\nexport default { lead: "13 November 2026, a declared note", cost: COST.line, check: () => "the declared note is not done. Mend: do it" };\n');
 const B = commit("B");
 const SIDE = git(theCore, "commit-tree", `${B}^{tree}`, "-p", B, "-m", "off main");
 // (packed once: every later fetch, clone and archive of the core reuses the pack, where the loose objects each time are compressed again, which was about half of a run's time in them; #812)
@@ -77,7 +86,7 @@ git(tmp, "init", "-q", "--bare", "-b", "main", origin);
 fs.mkdirSync(p);
 git(p, "init", "-q", "-b", "main");
 git(p, "remote", "add", "origin", origin);
-const manifest = (owner, pin = A) => `# Core manifest\n\nCore: ${CORE} at ${pin}, copied whole under core/ (never edited here).\nFloor: whole. Modules: all.\n\n## Slots\n| Slot | Here |\n| --- | --- |\n| *owner's account* | \`${owner}\` |\n`;
+const manifest = (owner, pin = A) => `# Core manifest\n\nCore: ${CORE} at ${pin}, copied whole under core/ (never edited here).\nFloor: whole. Modules: all.\n\n## Slots\n| Slot | Here |\n| --- | --- |\n| *owner's account* | \`${owner}\` |\n\n## Differences\n\n- "13 November 2026, a declared note": left undone here on purpose.\n`;
 write(p, "core-manifest.md", manifest(OWNER));
 const first = node(p, path.join(clone, "scripts", "sync.mjs"));
 ok(first.status === 0 && first.out.includes("the first copy"), "the first copy: the sync script, run from a clone of the core, writes core/ at the manifest's pin", first.out);
@@ -104,7 +113,10 @@ const s = (r => ({ status: r.status, out: `${r.stdout}${r.stderr}` }))(spawnSync
 const calls = read(p, ".github/workflows/core.yml");
 ok(s.status === 0 && s.out.includes(`${SHA(A)} -> ${SHA(B)}`) && read(p, "core-manifest.md") === manifest(OWNER, B), "the sync takes a project that follows main to the core's newest commit, and moves the manifest's pin", s.out);
 ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) && s.out.includes("personal-terms.yml"), "  it moves a call whose workflow changed, and leaves one whose workflow did not", calls);
-ok(s.out.includes("a note for the test"), "  and prints the sync notes the core gained between the two pins", s.out);
+ok(s.out.includes("Done when nothing: an entry that B gains over A."), "  and prints the sync notes the core gained between the two pins", s.out);
+ok(s.out.includes("- 13 November 2026, a done note: done here, as its step reads.") && !s.out.includes("as it always does"), "  each whose step the new copy reads done here by its lead alone (#1264)", s.out);
+ok(s.out.includes("this one leaves it undone on purpose") && !s.out.includes("a declared note: done here"), "  one the manifest's \"Differences\" leaves undone on purpose in full, never told done (#1264)", s.out);
+ok(s.out.includes("the review reads the other half") && !s.out.includes("a partly note: done here"), "  one whose check leaves a part to the review in full, though its check passes (#1264)", s.out);
 ok(/The core's files and parts written[\s\S]*\.github\/workflows\/look\.yml[\s\S]*For the sync PR's description[\s\S]*Steps not done[\s\S]*Beside a fresh start/.test(s.out),
   "  then, from the copy it wrote, what the core owns written by the one process (#1083), and every step not done, a standing one too, and every difference from a fresh start, for the PR's description", s.out);
 ok(/\n(No setting only the owner gives is new since [0-9a-f]{7}: the sitting is not asked again|The settings only the owner gives)/.test(s.out), "  and asks the owner's settings again only where one is new since the old pin, saying so where none is (owner-settings.mjs; #1085)", s.out);

@@ -24,6 +24,7 @@ import { logged, unrooted } from "./guards.mjs";
 import { MODULES } from "./reading.mjs";
 import { started } from "./started.mjs";
 import { copyOf, projectAt, readCore } from "./core-path.mjs";
+import { movedModules } from "./step-checks-moved.mjs";
 
 const plain = s => s.toLowerCase().replace(/[‘’]/gu, "'").replace(/\s+/gu, " ").trim();
 // (a phrase in italics may run over one line break, as a module's text wraps it: "*where the numbers\n  go*"; the
@@ -76,28 +77,41 @@ export function markGaps(readme, stands) {
   return out;
 }
 
-// What the manifest's "Modules:" line takes: "all", the names of a list, or null where it is neither. And the modules
-// it leaves out, each with its reason ("" where it names none). A list names its modules in backticks, with or without
-// their folder and ".md"; or bare, parted by commas, read only where `known` (the core's modules, as `<name>.md`) holds
-// each, so that a line of words is never read as a list (#1248, point 1).
-export function modulesOf(manifest, known = null) {
-  const line = /\bModules:\s*([^\n]*)/u.exec(String(manifest))?.[1].trim() ?? "";
-  const names = text => [...text.matchAll(/`(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?`/gu)].map(m => `${m[1]}.md`);
-  const bare = !line.includes("`") && known ? listOf(`Modules: ${line}`)?.items.map(i => i.name) : null;
-  const taken = /^all\b/iu.test(line) ? "all" : names(line).length ? new Set(names(line))
-    : bare?.length && bare.every(n => known.includes(n)) ? new Set(bare) : null;
-  const notTaken = new Map();
-  const nt = /^Not taken:\s*(.*)$/mu.exec(String(manifest))?.[1] ?? "";
+// The modules the manifest's line "Not taken:" leaves out, each with its reason ("" where it names none).
+function notTakenOf(manifest) {
+  const notTaken = new Map(), nt = /^Not taken:\s*(.*)$/mu.exec(String(manifest))?.[1] ?? "";
   for (const m of nt.matchAll(/`(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?`(?:\s*\(([^)]*)\))?/gu)) notTaken.set(`${m[1]}.md`, (m[2] ?? "").trim());
-  return { taken, notTaken, line };
+  return notTaken;
 }
+
+// What the manifest's "Modules:" line takes: "all", the names of a list, or null where it is neither. And the modules
+// it leaves out, each with its reason ("" where it names none), and the names its list holds, as written, that are
+// neither in `known` nor in `movedTo` (`unknown`). A list names its modules in backticks, with or without their folder
+// and ".md"; or bare, parted by commas, read only where each name is in `known` (the core's modules, as `<name>.md`) or
+// `movedTo` (the modules the core moved, by their old name: step-checks-moved.mjs, `movedModules`), so that a line of
+// words is never read as a list (#1248, point 1); in either form a name the core moved is read as one, and an empty
+// list as taking no module (#1259, point 1).
+export function modulesOf(manifest, known = null, movedTo = {}) {
+  const at = /\bModules:\s*([^\n]*)/u.exec(String(manifest)), line = at?.[1].trim() ?? "";
+  const names = text => [...text.matchAll(/`(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?`/gu)].map(m => `${m[1]}.md`);
+  const list = at ? listOf(`Modules: ${line}`) : null, items = list?.items ?? [], read = n => known?.includes(n) || Object.hasOwn(movedTo, n);
+  const bare = !line.includes("`") && known && list ? items.map(i => i.name) : null;
+  const taken = /^all\b/iu.test(line) ? "all" : names(line).length ? new Set(names(line))
+    : bare && bare.every(read) ? new Set(bare) : null;
+  return { taken, notTaken: notTakenOf(manifest), line, unknown: known ? items.filter(i => i.name && !read(i.name)).map(i => i.raw.trim()) : [] };
+}
+// The module that holds a moved module's text now (`to`, the path it went to), or null where it went to a file no
+// project takes as a module, a role's (#1259, point 1).
+export const heldIn = (to, known) => { const base = path.posix.basename(to); return MODULES.some(d => to === `${d}/${base}`) && known.includes(base) ? base : null; };
 // A "Modules:" line's list as it is written: the line's text before it (`head`) and after it (`tail`), and each name, as
-// written (`raw`) and as a module's file (`name`), with whether they stand in backticks; null where the line holds no
-// such list ("all", nothing, or a bare name that is no plain name).
+// written (`raw`) and as a module's file (`name`), with whether they stand in backticks; an empty list where the line
+// names nothing, as one a moved name's move empties (#1259, point 1); null where it holds no such list ("all", or a
+// bare name that is no plain name).
 const MODULE_NAME = /^(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?$/u;
-function listOf(line) {
+export function listOf(line) {
   const [, head, body] = /^(.*?\bModules:\s*)(.*)$/u.exec(line) ?? [];
   if (body === undefined || /^all\b/iu.test(body)) return null;
+  if (/^\.?\s*$/u.test(body)) return { head, list: "", tail: body, ticks: false, items: [] };
   const ticks = body.includes("`");
   const [, list, tail] = (ticks ? /^(.*`)(.*)$/u : /^(.*?)(\.?\s*)$/u).exec(body);
   const raws = ticks ? [...list.matchAll(/`([^`\n]*)`/gu)].map(m => m[1]) : list.split(/\s*,\s*(?:and\s+)?|\s+and\s+/u);
@@ -178,14 +192,18 @@ export function placed(manifest, places) {
 }
 
 // What a project's manifest lacks, one note each, with the mend: the modules of `moduleTexts` ({ name: text }) its list
-// neither takes nor leaves out.
-export function notes({ manifest, moduleTexts, where = {} }) {
+// neither takes nor leaves out; a name the core moved (`movedTo`, as modulesOf takes it) says where its text went.
+export function notes({ manifest, moduleTexts, where = {}, movedTo = {} }) {
   const out = [];
   const names = Object.keys(moduleTexts).sort();
-  const { taken, notTaken, line } = modulesOf(manifest, names);
+  const { taken, notTaken, line } = modulesOf(manifest, names, movedTo);
   if (taken === null) out.push(`core-manifest.md: its "Modules:" line (${line ? `"${line}"` : "none found"}) is neither "all" nor a list of the core's modules, each as \`<name>.md\` in backticks or by its bare name, parted by commas, so the modules it takes cannot be read; write it as the README's "The manifest's format" has it ("Modules: all." or a list)`);
   if (taken instanceof Set) {
-    for (const n of [...taken].filter(n => !names.includes(n)).sort()) out.push(`core-manifest.md: its "Modules:" line names ${n}, which is no module of the core (${MODULES.map(d => `core/${d}/`).join(", ")}); take it out of the line`);
+    for (const n of [...taken].filter(n => !names.includes(n)).sort()) {
+      const to = Object.hasOwn(movedTo, n) ? movedTo[n] : null, module = to && heldIn(to, names);
+      const now = to ? `; its text moved to core/${to}, ${module ? `so \`${module}\` takes its place there` : "which no project takes as a module"}` : "";
+      out.push(`core-manifest.md: its "Modules:" line names ${n}, which is no module of the core (${MODULES.map(d => `core/${d}/`).join(", ")})${now}; take it out of the line${to ? " (`node core/scripts/steps.mjs --write` does so)" : ""}`);
+    }
     for (const n of names.filter(n => !taken.has(n) && !notTaken.get(n))) {
       out.push(`core-manifest.md: core/${where[n] ?? "tasks"}/${n} is neither on the "Modules:" line nor left out with a reason; add \`${n}\` to the line where the project takes it, or add it to a line "Not taken: \`${n}\` (<why it does not apply here>)." under it`);
     }
@@ -203,7 +221,7 @@ export function projectNotes(root, home) {
   // (the modules, by name, from each folder that holds them)
   const where = Object.fromEntries(MODULES.flatMap(d => Object.keys(readDir(path.join(home, d))).map(n => [n, d])));
   const moduleTexts = Object.assign({}, ...MODULES.map(d => readDir(path.join(home, d))));
-  return notes({ manifest: fs.readFileSync(path.join(root, "core-manifest.md"), "utf8"), moduleTexts, where });
+  return notes({ manifest: fs.readFileSync(path.join(root, "core-manifest.md"), "utf8"), moduleTexts, where, movedTo: movedModules(home) });
 }
 
 function main() {

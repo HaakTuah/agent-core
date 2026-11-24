@@ -534,7 +534,7 @@ function upgrade(p, from, ownChanges, expect) {
   git(p.dir, "push", "-q", "origin", "main");
   // (what the run at the same pin set aside of its writers, the session takes after the merge by running them again,
   // as its words allow, which the case of the steps below does; the stash dropped, so the clone stands as pushed; #1246)
-  const aside = git(p.dir, "stash", "list").split("\n").findIndex(l => l.endsWith("the steps' writes (#1091)"));
+  const aside = git(p.dir, "stash", "list").split("\n").findIndex(l => l.includes("the steps' writes (#1091)"));
   if (aside >= 0) git(p.dir, "stash", "drop", "-q", `stash@{${aside}}`);
   const main1 = git(p.dir, "rev-parse", "HEAD");
   const onPush = checks(p, "push", main1, { baseSha: main0 });

@@ -16,9 +16,8 @@ import { parseConfig, where as shapeAt } from "./shape.mjs";
 import { copiesConfig, marksConfig } from "./check-configs.mjs";
 import { atCopy } from "./core-path.mjs";
 import { MOVED_GLOB, MOVED_GLOBS, moved, namers, readsOldAlone } from "./step-checks-moved.mjs";
-import { places } from "./step-checks-modules.mjs";
+import { rewritten } from "./step-checks-modules.mjs";
 import { MANIFEST, pinsOnly } from "./sync-pins.mjs";
-import { placed } from "./manifest-reads.mjs";
 import { HERE, plain, shown } from "./step-checks.mjs";
 import { Unread, copyAt } from "./workflow-calls.mjs";
 import { installed } from "./packages.mjs";
@@ -27,6 +26,8 @@ import { asLF, asMended, reads as workflowsRead } from "./workflows.mjs";
 /** A writer that could not run: it wrote nothing, and its message says why; a check that reads with a writer's pieces
  * throws it as workflow-calls.mjs's `Unread`, which it is. */
 export class Unwritten extends Unread {}
+/** A writer kept from a file with changes not yet committed (`held`): at a sync, its own (#1259, point 2). */
+export class Busy extends Unwritten { constructor(message, file) { super(message); this.file = file; } }
 
 // The files of the project at `root` with changes not yet committed, new ones among them, as git lists them: none is
 // written, so that what a writer writes stays apart from a session's own changes and from a sync's (#1091). Left out:
@@ -48,7 +49,7 @@ export function writable(p, f, busy) {
   const st = fs.lstatSync(at, { throwIfNoEntry: false });
   if (st && !st.isFile()) throw new Unwritten(`\`${shown(f)}\` is no regular file`);
   // (the manifest's, beyond its `Core:` line, which a sync's move alone `held` lets through: #1248, point 2)
-  if (busy.has(f)) throw new Unwritten(`\`${shown(f)}\` has changes not yet committed${f === MANIFEST ? " beyond its `Core:` line, whose move by the sync alone is let through" : ""}: commit them or set them aside, then run it again`);
+  if (busy.has(f)) throw new Busy(`\`${shown(f)}\` has changes not yet committed${f === MANIFEST ? " beyond its `Core:` line, whose move by the sync alone is let through" : ""}: commit them or set them aside, then run it again`, f);
   if (spawnSync("git", ["check-ignore", "-q", "--", f], { cwd: p.root }).status === 0) throw new Unwritten(`git ignores \`${shown(f)}\`: take it out of the ignore list and commit it, then run it again`);
 }
 
@@ -272,14 +273,15 @@ function pathsLine(p, writes) {
 }
 
 // The manifest with each module its list neither takes nor leaves out placed from what is read exactly (#1094;
-// step-checks-modules.mjs, `places`, which `opts` narrows), where there is one to place.
+// step-checks-modules.mjs, `rewritten`, which `opts` narrows), and, by the step that places every module, each name the
+// core moved brought to where its text went (#1259, point 1), where there is one to place or bring.
 export const writePlaced = opts => (p, busy) => {
-  const left = places(p, opts);
-  if (!left.length) return [];
+  const text = rewritten(p, opts);
+  if (text === p.manifest) return [];
   writable(p, "core-manifest.md", busy);
   // (its own line ends kept: the manifest is read as LF, and a file the tree holds with Windows ones, as git writes it
   // with core.autocrlf, would otherwise be written whole in LF, every line of it changed; #1227)
-  const raw = p.read("core-manifest.md", true) ?? "", crlf = /\r\n/u.test(raw) && !/(^|[^\r])\n/u.test(raw), text = placed(p.manifest, left);
+  const raw = p.read("core-manifest.md", true) ?? "", crlf = /\r\n/u.test(raw) && !/(^|[^\r])\n/u.test(raw);
   put(p, "core-manifest.md", crlf ? text.replace(/\n/gu, "\r\n") : text);
   return ["core-manifest.md"];
 };
