@@ -160,9 +160,13 @@ for (const l of WHOLE) {
   // committed, left where it stands ----
   put("sync-own.md", "the sync's own\n");
   r = write("--aside");
-  const stashed = git("stash", "list");
-  ok(r.status === 0 && r.stdout.includes(`set aside in the stash "${ASIDE}"`) && r.stdout.includes("git stash pop stash@{N}") && dirty() === "?? sync-own.md" && stashed.includes(ASIDE) && missed(l).length === 1,
-    "--aside sets what it wrote aside in a stash, the tree as it stood, the sync's own change left out of it, and names the stash to pop", `${r.stdout}${r.stderr}\n${stashed}\n${dirty()}`);
+  const stashed = git("stash", "list"), named = out => /set aside in the stash "([^"]+)"/u.exec(out)?.[1] ?? "", name = named(r.stdout);
+  ok(r.status === 0 && name.startsWith(ASIDE) && /, \d{4}-\d\d-\d\dT[\d:.]+Z$/u.test(name) && r.stdout.includes(`N the number it gives the stash "${name}"`) && dirty() === "?? sync-own.md" && stashed.includes(name) && missed(l).length === 1,
+    "--aside sets what it wrote aside in a stash named by the time, the tree as it stood, the sync's own change left out of it, and names the stash to pop", `${r.stdout}${r.stderr}\n${stashed}\n${dirty()}`);
+  r = write("--aside");
+  const second = named(r.stdout), both = git("stash", "list");
+  ok(second && second !== name && both.includes(name) && both.includes(second), "run again, as a sync run again at its pin is, it sets its writes aside under a name of their own, which its report names, never the earlier's (#1264)", `${r.stdout}\n${both}`);
+  git("stash", "drop", "-q", "stash@{0}");
   git("stash", "pop", "-q");
   ok(!missed(l).length && read("sync-own.md") === "the sync's own\n", "and the stash, popped, brings it back: the step reads done", report(notDone(dir)));
   back();
@@ -216,7 +220,7 @@ for (const l of WHOLE) {
   put("core-manifest.md", moved);
   r = write("--aside");
   const left = raw("core-manifest.md");
-  ok(r.status === 0 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``) && r.stdout.includes(`set aside in the stash "${ASIDE}"`) && left === moved && dirty() === "M core-manifest.md",
+  ok(r.status === 0 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``) && r.stdout.includes(`set aside in the stash "${ASIDE} at ${"c".repeat(7)}, `) && left === moved && dirty() === "M core-manifest.md",
     "at a sync that moved the manifest's pin, --aside writes its module lines and sets them aside, the moved pin left where the sync put it", `${r.stdout}${r.stderr}\n---\n${left}\n---\n${dirty()}`);
   commit("the sync's pull request, merged");
   git("stash", "pop", "-q");
