@@ -229,9 +229,9 @@ function callers({ root, show, head, base }, tmp) {
   const calls = job => call.test(String(job?.uses ?? ""));
   const listed = rev => { try { return git(root, "ls-tree", "-z", "--name-only", `${rev}:.github/workflows`).split("\0").filter(f => /\.ya?ml$/.test(f)); } catch { return []; } };
   const read = rev => listed(rev).map(f => readable(f, show(rev, `.github/workflows/${f}`), { say, fail })).filter(Boolean);
-  // (a base's call moved to the head's pin where the workflow it calls stands there)
-  const moved = uses => { const m = call.exec(String(uses)); return m && m[2] === pinOf(base) && coreFile(tmp, pin, `.github/workflows/${m[1]}`) !== null ? String(uses).replace(/@[0-9a-f]{40}$/u, `@${pin}`) : uses; };
-  const own = sync ? syncCalls(read(base), read(head), calls, moved, uses => call.exec(String(uses))?.[1] ?? null) : read(at);
+  // (a base's call moved to the head's pin, from whatever pin it held, where the workflow it calls stands there: #1258)
+  const moved = uses => { const m = call.exec(String(uses)); return m && coreFile(tmp, pin, `.github/workflows/${m[1]}`) !== null ? String(uses).replace(/@[0-9a-f]{40}$/u, `@${pin}`) : uses; };
+  const own = sync ? syncCalls(read(base), read(head), calls, moved) : read(at);
   if (own.some(c => Object.values(c.wf.jobs ?? {}).some(calls))) return own;
   const kit = [];
   const templates = coreFile(tmp, pin, "setup/template/workflows", true);

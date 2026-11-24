@@ -2,15 +2,15 @@
 // host"): those whose triggers start on it, as GitHub reads them, and, of a sync, its own. The calls are the base's, so
 // a change cannot leave a check out by taking its call out; but a change that moves the manifest's pin forward along the
 // core's main, a sync, runs its own calls as GitHub runs its merge, at the new pin, since the old pin's core.yml reads
-// a copy the new one leaves otherwise as differing (#1245, point 1); of the base's, a call of a workflow the sync calls
-// too runs only where it moves to the sync's pin, and there only where the sync calls it otherwise, never as the copy's
-// gate behind the sync's own core.yml passed (#1258); and every call of a workflow the sync calls not at all runs as the base
-// holds it, so a sync leaves no check out. Also the reading of the project's own workflows, which job stops the rest,
-// and the keys and reasons its verdicts are written under. Node's own modules, the core's address, its YAML reader and
-// the runner's path filter.
+// a copy the new one leaves otherwise as differing (#1245, point 1); and each of the base's calls, moved to the sync's
+// pin, where the sync leaves it out or calls it otherwise, so a sync leaves no check out, never as the copy's gate
+// behind the sync's own core.yml passed (#1258). Also the reading of the project's own workflows, which job stops the rest,
+// and the keys and reasons its verdicts are written under. Node's own modules, the core's address, its YAML reader, the
+// reader of the signature check's refusal of an npm (npm-reads.mjs) and the runner's path filter.
 import { CORE } from "./core-address.mjs";
 import { MEND } from "./mend.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
+import { npmRefused } from "./npm-reads.mjs";
 import { needsOf } from "./workflow-needs.mjs";
 import { pathsLetThrough } from "./workflow-run.mjs";
 
@@ -22,25 +22,20 @@ export function movesForward(from, to, past) {
 }
 
 // A sync's calls: its own (`head`, each { file, wf }), and, of the base's, each job that calls a workflow of the core's
-// (`calls(job)`) that the head's file of that name does not, as the base holds it; and each the head calls otherwise
-// than the base but for the pin, or from a file whose triggers or other settings outside its jobs differ, as the base
-// calls it at the head's pin where `moved(uses)` gives it there, beside the head's own, so a sync that weakens a call's
-// inputs or triggers, or calls another workflow in its place, drops no check. Where `named(uses)` names the workflow a
-// call calls, a base job whose call of a workflow the head calls too stays at a pin the head calls it at nowhere is
-// left out, as GitHub runs the merge's calls alone (#1258, point 1): at its old pin it would read the sync's copy as
-// differing; and one the head's file does not call, at the head's pin, where `moved` gives it there. Each of the base's
-// is marked `base`, which check.mjs reads.
-export function syncCalls(base, head, calls, moved = uses => uses, named = () => null) {
+// (`calls(job)`), moved to the sync's pin where `moved(uses)` gives it there (#1258, point 1: GitHub runs no call at the
+// old pin, whose core.yml would read the sync's copy as differing, whatever pin the base held it at): one the head's
+// file of that name does not call, so a sync that takes a call out drops no check; and one the head calls otherwise, or
+// from a file whose triggers or other settings outside its jobs differ, as the base calls it, beside the head's own, so
+// a sync that weakens a call's inputs or triggers, points it at another commit, or calls another workflow in its place,
+// drops no check. Each of the base's is marked `base`, which check.mjs reads.
+export function syncCalls(base, head, calls, moved = uses => uses) {
   const out = [...head];
-  const headCalls = head.flatMap(({ wf }) => Object.values(wf.jobs ?? {}).filter(calls).map(job => String(job.uses)));
-  const calledToo = uses => named(uses) !== null && headCalls.some(h => named(h) === named(uses));
   for (const { file, wf } of base) {
     const theirs = head.find(h => h.file === file)?.wf, mine = theirs?.jobs ?? {};
     const alike = theirs && canonical({ ...wf, jobs: null }) === canonical({ ...theirs, jobs: null });
     const jobs = Object.entries(wf.jobs ?? {}).filter(([, job]) => calls(job)).flatMap(([id, job]) => {
-      const there = { ...job, uses: moved(job.uses) }, too = calledToo(String(job.uses));
-      if (too && !headCalls.includes(String(there.uses))) return [];
-      if (!calls(mine[id])) return [[id, too ? there : job]];
+      const there = { ...job, uses: moved(job.uses) };
+      if (!calls(mine[id])) return [[id, there]];
       return alike && canonical(there) === canonical(mine[id]) ? [] : [[`${id} (as the base calls it)`, there]];
     });
     if (jobs.length) out.push({ file, wf: { ...wf, jobs: Object.fromEntries(jobs) }, base: true });
@@ -115,9 +110,12 @@ export function calledKeys({ file, id, job }, read) {
   return ids.length ? ids.map(called => `${file}/${id}/${called}`) : [`${file}/${id}`];
 }
 
-// Why a job was not run here, or null: on another system, or each failed step wanting a program this machine lacks (#1245, points 8 and 9).
+// Why a job was not run here, or null: on another system, or each failed step wanting a program this machine lacks
+// (#1245, points 8 and 9), or an npm, where the signature check refused the machine's as too old to read its settings,
+// its own words read exactly (npm-reads.mjs; #1262): a verdict of the machine's, not the change's.
 export function unrunWhy(r) {
-  const lacks = !r.passed && r.steps.every(s => s.passed || s.missing) && [...new Set(r.steps.map(s => s.missing).filter(Boolean))].join(", ");
+  const wants = r.passed ? [] : r.steps.filter(s => !s.passed).map(s => s.missing ?? (npmRefused(s.out) && `npm ${npmRefused(s.out)} or later, which the core's own Node (its .node-version) brings`));
+  const lacks = wants.length > 0 && wants.every(Boolean) && [...new Set(wants)].join(", ");
   return lacks ? `it needs ${lacks}, which this machine lacks` : r.unrun ?? null;
 }
 

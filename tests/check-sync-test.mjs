@@ -1,10 +1,10 @@
 // Tests of the core's checks from plain git (check.mjs; #1258) on a sync: a sync along the core's main runs as
 // GitHub runs its merge, its own calls at the new pin, and the base's call of core.yml, left at a pin whose core.yml
-// compares the copy leaving out less, neither runs nor gates, though the sync gives the call an input the kit adds; the
-// same change, its pin moved to a commit off the core's main, is no sync, and the base's calls run, so a change cannot
-// drop a check by taking its call out; and a job stopped behind a failure of core.yml's is written by the key it runs
-// under (point 2). Split from check-test.mjs, which holds the rest, to keep each within its size
-// mark. A scratch core reached through the core's own address by a git rewrite, its packages from a copy of the
+// compares the copy leaving out less, runs at the new pin as the base calls it, though the sync gives the call an input
+// the kit adds; the same change, its pin moved to a commit off the core's main, is no sync, and the base's calls run,
+// so a change cannot drop a check by taking its call out; and a job stopped behind a failure of core.yml's is written by
+// the key it runs under (point 2). Split from check-test.mjs, which holds the rest, to keep each within its size mark.
+// A scratch core reached through the core's own address by a git rewrite, its packages from a copy of the
 // machine's npm cache, as check-test.mjs sets them up, so nothing reaches the network. Git, bash, npm and Node's own
 // modules.
 //
@@ -13,6 +13,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { syncCalls } from "../scripts/check-calls.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { npmWithCache, scratch, scratchEnv, tally } from "../scripts/scratch-core.mjs";
 import { npmOnce } from "../scripts/npm-once.mjs";
@@ -22,6 +23,18 @@ const { tmp, git, core, project } = scratch("check-sync-test-");
 const env = npmOnce(scratchEnv(core, tmp), tmp, { real: npmWithCache(tmp) });
 const check = (dir, ...args) => { const r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), ...args], { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 const commit = (dir, what) => { git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", what); };
+
+// (#1258, point 1: every base call moves to the sync's pin, whatever pin it held, where its workflow stands there; one
+// the sync's file calls alike is left to it, and one it calls otherwise, from another trigger or at another commit,
+// runs as the base calls it, so nothing is dropped)
+const move = uses => (uses.startsWith("lic@") ? uses : uses.replace(/@\w+$/u, "@new"));
+const stale = syncCalls([{ file: "core.yml", wf: { on: "pull_request", jobs: { core: { uses: "core@older" }, same: { uses: "copies@older" }, gone: { uses: "terms@older" }, kept: { uses: "lic@older" } } } },
+  { file: "t.yml", wf: { on: "pull_request", jobs: { t: { uses: "terms@older" } } } }, { file: "c.yml", wf: { on: "pull_request", jobs: { c: { uses: "core@older", with: { copies: true } } } } }],
+[{ file: "core.yml", wf: { on: "pull_request", jobs: { core: { uses: "core@new", with: { added: true } }, same: { uses: "copies@new" } } } },
+  { file: "t.yml", wf: { on: "workflow_dispatch", jobs: { t: { uses: "terms@new" } } } }, { file: "c.yml", wf: { on: "pull_request", jobs: { c: { uses: "core@other" } } } }], job => Boolean(job?.uses), move);
+const kept = stale.slice(3).map(c => `${c.file}:${c.wf.on}:${Object.entries(c.wf.jobs).map(([id, j]) => `${id}=${j.uses}${j.with ? JSON.stringify(j.with) : ""}`).join()}`).join(";");
+ok(stale.length === 6 && kept === 'core.yml:pull_request:core (as the base calls it)=core@new,gone=terms@new,kept=lic@older;t.yml:pull_request:t (as the base calls it)=terms@new;c.yml:pull_request:c (as the base calls it)=core@new{"copies":true}' && stale.slice(3).every(c => c.base) && !stale.slice(0, 3).some(c => c.base),
+  "of the base's calls on a sync, whatever pin each held, one the sync calls alike is left to it; one it calls otherwise, from a trigger that starts on no change, or at another commit, runs as the base calls it at the sync's pin; one it leaves out runs at the sync's pin, or where its workflow is not there, as the base holds it (#1258, point 1)", kept);
 
 // a project the starter kit writes, at the scratch core's commit
 const p = project("a-project", "--owner", "someone");
@@ -58,8 +71,8 @@ syncTo(newer);
 const synced = path.join(tmp, "synced.json");
 r = check(dir, "--base", "before-sync", "--verdicts", synced);
 const after = JSON.parse(fs.readFileSync(synced, "utf8"));
-ok(r.status === 0 && r.out.includes("a sync: its own calls run") && !r.out.includes("differs from the core at its pin") && !r.out.includes("as the base calls it") && /ok {3}core\.yml\/core\/core/.test(r.out) && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && Object.values(after).every(v => v === "passed"),
-  "a sync runs its own calls at the new pin, and the base's call of core.yml at an older pin, which reads a copy that leaves out more as differing, neither runs nor stops the rest", `${r.out}\n${JSON.stringify(after)}`);
+ok(r.status === 0 && r.out.includes("a sync: its own calls run") && !r.out.includes("differs from the core at its pin") && /ok {3}core\.yml\/core\/core/.test(r.out) && /ok {3}core\.yml\/core \(as the base calls it\)\/core/.test(r.out) && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && Object.values(after).every(v => v === "passed"),
+  "a sync runs its own calls at the new pin, and the base's call of core.yml, held at an older pin whose core.yml reads a copy that leaves out more as differing, runs as the base calls it at the new pin, and passes", `${r.out}\n${JSON.stringify(after)}`);
 syncTo(offMain);
 const stopped = path.join(tmp, "stopped.json");
 r = check(dir, "--base", "before-sync", "--verdicts", stopped);

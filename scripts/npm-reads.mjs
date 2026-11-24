@@ -23,6 +23,11 @@ function before(a, b) {
 export const npmReadsAll = (settings = Object.keys(NPM_READS)) => settings.map(s => NPM_READS[s]).reduce((a, b) => (before(a, b) ? b : a));
 // Of the settings named, those the npm at `version` does not read: every one where no version is given.
 export const npmIgnores = (version, settings = Object.keys(NPM_READS)) => settings.filter(s => before(version, NPM_READS[s]));
+// What checks.mjs's signature check says where the npm at `version` ignores the settings named (`ignored`), which npm
+// reads from `least` on, and so installs nothing (#704); and, of a step's output, the npm such a refusal asks, or null
+// where it holds none, so check.mjs writes the job unrun on that machine, never failed (#1262). One wording, both read.
+export const npmRefusal = (version, ignored, least) => `npm ${version || "here, whose version could not be read,"} reads none of ${ignored.map(s => `--${s}`).join(", ")}, which npm reads from ${least} on, so its install would fetch any git, web or file source the lock file names, and nothing was installed.`;
+export const npmRefused = out => /^FAIL npm (?:\S+|here, whose version could not be read,) reads none of --[\w-]+(?:, --[\w-]+)*, which npm reads from (\d+\.\d+\.\d+) on, so its install would fetch any git, web or file source the lock file names, and nothing was installed\./mu.exec(String(out ?? ""))?.[1] ?? null;
 // The version of the npm the PATH finds, run in `cwd` (on Windows through its shell, by the path the system names, where
 // npm is a .cmd file, and looked for on the PATH alone, never in `cwd`), or "" where it cannot be read.
 export function npmVersion(cwd) {
