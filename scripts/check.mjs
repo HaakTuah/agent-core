@@ -12,10 +12,9 @@
 // read from the core at the call's pin, fetched from the core's address by git, as GitHub reads it, never from the
 // copy under core/, which the change may have edited; and a pipeline runs this script itself from a clone of the core,
 // not from that copy (tasks/hosts.md). It runs in a scratch clone of the commit, removed at its end, so it changes
-// nothing in the project. The steps run the change's own code, so they get only the variables a program needs to start
-// and reach the network, named in KEPT, with a home folder of their own and git's rewrites of an address alone (they
-// still run as the caller's user: tasks/hosts.md says where it runs). What only the host can do (a review app's status, the dependency review, code scanning, a job started by a
-// schedule) is not run here and is named: that is the host's part, and where a host has none, what stands in is in its
+// nothing in the project. What its steps run with, as they run the change's own code: KEPT, below. What only the
+// host can do (a review app's status, the dependency review, code scanning, a job started by a schedule) is not run
+// here and is named: that is the host's part, and where a host has none, what stands in is in its
 // part (tasks/hosts.md). The personal-terms list is read from the environment (PERSONAL_TERMS), never from a file, as
 // the host keeps it among its secrets, and each of its terms is printed as *** wherever a step prints it, in any case. It prints
 // each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed.
@@ -58,14 +57,12 @@ export const HOST_OWN = {
 // starts in, which the change under check fills, on any system; #513)
 const env = withAbsolutePath(plainEnv());
 // What the steps run with, since they run the change's own code (its copy's scripts, its packages' restore): only what
-// a program needs to start and reach the network, by name, with a home folder of its own in the scratch folder, no
-// system git settings, and of git's settings given here only the rewrites of an address (url.*.insteadOf), so no token
-// in this environment or in git's settings reaches them. They still run as the caller's own user, so a pipeline runs
-// this where no sign-in is held (tasks/hosts.md). On Windows a program finds the system's folders by name (NuGet reads
-// each from the environment, and a restore fails with no code of its own where one is missing; #1239): those of the
-// programs and of the machine's settings are kept, and the user's own two, which hold the user's sign-ins, are folders
-// of the scratch home, as HOME is.
-const KEPT = /^(PATH|LANG|LC_[A-Z]+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|PROGRAMDATA|ALLUSERSPROFILE|PROGRAMFILES|PROGRAMFILES\(X86\)|PROGRAMW6432|HTTPS?_PROXY|NO_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|GIT_ALLOW_PROTOCOL)$/i;
+// a program needs to start and reach the network, by name (on Windows the system's folders too, which NuGet reads by
+// name; #1239), a home folder of its own in the scratch folder, the user's own folders in it, no system git settings,
+// and of git's settings only the rewrites of an address (url.*.insteadOf), so no token in this environment or in git's
+// settings reaches them. They still run as the caller's own user, so a pipeline runs this where no sign-in is held
+// (tasks/hosts.md).
+const KEPT = /^(PATH|LANG|LC_[A-Z]+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|PROGRAM(DATA|FILES(\(X86\))?)|HTTPS?_PROXY|NO_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|GIT_ALLOW_PROTOCOL)$/i;
 export function stepEnv(home) {
   const kept = Object.fromEntries(Object.entries(env).filter(([name]) => KEPT.test(name)));
   const rewrites = [];
@@ -75,9 +72,9 @@ export function stepEnv(home) {
     if (/^url\..+\.insteadof$/i.test(key) && !/:\/\/[^/]*@/.test(key)) rewrites.push([key, env[`GIT_CONFIG_VALUE_${i}`] ?? ""]);
   }
   const git = Object.fromEntries(rewrites.flatMap(([key, value], i) => [[`GIT_CONFIG_KEY_${i}`, key], [`GIT_CONFIG_VALUE_${i}`, value]]));
-  const appData = path.join(home, "AppData", "Roaming"), localAppData = path.join(home, "AppData", "Local");
-  for (const dir of [appData, localAppData]) fs.mkdirSync(dir, { recursive: true });
-  return { ...kept, ...git, GIT_CONFIG_COUNT: String(rewrites.length), GIT_CONFIG_NOSYSTEM: "1", HOME: home, USERPROFILE: home, APPDATA: appData, LOCALAPPDATA: localAppData };
+  const [APPDATA, LOCALAPPDATA] = ["Roaming", "Local"].map(d => path.join(home, "AppData", d));
+  for (const d of [APPDATA, LOCALAPPDATA]) fs.mkdirSync(d, { recursive: true });
+  return { ...kept, ...git, GIT_CONFIG_COUNT: String(rewrites.length), GIT_CONFIG_NOSYSTEM: "1", HOME: home, USERPROFILE: home, APPDATA, LOCALAPPDATA };
 }
 let coreClone = null; // (the clone of the core's address, made at the first call: coreFile)
 const verdicts = {}; // (each job's verdict that ran, by its place, for --verdicts)
@@ -91,7 +88,7 @@ const warn = text => console.error(mask(text));
 const fail = (what, mend) => { warn(`FAIL ${what} ${MEND}${mend}`); process.exit(1); };
 const call = new RegExp(`^${CORE_SOURCE}/\\.github/workflows/([\\w.-]+)@([0-9a-f]{40})$`, "i");
 
-// It runs only as a command; check-test.mjs imports it for HOST_OWN alone, and nuget-gate-test.mjs for stepEnv.
+// It runs only as a command; tests import its HOST_OWN and stepEnv.
 if (started(import.meta.url)) main();
 
 function main() {
