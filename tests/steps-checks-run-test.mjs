@@ -75,7 +75,24 @@ ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths:
   put(list([...kept].reverse()), "other-tests");
   const otherJobs = named().includes("stand-in.yml");
   put(list([...kept, "src/**"]));
-  ok(left && otherJobs && named().includes("stand-in.yml") && /gains the same paths under its `paths`/.test(named()), "a workflow whose `paths` are a suite's `paths-ignore`, its jobs the suite's, stands in for it and is left out; one whose jobs or `paths` differ is reported, the mend saying what a stand-in gains", named());
+  ok(left && otherJobs && !named().includes("stand-in.yml"), "a workflow whose `paths` are a suite's `paths-ignore`, or more, its jobs the suite's, stands in for it and is left out; one whose jobs differ is reported", named());
+  // (a stand-in reports only the check a ruleset asks for, one job of a suite of several; its `paths` cover the suite's
+  // `paths-ignore`, a path more among them; one that leaves a path out, or whose job's name no reader tells exactly, a
+  // matrix's or an expression's, is reported, and the mend never asks a stand-in to take a path out: #1260)
+  const suiteJobs = jobs => fs.writeFileSync(suiteFile, `name: s\non:\n  pull_request:\n    paths-ignore: ${list(kept)}\njobs:\n${jobs.map(j => `  ${j}:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ${j}\n`).join("")}`);
+  suiteJobs(["t", "lint", "build"]);
+  put(list([...kept].reverse()));
+  const oneOfSeveral = !named().includes("stand-in.yml");
+  put(list([...kept, "docs/**"]));
+  const covers = !named().includes("stand-in.yml");
+  put(list(kept.slice(1)), "t");
+  const short = named();
+  fs.writeFileSync(standIn, `name: s\non:\n  pull_request:\n    paths: ${list(kept)}\njobs:\n  t:\n    strategy:\n      matrix:\n        os: [ubuntu-latest]\n    runs-on: \${{ matrix.os }}\n    steps:\n      - run: echo stand-in\n`);
+  const matrix = named().includes("stand-in.yml");
+  fs.writeFileSync(standIn, `name: s\non:\n  pull_request:\n    paths: ${list(kept)}\njobs:\n  t:\n    name: \${{ github.workflow }}\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo stand-in\n`);
+  const expression = named().includes("stand-in.yml");
+  ok(oneOfSeveral && covers && short.includes("stand-in.yml") && matrix && expression && /gains the same paths under its `paths`, never `!<its path>`/.test(short),
+    "a stand-in reporting one check of a suite of several, its `paths` covering the suite's `paths-ignore`, is left out; one that leaves a path out, or whose job's name is a matrix's or an expression's, is reported, the mend never taking a stand-in's path out", short);
   fs.rmSync(standIn);
 }
 fs.rmSync(suiteFile);

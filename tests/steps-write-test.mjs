@@ -124,6 +124,12 @@ for (const l of WHOLE) {
   r = write();
   ok(r.stdout.includes(`- ${l}: wrote nothing, since \`checks/holders.json\` has changes not yet committed`) && !fs.existsSync(path.join(dir, "checks/holders.json")),
     "a file with changes not yet committed (here taken out) is never written: --write says so and writes nothing", `${r.stdout}${r.stderr}`);
+  // (at a sync, whose own changes are not yet committed: the run says to write again once the sync merges, with the
+  // command, and sets nothing aside, so one command then writes it all: #1259, point 2)
+  const before = dirty();
+  r = write("--aside");
+  ok(r.status === 0 && /once this sync's pull request merges, on a fresh branch from `main`, run `node core\/scripts\/steps\.mjs --write`/u.test(r.stdout) && r.stdout.includes("`checks/holders.json`") && !git("stash", "list").trim() && dirty() === before,
+    "at a sync, a writer kept from a file by changes not yet committed is said, with the command to run once the sync merges, and nothing is set aside", `${r.stdout}${r.stderr}`);
   back();
   STAGES[l].stage(dir);
   fs.mkdirSync(path.join(dir, "checks/holders.json"));

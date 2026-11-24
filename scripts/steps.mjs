@@ -40,7 +40,7 @@ import { started } from "./started.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { copyAt } from "./workflow-calls.mjs";
 import { HERE, mendAt, plain, shown } from "./step-checks.mjs";
-import { held } from "./step-writers.mjs";
+import { Busy, held } from "./step-writers.mjs";
 import { pinsBack, pinsOf } from "./sync-pins.mjs";
 import { installed, listed, notInstalled } from "./packages.mjs";
 
@@ -143,7 +143,7 @@ export function written(root, steps = STEPS, merge = null) {
     if (declared(p, step)) continue;
     try { if (step.check && !step.check(p)) continue; } catch (e) { out.push({ lead: step.lead, why: `its check could not read the project (${plain(e.message, root)})` }); continue; }
     let wrote;
-    try { wrote = step.write(p, busy); } catch (e) { out.push({ lead: step.lead, why: lower(plain(e.message, root)) }); continue; }
+    try { wrote = step.write(p, busy); } catch (e) { out.push({ lead: step.lead, why: lower(plain(e.message, root)), ...(e instanceof Busy ? { busy: e.file } : {}) }); continue; }
     if (!wrote.length) continue;
     let mend;
     try { mend = step.check ? step.check(project(root)) : null; } catch (e) { mend = `its check could not read the project after it (${plain(e.message, root)})`; }
@@ -153,11 +153,16 @@ export function written(root, steps = STEPS, merge = null) {
 }
 
 // What --write prints: each step written, with its files and what is left of it, and each it could not write, with why;
-// `how` "aside" where they stand in the stash ASIDE, "put back" where git could not make one and each was put back.
+// `how` "aside" where they stand in the stash ASIDE, "put back" where git could not make one and each was put back,
+// "again" where, at a sync, a writer was kept from a file the sync left with changes not yet committed, and each was put
+// back so that all are written once the sync merges (#1259, point 2).
 export function writeReport(done, how = null) {
   if (!done.length) return "No step left a script could write (`core/scripts/steps.mjs --write`).";
   const kept = " No word of a rule's text is written, but a pointer's path and the manifest's module lines.", later = "once this sync's pull request merges, on a fresh branch from `main`,";
-  const head = !done.some(d => d.wrote?.length) ? "The steps' writers wrote nothing (`core/scripts/steps.mjs --write`)."
+  const wrote = done.some(d => d.wrote?.length);
+  if (how === "again") return [`${wrote ? "Written by the steps' writers (`core/scripts/steps.mjs --write`), and put back as they stood" : "The steps' writers wrote nothing (`core/scripts/steps.mjs --write`)"}, since a file a writer writes holds changes not yet committed, as this sync leaves it: ${later} run \`node core/scripts/steps.mjs --write\`, which writes then what each wrote or would write here, and commit it in a pull request of its own, with the usual reviews.${kept}`,
+    ...done.map(d => d.busy ? `- ${d.lead}: to write once this sync merges, since \`${shown(d.busy)}\` has changes not yet committed.` : d.why ? `- ${d.lead}: wrote nothing, since ${d.why}.` : `- ${d.lead}: to write once this sync merges (\`core/scripts/steps.mjs --write\` wrote ${d.wrote.map(f => `\`${shown(f)}\``).join(", ")}, and it was put back).`)].join("\n");
+  const head = !wrote ? "The steps' writers wrote nothing (`core/scripts/steps.mjs --write`)."
     : how === "aside" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), then set aside in the stash "${ASIDE}", so this sync stays a pure one: ${later} run \`git stash list\` and \`git stash pop stash@{N}\`, N the number it gives the stash "${ASIDE}" (or \`node core/scripts/steps.mjs --write\` again, which writes the same) and commit them in a pull request of its own, with the usual reviews.${kept}`
     : how === "put back" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), and put back as they stood, since git could not set them aside, so this sync stays a pure one: ${later} run \`node core/scripts/steps.mjs --write\` and commit what it writes in a pull request of its own, with the usual reviews.${kept}`
     : `Written by the steps' writers (\`core/scripts/steps.mjs --write\`): commit them in a pull request of their own, with the usual reviews.${kept}`;
@@ -203,7 +208,10 @@ if (stop) { if (!process.argv.includes("--aside")) console.log(stop); } // (the 
 else if (started(import.meta.url) && process.argv.includes("--write")) {
   import("./converge.mjs").then(({ merged }) => {
     const root = process.cwd(), done = written(root, STEPS, merged), aside = process.argv.includes("--aside"), files = [...new Set(done.flatMap(d => d.wrote ?? []))];
-    console.log(writeReport(done, !aside || !files.length ? null : setAside(root, files) ? "aside" : "put back"));
+    // (at a sync, a writer kept from a file the sync changed: all are put back, never a part set aside, and written once it merges)
+    const again = aside && done.some(d => d.busy);
+    if (again && files.length) setAside(root, files, () => { throw new Error("put back: written again once the sync merges"); });
+    console.log(writeReport(done, again ? "again" : !aside || !files.length ? null : setAside(root, files) ? "aside" : "put back"));
   }).catch(e => {
     console.error(`FAIL: the steps' writers could not run here (${plain(e.message)}). Mend: run it as the copy's own script, node core/scripts/steps.mjs --write, from the project's root, a git repository`);
     process.exitCode = 1;
