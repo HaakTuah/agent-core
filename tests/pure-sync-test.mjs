@@ -362,6 +362,21 @@ const off = node(p, "core/scripts/sync.mjs", SIDE);
 ok(off.status === 1 && off.out.includes("not a commit of the core's main") && git(p, "status", "--porcelain") === "", "so is one off the core's main", off.out);
 const same = node(p, "core/scripts/sync.mjs", A);
 ok(same.status === 0 && same.out.includes("already at") && git(p, "status", "--porcelain") === "", "at the pin already, there is nothing to sync", same.out);
+// (#1246, point 1: a copy an older sync script moved got the copy and the pins alone; the run at the same pin gives the
+// rest, what the sync asks since the pin before, read from the project's own history, and every report)
+ok(/could not be read from the history of core-manifest\.md[\s\S]*For the sync PR's description[\s\S]*Steps not done/.test(same.out) && /The settings only the owner gives|setting only the owner gives/.test(same.out),
+  "  and does all else a sync does, saying where no pin before it stands in the manifest's history, and listing every setting only the owner gives", same.out);
+for (const [how, at] of [["committed", LEGIT], ["left in the working tree by an older script", base]]) {
+  git(p, "checkout", "-q", "-B", "again", at);
+  if (at === base) { git(p, "checkout", "-q", LEGIT, "--", "core"); write(p, "core-manifest.md", manifest(OWNER, B)); }
+  const rerun = node(p, "core/scripts/sync.mjs", B);
+  ok(rerun.status === 0 && rerun.out.includes("already at") && rerun.out.includes("a note for the test") && /For the sync PR's description[\s\S]*Steps not done[\s\S]*Beside a fresh start[\s\S]*\nattached: /.test(rerun.out),
+    `  a sync at the same pin, ${how}, prints what the sync asks since the pin before, read from the manifest's history, and every report`, rerun.out);
+  git(p, "reset", "-q", "--hard");
+  git(p, "clean", "-qfd");
+  git(p, "stash", "clear");
+}
+git(p, "checkout", "-q", "more");
 write(p, "core-manifest.md", manifest("someone-else"));
 git(p, "commit", "-q", "-am", "another owner");
 const other = git(p, "rev-parse", "HEAD");

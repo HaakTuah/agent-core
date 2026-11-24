@@ -7,7 +7,7 @@ import { MODULES } from "../reading.mjs";
 import { notTakenWithout, read, write } from "../stage-helpers.mjs";
 import { project } from "../steps.mjs";
 import step from "../steps/160-the-modules-a-project-takes.mjs";
-import confirm from "./820-the-modules-a-project-takes-placed-from-what-is-read.mjs";
+import confirm from "./823-the-modules-a-project-takes-placed-from-what-is-read.mjs";
 
 const HOME = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 

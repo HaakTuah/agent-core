@@ -2,21 +2,35 @@
 // holds, since a private repository may hold the CodeQL workflow and a public one may lack it, and the kit writes other
 // files for each (init.mjs, --private). The repository is the one the clone's origin names on github.com. GitHub's job
 // reads it from the event it runs on (GITHUB_EVENT_PATH), where that event's repository is the origin's; a session
-// asks gh (`gh api repos/<owner>/<name>`). Where neither answers, it says it could not read it and the mend, and the
-// reader that asked decides nothing on it (fresh.mjs, converge.mjs, pure-sync.mjs). A test stands in for the host
-// with a file of its answers, each project's root or origin to { "private": true | false }, named by CORE_HOST_ANSWERS, as
-// GitHub's event stands for it in a job. Node's own modules, git and gh.
+// asks gh (`gh api repos/<owner>/<name>`), and where gh gives no answer (it is not signed in), GitHub's API with no
+// sign-in (#1246, point 2), which answers for a public repository: each reads the host's own field "private", so
+// neither guesses, and a refusal (a private repository, to a reader with no sign-in, is "Not Found" as one not there is)
+// answers nothing. Where none answers, it says it could not read it and the mend, and the reader that asked decides
+// nothing on it (fresh.mjs, converge.mjs, pure-sync.mjs). A test stands in for the host with a file of its answers,
+// each project's root or origin to { "private": true | false }, named by CORE_HOST_ANSWERS, as GitHub's event stands
+// for it in a job. Node's own modules, git and gh.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { repoOf } from "./inbox.mjs";
 
 const gh = route => { const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 24 }); if (r.status !== 0) throw new Error(`${r.stderr || r.error || "no answer"}`.trim()); return r.stdout; };
+// (GitHub's API with no sign-in, through the machine's proxy where it names one, in a Node process of its own, since
+// this reader is synchronous: what it prints is the status, and the field "private" where it answered)
+const ANONYMOUS = `fetch(process.argv[1], { headers: { "user-agent": "agent-core", accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(20000) })
+  .then(async r => process.stdout.write(JSON.stringify({ status: r.status, private: r.status === 200 ? (await r.json())?.private : undefined })))
+  .catch(e => process.stdout.write(JSON.stringify({ status: 0, why: String(e?.cause?.code ?? e?.name ?? "no answer") })));`;
+const anonymous = route => {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(GH|GITHUB)_(TOKEN|ENTERPRISE_TOKEN)$/i.test(k)));
+  const r = spawnSync(process.execPath, ["-e", ANONYMOUS, `https://api.github.com/${route}`], { encoding: "utf8", timeout: 30000, env: { ...env, NODE_USE_ENV_PROXY: "1", NODE_NO_WARNINGS: "1" } });
+  try { return JSON.parse(r.stdout); } catch { return { status: 0, why: r.error?.code ?? "no answer" }; }
+};
 const said = new Map(); // (one answer a repository a process, so a sync's earlier kits ask the host once)
 
 // { private: true | false } as the host says it of the repository at `root`, or { unread: why, with the mend }.
-// `env` and `ask` (a route to its answer's text) are the job's environment and gh, which a test replaces.
-export function privateOf(root, { env = process.env, ask = gh } = {}) {
+// `env`, `ask` (a route to its answer's text) and `bare` (a route to { status, private }) are the job's environment, gh
+// and the API with no sign-in, which a test replaces.
+export function privateOf(root, { env = process.env, ask = gh, bare = anonymous } = {}) {
   const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { cwd: root, encoding: "utf8" }).stdout?.trim() ?? "";
   const standIn = answered(env, root, origin);
   if (standIn) return standIn;
@@ -24,7 +38,7 @@ export function privateOf(root, { env = process.env, ask = gh } = {}) {
   if (!repo) return { unread: "whether the repository is private could not be read: the clone's origin names no repository on github.com. Mend: run it from a clone of the project's repository whose origin is its address on github.com" };
   const key = `${repo}\n${env.GITHUB_EVENT_PATH ?? ""}`;
   if (ask === gh && said.has(key)) return said.get(key);
-  const answer = fromEvent(env, repo) ?? fromGh(ask, repo);
+  const answer = fromEvent(env, repo) ?? fromGh(ask, bare, repo);
   if (ask === gh) said.set(key, answer);
   return answer;
 }
@@ -47,9 +61,13 @@ function fromEvent(env, repo) {
   } catch { return null; }
 }
 
-// What gh says of `repo`, or why it could not, with the mend.
-function fromGh(ask, repo) {
+// What gh says of `repo`, else GitHub's API with no sign-in, or why neither could, with the mend.
+function fromGh(ask, bare, repo) {
   let why = "";
   try { const r = JSON.parse(ask(`repos/${repo}`)); if (typeof r?.private === "boolean") return { private: r.private }; } catch (e) { why = ` (${String(e.message).split("\n")[0].slice(0, 120)})`; }
-  return { unread: `whether ${repo} is private could not be read: GitHub gave gh no answer${why}. Mend: sign gh in for an account that can read the repository (\`gh auth login\`), then run it again` };
+  let open = {};
+  try { open = bare(`repos/${repo}`) ?? {}; } catch { /* (no answer) */ }
+  if (open.status === 200 && typeof open.private === "boolean") return { private: open.private };
+  const plain = `HTTP ${Number(open.status) || "none"}${open.status === 404 ? ", as for a private repository or one not there" : open.status === 403 ? ", refused or past the limit for readers with no sign-in" : ""}`;
+  return { unread: `whether ${repo} is private could not be read: GitHub gave gh no answer${why}, nor a read with no sign-in (${plain}). Mend: sign gh in for an account that can read the repository (\`gh auth login\`), then run it again; for a public repository, a read with no sign-in answers once this machine reaches api.github.com and is not past GitHub's limit for it` };
 }

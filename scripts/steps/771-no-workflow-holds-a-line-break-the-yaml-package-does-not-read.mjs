@@ -1,4 +1,4 @@
-// The step of setup/sync-notes/770-no-workflow-holds-a-line-break-the-yaml-package-does-not-read.md, which steps.mjs, beside this folder, loads with the rest in the order
+// The step of setup/sync-notes/771-no-workflow-holds-a-line-break-the-yaml-package-does-not-read.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
 import { COST } from "../step-checks.mjs";
 import { lineBreaksMended } from "../step-checks-workflow-text.mjs";

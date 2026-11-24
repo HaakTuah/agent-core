@@ -534,6 +534,9 @@ jobs:
       - name: The host read and written for the steps, on a stand-in for GitHub
         if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/host-test.mjs ')) }}
         run: node tests/host-test.mjs
+      - name: Whether a repository is private, as its host says it, on a stand-in for GitHub
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/host-private-test.mjs ')) }}
+        run: node tests/host-private-test.mjs
       - name: The reader of a project's call of the security review, for the owner's settings
         if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/review-caller-test.mjs ')) }}
         run: node tests/review-caller-test.mjs
