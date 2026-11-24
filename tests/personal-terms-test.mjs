@@ -390,6 +390,13 @@ fs.writeFileSync(path.join(noFolder, "mkdir"), `#!/bin/sh\ncase "$*" in *commit-
 const unmade = check(pull([[{ "b.md": "Words.\n" }]]), { more: noFolder });
 ok(!unmade.passed && mended(unmade.out) && unmade.out.includes("could not be made, so no commit's address was read"), "where the address step's folder cannot be made, it fails, saying the mend", unmade.out);
 ok(!unmade.out.includes(tmp) && !unmade.out.includes("cannot create directory"), "that failure names the runner's temporary folder, never writing out its path (#1223)", unmade.out);
+// (and where the scan step's own folder cannot be made, that step fails, saying the mend, named the same way)
+const noScanFolder = path.join(tmp, "no-scan-folder");
+fs.mkdirSync(noScanFolder);
+fs.writeFileSync(path.join(noScanFolder, "mkdir"), `#!/bin/sh\ncase "$*" in *personal-terms/none*) echo "mkdir: cannot create directory '$*': Permission denied" >&2; exit 1 ;; esac\ncommand -p mkdir "$@"\n`, { mode: 0o755 });
+const unscanned = check(pull([[{ "b.md": "Words.\n" }]]), { more: noScanFolder });
+ok(!unscanned.passed && mended(unscanned.out) && unscanned.out.includes("RUNNER_TEMP/personal-terms, could not be made, so nothing was read") && !unscanned.out.includes(tmp) && !unscanned.out.includes("cannot create directory"),
+  "where the scan step's folder cannot be made, it fails, saying the mend, never writing out its path (#1223)", unscanned.out);
 const sum = /Linux\/x86_64\) file=\S+ archive=[0-9a-f]{64} sum=([0-9a-f]{64})/.exec(workflow)?.[1], version = /version=(\S+)/.exec(workflow)?.[1];
 const keptTool = path.join(tmp, "kept"), keptDir = path.join(keptTool, "agent-core-tools", `betterleaks-${version}`), ran = path.join(tmp, "kept-ran");
 fs.mkdirSync(keptDir, { recursive: true });

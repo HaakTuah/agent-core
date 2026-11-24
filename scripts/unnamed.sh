@@ -17,8 +17,9 @@ unnamed() (
   }
   t=${1%/} h=${HOME:-}; h=${h%/}
   temps=() homes=()
-  [ "${#t}" -gt 1 ] && mapfile -t temps < <(forms "$t")
-  [ "${#h}" -gt 1 ] && mapfile -t homes < <(forms "$h")
+  # (read with a loop, not mapfile, which macOS's own bash, 3.2, lacks: a filter it could not build would show all)
+  if [ "${#t}" -gt 1 ]; then while IFS= read -r f; do temps+=("$f"); done < <(forms "$t"); fi
+  if [ "${#h}" -gt 1 ]; then while IFS= read -r f; do homes+=("$f"); done < <(forms "$h"); fi
   command -v cygpath > /dev/null 2>&1 && shopt -s nocasematch
   while IFS= read -r l || [ -n "$l" ]; do
     for f in "${temps[@]}"; do l=${l//"$f"/'<temp>'}; done

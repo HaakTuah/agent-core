@@ -531,19 +531,23 @@ if (process.platform !== "win32") {
   // stand-in for cygpath gives each form under a drive of its own making)
   const win = scratchDir("fetch-win-");
   fs.writeFileSync(path.join(win, "cygpath"), String.raw`#!/bin/sh
-case $1 in -w) printf 'C:%s\n' "$2" | tr / '\\' ;; -m) printf 'C:%s\n' "$2" ;; -u) printf '/c%s\n' "$2" ;; *) exit 1 ;; esac
+case $1 in -w) printf 'C:%s\n' "$2" | tr / '\\' ;; -m) printf 'C:%s\n' "$2" ;; -u) printf '/c%s\n' "$2" ;; -d) printf '%s\n' "$2" | awk -F/ '{ s = "C:"; for (i = 2; i <= NF; i++) s = s "\\" (length($i) > 8 ? toupper(substr($i, 1, 6)) "~1" : toupper($i)); print s }' ;; *) exit 1 ;; esac
 `, { mode: 0o755 });
   const forms = String.raw`#!/bin/sh
-w=$(cygpath -w "$PWD"); printf '%s\n' "at $w, $(cygpath -m "$PWD"), $(cygpath -u "$HOME"), $(printf %s "$w" | tr A-Z a-z) and $(cygpath -w "$HOME" | sed 's/\\/\\\\/g')\\x" >&2
+w=$(cygpath -w "$PWD"); printf '%s\n' "at $w, $(cygpath -m "$PWD"), $(cygpath -u "$HOME"), $(printf %s "$w" | tr A-Z a-z) and $(cygpath -w "$HOME" | sed 's/\\/\\\\/g')\\x, short $(cygpath -d "$PWD")" >&2
 exit 1
 `;
   for (const name of ["python3", "python", "curl"]) fs.writeFileSync(path.join(win, name), forms, { mode: 0o755 });
   for (const script of ["workflow-tools.sh", "lychee.sh"]) {
     const run = spawnSync("bash", [path.join(core, "scripts", script)], { encoding: "utf8", env: { ...process.env, RUNNER_TEMP: runnerTemp, HOME: home, PATH: `${win}:${process.env.PATH}` } });
     const err = (run.stderr || "").toLowerCase(), names = [runnerTemp, home].map(p => path.basename(p).toLowerCase());
-    ok(run.status === 0 && err.includes("at <temp>") && names.every(n => !err.includes(n)),
+    const short = folder => `${path.basename(folder).slice(0, 6).toLowerCase()}~1`;
+    ok(run.status === 0 && err.includes("at <temp>") && err.includes("short <temp>") && names.every(n => !err.includes(n)) && !err.includes(short(runnerTemp)),
       `${script} names the temporary and home folders in each form Windows writes them, letter case aside (#1223)`, run.stderr);
   }
+  // (with no mapfile, as in macOS's own bash, 3.2, the folders are named all the same)
+  const old = spawnSync("bash", ["-c", 'enable -n mapfile; . "$1"; printf "%s\\n" "$2/x $HOME/y" | unnamed "$2"', "-", path.join(core, "scripts", "unnamed.sh"), runnerTemp], { encoding: "utf8", env: { ...process.env, HOME: home } });
+  ok(old.stdout === "<temp>/x ~/y\n" && !old.stderr, "unnamed() names the folders with no mapfile, as in macOS's own bash (#1223)", old.stdout + old.stderr);
 }
 
 process.exit(failed ? 1 : 0);
