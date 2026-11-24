@@ -2,12 +2,15 @@
 // host"): those whose triggers start on it, as GitHub reads them, and, of a sync, its own. The calls are the base's, so
 // a change cannot leave a check out by taking its call out; but a change that moves the manifest's pin forward along the
 // core's main, a sync, runs its own calls as GitHub runs its merge, at the new pin, since the old pin's core.yml reads
-// a copy the new one leaves otherwise as differing (#1245, point 1); and every call the base makes that the sync's
-// own calls leave out runs as the base holds it, and each they call otherwise runs too, so a sync leaves no check out. Also the reading of the project's
-// own workflows. Node's own modules, the core's address, its YAML reader and the runner's path filter.
+// a copy the new one leaves otherwise as differing (#1245, point 1); and each of the base's calls, moved to the sync's
+// pin, where the sync leaves it out or calls it otherwise, so a sync leaves no check out, never as the copy's gate
+// behind the sync's own core.yml passed (#1258). Also the reading of the project's own workflows, which job stops the rest,
+// and the keys and reasons its verdicts are written under. Node's own modules, the core's address, its YAML reader, the
+// reader of the signature check's refusal of an npm (npm-reads.mjs) and the runner's path filter.
 import { CORE } from "./core-address.mjs";
 import { MEND } from "./mend.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
+import { npmRefused } from "./npm-reads.mjs";
 import { needsOf } from "./workflow-needs.mjs";
 import { pathsLetThrough } from "./workflow-run.mjs";
 
@@ -19,21 +22,23 @@ export function movesForward(from, to, past) {
 }
 
 // A sync's calls: its own (`head`, each { file, wf }), and, of the base's, each job that calls a workflow of the core's
-// (`calls(job)`) that the head's file of that name does not, as the base holds it; and each the head calls otherwise
-// than the base but for the pin, or from a file whose triggers or other settings outside its jobs differ, as the base
-// calls it at the head's pin where `moved(uses)` gives it there, beside the head's own, so a sync that weakens a call's
-// inputs or triggers, or calls another workflow in its place, drops no check.
+// (`calls(job)`), moved to the sync's pin where `moved(uses)` gives it there (#1258, point 1: GitHub runs no call at the
+// old pin, whose core.yml would read the sync's copy as differing, whatever pin the base held it at): one the head's
+// file of that name does not call, so a sync that takes a call out drops no check; and one the head calls otherwise, or
+// from a file whose triggers or other settings outside its jobs differ, as the base calls it, beside the head's own, so
+// a sync that weakens a call's inputs or triggers, points it at another commit, or calls another workflow in its place,
+// drops no check. Each of the base's is marked `base`, which check.mjs reads.
 export function syncCalls(base, head, calls, moved = uses => uses) {
   const out = [...head];
   for (const { file, wf } of base) {
     const theirs = head.find(h => h.file === file)?.wf, mine = theirs?.jobs ?? {};
     const alike = theirs && canonical({ ...wf, jobs: null }) === canonical({ ...theirs, jobs: null });
     const jobs = Object.entries(wf.jobs ?? {}).filter(([, job]) => calls(job)).flatMap(([id, job]) => {
-      if (!calls(mine[id])) return [[id, job]];
       const there = { ...job, uses: moved(job.uses) };
+      if (!calls(mine[id])) return [[id, there]];
       return alike && canonical(there) === canonical(mine[id]) ? [] : [[`${id} (as the base calls it)`, there]];
     });
-    if (jobs.length) out.push({ file, wf: { ...wf, jobs: Object.fromEntries(jobs) } });
+    if (jobs.length) out.push({ file, wf: { ...wf, jobs: Object.fromEntries(jobs) }, base: true });
   }
   return out;
 }
@@ -90,6 +95,44 @@ export function ownJobs({ file, wf }, say) {
     return [id, { ...job, needs: needs.filter(n => ids.has(n)) }];
   });
   return kept.length ? [{ file, wf: { ...wf, jobs: Object.fromEntries(kept) } }] : [];
+}
+
+// Whether a job's outcome stops the rest: core.yml's, where a step of its own failed (`r.copy`, or any failure where
+// that is not said) or it did not run here, save where every step of its own passed first (`r.held`: an npm refused
+// after them; #1262); but a sync's call of the base's (`j.base`, from syncCalls) never once the sync's own core.yml
+// proved the copy (`proved`; #1258, point 1).
+export const gates = (j, r, proved) => j.name === "core.yml" && !(j.base && proved) && Boolean((r.copy ?? r.failed > 0) || (r.unrun && !r.held));
+
+// Of a job's results: whether a step of core.yml's own failed, before those it runs of the copy's scripts, which begin
+// where it reads where the copy stands (any step, where none reads that); and `held`, where one does and none failed,
+// so the copy is proved even where a later step left the job unrun (#1262).
+export function ownFailed(r) {
+  const parts = r.steps.findIndex(s => String(s.name ?? "").startsWith("Where the core's copy stands"));
+  const failed = r.steps.some((s, i) => !s.passed && (parts < 0 || i < parts));
+  return { failed, held: parts > 0 && !failed };
+}
+
+// Whether a job proves the copy the core, so that a base's call of core.yml stops nothing after it: the sync's own call
+// of core.yml, at the manifest's pin (`pin`), never one the change points elsewhere, its own steps passed, run whole or
+// left unrun after them (`held`) (#1258, point 1; #1262).
+export const proves = (j, r, pin) => j.name === "core.yml" && !j.base && String(j.job?.uses ?? "").endsWith(`@${pin}`) && !r.failed && (r.unrun ? Boolean(r.held) : r.ran > 0);
+
+// The keys a job that calls a workflow of the core's is written under, as check.mjs writes a verdict: one for each job
+// of the workflow it calls, whose text `read(uses)` gives; its own place where that cannot be read (#1258, point 2).
+export function calledKeys({ file, id, job }, read) {
+  let ids = [];
+  try { ids = Object.keys(parseYaml(read(String(job?.uses ?? "")) ?? "")?.jobs ?? {}); } catch { /* (not read: its own place) */ }
+  return ids.length ? ids.map(called => `${file}/${id}/${called}`) : [`${file}/${id}`];
+}
+
+// Why a job was not run here, or null: on another system, or each failed step wanting a program this machine lacks
+// (#1245, points 8 and 9), or an npm, where core.yml's signature check refused the machine's as too old to read its settings,
+// its own words read exactly (npm-reads.mjs; #1262): a verdict of the machine's, not the change's.
+export function unrunWhy(r) {
+  const refused = s => String(s.name ?? "").startsWith("The signature check") && npmRefused(s.out);
+  const wants = r.passed ? [] : r.steps.filter(s => !s.passed).map(s => s.missing ?? (refused(s) && `npm ${refused(s)} or later, which the core's own Node (its .node-version) brings`));
+  const lacks = wants.length > 0 && wants.every(Boolean) && [...new Set(wants)].join(", ");
+  return lacks ? `it needs ${lacks}, which this machine lacks` : r.unrun ?? null;
 }
 
 // The run's last lines, through `say` and `warn`, and its exit code. A job not run here proved nothing, so it fails the

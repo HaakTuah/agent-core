@@ -11,8 +11,8 @@
       "overrides": { "mutation-testing-report-schema": "3.9.0", "qs": "6.16.1" },
       "data": ["caniuse-lite"],
       "folder": "checks/mutation",
-      "command": "node {copy}scripts/stryker.mjs --tool checks/mutation --report {report} {lines}",
-      "runner": "node"
+      "command": "node {copy}scripts/stryker.mjs --tool checks/mutation{runner} --report {report} {lines}",
+      "runners": { "node": { "words": "", "named": "node <file>" }, "vitest": { "words": " --runner vitest", "named": "vitest run <file>", "locked": "vitest", "plain": ["vitest", "vitest run"] } }
     },
     "Stryker.NET": {
       "registry": "nuget", "package": "dotnet-stryker", "licence": "Apache-2.0",
