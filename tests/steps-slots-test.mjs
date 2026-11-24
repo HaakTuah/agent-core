@@ -86,10 +86,33 @@ const marksFile = path.join(lockProject, "checks/sizes.json"), marksAsKit = fs.r
 for (const [broken, what] of [["{ not json", "no JSON"], ['{"each": 1}', "the wrong shape"], ["\nFAIL: x\n", "no JSON, a line of which reads as a verdict"]]) {
   fs.writeFileSync(marksFile, broken);
   const missed = notDone(lockProject);
-  ok(missed.length === 2 && missed[0].lead.startsWith("14 November 2026, the size marks") && missed[0].mend.includes("did not run to its end")
-    && missed[1].lead.startsWith("15 November 2026, the progress file") && missed[1].mend.includes("could not read the project"), `size marks of ${what} are reported as not read, by both steps that read them`, report(missed));
+  ok(missed.length === 3 && missed[0].lead.startsWith("14 November 2026, the size marks") && missed[0].mend.includes("did not run to its end")
+    && missed[1].lead.startsWith("15 November 2026, the progress file") && missed[1].mend.includes("could not read the project")
+    && missed[2].lead.startsWith("24 November 2026, the size marks read") && missed[2].mend.includes("could not read the project"), `size marks of ${what} are reported as not read, by each of the three steps that read them`, report(missed));
 }
 fs.writeFileSync(marksFile, marksAsKit);
+
+// ---- the core's part of AGENTS.md as the step of the start reads it (#1272, point 4): within its marks; with none, as a
+// kit wrote it before them, its imports of the copy; marks it cannot tell apart, said not read, never done ----
+{
+  const start = "24 November 2026, the size marks read what the core's part imports", agents = path.join(lockProject, "AGENTS.md"), agentsAsKit = fs.readFileSync(agents, "utf8");
+  const [BEGIN, END] = ["<!-- The core's part: a sync writes it; write yours outside. -->", "<!-- The core's part ends. -->"];
+  const unmarked = agentsAsKit.replace(`${BEGIN}\n`, "").replace(`${END}\n`, "");
+  const marks = JSON.parse(marksAsKit), without = { ...marks, read: Object.fromEntries(Object.entries(marks.read).filter(([f]) => f !== "core/roles/builder.md")) };
+  ok(agentsAsKit.includes(BEGIN) && unmarked !== agentsAsKit, "(the kit's AGENTS.md holds the core's marks)");
+  fs.writeFileSync(agents, unmarked);
+  ok(!notDone(lockProject).some(s => s.lead === start), "an AGENTS.md with no marks, its imports all named under \"read\", reads done", report(notDone(lockProject)));
+  fs.writeFileSync(marksFile, `${JSON.stringify(without, null, 2)}\n`);
+  let missed = notDone(lockProject).filter(s => s.lead === start);
+  ok(missed.length === 1 && missed[0].mend.includes("`core/roles/builder.md`"), "and with one it imports left out of \"read\", names that file", report(missed));
+  fs.writeFileSync(agents, `${agentsAsKit}\n${BEGIN}\n`);
+  missed = notDone(lockProject).filter(s => s.lead === start);
+  ok(missed.length === 1 && missed[0].mend.includes("could not read the project"), "marks given twice are said not read, never done", report(missed));
+  fs.writeFileSync(agents, agentsAsKit.replace(/\n/g, "\r\n"));
+  missed = notDone(lockProject).filter(s => s.lead === start);
+  ok(missed.length === 1 && missed[0].mend.includes("`core/roles/builder.md`") && !missed[0].mend.includes("core/floor/security.md"), "an AGENTS.md with Windows line ends is read as one with Unix ones", report(missed));
+  fs.writeFileSync(agents, agentsAsKit); fs.writeFileSync(marksFile, marksAsKit);
+}
 
 // ---- a step left undone on purpose, on the owner's word: declared, not reported ----
 const sec = STAGES["12 November 2026, the security review shown on every pull request"];

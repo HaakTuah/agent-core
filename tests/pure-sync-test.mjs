@@ -305,6 +305,23 @@ git(p, "push", "-q", "-f", "origin", `${base}:main`);
 git(p, "checkout", "-q", "sync");
 git(p, "reset", "-q", "--hard", LEGIT);
 git(p, "clean", "-q", "-fd");
+// main imports, above CLAUDE.md's part, a module of its copy that the new pin makes a moved stub whose target the part
+// imports, and the sync takes the import out, as the one process does with the copy at the new pin: pure, the stub read
+// from the core at the pin, never from main's copy (#1272, point 2)
+git(p, "checkout", "-q", "-B", "main-stub", base);
+write(p, "core/modules/claude.md", "# Claude's part\n\nThe rules as the old pin held them.\n");
+write(p, "CLAUDE.md", read(p, "CLAUDE.md").replace("<!-- The core's part: a sync writes it;", "@core/modules/claude.md\n<!-- The core's part: a sync writes it;"));
+git(p, "commit", "-q", "-am", "an import of a module, before the module moved");
+git(p, "push", "-q", "-f", "origin", "main-stub:main");
+git(p, "checkout", "-q", "-B", "sync-stub");
+git(p, "checkout", "-q", LEGIT, "--", ".");
+git(p, "commit", "-q", "-m", "the sync, the moved stub's import taken out");
+const stubbed = pure();
+ok(stubbed.status === 0 && !read(p, "CLAUDE.md").includes("@core/modules/claude.md"), "a sync that takes out an import of a module the new pin moves is pure, the stub read from the core at the pin", stubbed.out);
+git(p, "push", "-q", "-f", "origin", `${base}:main`);
+git(p, "checkout", "-q", "sync");
+git(p, "reset", "-q", "--hard", LEGIT);
+git(p, "clean", "-q", "-fd");
 // a private project whose main holds the calls its earlier kit wrote that the one job of core.yml folds: the sync that
 // writes the one job and takes them out, as the process does, is pure; the same deletions with core.yml left as main
 // holds it are not, nor is one of a check the one job does not run, the licence check (#1101, point 2)
