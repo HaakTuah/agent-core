@@ -15,7 +15,7 @@ import { READ_MOST } from "./own-files.mjs";
 import { parseConfig, where as shapeAt } from "./shape.mjs";
 import { copiesConfig, marksConfig } from "./check-configs.mjs";
 import { atCopy } from "./core-path.mjs";
-import { MOVED_GLOB, MOVED_GLOBS, cut, moved, namers, readsOldAlone, sure } from "./step-checks-moved.mjs";
+import { MOVED_GLOB, MOVED_GLOBS, moved, namers, partCut, readsOldAlone, sure } from "./step-checks-moved.mjs";
 import { rewritten } from "./step-checks-modules.mjs";
 import { MANIFEST, pinsOnly } from "./sync-pins.mjs";
 import { HERE, plain, shown } from "./step-checks.mjs";
@@ -223,7 +223,7 @@ export function writeMoved(p, busy) {
   let marks = null;
   try { marks = marksConfig(p); } catch { /* (marks whose path cannot be read are read as any other file) */ }
   for (const f of sure(p, namers(p))) {
-    const text = p.read(f) ?? "", c = cut(text), own = t => movedIn(f === marks ? marksMoved(t, map) : t, map, oldPath, c?.[1]?.split("\n").map(l => l.replace(/\r$/u, "")));
+    const text = p.read(f) ?? "", c = partCut(f, text), own = t => movedIn(f === marks ? marksMoved(t, map) : t, map, oldPath, c?.[1]?.split("\n").map(l => l.replace(/\r$/u, "")));
     if (!c) continue;
     let next = c.length === 3 ? `${own(c[0])}${c[1]}${own(c[2])}` : own(text);
     if (oldPath && readsOldAlone(p, f, copy)) next = next.split(atCopy(MOVED_GLOB, copy)).join(atCopy(`${MOVED_GLOB}, ${MOVED_GLOBS}`, copy));

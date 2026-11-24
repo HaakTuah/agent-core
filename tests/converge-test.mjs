@@ -14,7 +14,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { BEGIN, END, converged, partIn } from "../scripts/core-owned.mjs";
+import { BEGIN, END, converged, partIn, stubOf } from "../scripts/core-owned.mjs";
 import { kits, merged, plan } from "../scripts/converge.mjs";
 import { kind } from "../scripts/fresh.mjs";
 import { privateOf } from "../scripts/host-private.mjs";
@@ -120,6 +120,10 @@ try {
     const stubbed = converged("CLAUDE.md", `# C\n\n@core/modules/claude.md\n@core/modules/x.md\n\n${want.slice(5)}`, want, [], () => true, stub);
     ok(stubbed.text === `# C\n\n@core/modules/x.md\n\n${want.slice(5)}` && /held @core\/modules\/claude\.md outside/.test(stubbed.left ?? ""),
       "  an import of a moved stub whose target the part imports is taken out and named, one whose target it does not, kept (#1272, point 2)", JSON.stringify(stubbed));
+    // (a stub is its pointers alone: one that holds a line of its own beside them is read as no stub, so it is kept)
+    const pointer = "# Moved: Claude's part\n\n[`tools/claude.md`](../tools/claude.md) holds these rules now: read it whole.\n\n@../tools/claude.md\n";
+    ok(JSON.stringify(stubOf(() => pointer, ".", "core/modules/claude.md")) === '["core/tools/claude.md"]' && stubOf(() => `${pointer}\nNever push on a Friday.\n`, ".", "core/modules/claude.md") === null,
+      "  a moved stub is read as one only where it holds its pointers and nothing else", String(stubOf(() => `${pointer}\nNever push on a Friday.\n`, ".", "core/modules/claude.md")));
   }
   ok(partIn("@a.md\n\n@b.md\n", new Set(["@a.md", "@b.md"])) === "many" && partIn(`${BEGIN}\n${BEGIN}\n${END}\n`, new Set()) === "many", "  where it cannot tell which run of imports is the core's, it says so, and takes none");
   git(p.dir, "checkout", "-q", "--", ".");
@@ -132,6 +136,15 @@ try {
     const stubbed = converge(p.dir, "--write");
     ok(read(p.dir, "CLAUDE.md") === kitText.replace(BEGIN, `@core/modules/git.md\n${BEGIN}`) && /CLAUDE\.md held @core\/modules\/claude\.md outside the core's part/.test(stubbed.out),
       "  the one process takes out an import of the core's moved stub whose target the part imports, and names it; a stub whose target it does not import stays", `${read(p.dir, "CLAUDE.md")}\n${stubbed.out}`);
+    git(p.dir, "checkout", "-q", "--", ".");
+    // (a file of the project's own that opens as a stub does is no stub of the core's: its import stays)
+    fs.mkdirSync(path.join(p.dir, "docs"), { recursive: true });
+    write(p.dir, "docs/deploy.md", "# Moved: our deploy notes now open with the rules below\n\nNever deploy on a Friday.\n\n@../AGENTS.md\n");
+    write(p.dir, "CLAUDE.md", kitText.replace(BEGIN, `@docs/deploy.md\n${BEGIN}`));
+    git(p.dir, "add", "docs/deploy.md");
+    const own = converge(p.dir, "--write");
+    ok(read(p.dir, "CLAUDE.md") === kitText.replace(BEGIN, `@docs/deploy.md\n${BEGIN}`), "  a file of the project's own that opens \"# Moved:\" is no stub of the core's: its import stays", `${read(p.dir, "CLAUDE.md")}\n${own.out}`);
+    git(p.dir, "rm", "-q", "--cached", "docs/deploy.md"); fs.rmSync(path.join(p.dir, "docs/deploy.md"));
     git(p.dir, "checkout", "-q", "--", ".");
   }
 

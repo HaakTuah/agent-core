@@ -50,7 +50,8 @@ export function partIn(text, kitLines) {
 // What a moved stub of the core's leads to (a file whose first line opens "# Moved:"; its "holds these rules now" link,
 // each "Now in" link and each import it holds), as imports in a rule file of the folder `from` name them: the import `f`
 // there names the stub; `read` gives a file's text from the project's root, null where it is none. Null where it is no
-// stub. `seen` keeps each file's answer, so that a file many imports name is read once.
+// stub, or holds a line beside its title and pointers (#1272, point 2). `seen` keeps each file's answer, so that a file
+// many imports name is read once.
 export function stubOf(read, from, f, seen = new Map()) {
   const at = path.posix.normalize(path.posix.join(from, f)), key = `${from}\n${at}`;
   if (!seen.has(key)) seen.set(key, leadsTo(at.startsWith("../") || path.posix.isAbsolute(at) ? null : read(at), at, from));
@@ -58,7 +59,11 @@ export function stubOf(read, from, f, seen = new Map()) {
 }
 function leadsTo(text, at, from) {
   if (!text || !/^# Moved:/u.test(text)) return null;
-  const links = [/^\[`[^`\s]+`\]\(([^)\s#]+)[^)\s]*\) holds these rules now/gmu, /^Now in \[`[^`\s]+`\]\(([^)\s#]+)[^)\s]*\)/gmu, /^@(\S+)$/gmu].flatMap(r => [...text.matchAll(r)].map(m => m[1]));
+  const pointers = [/^\[`[^`\s]+`\]\(([^)\s#]+)(?:#[^)\s]*)?\) holds these rules now/u, /^Now in \[`[^`\s]+`\]\(([^)\s#]+)(?:#[^)\s]*)?\)/u, /^@(\S+)$/u];
+  // (a stub holds its pointers and nothing else: one with none, or a line of its own beside them, is no stub, its import kept)
+  const lines = text.split(/\r?\n/u).slice(1).filter(l => l.trim());
+  if (!lines.length || !lines.every(l => pointers.some(r => r.test(l)))) return null;
+  const links = lines.map(l => pointers.map(r => r.exec(l)?.[1]).find(Boolean));
   return [...new Set(links.map(l => path.posix.relative(from, path.posix.join(path.posix.dirname(at), l))))];
 }
 

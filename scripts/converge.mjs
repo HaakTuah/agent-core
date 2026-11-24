@@ -73,11 +73,12 @@ const outside = to => { try { inside(to, "the path"); return false; } catch { re
 
 // What the process does to the project `p`: [{ to, text }] to write, [{ to }] to take out, [{ to, why }] left as the
 // project's. `kit` is what this kit writes for it ([path, text]), `older` the earlier kits', `exists` whether a path from
-// the project's root is there (an import's, in a rule file). A workflow of the core's whose check the one job of the
+// the project's root is there (an import's, in a rule file), `stubText` the text of a path in the copy (a moved stub of
+// the core's, which a stub of the project's own never is: #1272, point 2), null where none. A workflow of the core's whose check the one job of the
 // core.yml the project ends with runs (`FOLDED`) is taken out, where it carries the core's mark or is, mark and pins
 // aside, an earlier kit's text, so that check runs once (#1101, point 2): a private project's earlier kit wrote the
 // copies, description, signature and NuGet calls that the one job folds.
-export function plan(p, kit, older = [], { first = false, exists = f => fs.existsSync(path.join(p.root, f)) } = {}) {
+export function plan(p, kit, older = [], { first = false, exists = f => fs.existsSync(path.join(p.root, f)), stubText = g => (g.startsWith(copyAt(p)) ? p.read(g) : null) } = {}) {
   const write = [], left = [], stubs = new Map();
   for (const [to, want] of kit) {
     if (p.differences.some(l => l.includes(`"${to}"`))) continue;
@@ -89,7 +90,7 @@ export function plan(p, kit, older = [], { first = false, exists = f => fs.exist
     try { there = !!fs.lstatSync(path.join(p.root, to)); } catch { /* (not there) */ }
     const now = there ? p.read(to, true) : null;
     if (there && now === null) { left.push({ to, why: "is no regular file the process can read: left as it is" }); continue; }
-    const r = converged(to, now, want, older.map(k => k.find(([f]) => f === to)?.[1]).filter(t => t !== undefined), f => exists(path.posix.join(path.posix.dirname(to), f)), f => stubOf(g => p.read(g), path.posix.dirname(to), f, stubs));
+    const r = converged(to, now, want, older.map(k => k.find(([f]) => f === to)?.[1]).filter(t => t !== undefined), f => exists(path.posix.join(path.posix.dirname(to), f)), f => stubOf(stubText, path.posix.dirname(to), f, stubs));
     if (r.text !== undefined) write.push({ to, text: r.text });
     if (r.left) left.push({ to, why: r.left });
   }

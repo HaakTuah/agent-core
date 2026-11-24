@@ -114,6 +114,16 @@ for (const l of WHOLE) {
   r = write();
   ok(read("CLAUDE.md") === stale, "  and an old path inside the part is the one process's to write: left as it stands", `${r.stdout}${r.stderr}\n---\n${read("CLAUDE.md")}`);
   back();
+  // (only the root's AGENTS.md and CLAUDE.md hold a part the one process writes: marks in another file, copied there, are
+  // the project's text, read and written whole)
+  fs.mkdirSync(path.join(dir, "packages/app"), { recursive: true });
+  put("packages/app/AGENTS.md", "<!-- The core's part: a sync writes it; write yours outside. -->\n@../../core/modules/git.md\n<!-- The core's part ends. -->\n");
+  commit("a nested rule file holding the core's marks");
+  const nested = missed(l)[0]?.mend ?? "";
+  r = write();
+  ok(nested.includes("packages/app/AGENTS.md") && read("packages/app/AGENTS.md").includes("@../../core/roles/shared/work-flow.md"),
+    "the rules' move: a rule file in a folder, the core's marks in it, is read and written whole, the marks no part of the core's there", `${r.stdout}${r.stderr}\n---\n${nested}\n---\n${read("packages/app/AGENTS.md")}`);
+  back();
   // (a file of the project's that is no rule file, no file at the root under a dot and none of the step's configs is
   // written only once .gitattributes says which files a tool writes, and one marked so is left: #1272, point 3)
   fs.mkdirSync(path.join(dir, "notes"));
@@ -125,11 +135,21 @@ for (const l of WHOLE) {
   const unmarked = missed(l)[0]?.mend ?? "";
   ok(read("notes/design.md").includes("core/modules/git.md") && read("gen/design.md").includes("core/modules/git.md") && unmarked.includes("`notes/design.md`") && unmarked.includes("`gen/design.md`") && unmarked.includes("linguist-generated") && unmarked.includes(".gitattributes"),
     "the rules' move: with no .gitattributes that says which files a tool writes, --write leaves the project's other files, and the mend asks for the marks (#1272, point 3)", `${r.stdout}${r.stderr}\n---\n${unmarked}`);
+  // (each file by its own attribute: a vendored library's own .gitattributes, or one that marks the generated folder
+  // alone, says nothing of the notes, which stay left until a line gives them a value)
+  fs.mkdirSync(path.join(dir, "vendor"));
+  put("vendor/.gitattributes", "*.js linguist-vendored\n");
   put(".gitattributes", "gen/** linguist-generated\n");
-  commit("the generated folder marked");
+  commit("the generated folder marked, the notes not");
+  r = write();
+  const half = missed(l)[0]?.mend ?? "";
+  ok(read("notes/design.md").includes("core/modules/git.md") && half.includes("`notes/design.md`") && !half.includes("`gen/design.md`") && half.includes("* -linguist-generated"),
+    "  and with only the generated folder marked, the notes' file, which no attribute decides, is still left and named", `${r.stdout}${r.stderr}\n---\n${half}`);
+  put(".gitattributes", "* -linguist-generated\ngen/** linguist-generated\n");
+  commit("every other file marked as the project's own");
   r = write();
   ok(read("notes/design.md") === "See `core/roles/shared/work-flow.md`.\n" && read("gen/design.md") === "See `core/modules/git.md`.\n" && !missed(l).length,
-    "  and once it does, --write writes the unmarked folder's file, the marked one left, and the step reads done", `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
+    "  and once a line gives it its value, --write writes the notes' file, the marked one left, and the step reads done", `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
   back();
 }
 

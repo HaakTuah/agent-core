@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { copiesConfig, marksConfig } from "./check-configs.mjs";
-import { BEGIN, END } from "./core-owned.mjs";
+import { BEGIN, BLOCKS, END } from "./core-owned.mjs";
 import { atCopy } from "./core-path.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { copyAt } from "./workflow-calls.mjs";
@@ -57,54 +57,57 @@ const rulesOf = p => {
 export function namers(p) {
   const rules = rulesOf(p);
   const some = p.files.filter(f => !f.startsWith(copyAt(p)) && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
-  const made = generated(p.root, some);
+  const { made } = attributed(p.root, some);
   return some.filter(f => rules.includes(f) || !made.has(f));
 }
 
-// Of `files`, those the project's git attributes mark `linguist-generated` or `linguist-vendored`, as GitHub reads them:
-// a tool writes them, and the project keeps them as it writes them, so no path in them is the step's to name (#1248,
-// point 5). Where git cannot say (no repository), none.
-function generated(root, files) {
-  const out = new Set();
-  if (!root || !files.length) return out;
+// Of `files`, as the project's git attributes give `linguist-generated` and `linguist-vendored`, as GitHub reads them:
+// `made`, those either marks (a tool writes them, and the project keeps them as it writes them, so no path in them is the
+// step's to name: #1248, point 5), and `own`, those either gives a value that marks them not (unset or false), so the
+// project says they are its own (#1272, point 3). Where git cannot say (no repository), none of either.
+function attributed(root, files) {
+  const made = new Set(), own = new Set();
+  if (!root || !files.length) return { made, own };
   const r = spawnSync("git", ["check-attr", "-z", "--stdin", "linguist-generated", "linguist-vendored"], { cwd: root, input: files.join("\0"), encoding: "utf8", maxBuffer: 1 << 28 });
   const parts = r.status === 0 ? r.stdout.split("\0") : [];
-  for (let i = 0; i + 2 < parts.length; i += 3) if (!["unspecified", "unset", "false"].includes(parts[i + 2])) out.add(parts[i]);
-  return out;
+  for (let i = 0; i + 2 < parts.length; i += 3) {
+    if (["unset", "false"].includes(parts[i + 2])) own.add(parts[i]);
+    else if (parts[i + 2] !== "unspecified") made.add(parts[i]);
+  }
+  for (const f of made) own.delete(f);
+  return { made, own };
 }
 
-// A file's text cut round the core's part, which the one process writes (converge.mjs) and no step's writer does (#1272,
-// point 1): [before, part, after] where its marks stand once each, in order; [text] where it has none; null where they
-// stand more than once or apart, so that which part is the core's cannot be told.
+// A text cut round the core's part (#1272, point 1): [before, part, after] where its marks stand once each, in order;
+// [text] where it has none; null where they stand more than once or apart, so that which part is the core's cannot be
+// told.
 export function cut(text) {
   const b = text.indexOf(BEGIN), e = text.indexOf(END);
   if (b < 0 && e < 0) return [text];
   return b < 0 || e < b || text.includes(BEGIN, b + 1) || text.includes(END, e + 1) ? null : [text.slice(0, b), text.slice(b, e + END.length), text.slice(e + END.length)];
 }
+// The file `f`'s text cut so: only the root's AGENTS.md and CLAUDE.md hold a part, which the one process writes
+// (converge.mjs) and no step's writer does; in any other file the marks are the project's text, read whole.
+export const partCut = (f, text) => (BLOCKS.includes(f) ? cut(text) : [text]);
 // (a file's own text: what lies outside the core's part, the whole where the part cannot be told apart)
-const ownText = text => { const c = cut(text); return c?.length === 3 ? `${c[0]}\n${c[2]}` : text; };
+const ownText = (f, text) => { const c = partCut(f, text); return c?.length === 3 ? `${c[0]}\n${c[2]}` : text; };
 
-// Whether the project's git attributes say which of its files a tool writes: a .gitattributes of its own that names
-// linguist-generated or linguist-vendored for any pattern, set, unset or given a value, as GitHub reads them.
-const toolsMarked = p => p.files.some(f => /(?:^|\/)\.gitattributes$/u.test(f) && !f.startsWith(copyAt(p)) && (p.read(f) ?? "").split(/\r?\n/u)
-  .some(l => !/^\s*#/u.test(l) && l.trim().split(/\s+/u).slice(1).some(a => /^[-!]?linguist-(?:generated|vendored)(?:=|$)/u.test(a))));
 // The step's own configs, which its writer writes as the step words them: the size marks, the copies check's config and
 // the manifest, each where it can be read.
 const configs = p => new Set(["core-manifest.md", ...[marksConfig, copiesConfig].flatMap(c => { try { return [c(p)]; } catch { return []; } })]);
 // Of `files`, those the step's writer writes (step-writers.mjs, writeMoved): each rule file, each at the root under a
-// dot and each of the step's configs; any other only where the project's git attributes say which files a tool writes,
-// since until then a tool's output cannot be told from the project's own source (#1272, point 3).
+// dot and each of the step's configs; any other only where the project's git attributes mark it, by itself, as no
+// tool's output, since until then a tool's output cannot be told from the project's own source (#1272, point 3).
 export function sure(p, files) {
-  if (toolsMarked(p)) return files;
-  const rules = new Set(rulesOf(p)), own = configs(p);
+  const rules = new Set(rulesOf(p)), configured = configs(p), { own } = attributed(p.root, files);
   // (floor rule 3's rule files in any folder, even where SECURITY.md gives no list yet)
-  return files.filter(f => rules.has(f) || /(?:^|\/)(?:AGENTS|CLAUDE|GEMINI)\.md$/u.test(f) || /^\.[^/]/u.test(f) || own.has(f));
+  return files.filter(f => rules.has(f) || /(?:^|\/)(?:AGENTS|CLAUDE|GEMINI)\.md$/u.test(f) || /^\.[^/]/u.test(f) || configured.has(f) || own.has(f));
 }
 
 // Of those, the files that name each old path outside the core's part: Map(old path -> [file]).
 function namedStill(p, map) {
   const found = new Map(), old = new RegExp(`core/(${Object.keys(map).map(f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("|")})(?![\\w/-])`, "gu");
-  for (const f of namers(p)) for (const m of ownText(p.read(f) ?? "").matchAll(old)) found.set(m[1], [...new Set([...(found.get(m[1]) ?? []), f])]);
+  for (const f of namers(p)) for (const m of ownText(f, p.read(f) ?? "").matchAll(old)) found.set(m[1], [...new Set([...(found.get(m[1]) ?? []), f])]);
   return found;
 }
 
@@ -130,6 +133,6 @@ export function movedPaths(p) {
   if (globs.length) wrong.push(`after the pattern ${MOVED_GLOB} add the patterns ${MOVED_GLOBS}, leaving it where it is, since a copies config may read more and never less (in ${said(globs)})`);
   if (!/^Paths:.*\btasks\/.*\btools\//mu.test(p.manifest)) wrong.push('the "Paths:" line of `core-manifest.md` reads "one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/"');
   const named = [...new Set([...found.values()].flat())], unsure = named.filter(f => !sure(p, named).includes(f));
-  const marks = unsure.length ? ` The step's writer (\`node core/scripts/steps.mjs --write\`) leaves ${said(unsure)}, since until \`.gitattributes\` says which files a tool writes it cannot tell one from the project's own source: mark each folder a tool writes \`linguist-generated\` (or \`linguist-vendored\`) there, or, where no tool writes any, add the line \`* -linguist-generated\`, and run it again.` : "";
+  const marks = unsure.length ? ` The step's writer (\`node core/scripts/steps.mjs --write\`) leaves ${said(unsure)}, since until the project's \`.gitattributes\` gives a file \`linguist-generated\` or \`linguist-vendored\` it cannot tell a tool's output from the project's own source: add to it the line \`* -linguist-generated\`, after it mark each folder a tool writes \`linguist-generated\` (or \`linguist-vendored\`), and run it again.` : "";
   return wrong.length ? `${first(found)} one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.${marks}` : null;
 }
