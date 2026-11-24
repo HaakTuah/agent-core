@@ -108,24 +108,39 @@ export const callers = p => (readable(p, text => text.toLowerCase().includes(`${
 // workflow that selects its suites through the copy's select.mjs is left out: the selection counts the copy's files
 // as the step asks, and a workflow in which only a pin moved as no change (#1093, point 2). It is left out whole, since
 // which of its jobs runs a suite no reader tells exactly: the step's `partly` leaves another job's to the review. A
-// stand-in is left out too: a workflow whose `paths` are, as a set, another's `paths-ignore`, and whose jobs, by the
-// names they report as checks, are that one's, so that a check a ruleset asks for reports where the suite is skipped
-// (#1248, point 3); it is meant to start where the suite does not. A workflow that mirrors the filter under jobs of other
-// names is no stand-in, and is read as any other.
+// stand-in is left out too: a workflow whose `paths` hold each path of another's `paths-ignore`, and each of whose jobs
+// reports a check that one reports, by a name read exactly, so that a check a ruleset asks for reports where the suite
+// is skipped (#1248, point 3; #1260); it is meant to start where the suite does not. A name is read exactly where it is
+// the job's `name` or key with no expression in it and the job has no matrix, which adds to the name GitHub reports. A
+// workflow with `paths` that shares a check with a suite, or may (a name not read exactly whose start a suite's check
+// has, or a suite whose names are not read exactly), and is no stand-in is still reported, with the mend that makes it
+// one, never `!<its path>`, which could leave that check unreported: "Nothing locks a project".
 export function suitesOnPins(p) {
   const pins = callers(p);
   readable(p, text => /paths(-ignore)?\s*:/.test(text));
   const selects = runFiles(p, "select.mjs");
-  const filter = (w, key) => { const list = w.yaml?.on?.pull_request?.[key]; return Array.isArray(list) ? [...new Set(list.map(String))].sort().join("\n") : null; };
-  const checks = w => { const jobs = w.yaml?.jobs; return jobs && typeof jobs === "object" ? [...new Set(Object.entries(jobs).map(([k, j]) => String(j?.name ?? k)))].sort().join("\n") : null; };
-  const ignored = Object.entries(p.workflows).map(([f, w]) => [f, filter(w, "paths-ignore"), checks(w)]).filter(([, l]) => l !== null);
-  const standsIn = (f, w) => filter(w, "paths") !== null && ignored.some(([g, l, c]) => g !== f && l === filter(w, "paths") && c !== null && c === checks(w));
+  const filter = (w, key) => { const list = w.yaml?.on?.pull_request?.[key]; return Array.isArray(list) ? new Set(list.map(String)) : null; };
+  // (each job's check name, or null where one is not read exactly)
+  const names = w => { const jobs = w.yaml?.jobs; return jobs && typeof jobs === "object" ? Object.entries(jobs).map(([k, j]) => { const n = String(j?.name ?? k); return n.includes("${{") || j?.strategy?.matrix !== undefined ? null : n; }) : []; };
+  // (the start of each name not read exactly as GitHub reports it: an expression's literal part before it, or a matrix
+  // job's name and " (", which GitHub follows with the matrix's values)
+  const starts = w => Object.entries(w.yaml?.jobs ?? {}).map(([k, j]) => String(j?.name ?? k)).filter((n, i) => names(w)[i] === null).map(n => n.includes("${{") ? n.slice(0, n.indexOf("${{")) : `${n} (`);
+  const suites = Object.entries(p.workflows).map(([f, w]) => [f, filter(w, "paths-ignore"), new Set(names(w).filter(n => n !== null)), names(w).includes(null)]).filter(([, l]) => l !== null);
+  const shares = (f, w) => suites.filter(([g, , c]) => g !== f && names(w).some(n => n !== null && c.has(n)));
+  // (a suite one of whose checks a name not read exactly may be: one it reports starts so, or one it reports is not read)
+  const mayShare = (f, w) => suites.some(([g, , c, unread]) => g !== f && starts(w).some(at => unread || [...c].some(n => n.startsWith(at))));
+  const standsIn = (f, w) => { const own = filter(w, "paths"), n = names(w); return own !== null && n.length > 0 && shares(f, w).some(([, l, c]) => [...l].every(x => own.has(x)) && n.every(x => x !== null && c.has(x))); };
   const started = Object.entries(p.workflows).filter(([f, w]) => !pins.includes(`.github/workflows/${f}`) && !selects.includes(`.github/workflows/${f}`) && !standsIn(f, w)).flatMap(([f, w]) => {
     const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];
     const by = Array.isArray(only) ? pins.filter(c => pathsLetThrough(only, [c])) : Array.isArray(ignore) ? pins.filter(c => !pathsLetThrough(ignore, [c])) : [];
-    return by.length ? [`\`.github/workflows/${shown(f)}\` (${by.map(shown).join(", ")})`] : [];
+    return by.length ? [[`\`.github/workflows/${shown(f)}\` (${by.map(shown).join(", ")})`, Array.isArray(only) && (shares(f, w).length > 0 || mayShare(f, w))]] : [];
   });
-  return started.length ? `A sync that only moves the pin of a call to the core's workflows starts no suite of the project's own: each workflow named lists in its \`paths-ignore\`, beside \`core/**\` and \`core-manifest.md\`, each file that holds only such calls by its exact path, or, where it filters with \`paths\`, takes each out with \`!<its path>\` after its patterns (\`core.yml\` checks those pins on every pull request); a workflow that stands in for such a suite, its \`paths\` the suite's \`paths-ignore\` and its jobs named as the suite's, so that a check a ruleset asks for reports where the suite is skipped, gains the same paths under its \`paths\`. Started by such a file alone: ${started.join("; ")}.` : null;
+  if (!started.length) return null;
+  const suite = started.filter(([, s]) => !s).map(([t]) => t), standing = started.filter(([, s]) => s).map(([t]) => t);
+  return [`A sync that only moves the pin of a call to the core's workflows starts no suite of the project's own (\`core.yml\` checks those pins on every pull request).`,
+    suite.length && `Each workflow named here lists in its \`paths-ignore\`, beside \`core/**\` and \`core-manifest.md\`, each file that holds only such calls by its exact path, or, where it filters with \`paths\`, takes each out with \`!<its path>\` after its patterns; a workflow that stands in for such a suite, so that a check a ruleset asks for reports where the suite is skipped, gains the same paths under its \`paths\`, never \`!<its path>\`. Started by such a file alone: ${suite.join("; ")}.`,
+    standing.length && `Each workflow named here reports a check a suite with \`paths-ignore\` reports, so it may stand in for that suite: it gains the same paths under its \`paths\`, never \`!<its path>\`, which could leave that check unreported, until its \`paths\` hold each path of the suite's \`paths-ignore\` and each of its jobs is named by a plain \`name\` (no expression, no matrix) the suite's jobs report too; then it reads as a stand-in and is left out. Started by such a file alone: ${standing.join("; ")}.`]
+    .filter(Boolean).join(" ");
 }
 
 // A call to one of the core's pull-request checks whose job is skipped on a draft, or which skips a draft by itself (the

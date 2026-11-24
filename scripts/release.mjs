@@ -12,7 +12,7 @@
 // from that commit, or where a check on it has not passed; and, once the staged cases hold a release (staged.mjs,
 // beside this file), where one failed in its last run as that commit's record holds it; and where the trial on a real
 // project (release-trial.mjs, beside this file; #1084) has no record that stands for that commit, or one where a check passed before the
-// update and failed after it. Git and Node's own modules only.
+// update and failed after it, or one was not measured, a job check.mjs could not read (#1263). Git and Node's own modules only.
 //
 //   node scripts/release.mjs          what the next release would be, and what it carries
 //   node scripts/release.mjs --cut --at <sha> --runs <file> --full <file>

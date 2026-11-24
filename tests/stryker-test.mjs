@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { limitOf } from "../scripts/mutate.mjs";
 import { coreReporter, named, progress, strykerPlugins } from "../scripts/stryker-plugin.mjs";
-import { asItStands, counted, dispatch, optionsOf, stopTests, strykers, testsFor, word } from "../scripts/stryker.mjs";
+import { asItStands, counted, dispatch, optionsOf, stopTests, strykers, testsFor, vitestAt, word } from "../scripts/stryker.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -35,7 +35,8 @@ try {
   ok(m0.status === "Pending" && same(m0.location, { start: { line: 1, column: 3 }, end: { line: 1, column: 6 } }) && first.report.files["src/a.mjs"].mutants[1].status === "Ignored",
     "a fault planned to run is not run yet, its place counted from 1; one Stryker judged early keeps its status");
   const then = state.tested({ id: "0", status: "Killed", killedBy: ["0"], statusReason: "a long output", mutatorName: "EqualityOperator", replacement: "!==", location: m0.location });
-  ok(then.files["src/a.mjs"].mutants[0].status === "Killed" && !("statusReason" in then.files["src/a.mjs"].mutants[0]) && !("killedBy" in then.files["src/a.mjs"].mutants[0]), "a fault tested takes its status, and neither what a test printed nor the command runner's name for its command");
+  const t0 = then.files["src/a.mjs"].mutants[0];
+  ok(t0.status === "Killed" && !("statusReason" in t0) && !("killedBy" in t0), "a fault tested takes its status, and neither what a test printed nor the command runner's name for its command");
   const end = state.ended({ files: { "src/a.mjs": { language: "javascript", source: "s", mutants: [{ id: "0", status: "Survived", statusReason: "x", mutatorName: "M", replacement: "r", location: m0.location }] } } });
   ok(end.files["src/a.mjs"].source === "s" && end.files["src/a.mjs"].mutants.length === 1 && end.files["src/a.mjs"].mutants[0].status === "Survived" && !("statusReason" in end.files["src/a.mjs"].mutants[0]),
     "once the run ends, the report is Stryker's own, with nothing a test printed");
@@ -47,7 +48,7 @@ try {
   fs.writeFileSync(sources, JSON.stringify({ [named(file)]: "x === 1;\n" }));
   const reporter = (fs.mkdirSync(files), coreReporter({ coreRun: { report: path.join(files, "r.json"), plan: path.join(files, "plan.json"), sources } }));
   reporter.onMutationTestingPlanReady({ mutantPlans: [plan("0", 0)] });
-  ok(JSON.parse(fs.readFileSync(path.join(files, "r.json"), "utf8")).files[named(file)]?.source === "x === 1;\n", "the plug-in writes each file's text as it stood before Stryker wrote its own into it, which its faults' places count in");
+  ok(JSON.parse(fs.readFileSync(path.join(files, "r.json"), "utf8")).files[named(file)]?.source === "x === 1;\n", "the plug-in writes each file's text as it stood before Stryker's own, which its faults' places count in");
   reporter.onMutationTestReportReady({ files: {} });
   ok(same(fs.readdirSync(files).sort(), ["plan.json", "r.json"]) && JSON.parse(fs.readFileSync(path.join(files, "r.json"), "utf8")).schemaVersion === "1",
     "the plug-in writes each file whole beside its place and moves it there, leaving nothing half written", fs.readdirSync(files).join(", "));
@@ -65,7 +66,7 @@ try {
   const run1 = fake({ "test/a-test.mjs": { result: "failed", took: 1 }, "test/b-test.mjs": { result: "passed", took: 2 }, "test/b-test.mjs with": { result: "failed", took: 1 } });
   const caught = await dispatch(map, "7", run1);
   ok(caught === 1 && same(calls, [["test/a-test.mjs", 60, "as it stands"], ["test/b-test.mjs", 60, "as it stands"], ["test/b-test.mjs", limitOf(2), "with the fault"]]),
-    "a test is run as it stands first, with no fault switched on; one that fails there is left out; the next, with the fault in, is held to mutate.mjs's limit, and its failing catches the fault", JSON.stringify(calls));
+    "a test runs as it stands first, left out where it fails there; with the fault in, it is held to mutate.mjs's limit, its failing catching the fault", JSON.stringify(calls));
   calls.length = 0;
   ok(await dispatch(map, "7", fake({ "test/b-test.mjs with": { result: "passed", took: 2 } })) === 0 && same(calls, [["test/b-test.mjs", limitOf(2), "with the fault"]]),
     "a test is run as it stands once for the whole run, and a fault no test fails on survives", JSON.stringify(calls));
@@ -116,9 +117,9 @@ try {
     "Stryker runs this script's tests for each fault by its command runner, in place, with the core's reporter alone");
   ok(same(strykers(["a.py:1-3,b.ts:2-4"], ["a.py", "b.ts", "c.mjs"]), { named: ["b.ts:2-4"], code: ["b.ts", "c.mjs"], left: ["a.py"] })
     && same(strykers([], ["a.py", "b.ts"]), { named: [], code: ["b.ts"], left: ["a.py"] }) && strykers(["a.py:1-3"], ["a.py", "b.ts"]).named === null,
-    "a file of a language the list does not give Stryker is left out and named, and where only such files are named nothing is measured");
+    "a file of a language the list does not give Stryker is left out and named; where only such are named, nothing is measured");
   const refused = (p, windows) => { try { word(p, windows); return false; } catch (e) { return mended(`FAIL: ${e.message}`); } };
-  ok(refused("/x/a\nb", false) && refused("/x/a%PATH%b", true) && refused('/x/"a"', true) && !refused('/x/"a"', false), "a path no shell's word can hold as it is, a line break anywhere, or a % or double quote on Windows, is refused, saying the mend");
+  ok(refused("/x/a\nb", false) && refused("/x/a%PATH%b", true) && refused('/x/"a"', true) && !refused('/x/"a"', false), "a path no shell's word holds as written (a line break; on Windows, a % or double quote) is refused, saying the mend");
   if (process.platform !== "win32") {
     const odd = "/tmp/a $HOME `id` 'q' \\ \"d\"";
     ok(spawnSync("sh", ["-c", `printf %s ${word(odd)}`], { encoding: "utf8" }).stdout === odd, "a path is one word of the shell, read as it is written: nothing in it is expanded");
@@ -126,24 +127,37 @@ try {
   const bare = spawnSync(process.execPath, [SCRIPT, "--report", path.join(scratch, "r.json")], { encoding: "utf8" });
   const none = spawnSync(process.execPath, [SCRIPT, "--tool", path.join(scratch, "none"), "--report", path.join(scratch, "r.json")], { encoding: "utf8" });
   ok(bare.status === 1 && mended(bare.stderr) && none.status === 1 && /Stryker is not installed in/.test(none.stderr) && mended(none.stderr) && /npm ci --ignore-scripts/.test(none.stderr),
-    "a run not told where Stryker is, or told a folder it is not installed in, fails, saying the mend", `${bare.stderr}\n${none.stderr}`);
+    "a run not told where Stryker is, or told a folder without it, fails, saying the mend", `${bare.stderr}\n${none.stderr}`);
+
+  // ---- tests vitest runs (#1274) ----
+  const vt = path.join(scratch, "vt"), pkg = path.join(vt, "node_modules/vitest"), V = "node_modules/vitest/v.mjs";
+  const vitestIs = bin => { fs.mkdirSync(`${pkg}/sub`, { recursive: true }); fs.writeFileSync(`${pkg}/package.json`, JSON.stringify({ bin })); fs.writeFileSync(`${pkg}/v.mjs`, ""); return vitestAt(vt); };
+  ok(vitestIs({ vitest: "./v.mjs" }) === V && vitestIs("v.mjs") === V && vitestIs({ vitest: "../../outside.mjs" }) === null && vitestIs({ vitest: "missing.mjs" }) === null && vitestIs("sub") === null && vitestAt(path.join(scratch, "none")) === null,
+    "the project's vitest is the file its package.json names in its folder, or none");
+  if (process.platform !== "win32") { fs.symlinkSync(SCRIPT, `${pkg}/l.mjs`); ok(vitestIs("l.mjs") === null, "nor one a link leads out of it"); }
+  const jest = spawnSync(process.execPath, [SCRIPT, "--tool", ".", "--runner", "jest", "--report", "r.json"], { encoding: "utf8" }).stderr;
+  ok(/told to run its tests with jest.*--runner vitest/.test(jest) && mended(jest), "another runner is refused, saying the mend", jest);
 
   // ---- a run with Stryker itself, in a scratch repository ----
   if (TOOL) {
-    const dir = path.join(scratch, "repo");
-    fs.mkdirSync(dir);
-    const git = (...args) => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-    const write = (f, t) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), t); };
+    // (a scratch repository: its code, and a test of it at `test`)
     const SOURCE = "export const big = x => x > 10;\nexport const same = (a, b) => a === b;\n";
-    git("init", "-q", "-b", "main"); git("config", "user.email", "t@example.invalid"); git("config", "user.name", "Test");
-    write("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"], tests: ["test"] }));
-    write("src/a.mjs", SOURCE);
-    write("test/a-test.mjs", "import { big, same } from '../src/a.mjs';\nif (big(5) || !big(20) || !same(1, 1) || same(1, 2)) process.exit(1);\n");
+    const repoOf = (name, test) => {
+      const dir = path.join(scratch, name), write = (f, t) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), t); };
+      const git = (...args) => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+      fs.mkdirSync(dir); git("init", "-q", "-b", "main"); git("config", "user.email", "t@example.invalid"); git("config", "user.name", "Test");
+      write("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"], tests: ["test"] }));
+      write("src/a.mjs", SOURCE);
+      write(test, "import { big, same } from '../src/a.mjs';\nif (big(5) || !big(20) || !same(1, 1) || same(1, 2)) process.exit(1);\n");
+      return { dir, git, write };
+    };
+    const { dir, git, write } = repoOf("repo", "test/a-test.mjs");
     write("test/broken-test.mjs", "import '../src/a.mjs';\nprocess.exit(1);\n");
     git("add", "-A"); git("commit", "-q", "-m", "base");
     const out = path.join(dir, "report.json");
     const run = spawnSync(process.execPath, [SCRIPT, "--tool", TOOL, "--report", out], { cwd: dir, encoding: "utf8" });
-    const got = fs.existsSync(out) ? JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"]?.mutants ?? [] : [];
+    const faults = () => fs.existsSync(out) ? JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"]?.mutants ?? [] : [];
+    let got = faults();
     const on = (line, status) => got.some(m => m.location.start.line === line && m.status === status);
     ok(run.status === 0 && on(1, "Survived") && on(2, "Killed") && !got.some(m => m.status === "Pending"), "with Stryker: a fault a test catches is Killed, one it does not Survived, every fault run", `${run.stdout}${run.stderr}`);
     ok(run.stdout.includes("left out, failing or past 60 s as they stand: test/broken-test.mjs"), "a test that fails as it stands is left out, and the run says so", run.stdout);
@@ -151,8 +165,8 @@ try {
       "the project's own files are left as they were, and the working copy taken away", git("status", "--porcelain"));
     write("test/a-test.mjs", `${fs.readFileSync(path.join(dir, "test/a-test.mjs"), "utf8")}await new Promise(r => setTimeout(r, 4000));\n`);
     const slow = spawnSync(process.execPath, [SCRIPT, "--tool", TOOL, "--report", out, "--budget", "6", "src/a.mjs:1-2"], { cwd: dir, encoding: "utf8" });
-    const late = JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"]?.mutants ?? [];
-    ok(slow.status === 0 && late.some(m => m.status === "Pending") && JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].source === SOURCE && /not run \(the budget\)/.test(slow.stdout), "past its budget, Stryker is stopped and the faults it did not run are written as not run", `${slow.stdout}${slow.stderr}`);
+    const late = faults();
+    ok(slow.status === 0 && late.some(m => m.status === "Pending") && JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].source === SOURCE && /not run \(the budget\)/.test(slow.stdout), "past its budget, Stryker is stopped and the faults not run are written so", `${slow.stdout}${slow.stderr}`);
     // (a run stopped by a signal stops Stryker and all it started before it takes its working copy away, off Windows)
     if (process.platform !== "win32") {
       const strykers = () => spawnSync("pgrep", ["-f", `${TOOL}/node_modules/@stryker-mutator/core/bin/stryker.js run`], { encoding: "utf8" }).stdout.trim();
@@ -163,7 +177,21 @@ try {
       await new Promise(r => child.on("exit", r));
       ok(was && !strykers() && git("worktree", "list").trim().split("\n").length === 1, "a run stopped by a signal stops Stryker with it, and takes its working copy away", `before: ${was || "none"}; after: ${strykers() || "none"}`);
     }
-  } else console.log("note the run with Stryker itself needs --tool <the folder it is installed in>: the tests workflow gives it in the step that installs Stryker");
+    // (tests vitest runs: a stand-in for its vitest runs the file and logs what it was asked)
+    const v = repoOf("vitest-repo", "test/a.test.mjs");
+    v.write(".gitignore", "node_modules/\n"); v.write("package.json", JSON.stringify({ scripts: { test: "vitest run" } }));
+    v.git("add", "-A"); v.git("commit", "-q", "-m", "base");
+    const log = path.join(scratch, "asked.log"), vrun = () => spawnSync(process.execPath, [SCRIPT, "--tool", TOOL, "--runner", "vitest", "--report", out], { cwd: v.dir, encoding: "utf8", env: { ...process.env, ASKED: log } });
+    const missing = vrun().stderr;
+    ok(/node_modules\/vitest at the project's root names no program/.test(missing) && mended(missing), "tests vitest runs fail with no vitest installed, saying the mend", missing);
+    v.write("node_modules/vitest/package.json", JSON.stringify({ type: "module", bin: { vitest: "./vitest.mjs" } }));
+    v.write("node_modules/vitest/vitest.mjs", "import fs from 'node:fs';\nimport cp from 'node:child_process';\nconst [, , how, file] = process.argv;\nfs.appendFileSync(process.env.ASKED, `${how} ${file}\\n`);\nprocess.exit(cp.spawnSync(process.execPath, [file]).status);\n");
+    fs.rmSync(out, { force: true });
+    const vran = vrun(), asked = fs.existsSync(log) ? [...new Set(fs.readFileSync(log, "utf8").trim().split("\n"))] : [];
+    got = faults();
+    ok(vran.status === 0 && on(1, "Survived") && on(2, "Killed") && same(asked, ["run test/a.test.mjs"]),
+      "tests vitest runs are each run through the project's vitest and measured", `${vran.stdout}${vran.stderr}\nasked: ${asked}`);
+  } else console.log("note the run with Stryker itself needs --tool <its folder>, which the tests workflow gives where it installs Stryker");
 } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 
 console.log(`${count - failed} of ${count} passed`);
