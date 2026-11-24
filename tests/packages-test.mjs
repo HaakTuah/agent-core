@@ -136,9 +136,10 @@ if (failed) { console.log(`FAIL ${failed} of the lock file's checks above failed
   ok(npmIgnores("10.9.9").length === 5 && npmIgnores("11.9.0").join() === "allow-remote,allow-file,allow-directory,min-release-age" && npmIgnores("11.13.0").join() === "allow-remote,allow-file,allow-directory"
     && npmIgnores("11.14.1").join() === "allow-remote" && npmIgnores("11.15.0").length === 0 && npmIgnores("12.0.0").length === 0 && npmIgnores("").length === 5 && npmIgnores("11.13.9", ["allow-git"]).length === 0 && npmIgnores("11.14.0-pre.0").length === 3 && npmIgnores("11.15.1-pre.0").length === 0 && npmIgnores("eleven").length === 5 && npmReadsAll() === "11.15.0" && npmReadsAll(["allow-git"]) === "11.9.0",
   "version 10 of npm reads none of the settings, its version 11 reads allow-git from 11.9.0, min-release-age from 11.10.0, allow-remote from 11.15.0 (11.14 lists it, but refuses the registry's own packages under it: #1262) and the others from 11.14.0, and an npm whose version cannot be read is taken to read none");
-  // (the version the signature check's mend puts in place, the least that reads them all, is the one its licence audit names)
-  const audited = json(".github/licences-audit.json").entries.find(e => /^npm$/u.test(e.name));
-  ok(audited?.version === npmReadsAll(), "the licence audit names, for the package manager, the least version that reads every setting, the one the signature check's mend puts in place (#1262)", audited?.version);
+  // (the version the signature check's mend puts in place, which checks-test.mjs holds to the one its refusal names, is
+  // the one npm's single entry in the licence audit names)
+  const audited = json(".github/licences-audit.json").entries.filter(e => /^npm$/u.test(e.name)), [, named] = /--ignore-scripts npm@([^`\s]+)`/u.exec(fs.readFileSync(path.join(root, "scripts/checks.mjs"), "utf8")) ?? [];
+  ok(audited.length === 1 && !!named && audited[0].version === named, "the licence audit names, for the package manager, one entry, at the version the signature check's mend puts in place (#1262)", `${audited.map(e => e.version)} ${named}`);
   // (the .npmrc the copy carries holds the core's own two settings alone, which install.mjs holds it to too)
   const { npmrcOthers } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href), npmrc = fs.readFileSync(path.join(root, ".packages/.npmrc"), "utf8");
   ok(npmrcOthers(npmrc).length === 0, "the core's .npmrc holds nothing but its own two settings, so the install and the signatures' check ask npm's own registry, with no token, proxy or certificate of another's", npmrcOthers(npmrc).join(" | "));

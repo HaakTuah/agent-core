@@ -201,7 +201,7 @@ function unread(cwd) {
   if (!ignored.length) return false;
   // (the mend's command names the least npm written out, so the licence scan reads it; checks-test.mjs holds it to `least`)
   const least = npmReadsAll(ALLOWS);
-  console.log(`FAIL ${npmRefusal(version, ignored, least)} ${MEND}from a folder outside the repository, install the version the refusal names into a folder of its own, running no install script: ${"`npm install --global --prefix=<its-folder> --ignore-scripts npm@11.15.0`"}; then put that folder's bin (on Windows, the folder itself) first on the PATH and run this check again`);
+  console.log(`FAIL ${npmRefusal(version, ignored, least)} ${MEND}from a folder outside the repository, install the version the refusal names into a folder of its own, also outside the repository, running no install script: ${"`npm install --global --prefix=<its-folder> --ignore-scripts npm@11.15.0`"}; then put that folder's bin (on Windows, the folder itself) first on the PATH and run this check again`);
   return true;
 }
 const install = cwd => !unread(cwd) && passed(process.platform === "win32"

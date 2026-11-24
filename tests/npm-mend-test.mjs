@@ -1,9 +1,11 @@
 // Checks that the mend the signature check gives under an npm too old for it (scripts/checks.mjs, #1262), followed as
-// worded, makes the check pass: on a scratch project whose lock file names one package of the registry's, under npm
-// 11.14.1 (which lists --allow-remote, but under --allow-remote=none refuses the registry's own packages too) the check
-// installs nothing and fails, saying the mend; its command, run by that npm from outside the repository, installs the npm
-// it names, and with that folder's bin first on the PATH the check installs, reads the signature and passes. It installs
-// npm twice and the package from npm's registry, so it is in the part network (tasks/tests.md, "A test that reaches the
+// worded, makes the check pass: on a scratch project whose lock file names one package of the registry's, under an npm
+// that stands as 11.14.1 (which lists --allow-remote, but under --allow-remote=none refuses the registry's own packages
+// too) the check installs nothing and fails, saying the mend; its command, run by the machine's npm from outside the
+// repository, installs the npm it names, and with that folder's bin first on the PATH the check installs, reads the
+// signature and passes. The npm that stands as 11.14.1 is a stand-in that answers its version and hands every other
+// call to the machine's own, so nothing is fetched but what the mend names, which the licence audit holds. It installs
+// npm and the package from npm's registry, so it is in the part network (tasks/tests.md, "A test that reaches the
 // network runs once per batch"). On Linux, as the refusal's own case in checks-test.mjs. Git, npm and Node's own modules.
 //
 //   node tests/npm-mend-test.mjs
@@ -12,22 +14,26 @@ import fs from "node:fs";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
 import { npmRefused } from "../scripts/npm-reads.mjs";
-import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { root, scratchDir, scratchEnv, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
 if (process.platform !== "win32") {
   const tmp = scratchDir("npm-mend-test-");
-  // (its name built from pieces, so that the licence scan reads no command here: the versions are written out below)
+  // (its name built from pieces, so that the licence scan reads no command here: the one install this test makes is the
+  // mend's own, read from what the check prints, whose command the scan reads in checks.mjs)
   const NPM = ["n", "pm"].join("");
-  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|PR_|BASE_SHA$|CALLER$)|TOKEN|SECRET/i.test(name)));
-  Object.assign(env, { GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" });
+  // (as every scratch test's: no token, secret, password, credential or npm setting of the run's reaches git or npm)
+  const env = scratchEnv(root, tmp);
   const git = (...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8" }).trim();
   const npm = (bin, args) => spawnSync(NPM, args, { cwd: tmp, env: { ...env, PATH: `${bin}${path.delimiter}${env.PATH}` }, encoding: "utf8" });
 
-  // (the machine's npm: one the check refuses, installed as any npm is, from the registry, running no install script)
+  // (the machine's npm, standing as one the check refuses: it answers its version and hands every other call to the npm
+  // found first on the PATH, by an absolute entry)
+  const real = env.PATH.split(path.delimiter).filter(d => path.isAbsolute(d)).map(d => path.join(d, NPM)).find(f => { try { fs.accessSync(f, fs.constants.X_OK); return fs.statSync(f).isFile(); } catch { return false; } });
   const old = path.join(tmp, "old");
-  const got = npm("", ["install", "--global", "--prefix", old, "--ignore-scripts", "--no-audit", "--no-fund", "npm@11.14.1"]);
-  ok(got.status === 0, "the machine's npm here, at 11.14.1, is installed", `${got.stdout}${got.stderr}`.slice(-800));
+  fs.mkdirSync(old);
+  fs.writeFileSync(path.join(old, NPM), `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 11.14.1; exit 0; fi\nexec ${JSON.stringify(real ?? "")} "$@"\n`, { mode: 0o755 });
+  ok(!!real && npm(old, ["--version"]).stdout.trim() === "11.14.1", "the machine's npm here stands as 11.14.1", real);
 
   // (a project whose copy of the core is this one, and whose change adds one package the core's own lock file pins)
   const dir = path.join(tmp, "p");
@@ -49,15 +55,15 @@ if (process.platform !== "win32") {
     return { status: r.status, out: `${r.stdout}${r.stderr}` };
   };
 
-  const refused = check(path.join(old, "bin"));
+  const refused = check(old);
   ok(refused.status === 1 && npmRefused(refused.out) === "11.15.0" && mended(refused.out), "under 11.14.1 the check installs nothing and fails, saying the mend", refused.out);
   // (the mend as worded: its command, run by the machine's npm from outside the repository, its folder named; then that
   // folder's bin first on the PATH)
   const [, words] = new RegExp(`\`(${NPM} install --global --prefix=<its-folder> [^\`]+)\``, "u").exec(refused.out) ?? [];
   const mendAt = path.join(tmp, "mended");
-  const followed = words && npm(path.join(old, "bin"), words.replace("<its-folder>", mendAt).split(" ").slice(1));
+  const followed = words && npm(old, words.replace("<its-folder>", mendAt).split(" ").slice(1));
   ok(followed?.status === 0, "its command, run as worded by the machine's npm, installs the version it names", words ?? refused.out);
-  const passed = check(`${path.join(mendAt, "bin")}${path.delimiter}${path.join(old, "bin")}`);
+  const passed = check(`${path.join(mendAt, "bin")}${path.delimiter}${old}`);
   ok(passed.status === 0 && /verified registry signature/u.test(passed.out), "and with that folder's bin first on the PATH, the check installs from the lock file, reads the signature and passes", passed.out.slice(-1200));
 } else console.log("skip: the refusal's case runs on Linux, as checks-test.mjs's does");
 
