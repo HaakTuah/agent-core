@@ -5,6 +5,8 @@ import { read, write } from "../stage-helpers.mjs";
 const FILE = "core/roles/builder.md";
 
 export default {
+  // (asked of every project whose marks predate the role files the core's part imports, which a sync does not write)
+  asked: true,
   // (the size marks of a project whose kit predates the role files: the builder's role, which the core's part of
   // AGENTS.md imports, not under "read"; the mend names it there at the marks' "each", as the step words it)
   stage: dir => {

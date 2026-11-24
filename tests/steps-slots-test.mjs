@@ -86,8 +86,9 @@ const marksFile = path.join(lockProject, "checks/sizes.json"), marksAsKit = fs.r
 for (const [broken, what] of [["{ not json", "no JSON"], ['{"each": 1}', "the wrong shape"], ["\nFAIL: x\n", "no JSON, a line of which reads as a verdict"]]) {
   fs.writeFileSync(marksFile, broken);
   const missed = notDone(lockProject);
-  ok(missed.length === 2 && missed[0].lead.startsWith("14 November 2026, the size marks") && missed[0].mend.includes("did not run to its end")
-    && missed[1].lead.startsWith("15 November 2026, the progress file") && missed[1].mend.includes("could not read the project"), `size marks of ${what} are reported as not read, by both steps that read them`, report(missed));
+  ok(missed.length === 3 && missed[0].lead.startsWith("14 November 2026, the size marks") && missed[0].mend.includes("did not run to its end")
+    && missed[1].lead.startsWith("15 November 2026, the progress file") && missed[1].mend.includes("could not read the project")
+    && missed[2].lead.startsWith("24 November 2026, the size marks read") && missed[2].mend.includes("could not read the project"), `size marks of ${what} are reported as not read, by each of the three steps that read them`, report(missed));
 }
 fs.writeFileSync(marksFile, marksAsKit);
 
