@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
 import { npmRefused } from "../scripts/npm-reads.mjs";
-import { root, scratchDir, scratchEnv, tally } from "../scripts/scratch-core.mjs";
+import { machineNpm, root, scratchDir, scratchEnv, shWord, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
 if (process.platform !== "win32") {
@@ -27,12 +27,12 @@ if (process.platform !== "win32") {
   const git = (...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8" }).trim();
   const npm = (bin, args) => spawnSync(NPM, args, { cwd: tmp, env: { ...env, PATH: `${bin}${path.delimiter}${env.PATH}` }, encoding: "utf8" });
 
-  // (the machine's npm, standing as one the check refuses: it answers its version and hands every other call to the npm
-  // found first on the PATH, by an absolute entry)
-  const real = env.PATH.split(path.delimiter).filter(d => path.isAbsolute(d)).map(d => path.join(d, NPM)).find(f => { try { fs.accessSync(f, fs.constants.X_OK); return fs.statSync(f).isFile(); } catch { return false; } });
+  // (the machine's npm, standing as one the check refuses: it answers its version and hands every other call to the
+  // machine's own)
+  const real = machineNpm(env);
   const old = path.join(tmp, "old");
   fs.mkdirSync(old);
-  fs.writeFileSync(path.join(old, NPM), `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 11.14.1; exit 0; fi\nexec ${JSON.stringify(real ?? "")} "$@"\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(old, NPM), `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 11.14.1; exit 0; fi\nexec ${shWord(real ?? "")} "$@"\n`, { mode: 0o755 });
   ok(!!real && npm(old, ["--version"]).stdout.trim() === "11.14.1", "the machine's npm here stands as 11.14.1", real);
 
   // (a project whose copy of the core is this one, and whose change adds one package the core's own lock file pins)
