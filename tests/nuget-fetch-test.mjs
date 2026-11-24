@@ -233,18 +233,19 @@ else {
   fs.writeFileSync(path.join(real, "src/App/packages.lock.json"), lock({ "Newtonsoft.Json": { type: "Direct", requested: "[13.0.3, )", resolved: "13.0.3", contentHash: "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ==" } }));
   const fetchReal = () => spawnSync(process.execPath, ["-e", `import(${JSON.stringify(new URL("../scripts/nuget-fetch.mjs", import.meta.url).href)}).then(m => m.fetchAll(${JSON.stringify({ nuget: { ships: ["src/App/packages.lock.json"], tools: [] } })}, ${JSON.stringify(real)}, ["src/App/packages.lock.json"], ${JSON.stringify(path.join(real, "fetched"))}, [${JSON.stringify(REGISTRY)}])).then(r => console.log(JSON.stringify(r)))`], { env: { ...process.env, NODE_USE_ENV_PROXY: "1" }, encoding: "utf8" })
   // (a registry that does not answer is no fault of what is tested: the fetch is tried three times, and where each failure
-  // is that the registry could not be read, the case says so and passes, as the others, held on a stand-in, hold the
+  // is that the registry did not answer, the case says so and passes, as the others, held on a stand-in, hold the
   // hash; a hash that does not match, or any other failure, fails; #543)
-  const unanswered = r => r.failures?.length > 0 && r.failures.every(f => f.includes("could not be read"));
+  // (not answering is the fetch failing outright, a timeout, or the registry's own 429 or 5xx; a refusal of a redirect that is not https, or any other status, is the fetch's and fails)
+  const unanswered = r => r.failures?.length > 0 && r.failures.every(f => f.includes("could not be read") && /\(fetch failed|timed? ?out|aborted|: (?:429|5\d\d)\b/i.test(f));
   let out, got;
   for (let attempt = 1; attempt <= 3; attempt++) {
     out = fetchReal();
     got = JSON.parse(out.stdout || "{}");
     if (!unanswered(got)) break;
-    await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+    if (attempt < 3) await new Promise(resolve => setTimeout(resolve, attempt * 2000));
   }
   const manifest = path.join(real, "fetched", "newtonsoft.json", "13.0.3", "newtonsoft.json.nuspec");
-  if (unanswered(got)) console.log(`skip the real package: nuget.org did not answer in three tries (${got.failures[0]})`);
+  if (unanswered(got)) console.log(`::warning::skip the real package: nuget.org did not answer in three tries (${got.failures[0]})`);
   else ok(got.failures?.length === 0 && fs.existsSync(manifest) && fs.readFileSync(manifest, "utf8").includes("MIT"), "a real package is fetched from nuget.org and held to the content hash a real lock file names", `${out.stdout}${out.stderr}`);
 }
 
