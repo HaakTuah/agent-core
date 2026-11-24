@@ -15,7 +15,8 @@
 // (host-private.mjs; #1095, point 1), never from which workflows stand, a game from the manifest's line "Modules:
 // all", and a game's previews and the versions check from its calls to the core's preview.yml and versions.yml. Where the host cannot say whether it is private, nothing is compared, and the report says so with the mend. Given earlier kits (the sync gives the kit of each pin the project's manifest
 // named and of every release of the core's), it lists too what the project still holds of theirs that the kit no longer writes: the wording the core
-// has left. It reads only and fails nothing. Node's own modules and git only.
+// has left, and where that is a paragraph or line the kit has reworded, one line that shows the words that differ
+// (#1265, point 2). It reads only and fails nothing. Node's own modules and git only.
 //
 //   node core/scripts/fresh.mjs                   from a project's root: the differences, or that there are none
 //   node core/scripts/fresh.mjs --older <dir>     and, of each folder under <dir> that holds an earlier copy's
@@ -130,6 +131,34 @@ function readAs(to, text) {
 }
 const named = u => u.row !== undefined ? `the row "${u.row}"` : u.para !== undefined ? `the paragraph "${short(u.para)}"` : u.key !== undefined ? `the key "${u.key}"` : `the line "${short(u.line)}"`;
 
+// Of the paragraphs and lines the project lacks (`lacking`) and those of an earlier kit's it still holds (`held`), each
+// pair that is one reworded (#1265, point 2): of one kind, sharing at least OPENING characters of opening, each lacked
+// one with the held one it shares most with, so one line says what differs where two labels, cut, read alike.
+const OPENING = 30;
+const textOf = u => u.para ?? u.line;
+const opening = (a, b) => { let i = 0; while (i < a.length && a[i] === b[i]) i++; return i; };
+function reworded(lacking, held) {
+  const pairs = [], free = new Set(held);
+  for (const want of lacking) {
+    if (textOf(want) === undefined) continue;
+    const best = [...free].filter(u => (u.para === undefined) === (want.para === undefined) && textOf(u) !== undefined)
+      .map(u => [u, opening(textOf(want), textOf(u))]).filter(([, n]) => n >= OPENING).sort((a, b) => b[1] - a[1])[0];
+    if (best) { pairs.push([want, best[0]]); free.delete(best[0]); }
+  }
+  const paired = new Set(pairs.map(([w]) => w));
+  return { pairs, lacks: lacking.filter(u => !paired.has(u)), left: held.filter(u => free.has(u)) };
+}
+// What differs between the kit's words `want` and the project's `had`: the stretch between the opening and ending they
+// share, with a few whole words around it, cut to a length a line can show.
+function changed(want, had) {
+  const start = opening(want, had);
+  let end = 0;
+  while (end < want.length - start && end < had.length - start && want[want.length - 1 - end] === had[had.length - 1 - end]) end++;
+  const from = start > 20 ? want.lastIndexOf(" ", start - 20) + 1 : 0, after = want.slice(want.length - end), tail = after.length > 12 ? after.slice(0, after.indexOf(" ", 12) + 1 || after.length).trimEnd() : after;
+  const stretch = t => { const shown = `${t.slice(from, t.length - end)}${tail}`; return `${from > 0 ? "…" : ""}${short(shown)}${tail.length < after.length && shown.length <= 70 ? "…" : ""}`; };
+  return `the starter kit writes "${stretch(want)}" where the project holds "${stretch(had)}"`;
+}
+
 // The differences between what the kit writes, `kit` ([path, text]), and the project `p`, each a line to print: what
 // it lacks of the kit's, and, of what an earlier kit wrote (`older`, each a kit as `kit` is), what it still holds that
 // the kit no longer writes, the wording the core has left.
@@ -143,12 +172,14 @@ export function differences(p, kit, older = []) {
     if (text === null) { out.push(`${to}: missing (the starter kit writes it today)`); continue; }
     const have = readAs(to, text), now = readAs(to, want);
     if (have.unread) { out.push(`${to}: its content cannot be read as JSON`); continue; }
-    const lacks = now.units.filter(u => !have.has(u)).map(named);
+    const lacking = now.units.filter(u => !have.has(u));
     const seen = new Set();
-    const left = older.flatMap(k => k.filter(([f]) => f === to).flatMap(([, then]) => readAs(to, then).units))
-      .filter(u => !now.has(u) && have.has(u) && !seen.has(named(u)) && seen.add(named(u))).map(u => `${named(u)}, which the starter kit no longer writes`);
-    if (lacks.length) out.push(`${to}: lacks ${lacks.join("; ")}`);
-    if (left.length) out.push(`${to}: still holds ${left.join("; ")}`);
+    const held = older.flatMap(k => k.filter(([f]) => f === to).flatMap(([, then]) => readAs(to, then).units))
+      .filter(u => !now.has(u) && have.has(u) && !seen.has(named(u)) && seen.add(named(u)));
+    const { pairs, lacks, left } = reworded(lacking, held);
+    if (lacks.length) out.push(`${to}: lacks ${lacks.map(named).join("; ")}`);
+    if (left.length) out.push(`${to}: still holds ${left.map(u => `${named(u)}, which the starter kit no longer writes`).join("; ")}`);
+    for (const [want, had] of pairs) out.push(`${to}: differs in ${named(want)}: ${changed(textOf(want), textOf(had))}`);
   }
   return out;
 }

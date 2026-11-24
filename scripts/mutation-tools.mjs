@@ -17,7 +17,8 @@
 //                                                  and the package list and npm config of the folder the tool is installed
 //                                                  in, each where none stands, and its lock file under the size marks'
 //                                                  "skip", with what is left to do: its lock file, the licence check's
-//                                                  entries for both and its data packages, and the job's install and step
+//                                                  entries for both and its data packages, any audit the project keeps
+//                                                  of its own lock files, and the job's install and step
 // Run from the project's root. Reads the project; --write writes the row and those two files, each through no link.
 // git and Node's own modules.
 import fs from "node:fs";
@@ -149,8 +150,9 @@ export function folderOf(command) {
 // check's config (null where none can be read) and `at` that config's path, as the project's licence check is given it
 // (null where it cannot be read: #1247, point 3): the lock file, the config's entries for it, for the npm config and for
 // the packages of data the lock brings (`data` in the list: CC-BY, which floor rule 10 allows for data and assets, so
-// the check reads each so named under that list, as the core's own config does; #1247, point 1), and the job's install
-// and step, each worded so a session acts on it with no rule file open. Nothing once all stand.
+// the check reads each so named under that list, as the core's own config does; #1247, point 1), any audit of the
+// project's own of its lock files (#1265, point 3), and the job's install and step, each worded so a session acts on
+// it with no rule file open. Nothing once all stand.
 export function leftFor(tool, has, config = null, at = "checks/licences.json") {
   if (!tool?.folder) return [];
   const lock = `${tool.folder}/package-lock.json`, npmrc = `${tool.folder}/.npmrc`, names = (key, f) => Array.isArray(config?.[key]) && config[key].includes(f);
@@ -158,6 +160,9 @@ export function leftFor(tool, has, config = null, at = "checks/licences.json") {
   const left = [];
   if (!has(lock)) left.push(`commit ${tool.folder}/package.json with its lock file, written from it with no install scripts by npm install --package-lock-only --ignore-scripts --prefix ${tool.folder}`);
   if (!names("lockfiles", lock)) left.push(`name ${lock} under "lockfiles" in ${it}, so that check reads the licence of every package it installs (floor rule 10)`);
+  // (an audit of the project's own that reads its lock files, a workflow's npm audit say, which the core cannot read
+  // exactly, is named while the lock joins, since it reads the tool's packages from then on: #1265, point 3)
+  if (!has(lock) || !names("lockfiles", lock)) left.push(`have any audit the project keeps of its own lock files read ${lock} too (a workflow or script of the project's own that audits each lock file, npm audit say), since the tool's packages join what it reads; where one fails on them, mend it in the same pull request as the lock file`);
   if (!names("ignoreScriptsIn", npmrc)) left.push(`name ${npmrc} under "ignoreScriptsIn" in that config, so that check holds it to ignore-scripts=true and min-release-age=7 (floor rules 7 and 15)`);
   if (data.length) left.push(`name ${data.join(", ")} under "data" in that config: ${data.length > 1 ? "packages" : "a package"} of data the lock brings under CC-BY, which floor rule 10 allows for data and assets, so that check reads ${data.length > 1 ? "each" : "it"} under that list`);
   if (!has(lock)) left.push(`in the project's own job that runs its tests on a pull request, after them, add two steps: the install, ${installIn(tool.folder)}, and node core/scripts/strength.mjs with STRENGTH_BASE set to the pull request's base (origin/<its base branch>, fetched first). A change to a workflow, it passes two security reviews (floor rule 3); until it is made the strength check reports that it did not measure, and fails nothing`);
