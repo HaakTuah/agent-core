@@ -30,7 +30,8 @@ import { corePath, floorCopy, projectAt } from "./core-path.mjs";
 import { sizeOf as size } from "./file-size.mjs";
 import { leadsOut } from "./guards.mjs";
 
-const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+// (a listing of the tracked paths grows with the project: 256 MB, not Node's default 1 MB; #1204)
+const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
 const MARKS = process.argv[2];
 if (!MARKS) { console.error("FAIL: no config was named. Mend: name it: node <the core's path, core/ as a rule>scripts/reading-size.mjs <config>"); process.exit(1); }
 let marks;
@@ -52,7 +53,9 @@ const MARKS_AT = real(path.resolve(MARKS));
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
 // (a submodule's files too, at their paths from here: a library that carries the core brings its copy so; core-path.mjs)
-const tracked = new Set(git(["ls-files", "-z", "--recurse-submodules"]).split("\0").filter(Boolean));
+let tracked;
+try { tracked = new Set(git(["ls-files", "-z", "--recurse-submodules"]).split("\0").filter(Boolean)); }
+catch (e) { console.error(`FAIL: git could not list the tracked paths (${e.code ?? String(e.message).split("\n")[0]}). Mend: run \`git ls-files\` here and mend what it reports (an unreadable index, a submodule not set up, more paths than the 256 MB the check reads), then run this again`); process.exit(1); }
 const kb = n => (n / 1024).toFixed(1);
 // (the core's copy at the manifest's path, and the floor's own copy a repository whose core a library carries keeps:
 // tasks/repositories.md; core-path.mjs)
