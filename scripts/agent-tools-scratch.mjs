@@ -75,7 +75,7 @@ export const TREE_HOOK = "bash scripts/format.sh", MAIN_HOOK = "git show refs/re
 export const NOT_KIT = "is not in the starter kit's form, so nothing shows that it runs its copy on main";
 export const entry = (command, extra = {}) => ({ kind: "hook", name: `PostToolUse: ${command}`, publisher: "this project", ...extra });
 export const script = { "scripts/format.sh": "echo formatted\n" };
-export const fromWorkingTree = { from: "the working tree" };
+export const fromWorkingTree = { from: "the working tree" }, fromMain = { from: "main" };
 // (the settings by which Claude Code runs a command of its own, read as hooks are)
 export const withSetting = (key, value) => ({ ".claude/settings.json": { ...JSON.parse(KIT), [key]: value } });
 // (and what else a tool runs by itself: the hooks of a skill's or a subagent's frontmatter, a remote server's and a

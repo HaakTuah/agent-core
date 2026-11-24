@@ -18,6 +18,8 @@ import { CORE } from "../scripts/core-address.mjs";
 import { keysOnce } from "../scripts/step-checks-workflow-text.mjs";
 import { LONGEST, twice, uncommented } from "../scripts/yaml-keys.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
+import { STAGES } from "../scripts/steps-stage.mjs";
+import { run as runTools } from "../scripts/workflow-tools.mjs";
 
 let failed = 0;
 const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}${cond || !detail ? "" : `\n     ${String(detail).slice(0, 1200)}`}`); if (!cond) failed++; };
@@ -555,6 +557,22 @@ exit 1
   // (with no mapfile, as in macOS's own bash, 3.2, the folders are named all the same)
   const old = spawnSync("bash", ["-c", 'enable -n mapfile; . "$1"; printf "%s\\n" "$2/x $HOME/y" | unnamed "$2"', "-", path.join(core, "scripts", "unnamed.sh"), runnerTemp], { encoding: "utf8", env: { ...process.env, HOME: home } });
   ok(old.stdout === "<temp>/x ~/y\n" && !old.stderr, "unnamed() names the folders with no mapfile, as in macOS's own bash (#1223)", old.stdout + old.stderr);
+}
+
+// ---- the queue job's step followed as worded on the caller the kits before it wrote, its rights at the workflow's
+// level: the workflow check, zizmor included, finds nothing in what the mend leaves (#1273, point 1) ----
+{
+  const QUEUE_LEAD = "19 November 2026, a pull request of the progress file alone proved by a script", caller = scratchDir("workflows-queue-");
+  fs.mkdirSync(path.join(caller, ".github/workflows"), { recursive: true });
+  fs.writeFileSync(path.join(caller, ".github/workflows/security-review.yml"), fs.readFileSync(path.join(core, TEMPLATES, "workflows/security-review.yml.tmpl"), "utf8").replace(/\{\{core\}\}/g, CORE).replace(/\{\{pin\}\}/g, "0".repeat(40)));
+  STAGES[QUEUE_LEAD].stage(caller);
+  const staged = parseYaml(fs.readFileSync(path.join(caller, ".github/workflows/security-review.yml"), "utf8"));
+  ok(staged.permissions?.statuses === "write" && Object.keys(staged.jobs).length === 1, "the stage holds the caller as the kits before the queue job wrote it, its rights at the workflow's level", JSON.stringify(staged));
+  STAGES[QUEUE_LEAD].mend(caller);
+  if (process.env.ZIZMOR) {
+    const { found } = runTools(caller, [".github/workflows/security-review.yml"], { zizmor: process.env.ZIZMOR });
+    ok(!found.length, "and once its mend is made as the step words it, zizmor finds nothing in it, no write right at the workflow's level beside two jobs", JSON.stringify(found));
+  } else console.log("ok   (not run here: zizmor is fetched by the job's set-up on the runners alone, where this case runs)");
 }
 
 process.exit(failed ? 1 : 0);

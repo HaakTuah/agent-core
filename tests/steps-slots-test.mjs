@@ -107,6 +107,13 @@ sec.mend(lockProject);
     && queueAsked(t => t.replace("    if: ${{ !cancelled() }}\n", "")) && queueAsked(t => t.replace("    needs: queue\n", "")) && queueAsked(t => t.replace("needs.queue.outputs.head", "needs.queue.outputs.other"))
     && !queueAsked(t => t.replace("if: ${{ !cancelled() }}", "if: ${{ always() && github.event_name != 'push' }}")),
     "a caller of the security review is asked the queue job unless it calls queue-only.yml at the review's pin, may read issues, and the review's job needs it, takes its head and runs where it is skipped");
+  // (the caller as the kits before the queue job wrote it, its rights at the workflow's level: the job added beside it as
+  // the step once worded it leaves a write right to both jobs, which zizmor fails; asked until the rights stand at job
+  // level, as the template has them; #1273, point 1)
+  const hoisted = t => t.replace(/^permissions:\n {2}contents: read\n/m, "permissions:\n  contents: read\n  pull-requests: read\n  statuses: write\n").replace("    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n", "");
+  const said = change => { fs.writeFileSync(flow, change(was)); const m = notDone(lockProject, only(QUEUE_LEAD)).find(x => x.lead === QUEUE_LEAD)?.mend ?? ""; fs.writeFileSync(flow, was); return m; };
+  ok(queueAsked(hoisted) && queueAsked(t => hoisted(t).replace(/^permissions:\n(?: {2}.*\n)+/m, "permissions: write-all\n")) && !queueAsked(t => t.replace(/^permissions:\n {2}contents: read\n/m, "permissions: read-all\n"))
+    && said(hoisted).includes("move the rights to job level"), "and asked where a write right stands at the workflow's level beside two jobs, its mend moving the rights to job level", said(hoisted));
 }
 
 // ---- a check that cannot read the project is reported, never read as done ----

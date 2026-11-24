@@ -9,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { CORE } from "../scripts/core-address.mjs";
-import { run, pr, project, script, listing, KIT, HOOKS, LINKS, git, front, withSetting, TREE_HOOK, withHook, entry, fromWorkingTree, NOT_KIT, KIT_HOOK, withPlugins, PLUGIN, codexHook, change, env, asserting } from "../scripts/agent-tools-scratch.mjs";
+import { run, pr, project, script, listing, KIT, HOOKS, LINKS, git, front, withSetting, TREE_HOOK, withHook, entry, fromWorkingTree, fromMain, MAIN_HOOK, NOT_KIT, KIT_HOOK, withPlugins, PLUGIN, codexHook, change, env, asserting } from "../scripts/agent-tools-scratch.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -60,6 +60,15 @@ fails(run(pr(project({ ...script, ".claude/settings.json": withHook(KIT_HOOK), .
 fails(run(project({ ...script, ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK, fromWorkingTree)) })), "a mark on a hook in the kit's form fails", 'but its command is the starter kit\'s form, which runs its copy on main. Mend: take "from" out');
 fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-market": true }), ...listing({ ...PLUGIN, ...fromWorkingTree }) })), "a mark on what is no hook fails", 'only a hook\'s entry may say "from"');
 fails(run(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK, fromWorkingTree)) }), "--core"), "in the core's own repository none may stand, marked or not", "none may stand");
+// (a hook that fetches its file from main in a form of its own is listed by "from": "main", read from its command; one
+// that fetches nothing from main is listed by "the working tree" alone; #1273, point 2)
+const mainStood = project({ ...script, ".claude/settings.json": withHook(MAIN_HOOK) });
+const mainFirst = run(pr(mainStood, listing(entry(MAIN_HOOK))));
+ok(mainFirst.status === 0 && /note as the base held it[\s\S]*give its entry in checks\/licences\.json "from": "main"/.test(mainFirst.out), "a hook the base held that fetches its file from main is noted, saying to list it with \"from\": \"main\"", mainFirst.out);
+const mainMarked = run(pr(mainStood, listing(entry(MAIN_HOOK, fromMain))));
+ok(mainMarked.status === 0 && /note .*lists it in the baseline \("from": "main"\)/.test(mainMarked.out), "and passes once marked so, listed in the baseline", mainMarked.out);
+fails(run(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK, fromMain)) })), "\"from\": \"main\" on a hook whose command fetches nothing from main fails", 'fetches no file from main', '"from": "the working tree"');
+fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-market": true }), ...listing({ ...PLUGIN, ...fromMain }) })), "and on what is no hook", 'only a hook\'s entry may say "from"');
 const kiroTree = { version: "v1", hooks: [{ name: "fmt", trigger: "Stop", action: { type: "command", command: "node \"$CLAUDE_PROJECT_DIR/scripts/fmt.mjs\"" } }] };
 fails(run(pr(project({ ...listing() }), { "scripts/fmt.mjs": "", ".kiro/hooks/fmt.json": kiroTree, ".codex/config.toml": "notify = [\"python3\", \"scripts/notify.py\"]\n", "scripts/notify.py": "", ...listing({ kind: "hook", name: "Kiro Stop: node \"$CLAUDE_PROJECT_DIR/scripts/fmt.mjs\"", publisher: "this project" }, { kind: "hook", name: "Codex notify: python3 scripts/notify.py", publisher: "this project" }) })),
     "Kiro's and Codex's hooks are held to it too", `the hook "Kiro Stop: node`, `the hook "Codex notify: python3 scripts/notify.py", configured in .codex/config.toml, ${NOT_KIT}`);
