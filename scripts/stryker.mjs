@@ -61,7 +61,8 @@ let groups = null, runner = [];
 export const argsOf = (prefix, test) => [...prefix, test];
 
 // The program of the vitest installed at the project's root (`root`), as its package.json names it: its path from the
-// root, or null where none is installed, it names none, or the one it names is not inside its own folder.
+// root, or null where none is installed, it names none, or the one it names, its links followed, is not inside the
+// folder, its links followed too.
 export function vitestAt(root) {
   const folder = "node_modules/vitest";
   let bin;
@@ -69,7 +70,10 @@ export function vitestAt(root) {
   const named = typeof bin === "string" ? bin : bin?.vitest;
   if (typeof named !== "string") return null;
   const at = path.posix.join(folder, named.replaceAll("\\", "/"));
-  return at.startsWith(`${folder}/`) && fs.existsSync(path.join(root, at)) ? at : null;
+  try {
+    const inside = path.relative(fs.realpathSync(path.join(root, folder)), fs.realpathSync(path.join(root, at)));
+    return at.startsWith(`${folder}/`) && inside && inside.split(path.sep)[0] !== ".." && !path.isAbsolute(inside) ? at : null;
+  } catch { return null; }
 }
 
 // One run of a test with `node`, its fault switched on or not: mutate.mjs's run, which stops past its time the test
@@ -215,7 +219,7 @@ async function main(argv) {
   if (t >= 0) return dispatch(JSON.parse(fs.readFileSync(argv[t + 1], "utf8")), process.env[ACTIVE]);
   const { out, bin, budget, vitest, named: asked } = askedOf(argv), until = Date.now() + budget * 1000;
   const program = vitest ? vitestAt(".") : null;
-  if (vitest && !program) refuse("the tests are to be run by vitest, and node_modules/vitest at the project's root names no program", "install the project's packages first (npm ci), as its job does before its tests, then run this again");
+  if (vitest && !program) refuse("the tests are to be run by vitest, and node_modules/vitest at the project's root names no program", "install the project's packages first (npm ci --ignore-scripts), as its job does before its tests, then run this again");
   const project = projectOf(), { named, code, left } = strykers(asked, project.code), { texts, testTexts } = project;
   if (left.length) console.log(`left out, of languages the core's list does not give Stryker: ${left.join(", ")}`);
   if (named === null || !code.length) {
