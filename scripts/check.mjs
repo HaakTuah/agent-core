@@ -61,8 +61,11 @@ const env = withAbsolutePath(plainEnv());
 // a program needs to start and reach the network, by name, with a home folder of its own in the scratch folder, no
 // system git settings, and of git's settings given here only the rewrites of an address (url.*.insteadOf), so no token
 // in this environment or in git's settings reaches them. They still run as the caller's own user, so a pipeline runs
-// this where no sign-in is held (tasks/hosts.md).
-const KEPT = /^(PATH|LANG|LC_[A-Z]+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|HTTPS?_PROXY|NO_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|GIT_ALLOW_PROTOCOL)$/i;
+// this where no sign-in is held (tasks/hosts.md). On Windows a program finds the system's folders by name (NuGet reads
+// each from the environment, and a restore fails with no code of its own where one is missing; #1239): those of the
+// programs and of the machine's settings are kept, and the user's own two, which hold the user's sign-ins, are folders
+// of the scratch home, as HOME is.
+const KEPT = /^(PATH|LANG|LC_[A-Z]+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|PROGRAMDATA|ALLUSERSPROFILE|PROGRAMFILES|PROGRAMFILES\(X86\)|PROGRAMW6432|HTTPS?_PROXY|NO_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|GIT_ALLOW_PROTOCOL)$/i;
 export function stepEnv(home) {
   const kept = Object.fromEntries(Object.entries(env).filter(([name]) => KEPT.test(name)));
   const rewrites = [];
@@ -72,7 +75,9 @@ export function stepEnv(home) {
     if (/^url\..+\.insteadof$/i.test(key) && !/:\/\/[^/]*@/.test(key)) rewrites.push([key, env[`GIT_CONFIG_VALUE_${i}`] ?? ""]);
   }
   const git = Object.fromEntries(rewrites.flatMap(([key, value], i) => [[`GIT_CONFIG_KEY_${i}`, key], [`GIT_CONFIG_VALUE_${i}`, value]]));
-  return { ...kept, ...git, GIT_CONFIG_COUNT: String(rewrites.length), GIT_CONFIG_NOSYSTEM: "1", HOME: home, USERPROFILE: home };
+  const appData = path.join(home, "AppData", "Roaming"), localAppData = path.join(home, "AppData", "Local");
+  for (const dir of [appData, localAppData]) fs.mkdirSync(dir, { recursive: true });
+  return { ...kept, ...git, GIT_CONFIG_COUNT: String(rewrites.length), GIT_CONFIG_NOSYSTEM: "1", HOME: home, USERPROFILE: home, APPDATA: appData, LOCALAPPDATA: localAppData };
 }
 let coreClone = null; // (the clone of the core's address, made at the first call: coreFile)
 const verdicts = {}; // (each job's verdict that ran, by its place, for --verdicts)
