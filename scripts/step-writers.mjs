@@ -17,6 +17,7 @@ import { copiesConfig, marksConfig } from "./check-configs.mjs";
 import { atCopy } from "./core-path.mjs";
 import { MOVED_GLOB, MOVED_GLOBS, moved, namers, readsOldAlone } from "./step-checks-moved.mjs";
 import { places } from "./step-checks-modules.mjs";
+import { MANIFEST, pinsOnly } from "./sync-pins.mjs";
 import { placed } from "./manifest-reads.mjs";
 import { HERE, plain, shown } from "./step-checks.mjs";
 import { Unread, copyAt } from "./workflow-calls.mjs";
@@ -28,32 +29,16 @@ import { asLF, asMended, reads as workflowsRead } from "./workflows.mjs";
 export class Unwritten extends Unread {}
 
 // The files of the project at `root` with changes not yet committed, new ones among them, as git lists them: none is
-// written, so that what a writer writes stays apart from a session's own changes and from a sync's (#1091). The one
-// left out: the manifest changed in its `Core:` line alone, in the index and the tree, as the sync moves its pin before
-// the writers run (sync.mjs), whose module lines are written around it and its pin put back by setAside (#1094).
+// written, so that what a writer writes stays apart from a session's own changes and from a sync's (#1091). Left out:
+// a file the sync changed in its pins alone, in the index and the tree, the manifest's `Core:` line (#1094) or a call
+// to one of the core's workflows (#1248, point 4), which the writers write around and setAside puts back (sync-pins.mjs).
 export function held(root) {
   const out = execFileSync("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--no-renames"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
   const busy = new Set(out.split("\0").filter(Boolean).map(l => l.slice(3)));
-  if (busy.has(MANIFEST) && pinOnly(root)) busy.delete(MANIFEST);
+  for (const f of busy) if (pinsOnly(root, f)) busy.delete(f);
   return busy;
 }
-export const MANIFEST = "core-manifest.md";
-const PIN_LINE = /^Core: .*$/mu;
-// The manifest's `Core:` line in the project at `root`, read before setAside (null where it names none), and put back
-// after it, so a pin the sync moved stays in its pull request (#1094).
-export const pinOf = root => { const f = path.join(root, MANIFEST); return fs.existsSync(f) ? PIN_LINE.exec(fs.readFileSync(f, "utf8"))?.[0] ?? null : null; };
-export function pinBack(root, pin) {
-  const f = path.join(root, MANIFEST);
-  if (pin && fs.existsSync(f)) fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace(PIN_LINE, () => pin));
-}
-function pinOnly(root) {
-  const at = rev => { try { return execFileSync("git", ["show", `${rev}:${MANIFEST}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; } };
-  let tree = null;
-  try { tree = fs.readFileSync(path.join(root, MANIFEST), "utf8"); } catch { /* gone or no file: busy */ }
-  // (line ends read as one, as git with core.autocrlf writes a tree the blob holds with LF alone)
-  const head = at("HEAD"), but = t => t?.replace(/\r\n/gu, "\n").replace(PIN_LINE, "");
-  return head !== null && [at(""), tree].every(t => t !== null && but(t) === but(head));
-}
+export { MANIFEST };
 
 // Whether `f` may be written: a plain path of the project's own outside the copy, no link and under none, no file with
 // changes not yet committed and none git ignores, which no stash could set aside; else Unwritten, naming it.

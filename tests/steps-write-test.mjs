@@ -1,7 +1,7 @@
 // Tests the steps' writers (steps.mjs --write, step-writers.mjs; #1091) on a project the starter kit of this commit
 // writes in a scratch folder, committed: each step a writer does whole, taken out, reads done after `--write`, the
 // project's rule files keeping their words, a baseline skipped by the size marks; the step of the rules' move and that of the agent tools' files written as far
-// as they are exact, the rest left to their mends; a file with changes not yet committed, a writer that cannot run, a
+// as they are exact, the rest left to their mends; a file with changes not yet committed (but the pins a sync moved), a writer that cannot run, a
 // step the manifest declares undone on purpose, a file git ignores and a run outside the copy write nothing; `--aside` sets what it
 // wrote aside in a stash, which brings it back; and the key merge of the checks' configs (#1095, point 5). Node's own modules and git.
 //
@@ -12,7 +12,8 @@ import path from "node:path";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { declare, kitIn, ruleTexts, wordsKept } from "../scripts/steps-kit.mjs";
 import { ASIDE, MOVED_GLOB, MOVED_GLOBS, STEPS, notDone, report, setAside, writeReport } from "../scripts/steps.mjs";
-import { OLD_PATHS, Unwritten, oldPathsIn, writable } from "../scripts/step-writers.mjs";
+import { OLD_PATHS, Unwritten, held, oldPathsIn, writable } from "../scripts/step-writers.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 import { MERGED } from "../scripts/converge.mjs";
 
@@ -226,6 +227,22 @@ for (const l of WHOLE) {
   fs.rmSync(path.join(dir, "core-manifest.md"));
   r = write();
   ok(r.status === 0 && !r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``) && !fs.existsSync(path.join(dir, "core-manifest.md")), "a manifest taken out and not yet committed is written by none, and --write fails nothing", `${r.stdout}${r.stderr}`);
+  back();
+}
+
+// (a workflow the sync changed in its calls' pins alone is let through to the writers, and its moved pin put back after
+// they are set aside (scripts/sync-pins.mjs); one changed beyond them is held: #1248, point 4)
+{
+  const wf = ".github/workflows/own.yml", calls = (sha, note) => `# ${note}\njobs:\n  core:\n    uses: ${CORE.toLowerCase()}/.github/workflows/core.yml@${sha}\n`;
+  fs.mkdirSync(path.join(dir, ".github/workflows"), { recursive: true });
+  put(wf, calls("a".repeat(40), "see core/x.md"));
+  commit("a call to the core");
+  put(wf, calls("c".repeat(40), "see core/x.md"));
+  const through = !held(dir).has(wf);
+  put(wf, calls("c".repeat(40), "see core/y.md"));
+  ok(through && held(dir).has(wf) && setAside(dir, [wf]) && read(wf) === calls("c".repeat(40), "see core/x.md") && dirty() === `M ${wf}`,
+    "a workflow whose calls' pins alone the sync moved is written, its write set aside and the moved pin put back; one changed beyond them is held", read(wf));
+  git("stash", "drop", "-q");
   back();
 }
 

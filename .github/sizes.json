@@ -17,7 +17,7 @@
     },
     "scripts/copies.mjs": { "mark": 34376, "why": "the question of a split is asked in #1102" },
     "scripts/mutation-tools.mjs": { "mark": 22389, "why": "the question of a split is asked in #1253" },
-    "tests/steps-write-test.mjs": { "mark": 20988, "why": "the question of a split is asked in #1253" },
+    "tests/steps-write-test.mjs": { "mark": 22094, "why": "the question of a split is asked in #1253" },
     "scripts/labels.mjs": { "mark": 22008, "why": "the question of a split is asked in #1186" },
     ".github/sizes.json": { "mark": 20901, "why": "a list a script reads, each entry looked up by its path; no split lets anyone read less" },
     "scripts/licences.mjs": { "mark": 52937, "why": "the question of a split is asked in #1151" },

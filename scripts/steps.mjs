@@ -40,7 +40,8 @@ import { started } from "./started.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { copyAt } from "./workflow-calls.mjs";
 import { HERE, mendAt, plain, shown } from "./step-checks.mjs";
-import { MANIFEST, held, pinBack, pinOf } from "./step-writers.mjs";
+import { held } from "./step-writers.mjs";
+import { pinsBack, pinsOf } from "./sync-pins.mjs";
 import { installed, listed, notInstalled } from "./packages.mjs";
 
 // What a step reads a project with, and the words of an error with no path of the machine's in them: step-checks.mjs
@@ -165,20 +166,20 @@ export function writeReport(done, how = null) {
 // What the writers wrote set aside in a stash, so the tree stands as it stood before them; where git cannot make one (no
 // name to make it under, a file it refuses), each file put back as it stood, and false: a file git holds taken back from
 // its last commit, index and tree, since a writer writes none with changes not yet committed, and a new one taken out.
-// Paths are read as written, never as patterns. The manifest's `Core:` line as it stood is put back after either, so a
-// pin the sync moved stays in its pull request (#1094). (`push`, git's own, is given another only by the test, to fail.)
+// Paths are read as written, never as patterns. The pins as they stood, the manifest's `Core:` line and each call to the
+// core's workflows, are put back after either, so a pin the sync moved stays in its pull request (#1094; #1248, point 4). (`push`, git's own, is given another only by the test, to fail.)
 export function setAside(root, files, push = () => execFileSync("git", ["--literal-pathspecs", "stash", "push", "--include-untracked", "--quiet", "-m", ASIDE, "--", ...files], { cwd: root, stdio: ["ignore", "ignore", "pipe"] })) {
-  const pin = files.includes(MANIFEST) ? pinOf(root) : null;
+  const pins = pinsOf(root, files);
   try {
     push();
-    pinBack(root, pin);
+    pinsBack(root, pins);
     return true;
   } catch {
     const tracked = execFileSync("git", ["--literal-pathspecs", "ls-tree", "-r", "-z", "--name-only", "HEAD", "--", ...files], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
     execFileSync("git", ["--literal-pathspecs", "reset", "-q", "--", ...files], { cwd: root, stdio: "ignore" });
     if (tracked.length) execFileSync("git", ["--literal-pathspecs", "checkout", "-q", "HEAD", "--", ...tracked], { cwd: root, stdio: "ignore" });
     for (const f of files.filter(f => !tracked.includes(f))) fs.rmSync(path.join(root, f), { force: true });
-    pinBack(root, pin);
+    pinsBack(root, pins);
     return false;
   }
 }
