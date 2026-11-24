@@ -46,6 +46,7 @@ import { where as shapeAt } from "./shape.mjs";
 import { Unwritten, writable } from "./step-writers.mjs";
 import { inside } from "./step-paths.mjs";
 import { started } from "./started.mjs";
+import { requiredOf } from "./schemas.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/u;
@@ -139,9 +140,10 @@ export function asEarlier(p, templates, k, opts = {}) {
 // regular file of the project's own, or no JSON object, is never written. The kind is read with no question to the host:
 // no config the kit writes differs by whether the repository is private.
 export const MERGED = "the kit's keys in the checks' configs (#1095, point 5)";
-// (a key whose absence its check fails, asking a judgement, is never added: the licence check's "ships", which says what
-// reaches users, licences.mjs; it stays its step's to ask)
-const ASKED = { licences: ["ships"] };
+// (a key whose absence its check fails is never added, at any depth: it asks a judgement, as the licence check's "ships"
+// and "scan"'s "served", what reaches users, do, and stays its step's to ask; read from each check's schema, the audit's
+// "entries" from licences.mjs, `auditEntries`, which no schema holds)
+const asksOf = (to, at) => to === at.audit ? { required: ["entries"], keys: {} } : requiredOf(to === at.copies ? "copies" : to === at.licences || to === at.nuget ? "licences" : "shape");
 export function merged(root, busy) {
   const p = project(root), k = kind(p, {}), at = configs(p);
   const targets = new Set([at.copies, shapeAt(p.manifest), at.audit, at.licences, at.nuget].filter(Boolean));
@@ -149,7 +151,7 @@ export function merged(root, busy) {
   for (const [to, want] of fresh(p, undefined, { k }).filter(([f]) => targets.has(f) && !p.differences.some(l => l.includes(`"${f}"`)))) {
     const now = p.read(to, true);
     if (now === null) continue;
-    const r = keysMerged(now, want, to === at.licences ? ASKED.licences : []);
+    const r = keysMerged(now, want, asksOf(to, at));
     if (r.left) { out.push({ lead: MERGED, why: `\`${to}\` ${r.left}` }); continue; }
     if (!r.text) continue;
     try { writable(p, to, busy); } catch (e) { if (!(e instanceof Unwritten)) throw e; out.push({ lead: MERGED, why: plain(e.message, root) }); continue; }

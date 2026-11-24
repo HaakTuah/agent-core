@@ -243,7 +243,7 @@ for (const l of WHOLE) {
   delete shape.systems;
   delete lic.scan.skip;
   delete lic.ships;
-  lic.scan.served = ["site/"];
+  delete lic.scan.served;
   put("checks/copies.json", `${JSON.stringify(copies, null, 4)}\n`);
   put("checks/shape.json", `${JSON.stringify(shape, null, 2)}\n`);
   put("checks/licences.json", `${JSON.stringify(lic, null, 2)}\n`);
@@ -252,9 +252,9 @@ for (const l of WHOLE) {
   const [c, s, l] = ["checks/copies.json", "checks/shape.json", "checks/licences.json"].map(json);
   ok(r.status === 0 && r.stdout.includes(`- ${MERGED}: wrote `) && ["copies", "shape", "licences"].every(n => r.stdout.includes(`checks/${n}.json`))
     && Array.isArray(c.code) && !c.code.length && c.prose.join() === "docs/*.md" && read("checks/copies.json").startsWith('{\n    "')
-    && s.systems && !Object.keys(s.systems).length && Array.isArray(l.scan.skip) && !l.scan.skip.length && l.scan.served.join() === "site/",
+    && s.systems && !Object.keys(s.systems).length && Array.isArray(l.scan.skip) && !l.scan.skip.length,
   "--write adds the kit's keys a config lacks whose value reads nothing, at any depth, keeping the project's values and indent", `${r.stdout}${r.stderr}`);
-  ok(!("proseFromSecurity" in c) && !("tests" in s) && !("ships" in l), "a key that has a check read more, or asks a judgement (what ships), is not added", JSON.stringify([c, s, l]));
+  ok(!("proseFromSecurity" in c) && !("tests" in s) && !("ships" in l) && !("served" in l.scan), "a key that has a check read more, or whose absence fails (what ships or is served), is not added", JSON.stringify([c, s, l]));
   r = write();
   ok(r.status === 0 && !r.stdout.includes(MERGED), "run again, it writes nothing more", r.stdout);
   back();

@@ -10,7 +10,8 @@
 //
 //   import { keysOf, shapeFaults } from "./schemas.mjs";   shapeFaults("copies", config, "core/"[, its path]) -> ["the config's ...",
 //                                                  ...], [] where it holds; null where ajv is not installed, which the
-//                                                  caller says; keysOf("copies") -> the keys its schema gives
+//                                                  caller says; keysOf("copies") -> the keys its schema gives;
+//                                                  requiredOf("copies") -> the keys it asks, at each depth
 import fs from "node:fs";
 import { installed, loadSync } from "./packages.mjs";
 
@@ -31,6 +32,13 @@ function checker(name) {
 /** The keys the schema `name` gives its file, read from the schema alone, with no package: for a script that tells its
  *  own file from another's by them. */
 export const keysOf = name => Object.keys(schemaOf(name).properties ?? {});
+/** The keys the schema `name` asks at each depth, read from the schema alone: { required, keys: { <key>: the same of its
+ *  value } }, for a writer that must never add a key whose absence the check fails (converge.mjs, `merged`). */
+export const requiredOf = name => {
+  const schema = schemaOf(name), at = node => node?.$ref ? schema.$defs?.[node.$ref.replace("#/$defs/", "")] : node;
+  const tree = node => ({ required: at(node)?.required ?? [], keys: Object.fromEntries(Object.entries(at(node)?.properties ?? {}).map(([k, v]) => [k, tree(v)])) });
+  return tree(schema);
+};
 
 // The mend of a failing rule: the nearest "mendFor" of its keyword, else "mend", up its schema's path.
 function mendOf(schema, schemaPath, keyword) {
