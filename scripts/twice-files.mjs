@@ -23,12 +23,14 @@ export const blobId = buf => crypto.createHash("sha1").update(`blob ${buf.length
 // The blob's id of each of `files` (paths of the project's) as git would store it from the project, its line-end filters
 // applied (`git hash-object`), so that a file is equal to the core's whatever line ends git writes to the disk: where it
 // writes CRLF (core.autocrlf, as on Windows), the copy unpacked from the core's archive holds CRLF, and the earlier
-// copies, read from git's objects, LF (#1221). A name no line can carry, or a project git cannot hash, is read as it
-// stands.
+// copies, read from git's objects, LF (#1221). The project's own filters run, as at its own `git add`, bounded in time.
+// A name a line cannot carry as it stands (a line's end, or a leading quote, which git reads as a quoted name), or a
+// project git cannot hash, is read from the disk as it stands, and the latter said.
 function storedIds(p, files) {
-  const lined = files.filter(f => !/[\n\r]/u.test(f));
+  const lined = files.filter(f => !/[\n\r]/u.test(f) && !f.startsWith('"'));
   let ids = [];
-  try { ids = lined.length ? execFileSync("git", ["hash-object", "--stdin-paths"], { cwd: p.root, input: `${lined.join("\n")}\n`, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["pipe", "pipe", "ignore"] }).trim().split("\n") : []; } catch { ids = []; }
+  try { ids = lined.length ? execFileSync("git", ["hash-object", "--stdin-paths"], { cwd: p.root, input: `${lined.join("\n")}\n`, encoding: "utf8", maxBuffer: 1 << 28, timeout: 60000, stdio: ["pipe", "pipe", "ignore"] }).trim().split("\n") : []; } catch { ids = []; }
+  if (ids.length !== lined.length) console.error(`The twice reading hashed ${lined.length} files from the disk's bytes: git hash-object failed in the project, so a file that differs from the core's in line ends alone is not found equal.`);
   const byFile = new Map(ids.length === lined.length ? lined.map((f, i) => [f, ids[i]]) : []);
   for (const f of files) if (!byFile.has(f)) { try { byFile.set(f, blobId(fs.readFileSync(path.join(p.root, f)))); } catch { /* (unread: no id) */ } }
   return byFile;
@@ -41,6 +43,7 @@ function coreBlobs(p) {
   const copy = path.relative(p.root, p.copyDir).split(path.sep).join("/"), files = p.copyFiles.filter(f => !f.startsWith("setup/template/"));
   const ids = storedIds(p, files.map(f => `${copy}/${f}`));
   for (const f of files) if (ids.has(`${copy}/${f}`)) add(ids.get(`${copy}/${f}`), f, "the copy");
+  // The earlier copies' ids are git's own, not passed through the project's filters: line ends are the same either way.
   for (const sha of p.earlier) {
     for (const e of listTree(p.bare, sha)) if (!e.file.startsWith("setup/template/")) add(e.id, e.file, sha.slice(0, 7));
   }

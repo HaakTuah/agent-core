@@ -81,6 +81,26 @@ const { ok, done } = tally();
   ok(found.some(l => /^notes\/zephyr-notes\.md is the core's docs\/zephyr-notes\.md, byte for byte: no file names it, so it goes$/u.test(l)), "a file equal to one of the copy's as git stores both, the copy's with CRLF on the disk, goes", found.join("\n"));
 }
 
+// A name that opens with a quote is read as it stands, never as a quoted name git would read as another path's (#1221);
+// Windows lets no file name hold a quote.
+if (process.platform !== "win32") {
+  const dir = project("quoted"), name = '"core\\057docs\\057zephyr-notes.md"x.md';
+  fs.writeFileSync(path.join(dir, name), `${"Text of the project's own, unlike any of the core's. ".repeat(20)}\n`);
+  git(dir, "add", "-A");
+  const found = findings(projectOf(dir)).filter(f => f.fix).map(f => f.line);
+  ok(!found.some(l => l.includes("x.md")), "a name that opens with a quote is not found equal to the file its quoted form names", found.join("\n"));
+}
+
+// Where git cannot hash a file (one gone since the copy was listed), the rest are hashed from the disk, and it is said.
+{
+  const dir = project("gone"), p = projectOf(dir), said = [], warn = console.error;
+  fs.rmSync(path.join(dir, "core", p.copyFiles.find(f => f !== "docs/zephyr-notes.md" && f.endsWith(".md"))));
+  console.error = m => said.push(m);
+  let found;
+  try { found = findings(p).map(f => f.line); } finally { console.error = warn; }
+  ok(said.some(m => /^The twice reading hashed \d+ files from the disk's bytes: git hash-object failed/u.test(m)) && found.some(l => l.startsWith("notes/zephyr-notes.md is the core's docs/zephyr-notes.md, byte for byte")), "where git cannot hash a file, the rest are hashed from the disk, and it is said", [...said, ...found].join("\n"));
+}
+
 // A path that held other content at an earlier release moves only as it moved from the old pin, and the command the
 // report gives keeps the old pin, so --fix reads the same history.
 {
