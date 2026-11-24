@@ -104,7 +104,7 @@
       "why": "#441: the game rules split into a base and a file for each kind (#484, points 6 and 7)."
     },
     "tests/upgrade-test.mjs": {
-      "mark": 98773,
+      "mark": 123905,
       "why": "One flow over the projects it builds: each case takes a project as the one before left it (written, synced, merged, its own pull requests after), so a file of its own would build them again; and tests/ holds test files alone (#614), so no module beside it can hold a part. A session reads the case it changes, found by its section's heading."
     },
     "scripts/read-total.mjs": {
@@ -254,7 +254,7 @@
       "why": "#943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
     },
     ".github/shape-baseline.json": {
-      "mark": 26560,
+      "mark": 27000,
       "why": "A baseline the shape check reads and writes whole (--write), in the form every project's baseline takes; 'grown' gives the reason for some of the keys 'listed' holds, so a split along the two parts would make two files to keep in step, and none along who reads it was found."
     },
     "tests/staged-test.mjs": {

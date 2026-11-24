@@ -163,8 +163,9 @@ function runsOf(o, part) {
   return o.runs.filter(r => r.part === part).map(r => ({ ...r.settings, ...given, advisory: r.settings.advisory === true || o.advisory }));
 }
 
-// The base, as a commit: what --base names, fetched where it is origin/<branch> and not here yet (a checkout of one
-// commit, as a workflow's); "" where none is given or it is given empty. Where it cannot be had, it fails, or, given
+// The base, as a commit: what --base names, fetched where it is origin/<branch> and not here yet (a clone that lacks
+// it; the core's workflows give HEAD^1, the merge's first parent, which their checkout holds, since their fetch has no
+// token to sign in with: #674); "" where none is given or it is given empty. Where it cannot be had, it fails, or, given
 // `exits` false, throws that failure's line.
 function baseCommit(base, exits = true) {
   if (!base) return "";
@@ -219,9 +220,12 @@ function lookUp(o, { coreAt, check }) {
 
 const RUN = {
   copies(o, { coreAt, check }) {
-    // (a base that cannot be had is a failure of its own, and every check still runs, each saying what it could not read)
-    if (o.base) check("The base the change merges into", () => { try { baseCommit(o.base, false); return true; } catch (e) { console.log(e.message); return false; } });
-    for (const [name, script, arg, baseVar] of COPIES) check(name, () => node(coreAt, script, arg ? [o[arg]] : [], { env: baseVar ? { [baseVar]: o.base ?? "" } : {} }));
+    // (a base that cannot be had is a failure of its own, and every check still runs, each saying what it could not read;
+    // one that can is given to each as its commit, so a base named from here, such as HEAD^1, names the same commit
+    // wherever a check reads it; #674)
+    let base = o.base ?? "";
+    if (o.base) check("The base the change merges into", () => { try { base = baseCommit(o.base, false); return true; } catch (e) { console.log(e.message); return false; } });
+    for (const [name, script, arg, baseVar] of COPIES) check(name, () => node(coreAt, script, arg ? [o[arg]] : [], { env: baseVar ? { [baseVar]: base } : {} }));
   },
 
   description(o, { coreAt, check }) {

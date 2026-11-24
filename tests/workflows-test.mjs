@@ -414,7 +414,7 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
   const suites = lists(tests.jobs.suites.strategy.matrix.include), upgrades = lists(tests.jobs.upgrade.strategy.matrix.include);
   const only = (l, os) => l.length > 0 && l.every(x => x.os === os);
   const NETWORK = "suites-network";
-  const WINDOWS = ["suites-projects", "suites-sync", "suites-kit", "suites-core", "suites-core-places", "suites-licences", "suites-rest", "suites-tools"];
+  const WINDOWS = ["suites-projects", "suites-sync", "suites-converge", "suites-hostile", "suites-kit", "suites-steps", "suites-writes", "suites-core", "suites-core-places", "suites-licences", "suites-scans", "suites-rest", "suites-rest-two", "suites-rest-three", "suites-tools"];
   const named = l => [...new Set(l.map(x => x.suite))].sort().join();
   ok(suites && Object.keys(tests.jobs.suites.strategy.matrix).join() === "include" && suites.every(l => l.every(x => x.node && x.suite && x.os && x.parts))
     && only(suites[0], "ubuntu-latest") && only(suites[1].filter(x => x.suite !== NETWORK), "windows-latest") && named(suites[1].filter(x => x.suite !== NETWORK)) === [...WINDOWS].sort().join()
@@ -496,6 +496,23 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
   ok(fetches.length >= 3 && fetches.every(l => l.includes("--no-auto-maintenance")) && checkouts.length >= 1 && checkouts.every(off),
     "each fetch of the copy's check, and its checkout of the core into a folder, starts no upkeep of git's own, which would race the check's removal of what it fetched (#802)",
     [...fetches.filter(l => !l.includes("--no-auto-maintenance")), ...checkouts.filter(s => !off(s)).map(s => s.with.path)].join(" | "));
+}
+
+// (#674: the copies checks read the base the change merges into; their checkout keeps no token, so in a private
+// repository a fetch of origin/<branch> after it fails. Each job that runs them gives HEAD^1, the merge's first parent,
+// from a checkout of the project that holds the merge's parents)
+for (const file of ["copies.yml", "core.yml"]) {
+  const wf = parseYaml(fs.readFileSync(path.join(wfDir, file), "utf8"));
+  const jobs = Object.values(wf.jobs).filter(j => (j.steps ?? []).some(s => /scripts\/checks\.mjs copies\b/.test(String(s.run ?? ""))));
+  const bad = jobs.flatMap(j => {
+    const own = j.steps.find(s => String(s.uses ?? "").startsWith("actions/checkout@") && !s.with?.repository && !s.with?.path);
+    const runs = j.steps.filter(s => /scripts\/checks\.mjs copies\b/.test(String(s.run ?? "")));
+    return [
+      ...(Number(own?.with?.["fetch-depth"]) >= 2 && own?.with?.["persist-credentials"] === false ? [] : ["its checkout of the project: fetch-depth 2 or more, persist-credentials false"]),
+      ...runs.filter(s => s.env?.BASE !== "${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}").map(s => `BASE ${s.env?.BASE}`),
+    ];
+  });
+  ok(jobs.length === 1 && bad.length === 0, `${file}: the copies checks read their base as HEAD^1 of a checkout that holds it, with no fetch that would need a token (#674)`, bad.join(" | "));
 }
 
 // (#1223) the two fetch scripts name the temporary and home folders where they show a failed fetch's log, never write
