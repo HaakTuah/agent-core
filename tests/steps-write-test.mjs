@@ -218,24 +218,6 @@ for (const l of WHOLE) {
   r = write("--aside");
   ok(r.status === 0 && raw("core-manifest.md") === moved, "and with --aside, the pin put back on a file whose line ends the stash changed, keeping them", JSON.stringify(read("core-manifest.md").slice(0, 300)));
   back();
-  // (a list of bare names, as the README's format writes it, read and added to in its own form after a sync moved the
-  // pin; and a manifest changed beyond its pin refused, saying so: #1248, points 1 and 2)
-  STAGES[placing].stage(dir);
-  put("core-manifest.md", raw("core-manifest.md").replace(/^(Floor: whole\. Modules: )(.*)$/mu, (l, head, list) => `${head}${list.replace(/`|\.md(?=`|,|\.$)/gu, "")}`));
-  commit("a module neither taken nor left out, the list bare");
-  put("core-manifest.md", raw("core-manifest.md").replace(/^(Core: .*?)\b[0-9a-f]{40}\b/mu, `$1${"c".repeat(40)}`));
-  r = write();
-  const bareNow = raw("core-manifest.md"), list = /^Floor: whole\. Modules: (.*)$/mu.exec(bareNow)[1];
-  ok(r.status === 0 && r.stdout.includes(`- ${placing}: wrote \`core-manifest.md\``) && !missed(placing).length && !/`|\.md/u.test(list) && list.includes("done-when") && bareNow.includes(pin),
-    "a bare list is read and placed by --write after a sync moved the pin, each name it gains bare as those there", `${r.stdout}${r.stderr}\n---\n${list}`);
-  back();
-  STAGES[placing].stage(dir);
-  commit("a module neither taken nor left out");
-  put("core-manifest.md", `${moved}\n## Pace\nlanes: 2\n`);
-  r = write();
-  ok(r.status === 0 && r.stdout.includes("`core-manifest.md` has changes not yet committed beyond its `Core:` line, whose move by the sync alone is let through") && raw("core-manifest.md") === `${moved}\n## Pace\nlanes: 2\n`,
-    "a manifest changed beyond its pin is never written, and --write says that the pin's move alone is let through", `${r.stdout}${r.stderr}`);
-  back();
   STAGES[placing].stage(dir);
   commit("a module neither taken nor left out");
   fs.rmSync(path.join(dir, "core-manifest.md"));

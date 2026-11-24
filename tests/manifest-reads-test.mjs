@@ -11,6 +11,8 @@ import { fileURLToPath } from "node:url";
 import { CONFIRM, factsOf, markGap, markGaps, modulesOf, moduleNames, notes, placed, placeOf, slotTable, toConfirm, toPlace } from "../scripts/manifest-reads.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { places } from "../scripts/step-checks-modules.mjs";
+import { writable } from "../scripts/step-writers.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -91,6 +93,15 @@ ok(m.taken.has("a.md") && m.taken.has("b.md") && m.notTaken.get("g.md") === "no 
   ok(/Modules: a, planning, z\.$/m.test(placed(kit("a, z"), [p])) && /Modules: `a`, `planning`, `z`\.$/m.test(placed(kit("`a`, `z`"), [p])) && /Modules: a\.md, planning\.md\.$/m.test(placed(kit("a.md"), [p]))
     && /Modules: `z`, `a`, `planning`\.$/m.test(placed(kit("`z`, `a`"), [p])), "a name added takes the list's own form: bare or in backticks, with \".md\" only where a name there has it", placed(kit("a, z"), [p]));
   ok(notes({ manifest: kit("a, planning"), moduleTexts: { "a.md": "", "planning.md": "" } }).length === 0 && has(notes({ manifest: kit("a, whatever"), moduleTexts: { "a.md": "" } }), "or by its bare name"), "the notes read a bare list too, and say how a list is written where one cannot be read");
+  // (the steps read it with the core's own modules, a module a step leaves aside among them; a line they cannot read is
+  // quoted; and the writers' refusal of a manifest changed beyond its pin says what a sync's move is let through)
+  const coreList = kit("cleaning, game-design.md and tasks/tests"), unread = e => { try { places({ manifest: e, files: [] }); } catch (err) { return err.message; } return ""; };
+  ok(places({ manifest: coreList, files: [] }, { except: ["cleaning.md"] }).every(l => !["cleaning.md", "game-design.md", "tests.md"].includes(l.name))
+    && /"Modules:" line of `core-manifest\.md` \("cleaning, whatever\."\) is neither "all" nor a list/.test(unread(kit("cleaning, whatever"))) && /has no "Modules:" line/.test(unread("# Core manifest\n")),
+    "the steps read a bare list by the core's modules, a module left aside too, and quote a line they cannot read", unread(kit("cleaning, whatever")));
+  let refused = "";
+  try { writable({ root: scratchDir("manifest-reads-writable-"), manifest: kit("all") }, "core-manifest.md", new Set(["core-manifest.md"])); } catch (e) { refused = e.message; }
+  ok(refused.includes("has changes not yet committed beyond its `Core:` line, whose move by the sync alone is let through"), "the writers' refusal of a manifest changed beyond its pin says the sync's move of it is let through", refused);
   let threw = null;
   try { placed(kit("all"), [{ name: "a.md", take: true }]); } catch (e) { threw = e; }
   ok(threw && /names no module/.test(threw.message), "a Modules line with no module to add after is never written");
