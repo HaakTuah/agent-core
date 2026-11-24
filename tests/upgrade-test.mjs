@@ -138,6 +138,10 @@ ok(threw === 3, "a context, function or sign it does not know stops the test, to
   ok(back.join(" | ") === "a | b", "include is read after exclude, so it adds back what exclude took out, and either may be an expression", back.join(" | "));
   ok(jobs("        os: [a]\n        exclude:\n          - shell: bash\n")[0].startsWith("threw:") && jobs("        include: [a]\n")[0].startsWith("threw:"),
     "an exclude of a key the matrix lacks, and an include that is no mapping, stop the test, to be taught");
+  ok(jobs("        os: [a, b]\n        include:\n          - constructor: c\n").join(" | ") === "a, c | b, c" && jobs("        os: [a, b]\n        exclude:\n          - toString: c\n")[0].startsWith("threw:"),
+    "a key named as an object's own (constructor, toString) is a matrix key like any other, never one the matrix seems to have", jobs("        os: [a, b]\n        include:\n          - constructor: c\n").join(" | "));
+  ok(["        os: [a]\n        include:\n          - __proto__: {x: y}\n", "        include: []\n", "        os: []\n"].every(m => jobs(m).join("").startsWith("threw:")),
+    "a key __proto__, and a matrix that makes no job, which the page does not define, stop the test, to be taught");
 }
 
 // ---- the core: its history, with the commit under test as main, cut as a release ----

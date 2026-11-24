@@ -33,12 +33,14 @@ const valueOf = (v, contexts) => {
 // takes out every combination it matches in part; then each `include` entry, in order, adds its values to every original
 // combination where it overwrites no original value (an added one it may), and where it fits none stands as a
 // combination of its own, which no later entry extends. A matrix of include alone runs each entry. What the page leaves
-// undefined (an exclude of a key the matrix lacks, an entry that is no mapping) stops the test, to be taught.
+// undefined (an exclude of a key the matrix lacks, an entry that is no mapping, a key `__proto__`, a matrix that makes
+// no job) stops the test, to be taught.
 function combinations(matrix, contexts) {
   if (matrix === undefined || matrix === null) return [null];
   const m = valueOf(matrix, contexts);
-  if (!isMapping(m)) throw new Error(`a matrix this runner does not know: ${JSON.stringify(matrix)}`);
+  if (!isMapping(m) || Object.hasOwn(m, "__proto__")) throw new Error(`a matrix this runner does not know: ${JSON.stringify(matrix)}`);
   const { include = [], exclude = [], ...vars } = m;
+  const known = k => Object.hasOwn(vars, k);
   let list = Object.keys(vars).length ? [{}] : [];
   for (const [key, raw] of Object.entries(vars)) {
     const values = valueOf(raw, contexts);
@@ -46,24 +48,26 @@ function combinations(matrix, contexts) {
     list = list.flatMap(c => values.map(v => ({ ...c, [key]: v })));
   }
   for (const entry of entries(exclude, "exclude", contexts)) {
-    const lacking = Object.keys(entry).find(k => !(k in vars));
+    const lacking = Object.keys(entry).find(k => !known(k));
     if (lacking) throw new Error(`a matrix's exclude names ${lacking}, which the matrix lacks: this runner does not know what GitHub does with it`);
     list = list.filter(c => !Object.entries(entry).every(([k, v]) => same(c[k], v)));
   }
   const added = [];
   for (const entry of entries(include, "include", contexts)) {
-    const fits = list.filter(c => Object.entries(entry).every(([k, v]) => !(k in vars) || same(c[k], v)));
+    const fits = list.filter(c => Object.entries(entry).every(([k, v]) => !known(k) || same(c[k], v)));
     for (const c of fits) Object.assign(c, entry);
     if (!fits.length) added.push({ ...entry });
   }
-  return [...list, ...added];
+  const all = [...list, ...added];
+  if (!all.length) throw new Error(`a matrix that makes no job, which this runner does not know: ${JSON.stringify(matrix)}`);
+  return all;
 }
 
 const isMapping = v => v !== null && typeof v === "object" && !Array.isArray(v);
 // A matrix's include or exclude: a list of mappings, written so or given by an expression.
 function entries(raw, what, contexts) {
   const list = valueOf(raw, contexts);
-  if (!Array.isArray(list) || !list.every(isMapping)) throw new Error(`a matrix's ${what} this runner does not know: ${JSON.stringify(raw)}`);
+  if (!Array.isArray(list) || !list.every(e => isMapping(e) && !Object.hasOwn(e, "__proto__"))) throw new Error(`a matrix's ${what} this runner does not know: ${JSON.stringify(raw)}`);
   return list;
 }
 // Whether two of a matrix's values are the same: equal as written, a mapping or list by each of its values.
