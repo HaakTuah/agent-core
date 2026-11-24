@@ -98,6 +98,8 @@ try {
     && /Left to do: commit checks\/mutation\/package\.json with its lock file/.test(r.stdout) && /Left to do: name checks\/mutation\/package-lock\.json under "lockfiles"/.test(r.stdout)
     && /Left to do: name checks\/mutation\/\.npmrc under "ignoreScriptsIn"/.test(r.stdout) && /Left to do: in the project's own job .*node core\/scripts\/strength\.mjs .*two security reviews/.test(r.stdout),
     "once there are tests, --write names Stryker, writes its package list and npm config, and says the lock file, the licence check's entries and the job's two steps are left", r.stdout + r.stderr);
+  ok(/Left to do: have any audit the project keeps of its own lock files read checks\/mutation\/package-lock\.json too/.test(r.stdout),
+    "--write names any audit the project keeps of its lock files, which must read the tool's lock too (#1265, point 3)", r.stdout + r.stderr);
   // (the licence check's config where the project's call gives it, and the lock named under the size marks' "skip": #1247, points 3 and 2)
   fs.rmSync(path.join(dir, "checks/mutation"), { recursive: true });
   put(".github/workflows/licences.yml", `on: pull_request\njobs:\n  licences:\n    uses: ${CORE}/.github/workflows/licences.yml@${"0".repeat(40)}\n    with:\n      config: policy/licences.json\n`);
