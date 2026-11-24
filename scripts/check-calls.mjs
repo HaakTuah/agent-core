@@ -19,16 +19,18 @@ export function movesForward(from, to, past) {
 
 // A sync's calls: its own (`head`, each { file, wf }), and, of the base's, each job that calls a workflow of the core's
 // (`calls(job)`) that the head's file of that name does not, as the base holds it; and each the head calls otherwise
-// than the base but for the pin, as the base calls it at the head's pin where `moved(uses)` gives it there, beside the
-// head's own, so a sync that weakens a call's inputs, or calls another workflow in its place, drops no check.
+// than the base but for the pin, or from a file whose triggers or other settings outside its jobs differ, as the base
+// calls it at the head's pin where `moved(uses)` gives it there, beside the head's own, so a sync that weakens a call's
+// inputs or triggers, or calls another workflow in its place, drops no check.
 export function syncCalls(base, head, calls, moved = uses => uses) {
   const out = [...head];
   for (const { file, wf } of base) {
-    const mine = head.find(h => h.file === file)?.wf.jobs ?? {};
+    const theirs = head.find(h => h.file === file)?.wf, mine = theirs?.jobs ?? {};
+    const alike = theirs && canonical({ ...wf, jobs: null }) === canonical({ ...theirs, jobs: null });
     const jobs = Object.entries(wf.jobs ?? {}).filter(([, job]) => calls(job)).flatMap(([id, job]) => {
       if (!calls(mine[id])) return [[id, job]];
       const there = { ...job, uses: moved(job.uses) };
-      return canonical(there) === canonical(mine[id]) ? [] : [[`${id} (as the base calls it)`, there]];
+      return alike && canonical(there) === canonical(mine[id]) ? [] : [[`${id} (as the base calls it)`, there]];
     });
     if (jobs.length) out.push({ file, wf: { ...wf, jobs: Object.fromEntries(jobs) } });
   }

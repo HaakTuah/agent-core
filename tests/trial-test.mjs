@@ -113,6 +113,9 @@ jobs:
   const weak = syncCalls([{ file: "c.yml", wf: { jobs: { copies: { uses: "c@old", with: { a: 1, b: 2 } }, same: { with: { b: 2, a: 1 }, uses: "s@old" } } } }], [{ file: "c.yml", wf: { jobs: { copies: { uses: "core@new" }, same: { uses: "s@new", with: { a: 1, b: 2 } } } } }], calls, uses => uses.replace("old", "new"));
   ok(weak.length === 2 && Object.keys(weak[1].wf.jobs).join() === "copies (as the base calls it)" && weak[1].wf.jobs["copies (as the base calls it)"].uses === "c@new" && weak[1].wf.jobs["copies (as the base calls it)"].with.b === 2,
     "  and a call the sync changes in more than its pin runs too as the base calls it, at the new pin, so no check is dropped by a weakened call", JSON.stringify(weak));
+  const narrowed = syncCalls([{ file: "c.yml", wf: { on: { pull_request: null }, jobs: { c: { uses: "c@old" } } } }], [{ file: "c.yml", wf: { on: { workflow_dispatch: null }, jobs: { c: { uses: "c@new" } } } }], calls, uses => uses.replace("old", "new"));
+  ok(narrowed.length === 2 && narrowed[1].wf.on.pull_request === null && narrowed[1].wf.jobs["c (as the base calls it)"].uses === "c@new",
+    "  and so does a call whose file's triggers the sync changes, run on the base's triggers", JSON.stringify(narrowed));
 
   // (point 8: a push that names tags alone starts on no push to main, and a job on another system is left unrun, said so;
   // point 9: a step that wants a program this machine lacks says which)
