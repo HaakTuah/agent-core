@@ -149,7 +149,8 @@ for (const name of named.length ? named : [first]) {
       if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `- Did not run: ${said.replace(/[<>&`*_[\]|]/gu, "?")}\n`);
       continue;
     }
-    console.error(`FAIL: the core's packages could not be installed from ${root}${lock}, twice: ${why}. Mend: run this again once the registry answers; if it fails again, file it as a fault (it takes the program that comes with its platform, and a network that reaches its registry)`);
+    console.error(`note the second install from ${lock} failed too: ${why}`); // (the log alone: the FAIL line below is read back into pull request text, by packages.mjs)
+    console.error(`FAIL: the core's packages could not be installed from ${lock}, twice (the installer's own words are in this job's log). Mend: run this again once the registry answers, and read the log; if it fails again, file it as a fault (it takes the program that comes with its platform, and a network that reaches its registry)`);
     process.exit(1);
   }
   console.log(`ok   the core's packages installed from ${lock} into ${into} in ${((Date.now() - began) / 1000).toFixed(1)} s`);

@@ -525,7 +525,7 @@ try {
   fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify(wrong, null, 2));
   fs.rmSync(path.join(pk, "node_modules"), { recursive: true, force: true });
   const refused = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...env, ...regEnv } });
-  ok(refused.status === 1 && /EINTEGRITY|integrity/iu.test(refused.stderr) && /runs again/u.test(refused.stderr) && /could not be installed .*twice/u.test(refused.stderr) && told(refused.stderr), "an install that fails is run once more, and a second failure fails, saying the mend", refused.stderr);
+  ok(refused.status === 1 && /EINTEGRITY|integrity/iu.test(refused.stderr) && /runs again/u.test(refused.stderr) && /could not be installed .*twice/u.test(refused.stderr) && told(refused.stderr) && !refused.stderr.split("\n").some(l => /^FAIL: /u.test(l) && (l.includes(path.dirname(copy)) || /npm error|_logs|EINTEGRITY/u.test(l))), "an install that fails is run once more, and a second failure fails, saying the mend", refused.stderr);
   const mismatched = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: local });
   ok(mismatched.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "in a project's pull request an install that fails for anything but the registry not answering fails, and tells the job nothing", `${mismatched.status} ${mismatched.stdout}${mismatched.stderr}`);
   // (nor where npm's message echoes a network error's name from what the lock file holds, a version here: #714)
