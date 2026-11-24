@@ -197,7 +197,7 @@ function applied(root, write, remove) {
 // did not change is never read, so nothing that stood fails here (AGENTS.md, "Nothing locks a project").
 function check(p, base) {
   if (!base) { console.log("the core's files and parts are read on a pull request alone: nothing to read"); return; }
-  const changed = execFileSync("git", ["diff", "--name-only", "--no-renames", `${base}...HEAD`], { cwd: p.root, encoding: "utf8" }).split("\n").filter(Boolean);
+  const changed = execFileSync("git", ["diff", "--name-only", "--no-renames", `${base}...HEAD`], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\n").filter(Boolean);
   const k = kind(p), bad = unformed(p, k);
   if (bad.length) { console.log(`the core's files and parts could not be read against the kit: ${bad.join("; ")}`); return; }
   const { kit } = kits(p, null, k);

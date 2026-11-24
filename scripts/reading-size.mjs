@@ -28,9 +28,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { corePath, floorCopy, projectAt } from "./core-path.mjs";
 import { sizeOf as size } from "./file-size.mjs";
-import { leadsOut } from "./guards.mjs";
+import { leadsOut, logged } from "./guards.mjs";
 
-const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+// (a listing of the tracked paths grows with the project: 256 MB, not Node's default 1 MB; #1204)
+const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
 const MARKS = process.argv[2];
 if (!MARKS) { console.error("FAIL: no config was named. Mend: name it: node <the core's path, core/ as a rule>scripts/reading-size.mjs <config>"); process.exit(1); }
 let marks;
@@ -52,7 +53,9 @@ const MARKS_AT = real(path.resolve(MARKS));
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
 // (a submodule's files too, at their paths from here: a library that carries the core brings its copy so; core-path.mjs)
-const tracked = new Set(git(["ls-files", "-z", "--recurse-submodules"]).split("\0").filter(Boolean));
+let tracked;
+try { tracked = new Set(git(["ls-files", "-z", "--recurse-submodules"]).split("\0").filter(Boolean)); }
+catch (e) { console.error(`FAIL: ${logged(`git could not list the tracked paths (${e.code ?? String(e.message).split("\n")[0]})`)}. Mend: run \`git ls-files\` here and mend what it reports (an unreadable index, a submodule not set up, more paths than the 256 MB the check reads), then run this again`); process.exit(1); }
 const kb = n => (n / 1024).toFixed(1);
 // (the core's copy at the manifest's path, and the floor's own copy a repository whose core a library carries keeps:
 // tasks/repositories.md; core-path.mjs)
@@ -93,7 +96,7 @@ if (base) {
   // (a submodule's files show here only as its path: a file of a library that carries the core, changed when the pull
   // request moves the library, is not seen as changed, which leaves its split mark unheld, as before such files were read)
   let changed;
-  try { changed = new Set(git(["diff", "--name-only", base]).split("\n")); } catch { console.error(`FAIL: ${base} is not a commit here. Mend: fetch it (git fetch origin ${base}), or set SIZES_BASE to the pull request's base`); process.exit(1); }
+  try { changed = new Set(git(["diff", "--name-only", base]).split("\n")); } catch (e) { if (e.code === "ENOBUFS") { console.error("FAIL: git could not read the changed paths: more than the 256 MB the check reads. Mend: split the pull request, or bring its branch up to date with the default branch, then run this again"); process.exit(1); } console.error(`FAIL: ${base} is not a commit here. Mend: fetch it (git fetch origin ${base}), or set SIZES_BASE to the pull request's base`); process.exit(1); }
   // (the base's own lines of "past", where its config can be read there: a line the base did not hold is this PR's)
   let basePast = {};
   try { const was = JSON.parse(git(["show", `${base}:${path.relative(real(process.cwd()), MARKS_AT).split(path.sep).join("/")}`])); if (was?.past && typeof was.past === "object") basePast = was.past; } catch { /* (no config on the base: every line is this PR's) */ }

@@ -155,6 +155,17 @@ if (p.status === 0) {
   const ownGrew = sizeCheck();
   undo();
   ok(coreGrew.status === 0 && ownGrew.status === 1 && /project's own files every session reads total .*\. Mend: make them smaller/.test(ownGrew.stderr) && mended(ownGrew.stderr), "the core's copy grown by a sync fails no project's total; the project's own files grown past it do", `${coreGrew.stderr}${ownGrew.stdout}`);
+  // (a listing of the tracked paths past 1 MB, Node's default buffer for what git prints, is read whole, and where git cannot
+  // list at all the check fails saying so, with its mend: #1204; the index is put back after each)
+  const indexAt = path.join(p.dir, ".git/index"), indexWas = fs.readFileSync(indexAt);
+  const blob = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: p.dir, input: "", encoding: "utf8" }).stdout.trim();
+  spawnSync("git", ["update-index", "--add", "--index-info"], { cwd: p.dir, input: Array.from({ length: 30000 }, (_, i) => `100644 ${blob}\t0\tgenerated/folder-${i}/a-file-with-a-path-of-fifty-characters-${i}.txt\n`).join("") });
+  const longList = sizeCheck();
+  fs.writeFileSync(indexAt, "not an index");
+  const noList = sizeCheck();
+  fs.writeFileSync(indexAt, indexWas);
+  ok(longList.status === 0 && !/ENOBUFS/.test(longList.stderr), "a project whose tracked paths list past 1 MB passes the reading-size check, the listing read whole", `${longList.stdout}${longList.stderr}`);
+  ok(noList.status === 1 && mended(noList.stderr) && /git could not list the tracked paths/.test(noList.stderr) && !/at .*\.mjs:\d+/.test(noList.stderr), "where git cannot list the tracked paths, the reading-size check fails saying so, with its mend", noList.stderr);
   // (a file past the split mark that a pull request changes asks the question: no line in "past", or one with no why
   // or grown a quarter past its mark, fails with its mend; one whose line says why it stays whole passes, and one of a
   // mark alone that stood before stands as it did; #469)
