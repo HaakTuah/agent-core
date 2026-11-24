@@ -114,7 +114,8 @@ export const coreCall = (name, inputs) => ({ jobs: { c: { uses: `${CORE}/.github
 export const copiesOf = (...a) => configs(inMemory(...a)).copies;
 export const notRead = (what, ...a) => { const at = configs(inMemory(...a)); return at[what] === null && at.unread.length > 0; };
 // The project's manifest with its differences "None" changed to `line`, a step left undone on the owner's word.
-export const declare = (d, line) => fs.writeFileSync(path.join(d, "core-manifest.md"), fs.readFileSync(path.join(d, "core-manifest.md"), "utf8").replace(/^## Differences\n+None\.\n?/m, `## Differences\n- ${line}\n`));
+// (the manifest's line ends kept: a tree git writes with core.autocrlf holds Windows ones)
+export const declare = (d, line) => fs.writeFileSync(path.join(d, "core-manifest.md"), fs.readFileSync(path.join(d, "core-manifest.md"), "utf8").replace(/^## Differences(\r?\n)(?:\r?\n)*None\.(?:\r?\n)?/m, (_, eol) => `## Differences${eol}- ${line}${eol}`));
 
 // `kitIn(tmp)`'s kit, each read back as it is written, before any case changes it, with `ok` told what it found
 // (unless `held` is false): every step done, its kind read from what it holds, no difference from a fresh start, and
