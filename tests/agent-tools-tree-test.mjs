@@ -101,13 +101,20 @@ git(sub, "merge", "-q", "--no-ff", "-m", "merge", "change");
 fails(run(sub), "and one whose fetched path is a submodule's entry", NOT_FILE);
 // (#476's fallback security review of bf7b3b2: what git shows at the path is asked of git, whatever the listing says,
   // as of an empty folder, which the listing leaves out)
-const emptyBase = project({ ...listing() }), inEmpty = { cwd: emptyBase, env, encoding: "utf8" };
-const emptyTree = execFileSync("git", ["mktree"], { ...inEmpty, input: "" }).trim();
-const withEmpty = execFileSync("git", ["mktree"], { ...inEmpty, input: `${git(emptyBase, "ls-tree", "HEAD")}\n040000 tree ${emptyTree}\tformat.sh\n` }).trim();
-git(emptyBase, "update-ref", "refs/heads/main", git(emptyBase, "commit-tree", withEmpty, "-p", "HEAD", "-m", "an empty folder at the path"));
-git(emptyBase, "reset", "-q", "--hard");
+const emptyMain = () => {
+  const base = project({ ...listing() }), inEmpty = { cwd: base, env, encoding: "utf8" };
+  const emptyTree = execFileSync("git", ["mktree"], { ...inEmpty, input: "" }).trim();
+  const withEmpty = execFileSync("git", ["mktree"], { ...inEmpty, input: `${git(base, "ls-tree", "HEAD")}\n040000 tree ${emptyTree}\tformat.sh\n` }).trim();
+  git(base, "update-ref", "refs/heads/main", git(base, "commit-tree", withEmpty, "-p", "HEAD", "-m", "an empty folder at the path"));
+  git(base, "reset", "-q", "--hard");
+  return base;
+};
 const rootKit = KIT_HOOK.replace("main:scripts/format.sh", "main:format.sh");
-fails(run(pr(emptyBase, { ".claude/settings.json": withHook(rootKit), ...listing(entry(rootKit)) })), "and one whose fetched path main holds as an empty folder", 'fetches "format.sh" from main, which the project holds as no plain file');
+fails(run(pr(emptyMain(), { ".claude/settings.json": withHook(rootKit), ...listing(entry(rootKit)) })), "and one whose fetched path main holds as an empty folder", 'fetches "format.sh" from main, which the project holds as no plain file');
+// (#1277's fallback review of 253908e: such a hook marked "from": "main", whose command does fetch from main, is told
+// what is wrong with its file, never that it fetches nothing from main)
+const notFileMarked = run(pr(emptyMain(), { ".claude/settings.json": withHook(rootKit), ...listing(entry(rootKit, fromMain)) }));
+ok(!/fetches no file from main/.test(notFileMarked.out), "and, marked \"from\": \"main\", is not told its command fetches nothing from main", notFileMarked.out);
 // (#476's fallback security review of de6baf6: and where the merge itself holds an empty folder there, main a file)
 const emptyHead = project({ "format.sh": "echo a file\n", ...listing() }), inHead = { cwd: emptyHead, env, encoding: "utf8" };
 pr(emptyHead, { ".claude/settings.json": withHook(rootKit), ...listing(entry(rootKit)) });

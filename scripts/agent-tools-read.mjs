@@ -141,15 +141,16 @@ export function readCommands(state, file, settings) {
 // but a plain file (`inLibrary`: git prints a link's target, which bash then runs). Where the library's objects are not
 // at hand, the file is not read: said, never failed.
 function readSource(state, name, commands) {
+  const main = commands.every(fetchesMain);
   for (const command of commands) {
     const at = fetchedBy(command);
     if (command === NO_KIT) return void state.sources.set(name, { why: NO_KIT_WHY, how: NO_KIT_HOW });
-    if (at === null) return void state.sources.set(name, { why: NOT_KIT_WHY, how: HOW, main: commands.every(fetchesMain) });
+    if (at === null) return void state.sources.set(name, { why: NOT_KIT_WHY, how: HOW, main });
     // (the command in the kit's form already, its mend is the fetched file's)
-    if (state.linked(at)) return void state.sources.set(name, { why: `fetches ${show(at)} from main, which the project holds as no plain file (a link, a folder or a submodule), so main gives no script but what git prints of it`, how: `make ${show(at)} a plain file committed in the project, the script itself in place of the link, folder or submodule, so main gives it` });
+    if (state.linked(at)) return void state.sources.set(name, { why: `fetches ${show(at)} from main, which the project holds as no plain file (a link, a folder or a submodule), so main gives no script but what git prints of it`, how: `make ${show(at)} a plain file committed in the project, the script itself in place of the link, folder or submodule, so main gives it`, main });
     const from = libraryOf(command), held = from && state.inLibrary(from.library, from.rest);
-    if (held === "link") return void state.sources.set(name, { why: `reads ${show(from.rest)} from the library ${show(from.library)}, which this project commits as a link, so the folder it leads to is the branch's to choose, not the submodule main pins`, how: `commit ${show(from.library)} as the submodule that carries the core (git submodule add), never as a link` });
-    if (held === "other") return void state.sources.set(name, { why: `reads ${show(from.rest)} from the commit of ${show(from.library)} that main pins, which holds it as no plain file (a link, a folder or a submodule), so what runs is what git prints of it`, how: `make ${show(from.rest)} a plain file committed in ${show(from.library)}, the script itself in place of the link, folder or submodule, and pin that commit` });
+    if (held === "link") return void state.sources.set(name, { why: `reads ${show(from.rest)} from the library ${show(from.library)}, which this project commits as a link, so the folder it leads to is the branch's to choose, not the submodule main pins`, how: `commit ${show(from.library)} as the submodule that carries the core (git submodule add), never as a link`, main });
+    if (held === "other") return void state.sources.set(name, { why: `reads ${show(from.rest)} from the commit of ${show(from.library)} that main pins, which holds it as no plain file (a link, a folder or a submodule), so what runs is what git prints of it`, how: `make ${show(from.rest)} a plain file committed in ${show(from.library)}, the script itself in place of the link, folder or submodule, and pin that commit`, main });
     if (held === "unread") state.notRead.add(`${name}: the file ${show(from.rest)} of the commit of ${show(from.library)} that main pins was not read, since the submodule's repository is not at hand here, so whether it is a plain file is not known. To mend: bring it in (git submodule update --init ${from.library}), a submodule named as its path (git submodule add --name ${from.library}), which a hook reads it by`);
   }
 }
