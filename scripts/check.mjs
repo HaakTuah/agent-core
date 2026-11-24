@@ -105,7 +105,7 @@ function main() {
   for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
   const o = options();
   // (a clone of the core installs none itself, as a copy does: #1245, point 6)
-  if (!installed("yaml")) { const [what, mend] = notInstalled("yaml").split(" Mend: "); fail(`no workflow can be read here: ${what}.`, mend); }
+  if (!installed("yaml")) { const [what, mend] = notInstalled("yaml").split(". Mend: "); fail(`no workflow can be read here: ${what}.`, mend); }
   const p = { ...project(o), own: o.own, verdicts: o.verdicts === null ? null : path.resolve(o.verdicts) };
   if (p.verdicts !== null) outside(p, o.verdicts);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));

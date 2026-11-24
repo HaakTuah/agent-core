@@ -137,9 +137,11 @@ export function unrunWhy(r) {
 
 // The run's last lines, through `say` and `warn`, and its exit code. A job not run here proved nothing, so it fails the
 // run as a failed one does: where check.mjs is the gate, a broken command or a job of another system would pass
-// otherwise (#1245, points 8 and 9); its verdict still says unrun.
+// otherwise (#1245, points 8 and 9); its verdict still says unrun. The counts hold, with --own, the project's own jobs
+// too, so the line names both, never the core's checks alone (#1275, point 2).
 export function closing({ failed, ran, unrun }, say, warn) {
   if (unrun) warn(`FAIL ${unrun} job(s) skipped above could not run here, so proved nothing. ${MEND}run them where each skip line says, or mend the command it names.`);
-  say(failed || unrun ? `${failed} of the core's checks failed, ${unrun} not run` : `ok   every check of the core that runs from plain git passed (${ran})`);
+  const which = "the core's checks that run from plain git and, with --own, the project's own jobs";
+  say(failed || unrun ? `${failed} of the jobs run here failed, ${unrun} not run (${which})` : `ok   every job run here passed (${ran}: ${which})`);
   return failed || unrun ? 1 : 0;
 }
