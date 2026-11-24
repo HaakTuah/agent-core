@@ -57,5 +57,5 @@ export function libraryOf(command) {
 // (`git … show refs/remotes/origin/main:<path>`, the ref perhaps quoted): what a hook run from main's copy fetches, read
 // from its words alone. It does not show that what is fetched is what runs: a hook so read is only marked as it stands
 // ("from": "main", agent-tools-entries.mjs), and whether it runs main's copy stays a security judgement.
-const FROM_MAIN = /\bgit\b[^;&|\n]*?\sshow\s+["']?refs\/remotes\/origin\/main:[\w-]/u;
+const FROM_MAIN = /\bgit\b[^;&|\n]*?\sshow\s+["']?refs\/remotes\/origin\/main:[\w.-]/u;
 export const fetchesMain = command => FROM_MAIN.test(String(command));
