@@ -30,6 +30,10 @@ const named = f => f.replace(/\.(md|mjs)$/u, "");
 const unpaired = [...noteFiles.filter(f => !f.endsWith(".md") || !stepFiles.includes(`${named(f)}.mjs`)).map(f => `${FOLDER}/${f}`),
   ...stepFiles.filter(f => !f.endsWith(".mjs") || !noteFiles.includes(`${named(f)}.md`)).map(f => `scripts/steps/${f}`)];
 ok(noteFiles.length === STEPS.length && !unpaired.length, `each entry stands in a file of ${FOLDER}/ and its step in a file of scripts/steps/ of the same name, NNN-<name>`, `without its pair: ${unpaired.join(", ")}`);
+// (#1246, point 3: the number alone orders the entries, so no two share one and none lacks one)
+const numberShared = names => names.filter(f => { const n = /^(\d{3})-/u.exec(f)?.[1]; return !n || names.filter(g => g.startsWith(`${n}-`)).length > 1; });
+ok(!numberShared(noteFiles).length, `each file of ${FOLDER}/ opens with a number of three digits that no other entry shares, so the number alone says its place`, `a number shared or missing: ${numberShared(noteFiles).join(", ")}. Give each a number of its own between the entries before and after it, and its step and stage the same name`);
+ok(numberShared(["740-a.md", "740-b.md", "750-c.md", "d.md"]).join() === "740-a.md,740-b.md,d.md", "  a number two entries share, or none, fails");
 const notOne = noteFiles.filter(f => !/^- \*\*[^\n]+\n$/u.test(fs.readFileSync(path.join(root, FOLDER, f), "utf8")));
 ok(!notOne.length, `each file of ${FOLDER}/ holds one entry, on one line`, notOne.join(", "));
 const own = fs.readFileSync(path.join(root, NOTES), "utf8");

@@ -64,6 +64,17 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      insider's text); limits: 256 MB of an answer (16 MB for the inbox's own), 500 pages of 100, and for the take-out
      1,048,576 characters of a text, past which it is left unread, and the first 100 edits of its history; hostile
      tests: `tests/hostile-issues-test.mjs`, and for the take-out `tests/issue-terms-test.mjs`.
+   - whether a project's repository is private, read by `scripts/host-private.mjs`:
+     - from the event of GitHub's job, for its own repository alone;
+     - else from gh;
+     - else from GitHub's API with no sign-in, in a Node process of its own, run with no token of gh's or GitHub's and
+       through the proxy its environment names;
+     - else from `CORE_PRIVATE`, `true` or `false`, which the gate of `pure-sync.mjs` clears;
+     - the repository named by the clone's origin, or, where that is a folder that is itself a clone, by that folder's
+       origin, at most four deep;
+     - limits: 16 MB of gh's answer; 20 s for the read with no sign-in, and 30 s for its process; of each answer only a
+       boolean field `private` is taken, from the read with no sign-in only with status 200, all else reading nothing;
+     - hostile tests: `tests/host-private-test.mjs`.
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository (the
      workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`, `scripts/releases.mjs`,
      `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`, `scripts/clean-merges.mjs`,

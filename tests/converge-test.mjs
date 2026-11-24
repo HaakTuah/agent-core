@@ -4,8 +4,8 @@
 // AGENTS.md and CLAUDE.md written, every byte outside the parts kept; a workflow of the project's own, a file the
 // manifest's "Differences" names and a rule file whose run of imports holds a line of its own are never written over;
 // a value out of its form writes nothing and says the mend; the kind is read from the host (whether the repository is
-// private: from GitHub's event in a job, from gh in a session), never from the workflows that stand, and with no answer
-// the process writes nothing and says the mend; and the check fails a pull request that makes a file or
+// private: from GitHub's event in a job, from gh, or GitHub's API with no sign-in, in a session: host-private-test.mjs),
+// never from the workflows that stand, and with no answer the process writes nothing and says the mend; and the check fails a pull request that makes a file or
 // part the core marks other than the core writes it, with its mend, and passes one that changes only what is the
 // project's. Git and Node's own modules.
 //
@@ -129,16 +129,6 @@ try {
   const compared = spawnSync(process.execPath, ["core/scripts/fresh.mjs"], { cwd: p.dir, env: plainEnv, encoding: "utf8" });
   ok(compared.status === 0 && /not compared, since whether the repository is private could not be read/.test(compared.stdout), "  nor is the project compared with a fresh start", compared.stdout);
   git(p.dir, "checkout", "-q", "--", ".");
-  const hosted = fresh("a-hosted-clone"), repo = "someone-else/a-hosted-clone";
-  git(hosted, "remote", "add", "origin", `https://github.com/${repo}.git`);
-  const routes = [], gh = answer => route => { routes.push(route); return JSON.stringify(answer); };
-  ok(privateOf(hosted, { env: {}, ask: gh({ private: true }) }).private === true && routes.join() === `repos/${repo}`, "  a session asks gh of the repository its origin names", routes.join());
-  const event = path.join(tmp, "event.json");
-  write(tmp, "event.json", JSON.stringify({ repository: { full_name: repo, private: false } }));
-  ok(privateOf(hosted, { env: { GITHUB_EVENT_PATH: event }, ask: () => { throw new Error("not asked"); } }).private === false, "  GitHub's job reads it from the event it runs on, and asks gh nothing");
-  write(tmp, "event.json", JSON.stringify({ repository: { full_name: "someone-else/another", private: false } }));
-  const refusedHost = privateOf(hosted, { env: { GITHUB_EVENT_PATH: event }, ask: () => { throw new Error("gh: Not Found (HTTP 404)"); } });
-  ok(/could not be read: GitHub gave gh no answer \(gh: Not Found \(HTTP 404\)\)\. Mend: sign gh in/.test(refusedHost.unread ?? ""), "  an event of another repository is not read, and where gh gives no answer, it says so with the mend", JSON.stringify(refusedHost));
 
   // ---- a path the manifest places outside the project (floor rule 13) ----
   const placed = read(p.dir, "core-manifest.md");

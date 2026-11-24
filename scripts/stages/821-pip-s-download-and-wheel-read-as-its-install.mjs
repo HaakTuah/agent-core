@@ -1,4 +1,4 @@
-// The stage of scripts/steps/820-pip-s-download-and-wheel-read-as-its-install.mjs: how a project that missed that step holds it, and its mend as the step words it.
+// The stage of scripts/steps/821-pip-s-download-and-wheel-read-as-its-install.mjs: how a project that missed that step holds it, and its mend as the step words it.
 // scripts/steps-stage.mjs loads it, in the order of the names.
 import { licenceConfig } from "../check-configs.mjs";
 import { project } from "../steps.mjs";

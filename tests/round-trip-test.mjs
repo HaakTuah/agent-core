@@ -1,7 +1,5 @@
 // The round trips of #1108: in projects the kit writes of each kind the upgrade test holds, each file the kit, a check, a
-// step or a sync writes is read back by each reader of the core's that reads it, to the meaning written. The list:
-// each script that writes a file is a writer here, with where its round trip stands, or named with why no reader of the
-// core reads it in a project.
+// step or a sync writes is read back by each reader of the core's that reads it, to the meaning written.
 //
 //   node tests/round-trip-test.mjs
 import fs from "node:fs";
@@ -38,13 +36,14 @@ const WRITERS = {
   "shape.mjs": ["here", "the shape baseline, read by the shape check and the dose"],
   "dose.mjs": ["here", "the last audit in the shape baseline, read by the dose and the shape check"],
   "holders-own.mjs": ["here", "checks/holders.json, read by holders.mjs --own"],
-  "mutation-tools.mjs": ["tests/mutation-tools-test.mjs", "its row and list"],
+  "mutation-tools.mjs": ["tests/mutation-tools-test.mjs", "its row, list, size marks"],
   "core-reading.mjs": ["here", "checks/core-reading.json, read by its own `due`"],
   "look-keep.mjs": ["here", "an inbox file, read by the inbox's reader"],
   "queue.mjs": ["tests/queue-test.mjs", "the progress file --clear rewrites, read by its reader"],
   "screens.mjs": ["tests/screens-test.mjs", "the screens' baseline --write rewrites, read by readBaseline"],
   "strength.mjs": ["tests/strength-test.mjs", "the strength baseline --whole and --lower write, read by the check"],
   "step-writers.mjs": ["tests/steps-write-test.mjs", "read by each step's check"],
+  "sync-pins.mjs": ["tests/steps-write-test.mjs", "the pins put back"],
   "twice.mjs": ["tests/twice-test.mjs", "the workflows and pointers --fix corrects, read again by its YAML reader: nothing exact left"],
 };
 // The scripts that write a file no reader of the core reads in a project, each with why.

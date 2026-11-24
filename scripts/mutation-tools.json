@@ -9,6 +9,7 @@
     "Stryker": {
       "registry": "npm", "package": "@stryker-mutator/core", "version": "10.1.1", "licence": "Apache-2.0",
       "overrides": { "mutation-testing-report-schema": "3.9.0", "qs": "6.16.1" },
+      "data": ["caniuse-lite"],
       "folder": "checks/mutation",
       "command": "node {copy}scripts/stryker.mjs --tool checks/mutation --report {report} {lines}",
       "runner": "node"

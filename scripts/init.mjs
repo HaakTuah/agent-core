@@ -255,10 +255,11 @@ export const readyOnly = text => text
 
 // The reading-size check's first marks: each file every session reads at about 20 KB, and the total of the project's
 // own among them (the core's copy under core/ is held to the core's own cap) at what they come to today, rounded up
-// to a whole KB with one to spare, so the first task has room and the mark means something.
-export function sizes(bytes) {
+// to a whole KB with one to spare, so the first task has room and the mark means something; under "skip", `skip`, the
+// files the kit's scripts write that only a script reads (#1247, point 2).
+export function sizes(bytes, skip = []) {
   const total = Object.entries(bytes).filter(([f]) => !f.startsWith("core/")).reduce((a, [, b]) => a + b, 0);
-  return { each: 20 * KB, read: Object.fromEntries(Object.keys(bytes).map(f => [f, 20 * KB])), total: (Math.ceil(total / KB) + 1) * KB, split: 50 * KB, skip: [], past: {} };
+  return { each: 20 * KB, read: Object.fromEntries(Object.keys(bytes).map(f => [f, 20 * KB])), total: (Math.ceil(total / KB) + 1) * KB, split: 50 * KB, skip, past: {} };
 }
 
 // The licence check's first config: nothing ships yet, and of npm's files only those that stand today are named,
@@ -355,18 +356,27 @@ function writeKit(o, here, pin, out) {
   // --write writes them, before the licence check's config, which names that npm config)
   const tool = setUp(here, o.mutation), mutation = MUTATION.tools[o.mutation?.tool];
   const made = [...tool.written];
-  if (!there("checks/sizes.json")) { write("checks/sizes.json", `${JSON.stringify(sizes(Object.fromEntries(startOf(Object.fromEntries(out)).filter(there).map(f => [f, sizeOf(path.join(here, f))]))), null, 2)}\n`); made.push("checks/sizes.json"); }
+  // (the shape check's baseline and the tool's lock file, which a script writes and a split of answers nothing, skipped)
+  const skip = ["checks/shape-baseline.json", ...(mutation?.folder ? [`${mutation.folder}/package-lock.json`] : [])];
+  if (!there("checks/sizes.json")) { write("checks/sizes.json", `${JSON.stringify(sizes(Object.fromEntries(startOf(Object.fromEntries(out)).filter(there).map(f => [f, sizeOf(path.join(here, f))])), skip), null, 2)}\n`); made.push("checks/sizes.json"); }
   // (the versions check's config, with no entry yet: the project names each version Dependabot cannot see; #1095, point 6)
   if (o.versions && !there(VERSIONS)) { write(VERSIONS, `${JSON.stringify(VERSIONS_START, null, 2)}\n`); made.push(VERSIONS); }
   let config = null;
   if (!there("checks/licences.json")) {
-    config = licences(o, there);
-    if (mutation?.folder && there(`${mutation.folder}/.npmrc`)) config.ignoreScriptsIn = [...(config.ignoreScriptsIn ?? []), `${mutation.folder}/.npmrc`];
+    config = withTool(licences(o, there), mutation, there);
     write("checks/licences.json", `${JSON.stringify(config, null, 2)}\n`); made.push("checks/licences.json");
   }
   git(["add", "--", ...written, ...made, "core"], here, guarded());
   // (what is left for the tool: where the licence check's config stood, the project's own, each entry it would name is asked)
   return { written, left, made: [...made, ...firstBaselines(here)], tool: [tool.blocked, ...leftFor(mutation, there, config)].filter(Boolean) };
+}
+
+// The licence check's first config with what the mutation tool needs of it: its npm config, where it stands, and the
+// packages of data its lock brings under CC-BY, which floor rule 10 allows for data (#1247, point 1).
+function withTool(config, tool, there) {
+  if (tool?.folder && there(`${tool.folder}/.npmrc`)) config.ignoreScriptsIn = [...(config.ignoreScriptsIn ?? []), `${tool.folder}/.npmrc`];
+  if (tool?.data?.length) config.data = [...new Set([...(config.data ?? []), ...tool.data])];
+  return config;
 }
 
 // What the kit wrote, and what it leaves for the project and for the owner.

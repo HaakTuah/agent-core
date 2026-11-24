@@ -1,4 +1,4 @@
-// The step of setup/sync-notes/740-a-project-s-records-one-file-per-entry.md, which steps.mjs, beside this folder, loads with the rest in the order
+// The step of setup/sync-notes/741-a-project-s-records-one-file-per-entry.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
 import { COST } from "../step-checks.mjs";
 

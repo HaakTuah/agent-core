@@ -2,6 +2,7 @@
 // (steps.mjs, beside this file, holds the steps, and step-checks.mjs the words they share). Each piece takes the
 // project as steps.mjs's `project` reads it and returns the mend, or null where the step is done; a step names the
 // ones it needs, none runs by itself, and the step's writer (step-writers.mjs) reads the project with the same pieces. It reads only. Node's own modules and git only.
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { atCopy } from "./core-path.mjs";
@@ -43,11 +44,26 @@ const dated = f => /\.(md|txt)$/u.test(f) && (/(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.t
 // The project's own files that may name a file of the core and that a check, a tool or a session reads as they stand
 // now: each rule file and each file a tool takes its instructions from, whatever its name or folder; every file at the
 // root whose name, or whose folder's, opens with a dot, where tools keep what they read, whatever its name; and every
-// other file of text that is no dated record.
+// other file of text that is no dated record. Left out: what git's attributes mark as a tool's output (`generated`),
+// save a rule file, which a tool reads all the same.
 export function namers(p) {
   let rules = [];
   try { rules = ruleFiles(p.read, dir => p.files.filter(f => f.startsWith(`${dir}/`)), { tools: true }); } catch { /* (no list of rule files yet: the files of text alone) */ }
-  return p.files.filter(f => !f.startsWith(copyAt(p)) && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
+  const some = p.files.filter(f => !f.startsWith(copyAt(p)) && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
+  const made = generated(p.root, some);
+  return some.filter(f => rules.includes(f) || !made.has(f));
+}
+
+// Of `files`, those the project's git attributes mark `linguist-generated` or `linguist-vendored`, as GitHub reads them:
+// a tool writes them, and the project keeps them as it writes them, so no path in them is the step's to name (#1248,
+// point 5). Where git cannot say (no repository), none.
+function generated(root, files) {
+  const out = new Set();
+  if (!root || !files.length) return out;
+  const r = spawnSync("git", ["check-attr", "-z", "--stdin", "linguist-generated", "linguist-vendored"], { cwd: root, input: files.join("\0"), encoding: "utf8", maxBuffer: 1 << 28 });
+  const parts = r.status === 0 ? r.stdout.split("\0") : [];
+  for (let i = 0; i + 2 < parts.length; i += 3) if (!["unspecified", "unset", "false"].includes(parts[i + 2])) out.add(parts[i]);
+  return out;
 }
 
 // Of those, the files that name each old path: Map(old path -> [file]).

@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { limitOf } from "../scripts/mutate.mjs";
 import { coreReporter, named, progress, strykerPlugins } from "../scripts/stryker-plugin.mjs";
-import { asItStands, counted, dispatch, optionsOf, stopTests, testsFor, word } from "../scripts/stryker.mjs";
+import { asItStands, counted, dispatch, optionsOf, stopTests, strykers, testsFor, word } from "../scripts/stryker.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -114,6 +114,9 @@ try {
   const o = optionsOf({ mutate: ["src/a.mjs:1-2"], mapAt: "/x/tests.json", scratch: "/x", report: "/x/r.json", plan: "/x/plan.json", sources: "/x/s.json", concurrency: 2 });
   ok(o.testRunner === "command" && o.inPlace && o.coverageAnalysis === "off" && o.commandRunner.command.endsWith(`--tests ${word("/x/tests.json")}`) && same(o.reporters, ["core-report"]) && o.plugins[0].endsWith("stryker-plugin.mjs") && same(o.coreRun, { report: "/x/r.json", plan: "/x/plan.json", sources: "/x/s.json" }) && same(o.mutate, ["src/a.mjs:1-2"]),
     "Stryker runs this script's tests for each fault by its command runner, in place, with the core's reporter alone");
+  ok(same(strykers(["a.py:1-3,b.ts:2-4"], ["a.py", "b.ts", "c.mjs"]), { named: ["b.ts:2-4"], code: ["b.ts", "c.mjs"], left: ["a.py"] })
+    && same(strykers([], ["a.py", "b.ts"]), { named: [], code: ["b.ts"], left: ["a.py"] }) && strykers(["a.py:1-3"], ["a.py", "b.ts"]).named === null,
+    "a file of a language the list does not give Stryker is left out and named, and where only such files are named nothing is measured");
   const refused = (p, windows) => { try { word(p, windows); return false; } catch (e) { return mended(`FAIL: ${e.message}`); } };
   ok(refused("/x/a\nb", false) && refused("/x/a%PATH%b", true) && refused('/x/"a"', true) && !refused('/x/"a"', false), "a path no shell's word can hold as it is, a line break anywhere, or a % or double quote on Windows, is refused, saying the mend");
   if (process.platform !== "win32") {

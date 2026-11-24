@@ -120,7 +120,7 @@ ok(fs.readFileSync(path.join(root, ".claude/settings.json"), "utf8") === fromFol
 ok(!/\{\{[a-z]+\}\}/.test(whole) && whole.includes("${{ secrets.PERSONAL_TERMS }}") && whole.includes(`uses: ${CORE}/.github/workflows/core.yml@${A}`) && whole.includes(`dependency-name: "${CORE}*"`), "filled in, no template word is left and GitHub's own expressions stand as written, each call is to the core's own address at the pin, and Dependabot leaves those calls alone");
 
 // the program whole: a scratch copy of the core as it stands here, and a scratch project
-const { tmp, env, git, run, core, pin, script, project } = scratch("init-test-");
+const { tmp, env, git, run, core, pin, script, fresh, project } = scratch("init-test-");
 
 const p = project("a-project", "--owner", "someone-else", "--npm", "tools");
 const has = f => fs.existsSync(path.join(p.dir, f)), read = f => fs.readFileSync(path.join(p.dir, f), "utf8");
@@ -526,6 +526,14 @@ if (q.status === 0) {
     "a game's manifest has a row for each slot game-design.md uses, each left to fill and named, without its table's bar, in what is left", q.out.slice(0, 1500));
 }
 if (q.status === 0) ok(/^Floor: whole\. Modules: all\.$/m.test(fs.readFileSync(path.join(q.dir, "core-manifest.md"), "utf8")) && fs.readFileSync(path.join(q.dir, "AGENTS.md"), "utf8").startsWith("# A private game\n"), "a game takes every module, and a name given is the name used");
+// (a project that holds JavaScript and its tests gets Stryker, and its licence config names the data the lock brings: #1247, point 1)
+{
+  const dir = fresh("a-project-with-tests");
+  fs.writeFileSync(path.join(dir, "a.js"), "export const a = 1;\n");
+  fs.writeFileSync(path.join(dir, "a.test.js"), "import { a } from './a.js';\n");
+  const r = run(dir, script, "--owner", "x"), config = JSON.parse(fs.readFileSync(path.join(dir, "checks/licences.json"), "utf8"));
+  ok(r.status === 0 && fs.existsSync(path.join(dir, "checks/mutation/.npmrc")) && config.data?.includes("caniuse-lite") && !r.out.includes('under "data"'), "a project with code and tests gets the list's tool, and its licence config names the data its lock brings, so nothing is left to ask of it", r.out.slice(0, 1500));
+}
 const t = project("a-folder-named-true", "--owner", "x", "--npm", "true");
 ok(t.status === 0 && fs.readFileSync(path.join(t.dir, ".github/workflows/signatures.yml"), "utf8").includes('directory: "true"') && fs.readFileSync(path.join(t.dir, ".github/dependabot.yml"), "utf8").includes('directory: "/true"'), "a folder whose name YAML would read as something else is written in quotes, so it stays a name");
 const n = project("a-dotnet-project", "--owner", "x", "--nuget", "src", "--private");

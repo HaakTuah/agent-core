@@ -9,6 +9,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { CORE, OWNER } from "./core-address.mjs";
+import { readCore } from "./core-path.mjs";
 import { aRepository, logged } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
@@ -108,6 +109,22 @@ export function fetchCore(dir, url = `https://github.com/${CORE}`) {
 
 // Whether the commit `older` is `newer` or one it came from; false too where either is no commit there.
 export const past = (older, newer, dir) => SHA.test(older) && holds(["merge-base", "--is-ancestor", older, newer], dir);
+
+// The pins the manifest named before `pin`, read from the project's history at `rev` (the sync's HEAD, the proof's
+// base), newest first, `rev` itself first: each other commit of the core's main, fetched to `dir`, that a "Core:" line
+// of it named, the first the pin before. Their kits are how the one process, and the proof that renders it, know a file
+// an earlier kit wrote and no sync since wrote again, as one before the process came (#1246, point 5).
+export function pinsBefore(manifest, pin, dir, rev = "HEAD") {
+  const run = args => { try { return execFileSync("git", args, { encoding: "utf8", env: plainEnv(), stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }); } catch { return null; } };
+  const commits = (run(["log", "--format=%H", "-n", "200", rev, "--", manifest]) ?? "").split("\n").filter(Boolean), pins = [];
+  for (const c of [rev, ...commits]) {
+    const text = run(["show", `${c}:${manifest}`]);
+    let was = null;
+    try { was = text === null ? null : readCore(text).pin; } catch { /* (a line out of its form names no pin) */ }
+    if (was && was !== pin && !pins.includes(was) && past(was, "refs/heads/main", dir)) pins.push(was);
+  }
+  return pins;
+}
 
 // Every tag there with a release's name, by its number, lowest first, with the commit it stands on: followed through
 // to a commit however the tag was made (a tag of a tag too), so a release is never anything but a commit; null where
