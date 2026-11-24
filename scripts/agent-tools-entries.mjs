@@ -5,7 +5,8 @@ import { exact } from "./exact-versions.mjs";
 const KINDS = { plugin: "the plug-in", server: "the tool server", skill: "the skill", hook: "the hook" };
 const PINNED = new Set(["plugin", "server"]); // (the kinds that must give a version: neither is a file of the project's)
 // (what an entry's "from" may say of a hook not in the kit's form, as the base held it: that it takes a file of the
-// project from the working tree, or, where its command fetches a file from main in a form of its own, from main; #1273)
+// project from the working tree, or, where its command has git show a file of main in a form of its own, from main: a
+// mark of what the command names, never that main's copy is what runs, which stays a judgement; #1273)
 export const TREE = "the working tree", MAIN = "main";
 // (the mark that fits a hook's source, as agent-tools-read.mjs reads it)
 export const markOf = source => (source?.main ? MAIN : TREE);

@@ -54,8 +54,10 @@ export function libraryOf(command) {
   return found?.library === undefined ? null : { library: found.library, rest: found.rest };
 }
 // Whether a command, in the kit's form or one of its own, has git show a file of the remote's `main`
-// (`git … show refs/remotes/origin/main:<path>`, the ref perhaps quoted): what a hook run from main's copy fetches, read
-// from its words alone. It does not show that what is fetched is what runs: a hook so read is only marked as it stands
-// ("from": "main", agent-tools-entries.mjs), and whether it runs main's copy stays a security judgement.
-const FROM_MAIN = /\bgit\b[^;&|\n]*?\sshow\s+["']?refs\/remotes\/origin\/main:[\w.-]/u;
+// (`git … show refs/remotes/origin/main:<path>`, the ref perhaps quoted), read from its words alone: git where a command
+// starts (never in an echo's words or a comment), the path from the repository's root (never ./ or ../, which git reads
+// from the folder it runs in), and its output not sent to a file. It does not show that what is fetched is what runs: a
+// hook so read is only marked as it stands ("from": "main", agent-tools-entries.mjs), and whether it runs main's copy
+// stays a security judgement.
+const FROM_MAIN = /(?:^|[;&|(`'"])\s*git\b[^;&|\n#]*?\sshow\s+["']?refs\/remotes\/origin\/main:(?!\.{1,2}\/)(?=([^\s;&|"'`)]+))\1["']?(?!\s*>)/u;
 export const fetchesMain = command => FROM_MAIN.test(String(command));

@@ -91,6 +91,11 @@ fails(run(pr(project({ ...script, ...listing(SK), ".claude/skills/s/SKILL.md": "
 // (whether a command fetches a file from main, in any form, read from its words: what its entry's mark follows; #1273)
 ok([MAIN_HOOK, KIT_HOOK, `bash -c 'git -C "$CLAUDE_PROJECT_DIR" show "refs/remotes/origin/main:scripts/a.sh" | bash'`, "f=$(git --no-pager show refs/remotes/origin/main:a.sh) && bash -c \"$f\"",
   "git show refs/remotes/origin/main:.claude/hooks/format.sh | bash"].every(fetchesMain)
-  && ![TREE_HOOK, "git show HEAD:scripts/a.sh | bash", "git show refs/remotes/origin/main | bash", "echo show refs/remotes/origin/main:a.sh; bash a.sh", "git log; show refs/remotes/origin/main:a.sh"].some(fetchesMain),
-  "a command that has git show a file of the remote's main is read as fetching from main, whatever its form, a path under a dot folder too; one that shows another ref, no file, or no git's, is not");
+  && ![TREE_HOOK, "git show HEAD:scripts/a.sh | bash", "git show refs/remotes/origin/main | bash", "echo show refs/remotes/origin/main:a.sh; bash a.sh", "git log; show refs/remotes/origin/main:a.sh",
+    // (the fallback reviewer's: git's words in an echo or a comment, a path git reads from the folder it runs in, and
+    // the file fetched only to be thrown away while the working tree's copy runs)
+    "echo git show refs/remotes/origin/main:a.sh; bash a.sh", "bash a.sh # git show refs/remotes/origin/main:a.sh",
+    "git show refs/remotes/origin/main:./a.sh | bash", "git show refs/remotes/origin/main:../a.sh | bash",
+    "bash -c 'git show refs/remotes/origin/main:scripts/format.sh >/dev/null; bash scripts/format.sh'"].some(fetchesMain),
+  "a command that has git show a file of the remote's main is read as fetching from main, whatever its form, a path under a dot folder too; one that shows another ref, no file, no git's, a path from the folder it runs in, or output sent to a file, is not");
 done("where each hook's command comes from");
