@@ -7,17 +7,22 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #1257 | rule builder; its rest for release 7, the owner's word on #1257 | release 6's cut |
+| #1257 | rule builder; its rest for release 7, the owner's word on #1257 | |
+| #1236, #1238 | builder; release 7, one PR each | |
+| #1231, point 3 | builder; release 7 | |
+| #1261 | rule builder; release 7 | |
+| #1287 | builder; release 7 | |
+| the advisory filed privately (Security tab) | rule builder; release 7 | |
 | #1093, with #1090 | rule builder | |
 | #1095, points 2 to 6 | rule builder | #1094 |
-| #1136 to #1140 | builder; release 7, one PR each | release 6's cut |
-| #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 7, one PR each | release 6's cut |
-| #1123 | rule builder; release 7 | release 6's cut; #974, #1060 (`roles/adviser.md`) |
-| #1112, #1074, #1073, #1098, #1133 | builder; release 7, one PR each | release 6's cut |
-| #1142 | rule builder; release 7; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md` | release 6's cut |
-| #1180, #1181 | rule builder; release 7, one PR each | release 6's cut |
-| #1182 | rule builder; release 7 | release 6's cut |
-| #1202 | rule builder; release 7; `AGENTS.md` and what every session here reads at its start | release 6's cut; #1046 and #1052 (`AGENTS.md`, one at a time) |
+| #1136 to #1140 | builder; release 7, one PR each | |
+| #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 7, one PR each | |
+| #1123 | rule builder; release 7 | #974, #1060 (`roles/adviser.md`) |
+| #1112, #1074, #1073, #1098, #1133 | builder; release 7, one PR each | |
+| #1142 | rule builder; release 7; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md` | |
+| #1180, #1181 | rule builder; release 7, one PR each | |
+| #1182 | rule builder; release 7 | |
+| #1202 | rule builder; release 7; `AGENTS.md` and what every session here reads at its start | #1046 and #1052 (`AGENTS.md`, one at a time) |
 | #810 | the orchestrator | the batch's end |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
