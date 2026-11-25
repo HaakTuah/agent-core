@@ -48,7 +48,25 @@ export function privateOf(root, { env = process.env, ask = gh, bare = anonymous 
   return answer;
 }
 
-const originUrl = root => spawnSync("git", ["config", "--get", "remote.origin.url"], { cwd: root, encoding: "utf8" }).stdout?.trim() ?? "";
+// The clone's origin as its own config holds it: git follows no include there, and is not run where the clone's git
+// folder or its common folder lies on another machine, so such a clone reads as one with no origin.
+const originUrl = root => gitDirAfar(root) ? "" : spawnSync("git", ["config", "--no-includes", "--get", "remote.origin.url"], { cwd: root, encoding: "utf8" }).stdout?.trim() ?? "";
+// Whether the git folder of the clone at `at` (its .git, a link or a file naming it, or `at` itself where it is a bare
+// one) or the common folder that folder names lies on another machine, as afar() reads a path; each step read here,
+// a link by what it says and never by following it.
+function gitDirAfar(at) {
+  const named = (from, to) => afar(to) || afar(path.resolve(from, to));
+  const dotGit = path.join(at, ".git");
+  let dir = at;
+  try {
+    const kind = fs.lstatSync(dotGit);
+    if (kind.isSymbolicLink()) { const to = fs.readlinkSync(dotGit); if (named(at, to)) return true; dir = path.resolve(at, to); }
+    else if (kind.isFile()) { const to = /^gitdir:[ \t]*(.*?)[ \t\r]*$/m.exec(fs.readFileSync(dotGit, "utf8"))?.[1] ?? ""; if (!to || named(at, to)) return true; dir = path.resolve(at, to); }
+    else dir = dotGit;
+  } catch { /* (no .git: a bare clone, or none, which git answers itself) */ }
+  try { const common = fs.readFileSync(path.join(dir, "commondir"), "utf8").trim(); if (common && named(dir, common)) return true; } catch { /* (no common folder named) */ }
+  return false;
+}
 // The origin that names the repository: where a clone was made from a folder (check.mjs's scratch clone, a clone of
 // the project's working copy; #1246, point 6), that folder's own origin, a few clones deep, so the repository is the
 // one its first clone names, read and never guessed; else the clone's own origin. A folder that is not itself a clone

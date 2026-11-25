@@ -82,6 +82,26 @@ const far = probed.filter(at => /^[\\/]{2}|^[\\/]some-other-machine/.test(at));
 ok(uncRead.every(r => /names no repository on github\.com, nor does the origin of the clone it was made from/.test(r.unread ?? "")) && far.length === 0,
   "an origin that names another machine, as a UNC or device path does, is not followed: nothing there is probed or read, and it names no repository, as any origin the reader cannot map", far.join(" "));
 
+// ---- git reads the clone's own config, and is not run where its git folder lies on another machine ----
+// (each points, through a path with two leading slashes, at a real clone whose origin names the repository: where the
+// path is followed, git reads that origin there too, so each case bites on every system; a link, only where one can be
+// made)
+const elsewhere = `//${path.join(hosted, ".git").replace(/^[\\/]+/, "")}`;
+const included = path.join(tmp, "included"), pointed = path.join(tmp, "pointed"), common = path.join(tmp, "common"), linked = path.join(tmp, "linked");
+clone(included, path.join(tmp, "not-there"));
+fs.writeFileSync(path.join(tmp, "origin.inc"), `[remote "origin"]\n\turl = https://github.com/${repo}.git\n`);
+fs.writeFileSync(path.join(included, ".git", "config"), `[core]\n\trepositoryformatversion = 0\n[include]\n\tpath = ${path.join(tmp, "origin.inc").replaceAll("\\", "\\\\")}\n`);
+fs.mkdirSync(pointed); fs.writeFileSync(path.join(pointed, ".git"), `gitdir: ${elsewhere}\n`);
+const worktree = path.join(tmp, "worktree-git");
+fs.mkdirSync(path.join(worktree), { recursive: true }); fs.writeFileSync(path.join(worktree, "HEAD"), "ref: refs/heads/main\n"); fs.writeFileSync(path.join(worktree, "commondir"), `${elsewhere}\n`);
+fs.mkdirSync(common); fs.writeFileSync(path.join(common, ".git"), `gitdir: ${worktree}\n`);
+let links = true;
+try { fs.mkdirSync(linked); fs.symlinkSync(elsewhere, path.join(linked, ".git"), "dir"); } catch { links = false; }
+const gitDirs = [included, pointed, common, ...(links ? [linked] : [])];
+ok(gitDirs.every(at => /names no repository on github\.com/.test(privateOf(at, { env: {}, ask: notAsked, bare: notAsked }).unread ?? "")),
+  `git follows no include of the clone's config, and reads no origin where the clone's .git file, its common folder${links ? " or a link of .git" : ""} names a folder on another machine`,
+  gitDirs.map(at => `${path.basename(at)}: ${JSON.stringify(privateOf(at, { env: {}, ask: () => "{}", bare: () => ({}) }))}`).join("; "));
+
 // ---- the read with no sign-in itself, its own process run, sent to a proxy that is not there ----
 // (the environment the reader is given, never this process's: here a proxy that is not there, so nothing leaves)
 const offline = { PATH: process.env.PATH, HTTPS_PROXY: "http://127.0.0.1:9", https_proxy: "http://127.0.0.1:9", NO_PROXY: "", no_proxy: "" };
