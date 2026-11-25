@@ -46,19 +46,20 @@ export function leadsOut(root, at) {
 export const oneLine = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
 
 /** Text with the user and password of every address in it cut out, up to the last "@" before the address's path
- *  ("git+https://user:pass@host/x" as "git+https://host/x"), after a scheme and one slash or more, either way
- *  ("https:\\u@host", "https:///u@host"), so a sign-in a project's file holds in an address is not printed (floor rule
- *  1). Kept as they are: a user that is "git" alone, which signs in with nothing, and an image's digest, "sha256:" and
+ *  ("git+https://user:pass@host/x" as "git+https://host/x"), so a sign-in a project's file holds in an address is not
+ *  printed (floor rule 1). Read as the URL standard reads an address's authority: after one of its special schemes
+ *  (http, https, ws, wss, ftp, file) and one slash or more, either way ("https:\\u@host", "https:/u@host"), up to a
+ *  slash, a backslash but before a quote, "?" or "#"; after any other scheme and "//", up to a slash, "?" or "#", a
+ *  backslash included. So a sign-in may hold a quote (as JSON writes it too, '\\"'), a space, a tab or a line's break,
+ *  and a text that runs from an address to a later "@" before its end loses what lies between: only more is cut.
+ *  Kept as they are: a user that is "git" alone, which signs in with nothing, and an image's digest, "sha256:" and
  *  32 hex digits or more ("docker://x@sha256:…"), never a host of that name.
- *  A sign-in ends where the URL standard ends an address's authority, at a slash, "?" or "#", and at a backslash but
- *  before a quote, so it may hold a quote (as JSON writes it too, '\\"'), a space, a tab or a line's break; a text
- *  that runs from an address to a later "@" before any of these loses what lies between: only more is cut, never less.
- *  Not cut: an address with no slash after its scheme, which reads as npm's alias "npm:name@1", and a sign-in holding a
- *  slash, a backslash not before a quote, "?" or "#", where the address it is part of is read as ending.
- *  A scheme is read from where its letters start alone, and one letter is a scheme only before "//", so a drive's path
- *  ("C:\\me@x", "C:/me@x") is none, though "C://me@x" reads as one and loses "me@". A backslash before a quote ends
- *  no scheme, so no sign-in holds the start of another address, and a long text is read once. */
-export const noSignIn = text => String(text).replace(/(?<![a-z\d+.-])([a-z](?:[a-z\d+.-]+:(?:\/|\\(?!"))+|:\/\/+))((?:[^/\\?#]|\\")+)@(?!sha\d+:[a-f\d]{32,})/giu, (whole, scheme, user) => (user === "git" ? whole : scheme));
+ *  Not cut: an address of another scheme with no "//" after it, which holds no sign-in ("npm:name@1", npm's alias, and
+ *  a drive's path, "C:\\me@x", "C:/me@x"; "C://me@x" reads as one and loses "me@"), and a sign-in holding what ends it.
+ *  A scheme is read from where its letters start alone, and no sign-in holds the start of another address of its kind
+ *  (a slash ends each, and a backslash before a quote ends no special scheme), so a long text is read once. */
+export const noSignIn = text => String(text).replace(/(?<![a-z\d+.-])(?:((?:https?|wss?|ftp|file):(?:\/|\\(?!"))+)((?:[^/\\?#]|\\")+)|([a-z][a-z\d+.-]*:\/\/+)([^/?#]+))@(?!sha\d+:[a-f\d]{32,})/giu,
+  (whole, special, specialUser, other, otherUser) => ((specialUser ?? otherUser) === "git" ? whole : special ?? other));
 
 /** Text from a project, made safe to print on one line of a workflow's log: any address's sign-in cut out (noSignIn),
  *  "%", a carriage return and a line feed escaped as GitHub documents a command's data is (%25, %0D, %0A), and any other
