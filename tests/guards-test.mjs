@@ -69,11 +69,12 @@ ok(seen("``` not a fence `\nshown").includes("shown") && seen("```\nhidden").tri
   const cut = noSignIn(`a spec "git+https://${user}:${pass}@example.invalid/x.git" and https://${user}@a@example.invalid/y`);
   ok(cut === 'a spec "git+https://example.invalid/x.git" and https://example.invalid/y', "the user and password of every address in a text are cut out", cut.replaceAll(user, "<user>").replaceAll(pass, "<pass>"));
   ok(!logged(`https://${user}:${pass}@example.invalid/`).includes(pass) && !logged(`https://${user}:${pass}@example.invalid/`).includes(user), "a text printed to the log holds no address's sign-in");
-  ok([`https:/${user}:${pass}@example.invalid/x`, `https:///${user}:${pass}@example.invalid/x`, `https:\\\\${user}:${pass}@example.invalid/x`, `HTTPS://${user}@example.invalid/x`].every(t => !noSignIn(t).includes(user) && noSignIn(t).endsWith("example.invalid/x")),
+  ok([`https:/${user}:${pass}@example.invalid/x`, `https:///${user}:${pass}@example.invalid/x`, `https:\\\\${user}:${pass}@example.invalid/x`, `HTTPS://${user}@example.invalid/x`,
+    `git+https://git@${user}:${pass}@example.invalid/x`, `https://${user}:${pass}@sha256:443/example.invalid/x`].every(t => !noSignIn(t).includes(user) && noSignIn(t).endsWith("example.invalid/x")),
     "an address with one slash or more after its scheme, either way, in any case, has its sign-in cut out too");
   const plain = ["https://registry.npmjs.org/@scope/x/-/x-1.0.0.tgz", "git+ssh://example.invalid/x.git#abc", "x@1.2.3", "mail me@example.invalid",
-    "ssh://git@example.invalid/x.git", "docker://alpine@sha256:0123abcd", '{"type":"x://y","url":"z@w"}', "npm:@scope/x@1.0.0", "C:\\\\@types"];
-  ok(plain.every(t => noSignIn(t) === t), "an address with no sign-in, the user git, an image's digest, a name with a version, npm's alias, a bare address of mail and text across a quote are left as they are", JSON.stringify(plain.map(noSignIn)));
+    "ssh://git@example.invalid/x.git", `docker://alpine@sha256:${"0123abcd".repeat(8)}`, '{"type":"x://y","url":"z@w"}', "npm:@scope/x@1.0.0", "C:\\\\@types", "C:\\me@x\\file.txt"];
+  ok(plain.every(t => noSignIn(t) === t), "an address with no sign-in, the user git, an image's digest, a name with a version, npm's alias, a bare address of mail, a drive's path and text across a quote are left as they are", JSON.stringify(plain.map(noSignIn)));
 }
 
 console.log(`${count - failed} of ${count} passed`);
