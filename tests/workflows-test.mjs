@@ -582,4 +582,33 @@ exit 1
   } else console.log("ok   (not run here: zizmor and actionlint are fetched by the job's set-up on the runners alone, where this case runs)");
 }
 
+// ---- the base a check reads from the checkout (#1231) ----
+// A checkout at depth 2 holds the merge a pull request's run checks out and its two parents, and may not hold the
+// event's base commit, which a private repository's job cannot fetch with no token: every step that gives the base to a
+// check that reads it from the checkout names HEAD^1, the merge's first parent; the event's base commit stands only where
+// it is read through GitHub's API alone (the description check's BASE_SHA) or the checkout holds the whole history.
+{
+  const steps = [];
+  for (const file of fs.readdirSync(wfDir).filter((f) => /\.ya?ml$/u.test(f))) {
+    const wf = parseYaml(fs.readFileSync(path.join(wfDir, file), "utf8"));
+    for (const [jobName, job] of Object.entries(wf?.jobs ?? {})) for (const step of job?.steps ?? []) steps.push({ file, jobName, job, step });
+  }
+  const event = "pull_request.base.sha";
+  const fromCheckout = steps.filter(({ job, step }) => {
+    // (the job's own checkout, of the repository under check, not another it checks out into a folder, as core.yml's of the core)
+    const whole = (job.steps ?? []).some((s) => String(s.uses ?? "").startsWith("actions/checkout@") && !s.with?.path && !s.with?.repository && String(s.with?.["fetch-depth"]) === "0");
+    const api = /pr-description\.mjs|checks\.mjs" description|checks\.mjs description/u.test(String(step.run ?? ""));
+    const named = [...Object.entries(step.env ?? {}).filter(([key]) => !(api && key === "BASE_SHA")).map(([, v]) => v), step.run, ...Object.values(step.with ?? {})];
+    return !whole && named.some((v) => String(v ?? "").includes(event));
+  }).map(({ file, jobName, step }) => `${file}: ${jobName}: ${step.name ?? step.id}`);
+  ok(steps.length > 50 && fromCheckout.length === 0, "no step gives the event's base commit to a check that reads it from a checkout that may not hold it", fromCheckout.join("\n"));
+  const at = (file, name) => steps.find((s) => s.file === file && String(s.step.name ?? "").startsWith(name))?.step ?? {};
+  const given = [["core.yml", "The signature check"], ["core.yml", "The NuGet check, last"], ["signatures.yml", "The signature check"], ["nuget.yml", "The NuGet check"]]
+    .filter(([file, name]) => { const step = at(file, name); return !(String(step.env?.BASE).includes("HEAD^1") && /--base "\$BASE"/u.test(String(step.run))); });
+  ok(given.length === 0, "the signature and NuGet steps give their check HEAD^1, the merge's first parent, as --base", given.join("; "));
+  const looked = [["licences.yml", "Every package and audit entry"], ["tests.yml", "Each package new to the core's own lock file"]]
+    .filter(([file, name]) => !String(at(file, name).env?.LOOKUP_BASE).includes("'HEAD^1'"));
+  ok(looked.length === 0, "the lookup's steps name HEAD^1 as LOOKUP_BASE on a pull request", looked.join("; "));
+}
+
 process.exit(failed ? 1 : 0);

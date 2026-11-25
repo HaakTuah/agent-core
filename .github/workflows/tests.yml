@@ -797,7 +797,7 @@ jobs:
       - name: Each package new to the core's own lock file looked up in its registry (floor rule 15; once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }}
         env:
-          LOOKUP_BASE: ${{ github.event.pull_request.base.sha }} # empty on a push to main, where nothing is new
+          LOOKUP_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }} # the merge's first parent, which the checkout holds (#1231); empty on a push to main, where nothing is new
         shell: bash
         run: node scripts/lookup.mjs .github/licences.json
       - name: The week's wait on each package the lock files bring or update (floor rule 7; once, on Linux)

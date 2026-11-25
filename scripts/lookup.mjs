@@ -413,13 +413,18 @@ export function summarise(lines, nuget) {
   try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### The lookup${nuget ? " (NuGet)" : ""}\n\n${lines.map((l) => `- ${l.replace(/[<>&`*_[\]|]/gu, "?")}`).join("\n")}\n`); } catch { /* (a summary is a convenience: the log holds every line) */ }
 }
 
-// The pull request's base as its workflow names it (LOOKUP_BASE, from the event's base commit), where the checkout holds
-// that commit: a checkout of the head alone, or of a head that merges main, would read no base, or the pull request's
-// own earlier commit as its first parent.
+// The forms a job names its pull request's base in (LOOKUP_BASE): a commit, or HEAD^1, the first parent of the merge its
+// checkout holds, as the core's workflows name it, since the event's base commit may not be in a shallow checkout (#1231).
+export const NAMED_BASE = /^(?:[0-9a-f]{40}|HEAD\^1)$/u;
+
+// The pull request's base as its workflow names it (LOOKUP_BASE), as a commit, where the checkout holds it: a checkout
+// of the head alone, or of a head that merges main, would read no base, or the pull request's own earlier commit as its
+// first parent, so HEAD^1 is read only where HEAD is a merge.
 export function namedBase(root) {
-  const sha = process.env.LOOKUP_BASE;
-  if (typeof sha !== "string" || !/^[0-9a-f]{40}$/u.test(sha)) return null;
-  try { execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd: root, stdio: "ignore" }); return sha; } catch { return null; }
+  const name = process.env.LOOKUP_BASE;
+  if (typeof name !== "string" || !NAMED_BASE.test(name)) return null;
+  const commit = (rev) => execFileSync("git", ["rev-parse", "--verify", "-q", `${rev}^{commit}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  try { if (name === "HEAD^1") commit("HEAD^2"); return commit(name) || null; } catch { return null; }
 }
 
 if (started(import.meta.url)) {

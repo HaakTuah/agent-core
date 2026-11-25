@@ -83,7 +83,7 @@ jobs:
         if: ${{ !cancelled() }}
         env:
           CONFIG: ${{ inputs.config }}
-          LOOKUP_BASE: ${{ github.event.pull_request.base.sha }} # empty where the caller runs on anything but a pull request
+          LOOKUP_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }} # the merge's first parent, which the checkout holds (#1231); empty where the caller runs on anything but a pull request
         run: node "$CORE_AT"scripts/licences.mjs "$CONFIG"
       - name: Every tool the agents load listed, with its publisher and version (floor topic 15)
         if: ${{ !cancelled() }}
