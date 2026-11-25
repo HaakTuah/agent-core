@@ -43,7 +43,7 @@ import { fileURLToPath } from "node:url";
 import { counted as bytesOf, sizeOf } from "./file-size.mjs";
 import { gather, library, reading } from "./reading.mjs";
 import { counted as countedBy, writersOf } from "./security-review.mjs";
-import { asText } from "./guards.mjs";
+import { asText, logged } from "./guards.mjs";
 import { started } from "./started.mjs";
 
 // Each role's cap, a whole number of KB: one line a role, spelled exactly so. The record of each cap's raises, with its
@@ -245,7 +245,7 @@ function main([flag, baseFile, commentsFile, rightsFile, headFile]) {
   if (flag === "--base" && base === null) { console.error(`FAIL: git cannot read the base ${baseFile ?? "(none named)"}. Mend: name a revision git holds here (the workflow fetches the merge commit's parents: HEAD^1)`); return 1; }
   const wrong = [], { fail, task } = judged(measured(roles, wrong), base, base ? capsAt(baseFile) : {});
   // (each role's and file's name in a line as text alone, a pull request's to choose; #1348)
-  for (const t of task) console.log(`::warning::${asText(t)}, which fails nothing: a task to trim, which the scheduled look keeps as the issue "${DUE_TITLE}"`);
+  for (const t of task) console.log(`::warning::${logged(t)}, which fails nothing: a task to trim, which the scheduled look keeps as the issue "${DUE_TITLE}"`);
   for (const w of [...wrong, ...fail]) console.error(asText(`FAIL: ${w}`));
   return wrong.length || fail.length ? 1 : 0;
 }
