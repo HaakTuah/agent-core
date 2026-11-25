@@ -69,9 +69,9 @@ ok(seen("``` not a fence `\nshown").includes("shown") && seen("```\nhidden").tri
   const cut = noSignIn(`a spec "git+https://${user}:${pass}@example.invalid/x.git" and https://${user}@a@example.invalid/y`);
   ok(cut === 'a spec "git+https://example.invalid/x.git" and https://example.invalid/y', "the user and password of every address in a text are cut out", cut.replaceAll(user, "<user>").replaceAll(pass, "<pass>"));
   ok(!logged(`https://${user}:${pass}@example.invalid/`).includes(pass) && !logged(`https://${user}:${pass}@example.invalid/`).includes(user), "a text printed to the log holds no address's sign-in");
-  ok([`https:/${user}:${pass}@example.invalid/x`, `https:///${user}:${pass}@example.invalid/x`, `https:\\\\${user}:${pass}@example.invalid/x`, `HTTPS://${user}@example.invalid/x`, `x://${user}:${pass}@example.invalid/x`,
+  ok([`https:/${user}:${pass}@example.invalid/x`, `https:///${user}:${pass}@example.invalid/x`, `https:\\\\${user}:${pass}@example.invalid/x`, `HTTPS://${user}@example.invalid/x`, `https:${user}:${pass}@example.invalid/x`, `ftp:\\${user}@example.invalid/x`, `x://${user}:${pass}@example.invalid/x`,
     `git+https://git@${user}:${pass}@example.invalid/x`, `https://${user}:${pass}@sha256:443/example.invalid/x`, `https://${user}:${pass}"tail@example.invalid/x`, `git+https://${user}:${pass}\\tail@example.invalid/x`, `x://${user}:${pass}\\"tail@example.invalid/x`].every(t => !noSignIn(t).includes(user) && noSignIn(t).endsWith("example.invalid/x")),
-    "an address with one slash or more after its scheme, either way, in any case, has its sign-in cut out too, a quote in it");
+    "an address with one slash or more after its scheme, either way, in any case, has its sign-in cut out too, none after a special scheme but file, a quote in it");
   ok(noSignIn(`https:\\\\${user}:${pass}"x@example.invalid/x`) === "https:\\\\example.invalid/x", "a backslash before a quote is a sign-in's, not a scheme's", noSignIn(`https:\\\\${user}:${pass}"x@example.invalid/x`).replaceAll(user, "<user>"));
   const quoted = noSignIn(JSON.stringify({ spec: `https://${user}:${pass}"tail@example.invalid/x` }));
   ok(quoted === '{"spec":"https://example.invalid/x"}', "a sign-in holding a quote is cut out, as JSON writes it too", quoted.replaceAll(user, "<user>").replaceAll(pass, "<pass>"));
@@ -88,8 +88,8 @@ ok(seen("``` not a fence `\nshown").includes("shown") && seen("```\nhidden").tri
   const over = `https://${"a".repeat(2049)}@example.invalid/x`;
   ok(noSignIn(over) === over && noSignIn(`https://${"a".repeat(2048)}@example.invalid/x`) === "https://example.invalid/x", "a sign-in of up to 2,048 characters is cut, a longer one is read as no address", "");
   const plain = ["https://registry.npmjs.org/@scope/x/-/x-1.0.0.tgz", "git+ssh://example.invalid/x.git#abc", "x@1.2.3", "mail me@example.invalid",
-    "ssh://git@example.invalid/x.git", `docker://alpine@sha256:${"0123abcd".repeat(8)}`, "npm:@scope/x@1.0.0", "C:\\\\@types", "C:\\me@x\\file.txt", "C:/me@x/file.txt", 'ab:\\"u@h'];
-  ok(plain.every(t => noSignIn(t) === t), "an address with no sign-in, the user git, an image's digest, a name with a version, npm's alias, a bare address of mail, a drive's path and a backslash before a quote, which ends no scheme, are left as they are", JSON.stringify(plain.map(noSignIn)));
+    "ssh://git@example.invalid/x.git", `docker://alpine@sha256:${"0123abcd".repeat(8)}`, "npm:@scope/x@1.0.0", "C:\\\\@types", "file:../@scope/x", "file:me@x/y", "C:\\me@x\\file.txt", "C:/me@x/file.txt", 'ab:\\"u@h'];
+  ok(plain.every(t => noSignIn(t) === t), "an address with no sign-in, the user git, an image's digest, a name with a version, npm's alias, a bare address of mail, a file's path, a drive's path and a backslash before a quote, which ends no scheme, are left as they are", JSON.stringify(plain.map(noSignIn)));
 }
 
 console.log(`${count - failed} of ${count} passed`);

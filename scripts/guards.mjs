@@ -48,7 +48,8 @@ export const oneLine = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\
 /** Text with the user and password of every address in it cut out, up to the last "@" before the address's path
  *  ("git+https://user:pass@host/x" as "git+https://host/x"), so a sign-in a project's file holds in an address is not
  *  printed (floor rule 1). Read as the URL standard reads an address's authority: after one of its special schemes
- *  (http, https, ws, wss, ftp, file) and one slash or more, either way ("https:\\u@host", "https:/u@host"), up to a
+ *  (http, https, ws, wss, ftp; file) and any slashes, either way, none among them ("https:u@host", "https:\\u@host";
+ *  file's one or more, since a file's address with none is a path, "file:../@scope/x"), up to a
  *  slash, a backslash but before a quote, "?" or "#"; after any other scheme and "//", up to a slash, "?" or "#", a
  *  backslash included. So a sign-in may hold a quote (as JSON writes it too, '\\"'). In a line of text (noSignIn) it
  *  ends at a space, a tab or a line's break too, so the words after an address, a failure's mend among them, are never
@@ -62,7 +63,7 @@ export const oneLine = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\
  *  takes and what it costs; and, in a line of text, one holding a space, a tab or a line's break.
  *  A scheme is read from where its letters start alone, and no sign-in holds the start of another address of its kind
  *  (a slash ends each, and a backslash before a quote ends no special scheme), so a long text is read once. */
-const signIns = (ends) => new RegExp(String.raw`(?<![a-z\d+.-])(?:((?:https?|wss?|ftp|file):(?:\/|\\(?!"))+)((?:[^/\\?#${ends}]|\\"){1,2048})|([a-z][a-z\d+.-]*:\/\/+)([^/?#${ends}]{1,2048}))@(?!sha\d+:[a-f\d]{32,})`, "giu");
+const signIns = (ends) => new RegExp(String.raw`(?<![a-z\d+.-])(?:((?:https?|wss?|ftp):(?:\/|\\(?!"))*|file:(?:\/|\\(?!"))+)((?:[^/\\?#${ends}]|\\"){1,2048})|([a-z][a-z\d+.-]*:\/\/+)([^/?#${ends}]{1,2048}))@(?!sha\d+:[a-f\d]{32,})`, "giu");
 const cutBy = (pattern) => text => String(text).replace(pattern,
   (whole, special, specialUser, other, otherUser) => ((specialUser ?? otherUser) === "git" ? whole : special ?? other));
 export const noSignIn = cutBy(signIns(String.raw`\s`));
