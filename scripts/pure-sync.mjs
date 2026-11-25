@@ -19,16 +19,9 @@
 // call to a core workflow is pinned to a commit of the core's main.
 // It prints the head it checked, for the merge call's `sha` (`tasks/github-calls.md`), so nothing pushed after the
 // check can merge.
-//
-//   node <a clone of the core at the commit tried>/scripts/pure-sync.mjs --trial <that commit's full SHA>
-//
-// A release's trial on a copy of a project (AGENTS.md, "A release is cut on the owner's word"; #1261) asks the same proof
-// against the commit it tries before that commit is a release: the one thing it reads otherwise is that the pin is a
-// release, which it reads only where the pin is that commit, and it refuses a sync to any other. That is a reading, never
-// the proof: it prints no head to merge, never exits 0, whatever it finds, so nothing that waits on the proof takes it
-// for one, and ends with the line `trial answer: ` and, in JSON, the commit, whether the sync is pure against it and the
-// copy the project's main held, by the core's release at its pin or `main` for a commit of main that is no release
-// (`unknown` where neither), for the trial's record (release-trial.mjs). The merge's gate runs it with no argument. Git and Node's own modules only, and gh where no workflow's event says whose account holds the
+// With `--trial <full SHA>`, a release's trial asks it against that commit before it is a release (#1261): the pin must
+// be that commit, read as the release it is to be. A reading, no proof: it never exits 0 nor names a head to merge, and
+// ends with `trial answer: ` and JSON, for release-trial.mjs. The merge's gate gives no argument. Git and Node's own modules only, and gh where no workflow's event says whose account holds the
 // repository (releases.mjs, hostAccount); it changes nothing.
 import "./whole-output.mjs";
 import { execFileSync } from "node:child_process";
@@ -47,10 +40,9 @@ import { privateOf } from "./host-private.mjs";
 import { project } from "./steps.mjs";
 
 const CORE = `https://github.com/${ADDRESS}.git`;
-// (no argument, the proof; `--trial <full SHA>`, the trial's reading; anything else is refused before anything is read)
 const argv = process.argv.slice(2), tried = argv[0] === "--trial" && argv.length === 2 && /^[0-9a-f]{40}$/u.test(argv[1]) ? argv[1] : null;
 if (argv.length && !tried) {
-  console.log("not a pure sync: give no argument for the proof, or `--trial <the full SHA of the commit tried>` for a release's trial");
+  console.log("not a pure sync: give no argument, or `--trial <the full SHA of the commit tried>` in a release's trial");
   process.exit(2);
 }
 const raw = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
@@ -68,7 +60,7 @@ const show = (rev, file) => { try { return git(["show", `${rev}:${file}`]); } ca
 // synced in the library's repository, so a change here is no sync of it)
 const was = readCore(show(base, "core-manifest.md")), now = readCore(show(head, "core-manifest.md"));
 const oldPin = was.pin, pin = now.pin, at = was.path ?? "core/";
-if (tried && pin && pin !== tried) fail.push(`the sync moves the copy to ${pin}, not to the commit tried, ${tried}: a trial's reading is asked of a sync to that commit alone`);
+if (tried && pin && pin !== tried) fail.push(`the sync moves the copy to ${pin}, not to the commit tried, ${tried}`);
 if (!oldPin || !pin) fail.push(`core-manifest.md has no one "Core: ${ADDRESS} at <full SHA>, copied whole under <path>/" line on both sides${was.form === "carried" || now.form === "carried" ? ": a core a library carries is synced in the library's own repository" : ""}`);
 else if (now.path !== at) fail.push(`the copy's path moves from ${at} to ${now.path}: a sync moves the pin alone`);
 
@@ -216,7 +208,6 @@ try {
   // (a project that follows the core's releases takes, unreviewed, only what the core's owner chose to hand on: a sync
   // to any other commit of main is reviewed like any PR, and merges after its review; core archive 201)
   const follows = followsOf(show(head, "core-manifest.md"), hostSaid(console.error));
-  // (in a release's trial, the commit tried is read as the release it is to be, and nothing else: no proof of a merge)
   if (pin && follows !== "main" && pin !== tried && !releasesIn(dir).some((r) => r.sha === pin)) {
     // (and how to take a release instead: a copy older than release-1 lands here, its own sync script taking main; #365)
     const [newest] = releasesIn(dir);
@@ -224,7 +215,7 @@ try {
   }
   if (pin && oldPin && inCore(["merge-base", "--is-ancestor", pin, "refs/heads/main"])) provedOwned(dir);
   else if (later.length || gone.length) fail.push(`${[...later, ...gone].join(", ")}: no file outside the copy is proved where the pin is not a commit of the core's main`);
-  // (the copy main held, by the core's release at its pin, for the trial's record)
+  // (the copy main held, by the release at its pin, `main` for no release, for the trial's record)
   if (tried) from = releasesIn(dir).find((r) => r.sha === oldPin)?.name ?? (oldPin && inCore(["merge-base", "--is-ancestor", oldPin, "refs/heads/main"]) ? "main" : "unknown");
   const own = git(["rev-parse", "--absolute-git-dir"]); // (the project's clone, named outright as copy-tree.mjs asks)
   if (pin && inCore(["cat-file", "-e", `${pin}^{commit}`])) {

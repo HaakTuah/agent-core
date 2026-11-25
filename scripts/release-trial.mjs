@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { leadsOut } from "./guards.mjs";
+import { answersOf, syncCounts, syncFormed, syncSaid, syncsIn } from "./trial-sync.mjs";
 
 // The key check.mjs --verdicts adds where it was run from outside the project, a clone of the core (check.mjs's RUN_FROM,
 // which the test holds to this one; #1244): no job's place.
@@ -71,39 +72,20 @@ const ranClass = (now, then) => {
 
 // The record of a trial at `sha` on the day `day`: each project's runs, [before, after], counted, and how many baselines
 // the release's check.mjs took from a clone of the core, where the copy's could not (#1244); no pair where no project
-// that takes the core allowed one. And, of each project whose sync was asked pure-sync.mjs's reading against the commit
-// tried (#1261), its answer, `answers`, one at most a pair, null where none was asked: how many were pure and how many
-// not, and, by the core's release at the pin of the copy its main held, the copies its runs before started from
-// (`copiesFrom`, `main` for a commit of main that is no release). A reading: it holds no cut.
+// that takes the core allowed one; and the syncs' readings, `answers`, a pair's each or null (trial-sync.mjs; #1261).
 export function trialRecord(sha, day, pairs, answers = []) {
   const counts = Object.fromEntries(COUNTS.map(k => [k, 0]));
   for (const [before, after] of pairs) for (const [k, jobs] of Object.entries(compared(before, after))) counts[k] += jobs.length;
-  const asked = answers.filter(Boolean), copiesFrom = {};
-  for (const { from } of asked) copiesFrom[from] = (copiesFrom[from] ?? 0) + 1;
-  return { commit: sha, day, projects: pairs.length, ...counts, baselineFromClone: pairs.filter(([before]) => Object.hasOwn(before ?? {}, RUN_FROM)).length,
-    syncPure: asked.filter(a => a.pure).length, syncNotPure: asked.filter(a => !a.pure).length, copiesFrom };
+  return { commit: sha, day, projects: pairs.length, ...counts, baselineFromClone: pairs.filter(([before]) => Object.hasOwn(before ?? {}, RUN_FROM)).length, ...syncCounts(answers) };
 }
 
-// What pure-sync.mjs --trial printed, read from the file `text` holds, for the commit `sha`: its last line `trial
-// answer: ` and its JSON, or why it is none.
-const FROM = /^(release-\d+|main|unknown)$/;
-export function answerOf(text, sha) {
-  const line = String(text).split("\n").map(l => l.trimEnd()).filter(l => l.startsWith("trial answer: ")).at(-1);
-  let a = null;
-  try { a = JSON.parse(line.slice("trial answer: ".length)); } catch { /* (none, or not read) */ }
-  if (a === null || typeof a !== "object" || typeof a.pure !== "boolean" || !FROM.test(String(a.from))) return { why: "holds no line `trial answer: ` as pure-sync.mjs --trial prints it" };
-  if (a.commit !== sha) return { why: `answers for ${String(a.commit).slice(0, 7)}, not the commit tried, ${sha.slice(0, 7)}` };
-  return { answer: { pure: a.pure, from: a.from } };
-}
 
 // Whether a record is in the form --trial writes: the commit, the day, and counts, all none where no project was tried.
 function formed(r) {
   if (r === null || typeof r !== "object") return false;
   const counts = [...COUNTS, "baselineFromClone"].map(k => r[k]);
-  const from = r.copiesFrom !== null && typeof r.copiesFrom === "object" && !Array.isArray(r.copiesFrom) ? Object.entries(r.copiesFrom) : null;
-  return /^[0-9a-f]{40}$/.test(String(r.commit)) && /^\d{4}-\d\d-\d\d$/.test(String(r.day)) && [r.projects, ...counts, r.syncPure, r.syncNotPure].every(n => Number.isInteger(n) && n >= 0)
-    && (r.projects > 0 || counts.every(n => n === 0)) && r.baselineFromClone <= r.projects && r.syncPure + r.syncNotPure <= r.projects
-    && from !== null && from.every(([k, n]) => FROM.test(k) && Number.isInteger(n) && n > 0) && from.reduce((sum, [, n]) => sum + n, 0) === r.syncPure + r.syncNotPure;
+  return /^[0-9a-f]{40}$/.test(String(r.commit)) && /^\d{4}-\d\d-\d\d$/.test(String(r.day)) && [r.projects, ...counts].every(n => Number.isInteger(n) && n >= 0)
+    && (r.projects > 0 || counts.every(n => n === 0)) && r.baselineFromClone <= r.projects && syncFormed(r);
 }
 
 // How the runs are taken, for a mend that asks a trial: check.mjs from the project's clone, before the update and after,
@@ -141,14 +123,8 @@ export const BLIND = "GitHub's own services (its dependency review, CodeQL) run 
 // What a record in its form says.
 const trialSaid = r => (r.projects === 0
   ? `No project that takes the core allowed a trial of this release (${TRIAL}, ${r.day}), so none ran.`
-  : `The trial on a real project ran on ${r.commit.slice(0, 7)} on ${r.day}, in ${plural(r.projects, "project")}: ${plural(r.passedBoth, "check")} passed before and after the update, ${r.fixedAfter} failed before and passed after, ${r.failedBoth} failed before and after (standing before the release), ${r.failedAfter} passed before and failed after (the release's), ${r.failedAfterAlone} ran after alone and failed (the release's too), ${r.stoppedAfter} ran before and stopped after it behind a failure, ${r.stoppedNeither} stopped after it that ran not before (holding nothing), ${r.unreadAfter} run before and not read after it and ${r.unreadBefore} not read before it and failed after (not measured), ${r.unreadNeither} read in neither run (not measured, holding nothing), ${r.ranAfterAlone} ran after alone and passed, ${r.ranBeforeAlone} ran before alone and passed, ${r.failedBeforeAlone} ran before alone and failed, ${r.unrunAfter} not run after on this machine, and ${r.unrunAfterRan} not run after it there though they ran before; ${r.baselineFromClone} of the baselines taken by the release's check.mjs from a clone of the core, the copy's holding none that writes verdicts. ${synced(r)} ${BLIND}`);
+  : `The trial on a real project ran on ${r.commit.slice(0, 7)} on ${r.day}, in ${plural(r.projects, "project")}: ${plural(r.passedBoth, "check")} passed before and after the update, ${r.fixedAfter} failed before and passed after, ${r.failedBoth} failed before and after (standing before the release), ${r.failedAfter} passed before and failed after (the release's), ${r.failedAfterAlone} ran after alone and failed (the release's too), ${r.stoppedAfter} ran before and stopped after it behind a failure, ${r.stoppedNeither} stopped after it that ran not before (holding nothing), ${r.unreadAfter} run before and not read after it and ${r.unreadBefore} not read before it and failed after (not measured), ${r.unreadNeither} read in neither run (not measured, holding nothing), ${r.ranAfterAlone} ran after alone and passed, ${r.ranBeforeAlone} ran before alone and passed, ${r.failedBeforeAlone} ran before alone and failed, ${r.unrunAfter} not run after on this machine, and ${r.unrunAfterRan} not run after it there though they ran before; ${r.baselineFromClone} of the baselines taken by the release's check.mjs from a clone of the core, the copy's holding none that writes verdicts. ${syncSaid(r)} ${BLIND}`);
 
-// What a record says of the syncs' readings (#1261), which hold no cut, and of the copies the runs before started from.
-const synced = r => {
-  const from = Object.entries(r.copiesFrom).map(([k, n]) => `${n} from ${k === "main" ? "a commit of the core's main that is no release" : k === "unknown" ? "a copy not read" : k}`);
-  const left = r.projects - r.syncPure - r.syncNotPure;
-  return `Against the commit tried, as pure-sync.mjs --trial reads it, holding no cut: ${r.syncPure} of the syncs pure, ${r.syncNotPure} not${left ? `, ${left} not asked` : ""}${from.length ? `; the runs before the update started from the copies their main held, ${from.join(", ")}` : ""}.`;
-};
 
 // How many of the owner's own projects take the core, as scripts/state-report.mjs --projects lists them (a line each,
 // another owner's named as such), or null where it could not read them.
@@ -167,12 +143,7 @@ export const ownCount = printed => printed.split("\n").filter(l => /^- (`[^`]+`|
 // --trial <sha> [<before> <after> [--sync <reading>]]...: writes the trial's record, each pair one project's runs of
 // check.mjs --verdicts, and each `--sync` after it what pure-sync.mjs --trial printed of that project's sync (#1261).
 export function trial([sha, ...args], fail) {
-  const files = [], syncs = [];
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] !== "--sync") { files.push(args[i]); continue; }
-    if (!files.length || files.length % 2 || syncs[files.length / 2 - 1] !== undefined || args[i + 1] === undefined) { files.length = 1; break; }
-    syncs[files.length / 2 - 1] = args[++i];
-  }
+  const { files, syncs } = syncsIn(args);
   if (!/^[0-9a-f]{40}$/.test(sha ?? "") || files.length % 2) return fail(`--trial needs the full SHA of the commit tried, then for each project tried the file check.mjs --verdicts wrote before the update and the one it wrote after, each pair followed by \`--sync\` and the file that holds what pure-sync.mjs --trial printed of its sync (${RUNS}); no file where no project allowed a trial`);
   const inside = [...files, ...syncs.filter(Boolean)].find(f => !leadsOut(ROOT, f));
   if (inside) return fail(`${inside} lies in the core's own repository, where a project's job names could be committed: write the runs' verdicts to a scratch folder outside every repository, and give those files`);
@@ -186,15 +157,8 @@ export function trial([sha, ...args], fail) {
     if (Object.keys(pair[0]).some(j => j !== RUN_FROM) && !Object.keys(pair[1]).some(j => j !== RUN_FROM)) return fail(`${files[i + 1]} holds no job, where the run before the update held some: check.mjs ran nothing after it, so run it again and give what it writes`);
     pairs.push(pair);
   }
-  const answers = [];
-  for (const [n, f] of syncs.entries()) {
-    if (f === undefined) { answers.push(null); continue; }
-    let text = null;
-    try { text = fs.readFileSync(f, "utf8"); } catch { /* (not read) */ }
-    const got = text === null ? { why: "cannot be read" } : answerOf(text, sha);
-    if (!got.answer) return fail(`${f}, given with --sync for project ${n + 1}, ${got.why}: give the file pure-sync.mjs --trial ${sha} wrote, run from a clone of the core at that commit, in that project's clone with its sync's branch checked out`);
-    answers.push(got.answer);
-  }
+  const { answers, why } = answersOf(syncs, sha, pairs.length);
+  if (why) return fail(why);
   const record = trialRecord(sha, new Date().toISOString().slice(0, 10), pairs, answers);
   fs.writeFileSync(path.join(ROOT, TRIAL), `${JSON.stringify(record, null, 2)}\n`);
   console.log(`${TRIAL} written. ${trialSaid(record)}`);
