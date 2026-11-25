@@ -194,8 +194,8 @@ expect("a lock file nested past the bound is refused", check("package-lock.json"
   const user = ["made", "up"].join("-"), pass = ["not", "a", "pass"].join("_"), signed = `git+https://${user}:${pass}@example.invalid/a.git`;
   const said = [...one(signed, signed), ...project({ "": { dependencies: { a: "1.2.3" }, overrides: { a: signed } } }, { "": { dependencies: { a: "1.2.3" } }, "node_modules/a": { version: "1.2.3" } })];
   if (said.length !== 2 || said.some((p) => p.includes(user) || p.includes(pass)) || !said.every((p) => p.includes('"git+https://example.invalid/a.git" is not one exact version'))) { failed++; console.error(`FAIL a spec with a sign-in is quoted without it: ${JSON.stringify(said).replaceAll(user, "<user>").replaceAll(pass, "<pass>")}`); }
-  const quote = `https://${user}:${pass}"tail@example.invalid/a.tgz`, saidQuote = one(quote, quote);
-  if (saidQuote.length !== 1 || saidQuote[0].includes(user) || saidQuote[0].includes(pass)) { failed++; console.error(`FAIL a spec whose sign-in holds a quote is quoted without it: ${JSON.stringify(saidQuote).replaceAll(user, "<user>").replaceAll(pass, "<pass>")}`); }
+  const saidQuote = [`${pass}"tail`, `${pass} tail`, `${pass}\ttail`].flatMap((p) => one(`https://${user}:${p}@example.invalid/a.tgz`, `https://${user}:${p}@example.invalid/a.tgz`));
+  if (saidQuote.length !== 3 || saidQuote.some((p) => p.includes(user) || p.includes(pass))) { failed++; console.error(`FAIL a spec whose sign-in holds a quote, a space or a tab is quoted without it: ${JSON.stringify(saidQuote).replaceAll(user, "<user>").replaceAll(pass, "<pass>")}`); }
 }
 
 console.log(failed ? `${failed} FAILED` : "ok   the exact-versions check tells every case apart");
