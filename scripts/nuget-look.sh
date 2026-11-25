@@ -52,7 +52,7 @@ holds() {
     if printf '%s\n' "$codes" | grep -qvE '^error NU110[123]$'; then echo "$(shown "$project"):" $codes; return 1; fi
     while IFS= read -r id; do
       printf '%s\n' "$id" | grep -qxE "$PACKS" && continue
-      [ "${#locks[@]}" -gt 0 ] && grep -qiF -- "\"$id\": {" "${locks[@]}" || { echo "$(shown "$project"): a package no lock file names is asked for ($id)"; return 1; }
+      [ "${#locks[@]}" -gt 0 ] && grep -qiF -- "\"$id\": {" "${locks[@]}" || { echo "$(shown "$project"): a package no lock file names is asked for ($(shown "$id"))"; return 1; }
     done < <(printf '%s\n' "$out" | grep -oE 'NU110[123]: Unable to find (a stable )?package [^ ]+' | sed -E 's/.* package //; s/\.$//' | sort -u)
   done
   # (each project's own record of its restore, written just now inside the checkout and naming that project:
