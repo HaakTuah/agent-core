@@ -18,7 +18,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1142 | rule builder; release 7; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md` | |
 | #1180, #1181 | rule builder; release 7, one PR each | |
 | #1182 | rule builder; release 7 | |
-| #1202 | rule builder; release 7; `AGENTS.md` and what every session here reads at its start | #1334, #1046 and #1052 (`AGENTS.md`, one at a time) |
+| #1202 | rule builder; release 7; `AGENTS.md` and what every session here reads at its start | #1046 and #1052 (`AGENTS.md`, one at a time) |
 | #810 | the orchestrator | the batch's end |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
