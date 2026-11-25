@@ -145,7 +145,13 @@ function flow(rest, toks, k) {
   // escape, #, bracket, comma or colon within it to read two ways; #1313)
   // (what stands between them, gathered in one pass, so a long list costs no more than its length)
   let text = "", from = at;
-  if (rest[at] === "[") for (const t of toks.slice(k, j)) if (WORDS.test(t.src)) { text += rest.slice(from, t.col); from = t.col + t.src.length; }
+  // (the brackets open around each token: only one whose innermost is a [ is read so, never one in a { } within it)
+  const open = [];
+  for (const t of toks.slice(k, j)) {
+    if ("[{".includes(t.src)) open.push(t.src);
+    else if ("]}".includes(t.src)) open.pop();
+    else if (rest[at] === "[" && open.at(-1) === "[" && WORDS.test(t.src)) { text += rest.slice(from, t.col); from = t.col + t.src.length; }
+  }
   text += rest.slice(from, end);
   if (/["'#&*!]/u.test(text)) return { why: "a quote, #, anchor, alias or tag inside [ ] or { }" };
   if (j >= toks.length || toks.slice(k, j).some(t => t.runs)) return { why: "a [ ] or { } that runs on to the next line" };
