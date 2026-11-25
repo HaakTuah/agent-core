@@ -498,4 +498,17 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     [...fetches.filter(l => !l.includes("--no-auto-maintenance")), ...checkouts.filter(s => !off(s)).map(s => s.with.path)].join(" | "));
 }
 
+// (#1311: a job's own limit cancels the whole job, which skips the steps after it; so the daily look's step has a limit
+// of its own, lower than the job's, that fails that step alone, and the personal-terms step after it runs whatever
+// the look did)
+{
+  const job = parseYaml(fs.readFileSync(path.join(wfDir, "look.yml"), "utf8")).jobs.look, steps = job.steps ?? [];
+  const look = steps.findIndex(s => /^node "\$CORE_AT"scripts\/look\.mjs$/.test(String(s.run ?? "")));
+  const terms = steps.findIndex(s => /issue-terms\.mjs/.test(String(s.run ?? "")));
+  const lookStep = steps[look] ?? {}, termsStep = steps[terms] ?? {};
+  ok(look >= 0 && terms > look && lookStep["timeout-minutes"] > 5 && lookStep["timeout-minutes"] < job["timeout-minutes"]
+    && lookStep["timeout-minutes"] + 5 <= job["timeout-minutes"] && termsStep.if === "${{ !cancelled() }}" && lookStep.if === "${{ !cancelled() }}",
+    "the daily look's step has a limit of its own, longer than a first run needs and shorter than the job's with room left for the step after it, which runs unless the job was cancelled (#1311)", JSON.stringify({ look: lookStep["timeout-minutes"], job: job["timeout-minutes"], terms: termsStep.if }));
+}
+
 process.exit(failed ? 1 : 0);
