@@ -8,6 +8,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #1295, #1348 | builder; release 7, one PR each | |
+| #1358, #1349 to #1352 | builder; release 8, one PR each | release 7's cut |
 | #1334 | rule builder; release 8 | release 7's cut |
 | #1093, with #1090 | rule builder | |
 | #1095, points 2 to 6 | rule builder | #1094 |
@@ -15,7 +16,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 8, one PR each | release 7's cut |
 | #1123 | rule builder; release 8 | #974, #1060 (`roles/adviser.md`); release 7's cut |
 | #1073, #1098, #1133, #1356 | builder; release 8, one PR each | release 7's cut |
-| #1349 to #1352 | builder; release 8, one PR each | release 7's cut |
 | #1142 | rule builder; release 8; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md` | release 7's cut |
 | #1180, #1181 | rule builder; release 8, one PR each | release 7's cut |
 | #1182 | rule builder; release 8 | release 7's cut |
