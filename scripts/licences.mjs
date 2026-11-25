@@ -39,7 +39,7 @@ import { join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, noSignInWhole, parseBounded, quotedAlone } from "./guards.mjs";
 import { scan } from "./licence-scan.mjs";
-import { trackedIn, unnamedLocks } from "./licence-locks.mjs";
+import { stoodAt, trackedIn, unnamedLocks } from "./licence-locks.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { shapeFaults } from "./schemas.mjs";
 import { started } from "./started.mjs";
@@ -517,7 +517,7 @@ export function check(config, root, base = null, baseConfig = null) {
     if (!existsSync(join(root, f)) || !scriptsOff(readFileSync(join(root, f), "utf8"))) failures.push(`${f} does not set ignore-scripts=true (floor rule 15). Mend: add the line ignore-scripts=true to ${f}`);
   }
   const wait = waitFaults(root, base, config.ignoreScriptsIn ?? []);
-  const unnamed = unnamedLocks(root, trackedIn(root), config, base, (f) => textAt(root, base, f) !== null);
+  const unnamed = unnamedLocks(root, trackedIn(root), config, base, stoodAt(root, base, ctx.then));
   failures.push(...wait.failures, ...unnamed.failures);
   const all = [...new Set(failures)]; // (a package a lockfile holds twice fails once)
   const summary = summaryOf(ctx, packages, entries, scanned, all.length);
@@ -693,6 +693,11 @@ export function actionLists(config, core = coreConfig()) {
   return [`allow-licenses=${lists.tools.join(",")}`, `allow-dependencies-licenses=${[...new Set([...through(config), ...through(core)])].map((n) => `pkg:npm/${n}`).join(",")}`];
 }
 
+// (the core's own config is an object whose "data", "fonts" and "accepted" are each a list, if there, of entries of
+// "accepted" that are each an object)
+const object = (o) => o !== null && typeof o === "object" && !Array.isArray(o);
+const coreForm = (core) => object(core) && [core.data, core.fonts, core.accepted].every((l) => l === undefined || Array.isArray(l)) && (core.accepted ?? []).every(object);
+
 // The core's own licence config, beside this script's folder (.github/licences.json, which the copy holds too), or
 // none where it is not there; each name it would let through held to npm's form.
 export function coreConfig(at = fileURLToPath(new URL("../.github/licences.json", import.meta.url))) {
@@ -701,10 +706,10 @@ export function coreConfig(at = fileURLToPath(new URL("../.github/licences.json"
   let core;
   try { core = JSON.parse(readFileSync(at, "utf8")); } catch { throw new Error(`the core's own licence config, ${at}, cannot be read as JSON. ${mend}`); }
   // (each list's form first, then the names in it, so a list of another form fails with its mend, never by a spread)
-  if (!core || typeof core !== "object" || Array.isArray(core) || [core.data, core.fonts, core.accepted].some((l) => l !== undefined && !Array.isArray(l))) throw new Error(`the core's own licence config, ${at}, is not an object whose "data", "fonts" and "accepted" are each a list. ${mend}`);
+  if (!coreForm(core)) throw new Error(`the core's own licence config, ${at}, is not an object whose "data", "fonts" and "accepted" are each a list, each entry of "accepted" an object. ${mend}`);
   const npmName = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/u;
-  const names = [...(core.data ?? []), ...(core.fonts ?? []), ...(core.accepted ?? []).filter((a) => a?.package !== undefined).map((a) => (typeof a.package === "string" ? a.package.slice(0, a.package.lastIndexOf("@")) : a.package))];
-  if (names.some((n) => typeof n !== "string" || !npmName.test(n))) throw new Error(`the core's own licence config, ${at}, names what is no npm package name in "data", "fonts" or "accepted". ${mend}`);
+  const names = [...(core.data ?? []), ...(core.fonts ?? []), ...(core.accepted ?? []).filter((a) => a.package !== undefined).map((a) => (typeof a.package === "string" && ACCEPTED_NPM.test(a.package) ? a.package.slice(0, a.package.lastIndexOf("@")) : null))];
+  if (names.some((n) => typeof n !== "string" || !npmName.test(n))) throw new Error(`the core's own licence config, ${at}, names what is no npm package name in "data" or "fonts", or no <name>@<version> in "accepted". ${mend}`);
   return core;
 }
 
