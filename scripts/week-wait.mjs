@@ -36,7 +36,7 @@ function entryFault(k, e) {
   // (an address in its one plain form alone, a name as npm spells one: never one a URL parser reads otherwise)
   const plainAddress = (() => { try { return new URL(e.resolved).href === e.resolved; } catch { return false; } })();
   if (!name || !version || version !== e.version || !plainAddress || !NAME.test(name)) {
-    return { fault: `${k}: its address names ${name ?? "no package of npm's registry"} at ${version ?? "no version"}${plainAddress ? "" : " in no plain form"}, and its version field ${e.version === undefined ? "none" : noSignIn(e.version)}` };
+    return { fault: `${k}: its address names ${name ?? "no package of npm's registry"} at ${version ?? "no version"}${plainAddress ? "" : " in no plain form"}, and its version field ${e.version ?? "none"}` };
   }
   // (the folder npm installs it in is named for the package its address fetches, so the lock file reads as it installs)
   if (k.slice(k.lastIndexOf("node_modules/") + "node_modules/".length) !== name) return { fault: `${k}: its folder names another package than its address fetches, ${name}` };
@@ -62,7 +62,7 @@ export const tooYoung = async (packages, base, ask, now) => {
     if (!k || same(base[k], e)) continue;
     const { fault, name, version } = entryFault(k, e);
     const said = fault ?? registryFault(name, version, e, await ask(name).catch(err => ({ status: err.message })), now);
-    if (said) out.push(said);
+    if (said) out.push(noSignIn(said)); // (its key, fields and version as the lock holds them, any sign-in cut out: floor rule 1)
   }
   return out;
 };

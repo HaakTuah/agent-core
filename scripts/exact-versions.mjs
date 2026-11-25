@@ -32,7 +32,7 @@ export const exact = (text) => {
 };
 const inside = (key) => !key.startsWith("/") && !`/${key}/`.includes("/../") && !/[\\:]/u.test(key); // (a folder of the project's, by its key)
 // (a name or version printed so that it stays on its line, any address's sign-in cut out: floor rule 1)
-const show = (value) => noSignIn(JSON.stringify(value) ?? String(value));
+const show = (value) => (typeof value === "string" ? JSON.stringify(noSignIn(value)) : noSignIn(JSON.stringify(value) ?? String(value)));
 
 // Whether a "$name" points to a dependency every list of the root's that holds the name holds at one exact version, and
 // one does.

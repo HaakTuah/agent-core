@@ -183,14 +183,15 @@ ok(r.failures.length === 1 && /outside the registry/u.test(r.failures[0]), "NuGe
 }
 
 // ---- An address with a sign-in in it, the sign-in made up and built from pieces as the test runs: the source is named
-// by its host alone, and nothing printed holds the user or the password (floor rule 1)
+// by its host alone, and nothing printed holds the user or the password (floor rule 1), a password long enough that its
+// "@" stands past where a printed value is cut short among them
 {
-  const user = ["made", "up"].join("-"), pass = ["not", "a", "pass"].join("_");
+  const user = ["made", "up"].join("-"), pass = [["not", "a", "pass"].join("_"), "x".repeat(240)].join("-");
   const signed = npmPackages(JSON.stringify({ lockfileVersion: 3, packages: { "": { dependencies: { "web-moss": "1.0.0", "git-moss": "1.0.0" } },
     "node_modules/web-moss": { version: "1.0.0", resolved: `https://${user}:${pass}@example.invalid/web-moss-1.0.0.tgz`, integrity: INVENTED_SUM },
     "node_modules/git-moss": { version: `git+https://${user}:${pass}@example.invalid/git-moss.git#0123456`, resolved: `git+https://${user}:${pass}@example.invalid/git-moss.git#0123456` } } }), "package-lock.json");
   const said = JSON.stringify(sourceFaults([["package-lock.json", signed]], []));
-  ok(signed.find((p) => p.name === "web-moss")?.from === "a web address on example.invalid" && !said.includes(user) && !said.includes(pass) && said.includes("git-moss@git+https://example.invalid/git-moss.git"),
+  ok(signed.find((p) => p.name === "web-moss")?.from === "a web address on example.invalid" && !said.includes(user) && !said.includes(pass.slice(0, 12)) && said.includes("git-moss@git+https://example.invalid/git-moss.git"),
     `an address with a sign-in is named by its host, and the sign-in printed nowhere (${said.replaceAll(user, "<user>").replaceAll(pass, "<pass>")})`);
 }
 

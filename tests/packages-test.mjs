@@ -127,6 +127,8 @@ const plainEnv = { ...env };
     [{ ...held, "node_modules/yaml\\..\\x": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /names no installed package's folder/u],
     // (a version field that names an address with a sign-in in it, made up from pieces: quoted with the sign-in cut out)
     [{ "node_modules/yaml": { version: `git+https://${["made", "up"].join("-")}:${["not", "a", "pass"].join("_")}@example.invalid/yaml.git`, resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /its version field git\+https:\/\/example\.invalid\/yaml\.git$/u],
+    // (and a key that is such an address, its sign-in cut out with the rest of the fault)
+    [{ ...held, [`git+https://${["made", "up"].join("-")}:${["not", "a", "pass"].join("_")}@example.invalid/x.git`]: { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /^git\+https:\/\/example\.invalid\/x\.git: a key that names no installed package's folder$/u],
   ];
   const results = await Promise.all(cases.map(([lock]) => tooYoung(lock, held, ask, now)));
   ok(cases.every(([, said], i) => results[i].length === 1 && said.test(results[i][0])) && (await tooYoung(held, held, ask, now)).length === 0
