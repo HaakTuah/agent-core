@@ -22,6 +22,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { isMainThread } from "node:worker_threads";
+import { noSignIn } from "./guards.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 // (the core's own repository, which holds its tests: a copy holds none, .gitattributes keeping them out)
@@ -140,21 +141,23 @@ const SPEC_FIELDS = ["dependencies", "devDependencies", "optionalDependencies", 
 const registrySpec = v => typeof v === "string" && /^[\w.^~<>=|*+ -]*$/u.test(v) && !/^\./u.test(v) && !/\.t(?:gz|ar)/iu.test(v);
 const KEY = /^(?:node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*\/)*node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*$/u;
 const plainAddress = r => { try { return /^https:\/\/registry\.npmjs\.org\//u.test(r) && new URL(r).href === r; } catch { return false; } };
+// A spec not of npm's registry is never quoted, since it may name an address with a sign-in in it (floor rule 1): its
+// field and package say where it stands; and a name or key that holds an address is printed with its sign-in cut out.
 // `overrides` lets the package list hold npm's field of that name, each at one exact version of npm's registry: given
 // for the core's own mutation tool's install alone (install.mjs, #581), never for an install a copy carries, since npm
 // acts on it in place of what the packages ask.
 export function lockFaults(list, lock, { overrides = false } = {}) {
-  const out = [], specs = (where, o) => { for (const [n, v] of Object.entries(o ?? {})) if (!registrySpec(v)) out.push(`${where}: the spec ${JSON.stringify(n)}: ${JSON.stringify(v)} names no version, range or tag of npm's registry`); };
+  const out = [], specs = (where, o) => { for (const [n, v] of Object.entries(o ?? {})) if (!registrySpec(v)) out.push(`${where}: the spec of ${JSON.stringify(n)} is not of npm's registry: it names no version, range or tag there`); };
   if (!plainObject(list)) return ["package.json: not an object of fields"];
   if (!plainObject(lock)) return ["package-lock.json: not an object of fields"];
   const own = overrides ? ["overrides"] : [];
   for (const k of Object.keys(list ?? {})) if (![...LIST_FIELDS, ...own].includes(k)) out.push(`package.json: the field ${JSON.stringify(k)}, which the core's package list does not hold`);
   for (const f of [...SPEC_FIELDS, ...own]) specs(`package.json ${f}`, list?.[f]);
   // (the package list's own packages at one exact version each: floor rule 7)
-  for (const f of ["dependencies", "devDependencies", ...own]) for (const [n, v] of Object.entries(list?.[f] ?? {})) if (!/^\d+\.\d+\.\d+$/u.test(String(v))) out.push(`package.json ${f}: ${JSON.stringify(n)} at ${JSON.stringify(v)}, not one exact version`);
+  for (const f of ["dependencies", "devDependencies", ...own]) for (const [n, v] of Object.entries(list?.[f] ?? {})) if (!/^\d+\.\d+\.\d+$/u.test(String(v))) out.push(`package.json ${f}: ${JSON.stringify(n)} at ${registrySpec(v) ? JSON.stringify(v) : "a spec not of npm's registry"}, not one exact version`);
   out.push(...formFaults(lock));
   for (const [k, e] of Object.entries(lock?.packages ?? {})) out.push(...(k ? entryFaults(k, e ?? {}, specs) : rootFaults(e, list)));
-  return out;
+  return out.map(noSignIn);
 }
 
 const plainObject = v => v !== null && typeof v === "object" && !Array.isArray(v);

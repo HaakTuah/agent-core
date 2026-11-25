@@ -45,10 +45,16 @@ export function leadsOut(root, at) {
  *  text that held none. */
 export const oneLine = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
 
-/** Text from a project, made safe to print on one line of a workflow's log: "%", a carriage return and a line feed
- *  escaped as GitHub documents a command's data is (%25, %0D, %0A), and any other control character or line separator
- *  shown as "?" (oneLine), so no part of it starts a line of its own, which GitHub Actions could read as a command. */
-export const logged = text => oneLine(String(text).replace(/%/gu, "%25").replace(/\r/gu, "%0D").replace(/\n/gu, "%0A"));
+/** Text with the user and password of every address in it cut out, up to the last "@" before the address's path
+ *  ("git+https://user:pass@host/x" as "git+https://host/x"), so a sign-in a project's file holds in an address is never
+ *  printed (floor rule 1). */
+export const noSignIn = text => String(text).replace(/([a-z][a-z\d+.-]*:\/\/)[^\s/\\?#]*@/giu, "$1");
+
+/** Text from a project, made safe to print on one line of a workflow's log: any address's sign-in cut out (noSignIn),
+ *  "%", a carriage return and a line feed escaped as GitHub documents a command's data is (%25, %0D, %0A), and any other
+ *  control character or line separator shown as "?" (oneLine), so no part of it starts a line of its own, which GitHub
+ *  Actions could read as a command. */
+export const logged = text => oneLine(noSignIn(text).replace(/%/gu, "%25").replace(/\r/gu, "%0D").replace(/\n/gu, "%0A"));
 
 /** How deep a value read from a project's JSON may nest, in objects and lists, before a check refuses it: far past any
  *  config, manifest or lock file, and short of where reading it, or printing it, would run out of stack. */

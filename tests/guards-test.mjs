@@ -7,7 +7,7 @@
 //   node tests/guards-test.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { DEEPEST, aCommit, aRepository, inProject, leadsOut, logged, oneLine, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
+import { DEEPEST, aCommit, aRepository, inProject, leadsOut, logged, noSignIn, oneLine, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -61,6 +61,17 @@ const text = "Shown first\n<!-- hidden one -->\n```\nhidden in a fence\n```\n~~~
 const read = seen(text).split("\n");
 ok(read.length === text.split("\n").length && read.filter(l => l.trim()).join("|") === "Shown first|shown |shown again", "a Markdown text is read as its reader sees it: no line of an HTML comment or a fenced block, the lines kept where they stood", JSON.stringify(read));
 ok(seen("``` not a fence `\nshown").includes("shown") && seen("```\nhidden").trim() === "", "a fence never closed hides to the end; a line of backticks with one after it opens none");
+
+// (an address with a sign-in in it, the sign-in made up and built from pieces as the test runs: the user and the
+// password cut out wherever the address stands, as the last "@" before its path ends them; nothing else touched)
+{
+  const user = ["made", "up"].join("-"), pass = ["not", "a", "pass"].join("_");
+  const cut = noSignIn(`a spec "git+https://${user}:${pass}@example.invalid/x.git" and https://${user}@a@example.invalid/y`);
+  ok(cut === 'a spec "git+https://example.invalid/x.git" and https://example.invalid/y', "the user and password of every address in a text are cut out", cut.replaceAll(user, "<user>").replaceAll(pass, "<pass>"));
+  ok(!logged(`https://${user}:${pass}@example.invalid/`).includes(pass) && !logged(`https://${user}:${pass}@example.invalid/`).includes(user), "a text printed to the log holds no address's sign-in");
+  const plain = ["https://registry.npmjs.org/@scope/x/-/x-1.0.0.tgz", "git+ssh://example.invalid/x.git#abc", "x@1.2.3", "mail me@example.invalid"];
+  ok(plain.every(t => noSignIn(t) === t), "an address with no sign-in, a name with a version and a bare address of mail are left as they are", JSON.stringify(plain.map(noSignIn)));
+}
 
 console.log(`${count - failed} of ${count} passed`);
 process.exitCode = failed ? 1 : 0;

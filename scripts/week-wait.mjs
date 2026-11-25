@@ -12,6 +12,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { noSignIn } from "./guards.mjs";
 import { registryName, registryVersion } from "./licences.mjs";
 import { fetched } from "./lookup.mjs";
 import { ENTRY_FIELDS as FIELDS } from "./packages.mjs";
@@ -35,7 +36,7 @@ function entryFault(k, e) {
   // (an address in its one plain form alone, a name as npm spells one: never one a URL parser reads otherwise)
   const plainAddress = (() => { try { return new URL(e.resolved).href === e.resolved; } catch { return false; } })();
   if (!name || !version || version !== e.version || !plainAddress || !NAME.test(name)) {
-    return { fault: `${k}: its address names ${name ?? "no package of npm's registry"} at ${version ?? "no version"}${plainAddress ? "" : " in no plain form"}, and its version field ${e.version ?? "none"}` };
+    return { fault: `${k}: its address names ${name ?? "no package of npm's registry"} at ${version ?? "no version"}${plainAddress ? "" : " in no plain form"}, and its version field ${e.version === undefined ? "none" : noSignIn(e.version)}` };
   }
   // (the folder npm installs it in is named for the package its address fetches, so the lock file reads as it installs)
   if (k.slice(k.lastIndexOf("node_modules/") + "node_modules/".length) !== name) return { fault: `${k}: its folder names another package than its address fetches, ${name}` };

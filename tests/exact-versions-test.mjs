@@ -188,6 +188,13 @@ if (run("1.2.3", "../tools/package-lock.json") !== 1 || run("1.2.3", join(tmpdir
 const deep = (inner) => `${"{\"a\":".repeat(20000)}${inner}${"}".repeat(20000)}`;
 expect("overrides nested past the bound are refused", check("package-lock.json", reader({ "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {} } }), "package.json": `{"overrides":${deep('"1.2.3"')}}` })), ["cannot be read as JSON (it nests deeper than 200 objects and lists). Mend: "]);
 expect("a lock file nested past the bound is refused", check("package-lock.json", reader({ "package-lock.json": `{"lockfileVersion":3,"packages":{"":${deep("{}")}}}` })), ["cannot be read as JSON (it nests deeper than 200 objects and lists). Mend: "]);
+{
+  // (a spec and an override that name an address with a sign-in in it, the sign-in made up and built from pieces as the
+  // test runs: each is refused, and the address is quoted with its user and password cut out; floor rule 1)
+  const user = ["made", "up"].join("-"), pass = ["not", "a", "pass"].join("_"), signed = `git+https://${user}:${pass}@example.invalid/a.git`;
+  const said = [...one(signed, signed), ...project({ "": { dependencies: { a: "1.2.3" }, overrides: { a: signed } } }, { "": { dependencies: { a: "1.2.3" } }, "node_modules/a": { version: "1.2.3" } })];
+  if (said.length !== 2 || said.some((p) => p.includes(user) || p.includes(pass)) || !said.every((p) => p.includes('"git+https://example.invalid/a.git" is not one exact version'))) { failed++; console.error(`FAIL a spec with a sign-in is quoted without it: ${JSON.stringify(said).replaceAll(user, "<user>").replaceAll(pass, "<pass>")}`); }
+}
 
 console.log(failed ? `${failed} FAILED` : "ok   the exact-versions check tells every case apart");
 process.exit(failed ? 1 : 0);

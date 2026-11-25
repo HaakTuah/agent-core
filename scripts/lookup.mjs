@@ -97,7 +97,8 @@ function source(resolved) {
   if (typeof resolved !== "string" || !resolved) return "no address the lock file names";
   if (/^(?:git\+|git:|github:|gitlab:|bitbucket:)/u.test(resolved)) return "a git address";
   if (resolved.startsWith("file:")) return "a packed file named by its path";
-  const host = /^https?:\/\/([^/:@?#]{1,100})/u.exec(resolved)?.[1];
+  // (the host after any user and password, which are never printed: floor rule 1)
+  const host = /^https?:\/\/(?:[^/\\?#]*@)?([^/\\:@?#]{1,100})/u.exec(resolved)?.[1];
   return host ? `a web address on ${host}` : "an address of another kind";
 }
 

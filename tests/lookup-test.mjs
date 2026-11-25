@@ -6,7 +6,7 @@
 import { execFileSync } from "node:child_process";
 import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { lookUp, newPackages, npmPackages, nugetPackages, run, YOUNG } from "../scripts/lookup.mjs";
+import { lookUp, newPackages, npmPackages, nugetPackages, run, sourceFaults, YOUNG } from "../scripts/lookup.mjs";
 import { INVENTED_SUM, NOW, ago, asked, get, tgz } from "../scripts/lookup-stage.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -180,6 +180,18 @@ ok(r.failures.length === 1 && /outside the registry/u.test(r.failures[0]), "NuGe
     r = await run(config, { root: at, base, get, now: NOW });
     ok(r.code === 0 && !r.lines.some((l) => /tidy-moss-helper|own-moss/u.test(l) && /integrity|not npm.s registry/u.test(l)), `a package inside another's file, and a packed file of the project's own, pass (${r.lines})`);
   } finally { rmSync(at, { recursive: true, force: true }); }
+}
+
+// ---- An address with a sign-in in it, the sign-in made up and built from pieces as the test runs: the source is named
+// by its host alone, and nothing printed holds the user or the password (floor rule 1)
+{
+  const user = ["made", "up"].join("-"), pass = ["not", "a", "pass"].join("_");
+  const signed = npmPackages(JSON.stringify({ lockfileVersion: 3, packages: { "": { dependencies: { "web-moss": "1.0.0", "git-moss": "1.0.0" } },
+    "node_modules/web-moss": { version: "1.0.0", resolved: `https://${user}:${pass}@example.invalid/web-moss-1.0.0.tgz`, integrity: INVENTED_SUM },
+    "node_modules/git-moss": { version: `git+https://${user}:${pass}@example.invalid/git-moss.git#0123456`, resolved: `git+https://${user}:${pass}@example.invalid/git-moss.git#0123456` } } }), "package-lock.json");
+  const said = JSON.stringify(sourceFaults([["package-lock.json", signed]], []));
+  ok(signed.find((p) => p.name === "web-moss")?.from === "a web address on example.invalid" && !said.includes(user) && !said.includes(pass) && said.includes("git-moss@git+https://example.invalid/git-moss.git"),
+    `an address with a sign-in is named by its host, and the sign-in printed nowhere (${said.replaceAll(user, "<user>").replaceAll(pass, "<pass>")})`);
 }
 
 

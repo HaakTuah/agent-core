@@ -56,6 +56,22 @@ const plainEnv = { ...env };
     "and a field of its own, a spec naming git, a file or a tarball, a linked entry or one from another address, each is one it refuses; a range or a tag is none");
   const acted = { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], optional: true, integrity: "sha512-AAAA" } } };
   ok(lockFaults(list, acted).some(f => /field optional, which npm would act on and the core's lock never writes/u.test(f)), "an entry that holds a field npm would act on that the core's lock never writes is refused before npm runs, whatever else it holds", JSON.stringify(lockFaults(list, acted)));
+  // (a spec that names an address with a sign-in in it, in the package list and in a lock entry: the fault names the
+  // field and the package and says the spec is not of npm's registry, and quotes nothing of the address, so the sign-in
+  // never reaches a check's output (floor rule 1); the sign-in made up, built from pieces as the test runs)
+  const user = ["made", "up", "user"].join("-"), pass = ["not", "a", "sign", "in"].join("_"), signed = `git+https://${user}:${pass}@example.invalid/x.git`;
+  const signedFaults = [...lockFaults({ ...list, devDependencies: { ...list.devDependencies, x: signed } }, lock),
+    ...lockFaults(list, { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], dependencies: { x: signed } } } })];
+  // (and a name or key that is such an address itself, printed with the sign-in cut out)
+  const keyFaults = [...lockFaults({ ...list, devDependencies: { ...list.devDependencies, [signed]: "1.0.0" } }, lock), ...lockFaults(list, { ...lock, packages: { ...lock.packages, [signed]: {} } })];
+  ok(keyFaults.length > 1 && keyFaults.every(f => !f.includes(user) && !f.includes(pass)) && keyFaults.some(f => f.includes("git+https://example.invalid/x.git")),
+    "a name or lock key that names an address with a sign-in is printed with the sign-in cut out", JSON.stringify(keyFaults).replaceAll(user, "<user>").replaceAll(pass, "<pass>"));
+  ok(lockFaults({ ...list, devDependencies: { ...list.devDependencies, x: "^1.0.0" } }, lock).some(f => f.includes('package.json devDependencies: "x" at "^1.0.0", not one exact version')),
+    "a range of npm's registry where one exact version belongs is quoted, since it names no address", JSON.stringify(lockFaults({ ...list, devDependencies: { ...list.devDependencies, x: "^1.0.0" } }, lock)));
+  ok(signedFaults.length > 0 && signedFaults.every(f => !f.includes(user) && !f.includes(pass) && !f.includes("example.invalid"))
+    && signedFaults.some(f => /^package\.json devDependencies: the spec of "x" is not of npm's registry/u.test(f))
+    && signedFaults.some(f => /^package-lock\.json node_modules\/yaml dependencies: the spec of "x" is not of npm's registry/u.test(f)),
+    "a spec that names an address with a sign-in is refused by its field and package, and nothing of the address is quoted", JSON.stringify(signedFaults).replaceAll(user, "<user>").replaceAll(pass, "<pass>"));
   const unsorted = { ...list, devDependencies: Object.fromEntries(Object.entries(list.devDependencies).reverse()) };
   // (an override, as the core's own mutation tool's lock holds one (#581): there alone, at one exact version of npm's
   // registry, as a package of the list is, and no other spec)
@@ -113,6 +129,8 @@ const plainEnv = { ...env };
     [{ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a", license: "MIT" } }, /its license not the registry's/u],
     [{ ...held, "node_modules/spdx-exceptions": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /its folder names another package than its address fetches/u],
     [{ ...held, "node_modules/yaml\\..\\x": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /names no installed package's folder/u],
+    // (a version field that names an address with a sign-in in it, made up from pieces: quoted with the sign-in cut out)
+    [{ "node_modules/yaml": { version: `git+https://${["made", "up"].join("-")}:${["not", "a", "pass"].join("_")}@example.invalid/yaml.git`, resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /its version field git\+https:\/\/example\.invalid\/yaml\.git$/u],
   ];
   const results = await Promise.all(cases.map(([lock]) => tooYoung(lock, held, ask, now)));
   ok(cases.every(([, said], i) => results[i].length === 1 && said.test(results[i][0])) && (await tooYoung(held, held, ask, now)).length === 0
@@ -576,7 +594,7 @@ try {
   const copyNpmrc = fs.readFileSync(path.join(pk, ".npmrc"), "utf8");
   refuses("the .npmrc holds a line beside the core's own two settings", () => fs.appendFileSync(path.join(pk, ".npmrc"), `"${["regi", "stry"].join("")}" = https://example.invalid/\n`), () => fs.writeFileSync(path.join(pk, ".npmrc"), copyNpmrc), /holds a line beside the core's own two settings/u);
   const copyList = fs.readFileSync(path.join(pk, "package.json"), "utf8");
-  refuses("the package list names a dependency of git, before npm runs", () => fs.writeFileSync(path.join(pk, "package.json"), JSON.stringify({ ...JSON.parse(copyList), devDependencies: { x: "git+https://example.invalid/x.git" } })), () => fs.writeFileSync(path.join(pk, "package.json"), copyList), /names no version, range or tag of npm's registry/u);
+  refuses("the package list names a dependency of git, before npm runs", () => fs.writeFileSync(path.join(pk, "package.json"), JSON.stringify({ ...JSON.parse(copyList), devDependencies: { x: "git+https://example.invalid/x.git" } })), () => fs.writeFileSync(path.join(pk, "package.json"), copyList), /the spec of "x" is not of npm's registry/u);
   const elsewhere = path.join(tmp, "elsewhere");
   fs.mkdirSync(elsewhere);
   fs.writeFileSync(path.join(elsewhere, "kept.txt"), "kept\n");
