@@ -66,8 +66,9 @@ function originOf(root, origin) {
 }
 
 // The folder a file:// URL names, as node reads it for the machine (a Windows drive's `file:///D:/x` is `D:\x`, never
-// `/D:/x`); null where it is no URL node can map.
-const fileFolder = url => { try { return fileURLToPath(url); } catch { return null; } };
+// `/D:/x`); null where it is no URL node can map, and where it names another machine (on Windows a UNC path, which
+// probing would send a sign-in to), so a hostile clone's origin makes no connection.
+const fileFolder = url => { try { const host = new URL(url).hostname; return host && host !== "localhost" ? null : fileURLToPath(url); } catch { return null; } };
 
 // A test's answer for the project, by its root or by its origin, which each clone of it shares; else null.
 function answered(env, root, origin) {
