@@ -126,14 +126,14 @@ unread(edit("          name: an-input", "          name: an-input\n            -
 unread(edit("        run: echo hi", "        run:\n          echo hi"), "a value on a line of its own", "a line of its own");
 passes(edit("# the kinds", "# what starts it", edit("[opened, synchronize]", '["opened", synchronize]')), "a comment beside [ ] with a quoted word changed", edit("[opened, synchronize]", '["opened", synchronize]'));
 // quoted plain words in [ ] are read (#1313), and a change to them, or a quote around anything else, is not passed
-const kit = 'version: 2\nupdates:\n  - package-ecosystem: "npm"\n    groups:\n      minor-and-patch:\n        patterns: ["*"]\n        update-types: ["minor", "patch"] # a new major is its own PR\n';
+const kit = 'version: 2\nupdates:\n  - package-ecosystem: "github-actions"\n    groups:\n      minor-and-patch:\n        patterns: ["*"]\n        update-types: ["minor", "patch"] # a new major is its own PR\n';
 passes(kit.replace("its own PR", "its own pull request"), "a comment beside [ ] of quoted plain words changed", kit);
 passes(kit.replace("  - package-ecosystem", "  # see the rules\n  - package-ecosystem"), "a comment line added in a file with [ ] of quoted plain words", kit);
 passes("a: [\"Az09 ._/*+-\"] # x\n", "every character a plain word may hold, quoted in [ ]", "a: [\"Az09 ._/*+-\"]\n");
 passes("a: ['x', \"y\", z]\n", "single, double and plain words together in [ ]", "a: ['x', \"y\", z]\n");
 fails(kit.replace('["minor", "patch"]', '["minor", "patch", "major"]'), "a word added to [ ] of quoted words", "more than a comment", kit);
 fails(kit.replace('["minor", "patch"]', '["minor"]'), "a word taken out of [ ] of quoted words", "more than a comment", kit);
-fails(kit.replace('["*"]', '["npm*"]'), "a quoted word in [ ] changed", "more than a comment", kit);
+fails(kit.replace('["*"]', '["actions*"]'), "a quoted word in [ ] changed", "more than a comment", kit);
 fails(kit.replace('"patch"] # a new', '"patch"]# a new'), "a comment beside [ ] that loses its space before it", "", kit);
 for (const [list, what] of [['["a#b"]', "a #"], ['["a\\\\"]', "a backslash"], ['["a\\"b"]', "an escaped quote"], ["['it''s']", "a doubled quote"], ['["a, b"]', "a comma"], ['["a: b"]', "a colon"], ['["a]"]', "a bracket"], ['["${{ x }}"]', "an expression"], ['{ "a": b }', "{ } (only [ ] is read so)"], ['["a" # x\n  , "b"]', "a # between quoted words"]]) unread(`k: ${list}\n`, `a quote inside [ ] around ${what}`, list.includes("\n") ? "" : "inside [ ] or { }");
 unread(edit("[opened, synchronize] # the kinds", "[opened, # the kinds\n      synchronize]"), "[ ] that runs on to the next line", "inside [ ] or { }");
