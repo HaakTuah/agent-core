@@ -42,7 +42,7 @@ import { FOLDERS, ROOT, rules } from "./rules.mjs";
 import { shapeFaults } from "./schemas.mjs";
 import { started } from "./started.mjs";
 import { CASES } from "./staged.mjs";
-import { parseBounded } from "./guards.mjs";
+import { asText, parseBounded } from "./guards.mjs";
 
 // (what a project's own list reads, and the shared pieces, stay importable from here, as they were before the split)
 export { FILE, HOOKS, OWN, counts, ownHolders, ownReport, writeOwn };
@@ -201,7 +201,7 @@ if (started(import.meta.url) && process.argv.includes("--own")) {
   unchecked();
   const h = holders();
   const lines = report().map(l => l.slice(2));
-  console.log(process.argv.includes("--list") ? lines.join("\n") : lines[0]);
-  for (const w of h.wrong) console.error(`FAIL ${w}`);
+  console.log((process.argv.includes("--list") ? lines : lines.slice(0, 1)).map(asText).join("\n"));
+  for (const w of h.wrong) console.error(asText(`FAIL ${w}`));
   if (h.wrong.length) process.exitCode = 1;
 }
