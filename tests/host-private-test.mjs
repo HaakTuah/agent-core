@@ -5,7 +5,6 @@
 // and the clone a folder git reads, written here. Node's own modules.
 //
 //   node tests/host-private-test.mjs
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -104,10 +103,12 @@ ok(gitDirs.every(at => /names no repository on github\.com/.test(privateOf(at, {
   `git follows no include of the clone's config, and reads no origin where the clone's .git file, its common folder${links ? " or a link of .git" : ""} names a folder on another machine`,
   gitDirs.map(at => `${path.basename(at)}: ${JSON.stringify(privateOf(at, { env: {}, ask: () => "{}", bare: () => ({}) }))}`).join("; "));
 
-// (a worktree git makes, its .git file naming a folder of a clone on this machine, and a link of .git to one, are read
-// as before: sessions work in worktrees)
-const main = path.join(tmp, "main"), tree = path.join(tmp, "tree"), run = (...args) => spawnSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", ...args], { encoding: "utf8" });
-run("init", "-q", main); run("-C", main, "commit", "-q", "--allow-empty", "-m", "start"); run("-C", main, "remote", "add", "origin", `https://github.com/${repo}.git`); run("-C", main, "worktree", "add", "-q", tree);
+// (a worktree as git lays one out, its .git file naming a folder of a clone on this machine, whose commondir names the
+// clone's git folder, and a link of .git to one, are read as before: sessions work in worktrees)
+const tree = path.join(tmp, "tree"), treeGit = path.join(hosted, ".git", "worktrees", "tree");
+fs.mkdirSync(treeGit, { recursive: true }); fs.mkdirSync(tree);
+fs.writeFileSync(path.join(treeGit, "HEAD"), "ref: refs/heads/tree\n"); fs.writeFileSync(path.join(treeGit, "commondir"), "../..\n"); fs.writeFileSync(path.join(treeGit, "gitdir"), `${path.join(tree, ".git")}\n`);
+fs.writeFileSync(path.join(tree, ".git"), `gitdir: ${treeGit}\n`);
 bareRoutes.length = 0;
 const near = [tree, ...(links ? [nearLinked] : [])].map(at => privateOf(at, { env: {}, ask: noGh, bare: bare({ status: 200, private: false }) }).private);
 ok(fs.statSync(path.join(tree, ".git")).isFile() && near.every(v => v === false) && bareRoutes.every(r => r === `repos/${repo}`),
