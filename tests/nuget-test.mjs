@@ -409,6 +409,17 @@ ok(run("--projects").status === 0 && run("--projects").stdout === "src/App/App.c
   git("rm", "-q", "-r", "--cached", "src/100%Cover"); fs.rmSync(path.join(repo, "src/100%Cover"), { recursive: true, force: true });
   ok(listed.status === 0 && listed.stdout === "src/100%Cover/Cover.csproj\nsrc/App/App.csproj\n", "a project file whose name holds \"%\" is listed as it stands", listed.out);
 }
+if (process.platform !== "win32") {
+  // (a name that holds "::", "##[" and a tab is refused on a line that holds none of them, each broken as nuget-look.sh
+  // breaks them, so no name a pull request adds holds a runner's workflow command in the step's log; #1327)
+  const odd = "a::b##[c\td";
+  inRepo(`src/${odd}/App.csproj`, "<Project />"); inRepo(`build/${odd}.xml`, "<Project />"); git("add", "-A");
+  const projectsRefused = run("--projects"), importsRefused = run("--imports");
+  git("rm", "-q", "-r", "--cached", `src/${odd}`, `build/${odd}.xml`); fs.rmSync(path.join(repo, `src/${odd}`), { recursive: true, force: true }); fs.rmSync(path.join(repo, `build/${odd}.xml`));
+  for (const [refused, named] of [[projectsRefused, `src/a: :b# #[c?d/App.csproj`], [importsRefused, `build/a: :b# #[c?d.xml`]])
+    ok(refused.status === 1 && refused.stdout === "" && refused.out.startsWith("FAIL: ") && refused.out.includes(named) && !/::|##\[|\t/u.test(refused.out) && mended(refused.out),
+      "a file whose name holds \"::\", \"##[\" and a control character is refused, on a line that holds none of them", refused.out);
+}
 ok(run("checks/licences.json", "--sources").status === 0 && run("checks/licences.json", "--sources").stdout === `${REGISTRY}\n` && run("--sources").status === 1 && run("checks/missing.json", "--sources").status === 1,
   "asked for the sources, it lists the registry and what the config names, a line each, and fails without a config it can read");
 inRepo(L, lock(direct(["Newtonsoft.Json", "13.0.3"])));
