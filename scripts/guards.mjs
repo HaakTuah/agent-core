@@ -84,7 +84,9 @@ function partOf(text, start, colon, count) {
 // before a break is no part of an address in a line of text) or follow only signs that are no letter there ("1https",
 // "-https", never "git+https" or "-ab-https"); and beside it one that is not special, read from the run's first letter,
 // past any sign before it ("-ab-https" as "ab-https"), or from where a letter follows a break in it ("git+\nhttps",
-// "h\nttps"), as the URL standard reads it from the word's start or a line's: "" where none is. Each name is the end of the run, so at most one is special, and of the run whole, its first
+// "h\nttps"), as the URL standard reads it from the word's start or a line's: "" where none is. Each name is the end of
+// the run, so at most one is special, since no special scheme's name ends another's ("ws" is no ending of "wss"): one
+// added to SPECIAL, and to specialIn's pattern, is checked for that first. Of the run whole, its first
 // part after a break and its last, one is not wherever two of them are read; every scheme not special cuts the same)
 function schemeBefore(text, colon) {
   let start = colon, first = -1, last = -1;
@@ -145,7 +147,8 @@ function signInAt(text, { from }, authority, end) {
   }
   return authority.at < from ? -1 : authority.at;
 }
-const cutBy = (stops) => text => {
+// (a cut ending at `stops` too, `mark` written where each sign-in stood)
+const cutBy = (stops, mark = "") => text => {
   text = String(text);
   const ends = { special: new RegExp(String.raw`[/?#${stops}]|\\(?!")`, "gu"), other: new RegExp(`[/?#${stops}]`, "gu") };
   const seen = { special: { end: -1, at: -1 }, other: { end: -1, at: -1 } };
@@ -158,7 +161,7 @@ const cutBy = (stops) => text => {
       if (at >= 0 && (!cut || at > cut.at)) cut = { from: address.from, at };
     }
     if (!cut) continue;
-    if (text.slice(cut.from, cut.at) !== "git") { out += text.slice(copied, cut.from); copied = cut.at + 1; }
+    if (text.slice(cut.from, cut.at) !== "git") { out += text.slice(copied, cut.from) + mark; copied = cut.at + 1; }
     colon = cut.at;
   }
   return out + text.slice(copied);
@@ -180,13 +183,30 @@ export const quotedAlone = value => JSON.stringify(value, (key, part) => {
  *  Actions could read as a command. */
 export const logged = text => oneLine(noSignIn(text).replace(/%/gu, "%25").replace(/\r/gu, "%0D").replace(/\n/gu, "%0A"));
 /** A value printed to the log on its own (a failure's message, a name), its sign-in cut whole (noSignInWhole), then as
- *  logged. Where the cut took a mend it held (". Mend: ") with a sign-in, as a password may hold one, it says so in a
- *  mend of its own. */
-const MEND = ". Mend: ", mends = text => text.split(MEND).length;
-export const loggedAlone = value => {
+ *  logged. A sign-in may hold a mend's marker (". Mend: "), as a password may, and the URL standard reads one from an
+ *  address to a later "@" all the same where the words between are a message's mend ("https://example.invalid. Mend:
+ *  install @scope/x"), so neither can be told from the other and both are cut. Where the cut took the mend so, "[cut]"
+ *  stands where it cut and a mend of its own stands in for the one taken, saying what to do, then what was cut. */
+const MEND = ". Mend: ", CUT = "[cut]", mends = text => text.split(MEND).length, marked = cutBy("", CUT);
+const CUT_SAID = `the words from an address to a later "@" may hold a sign-in, so they were cut where "${CUT}" stands, \
+the message's own mend with them`;
+// (the value cut whole, with "[cut]" where it cut wherever the cut took a mend, and whether it did)
+const cutAlone = value => {
   const text = String(value), cut = noSignInWhole(text);
-  return logged(mends(cut) === mends(text) ? cut : `${cut}${MEND}an address in this message held a sign-in, cut out with \
-the words up to its "@", a mend among them; read the value it names in the project, and write it with no sign-in`);
+  return mends(cut) === mends(text) ? { cut, took: false } : { cut: marked(text), took: true };
+};
+export const loggedAlone = value => {
+  const { cut, took } = cutAlone(value);
+  return logged(took ? `${cut}${MEND}take any user or password out of each address shown before "${CUT}" where the \
+project's files write it with one, and run the check again; where they write none, read this message's own mend in the \
+check's script, found by its words before the address: ${CUT_SAID}` : cut);
+};
+/** A message printed inside a failure's line of the caller's, as its cause ("<what failed> (<the cause>). Mend: <the
+ *  caller's mend>"): cut as loggedAlone cuts it, saying in words, never in a mend, where the cut took the message's own
+ *  mend, and each "Mend: " in it written "mend: ", so the line holds one mend, the caller's. */
+export const loggedCause = value => {
+  const { cut, took } = cutAlone(value);
+  return logged(`${cut}${took ? `; ${CUT_SAID}` : ""}`.replace(/Mend: /gu, "mend: "));
 };
 
 /** How deep a value read from a project's JSON may nest, in objects and lists, before a check refuses it: far past any

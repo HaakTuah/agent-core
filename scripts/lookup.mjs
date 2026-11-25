@@ -27,7 +27,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync, realpathSync } from "node:fs";
 import path, { posix } from "node:path";
 import { fileURLToPath } from "node:url";
-import { leadsOut, logged, loggedAlone, noSignInWhole, parseBounded } from "./guards.mjs";
+import { leadsOut, logged, loggedCause, noSignInWhole, parseBounded } from "./guards.mjs";
 import { baseOf, configAt, loadConfig, lockInstalled, registryName, textAt } from "./licences.mjs";
 import { lockPackages, nugetConfig } from "./nuget.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
@@ -432,7 +432,7 @@ if (started(import.meta.url)) {
   if (!configPath) { console.error("FAIL: no config was named. Mend: name it: node core/scripts/lookup.mjs <the licence check's config> [--nuget]"); process.exit(1); }
   let root;
   try { root = projectAt(fileURLToPath(new URL(".", import.meta.url))).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim(); }
-  catch (e) { console.error(`FAIL: ${loggedAlone(e.message)}. Mend: run it from the project's root, a git repository`); process.exit(1); }
+  catch (e) { console.error(`FAIL: ${loggedCause(e.message)}. Mend: run it from the project's root, a git repository`); process.exit(1); }
   const nuget = process.argv.includes("--nuget");
   const { lines, code } = await run(configPath, { root, base: namedBase(root) ?? baseOf(root), nuget });
   for (const line of lines) (line.startsWith("FAIL") ? console.error : console.log)(line);
