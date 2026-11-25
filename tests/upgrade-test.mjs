@@ -57,6 +57,7 @@ import { copyAt } from "../scripts/workflow-calls.mjs";
 import { importsOf, projectFilesByContent, readProject } from "../scripts/nuget.mjs";
 import { STEPS, callers, leads, notDone, project as read, report } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, notesAt } from "../scripts/sync-notes.mjs";
+import { ASIDE } from "../scripts/sync-pins.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
 import { compared } from "../scripts/release-trial.mjs";
 import { evaluate, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
@@ -536,9 +537,11 @@ function upgrade(p, from, ownChanges, expect) {
   git(p.dir, "merge", "-q", "--no-ff", "-m", "Merge the sync", "sync");
   git(p.dir, "push", "-q", "origin", "main");
   // (what the run at the same pin set aside of its writers, the session takes after the merge by running them again,
-  // as its words allow, which the case of the steps below does; the stash dropped, so the clone stands as pushed; #1246)
-  const aside = git(p.dir, "stash", "list").split("\n").findIndex(l => l.includes("the steps' writes (#1091)"));
-  if (aside >= 0) git(p.dir, "stash", "drop", "-q", `stash@{${aside}}`);
+  // as its words allow, which the case of the steps below does; the stashes dropped, so the clone stands as pushed; #1246.
+  // Each run of the sync sets aside a stash of its own, so where the copy's own sync took the release too, before the
+  // run again at its pin, two stand; #1303)
+  const asides = git(p.dir, "stash", "list").split("\n").map((l, i) => (l.includes(ASIDE) ? i : -1)).filter(i => i >= 0);
+  for (const i of asides.reverse()) git(p.dir, "stash", "drop", "-q", `stash@{${i}}`);
   const main1 = git(p.dir, "rev-parse", "HEAD");
   const onPush = checks(p, "push", main1, { baseSha: main0 });
   ok(!failures(onPush), `${p.name}: every check passes on main after the merge (${started(onPush).length} jobs)`, failures(onPush));
