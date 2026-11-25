@@ -27,7 +27,9 @@ const JSON_CASES = [
   [`{"a": ${MARK}}`, 1, 7], [`{"key": "${MARK}"`, 1, 18], [`{\n  "a": 1,\n  "b": ${MARK}\n}`, 3, 8], [`["${MARK}" 2]`, 1, 12],
   [`{"${MARK}": 1}x${MARK}`, 1, 15], [`{"a": "${MARK}\u0001"}`, 1, 15], [`﻿{"${MARK}": 1}`, 1, 1], [`[1,\n"${MARK}",`, 2, 11],
   [`{"a": tru${MARK}}`, 1, 10], [`{"a": -${MARK}}`, 1, 8], [`{\r"${MARK}" 1}`, 2, 11], [`{\r\n"${MARK}" 1}`, 2, 11],
-  [`{\r\r\n"${MARK}" 1}`, 3, 11], [`[1,\r${MARK}]`, 2, 1],
+  [`{\r\r\n"${MARK}" 1}`, 3, 11], [`[1,\r${MARK}]`, 2, 1], [`{"a": 1} ${MARK} at position 2`, 1, 10],
+  // (short enough that V8 quotes them whole, its words then standing in the quote: only its own offset is read)
+  ["nope at position 999", 1, 2], ["[x at position 9]", 1, 2], ["[1,\nx at position 3 (line 1 column 4)]", 2, 1],
 ];
 for (const [text, line, col] of JSON_CASES) {
   const m = said(parseBounded, text);

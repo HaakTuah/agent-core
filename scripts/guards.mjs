@@ -282,12 +282,15 @@ export function parseFault(kind, text, at) {
 
 // (V8's words for a fault of JSON that quote nothing of the text: words, and the marks of JSON's own grammar in quotes)
 const JSON_KIND = /^(?:[A-Za-z -]|'[,:{}[\]]')+$/u;
+// (V8's own offset, which ends its message where it gives one: a text quoted earlier in the message may hold the same
+// words, so only the end is read)
+const JSON_AT = /(?: in JSON)? at position (\d+)(?: \(line \d+ column \d+\))?$/u;
 // (where V8 names the offending character, and not its offset, the offset is the shortest start of the text that already
 // fails other than by ending early: each shorter one is the start of a JSON text, so it parses, or fails at its end)
 function jsonFaultAt(text) {
   const failsWithin = k => {
     try { JSON.parse(text.slice(0, k)); return false; } catch (e) {
-      const m = String(e?.message), at = / at position (\d+)/u.exec(m);
+      const m = String(e?.message), at = JSON_AT.exec(m);
       return !/^Unexpected end of JSON input/u.test(m) && (!at || Number(at[1]) < k);
     }
   };
@@ -303,7 +306,7 @@ export function parseBounded(text) {
   let value;
   try { value = JSON.parse(text); } catch (e) {
     if (!(e instanceof SyntaxError)) throw e;
-    const s = String(text), m = String(e.message), at = / at position (\d+)/u.exec(m), words = at ? m.slice(0, at.index).replace(/ in JSON$/u, "") : "";
+    const s = String(text), m = String(e.message), at = JSON_AT.exec(m), words = at ? m.slice(0, at.index) : "";
     if (/^Unexpected end of JSON input/u.test(m)) throw parseFault("unexpected end of input", s, s.length);
     const kind = /^Unexpected token/u.test(m) ? "unexpected character" : JSON_KIND.test(words) ? words[0].toLowerCase() + words.slice(1) : "not valid JSON";
     throw parseFault(kind, s, at ? Number(at[1]) : jsonFaultAt(s));
