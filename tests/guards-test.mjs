@@ -7,7 +7,7 @@
 //   node tests/guards-test.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { DEEPEST, aCommit, aRepository, inProject, leadsOut, logged, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
+import { DEEPEST, aCommit, aRepository, inProject, leadsOut, logged, loggedAlone, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -83,10 +83,14 @@ ok(seen("``` not a fence `\nshown").includes("shown") && seen("```\nhidden").tri
   ok(tabbed === '{"https://example.invalid/k":["git+https://example.invalid/x"],"plain":1}', "a value written as JSON has each text and key cut before an escape could hide its sign-in", tabbed.replaceAll(user, "<user>"));
   ok(quotedAlone(undefined) === undefined && quotedAlone("x@1") === '"x@1"', "a value JSON writes nothing of stays nothing; a text is quoted as JSON quotes it");
   let long;
-  try { long = [noSignIn(`https://${"a".repeat(12e6)}`), noSignInWhole(`https://${"\\\"".repeat(4e6)}@`), noSignInWhole(`x://${"a ".repeat(6e6)}`)]; } catch (e) { long = e; }
+  try { long = [noSignIn(`https://${"a".repeat(12e6)}`), noSignInWhole("ws:".repeat(4e6)), noSignInWhole(`x://${"@".repeat(12e6)}`), noSignInWhole(`https://${"\\\"".repeat(4e6)}@`), noSignInWhole(`x://${"a ".repeat(6e6)}`)]; } catch (e) { long = e; }
   ok(Array.isArray(long), "a long text is read without running out of stack", String(long).slice(0, 200));
-  const over = `https://${"a".repeat(2049)}@example.invalid/x`;
-  ok(noSignIn(over) === over && noSignIn(`https://${"a".repeat(2048)}@example.invalid/x`) === "https://example.invalid/x", "a sign-in of up to 2,048 characters is cut, a longer one is read as no address", "");
+  const longPass = "x".repeat(5000);
+  ok(noSignIn(`https://${user}:${longPass}@example.invalid/x`) === "https://example.invalid/x", "a sign-in of any length is cut whole");
+  ok([`https:\n//${user}:${pass}@example.invalid/x`, `https:/\t/${user}:${pass}@example.invalid/x`, `x:/\r/${user}:${pass}@example.invalid/x`].every(t => !noSignInWhole(t).includes(pass) && !noSignIn(t).includes(pass)),
+    "a tab or a line's break among an address's slashes, which the URL standard drops, ends no address");
+  ok(noSignIn(`https://${user}:${pass}@sha256:${"0".repeat(32)}/x`) === `https://sha256:${"0".repeat(32)}/x`, "a host named as a digest, with a port and a path after it, is no digest");
+  ok(!loggedAlone(`could not read https://${user}:${pass} x@example.invalid/x`).includes(pass), "a value printed on its own to the log has its sign-in cut whole");
   const plain = ["https://registry.npmjs.org/@scope/x/-/x-1.0.0.tgz", "git+ssh://example.invalid/x.git#abc", "x@1.2.3", "mail me@example.invalid",
     "ssh://git@example.invalid/x.git", `docker://alpine@sha256:${"0123abcd".repeat(8)}`, "npm:@scope/x@1.0.0", "C:\\\\@types", "file:../@scope/x", "file:me@x/y", "C:\\me@x\\file.txt", "C:/me@x/file.txt", 'ab:\\"u@h'];
   ok(plain.every(t => noSignIn(t) === t), "an address with no sign-in, the user git, an image's digest, a name with a version, npm's alias, a bare address of mail, a file's path, a drive's path and a backslash before a quote, which ends no scheme, are left as they are", JSON.stringify(plain.map(noSignIn)));

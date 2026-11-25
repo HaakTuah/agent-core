@@ -105,6 +105,15 @@ try {
     "a pattern of a script written into another fails, naming the first, with its mend", r.out);
   drop("src/other.mjs");
 
+  // (a pattern that holds an address's sign-in, made up and built from pieces, its "@" past where the value is cut short)
+  const user = ["made", "up"].join("-"), pass = ["not", "a", "pass"].join("_"), padded = "a".repeat(80);
+  const SIGNED = `/^https:\\/\\/${user}:${pass}${padded}@example\\.invalid\\/[a-z]+$/u`;
+  put("src/signed.mjs", `export const A = ${SIGNED};\n`); put("src/signed-too.mjs", `export const B = ${SIGNED};\n`);
+  r = check({ COPIES_BASE: base });
+  ok(r.status === 1 && r.out.includes("FAIL: a value written twice: /^https:\\/\\/example\\.invalid") && !r.out.includes(user) && !r.out.includes(pass),
+    "a value written twice is printed with its address's sign-in cut out before it is cut short", r.out.replaceAll(user, "<user>").replaceAll(pass, "<pass>"));
+  drop("src/signed.mjs"); drop("src/signed-too.mjs");
+
   // (a value moved, from one file to another, passes: the places do not grow)
   fs.renameSync(path.join(dir, "deploy.sh"), path.join(dir, "release.sh"));
   r = check({ COPIES_BASE: base });

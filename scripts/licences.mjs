@@ -36,7 +36,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { inProject, leadsOut, logged, parseBounded } from "./guards.mjs";
+import { inProject, leadsOut, logged, noSignInWhole, parseBounded, quotedAlone } from "./guards.mjs";
 import { scan } from "./licence-scan.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { shapeFaults } from "./schemas.mjs";
@@ -475,7 +475,7 @@ function lockfilePackages(root, lockPath, ships, text = (f) => ownText(root, f))
   const lock = read(posix.basename(lockPath));
   if (!lock.packages || typeof lock.packages !== "object" || Array.isArray(lock.packages)) throw new Error(`${lockPath} has no "packages" (npm's lockfile version 2 or 3). Mend: write it anew with npm, version 7 or later: its install, given --package-lock-only`);
   const odd = Object.entries(lock.packages).find(([path, entry]) => !lockPathOk(path) || !entry || typeof entry !== "object" || Array.isArray(entry));
-  if (odd) throw new Error(`${lockPath} holds an entry at ${JSON.stringify(odd[0]).slice(0, 200)} that is not written as npm writes one. Mend: write it anew with npm, never by hand: its install, given --package-lock-only`);
+  if (odd) throw new Error(`${lockPath} holds an entry at ${quotedAlone(odd[0]).slice(0, 200)} that is not written as npm writes one. Mend: write it anew with npm, never by hand: its install, given --package-lock-only`);
   const workspaces = workspacesIn(read("package.json"), posix.join(base, "package.json"));
   const shipped = ships ? shippedPaths(lock.packages, workspaces, (dir) => read(posix.join(dir, "package.json"))) : new Set();
   return lockRead(lock.packages, workspaces)
@@ -574,7 +574,7 @@ function checkPackage(ctx, p) {
 /** The failure of a package off its list. */
 function offList(p) {
   const never = p.license !== undefined && NEVER.test(typeof p.license === "string" ? p.license : JSON.stringify(p.license));
-  return `off the ${p.shipped ? "list for what ships" : "tools' list"}: ${p.name}@${p.version} (${p.license === undefined ? "no licence" : typeof p.license === "string" ? p.license : JSON.stringify(p.license)}), in ${p.lockPath}${never ? ". Mend: replace it with a package under a licence on that list; floor rule 10 never takes these terms in" : `. Mend: replace it with a package under a licence on that list; or, where the owner wants it anyway, file an issue asking the owner's yes, which goes in the config's "accepted" with the owner's words (floor rule 10)`}`;
+  return `off the ${p.shipped ? "list for what ships" : "tools' list"}: ${noSignInWhole(p.name)}@${noSignInWhole(p.version)} (${p.license === undefined ? "no licence" : typeof p.license === "string" ? noSignInWhole(p.license) : quotedAlone(p.license)}), in ${p.lockPath}${never ? ". Mend: replace it with a package under a licence on that list; floor rule 10 never takes these terms in" : `. Mend: replace it with a package under a licence on that list; or, where the owner wants it anyway, file an issue asking the owner's yes, which goes in the config's "accepted" with the owner's words (floor rule 10)`}`;
 }
 
 /** The audit the config names, each entry held to its list and its notice: its entries, for the scan. */
