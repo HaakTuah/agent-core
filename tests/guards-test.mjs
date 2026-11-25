@@ -91,6 +91,8 @@ ok(seen("``` not a fence `\nshown").includes("shown") && seen("```\nhidden").tri
     "a tab or a line's break among an address's slashes, which the URL standard drops, ends no address");
   ok([`ht\ttps:${user}:${pass}@example.invalid/x`, `git+ht\ntps://${user}:${pass}@example.invalid/x`, `\thttps://${user}:${pass}@example.invalid/x`].every(t => !noSignInWhole(t).includes(pass)),
     "a tab or a line's break in a scheme's name, which the URL standard drops, hides no address");
+  ok([`x\nhttps:${user}:${pass}@example.invalid/x`, `x\thttps:${user}:${pass}@example.invalid/x`, `key\thttp:/${user}:${pass}@example.invalid/x`, `foo\nhttps:\\${user}:${pass}@example.invalid/x`, `foo\rwss:${user}:${pass}@example.invalid`, `x\n\nhttp:${user}:${pass}@example.invalid`].every(t => !noSignInWhole(t).includes(pass) && !noSignIn(t).includes(pass) && !loggedAlone(t).includes(pass)),
+    "a special scheme after a word and a tab or a line's break is read as the scheme, with or without slashes");
   ok(noSignIn(`https://${user}:${pass}@sha256:${"0".repeat(32)}/x`) === `https://sha256:${"0".repeat(32)}/x`, "a host named as a digest, with a port and a path after it, is no digest");
   ok(!loggedAlone(`could not read https://${user}:${pass} x@example.invalid/x`).includes(pass), "a value printed on its own to the log has its sign-in cut whole");
   const refused = "checks/https:shape.json cannot be read. Mend: write it as \"src/\" names it, or mail me@example.invalid";

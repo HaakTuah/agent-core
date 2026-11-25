@@ -73,12 +73,17 @@ const dropped = c => c === 9 || c === 10 || c === 13; // (a tab or a line's brea
 // (the scheme that ends at the ":" at `colon`, a tab or a line's break in it dropped and in lower case, read back to where
 // its letters start; or, where a digit, "+", "-" or "." stands before them, the special scheme its end names: "" where
 // none)
+// (the scheme a run of a scheme's letters names: the run whole, where it starts with a letter, else a special one it ends in)
+const schemeOf = run => letter(run.charCodeAt(0)) ? run.toLowerCase()
+  : (/(?:^|[^a-z])(https?|wss?|ftp|file)$/u.exec(run.toLowerCase())?.[1] ?? "");
 function schemeBefore(text, colon) {
-  let start = colon;
-  while (start > 0 && (ofScheme(text.charCodeAt(start - 1)) || dropped(text.charCodeAt(start - 1)))) start--;
+  let start = colon, last = -1;
+  for (let c; start > 0 && (ofScheme(c = text.charCodeAt(start - 1)) || dropped(c)); start--) if (last < 0 && dropped(c)) last = start;
   while (start < colon && dropped(text.charCodeAt(start))) start++;
-  const name = text.slice(start, colon).replace(/[\t\n\r]/gu, "").toLowerCase();
-  return letter(text.charCodeAt(start)) ? name : (/(?:^|[^a-z])(https?|wss?|ftp|file)$/u.exec(name)?.[1] ?? "");
+  // (the run read whole, a tab or line's break dropped, or, where only the part after the last of them names a special
+  // scheme, that part: a word before a break is no part of an address in a line of text)
+  const whole = schemeOf(text.slice(start, colon).replace(/[\t\n\r]/gu, "")), after = last < 0 ? "" : schemeOf(text.slice(last, colon));
+  return SPECIAL.has(after) && !SPECIAL.has(whole) ? after : whole;
 }
 // (where the slashes after the ":" at `colon` end, and how many they are: a backslash counted for a special scheme alone,
 // and never one before a quote)
@@ -144,7 +149,8 @@ export const quotedAlone = value => JSON.stringify(value, (key, part) => {
  *  Actions could read as a command. */
 export const logged = text => oneLine(noSignIn(text).replace(/%/gu, "%25").replace(/\r/gu, "%0D").replace(/\n/gu, "%0A"));
 /** A value printed to the log on its own (a failure's message, a name), its sign-in cut whole (noSignInWhole), the
- *  part before a mend it holds (". Mend: ") and the mend each on its own, so the mend is never cut, then as logged. */
+ *  part before a mend it holds (". Mend: ") and the mend each on its own, so the mend is never cut with what is before
+ *  it (an address the mend itself names may still be), then as logged. */
 export const loggedAlone = value => logged(String(value).split(". Mend: ").map(noSignInWhole).join(". Mend: "));
 
 /** How deep a value read from a project's JSON may nest, in objects and lists, before a check refuses it: far past any
