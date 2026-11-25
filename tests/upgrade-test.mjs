@@ -38,7 +38,8 @@
 // modules.
 // A part of it can run alone, where the whole runs past its time mark (on Windows, in the release workflow, a job each,
 // #1240): the older of the two releases, the newer, or one project kind of either, with the copy older than the first
-// beside the older and the release that asks no sync beside the newer's npm project.
+// beside the older, the fixed start of the private calls (release 5's, once it is no longer one of the two) with it, and
+// the release that asks no sync beside the newer's npm project.
 //
 //   node tests/upgrade-test.mjs [--part all | older | newer | older-npm | older-dotnet | older-pre | newer-npm | newer-dotnet]
 import { execFileSync, spawnSync } from "node:child_process";
@@ -1427,7 +1428,8 @@ if (inPart("older", KIND_PRE)) {
 }
 
 const OF = { npm: "an npm project", dotnet: "a .NET project", pre: "a project older than the first release" };
-const proven = { all: "a project of each of the last two releases", older: `the part "older": ${starts.length > 1 ? "a project of the older of the last two releases, and one" : "a project"} older than the first${starts.includes(FIXED) ? "" : ", and the fixed start of the private calls"}`, newer: "the part \"newer\": a project of the newer of the last two releases" }[PART]
-  ?? `the part "${PART}": ${OF[PART.split("-")[1]]}${PART === "older-pre" ? "" : ` of the ${PART.split("-")[0]} of the last two releases`}`;
+const fixedNote = cut.includes(FIXED) && !starts.includes(FIXED) && ["all", "older", "older-pre"].includes(PART) ? ", and the fixed start of the private calls" : "";
+const proven = { all: "a project of each of the last two releases", older: `the part "older": ${starts.length > 1 ? "a project of the older of the last two releases, and one" : "a project"} older than the first${fixedNote}`, newer: "the part \"newer\": a project of the newer of the last two releases" }[PART]
+  ?? `the part "${PART}": ${OF[PART.split("-")[1]]}${PART === "older-pre" ? fixedNote : ` of the ${PART.split("-")[0]} of the last two releases`}`;
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions: ${proven}, synced to this commit, passes every check unchanged`);
 process.exitCode = failed ? 1 : 0;
