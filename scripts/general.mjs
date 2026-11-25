@@ -23,13 +23,14 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { OWNER } from "./core-address.mjs";
+import { parseBounded } from "./guards.mjs";
 
 const args = process.argv.slice(2);
 const at = args.indexOf("--base");
 const baseRev = at >= 0 ? args[at + 1] : null;
 // (a commit, never an option: git is asked whether it is one, and it stands after --end-of-options)
 if (at >= 0 && (!/^[\w^~./][\w^~./-]*$/.test(baseRev ?? "") || (() => { try { execFileSync("git", ["rev-parse", "--verify", "--quiet", "--end-of-options", `${baseRev}^{commit}`], { stdio: "ignore" }); return false; } catch { return true; } })())) { console.log(`FAIL --base needs a commit of this repository, and "${baseRev ?? ""}" is none. Mend: fetch the base (git fetch origin main) and name its commit after --base`); process.exit(1); }
-const config = JSON.parse(fs.readFileSync(args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--base") ?? "scripts/general.json", "utf8"));
+const config = parseBounded(fs.readFileSync(args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--base") ?? "scripts/general.json", "utf8"));
 const account = { pattern: OWNER.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&"), say: "the *owner's account*, or the repository's own address" };
 const words = [...config.words, account].map(w => ({ re: new RegExp(w.pattern, w.case ? "u" : "iu"), say: w.say, outside: w.outside ?? [] }));
 const exempt = new Set(config.exempt);

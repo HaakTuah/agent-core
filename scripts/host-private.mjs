@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoOf } from "./inbox.mjs";
+import { parseBounded } from "./guards.mjs";
 
 const gh = route => { const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 24 }); if (r.status !== 0) throw new Error(`${r.stderr || r.error || "no answer"}`.trim()); return r.stdout; };
 // (GitHub's API with no sign-in, through the machine's proxy where it names one, in a Node process of its own, since
@@ -93,7 +94,7 @@ function fromEvent(env, repo) {
 // none could, with the mend.
 function fromGh(ask, bare, repo, env) {
   let why = "";
-  try { const r = JSON.parse(ask(`repos/${repo}`)); if (typeof r?.private === "boolean") return { private: r.private }; } catch (e) { why = ` (${String(e.message).split("\n")[0].slice(0, 120)})`; }
+  try { const r = parseBounded(ask(`repos/${repo}`)); if (typeof r?.private === "boolean") return { private: r.private }; } catch (e) { why = ` (${String(e.message).split("\n")[0].slice(0, 120)})`; }
   let open = {};
   try { open = bare(`repos/${repo}`, env) ?? {}; } catch { /* (no answer) */ }
   if (open.status === 200 && typeof open.private === "boolean") return { private: open.private };

@@ -650,6 +650,9 @@ jobs:
       - name: The words check, the dated records' added lines too
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/general-test.mjs ')) }}
         run: node tests/general-test.mjs
+      - name: A parse error names where, not what, and every JSON.parse of the scripts stands where its error is worded so
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/parse-errors-test.mjs ')) }}
+        run: node tests/parse-errors-test.mjs
       - name: The marks check, a rule written read for its reason, its holder and its condition
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/pattern-test.mjs ')) }}
         run: node tests/pattern-test.mjs

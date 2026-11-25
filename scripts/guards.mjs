@@ -267,10 +267,46 @@ export function seen(markdown) {
   return out.join("\n");
 }
 
+/** A reader's refusal of a text, as every parse error the core prints is worded (#1333): the kind of fault and where it
+ *  stands, "<kind> at line L, column C" (each from 1), and never a character of the text itself, so a session opens the
+ *  file there and the printout holds nothing the file holds. `at` is the fault's offset in `text`, or { line, col }. */
+export function parseFault(kind, text, at) {
+  let place = at;
+  if (typeof at === "number") {
+    const before = String(text).slice(0, Math.max(0, at));
+    place = { line: before.split("\n").length, col: before.length - before.lastIndexOf("\n") };
+  }
+  return new SyntaxError(place ? `${kind} at line ${place.line}, column ${place.col}` : kind);
+}
+
+// (V8's words for a fault of JSON that quote nothing of the text: words, and the marks of JSON's own grammar in quotes)
+const JSON_KIND = /^(?:[A-Za-z -]|'[,:{}[\]]')+$/u;
+// (where V8 names the offending character, and not its offset, the offset is the shortest start of the text that already
+// fails other than by ending early: each shorter one is the start of a JSON text, so it parses, or fails at its end)
+function jsonFaultAt(text) {
+  const failsWithin = k => {
+    try { JSON.parse(text.slice(0, k)); return false; } catch (e) {
+      const m = String(e?.message), at = / at position (\d+)/u.exec(m);
+      return !/^Unexpected end of JSON input/u.test(m) && (!at || Number(at[1]) < k);
+    }
+  };
+  let lo = 1, hi = text.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (failsWithin(mid)) hi = mid; else lo = mid + 1; }
+  return lo - 1;
+}
+
 /** JSON's text parsed, as JSON.parse parses it, and refused, as text that is no JSON is, where it nests deeper than
- *  DEEPEST: what reads it after, by recursion or by printing it, then never runs out of stack. */
+ *  DEEPEST: what reads it after, by recursion or by printing it, then never runs out of stack. A text that is no JSON
+ *  throws parseFault's form, never V8's own message, which quotes the text. */
 export function parseBounded(text) {
-  const value = JSON.parse(text);
+  let value;
+  try { value = JSON.parse(text); } catch (e) {
+    if (!(e instanceof SyntaxError)) throw e;
+    const s = String(text), m = String(e.message), at = / at position (\d+)/u.exec(m), words = at ? m.slice(0, at.index).replace(/ in JSON$/u, "") : "";
+    if (/^Unexpected end of JSON input/u.test(m)) throw parseFault("unexpected end of input", s, s.length);
+    const kind = /^Unexpected token/u.test(m) ? "unexpected character" : JSON_KIND.test(words) ? words[0].toLowerCase() + words.slice(1) : "not valid JSON";
+    throw parseFault(kind, s, at ? Number(at[1]) : jsonFaultAt(s));
+  }
   if (tooDeep(value)) throw new SyntaxError(`it nests deeper than ${DEEPEST} objects and lists`);
   return value;
 }

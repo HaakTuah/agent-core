@@ -65,6 +65,7 @@ import { HOLDS, numberMend } from "./pr-number.mjs";
 import { calledFor } from "./pr-reads.mjs";
 import { MANIFEST_MAX, REASONS, UNREADABLE, differencesAdded, reasonsMend } from "./pr-reasons.mjs";
 import { WAITS, heldAt, waitsMend, waitsOn } from "./pr-waits.mjs";
+import { parseBounded } from "./guards.mjs";
 
 // (what each line's check holds, exported from here as before they were split)
 export { HOLDS, calledFor, MANIFEST_MAX, NO_COST, REASONS, UNREADABLE, WAITS, costMend, differencesAdded, heldAt, numberMend, reasonsMend, waitsMend, waitsOn };
@@ -141,7 +142,7 @@ if (started(import.meta.url)) {
     try {
       const commits = JSON.parse(gh(`repos/${repo}/commits?path=${file}&sha=${base}&per_page=100`)).map(c => ({ sha: c.sha, date: c.commit?.committer?.date })).filter(c => /^[0-9a-f]{40}$/.test(c.sha));
       then = "";
-      heldAt(commits, created, sha => { then = Buffer.from(JSON.parse(gh(`repos/${repo}/contents/${file}?ref=${sha}`)).content ?? "", "base64").toString("utf8"); return true; });
+      heldAt(commits, created, sha => { then = Buffer.from(parseBounded(gh(`repos/${repo}/contents/${file}?ref=${sha}`)).content ?? "", "base64").toString("utf8"); return true; });
     } catch { then = null; }
     const why = then === null ? "whether the copy on its base held it could not be read" : "the copy on its base did not hold it when the pull request opened";
     if (then?.includes("export const WAITS_SINCE")) { const mend = waitsMend(process.env.PR_BODY); if (mend) mends.push(mend); }

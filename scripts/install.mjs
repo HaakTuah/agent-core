@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { npmIgnores, npmReadsAll, npmVersion } from "./npm-reads.mjs";
-import { noSignInWhole } from "./guards.mjs";
+import { noSignInWhole, parseBounded } from "./guards.mjs";
 import { INSTALLS, lockFaults, npmrcOthers } from "./packages.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -108,8 +108,8 @@ const unanswered = text => NPM_UNANSWERED.test(String(text ?? "")) || (PIP_UNANS
 function namesNothing(name) {
   const { lock, folder, pip } = REGISTRIES[name];
   if (pip) return false;
-  const { packages: entries = {} } = JSON.parse(fs.readFileSync(path.join(root, lock), "utf8"));
-  const list = JSON.parse(fs.readFileSync(path.join(root, folder, "package.json"), "utf8"));
+  const { packages: entries = {} } = parseBounded(fs.readFileSync(path.join(root, lock), "utf8"));
+  const list = parseBounded(fs.readFileSync(path.join(root, folder, "package.json"), "utf8"));
   return Object.keys(entries).every(k => !k) && !Object.keys({ ...list.dependencies, ...list.devDependencies, ...entries[""]?.dependencies, ...entries[""]?.devDependencies }).length;
 }
 
