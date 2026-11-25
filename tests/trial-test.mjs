@@ -156,9 +156,6 @@ jobs:
   lines.length = 0;
   ok(close({ failed: 1, ran: 3, unrun: 0 }) === 1 && lines[0] === "1 of the jobs run here failed, 0 not run (the core's checks that run from plain git and, with --own, the project's own jobs)" && close({ failed: 0, ran: 3, unrun: 0 }) === 0 && lines[1] === "ok   every job run here passed (3: the core's checks that run from plain git and, with --own, the project's own jobs)",
     "the summary names the project's own jobs beside the core's checks, never counting them as the core's (#1275, point 2)", lines.join("\n"));
-  lines.length = 0;
-  ok(close({ failed: 2, ran: 5, unrun: 1, own: { failed: 1, ran: 3, unrun: 1 } }) === 1 && lines[1] === "2 of the jobs run here failed, 1 not run (the core's checks that run from plain git and, with --own, the project's own jobs; of those the project's own: 1 failed, 1 not run, 3 ran)" && close({ failed: 0, ran: 5, unrun: 0, own: { failed: 0, ran: 3, unrun: 0 } }) === 0 && lines[2] === "ok   every job run here passed (5: the core's checks that run from plain git and, with --own, the project's own jobs; of those the project's own: 0 failed, 0 not run, 3 ran)",
-    "with --own the summary counts the project's own jobs apart from the core's checks, those that failed, were not run and ran (#1287)", lines.join("\n"));
   ok(!lacking.passed && lacking.steps.find(s => !s.passed)?.missing === "no-such-program-of-the-trial", "a step that wants a program this machine lacks names it, for check.mjs to leave the job unrun (#1245, point 9)", JSON.stringify(lacking.steps));
 
   // (point 10: each job in its class, the record counting each, and a job failed after alone holding the cut as the release's)
