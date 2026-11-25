@@ -79,11 +79,12 @@ function partOf(text, start, colon, count) {
   while (from > start && !dropped(text.charCodeAt(from - 1))) from--;
   return { at, from };
 }
-// (the scheme that ends at the ":" at `colon`, tabs and line breaks in it dropped, as the URL standard drops them: a
+// (the schemes that end at the ":" at `colon`, tabs and line breaks in it dropped, as the URL standard drops them: a
 // special one where its letters start their part of the run (the run, or the text after a break in it, since a word
 // before a break is no part of an address in a line of text) or follow a sign that is no letter in a part that starts
 // with none ("1https", never "git+https"); else the run whole where it starts with a letter, else the part after its
-// first break that starts with one; "" where none is)
+// first break that starts with one; "" where none is. Where a special one is read from after a break, the run whole,
+// where it starts with a letter, is read too ("git+\nhttps"), as the URL standard reads it from the word's start)
 function schemeBefore(text, colon) {
   let start = colon, first = -1;
   for (let c; start > 0 && (ofScheme(c = text.charCodeAt(start - 1)) || dropped(c)); start--) {
@@ -91,10 +92,17 @@ function schemeBefore(text, colon) {
   }
   while (start < colon && dropped(text.charCodeAt(start))) start++;
   const named = from => text.slice(from, colon).replace(/[\t\n\r]/gu, "").toLowerCase(), name = named(start);
+  const special = specialIn(text, start, colon, name), whole = letter(text.charCodeAt(start)) ? name : "";
+  if (special) return whole && whole !== special ? [special, whole] : [special];
+  return [whole || (first < 0 ? "" : named(first))];
+}
+// (the special scheme the run from `start` to `colon`, read as `name`, ends in, where its letters start their part of
+// the run or follow a sign that is no letter in a part that starts with none: "" where none does)
+function specialIn(text, start, colon, name) {
   const special = /(https?|wss?|ftp|file)$/u.exec(name)?.[1] ?? "";
-  const { at, from } = special ? partOf(text, start, colon, special.length) : { at: -1, from: 0 };
-  if (special && (at === from || (!letter(text.charCodeAt(from)) && !letter(text.charCodeAt(at - 1))))) return special;
-  return letter(text.charCodeAt(start)) ? name : first < 0 ? "" : named(first);
+  if (!special) return "";
+  const { at, from } = partOf(text, start, colon, special.length);
+  return at === from || (!letter(text.charCodeAt(from)) && !letter(text.charCodeAt(at - 1))) ? special : "";
 }
 // (where the slashes after the ":" at `colon` end, and how many they are: a backslash counted for a special scheme alone,
 // and never one before a quote)
@@ -106,9 +114,9 @@ function slashesAfter(text, colon, special) {
     else if (!dropped(c)) return { from, slashes };
   }
 }
-// (the address whose scheme ends at the ":" at `colon`: its kind and where its authority starts, or null where none does)
-function addressAt(text, colon) {
-  const name = schemeBefore(text, colon), kind = SPECIAL.has(name) ? "special" : "other";
+// (the address a scheme `name` that ends at the ":" at `colon` starts: its kind and where its authority starts, or null)
+function addressAt(text, colon, name) {
+  const kind = SPECIAL.has(name) ? "special" : "other";
   if (!name) return null;
   const { from, slashes } = slashesAfter(text, colon, kind === "special");
   return slashes >= (kind === "other" ? 2 : name === "file" ? 1 : 0) ? { kind, from } : null;
@@ -123,23 +131,31 @@ const lastSignInAt = (text, floor, end) => {
   }
   return -1;
 };
+// (the "@" that ends the sign-in of an address of one kind whose authority starts at `from`, or -1: an authority not
+// read yet is read once, where it ends and its last "@", and kept in `authority` for every address that starts in it)
+function signInAt(text, { from }, authority, end) {
+  if (from > authority.end) {
+    end.lastIndex = from;
+    authority.end = end.exec(text)?.index ?? text.length;
+    authority.at = lastSignInAt(text, from, authority.end);
+  }
+  return authority.at < from ? -1 : authority.at;
+}
 const cutBy = (stops) => text => {
   text = String(text);
   const ends = { special: new RegExp(String.raw`[/?#${stops}]|\\(?!")`, "gu"), other: new RegExp(`[/?#${stops}]`, "gu") };
   const seen = { special: { end: -1, at: -1 }, other: { end: -1, at: -1 } };
   let out = "", copied = 0;
   for (let colon = text.indexOf(":"); colon !== -1; colon = text.indexOf(":", colon + 1)) {
-    const address = addressAt(text, colon);
-    if (!address) continue;
-    const { kind, from } = address, authority = seen[kind];
-    if (from > authority.end) { // (an authority not read yet: where it ends, and its sign-in's "@")
-      ends[kind].lastIndex = from;
-      authority.end = ends[kind].exec(text)?.index ?? text.length;
-      authority.at = lastSignInAt(text, from, authority.end);
+    let cut = null; // (of the readings of the scheme, the one whose sign-in reaches furthest)
+    for (const name of schemeBefore(text, colon)) {
+      const address = addressAt(text, colon, name);
+      const at = address ? signInAt(text, address, seen[address.kind], ends[address.kind]) : -1;
+      if (at >= 0 && (!cut || at > cut.at)) cut = { from: address.from, at };
     }
-    if (authority.at < from) continue;
-    if (text.slice(from, authority.at) !== "git") { out += text.slice(copied, from); copied = authority.at + 1; }
-    colon = authority.at;
+    if (!cut) continue;
+    if (text.slice(cut.from, cut.at) !== "git") { out += text.slice(copied, cut.from); copied = cut.at + 1; }
+    colon = cut.at;
   }
   return out + text.slice(copied);
 };
@@ -159,10 +175,15 @@ export const quotedAlone = value => JSON.stringify(value, (key, part) => {
  *  control character or line separator shown as "?" (oneLine), so no part of it starts a line of its own, which GitHub
  *  Actions could read as a command. */
 export const logged = text => oneLine(noSignIn(text).replace(/%/gu, "%25").replace(/\r/gu, "%0D").replace(/\n/gu, "%0A"));
-/** A value printed to the log on its own (a failure's message, a name), its sign-in cut whole (noSignInWhole), the
- *  part before a mend it holds (". Mend: ") and the mend each on its own, so the mend is never cut with what is before
- *  it (an address the mend itself names may still be), then as logged. */
-export const loggedAlone = value => logged(String(value).split(". Mend: ").map(noSignInWhole).join(". Mend: "));
+/** A value printed to the log on its own (a failure's message, a name), its sign-in cut whole (noSignInWhole), then as
+ *  logged. Where the cut took a mend it held (". Mend: ") with a sign-in, as a password may hold one, it says so in a
+ *  mend of its own. */
+const MEND = ". Mend: ", mends = text => text.split(MEND).length;
+export const loggedAlone = value => {
+  const text = String(value), cut = noSignInWhole(text);
+  return logged(mends(cut) === mends(text) ? cut : `${cut}${MEND}an address in this message held a sign-in, cut out with \
+the words up to its "@", a mend among them; read the value it names in the project, and write it with no sign-in`);
+};
 
 /** How deep a value read from a project's JSON may nest, in objects and lists, before a check refuses it: far past any
  *  config, manifest or lock file, and short of where reading it, or printing it, would run out of stack. */
