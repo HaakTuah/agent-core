@@ -53,9 +53,8 @@ export function writable(p, f, busy) {
   if (spawnSync("git", ["check-ignore", "-q", "--", f], { cwd: p.root }).status === 0) throw new Unwritten(`git ignores \`${shown(f)}\`: take it out of the ignore list and commit it, then run it again`);
 }
 
-// A file's own line ends (#1238), read from its raw text, where `p.read` turns Windows ones into LF: CRLF where every line
-// ends so, as git writes a tree with core.autocrlf, else LF. `inEnds` is a text, read as LF, in them; the one reading of
-// "CRLF" the writers share.
+// A file's own line ends (#1238), from its raw text (`p.read` turns CRLF into LF): CRLF where every line ends so, else
+// LF; `inEnds` writes an LF text in them.
 export const eolOf = (p, f) => { const raw = p.read(f, true) ?? ""; return /\r\n/u.test(raw) && !/(^|[^\r])\n/u.test(raw) ? "\r\n" : "\n"; };
 export const inEnds = (p, f, text) => eolOf(p, f) === "\r\n" ? text.replace(/\r?\n/gu, "\r\n") : text;
 
@@ -288,7 +287,7 @@ export const writePlaced = opts => (p, busy) => {
   const text = rewritten(p, opts);
   if (text === p.manifest) return [];
   writable(p, "core-manifest.md", busy);
-  // (its own line ends kept, #1227: the manifest is read as LF, and written whole in LF a tree's Windows ones would all change)
+  // (its own line ends kept: #1227)
   put(p, "core-manifest.md", inEnds(p, "core-manifest.md", text));
   return ["core-manifest.md"];
 };
