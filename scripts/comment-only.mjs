@@ -143,8 +143,10 @@ function flow(rest, toks, k) {
   const end = j < toks.length ? toks[j].col + 1 : rest.length;
   // (in [ ] alone, a quoted value the lexer ends on its own quote and that holds only plain words is read: no quote,
   // escape, #, bracket, comma or colon within it to read two ways; #1313)
-  let text = rest.slice(at, end);
-  if (rest[at] === "[") for (const t of toks.slice(k, j)) if (WORDS.test(t.src)) text = text.slice(0, t.col - at) + "w".repeat(t.src.length) + text.slice(t.col - at + t.src.length);
+  // (what stands between them, gathered in one pass, so a long list costs no more than its length)
+  let text = "", from = at;
+  if (rest[at] === "[") for (const t of toks.slice(k, j)) if (WORDS.test(t.src)) { text += rest.slice(from, t.col); from = t.col + t.src.length; }
+  text += rest.slice(from, end);
   if (/["'#&*!]/u.test(text)) return { why: "a quote, #, anchor, alias or tag inside [ ] or { }" };
   if (j >= toks.length || toks.slice(k, j).some(t => t.runs)) return { why: "a [ ] or { } that runs on to the next line" };
   return after(rest, toks, j + 1, at, end, "flow");
