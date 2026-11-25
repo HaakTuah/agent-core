@@ -52,9 +52,9 @@ export const oneLine = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\
  *  32 hex digits or more ("docker://x@sha256:…"), never a host of that name.
  *  Not cut: an address with no slash after its scheme, which reads as npm's alias "npm:name@1", and a sign-in holding
  *  a slash, "?", "#", '"' or a space, where the address it is part of is read as ending. A scheme is read from where
- *  its letters start alone, two or more, so a drive's letter ("C:\\me@x") is none, and a sign-in ends at the next slash,
- *  so a long text is read once. */
-export const noSignIn = text => String(text).replace(/(?<![a-z\d+.-])([a-z][a-z\d+.-]+:[\\/]+)([^\s/\\?#"]+)@(?!sha\d+:[a-f\d]{32,})/giu, (whole, scheme, user) => (user === "git" ? whole : scheme));
+ *  its letters start alone, and one letter is a scheme only before "//", so a drive's path ("C:\\me@x", "C:/me@x") is
+ *  none; a sign-in ends at the next slash, so a long text is read once. */
+export const noSignIn = text => String(text).replace(/(?<![a-z\d+.-])([a-z](?:[a-z\d+.-]+:[\\/]+|:\/\/+))([^\s/\\?#"]+)@(?!sha\d+:[a-f\d]{32,})/giu, (whole, scheme, user) => (user === "git" ? whole : scheme));
 
 /** Text from a project, made safe to print on one line of a workflow's log: any address's sign-in cut out (noSignIn),
  *  "%", a carriage return and a line feed escaped as GitHub documents a command's data is (%25, %0D, %0A), and any other
