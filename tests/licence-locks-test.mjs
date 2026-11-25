@@ -1,0 +1,80 @@
+// Checks that each npm lock file of a project is named in its licence config or said (scripts/licence-locks.mjs, run by
+// scripts/licences.mjs; #1316): one a pull request adds fails, saying its mend, one that stood at its base or with no
+// base to read is reported, and those the scan reads, a shrinkwrap file's twin and the core's copy are left to what holds
+// them; and that the core's own config is refused with its mend where a list of it is of another form (#1316, point 2).
+// Run by the core's tests workflow (.github/workflows/tests.yml).
+//
+//   node tests/licence-locks-test.mjs
+import { rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { CORE } from "../scripts/core-address.mjs";
+import { unnamedLocks } from "../scripts/licence-locks.mjs";
+import { check, coreConfig } from "../scripts/licences.mjs";
+import { asOutput, done, ok } from "../scripts/licence-scan-stage.mjs";
+import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
+
+const says = (list, f) => list.filter((m) => m.startsWith(`${f} is an npm lock file the licence config's "lockfiles" does not name`));
+const tracked = ["package.json", "package-lock.json", "app/package-lock.json", "app/npm-shrinkwrap.json", "tools/package-lock.json", "docs/npm-shrinkwrap.json", "mypackage-lock.json", "package-lock.json.bak", "core/package-lock.json"];
+const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.json"] };
+
+// a pull request's base: one it adds fails with its mend, one that stood is reported; a named one, its shrinkwrap twin
+// (which the check fails as a pair) and a file of another name say nothing; with no manifest, core/ is the project's own
+{
+  const r = unnamedLocks(".", tracked, config, "HEAD^1", (f) => f === "tools/package-lock.json");
+  ok(r.failures.length === 2 && says(r.failures, "docs/npm-shrinkwrap.json").length === 1 && says(r.failures, "core/package-lock.json").length === 1
+    && mended(asOutput(r.failures)) && r.failures.every((m) => m.includes("the dependency review alone holds them") && m.includes(`Mend: name ${m.slice(0, m.indexOf(" "))} in the config's "lockfiles"`)),
+  "an npm lock file a pull request adds and the config does not name fails, saying its mend", JSON.stringify(r));
+  ok(r.reports.length === 1 && says(r.reports, "tools/package-lock.json").length === 1 && r.reports[0].includes("it stood so at the pull request's base, so it passes"),
+    "one that stood at the base is reported and passes", JSON.stringify(r));
+  const none = unnamedLocks(".", tracked, config, null, () => false);
+  ok(none.failures.length === 0 && none.reports.length === 3 && none.reports.every((m) => m.includes("with no base to read it against, so it passes")),
+    "with no base to read, each is reported and passes", JSON.stringify(none));
+}
+
+// in a project, its copy of the core, at the manifest's path, is the core's, and a folder that only begins so is not
+{
+  const dir = scratchDir("licence-locks-");
+  try {
+    writeFileSync(join(dir, "core-manifest.md"), `Core: ${CORE} at ${"0".repeat(40)}, copied whole under vendor/core/ (never edited here).\n`);
+    const r = unnamedLocks(dir, ["core-manifest.md", "vendor/core/.packages/package-lock.json", "vendor/corex/package-lock.json", "core/package-lock.json"], { ships: [], lockfiles: [] }, "HEAD^1", () => false);
+    ok(r.failures.length === 2 && says(r.failures, "vendor/corex/package-lock.json").length === 1 && says(r.failures, "core/package-lock.json").length === 1 && r.reports.length === 0,
+      "the core's copy is left to the core, at the path the manifest names", JSON.stringify(r));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+// a config with a scan: what it reads is the scan's to fail, what it skips is said here
+{
+  const r = unnamedLocks(".", ["tools/package-lock.json", "docs/package-lock.json"], { ...config, scan: { served: [], skip: ["docs/"] } }, "HEAD^1", () => false);
+  ok(r.failures.length === 1 && says(r.failures, "docs/package-lock.json").length === 1, "where the config scans, a lock file the scan reads is left to it, and one it skips is said", JSON.stringify(r));
+}
+
+// where git lists nothing, it says so, failing nothing; the check gives its failures and reports
+{
+  const r = unnamedLocks(".", null, config, "HEAD^1", () => false);
+  ok(r.failures.length === 0 && r.reports.length === 1 && r.reports[0].includes("could not be listed") && r.reports[0].includes("Mend: run the check in the project's git checkout"),
+    "where the lock files cannot be listed it says so, with its mend, and fails nothing", JSON.stringify(r));
+  const dir = scratchDir("licence-locks-nogit-");
+  try {
+    const off = check({ ships: [], lockfiles: [] }, dir, null);
+    ok(off.failures.length === 0 && off.reports.some((m) => m.includes("could not be listed")), "the check reports it, outside a git checkout", JSON.stringify(off));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  const core = fileURLToPath(new URL("..", import.meta.url));
+  const added = check({ ships: [], lockfiles: [] }, core, "refs/heads/no-such-base", null), stood = check({ ships: [], lockfiles: [] }, core, "HEAD", null);
+  ok(says(added.failures, ".packages/package-lock.json").length === 1 && says(stood.failures, ".packages/package-lock.json").length === 0 && says(stood.reports, ".packages/package-lock.json").length === 1,
+    "the check fails a lock file its base does not hold and reports one it held, on the core's own checkout with a config that names none", JSON.stringify({ added: added.failures.slice(0, 3), stood: stood.reports.slice(0, 3) }));
+}
+
+// the core's own config: each list's form is read before its names, so a list of another form fails with its mend
+{
+  const dir = scratchDir("licence-locks-core-"), at = join(dir, "licences.json");
+  const refuses = (text) => { writeFileSync(at, text); try { coreConfig(at); return ""; } catch (e) { return e.message; } };
+  try {
+    const forms = ['{"data":7}', '{"fonts":{"a":1}}', '{"accepted":"x"}', "[]", "null"].map(refuses);
+    ok(forms.every((m) => /is not an object whose "data", "fonts" and "accepted" are each a list\. Mend: /u.test(m)) && /no npm package name.*\. Mend: /u.test(refuses('{"fonts":["Not A Name"]}')) && refuses('{"data":["x"]}') === "",
+      "the core's own config whose lists are of another form, or that is no object, is refused with its mend, and its names are read after", forms.join("\n"));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+done();

@@ -247,6 +247,9 @@ jobs:
       - name: The licence check's lists and readers
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licences-test.mjs ')) }}
         run: node tests/licences-test.mjs
+      - name: The licence check's npm lock files its config does not name, and the core's own config's form
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-locks-test.mjs ')) }}
+        run: node tests/licence-locks-test.mjs
       - name: The licence check on a whole project, and its scan
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-test.mjs ')) }}
         run: node tests/licence-scan-test.mjs

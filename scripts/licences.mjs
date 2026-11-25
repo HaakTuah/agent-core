@@ -14,7 +14,8 @@
 //   node core/scripts/licences.mjs <config> --action   the dependency review's lists, as lines for $GITHUB_OUTPUT
 //
 // The config, a JSON file the project keeps (its SECURITY.md names it under rule 10; protected like the check), names:
-// "lockfiles", the npm lockfiles whose every package is checked; "ships", the package.json files (each beside one of
+// "lockfiles", the npm lockfiles whose every package is checked (one the project tracks and it does not name is said:
+// licence-locks.mjs, beside this file, says how; #1316); "ships", the package.json files (each beside one of
 // those lockfiles) whose runtime dependencies, and those of the workspaces it declares, ship ([] if no package ships);
 // "data" and "fonts", the packages checked by hand to be data or assets, or fonts; "audit", the project's audit of what
 // no lockfile holds, a JSON file whose "entries" each have a "name", a "licence", "ships": true if it ships, and
@@ -38,6 +39,7 @@ import { join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, noSignInWhole, parseBounded, quotedAlone } from "./guards.mjs";
 import { scan } from "./licence-scan.mjs";
+import { trackedIn, unnamedLocks } from "./licence-locks.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { shapeFaults } from "./schemas.mjs";
 import { started } from "./started.mjs";
@@ -515,10 +517,11 @@ export function check(config, root, base = null, baseConfig = null) {
     if (!existsSync(join(root, f)) || !scriptsOff(readFileSync(join(root, f), "utf8"))) failures.push(`${f} does not set ignore-scripts=true (floor rule 15). Mend: add the line ignore-scripts=true to ${f}`);
   }
   const wait = waitFaults(root, base, config.ignoreScriptsIn ?? []);
-  failures.push(...wait.failures);
+  const unnamed = unnamedLocks(root, trackedIn(root), config, base, (f) => textAt(root, base, f) !== null);
+  failures.push(...wait.failures, ...unnamed.failures);
   const all = [...new Set(failures)]; // (a package a lockfile holds twice fails once)
   const summary = summaryOf(ctx, packages, entries, scanned, all.length);
-  return { failures: all, reports: [...reports, ...wait.reports, ...(scanned?.reports ?? [])], summary };
+  return { failures: all, reports: [...reports, ...wait.reports, ...unnamed.reports, ...(scanned?.reports ?? [])], summary };
 }
 
 // (the audit's path a config names, or null)
@@ -681,7 +684,8 @@ function summaryOf(ctx, packages, entries, scanned, failing) {
  * lock file a pull request changes, the core's copy among them, and the core's own lock files are held under the core's
  * config in the core's own repository, the copy held to it byte for byte (#1310): a sync never fails on what the
  * project did not change ("Nothing locks a project" in the core's AGENTS.md). A package of the project's own of such a
- * name is still held by this check to the project's config.
+ * name is still held by this check to the project's config, in each lock file it names; the review matches a name
+ * whatever its version, so each one it does not name is said (licence-locks.mjs, beside this file; #1316).
  */
 export function actionLists(config, core = coreConfig()) {
   const lists = policy(config), tools = new Set(lists.tools);
@@ -696,9 +700,11 @@ export function coreConfig(at = fileURLToPath(new URL("../.github/licences.json"
   const mend = "Mend: take the core's .github/licences.json back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)";
   let core;
   try { core = JSON.parse(readFileSync(at, "utf8")); } catch { throw new Error(`the core's own licence config, ${at}, cannot be read as JSON. ${mend}`); }
+  // (each list's form first, then the names in it, so a list of another form fails with its mend, never by a spread)
+  if (!core || typeof core !== "object" || Array.isArray(core) || [core.data, core.fonts, core.accepted].some((l) => l !== undefined && !Array.isArray(l))) throw new Error(`the core's own licence config, ${at}, is not an object whose "data", "fonts" and "accepted" are each a list. ${mend}`);
   const npmName = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/u;
-  const names = [...(core?.data ?? []), ...(core?.fonts ?? []), ...(Array.isArray(core?.accepted) ? core.accepted : []).filter((a) => a?.package !== undefined).map((a) => (typeof a.package === "string" ? a.package.slice(0, a.package.lastIndexOf("@")) : a.package))];
-  if (!core || typeof core !== "object" || Array.isArray(core) || [core.data, core.fonts, core.accepted].some((l) => l !== undefined && !Array.isArray(l)) || names.some((n) => typeof n !== "string" || !npmName.test(n))) throw new Error(`the core's own licence config, ${at}, names what is no npm package name in "data", "fonts" or "accepted". ${mend}`);
+  const names = [...(core.data ?? []), ...(core.fonts ?? []), ...(core.accepted ?? []).filter((a) => a?.package !== undefined).map((a) => (typeof a.package === "string" ? a.package.slice(0, a.package.lastIndexOf("@")) : a.package))];
+  if (names.some((n) => typeof n !== "string" || !npmName.test(n))) throw new Error(`the core's own licence config, ${at}, names what is no npm package name in "data", "fonts" or "accepted". ${mend}`);
   return core;
 }
 
