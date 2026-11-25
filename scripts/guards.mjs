@@ -73,17 +73,27 @@ const dropped = c => c === 9 || c === 10 || c === 13; // (a tab or a line's brea
 // (the scheme that ends at the ":" at `colon`, a tab or a line's break in it dropped and in lower case, read back to where
 // its letters start; or, where a digit, "+", "-" or "." stands before them, the special scheme its end names: "" where
 // none)
-// (the scheme a run of a scheme's letters names: the run whole, where it starts with a letter, else a special one it ends in)
-const schemeOf = run => letter(run.charCodeAt(0)) ? run.toLowerCase()
-  : (/(?:^|[^a-z])(https?|wss?|ftp|file)$/u.exec(run.toLowerCase())?.[1] ?? "");
+// (whether a tab or a line's break stands right before the `count`th letter back from `colon`, breaks not counted)
+function breakBefore(text, colon, count) {
+  let at = colon;
+  for (; count > 0; at--) if (!dropped(text.charCodeAt(at - 1))) count--;
+  return dropped(text.charCodeAt(at - 1));
+}
+// (the scheme that ends at the ":" at `colon`, tabs and line breaks in it dropped, as the URL standard drops them: a
+// special one where its letters start the run, follow a break, since a word before a break is no part of an address in
+// a line of text, or follow a sign that is no letter in a run that starts with none; else the run whole where it starts with a letter, else the part
+// after its first break that starts with one; "" where none is)
 function schemeBefore(text, colon) {
-  let start = colon, last = -1;
-  for (let c; start > 0 && (ofScheme(c = text.charCodeAt(start - 1)) || dropped(c)); start--) if (last < 0 && dropped(c)) last = start;
+  let start = colon, first = -1;
+  for (let c; start > 0 && (ofScheme(c = text.charCodeAt(start - 1)) || dropped(c)); start--) {
+    if (dropped(c) && letter(text.charCodeAt(start))) first = start;
+  }
   while (start < colon && dropped(text.charCodeAt(start))) start++;
-  // (the run read whole, a tab or line's break dropped, or, where only the part after the last of them names a special
-  // scheme, that part: a word before a break is no part of an address in a line of text)
-  const whole = schemeOf(text.slice(start, colon).replace(/[\t\n\r]/gu, "")), after = last < 0 ? "" : schemeOf(text.slice(last, colon));
-  return SPECIAL.has(after) && !SPECIAL.has(whole) ? after : whole;
+  const named = from => text.slice(from, colon).replace(/[\t\n\r]/gu, "").toLowerCase(), name = named(start);
+  const special = /(https?|wss?|ftp|file)$/u.exec(name)?.[1] ?? "", before = name.length - special.length;
+  const opens = !letter(text.charCodeAt(start)) && !letter(name.charCodeAt(before - 1)); // ("1https", never "git+https")
+  if (special && (before === 0 || opens || breakBefore(text, colon, special.length))) return special;
+  return letter(text.charCodeAt(start)) ? name : first < 0 ? "" : named(first);
 }
 // (where the slashes after the ":" at `colon` end, and how many they are: a backslash counted for a special scheme alone,
 // and never one before a quote)
