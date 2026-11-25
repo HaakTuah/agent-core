@@ -82,19 +82,21 @@ function partOf(text, start, colon, count) {
 // (the schemes that end at the ":" at `colon`, tabs and line breaks in it dropped, as the URL standard drops them: a
 // special one where its letters start their part of the run (the run, or the text after a break in it, since a word
 // before a break is no part of an address in a line of text) or follow a sign that is no letter in a part that starts
-// with none ("1https", never "git+https"); else the run whole where it starts with a letter, else the part after its
-// first break that starts with one; "" where none is. Where a special one is read from after a break, the run whole,
-// where it starts with a letter, is read too ("git+\nhttps"), as the URL standard reads it from the word's start)
+// with none ("1https", never "git+https"); and beside it one that is not special, read from where a letter starts the
+// run or follows a break in it ("git+\nhttps", "h\nttps"), as the URL standard reads it from the word's start or a
+// line's: "" where none is. Each name is the end of the run, so at most one is special, and of the run whole, its first
+// part after a break and its last, one is not wherever two of them are read; every scheme not special cuts the same)
 function schemeBefore(text, colon) {
-  let start = colon, first = -1;
+  let start = colon, first = -1, last = -1;
   for (let c; start > 0 && (ofScheme(c = text.charCodeAt(start - 1)) || dropped(c)); start--) {
-    if (dropped(c) && letter(text.charCodeAt(start))) first = start;
+    if (dropped(c) && letter(text.charCodeAt(start))) { first = start; if (last < 0) last = start; }
   }
   while (start < colon && dropped(text.charCodeAt(start))) start++;
-  const named = from => text.slice(from, colon).replace(/[\t\n\r]/gu, "").toLowerCase(), name = named(start);
-  const special = specialIn(text, start, colon, name), whole = letter(text.charCodeAt(start)) ? name : "";
-  if (special) return whole && whole !== special ? [special, whole] : [special];
-  return [whole || (first < 0 ? "" : named(first))];
+  const named = from => text.slice(from, colon).replace(/[\t\n\r]/gu, "").toLowerCase();
+  const special = specialIn(text, start, colon, named(start));
+  const other = [letter(text.charCodeAt(start)) ? start : -1, first, last].filter(at => at >= 0).map(named)
+    .find(name => name !== special) ?? "";
+  return special && other ? [special, other] : [special || other];
 }
 // (the special scheme the run from `start` to `colon`, read as `name`, ends in, where its letters start their part of
 // the run or follow a sign that is no letter in a part that starts with none: "" where none does)

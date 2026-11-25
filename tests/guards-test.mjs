@@ -98,6 +98,8 @@ ok(seen("``` not a fence `\nshown").includes("shown") && seen("```\nhidden").tri
   ok(noSignIn("file:../@scope/x 1.\nssh:x") === "file:../@scope/x 1.\nssh:x" && noSignIn("mytext\nwhttp:x@y") === "mytext\nwhttp:x@y", "a scheme a break splits from no address is still no address");
   ok(!noSignInWhole(`git+\nhttps://${user}:${pass}\\tail@example.invalid/a.git`).includes(pass) && !noSignIn(`git+\nhttps://${user}:${pass}\\tail@example.invalid/a.git`).includes(pass),
     "a scheme a break splits is read whole too, where it starts with a letter, and the reading that cuts more is taken");
+  ok([`+\ngit+\nhttps://${user}:${pass}\\t@example.invalid/x`, `.\ngit\n+https://${user}:${pass}\\t@example.invalid/x`, `1\nab\nhttps://${user}:${pass}\\t@example.invalid/x`, `h\nttps://${user}:${pass}\\t@example.invalid/x`, `ht\ttps://${user}:${pass}\\t@example.invalid/x`, `w\ns://${pass}\\@example.invalid/x`, `say h\nttps://${user}:${pass}\\t@example.invalid/x`].every(t => !noSignInWhole(t).includes(pass) && !noSignIn(t).includes(pass) && !loggedAlone(t).includes(pass)),
+    "a scheme that is no special one, read from any break that a letter follows, is read beside a special one");
   const marked = loggedAlone(`https://${user}:${pass}. Mend: tail@example.invalid/x`);
   ok(!marked.includes(pass) && !marked.includes("tail") && marked.includes(". Mend: an address in this message held a sign-in"), "a sign-in that holds a mend's marker is cut whole, and a mend of its own says so", marked.replaceAll(pass, "<pass>"));
   ok(noSignIn(`https://${user}:${pass}@sha256:${"0".repeat(32)}/x`) === `https://sha256:${"0".repeat(32)}/x`, "a host named as a digest, with a port and a path after it, is no digest");
