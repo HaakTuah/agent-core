@@ -13,7 +13,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1261 | rule builder; release 7 | |
 | #1287 | builder; release 7 | |
 | the advisory filed privately (Security tab) | rule builder; release 7 | |
-| #1302, #1306, #1307, #1311 | builder; release 7, one PR each | |
+| #1302, #1306, #1307, #1311, #1313 | builder; release 7, one PR each | |
 | #1093, with #1090 | rule builder | |
 | #1095, points 2 to 6 | rule builder | #1094 |
 | #1136 to #1140 | builder; release 7, one PR each | |
