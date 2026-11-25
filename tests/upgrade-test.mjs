@@ -1168,12 +1168,12 @@ let synced = null; // (the npm project of the newest release started from, once 
 // (a part of the older release, where only one release comes before the commit under test, would prove nothing it names)
 ok(starts.length > 1 || !process.env.GITHUB_ACTIONS || !/^older-(npm|dotnet)$/.test(PART), `on GitHub's runners two releases of the core's come before the commit under test, for the part "${PART}" to start from`);
 // (the private project's calls as a kit wrote them before the one job, whose cases below need a start that wrote them:
-// release 5's kit, a tag never moved, stands in as a fixed start of the older part where it is no longer one of the last
-// two releases; #1302)
+// release 5's kit, a tag never moved, stands in as a fixed start, in the part "older-pre" (the shortest of the older
+// part's jobs, so none passes its time) where it is no longer one of the last two releases; #1302)
 const FIXED = "release-5";
 for (const tag of [...starts, ...(cut.includes(FIXED) && !starts.includes(FIXED) ? [FIXED] : [])]) {
   const fixed = !starts.includes(tag), release = tag === starts.at(-1) ? "newer" : "older";
-  if (fixed ? !inPart(release, KIND_NET) : !inPart(release, KIND_JS) && !inPart(release, KIND_NET)) continue;
+  if (fixed ? !inPart(release, KIND_PRE) : !inPart(release, KIND_JS) && !inPart(release, KIND_NET)) continue;
   const from = { tag, sha: git(theCore, "rev-parse", `${tag}^{commit}`), dir: path.join(tmp, `core-at-${tag}`) };
   git(tmp, "clone", "-q", theCore, from.dir);
   git(from.dir, "checkout", "-q", from.sha);
@@ -1199,7 +1199,7 @@ for (const tag of [...starts, ...(cut.includes(FIXED) && !starts.includes(FIXED)
   }
 
   // the .NET project, private, held as Windows holds it
-  if (inPart(release, KIND_NET)) {
+  if (fixed || inPart(release, KIND_NET)) {
     const dotnetProject = project(`a-dotnet-project-from-${tag}`, from, { owner: "someone-else", kit: ["--nuget", ".", "--private"], isPrivate: true, windows: true, as: ownersName, files: dir => {
       write(dir, "src/App/App.csproj", `<Project Sdk="Microsoft.NET.Sdk">\r\n  <PropertyGroup>\r\n    <OutputType>Exe</OutputType>\r\n    <TargetFramework>${tfm}</TargetFramework>\r\n    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>\r\n  </PropertyGroup>\r\n</Project>\r\n`);
       write(dir, "src/App/Program.cs", 'System.Console.WriteLine("Hello");\r\n');
@@ -1221,7 +1221,7 @@ for (const tag of [...starts, ...(cut.includes(FIXED) && !starts.includes(FIXED)
     if (stood) nugetInPrivate(dotnetProject); // (its NuGet call as it stood, which a kit that wrote the one job never wrote)
     if (!fixed) parserUnnamed(dotnetProject);
     // (its calls as they stood, taken to a ready trigger and to the one job, from the start whose kit wrote them: of the
-    // last two releases, only the older's, release 6's kit writing the one job, #1300; or the fixed start, #1302)
+    // last two releases, only the older's while release 5 is one of them, #1300; after, the fixed start, #1302)
     if (stood) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); }
   }
 }
@@ -1427,7 +1427,7 @@ if (inPart("older", KIND_PRE)) {
 }
 
 const OF = { npm: "an npm project", dotnet: "a .NET project", pre: "a project older than the first release" };
-const proven = { all: "a project of each of the last two releases", older: `the part "older": ${starts.length > 1 ? "a project of the older of the last two releases, and one" : "a project"} older than the first`, newer: "the part \"newer\": a project of the newer of the last two releases" }[PART]
+const proven = { all: "a project of each of the last two releases", older: `the part "older": ${starts.length > 1 ? "a project of the older of the last two releases, and one" : "a project"} older than the first${starts.includes(FIXED) ? "" : ", and the fixed start of the private calls"}`, newer: "the part \"newer\": a project of the newer of the last two releases" }[PART]
   ?? `the part "${PART}": ${OF[PART.split("-")[1]]}${PART === "older-pre" ? "" : ` of the ${PART.split("-")[0]} of the last two releases`}`;
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions: ${proven}, synced to this commit, passes every check unchanged`);
 process.exitCode = failed ? 1 : 0;
