@@ -22,7 +22,6 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { isMainThread } from "node:worker_threads";
-import { noSignIn } from "./guards.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 // (the core's own repository, which holds its tests: a copy holds none, .gitattributes keeping them out)
@@ -144,7 +143,8 @@ const quoted = v => (registrySpec(v) ? JSON.stringify(v) : "a spec not of npm's 
 const KEY = /^(?:node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*\/)*node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*$/u;
 const plainAddress = r => { try { return /^https:\/\/registry\.npmjs\.org\//u.test(r) && new URL(r).href === r; } catch { return false; } };
 // A spec not of npm's registry is never quoted, since it may name an address with a sign-in in it (floor rule 1): its
-// field and package say where it stands; and a name or key that holds an address is printed with its sign-in cut out.
+// field and package say where it stands; a name or key, quoted as it stands, is cut of any sign-in where it is printed
+// (install.mjs, by guards.mjs's noSignIn, which this file does not import: it is copied alone; work-saved.sh).
 // `overrides` lets the package list hold npm's field of that name, each at one exact version of npm's registry: given
 // for the core's own mutation tool's install alone (install.mjs, #581), never for an install a copy carries, since npm
 // acts on it in place of what the packages ask.
@@ -159,7 +159,7 @@ export function lockFaults(list, lock, { overrides = false } = {}) {
   for (const f of ["dependencies", "devDependencies", ...own]) for (const [n, v] of Object.entries(list?.[f] ?? {})) if (!/^\d+\.\d+\.\d+$/u.test(String(v))) out.push(`package.json ${f}: ${JSON.stringify(n)} at ${quoted(v)}, not one exact version`);
   out.push(...formFaults(lock));
   for (const [k, e] of Object.entries(lock?.packages ?? {})) out.push(...(k ? entryFaults(k, e ?? {}, specs) : rootFaults(e, list)));
-  return out.map(noSignIn);
+  return out;
 }
 
 const plainObject = v => v !== null && typeof v === "object" && !Array.isArray(v);

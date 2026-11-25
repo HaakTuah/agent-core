@@ -62,10 +62,6 @@ const plainEnv = { ...env };
   const user = ["made", "up", "user"].join("-"), pass = ["not", "a", "sign", "in"].join("_"), signed = `git+https://${user}:${pass}@example.invalid/x.git`;
   const signedFaults = [...lockFaults({ ...list, devDependencies: { ...list.devDependencies, x: signed } }, lock),
     ...lockFaults(list, { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], dependencies: { x: signed } } } })];
-  // (and a name or key that is such an address itself, printed with the sign-in cut out)
-  const keyFaults = [...lockFaults({ ...list, devDependencies: { ...list.devDependencies, [signed]: "1.0.0" } }, lock), ...lockFaults(list, { ...lock, packages: { ...lock.packages, [signed]: {} } })];
-  ok(keyFaults.length > 1 && keyFaults.every(f => !f.includes(user) && !f.includes(pass)) && keyFaults.some(f => f.includes("git+https://example.invalid/x.git")),
-    "a name or lock key that names an address with a sign-in is printed with the sign-in cut out", JSON.stringify(keyFaults).replaceAll(user, "<user>").replaceAll(pass, "<pass>"));
   ok(lockFaults({ ...list, devDependencies: { ...list.devDependencies, x: "^1.0.0" } }, lock).some(f => f.includes('package.json devDependencies: "x" at "^1.0.0", not one exact version')),
     "a range of npm's registry where one exact version belongs is quoted, since it names no address", JSON.stringify(lockFaults({ ...list, devDependencies: { ...list.devDependencies, x: "^1.0.0" } }, lock)));
   ok(signedFaults.length > 0 && signedFaults.every(f => !f.includes(user) && !f.includes(pass) && !f.includes("example.invalid"))
@@ -595,6 +591,10 @@ try {
   refuses("the .npmrc holds a line beside the core's own two settings", () => fs.appendFileSync(path.join(pk, ".npmrc"), `"${["regi", "stry"].join("")}" = https://example.invalid/\n`), () => fs.writeFileSync(path.join(pk, ".npmrc"), copyNpmrc), /holds a line beside the core's own two settings/u);
   const copyList = fs.readFileSync(path.join(pk, "package.json"), "utf8");
   refuses("the package list names a dependency of git, before npm runs", () => fs.writeFileSync(path.join(pk, "package.json"), JSON.stringify({ ...JSON.parse(copyList), devDependencies: { x: "git+https://example.invalid/x.git" } })), () => fs.writeFileSync(path.join(pk, "package.json"), copyList), /the spec of "x" is not of npm's registry/u);
+  // (a lock key that is an address with a sign-in in it: the refusal prints it with the sign-in cut out (floor rule 1),
+  // the sign-in made up, built from pieces as the test runs)
+  const keyUser = ["made", "up", "user"].join("-"), keyPass = ["not", "a", "sign", "in"].join("_"), copyLock = fs.readFileSync(path.join(pk, "package-lock.json"), "utf8");
+  refuses("the lock file holds a key that is an address with a sign-in, which it prints with the sign-in cut out", () => { const l = JSON.parse(copyLock); fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify({ ...l, packages: { ...l.packages, [`git+https://${keyUser}:${keyPass}@example.invalid/x.git`]: {} } })); }, () => fs.writeFileSync(path.join(pk, "package-lock.json"), copyLock), new RegExp(`^(?![^]*(?:${keyUser}|${keyPass}))[^]*"git\\+https://example\\.invalid/x\\.git": a key that names no folder`, "u"));
   const elsewhere = path.join(tmp, "elsewhere");
   fs.mkdirSync(elsewhere);
   fs.writeFileSync(path.join(elsewhere, "kept.txt"), "kept\n");

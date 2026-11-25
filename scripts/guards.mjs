@@ -47,8 +47,9 @@ export const oneLine = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\
 
 /** Text with the user and password of every address in it cut out, up to the last "@" before the address's path
  *  ("git+https://user:pass@host/x" as "git+https://host/x"), so a sign-in a project's file holds in an address is never
- *  printed (floor rule 1). */
-export const noSignIn = text => String(text).replace(/([a-z][a-z\d+.-]*:\/\/)[^\s/\\?#]*@/giu, "$1");
+ *  printed (floor rule 1). A scheme is read from where its letters start alone, so a long text is read once, never
+ *  again from each of its letters. */
+export const noSignIn = text => String(text).replace(/(?<![a-z\d+.-])([a-z][a-z\d+.-]*:\/\/)[^\s/\\?#]*@/giu, "$1");
 
 /** Text from a project, made safe to print on one line of a workflow's log: any address's sign-in cut out (noSignIn),
  *  "%", a carriage return and a line feed escaped as GitHub documents a command's data is (%25, %0D, %0A), and any other
