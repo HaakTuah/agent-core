@@ -1219,6 +1219,7 @@ for (const tag of [...starts, ...(cut.includes(FIXED) && !starts.includes(FIXED)
       ...(sdk ? [[["nuget.yml", "core.yml"].some(f => ran(results, f, "Restore each project file from its lock file alone")) === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
     if (!fixed) readersAgainstTools(dotnetProject); // (and against the .NET SDK, held as Windows holds it)
     const stood = asItStood(dotnetProject);
+    if (fixed) ok(stood, `${dotnetProject.name}: the fixed start's kit wrote the private calls, so the four cases below have a start (#1302)`);
     if (stood) nugetInPrivate(dotnetProject); // (its NuGet call as it stood, which a kit that wrote the one job never wrote)
     if (!fixed) parserUnnamed(dotnetProject);
     // (its calls as they stood, taken to a ready trigger and to the one job, from the start whose kit wrote them: of the
