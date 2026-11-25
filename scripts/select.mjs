@@ -255,10 +255,10 @@ async function main(argv) {
   const now = config ? standing(config) : null, failed = readFailed(opts["--failed"]);
   const s = await chosen({ config, at, base, passed: opts["--passed"], select: from => selectedFrom(from, { now, config, failed }) });
   // (a name the variable cannot hold as one word, a space or a line's end in it, runs the whole suite: no file's name
-  // sets another variable for the steps after it)
+  // sets another variable for later steps)
   if (!s.all && s.tests.some(t => !PLAIN.test(t))) Object.assign(s, { all: true, why: "a test's file name holds what a list of names cannot (a space or a line's end)" });
   const lines = said(s, now ? now.tests.size : "all its");
-  console.log(lines.map(asText).join("\n")); // (each as text alone: a file's name in it is the pull request's; #1348)
+  console.log(lines.map(asText).join("\n"));
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
   // (nothing selected is "none", as everything is "all": a runner given an empty list would run every test)
   if (opts["--env"]) fs.appendFileSync(process.env.GITHUB_ENV, `${opts["--env"]}=${s.all ? "all" : s.none ? "none" : ` ${s.tests.join(" ")} `}\n`);

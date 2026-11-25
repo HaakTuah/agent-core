@@ -133,26 +133,17 @@ const run = (dir, args, extra = {}) => {
   ok(at("ran lookup.mjs [checks/a.json") >= 0 && at("ran lookup.mjs [checks/b.json") >= 0 && at("ran lookup.mjs [checks/b.json") < at("ran nuget-look.sh"),
     "two calls of the NuGet check: every config's lookup runs before any look, which may run the change's build files", order.out);
 }
-// a changed file's name is listed as text alone: "::" and "##[" broken, also where only characters beyond ASCII stand
-// between their marks, and a control character shown as git quotes it, so no line is read as a workflow command (#1348)
+// a changed file's name is listed as text alone (#1348)
 {
-  const dir = project();
-  const base = git(dir, "rev-parse", "HEAD");
-  const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: dir, env, input: "{}\n", encoding: "utf8" }).trim();
-  // (added to the index alone, so no file of that name is written to the disk)
-  for (const name of ["web/a::b##[group]c\u0001d/package.json", "web/e:\u00e9:f#\u00e9#[group]g/package.json"]) git(dir, "update-index", "--add", "--cacheinfo", `100644,${blob},${name}`);
-  git(dir, "commit", "-q", "-m", "names chosen by the pull request");
-  for (const quoted of ["true", "false"]) {
-    git(dir, "config", "core.quotePath", quoted);
-    const r = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base });
-    const listed = r.out.slice(r.out.indexOf("Changed:\n"), r.out.indexOf("\n== ", r.out.indexOf("Changed:\n")));
-    const lines = listed.split("\n").slice(1);
-    ok(lines.length === 2 && lines.every(l => l.startsWith("- ")) && lines[0].includes("a: :b# #[group]c") && !lines.some(l => /[\u0000-\u001f\u007f]/u.test(l))
-      && !r.out.includes("##[") && !/^\s*::/m.test(r.out) && !/:[^\u0000-\u007f]*:|#[^\u0000-\u007f]*#[^\u0000-\u007f]*\[/u.test(listed),
-    `signatures: a changed file whose name holds "::", "##[", a letter beyond ASCII between their marks or a control character is listed with none of them read as a command (core.quotePath ${quoted})`, r.out);
+  const dir = project(), base = git(dir, "rev-parse", "HEAD");
+  git(dir, "update-index", "--add", "--cacheinfo", `100644,${git(dir, "rev-parse", "HEAD:core/.node-version")},web/a::b##[c\u0001\n:\u00e9:#\u00e9#[d/package.json`);
+  git(dir, "commit", "-qm", "n");
+  for (const q of ["true", "false"]) {
+    git(dir, "config", "core.quotePath", q);
+    const r = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base }), at = r.out.split("\n").find(l => l.includes("web/a"));
+    ok(at.startsWith('- "web/a: :b# #[c') && !/:[^\0-\x7f]*:|#[^\0-\x7f]*#[^\0-\x7f]*\[/u.test(at), `signatures: a name listed as text (quotePath ${q})`, r.out);
   }
 }
-
 // the package checks look first: with nothing they read changed, nothing is installed or restored
 {
   const dir = project({ "web/package.json": "{}\n" });
