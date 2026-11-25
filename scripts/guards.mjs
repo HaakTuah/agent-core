@@ -269,12 +269,13 @@ export function seen(markdown) {
 
 /** A reader's refusal of a text, as every parse error the core prints is worded (#1333): the kind of fault and where it
  *  stands, "<kind> at line L, column C" (each from 1), and never a character of the text itself, so a session opens the
- *  file there and the printout holds nothing the file holds. `at` is the fault's offset in `text`, or { line, col }. */
+ *  file there and the printout holds nothing the file holds. `at` is the fault's offset in `text`, or { line, col }; a
+ *  line ends at CRLF, CR or LF, as V8 counts them. */
 export function parseFault(kind, text, at) {
   let place = at;
   if (typeof at === "number") {
-    const before = String(text).slice(0, Math.max(0, at));
-    place = { line: before.split("\n").length, col: before.length - before.lastIndexOf("\n") };
+    const lines = String(text).slice(0, Math.max(0, at)).split(/\r\n|\r|\n/u);
+    place = { line: lines.length, col: lines.at(-1).length + 1 };
   }
   return new SyntaxError(place ? `${kind} at line ${place.line}, column ${place.col}` : kind);
 }

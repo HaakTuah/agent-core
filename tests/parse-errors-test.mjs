@@ -26,7 +26,8 @@ const said = (read, text) => { try { read(text); return null; } catch (e) { retu
 const JSON_CASES = [
   [`{"a": ${MARK}}`, 1, 7], [`{"key": "${MARK}"`, 1, 18], [`{\n  "a": 1,\n  "b": ${MARK}\n}`, 3, 8], [`["${MARK}" 2]`, 1, 12],
   [`{"${MARK}": 1}x${MARK}`, 1, 15], [`{"a": "${MARK}\u0001"}`, 1, 15], [`﻿{"${MARK}": 1}`, 1, 1], [`[1,\n"${MARK}",`, 2, 11],
-  [`{"a": tru${MARK}}`, 1, 10], [`{"a": -${MARK}}`, 1, 8],
+  [`{"a": tru${MARK}}`, 1, 10], [`{"a": -${MARK}}`, 1, 8], [`{\r"${MARK}" 1}`, 2, 11], [`{\r\n"${MARK}" 1}`, 2, 11],
+  [`{\r\r\n"${MARK}" 1}`, 3, 11], [`[1,\r${MARK}]`, 2, 1],
 ];
 for (const [text, line, col] of JSON_CASES) {
   const m = said(parseBounded, text);
@@ -38,7 +39,7 @@ ok(JSON.stringify(parseBounded(`{"a":[1,"${MARK}"]}`)) === `{"a":[1,"${MARK}"]}`
 // (where V8 names a character and no offset, the place is found by parsing the text's starts: it is the first of them
 // that fails other than by ending early, for any text)
 {
-  const signs = "{}[]:,\"tfnrue01-.eE \\\n";
+  const signs = "{}[]:,\"tfnrue01-.eE \\\n\r";
   let wrong = null;
   for (let i = 0; i < 4000 && !wrong; i++) {
     let s = "";
@@ -49,11 +50,27 @@ ok(JSON.stringify(parseBounded(`{"a":[1,"${MARK}"]}`)) === `{"a":[1,"${MARK}"]}`
     for (; k <= s.length; k++) {
       try { JSON.parse(s.slice(0, k)); } catch (e) { const at = / at position (\d+)/u.exec(e.message); if (!/^Unexpected end/u.test(e.message) && (!at || Number(at[1]) < k)) break; }
     }
-    const before = s.slice(0, k - 1), place = `at line ${before.split("\n").length}, column ${before.length - before.lastIndexOf("\n")}`;
+    const lines = s.slice(0, k - 1).split(/\r\n|\r|\n/u), place = `at line ${lines.length}, column ${lines.at(-1).length + 1}`;
     const m = said(parseBounded, s);
     if (!m.endsWith(place)) wrong = `${JSON.stringify(s)}: ${m}, not ${place}`;
   }
   ok(!wrong, "where V8 names no offset, the place is the fault's own", wrong ?? "");
+}
+// (where V8 gives a line and column, the place is V8's own, whatever ends its lines: CRLF, CR or LF)
+{
+  const signs = "{}[]:,\"tfn01 \n\r";
+  let wrong = null, seen = 0;
+  for (let i = 0; i < 4000 && !wrong; i++) {
+    let s = "";
+    for (let j = 2 + (i % 14); j > 0; j--) s += signs[(i * 6151 + j * 92821 + j * j * 17) % signs.length];
+    let v8;
+    try { JSON.parse(s); continue; } catch (e) { v8 = /\(line (\d+) column (\d+)\)/u.exec(e.message); }
+    if (!v8 || !/[\r\n]/u.test(s)) continue;
+    seen++;
+    const m = said(parseBounded, s);
+    if (!m.endsWith(`at line ${v8[1]}, column ${v8[2]}`)) wrong = `${JSON.stringify(s)}: ${m}, not line ${v8[1]} column ${v8[2]}`;
+  }
+  ok(!wrong && seen > 100, `where V8 gives a line and column, the place is V8's own (${seen} texts with line breaks)`, wrong ?? seen);
 }
 
 for (const [text, kind, line, col] of [
