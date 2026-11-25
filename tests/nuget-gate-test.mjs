@@ -173,11 +173,11 @@ mkdir -p "$dir/obj" "$COPY/obj"
 printf '{"project":{"restore":{"projectPath":"%s/%s"},"frameworks":{}}}' "$PWD" "\${last#./}" > "$dir/obj/project.assets.json"
 printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":{"downloadDependencies":[{"name":"Beside.Lock"}]}}}}' "$PWD" "$COPY" > "$COPY/obj/project.assets.json"
 `, { mode: 0o755 });
-  const atCopy = (copy, at) => {
+  const atCopy = (copy, at, bin = standIn, files = {}) => {
     const dir = path.join(tmp, `copy-${++n}`);
     fs.mkdirSync(dir);
     git(dir, "init", "-q", "-b", "main");
-    for (const [f, text] of Object.entries({ ...START, "core-manifest.md": `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${copy} (never edited here).\n` })) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
+    for (const [f, text] of Object.entries({ ...START, ...files, "core-manifest.md": `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${copy} (never edited here).\n` })) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
     fs.cpSync(path.join(root, "scripts"), path.join(dir, copy, "scripts"), { recursive: true });
     git(dir, "add", "-A");
     git(dir, "commit", "-q", "-m", "base");
@@ -187,7 +187,7 @@ printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":
     git(dir, "commit", "-q", "-m", "a change");
     const output = path.join(tmp, `look-${n}`);
     fs.writeFileSync(output, "");
-    const r = spawnSync("bash", ["-e", `${copy}scripts/nuget-look.sh`], { cwd: dir, encoding: "utf8", env: { ...env, PATH: `${standIn}${path.delimiter}${env.PATH}`, COPY: at, BASE: baseSha, CONFIG: "checks/licences.json",
+    const r = spawnSync("bash", ["-e", `${copy}scripts/nuget-look.sh`], { cwd: dir, encoding: "utf8", env: { ...env, PATH: `${bin}${path.delimiter}${env.PATH}`, COPY: at, BASE: baseSha, CONFIG: "checks/licences.json",
       CALLER: "someone/project/.github/workflows/restore.yml@refs/pull/1/merge", GITHUB_REPOSITORY: "someone/project", CORE_AT: copy, NUGET_PACKAGES: path.join(tmp, `look-packages-${n}`), GITHUB_OUTPUT: output } });
     return { run: r.status === 0 ? /^run=(.*)$/m.exec(fs.readFileSync(output, "utf8"))?.[1]?.trim() : undefined, out: `${r.stdout}${r.stderr}` };
   };
@@ -198,26 +198,8 @@ printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":
 
   // a project file whose path starts with "::" or holds "##[" is named broken in each failure line, as NuGet's own output
   // is: a stand-in for dotnet whose restore fails, with no error named and with one NuGet names
-  const named = (dotnet, name) => {
-    const bin = path.join(tmp, `fails-${++n}`), dir = path.join(tmp, `named-${n}`), output = path.join(tmp, `look-${n}`);
-    fs.mkdirSync(bin);
-    fs.writeFileSync(path.join(bin, "dotnet"), `#!/bin/sh\n${dotnet}\nexit 1\n`, { mode: 0o755 });
-    fs.mkdirSync(dir);
-    git(dir, "init", "-q", "-b", "main");
-    for (const [f, text] of Object.entries({ ...START, [name]: project() })) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
-    fs.cpSync(path.join(root, "scripts"), path.join(dir, "core/scripts"), { recursive: true });
-    git(dir, "add", "-A");
-    git(dir, "commit", "-q", "-m", "base");
-    const baseSha = git(dir, "rev-parse", "HEAD");
-    fs.writeFileSync(path.join(dir, "README.md"), "# A project\n\nMore.\n");
-    git(dir, "add", "-A");
-    git(dir, "commit", "-q", "-m", "a change");
-    fs.writeFileSync(output, "");
-    const r = spawnSync("bash", ["-e", "core/scripts/nuget-look.sh"], { cwd: dir, encoding: "utf8", env: { ...env, PATH: `${bin}${path.delimiter}${env.PATH}`, BASE: baseSha, CONFIG: "checks/licences.json",
-      CALLER: "", GITHUB_REPOSITORY: "someone/project", CORE_AT: "core/", NUGET_PACKAGES: path.join(tmp, `look-packages-${n}`), GITHUB_OUTPUT: output } });
-    return `${r.stdout}${r.stderr}`;
-  };
-  const unnamed = named("", "::error::x/App.csproj"), coded = named('echo "error NU1004: the lock file"', "src/##[group]x/App.csproj");
+  const failing = said => { const bin = path.join(tmp, `fails-${++n}`); fs.mkdirSync(bin); fs.writeFileSync(path.join(bin, "dotnet"), `#!/bin/sh\n${said}\nexit 1\n`, { mode: 0o755 }); return bin; };
+  const unnamed = atCopy("core/", "core/", failing(""), { "::error::x/App.csproj": project() }).out, coded = atCopy("core/", "core/", failing('echo "error NU1004: the lock file"'), { "src/##[group]x/App.csproj": project() }).out;
   ok(unnamed.includes(": :error: :x/App.csproj: the restore failed with no error NuGet names") && !/^\s*::/m.test(unnamed), "a project file's path that starts with \"::\" is broken where the restore fails with no error named", unnamed);
   ok(coded.includes("src/# #[group]x/App.csproj: error NU1004") && !coded.includes("##["), "and one that holds \"##[\" is broken where it fails with an error NuGet names", coded);
 }
