@@ -11,8 +11,7 @@
 import { execFileSync } from "node:child_process";
 import { posix } from "node:path";
 import { copyOf } from "./core-path.mjs";
-
-const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
+import { LOCKFILE } from "./licence-scan.mjs";
 
 // (a path of the config's "scan" holds a file where it is that file, or a folder ending in "/" above it, as the scan reads it)
 const under = (f, paths) => (paths ?? []).some((p) => p === "" || p === f || (p.endsWith("/") && f.startsWith(p)));
