@@ -10,8 +10,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseBounded } from "../scripts/guards.mjs";
+import { SEEK, parseBounded } from "../scripts/guards.mjs";
 import { load } from "../scripts/parser.mjs";
+import { LARGEST, budgetOf, parseWithin } from "../scripts/tree-walk.mjs";
 import { parseToml } from "../scripts/toml.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
 
@@ -38,6 +39,15 @@ for (const [text, line, col] of JSON_CASES) {
 ok(said(parseBounded, "") === "unexpected end of input at line 1, column 1", "an empty text is refused as one that ends early", said(parseBounded, ""));
 ok(/^it nests deeper than \d+ objects and lists$/u.test(said(parseBounded, "[".repeat(300) + "]".repeat(300))), "a text nested too deep is still refused so");
 ok(JSON.stringify(parseBounded(`{"a":[1,"${MARK}"]}`)) === `{"a":[1,"${MARK}"]}`, "JSON is read as JSON.parse reads it");
+// (a long text whose fault V8 gives no offset for answers in about the time of one parse, the place not sought, and
+// one of SEEK characters still has its place)
+{
+  const long = n => `[${'"a",'.repeat(Math.ceil(n / 4))}${MARK}]`;
+  const start = performance.now(), m = said(parseBounded, long(4 * SEEK)), took = performance.now() - start;
+  ok(m === `unexpected character, its place not sought in a text past ${SEEK} characters` && took < 5000, `a text past SEEK is refused by its kind alone, in ${Math.round(took)} ms`, m);
+  const text = long(SEEK - 20), at = text.length - MARK.length;
+  ok(text.length <= SEEK && said(parseBounded, text) === `unexpected character at line 1, column ${at}`, "a text of SEEK characters at most has its place", said(parseBounded, text));
+}
 // (where V8 names a character and no offset, the place is found by parsing the text's starts: it is the first of them
 // that fails other than by ending early, for any text)
 {
@@ -133,7 +143,9 @@ const found = [], calls = { raw: 0 };
 for (const file of files) {
   const src = fs.readFileSync(path.join(root, file), "utf8");
   if (!src.includes("JSON.parse")) continue;
-  const tree = parser.parse("javascript", src);
+  // (with the limits the core reads any JavaScript in: a file past them is not read, and fails here)
+  const tree = src.length > LARGEST.javascript ? null : parseWithin(parser.parse, "javascript", src, budgetOf(src));
+  if (!tree) { found.push(`${file}: too large, or too slow, for the parser to read within the limits of scripts/tree-walk.mjs, so its calls of JSON.parse are not read. Mend: split it into scripts of their own`); continue; }
   const stack = [tree.rootNode];
   while (stack.length) {
     const n = stack.pop();

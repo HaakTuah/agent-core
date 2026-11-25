@@ -286,7 +286,10 @@ const JSON_KIND = /^(?:[A-Za-z -]|'[,:{}[\]]')+$/u;
 // words, so only the end is read)
 const JSON_AT = /(?: in JSON)? at position (\d+)(?: \(line \d+ column \d+\))?$/u;
 // (where V8 names the offending character, and not its offset, the offset is the shortest start of the text that already
-// fails other than by ending early: each shorter one is the start of a JSON text, so it parses, or fails at its end)
+// fails other than by ending early: each shorter one is the start of a JSON text, so it parses, or fails at its end;
+// sought only in a text of SEEK characters at most, since each step parses a start of it again, about 20 parses of the
+// text at SEEK, so a longer text answers in about the time of one parse, its fault's place not given)
+export const SEEK = 1 << 20;
 function jsonFaultAt(text) {
   const failsWithin = k => {
     try { JSON.parse(text.slice(0, k)); return false; } catch (e) {
@@ -309,6 +312,7 @@ export function parseBounded(text) {
     const s = String(text), m = String(e.message), at = JSON_AT.exec(m), words = at ? m.slice(0, at.index) : "";
     if (/^Unexpected end of JSON input/u.test(m)) throw parseFault("unexpected end of input", s, s.length);
     const kind = /^Unexpected token/u.test(m) ? "unexpected character" : JSON_KIND.test(words) ? words[0].toLowerCase() + words.slice(1) : "not valid JSON";
+    if (!at && s.length > SEEK) throw parseFault(`${kind}, its place not sought in a text past ${SEEK} characters`, s, null);
     throw parseFault(kind, s, at ? Number(at[1]) : jsonFaultAt(s));
   }
   if (tooDeep(value)) throw new SyntaxError(`it nests deeper than ${DEEPEST} objects and lists`);
