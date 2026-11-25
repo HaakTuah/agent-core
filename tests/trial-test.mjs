@@ -203,7 +203,7 @@ jobs:
   const sideSaid = [];
   const sayer = { way: (part, text) => sideSaid.push(["way", part, text]), unread: (part, text) => sideSaid.push(["unread", part, text]) };
   const side = sideOf(project, "core/", bare, { pin: unreleased, main: "HEAD" }, sayer);
-  ok(side === null && sideSaid.length === 1 && sideSaid[0][0] === "unread" && /not yet a release: in a release's trial .*nothing is to be done/u.test(sideSaid[0][2]), "a sync to a commit of main past the newest release, as a trial makes, is said to need nothing in a trial, and is counted neither way (#1245, point 7)", JSON.stringify(sideSaid));
+  ok(side === null && sideSaid.length === 1 && sideSaid[0][0] === "unread" && /not yet a release: in a release's trial .*pure-sync\.mjs --trial [0-9a-f]{40}`.*nothing else is to be done/u.test(sideSaid[0][2]), "a sync to a commit of main past the newest release, as a trial makes, is said to need nothing in a trial, and is counted neither way (#1245, point 7)", JSON.stringify(sideSaid));
   ok(sideOf(project, "core/", bare, { pin: released, main: "HEAD" }, sayer) === released, "  and a sync to a release runs from that release");
 }
 done("check.mjs as a release's trial runs it");

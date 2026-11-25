@@ -191,7 +191,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   after (the release's, which stops the cut), or ran before and could not be read after, or could not be read before
   and failed after (not measured, which stops it too; #1257), or ran before and was stopped behind a failure or not
   run after (which stops it too, the trial run again once what stopped it is mended), or ran or was read in neither run
-  (which stops nothing); it records the counts alone (`node scripts/release.mjs --trial`) in a pull
+  (which stops nothing); the sync is read pure or not against the release's commit by floor rule 8's proof
+  (`scripts/pure-sync.mjs --trial <the commit>`, a reading that stops nothing and proves no merge; #1261); it records
+  the counts alone, with the release each run before started from (`node scripts/release.mjs --trial`), in a pull
   request of its own. Another owner's project has its own code run only where no sign-in or key of the owner's is held
   (floor rule 18). The one condition that changes it: no such project allows a trial; the record says so, and so does
   the release. It does not mean that a project is written to, that its private code leaves it, or that it is named

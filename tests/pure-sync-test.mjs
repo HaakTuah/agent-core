@@ -134,10 +134,10 @@ ok(entries(git(p, "rev-parse", "HEAD:core"), path.join(p, ".git")) === entries(c
 const GH_ORIGIN = "https://github.com/someone/project.git", event = path.join(tmp, "event.json");
 fs.writeFileSync(event, JSON.stringify({ repository: { full_name: "someone/project", private: false } }));
 git(p, "config", `url.${slash(origin)}.insteadOf`, GH_ORIGIN);
-const pure = () => {
+const pure = (...args) => {
   git(p, "remote", "set-url", "origin", GH_ORIGIN);
   try {
-    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs"), ...args], { cwd: p, env: { ...env, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
     return { status: r.status, out: `${r.stdout}${r.stderr}` };
   } finally { git(p, "remote", "set-url", "origin", origin); }
 };
@@ -473,8 +473,21 @@ git(p, "checkout", "-q", "-B", "unreleased", other);
 const toC = node(p, "core/scripts/sync.mjs", C);
 git(p, "add", "-A"); git(p, "commit", "-q", "-m", "to C");
 const unreleased = pure();
-ok(toC.status === 0 && read(p, "core-manifest.md") === manifest("someone-else", C) && unreleased.status === 1 && unreleased.out.includes(`${C} is no release of the core: the sync is reviewed like any PR`) && unreleased.out.includes(`node core/scripts/sync.mjs ${B}\` (release-2, the newest)`) && /not yet a release, and nothing/.test(unreleased.out),
-  "a sync to a commit no release, where the releases are followed, is no pure sync: it is reviewed, or made again at the newest release, and in a trial needs nothing", `${toC.out}\n${unreleased.out}`);
+ok(toC.status === 0 && read(p, "core-manifest.md") === manifest("someone-else", C) && unreleased.status === 1 && unreleased.out.includes(`${C} is no release of the core: the sync is reviewed like any PR`) && unreleased.out.includes(`node core/scripts/sync.mjs ${B}\` (release-2, the newest)`) && unreleased.out.includes(`ask the trial's reading instead, \`--trial ${C}\``),
+  "a sync to a commit no release, where the releases are followed, is no pure sync: it is reviewed, or made again at the newest release, and in a trial asks the trial's reading", `${toC.out}\n${unreleased.out}`);
+// (a release's trial asks the same proof against the commit it tries, as a reading: it reads that commit as the release
+// it is to be, prints no head to merge and never exits 0, so nothing that waits on the proof takes it for one; #1261)
+const answer = out => { const m = /^trial answer: (.*)$/mu.exec(out); try { return m && JSON.parse(m[1]); } catch { return null; } };
+const triedC = pure("--trial", C);
+ok(triedC.status === 1 && triedC.out.includes(`a pure sync against the commit tried, ${C}: a trial's reading, which proves no merge`) && !triedC.out.includes("sha=") && !triedC.out.includes("NOT PURE")
+  && JSON.stringify(answer(triedC.out)) === JSON.stringify({ commit: C, pure: true, from: "release-1" }),
+  "  a trial's reading against the commit tried finds the same sync pure, names the release main's copy stood at, and gives no head to merge", triedC.out);
+const triedB = pure("--trial", B);
+ok(triedB.status === 1 && triedB.out.includes(`moves the copy to ${C}, not to the commit tried, ${B}`) && answer(triedB.out)?.pure === false && answer(triedB.out)?.commit === B,
+  "  a trial's reading against another commit than the sync's is not pure", triedB.out);
+const triedName = pure("--trial", "main"), triedMore = pure("--trial", C, "--merge");
+ok([triedName, triedMore].every(r => r.status === 2 && !/^a pure sync/mu.test(r.out) && !r.out.includes("sha=") && answer(r.out) === null),
+  "  and one that names no full SHA, or more than it, is refused before anything is read", `${triedName.out}\n${triedMore.out}`);
 // (and a manifest that does not say what it follows, two rows of it, is read as following nothing: no sync to a commit
 // that is no release is pure there either)
 git(p, "checkout", "-q", "-B", "unclear", other);
