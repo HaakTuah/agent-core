@@ -21,8 +21,9 @@ const ANY_CASE = new RegExp(LOCKFILE.source, "iu");
 // (a path of the config's "scan" holds a file where it is that file, or a folder ending in "/" above it, as the scan reads it)
 const under = (f, paths) => (paths ?? []).some((p) => p === "" || p === f || (p.endsWith("/") && f.startsWith(p)));
 
+// (512 MiB of paths, some 5,000,000 files, near the longest text Node holds, so no project's list overruns it)
 const listed = (root, args) => {
-  try { return execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean); } catch { return null; }
+  try { return execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 1 << 29, stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean); } catch { return null; }
 };
 
 /** The tracked files of the project at `root` (git ls-files), or null where git lists none there. */
@@ -32,7 +33,7 @@ export const trackedIn = (root) => listed(root, ["ls-files", "-z"]);
  *  that `then` (the base's config, normalised) did not name. Where the base's tree cannot be listed, none stood. */
 export function stoodAt(root, base, then) {
   const files = new Set((base && listed(root, ["ls-tree", "-r", "-z", "--name-only", base, "--"])) ?? []);
-  const named = new Set(then?.lockfiles ?? []);
+  const named = new Set(Array.isArray(then?.lockfiles) ? then.lockfiles : []);
   return (f) => files.has(f) && !named.has(f);
 }
 
@@ -42,11 +43,11 @@ function unlisted(base) {
   return base ? { failures: [`${said}. Mend: run the check in the project's git checkout, as the licence workflow does`], reports: [] } : { failures: [], reports: [`${said}. Mend: run the check in the project's git checkout`] };
 }
 
-/** Whether `f` is no lock file of npm's for this check: no such name, one `named` holds with its twin, one of the
+/** Whether `f` is no lock file of npm's for this check: no such name, one `named` holds or, of npm's own case, its twin, one of the
  *  core's copy at `copy` (or null), or one the config's scan reads. */
 function leftOut(f, named, copy, config) {
   const twin = posix.join(posix.dirname(f), posix.basename(f) === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json");
-  if (!ANY_CASE.test(f) || named.has(f) || named.has(twin)) return true;
+  if (!ANY_CASE.test(f) || named.has(f) || (LOCKFILE.test(f) && named.has(twin))) return true;
   if (copy !== null && f.startsWith(copy)) return true;
   return Boolean(config.scan) && LOCKFILE.test(f) && !under(f, config.scan.skip);
 }

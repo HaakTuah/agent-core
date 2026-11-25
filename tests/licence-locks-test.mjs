@@ -52,12 +52,19 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
     "where the config scans, a lock file the scan reads is left to it, and one it skips or whose name differs only in case is said", JSON.stringify(r));
 }
 
+// a name that differs from npm's only in case is no twin of a named lock file, which the check reads by npm's own name
+{
+  const r = unnamedLocks(".", ["app/npm-shrinkwrap.json", "app/Package-Lock.json", "app/package-lock.json"], { ships: [], lockfiles: ["app/npm-shrinkwrap.json"] }, "HEAD^1", () => false);
+  ok(r.failures.length === 1 && says(r.failures, "app/Package-Lock.json").length === 1, "a lock file whose name differs only in case is said beside a named shrinkwrap file, whose twin of npm's own name is left to the check", JSON.stringify(r));
+}
+
 // what stood: a file of the base's tree, never a folder at that path, that the base's config did not name
 {
   const core = fileURLToPath(new URL("..", import.meta.url));
   const unnamed = stoodAt(core, "HEAD", { lockfiles: [] }), named = stoodAt(core, "HEAD", { lockfiles: [".packages/package-lock.json"] });
-  ok(unnamed(".packages/package-lock.json") && !named(".packages/package-lock.json") && !unnamed("scripts") && !stoodAt(core, null, null)(".packages/package-lock.json") && !stoodAt(core, "refs/heads/no-such-base", null)(".packages/package-lock.json"),
-    "a lock file stood where the base's tree held it as a file its config did not name; a folder, a name the base's config held, no base and a base that cannot be read are none");
+  ok(unnamed(".packages/package-lock.json") && !named(".packages/package-lock.json") && !unnamed("scripts") && !stoodAt(core, null, null)(".packages/package-lock.json") && !stoodAt(core, "refs/heads/no-such-base", null)(".packages/package-lock.json")
+    && stoodAt(core, "HEAD", { lockfiles: { a: 1 } })(".packages/package-lock.json") && stoodAt(core, "HEAD", { lockfiles: 7 })(".packages/package-lock.json"),
+    "a lock file stood where the base's tree held it as a file its config did not name; a folder, a name the base's config held, no base and a base that cannot be read are none, and a base's config whose list is of another form names none");
 }
 
 // where git lists nothing, it says so, failing a pull request and nothing else; the check gives its failures and reports
