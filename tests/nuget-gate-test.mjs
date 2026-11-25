@@ -152,6 +152,12 @@ if (sdk) {
   ok(!stale.passed && /NU1004/.test(stale.out) && /A restore from a lock file failed .*\. Mend: /.test(stale.out) && mended(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
 }
 
+// a changed file whose name holds "##[" is listed broken, behind its dash
+{
+  const r = gate({ "src/##[group]x/App.csproj": project() });
+  ok(r.run === "true" && r.out.includes("- src/# #[group]x/App.csproj") && !r.out.includes("##["), "a changed file whose name holds \"##[\" is listed with it broken", r.out);
+}
+
 // the second look, where the copy of the core stands at another path than core/ (#918): the restore's own records are read
 // outside the copy, at the path the caller gives (CORE_AT), whatever the copy holds. A stand-in for dotnet writes one for
 // the project and, inside the copy, one that downloads a package beside a lock file, which only a look that reads the
@@ -167,11 +173,11 @@ mkdir -p "$dir/obj" "$COPY/obj"
 printf '{"project":{"restore":{"projectPath":"%s/%s"},"frameworks":{}}}' "$PWD" "\${last#./}" > "$dir/obj/project.assets.json"
 printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":{"downloadDependencies":[{"name":"Beside.Lock"}]}}}}' "$PWD" "$COPY" > "$COPY/obj/project.assets.json"
 `, { mode: 0o755 });
-  const atCopy = (copy, at) => {
+  const atCopy = (copy, at, bin = standIn, files = {}) => {
     const dir = path.join(tmp, `copy-${++n}`);
     fs.mkdirSync(dir);
     git(dir, "init", "-q", "-b", "main");
-    for (const [f, text] of Object.entries({ ...START, "core-manifest.md": `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${copy} (never edited here).\n` })) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
+    for (const [f, text] of Object.entries({ ...START, ...files, "core-manifest.md": `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${copy} (never edited here).\n` })) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
     fs.cpSync(path.join(root, "scripts"), path.join(dir, copy, "scripts"), { recursive: true });
     git(dir, "add", "-A");
     git(dir, "commit", "-q", "-m", "base");
@@ -181,7 +187,7 @@ printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":
     git(dir, "commit", "-q", "-m", "a change");
     const output = path.join(tmp, `look-${n}`);
     fs.writeFileSync(output, "");
-    const r = spawnSync("bash", ["-e", `${copy}scripts/nuget-look.sh`], { cwd: dir, encoding: "utf8", env: { ...env, PATH: `${standIn}${path.delimiter}${env.PATH}`, COPY: at, BASE: baseSha, CONFIG: "checks/licences.json",
+    const r = spawnSync("bash", ["-e", `${copy}scripts/nuget-look.sh`], { cwd: dir, encoding: "utf8", env: { ...env, PATH: `${bin}${path.delimiter}${env.PATH}`, COPY: at, BASE: baseSha, CONFIG: "checks/licences.json",
       CALLER: "someone/project/.github/workflows/restore.yml@refs/pull/1/merge", GITHUB_REPOSITORY: "someone/project", CORE_AT: copy, NUGET_PACKAGES: path.join(tmp, `look-packages-${n}`), GITHUB_OUTPUT: output } });
     return { run: r.status === 0 ? /^run=(.*)$/m.exec(fs.readFileSync(output, "utf8"))?.[1]?.trim() : undefined, out: `${r.stdout}${r.stderr}` };
   };
@@ -189,6 +195,13 @@ printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":
   ok(vendor.run === "false" && deeper.run === "false" && usual.run === "false", "the restore's records inside the copy of the core, at core/ or at the path the caller gives, are no project's own: the look says no restore", [vendor, deeper, usual].map(r => r.out).join("\n"));
   const elsewhere = atCopy("vendor/core/", "vendor/other/");
   ok(elsewhere.run === "true", "and a record in a folder that is not the copy still makes it run", elsewhere.out);
+
+  // a project file whose path starts with "::" or holds "##[" is named broken in each failure line, as NuGet's own output
+  // is: a stand-in for dotnet whose restore fails, with no error named and with one NuGet names
+  const failing = said => { const bin = path.join(tmp, `fails-${++n}`); fs.mkdirSync(bin); fs.writeFileSync(path.join(bin, "dotnet"), `#!/bin/sh\n${said}\nexit 1\n`, { mode: 0o755 }); return bin; };
+  const unnamed = atCopy("core/", "core/", failing(""), { "::error::x/App.csproj": project() }).out, coded = atCopy("core/", "core/", failing('echo "error NU1004: the lock file"'), { "src/##[group]x/App.csproj": project() }).out;
+  ok(unnamed.includes(": :error: :x/App.csproj: the restore failed with no error NuGet names") && !/^\s*::/m.test(unnamed), "a project file's path that starts with \"::\" is broken where the restore fails with no error named", unnamed);
+  ok(coded.includes("src/# #[group]x/App.csproj: error NU1004") && !coded.includes("##["), "and one that holds \"##[\" is broken where it fails with an error NuGet names", coded);
 }
 
 done("the NuGet check's own steps");
