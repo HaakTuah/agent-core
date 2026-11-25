@@ -164,16 +164,6 @@ const run = (dir, args, extra = {}) => {
   const advised = run(dir, ["nuget", "--nuget", "checks/licences.json", "--advisory"], { BASE_SHA: base });
   ok(advised.status === 0 && /Advisory: nothing fails for it yet/.test(advised.out), "where advisory, it fails nothing", advised.out);
   fs.rmSync(path.join(dir, "fails.txt"));
-  // (as the core's workflows give it on a pull request (#1231): --base HEAD^1, the first parent of the merge the checkout
-  // holds, read as that commit, with no BASE_SHA)
-  const tip = git(dir, "rev-parse", "HEAD");
-  git(dir, "checkout", "-q", "--detach", base);
-  git(dir, "merge", "-q", "--no-ff", "-m", "the merge a pull request's run checks out", tip);
-  const parent = run(dir, ["nuget", "--nuget", "checks/licences.json", "--base", "HEAD^1"]);
-  ok(parent.status === 0 && new RegExp(`^ran nuget-look\\.sh BASE=${base} CONFIG=checks/licences\\.json$`, "m").test(parent.out) && new RegExp(`^ran lookup\\.mjs \\[checks/licences\\.json --nuget\\] .*LOOKUP_BASE=${base}`, "m").test(parent.out),
-    "nuget: --base HEAD^1 on a merge gives the look and the lookup its first parent, the base, as a commit", parent.out);
-  const signed = run(dir, ["signatures", "--signatures", "web", "--base", "HEAD^1"]);
-  ok(signed.status === 0 && /nothing to verify/.test(signed.out) && !/^== Install/m.test(signed.out), "signatures: --base HEAD^1 on a merge reads the change against its first parent, the base", signed.out);
 }
 // the signature check's install, under an npm that reads none of --allow-git, --allow-remote and --allow-file (npm 10,
 // which Node 22 brings, and npm 11 before 11.15.0, since 11.14 refuses the registry's own packages under --allow-remote=none), installs nothing and fails saying the mend, since that npm would

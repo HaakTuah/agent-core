@@ -10,7 +10,6 @@ import { readable } from "../scripts/licence-yes.mjs";
 import { installed } from "../scripts/packages.mjs";
 import { keysOf } from "../scripts/schemas.mjs";
 import { actionLists, alongside, coreConfig, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
-import { namedBase } from "../scripts/lookup.mjs";
 import { execFileSync } from "node:child_process";
 import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -258,17 +257,6 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
     ok(!none.failed && /no base to read it against: reported, never failed/u.test(none.out) && /^::warning::The lookup of the packages new to the project did not run/mu.test(none.out) && !/^FAIL/mu.test(none.out),
       "where the job names no base and its checkout holds none, a range is reported, never failed, beside the lookup's warning", none.out);
     ok(lacking.failed && /^FAIL: the lookup of the packages new to the project cannot run: the job names the pull request's base \(LOOKUP_BASE\), and its checkout does not hold that commit\. Mend: /mu.test(lacking.out), "a base the job names that its checkout does not hold fails the lookup, saying its mend", lacking.out);
-    // (HEAD^1, as the core's workflows name it (#1231), is the base only where HEAD is a merge: on the head alone it would
-    // be the pull request's own earlier commit, so it fails as a base not held does)
-    const notMerge = await run("HEAD^1");
-    ok(notMerge.failed && /^FAIL: the lookup of the packages new to the project cannot run: the job names the pull request's base \(LOOKUP_BASE\)/mu.test(notMerge.out), "HEAD^1 named on a checkout that is no merge fails the lookup as a base not held, saying its mend", notMerge.out);
-    const head = git("rev-parse", "HEAD");
-    git("checkout", "-q", "--detach", base); git("merge", "-q", "--no-ff", "-m", "merge", head);
-    process.env.LOOKUP_BASE = "HEAD^1";
-    ok(namedBase(dir) === base, "HEAD^1 named on a merge is read as its first parent, the base, as a commit", namedBase(dir));
-    const merged = await run("HEAD^1");
-    ok(!merged.failed && /stood so at the pull request's base: reported, never failed/u.test(merged.out) && !/^FAIL/mu.test(merged.out), "on a merge, HEAD^1 named reads the range that stood at the base as reported, never failed", merged.out);
-    for (const other of ["HEAD^2", "HEAD~1", "--all", "main"]) { process.env.LOOKUP_BASE = other; ok(namedBase(dir) === null, `a base named ${other}, no commit nor HEAD^1, is not taken`); }
   } finally {
     for (const [k, v] of [["GITHUB_EVENT_NAME", was.event], ["LOOKUP_BASE", was.base]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
     rmSync(dir, { recursive: true, force: true });

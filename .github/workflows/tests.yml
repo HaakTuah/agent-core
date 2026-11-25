@@ -520,6 +520,9 @@ jobs:
       - name: The one script of the core's checks without a secret (on Linux; the NuGet check's test runs it on Windows too)
         if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/checks-test.mjs ')) }}
         run: node tests/checks-test.mjs
+      - name: The base the core's workflows name on a pull request, HEAD^1, read by the lookup and the package checks (on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/base-parent-test.mjs ')) }}
+        run: node tests/base-parent-test.mjs
       - name: Where the core's copy stands, as the manifest names it
         if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-path-test.mjs ')) }}
         run: node tests/core-path-test.mjs
