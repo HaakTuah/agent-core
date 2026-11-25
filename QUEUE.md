@@ -8,17 +8,17 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #1307, #1333, #1311, #1313, #1316, #1319, #1322, #1327 | builder; release 7, one PR each | |
-| #1334 | rule builder; release 7 | |
+| #1334 | rule builder; release 8, before its trial | |
 | #1093, with #1090 | rule builder | |
 | #1095, points 2 to 6 | rule builder | #1094 |
-| #1136 to #1140 | builder; release 7, one PR each | |
-| #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 7, one PR each | |
-| #1123 | rule builder; release 7 | #974, #1060 (`roles/adviser.md`) |
-| #1112, #1074, #1073, #1098, #1133 | builder; release 7, one PR each | |
-| #1142 | rule builder; release 7; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md` | |
-| #1180, #1181 | rule builder; release 7, one PR each | |
-| #1182 | rule builder; release 7 | |
-| #1202 | rule builder; release 7; `AGENTS.md` and what every session here reads at its start | #1046 and #1052 (`AGENTS.md`, one at a time) |
+| #1136 to #1140 | builder; release 8, one PR each | |
+| #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 8, one PR each | |
+| #1123 | rule builder; release 8 | #974, #1060 (`roles/adviser.md`) |
+| #1073, #1098, #1133 | builder; release 8, one PR each | |
+| #1142 | rule builder; release 8; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md` | |
+| #1180, #1181 | rule builder; release 8, one PR each | |
+| #1182 | rule builder; release 8 | |
+| #1202 | rule builder; release 8; `AGENTS.md` and what every session here reads at its start | #1046 and #1052 (`AGENTS.md`, one at a time) |
 | #810 | the orchestrator | the batch's end |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
@@ -53,7 +53,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1046 | rule builder; #767's third kind, `AGENTS.md` | |
 | #1051 | rule builder; each pull request records its own cost | |
 | #1052 | rule builder; `AGENTS.md`, the workflow tries its own settings | #1051 (its point 6); #1046 (`AGENTS.md`, one at a time) |
-| #1185 | rule builder; release 7 | #1052 (its trial of when a builder hands over) |
+| #1185 | rule builder; release 8 | #1052 (its trial of when a builder hands over) |
 | #1060 | rule builder; `roles/adviser.md` | #1052 (its record holds it in part); #974 (`roles/adviser.md`, one at a time) |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
