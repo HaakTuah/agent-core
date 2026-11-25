@@ -107,7 +107,7 @@ ok(seen("``` not a fence `\nshown").includes("shown") && seen("```\nhidden").tri
   // it is cut all the same, and the mend that stands in for it says what to do, then what was cut)
   const lost = ["could not fetch https://registry.npmjs.org. Mend: install @scope/x and run again", "checks/https:shape.json cannot be read. Mend: mail me@example.invalid", `https://${user}:${pass}. Mend: tail@example.invalid/x`];
   const read = lost.map(t => loggedAlone(t));
-  ok(read[0].startsWith("could not fetch https://[cut]scope/x and run again. Mend: take any user or password out of each address shown before \"[cut]\"") && read[1].startsWith("checks/https:[cut]example.invalid. Mend: take "),
+  ok(read[0].startsWith("could not fetch https://[cut]scope/x and run again. Mend: take any user or password out of each address cut at \"[cut]\"") && read[1].startsWith("checks/https:[cut]example.invalid. Mend: take "),
     "a message whose mend the URL standard reads into a sign-in shows where it was cut, and its mend opens with what to do", JSON.stringify(read[0]));
   ok(read.every((r, i) => r.split(". Mend: ").length === 2 && r.split(". Mend: ")[0].replaceAll("[cut]", "") === noSignInWhole(lost[i]) && /were cut where "\[cut\]" stands, the message's own mend with them$/u.test(r) && mended(`FAIL: ${r}`)),
     "it cuts as much as a value cut whole, holds one mend, and says what was cut, a failure that says its mend", JSON.stringify(read.map(r => r.replaceAll(pass, "<pass>"))));

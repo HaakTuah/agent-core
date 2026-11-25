@@ -197,7 +197,7 @@ const cutAlone = value => {
 };
 export const loggedAlone = value => {
   const { cut, took } = cutAlone(value);
-  return logged(took ? `${cut}${MEND}take any user or password out of each address shown before "${CUT}" where the \
+  return logged(took ? `${cut}${MEND}take any user or password out of each address cut at "${CUT}" where the \
 project's files write it with one, and run the check again; where they write none, read this message's own mend in the \
 check's script, found by its words before the address: ${CUT_SAID}` : cut);
 };
