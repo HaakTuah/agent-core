@@ -116,7 +116,7 @@ export function trialAt(sha, git) {
 
 // What the trial cannot measure (#1310): a step of GitHub's own service runs only on a real pull request, so the runs
 // of check.mjs measure none; the core's own tests hold the dependency review's lists over the core's lock files.
-export const BLIND = "GitHub's own services (its dependency review, CodeQL) run only on a real pull request, so the trial measured none of them: the core's own tests hold the dependency review's lists over the core's lock files (tests/licences-test.mjs).";
+export const BLIND = "GitHub's own services (its dependency review, CodeQL) run only on a real pull request, so the trial measured none of them: the core's own tests hold the dependency review's lists over the core's lock files, on every pull request of the core's.";
 
 // What a record in its form says.
 const trialSaid = r => (r.projects === 0
