@@ -15,7 +15,7 @@ import { asOutput, done, ok } from "../scripts/licence-scan-stage.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
-const says = (list, f) => list.filter((m) => m.startsWith(`${f} is an npm lock file the licence config's "lockfiles" does not name`));
+const says = (list, f) => list.filter((m) => m.startsWith(`${f} is a lock file of npm's that the licence config's "lockfiles" does not name`));
 const tracked = ["package.json", "package-lock.json", "app/package-lock.json", "app/npm-shrinkwrap.json", "tools/package-lock.json", "docs/npm-shrinkwrap.json", "mypackage-lock.json", "package-lock.json.bak", "core/package-lock.json"];
 const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.json"] };
 
@@ -25,7 +25,7 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
   const r = unnamedLocks(".", tracked, config, "HEAD^1", (f) => f === "tools/package-lock.json");
   ok(r.failures.length === 2 && says(r.failures, "docs/npm-shrinkwrap.json").length === 1 && says(r.failures, "core/package-lock.json").length === 1
     && mended(asOutput(r.failures)) && r.failures.every((m) => m.includes("the dependency review alone holds them") && m.includes(`Mend: name ${m.slice(0, m.indexOf(" "))} in the config's "lockfiles"`)),
-  "an npm lock file a pull request adds and the config does not name fails, saying its mend", JSON.stringify(r));
+  "a lock file of npm's that a pull request adds and the config does not name fails, saying its mend", JSON.stringify(r));
   ok(r.reports.length === 1 && says(r.reports, "tools/package-lock.json").length === 1 && r.reports[0].includes("it stood so at the pull request's base, so it passes"),
     "one that stood at the base is reported and passes", JSON.stringify(r));
   const none = unnamedLocks(".", tracked, config, null, () => false);

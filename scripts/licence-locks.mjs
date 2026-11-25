@@ -27,7 +27,7 @@ export function trackedIn(root) {
  *  held `f`: { failures, reports }. */
 export function unnamedLocks(root, tracked, config, base, stood) {
   const failures = [], reports = [];
-  if (tracked === null) return { failures, reports: ["the project's npm lock files could not be listed (git lists no tracked file at its root), so none the licence config does not name is said; a lock file it does not name is held by the dependency review alone. Mend: run the check in the project's git checkout"] };
+  if (tracked === null) return { failures, reports: ["the project's lock files of npm's could not be listed (git lists no tracked file at its root), so none the licence config does not name is said; a lock file it does not name is held by the dependency review alone. Mend: run the check in the project's git checkout"] };
   const named = new Set(config.lockfiles ?? []);
   const copy = tracked.includes("core-manifest.md") ? copyOf(root) : null;
   const twin = (f) => posix.join(posix.dirname(f), posix.basename(f) === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json");
@@ -35,7 +35,7 @@ export function unnamedLocks(root, tracked, config, base, stood) {
     if (!LOCKFILE.test(f) || named.has(f) || named.has(twin(f))) continue;
     if (copy !== null && f.startsWith(copy)) continue;
     if (config.scan && !under(f, config.scan.skip)) continue;
-    const said = `${f} is an npm lock file the licence config's "lockfiles" does not name, so this check reads none of its packages and the dependency review alone holds them, by name, to the tools' list`;
+    const said = `${f} is a lock file of npm's that the licence config's "lockfiles" does not name, so this check reads none of its packages and the dependency review alone holds them, by name, to the tools' list`;
     if (base && !stood(f)) failures.push(`${said}. Mend: name ${f} in the config's "lockfiles", and its package.json in "ships" where its packages reach users`);
     else reports.push(`${said}; it stood so ${base ? "at the pull request's base" : "with no base to read it against"}, so it passes: name it in the config's "lockfiles"`);
   }
