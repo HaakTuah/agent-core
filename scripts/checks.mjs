@@ -167,8 +167,15 @@ function runsOf(o, part) {
 // it; the core's workflows give HEAD^1, the merge's first parent, which their checkout holds, since their fetch has no
 // token to sign in with: #674); "" where none is given or it is given empty. Where it cannot be had, it fails, or, given
 // `exits` false, throws that failure's line.
+const gitOk = (args) => { try { execFileSync("git", args, { stdio: "ignore" }); return true; } catch { return false; } };
 function baseCommit(base, exits = true) {
   if (!base) return "";
+  // (HEAD^1 is the base only as the first parent of a merge: on a head alone it is the change's own earlier commit)
+  if (base === "HEAD^1" && !gitOk(["rev-parse", "--verify", "-q", "HEAD^2^{commit}"])) {
+    const what = "--base HEAD^1 is given, and HEAD is no merge: HEAD^1 would be the change's own earlier commit, not its base.", mend = "check out the merge a pull request's run makes with `fetch-depth: 2`, or give the commit the change merges into, such as origin/main after a fetch.";
+    if (exits) fail(what, mend);
+    throw new Error(`FAIL ${what} ${MEND}${mend}`);
+  }
   const at = () => execFileSync("git", ["rev-parse", "--verify", "-q", `${base}^{commit}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   try { return at(); } catch { /* (not here yet) */ }
   const branch = /^origin\/([A-Za-z0-9._/-]+)$/.exec(base)?.[1];

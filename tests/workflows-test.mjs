@@ -591,14 +591,16 @@ exit 1
   const steps = [];
   for (const file of fs.readdirSync(wfDir).filter((f) => /\.ya?ml$/u.test(f))) {
     const wf = parseYaml(fs.readFileSync(path.join(wfDir, file), "utf8"));
-    for (const [jobName, job] of Object.entries(wf?.jobs ?? {})) for (const step of job?.steps ?? []) steps.push({ file, jobName, job, step });
+    for (const [jobName, job] of Object.entries(wf?.jobs ?? {})) for (const step of job?.steps ?? []) steps.push({ file, jobName, job, wf, step });
   }
   const event = "pull_request.base.sha";
-  const fromCheckout = steps.filter(({ job, step }) => {
+  const fromCheckout = steps.filter(({ job, wf, step }) => {
     // (the job's own checkout, of the repository under check, not another it checks out into a folder, as core.yml's of the core)
     const whole = (job.steps ?? []).some((s) => String(s.uses ?? "").startsWith("actions/checkout@") && !s.with?.path && !s.with?.repository && String(s.with?.["fetch-depth"]) === "0");
-    const api = /pr-description\.mjs|checks\.mjs" description|checks\.mjs description/u.test(String(step.run ?? ""));
-    const named = [...Object.entries(step.env ?? {}).filter(([key]) => !(api && key === "BASE_SHA")).map(([, v]) => v), step.run, ...Object.values(step.with ?? {})];
+    // (the exemption is the description check alone: `checks.mjs description` as a whole word, not `description signatures`)
+    const api = /pr-description\.mjs|checks\.mjs"? description(?![\w-])(?!\s+\w)/u.test(String(step.run ?? ""));
+    const envs = [wf.env, job.env, step.env].flatMap((e) => Object.entries(e ?? {}));
+    const named = [...envs.filter(([key]) => !(api && key === "BASE_SHA")).map(([, v]) => v), step.run, ...Object.values(step.with ?? {})];
     return !whole && named.some((v) => String(v ?? "").includes(event));
   }).map(({ file, jobName, step }) => `${file}: ${jobName}: ${step.name ?? step.id}`);
   ok(steps.length > 50 && fromCheckout.length === 0, "no step gives the event's base commit to a check that reads it from a checkout that may not hold it", fromCheckout.join("\n"));
