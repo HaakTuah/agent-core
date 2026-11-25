@@ -470,6 +470,9 @@ function upgrade(p, from, ownChanges, expect) {
   git(p.dir, "checkout", "-q", "main");
   if (trial) baseline.push = verdictsOf(p);
 
+  // (the steps not done before the sync, read as after it: one that stood at the start and was not done then, as a
+  // reading against the core a new project's kit records none of, is no ask of the release's, #1300)
+  const pending = reported(stepsIn(p.dir).out);
   // the sync, as the project's own copy of the release's sync.mjs makes it
   git(p.dir, "checkout", "-q", "-B", "sync", main0);
   const hadFolder = fs.existsSync(path.join(p.dir, "core", FOLDER));
@@ -563,7 +566,8 @@ function upgrade(p, from, ownChanges, expect) {
   }
   if (process.platform !== "win32") { // (the run is GitHub's, on Linux; its script starts gh as a program, which a stand-in on Windows cannot be)
     const daily = checks(p, "schedule", main1);
-    ok(!failures(daily) && started(daily).some(w => w.startsWith("core-moved.yml")), `${p.name}: the daily core-moved run passes`, failures(daily));
+    // (its own core-moved.yml, or, from release 6's kit on, the daily look's job, which runs the core-moved check first)
+    ok(!failures(daily) && started(daily).some(w => /^(core-moved|look)\.yml\//u.test(w)), `${p.name}: the daily core-moved run passes`, failures(daily));
   }
 
   // its own pull requests after the sync: they pass, and start no job they did not start before it
@@ -653,7 +657,7 @@ function upgrade(p, from, ownChanges, expect) {
   const here = stepsIn(p.dir);
   ok(here.status === r.status && here.out === r.out, `${p.name}: the steps read in this process are as the copy's program reads them`, `${r.out}\n---\n${here.out}`);
   const asked = reported(r.out);
-  ok(r.status === 0 && asked.every(lead => added.includes(lead) && STAGES[lead].asked), `${p.name}: after the sync, the steps not done are those the release adds that it asks of every project (${asked.length})`, r.out);
+  ok(r.status === 0 && asked.every(lead => STAGES[lead] && (added.includes(lead) ? STAGES[lead].asked : pending.includes(lead))), `${p.name}: after the sync, the steps not done are those the release adds that it asks of every project, or not done before it (${asked.length})`, r.out);
   const unmended = git(p.dir, "rev-parse", "HEAD");
   for (const lead of asked) STAGES[lead].mend(p.dir);
   if (asked.length) {
@@ -679,7 +683,8 @@ function upgrade(p, from, ownChanges, expect) {
     fs.mkdirSync(path.dirname(path.join(p.dir, file)), { recursive: true });
     fs.copyFileSync(path.join(p.newDir, file), path.join(p.dir, file));
   }
-  git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "made whole as attached.mjs says");
+  // (a project the newest release's kit wrote may lack nothing, so the commit is made only where something was written, #1300)
+  git(p.dir, "add", "-A"); if (git(p.dir, "status", "--porcelain")) git(p.dir, "commit", "-q", "-m", "made whole as attached.mjs says");
   const unmade = a.out;
   a = attached();
   ok(a.status === 0 && a.out.split("\n")[0] === "attached: yes", `${p.name}: synced whole, each step done and each mend made that the verdict named, it reads attached`, `${unmade}\n---\n${a.out}`);
@@ -759,7 +764,10 @@ function asItStood(p) {
   git(p.dir, "checkout", "-q", "main");
   const folded = ["copies.yml", "pr-description.yml", "nuget.yml"].map(f => `.github/workflows/${f}`);
   const had = folded.filter(f => { try { git(p.dir, "cat-file", "-e", `${p.main0}:${f}`); return true; } catch { return false; } });
-  ok(had.length >= 2 && !folded.some(f => fs.existsSync(path.join(p.dir, f))), `${p.name}: the calls its earlier kit wrote that the one job of core.yml folds (${had.length}) are taken out by the sync, as a new project of its kind lacks them`, had.join("\n"));
+  ok((had.length >= 2 || !had.length) && !folded.some(f => fs.existsSync(path.join(p.dir, f))), `${p.name}: the calls its earlier kit wrote that the one job of core.yml folds (${had.length}) are taken out by the sync, as a new project of its kind lacks them`, had.join("\n"));
+  // (a kit that wrote the one job already, release 6's on, wrote none of them: nothing stood to write back, and the
+  // cases that take such calls through their steps have none to take, #1300)
+  if (!had.length) return false;
   // (the calls the cases read, each as the release's own sync left it: as before, its pins moved to the manifest's)
   const pin = /^Core: \S+ at ([0-9a-f]{40}),/m.exec(fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8"))[1];
   for (const f of [...folded, ...["core.yml", "personal-terms.yml", "signatures.yml"].map(w => `.github/workflows/${w}`)]) {
@@ -773,6 +781,7 @@ function asItStood(p) {
   git(p.dir, "add", "-A");
   git(p.dir, "commit", "-q", "-m", "its calls kept as they were");
   git(p.dir, "push", "-q", "origin", "main");
+  return true;
 }
 
 // A private repository's NuGet check bills no job a pull request cannot need (#373): its call with the starter kit's
@@ -939,9 +948,14 @@ function seed(p, eol) {
   fs.rmSync(baseline);
   git(p.dir, "add", "-A");
   const first = node(p.dir, "core/scripts/copies.mjs", "checks/copies.json", "--first");
+  // (a start whose kit wrote the shape check's first baseline, release 6 on, lists the seeded code as standing before
+  // the check came, as its kit lists what stands; an older start's is written by the step that brings the check, #1300)
+  const shapeBaseline = path.join(p.dir, "checks/shape-baseline.json"), shaped = fs.existsSync(shapeBaseline);
+  if (shaped) fs.rmSync(shapeBaseline);
+  const shape = shaped ? node(p.dir, "core/scripts/shape.mjs", "checks/shape.json", "--first") : { status: 0, out: "" };
   git(p.dir, "add", "-A");
-  ok(copied && first.status === 0 && Object.keys(JSON.parse(fs.readFileSync(baseline, "utf8")).windows).length > had && !/`copilot\.md`/.test(fs.readFileSync(manifest, "utf8").split("\n").find(l => l.startsWith("Floor:"))),
-    `${p.name}: seeded with old content of each kind a check reads; the copy is listed in its baseline`, first.out);
+  ok(copied && first.status === 0 && shape.status === 0 && (!shaped || fs.existsSync(shapeBaseline)) && Object.keys(JSON.parse(fs.readFileSync(baseline, "utf8")).windows).length > had && !/`copilot\.md`/.test(fs.readFileSync(manifest, "utf8").split("\n").find(l => l.startsWith("Floor:"))),
+    `${p.name}: seeded with old content of each kind a check reads; the copy is listed in its baseline, and its code in the shape check's where its kit wrote one`, `${first.out}\n${shape.out}`);
 }
 
 // ---- the readers of a project's set-up, read against the tools that define what they read (#629; #593, point 9) ----
@@ -1176,10 +1190,12 @@ for (const tag of starts) {
     (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
       ...(sdk ? [[["nuget.yml", "core.yml"].some(f => ran(results, f, "Restore each project file from its lock file alone")) === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
     readersAgainstTools(dotnetProject); // (and against the .NET SDK, held as Windows holds it)
-    asItStood(dotnetProject);
-    nugetInPrivate(dotnetProject);
+    const stood = asItStood(dotnetProject);
+    if (stood) nugetInPrivate(dotnetProject); // (its NuGet call as it stood, which a kit that wrote the one job never wrote)
     parserUnnamed(dotnetProject);
-    if (tag === starts.at(-1)) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); } // (the kit's calls are the same from either release)
+    // (its calls as they stood, taken to a ready trigger and to the one job, from the start whose kit wrote them: of the
+    // last two releases, only the older's, release 6's kit writing the one job; #1300)
+    if (stood) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); }
   }
 }
 
