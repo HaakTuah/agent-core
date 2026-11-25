@@ -344,9 +344,11 @@ ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[
     && /holds no line/.test(answerOf(`trial answer: ${JSON.stringify({ commit: later, pure: "yes", from: "main" })}`, later).why) && /holds no line/.test(answerOf(`trial answer: ${JSON.stringify({ commit: later, pure: true, from: "my-project" })}`, later).why),
     "the sync's reading is read from what pure-sync.mjs --trial printed: its answer for the commit tried alone, never the proof's lines, a verdict of no form or a copy named otherwise than by the core");
   const noForm = [{ commit: later, projects: "one" }, { ...trialRecord(later, "2026-11-23", []), failedAfter: 2 }, { ...trialRecord(later, "2026-11-23", []), day: "<b>soon</b>" },
-    { ...readings, syncPure: 3 }, { ...readings, syncPure: 1, copiesFrom: { "release-5": 1, main: 1 } }, { ...readings, copiesFrom: { "release-5": 1, main: 1 } }, { ...readings, copiesFrom: { "a project": 3 } }, (({ copiesFrom, ...rest }) => rest)(readings)]
+    { ...readings, syncPure: 3 }, { ...readings, syncPure: 1, copiesFrom: { "release-5": 1, main: 1 } }, { ...readings, copiesFrom: { "release-5": 1, main: 1 } }, { ...readings, copiesFrom: { "a project": 3 } }, { ...readings, copiesFrom: null }, (({ syncPure, syncNotPure, ...rest }) => rest)(readings)]
     .map(bad => trialAt(record(bad), read));
-  ok(noForm.every(n => /no form/.test(n.said) && n.held !== null), "a record in no form holds the cut: a count that is no count, one of no project that counts a check, a day of no form, syncs read more or fewer than its projects, copies that do not add up to them, one named otherwise than by the core, and none at all");
+  ok(noForm.every(n => /no form/.test(n.said) && n.held !== null), "a record in no form holds the cut: a count that is no count, one of no project that counts a check, a day of no form, syncs read more or fewer than its projects, copies that do not add up to them, one named otherwise than by the core, copies of no form, and no syncs' counts at all");
+  const noCopies = trialAt(record((({ copiesFrom, ...rest }) => rest)(readings)), read);
+  ok(!/no form/.test(noCopies.said) && /2 of the syncs pure, 1 not\./.test(noCopies.said), "a record without the copies, data it may leave out, is in its form and says the syncs alone (#1261's design check)", noCopies.said);
   // (a later commit that takes out a file git would read as renamed into the record is still more than the record)
   commit({ "old.json": `${JSON.stringify({ a: 1, b: 2, c: 3, d: 4, e: 5 }, null, 2)}\n` }, "a file like the record");
   const like = git(t, "rev-parse", "HEAD");
