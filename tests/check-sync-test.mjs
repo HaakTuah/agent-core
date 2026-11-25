@@ -13,7 +13,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { proves, syncCalls } from "../scripts/check-calls.mjs";
+import { closing, proves, syncCalls } from "../scripts/check-calls.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { npmRefusal } from "../scripts/npm-reads.mjs";
 import { npmWithCache, scratch, scratchEnv, tally } from "../scripts/scratch-core.mjs";
@@ -102,5 +102,11 @@ r = check(dir, "--base", "before-sync", "--verdicts", refused);
 const refusedAt = JSON.parse(fs.readFileSync(refused, "utf8"));
 ok(r.status === 1 && r.out.includes("it needs npm 11.15.0 or later") && !r.out.includes("so no other check runs") && refusedAt["core.yml/core/core"] === "unrun" && refusedAt["copies.yml/copies/copies"] === "passed" && !Object.values(refusedAt).includes("stopped"),
   "core.yml failed only by the signature check's refusal of this machine's npm, its own steps passed, is unrun and stops no other check", `${r.out}\n${JSON.stringify(refusedAt)}`);
+
+// (#1287: the summary counts the project's own jobs apart from the core's checks, with --own alone)
+const said = [], part = (failed, unrun) => closing({ failed: 2, ran: 5, unrun: 1, own: { failed, ran: 3, unrun } }, l => said.push(l), l => said.push(l));
+part(1, 1); closing({ failed: 0, ran: 5, unrun: 0, own: { failed: 0, ran: 3, unrun: 0 } }, l => said.push(l));
+ok(said[1].endsWith("; of those the project's own: 1 failed, 1 not run, 3 ran)") && said[2].startsWith("ok   every job run here passed (5: ") && said[2].endsWith("; of those the project's own: 0 failed, 0 not run, 3 ran)"),
+  "with --own the summary counts the project's own jobs apart from the core's, those that failed, were not run and ran", said.join("\n"));
 
 done("a sync's calls in the core's checks from plain git");
