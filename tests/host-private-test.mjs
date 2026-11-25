@@ -5,6 +5,7 @@
 // and the clone a folder git reads, written here. Node's own modules.
 //
 //   node tests/host-private-test.mjs
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -96,11 +97,21 @@ const worktree = path.join(tmp, "worktree-git");
 fs.mkdirSync(path.join(worktree), { recursive: true }); fs.writeFileSync(path.join(worktree, "HEAD"), "ref: refs/heads/main\n"); fs.writeFileSync(path.join(worktree, "commondir"), `${elsewhere}\n`);
 fs.mkdirSync(common); fs.writeFileSync(path.join(common, ".git"), `gitdir: ${worktree}\n`);
 let links = true;
-try { fs.mkdirSync(linked); fs.symlinkSync(elsewhere, path.join(linked, ".git"), "dir"); } catch { links = false; }
+const nearLinked = path.join(tmp, "near-linked");
+try { fs.mkdirSync(linked); fs.symlinkSync(elsewhere, path.join(linked, ".git"), "dir"); fs.mkdirSync(nearLinked); fs.symlinkSync(path.join(hosted, ".git"), path.join(nearLinked, ".git"), "dir"); } catch { links = false; }
 const gitDirs = [included, pointed, common, ...(links ? [linked] : [])];
 ok(gitDirs.every(at => /names no repository on github\.com/.test(privateOf(at, { env: {}, ask: notAsked, bare: notAsked }).unread ?? "")),
   `git follows no include of the clone's config, and reads no origin where the clone's .git file, its common folder${links ? " or a link of .git" : ""} names a folder on another machine`,
   gitDirs.map(at => `${path.basename(at)}: ${JSON.stringify(privateOf(at, { env: {}, ask: () => "{}", bare: () => ({}) }))}`).join("; "));
+
+// (a worktree git makes, its .git file naming a folder of a clone on this machine, and a link of .git to one, are read
+// as before: sessions work in worktrees)
+const main = path.join(tmp, "main"), tree = path.join(tmp, "tree"), run = (...args) => spawnSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", ...args], { encoding: "utf8" });
+run("init", "-q", main); run("-C", main, "commit", "-q", "--allow-empty", "-m", "start"); run("-C", main, "remote", "add", "origin", `https://github.com/${repo}.git`); run("-C", main, "worktree", "add", "-q", tree);
+bareRoutes.length = 0;
+const near = [tree, ...(links ? [nearLinked] : [])].map(at => privateOf(at, { env: {}, ask: noGh, bare: bare({ status: 200, private: false }) }).private);
+ok(fs.statSync(path.join(tree, ".git")).isFile() && near.every(v => v === false) && bareRoutes.every(r => r === `repos/${repo}`),
+  `a worktree whose .git file names a clone on this machine${links ? ", and a link of .git to one," : ""} is read as before`, JSON.stringify(near));
 
 // ---- the read with no sign-in itself, its own process run, sent to a proxy that is not there ----
 // (the environment the reader is given, never this process's: here a proxy that is not there, so nothing leaves)
