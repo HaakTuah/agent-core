@@ -98,7 +98,7 @@ const verdictsFile = path.join(tmp, "verdicts.json");
 const without = check(dir);
 r = check(dir, "--own", "--verdicts", verdictsFile);
 const verdicts = JSON.parse(fs.readFileSync(verdictsFile, "utf8"));
-ok(without.status === 0 && !/own\.yml/.test(without.out) && r.status === 1 && /ok {3}own\.yml\/fine/.test(r.out) && /FAIL own\.yml\/broken: its step "echo broken && exit 3" failed/.test(r.out) && /skip own\.yml\/later/.test(r.out) && /FAIL 1 job/.test(r.out) && /of those the project.s own: 1 failed, \d+ not run, \d+ ran/.test(r.out) && !/of those the project.s own/.test(without.out),
+ok(without.status === 0 && !/own\.yml/.test(without.out) && r.status === 1 && /ok {3}own\.yml\/fine/.test(r.out) && /FAIL own\.yml\/broken: its step "echo broken && exit 3" failed/.test(r.out) && /skip own\.yml\/later/.test(r.out) && /FAIL 1 job/.test(r.out) && /of those the project's own: 3 failed, 1 not run, 4 ran\)/.test(r.out) && !/of those the project.s own/.test(without.out),
   "with --own the project's own jobs run too, one failing or not run here failing it, one whose condition does not hold skipped; without it, none", `${without.out}\n${r.out}`);
 ok(/host own\.yml\/deploy: it names an environment/.test(r.out) && !("own.yml/deploy" in verdicts) && verdicts["own.yml/secret"] === "passed",
   "a job of its own that names an environment, which deploys, is the host's own and not run, and its own jobs are given no secret", r.out);
