@@ -81,10 +81,10 @@ function partOf(text, start, colon, count) {
 }
 // (the schemes that end at the ":" at `colon`, tabs and line breaks in it dropped, as the URL standard drops them: a
 // special one where its letters start their part of the run (the run, or the text after a break in it, since a word
-// before a break is no part of an address in a line of text) or follow a sign that is no letter in a part that starts
-// with none ("1https", never "git+https"); and beside it one that is not special, read from where a letter starts the
-// run or follows a break in it ("git+\nhttps", "h\nttps"), as the URL standard reads it from the word's start or a
-// line's: "" where none is. Each name is the end of the run, so at most one is special, and of the run whole, its first
+// before a break is no part of an address in a line of text) or follow only signs that are no letter there ("1https",
+// "-https", never "git+https" or "-ab-https"); and beside it one that is not special, read from the run's first letter,
+// past any sign before it ("-ab-https" as "ab-https"), or from where a letter follows a break in it ("git+\nhttps",
+// "h\nttps"), as the URL standard reads it from the word's start or a line's: "" where none is. Each name is the end of the run, so at most one is special, and of the run whole, its first
 // part after a break and its last, one is not wherever two of them are read; every scheme not special cuts the same)
 function schemeBefore(text, colon) {
   let start = colon, first = -1, last = -1;
@@ -94,17 +94,19 @@ function schemeBefore(text, colon) {
   while (start < colon && dropped(text.charCodeAt(start))) start++;
   const named = from => text.slice(from, colon).replace(/[\t\n\r]/gu, "").toLowerCase();
   const special = specialIn(text, start, colon, named(start));
-  const other = [letter(text.charCodeAt(start)) ? start : -1, first, last].filter(at => at >= 0).map(named)
+  let lead = start;
+  while (lead < colon && !letter(text.charCodeAt(lead))) lead++;
+  const other = [lead < colon ? lead : -1, first, last].filter(at => at >= 0).map(named)
     .find(name => name !== special) ?? "";
   return special && other ? [special, other] : [special || other];
 }
-// (the special scheme the run from `start` to `colon`, read as `name`, ends in, where its letters start their part of
-// the run or follow a sign that is no letter in a part that starts with none: "" where none does)
+// (the special scheme the run from `start` to `colon`, read as `name`, ends in, where no letter stands before its
+// letters in their part of the run, only signs or nothing: "" where none does)
 function specialIn(text, start, colon, name) {
   const special = /(https?|wss?|ftp|file)$/u.exec(name)?.[1] ?? "";
   if (!special) return "";
   const { at, from } = partOf(text, start, colon, special.length);
-  return at === from || (!letter(text.charCodeAt(from)) && !letter(text.charCodeAt(at - 1))) ? special : "";
+  return /[a-z]/iu.test(text.slice(from, at)) ? "" : special;
 }
 // (where the slashes after the ":" at `colon` end, and how many they are: a backslash counted for a special scheme alone,
 // and never one before a quote)
