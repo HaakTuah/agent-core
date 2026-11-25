@@ -1190,9 +1190,12 @@ for (const tag of starts) {
     (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
       ...(sdk ? [[["nuget.yml", "core.yml"].some(f => ran(results, f, "Restore each project file from its lock file alone")) === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
     readersAgainstTools(dotnetProject); // (and against the .NET SDK, held as Windows holds it)
-    if (asItStood(dotnetProject)) nugetInPrivate(dotnetProject); // (its NuGet call as it stood, which a kit that wrote the one job never wrote)
+    const stood = asItStood(dotnetProject);
+    if (stood) nugetInPrivate(dotnetProject); // (its NuGet call as it stood, which a kit that wrote the one job never wrote)
     parserUnnamed(dotnetProject);
-    if (tag === starts.at(-1)) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); } // (the kit's calls are the same from either release)
+    // (its calls as they stood, taken to a ready trigger and to the one job, from the start whose kit wrote them: of the
+    // last two releases, only the older's, release 6's kit writing the one job; #1300)
+    if (stood) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); }
   }
 }
 
