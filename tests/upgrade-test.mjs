@@ -394,6 +394,9 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
     const ws = path.join(tmp, "ws", String(++runs));
     git(tmp, "clone", "-q", "--no-checkout", p.dir, ws);
     git(ws, "checkout", "-q", "--detach", sha);
+    // (on a pull request, the merge of its head into its base that GitHub checks out, refs/pull/N/merge: HEAD^1 the base,
+    // HEAD^2 the head, which the core's workflows read as the base on a pull request: #1231)
+    if (event === "pull_request" && baseSha) { git(ws, "checkout", "-q", "--detach", baseSha); git(ws, "merge", "-q", "--no-ff", "-m", "Merge the pull request", sha); }
     return ws;
   };
   const uses = {

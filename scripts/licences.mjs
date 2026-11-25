@@ -736,14 +736,14 @@ if (started(import.meta.url)) {
 // where the job names a base its checkout lacks, as the core's licences.yml does, which fails as lookup.mjs does.
 export async function alongside(configPath, root) {
   const { report } = await import("./exact-versions.mjs");
-  const { run, namedBase, summarise } = await import("./lookup.mjs");
+  const { run, namedBase, summarise, NAMED_BASE } = await import("./lookup.mjs");
   const at = namedBase(root) ?? baseOf(root);
   const exact = report(resolve(configPath), root, at ? (f) => textAt(root, at, f) : null, !at);
   for (const line of exact.err) console.error(line);
   for (const line of exact.out) console.log(line);
   if (!at && process.env.GITHUB_EVENT_NAME?.startsWith("pull_request")) {
     const mend = "give the job's checkout fetch-depth: 2 (the pull request merged into its base, with both parents)";
-    if (/^[0-9a-f]{40}$/u.test(process.env.LOOKUP_BASE ?? "")) {
+    if (NAMED_BASE.test(process.env.LOOKUP_BASE ?? "")) {
       console.error(`FAIL: the lookup of the packages new to the project cannot run: the job names the pull request's base (LOOKUP_BASE), and its checkout does not hold that commit. Mend: ${mend}`);
       return true;
     }
