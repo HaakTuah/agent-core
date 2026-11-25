@@ -12,6 +12,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { noSignInWhole } from "./guards.mjs";
 import { registryName, registryVersion } from "./licences.mjs";
 import { fetched } from "./lookup.mjs";
 import { ENTRY_FIELDS as FIELDS } from "./packages.mjs";
@@ -61,7 +62,7 @@ export const tooYoung = async (packages, base, ask, now) => {
     if (!k || same(base[k], e)) continue;
     const { fault, name, version } = entryFault(k, e);
     const said = fault ?? registryFault(name, version, e, await ask(name).catch(err => ({ status: err.message })), now);
-    if (said) out.push(said);
+    if (said) out.push(noSignInWhole(said)); // (its key, fields and version as the lock holds them, any sign-in cut out: floor rule 1)
   }
   return out;
 };

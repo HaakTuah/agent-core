@@ -27,7 +27,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync, realpathSync } from "node:fs";
 import path, { posix } from "node:path";
 import { fileURLToPath } from "node:url";
-import { leadsOut, logged, parseBounded } from "./guards.mjs";
+import { leadsOut, logged, loggedAlone, noSignInWhole, parseBounded } from "./guards.mjs";
 import { baseOf, configAt, loadConfig, lockInstalled, registryName, textAt } from "./licences.mjs";
 import { lockPackages, nugetConfig } from "./nuget.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
@@ -43,7 +43,8 @@ const NUGET_PAGES = 100;
 // (a name as npm's registry gives one, an old one in capitals too: at most a scope and a name, nothing an address reads)
 const NPM_NAME = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/iu;
 const KINDS = ["dependencies", "optionalDependencies", "peerDependencies"];
-const said = (value) => logged(String(value).slice(0, 200));
+// (any sign-in cut out before the text is cut short, so an "@" past the cut still ends it: floor rule 1)
+const said = (value) => logged(noSignInWhole(String(value)).slice(0, 200));
 const day = (ms) => new Date(ms).toISOString().slice(0, 10);
 const when = (text) => (typeof text === "string" && /^\d{4}-\d\d-\d\dT/u.test(text) ? Date.parse(text) : NaN);
 
@@ -97,7 +98,8 @@ function source(resolved) {
   if (typeof resolved !== "string" || !resolved) return "no address the lock file names";
   if (/^(?:git\+|git:|github:|gitlab:|bitbucket:)/u.test(resolved)) return "a git address";
   if (resolved.startsWith("file:")) return "a packed file named by its path";
-  const host = /^https?:\/\/([^/:@?#]{1,100})/u.exec(resolved)?.[1];
+  // (the host after any user and password, which are never printed: floor rule 1)
+  const host = /^https?:\/\/(?:[^/\\?#]*@)?([^/\\:@?#]{1,100})/u.exec(resolved)?.[1];
   return host ? `a web address on ${host}` : "an address of another kind";
 }
 
@@ -425,7 +427,7 @@ if (started(import.meta.url)) {
   if (!configPath) { console.error("FAIL: no config was named. Mend: name it: node core/scripts/lookup.mjs <the licence check's config> [--nuget]"); process.exit(1); }
   let root;
   try { root = projectAt(fileURLToPath(new URL(".", import.meta.url))).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim(); }
-  catch (e) { console.error(`FAIL: ${logged(e.message)}. Mend: run it from the project's root, a git repository`); process.exit(1); }
+  catch (e) { console.error(`FAIL: ${loggedAlone(e.message)}. Mend: run it from the project's root, a git repository`); process.exit(1); }
   const nuget = process.argv.includes("--nuget");
   const { lines, code } = await run(configPath, { root, base: namedBase(root) ?? baseOf(root), nuget });
   for (const line of lines) (line.startsWith("FAIL") ? console.error : console.log)(line);

@@ -7,7 +7,7 @@
 //   node tests/guards-test.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { DEEPEST, aCommit, aRepository, inProject, leadsOut, logged, oneLine, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
+import { DEEPEST, aCommit, aRepository, inProject, leadsOut, logged, loggedAlone, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -61,6 +61,57 @@ const text = "Shown first\n<!-- hidden one -->\n```\nhidden in a fence\n```\n~~~
 const read = seen(text).split("\n");
 ok(read.length === text.split("\n").length && read.filter(l => l.trim()).join("|") === "Shown first|shown |shown again", "a Markdown text is read as its reader sees it: no line of an HTML comment or a fenced block, the lines kept where they stood", JSON.stringify(read));
 ok(seen("``` not a fence `\nshown").includes("shown") && seen("```\nhidden").trim() === "", "a fence never closed hides to the end; a line of backticks with one after it opens none");
+
+// (an address with a sign-in in it, the sign-in made up and built from pieces as the test runs: the user and the
+// password cut out wherever the address stands, as the last "@" before its path ends them; nothing else touched)
+{
+  const user = ["made", "up"].join("-"), pass = ["not", "a", "pass"].join("_");
+  const cut = noSignIn(`a spec "git+https://${user}:${pass}@example.invalid/x.git" and https://${user}@a@example.invalid/y`);
+  ok(cut === 'a spec "git+https://example.invalid/x.git" and https://example.invalid/y', "the user and password of every address in a text are cut out", cut.replaceAll(user, "<user>").replaceAll(pass, "<pass>"));
+  ok(!logged(`https://${user}:${pass}@example.invalid/`).includes(pass) && !logged(`https://${user}:${pass}@example.invalid/`).includes(user), "a text printed to the log holds no address's sign-in");
+  ok([`https:/${user}:${pass}@example.invalid/x`, `https:///${user}:${pass}@example.invalid/x`, `https:\\\\${user}:${pass}@example.invalid/x`, `HTTPS://${user}@example.invalid/x`, `https:${user}:${pass}@example.invalid/x`, `ftp:\\${user}@example.invalid/x`, `x://${user}:${pass}@example.invalid/x`,
+    `git+https://git@${user}:${pass}@example.invalid/x`, `https://${user}:${pass}@sha256:443/example.invalid/x`, `https://${user}:${pass}"tail@example.invalid/x`, `git+https://${user}:${pass}\\tail@example.invalid/x`, `x://${user}:${pass}\\"tail@example.invalid/x`].every(t => !noSignIn(t).includes(user) && noSignIn(t).endsWith("example.invalid/x")),
+    "an address with one slash or more after its scheme, either way, in any case, has its sign-in cut out too, none after a special scheme but file, a quote in it");
+  ok(noSignIn(`https:\\\\${user}:${pass}"x@example.invalid/x`) === "https:\\\\example.invalid/x", "a backslash before a quote is a sign-in's, not a scheme's", noSignIn(`https:\\\\${user}:${pass}"x@example.invalid/x`).replaceAll(user, "<user>"));
+  const quoted = noSignIn(JSON.stringify({ spec: `https://${user}:${pass}"tail@example.invalid/x` }));
+  ok(quoted === '{"spec":"https://example.invalid/x"}', "a sign-in holding a quote is cut out, as JSON writes it too", quoted.replaceAll(user, "<user>").replaceAll(pass, "<pass>"));
+  const spaced = [" tail", "\ttail", "\ntail", "\"tail"].map(t => `https://${user}:${pass}${t}@example.invalid/x`);
+  ok(spaced.every(t => noSignInWhole(t) === "https://example.invalid/x"), "a value printed on its own has a sign-in cut out whole, a space, a tab or a line's break in it", JSON.stringify(spaced.map(noSignInWhole)).replaceAll(user, "<user>"));
+  const mend = "package.json: the spec of \"x\" names https://example.invalid, not a version. Mend: write it as x@1.2.3, then run the check again";
+  ok(noSignIn(mend) === mend && logged(mend) === mend, "a line of text keeps the words after an address, its mend among them, where a later \"@\" stands", logged(mend));
+  const tabbed = quotedAlone({ [`https://${user}:${pass}\tkey@example.invalid/k`]: [`git+https://${user}:${pass}\nlist@example.invalid/x`], plain: 1 });
+  ok(tabbed === '{"https://example.invalid/k":["git+https://example.invalid/x"],"plain":1}', "a value written as JSON has each text and key cut before an escape could hide its sign-in", tabbed.replaceAll(user, "<user>"));
+  ok(quotedAlone(undefined) === undefined && quotedAlone("x@1") === '"x@1"', "a value JSON writes nothing of stays nothing; a text is quoted as JSON quotes it");
+  let long;
+  try { long = [noSignIn(`https://${"a".repeat(12e6)}`), noSignInWhole("ws:".repeat(4e6)), noSignInWhole(`https:${"/".repeat(12e6)}`), noSignInWhole(`x:${"/\t".repeat(6e6)}`), noSignInWhole(`h${"t\t".repeat(6e6)}ps:`), noSignInWhole(`x://${"@".repeat(12e6)}`), noSignInWhole(`https://${"\\\"".repeat(4e6)}@`), noSignInWhole(`x://${"a ".repeat(6e6)}`)]; } catch (e) { long = e; }
+  ok(Array.isArray(long), "a long text is read without running out of stack", String(long).slice(0, 200));
+  const longPass = "x".repeat(5000);
+  ok(noSignIn(`https://${user}:${longPass}@example.invalid/x`) === "https://example.invalid/x", "a sign-in of any length is cut whole");
+  ok([`https:\n//${user}:${pass}@example.invalid/x`, `https:/\t/${user}:${pass}@example.invalid/x`, `x:/\r/${user}:${pass}@example.invalid/x`].every(t => !noSignInWhole(t).includes(pass) && !noSignIn(t).includes(pass)),
+    "a tab or a line's break among an address's slashes, which the URL standard drops, ends no address");
+  ok([`ht\ttps:${user}:${pass}@example.invalid/x`, `git+ht\ntps://${user}:${pass}@example.invalid/x`, `\thttps://${user}:${pass}@example.invalid/x`].every(t => !noSignInWhole(t).includes(pass)),
+    "a tab or a line's break in a scheme's name, which the URL standard drops, hides no address");
+  ok([`x\nhttps:${user}:${pass}@example.invalid/x`, `x\thttps:${user}:${pass}@example.invalid/x`, `key\thttp:/${user}:${pass}@example.invalid/x`, `foo\nhttps:\\${user}:${pass}@example.invalid/x`, `foo\rwss:${user}:${pass}@example.invalid`, `x\n\nhttp:${user}:${pass}@example.invalid`].every(t => !noSignInWhole(t).includes(pass) && !noSignIn(t).includes(pass) && !loggedAlone(t).includes(pass)),
+    "a special scheme after a word and a tab or a line's break is read as the scheme, with or without slashes");
+  ok([`x\nhttp\ts:${user}:${pass}@example.invalid/x`, `x\tht\ntps:${user}:${pass}@example.invalid`, `a b\nh\tttp:/${user}:${pass}@example.invalid`, `foo\nw\tss:${user}:${pass}@example.invalid`, `key\nH\rT\ttP\rs:${user}:${pass}@example.invalid`, `x\nf\tile:/${user}:${pass}@example.invalid`, `see 1.\nssh://${user}:${pass}@example.invalid/x`, `+\nssh://${user}:${pass}@example.invalid`, `x\n+https:${user}:${pass}@example.invalid`, `ab\n1https:${user}:${pass}@example.invalid`, `x\n.ftp:${user}:${pass}@example.invalid`, `git\n+https:${user}:${pass}@example.invalid`, `x\t\n+fTP:git:${pass}@example.invalid`].every(t => !noSignInWhole(t).includes(pass) && !noSignIn(t).includes(pass) && !loggedAlone(t).includes(pass)),
+    "a scheme read from after a tab or a line's break, with more breaks in it, or after a sign that is no letter, is read");
+  ok(noSignIn("file:../@scope/x 1.\nssh:x") === "file:../@scope/x 1.\nssh:x" && noSignIn("mytext\nwhttp:x@y") === "mytext\nwhttp:x@y", "a scheme a break splits from no address is still no address");
+  ok(!noSignInWhole(`git+\nhttps://${user}:${pass}\\tail@example.invalid/a.git`).includes(pass) && !noSignIn(`git+\nhttps://${user}:${pass}\\tail@example.invalid/a.git`).includes(pass),
+    "a scheme a break splits is read whole too, where it starts with a letter, and the reading that cuts more is taken");
+  ok([`+\ngit+\nhttps://${user}:${pass}\\t@example.invalid/x`, `.\ngit\n+https://${user}:${pass}\\t@example.invalid/x`, `1\nab\nhttps://${user}:${pass}\\t@example.invalid/x`, `h\nttps://${user}:${pass}\\t@example.invalid/x`, `ht\ttps://${user}:${pass}\\t@example.invalid/x`, `w\ns://${pass}\\@example.invalid/x`, `say h\nttps://${user}:${pass}\\t@example.invalid/x`].every(t => !noSignInWhole(t).includes(pass) && !noSignIn(t).includes(pass) && !loggedAlone(t).includes(pass)),
+    "a scheme that is no special one, read from any break that a letter follows, is read beside a special one");
+  const marked = loggedAlone(`https://${user}:${pass}. Mend: tail@example.invalid/x`);
+  ok(!marked.includes(pass) && !marked.includes("tail") && marked.includes(". Mend: an address in this message held a sign-in"), "a sign-in that holds a mend's marker is cut whole, and a mend of its own says so", marked.replaceAll(pass, "<pass>"));
+  ok(noSignIn(`https://${user}:${pass}@sha256:${"0".repeat(32)}/x`) === `https://sha256:${"0".repeat(32)}/x`, "a host named as a digest, with a port and a path after it, is no digest");
+  ok(!loggedAlone(`could not read https://${user}:${pass} x@example.invalid/x`).includes(pass), "a value printed on its own to the log has its sign-in cut whole");
+  const refused = "checks/https:shape.json cannot be read. Mend: write it as \"src/\" names it, or mail me@example.invalid";
+  ok(loggedAlone(refused) === refused, "a message printed on its own keeps the mend it holds", loggedAlone(refused));
+  ok([`https://${user}:${pass}@sha256:${"0".repeat(29)}443`, `-https://${user}:${pass}@example.invalid/x`, `1https://${user}:${pass}@example.invalid/x`, `.wss:${user}:${pass}@example.invalid/x`].every(t => !noSignIn(t).includes(pass)),
+    "a host named as a digest whose port is digits alone, and a special scheme after a digit, \"-\" or \".\", are cut");
+  const plain = ["https://registry.npmjs.org/@scope/x/-/x-1.0.0.tgz", "git+ssh://example.invalid/x.git#abc", "x@1.2.3", "mail me@example.invalid",
+    "ssh://git@example.invalid/x.git", `docker://alpine@sha256:${"0123abcd".repeat(8)}`, "npm:@scope/x@1.0.0", "C:\\\\@types", "file:../@scope/x", "file:me@x/y", "C:\\me@x\\file.txt", "C:/me@x/file.txt", 'ab:\\"u@h'];
+  ok(plain.every(t => noSignIn(t) === t), "an address with no sign-in, the user git, an image's digest, a name with a version, npm's alias, a bare address of mail, a file's path, a drive's path and a backslash before a quote, which ends no scheme, are left as they are", JSON.stringify(plain.map(noSignIn)));
+}
 
 console.log(`${count - failed} of ${count} passed`);
 process.exitCode = failed ? 1 : 0;

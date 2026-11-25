@@ -57,6 +57,12 @@ answers["https://api.github.com/repos/invented-org/quiet-moss"] = { status: 503 
 r = await lookAgain([pkg("moved-on-moss"), pkg("quiet-moss")], { get, now: NOW });
 ok(r.stale.length === 1 && /moved-on-moss@1\.1\.0: its registry no longer has this version/u.test(r.stale[0]), "a held version its registry no longer has is stale, though newer ones stand", r.stale);
 ok(r.unread.length === 1 && /quiet-moss@1\.1\.0: GitHub did not answer whether its repository/u.test(r.unread[0]), "GitHub not answering leaves the package unread, never taken as not archived", r.unread);
+// a version that is an address with a sign-in in it, its "@" past where a printed value is cut short: the sign-in is
+// cut out first, so none of it is printed (floor rule 1); the sign-in made up, built from pieces as the test runs
+const user = ["made", "up"].join("-"), pass = [["not", "a", "pass"].join("_"), "x".repeat(240)].join("-");
+r = await lookAgain([pkg("flaky-moss", { version: `git+https://${user}:${pass}@example.invalid/flaky-moss.git` })], { get, now: NOW });
+ok(r.unread.length === 1 && r.unread[0].includes("flaky-moss@git+https://example.invalid/flaky-moss.git") && !r.unread[0].includes(user) && !r.unread[0].includes(pass.slice(0, 12)),
+  "a version that is an address with a long sign-in is printed with the sign-in cut out", r.unread.join(" | ").replaceAll(user, "<user>").replaceAll(pass.slice(0, 12), "<pass>"));
 
 // GitHub, asked of at most GITHUB_MOST named packages, the oldest last release first
 asked.length = 0;
