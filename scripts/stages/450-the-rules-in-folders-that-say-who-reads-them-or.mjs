@@ -6,11 +6,12 @@ import { at, read, write } from "../stage-helpers.mjs";
 
 export default {
   asked: true,
-  // (a rule file that names the core's files where they stood, two of them now one file, on lines apart, and a rule that left its file for another, the
+  // (a rule file that names the core's files where they stood, two of them now one file that its core's part pulls in, and a rule that left its file for another, the
   // copies config with the old folder's pattern alone, the manifest's line with the old folders, and a dated record
   // that names an old path and is left as it stands; the mend names each by the path the step words)
   stage: dir => {
-    write(dir, "AGENTS.md", `${read(dir, "AGENTS.md").replace("@core/roles/shared/work-flow.md", "@core/modules/work-flow.md").replace("@core/roles/shared/how-to-work.md", "@core/modules/git.md\n@core/roles/shared/how-to-work.md").replace("core/tools/other-builders.md", "core/modules/other-builders.md")}\nWho builds: \`core/modules/roles.md\`, "The builders".\n`);
+    // (outside the core's part, which the one process writes and the step never reads: #1272, point 1)
+    write(dir, "AGENTS.md", `${read(dir, "AGENTS.md").replace("core/tools/other-builders.md", "core/modules/other-builders.md")}\nRead too:\n\n@core/modules/work-flow.md\n@core/modules/git.md\n\nWho builds: \`core/modules/roles.md\`, "The builders".\n`);
     // (a dated record of the project's own, which names an old path and stays as it stands)
     write(dir, "docs/records/2026-01-05.md", "# 5 January 2026\n\nRead that day: `core/modules/git.md`.\n");
     write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/^(Paths:.*?)tasks\/, tools\/, /m, "$1"));

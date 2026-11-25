@@ -2,6 +2,7 @@
 // of their names.
 import { COST } from "../step-checks.mjs";
 import { writeShape } from "../step-writers.mjs";
-import { shapeReadsParsed } from "../step-checks-shape.mjs";
+import { shapeLeft, shapeReadsParsed } from "../step-checks-shape.mjs";
 
-export default { lead: "18 November 2026, the shape check reads C#'s functions on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "csharp-tree"), write: writeShape };
+export default { lead: "18 November 2026, the shape check reads C#'s functions on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "csharp-tree"), write: writeShape,
+  left: shapeLeft };

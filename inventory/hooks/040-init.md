@@ -1,7 +1,7 @@
 - `scripts/init.mjs`, `scripts/converge.mjs`, `scripts/core-owned.mjs`, `scripts/host-private.mjs`, `scripts/steps.mjs`, `scripts/step-writers.mjs`, `scripts/sync-pins.mjs`, `scripts/step-checks.mjs`, `scripts/step-checks-tests.mjs`,
   `scripts/step-checks-ready.mjs`, `scripts/step-checks-tool-files.mjs`, `scripts/step-checks-shape.mjs`,
   `scripts/step-checks-workflow-text.mjs`, `scripts/step-checks-jobs.mjs`, `scripts/step-checks-lookup.mjs`,
-  `scripts/step-checks-hostile.mjs`, `scripts/step-checks-host.mjs`, `scripts/host.mjs`, `tests/host-test.mjs`, `scripts/step-checks-moved.mjs`, `scripts/step-checks-packages.mjs`, `scripts/step-checks-modules.mjs`, `scripts/step-checks-fetched.mjs`,
+  `scripts/step-checks-hostile.mjs`, `scripts/step-checks-host.mjs`, `scripts/host.mjs`, `tests/host-test.mjs`, `scripts/step-checks-moved.mjs`, `scripts/step-checks-packages.mjs`, `scripts/step-checks-modules.mjs`, `scripts/step-marks-start.mjs`, `scripts/step-checks-fetched.mjs`,
   `scripts/steps/`, `scripts/sync-notes.mjs`, `scripts/sync.mjs`, `scripts/fresh.mjs`, `scripts/check-configs.mjs`,
   `scripts/workflow-calls.mjs`, `scripts/step-paths.mjs`, `scripts/step-commands.mjs`, `scripts/own-runs.mjs`,
   `scripts/steps-stage.mjs`, `scripts/stage-helpers.mjs`, `scripts/stages/`, `scripts/bash-commands.mjs`,
