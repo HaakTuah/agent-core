@@ -40,8 +40,8 @@ import { privateOf } from "./host-private.mjs";
 import { project } from "./steps.mjs";
 
 const CORE = `https://github.com/${ADDRESS}.git`;
-const argv = process.argv.slice(2), tried = argv[0] === "--trial" && argv.length === 2 && /^[0-9a-f]{40}$/u.test(argv[1]) ? argv[1] : null;
-if (argv.length && !tried) {
+const [mode, asked, ...more] = process.argv.slice(2), tried = mode === "--trial" && !more.length && /^[0-9a-f]{40}$/u.test(asked ?? "") ? asked : null;
+if (mode !== undefined && !tried) {
   console.log("not a pure sync: give no argument, or `--trial <the full SHA of the commit tried>` in a release's trial");
   process.exit(2);
 }
