@@ -679,7 +679,8 @@ function upgrade(p, from, ownChanges, expect) {
     fs.mkdirSync(path.dirname(path.join(p.dir, file)), { recursive: true });
     fs.copyFileSync(path.join(p.newDir, file), path.join(p.dir, file));
   }
-  git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "made whole as attached.mjs says");
+  // (a project the newest release's kit wrote may lack nothing, so the commit is made only where something was written, #1300)
+  git(p.dir, "add", "-A"); if (git(p.dir, "status", "--porcelain")) git(p.dir, "commit", "-q", "-m", "made whole as attached.mjs says");
   const unmade = a.out;
   a = attached();
   ok(a.status === 0 && a.out.split("\n")[0] === "attached: yes", `${p.name}: synced whole, each step done and each mend made that the verdict named, it reads attached`, `${unmade}\n---\n${a.out}`);
