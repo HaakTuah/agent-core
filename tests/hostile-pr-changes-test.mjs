@@ -148,6 +148,9 @@ if (NAMES) {
 branch("gh-long", () => write(".github/workflows/a.yml", `${WORKFLOW}${"# a comment of the test\n".repeat(200000)}`));
 r = only();
 ok(r.status === 0 && r.ms < 5000, `comment-only: 4 MB of comments added to a workflow are read in ${r.ms} ms, as comments alone`);
+branch("gh-quoted", () => write(".github/workflows/a.yml", `${WORKFLOW}x: [${Array(48000).fill('"a"').join(",")}]\n`));
+r = only();
+ok(refused(r, "more than a comment") && r.ms < 5000, `comment-only: a list of 48,000 quoted words added to a workflow is read in ${r.ms} ms and refused (#1313)`);
 r = (branch("many-gh", () => { for (let i = 0; i < MANY; i++) write(`.github/many/f${i}.yml`, `${i}\n`); }), only());
 ok(r.status === 1 && r.out.includes("NOT ALONE .github/many/f0.yml: added, deleted") && !raw(r.out) && r.ms < 5000, `comment-only: ${MANY} files added under .github/ are each refused, read in ${r.ms} ms`);
 branch("gh-markup", () => write(".github/workflows/a.yml", WORKFLOW.replace("name: say", "name: ${{ secrets.TOKEN }}")));
