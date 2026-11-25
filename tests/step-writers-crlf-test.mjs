@@ -1,9 +1,8 @@
 // Tests that the steps' writers keep a file's Windows line ends (#1238): the size marks written by marksWritten, the
 // files writeMoved changes, the manifest writePlaced writes, each on a tree whose files have CRLF, as git writes one
-// with core.autocrlf, and read back in them. Node's own modules and git.
+// with core.autocrlf, and read back in them. Node's own modules.
 //
 //   node tests/step-writers-crlf-test.mjs
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { kitIn } from "../scripts/steps-kit.mjs";
@@ -17,12 +16,9 @@ const raw = f => fs.readFileSync(path.join(dir, f), "utf8");
 const crlf = text => text.replace(/\r?\n/gu, "\r\n");
 const allCrlf = text => /\r\n/u.test(text) && !/(^|[^\r])\n/u.test(text);
 const toCrlf = f => fs.writeFileSync(path.join(dir, f), crlf(raw(f)));
-const git = (...a) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...a], { cwd: dir });
-git("add", "-A"); git("commit", "-qm", "kit");
 
 const marks = "checks/sizes.json";
 fs.writeFileSync(path.join(dir, marks), JSON.stringify({ total: 1, read: {} }, null, 2) + "\n");
-git("add", "-A"); git("commit", "-qm", "marks");
 toCrlf(marks);
 let p = project(dir);
 ok(eolOf(p, marks) === "\r\n" && inEnds(p, marks, "a\nb\n") === "a\r\nb\r\n" && eolOf(p, "core-manifest.md") === "\n" && inEnds(p, "core-manifest.md", "a\n") === "a\n",
