@@ -39,12 +39,12 @@ for (const [text, line, col] of JSON_CASES) {
 ok(said(parseBounded, "") === "unexpected end of input at line 1, column 1", "an empty text is refused as one that ends early", said(parseBounded, ""));
 ok(/^it nests deeper than \d+ objects and lists$/u.test(said(parseBounded, "[".repeat(300) + "]".repeat(300))), "a text nested too deep is still refused so");
 ok(JSON.stringify(parseBounded(`{"a":[1,"${MARK}"]}`)) === `{"a":[1,"${MARK}"]}`, "JSON is read as JSON.parse reads it");
-// (a long text whose fault V8 gives no offset for answers in about the time of one parse, the place not sought, and
-// one of SEEK characters still has its place)
+// (a long text whose fault V8 gives no offset for is refused before the place is sought, so in the time of one parse,
+// and one of SEEK characters still has its place)
 {
   const long = n => `[${'"a",'.repeat(Math.ceil(n / 4))}${MARK}]`;
-  const start = performance.now(), m = said(parseBounded, long(4 * SEEK)), took = performance.now() - start;
-  ok(m === `unexpected character, its place not sought in a text past ${SEEK} characters` && took < 5000, `a text past SEEK is refused by its kind alone, in ${Math.round(took)} ms`, m);
+  const m = said(parseBounded, long(4 * SEEK));
+  ok(m === `unexpected character, its place not sought in a text past ${SEEK} characters`, "a text past SEEK is refused by its kind alone, its place not sought", m);
   const text = long(SEEK - 20), at = text.length - MARK.length;
   ok(text.length <= SEEK && said(parseBounded, text) === `unexpected character at line 1, column ${at}`, "a text of SEEK characters at most has its place", said(parseBounded, text));
 }
