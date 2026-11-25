@@ -60,11 +60,13 @@ export function readHost(p, repo, { ask = ghAsk, post = () => ({ status: null, e
 export const hostSteps = (root, h, steps = STEPS) => notDone(root, steps.filter(s => s.host), h);
 
 // What a run prints: the steps read on the host not done, each with its mend, and those GitHub gave no answer for, each
-// with why.
+// with why, and how many, never "every step is done" where any was not read.
 export function hostReport(missed) {
   const copy = missed.copy ?? "core/";
   const left = missed.hostUnread?.length ? `\n\nNot read on the host here, each left to the daily look's job, which reads it with its own token (\`${copy}scripts/look.mjs\`): ${missed.hostUnread.map(u => `${u.lead} (${u.why})`).join("; ")}.` : "";
-  if (!missed.length) return `Every step read on the host is done (\`${copy}scripts/host.mjs\`).${left}`;
+  // (a step not read here is never told done: #1275, point 1)
+  const unread = missed.hostUnread?.length ?? 0;
+  if (!missed.length) return `${unread ? `No step read on the host here is left undone, but ${unread} of them ${unread === 1 ? "was" : "were"} not read here, so none of ${unread === 1 ? "it is" : "those is"} told done` : "Every step read on the host is done"} (\`${copy}scripts/host.mjs\`).${left}`;
   return [`Steps read on the host not done (\`${copy}scripts/host.mjs\`; ${copy}${NOTES}): each a task the project's agents take, in a pull request of its own${missed.some(m => m.owner) ? "; one marked \"the owner's\" waits on the owner and is labelled so" : ""}.`,
     ...missed.map(m => `- ${m.lead}${m.owner ? " (the owner's)" : ""}: ${m.mend}`)].join("\n") + left;
 }

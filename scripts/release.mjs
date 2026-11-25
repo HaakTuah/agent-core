@@ -12,7 +12,7 @@
 // from that commit, or where a check on it has not passed; and, once the staged cases hold a release (staged.mjs,
 // beside this file), where one failed in its last run as that commit's record holds it; and where the trial on a real
 // project (release-trial.mjs, beside this file; #1084) has no record that stands for that commit, or one where a check passed before the
-// update and failed after it. Git and Node's own modules only.
+// update and failed after it, or one was not measured, a job check.mjs could not read (#1263). Git and Node's own modules only.
 //
 //   node scripts/release.mjs          what the next release would be, and what it carries
 //   node scripts/release.mjs --cut --at <sha> --runs <file> --full <file>
@@ -22,12 +22,15 @@
 //                                     all passed, and the tests' hourly or hand-started runs in --full, its answer to
 //                                     repos/<core>/actions/workflows/tests.yml/runs?head_sha=<sha>&branch=main, are none
 //                                     unfinished, the newest passed (fullRun); without the three it cuts nothing
-//   node scripts/release.mjs --trial <sha> [<before> <after>]...
+//   node scripts/release.mjs --trial <sha> [<before> <after> --sync <reading>]...
 //                                     writes the trial's record for the commit <sha>: for each project tried, the file
 //                                     check.mjs --verdicts wrote before the update and the one after, each outside
-//                                     every repository, counted; none where no project that takes the core allowed a
+//                                     every repository, counted, and after them, with --sync, which each pair needs, the file with what
+//                                     pure-sync.mjs --trial <sha> printed of its sync, read as a reading that holds no
+//                                     cut, with the copy its runs before started from (#1261); none where no project that takes the core allowed a
 //                                     trial, which it refuses where scripts/state-report.mjs --projects finds one of
-//                                     the owner's own
+//                                     the owner's own; where the trial holds the cut, it says how the runs are taken,
+//                                     the baseline from a clone of the core where the copy cannot (#1244)
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -146,6 +149,7 @@ function told({ name, sha, before, asks }, dir) {
   console.log(staged.said);
   const trialed = trialAt(sha, rev => inBare(dir, rev));
   console.log(trialed.said);
+  if (trialed.held) console.log(`Until then it is not cut: ${trialed.held}.`);
   return { staged, trialed };
 }
 

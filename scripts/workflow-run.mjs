@@ -1,144 +1,25 @@
 // What the upgrade test stands on (upgrade-test.mjs): it runs a workflow of the core's as GitHub would run it for a
 // project, job by job and step by step, so that the test runs each check's own shell and not a copy of it. It reads
-// the workflow's YAML with parse-yaml.mjs, evaluates GitHub's expressions (`${{ }}`: contexts, literals,
-// ! == != && || and the functions the core's workflows use), and runs each job whose `if` holds, a job for each
-// combination of its matrix: each `run` step in bash as GitHub runs it (with -e, and pipefail where its shell is named
-// bash), its env and its expressions filled in, its outputs read from GITHUB_OUTPUT; each `uses` step by a handler the
-// caller gives for that action, or not at all, said so. A context or function it does not know throws, so a workflow
-// the core changes in a way this cannot read fails the test, and is taught here, rather than running other than GitHub
-// would. Its runner is run by the tests, and by check.mjs, which runs the core's checks from plain git where no GitHub
-// runs them (tasks/hosts.md); no workflow of the core's runs it. Node's own modules, the YAML reader (parse-yaml.mjs) and the install step's copies (workflow-install.mjs).
+// the workflow's YAML with parse-yaml.mjs, evaluates GitHub's expressions with workflow-expressions.mjs, and runs each
+// job whose `if` holds, a job for each combination of its matrix, its include and exclude read as GitHub's page on the
+// workflow syntax defines them (#1263): each `run` step in bash as GitHub runs it (with -e, and pipefail where its shell
+// is named bash), its env and its expressions filled in, its outputs read from GITHUB_OUTPUT; each `uses` step by a handler the caller gives for that action, or not at all, said so. A context,
+// function or matrix it does not know throws, so a workflow the core changes in a way this cannot read fails the test,
+// and is taught here, rather than running other than GitHub would. Its runner is run by the tests, and by check.mjs,
+// which runs the core's checks from plain git where no GitHub runs them (tasks/hosts.md); no workflow of the core's
+// runs it. Node's own modules, the YAML reader (parse-yaml.mjs), the expressions' (workflow-expressions.mjs) and the
+// install step's copies (workflow-install.mjs).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { parseYaml } from "./parse-yaml.mjs";
+import { evaluate, fill, holds, str } from "./workflow-expressions.mjs";
 import { installKey, keepInstall, takeInstall } from "./workflow-install.mjs";
+import { inNeedsOrder, needsOf } from "./workflow-needs.mjs";
 
-// ---- GitHub's expressions ----
-
-const truthy = v => !(v === false || v === null || v === undefined || v === 0 || v === "" || Number.isNaN(v));
-const str = v => (v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v));
-const num = v => (v === null || v === undefined ? 0 : v === true ? 1 : v === false ? 0 : v === "" ? 0 : Number(v));
-const equal = (a, b) => {
-  a ??= null; b ??= null;
-  if (typeof a === "string" && typeof b === "string") return a.toLowerCase() === b.toLowerCase();
-  if (typeof a === typeof b) return a === b;
-  if (a === null || b === null) return false;
-  return num(a) === num(b);
-};
-
-/** The value of an expression (without its `${{ }}`), in the contexts given and the job's state so far. */
-export function evaluate(expr, contexts, state = { failed: false }) {
-  const ps = { expr, contexts, tokens: tokenize(expr), p: 0, fns: expressionFunctions(state) };
-  const out = orExpr(ps);
-  if (ps.p !== ps.tokens.length) throw new Error(`an expression this reader does not know: ${expr}`);
-  return out;
-}
-
-function tokenize(expr) {
-  const tokens = [];
-  for (let k = 0; k < expr.length;) {
-    const rest = expr.slice(k);
-    let m;
-    if ((m = /^\s+/.exec(rest))) { k += m[0].length; continue; }
-    if ((m = /^'(?:[^']|'')*'/.exec(rest))) tokens.push({ s: m[0].slice(1, -1).replace(/''/g, "'") });
-    else if ((m = /^(==|!=|&&|\|\||<=|>=|[!()[\],.<>])/.exec(rest))) tokens.push({ op: m[0] });
-    else if ((m = /^-?\d+(\.\d+)?/.exec(rest))) tokens.push({ n: Number(m[0]) });
-    else if ((m = /^[A-Za-z_][\w-]*/.exec(rest))) tokens.push({ id: m[0] });
-    else throw new Error(`an expression this reader does not know: ${expr}`);
-    k += m[0].length;
-  }
-  return tokens;
-}
-
-// The functions an expression may call, by their lower-case names.
-function expressionFunctions(state) {
-  return {
-    startswith: (a, b) => str(a).toLowerCase().startsWith(str(b).toLowerCase()),
-    endswith: (a, b) => str(a).toLowerCase().endsWith(str(b).toLowerCase()),
-    contains: (a, b) => (Array.isArray(a) ? a.some(x => equal(x, b)) : str(a).toLowerCase().includes(str(b).toLowerCase())),
-    fromjson: a => JSON.parse(str(a)), tojson: a => JSON.stringify(a ?? null),
-    format: (f, ...args) => str(f).replace(/\{\{|\}\}|\{(\d+)\}/g, (m, k) => (m === "{{" ? "{" : m === "}}" ? "}" : str(args[Number(k)]))),
-    always: () => true, cancelled: () => !!state.cancelled, success: () => !state.failed, failure: () => state.failed,
-  };
-}
-
-// The parser `ps` holds the expression, its tokens, the place it stands at, its contexts and its functions.
-const peek = (ps, op) => ps.tokens[ps.p]?.op === op;
-const take = (ps, op) => { if (!peek(ps, op)) throw new Error(`"${op}" expected in: ${ps.expr}`); ps.p++; };
-
-function callExpr(ps, name) {
-  const fn = ps.fns[name.toLowerCase()];
-  if (!fn) throw new Error(`a function this reader does not know: ${name}`);
-  take(ps, "(");
-  const args = [];
-  while (!peek(ps, ")")) { args.push(orExpr(ps)); if (!peek(ps, ")")) take(ps, ","); }
-  take(ps, ")");
-  return fn(...args);
-}
-
-function primaryExpr(ps) {
-  const t = ps.tokens[ps.p++];
-  if (!t) throw new Error(`an expression ends too soon: ${ps.expr}`);
-  if (t.op === "(") { const v = orExpr(ps); take(ps, ")"); return v; }
-  if ("s" in t) return t.s;
-  if ("n" in t) return t.n;
-  if (t.id === "true" || t.id === "false") return t.id === "true";
-  if (t.id === "null") return null;
-  if (t.id && peek(ps, "(")) return callExpr(ps, t.id);
-  if (t.id) { if (!(t.id in ps.contexts)) throw new Error(`a context this test does not give: ${t.id} (in ${ps.expr})`); return ps.contexts[t.id]; }
-  throw new Error(`an expression this reader does not know: ${ps.expr}`);
-}
-
-function postfixExpr(ps) {
-  let v = primaryExpr(ps);
-  for (;;) {
-    if (peek(ps, ".")) { ps.p++; const t = ps.tokens[ps.p++]; if (!t?.id) throw new Error(`a property name expected in: ${ps.expr}`); v = v?.[t.id] ?? null; }
-    else if (peek(ps, "[")) { ps.p++; const k = orExpr(ps); take(ps, "]"); v = v?.[k] ?? null; }
-    else return v;
-  }
-}
-
-const unaryExpr = ps => (peek(ps, "!") ? (ps.p++, !truthy(unaryExpr(ps))) : postfixExpr(ps));
-
-const ordered = { "<": (a, b) => a < b, ">": (a, b) => a > b, "<=": (a, b) => a <= b, ">=": (a, b) => a >= b };
-function compareExpr(ps) {
-  let v = unaryExpr(ps);
-  while (["<", ">", "<=", ">="].includes(ps.tokens[ps.p]?.op)) { const op = ps.tokens[ps.p++].op, w = unaryExpr(ps); v = ordered[op](num(v), num(w)); }
-  return v;
-}
-
-function eqExpr(ps) {
-  let v = compareExpr(ps);
-  while (peek(ps, "==") || peek(ps, "!=")) { const op = ps.tokens[ps.p++].op, w = compareExpr(ps); v = op === "==" ? equal(v, w) : !equal(v, w); }
-  return v;
-}
-
-function andExpr(ps) {
-  let v = eqExpr(ps);
-  while (peek(ps, "&&")) { ps.p++; const w = eqExpr(ps); v = truthy(v) ? w : v; }
-  return v;
-}
-
-function orExpr(ps) {
-  let v = andExpr(ps);
-  while (peek(ps, "||")) { ps.p++; const w = andExpr(ps); v = truthy(v) ? v : w; }
-  return v;
-}
-
-/** A text with each `${{ }}` in it filled in. */
-export const fill = (text, contexts, state) => (typeof text === "string" ? text.replace(/\$\{\{([\s\S]*?)\}\}/g, (_, e) => str(evaluate(e, contexts, state))) : text);
-/** Whether an `if` holds: a whole `${{ }}`, or an expression written bare. Left out: success(). */
-export function holds(cond, contexts, state) {
-  if (cond === undefined || cond === null) return !state.failed;
-  if (typeof cond === "boolean") return cond && !state.failed;
-  const t = String(cond).trim();
-  // (as GitHub reads it: a condition that asks no status of its own is read as success() && it)
-  if (!/\b(?:success|failure|always|cancelled)\s*\(/u.test(t) && state.failed) return false;
-  const whole = /^\$\{\{([\s\S]*)\}\}$/.exec(t);
-  return truthy(whole ? evaluate(whole[1], contexts, state) : t.includes("${{") ? fill(t, contexts, state) : evaluate(t, contexts, state));
-}
+// (the expressions, for those that import them from the runner, check.mjs among them)
+export { evaluate, fill, holds };
 
 // ---- running a called workflow ----
 
@@ -147,20 +28,51 @@ const valueOf = (v, contexts) => {
   const whole = typeof v === "string" && /^\s*\$\{\{([\s\S]*)\}\}\s*$/.exec(v);
   return whole ? evaluate(whole[1], contexts) : v;
 };
-// A job's matrix as its combinations ([null] for a job with none): each key's list, in GitHub's order. An include or an
-// exclude, which this has no need of yet, stops the test, to be taught.
+// A job's matrix as its combinations ([null] for a job with none), as GitHub's page on the workflow syntax defines
+// `jobs.<job_id>.strategy.matrix` (#1263): each key's list, in the order the keys are written; then each `exclude` entry
+// takes out every combination it matches in part; then each `include` entry, in order, adds its values to every original
+// combination where it overwrites no original value (an added one it may), and where it fits none stands as a
+// combination of its own, which no later entry extends. A matrix of include alone runs each entry. What the page leaves
+// undefined (an exclude of a key the matrix lacks, an entry that is no mapping, a key `__proto__`, a matrix that makes
+// no job) stops the test, to be taught.
 function combinations(matrix, contexts) {
   if (matrix === undefined || matrix === null) return [null];
   const m = valueOf(matrix, contexts);
-  if (!m || typeof m !== "object" || Array.isArray(m) || "include" in m || "exclude" in m) throw new Error(`a matrix this runner does not know: ${JSON.stringify(matrix)}`);
-  let list = [{}];
-  for (const [key, raw] of Object.entries(m)) {
+  if (!isMapping(m) || Object.hasOwn(m, "__proto__")) throw new Error(`a matrix this runner does not know: ${JSON.stringify(matrix)}`);
+  const { include = [], exclude = [], ...vars } = m;
+  const known = k => Object.hasOwn(vars, k);
+  let list = Object.keys(vars).length ? [{}] : [];
+  for (const [key, raw] of Object.entries(vars)) {
     const values = valueOf(raw, contexts);
     if (!Array.isArray(values)) throw new Error(`a matrix this runner does not know: ${key}`);
     list = list.flatMap(c => values.map(v => ({ ...c, [key]: v })));
   }
+  for (const entry of entries(exclude, "exclude", contexts)) {
+    const lacking = Object.keys(entry).find(k => !known(k));
+    if (lacking) throw new Error(`a matrix's exclude names ${lacking}, which the matrix lacks: this runner does not know what GitHub does with it`);
+    list = list.filter(c => !Object.entries(entry).every(([k, v]) => same(c[k], v)));
+  }
+  const added = [];
+  for (const entry of entries(include, "include", contexts)) {
+    const fits = list.filter(c => Object.entries(entry).every(([k, v]) => !known(k) || same(c[k], v)));
+    for (const c of fits) Object.assign(c, entry);
+    if (!fits.length) added.push({ ...entry });
+  }
+  const all = [...list, ...added];
+  if (!all.length) throw new Error(`a matrix that makes no job, which this runner does not know: ${JSON.stringify(matrix)}`);
+  return all;
+}
+
+const isMapping = v => v !== null && typeof v === "object" && !Array.isArray(v);
+// A matrix's include or exclude: a list of mappings, written so or given by an expression.
+function entries(raw, what, contexts) {
+  const list = valueOf(raw, contexts);
+  if (!Array.isArray(list) || !list.every(e => isMapping(e) && !Object.hasOwn(e, "__proto__"))) throw new Error(`a matrix's ${what} this runner does not know: ${JSON.stringify(raw)}`);
   return list;
 }
+// Whether two of a matrix's values are the same: equal as written, a mapping or list by each of its values.
+const same = (a, b) => (isMapping(a) && isMapping(b) ? Object.keys(a).length === Object.keys(b).length && Object.keys(a).every(k => same(a[k], b[k]))
+  : Array.isArray(a) && Array.isArray(b) ? a.length === b.length && a.every((x, k) => same(x, b[k])) : a === b);
 
 const outputsOf = file => {
   const out = {};
@@ -175,15 +87,15 @@ const outputsOf = file => {
 };
 
 /**
- * Runs each job of a called workflow (its text) as GitHub would for one event, and gives each job's result:
- * { job, ran, passed, steps: [{ name, ran, passed, out }] }. `inputs` and `secrets` are what the call passes (defaults
+ * Runs each job of a called workflow (its text) as GitHub would for one event, each after the jobs it needs, and gives
+ * each job's result: { job, ran, passed, steps: [{ name, ran, passed, out, missing }], declared: its own outputs, unrun, stopped: behind a failed need }. `inputs` and `secrets` are what the call passes (defaults
  * filled in here); `github` the github context; `base` the environment every step starts from; `workspace(job)` a
  * fresh folder for a job's runner; `uses` maps an action (its name before @) to a handler (step `with`, filled in;
  * the job's folder; the job's env) that does its part, or returns false where it stands for a step not run here.
  * With `dry`, it only says which jobs would start: each one that starts is a job the repository's owner pays for.
  * With `until`, a job stops after the step of that id (each job's `outputs` hold its steps' outputs). With `stop`, a
  * step that fails where `stop(its name)` holds cancels the rest of its job, as a run cancelled there: a step that runs
- * where `!cancelled()` runs no more. Each job's own
+ * where `!cancelled()` runs no more. With `machine`, a job on another system is unrun. Each job's own
  * temporary folder is made under `temp` and removed when the job ends.
  */
 // Whether a trigger's `paths:` filter lets a change through, as GitHub's cheat sheet reads one: `*` (no slash), `**`
@@ -284,18 +196,50 @@ function callInputs(wf, inputs, secrets) {
 // runs the core's install.mjs puts the packages into the workspace, so it runs once for each text, env and set of lock
 // files; every later job takes its result and a hard-linked copy of what the first one installed (each node_modules/ and
 // pypi/ below the core's .packages/), as the first run left it.
-export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir(), once = null, installed = null }) {
+//
+// `sayUnread`, for check.mjs (#1263, point 1): a job, or a combination of its matrix, that this cannot read is given
+// `unread`, why, in place of throwing, and the other jobs run on, each keeping its own verdict; a job that needs one
+// unread measured nothing, and is unread too, never given a guessed result. Without it, it throws, as above.
+export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir(), once = null, installed = null, machine = null, sayUnread = false }) {
   const wf = parseYaml(text);
-  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp, once, installed };
+  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp, once, installed, machine, sayUnread };
   const given = callInputs(wf, inputs, secrets);
-  const results = [];
-  for (const [id, job] of Object.entries(wf.jobs ?? {})) {
-    const top = { github, inputs: given, secrets, vars: {} };
-    if (!holds(job.if, top, { failed: false })) { results.push({ job: id, ran: false, passed: true, steps: [], outputs: {} }); continue; }
-    // (a matrix makes a job of each of its combinations, each one billed, named by its values as GitHub names it)
-    for (const matrix of combinations(job.strategy?.matrix, top)) runMatrixJob(rt, job, id, top, matrix, results);
+  const results = [], done = {}, stopped = new Set(), unread = new Set();
+  for (const [id, job] of inNeedsOrder(wf.jobs ?? {})) {
+    const lost = needsOf(job).filter(n => unread.has(n));
+    if (lost.length) { unread.add(id); results.push(unreadJob(id, `it needs ${lost.join(", ")}, which this runner could not read`)); continue; }
+    try {
+      runOne(rt, { id, job, given, secrets, done, stopped }, results);
+    } catch (e) {
+      if (!sayUnread) throw e;
+      unread.add(id);
+      results.push(unreadJob(id, e.message));
+    }
+    if (results.some(r => r.unread && (r.job === id || r.job.startsWith(`${id} (`)))) unread.add(id);
   }
   return results;
+}
+
+// A job this runner could not read: it ran not, and measured nothing.
+const unreadJob = (job, why) => ({ job, ran: false, passed: false, steps: [], outputs: {}, unread: why });
+
+// One job of the workflow, a job for each combination of its matrix, its result and outputs put in `done` for the jobs
+// that need it.
+function runOne(rt, { id, job, given, secrets, done, stopped }, results) {
+  // (the needs context; a job whose condition asks no status is skipped where a need did not succeed, and is
+  // `stopped` where one failed or was stopped and its own condition held: #1245, points 2 and 3)
+  const needs = Object.fromEntries(needsOf(job).map(n => [n, done[n]]));
+  const top = { github: rt.github, inputs: given, secrets, vars: {}, needs };
+  if (!holds(job.if, top, { failed: Object.values(needs).some(n => n.result !== "success") })) {
+    const behind = needsOf(job).some(n => done[n].result === "failure" || stopped.has(n)) && holds(job.if, top, { failed: false });
+    if (behind) stopped.add(id);
+    results.push({ job: id, ran: false, passed: true, steps: [], outputs: {}, ...behind && { stopped: true } }); done[id] = { result: "skipped", outputs: {} }; return;
+  }
+  const from = results.length;
+  // (a matrix makes a job of each of its combinations, each one billed, named by its values as GitHub names it)
+  for (const matrix of combinations(job.strategy?.matrix, top)) runMatrixJob(rt, job, id, top, matrix, results);
+  const mine = results.slice(from);
+  done[id] = { result: mine.every(r => r.passed) ? "success" : "failure", outputs: Object.assign({}, ...mine.map(r => r.declared)) };
 }
 
 // One job of a workflow for one combination of its matrix (null for none): its runner folder made, the job run, the folder removed.
@@ -303,9 +247,30 @@ function runMatrixJob(rt, job, id, top, matrix, results) {
   const tmp = fs.mkdtempSync(path.join(rt.temp, "runner-temp-"));
   const ctx = { ...top, runner: { temp: tmp, os: "Linux", ...rt.runner }, env: {}, steps: {}, matrix: matrix ?? {} };
   const state = { failed: false };
-  const result = { job: matrix ? `${id} (${Object.values(matrix).map(str).join(", ")})` : id, ran: true, passed: true, steps: [], outputs: ctx.steps };
+  const result = { job: matrix ? `${id} (${Object.values(matrix).map(str).join(", ")})` : id, ran: true, passed: true, steps: [], outputs: ctx.steps, declared: {} };
   results.push(result);
-  try { if (!rt.dry) runJob({ rt, job, id, ctx, state, result, tmp }); } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+  try {
+    if (rt.dry) return;
+    const away = rt.machine && elsewhere(fill(job["runs-on"], ctx, state), rt.machine);
+    if (away) { Object.assign(result, { ran: false, unrun: `it runs on ${away}, which this machine is not` }); return; }
+    runJob({ rt, job, id, ctx, state, result, tmp });
+    // (the job's own outputs, as its `outputs:` fills them in from its steps, for the jobs that need it)
+    result.declared = fillValues(job.outputs, ctx, state);
+  } catch (e) {
+    // (with sayUnread, a combination this cannot run as GitHub would is unread alone, the others kept)
+    if (!rt.sayUnread) throw e;
+    Object.assign(result, { ran: false, passed: false, unread: e.message, declared: {} });
+  } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+}
+
+// The system a job's `runs-on` names where it is not `platform` (process.platform's), or null (#1245, point 8): Windows
+// or macOS alone, since a Linux runner's steps (the core's own jobs among them) run wherever bash and Node are, as they
+// did before, a program the machine lacks said so (point 9). A label is read whole or by its first part, as
+// windows-latest or macOS: a runner's own name such as machine-2 is none.
+function elsewhere(on, platform) {
+  const labels = [on?.labels ?? on].flat().map(l => str(l).split("-")[0].toLowerCase());
+  const os = [["Windows", ["windows"], "win32"], ["macOS", ["macos", "mac"], "darwin"]].find(([, names]) => labels.some(l => names.includes(l)));
+  return os && os[2] !== platform ? os[0] : null;
 }
 
 // A map's values, each with its `${{ }}` filled in as text.
@@ -428,7 +393,9 @@ function runScript(jr, step, name, env) {
   if (kept) rt.once.store.set(kept, { passed, out, outputs, env: readIf(path.join(tmp, "env")) });
   keepInstall(rt, install, { passed, out, outputs, env: readIf(path.join(tmp, "env")) });
   carryEnv(path.join(tmp, "env"), ctx.env, id);
-  result.steps.push({ name, ran: true, passed, out });
+  // (a program this machine lacks, as bash says it: #1245, point 9)
+  const missing = r.status === 127 ? /: ([^\s:]+): (?:command )?not found/u.exec(out)?.[1] : undefined;
+  result.steps.push({ name, ran: true, passed, out, ...missing && { missing } });
   outcome(ctx, step, passed, outputs);
   if (!passed) failed(state, result, rt.stop, name);
 }

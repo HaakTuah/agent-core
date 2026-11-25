@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { fileOf, groupOf, LONG, MARKS, notLinked, offBy, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
+import { fileOf, groupOf, LONG, MARKS, notLinked, offBy, parseBaseline, parseConfig, readerOf, scanMend, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
 import { READERS } from "../scripts/shape-readers.mjs";
 import { LARGEST } from "../scripts/tree-walk.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -521,7 +521,7 @@ r = run([]);
 ok(r.status === 1 && mended(r.out) && /--first/.test(r.out), "a config with no baseline fails, saying how the first is written", r.out);
 r = run(["checks/shape.json", "--first"]);
 const baseline = () => JSON.parse(fs.readFileSync(path.join(dir, "checks/shape-baseline.json"), "utf8"));
-ok(r.status === 0 && same(Object.keys(baseline().listed), ["function: src/rules/index.js#tall"]) && same(baseline().listed["function: src/rules/index.js#tall"], { lines: 100, depth: 0, branches: 0 }), "--first lists what stands, its numbers and no line", r.out);
+ok(r.status === 0 && same(Object.keys(baseline().listed), ["function: src/rules/index.js#tall"]) && same(baseline().listed["function: src/rules/index.js#tall"], { lines: 100, depth: 0, branches: 0 }) && r.out.includes(`note checks/shape-baseline.json names the project's files by path. Mend: ${scanMend("checks/shape-baseline.json")}`), "--first lists what stands, its numbers and no line, and says what a project's own scan of paths named does about the baseline (#1289)", r.out);
 ok(run(["checks/shape.json", "--first"]).status === 1 && mended(run(["checks/shape.json", "--first"]).out), "--first writes no second baseline");
 commit("the shape check, with its first baseline");
 git("branch", "base");
@@ -549,11 +549,12 @@ r = run([], { SHAPE_BASE: "base" });
 ok(r.status === 1 && mended(r.out) && /neither listed nor held/.test(r.out), "an entry written into the baseline by hand, of code the base did not hold, fails against the base", r.out);
 git("checkout", "-q", "base", "--", "checks/shape-baseline.json");
 r = run(["--write"]);
-ok(r.status === 0 && same(Object.keys(baseline().listed), ["function: src/rules/index.js#tall"]) && baseline().listed["function: src/rules/index.js#tall"].lines === 80 && /passes? a mark/.test(run([], { SHAPE_BASE: "base" }).out),
-  "taken back as the base holds it and lowered, the baseline holds no more than before: --write never adds, and the new function fails as new", r.out);
+ok(r.status === 0 && same(Object.keys(baseline().listed), ["function: src/rules/index.js#tall"]) && baseline().listed["function: src/rules/index.js#tall"].lines === 80 && !/names the project's files by path/.test(r.out) && /passes? a mark/.test(run([], { SHAPE_BASE: "base" }).out),
+  "taken back as the base holds it and lowered, the baseline holds no more than before: --write never adds, and the new function fails as new, and no note of paths is printed", r.out);
 fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), JSON.stringify({ grown: { "function: src/rules/index.js#wide": "a table of the standard, read as one" }, listed: baseline().listed }));
 r = run(["--write"]);
-ok(r.status === 0 && baseline().listed["function: src/rules/index.js#wide"].lines === 70 && run([], { SHAPE_BASE: "base" }).status === 0, "but for one \"grown\" gives a reason for, which then passes against the base", r.out);
+ok(r.status === 0 && baseline().listed["function: src/rules/index.js#wide"].lines === 70 && run([], { SHAPE_BASE: "base" }).status === 0 && r.out.includes(`note checks/shape-baseline.json names the project's files by path. Mend: ${scanMend("checks/shape-baseline.json")}`),
+  "but for one \"grown\" gives a reason for, which then passes against the base, the entry it added printing the note of paths (#1289)", r.out);
 commit("a function with its reason");
 git("branch", "-f", "base");
 put("checks/shape.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"uses": [\n        "rules"\n      ]', '"uses": []'));

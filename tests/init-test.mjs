@@ -120,7 +120,7 @@ ok(fs.readFileSync(path.join(root, ".claude/settings.json"), "utf8") === fromFol
 ok(!/\{\{[a-z]+\}\}/.test(whole) && whole.includes("${{ secrets.PERSONAL_TERMS }}") && whole.includes(`uses: ${CORE}/.github/workflows/core.yml@${A}`) && whole.includes(`dependency-name: "${CORE}*"`), "filled in, no template word is left and GitHub's own expressions stand as written, each call is to the core's own address at the pin, and Dependabot leaves those calls alone");
 
 // the program whole: a scratch copy of the core as it stands here, and a scratch project
-const { tmp, env, git, run, core, pin, script, project } = scratch("init-test-");
+const { tmp, env, git, run, core, pin, script, fresh, project } = scratch("init-test-");
 
 const p = project("a-project", "--owner", "someone-else", "--npm", "tools");
 const has = f => fs.existsSync(path.join(p.dir, f)), read = f => fs.readFileSync(path.join(p.dir, f), "utf8");
@@ -155,6 +155,21 @@ if (p.status === 0) {
   const ownGrew = sizeCheck();
   undo();
   ok(coreGrew.status === 0 && ownGrew.status === 1 && /project's own files every session reads total .*\. Mend: make them smaller/.test(ownGrew.stderr) && mended(ownGrew.stderr), "the core's copy grown by a sync fails no project's total; the project's own files grown past it do", `${coreGrew.stderr}${ownGrew.stdout}`);
+  // (a listing of the tracked paths past 1 MB, Node's default buffer for what git prints, is read whole, and where git cannot
+  // list at all the check fails saying so, with its mend: #1204; the index is put back after each)
+  const indexAt = path.join(p.dir, ".git/index"), indexWas = fs.readFileSync(indexAt);
+  const blob = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: p.dir, input: "", encoding: "utf8" }).stdout.trim();
+  // (the form is "mode SP sha SP stage TAB path": a tab before the stage names a path with a tab, which Windows refuses, and the
+  // refusals, 30000 lines, kill git past the buffer and leave index.lock behind: #1234)
+  const added = spawnSync("git", ["update-index", "--add", "--index-info"], { cwd: p.dir, encoding: "utf8", input: Array.from({ length: 30000 }, (_, i) => `100644 ${blob} 0\tgenerated/folder-${i}/a-file-with-a-path-of-fifty-characters-${i}.txt\n`).join("") });
+  const firstAt = "generated/folder-0/a-file-with-a-path-of-fifty-characters-0.txt";
+  ok(added.status === 0 && spawnSync("git", ["ls-files", "--", firstAt], { cwd: p.dir, encoding: "utf8" }).stdout.trim() === firstAt, "the 30000 tracked paths the listing test needs are written to the index, each as the path it names", `${added.error ?? ""} ${String(added.stderr).slice(0, 300)}`);
+  const longList = sizeCheck();
+  fs.writeFileSync(indexAt, "not an index");
+  const noList = sizeCheck();
+  fs.writeFileSync(indexAt, indexWas);
+  ok(longList.status === 0 && !/ENOBUFS/.test(longList.stderr), "a project whose tracked paths list past 1 MB passes the reading-size check, the listing read whole", `${longList.stdout}${longList.stderr}`);
+  ok(noList.status === 1 && mended(noList.stderr) && /git could not list the tracked paths/.test(noList.stderr) && !/at .*\.mjs:\d+/.test(noList.stderr), "where git cannot list the tracked paths, the reading-size check fails saying so, with its mend", noList.stderr);
   // (a file past the split mark that a pull request changes asks the question: no line in "past", or one with no why
   // or grown a quarter past its mark, fails with its mend; one whose line says why it stays whole passes, and one of a
   // mark alone that stood before stands as it did; #469)
@@ -511,6 +526,14 @@ if (q.status === 0) {
     "a game's manifest has a row for each slot game-design.md uses, each left to fill and named, without its table's bar, in what is left", q.out.slice(0, 1500));
 }
 if (q.status === 0) ok(/^Floor: whole\. Modules: all\.$/m.test(fs.readFileSync(path.join(q.dir, "core-manifest.md"), "utf8")) && fs.readFileSync(path.join(q.dir, "AGENTS.md"), "utf8").startsWith("# A private game\n"), "a game takes every module, and a name given is the name used");
+// (a project that holds JavaScript and its tests gets Stryker, and its licence config names the data the lock brings: #1247, point 1)
+{
+  const dir = fresh("a-project-with-tests");
+  fs.writeFileSync(path.join(dir, "a.js"), "export const a = 1;\n");
+  fs.writeFileSync(path.join(dir, "a.test.js"), "import { a } from './a.js';\n");
+  const r = run(dir, script, "--owner", "x"), config = JSON.parse(fs.readFileSync(path.join(dir, "checks/licences.json"), "utf8"));
+  ok(r.status === 0 && fs.existsSync(path.join(dir, "checks/mutation/.npmrc")) && config.data?.includes("caniuse-lite") && !r.out.includes('under "data"'), "a project with code and tests gets the list's tool, and its licence config names the data its lock brings, so nothing is left to ask of it", r.out.slice(0, 1500));
+}
 const t = project("a-folder-named-true", "--owner", "x", "--npm", "true");
 ok(t.status === 0 && fs.readFileSync(path.join(t.dir, ".github/workflows/signatures.yml"), "utf8").includes('directory: "true"') && fs.readFileSync(path.join(t.dir, ".github/dependabot.yml"), "utf8").includes('directory: "/true"'), "a folder whose name YAML would read as something else is written in quotes, so it stays a name");
 const n = project("a-dotnet-project", "--owner", "x", "--nuget", "src", "--private");

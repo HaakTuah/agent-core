@@ -36,7 +36,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { CODE, OTHER } from "./code-shape.mjs";
-import { logged, parseBounded } from "./guards.mjs";
+import { logged, loggedAlone, parseBounded } from "./guards.mjs";
 import { pathIn } from "./reading.mjs";
 import { notLinked, parseBaseline, parseConfig, rowToken, where } from "./shape.mjs";
 import { started } from "./started.mjs";
@@ -244,5 +244,5 @@ function main(argv) {
 
 if (started(import.meta.url)) {
   try { process.exitCode = main(process.argv.slice(2)); }
-  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${logged(e.message)}`); process.exitCode = 1; }
+  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${loggedAlone(e.message)}`); process.exitCode = 1; }
 }

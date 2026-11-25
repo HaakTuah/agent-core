@@ -35,7 +35,7 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { MEND } from "./mend.mjs";
 import { installStep, installed } from "./packages.mjs";
-import { npmIgnores, npmReadsAll, npmVersion } from "./npm-reads.mjs";
+import { npmIgnores, npmReadsAll, npmRefusal, npmVersion } from "./npm-reads.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 
@@ -163,8 +163,9 @@ function runsOf(o, part) {
   return o.runs.filter(r => r.part === part).map(r => ({ ...r.settings, ...given, advisory: r.settings.advisory === true || o.advisory }));
 }
 
-// The base, as a commit: what --base names, fetched where it is origin/<branch> and not here yet (a checkout of one
-// commit, as a workflow's); "" where none is given or it is given empty. Where it cannot be had, it fails, or, given
+// The base, as a commit: what --base names, fetched where it is origin/<branch> and not here yet (a clone that lacks
+// it; the core's workflows give HEAD^1, the merge's first parent, which their checkout holds, since their fetch has no
+// token to sign in with: #674); "" where none is given or it is given empty. Where it cannot be had, it fails, or, given
 // `exits` false, throws that failure's line.
 function baseCommit(base, exits = true) {
   if (!base) return "";
@@ -198,8 +199,9 @@ const ALLOWS = ["allow-git", "allow-remote", "allow-file"];
 function unread(cwd) {
   const version = npmVersion(cwd), ignored = npmIgnores(version, ALLOWS);
   if (!ignored.length) return false;
+  // (the mend's command names the least npm written out, so the licence scan reads it; checks-test.mjs holds it to `least`)
   const least = npmReadsAll(ALLOWS);
-  console.log(`FAIL npm ${version || "here, whose version could not be read,"} reads none of ${ignored.map(s => `--${s}`).join(", ")}, which npm reads from ${least} on, so its install would fetch any git, web or file source the lock file names, and nothing was installed. ${MEND}run this check under the core's own Node, the version in its .node-version, whose npm reads them, as the signatures job does, or update npm here to ${least} or later`);
+  console.log(`FAIL ${npmRefusal(version, ignored, least)} ${MEND}from a folder outside the repository, install the version the refusal names into a folder of its own, also outside the repository, running no install script: ${"`npm install --global --prefix=<its-folder> --ignore-scripts npm@11.15.0`"}; then put that folder's bin (on Windows, the folder itself) first on the PATH and run this check again`);
   return true;
 }
 const install = cwd => !unread(cwd) && passed(process.platform === "win32"
@@ -219,9 +221,12 @@ function lookUp(o, { coreAt, check }) {
 
 const RUN = {
   copies(o, { coreAt, check }) {
-    // (a base that cannot be had is a failure of its own, and every check still runs, each saying what it could not read)
-    if (o.base) check("The base the change merges into", () => { try { baseCommit(o.base, false); return true; } catch (e) { console.log(e.message); return false; } });
-    for (const [name, script, arg, baseVar] of COPIES) check(name, () => node(coreAt, script, arg ? [o[arg]] : [], { env: baseVar ? { [baseVar]: o.base ?? "" } : {} }));
+    // (a base that cannot be had is a failure of its own, and every check still runs, each saying what it could not read;
+    // one that can is given to each as its commit, so a base named from here, such as HEAD^1, names the same commit
+    // wherever a check reads it; #674)
+    let base = o.base ?? "";
+    if (o.base) check("The base the change merges into", () => { try { base = baseCommit(o.base, false); return true; } catch (e) { console.log(e.message); return false; } });
+    for (const [name, script, arg, baseVar] of COPIES) check(name, () => node(coreAt, script, arg ? [o[arg]] : [], { env: baseVar ? { [baseVar]: base } : {} }));
   },
 
   description(o, { coreAt, check }) {

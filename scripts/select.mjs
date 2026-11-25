@@ -46,7 +46,7 @@ import { fileURLToPath } from "node:url";
 import { CODE } from "./code-shape.mjs";
 import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
-import { logged } from "./guards.mjs";
+import { loggedAlone } from "./guards.mjs";
 import { WORDS, mentioned, nameTrie } from "./name-trie.mjs";
 import { Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
@@ -267,5 +267,5 @@ async function main(argv) {
 
 if (started(import.meta.url)) {
   try { process.exitCode = await main(process.argv.slice(2)); }
-  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${logged(e.message)}`); process.exitCode = 1; }
+  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${loggedAlone(e.message)}`); process.exitCode = 1; }
 }

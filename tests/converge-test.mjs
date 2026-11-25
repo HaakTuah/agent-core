@@ -1,11 +1,12 @@
 // Tests of the one process that takes the core into a repository (scripts/converge.mjs; #1083), run as a project runs
 // it, in projects the starter kit writes from a scratch copy of the core: a new project has nothing more to write, and
 // run twice the process changes nothing; a project at a kit from before the marks gets its whole files and its parts of
-// AGENTS.md and CLAUDE.md written, every byte outside the parts kept; a workflow of the project's own, a file the
-// manifest's "Differences" names and a rule file whose run of imports holds a line of its own are never written over;
+// AGENTS.md and CLAUDE.md written, every byte outside the parts kept but an import the part holds, or one an earlier
+// kit wrote whose path is gone (#1246, point 4); a workflow of the project's own, a file the manifest's "Differences"
+// names and a rule file's own lines in a run of imports that holds one are never written over;
 // a value out of its form writes nothing and says the mend; the kind is read from the host (whether the repository is
-// private: from GitHub's event in a job, from gh in a session), never from the workflows that stand, and with no answer
-// the process writes nothing and says the mend; and the check fails a pull request that makes a file or
+// private: from GitHub's event in a job, from gh, or GitHub's API with no sign-in, in a session: host-private-test.mjs),
+// never from the workflows that stand, and with no answer the process writes nothing and says the mend; and the check fails a pull request that makes a file or
 // part the core marks other than the core writes it, with its mend, and passes one that changes only what is the
 // project's. Git and Node's own modules.
 //
@@ -13,7 +14,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { BEGIN, END, partIn } from "../scripts/core-owned.mjs";
+import { BEGIN, END, converged, partIn, stubOf } from "../scripts/core-owned.mjs";
 import { kits, merged, plan } from "../scripts/converge.mjs";
 import { kind } from "../scripts/fresh.mjs";
 import { privateOf } from "../scripts/host-private.mjs";
@@ -101,10 +102,51 @@ try {
   commit(p.dir, "a difference declared, and a run of imports with a line of the project's own");
   const own = converge(p.dir, "--write");
   ok(!fs.existsSync(path.join(p.dir, ".github/workflows/delete-merged-branches.yml")), "a file the manifest's \"Differences\" names is the project's: never written", own.out);
-  ok(read(p.dir, "CLAUDE.md").startsWith("# Claude's part\n\n@AGENTS.md\n@docs/the-project-s-own.md\n@core/tools/claude.md\n") && read(p.dir, "CLAUDE.md").endsWith(`${END}\n`),
-    "  a run of imports that holds a line of the project's own stays whole, and the core's part goes after it", read(p.dir, "CLAUDE.md"));
+  const claudeMd = read(p.dir, "CLAUDE.md");
+  ok(claudeMd.startsWith("# Claude's part\n\n@docs/the-project-s-own.md\n\n") && claudeMd.endsWith(`${END}\n`) && claudeMd.split("@AGENTS.md\n").length === 2 && /CLAUDE\.md held @AGENTS\.md, @core\/tools\/claude\.md outside the core's part/.test(own.out),
+    "  a run of imports that holds a line of the project's own keeps that line, the kit's lines taken out of it and named, and the core's part goes after it, each import once (#1246, point 4)", `${claudeMd}\n${own.out}`);
+  // (an import of an earlier layout, which an earlier kit wrote and whose path is gone, is taken out; one whose path is there, kept)
+  {
+    const want = `# C\n\n${BEGIN}\n@AGENTS.md\n@core/tools/claude.md\n${END}\n`, earlier = "# C\n\n@AGENTS.md\n@core/modules/claude.md\n", stood = "# C\n\n@AGENTS.md\n@core/modules/claude.md\n@docs/own.md\n";
+    const gone = converged("CLAUDE.md", stood, want, [earlier], f => f === "docs/own.md"), kept = converged("CLAUDE.md", stood, want, [earlier], () => true);
+    ok(gone.text === `# C\n\n@docs/own.md\n\n${BEGIN}\n@AGENTS.md\n@core/tools/claude.md\n${END}\n` && /held @AGENTS\.md, @core\/modules\/claude\.md/.test(gone.left) && !Object.keys(converged("CLAUDE.md", gone.text, want, [earlier], f => f === "docs/own.md")).length,
+      "  an import an earlier kit wrote whose path is gone is taken out with it, and run again nothing changes", JSON.stringify(gone));
+    ok(kept.text?.includes("@core/modules/claude.md\n@docs/own.md\n") && kept.text.split("@AGENTS.md").length === 2, "  and one whose path is there is the project's, kept", JSON.stringify(kept));
+    ok(!Object.keys(converged("CLAUDE.md", `${want}~~~\n\`\`\`\n@AGENTS.md\n~~~\n`, want, [earlier], () => false)).length, "  and a line of a fenced example is no import: kept");
+    ok(!Object.keys(converged("CLAUDE.md", `~~~\n${want}@core/modules/claude.md\n~~~\n`, want, [earlier], () => false)).length, "  so is one round the part");
+    // (an import of a moved stub whose every target the part imports counts as replaced, wherever it came from; one
+    // whose target the part does not import, kept: #1272, point 2)
+    const stub = f => ({ "core/modules/claude.md": ["core/tools/claude.md"], "core/modules/x.md": ["core/tools/x.md"] })[f] ?? null;
+    const stubbed = converged("CLAUDE.md", `# C\n\n@core/modules/claude.md\n@core/modules/x.md\n\n${want.slice(5)}`, want, [], () => true, stub);
+    ok(stubbed.text === `# C\n\n@core/modules/x.md\n\n${want.slice(5)}` && /held @core\/modules\/claude\.md outside/.test(stubbed.left ?? ""),
+      "  an import of a moved stub whose target the part imports is taken out and named, one whose target it does not, kept (#1272, point 2)", JSON.stringify(stubbed));
+    // (a stub is its pointers alone: one that holds a line of its own beside them is read as no stub, so it is kept)
+    const pointer = "# Moved: Claude's part\n\n[`tools/claude.md`](../tools/claude.md) holds these rules now: read it whole.\n\n@../tools/claude.md\n";
+    ok(JSON.stringify(stubOf(() => pointer, ".", "core/modules/claude.md")) === '["core/tools/claude.md"]' && stubOf(() => `${pointer}\nNever push on a Friday.\n`, ".", "core/modules/claude.md") === null,
+      "  a moved stub is read as one only where it holds its pointers and nothing else", String(stubOf(() => `${pointer}\nNever push on a Friday.\n`, ".", "core/modules/claude.md")));
+  }
   ok(partIn("@a.md\n\n@b.md\n", new Set(["@a.md", "@b.md"])) === "many" && partIn(`${BEGIN}\n${BEGIN}\n${END}\n`, new Set()) === "many", "  where it cannot tell which run of imports is the core's, it says so, and takes none");
   git(p.dir, "checkout", "-q", "--", ".");
+  // (the trial's case on the core's own stub: CLAUDE.md that imports core/modules/claude.md above the part, which pulls
+  // in what the part's core/tools/claude.md is, loses it; core/modules/git.md, whose target CLAUDE.md's part does not
+  // import, stays: #1272, point 2)
+  {
+    const kitText = read(p.dir, "core/setup/template/CLAUDE.md.tmpl");
+    write(p.dir, "CLAUDE.md", kitText.replace(BEGIN, `@core/modules/claude.md\n@core/modules/git.md\n${BEGIN}`));
+    const stubbed = converge(p.dir, "--write");
+    ok(read(p.dir, "CLAUDE.md") === kitText.replace(BEGIN, `@core/modules/git.md\n${BEGIN}`) && /CLAUDE\.md held @core\/modules\/claude\.md outside the core's part/.test(stubbed.out),
+      "  the one process takes out an import of the core's moved stub whose target the part imports, and names it; a stub whose target it does not import stays", `${read(p.dir, "CLAUDE.md")}\n${stubbed.out}`);
+    git(p.dir, "checkout", "-q", "--", ".");
+    // (a file of the project's own that opens as a stub does is no stub of the core's: its import stays)
+    fs.mkdirSync(path.join(p.dir, "docs"), { recursive: true });
+    write(p.dir, "docs/deploy.md", "# Moved: our deploy notes now open with the rules below\n\nNever deploy on a Friday.\n\n@../AGENTS.md\n");
+    write(p.dir, "CLAUDE.md", kitText.replace(BEGIN, `@docs/deploy.md\n${BEGIN}`));
+    git(p.dir, "add", "docs/deploy.md");
+    const own = converge(p.dir, "--write");
+    ok(read(p.dir, "CLAUDE.md") === kitText.replace(BEGIN, `@docs/deploy.md\n${BEGIN}`), "  a file of the project's own that opens \"# Moved:\" is no stub of the core's: its import stays", `${read(p.dir, "CLAUDE.md")}\n${own.out}`);
+    git(p.dir, "rm", "-q", "--cached", "docs/deploy.md"); fs.rmSync(path.join(p.dir, "docs/deploy.md"));
+    git(p.dir, "checkout", "-q", "--", ".");
+  }
 
   // ---- a value out of its form ----
   const named = read(p.dir, "AGENTS.md");
@@ -129,16 +171,6 @@ try {
   const compared = spawnSync(process.execPath, ["core/scripts/fresh.mjs"], { cwd: p.dir, env: plainEnv, encoding: "utf8" });
   ok(compared.status === 0 && /not compared, since whether the repository is private could not be read/.test(compared.stdout), "  nor is the project compared with a fresh start", compared.stdout);
   git(p.dir, "checkout", "-q", "--", ".");
-  const hosted = fresh("a-hosted-clone"), repo = "someone-else/a-hosted-clone";
-  git(hosted, "remote", "add", "origin", `https://github.com/${repo}.git`);
-  const routes = [], gh = answer => route => { routes.push(route); return JSON.stringify(answer); };
-  ok(privateOf(hosted, { env: {}, ask: gh({ private: true }) }).private === true && routes.join() === `repos/${repo}`, "  a session asks gh of the repository its origin names", routes.join());
-  const event = path.join(tmp, "event.json");
-  write(tmp, "event.json", JSON.stringify({ repository: { full_name: repo, private: false } }));
-  ok(privateOf(hosted, { env: { GITHUB_EVENT_PATH: event }, ask: () => { throw new Error("not asked"); } }).private === false, "  GitHub's job reads it from the event it runs on, and asks gh nothing");
-  write(tmp, "event.json", JSON.stringify({ repository: { full_name: "someone-else/another", private: false } }));
-  const refusedHost = privateOf(hosted, { env: { GITHUB_EVENT_PATH: event }, ask: () => { throw new Error("gh: Not Found (HTTP 404)"); } });
-  ok(/could not be read: GitHub gave gh no answer \(gh: Not Found \(HTTP 404\)\)\. Mend: sign gh in/.test(refusedHost.unread ?? ""), "  an event of another repository is not read, and where gh gives no answer, it says so with the mend", JSON.stringify(refusedHost));
 
   // ---- a path the manifest places outside the project (floor rule 13) ----
   const placed = read(p.dir, "core-manifest.md");

@@ -91,22 +91,29 @@ jobs:
           # (the store kept only in folders of this user's own, no link, so that another account's folder or link at
           # that name takes nothing in; a new copy written to a file of its own first, never through a name made before)
           owned() { [ -d "$1" ] && [ ! -L "$1" ] && [ -O "$1" ] || { echo "$1 is not a folder of this user's own" >&2; return 1; }; }
-          tools="${TMPDIR:-/tmp}/agent-core-tools" store="${TMPDIR:-/tmp}/agent-core-tools/betterleaks-$version" bl="betterleaks$exe" got="archive.${file#*.}"
+          # (the store named from the temporary folder, never by its full path, in the log and in the path the scan
+          # step is given, which the runner prints in that step's log: on a runner on the owner's own computer the
+          # temporary and home folders hold the account's name; #1223)
+          tmp="${TMPDIR:-/tmp}" where=${TMPDIR:+TMPDIR}; where=${where:-/tmp}
+          kept="agent-core-tools/betterleaks-$version" bl="betterleaks$exe" got="archive.${file#*.}"
           # (one kept from an earlier run is taken only where it holds its sum; otherwise it is fetched again, into a
-          # folder of this run's own, the archive and then the program checked before it is kept)
-          if [ "$(digest "$store/$bl")" != "$sum" ]; then
-            dir=$(mktemp -d) || { echo "Betterleaks $version is not fetched: no temporary folder could be made."; exit 0; }
+          # folder of this run's own straight in the temporary folder, so that `..` is that folder, the archive and
+          # then the program checked before it is kept; each path in its log written from there, and PowerShell's own
+          # words kept out, so the log shows no temporary or home folder)
+          if [ "$(digest "$tmp/$kept/$bl")" != "$sum" ]; then
+            dir=$(mktemp -d "$tmp/betterleaks.XXXXXX" 2> /dev/null) || { echo "Betterleaks $version is not fetched: no temporary folder could be made in $where."; exit 0; }
             if (cd "$dir" && curl -fsSL --proto =https --proto-redir =https --connect-timeout 30 --max-time 300 --retry 2 -o "$got" \
                 "https://github.com/betterleaks/betterleaks/releases/download/v$version/betterleaks_${version}_$file" \
               && [ "$(digest "$got")" = "$archive" ] \
               && case $file in
                    *.zip) if command -v unzip > /dev/null 2>&1; then unzip -q "$got" "$bl"
-                          else powershell -NoProfile -NonInteractive -Command "Expand-Archive -LiteralPath $got -DestinationPath out" && mv out/"$bl" .; fi ;;
+                          else powershell -NoProfile -NonInteractive -Command "Expand-Archive -LiteralPath $got -DestinationPath out" > /dev/null 2>&1 \
+                            && mv out/"$bl" . || { echo "PowerShell's Expand-Archive could not unpack $got, or $bl was not in it"; false; }; fi ;;
                    *) tar -xzf "$got" "$bl" ;;
                  esac \
               && [ "$(digest "$bl")" = "$sum" ] \
-              && mkdir -p "$tools" && owned "$tools" && mkdir -p "$store" && owned "$store" && new=$(mktemp "$store/new.XXXXXX") \
-              && cp "$bl" "$new" && chmod 755 "$new" && mv -f "$new" "$store/$bl") > "$dir/log" 2>&1; then :
+              && t="../${kept%/*}" && s="../$kept" && mkdir -p "$t" && owned "$t" && mkdir -p "$s" && owned "$s" \
+              && new=$(mktemp "$s/new.XXXXXX") && cp "$bl" "$new" && chmod 755 "$new" && mv -f "$new" "$s/$bl") > "$dir/log" 2>&1; then :
             else
               echo "Betterleaks $version is not fetched: its release for $(uname -s)/$(uname -m) could not be downloaded, differs from its sum here, or could not be kept. Of the fetch:"
               tail -n 5 "$dir/log" 2> /dev/null; echo "the archive's SHA-256: $(digest "$dir/$got")"
@@ -114,8 +121,8 @@ jobs:
             fi
             rm -rf "$dir"
           fi
-          echo "Betterleaks $version: $store/$bl, its SHA-256 $sum"
-          { echo "path=$store/$bl"; echo "sum=$sum"; } >> "$GITHUB_OUTPUT"
+          echo "Betterleaks $version: $where/$kept/$bl, its SHA-256 $sum"
+          { echo "path=$kept/$bl"; echo "sum=$sum"; } >> "$GITHUB_OUTPUT"
       # (the address in each commit's author and committer line (floor rule 11; #460, point 2): of the pull request's
       # own commits, as the step after reads them, each address is the host's no-reply one, the account's
       # (<login>@users.noreply.github.com, its id and "+" before it where the account has one, a bot's "[bot]" after
@@ -130,7 +137,12 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -z "$BASE" ]; then echo "Not a pull request, so no commit's address was read."; exit 0; fi
-          work="$RUNNER_TEMP/commit-addresses"; rm -rf "$work"; mkdir -p -m 700 "$work" || exit 1
+          # (its folders made under a mask that keeps them this run's alone where the system sets modes, as the step
+          # after makes its own; on Windows, where Git's mkdir refuses a mode and the mask sets none, they are only as
+          # private as the runner's temp folder, which holds the keyring below)
+          umask 077
+          work="$RUNNER_TEMP/commit-addresses"; rm -rf "$work"
+          mkdir -p "$work" 2> /dev/null || { echo "FAIL the folder this step works in, RUNNER_TEMP/commit-addresses, could not be made, so no commit's address was read. Mend: run the check again; where it fails again, give the account the runner runs as the right to write in the runner's temp folder (RUNNER_TEMP) and run it once more."; exit 1; }
           # (the pull request's own commits, as the step after takes them: GitHub's merge of it into its base checked
           # out, whose first parent is the base's side and is left out, with that merge itself)
           side=$BASE head=HEAD; if git rev-parse -q --verify 'HEAD^2' > /dev/null; then side=HEAD^1 head=HEAD^2; fi
@@ -139,7 +151,7 @@ jobs:
           # only where its committer is GitHub and an OpenPGP signature on it is good by a key of that keyring, named
           # by its fingerprint; git's other signature formats, which may carry their own certificate, are read by no
           # program, so one written by hand to look so does not)
-          keys="$work/github-keys"; mkdir -p -m 700 "$keys"
+          keys="$work/github-keys"; mkdir -p "$keys" 2> /dev/null
           if ! curl -fsS --max-time 30 --retry 3 https://github.com/web-flow.gpg | GNUPGHOME="$keys" gpg -q --batch --import 2> /dev/null; then
             echo "::notice::GitHub's signing key could not be fetched, so no commit is taken for one GitHub made: re-run the check"
           fi
@@ -193,18 +205,19 @@ jobs:
           if [ -z "$TERMS" ]; then echo "::notice::PERSONAL_TERMS is not set here, so nothing was checked."; exit 0; fi
           # (a pipeline's last command in this shell, so that what it sets stays set)
           umask 077; shopt -s lastpipe
-          work="$RUNNER_TEMP/personal-terms"; rm -rf "$work"; mkdir -p "$work/none" || exit 1
+          work="$RUNNER_TEMP/personal-terms"; rm -rf "$work"
+          mkdir -p "$work/none" 2> /dev/null || { echo "FAIL the folder this step works in, RUNNER_TEMP/personal-terms, could not be made, so nothing was read. Mend: run the check again; where it fails again, give the account the runner runs as the right to write in RUNNER_TEMP, and run it once more."; exit 1; }
           list="$work/terms"
           # (each term without the blanks around it, a carriage return among them, and no empty one)
           printf '%s\n' "$TERMS" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' > "$list"
           if [ ! -s "$list" ]; then echo "::notice::PERSONAL_TERMS holds no term, so nothing was checked."; rm -rf "$work"; exit 0; fi
           found=0
-          # (Betterleaks, as the step before fetched it: copied into this run's own folder and run only where the copy
+          # (Betterleaks, as the step before fetched it, its path from the temporary folder: copied into this run's own folder and run only where the copy
           # holds the sum that step checked it by, so that one changed after that step never runs; where that step
           # fetched none, the check fails, since it guards what may not leak (floor rule 14))
           digest() { { sha256sum < "$1" || shasum -a 256 < "$1"; } 2> /dev/null | cut -c1-64; }
           bl="$work/${BETTERLEAKS##*/}"
-          if [ -z "$BETTERLEAKS" ] || [ -z "$BETTERLEAKS_SUM" ] || ! cp -- "$BETTERLEAKS" "$bl" 2> /dev/null || [ "$(digest "$bl")" != "$BETTERLEAKS_SUM" ]; then
+          if [ -z "$BETTERLEAKS" ] || [ -z "$BETTERLEAKS_SUM" ] || ! cp -- "${TMPDIR:-/tmp}/$BETTERLEAKS" "$bl" 2> /dev/null || [ "$(digest "$bl")" != "$BETTERLEAKS_SUM" ]; then
             echo "FAIL Betterleaks, which matches the terms, was not fetched at its pin (the step \"Fetch Betterleaks\" says why), so nothing was read. Mend: run the check again; where it fails again, run it where Betterleaks' releases on github.com can be reached, on Linux, macOS or Windows, on x64 or arm64, as on GitHub's runners; the check guards what may not leak, so it never passes unread."
             rm -rf "$work"; exit 1
           fi
