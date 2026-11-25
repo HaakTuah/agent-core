@@ -70,19 +70,20 @@ const SPECIAL = new Set(["http", "https", "ws", "wss", "ftp", "file"]);
 const letter = c => (c >= 97 && c <= 122) || (c >= 65 && c <= 90);
 const ofScheme = c => letter(c) || (c >= 48 && c <= 57) || c === 43 || c === 45 || c === 46; // (a letter, digit, "+", "-" or ".")
 const dropped = c => c === 9 || c === 10 || c === 13; // (a tab or a line's break, which the URL standard drops)
-// (the scheme that ends at the ":" at `colon`, a tab or a line's break in it dropped and in lower case, read back to where
-// its letters start; or, where a digit, "+", "-" or "." stands before them, the special scheme its end names: "" where
-// none)
-// (whether a tab or a line's break stands right before the `count`th letter back from `colon`, breaks not counted)
-function breakBefore(text, colon, count) {
+// (where the `count`th letter back from `colon` stands, breaks not counted, and where the part it stands in starts: after
+// the nearest tab or line's break before it, or at `start`)
+function partOf(text, start, colon, count) {
   let at = colon;
   for (; count > 0; at--) if (!dropped(text.charCodeAt(at - 1))) count--;
-  return dropped(text.charCodeAt(at - 1));
+  let from = at;
+  while (from > start && !dropped(text.charCodeAt(from - 1))) from--;
+  return { at, from };
 }
 // (the scheme that ends at the ":" at `colon`, tabs and line breaks in it dropped, as the URL standard drops them: a
-// special one where its letters start the run, follow a break, since a word before a break is no part of an address in
-// a line of text, or follow a sign that is no letter in a run that starts with none; else the run whole where it starts with a letter, else the part
-// after its first break that starts with one; "" where none is)
+// special one where its letters start their part of the run (the run, or the text after a break in it, since a word
+// before a break is no part of an address in a line of text) or follow a sign that is no letter in a part that starts
+// with none ("1https", never "git+https"); else the run whole where it starts with a letter, else the part after its
+// first break that starts with one; "" where none is)
 function schemeBefore(text, colon) {
   let start = colon, first = -1;
   for (let c; start > 0 && (ofScheme(c = text.charCodeAt(start - 1)) || dropped(c)); start--) {
@@ -90,9 +91,9 @@ function schemeBefore(text, colon) {
   }
   while (start < colon && dropped(text.charCodeAt(start))) start++;
   const named = from => text.slice(from, colon).replace(/[\t\n\r]/gu, "").toLowerCase(), name = named(start);
-  const special = /(https?|wss?|ftp|file)$/u.exec(name)?.[1] ?? "", before = name.length - special.length;
-  const opens = !letter(text.charCodeAt(start)) && !letter(name.charCodeAt(before - 1)); // ("1https", never "git+https")
-  if (special && (before === 0 || opens || breakBefore(text, colon, special.length))) return special;
+  const special = /(https?|wss?|ftp|file)$/u.exec(name)?.[1] ?? "";
+  const { at, from } = special ? partOf(text, start, colon, special.length) : { at: -1, from: 0 };
+  if (special && (at === from || (!letter(text.charCodeAt(from)) && !letter(text.charCodeAt(at - 1))))) return special;
   return letter(text.charCodeAt(start)) ? name : first < 0 ? "" : named(first);
 }
 // (where the slashes after the ":" at `colon` end, and how many they are: a backslash counted for a special scheme alone,
