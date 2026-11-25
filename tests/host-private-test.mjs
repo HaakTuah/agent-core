@@ -7,17 +7,19 @@
 //   node tests/host-private-test.mjs
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { privateOf } from "../scripts/host-private.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
 const tmp = scratchDir("host-private-");
 const repo = "someone-else/a-hosted-clone", hosted = path.join(tmp, "clone");
-// (a clone as git reads it: its HEAD, its folders and its origin, which is all that is asked of it)
+// (a clone as git reads it: its HEAD, its folders and its origin, which is all that is asked of it; a backslash in a
+// config value is an escape, so a Windows path is written with each doubled, as git writes it)
 const clone = (at, origin) => {
   for (const d of ["objects", "refs/heads"]) fs.mkdirSync(path.join(at, ".git", d), { recursive: true });
   fs.writeFileSync(path.join(at, ".git", "HEAD"), "ref: refs/heads/main\n");
-  fs.writeFileSync(path.join(at, ".git", "config"), `[core]\n\trepositoryformatversion = 0\n\tbare = false\n[remote "origin"]\n\turl = ${origin}\n`);
+  fs.writeFileSync(path.join(at, ".git", "config"), `[core]\n\trepositoryformatversion = 0\n\tbare = false\n[remote "origin"]\n\turl = ${origin.replaceAll("\\", "\\\\")}\n`);
 };
 clone(hosted, `https://github.com/${repo}.git`);
 
@@ -51,14 +53,14 @@ ok(asked(bare({ status: 404 })).unread && privateOf(hosted, { env: { CORE_PRIVAT
 
 // ---- a clone made from a folder, as check.mjs's scratch clone is (#1246, point 6) ----
 const scratch = path.join(tmp, "scratch"), deeper = path.join(tmp, "deeper"), loose = path.join(tmp, "loose");
-const inside = path.join(tmp, "inside");
-clone(scratch, hosted); clone(deeper, `file://${scratch}`); clone(loose, path.join(tmp, "not-there")); clone(inside, path.join(hosted, "sub"));
+const inside = path.join(tmp, "inside"), afar = path.join(tmp, "afar");
+clone(scratch, hosted); clone(deeper, pathToFileURL(scratch).href); clone(loose, path.join(tmp, "not-there")); clone(afar, "file://some-other-machine/share/clone"); clone(inside, path.join(hosted, "sub"));
 fs.mkdirSync(path.join(hosted, "sub"));
 bareRoutes.length = 0;
 ok([scratch, deeper].every(at => privateOf(at, { env: {}, ask: noGh, bare: bare({ status: 200, private: false }) }).private === false) && bareRoutes.every(r => r === `repos/${repo}`) && bareRoutes.length === 2,
   "a clone made from a folder, or from a clone of one, names the repository its first clone's origin names", bareRoutes.join());
-ok([loose, inside].every(at => /names no repository on github\.com, nor does the origin of the clone it was made from/.test(privateOf(at, { env: {}, ask: notAsked, bare: notAsked }).unread ?? "")),
-  "a clone whose folder is not there, or is a folder inside another clone and no clone itself, names none, and asks nothing");
+ok([loose, inside, afar].every(at => /names no repository on github\.com, nor does the origin of the clone it was made from/.test(privateOf(at, { env: {}, ask: notAsked, bare: notAsked }).unread ?? "")),
+  "a clone whose folder is not there, is on another machine, or is a folder inside another clone and no clone itself, names none, and asks nothing");
 
 // ---- the read with no sign-in itself, its own process run, sent to a proxy that is not there ----
 // (the environment the reader is given, never this process's: here a proxy that is not there, so nothing leaves)
