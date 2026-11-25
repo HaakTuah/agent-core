@@ -677,12 +677,29 @@ function summaryOf(ctx, packages, entries, scanned, failing) {
  * cannot tell what ships), and lets the named data and font packages through to this check, which holds each to its
  * own list; and, of those the owner accepted, the ones whose accepted licence the tools' list would refuse, which this
  * check holds to its yes for that exact version (the review knows a package by its name alone, so it reads no version
- * of such a one).
+ * of such a one). It lets through, too, those the core's own config (`core`) names so, since the review reads every
+ * lock file a pull request changes, the core's copy among them, and the core's own lock files are held under the core's
+ * config in the core's own repository, the copy held to it byte for byte (#1310): a sync never fails on what the
+ * project did not change ("Nothing locks a project" in the core's AGENTS.md). A package of the project's own of such a
+ * name is still held by this check to the project's config.
  */
-export function actionLists(config) {
+export function actionLists(config, core = coreConfig()) {
   const lists = policy(config), tools = new Set(lists.tools);
-  const yeses = (config.accepted ?? []).filter((a) => a.package !== undefined && !licenceOk(a.licence, tools)).map((a) => a.package.slice(0, a.package.lastIndexOf("@")));
-  return [`allow-licenses=${lists.tools.join(",")}`, `allow-dependencies-licenses=${[...new Set([...(config.data ?? []), ...(config.fonts ?? []), ...yeses])].map((n) => `pkg:npm/${n}`).join(",")}`];
+  const through = (c) => [...(c.data ?? []), ...(c.fonts ?? []), ...(c.accepted ?? []).filter((a) => a.package !== undefined && !licenceOk(a.licence, tools)).map((a) => a.package.slice(0, a.package.lastIndexOf("@")))];
+  return [`allow-licenses=${lists.tools.join(",")}`, `allow-dependencies-licenses=${[...new Set([...through(config), ...through(core)])].map((n) => `pkg:npm/${n}`).join(",")}`];
+}
+
+// The core's own licence config, beside this script's folder (.github/licences.json, which the copy holds too), or
+// none where it is not there; each name it would let through held to npm's form.
+export function coreConfig(at = fileURLToPath(new URL("../.github/licences.json", import.meta.url))) {
+  if (!existsSync(at)) return {};
+  const mend = "Mend: take the core's .github/licences.json back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)";
+  let core;
+  try { core = JSON.parse(readFileSync(at, "utf8")); } catch { throw new Error(`the core's own licence config, ${at}, cannot be read as JSON. ${mend}`); }
+  const npmName = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/u;
+  const names = [...(core?.data ?? []), ...(core?.fonts ?? []), ...(Array.isArray(core?.accepted) ? core.accepted : []).filter((a) => a?.package !== undefined).map((a) => (typeof a.package === "string" ? a.package.slice(0, a.package.lastIndexOf("@")) : a.package))];
+  if (!core || typeof core !== "object" || Array.isArray(core) || [core.data, core.fonts, core.accepted].some((l) => l !== undefined && !Array.isArray(l)) || names.some((n) => typeof n !== "string" || !npmName.test(n))) throw new Error(`the core's own licence config, ${at}, names what is no npm package name in "data", "fonts" or "accepted". ${mend}`);
+  return core;
 }
 
 if (started(import.meta.url)) {
@@ -695,7 +712,9 @@ if (started(import.meta.url)) {
     root = projectAt(fileURLToPath(new URL(".", import.meta.url))).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();
   } catch (e) { fail(e.message); }
   if (process.argv.includes("--action")) {
-    for (const line of actionLists(config)) console.log(line);
+    let lines;
+    try { lines = actionLists(config); } catch (e) { fail(e.message); }
+    for (const line of lines) console.log(line);
   } else {
     let result;
     try { const base = baseOf(root); result = check(config, root, base, configAt(root, base, configPath)); } catch (e) { fail(e.message); }

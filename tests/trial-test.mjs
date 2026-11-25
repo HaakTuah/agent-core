@@ -13,7 +13,7 @@ import path from "node:path";
 import { RUN_FROM } from "../scripts/check.mjs";
 import { sameNode, standIns } from "../scripts/check-actions.mjs";
 import { closing, movesForward, ownJobs, syncCalls, triggered } from "../scripts/check-calls.mjs";
-import { COUNTS, compared, trialAt, trialRecord } from "../scripts/release-trial.mjs";
+import { BLIND, COUNTS, compared, trialAt, trialRecord } from "../scripts/release-trial.mjs";
 import { sideOf } from "../scripts/attached.mjs";
 import { notInstalled } from "../scripts/packages.mjs";
 import { mended } from "../scripts/mend.mjs";
@@ -184,6 +184,7 @@ jobs:
     "a trial with jobs that ran before and were stopped after holds the cut (#1257), the baseline from a clone of the core counted", `${stopped.said}\n${stopped.held}`);
   const clean = trialAt(SHA("a"), showing({ ...record, failedAfter: 0, stoppedAfter: 0 }));
   ok(clean.held === null && /0 ran before and stopped after it behind a failure/u.test(clean.said), "  and with none stopped, unrun or failed after, it holds nothing", clean.said);
+  ok(clean.said.endsWith(BLIND) && /dependency review.*only on a real pull request.*core's own tests hold the dependency review's lists/u.test(BLIND), "  and what it says names the blind spot, GitHub's dependency review, which runs only on a real pull request, and that the core's own tests hold its lists (#1310)", clean.said);
   ok(trialAt(SHA("a"), showing(record)).held !== null, "  where one failed after, it holds the cut");
   ok(trialAt(SHA("a"), showing({ ...record, baselineFromClone: 3 })).held !== null, "  and a record with more baselines from a clone than projects is in no form it writes");
 

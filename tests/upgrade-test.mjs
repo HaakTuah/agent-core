@@ -14,8 +14,8 @@
 // after it, the core's checks from plain git (scripts/check.mjs --own) run on a push to main and on a pull request of
 // its own, its own workflows among them, one of which runs a check of its copy with no install step (the case of
 // #1079), and no job that passed before fails after (release-trial.mjs, compared); in a new repository of each kind, as the
-// kit at the commit under test writes it, every job passes (#1084). GitHub's own services
-// (CodeQL, the dependency review) are not run here, and GitHub's API is a stand-in that gives the security-review check
+// kit at the commit under test writes it, every job passes (#1084). CodeQL is not run here, the
+// dependency review stands in by its lists over what a pull request brings into an npm lock file (#1310), and GitHub's API is a stand-in that gives the security-review check
 // one completed review. The sync's pull request is pure, as pure-sync.mjs reads it from the release it moves to, in
 // both projects. Each holds old content too, a breach of each kind a check reads (a long file, a function past a mark,
 // two files that import each other, a module its manifest's list does not name, a copy in its prose): none fails, a
@@ -59,6 +59,7 @@ import { STEPS, callers, leads, notDone, project as read, report } from "../scri
 import { FOLDER, NOTICE, notesAt } from "../scripts/sync-notes.mjs";
 import { ASIDE } from "../scripts/sync-pins.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
+import { licenceOk } from "../scripts/licences.mjs";
 import { compared } from "../scripts/release-trial.mjs";
 import { evaluate, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
 
@@ -363,6 +364,22 @@ fs.mkdirSync(installedOnce.temp);
   const ran = fs.readFileSync(count, "utf8").split("\n").filter(l => l === "install").length;
   ok(ran === 2 && i1.passed && i2.passed && i3.passed, "an install step runs once for each set of lock files, and the job after it finds the packages in its own workspace", String(ran));
 }
+// A stand-in for GitHub's dependency review on a pull request against `baseSha` (#1310): each package it brings into an
+// npm lock file, or moves to another version, refused where its licence is on none of `allow-licenses` and its name in
+// none of `allow-dependencies-licenses`, as the review refuses it; not run where there is no base to read it against.
+function reviewed(w, ws, baseSha) {
+  if (!baseSha) return false;
+  const list = k => new Set(String(w[k] ?? "").split(",").filter(Boolean));
+  const allow = list("allow-licenses"), through = list("allow-dependencies-licenses");
+  const at = (rev, f) => { try { return JSON.parse(git(ws, "show", `${rev}:${f}`)).packages ?? {}; } catch { return {}; } };
+  const refused = git(ws, "diff", "--name-only", baseSha, "HEAD").split("\n").filter(f => /(^|\/)package-lock\.json$/.test(f)).flatMap(f => {
+    const was = at(baseSha, f);
+    return Object.entries(at("HEAD", f)).filter(([p, e]) => p && !e.link && was[p]?.version !== e.version)
+      .map(([p, e]) => [p.slice(p.lastIndexOf("node_modules/") + "node_modules/".length), e.license])
+      .filter(([name, licence]) => !through.has(`pkg:npm/${name}`) && !licenceOk(licence, allow)).map(([name, licence]) => `${f}: ${name} (${licence})`);
+  });
+  if (refused.length) throw new Error(`the dependency review refuses ${refused.join(", ")}`);
+}
 // Every workflow of the project's that one event starts, and in it each call to a workflow of the core's, as GitHub
 // would run it on the commit `sha` (a pull request: the head, against `baseSha`, pushed to, or as `action` says, a
 // draft where `draft`). Each result: [file/job, result].
@@ -389,7 +406,7 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
       } else if (w.ref) git(ws, "checkout", "-q", "--detach", git(ws, "rev-parse", `origin/${w.ref}`));
     },
     "actions/setup-node": () => {}, // (the Node this test runs on is the core's own, in CI)
-    "actions/dependency-review-action": () => false,
+    "actions/dependency-review-action": (w, ws) => reviewed(w, ws, baseSha),
     "github/codeql-action/init": () => false,
     "github/codeql-action/analyze": () => false,
   };
