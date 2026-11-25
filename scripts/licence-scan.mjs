@@ -36,7 +36,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import { join, posix } from "node:path";
 import { OWNER } from "./core-address.mjs";
-import { DEEPEST, leadsOut, tooDeep } from "./guards.mjs";
+import { DEEPEST, leadsOut, parseBounded, tooDeep } from "./guards.mjs";
 import { commandLines, commands } from "./licence-commands.mjs";
 import { downloads, otherFetches } from "./licence-fetchers.mjs";
 import { fetched } from "./licence-npm.mjs";
@@ -92,7 +92,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = [], base = 
 
   for (const key of ["served", "tools", "skip"]) for (const p of settings[key] ?? []) if (p !== "" && !tracked.some((f) => holds(p, f))) fail(`the config's "scan.${key}": ${p} names no tracked file. Mend: correct the path, a folder ending in "/", or take it out`);
   for (const e of entries) entryFaults(c, e);
-  c.locks = lockfiles.map((l) => ({ dir: posix.dirname(l) === "." ? "" : `${posix.dirname(l)}/`, packages: JSON.parse(readFileSync(join(root, l), "utf8")).packages ?? {} }));
+  c.locks = lockfiles.map((l) => ({ dir: posix.dirname(l) === "." ? "" : `${posix.dirname(l)}/`, packages: parseBounded(readFileSync(join(root, l), "utf8")).packages ?? {} }));
   for (const f of files) scanned(c, f);
   return { failures, reports, scanned: files.length };
 }

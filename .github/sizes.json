@@ -280,6 +280,14 @@
     "tests/nuget-fetch-test.mjs": {
       "mark": 27539,
       "why": "One feature's cases (the fetch before the NuGet check's restore) on the scratch project and the package files they share, each case reading what the one before committed; split, each file would write that project again and add to the suite's time"
+    },
+    "scripts/merge-line.mjs": {
+      "mark": 20602,
+      "why": "the question of a split is asked in #1345"
+    },
+    "scripts/screens.mjs": {
+      "mark": 23155,
+      "why": "the question of a split is asked in #1345"
     }
   }
 }

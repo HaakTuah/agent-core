@@ -36,7 +36,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { inProject, leadsOut, logged, unrooted } from "./guards.mjs";
+import { inProject, leadsOut, logged, parseBounded, unrooted } from "./guards.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { whole } from "./core-owned.mjs";
 import { readBlobs } from "./blobs.mjs";
@@ -392,7 +392,7 @@ if (from) {
   }
   let there = true;
   try { git(["cat-file", "-e", `${from}:${BASELINE}`]); } catch { there = false; } // no baseline on that branch yet
-  const old = there ? counted(JSON.parse(git(["show", `${from}:${BASELINE}`])).windows, `${from}:${BASELINE}`) || null : null;
+  const old = there ? counted(parseBounded(git(["show", `${from}:${BASELINE}`])).windows, `${from}:${BASELINE}`) || null : null;
   // (save a window of a copy that stands in an agent tool's file and that the base held there in as many places:
   // listing what stood is what --tools does, and the base is the list until it is written; #405)
   const raised = old ? Object.entries(base.windows).filter(([h, n]) => (!(h in old) || n > old[h]) && !(toolWindows.has(h) && stood(h, n))) : [];
