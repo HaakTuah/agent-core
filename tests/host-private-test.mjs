@@ -63,12 +63,13 @@ ok([loose, inside, afar].every(at => /names no repository on github\.com, nor do
   "a clone whose folder is not there, is on another machine, or is a folder inside another clone and no clone itself, names none, and asks nothing");
 
 // ---- an origin that names another machine, a UNC path or a device path (#1295) ----
-// (every path the reader probes or reads is recorded, so the origins as written bite everywhere; that the reader maps
-// none to a UNC path, `/\\host\\share` resolving to one, bites on Windows alone, where git and node read it so)
+// (every path the reader probes or reads is recorded, so each case bites on every system: the origins as written are
+// stopped as written, and `file:////host/share`, which names no host, is stopped once mapped, to `//host/share` where
+// node maps it, and refused by node on Windows)
 const probed = [], { existsSync, realpathSync } = fs;
 fs.existsSync = at => { probed.push(String(at)); return existsSync(at); };
 fs.realpathSync = (at, ...rest) => { probed.push(String(at)); return realpathSync(at, ...rest); };
-const unc = ["\\\\some-other-machine\\share\\clone", "//some-other-machine/share/clone", "\\\\?\\UNC\\some-other-machine\\share\\clone", "/\\some-other-machine\\share\\clone"].map((origin, n) => {
+const unc = ["\\\\some-other-machine\\share\\clone", "//some-other-machine/share/clone", "\\\\?\\UNC\\some-other-machine\\share\\clone", "/\\some-other-machine\\share\\clone", "file:////some-other-machine/share/clone"].map((origin, n) => {
   const at = path.join(tmp, `unc-${n}`); clone(at, origin); return at;
 });
 const answers = path.join(tmp, "answers.json");
@@ -76,7 +77,8 @@ fs.writeFileSync(answers, JSON.stringify({ [path.join(tmp, "elsewhere")]: { priv
 const uncRead = unc.map(at => privateOf(at, { env: {}, ask: notAsked, bare: notAsked }));
 unc.forEach(at => privateOf(at, { env: { CORE_HOST_ANSWERS: answers }, ask: notAsked, bare: notAsked }));
 fs.existsSync = existsSync; fs.realpathSync = realpathSync;
-const far = probed.filter(at => /^[\\/]{2}|some-other-machine/.test(at));
+// (a path on another machine, or one that would be once joined: node joins `//host/share` and `.git` to `/host/share/.git`)
+const far = probed.filter(at => /^[\\/]{2}|^[\\/]some-other-machine/.test(at));
 ok(uncRead.every(r => /names no repository on github\.com, nor does the origin of the clone it was made from/.test(r.unread ?? "")) && far.length === 0,
   "an origin that names another machine, as a UNC or device path does, is not followed: nothing there is probed or read, and it names no repository, as any origin the reader cannot map", far.join(" "));
 
