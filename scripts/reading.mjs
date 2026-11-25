@@ -472,7 +472,9 @@ export function hookLine(dir, ms = 8000) {
 function alone(argv, dir, prefix, lib) {
   if (argv.includes("--check")) {
     const found = faults(lib, f => real(dir, `${prefix}${f}`) === "file");
-    for (const f of found) console.error(`FAIL: ${f}`);
+    // (each as text alone, a file's name in it being the pull request's, #1348: guards.mjs loaded here alone, since the
+    // start hook runs this script from its standard input, where no file beside it can be imported)
+    if (found.length) import("./guards.mjs").then(({ asText }) => { for (const f of found) console.error(asText(`FAIL: ${f}`)); });
     if (!found.length) console.log(`each of the ${Object.keys(lib.modules).length} modules and ${Object.keys(lib.roles).length} roles says when it is read, in words the reading script matches`);
     return found.length ? 1 : 0;
   }

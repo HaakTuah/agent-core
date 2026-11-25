@@ -46,7 +46,7 @@ import { fileURLToPath } from "node:url";
 import { CODE } from "./code-shape.mjs";
 import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
-import { loggedAlone } from "./guards.mjs";
+import { asText, loggedAlone } from "./guards.mjs";
 import { WORDS, mentioned, nameTrie } from "./name-trie.mjs";
 import { Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
@@ -258,7 +258,7 @@ async function main(argv) {
   // sets another variable for the steps after it)
   if (!s.all && s.tests.some(t => !PLAIN.test(t))) Object.assign(s, { all: true, why: "a test's file name holds what a list of names cannot (a space or a line's end)" });
   const lines = said(s, now ? now.tests.size : "all its");
-  console.log(lines.join("\n"));
+  console.log(lines.map(asText).join("\n")); // (each as text alone: a file's name in it is the pull request's; #1348)
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
   // (nothing selected is "none", as everything is "all": a runner given an empty list would run every test)
   if (opts["--env"]) fs.appendFileSync(process.env.GITHUB_ENV, `${opts["--env"]}=${s.all ? "all" : s.none ? "none" : ` ${s.tests.join(" ")} `}\n`);

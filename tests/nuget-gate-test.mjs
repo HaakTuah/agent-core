@@ -202,6 +202,12 @@ printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":
   const unnamed = atCopy("core/", "core/", failing(""), { "::error::x/App.csproj": project() }).out, coded = atCopy("core/", "core/", failing('echo "error NU1004: the lock file"'), { "src/##[group]x/App.csproj": project() }).out;
   ok(unnamed.includes(": :error: :x/App.csproj: the restore failed with no error NuGet names") && !/^\s*::/m.test(unnamed), "a project file's path that starts with \"::\" is broken where the restore fails with no error named", unnamed);
   ok(coded.includes("src/# #[group]x/App.csproj: error NU1004") && !coded.includes("##["), "and one that holds \"##[\" is broken where it fails with an error NuGet names", coded);
+  // (and where only letters beyond ASCII stand between a pair's marks: in the project's path and in what dotnet printed;
+  // #1348)
+  const pair = /:[^\u0000-\u007f]*:|#[^\u0000-\u007f]*#[^\u0000-\u007f]*\[/u;
+  const beyond = atCopy("core/", "core/", failing('echo "the restore of #\u00e9#[group]y stopped"'), { "src/:\u00e9:a#\u00e9#[group]x/App.csproj": project() }).out;
+  ok(beyond.includes("src/: \u00e9:a# \u00e9#[group]x/App.csproj: the restore failed with no error NuGet names") && beyond.includes("  | the restore of # \u00e9#[group]y stopped") && !pair.test(beyond),
+    "and a letter beyond ASCII between a pair's marks breaks nothing: the path and dotnet's lines are shown with each pair broken", beyond);
 }
 
 done("the NuGet check's own steps");

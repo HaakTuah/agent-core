@@ -23,8 +23,10 @@ paths=(':(glob,icase)**/*.csproj' ':(glob,icase)**/*.fsproj' ':(glob,icase)**/*.
 # package of the project's, and the same for every project on the runner's SDK)
 PACKS='Microsoft\.(NETCore|WindowsDesktop|AspNetCore)\.App\.Ref'
 # A file's name as a line here writes it: each "::" and "##[" broken, as in NuGet's own output below, so that no name a
-# pull request adds starts or holds a workflow command, on any of its lines.
-shown() { printf '%s\n' "$1" | sed -e ':a' -e 's/::/: :/' -e 'ta' -e 's/##\[/# #[/g'; }
+# pull request adds starts or holds a workflow command, on any of its lines, also where only bytes beyond printable
+# ASCII stand between a pair's marks (as asText in guards.mjs, which the scripts in Node print by; #1348).
+COLONS='s/:\([^ -~]*:\)/: \1/' HASHES='s/#\([^ -~]*#[^ -~]*\[\)/# \1/g'
+shown() { printf '%s\n' "$1" | LC_ALL=C sed -e ':a' -e "$COLONS" -e 'ta' -e "$HASHES"; }
 holds() {
   local empty config stamp project out codes id projects locks records
   # (from here the pull request's build files have run in this job: the licence read before the restore is
@@ -48,7 +50,7 @@ holds() {
     # read as a workflow command, which the runner finds after leading spaces, and "##[" anywhere; where none says
     # error, all it printed; #1239)
     [ -n "$codes" ] || { echo "$(shown "$project"): the restore failed with no error NuGet names. It printed:"
-      { printf '%s\n' "$out" | grep -iw error || printf '%s\n' "$out"; } | tr -d '\r' | sed 's/##\[/# #[/g; s/^/  | /'; return 1; }
+      { printf '%s\n' "$out" | grep -iw error || printf '%s\n' "$out"; } | tr -d '\r' | LC_ALL=C sed -e "$HASHES" -e 's/^/  | /'; return 1; }
     if printf '%s\n' "$codes" | grep -qvE '^error NU110[123]$'; then echo "$(shown "$project"):" $codes; return 1; fi
     while IFS= read -r id; do
       printf '%s\n' "$id" | grep -qxE "$PACKS" && continue

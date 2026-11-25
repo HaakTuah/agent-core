@@ -13,7 +13,7 @@ import path from "node:path";
 import { crc32, deflateRawSync } from "node:zlib";
 import { mended, unmended } from "../scripts/mend.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
-import { cut, fetchAll as fetchedAll, fileAddress, named, nuspecOf, toolsOf } from "../scripts/nuget-fetch.mjs";
+import { cut, fetchAll as fetchedAll, fileAddress, named, nuspecOf, printed, toolsOf } from "../scripts/nuget-fetch.mjs";
 import { REGISTRY, check as checked } from "../scripts/nuget.mjs";
 
 // (each failure the fetch and the check give in this test, read as they print it, for its mend; the last assertion
@@ -65,6 +65,17 @@ ok(JSON.stringify(named(nuspec("Foo", "1.1.0", "MIT"))) === '{"id":"Foo","versio
 // a tool, at one exact version
 const t = toolsOf(JSON.stringify({ version: 1, isRoot: true, tools: { "dotnet-ef": { version: "9.0.1", commands: ["dotnet-ef"] }, "range-tool": { version: "[1.0,2.0)" }, "star-tool": { version: "1.*" }, "no-version": {} } }), "x/.config/dotnet-tools.json");
 ok(t.tools.length === 1 && t.tools[0].id === "dotnet-ef" && t.failures.length === 3 && t.failures.every(f => f.includes("one exact version")), "a tool is held to one exact version: a range, a wildcard or none fails", JSON.stringify(t));
+// (a manifest's path and what it holds, and a source's error, are printed as text alone: "::" and "##[" broken, also where
+// only letters beyond ASCII stand between their marks, and a control character shown as "?", so the runner reads no line
+// as a workflow command; #1348)
+{
+  const at = "::a##[group]b\u0001c#\u00e9#[d/.config/dotnet-tools.json";
+  const odd = toolsOf(JSON.stringify({ version: 1, isRoot: true, tools: { "::x##[y": { version: "1.0.0" }, "z.tool": { version: "1:\u00f8:*" } } }), at);
+  const lines = printed({ notes: [`${at} is read`], reports: [], failures: [...odd.failures, `${at}: local-packages/ could not be read (::stop-commands::x ##[error]y). Mend: run the check again`] });
+  const all = [...lines.out, ...lines.err];
+  ok(lines.err.length === 3 && all.every(l => !/[\u0000-\u001f\u007f]/u.test(l) && !/^\s*:[^\u0000-\u007f]*:/u.test(l) && !/:[^\u0000-\u007f]*:|#[^\u0000-\u007f]*#[^\u0000-\u007f]*\[/u.test(l))
+    && lines.err[0].startsWith("FAIL: : :a# #[group]b?c# \u00e9#[d/.config/dotnet-tools.json: "), "a failure naming a manifest whose path holds \"::\", \"##[\", a letter beyond ASCII between their marks or a control character, and a source's error holding them, is printed with none read as a command", all.join("\n"));
+}
 
 // a project: its lock file, a tools manifest, and a folder of package files the config names as a source
 const root = path.join(tmp, "project"), source = path.join(root, "local-packages");

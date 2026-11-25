@@ -7,7 +7,7 @@
 //   node tests/guards-test.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { DEEPEST, aCommit, aRepository, inProject, leadsOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
+import { DEEPEST, aCommit, aRepository, inProject, asText, leadsOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -43,7 +43,17 @@ try {
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 
 const name = "a%b\r\n::name::value\u2028c\u0007d";
-ok(!/[\r\n\u2028\u0007]/u.test(logged(name)) && logged(name).startsWith("a%25b%0D%0A::") && logged("plain/name.js") === "plain/name.js", "a name printed to the log stays on its one line, escaped as GitHub documents", logged(name));
+ok(!/[\r\n\u2028\u0007]/u.test(logged(name)) && logged(name).startsWith("a%25b%0D%0A: :name: :value") && logged("plain/name.js") === "plain/name.js", "a name printed to the log stays on its one line, escaped as GitHub documents, each \"::\" broken", logged(name));
+// (a pull request chooses its files' names: none is read by the runner as a workflow command, "::" at a line's start or
+// "##[" anywhere, also where only letters beyond ASCII stand between the marks; #1348)
+{
+  const hostile = "::a##[group]b:\u00e9:c#\u00e9#[d#\u00f8#\u00e5[e:::\u0001###[f";
+  const shownAs = asText(hostile), commands = /:[^\u0000-\u007f]*:|#[^\u0000-\u007f]*#[^\u0000-\u007f]*\[/u;
+  ok(shownAs === ": :a# #[group]b: \u00e9:c# \u00e9#[d# \u00f8#\u00e5[e: : :?## #[f" && !commands.test(shownAs) && !commands.test(logged(hostile)),
+    "a name holding \"::\", \"##[\", a letter beyond ASCII between their marks or a control character is shown with none of them read as a command", shownAs);
+  ok(asText(shownAs) === shownAs && ["src/App.csproj", "12:30:45", "a:b#c[d", "a#b#[c", "\u00e6:\u00f8"].every(t => asText(t) === t),
+    "and shown again it changes nothing, nor does it change a name with no such pair");
+}
 
 ok(oneLine("100%Coverage/App.csproj") === "100%Coverage/App.csproj" && oneLine("a\nb\u2028c") === "a?b?c", "a name with no control character is shown as it stands, \"%\" and all; one with them, on one line");
 
