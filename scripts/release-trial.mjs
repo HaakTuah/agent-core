@@ -72,7 +72,7 @@ const ranClass = (now, then) => {
 
 // The record of a trial at `sha` on the day `day`: each project's runs, [before, after], counted, and how many baselines
 // the release's check.mjs took from a clone of the core, where the copy's could not (#1244); no pair where no project
-// that takes the core allowed one; and the syncs' readings, `answers`, a pair's each or null (trial-sync.mjs; #1261).
+// that takes the core allowed one; and the syncs' readings, `answers`, one for each pair (trial-sync.mjs; #1261).
 export function trialRecord(sha, day, pairs, answers = []) {
   const counts = Object.fromEntries(COUNTS.map(k => [k, 0]));
   for (const [before, after] of pairs) for (const [k, jobs] of Object.entries(compared(before, after))) counts[k] += jobs.length;
@@ -140,7 +140,7 @@ function ownProjects() {
 export const ownCount = printed => printed.split("\n").filter(l => /^- (`[^`]+`|a private project of the owner's): /.test(l)).length;
 
 
-// --trial <sha> [<before> <after> [--sync <reading>]]...: writes the trial's record, each pair one project's runs of
+// --trial <sha> [<before> <after> --sync <reading>]...: writes the trial's record, each pair one project's runs of
 // check.mjs --verdicts, and each `--sync` after it what pure-sync.mjs --trial printed of that project's sync (#1261).
 export function trial([sha, ...args], fail) {
   const { files, syncs } = syncsIn(args);

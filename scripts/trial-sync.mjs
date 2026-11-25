@@ -34,12 +34,13 @@ export function syncsIn(args) {
   return { files, syncs };
 }
 
-// Each project's answer, null where no --sync was given, from the files `syncs` names; or `why` the first is none.
+// Each project's answer, from the files `syncs` names, one for each pair; or `why` the first is none: a pair with no
+// --sync is refused, so no trial is recorded that never asked the reading.
 export function answersOf(syncs, sha, pairs) {
   const answers = [];
   for (let n = 0; n < pairs; n++) {
     const f = syncs[n];
-    if (f === undefined) { answers.push(null); continue; }
+    if (f === undefined) return { why: `project ${n + 1}'s runs are given with no --sync after them: run \`node <a clone of the core at ${sha.slice(0, 7)}>/scripts/pure-sync.mjs --trial ${sha} > <a file outside every repository>\` in that project's clone with its sync's branch checked out, and give that file with --sync after its pair` };
     let text = null;
     try { text = fs.readFileSync(f, "utf8"); } catch { /* (not read) */ }
     const got = text === null ? { why: "cannot be read" } : answerOf(text, sha);
@@ -51,22 +52,21 @@ export function answersOf(syncs, sha, pairs) {
 
 // The record's counts of the answers: the syncs pure and not, and the copies the runs before started from.
 export function syncCounts(answers) {
-  const asked = answers.filter(Boolean), copiesFrom = {};
-  for (const { from } of asked) copiesFrom[from] = (copiesFrom[from] ?? 0) + 1;
-  return { syncPure: asked.filter(a => a.pure).length, syncNotPure: asked.filter(a => !a.pure).length, copiesFrom };
+  const copiesFrom = {};
+  for (const { from } of answers) copiesFrom[from] = (copiesFrom[from] ?? 0) + 1;
+  return { syncPure: answers.filter(a => a.pure).length, syncNotPure: answers.filter(a => !a.pure).length, copiesFrom };
 }
 
-// Whether a record's counts of the syncs are in their form: counts, no more than its projects, and copies that add up to
-// the answers, each named as FROM says.
+// Whether a record's counts of the syncs are in their form: counts, one for each project, and copies that add up to
+// them, each named as FROM says.
 export function syncFormed(r) {
   const from = r.copiesFrom !== null && typeof r.copiesFrom === "object" && !Array.isArray(r.copiesFrom) ? Object.entries(r.copiesFrom) : null;
-  const counts = [r.syncPure, r.syncNotPure].every(n => Number.isInteger(n) && n >= 0) && r.syncPure + r.syncNotPure <= r.projects;
+  const counts = [r.syncPure, r.syncNotPure].every(n => Number.isInteger(n) && n >= 0) && r.syncPure + r.syncNotPure === r.projects;
   return counts && from !== null && from.every(([k, n]) => FROM.test(k) && Number.isInteger(n) && n > 0) && from.reduce((sum, [, n]) => sum + n, 0) === r.syncPure + r.syncNotPure;
 }
 
 // What a record says of them.
 export function syncSaid(r) {
   const from = Object.entries(r.copiesFrom).map(([k, n]) => `${n} from ${k === "main" ? "a commit of the core's main that is no release" : k === "unknown" ? "a copy not read" : k}`);
-  const left = r.projects - r.syncPure - r.syncNotPure;
-  return `Against the commit tried, as pure-sync.mjs --trial reads it, holding no cut: ${r.syncPure} of the syncs pure, ${r.syncNotPure} not${left ? `, ${left} not asked` : ""}${from.length ? `; the runs before the update started from the copies their main held, ${from.join(", ")}` : ""}.`;
+  return `Against the commit tried, as pure-sync.mjs --trial reads it, holding no cut: ${r.syncPure} of the syncs pure, ${r.syncNotPure} not${from.length ? `; the runs before the update started from the copies their main held, ${from.join(", ")}` : ""}.`;
 }
