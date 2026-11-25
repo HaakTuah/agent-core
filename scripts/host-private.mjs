@@ -56,10 +56,10 @@ const originUrl = root => spawnSync("git", ["config", "--get", "remote.origin.ur
 function originOf(root, origin) {
   let at = root, url = origin;
   for (let hop = 0; hop < 4 && url && !repoOf(url); hop++) {
-    const local = /^file:\/\//i.test(url) ? fileFolder(url) : /^[a-z][\w+.-]*:\/\/|^[^/\\]+@[^:]+:/i.test(url) ? null : path.resolve(at, url);
+    const local = /^file:\/\//i.test(url) ? fileFolder(url) : /^[a-z][\w+.-]*:\/\/|^[^/\\]+@[^:]+:/i.test(url) || afar(url) ? null : path.resolve(at, url);
     // (a folder that is itself a clone, its .git there or a bare one's HEAD and objects; never one inside another
-    // clone, whose origin git would find by searching upward)
-    if (!local || !(fs.existsSync(path.join(local, ".git")) || (fs.existsSync(path.join(local, "HEAD")) && fs.existsSync(path.join(local, "objects"))))) break;
+    // clone, whose origin git would find by searching upward, nor one on another machine)
+    if (!local || afar(local) || !(fs.existsSync(path.join(local, ".git")) || (fs.existsSync(path.join(local, "HEAD")) && fs.existsSync(path.join(local, "objects"))))) break;
     at = local;
     url = originUrl(at);
   }
@@ -71,13 +71,18 @@ function originOf(root, origin) {
 // probing would send a sign-in to), so a hostile clone's origin makes no connection.
 const fileFolder = url => { try { const host = new URL(url).hostname; return host && host !== "localhost" ? null : fileURLToPath(url); } catch { return null; } };
 
+// Whether a path names another machine, or may: two slashes or backslashes first, as a UNC path (`\\host\share`,
+// `//host/share`) and a device path (`\\?\UNC\host\share`) begin on Windows; such an origin is never followed, nothing
+// there probed or read, and it reads as one that names no repository (#1295).
+const afar = at => /^[\\/]{2}/.test(at);
+
 // A test's answer for the project, by its root or by its origin, which each clone of it shares; else null.
 function answered(env, root, origin) {
   if (!env.CORE_HOST_ANSWERS) return null;
   const real = at => { try { return fs.realpathSync(at); } catch { return path.resolve(at); } };
   let answers = {};
   try { answers = JSON.parse(fs.readFileSync(env.CORE_HOST_ANSWERS, "utf8")); } catch { /* (none: as no answer) */ }
-  const found = Object.entries(answers).find(([at]) => real(at) === real(root) || (origin && real(at) === real(origin)))?.[1];
+  const found = Object.entries(answers).find(([at]) => real(at) === real(root) || (origin && !afar(origin) && real(at) === real(origin)))?.[1];
   return typeof found?.private === "boolean" ? { private: found.private } : null;
 }
 
