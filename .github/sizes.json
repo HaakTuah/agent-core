@@ -120,7 +120,7 @@
       "why": "Whoever changes how the total is counted reads its tree reader, its readers, its cut and its conditions together, each calling the others; split, that session opens more files and reads no less, and no other task reads it."
     },
     "scripts/reading.mjs": {
-      "mark": 32082,
+      "mark": 40311,
       "why": "The start hook runs it from git with no file beside it, so it stands alone (its opening says so): no part can be moved to a file of its own."
     },
     "scripts/size.mjs": {

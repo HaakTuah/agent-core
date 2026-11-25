@@ -36,6 +36,7 @@ import { CORE } from "./core-address.mjs";
 import { MEND } from "./mend.mjs";
 import { installStep, installed } from "./packages.mjs";
 import { npmIgnores, npmReadsAll, npmRefusal, npmVersion } from "./npm-reads.mjs";
+import { asText } from "./guards.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 
@@ -320,7 +321,8 @@ function changes(base, paths, none) {
     if (!base) return true;
     try { git(["cat-file", "-e", `${base}^{commit}`]); } catch { git(["fetch", "--quiet", "--no-tags", "--depth=1", "origin", base]); }
     const changed = git(["diff", "--no-renames", "--name-only", base, "HEAD", "--", ...paths]).split("\n").filter(Boolean);
-    if (changed.length) { console.log(`Changed:\n${changed.map(f => `- ${f}`).join("\n")}`); return true; } // (behind a dash, so no file's name starts a workflow command)
+    // (each name behind a dash and as text alone, so none starts or holds a workflow command; #1348)
+    if (changed.length) { console.log(`Changed:\n${changed.map(f => `- ${asText(f)}`).join("\n")}`); return true; }
     if (/^120000 /m.test(git(["ls-files", "-s", "--", ...paths]))) { console.log("A listed file is a link to another, whose changes this step would not see."); return true; }
     console.log(none);
     return false;

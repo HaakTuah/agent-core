@@ -154,7 +154,7 @@ try {
     put(odd, `# Odd\n\n${OTHER}.\n`);
     g("add", "-A");
     r = check({ COPIES_BASE: written });
-    ok(r.status === 1 && /^FAIL: a new copy: .*x%0A::error::y\.md/m.test(r.out) && !/^::error::/m.test(r.out), "a file in a tool's folder whose name holds a line break is named on one line, escaped", r.out);
+    ok(r.status === 1 && /^FAIL: a new copy: .*x%0A: :error: :y\.md/m.test(r.out) && !/::/.test(r.out), "a file in a tool's folder whose name holds a line break is named on one line, escaped, each \"::\" broken", r.out);
     g("rm", "-q", "-f", odd);
     // (a tool's file that is a link inside the project is read through it, at the base as in the work tree)
     fs.symlinkSync("../../docs/a.md", path.join(dir, ".kiro/steering/link.md"));

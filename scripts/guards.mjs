@@ -45,6 +45,10 @@ export function leadsOut(root, at) {
  *  text that held none. */
 export const oneLine = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
 
+/** Text for a line of a step's log, read there as text alone (#1348): on one line (oneLine), each "::" and "##[" a
+ *  workflow command opens broken as ": :" and "# #[", also with only characters beyond ASCII between their marks. */
+export const asText = text => oneLine(text).replace(/:(?=[^\u0000-\u007f]*:)/gu, ": ").replace(/#(?=[^\u0000-\u007f]*#[^\u0000-\u007f]*\[)/gu, "# ");
+
 /** Text with the user and password of every address in it cut out, up to the last "@" before the address's path
  *  ("git+https://user:pass@host/x" as "git+https://host/x"), so a sign-in a project's file holds in an address is not
  *  printed (floor rule 1). Read as the URL standard reads an address's authority: after one of its special schemes
@@ -179,9 +183,8 @@ export const quotedAlone = value => JSON.stringify(value, (key, part) => {
 
 /** Text from a project, made safe to print on one line of a workflow's log: any address's sign-in cut out (noSignIn),
  *  "%", a carriage return and a line feed escaped as GitHub documents a command's data is (%25, %0D, %0A), and any other
- *  control character or line separator shown as "?" (oneLine), so no part of it starts a line of its own, which GitHub
- *  Actions could read as a command. */
-export const logged = text => oneLine(noSignIn(text).replace(/%/gu, "%25").replace(/\r/gu, "%0D").replace(/\n/gu, "%0A"));
+ *  control character or line separator shown as "?", and a command's marks broken (asText). */
+export const logged = text => asText(noSignIn(text).replace(/%/gu, "%25").replace(/\r/gu, "%0D").replace(/\n/gu, "%0A"));
 /** A value printed to the log on its own (a failure's message, a name), its sign-in cut whole (noSignInWhole), then as
  *  logged. A sign-in may hold a mend's marker (". Mend: "), as a password may, and the URL standard reads one from an
  *  address to a later "@" all the same where the words between are a message's mend ("https://example.invalid. Mend:

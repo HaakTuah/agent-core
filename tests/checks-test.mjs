@@ -133,6 +133,17 @@ const run = (dir, args, extra = {}) => {
   ok(at("ran lookup.mjs [checks/a.json") >= 0 && at("ran lookup.mjs [checks/b.json") >= 0 && at("ran lookup.mjs [checks/b.json") < at("ran nuget-look.sh"),
     "two calls of the NuGet check: every config's lookup runs before any look, which may run the change's build files", order.out);
 }
+// a changed file's name is listed as text alone (#1348)
+{
+  const dir = project(), base = git(dir, "rev-parse", "HEAD");
+  git(dir, "update-index", "--add", "--cacheinfo", `100644,${git(dir, "rev-parse", "HEAD:core/.node-version")},web/a::b##[c\u0001\n:\u00e9:#\u00e9#[d/package.json`);
+  git(dir, "commit", "-qm", "n");
+  for (const q of ["true", "false"]) {
+    git(dir, "config", "core.quotePath", q);
+    const r = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base }), at = r.out.split("\n").find(l => l.includes("web/a"));
+    ok(at.startsWith('- "web/a: :b# #[c') && !/:[^\0-\x7f]*:|#[^\0-\x7f]*#[^\0-\x7f]*\[/u.test(at), `signatures: a name listed as text (quotePath ${q})`, r.out);
+  }
+}
 // the package checks look first: with nothing they read changed, nothing is installed or restored
 {
   const dir = project({ "web/package.json": "{}\n" });

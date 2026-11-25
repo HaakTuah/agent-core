@@ -24,7 +24,7 @@ import { FILES, TEMPLATES } from "./init.mjs";
 import { ENTRY_FILES } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { MODULE as WAYS_MODULE, readWays } from "./ways.mjs";
-import { parseBounded } from "./guards.mjs";
+import { asText, parseBounded } from "./guards.mjs";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const TABLE = "tasks/tools.md";
@@ -140,6 +140,6 @@ if (started(import.meta.url)) {
   const tools = parseBounded(fs.readFileSync(path.join(ROOT, "scripts/staged-tools.json"), "utf8")).tools;
   const r = wrong({ tools, tracked: gitFiles(ROOT), isOpen: process.argv.includes("--open") ? ghOpen : () => null });
   console.log(`The table of what the core offers each tool: ${tools.length} tools, ${r.wrong.length} wrong${r.unread.length && process.argv.includes("--open") ? `; gh could not say whether ${r.unread.map(n => `#${n}`).join(", ")} ${r.unread.length > 1 ? "are" : "is"} open, so nothing fails for ${r.unread.length > 1 ? "them" : "it"}` : ""}.`);
-  for (const w of r.wrong) console.log(`FAIL ${w}`);
+  for (const w of r.wrong) console.log(asText(`FAIL ${w}`)); // (as text alone: a file's name in it is the pull request's; #1348)
   if (r.wrong.length) process.exitCode = 1;
 }
