@@ -18,7 +18,7 @@
 //                                         could be read
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { leadsOut, logged, noSignIn } from "./guards.mjs";
+import { leadsOut, logged, noSignInWhole } from "./guards.mjs";
 import { loadConfig } from "./licences.mjs";
 import { GITHUB_MOST, archived, fetched, packagesOf, pool, registry } from "./lookup.mjs";
 import { copyOf } from "./core-path.mjs";
@@ -29,7 +29,7 @@ export const STALE = 365;
 export const SECONDS = 120;
 const DAY = 86400000;
 // (any sign-in cut out before the text is cut short, so an "@" past the cut still ends it: floor rule 1)
-const said = (value) => logged(noSignIn(String(value)).slice(0, 200));
+const said = (value) => logged(noSignInWhole(String(value)).slice(0, 200));
 const day = (ms) => new Date(ms).toISOString().slice(0, 10);
 
 /** The packages of the config at `configPath` (npm's and NuGet's, each read from its lock files), once each by name and

@@ -144,7 +144,7 @@ const KEY = /^(?:node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*\/)*node_modu
 const plainAddress = r => { try { return /^https:\/\/registry\.npmjs\.org\//u.test(r) && new URL(r).href === r; } catch { return false; } };
 // A spec not of npm's registry is never quoted, since it may name an address with a sign-in in it (floor rule 1): its
 // field and package say where it stands; a name or key, quoted as it stands, is cut of any sign-in where it is printed
-// (install.mjs, by guards.mjs's noSignIn, which this file does not import: it is copied alone; work-saved.sh).
+// (install.mjs, by guards.mjs's noSignInWhole, which this file does not import: it is copied alone; work-saved.sh).
 // `overrides` lets the package list hold npm's field of that name, each at one exact version of npm's registry: given
 // for the core's own mutation tool's install alone (install.mjs, #581), never for an install a copy carries, since npm
 // acts on it in place of what the packages ask.

@@ -50,16 +50,31 @@ export const oneLine = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\
  *  printed (floor rule 1). Read as the URL standard reads an address's authority: after one of its special schemes
  *  (http, https, ws, wss, ftp, file) and one slash or more, either way ("https:\\u@host", "https:/u@host"), up to a
  *  slash, a backslash but before a quote, "?" or "#"; after any other scheme and "//", up to a slash, "?" or "#", a
- *  backslash included. So a sign-in may hold a quote (as JSON writes it too, '\\"'), a space, a tab or a line's break,
- *  and a text that runs from an address to a later "@" before its end loses what lies between: only more is cut.
+ *  backslash included. So a sign-in may hold a quote (as JSON writes it too, '\\"'). In a line of text (noSignIn) it
+ *  ends at a space, a tab or a line's break too, so the words after an address, a failure's mend among them, are never
+ *  cut with it; a value printed on its own (noSignInWhole, quotedAlone) is cut whole, its spaces and breaks included,
+ *  and a value that runs from an address to a later "@" loses what lies between: only more is cut.
  *  Kept as they are: a user that is "git" alone, which signs in with nothing, and an image's digest, "sha256:" and
  *  32 hex digits or more ("docker://x@sha256:…"), never a host of that name.
  *  Not cut: an address of another scheme with no "//" after it, which holds no sign-in ("npm:name@1", npm's alias, and
- *  a drive's path, "C:\\me@x", "C:/me@x"; "C://me@x" reads as one and loses "me@"), and a sign-in holding what ends it.
+ *  a drive's path, "C:\\me@x", "C:/me@x"; "C://me@x" reads as one and loses "me@"); a sign-in holding what ends it
+ *  ('https:\\"u:p@h' among them, read as no address); one of more than 2,048 characters, which bounds what one cut
+ *  takes and what it costs; and, in a line of text, one holding a space, a tab or a line's break.
  *  A scheme is read from where its letters start alone, and no sign-in holds the start of another address of its kind
  *  (a slash ends each, and a backslash before a quote ends no special scheme), so a long text is read once. */
-export const noSignIn = text => String(text).replace(/(?<![a-z\d+.-])(?:((?:https?|wss?|ftp|file):(?:\/|\\(?!"))+)((?:[^/\\?#]|\\")+)|([a-z][a-z\d+.-]*:\/\/+)([^/?#]+))@(?!sha\d+:[a-f\d]{32,})/giu,
+const signIns = (ends) => new RegExp(String.raw`(?<![a-z\d+.-])(?:((?:https?|wss?|ftp|file):(?:\/|\\(?!"))+)((?:[^/\\?#${ends}]|\\"){1,2048})|([a-z][a-z\d+.-]*:\/\/+)([^/?#${ends}]{1,2048}))@(?!sha\d+:[a-f\d]{32,})`, "giu");
+const cutBy = (pattern) => text => String(text).replace(pattern,
   (whole, special, specialUser, other, otherUser) => ((specialUser ?? otherUser) === "git" ? whole : special ?? other));
+export const noSignIn = cutBy(signIns(String.raw`\s`));
+export const noSignInWhole = cutBy(signIns(""));
+
+/** A value written as JSON with each of its texts and keys cut by noSignInWhole before it is quoted, so a sign-in JSON
+ *  would write with an escape ("\\t", "\\n") is cut all the same: undefined where JSON writes nothing. */
+export const quotedAlone = value => JSON.stringify(value, (key, part) => {
+  if (typeof part === "string") return noSignInWhole(part);
+  if (part === null || typeof part !== "object" || Array.isArray(part)) return part;
+  return Object.fromEntries(Object.entries(part).map(([name, inner]) => [noSignInWhole(name), inner]));
+});
 
 /** Text from a project, made safe to print on one line of a workflow's log: any address's sign-in cut out (noSignIn),
  *  "%", a carriage return and a line feed escaped as GitHub documents a command's data is (%25, %0D, %0A), and any other

@@ -15,7 +15,7 @@
 // Usage, from the project's root:  node core/scripts/exact-versions.mjs <the licence check's config>
 import { readFileSync } from "node:fs";
 import { join, posix, resolve } from "node:path";
-import { inProject, logged, noSignIn, parseBounded } from "./guards.mjs";
+import { inProject, logged, noSignInWhole, parseBounded, quotedAlone } from "./guards.mjs";
 import { started } from "./started.mjs";
 
 const KINDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
@@ -32,7 +32,7 @@ export const exact = (text) => {
 };
 const inside = (key) => !key.startsWith("/") && !`/${key}/`.includes("/../") && !/[\\:]/u.test(key); // (a folder of the project's, by its key)
 // (a name or version printed so that it stays on its line, any address's sign-in cut out: floor rule 1)
-const show = (value) => (typeof value === "string" ? JSON.stringify(noSignIn(value)) : noSignIn(JSON.stringify(value) ?? String(value)));
+const show = (value) => quotedAlone(value) ?? String(value);
 
 // Whether a "$name" points to a dependency every list of the root's that holds the name holds at one exact version, and
 // one does.
@@ -82,7 +82,7 @@ function ownLink(entry, packages) {
 
 // What a dependency's spec says of its entry in the lock file, as the problems it has: none, or one.
 function dependencyProblems({ file, kind, name, spec, entry, lockfile }) {
-  if (!exact(spec)) return [`${file}: ${kind} ${show(name)}: ${show(spec)} is not one exact version. Mend: write the one exact version the lock file installs${entry && typeof entry === "object" && typeof entry.version === "string" ? `, ${noSignIn(entry.version)}` : ""}, then write the lock file anew with npm: its install, given --package-lock-only`];
+  if (!exact(spec)) return [`${file}: ${kind} ${show(name)}: ${show(spec)} is not one exact version. Mend: write the one exact version the lock file installs${entry && typeof entry === "object" && typeof entry.version === "string" ? `, ${noSignInWhole(entry.version)}` : ""}, then write the lock file anew with npm: its install, given --package-lock-only`];
   if (entry === undefined) {
     if (kind === "peerDependencies" || kind === "optionalDependencies") return []; // (a lock file may leave these out)
     return [`${file}: ${kind} ${show(name)}: ${show(spec)} is not in ${lockfile}. Mend: write the lock file anew with npm: its install, given --package-lock-only`];

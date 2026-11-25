@@ -27,7 +27,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync, realpathSync } from "node:fs";
 import path, { posix } from "node:path";
 import { fileURLToPath } from "node:url";
-import { leadsOut, logged, noSignIn, parseBounded } from "./guards.mjs";
+import { leadsOut, logged, noSignInWhole, parseBounded } from "./guards.mjs";
 import { baseOf, configAt, loadConfig, lockInstalled, registryName, textAt } from "./licences.mjs";
 import { lockPackages, nugetConfig } from "./nuget.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
@@ -44,7 +44,7 @@ const NUGET_PAGES = 100;
 const NPM_NAME = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/iu;
 const KINDS = ["dependencies", "optionalDependencies", "peerDependencies"];
 // (any sign-in cut out before the text is cut short, so an "@" past the cut still ends it: floor rule 1)
-const said = (value) => logged(noSignIn(String(value)).slice(0, 200));
+const said = (value) => logged(noSignInWhole(String(value)).slice(0, 200));
 const day = (ms) => new Date(ms).toISOString().slice(0, 10);
 const when = (text) => (typeof text === "string" && /^\d{4}-\d\d-\d\dT/u.test(text) ? Date.parse(text) : NaN);
 
