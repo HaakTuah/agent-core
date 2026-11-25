@@ -51,21 +51,53 @@ export const oneLine = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\
  *  (http, https, ws, wss, ftp; file) and any slashes, either way, none among them ("https:u@host", "https:\\u@host";
  *  file's one or more, since a file's address with none is a path, "file:../@scope/x"), up to a slash, a backslash but
  *  before a quote, "?" or "#"; after any other scheme and "//", up to a slash, "?" or "#", a backslash included; a tab or
- *  a line's break among the slashes dropped, as the standard drops it. So a sign-in may hold a quote (as JSON writes it
+ *  a line's break in the scheme or among the slashes dropped, as the standard drops it. So a sign-in may hold a quote (as JSON writes it
  *  too, '\\"'). In a line of text (noSignIn) it ends at a space, a tab or a line's break too, so the words after an
  *  address, a failure's mend among them, are never cut with it; a value printed on its own (noSignInWhole, quotedAlone,
  *  loggedAlone) is cut whole, its spaces and breaks included, and a value that runs from an address to a later "@"
  *  loses what lies between: only more is cut.
  *  Kept as they are: a user that is "git" alone, which signs in with nothing, and an image's digest, "sha256:" and
- *  32 hex digits or more with no path after them ("docker://x@sha256:…"), never a host of that name and a port.
+ *  32 hex digits or more, a letter among them, with no path after them ("docker://x@sha256:…"), never a host of that
+ *  name and a port.
  *  Not cut: an address of another scheme with no "//" after it, which holds no sign-in ("npm:name@1", npm's alias, and
  *  a drive's path, "C:\\me@x", "C:/me@x"; "C://me@x" reads as one and loses "me@"); a sign-in holding what ends it
- *  ('https:\\"u:p@h' among them, read as no address); a scheme with a tab or a line's break in its name; and, in a line
+ *  ('https:\\"u:p@h' among them, read as no address); and, in a line
  *  of text, a sign-in holding a space, a tab or a line's break.
- *  A scheme is read from where its letters start alone, and each authority's end and last "@" are found once, however
- *  many addresses start inside it, so a long text is read in one pass and two scans back. */
-const SCHEMES = /(?<![a-z\d+.-])(?:((?:https?|wss?|ftp):[\t\n\r]*(?:(?:\/|\\(?!"))[\t\n\r]*)*|file:[\t\n\r]*(?:(?:\/|\\(?!"))[\t\n\r]*)+)|[a-z][a-z\d+.-]*:[\t\n\r]*\/[\t\n\r]*\/[\t\n\r/]*)/giu;
-const DIGEST = /sha\d+:[a-f\d]{32,}(?![a-f\d/\\?#])/iuy;
+ *  A scheme is read back from each ":" to where its letters start, its slashes forward, and each authority's end and
+ *  last "@" are found once, however many addresses start inside it: a long text is read in a few passes, by hand where
+ *  a pattern would run deep. */
+const SPECIAL = new Set(["http", "https", "ws", "wss", "ftp", "file"]);
+const letter = c => (c >= 97 && c <= 122) || (c >= 65 && c <= 90);
+const ofScheme = c => letter(c) || (c >= 48 && c <= 57) || c === 43 || c === 45 || c === 46; // (a letter, digit, "+", "-" or ".")
+const dropped = c => c === 9 || c === 10 || c === 13; // (a tab or a line's break, which the URL standard drops)
+// (the scheme that ends at the ":" at `colon`, a tab or a line's break in it dropped and in lower case, read back to where
+// its letters start; or, where a digit, "+", "-" or "." stands before them, the special scheme its end names: "" where
+// none)
+function schemeBefore(text, colon) {
+  let start = colon;
+  while (start > 0 && (ofScheme(text.charCodeAt(start - 1)) || dropped(text.charCodeAt(start - 1)))) start--;
+  while (start < colon && dropped(text.charCodeAt(start))) start++;
+  const name = text.slice(start, colon).replace(/[\t\n\r]/gu, "").toLowerCase();
+  return letter(text.charCodeAt(start)) ? name : (/(?:^|[^a-z])(https?|wss?|ftp|file)$/u.exec(name)?.[1] ?? "");
+}
+// (where the slashes after the ":" at `colon` end, and how many they are: a backslash counted for a special scheme alone,
+// and never one before a quote)
+function slashesAfter(text, colon, special) {
+  let from = colon + 1, slashes = 0;
+  for (; ; from++) {
+    const c = text.charCodeAt(from);
+    if (c === 47 || (special && c === 92 && text.charCodeAt(from + 1) !== 34)) slashes++;
+    else if (!dropped(c)) return { from, slashes };
+  }
+}
+// (the address whose scheme ends at the ":" at `colon`: its kind and where its authority starts, or null where none does)
+function addressAt(text, colon) {
+  const name = schemeBefore(text, colon), kind = SPECIAL.has(name) ? "special" : "other";
+  if (!name) return null;
+  const { from, slashes } = slashesAfter(text, colon, kind === "special");
+  return slashes >= (kind === "other" ? 2 : name === "file" ? 1 : 0) ? { kind, from } : null;
+}
+const DIGEST = /sha\d+:(?=\d*[a-f])[a-f\d]{32,}(?![a-f\d/\\?#])/iuy; // (a hex letter in it, so no port of digits alone)
 // (the last "@" in text from `floor` to `end` that is no image's digest's, or -1)
 const lastSignInAt = (text, floor, end) => {
   for (let at = end - 1; at >= floor; at--) {
@@ -77,11 +109,13 @@ const lastSignInAt = (text, floor, end) => {
 };
 const cutBy = (stops) => text => {
   text = String(text);
-  const schemes = new RegExp(SCHEMES), ends = { special: new RegExp(String.raw`[/?#${stops}]|\\(?!")`, "gu"), other: new RegExp(`[/?#${stops}]`, "gu") };
+  const ends = { special: new RegExp(String.raw`[/?#${stops}]|\\(?!")`, "gu"), other: new RegExp(`[/?#${stops}]`, "gu") };
   const seen = { special: { end: -1, at: -1 }, other: { end: -1, at: -1 } };
   let out = "", copied = 0;
-  for (let m; (m = schemes.exec(text));) {
-    const kind = m[1] === undefined ? "other" : "special", from = m.index + m[0].length, authority = seen[kind];
+  for (let colon = text.indexOf(":"); colon !== -1; colon = text.indexOf(":", colon + 1)) {
+    const address = addressAt(text, colon);
+    if (!address) continue;
+    const { kind, from } = address, authority = seen[kind];
     if (from > authority.end) { // (an authority not read yet: where it ends, and its sign-in's "@")
       ends[kind].lastIndex = from;
       authority.end = ends[kind].exec(text)?.index ?? text.length;
@@ -89,7 +123,7 @@ const cutBy = (stops) => text => {
     }
     if (authority.at < from) continue;
     if (text.slice(from, authority.at) !== "git") { out += text.slice(copied, from); copied = authority.at + 1; }
-    schemes.lastIndex = authority.at + 1;
+    colon = authority.at;
   }
   return out + text.slice(copied);
 };
@@ -109,9 +143,9 @@ export const quotedAlone = value => JSON.stringify(value, (key, part) => {
  *  control character or line separator shown as "?" (oneLine), so no part of it starts a line of its own, which GitHub
  *  Actions could read as a command. */
 export const logged = text => oneLine(noSignIn(text).replace(/%/gu, "%25").replace(/\r/gu, "%0D").replace(/\n/gu, "%0A"));
-/** A value printed to the log on its own (a failure's message, a name), its sign-in cut whole (noSignInWhole), then as
- *  logged. */
-export const loggedAlone = value => logged(noSignInWhole(value));
+/** A value printed to the log on its own (a failure's message, a name), its sign-in cut whole (noSignInWhole), the
+ *  part before a mend it holds (". Mend: ") and the mend each on its own, so the mend is never cut, then as logged. */
+export const loggedAlone = value => logged(String(value).split(". Mend: ").map(noSignInWhole).join(". Mend: "));
 
 /** How deep a value read from a project's JSON may nest, in objects and lists, before a check refuses it: far past any
  *  config, manifest or lock file, and short of where reading it, or printing it, would run out of stack. */

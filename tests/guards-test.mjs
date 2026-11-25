@@ -83,14 +83,20 @@ ok(seen("``` not a fence `\nshown").includes("shown") && seen("```\nhidden").tri
   ok(tabbed === '{"https://example.invalid/k":["git+https://example.invalid/x"],"plain":1}', "a value written as JSON has each text and key cut before an escape could hide its sign-in", tabbed.replaceAll(user, "<user>"));
   ok(quotedAlone(undefined) === undefined && quotedAlone("x@1") === '"x@1"', "a value JSON writes nothing of stays nothing; a text is quoted as JSON quotes it");
   let long;
-  try { long = [noSignIn(`https://${"a".repeat(12e6)}`), noSignInWhole("ws:".repeat(4e6)), noSignInWhole(`x://${"@".repeat(12e6)}`), noSignInWhole(`https://${"\\\"".repeat(4e6)}@`), noSignInWhole(`x://${"a ".repeat(6e6)}`)]; } catch (e) { long = e; }
+  try { long = [noSignIn(`https://${"a".repeat(12e6)}`), noSignInWhole("ws:".repeat(4e6)), noSignInWhole(`https:${"/".repeat(12e6)}`), noSignInWhole(`x:${"/\t".repeat(6e6)}`), noSignInWhole(`h${"t\t".repeat(6e6)}ps:`), noSignInWhole(`x://${"@".repeat(12e6)}`), noSignInWhole(`https://${"\\\"".repeat(4e6)}@`), noSignInWhole(`x://${"a ".repeat(6e6)}`)]; } catch (e) { long = e; }
   ok(Array.isArray(long), "a long text is read without running out of stack", String(long).slice(0, 200));
   const longPass = "x".repeat(5000);
   ok(noSignIn(`https://${user}:${longPass}@example.invalid/x`) === "https://example.invalid/x", "a sign-in of any length is cut whole");
   ok([`https:\n//${user}:${pass}@example.invalid/x`, `https:/\t/${user}:${pass}@example.invalid/x`, `x:/\r/${user}:${pass}@example.invalid/x`].every(t => !noSignInWhole(t).includes(pass) && !noSignIn(t).includes(pass)),
     "a tab or a line's break among an address's slashes, which the URL standard drops, ends no address");
+  ok([`ht\ttps:${user}:${pass}@example.invalid/x`, `git+ht\ntps://${user}:${pass}@example.invalid/x`, `\thttps://${user}:${pass}@example.invalid/x`].every(t => !noSignInWhole(t).includes(pass)),
+    "a tab or a line's break in a scheme's name, which the URL standard drops, hides no address");
   ok(noSignIn(`https://${user}:${pass}@sha256:${"0".repeat(32)}/x`) === `https://sha256:${"0".repeat(32)}/x`, "a host named as a digest, with a port and a path after it, is no digest");
   ok(!loggedAlone(`could not read https://${user}:${pass} x@example.invalid/x`).includes(pass), "a value printed on its own to the log has its sign-in cut whole");
+  const refused = "checks/https:shape.json cannot be read. Mend: write it as \"src/\" names it, or mail me@example.invalid";
+  ok(loggedAlone(refused) === refused, "a message printed on its own keeps the mend it holds", loggedAlone(refused));
+  ok([`https://${user}:${pass}@sha256:${"0".repeat(29)}443`, `-https://${user}:${pass}@example.invalid/x`, `1https://${user}:${pass}@example.invalid/x`, `.wss:${user}:${pass}@example.invalid/x`].every(t => !noSignIn(t).includes(pass)),
+    "a host named as a digest whose port is digits alone, and a special scheme after a digit, \"-\" or \".\", are cut");
   const plain = ["https://registry.npmjs.org/@scope/x/-/x-1.0.0.tgz", "git+ssh://example.invalid/x.git#abc", "x@1.2.3", "mail me@example.invalid",
     "ssh://git@example.invalid/x.git", `docker://alpine@sha256:${"0123abcd".repeat(8)}`, "npm:@scope/x@1.0.0", "C:\\\\@types", "file:../@scope/x", "file:me@x/y", "C:\\me@x\\file.txt", "C:/me@x/file.txt", 'ab:\\"u@h'];
   ok(plain.every(t => noSignIn(t) === t), "an address with no sign-in, the user git, an image's digest, a name with a version, npm's alias, a bare address of mail, a file's path, a drive's path and a backslash before a quote, which ends no scheme, are left as they are", JSON.stringify(plain.map(noSignIn)));
