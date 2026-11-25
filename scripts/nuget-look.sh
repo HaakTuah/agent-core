@@ -26,7 +26,7 @@ PACKS='Microsoft\.(NETCore|WindowsDesktop|AspNetCore)\.App\.Ref'
 # pull request adds starts or holds a workflow command, on any of its lines, also where only bytes beyond printable
 # ASCII stand between a pair's marks (as asText in guards.mjs, which the scripts in Node print by; #1348).
 COLONS='s/:\([^ -~]*:\)/: \1/' HASHES='s/#\([^ -~]*#[^ -~]*\[\)/# \1/g'
-# (any other control byte shown as "?", as oneLine shows it; a line break too in one name, named)
+# (any other ASCII control byte shown as "?", as oneLine shows it; a line break too in one name, named)
 shown() { printf '%s\n' "$1" | LC_ALL=C tr '\000-\011\013-\037\177' '?' | LC_ALL=C sed -e ':a' -e "$COLONS" -e 'ta' -e "$HASHES"; }
 named() { shown "${1//$'\n'/?}"; }
 holds() {
