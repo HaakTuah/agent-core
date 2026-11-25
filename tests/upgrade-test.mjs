@@ -1167,15 +1167,19 @@ function againstSdk(p, dir) {
 let synced = null; // (the npm project of the newest release started from, once synced)
 // (a part of the older release, where only one release comes before the commit under test, would prove nothing it names)
 ok(starts.length > 1 || !process.env.GITHUB_ACTIONS || !/^older-(npm|dotnet)$/.test(PART), `on GitHub's runners two releases of the core's come before the commit under test, for the part "${PART}" to start from`);
-for (const tag of starts) {
-  const release = tag === starts.at(-1) ? "newer" : "older";
-  if (!inPart(release, KIND_JS) && !inPart(release, KIND_NET)) continue;
+// (the private project's calls as a kit wrote them before the one job, whose cases below need a start that wrote them:
+// release 5's kit, a tag never moved, stands in as a fixed start of the older part where it is no longer one of the last
+// two releases; #1302)
+const FIXED = "release-5";
+for (const tag of [...starts, ...(cut.includes(FIXED) && !starts.includes(FIXED) ? [FIXED] : [])]) {
+  const fixed = !starts.includes(tag), release = tag === starts.at(-1) ? "newer" : "older";
+  if (fixed ? !inPart(release, KIND_NET) : !inPart(release, KIND_JS) && !inPart(release, KIND_NET)) continue;
   const from = { tag, sha: git(theCore, "rev-parse", `${tag}^{commit}`), dir: path.join(tmp, `core-at-${tag}`) };
   git(tmp, "clone", "-q", theCore, from.dir);
   git(from.dir, "checkout", "-q", from.sha);
 
   // the npm project, public
-  if (inPart(release, KIND_JS)) {
+  if (!fixed && inPart(release, KIND_JS)) {
     const npmProject = project(`an-npm-project-from-${tag}`, from, { owner: "someone-else", kit: ["--npm", "."], isPrivate: false, files: dir => {
       write(dir, "package.json", '{\n  "name": "an-npm-project",\n  "version": "1.0.0",\n  "private": true,\n  "type": "module",\n  "dependencies": {\n    "ms": "2.1.3"\n  }\n}\n');
       write(dir, "package-lock.json", `${JSON.stringify({ name: "an-npm-project", version: "1.0.0", lockfileVersion: 3, requires: true, packages: { "": { name: "an-npm-project", version: "1.0.0", dependencies: { ms: "2.1.3" } },
@@ -1208,16 +1212,16 @@ for (const tag of starts) {
     git(dotnetProject.dir, "add", "-A");
     ok(git(dotnetProject.dir, "ls-files", "-s").split("\n").every(l => l.startsWith("100644 ")), `${dotnetProject.name}: every file it holds is 100644, as on Windows, the copy of the core's scripts too`);
     seed(dotnetProject, "\r\n");
-    upgrade(dotnetProject, from, [["touches only its docs", dir => write(dir, "README.md", "# A .NET project\r\n\r\nMore words.\r\n")],
+    if (!fixed) upgrade(dotnetProject, from, [["touches only its docs", dir => write(dir, "README.md", "# A .NET project\r\n\r\nMore words.\r\n")],
       ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
     (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
       ...(sdk ? [[["nuget.yml", "core.yml"].some(f => ran(results, f, "Restore each project file from its lock file alone")) === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
-    readersAgainstTools(dotnetProject); // (and against the .NET SDK, held as Windows holds it)
+    if (!fixed) readersAgainstTools(dotnetProject); // (and against the .NET SDK, held as Windows holds it)
     const stood = asItStood(dotnetProject);
     if (stood) nugetInPrivate(dotnetProject); // (its NuGet call as it stood, which a kit that wrote the one job never wrote)
-    parserUnnamed(dotnetProject);
+    if (!fixed) parserUnnamed(dotnetProject);
     // (its calls as they stood, taken to a ready trigger and to the one job, from the start whose kit wrote them: of the
-    // last two releases, only the older's, release 6's kit writing the one job; #1300)
+    // last two releases, only the older's, release 6's kit writing the one job, #1300; or the fixed start, #1302)
     if (stood) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); }
   }
 }
