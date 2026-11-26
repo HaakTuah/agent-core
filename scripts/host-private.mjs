@@ -60,8 +60,9 @@ function originUrl(root) {
 }
 // The git folder of the clone at `at` (its .git, a link to a folder or to a file naming one, a file naming one, or `at`
 // itself where it is a bare one), or null where it, the common folder it names or any entry of either git reads lies on
-// another machine, or may, as linksAfar() reads a path; a file is read only once that says it is near, and the files
-// that name a folder are read as git reads them (gitFile(), commonOf()).
+// another machine, or may, as linksAfar() reads a path; a file is read only once that says it is near, the files that
+// name a folder are read as git reads them (gitFile(), commonOf()), and a git folder that is no folder (a file, which
+// git would read as naming another) is none.
 function gitDirOf(at) {
   if (linksAfar(at)) return null;
   const dotGit = path.join(at, ".git");
@@ -71,13 +72,14 @@ function gitDirOf(at) {
     if (fs.statSync(dotGit).isFile()) { const to = gitFile(fs.readFileSync(dotGit, "utf8")); if (!to || linksAfar(at, to)) return null; dir = under(at, to); }
     else dir = dotGit;
   } catch { /* (no .git: a bare clone, or none, which git answers itself) */ }
-  if (GIT_READS.some(name => linksAfar(dir, name))) return null;
+  if (GIT_READS.some(name => linksAfar(dir, name)) || !folder(dir)) return null;
   const common = commonOf(dir);
   return !common || !(linksAfar(dir, common) || GIT_READS.some(name => linksAfar(under(dir, common), name))) ? dir : null;
 }
 // (as git reads them: a .git file is "gitdir: " and the rest of the file, and a commondir the whole file, each with only
 // its last line ends dropped, never a space or a tab; a .git file in another form names nothing)
 const gitFile = text => text.startsWith("gitdir: ") ? text.slice(8).replace(/[\r\n]+$/, "") : "";
+const folder = at => { try { return fs.statSync(whole(at)).isDirectory(); } catch { return false; } };
 const commonOf = dir => { try { return fs.readFileSync(under(dir, "commondir"), "utf8").replace(/[\r\n]+$/, ""); } catch { return ""; } };
 // (what git opens in a git folder, or its common folder, to find the clone and read its config)
 const GIT_READS = ["HEAD", "commondir", "config", "config.worktree", "objects", "refs", "packed-refs"];

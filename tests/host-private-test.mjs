@@ -121,7 +121,8 @@ try {
 } catch { links = false; }
 // (and as git reads them: a link of .git to a file naming a folder, and a .git file or a commondir whose path keeps a
 // space at either end, git taking it whole, each naming through a link, where links can be made; and with none, a
-// folder origin git would take as no clone, so that it searched the folders above it, whose .git names one)
+// folder origin git would take as no clone, so that it searched the folders above it, whose .git names one, and a .git
+// file naming a file that names one)
 const toFile = path.join(tmp, "to-file"), spaced = path.join(tmp, "spaced"), ending = path.join(tmp, "ending"), commonSpaced = path.join(tmp, "common-spaced");
 try {
   fs.writeFileSync(path.join(tmp, "gitfile-near"), `gitdir: ${elsewhere}\n`); fs.mkdirSync(toFile); fs.symlinkSync(path.join(tmp, "gitfile-near"), path.join(toFile, ".git"), "file");
@@ -135,7 +136,9 @@ try {
 const up = path.join(tmp, "up"), viaUp = path.join(tmp, "via-up");
 fs.mkdirSync(path.join(up, "inner", ".git"), { recursive: true }); fs.writeFileSync(path.join(up, ".git"), `gitdir: ${elsewhere}\n`);
 clone(viaUp, path.join(up, "inner"));
-const gitDirs = [included, pointed, common, viaUp, ...(links ? [linked, viaFar, chained, named, passed, commonLinked, configLinked, toFile, spaced, ending, commonSpaced] : [])];
+const twice = path.join(tmp, "twice");
+fs.writeFileSync(path.join(tmp, "gitfile-twice"), `gitdir: ${elsewhere}\n`); fs.mkdirSync(twice); fs.writeFileSync(path.join(twice, ".git"), `gitdir: ${path.join(tmp, "gitfile-twice")}\n`);
+const gitDirs = [included, pointed, common, viaUp, twice, ...(links ? [linked, viaFar, chained, named, passed, commonLinked, configLinked, toFile, spaced, ending, commonSpaced] : [])];
 ok(gitDirs.every(at => /names no repository on github\.com/.test(privateOf(at, { env: {}, ask: notAsked, bare: notAsked }).unread ?? "")),
   `git follows no include of the clone's config, searches no folder above a folder origin, and reads no origin where the clone's .git file, its common folder${links ? ", a link of .git, or a link reached by way of an origin's folder, another link or a file git reads, each read as git reads it," : ""} names a folder on another machine`,
   gitDirs.map(at => `${path.basename(at)}: ${JSON.stringify(privateOf(at, { env: {}, ask: () => "{}", bare: () => ({}) }))}`).join("; "));
