@@ -18,7 +18,9 @@
 // one written to look so (unsigned, signed by another key, or with a certificate made to look like GitHub's) fails, and so does every merge's author where the key
 // cannot be fetched; only in a commit of the base's, though the event
 // names an older base; a term only in the copyright lines of LICENSE and NOTICE of their shape, at the root and in the
-// core's copy (#257); and a repository without the secret. What Betterleaks, which matches the terms (#579), would read
+// core's copy (#257); and a repository without the secret. The address in a commit's author and committer line (#460,
+// point 2), with the secret or without: an address that is no no-reply one fails, one that only looks like one too; a
+// no-reply one passes, as does one only in a commit main holds, and one of a merge GitHub made under a profile above. What Betterleaks, which matches the terms (#579), would read
 // otherwise fails all the same: a file of text that begins as an archive or a PDF does, a line marked for it to pass
 // over, a term beside its ignore and config files, a term holding a pattern's characters, matched as listed, a file
 // whose name puts a binary type's mark where it reads one, a term on any line of a long run or across a long line's
@@ -45,7 +47,11 @@ const [term, other, wide] = [["qz", "vk", "wy"], ["xj", "qq", "zf"], ["zÃ§", "qÃ
 const TERMS = `${term}\n${other}\n${wide}\n`;
 const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$)/i.test(name)));
 Object.assign(env, { GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_DATE: "2026-11-13T12:00:00Z", GIT_COMMITTER_DATE: "2026-11-13T12:00:00Z" });
-const ME = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+// (the host's no-reply domain, and an invented account's address in it, which the address step passes: #460, point 2;
+// each address here is invented, by the id 0, which GitHub gives no account, or by a login with "--", which it refuses)
+const NOREPLY = ["users", "noreply", "github", "com"].join(".");
+const MINE = `${["0", "a-scratch-builder"].join("+")}@${NOREPLY}`;
+const ME = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: MINE, GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: MINE };
 const git = (dir, args, extra = {}) => execFileSync("git", args, { cwd: dir, env: { ...env, ...ME, ...extra }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const AS_GITHUB = { GIT_COMMITTER_NAME: "GitHub", GIT_COMMITTER_EMAIL: "noreply@github.com" };
 // GitHub's own signing key, stood in for by one made here, which a stand-in for curl serves as the check fetches it;
@@ -59,7 +65,7 @@ fs.mkdirSync(stubs);
 // archive, and hands any other fetch to the machine's own curl, save where a case has it fail)
 const isFile = f => { try { return fs.statSync(f).isFile(); } catch { return false; } };
 const realCurl = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(Boolean).flatMap(d => ["curl", "curl.exe"].map(c => path.join(d, c))).find(isFile);
-fs.writeFileSync(path.join(stubs, "curl"), `#!/bin/sh\ncase "$*" in *web-flow.gpg*) [ -f "$STAND_IN_KEY" ] || exit 22; cat "$STAND_IN_KEY"; exit 0 ;; esac\n[ -z "$FETCH_FAILS" ] || exit 22\n${ARCHIVE_SERVER}exec '${(realCurl ?? "curl").replace(/\\/g, "/")}' "$@"\n`, { mode: 0o755 });
+fs.writeFileSync(path.join(stubs, "curl"), `#!/bin/sh\ncase "$*" in *web-flow.gpg*) [ -f "$STAND_IN_KEY" ] || exit 22; cat "$STAND_IN_KEY"; exit 0 ;; esac\n[ -z "$FETCH_FAILS" ] || { o=; for a; do [ "$o" = -o ] && o=$a && break; o=$a; done; echo "curl: (23) Failed writing to the file $o" >&2; exit 22; }\n${ARCHIVE_SERVER}exec '${(realCurl ?? "curl").replace(/\\/g, "/")}' "$@"\n`, { mode: 0o755 });
 const makeKey = (home, who) => { fs.mkdirSync(home, { mode: 0o700 }); return bash(`gpg -q --batch --pinentry-mode loopback --passphrase '' --quick-gen-key '${who}' ed25519 sign never`, { GNUPGHOME: home }).status === 0; };
 const signedBy = (home, key) => ({ GNUPGHOME: home, GIT_CONFIG_COUNT: "3", GIT_CONFIG_KEY_0: "commit.gpgSign", GIT_CONFIG_VALUE_0: "true", GIT_CONFIG_KEY_1: "gpg.program", GIT_CONFIG_VALUE_1: "gpg", GIT_CONFIG_KEY_2: "user.signingKey", GIT_CONFIG_VALUE_2: key });
 process.on("exit", () => { for (const home of [signer, stranger]) bash("gpgconf --kill all", { GNUPGHOME: home }); });
@@ -110,7 +116,7 @@ function check({ dir, first }, { terms = TERMS, title = "A change", body = "Word
   const PATH = env.PATH ?? env.Path ?? "";
   const base = { ...env, ...ME, ...(locale ? { LC_ALL: locale } : {}), ...(store ? { TMPDIR: store } : {}), ...(fetchFails ? { FETCH_FAILS: "1" } : {}), STAND_IN_KEY: key, PATH: `${more ? `${more}${path.delimiter}` : ""}${stubs}${path.delimiter}${PATH}` };
   const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {} }, temp: tmp });
-  return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
+  return { passed: job.passed, out: job.steps.map(s => s.out).join(""), outputs: job.outputs };
 }
 // (never printed in any case: GitHub's masking of the secret matches its case exactly)
 const fails = (what, repo, opts) => { const r = check(repo, opts); ok(!r.passed && mended(r.out) && ![term, other, wide].some(t => r.out.toLowerCase().includes(t.toLowerCase())), `${what} fails, and the term is never printed`, r.out); };
@@ -130,11 +136,11 @@ passes("deleting a file named with a term before the rule", cleanup(dir => git(d
 passes("renaming such a file to a clean name", cleanup(dir => git(dir, ["mv", `old-${term}.md`, "old.md"])));
 fails("a term in a commit's message", pull([[{ "b.md": "x\n" }, {}, `fix for ${term}`]]));
 fails("a term in a commit's author name", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]));
-fails("a term in a commit's author address", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `${other}@example.invalid` }]]));
+fails("a term in a commit's author address", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `${other}@${NOREPLY}` }]]));
 fails("a term in a commit's committer name", pull([[{ "b.md": "x\n" }, { GIT_COMMITTER_NAME: term }]]));
 // a name the machine's git writes into every commit fails in a private repository too, and the failure says how the
 // session mends the pull request itself (core archive 202), naming both commits
-const named = check(pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}`, GIT_COMMITTER_EMAIL: `${other}@example.invalid` }], [{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]), { isPrivate: true });
+const named = check(pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}`, GIT_COMMITTER_EMAIL: `${other}@${NOREPLY}` }], [{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]), { isPrivate: true });
 ok(!named.passed && mended(named.out) && /Mend: on the machine that made them/.test(named.out) && /--reset-author/.test(named.out) && (named.out.split(/author or committer \(name or address\), below\.[^\n]*\n/u)[1]?.split("\n")[0].match(/\b[0-9a-f]{7,}\b/g) ?? []).length === 2 && ![term, other, wide].some(t => named.out.includes(t)),
   "a term in commits' author or committer fails in a private repository too, both commits named, the mend said and the term never printed", named.out);
 // a merge of main into the branch, as "update branch" makes it (GitHub's) or as a person does
@@ -191,6 +197,38 @@ if (gpg) {
   fails("a commit that is no merge GitHub signed, under an author no merge of GitHub's on main carries (as its API takes one)", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]]));
 }
 fails("a commit that is no merge, with a term in its author, committed as GitHub but not signed", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...AS_GITHUB }]]));
+// The address in each commit's author and committer line (#460, point 2), read with no secret too: a no-reply one
+// passes, any other fails saying the mend, the commit and its line named and the address never printed; a commit main
+// already holds is never read; a commit GitHub itself made under a profile it wrote on main is excepted, as for the
+// terms, and one written to look so is not. Each address invented.
+const personal = ["someone", "example.invalid"].join("@");
+const addressFails = (what, repo, line, opts = {}) => {
+  for (const terms of ["", TERMS]) {
+    const r = check(repo, { terms, ...opts });
+    ok(!r.passed && mended(r.out) && /is not a no-reply one/.test(r.out) && new RegExp(`\\b[0-9a-f]{7,} ${line}\\b`).test(r.out) && !r.out.includes(personal.split("@")[1]),
+      `${what} fails${terms ? "" : " with no secret set"}, its commit and line named, the address never printed`, r.out);
+  }
+};
+const addressPasses = (what, repo) => { for (const terms of ["", TERMS]) passes(`${what}${terms ? "" : ", with no secret set,"}`, repo, { terms }); };
+addressPasses("commits under an account's no-reply address, with its id or without, a bot's, GitHub's own and Claude Code's, any letter case",
+  pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `a--scratch-builder@${NOREPLY}`, GIT_COMMITTER_EMAIL: `0+Scratch--Bot[bot]@${NOREPLY.toUpperCase()}` }],
+    [{ "c.md": "y\n" }, { GIT_AUTHOR_EMAIL: ["noreply", "anthropic.com"].join("@"), GIT_COMMITTER_EMAIL: ["noreply", "github.com"].join("@") }]]));
+addressFails("an author's address that is no no-reply one", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: personal }]]), "author");
+addressFails("a committer's address that is no no-reply one", pull([[{ "b.md": "x\n" }], [{ "c.md": "y\n" }, { GIT_COMMITTER_EMAIL: personal }]]), "committer");
+addressFails("an address that only looks like the host's no-reply one", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `someone@${NOREPLY}.example.invalid` }]]), "author");
+addressFails("an account's no-reply address with more than its id before the login", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `someone+1@${NOREPLY}` }]]), "author");
+addressPasses("a personal address only in a commit main already holds", pull([[{ "b.md": "x\n" }]], [[{ "c.md": "y\n" }, { GIT_AUTHOR_EMAIL: personal, GIT_COMMITTER_EMAIL: personal }, "on main"]]));
+{
+  const both = check(pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_EMAIL: personal }]]));
+  ok(!both.passed && mended(both.out) && /is not a no-reply one/.test(both.out) && /in these files/.test(both.out), "a personal address and a term together each fail, the terms read though the address failed", both.out);
+}
+if (gpg) {
+  // (a merge GitHub made into the branch under the profile it wrote on a merge of main's, its address that profile's)
+  const profiled = committer => pull([[{ "b.md": "x\n" }], [dir => { git(dir, ["merge", "-q", "--no-ff", "--no-edit", "main"], { GIT_AUTHOR_NAME: "Someone", GIT_AUTHOR_EMAIL: personal, ...committer }); }]],
+    [...onMain, [dir => { git(dir, ["checkout", "-q", "-b", "side"]); commitAll(dir, [{ "side.md": "s\n" }]); git(dir, ["checkout", "-q", "main"]); git(dir, ["merge", "-q", "--no-ff", "--no-edit", "side"], { GIT_AUTHOR_NAME: "Someone", GIT_AUTHOR_EMAIL: personal, ...GITHUB }); }, {}, "after that merge"]]);
+  addressPasses("a merge GitHub itself made into the branch under the profile it wrote on a merge of main's, whatever its address (floor rule 11's exception)", profiled(GITHUB));
+  addressFails("such a merge written to look like GitHub's, committed as GitHub but not signed", profiled(AS_GITHUB), "author");
+}
 // a merge resolved by hand: the lines its resolution adds are read
 const resolved = pull([[{ "a.md": "one\nmine\nthree\n" }], [dir => {
   try { git(dir, ["merge", "-q", "--no-edit", "main"]); } catch { /* (the conflict, resolved below) */ }
@@ -344,6 +382,21 @@ const otherSystem = path.join(tmp, "plan9");
 fs.mkdirSync(otherSystem);
 fs.writeFileSync(path.join(otherSystem, "uname"), `#!/bin/sh\ncase "$1" in -s) echo Plan9 ;; -m) echo 386 ;; *) echo Plan9 ;; esac\n`, { mode: 0o755 });
 unfetched("where no pin stands for the machine's system", { more: otherSystem }, "no pin stands in this check for Plan9/386");
+// (where the folder the address step works in cannot be made, as Git for Windows' mkdir could not make it with a mode,
+// #1211, the step fails, saying the mend, and reads nothing; a mkdir of the test's own stands in for one that fails)
+const noFolder = path.join(tmp, "no-folder");
+fs.mkdirSync(noFolder);
+fs.writeFileSync(path.join(noFolder, "mkdir"), `#!/bin/sh\ncase "$*" in *commit-addresses*) echo "mkdir: cannot create directory: Permission denied" >&2; exit 1 ;; esac\ncommand -p mkdir "$@"\n`, { mode: 0o755 });
+const unmade = check(pull([[{ "b.md": "Words.\n" }]]), { more: noFolder });
+ok(!unmade.passed && mended(unmade.out) && unmade.out.includes("could not be made, so no commit's address was read"), "where the address step's folder cannot be made, it fails, saying the mend", unmade.out);
+ok(!unmade.out.includes(tmp) && !unmade.out.includes("cannot create directory"), "that failure names the runner's temporary folder, never writing out its path (#1223)", unmade.out);
+// (and where the scan step's own folder cannot be made, that step fails, saying the mend, named the same way)
+const noScanFolder = path.join(tmp, "no-scan-folder");
+fs.mkdirSync(noScanFolder);
+fs.writeFileSync(path.join(noScanFolder, "mkdir"), `#!/bin/sh\ncase "$*" in *personal-terms/none*) echo "mkdir: cannot create directory '$*': Permission denied" >&2; exit 1 ;; esac\ncommand -p mkdir "$@"\n`, { mode: 0o755 });
+const unscanned = check(pull([[{ "b.md": "Words.\n" }]]), { more: noScanFolder });
+ok(!unscanned.passed && mended(unscanned.out) && unscanned.out.includes("RUNNER_TEMP/personal-terms, could not be made, so nothing was read") && !unscanned.out.includes(tmp) && !unscanned.out.includes("cannot create directory"),
+  "where the scan step's folder cannot be made, it fails, saying the mend, never writing out its path (#1223)", unscanned.out);
 const sum = /Linux\/x86_64\) file=\S+ archive=[0-9a-f]{64} sum=([0-9a-f]{64})/.exec(workflow)?.[1], version = /version=(\S+)/.exec(workflow)?.[1];
 const keptTool = path.join(tmp, "kept"), keptDir = path.join(keptTool, "agent-core-tools", `betterleaks-${version}`), ran = path.join(tmp, "kept-ran");
 fs.mkdirSync(keptDir, { recursive: true });
@@ -357,6 +410,20 @@ fs.mkdirSync(elsewhere);
 if (process.platform !== "win32") {
   fs.symlinkSync(elsewhere, path.join(linked, "agent-core-tools"));
   unfetched("where the store's folder is a link", { store: linked }, "is not a folder of this user's own", () => fs.readdirSync(elsewhere).length === 0);
+  const linkedOut = check(pull([[{ "b.md": "Words.\n" }]]), { store: linked }).out;
+  ok(linkedOut.includes("../agent-core-tools is not a folder of this user's own") && !linkedOut.includes(linked), "the store's log names its folders from the fetch's own, never writing out the temporary folder (#1223)", linkedOut);
+}
+{
+  const fresh = path.join(tmp, "fresh-store");
+  fs.mkdirSync(fresh);
+  const fetched = check(pull([[{ "b.md": "Words.\n" }]]), { store: fresh });
+  ok(fetched.passed && fetched.out.includes("TMPDIR/agent-core-tools/betterleaks-") && !fetched.out.includes(fresh), "the program fetched is named under TMPDIR, never by its full path (#1223)", fetched.out);
+  const given = fetched.outputs.betterleaks?.outputs?.path ?? "";
+  ok(/^agent-core-tools\/betterleaks-[^/]+\/betterleaks(\.exe)?$/.test(given), "the scan step is given the program's path from the temporary folder, which the runner prints in its log, never the full path (#1223)", given);
+  const unfetchedStore = path.join(tmp, "unfetched-store");
+  fs.mkdirSync(unfetchedStore);
+  const failedFetch = check(pull([[{ "b.md": "Words.\n" }]]), { store: unfetchedStore, fetchFails: true });
+  ok(!failedFetch.passed && failedFetch.out.includes("Failed writing to the file archive.") && !failedFetch.out.includes(unfetchedStore), "a failed download's log names the archive as curl was given it, from the fetch's own folder, never writing out the temporary folder (#1223)", failedFetch.out);
 }
 const tooLong = check(pull([[{ "b.md": "x\n" }]]), { terms: `${term}\n${"q".repeat(2001)}\n` });
 ok(!tooLong.passed && mended(tooLong.out) && tooLong.out.includes("longer than 2,000 bytes") && !tooLong.out.includes(term), "a term longer than the check can read whole fails, saying the mend, never hanging", tooLong.out);

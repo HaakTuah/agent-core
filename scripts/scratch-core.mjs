@@ -18,6 +18,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
+import { parseBounded } from "./guards.mjs";
 
 /** The core's root, where these scripts stand. */
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -87,9 +88,14 @@ export function scratchDir(prefix) {
 let answers = null;
 export function hostSays(dir, isPrivate) {
   if (!answers) { answers = path.join(scratchDir("host-answers-"), "answers.json"); fs.writeFileSync(answers, "{}"); process.env.CORE_HOST_ANSWERS = answers; }
-  if (dir) fs.writeFileSync(answers, JSON.stringify({ ...JSON.parse(fs.readFileSync(answers, "utf8")), [dir]: { private: !!isPrivate } }));
+  if (dir) fs.writeFileSync(answers, JSON.stringify({ ...parseBounded(fs.readFileSync(answers, "utf8")), [dir]: { private: !!isPrivate } }));
   return answers;
 }
+
+// (the address git writes into each scratch commit: an invented account's no-reply one, its id 0, which GitHub gives
+// no account; the personal-terms check passes it in a pull request's commits, as a project's own runs see them: #460,
+// point 2)
+const ADDRESS = `0+t@${["users", "noreply", "github", "com"].join(".")}`;
 
 // `prefix` names the temporary folder. It gives: `tmp`, that folder; `env`, the environment of every call; `git(dir,
 // ...args)` and `run(dir, ...args)`, git and Node run in a folder (run: the script and its arguments, giving its exit
@@ -101,7 +107,7 @@ export function scratch(prefix) {
   hostSays();
   const tmp = scratchDir(prefix);
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
-  Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" });
+  Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: ADDRESS, GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: ADDRESS, GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" });
   const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
   const run = (dir, ...args) => { const r = spawnSync(process.execPath, args, { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
   const core = path.join(tmp, "the-core");
@@ -138,16 +144,26 @@ export function npmCacheCopy(tmp, env = process.env) {
  *  as it did. The settings are the wrapper's, set where npm starts, so npm-once.mjs, which the licence scan passes
  *  over, passes on the environment it was given as before (#772). */
 export function npmWithCache(tmp, env = process.env) {
-  const windows = process.platform === "win32", program = `npm${windows ? ".cmd" : ""}`, key = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
-  const real = (env[key] ?? "").split(path.delimiter).filter(d => path.isAbsolute(d)).map(d => path.join(d, program)).find(f => fs.existsSync(f));
+  const windows = process.platform === "win32", program = `npm${windows ? ".cmd" : ""}`;
+  const real = machineNpm(env);
   const cache = real && npmCacheCopy(tmp, env);
   if (!cache) return undefined;
   const dir = path.join(tmp, "npm-cached"), wrapper = path.join(dir, program);
   fs.mkdirSync(dir);
   if (windows) fs.writeFileSync(wrapper, `@set "npm_config_cache=${cache}"\r\n@set "npm_config_prefer_offline=true"\r\n@set "npm_config_fetch_retries=0"\r\n@call "${real}" %*\r\n`);
-  else fs.writeFileSync(wrapper, `#!/bin/sh\nnpm_config_cache='${cache.replace(/'/g, "'\\''")}' npm_config_prefer_offline=true npm_config_fetch_retries=0 exec '${real.replace(/'/g, "'\\''")}' "$@"\n`, { mode: 0o755 });
+  else fs.writeFileSync(wrapper, `#!/bin/sh\nnpm_config_cache=${shWord(cache)} npm_config_prefer_offline=true npm_config_fetch_retries=0 exec ${shWord(real)} "$@"\n`, { mode: 0o755 });
   return wrapper;
 }
+
+/** This machine's npm: the first on the PATH of `env`, by an absolute entry alone, so no folder a test starts in is
+ *  searched; undefined where none is there. */
+export function machineNpm(env = process.env) {
+  const program = `npm${process.platform === "win32" ? ".cmd" : ""}`, key = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
+  return (env[key] ?? "").split(path.delimiter).filter(d => path.isAbsolute(d)).map(d => path.join(d, program)).find(f => fs.existsSync(f));
+}
+
+/** `text` as one word of a POSIX shell script, in single quotes, so nothing in it expands. */
+export const shWord = text => `'${text.replace(/'/g, "'\\''")}'`;
 
 /** The lines of a stand-in for curl (a shell script on a scratch PATH) that serve Betterleaks' release from a folder: where
  *  the fetched address is one of that project's releases on github.com and CORE_ARCHIVES names a folder holding a file
@@ -179,7 +195,7 @@ export function scratchEnv(theCore, tmp, { findsBare = false } = {}) {
   hostSays();
   const url = `https://github.com/${CORE}`;
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$|CLAUDE_|GH_|NPM_|NUGET_|DOTNET_CLI_HOME$)|^npm_|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(name)));
-  Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid",
+  Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: ADDRESS, GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: ADDRESS,
     GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_ALLOW_PROTOCOL: "file",
     GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_0: url, GIT_CONFIG_KEY_1: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_1: `${url}.git` });
   if (!findsBare) Object.assign(env, { GIT_CONFIG_COUNT: "3", GIT_CONFIG_KEY_2: "safe.bareRepository", GIT_CONFIG_VALUE_2: "explicit" });

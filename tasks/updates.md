@@ -17,7 +17,9 @@ the core owner's reasons: that owner gives the project's differences, and each i
 (`README.md`, "Reporting to the core"). Reason: a question answered from the reasons settles fast, and shows the core
 where a rule is not general enough. Held, in part, by the description check, which fails a pull request that adds a line
 under the manifest's "Differences" with no line "Reasons read:", and by the reviews every change to a manifest gets as a
-protected file; a question filed with the core, by nothing yet.
+protected file; a question filed with the core, by `scripts/reasons-said.mjs`, run beside the labels check in the core's
+scheduled look, which reports an issue filed from a project that names a rule of the core by its file or as a floor rule
+and leaves the forms' heading on its reasons out or empty.
 
 **The newest stable version, unless there is a reason.**
 - Updates are upkeep: they wait for no queue entry.

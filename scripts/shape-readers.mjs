@@ -13,8 +13,9 @@ import path from "node:path";
 import { CODE, globals, imports, isModule, isP, jsxIn, lyingUnder, nameTree, tokens } from "./code-shape.mjs";
 import { javascriptFunctions } from "./javascript-functions.mjs";
 import { OWN as CS_OWN, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "./shape-csharp.mjs";
-import { unnamedFor, unreachedFor } from "./parser.mjs";
-import { OWN as PY_OWN, STDLIB, normal, pythonPackages, readPython, resolvePython } from "./shape-python.mjs";
+import { unreachedFor } from "./parser.mjs";
+import { OWN as PY_OWN, STDLIB, pythonPackages, readPython, resolvePython } from "./shape-python.mjs";
+import { normal } from "./pypi-name.mjs";
 
 // Each reader by its name, with what it reads, as a note says it.
 export const READERS = {
@@ -37,9 +38,8 @@ export const READERS = {
   processes: "the tests that start another process",
   changes: "the comments that mark a change",
 };
-// The readers that read on the parser and could not run, its packages not installed for the registry not answering in
-// a project's pull request, or for a project's own job naming the core's first install alone (parser.mjs, unreachedFor,
-// unnamedFor): the check reads their finds as a reader's the baseline does not name, reported and never failed, and
+// The readers that read on the parser and could not run, its packages not installed (parser.mjs, unreachedFor): the
+// check reads their finds as a reader's the baseline does not name, reported and never failed, and
 // says so (#654, point 4; #719).
 // (each reader on the parser, by the grammars it reads with)
 const ON_PARSER = { "javascript-tree": ["javascript", "typescript", "tsx"], "csharp-tree": ["csharp"], "python-tree": ["python"] };
@@ -48,7 +48,6 @@ export const unreachedReaders = () => readersWhere(unreachedFor);
 // (the readers that read all they find on the parser, imports and tokens too, so that none of a file's finds is read
 // where it could not run)
 export const WHOLE_ON_PARSER = ["csharp-tree", "python-tree"];
-export const unnamedReaders = () => readersWhere(unnamedFor);
 // The marks of a change in a comment (tasks/code-shape.md, "A comment says why the code is so, never what changed";
 // #458), each by its name, read of each line of a comment, a block's own * and a list's - before it aside: a change's
 // heading, a word of change in capitals that opens the line before a colon or a date (a line of a comment that goes on

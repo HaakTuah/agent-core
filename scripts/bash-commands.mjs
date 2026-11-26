@@ -24,7 +24,7 @@ export function bashCommands(run) {
     try { found = inParser(import.meta.url, "read", text); } catch (e) {
       // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step)
       const mended = / Mend: /u.test(e?.message ?? "");
-      if (e?.kind === "load") throw new Error(`The parser or the grammar of bash could not be loaded: ${mended ? e.message : `${e.message}. Mend: run node core/scripts/install.mjs parser (in the core, scripts/install.mjs parser), which installs the parser's packages from its lock file, then run this again`}`);
+      if (e?.kind === "load") throw new Error(`The parser or the grammar of bash could not be loaded: ${mended ? e.message : `${e.message}. Mend: run \`if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs parser; fi\` (in the core, node scripts/install.mjs parser), which installs the parser's packages from its lock file, then run this again`}`);
       throw e;
     }
     if (READ.size >= READ_MOST) READ.clear();
@@ -49,8 +49,9 @@ const MARKED = /GH(?:EXPR|GLOB)\d+Z/u;
 // (how long the grammar may take on a step's text, every reading of it together, in milliseconds: its recovery from an
 // error grows faster than the text, and no step holds a text it cannot read in that time but to hide what it holds.
 // Such a step is not read at all, never read in parts, since a line read alone misreads a quote or a continued line
-// that runs over it)
-const WHOLE = 500;
+// that runs over it). A test of a reader on a loaded machine gives a longer time in CORE_BASH_PARSE_MS, read when the
+// parser's thread starts, so that a text it reads within its time elsewhere is not lost to a busy runner (#1163)
+const WHOLE = Number(process.env.CORE_BASH_PARSE_MS) > 0 ? Number(process.env.CORE_BASH_PARSE_MS) : 500;
 
 /** The commands of `run`, read with the parser's `parse` (in its thread: bashCommands, above); null where the grammar
  *  cannot read it within its time. */

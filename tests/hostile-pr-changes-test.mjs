@@ -148,6 +148,9 @@ if (NAMES) {
 branch("gh-long", () => write(".github/workflows/a.yml", `${WORKFLOW}${"# a comment of the test\n".repeat(200000)}`));
 r = only();
 ok(r.status === 0 && r.ms < 5000, `comment-only: 4 MB of comments added to a workflow are read in ${r.ms} ms, as comments alone`);
+branch("gh-quoted", () => write(".github/workflows/a.yml", `${WORKFLOW}x: [${Array(48000).fill('"a"').join(",")}]\n`));
+r = only();
+ok(refused(r, "more than a comment") && r.ms < 5000, `comment-only: a list of 48,000 quoted words added to a workflow is read in ${r.ms} ms and refused (#1313)`);
 r = (branch("many-gh", () => { for (let i = 0; i < MANY; i++) write(`.github/many/f${i}.yml`, `${i}\n`); }), only());
 ok(r.status === 1 && r.out.includes("NOT ALONE .github/many/f0.yml: added, deleted") && !raw(r.out) && r.ms < 5000, `comment-only: ${MANY} files added under .github/ are each refused, read in ${r.ms} ms`);
 branch("gh-markup", () => write(".github/workflows/a.yml", WORKFLOW.replace("name: say", "name: ${{ secrets.TOKEN }}")));
@@ -522,14 +525,14 @@ if (process.platform !== "win32") {
   fs.symlinkSync(path.join(away, "x.md"), path.join(rf, "tasks/link.md"));
   fs.symlinkSync(path.join(away, "x.md"), path.join(rf, "floor/more.md"));
   fs.symlinkSync(path.join(away, "x.md"), path.join(rf, "AGENTS.md"));
-  fs.symlinkSync(path.join(away, "x.md"), path.join(rf, "tasks/two\nFAIL: lines.md"));
+  fs.symlinkSync(path.join(away, "x.md"), path.join(rf, "tasks/two\nFAIL::##[ lines.md"));
   fs.mkdirSync(path.join(rf, "inbox"));
   fs.writeFileSync(path.join(rf, "inbox/item.md"), "# An item\n");
   fs.symlinkSync(path.join(away, "x.md"), path.join(rf, "inbox\\item.md"));
   const r = spawnSync(process.execPath, [path.join(root, "scripts", "reading.mjs"), "--check"], { cwd: rf, env, encoding: "utf8", timeout: 5000 });
   const out = `${r.stdout}${r.stderr}`;
   const lib = library(rf, ""), fails = out.split("\n").filter(l => l.startsWith("FAIL"));
-  ok(r.status === 1 && !raw(out) && ["AGENTS.md", "floor/more.md", "floor/topics", "tasks/more", "tasks/link.md", "tasks/two\\nFAIL: lines.md"].every(l => out.includes(`FAIL: ${l.includes("\\") ? `"${l}"` : l} is a symbolic link`)) && fails.length === 6 && mended(out), "reading.mjs --check: a rule folder that is a link, a folder and a file link in a rule folder, one in the floor's folder and the core's AGENTS.md are each refused once with its mend, a name with a line's end on one line", out);
+  ok(r.status === 1 && !raw(out) && ["AGENTS.md", "floor/more.md", "floor/topics", "tasks/more", "tasks/link.md", "tasks/two\\nFAIL: :# #[ lines.md"].every(l => out.includes(`FAIL: ${l.includes("\\") ? `"${l}"` : l} is a symbolic link`)) && fails.length === 6 && mended(out), "reading.mjs --check: a rule folder that is a link, a folder and a file link in a rule folder, one in the floor's folder and the core's AGENTS.md are each refused once with its mend, a name with a line's end on one line", out);
   ok(Object.keys(lib.modules).every(f => !/^floor\/topics\/|^tasks\/(?:more|link|two)/u.test(f)) && lib.links.length === 6, "reading.mjs: the library reads no module through a link, and lists each link it met");
   ok(regular(rf, "inbox/item.md") === "# An item\n" && regular(rf, "inbox\\item.md") === (path.sep === "\\" ? "# An item\n" : null), "reading.mjs: a name with a backslash, a link, is the path checked and the path opened");
   const got = rules(rf, { agents: true });

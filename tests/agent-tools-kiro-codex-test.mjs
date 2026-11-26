@@ -63,7 +63,7 @@ const { passes, fails } = asserting(ok);
   fails(run(pr(older, { ".codex/config.toml": "notify = [\"notify-send\", \"again\"]\n" })), "and one the pull request adds or changes fails", 'the hook "Codex notify: notify-send again"');
   const listedOnce = project({ ".codex/config.toml": "notify = [\"notify-send\", \"done\"]\n", ...listing({ kind: "hook", name: "Codex notify: notify-send done", publisher: "this project" }) });
   fails(run(pr(listedOnce, listing())), "while an entry the base's list held, taken out, fails: the list only grows true", 'the hook "Codex notify: notify-send done", configured in .codex/config.toml, is not listed');
-  fails(run(project({ ".codex/config.toml": "[mcp_servers.x]\ncommand = \"npx\"\ncommand = \"node\"\n", ...listing() })), "a config.toml Codex would refuse is refused", ".codex/config.toml cannot be read as TOML (line 3: trying to redefine an already defined table or value)");
+  fails(run(project({ ".codex/config.toml": "[mcp_servers.x]\ncommand = \"npx\"\ncommand = \"node\"\n", ...listing() })), "a config.toml Codex would refuse is refused", ".codex/config.toml cannot be read as TOML (trying to redefine an already defined table or value at line 3, column 1)");
 }
 // ---- what the tools' settings set in the environment of the programs they start ----
 {
@@ -98,7 +98,7 @@ const { passes, fails } = asserting(ok);
   const want = '{"__proto__":"p","a":{"b":1},"s":"é\\n","m":"x y","l":"z","t":{"d":"1979-05-27T07:32:00.000Z","i":{"k":[1,"two",[true]]}},"r":[{"n":1},{"n":2}]}';
   ok(JSON.stringify(t) === want && Object.getPrototypeOf(t) === Object.prototype, "TOML is read as JSON would hold it, a key \"__proto__\" a key like any other", JSON.stringify(t));
   const headers = Array.from({ length: 200 }, (_, i) => `[[${Array(i + 1).fill("a").join(".")}]]`).join("\n");
-  for (const [bad, says] of [[`${headers}\n${Array(199).fill("b").join(".")} = 1\n`, "nests deeper than 200"], ["a = 1\na = 2", "line 2: trying to redefine"], ["a = \"x", "unfinished string"], ["[a]\n[a]", "line 2: trying to redefine"], ["a = [1", "expected comma"], ["a = 1 b", "end-of-line"], ["x = [{ a = 1 }]\n[[x]]", "line 2: trying to redefine"], ["a = \"\\q\"", "escape sequence"], [`a = ${"[".repeat(300)}`, "nests deeper than 200"]]) {
+  for (const [bad, says] of [[`${headers}\n${Array(199).fill("b").join(".")} = 1\n`, "nests deeper than 200"], ["a = 1\na = 2", "trying to redefine an already defined table or value at line 2, column 1"], ["a = \"x", "unfinished string"], ["[a]\n[a]", "trying to redefine an already defined table or value at line 2, column 2"], ["a = [1", "expected comma"], ["a = 1 b", "end-of-line"], ["x = [{ a = 1 }]\n[[x]]", "trying to redefine an already defined table or value at line 2, column 3"], ["a = \"\\q\"", "escape sequence"], [`a = ${"[".repeat(300)}`, "nests deeper than 200"]]) {
     let message = "";
     try { parseToml(bad); } catch (e) { message = e.message; }
     ok(message.includes(says), `TOML that is no TOML is refused: ${says}`, message);
@@ -108,7 +108,7 @@ const { passes, fails } = asserting(ok);
   for (const lost of ["notify = [\"python3\", \"\"\"notify.py\\\n\"\"\"\"\"]\n", "command = \"\"\"x \\\r\n  \"\"\"\"\n", "a = \"\"\"x\\\\\\\n\"\"\"\"\n"]) {
     let message = "";
     try { parseToml(lost); } catch (e) { message = e.message; }
-    ok(message.startsWith("line 1: a string's line-ending backslash runs into its closing quotes"), `a string whose quotes the package would drop is refused: ${JSON.stringify(lost)}`, message);
+    ok(/^a string's line-ending backslash runs into its closing quotes, which the TOML package reads wrong at line 1, column \d+$/u.test(message), `a string whose quotes the package would drop is refused: ${JSON.stringify(lost)}`, message);
   }
   // (#634's code review: only a multi-line basic string; a literal string, a comment and a one-line string are read)
   const literal = parseToml("notify = ['''a\\\n'''', \"b\\\\\", '''c\\\n''''']\n# d\\\n");

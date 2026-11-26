@@ -5,5 +5,5 @@
     "check: setup/template/claude-settings.json.tmpl, in part",
     "check: scripts/agent-tools.mjs, in part"
   ],
-  "behind": [134, 138, 180, 203, 232, 241, "#492"]
+  "behind": [134, 138, 180, 203, 232, 241, "#492", "#1134.4"]
 }

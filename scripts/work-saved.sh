@@ -47,19 +47,19 @@ if [ "$mode" = start ] && command -v npm >/dev/null 2>&1 && command -v node >/de
       dest="${at}.packages/node_modules"
       here=$(pwd -P)
       if [ "$(cd "./${at}.packages" 2>/dev/null && pwd -P)" != "$here/${at}.packages" ]; then
-        echo "The core's packages are not installed: ${at}.packages is not a folder of this checkout's own. Mend: put the core's files there in place of the link, then run node ${at}scripts/install.mjs."
+        echo "The core's packages are not installed: ${at}.packages is not a folder of this checkout's own. Mend: put the core's files there in place of the link, then install them: if [ -f ${at}scripts/install.mjs ]; then node ${at}scripts/install.mjs; fi."
       # (a link as the shell sees one, or as Node does, which reads a Windows junction as one too)
       elif [ -L "$dest" ] || node -e 'process.exit(require("fs").lstatSync(process.argv[1],{throwIfNoEntry:false})?.isSymbolicLink()?0:1)' "$dest" 2>/dev/null \
         || [ -n "$(g ls-files -- "$dest" 2>/dev/null | head -n 1)" ]; then
-        echo "The core's packages are not installed: ${dest} is a link or holds files git tracks, which the install would replace. Mend: take it out of git and remove the link, then run node ${at}scripts/install.mjs."
+        echo "The core's packages are not installed: ${dest} is a link or holds files git tracks, which the install would replace. Mend: take it out of git and remove the link, then install them: if [ -f ${at}scripts/install.mjs ]; then node ${at}scripts/install.mjs; fi."
       # (main's own reading of its package list, lock file and .npmrc, as install.mjs reads them before npm runs: only
       # npm's registry, and its own two settings; the npm that comes with the least Node reads no setting that says so)
       elif ! node --input-type=module -e 'const fs=await import("node:fs"),{pathToFileURL}=await import("node:url");const w=process.argv[1],p=await import(pathToFileURL(w+"/scripts/packages.mjs").href),r=f=>fs.readFileSync(w+"/"+f,"utf8");process.exit(p.lockFaults(JSON.parse(r("package.json")),JSON.parse(r("package-lock.json"))).length||p.npmrcOthers(r(".npmrc")).length?1:0)' "$w" >/dev/null 2>&1; then
-        echo "The core's packages are not installed: main's ${at}.packages/package.json, ${at}.packages/package-lock.json or ${at}.packages/.npmrc names a source or a setting the core's install does not take. Mend: run node ${at}scripts/install.mjs, which says what it refuses."
+        echo "The core's packages are not installed: main's ${at}.packages/package.json, ${at}.packages/package-lock.json or ${at}.packages/.npmrc names a source or a setting the core's install does not take. Mend: run if [ -f ${at}scripts/install.mjs ]; then node ${at}scripts/install.mjs; fi, which says what it refuses."
       else
         omit=--omit=dev; [ -z "$at" ] && [ -d tests ] && omit= # (a copy installs no package only the core's own tests run)
         if (cd "$w" && timeout 20 npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none --allow-directory=none --workspaces=false $omit >/dev/null 2>&1) && rm -rf "$dest" && mv "$w/node_modules" "$dest"; then :; else
-          echo "The core's packages are not installed: npm could not install them from main's ${at}.packages/package-lock.json. Mend: run node ${at}scripts/install.mjs before running a check."
+          echo "The core's packages are not installed: npm could not install them from main's ${at}.packages/package-lock.json. Mend: none is needed for the checks, which install them themselves before they read (#1093); to install them now, run if [ -f ${at}scripts/install.mjs ]; then node ${at}scripts/install.mjs; fi."
         fi
       fi
     fi

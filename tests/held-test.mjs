@@ -3,7 +3,7 @@
 // registry gives, trimmed to what it reads, and handed to it in place of the network (floor rule 8: no live call, no
 // real package). Run: node tests/held-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { GITHUB_MOST } from "../scripts/lookup.mjs";
@@ -57,6 +57,12 @@ answers["https://api.github.com/repos/invented-org/quiet-moss"] = { status: 503 
 r = await lookAgain([pkg("moved-on-moss"), pkg("quiet-moss")], { get, now: NOW });
 ok(r.stale.length === 1 && /moved-on-moss@1\.1\.0: its registry no longer has this version/u.test(r.stale[0]), "a held version its registry no longer has is stale, though newer ones stand", r.stale);
 ok(r.unread.length === 1 && /quiet-moss@1\.1\.0: GitHub did not answer whether its repository/u.test(r.unread[0]), "GitHub not answering leaves the package unread, never taken as not archived", r.unread);
+// a version that is an address with a sign-in in it, its "@" past where a printed value is cut short: the sign-in is
+// cut out first, so none of it is printed (floor rule 1); the sign-in made up, built from pieces as the test runs
+const user = ["made", "up"].join("-"), pass = [["not", "a", "pass"].join("_"), "x".repeat(240)].join("-");
+r = await lookAgain([pkg("flaky-moss", { version: `git+https://${user}:${pass}@example.invalid/flaky-moss.git` })], { get, now: NOW });
+ok(r.unread.length === 1 && r.unread[0].includes("flaky-moss@git+https://example.invalid/flaky-moss.git") && !r.unread[0].includes(user) && !r.unread[0].includes(pass.slice(0, 12)),
+  "a version that is an address with a long sign-in is printed with the sign-in cut out", r.unread.join(" | ").replaceAll(user, "<user>").replaceAll(pass.slice(0, 12), "<pass>"));
 
 // GitHub, asked of at most GITHUB_MOST named packages, the oldest last release first
 asked.length = 0;
@@ -120,6 +126,20 @@ try {
     writeFileSync(join(at, "checks/licences.json"), JSON.stringify({ lockfiles: [], ships: [] }));
     const run = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/held.mjs", import.meta.url)), "--issue"], { cwd: at, encoding: "utf8" });
     ok(run.status === 3 && run.stdout.trim() === "", "a config named only when the workflow runs is not stood in for by the kit's: the issue is left as it stands", `${run.status} ${run.stdout} ${run.stderr}`);
+  } finally { rmSync(at, { recursive: true, force: true }); }
+}
+
+// ---- Each sync runs it among its reports (#1095), as the sync runs one: from the project's root, no option; a project
+// whose config holds no lock file is asked of no registry, and the run says so and fails nothing
+{
+  const at = scratchDir("held-sync-");
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: at });
+    mkdirSync(join(at, "checks"));
+    writeFileSync(join(at, "checks/licences.json"), JSON.stringify({ lockfiles: [], ships: [] }));
+    const run = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/held.mjs", import.meta.url))], { cwd: at, encoding: "utf8" });
+    const listed = /\["host\.mjs"\], \["held\.mjs"\]/.test(readFileSync(new URL("../scripts/sync.mjs", import.meta.url), "utf8"));
+    ok(listed && run.status === 0 && /^ok   none of the 0 packages asked has gone stale/.test(run.stdout), "the sync runs held.mjs among its reports, and with nothing held it says so and fails nothing", `${listed} ${run.status} ${run.stdout} ${run.stderr}`);
   } finally { rmSync(at, { recursive: true, force: true }); }
 }
 

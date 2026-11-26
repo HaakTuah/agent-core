@@ -14,8 +14,9 @@
 //     merge) and binary files are not counted.
 // A PR that crosses a mark moves the mark in the config only as roles/shared/review-guidelines.md says ("A mark on what
 // every session reads", and "What blocks"). The PR's changes are those against SIZES_BASE (set by the copies workflow,
-// .github/workflows/copies.yml, which runs this), else where HEAD left origin/main; in CI that is the base's tip
-// against the PR's merge commit, so a run after the base moves on counts its new changes too. Node's own modules only.
+// .github/workflows/copies.yml, which runs this), else where HEAD left origin/main; in CI that is HEAD^1, the first
+// parent of the PR's merge commit, given as a commit (scripts/checks.mjs; #1217): the base's tip as GitHub made that
+// merge, so a run after the base moves on counts its new changes too. Node's own modules only.
 // A file's size is its bytes without each carriage return before a line feed (file-size.mjs, beside this file), so it
 // is the same on a machine where git converts line endings on checkout as on GitHub.
 // It checks the project it lies in (core/scripts/ there), whatever the directory it is started from; the config's own
@@ -28,13 +29,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { corePath, floorCopy, projectAt } from "./core-path.mjs";
 import { sizeOf as size } from "./file-size.mjs";
-import { leadsOut } from "./guards.mjs";
+import { asText, leadsOut, logged, parseBounded } from "./guards.mjs";
 
-const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+// (a listing of the tracked paths grows with the project: 256 MB, not Node's default 1 MB; #1204)
+const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
 const MARKS = process.argv[2];
 if (!MARKS) { console.error("FAIL: no config was named. Mend: name it: node <the core's path, core/ as a rule>scripts/reading-size.mjs <config>"); process.exit(1); }
 let marks;
-try { marks = JSON.parse(fs.readFileSync(MARKS, "utf8")); } catch (e) { console.error(`FAIL: ${MARKS} could not be read as JSON (${String(e.message).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?")}). Mend: name the config the copies workflow is given, and write it as JSON`); process.exit(1); }
+try { marks = parseBounded(fs.readFileSync(MARKS, "utf8")); } catch (e) { console.error(`FAIL: ${MARKS} could not be read as JSON (${String(e.message).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?")}). Mend: name the config the copies workflow is given, and write it as JSON`); process.exit(1); }
 if (!marks || typeof marks !== "object" || Array.isArray(marks)) marks = {}; // (JSON's null, a list or a value alone: the form below refuses it)
 const num = v => Number.isInteger(v) && v > 0, obj = o => o && typeof o === "object" && !Array.isArray(o), nums = o => obj(o) && Object.values(o).every(num);
 // (a line of "past": a mark alone, as written before it took a why, or { "mark", "why" })
@@ -52,7 +54,9 @@ const MARKS_AT = real(path.resolve(MARKS));
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
 // (a submodule's files too, at their paths from here: a library that carries the core brings its copy so; core-path.mjs)
-const tracked = new Set(git(["ls-files", "-z", "--recurse-submodules"]).split("\0").filter(Boolean));
+let tracked;
+try { tracked = new Set(git(["ls-files", "-z", "--recurse-submodules"]).split("\0").filter(Boolean)); }
+catch (e) { console.error(`FAIL: ${logged(`git could not list the tracked paths (${e.code ?? String(e.message).split("\n")[0]})`)}. Mend: run \`git ls-files\` here and mend what it reports (an unreadable index, a submodule not set up, more paths than the 256 MB the check reads), then run this again`); process.exit(1); }
 const kb = n => (n / 1024).toFixed(1);
 // (the core's copy at the manifest's path, and the floor's own copy a repository whose core a library carries keeps:
 // tasks/repositories.md; core-path.mjs)
@@ -93,7 +97,7 @@ if (base) {
   // (a submodule's files show here only as its path: a file of a library that carries the core, changed when the pull
   // request moves the library, is not seen as changed, which leaves its split mark unheld, as before such files were read)
   let changed;
-  try { changed = new Set(git(["diff", "--name-only", base]).split("\n")); } catch { console.error(`FAIL: ${base} is not a commit here. Mend: fetch it (git fetch origin ${base}), or set SIZES_BASE to the pull request's base`); process.exit(1); }
+  try { changed = new Set(git(["diff", "--name-only", base]).split("\n")); } catch (e) { if (e.code === "ENOBUFS") { console.error("FAIL: git could not read the changed paths: more than the 256 MB the check reads. Mend: split the pull request, or bring its branch up to date with the default branch, then run this again"); process.exit(1); } console.error(`FAIL: ${base} is not a commit here. Mend: fetch it (git fetch origin ${base}), or set SIZES_BASE to the pull request's base`); process.exit(1); }
   // (the base's own lines of "past", where its config can be read there: a line the base did not hold is this PR's)
   let basePast = {};
   try { const was = JSON.parse(git(["show", `${base}:${path.relative(real(process.cwd()), MARKS_AT).split(path.sep).join("/")}`])); if (was?.past && typeof was.past === "object") basePast = was.past; } catch { /* (no config on the base: every line is this PR's) */ }
@@ -113,8 +117,9 @@ if (base) {
 } else notes.push("no base to compare with (set SIZES_BASE), so the files past the split mark were not checked for changes");
 for (const f of Object.keys(marks.past)) if (!big.includes(f)) fail.push(`${MARKS} lists ${f} under "past", but it is not past ${marks.split} bytes now. Mend: take it out of "past"`);
 
-for (const n of notes) console.log(`note ${n}`);
-for (const x of fail) console.error(`FAIL: ${x}`);
+// (each line as text alone: a file's name in it is the pull request's; #1348)
+for (const n of notes) console.log(asText(`note ${n}`));
+for (const x of fail) console.error(asText(`FAIL: ${x}`));
 if (fail.length) process.exit(1);
-console.log(`ok   read by every session: ${Object.keys(marks.read).map(f => `${f} ${kb(size(f))} KB`).join(", ")}; the project's own ${kb(total)} of ${kb(marks.total)} KB. `
-  + `Past ${kb(marks.split)} KB: ${big.join(", ") || "none"}${base ? ", none changed here" : ""}`);
+console.log(asText(`ok   read by every session: ${Object.keys(marks.read).map(f => `${f} ${kb(size(f))} KB`).join(", ")}; the project's own ${kb(total)} of ${kb(marks.total)} KB. `
+  + `Past ${kb(marks.split)} KB: ${big.join(", ") || "none"}${base ? ", none changed here" : ""}`));

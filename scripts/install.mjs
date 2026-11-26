@@ -20,6 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { npmIgnores, npmReadsAll, npmVersion } from "./npm-reads.mjs";
+import { noSignInWhole, parseBounded } from "./guards.mjs";
 import { INSTALLS, lockFaults, npmrcOthers } from "./packages.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -56,34 +57,36 @@ const PACKAGE_FILES = new Set(["package.json", "package-lock.json", ".npmrc", "n
 // A file in an install's folder beside the core's own (in .packages/, the nested installs' folders too): a shrinkwrap,
 // which npm reads first, or any other, such as one npm would read as its own settings where a command names the folder.
 // The failure's words with its mend; null where none stands.
+// (a path is shown from the copy's root: a refusal is read back into pull request text, which holds no path of the machine)
+const rel = f => path.relative(root, f).split(path.sep).join("/") || ".";
 function strays(dir, at) {
-  if (fs.existsSync(at("npm-shrinkwrap.json"))) return `${at("npm-shrinkwrap.json")} stands beside the lock file, and would be installed from in its place. Mend: take it out; the core's packages are named in its lock files alone`;
+  if (fs.existsSync(at("npm-shrinkwrap.json"))) return `${rel(at("npm-shrinkwrap.json"))} stands beside the lock file, and would be installed from in its place. Mend: take it out; the core's packages are named in its lock files alone`;
   const extra = fs.readdirSync(dir).filter(f => !PACKAGE_FILES.has(f) && !(dir === packages && NESTED.includes(f) && fs.lstatSync(path.join(dir, f)).isDirectory()));
-  return extra.length ? `${dir} holds ${extra.map(f => JSON.stringify(f)).join(", ")} beside the package list, lock file, .npmrc and install. Mend: take ${extra.length === 1 ? "it" : "them"} out; the folder holds those alone` : null;
+  return extra.length ? `${rel(dir)} holds ${extra.map(f => JSON.stringify(f)).join(", ")} beside the package list, lock file, .npmrc and install. Mend: take ${extra.length === 1 ? "it" : "them"} out; the folder holds those alone` : null;
 }
 function refusal(name) {
   const { folder: own, lock, into } = REGISTRIES[name];
   const dir = path.join(root, own), at = f => path.join(dir, f);
   const folder = path.join(root, into.replace(/\/$/u, "")); // (no "/" after it, which would read the link's target)
   // (a link first, before anything is read through it: .packages/, the install's own folder, and its node_modules/)
-  for (const f of [...new Set([packages, dir]), folder]) if (fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()) return `${f} is a link, which the install would write through, or empty. Mend: remove the link, then run this again`;
+  for (const f of [...new Set([packages, dir]), folder]) if (fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()) return `${rel(f)} is a link, which the install would write through, or empty. Mend: remove the link, then run this again`;
   // (and files git tracks in the install's folder, which it would replace, for every install, PyPI's too)
   let tracked = "";
   try { tracked = spawnSync("git", ["ls-files", "--", into], { cwd: root, encoding: "utf8" }).stdout ?? ""; } catch { /* (no git: nothing tracked) */ }
-  if (tracked.trim()) return `${folder} holds files git tracks, which the install would replace. Mend: take them out of git (git rm -r --cached ${into}), then run this again`;
+  if (tracked.trim()) return `${rel(folder)} holds files git tracks, which the install would replace. Mend: take them out of git (git rm -r --cached ${into}), then run this again`;
   if (REGISTRIES[name].pip) return null; // (what follows is npm's: pip reads the hashes in its lock file alone)
   // (what the package list and lock file hold, read before npm runs: the npm that comes with the least Node fetches
   // whatever source a spec names, and runs its prepare script, whatever setting says otherwise)
   let faults;
   try { faults = lockFaults(JSON.parse(fs.readFileSync(at("package.json"), "utf8")), JSON.parse(fs.readFileSync(at("package-lock.json"), "utf8")), { overrides: Object.hasOwn(OWN_ONLY, name) }); }
-  catch (e) { faults = [`${lock} or ${own}/package.json cannot be read (${e.message})`]; }
-  if (faults.length) return `${faults[0]}${faults.length > 1 ? `, and ${faults.length - 1} more` : ""}. Mend: write the package list and lock file as npm's own install from its registry writes them, with no other source`;
+  catch (e) { faults = [`${lock} or ${own}/package.json cannot be read`]; }
+  if (faults.length) return `${noSignInWhole(faults[0])}${faults.length > 1 ? `, and ${faults.length - 1} more` : ""}. Mend: write the package list and lock file as npm's own install from its registry writes them, with no other source`;
   const stray = strays(dir, at);
   if (stray) return stray;
   let npmrc = "";
   try { npmrc = fs.readFileSync(at(".npmrc"), "utf8"); } catch { /* (none: npm's own registry) */ }
   const others = npmrcOthers(npmrc);
-  if (others.length) return `${at(".npmrc")} holds ${others.length === 1 ? "a line" : `${others.length} lines`} beside the core's own two settings (the first: ${JSON.stringify(others[0].slice(0, 80))}), which npm would read: a registry, a host's token, a proxy or a certificate would send the install elsewhere. Mend: take ${others.length === 1 ? "that line" : "those lines"} out; the core's .npmrc holds ignore-scripts=true and min-release-age alone`;
+  if (others.length) return `${rel(at(".npmrc"))} holds ${others.length === 1 ? "a line" : `${others.length} lines`} beside the core's own two settings, which npm would read: a registry, a host's token, a proxy or a certificate would send the install elsewhere. Mend: take ${others.length === 1 ? "that line" : "those lines"} out; the core's .npmrc holds ignore-scripts=true and min-release-age alone`;
   return null;
 }
 
@@ -105,8 +108,8 @@ const unanswered = text => NPM_UNANSWERED.test(String(text ?? "")) || (PIP_UNANS
 function namesNothing(name) {
   const { lock, folder, pip } = REGISTRIES[name];
   if (pip) return false;
-  const { packages: entries = {} } = JSON.parse(fs.readFileSync(path.join(root, lock), "utf8"));
-  const list = JSON.parse(fs.readFileSync(path.join(root, folder, "package.json"), "utf8"));
+  const { packages: entries = {} } = parseBounded(fs.readFileSync(path.join(root, lock), "utf8"));
+  const list = parseBounded(fs.readFileSync(path.join(root, folder, "package.json"), "utf8"));
   return Object.keys(entries).every(k => !k) && !Object.keys({ ...list.dependencies, ...list.devDependencies, ...entries[""]?.dependencies, ...entries[""]?.devDependencies }).length;
 }
 
@@ -143,12 +146,14 @@ for (const name of named.length ? named : [first]) {
     // check that needs a package says it did not run, and the job is run again before the merge)
     if (!own && unanswered(r.stderr) && /^pull_request/u.test(process.env.GITHUB_EVENT_NAME ?? "") && process.env.GITHUB_ENV) {
       fs.appendFileSync(process.env.GITHUB_ENV, "CORE_PACKAGES_UNREACHED=1\n");
-      const said = `The core's packages could not be installed from ${lock}, twice, so each check that needs one did not run: ${why}. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`;
+      console.error(`note the second install from ${lock} failed too: ${why}`); // (the log alone: the warning below reaches the pull request)
+      const said = `The core's packages could not be installed from ${lock}, twice, so each check that needs one did not run (the installer's own words stay in this job's log, never in this note, which reaches the pull request). Mend: run this job again before the pull request merges and read the log; if it fails again, file it as a fault`;
       console.log(`::warning::${said}`);
       if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `- Did not run: ${said.replace(/[<>&`*_[\]|]/gu, "?")}\n`);
       continue;
     }
-    console.error(`FAIL: the core's packages could not be installed from ${root}${lock}, twice: ${why}. Mend: run this again once the registry answers; if it fails again, file it as a fault (it takes the program that comes with its platform, and a network that reaches its registry)`);
+    console.error(`note the second install from ${lock} failed too: ${why}`); // (the log alone: the FAIL line below is read back into pull request text, by packages.mjs)
+    console.error(`FAIL: the core's packages could not be installed from ${lock}, twice (the installer's own words are in this job's log). Mend: run this again once the registry answers, and read the log; if it fails again, file it as a fault (it takes the program that comes with its platform, and a network that reaches its registry)`);
     process.exit(1);
   }
   console.log(`ok   the core's packages installed from ${lock} into ${into} in ${((Date.now() - began) / 1000).toFixed(1)} s`);

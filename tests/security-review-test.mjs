@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { CONTEXT, EDITED, NEW_LINE, UNREAD, boundOf, commentsAlone, form, judge, named, pinsAlone, reviewersOf, status } from "../scripts/security-review.mjs";
+import { CONTEXT, EDITED, NEW_LINE, UNREAD, boundOf, commentsAlone, form, judge, named, pinsAlone, powerFilesOf, reviewersOf, status } from "../scripts/security-review.mjs";
 import { blockingOf, otherOf, postedKind } from "../scripts/review-record.mjs";
 import { judge as codeReview } from "../scripts/code-review-wait.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -190,6 +190,18 @@ ok([".claude/settings.json", "action.yml", "tools/x/action.yaml", ".GitHub/workf
 ok(is(two([summary(done)], [file("x.yml", "", { status: "renamed", previous_filename: ".github/workflows/x.yml" })]), false, "second") && is(two([summary(done)], [file(".github/workflows/x.yml", "", { status: "added" })]), false, "second"), "a workflow moved away, or added, asks two");
 ok(is(two([summary(done)], [pinMove, callMove, file("src/x.js", patch(["a", "b"]))]), true, "has run") && is(two([summary(done)], [file("core/.github/workflows/x.yml", patch(["a", "b"]))]), true, "has run"), "pins moved alone, and the copy under core/, ask one");
 ok(is(two([], undefined), false, "no security review") && is(judge(pull, [summary(done)], [], undefined), true, "has run"), "given no files, it asks what it asked before");
+// given what power.mjs read as running with power (#1134, point 4): the two where a file of the set changed, and only there
+const powered = (files, power) => judge(counted(pull, files), [summary(done)], [], undefined, files, true, { power });
+const script = file("scripts/run.mjs", patch(["a", "b"]));
+ok(is(powered([stepChange], new Set()), true, "has run") && is(powered([file(".claude/settings.json", patch(["a", "b"]))], new Set()), true, "has run"), "given the set, a workflow that may only read, or any file not in it, asks one");
+ok(is(powered([script], new Set(["scripts/run.mjs"])), false, "second") && is(powered([file("x.mjs", "", { status: "renamed", previous_filename: "scripts/run.mjs" })], new Set(["scripts/run.mjs"])), false, "second"), "a script in the set asks two, by its name now or before");
+ok(is(powered([pinMove], new Set([".github/workflows/ci.yml"])), true, "has run"), "a powered workflow whose pins alone moved asks one, as before (floor rule 17)");
+ok(is(powered([script], null), false, "second") && is(powered([file("docs/x.md", patch(["a", "b"]))], null), true, "has run") && is(powered([file("core/scripts/x.mjs", patch(["a", "b"]))], null), true, "has run"),
+  "where the set could not be read, each changed script asks two, and a document, or a script of the copy, asks one");
+ok(is(powered([file("bin/deploy", patch(["a", "b"]))], null), false, "second") && is(powered([file("bin/deploy", patch(["a", "b"]))], new Set()), true, "has run"),
+  "where the set could not be read, a changed file with no extension asks two, as power.mjs reads it runnable; given the set, only where it is in it");
+ok(["src/App.cs", ".codex/config.toml", "package.json", ".kiro/settings.json"].every((name) => is(powered([file(name, patch(["a", "b"]))], null), false, "second")) && is(powered([file("config/x.json", patch(["a", "b"]))], null), true, "has run"),
+  "where the set could not be read, a compiled language's source, an agent tool's config and an install file each ask two; a JSON file of data asks one");
 // each status that waits says its mend, whole, within GitHub's 140 characters
 const waits = [judge(pull, []), judge(pull, [summary(open)], [finding("2026-11-12T10:30:00Z")]), judge(pull, [summary(open)]), judge(pull, [late, said("Security review: x")], [finding("2026-11-12T10:30:00Z")]),
   judge(pull, [summary(running), early]), two([summary(done)], [stepChange])];
@@ -292,6 +304,20 @@ ok(byApp.every((v) => names(v, "(?:the )?fallback(?: reviewer)?")) && unread.why
 ok(byOwn.every((v) => names(v, "your (?:security )?reviewer") && !/Mend: (?:the )?fallback/u.test(v.why)), `elsewhere it names the project's own security reviewer first: ${byOwn.map((v) => status(v, false).description).join(" | ")}`);
 ok(is(across(twice, [summary(onOld), said(`Security review: on ${MID}`)], [HEAD]), true, "posted on an earlier commit, only updates from main since") && is(across(updated, [said(`Security review: on ${HEAD}`)], []), true, "is posted on the pull request") && is(across(updated, [summary(onOld)], { [HEAD]: true }), false, "merge aaaaaaa unproved"), "a review of the merge where it stops, or of the head, stands; a list that is no list proves none");
 ok(is(across(updated, [summary(onOld)], undefined), true, "only updates from main since") && across(updated, [summary(onOld)], [], false).done === true && across(updated, [summary(onOld)], [], false).why.startsWith("before this check came, so not waited for: Codex's review saw ccccccc; merge aaaaaaa"), "given no list of the merges proved (an older workflow) the parents alone are read, as before; a pull request from before the check is told, never held");
+// A light commit (#1134, point 1: one that touches nothing that runs with power, as power.mjs reads it) carries over a
+// review that found nothing blocking; one not light, a review with a blocking finding, and a list not given do not
+{
+  ok(powerFilesOf(undefined, () => ({})) === undefined && powerFilesOf("p", () => ({})) === null && powerFilesOf("p", () => ({ power: [1] })) === null
+  && [...powerFilesOf("p", () => ({ power: ["a"] }))].join() === "a", "power.mjs's paths: none where it did not run, null where it wrote none it could read, and the Set it wrote");
+const light = (comments, given, commits = pushed) => judge({ ...pull, commits: commits.length }, comments, [], commits, undefined, true, { light: given });
+  ok(is(light([summary(onOld)], [HEAD]), true, "(on ccccccc, earlier than the head aaaaaaa, only light commits or updates from main since)") && is(light([said(`Security review: on ${OLD}\nBlocking findings: 0.\nOther findings: 1.`)], [HEAD]), true, "only light commits or updates from main since"),
+    "Codex's review that found nothing open, or a posted one that declares nothing blocking, of a commit light commits alone follow, stands for the head");
+  ok(is(light([summary(onOld)], []), false, "Codex saw ccccccc, not head") && is(light([summary(onOld)], undefined), false, "Codex saw") && is(light([said(`Security review: on ${OLD}\nBlocking findings: 1.\nOther findings: 0.`)], [HEAD]), false, "review not on head") && is(light([said(`Security review: on ${OLD}`)], [HEAD]), false, "review not on head"),
+    "a commit not light, no list, or a review with a blocking finding or none declared, asks a review of the head");
+  ok(is(light([summary(onOld)], [HEAD], [step(OLD, "e".repeat(40)), step(HEAD, "f".repeat(40))]), false, "Codex saw") && is(light([summary({ ...open, commit_sha: OLD })], [HEAD]), false, "Codex open finding hidden"),
+    "a light commit whose parent is no commit of the pull request's carries nothing, and Codex's open finding is still answered");
+  ok(status(light([summary(onOld)], [HEAD]), true).description.length <= 140, "its status's words fit GitHub's 140 characters");
+}
 
 // A pure sync (#99): pure-sync.mjs, which the workflow runs, proves it, and it needs no review unless one began by itself.
 const pure = (comments, files) => judge(files === undefined ? pull : counted(pull, files), comments, [], [], files, true, { pure: true });

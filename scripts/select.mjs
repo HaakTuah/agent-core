@@ -22,6 +22,10 @@
 // The config is the shape check's (shape.mjs, where()): its "code", "tests", "aliases" and "select" ({ "proof",
 // "whole", "none" }, each git pathspecs).
 //
+// A project's copy of the core is read as a sync changes it (#1093, point 2): its .node-version selects the whole suite,
+// any other file of it the tests that can run the copy (copyChange), and a workflow in which only the pins of calls to
+// the core's workflows moved, nothing.
+//
 // A tree that passed is not run again (tasks/tests.md; #457): on a push, given --passed and the name of the check that
 // gates the tests, where HEAD merges a pull request's head whose tree it holds (the head was up to date), the change it
 // brings selects the whole suite, as that pull request's run selected it, and the check passed on that head, nothing is
@@ -42,7 +46,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE } from "./code-shape.mjs";
-import { logged } from "./guards.mjs";
+import { CORE } from "./core-address.mjs";
+import { corePath } from "./core-path.mjs";
+import { asText, loggedAlone } from "./guards.mjs";
 import { WORDS, mentioned, nameTrie } from "./name-trie.mjs";
 import { CHARACTERS, Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
@@ -111,7 +117,7 @@ export function reached(tests, linked, pace = () => {}) {
 // `changed` the paths it changes (gone ones among them), `texts` and `tests` the project as the shape check reads it,
 // `reach` its imports, `failed` the tests that failed last time, `config` the shape check's, `before` a changed file's
 // text at the base (null where it was not there), `beside` what git holds of C# and MSBuild beside the texts (heldBeside).
-export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), unread = [], failed = [], config, watch = null, before = () => null, beside = heldBeside }) {
+export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), unread = [], failed = [], config, watch = null, before = () => null, beside = heldBeside, copy = null, pinned = new Set() }) {
   const proof = matcher(config.select.proof), m = { whole: matcher(config.select.whole), none: matcher(config.select.none), isTest: matcher(config.tests) };
   const by = new Map(), add = (t, why) => { if (tests.has(t) && !by.has(t)) by.set(t, why); };
   const pace = watch?.pace(); // (one budget for the linking and the search from each test)
@@ -121,8 +127,8 @@ export function selection({ changed, texts, tests, reach, scripts = new Set(), u
   // (and, where pytest runs a conftest.py the config does not read, each test of Python, whose fixtures may come from it)
   const blind = new Set([...reaches].filter(([t, files]) => [...files].some(f => (CS.test(f) ? cs.unsure : unsure).has(f)) || (t.endsWith(".py") && unread.some(c => c.endsWith("conftest.py")))).map(([t]) => t));
   // (the tests that reach every file, told once: the config's pathspecs are tried on each test, never on each changed file's account)
-  let every = null;
-  const ctx = { texts, tests, scripts, add, reaches, pace, before: heldToBudget(before, pace), ...m, wholes: () => (every ??= [...tests].filter(t => m.whole(t) || blind.has(t))) };
+  let every = null, copying = null;
+  const ctx = { texts, tests, scripts, add, reaches, pace, before: heldToBudget(before, pace), copy, pinned, ...m, wholes: () => (every ??= [...tests].filter(t => m.whole(t) || blind.has(t))), copyTests: () => (copying ??= copyReaching(texts, reaches, copy)) };
   for (const t of tests) if (proof(t)) add(t, "never selected out: the project's proof that behaviour was kept");
   for (const t of failed) add(t, "failed last time");
   for (const f of changed) {
@@ -133,8 +139,9 @@ export function selection({ changed, texts, tests, reach, scripts = new Set(), u
 }
 
 // What one changed file selects, through `ctx.add`; the reason the whole suite runs where its reach cannot be told.
-function oneChange(f, { texts, tests, scripts, add, reaches, pace, before, wholes, none, isTest }) {
-  if (none(f)) return null;
+function oneChange(f, { texts, tests, scripts, add, reaches, pace, before, wholes, none, isTest, copy, pinned, copyTests }) {
+  if (none(f) || pinned.has(f)) return null;
+  if (copy && f.startsWith(copy)) return copyChange(f, { add, wholes, copy, copyTests });
   if (isTest(f) && tests.has(f)) add(f, "added or changed"); // (and, a helper among the tests, what imports it)
   // (a file gone, a helper among the tests too, leaves no import to follow; a package's manifest, read beside the code,
   // links nothing: a change to either may reach every test)
@@ -169,6 +176,41 @@ function heldToBudget(before, pace = () => {}) {
     return text;
   };
 }
+
+// A file of the project's copy of the core (#1093, point 2): its .node-version, the Node the suites run on, reaches
+// every test; any other, the copy's scripts first, the tests that can run the copy (copyReaching). Names more, never less.
+function copyChange(f, { add, wholes, copy, copyTests }) {
+  if (f === `${copy}.node-version`) return `${f}, the Node the suites run on, changed`;
+  for (const t of copyTests()) add(t, `can run the copy of the core (${f})`);
+  for (const t of wholes()) add(t, `reaches every file (${f})`);
+  return null;
+}
+
+// The tests that reach a file naming the copy's folder: as a path ("core/scripts/x.mjs", or with backslashes as Windows
+// writes one), its last folder so too, or as a quoted piece of one (path.join("core", ...)). A test that imports the
+// copy's scripts is one whose imports the readers cannot follow, which reaches every file (wholes); a test that neither
+// names the copy nor imports from it cannot run it.
+function copyReaching(texts, reaches, copy) {
+  const esc = t => t.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&"), folder = copy.replace(/\/$/u, "");
+  const naming = new RegExp(`(?:^|[^\\w.-])(?:${esc(folder).replace(/\//gu, "[\\\\/]+")}|${esc(folder.split("/").pop())})(?:[\\\\/]|["'\`])`, "u");
+  const names = new Set(Object.keys(texts).filter(t => naming.test(texts[t])));
+  return [...reaches].filter(([, files]) => [...files].some(x => names.has(x))).map(([t]) => t);
+}
+
+// Each workflow the change touches in which only the pins of calls to the core's workflows moved, as a sync moves
+// them: a workflow is no code, and its pins no test reads (#1093, point 2). `core.yml` checks those pins.
+const PIN = new RegExp(`(${CORE.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")}/\\.github/workflows/[\\w.-]+\\.ya?ml)@[^\\s'"#]+`, "giu");
+const unpinned = text => text.replace(PIN, "$1@");
+function pinsOnly(base, changed) {
+  const at = (rev, f) => { try { return git(["show", `${rev}:${f}`]); } catch { return null; } };
+  return new Set(changed.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(f)).filter(f => {
+    const was = at(base, f), now = at("HEAD", f);
+    return was !== null && now !== null && was !== now && unpinned(was) === unpinned(now);
+  }));
+}
+
+// The path of the project's copy of the core, or null in the core's own repository, where its files are the code.
+const copyOf = () => { try { return corePath(".") || null; } catch { return null; } };
 
 const pick = ({ reach, scripts, unsure }) => ({ reach, scripts, unsure });
 // The conftest.py files git holds that the config's pathspecs leave out: pytest runs them all the same.
@@ -227,7 +269,7 @@ function configOf(at) {
 // together, are too many or too slow to read within the time rule 5 of SECURITY.md allows (hurry.mjs; #881, #962).
 function selectedFrom(from, { now, config, failed }) {
   const changed = changedSince(from), watch = hurry({ files: new Set(changed) });
-  try { return selection({ changed, texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests, watch)), unread: unreadConftests(now.texts), failed, config, watch, before: f => textAt(from, f) }); }
+  try { return selection({ changed, texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests, watch)), unread: unreadConftests(now.texts), failed, config, watch, before: f => textAt(from, f), copy: copyOf(), pinned: pinsOnly(from, changed) }); }
   catch (e) { if (e instanceof Late) return { all: true, why: e.message, tests: [...now.tests].sort() }; throw e; }
 }
 
@@ -250,10 +292,10 @@ async function main(argv) {
   const now = config ? standing(config) : null, failed = readFailed(opts["--failed"]);
   const s = await chosen({ config, at, base, passed: opts["--passed"], select: from => selectedFrom(from, { now, config, failed }) });
   // (a name the variable cannot hold as one word, a space or a line's end in it, runs the whole suite: no file's name
-  // sets another variable for the steps after it)
+  // sets another variable for later steps)
   if (!s.all && s.tests.some(t => !PLAIN.test(t))) Object.assign(s, { all: true, why: "a test's file name holds what a list of names cannot (a space or a line's end)" });
   const lines = said(s, now ? now.tests.size : "all its");
-  console.log(lines.join("\n"));
+  console.log(lines.map(asText).join("\n"));
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
   // (nothing selected is "none", as everything is "all": a runner given an empty list would run every test)
   if (opts["--env"]) fs.appendFileSync(process.env.GITHUB_ENV, `${opts["--env"]}=${s.all ? "all" : s.none ? "none" : ` ${s.tests.join(" ")} `}\n`);
@@ -262,5 +304,5 @@ async function main(argv) {
 
 if (started(import.meta.url)) {
   try { process.exitCode = await main(process.argv.slice(2)); }
-  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${logged(e.message)}`); process.exitCode = 1; }
+  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${loggedAlone(e.message)}`); process.exitCode = 1; }
 }

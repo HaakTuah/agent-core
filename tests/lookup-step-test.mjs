@@ -24,7 +24,7 @@ try {
   const own = (...lines) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n${lines.map((l) => `      - run: ${l}\n`).join("")}`);
   own("node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget.mjs c.json");
   let missed = notDone(tmp, step);
-  ok(missed.length === 1 && /for each config `core\/scripts\/exact-versions\.mjs` is given, add a step that runs `node core\/scripts\/lookup\.mjs` with the same config,/u.test(missed[0].mend) && !/`--nuget`/u.test(missed[0].mend), `the NuGet lookup does not stand in for the npm one (${missed.map((m) => m.mend)})`);
+  ok(missed.length === 1 && /for each config `core\/scripts\/exact-versions\.mjs` is given, add a step that runs `node core\/scripts\/lookup\.mjs` with the same config \(or the licence check/u.test(missed[0].mend) && !/`--nuget`/u.test(missed[0].mend), `the NuGet lookup does not stand in for the npm one (${missed.map((m) => m.mend)})`);
   own("node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget-fetch.mjs c.json", "node core/scripts/lookup.mjs c.json");
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /with the same config and `--nuget`/u.test(missed[0].mend), `nor the npm lookup for the NuGet one (${missed.map((m) => m.mend)})`);
@@ -33,6 +33,21 @@ try {
   ok(missed.length === 1 && /give its checkout `fetch-depth: 2`/u.test(missed[0].mend), `with both, a checkout of one commit is still reported, since the lookup would read no base (${missed.map((m) => m.mend)})`);
   writeFileSync(join(tmp, ".github/workflows/own.yml"), `${readFileSync(join(tmp, ".github/workflows/own.yml"), "utf8").replace("    steps:\n", "    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n")}`);
   ok(notDone(tmp, step).length === 0, "and with both, on a checkout that holds the base, the step is done");
+  // (from #1093 the licence script looks up npm's new packages itself: it counts where a lookup would, on a checkout
+  // that holds the base, and never for NuGet, nor after something of the pull request's, nor with --action)
+  const licenceFlow = (depth, ...lines) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n${depth ? "        with:\n          fetch-depth: 2\n" : ""}${lines.map((l) => `      - run: ${l}\n`).join("")}`);
+  licenceFlow(true, "node core/scripts/licences.mjs c.json", "node core/scripts/exact-versions.mjs c.json");
+  ok(notDone(tmp, step).length === 0, "the licence script, which looks up npm's new packages itself, stands for the npm lookup on a checkout that holds the base");
+  licenceFlow(false, "node core/scripts/licences.mjs c.json", "node core/scripts/exact-versions.mjs c.json");
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /add a step that runs `node core\/scripts\/lookup\.mjs`/u.test(missed[0].mend), `but not on a checkout of one commit, where it reads no base (${missed.map((m) => m.mend)})`);
+  licenceFlow(true, "npm ci", "node core/scripts/licences.mjs c.json", "node core/scripts/exact-versions.mjs c.json");
+  ok(notDone(tmp, step).length === 1, "nor after something of the pull request's has run");
+  licenceFlow(true, "node core/scripts/licences.mjs c.json --action", "node core/scripts/exact-versions.mjs c.json");
+  ok(notDone(tmp, step).length === 1, "nor where it only writes the dependency review's lists");
+  licenceFlow(true, "node core/scripts/licences.mjs c.json", "node core/scripts/nuget.mjs c.json");
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /`--nuget`/u.test(missed[0].mend), `nor for the NuGet lookup (${missed.map((m) => m.mend)})`);
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: echo first\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /give its checkout `fetch-depth: 2`/u.test(missed[0].mend), `a fetch depth in another job than the lookup's does not count (${missed.map((m) => m.mend)})`);

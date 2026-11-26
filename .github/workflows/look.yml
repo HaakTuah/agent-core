@@ -11,7 +11,10 @@
 # text of a pull request or an issue reaches a command: the scripts read them through gh's answers alone. Its last step
 # takes the personal terms out of issues and comments (core/scripts/issue-terms.mjs; #783), where the call passes the
 # secret PERSONAL_TERMS, as the starter kit's does. It may write issues, and read pull requests, checks and statuses;
-# nothing else, so a pull request's own text or a review's it counts and leaves to the owner's run of the script.
+# nothing else, so a pull request's own text or a review's it counts and leaves to the owner's run of the script. The
+# look reads the host for the steps and the settings only the owner gives with this token, and writes with it only the
+# labels of the core's list and its issues (core/scripts/host.mjs; #1092): what the token may not do, it files for the
+# owner, each right it uses named below.
 name: look
 
 on:
@@ -31,13 +34,16 @@ jobs:
     # branch a manual start names, so the scripts it runs and the files they read are always that branch's
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # (the job's limit is a ceiling that cancels the whole job, and a cancelled job skips every step after it; the look's
+    # own step below has the lower limit, which fails that step alone, so the personal-terms step after it still runs;
+    # a limit costs a billed minute only for a minute run: #1311)
+    timeout-minutes: 20
     permissions:
-      contents: read
-      issues: write
-      pull-requests: read
-      checks: read
-      statuses: read
+      contents: read # the default branch's files, which the steps and the look read
+      issues: write # the look's issues and its record, and the labels of the core's list it makes (#1092)
+      pull-requests: read # the pull requests that stand idle, and the late review findings
+      checks: read # the checks failed on the default branch
+      statuses: read # the statuses on the default branch's newest commit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -59,8 +65,12 @@ jobs:
         run: node "$CORE_AT"scripts/core-moved.mjs
       - name: The scheduled look
         if: ${{ !cancelled() }}
+        timeout-minutes: 12 # (a project's first run files the most issues and is the slowest, #1311)
         env:
           GH_TOKEN: ${{ github.token }}
+          # (whether the call passes the secret PERSONAL_TERMS, true or false, for the owner's settings the look reads:
+          # its value never reaches this step; #1092)
+          TERMS_GIVEN: ${{ secrets.PERSONAL_TERMS != '' }}
         run: node "$CORE_AT"scripts/look.mjs
       - name: Personal terms taken out of issues and comments (floor rule 11; counts alone, never a term or where one stood)
         if: ${{ !cancelled() }}

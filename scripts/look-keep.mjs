@@ -9,6 +9,7 @@ import { CORE } from "./core-address.mjs";
 import { FOLDER } from "./inbox.mjs";
 import { timeOf } from "./moment.mjs";
 import { TITLES } from "./look-kinds.mjs";
+import { parseBounded } from "./guards.mjs";
 
 export const BOT = "github-actions[bot]";
 export const LABELS = ["queued", "by:look"];
@@ -49,7 +50,7 @@ export const updating = (issue, body, requeue = null) => {
 function write(method, route, payload) {
   const r = spawnSync("gh", ["api", "-X", method, route, "--input", "-"], { input: JSON.stringify(payload), encoding: "utf8", maxBuffer: 1 << 24 });
   if (r.status !== 0) throw new Error(`GitHub refused ${method} ${route.replace(/^repos\/[^/]+\/[^/]+\//, "")}`);
-  return r.stdout ? JSON.parse(r.stdout) : {};
+  return r.stdout ? parseBounded(r.stdout) : {};
 }
 
 // The state label of an issue the look keeps and still holds open, kept to what its reader says of the owner: what
@@ -151,13 +152,16 @@ function act({ repo, owner, dry }, did, title, body, issue, unread, { closes = t
   } catch (e) { did.push(`  ${e.message}`); }
 }
 
-// The record, written last: a closed issue of its own.
-function writeRecord({ repo, dry, carrier, at }, record, did) {
-  const recordBody = `The scheduled look's own record (\`core/scripts/look.mjs\`): when it last ran, so that the next run says where one was missed. Nothing to do here; it stays closed.\n\nLast run: ${at} (${carrier}).\n`;
+// The record, written last: a closed issue of its own. With the last run, when the look last looked the packages up
+// (`looked`) and last read the host (`hostRead`), which steps 600 and 820 read (step-checks-host.mjs).
+export const recordBody = ({ at, carrier, looked = null, hostRead = null }) => `The scheduled look's own record (\`core/scripts/look.mjs\`): when it last ran, so that the next run says where one was missed. Nothing to do here; it stays closed.\n\nLast run: ${at} (${carrier}).\n${looked ? `Packages looked up: ${looked}.\n` : ""}${hostRead ? `Host read: ${hostRead}.\n` : ""}`;
+function writeRecord(ctx, record, did) {
+  const { repo, dry } = ctx;
+  const body = recordBody(ctx);
   if (!dry) {
     try {
-      if (record) write("PATCH", `repos/${repo}/issues/${record.number}`, { body: recordBody, state: "closed" });
-      else { const made = write("POST", `repos/${repo}/issues`, { title: RECORD, body: recordBody, labels: ["by:look"] }); if (made.number) write("PATCH", `repos/${repo}/issues/${made.number}`, { state: "closed", state_reason: "completed" }); }
+      if (record) write("PATCH", `repos/${repo}/issues/${record.number}`, { body, state: "closed" });
+      else { const made = write("POST", `repos/${repo}/issues`, { title: RECORD, body, labels: ["by:look"] }); if (made.number) write("PATCH", `repos/${repo}/issues/${made.number}`, { state: "closed", state_reason: "completed" }); }
     } catch (e) { did.push(`the record: ${e.message}`); }
   }
 }

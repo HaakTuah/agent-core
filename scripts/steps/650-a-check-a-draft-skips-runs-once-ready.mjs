@@ -2,4 +2,4 @@
 // of their names.
 import { COST } from "../step-checks.mjs";
 
-export default { lead: "18 November 2026, a check a draft skips runs once ready", cost: COST.check, held: "the workflow check" };
+export default { lead: "18 November 2026, a check a draft skips runs once ready", cost: COST.check, asks: "nothing", held: "the workflow check" };
