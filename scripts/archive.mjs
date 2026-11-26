@@ -50,16 +50,23 @@ export function marksOf(text) {
   return out;
 }
 
+// The archive's files read plainly: a folder's names (none where it is not there), and a file's text.
+const PLAIN = {
+  list: (root, folder) => { const dir = path.join(root, folder); return fs.existsSync(dir) ? fs.readdirSync(dir) : []; },
+  read: (root, rel) => fs.readFileSync(path.join(root, rel), "utf8"),
+};
+
 // The items of one folder under `root`: a Map of key (a number, or "#N" or "#N.P") to { file, text }, in the order they
 // stand, and where each key stands (`places`: key to its "file:line"s and files, in the order they stand, more than one
-// where it stands twice).
-export function itemsIn(root, folder) {
+// where it stands twice). `io` reads the folder: `list` gives its files' names, `read` a file's text or null; by default,
+// plainly, as the core's own archive is read, and pr-head.mjs gives the guarded readers of reading.mjs (#848).
+export function itemsIn(root, folder, io = PLAIN) {
   const out = new Map(), places = new Map();
-  const dir = path.join(root, folder);
-  if (!fs.existsSync(dir)) return { items: out, places };
-  for (const f of fs.readdirSync(dir).filter(f => FILE.test(f)).sort()) {
+  for (const f of io.list(root, folder).filter(f => FILE.test(f)).sort()) {
     let at = null;
-    for (const [i, line] of fs.readFileSync(path.join(dir, f), "utf8").replace(/\r\n/gu, "\n").split("\n").entries()) {
+    const text = io.read(root, `${folder}/${f}`);
+    if (text === null) continue;
+    for (const [i, line] of text.replace(/\r\n/gu, "\n").split("\n").entries()) {
       const m = OPENS.exec(line);
       if (m) {
         at = keyOf(m[1]);
@@ -82,9 +89,9 @@ function fileOf(root, folder, n) {
   return f ? `${folder}/${f}` : undefined;
 }
 
-// Both forms: { reasons, words }, each a Map as itemsIn() gives it.
-export function items(root) {
-  return { reasons: itemsIn(root, REASONS).items, words: itemsIn(root, WORDS).items };
+// Both forms: { reasons, words }, each a Map as itemsIn() gives it, under `prefix` of `root` and read by `io`.
+export function items(root, prefix = "", io = PLAIN) {
+  return { reasons: itemsIn(root, `${prefix}${REASONS}`, io).items, words: itemsIn(root, `${prefix}${WORDS}`, io).items };
 }
 
 // An item keyed twice, or standing in a file its key does not put it in, each a line with its mend (#394): "core

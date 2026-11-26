@@ -132,11 +132,6 @@
       "mark": "move",
       "why": "binds whoever adds a note that changes an issue: to the module read when an issue is filed or noted"
     },
-    "roles/shared/inbox.md: The *progress file* holds order only": {
-      "mark": "check",
-      "by": "#552",
-      "why": "a line of `QUEUE.md` whose issue is closed, or a row with more than its three cells, is read exactly; in a project its *progress file* is a slot, so the core's first"
-    },
     "roles/shared/inbox.md: An obvious improvement is built at once": {
       "mark": "goes",
       "why": "\"obvious\" is no trigger anyone can observe; filing and the queue's gate say the rest"

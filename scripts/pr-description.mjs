@@ -41,10 +41,12 @@
 // for passes where it begins in its form, whatever follows it (#750, point 4).
 // And, of one opened since the copy on its base held CHANGED_SINCE, each test file it leaves with fewer lines that
 // assert, or in which it skips a case, named on the line weakened.mjs, beside this file, asks, and each whose
-// assertions it only changes listed for the reviewer (#307).
+// assertions it only changes listed for the reviewer (#307). And, of one opened since the copy on its base held
+// HEAD_SINCE, that its description names no archive key its head's archive does not hold and leaves no placeholder in
+// ("No description left untrue" in roles/shared/how-to-work.md; #1136).
 // Each line's check stands in a file beside this one (#888), read alone by whoever changes it, and is exported from here: the
 // line "Waits on:" in pr-waits.mjs, the cost line in pr-cost.mjs, the rule's number in pr-number.mjs, "Read for it:" in
-// pr-reads.mjs, "Reasons read:" in pr-reasons.mjs; this file holds the parts, the days from which each line is asked and
+// pr-reads.mjs, "Reasons read:" in pr-reasons.mjs, what the description names that its head does not hold in pr-head.mjs; this file holds the parts, the days from which each line is asked and
 // the run that asks them.
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
@@ -61,6 +63,7 @@ import { coreAt, lineMend, pathIn, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
 import { changedMend, plain, testsChanged } from "./weakened.mjs";
 import { NO_COST, costMend } from "./pr-cost.mjs";
+import { headMends, headOf } from "./pr-head.mjs";
 import { HOLDS, numberMend } from "./pr-number.mjs";
 import { calledFor } from "./pr-reads.mjs";
 import { MANIFEST_MAX, REASONS, UNREADABLE, differencesAdded, reasonsMend } from "./pr-reasons.mjs";
@@ -68,7 +71,7 @@ import { WAITS, heldAt, waitsMend, waitsOn } from "./pr-waits.mjs";
 import { asText, parseBounded } from "./guards.mjs";
 
 // (what each line's check holds, exported from here as before they were split)
-export { HOLDS, calledFor, MANIFEST_MAX, NO_COST, REASONS, UNREADABLE, WAITS, costMend, differencesAdded, heldAt, numberMend, reasonsMend, waitsMend, waitsOn };
+export { HOLDS, calledFor, headMends, MANIFEST_MAX, NO_COST, REASONS, UNREADABLE, WAITS, costMend, differencesAdded, heldAt, numberMend, reasonsMend, waitsMend, waitsOn };
 export const WAITS_SINCE = "2026-11-16T00:00:00Z";
 // The day from which the line "Read for it:" is asked, of a pull request opened since the copy on its base held this.
 export const READS_SINCE = "2026-11-16T00:00:00Z";
@@ -91,6 +94,11 @@ export const REASONS_SINCE = "2026-11-19T00:00:00Z";
 // The day from which the owner's yes is asked of a pull request that changes the floor or the review guidelines
 // (owner-yes.mjs, beside this file; #549), as the lines above are.
 export const YES_SINCE = "2026-11-18T00:00:00Z";
+
+// The day from which a description is asked to name no archive key its head does not hold and to leave no placeholder
+// in (pr-head.mjs, beside this file; #1136), as the lines above are, and whether it is asked.
+export const HEAD_SINCE = "2026-11-23T00:00:00Z";
+export const headAsked = (created, then) => String(created) >= HEAD_SINCE && Boolean(then?.includes("export const HEAD_SINCE"));
 
 // Whether it is asked of a pull request opened at `created` (as GitHub gives it), `then` the copy on its base when it
 // opened, or null where that could not be read: only where both are on or after the day it came.
@@ -196,6 +204,8 @@ if (started(import.meta.url)) {
       if (mend) mends.push(mend);
       else console.log(added === null ? `ok   the line "${REASONS}" is not asked here: the change could not be read against its base` : added.length ? `ok   the description says the reasons read for the difference it adds` : `ok   the line "${REASONS}" is not asked here: no line is added under the manifest's "Differences"`);
     } else console.log(`ok   the line "${REASONS}" is not asked here: ${why}`);
+    if (headAsked(created, then)) { const head = headOf(process.env.PR_BODY, coreAt(process.cwd())); for (const line of head.oks) console.log(`ok   ${line}`); mends.push(...head.mends); }
+    else console.log(`ok   the archive keys and placeholders of the description are not asked here: ${why}`);
     if (created >= YES_SINCE && then?.includes("export const YES_SINCE")) {
       const diff = spawnSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
       // (where the core lies is read from the base's manifest, never the head's, which the pull request could bring)

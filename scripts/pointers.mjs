@@ -43,6 +43,7 @@ import { corePath, projectAt } from "./core-path.mjs";
 import { logged, loggedAlone } from "./guards.mjs";
 import { checkRules } from "./links.mjs";
 import { markdownReader } from "./markdown.mjs";
+import { DEEPEST, LIST, SEARCHED, brokenNames, listOf, nameKey } from "./names.mjs";
 import { didNotRun, installed } from "./packages.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 
@@ -72,6 +73,12 @@ let tracked;
 try { tracked = (AT ? git(['ls-tree', '-r', '-z', '--name-only', AT]) : git(['ls-files', '-z', '--recurse-submodules'])).split('\0').filter(Boolean); }
 catch (e) { console.error(`FAIL: ${logged(`git could not list the tracked paths${AT ? ` at ${AT}` : ""} (${e.code ?? e.message.split("\n")[0]})`)}. Mend: run \`git ls-files\` here and mend what it reports (an unreadable index, a submodule not set up, more paths than the 256 MB the check reads), then run this again`); process.exit(1); }
 const CORE = process.argv.includes("--core");
+// The pull request's base as a commit (POINTERS_BASE, as the copies workflow sets it), or null where none is set.
+function baseCommit() {
+  const from = process.env.POINTERS_BASE;
+  if (!from) return null;
+  try { return git(["rev-parse", "--verify", "--quiet", "--end-of-options", `${from}^{commit}`]).trim(); } catch { console.error(`FAIL: ${logged(`POINTERS_BASE ${from} is not a commit here`)}. Mend: fetch it (git fetch origin <the base branch>) before the check runs`); process.exit(1); }
+}
 const show = AT ? f => (tracked.includes(f) ? atCommit(f) : null) : undefined, under = AT ? dir => tracked.filter(f => f.startsWith(`${dir}/`)) : undefined;
 let RULES, TOOLS;
 try {
@@ -139,6 +146,7 @@ const hasPoint = (file, from, to, n) => parse(file).lines.slice(from, to).some(l
 // wider than WIDEST, so each leads nowhere and is named, never read as nothing or built whole)
 const WIDEST = 1000;
 const numbers = text => text.split(/, | and | or /).flatMap(s => s.includes('#') ? [s] : s.includes(' to ') ? (([a, b]) => b < a || b - a >= WIDEST ? [s] : Array.from({ length: b - a + 1 }, (_, k) => a + k))(s.split(' to ').map(Number)) : [Number(s)]);
+const pathForm = n => /^[\w.@-]*[\w-]\/|^[\w./-]+\.(md|js|json|sh|css|html|yml|txt)$|\/$/.test(n) && !/[<>*]/.test(n) && !n.startsWith('@');
 function atoms(text) {
   const out = [];
   const re = /\b[Ff]loor (rules?) (\d+(?:(?:, | and | to | or )\d+)*)\b|\b[Cc]ore archive ((?:#\d+(?:\.\d+)?|\d+)(?:(?:, | and | to | or )(?:#\d+(?:\.\d+)?|\d+))*)\b|`([^`\s]+)`|"([A-Z][^"]{1,60})"|“([A-Z][^”]{1,60})”|\b(rules?|points?) (\d+(?:(?:, | and | to | or )\d+)*)\b/g;
@@ -149,7 +157,7 @@ function atoms(text) {
     const m = [m0[0], m0[4], m0[5], m0[6], m0[7], m0[8]];
     if (m[1] !== undefined) {
       // a package's name, such as `@types/node`, is no path
-      if (!/^[\w.@-]*[\w-]\/|^[\w./-]+\.(md|js|json|sh|css|html|yml|txt)$|\/$/.test(m[1]) || /[<>*]/.test(m[1]) || m[1].startsWith('@')) continue;
+      if (!pathForm(m[1])) continue;
       out.push({ ...at, file: m[1] });
     } else if (m[2] || m[3]) out.push({ ...at, title: plain(m[2] || m[3]) });
     else {
@@ -171,9 +179,8 @@ let count = 0;
 const LYCHEE = AT ? "" : process.env.LYCHEE || "", byTool = new Set();
 let tool = null;
 if (LYCHEE) {
-  let base = CORE ? "" : null;
   // (the pull request's base, whose tree links.mjs reads only where lychee finds a broken link)
-  if (!CORE && process.env.POINTERS_BASE) { try { base = git(["rev-parse", "--verify", "--quiet", "--end-of-options", `${process.env.POINTERS_BASE}^{commit}`]).trim(); } catch { console.error(`FAIL: ${logged(`POINTERS_BASE ${process.env.POINTERS_BASE} is not a commit here`)}. Mend: fetch it (git fetch origin <the base branch>) before the check runs`); process.exit(1); } }
+  const base = CORE ? "" : baseCommit();
   tool = checkRules({ program: LYCHEE, rules: RULES, tracked: files, folders: dirs, text, base });
   if (tool.unread) console.log(`::warning::${logged(`The pointer check could not run lychee on the rule files (${tool.unread}), so their links were read by the core's own reading alone. Mend: run this job again; if it fails again, file it as a fault`)}`);
   else { for (const f of tool.read) byTool.add(f); count += tool.count; }
@@ -285,14 +292,56 @@ for (const rf of RULES) {
 const inTool = x => { for (const f of TOOLS) { const m = x.startsWith(`${f}:`) && /^:\d+: ([\s\S]*)$/u.exec(x.slice(f.length)); if (m) return { file: f, words: m[1] }; } return null; };
 const key = t => `${t.file}\t${t.words}`;
 if (AT) { console.log(JSON.stringify([...new Set(broken)].map(inTool).filter(Boolean).map(key))); process.exit(0); }
+// Names in the descriptions (names.mjs; #460, point 4), those the pointers above read in a rule file aside: in the core
+// each that stands nowhere fails; in a project one the pull request's base held (its list, LIST, where the base holds
+// one it can read, else what the base reads so) is noted and fails nothing, as is each where there is no base, and any
+// other fails. `--write-names` writes the list: where there is none, each that stands nowhere; else those of it that
+// still do, never one more.
+const NAMES = { core: CORE, copy: CORE ? "" : HOME, skip: (f, n) => RULES.includes(f) && pathForm(n) };
+// (a description, the manifest and the package file are read only where each is a regular file of this checkout, no
+// link, of at most DESCRIBED bytes, so one that leads elsewhere or is too large to read is noted or read as missing,
+// never followed)
+const DESCRIBED = 1024 * 1024;
+const usable = f => { try { const st = fs.lstatSync(f); return st.isFile() && st.size <= DESCRIBED; } catch { return false; } };
+const names = brokenNames({ ...NAMES, read: f => (files.has(f) && usable(f) ? text(f) : null), tracked, blocksOf: f => (files.has(f) ? parse(f).blocks : []), usable });
+if (process.argv.includes("--write-names")) {
+  if (CORE) { console.error("FAIL: the core keeps no list of names: each that stands nowhere fails in its own run. Mend: run it without --write-names"); process.exit(1); }
+  const st = f => fs.lstatSync(f, { throwIfNoEntry: false });
+  if ((st("checks") && !st("checks").isDirectory()) || (st(LIST) && !st(LIST).isFile())) { console.error(`FAIL: ${LIST} or its folder is a link or no regular file, so it is not written through. Mend: delete it, commit that, and run this again`); process.exit(1); }
+  const there = fs.existsSync(LIST), had = there ? listOf(text(LIST)) : null;
+  if (there && !had) { console.error(`FAIL: ${LIST} cannot be read as { "names": [{ "file", "name" }] }. Mend: delete it and run this again, which writes it anew`); process.exit(1); }
+  const keep = [...new Map(names.found.filter(x => !had || had.has(nameKey(x))).map(x => [nameKey(x), { file: x.file, name: x.name }])).values()];
+  fs.mkdirSync("checks", { recursive: true });
+  fs.writeFileSync(LIST, `${JSON.stringify({ names: keep }, null, 2)}\n`);
+  console.log(`wrote ${LIST}: ${keep.length} names in the descriptions that stand nowhere`);
+  process.exit(0);
+}
+let namesHeld = null;
+if (!CORE && names.found.length) {
+  const sha = baseCommit();
+  if (sha) {
+    const atBase = readAt(sha), baseTracked = git(["ls-tree", "-r", "-z", "--name-only", sha]).split("\0").filter(Boolean);
+    const blocksOf = f => { try { return readMarkdown(atBase(f) ?? "").blocks; } catch { return []; } };
+    const list = atBase(LIST);
+    namesHeld = (list !== null && listOf(list)) || new Set(brokenNames({ ...NAMES, read: atBase, tracked: baseTracked, blocksOf, tree: sha }).found.map(nameKey));
+  }
+}
+const oldNames = [];
+for (const x of names.found) {
+  const said = `${x.file}:${x.line}: \`${x.name}\` ${x.what}`;
+  if (CORE || (namesHeld && !namesHeld.has(nameKey(x)))) broken.push(`${said}. Mend: write the name of the file or script that holds it now, or take it out where that is gone; where a run writes the file, have git ignore it`);
+  else oldNames.push(said);
+}
+if (names.unread) console.log(`note ${logged(names.unread)}, so no names in the descriptions were read`);
+for (const f of names.unusable) console.log(`note ${logged(`${f} is a link or no regular file, or past ${DESCRIBED} bytes`)}, so its names were not read`);
+if (names.left) console.log(`note ${names.left} names in the descriptions were left alone: deeper than ${DEEPEST} segments, or, being no tracked file, past ${SEARCHED} to search the project's code for, or not searched since git could not`);
+for (const x of oldNames) console.log(`note ${logged(`a name in a description that stands nowhere: ${x}`)} (${namesHeld ? `the pull request's base held it` : "with no base to read against"}, so it fails nothing: name what holds it now, or take it out, and lower the list with node ${HOME}scripts/pointers.mjs --write-names)`);
 // (in a project, one the pull request's base held is noted, and every one where there is no base to read against)
 const old = [];
 if (!CORE && broken.some(inTool)) {
-  const from = process.env.POINTERS_BASE ?? "";
+  const from = process.env.POINTERS_BASE ?? "", sha = baseCommit();
   let held = null;
-  if (from) {
-    let sha;
-    try { sha = git(["rev-parse", "--verify", "--quiet", "--end-of-options", `${from}^{commit}`]).trim(); } catch { console.error(`FAIL: ${logged(`POINTERS_BASE ${from} is not a commit here`)}. Mend: fetch it (git fetch origin <the base branch>) before the check runs`); process.exit(1); }
+  if (sha) {
     const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), "--tools-at", sha], { encoding: "utf8", maxBuffer: 1 << 28 });
     try { held = new Set(JSON.parse(r.stdout)); } catch { console.error(`FAIL: the pointers in the agent tools' files at ${logged(from)} could not be read. Mend: run node ${HOME}scripts/pointers.mjs where git can read every file of that commit`); process.exit(1); }
   }
@@ -308,4 +357,4 @@ for (const x of new Set(old.reverse())) console.log(`note ${logged(`a broken poi
 if (quotes.length) console.log(logged(`note ${new Set(quotes).size} quotes are no section of any file the rule files name, so read as quotes: ${[...new Set(quotes)].map(q => `"${q}"`).join(', ')}`));
 for (const x of new Set(broken)) console.error(`FAIL: ${logged(`a broken pointer: ${x}`)}${x.includes(". Mend: ") ? "" : ". Mend: point it at the file, heading or numbered point that holds what it means, or take it out where that is gone"}`);
 if (broken.length) process.exit(1);
-console.log(`ok   ${count} pointers in the rule files lead somewhere (${unread.length} in forms it cannot read${notFound.length ? `, ${notFound.length} read and not found` : ""}${old.length ? `, ${new Set(old).size} old in an agent tool's file` : ""}, listed above)`);
+console.log(`ok   ${count} pointers in the rule files and ${names.count} names in the descriptions lead somewhere (${unread.length} in forms it cannot read${notFound.length ? `, ${notFound.length} read and not found` : ""}${old.length ? `, ${new Set(old).size} old in an agent tool's file` : ""}, listed above)`);
