@@ -9,7 +9,8 @@
 // NuGet.Config that maps its packages to their sources included. No package is
 // downloaded: the step restores against an empty source. The whole job, on a project with no package: its restore and
 // its check pass, and a lock file that no longer holds what its project asks for fails the restore. Where there is no
-// .NET SDK (never on GitHub's runners) only the first look is tried. The one case where the restore must succeed, which
+// .NET SDK (never on GitHub's runners) only the first look is tried, and the whole job on a stand-in for dotnet that
+// says the machine lacks the SDK band global.json pins, whose restore reads as not run (#1361, point 10). The one case where the restore must succeed, which
 // asks NuGet's own registry, is nuget-gate-network-test.mjs's, in the part network (#772). The whole job installs the core's packages from a
 // copy of the machine's npm cache, made as the test starts, so it reaches no registry (#772). On Linux and on Windows.
 // Git, bash, jq, the .NET SDK, npm and Node's own modules.
@@ -150,6 +151,21 @@ if (sdk) {
   ok(!imported.passed && /NU1004/.test(imported.out) && imported.ran.includes(FETCH) && imported.ran.indexOf(FETCH) < imported.ran.indexOf("Restore each project file from its lock file alone") && imported.out.includes("build/deps.xml"), "where only an imported file changed, the first look names it, so the read before the restore runs, and the restore fails what no lock file holds", imported.out.slice(-1500));
   const stale = whole({ "src/App/App.csproj": project("") });
   ok(!stale.passed && /NU1004/.test(stale.out) && /A restore from a lock file failed .*\. Mend: /.test(stale.out) && mended(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
+}
+
+// the whole job on a machine without the SDK band the project's global.json pins (a stand-in for dotnet that says so): the
+// restore is not run, the machine's fault, and the job says what it lacks with its mend, not that a lock file failed
+if (process.platform === "win32") console.log("skip the job without the SDK band: the stand-in for dotnet is a shell script");
+else {
+  const bin = path.join(tmp, "no-band");
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, "dotnet"), '#!/bin/sh\necho "A compatible .NET SDK was not found." >&2\necho "Requested SDK version: 1.0.100"\nexit 1\n', { mode: 0o755 });
+  const kept = env.PATH;
+  env.PATH = `${bin}${path.delimiter}${kept}`;
+  const lacked = whole({ "README.md": "# More\n" });
+  env.PATH = kept;
+  ok(!lacked.passed && lacked.out.includes("could not run: this machine has no .NET SDK that the project's global.json accepts") && /could not run here, since this machine lacks the \.NET SDK band the project's global\.json names: Restore each project file from its lock file alone\. Mend: /.test(lacked.out) && mended(lacked.out) && !lacked.out.includes("A restore from a lock file failed"),
+    "a machine without the SDK band global.json pins leaves the restore not run, saying what it lacks with its mend, and no lock file is said to have failed", lacked.out.slice(-1500));
 }
 
 // a changed file whose name holds "##[" is listed broken, behind its dash
