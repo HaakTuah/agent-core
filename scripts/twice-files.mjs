@@ -1,8 +1,10 @@
 // The files and the pointers of what a project holds twice (twice.mjs, beside this file, which reads the rest, gives
 // the project `p` it reads and makes the corrections; tasks/cleaning.md, "The reading asks what a project holds
 // twice"; #1087): the files outside the copy equal byte for byte to one of the core's, and which of them may go, and the
-// pointers in the project's own text. It reads and writes nothing itself but what git's object ids ask. Node's own
+// pointers in the project's own text. It reads and writes nothing itself but what git's object ids ask, and git's hash of
+// each file it compares. Node's own
 // modules and git.
+import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -18,11 +20,30 @@ const SMALLEST = 100; // (a file of fewer bytes, an empty one above all, matches
 // A blob's id as git names it, so that a file is matched to one of an earlier copy's by its id alone.
 export const blobId = buf => crypto.createHash("sha1").update(`blob ${buf.length}\0`).update(buf).digest("hex");
 
+// The blob's id of each of `files` (paths of the project's) as git would store it from the project, its line-end filters
+// applied (`git hash-object`), so that a file is equal to the core's whatever line ends git writes to the disk: where it
+// writes CRLF (core.autocrlf, as on Windows), the copy unpacked from the core's archive holds CRLF, and the earlier
+// copies, read from git's objects, LF (#1221). The project's own filters run, as at its own `git add`, bounded in time.
+// A name a line cannot carry as it stands (a line's end, or a leading quote, which git reads as a quoted name), or a
+// project git cannot hash, is read from the disk as it stands, and the latter said.
+function storedIds(p, files) {
+  const lined = files.filter(f => !/[\n\r]/u.test(f) && !f.startsWith('"'));
+  let ids = [];
+  try { ids = lined.length ? execFileSync("git", ["hash-object", "--stdin-paths"], { cwd: p.root, input: `${lined.join("\n")}\n`, encoding: "utf8", maxBuffer: 1 << 28, timeout: 60000, stdio: ["pipe", "pipe", "ignore"] }).trim().split("\n") : []; } catch { ids = []; }
+  if (ids.length !== lined.length) console.error(`The twice reading hashed ${lined.length} files from the disk's bytes: git hash-object failed in the project, so a file that differs from the core's in line ends alone is not found equal.`);
+  const byFile = new Map(ids.length === lined.length ? lined.map((f, i) => [f, ids[i]]) : []);
+  for (const f of files) if (!byFile.has(f)) { try { byFile.set(f, blobId(fs.readFileSync(path.join(p.root, f)))); } catch { /* (unread: no id) */ } }
+  return byFile;
+}
+
 // Each file of the copy and of the earlier copies by its blob's id: the paths of the core's that hold it.
 function coreBlobs(p) {
   const byId = new Map();
   const add = (id, file, at) => { if (!byId.has(id)) byId.set(id, []); byId.get(id).push({ file, at }); };
-  for (const f of p.copyFiles) if (!f.startsWith("setup/template/")) add(blobId(fs.readFileSync(path.join(p.copyDir, f))), f, "the copy");
+  const copy = path.relative(p.root, p.copyDir).split(path.sep).join("/"), files = p.copyFiles.filter(f => !f.startsWith("setup/template/"));
+  const ids = storedIds(p, files.map(f => `${copy}/${f}`));
+  for (const f of files) if (ids.has(`${copy}/${f}`)) add(ids.get(`${copy}/${f}`), f, "the copy");
+  // The earlier copies' ids are git's own, not passed through the project's filters: line ends are the same either way.
   for (const sha of p.earlier) {
     for (const e of listTree(p.bare, sha)) if (!e.file.startsWith("setup/template/")) add(e.id, e.file, sha.slice(0, 7));
   }
@@ -33,9 +54,9 @@ export const listTree = (bare, sha) => inBare(bare, ["ls-tree", "-r", "-z", sha]
 // The files outside the copy equal byte for byte to one of the core's: { file, core, at, goes, why }, `goes` where it
 // may go (below), else `why` it stays for the auditor.
 export function filesFound(p) {
-  const byId = coreBlobs(p), found = [];
+  const byId = coreBlobs(p), found = [], ids = storedIds(p, p.outside.filter(f => compared(p, f)));
   for (const f of p.outside) {
-    const hit = compared(p, f) && equalTo(p, byId, f);
+    const hit = ids.has(f) && equalTo(p, byId, f, ids.get(f));
     if (hit) found.push(hit);
   }
   return unnamed(p, found);
@@ -48,11 +69,11 @@ export const linked = (p, f) => { try { return fs.realpathSync(path.join(p.root,
 // stands, in ways no file names; and of Markdown, not a name a tool looks for in its folder, nor one in a dot folder.
 const MARKDOWN = /\.md$/iu;
 const BY_PLACE = /(?:^|\/)(?:README|index|AGENTS|CLAUDE|GEMINI|REVIEW|SECURITY|CONTRIBUTING|CODE_OF_CONDUCT|CHANGELOG|SUPPORT)\.md$|(?:^|\/)\./iu;
-// The file `f` as a finding where it is equal to one of the core's, else null.
-function equalTo(p, byId, f) {
-  let buf;
-  try { buf = fs.readFileSync(path.join(p.root, f)); } catch { return null; }
-  const hits = buf.length < SMALLEST ? null : byId.get(blobId(buf));
+// The file `f`, whose blob's id is `id`, as a finding where it is equal to one of the core's, else null.
+function equalTo(p, byId, f, id) {
+  let size;
+  try { size = fs.statSync(path.join(p.root, f)).size; } catch { return null; }
+  const hits = size < SMALLEST ? null : byId.get(id);
   if (!hits) return null;
   const found = { file: f, core: hits[0].file, at: hits[0].at, goes: true };
   if (hits.some(h => FLOOR.test(h.file)) || p.safety.has(f)) Object.assign(found, { goes: false, why: "it is the floor's text or a safety rule, which goes only on its owner's word" });

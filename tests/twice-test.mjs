@@ -14,6 +14,7 @@ import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
 import { closeness, unitsOf } from "../scripts/twice-text.mjs";
 import { findings, projectOf, report, withoutJob } from "../scripts/twice.mjs";
+import { untar } from "../scripts/releases.mjs";
 import { root, tally } from "../scripts/scratch-core.mjs";
 import { A, FLOOR, GUIDE_OLD, NEAR, OTHER, RULE, SAFE, WORKFLOW, core, earlier, fetched, git, project, run, tmp, write } from "../scripts/twice-scratch.mjs";
 
@@ -70,6 +71,37 @@ const { ok, done } = tally();
   ok(!/Exact, which/u.test(again.stdout) && /For the auditor/u.test(again.stdout), "run again it finds nothing exact left", again.stdout);
 }
 
+// Where git writes CRLF to the disk (core.autocrlf, as on Windows), the copy unpacked from the core's archive holds CRLF
+// and the project's file LF: equal all the same, as git stores both (#1221).
+{
+  const dir = project("crlf"), note = path.join(dir, "core/docs/zephyr-notes.md");
+  git(dir, "config", "core.autocrlf", "true");
+  fs.writeFileSync(note, fs.readFileSync(note, "utf8").replace(/\r?\n/gu, "\r\n"));
+  const found = findings(projectOf(dir)).filter(f => f.fix).map(f => f.line);
+  ok(found.some(l => /^notes\/zephyr-notes\.md is the core's docs\/zephyr-notes\.md, byte for byte: no file names it, so it goes$/u.test(l)), "a file equal to one of the copy's as git stores both, the copy's with CRLF on the disk, goes", found.join("\n"));
+}
+
+// A name that opens with a quote is read as it stands, never as a quoted name git would read as another path's (#1221);
+// Windows lets no file name hold a quote.
+if (process.platform !== "win32") {
+  const dir = project("quoted"), name = '"core\\057docs\\057zephyr-notes.md"x.md';
+  fs.writeFileSync(path.join(dir, name), `${"Text of the project's own, unlike any of the core's. ".repeat(20)}\n`);
+  git(dir, "add", "-A");
+  const found = findings(projectOf(dir)).filter(f => f.fix).map(f => f.line);
+  ok(!found.some(l => l.includes("x.md")), "a name that opens with a quote is not found equal to the file its quoted form names", found.join("\n"));
+}
+
+// Where git cannot hash a file (one gone since the copy was listed), the rest are hashed from the disk, and it is said.
+{
+  const dir = project("gone"), p = projectOf(dir), said = [], warn = console.error;
+  for (const f of ["core/docs/zephyr-notes.md", "notes/zephyr-notes.md"]) fs.writeFileSync(path.join(dir, f), fs.readFileSync(path.join(dir, f), "utf8").replace(/\r\n/gu, "\n")); // (the disk's bytes alike, whatever line ends git writes)
+  fs.rmSync(path.join(dir, "core", p.copyFiles.find(f => f !== "docs/zephyr-notes.md" && f.endsWith(".md"))));
+  console.error = m => said.push(m);
+  let found;
+  try { found = findings(p).map(f => f.line); } finally { console.error = warn; }
+  ok(said.some(m => /^The twice reading hashed \d+ files from the disk's bytes: git hash-object failed/u.test(m)) && found.some(l => l.startsWith("notes/zephyr-notes.md is the core's docs/zephyr-notes.md, byte for byte")), "where git cannot hash a file, the rest are hashed from the disk, and it is said", [...said, ...found].join("\n"));
+}
+
 // A path that held other content at an earlier release moves only as it moved from the old pin, and the command the
 // report gives keeps the old pin, so --fix reads the same history.
 {
@@ -84,7 +116,7 @@ const { ok, done } = tally();
   fs.renameSync(path.join(hist, "old/check.json"), path.join(hist, "new/b.json")); git(hist, "add", "-A"); git(hist, "commit", "-qm", "pin");
   const at = git(hist, "rev-parse", "HEAD"), dir = path.join(tmp, "hist");
   fs.mkdirSync(path.join(dir, "core"), { recursive: true });
-  execFileSync("tar", ["-x", "-f", "-", "-C", path.join(dir, "core")], { input: execFileSync("git", ["archive", at], { cwd: hist }) });
+  untar(path.join(dir, "core"), execFileSync("git", ["archive", at], { cwd: hist }));
   write(dir, { "core-manifest.md": `# The core manifest\n\nCore: ${CORE} at ${at}, copied whole under core/\n`, "CLAUDE.md": "# Claude\n\nIt reads core/old/check.json.\n" });
   git(dir, "init", "-q", "-b", "main"); git(dir, "add", "-A");
   const args = ["--fetched", path.join(hist, ".git"), "--since", since], r = run(dir, ...args);

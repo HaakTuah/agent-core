@@ -13,6 +13,7 @@ import { installIn } from "./stryker.mjs";
 import { copyAt, readable } from "./workflow-calls.mjs";
 import { HERE, onPullRequests } from "./step-checks.mjs";
 import { where as shapeAt } from "./shape.mjs";
+import { parseBounded } from "./guards.mjs";
 
 // Whether a test of the project's own lies under its shape check's config's "tests", wherever they stand beside its code:
 // a file of the copy of the core (core/) is none.
@@ -20,7 +21,7 @@ function testsStand(p) {
   let config;
   try { config = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)); } catch { return false; }
   if (!config.tests.length) return false;
-  return execFileSync("git", ["ls-files", "-z", "--", ...config.tests], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith(copyAt(p)));
+  return execFileSync("git", ["ls-files", "-z", "--", ...config.tests], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").some(f => f && !f.startsWith(copyAt(p)));
 }
 
 // Whether a workflow that runs on pull requests has a step that runs the strength check, with STRENGTH_BASE set on the
@@ -55,8 +56,8 @@ export function strengthNamed(p) {
 // config taken out leaves the tests counted; the copy of the core aside.
 function testsTracked(p) {
   let specs;
-  try { specs = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)).tests; } catch { specs = JSON.parse(fs.readFileSync(path.join(HERE, "setup/template/shape.json.tmpl"), "utf8")).tests; }
-  return specs.length > 0 && execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith(copyAt(p)));
+  try { specs = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)).tests; } catch { specs = parseBounded(fs.readFileSync(path.join(HERE, "setup/template/shape.json.tmpl"), "utf8")).tests; }
+  return specs.length > 0 && execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").some(f => f && !f.startsWith(copyAt(p)));
 }
 
 // Whether a workflow that runs on pull requests has a step that runs the selection, with SELECT_BASE set on the step,

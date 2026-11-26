@@ -4,10 +4,11 @@
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { textAt, objectAt as objectIn } from "./git-objects.mjs";
-import { canonical, show, TREE, fold, describe } from "./agent-tools-entries.mjs";
+import { canonical, show, markOf, fold, describe } from "./agent-tools-entries.mjs";
 import { listing, LISTING_MAX } from "./agent-tools-listing.mjs";
 import { whereToolsRead, TOOL_FILES, READS } from "./agent-tools-links.mjs";
 import { agentFile, readProject } from "./agent-tools-project.mjs";
+import { parseBounded } from "./guards.mjs";
 
 // The config as the base held it, parsed, or null where it held none as a JSON object.
 export function configAtBase(root, base, file) {
@@ -45,23 +46,23 @@ export function sortPins(pins, { head, list, baseProject, baseList, core, mended
 // Each hook that takes a file of the project from the working tree into `fail` or `notes`. One that stood in the base,
 // the same hook taking the same files, is noted, and so is each where there is no base: unmarked where the base did
 // not mark it either (the list unwritten, or written before the check read where a hook's command comes from), and
-// marked "from": "the working tree" in its entry, which lists it in the baseline. A new one fails, marked or not, and
-// so does one whose mark the pull request took out while it stands: the baseline only shrinks. In the core's own
-// repository none may stand.
+// marked in its entry, "from": "the working tree", or "main" where its command fetches from main, which lists it in the
+// baseline. A new one fails, marked or not, and so does one whose mark the pull request took out while it stands: the
+// baseline only shrinks. In the core's own repository none may stand.
 export function sortSources({ sources, marked }, { head, baseProject, baseList, core, file, mended = null }, fail, notes) {
   // (as the base held it, or as it held it with a link's files read in the link's place, where the pull request replaced
   // it with them: mendedBase())
   const held = heldBy(head, baseProject, mended), stood = k => !!baseProject && held(k) && (baseProject.sources.has(k) || !!mended?.sources.has(k));
   for (const [k, problem] of sources) {
     if (!core && !baseProject) notes.push(`with no base to read against, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}`);
-    else if (!core && stood(k) && !baseList?.from.has(k)) notes.push(`as the base held it, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}; or, to list it in the baseline, give its entry in ${file} "from": ${show(TREE)}`);
+    else if (!core && stood(k) && !baseList?.from.has(k)) notes.push(`as the base held it, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}; or, to list it in the baseline, give its entry in ${file} "from": ${show(markOf(head.sources.get(k)))}`);
     else fail.push(problem);
   }
   // (each with its own mend: a setting no starter kit writes is taken out or moved, a hook rewritten in the kit's form)
-  for (const [k, said, how] of marked) {
+  for (const [k, said, how, mark] of marked) {
     if (core) fail.push(`${said}, and in the core's own repository none may stand. Mend: ${how}, and take "from" out of its entry, in this pull request`);
-    else if (!baseProject || stood(k)) notes.push(`${said}: its entry lists it in the baseline ("from": ${show(TREE)}), to be worked down`);
-    else fail.push(`${said}, and its entry says "from": ${show(TREE)}, but the base held no such hook, and the baseline lists only what stood before. Mend: ${how}, and take "from" out of its entry, in this pull request`);
+    else if (!baseProject || stood(k)) notes.push(`${said}: its entry lists it in the baseline ("from": ${show(mark)}), to be worked down`);
+    else fail.push(`${said}, and its entry says "from": ${show(mark)}, but the base held no such hook, and the baseline lists only what stood before. Mend: ${how}, and take "from" out of its entry, in this pull request`);
   }
 }
 // The way the text `text` of the link `at` names from the checkout's root, read as a string and nothing followed: as
@@ -135,7 +136,7 @@ export function sortBehind(root, base, fail, notes) {
   const holds = new Set([was, now].flatMap(l => [...l.dirs, ...l.ids.keys()]).map(fold));
   for (const at of standing) {
     const text = textAt(root, "HEAD", at) ?? null, ways = [false, true].map(win => namedWay(at, text, win));
-    for (const key of new Set(ways.map(w => JSON.stringify(w)))) behindOne(at, JSON.parse(key), { was, now, raw, changed, holds }, fail, notes);
+    for (const key of new Set(ways.map(w => JSON.stringify(w)))) behindOne(at, parseBounded(key), { was, now, raw, changed, holds }, fail, notes);
   }
 }
 // One such link `at`, by the way `way` its text names, as sortBehind() reads it.

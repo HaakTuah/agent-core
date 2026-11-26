@@ -308,7 +308,7 @@ ok(hostile.every(l => !l.includes("\n")) && !hostile.some(l => /(?:^|[^`'])@(?:g
   "text from the project's files goes into the report on one line, in code spans, so no workflow command or mention acts (floor rule 5)", hostile.join("\n"));
 fs.writeFileSync(path.join(proj, OWN), '{"holders": @ghost }');
 const unreadable = ownReport(proj).join("\n");
-ok(/cannot be read \(`[^`]*@ghost[^`]*`\)/u.test(unreadable) && !/@ghost/u.test(unreadable.replace(/`[^`]*`/gu, "")), "a list that cannot be read is named with JSON's own words in a code span, so no mention in it acts", unreadable);
+ok(/cannot be read \(`unexpected character at line 1, column 13`\)/u.test(unreadable) && !/@ghost/u.test(unreadable), "a list that cannot be read is named by the fault's kind and place alone, in a code span, so nothing of the list, a mention among it, reaches the report", unreadable);
 put("docs/play.md", "# Play\n\n- **A turn ends on a move.** Rules of play.\n");
 fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { ...written, "AGENTS.md: Each computer player keeps its style": "check: tests/style.test.js", "docs/design.md: Saves are small": "check: tests/saves.test.js", "AGENTS.md: Gone": "audit", "docs/play.md: A turn ends on a move": "check: the code review" } }));
 // (the answers, in the list's "about": those about a kind or every project named to be filed, naming the kind; a key

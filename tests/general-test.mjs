@@ -49,6 +49,12 @@ r = words({ "archive/items.md": OLD }, { "archive/items.md": `${OLD}\n2. **2 Nov
 ok(r.status === 1 && r.out.includes("archive/items.md:5:") && !r.out.includes("archive/items.md:1:") && mended(r.out), "a pronoun for the owner in a line a change adds to the archive fails, by its line; the older line in the same file does not", r.out);
 r = words({}, { "reports/2026-11-13-x.md": "# A report\n\nThe owner read it, and his answer was yes.\n" });
 ok(r.status === 1 && r.out.includes("reports/2026-11-13-x.md:3"), "so does one in a new report", r.out);
+// (a file's name the change chooses is printed as text alone, no workflow command read in it; #1348; Windows holds no
+// ":" in a name)
+if (process.platform !== "win32") {
+  r = words({}, { "archive/x::notice::y##[group]z.md": "Asked, he said yes.\n" });
+  ok(r.status === 1 && r.out.includes("archive/x: :notice: :y# #[group]z.md:1:") && !/::|##\[/u.test(r.out), "a failing line names a file whose name holds \"::\" and \"##[\" with each pair broken", r.out);
+}
 r = words({ "archive/items.md": OLD }, { "archive/items.md": `${OLD}\n2. **2 November**. Asked, the owner said:\n\n   > She can have it, he said.\n` });
 ok(r.status === 0, "a line quoting the owner's own words is not read: they are kept as said", r.out);
 r = words({ "archive/items.md": OLD }, { "floor/a.md": "# The floor\n\nNothing here.\n" });

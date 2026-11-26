@@ -14,8 +14,8 @@
 // after it, the core's checks from plain git (scripts/check.mjs --own) run on a push to main and on a pull request of
 // its own, its own workflows among them, one of which runs a check of its copy with no install step (the case of
 // #1079), and no job that passed before fails after (release-trial.mjs, compared); in a new repository of each kind, as the
-// kit at the commit under test writes it, every job passes (#1084). GitHub's own services
-// (CodeQL, the dependency review) are not run here, and GitHub's API is a stand-in that gives the security-review check
+// kit at the commit under test writes it, every job passes (#1084). CodeQL is not run here, the
+// dependency review stands in by its lists over what a pull request brings into an npm lock file (#1310), and GitHub's API is a stand-in that gives the security-review check
 // one completed review. The sync's pull request is pure, as pure-sync.mjs reads it from the release it moves to, in
 // both projects. Each holds old content too, a breach of each kind a check reads (a long file, a function past a mark,
 // two files that import each other, a module its manifest's list does not name, a copy in its prose): none fails, a
@@ -36,10 +36,12 @@
 // .NET SDK too, which takes nothing from the network for a project with no package, while npm takes one small package
 // from the registry. On Linux and on Windows. Git, tar, bash, npm, the .NET SDK where there is one, and Node's own
 // modules.
-// A part of it can run alone, where the whole runs past its time mark (on Windows, in the tests workflow): the older of
-// the two releases with the copy older than the first, or the newer release with the release that asks no sync.
+// A part of it can run alone, where the whole runs past its time mark (on Windows, in the release workflow, a job each,
+// #1240): the older of the two releases, the newer, or one project kind of either, with the copy older than the first
+// beside the older, the fixed start of the private calls (release 5's, once it is no longer one of the two) with it, and
+// the release that asks no sync beside the newer's npm project.
 //
-//   node tests/upgrade-test.mjs [--part all | older | newer]
+//   node tests/upgrade-test.mjs [--part all | older | newer | older-npm | older-dotnet | older-pre | newer-npm | newer-dotnet]
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -56,7 +58,9 @@ import { copyAt } from "../scripts/workflow-calls.mjs";
 import { importsOf, projectFilesByContent, readProject } from "../scripts/nuget.mjs";
 import { STEPS, callers, leads, notDone, project as read, report } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, notesAt } from "../scripts/sync-notes.mjs";
+import { ASIDE } from "../scripts/sync-pins.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
+import { licenceOk } from "../scripts/licences.mjs";
 import { compared } from "../scripts/release-trial.mjs";
 import { evaluate, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
 
@@ -67,11 +71,15 @@ const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   $
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // The part asked for: all of it where none is named.
 const [flag = "--part", PART = "all", ...more] = process.argv.slice(2);
-if (flag !== "--part" || !["all", "older", "newer"].includes(PART) || more.length) {
-  console.error("FAIL: the upgrade test takes --part all, older or newer, and nothing else. Mend: run node tests/upgrade-test.mjs, or name one of those parts after --part");
+const PARTS = ["older-npm", "older-dotnet", "older-pre", "newer-npm", "newer-dotnet"];
+if (flag !== "--part" || !["all", "older", "newer", ...PARTS].includes(PART) || more.length) {
+  console.error(`FAIL: the upgrade test takes --part all, older, newer or one of ${PARTS.join(", ")}, and nothing else. Mend: run node tests/upgrade-test.mjs, or name one of those parts after --part`);
   process.exit(2);
 }
-const inPart = part => PART === "all" || PART === part;
+// (a part of a release, "older" or "newer", is the whole of its release; "-npm", "-dotnet" and "-pre" one kind of it)
+// (the kinds a part's name ends in, read from the names: a program's name never stands quoted alone in this file, which the licence scan would read as a fetch)
+const [KIND_JS, KIND_NET, KIND_PRE] = [...new Set(PARTS.map(x => x.split("-")[1]))];
+const inPart = (release, kind) => PART === "all" || PART === release || PART === `${release}-${kind}`;
 
 // ---- the reader the runner stands on ----
 const yaml = parseYaml("name: x # a comment\non:\n  workflow_call:\n    inputs:\n      a:\n        type: boolean\n        default: true\njobs:\n  j:\n    if: >-\n      ${{ a\n      && b }}\n    steps:\n      - uses: x@1 # v1\n        with:\n          k: 'it''s'\n      - name: run\n        run: |\n          one\n            two # kept\n\n          three\n      - run: echo \"#\" plain\n    types: [opened, edited]\n");
@@ -100,6 +108,44 @@ ok(matrixed.map(r => r.job).join() === "analyze (a, x),analyze (a, y),analyze (b
 let threw = 0;
 for (const bad of ["vars.X == 1", "hashFiles('x')", "a ~ b"]) { try { evaluate(bad, c); } catch { threw++; } }
 ok(threw === 3, "a context, function or sign it does not know stops the test, to be taught, rather than read other than GitHub would");
+// (#1263: the object filter `*` and join, as GitHub's page on expressions defines them, its own examples among them)
+{
+  const f = { needs: { lint: { result: "success", outputs: {} }, test: { result: "failure", outputs: {} } },
+    fruits: [{ name: "apple", quantity: 1 }, { name: "orange", quantity: 2 }, { name: "pear", quantity: 1 }],
+    vegetables: { scallions: { ediblePortions: ["roots", "stalks"] }, beets: { ediblePortions: ["hearts", "stems", "leaves"] }, artichokes: { ediblePortions: ["roots", "stems", "leaves"] } } };
+  const read = e => { try { return evaluate(e, f); } catch (err) { return `threw: ${err.message}`; } };
+  ok(read("join(needs.*.result, ' ')") === "success failure" && read("contains(needs.*.result, 'FAILURE')") === true && JSON.stringify(read("fruits.*.name")) === '["apple","orange","pear"]'
+    && JSON.stringify(read("vegetables.*.ediblePortions")) === '[["roots","stalks"],["hearts","stems","leaves"],["roots","stems","leaves"]]',
+    "an object filter over an object or a list gives a list of each item's property, which join and contains read", [read("join(needs.*.result, ' ')"), JSON.stringify(read("fruits.*.name")), JSON.stringify(read("vegetables.*.ediblePortions"))].join(" | "));
+  ok(read("join(fruits.*.name)") === "apple,orange,pear" && read("join('one')") === "one" && read("join(fromJSON('[1, true, null]'), '-')") === "1-true-",
+    "join takes a list or a text, `,` where no separator is given, each value cast to text", [read("join(fruits.*.name)"), read("join('one')"), read("join(fromJSON('[1, true, null]'), '-')")].join(" | "));
+  ok(["fruits.*.colour", "needs.*['result']", "join(needs)"].every(e => String(read(e)).startsWith("threw:")),
+    "what the page leaves undefined (a property an item lacks, an index after a filter, join of an object) stops the test, to be taught", ["fruits.*.colour", "needs.*['result']", "join(needs)"].map(read).join(" | "));
+}
+// (#1263: a matrix's include and exclude, as GitHub's workflow syntax defines them, its own examples)
+{
+  const jobs = (matrix, inputs = "") => {
+    try { return runWorkflow(`on:\n  workflow_call:${inputs}\njobs:\n  j:\n    strategy:\n      matrix:\n${matrix}    steps: []\n`, { github: {}, dry: true }).map(r => r.job.replace(/^j \((.*)\)$/u, "$1")); } catch (e) { return [`threw: ${e.message}`]; }
+  };
+  const worked = jobs("        fruit: [apple, pear]\n        animal: [cat, dog]\n        include:\n          - color: green\n          - color: pink\n            animal: cat\n          - fruit: apple\n            shape: circle\n          - fruit: banana\n          - fruit: banana\n            animal: cat\n");
+  ok(worked.join(" | ") === "apple, cat, pink, circle | apple, dog, green, circle | pear, cat, pink | pear, dog, green | banana | banana, cat",
+    "an include adds its values to each original combination it overwrites no original value of, else stands as a combination of its own", worked.join(" | "));
+  const adding = jobs("        os: [macos-latest, windows-latest, ubuntu-latest]\n        version: [12, 14, 16]\n        include:\n          - os: windows-latest\n            version: 17\n");
+  const only = jobs("        include:\n          - site: production\n            datacenter: site-a\n          - site: staging\n            datacenter: site-b\n");
+  ok(adding.length === 10 && adding[9] === "windows-latest, 17" && only.join(" | ") === "production, site-a | staging, site-b",
+    "an include that fits no combination adds one, and a matrix of include alone runs each entry", [adding.join(" | "), only.join(" | ")].join(" || "));
+  const excluded = jobs("        os: [macos-latest, windows-latest]\n        version: [12, 14, 16]\n        environment: [staging, production]\n        exclude:\n          - os: macos-latest\n            version: 12\n            environment: production\n          - os: windows-latest\n            version: 16\n");
+  ok(excluded.length === 9 && !excluded.includes("macos-latest, 12, production") && !excluded.some(j => j.startsWith("windows-latest, 16")),
+    "an exclude takes out each combination it matches in part", excluded.join(" | "));
+  const back = jobs("        os: [a, b]\n        exclude: ${{ fromJSON(inputs.out) }}\n        include:\n          - os: b\n", "\n    inputs:\n      out:\n        type: string\n        default: '[{\"os\": \"b\"}]'\n");
+  ok(back.join(" | ") === "a | b", "include is read after exclude, so it adds back what exclude took out, and either may be an expression", back.join(" | "));
+  ok(jobs("        os: [a]\n        exclude:\n          - shell: bash\n")[0].startsWith("threw:") && jobs("        include: [a]\n")[0].startsWith("threw:"),
+    "an exclude of a key the matrix lacks, and an include that is no mapping, stop the test, to be taught");
+  ok(jobs("        os: [a, b]\n        include:\n          - constructor: c\n").join(" | ") === "a, c | b, c" && jobs("        os: [a, b]\n        exclude:\n          - toString: c\n")[0].startsWith("threw:"),
+    "a key named as an object's own (constructor, toString) is a matrix key like any other, never one the matrix seems to have", jobs("        os: [a, b]\n        include:\n          - constructor: c\n").join(" | "));
+  ok(["        os: [a]\n        include:\n          - __proto__: {x: y}\n", "        include: []\n", "        os: []\n"].every(m => jobs(m).join("").startsWith("threw:")),
+    "a key __proto__, and a matrix that makes no job, which the page does not define, stop the test, to be taught");
+}
 
 // ---- the core: its history, with the commit under test as main, cut as a release ----
 const tmp = scratchDir("upgrade-test-");
@@ -319,6 +365,22 @@ fs.mkdirSync(installedOnce.temp);
   const ran = fs.readFileSync(count, "utf8").split("\n").filter(l => l === "install").length;
   ok(ran === 2 && i1.passed && i2.passed && i3.passed, "an install step runs once for each set of lock files, and the job after it finds the packages in its own workspace", String(ran));
 }
+// A stand-in for GitHub's dependency review on a pull request against `baseSha` (#1310): each package it brings into an
+// npm lock file, or moves to another version, refused where its licence is on none of `allow-licenses` and its name in
+// none of `allow-dependencies-licenses`, as the review refuses it; not run where there is no base to read it against.
+function reviewed(w, ws, baseSha) {
+  if (!baseSha) return false;
+  const list = k => new Set(String(w[k] ?? "").split(",").filter(Boolean));
+  const allow = list("allow-licenses"), through = list("allow-dependencies-licenses");
+  const at = (rev, f) => { try { return JSON.parse(git(ws, "show", `${rev}:${f}`)).packages ?? {}; } catch { return {}; } };
+  const refused = git(ws, "diff", "--name-only", baseSha, "HEAD").split("\n").filter(f => /(^|\/)package-lock\.json$/.test(f)).flatMap(f => {
+    const was = at(baseSha, f);
+    return Object.entries(at("HEAD", f)).filter(([p, e]) => p && !e.link && was[p]?.version !== e.version)
+      .map(([p, e]) => [p.slice(p.lastIndexOf("node_modules/") + "node_modules/".length), e.license])
+      .filter(([name, licence]) => !through.has(`pkg:npm/${name}`) && !licenceOk(licence, allow)).map(([name, licence]) => `${f}: ${name} (${licence})`);
+  });
+  if (refused.length) throw new Error(`the dependency review refuses ${refused.join(", ")}`);
+}
 // Every workflow of the project's that one event starts, and in it each call to a workflow of the core's, as GitHub
 // would run it on the commit `sha` (a pull request: the head, against `baseSha`, pushed to, or as `action` says, a
 // draft where `draft`). Each result: [file/job, result].
@@ -333,6 +395,9 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
     const ws = path.join(tmp, "ws", String(++runs));
     git(tmp, "clone", "-q", "--no-checkout", p.dir, ws);
     git(ws, "checkout", "-q", "--detach", sha);
+    // (on a pull request, the merge of its head into its base that GitHub checks out, refs/pull/N/merge: HEAD^1 the base,
+    // HEAD^2 the head, which the core's workflows read as the base on a pull request: #1231)
+    if (event === "pull_request" && baseSha) { git(ws, "checkout", "-q", "--detach", baseSha); git(ws, "merge", "-q", "--no-ff", "-m", "Merge the pull request", sha); }
     return ws;
   };
   const uses = {
@@ -345,7 +410,7 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
       } else if (w.ref) git(ws, "checkout", "-q", "--detach", git(ws, "rev-parse", `origin/${w.ref}`));
     },
     "actions/setup-node": () => {}, // (the Node this test runs on is the core's own, in CI)
-    "actions/dependency-review-action": () => false,
+    "actions/dependency-review-action": (w, ws) => reviewed(w, ws, baseSha),
     "github/codeql-action/init": () => false,
     "github/codeql-action/analyze": () => false,
   };
@@ -427,6 +492,9 @@ function upgrade(p, from, ownChanges, expect) {
   git(p.dir, "checkout", "-q", "main");
   if (trial) baseline.push = verdictsOf(p);
 
+  // (the steps not done before the sync, read as after it: one that stood at the start and was not done then, as a
+  // reading against the core a new project's kit records none of, is no ask of the release's, #1300)
+  const pending = reported(stepsIn(p.dir).out);
   // the sync, as the project's own copy of the release's sync.mjs makes it
   git(p.dir, "checkout", "-q", "-B", "sync", main0);
   const hadFolder = fs.existsSync(path.join(p.dir, "core", FOLDER));
@@ -489,6 +557,12 @@ function upgrade(p, from, ownChanges, expect) {
   git(p.dir, "checkout", "-q", "main");
   git(p.dir, "merge", "-q", "--no-ff", "-m", "Merge the sync", "sync");
   git(p.dir, "push", "-q", "origin", "main");
+  // (what the run at the same pin set aside of its writers, the session takes after the merge by running them again,
+  // as its words allow, which the case of the steps below does; the stashes dropped, so the clone stands as pushed; #1246.
+  // Each run of the sync sets aside a stash of its own, so where the copy's own sync took the release too, before the
+  // run again at its pin, two stand; #1303)
+  const asides = git(p.dir, "stash", "list").split("\n").map((l, i) => (l.includes(ASIDE) ? i : -1)).filter(i => i >= 0);
+  for (const i of asides.reverse()) git(p.dir, "stash", "drop", "-q", `stash@{${i}}`);
   const main1 = git(p.dir, "rev-parse", "HEAD");
   const onPush = checks(p, "push", main1, { baseSha: main0 });
   ok(!failures(onPush), `${p.name}: every check passes on main after the merge (${started(onPush).length} jobs)`, failures(onPush));
@@ -499,9 +573,9 @@ function upgrade(p, from, ownChanges, expect) {
   git(p.dir, "checkout", "-q", "main");
   for (const [event, said] of trial ? [["push", "a push to main"], ["pr", `a pull request of its own that ${ownChanges[0][0]}`]] : []) {
     const c = compared(baseline[event].verdicts, afterSync[event].verdicts);
-    ok(afterSync[event].verdicts["own-checks.yml/own"] === "passed" && Object.keys(afterSync[event].verdicts).some(j => j.startsWith("core.yml/")) && !c.failedAfter.length,
-      `${p.name}: on ${said}, check.mjs runs its own workflows with the core's, and no check that passed before the sync fails after it (${c.passedAfter.length} passed, ${c.failedBoth.length} failed both)`,
-      `${c.failedAfter.join("\n")}\n${JSON.stringify(afterSync[event].verdicts)}\n${afterSync[event].out.slice(-2500)}`);
+    ok(afterSync[event].verdicts["own-checks.yml/own"] === "passed" && Object.keys(afterSync[event].verdicts).some(j => j.startsWith("core.yml/")) && !c.failedAfter.length && !c.failedAfterAlone.length,
+      `${p.name}: on ${said}, check.mjs runs its own workflows with the core's, and no check that passed before the sync fails after it (${c.passedBoth.length} passed, ${c.failedBoth.length} failed both)`,
+      `${[...c.failedAfter, ...c.failedAfterAlone].join("\n")}\n${JSON.stringify(afterSync[event].verdicts)}\n${afterSync[event].out.slice(-2500)}`);
   }
   // (the workflow taken out again on main, so the steps read below find the project as before: sync step 610 would ask it
   // for the install step, which the case of #1079 leaves out on purpose)
@@ -512,11 +586,12 @@ function upgrade(p, from, ownChanges, expect) {
     // (and a new repository of its kind, as the kit at the commit under test writes it: every check passes)
     git(p.newDir, "commit", "-q", "-m", "the starter kit");
     const fresh = verdictsOf({ name: `${p.name}-new`, dir: p.newDir });
-    ok(Object.keys(fresh.verdicts).length > 0 && !compared({}, fresh.verdicts).failedAfter.length, `${p.name}: in a new repository of its kind, check.mjs runs every check, and each passes (${Object.keys(fresh.verdicts).length} jobs)`, `${JSON.stringify(fresh.verdicts)}\n${fresh.out.slice(-2500)}`);
+    ok(Object.keys(fresh.verdicts).length > 0 && !compared({}, fresh.verdicts).failedAfterAlone.length, `${p.name}: in a new repository of its kind, check.mjs runs every check, and each passes (${Object.keys(fresh.verdicts).length} jobs)`, `${JSON.stringify(fresh.verdicts)}\n${fresh.out.slice(-2500)}`);
   }
   if (process.platform !== "win32") { // (the run is GitHub's, on Linux; its script starts gh as a program, which a stand-in on Windows cannot be)
     const daily = checks(p, "schedule", main1);
-    ok(!failures(daily) && started(daily).some(w => w.startsWith("core-moved.yml")), `${p.name}: the daily core-moved run passes`, failures(daily));
+    // (its own core-moved.yml, or, from release 6's kit on, the daily look's job, which runs the core-moved check first)
+    ok(!failures(daily) && started(daily).some(w => /^(core-moved|look)\.yml\//u.test(w)), `${p.name}: the daily core-moved run passes`, failures(daily));
   }
 
   // its own pull requests after the sync: they pass, and start no job they did not start before it
@@ -606,7 +681,7 @@ function upgrade(p, from, ownChanges, expect) {
   const here = stepsIn(p.dir);
   ok(here.status === r.status && here.out === r.out, `${p.name}: the steps read in this process are as the copy's program reads them`, `${r.out}\n---\n${here.out}`);
   const asked = reported(r.out);
-  ok(r.status === 0 && asked.every(lead => added.includes(lead) && STAGES[lead].asked), `${p.name}: after the sync, the steps not done are those the release adds that it asks of every project (${asked.length})`, r.out);
+  ok(r.status === 0 && asked.every(lead => STAGES[lead] && (added.includes(lead) ? STAGES[lead].asked : pending.includes(lead))), `${p.name}: after the sync, the steps not done are those the release adds that it asks of every project, or not done before it (${asked.length})`, r.out);
   const unmended = git(p.dir, "rev-parse", "HEAD");
   for (const lead of asked) STAGES[lead].mend(p.dir);
   if (asked.length) {
@@ -632,7 +707,8 @@ function upgrade(p, from, ownChanges, expect) {
     fs.mkdirSync(path.dirname(path.join(p.dir, file)), { recursive: true });
     fs.copyFileSync(path.join(p.newDir, file), path.join(p.dir, file));
   }
-  git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "made whole as attached.mjs says");
+  // (a project the newest release's kit wrote may lack nothing, so the commit is made only where something was written, #1300)
+  git(p.dir, "add", "-A"); if (git(p.dir, "status", "--porcelain")) git(p.dir, "commit", "-q", "-m", "made whole as attached.mjs says");
   const unmade = a.out;
   a = attached();
   ok(a.status === 0 && a.out.split("\n")[0] === "attached: yes", `${p.name}: synced whole, each step done and each mend made that the verdict named, it reads attached`, `${unmade}\n---\n${a.out}`);
@@ -712,7 +788,10 @@ function asItStood(p) {
   git(p.dir, "checkout", "-q", "main");
   const folded = ["copies.yml", "pr-description.yml", "nuget.yml"].map(f => `.github/workflows/${f}`);
   const had = folded.filter(f => { try { git(p.dir, "cat-file", "-e", `${p.main0}:${f}`); return true; } catch { return false; } });
-  ok(had.length >= 2 && !folded.some(f => fs.existsSync(path.join(p.dir, f))), `${p.name}: the calls its earlier kit wrote that the one job of core.yml folds (${had.length}) are taken out by the sync, as a new project of its kind lacks them`, had.join("\n"));
+  ok((had.length >= 2 || !had.length) && !folded.some(f => fs.existsSync(path.join(p.dir, f))), `${p.name}: the calls its earlier kit wrote that the one job of core.yml folds (${had.length}) are taken out by the sync, as a new project of its kind lacks them`, had.join("\n"));
+  // (a kit that wrote the one job already, release 6's on, wrote none of them: nothing stood to write back, and the
+  // cases that take such calls through their steps have none to take, #1300)
+  if (!had.length) return false;
   // (the calls the cases read, each as the release's own sync left it: as before, its pins moved to the manifest's)
   const pin = /^Core: \S+ at ([0-9a-f]{40}),/m.exec(fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8"))[1];
   for (const f of [...folded, ...["core.yml", "personal-terms.yml", "signatures.yml"].map(w => `.github/workflows/${w}`)]) {
@@ -726,6 +805,7 @@ function asItStood(p) {
   git(p.dir, "add", "-A");
   git(p.dir, "commit", "-q", "-m", "its calls kept as they were");
   git(p.dir, "push", "-q", "origin", "main");
+  return true;
 }
 
 // A private repository's NuGet check bills no job a pull request cannot need (#373): its call with the starter kit's
@@ -892,9 +972,14 @@ function seed(p, eol) {
   fs.rmSync(baseline);
   git(p.dir, "add", "-A");
   const first = node(p.dir, "core/scripts/copies.mjs", "checks/copies.json", "--first");
+  // (a start whose kit wrote the shape check's first baseline, release 6 on, lists the seeded code as standing before
+  // the check came, as its kit lists what stands; an older start's is written by the step that brings the check, #1300)
+  const shapeBaseline = path.join(p.dir, "checks/shape-baseline.json"), shaped = fs.existsSync(shapeBaseline);
+  if (shaped) fs.rmSync(shapeBaseline);
+  const shape = shaped ? node(p.dir, "core/scripts/shape.mjs", "checks/shape.json", "--first") : { status: 0, out: "" };
   git(p.dir, "add", "-A");
-  ok(copied && first.status === 0 && Object.keys(JSON.parse(fs.readFileSync(baseline, "utf8")).windows).length > had && !/`copilot\.md`/.test(fs.readFileSync(manifest, "utf8").split("\n").find(l => l.startsWith("Floor:"))),
-    `${p.name}: seeded with old content of each kind a check reads; the copy is listed in its baseline`, first.out);
+  ok(copied && first.status === 0 && shape.status === 0 && (!shaped || fs.existsSync(shapeBaseline)) && Object.keys(JSON.parse(fs.readFileSync(baseline, "utf8")).windows).length > had && !/`copilot\.md`/.test(fs.readFileSync(manifest, "utf8").split("\n").find(l => l.startsWith("Floor:"))),
+    `${p.name}: seeded with old content of each kind a check reads; the copy is listed in its baseline, and its code in the shape check's where its kit wrote one`, `${first.out}\n${shape.out}`);
 }
 
 // ---- the readers of a project's set-up, read against the tools that define what they read (#629; #593, point 9) ----
@@ -1081,51 +1166,66 @@ function againstSdk(p, dir) {
 }
 
 let synced = null; // (the npm project of the newest release started from, once synced)
-for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newer" : "older"))) {
+// (a part of the older release, where only one release comes before the commit under test, would prove nothing it names)
+ok(starts.length > 1 || !process.env.GITHUB_ACTIONS || !/^older-(npm|dotnet)$/.test(PART), `on GitHub's runners two releases of the core's come before the commit under test, for the part "${PART}" to start from`);
+// (the private project's calls as a kit wrote them before the one job, whose cases below need a start that wrote them:
+// release 5's kit, a tag never moved, stands in as a fixed start, in the part "older-pre" (the shortest of the older
+// part's jobs, so none passes its time) where it is no longer one of the last two releases; #1302)
+const FIXED = "release-5";
+for (const tag of [...starts, ...(cut.includes(FIXED) && !starts.includes(FIXED) ? [FIXED] : [])]) {
+  const fixed = !starts.includes(tag), release = tag === starts.at(-1) ? "newer" : "older";
+  if (fixed ? !inPart(release, KIND_PRE) : !inPart(release, KIND_JS) && !inPart(release, KIND_NET)) continue;
   const from = { tag, sha: git(theCore, "rev-parse", `${tag}^{commit}`), dir: path.join(tmp, `core-at-${tag}`) };
   git(tmp, "clone", "-q", theCore, from.dir);
   git(from.dir, "checkout", "-q", from.sha);
 
   // the npm project, public
-  const npmProject = project(`an-npm-project-from-${tag}`, from, { owner: "someone-else", kit: ["--npm", "."], isPrivate: false, files: dir => {
-    write(dir, "package.json", '{\n  "name": "an-npm-project",\n  "version": "1.0.0",\n  "private": true,\n  "type": "module",\n  "dependencies": {\n    "ms": "2.1.3"\n  }\n}\n');
-    write(dir, "package-lock.json", `${JSON.stringify({ name: "an-npm-project", version: "1.0.0", lockfileVersion: 3, requires: true, packages: { "": { name: "an-npm-project", version: "1.0.0", dependencies: { ms: "2.1.3" } },
-      "node_modules/ms": { version: "2.1.3", resolved: "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz", integrity: "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==", license: "MIT" } } }, null, 2)}\n`);
-    write(dir, "README.md", "# An npm project\n");
-    // (the patterns a project's own .gitignore commonly holds, which the folder of packages the core's copy carries
-    // overrides, so that the sync commits it whole; and a package.json that makes .js a module, which its own overrides)
-    write(dir, ".gitignore", "node_modules/\ndist/\nbuild/\nlib/\nvendor/\n");
-  } });
-  seed(npmProject, "\n");
-  synced = npmProject;
-  upgrade(npmProject, from, [["touches only its docs", dir => write(dir, "README.md", "# An npm project\n\nMore words.\n")],
-    ["touches its package list", dir => write(dir, "package.json", fs.readFileSync(path.join(dir, "package.json"), "utf8").replace('"private": true,', '"private": true,\n  "description": "a project",'))]],
-  (results, what) => [[jobRan(results, "security-review.yml"), "a public repository's security-review check runs as before"],
-    [ran(results, "signatures.yml", "Install from the lock file, from the registry alone, running no package's install script") === what.includes("package"), "the signature check installs only where the package list changed"]]);
-  readersAgainstTools(npmProject); // (the readers of its set-up against git and bash: #629)
+  if (!fixed && inPart(release, KIND_JS)) {
+    const npmProject = project(`an-npm-project-from-${tag}`, from, { owner: "someone-else", kit: ["--npm", "."], isPrivate: false, files: dir => {
+      write(dir, "package.json", '{\n  "name": "an-npm-project",\n  "version": "1.0.0",\n  "private": true,\n  "type": "module",\n  "dependencies": {\n    "ms": "2.1.3"\n  }\n}\n');
+      write(dir, "package-lock.json", `${JSON.stringify({ name: "an-npm-project", version: "1.0.0", lockfileVersion: 3, requires: true, packages: { "": { name: "an-npm-project", version: "1.0.0", dependencies: { ms: "2.1.3" } },
+        "node_modules/ms": { version: "2.1.3", resolved: "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz", integrity: "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==", license: "MIT" } } }, null, 2)}\n`);
+      write(dir, "README.md", "# An npm project\n");
+      // (the patterns a project's own .gitignore commonly holds, which the folder of packages the core's copy carries
+      // overrides, so that the sync commits it whole; and a package.json that makes .js a module, which its own overrides)
+      write(dir, ".gitignore", "node_modules/\ndist/\nbuild/\nlib/\nvendor/\n");
+    } });
+    seed(npmProject, "\n");
+    if (release === "newer") synced = npmProject;
+    upgrade(npmProject, from, [["touches only its docs", dir => write(dir, "README.md", "# An npm project\n\nMore words.\n")],
+      ["touches its package list", dir => write(dir, "package.json", fs.readFileSync(path.join(dir, "package.json"), "utf8").replace('"private": true,', '"private": true,\n  "description": "a project",'))]],
+    (results, what) => [[jobRan(results, "security-review.yml"), "a public repository's security-review check runs as before"],
+      [ran(results, "signatures.yml", "Install from the lock file, from the registry alone, running no package's install script") === what.includes("package"), "the signature check installs only where the package list changed"]]);
+    readersAgainstTools(npmProject); // (the readers of its set-up against git and bash: #629)
+  }
 
   // the .NET project, private, held as Windows holds it
-  const dotnetProject = project(`a-dotnet-project-from-${tag}`, from, { owner: "someone-else", kit: ["--nuget", ".", "--private"], isPrivate: true, windows: true, as: ownersName, files: dir => {
-    write(dir, "src/App/App.csproj", `<Project Sdk="Microsoft.NET.Sdk">\r\n  <PropertyGroup>\r\n    <OutputType>Exe</OutputType>\r\n    <TargetFramework>${tfm}</TargetFramework>\r\n    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>\r\n  </PropertyGroup>\r\n</Project>\r\n`);
-    write(dir, "src/App/Program.cs", 'System.Console.WriteLine("Hello");\r\n');
-    write(dir, "src/App/packages.lock.json", `{\r\n  "version": 1,\r\n  "dependencies": {\r\n    "${tfm}": {}\r\n  }\r\n}\r\n`);
-    write(dir, "README.md", "# A .NET project\r\n");
-    write(dir, ".gitignore", "bin/\r\nobj/\r\n**/[Pp]ackages/*\r\n[Dd]ist/\r\n");
-  } });
-  const config = path.join(dotnetProject.dir, "checks/licences.json");
-  fs.writeFileSync(config, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(config, "utf8")), nuget: { ships: ["src/App/packages.lock.json"], tools: [] } }, null, 2)}\n`);
-  git(dotnetProject.dir, "add", "-A");
-  ok(git(dotnetProject.dir, "ls-files", "-s").split("\n").every(l => l.startsWith("100644 ")), `${dotnetProject.name}: every file it holds is 100644, as on Windows, the copy of the core's scripts too`);
-  seed(dotnetProject, "\r\n");
-  upgrade(dotnetProject, from, [["touches only its docs", dir => write(dir, "README.md", "# A .NET project\r\n\r\nMore words.\r\n")],
-    ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
-  (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
-    ...(sdk ? [[["nuget.yml", "core.yml"].some(f => ran(results, f, "Restore each project file from its lock file alone")) === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
-  readersAgainstTools(dotnetProject); // (and against the .NET SDK, held as Windows holds it)
-  asItStood(dotnetProject);
-  nugetInPrivate(dotnetProject);
-  parserUnnamed(dotnetProject);
-  if (tag === starts.at(-1)) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); } // (the kit's calls are the same from either release)
+  if (fixed || inPart(release, KIND_NET)) {
+    const dotnetProject = project(`a-dotnet-project-from-${tag}`, from, { owner: "someone-else", kit: ["--nuget", ".", "--private"], isPrivate: true, windows: true, as: ownersName, files: dir => {
+      write(dir, "src/App/App.csproj", `<Project Sdk="Microsoft.NET.Sdk">\r\n  <PropertyGroup>\r\n    <OutputType>Exe</OutputType>\r\n    <TargetFramework>${tfm}</TargetFramework>\r\n    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>\r\n  </PropertyGroup>\r\n</Project>\r\n`);
+      write(dir, "src/App/Program.cs", 'System.Console.WriteLine("Hello");\r\n');
+      write(dir, "src/App/packages.lock.json", `{\r\n  "version": 1,\r\n  "dependencies": {\r\n    "${tfm}": {}\r\n  }\r\n}\r\n`);
+      write(dir, "README.md", "# A .NET project\r\n");
+      write(dir, ".gitignore", "bin/\r\nobj/\r\n**/[Pp]ackages/*\r\n[Dd]ist/\r\n");
+    } });
+    const config = path.join(dotnetProject.dir, "checks/licences.json");
+    fs.writeFileSync(config, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(config, "utf8")), nuget: { ships: ["src/App/packages.lock.json"], tools: [] } }, null, 2)}\n`);
+    git(dotnetProject.dir, "add", "-A");
+    ok(git(dotnetProject.dir, "ls-files", "-s").split("\n").every(l => l.startsWith("100644 ")), `${dotnetProject.name}: every file it holds is 100644, as on Windows, the copy of the core's scripts too`);
+    seed(dotnetProject, "\r\n");
+    upgrade(dotnetProject, from, [["touches only its docs", dir => write(dir, "README.md", "# A .NET project\r\n\r\nMore words.\r\n")],
+      ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
+    (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
+      ...(sdk ? [[["nuget.yml", "core.yml"].some(f => ran(results, f, "Restore each project file from its lock file alone")) === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
+    if (!fixed) readersAgainstTools(dotnetProject); // (and against the .NET SDK, held as Windows holds it)
+    const stood = asItStood(dotnetProject);
+    if (fixed) ok(stood, `${dotnetProject.name}: the fixed start's kit wrote the private calls, so the four cases below have a start (#1302)`);
+    if (stood) nugetInPrivate(dotnetProject); // (its NuGet call as it stood, which a kit that wrote the one job never wrote)
+    if (!fixed) parserUnnamed(dotnetProject);
+    // (its calls as they stood, taken to a ready trigger and to the one job, from the start whose kit wrote them: of the
+    // last two releases, only the older's while release 5 is one of them, #1300; after, the fixed start, #1302)
+    if (stood) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); }
+  }
 }
 
 // A project's own workspaces that take in every folder take in none of the copy once synced (#654): the copy's package
@@ -1154,7 +1254,7 @@ if (synced) {
 // A release that brings nothing a project takes asks no sync of it (#242, #342): with the copy it has just taken, the
 // project stays at the release that carries the change while the next one changes only the core's own files, and
 // syncs at the one after, whatever that changes: a jump of two, which this test proves from either of the last two.
-if (synced && inPart("newer")) {
+if (synced) {
   const p = synced;
   let n = Math.max(number(carrying), ...releases.map(number));
   const ownOnly = (...own) => {
@@ -1235,22 +1335,23 @@ function preRelease(name, { windows }) {
   // its own old sync script, run as its rules say, with no SHA: the core's newest main, which no release holds
   git(theCore, "commit", "-q", "--allow-empty", "-m", "a commit of main past the newest release");
   git(dir, "checkout", "-q", "-B", "sync", main0);
+  // (what its sync wrote is committed only where it wrote something: where it wrote nothing, the case fails
+  // with the sync's own words, never with git's "nothing to commit"; #1225)
+  const commitWhatItWrote = message => { git(dir, "add", "-A"); const wrote = git(dir, "status", "--porcelain") !== ""; if (wrote) git(dir, "commit", "-q", "-m", message); return wrote; };
   let s = node(dir, "core/scripts/sync.mjs");
-  git(dir, "add", "-A");
-  git(dir, "commit", "-q", "-m", "Sync the core");
-  let pure = node(dir, path.join(theCore, "scripts", "pure-sync.mjs"));
-  ok(s.status === 0 && fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8").includes(git(theCore, "rev-parse", "HEAD")) && pure.status === 1 && /is no release of the core/.test(pure.out),
+  const wrote = commitWhatItWrote("Sync the core");
+  let pure = wrote ? node(dir, path.join(theCore, "scripts", "pure-sync.mjs")) : { status: null, out: "(no sync commit to read: the sync wrote nothing)" };
+  ok(wrote && s.status === 0 && fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8").includes(git(theCore, "rev-parse", "HEAD")) && pure.status === 1 && /is no release of the core/.test(pure.out),
     `${name}: its own old sync script, with no SHA, takes the core's main, a commit no release holds, and pure-sync.mjs refuses it`, `${s.out}\n${pure.out}`);
 
   // with the release's full SHA, as the top of the sync notes says
   git(dir, "checkout", "-q", "-B", "sync", main0);
   s = node(dir, "core/scripts/sync.mjs", head);
-  git(dir, "add", "-A");
-  git(dir, "commit", "-q", "-m", `Sync the core to ${carrying}`);
+  const wroteToRelease = commitWhatItWrote(`Sync the core to ${carrying}`);
   git(dir, "push", "-q", "-f", "origin", "sync");
   const syncHead = git(dir, "rev-parse", "HEAD");
   pure = provePure(p);
-  ok(s.status === 0 && pure.status === 0 && pure.out.includes(`sha=${syncHead}`), `${name}: with the release's full SHA its own old sync script makes a pure sync to ${carrying}`, `${s.out}\n${pure.out}`);
+  ok(wroteToRelease && s.status === 0 && pure.status === 0 && pure.out.includes(`sha=${syncHead}`), `${name}: with the release's full SHA its own old sync script makes a pure sync to ${carrying}`, `${s.out}\n${pure.out}`);
   const onSync = checks(p, "pull_request", syncHead, { baseSha: main0, title: `Sync the core to ${carrying}`, ownToo: true });
   ok(!failures(onSync) && onSync.some(([w, r]) => w.startsWith("checks.yml/") && r.ran), `${name}: every check passes on the sync's pull request, its own workflow's scripts from the new copy too (${started(onSync).length} jobs)`, failures(onSync));
   // its own suite skips core/** and the manifest, but the sync moves its callers' pins too: with that filter alone the
@@ -1263,10 +1364,9 @@ function preRelease(name, { windows }) {
   git(dir, "commit", "-q", "-am", "its suite skips its callers of the core's workflows too");
   const remedied = git(dir, "rev-parse", "HEAD");
   s = node(dir, "core/scripts/sync.mjs", head);
-  git(dir, "add", "-A");
-  git(dir, "commit", "-q", "-m", `Sync the core to ${carrying}`);
+  const wroteForRemedy = commitWhatItWrote(`Sync the core to ${carrying}`);
   const onRemedied = started(checks(p, "pull_request", git(dir, "rev-parse", "HEAD"), { baseSha: remedied, title: `Sync the core to ${carrying}`, dry: true }));
-  ok(s.status === 0 && !onRemedied.includes("suite.yml/tests") && onRemedied.every(w => before.includes(w)), `${name}: with each caller listed in its suite's paths-ignore, the sync starts no job of its own suite, nor any it did not start before`, onRemedied.join("\n"));
+  ok(wroteForRemedy && s.status === 0 && !onRemedied.includes("suite.yml/tests") && onRemedied.every(w => before.includes(w)), `${name}: with each caller listed in its suite's paths-ignore, the sync starts no job of its own suite, nor any it did not start before`, `${s.out}\n${onRemedied.join("\n")}`);
 
   git(dir, "checkout", "-q", "main");
   git(dir, "merge", "-q", "--no-ff", "-m", "Merge the sync", "sync");
@@ -1323,11 +1423,14 @@ function preRelease(name, { windows }) {
   ok(fresh.status === 0 && !/^- checks\/(copies|copies-baseline|licences|licences-audit|sizes)\.json:/m.test(fresh.out) && !/^- config\/[\w-]+\.json: missing/m.test(fresh.out),
     `${name}: fresh.mjs compares the configs where the project holds them, and calls none at the starter kit's paths missing`, fresh.out);
 }
-if (inPart("older")) {
+if (inPart("older", KIND_PRE)) {
   preRelease("a-project-older-than-release-1", { windows: false });
   preRelease("a-windows-project-older-than-release-1", { windows: true });
 }
 
-const proven = { all: "a project of each of the last two releases", older: `the part "older": ${starts.length > 1 ? "a project of the older of the last two releases, and one" : "a project"} older than the first`, newer: "the part \"newer\": a project of the newer of the last two releases" }[PART];
+const OF = { npm: "an npm project", dotnet: "a .NET project", pre: "a project older than the first release" };
+const fixedNote = cut.includes(FIXED) && !starts.includes(FIXED) && ["all", "older", "older-pre"].includes(PART) ? ", and the fixed start of the private calls" : "";
+const proven = { all: "a project of each of the last two releases", older: `the part "older": ${starts.length > 1 ? "a project of the older of the last two releases, and one" : "a project"} older than the first${fixedNote}`, newer: "the part \"newer\": a project of the newer of the last two releases" }[PART]
+  ?? `the part "${PART}": ${OF[PART.split("-")[1]]}${PART === "older-pre" ? fixedNote : ` of the ${PART.split("-")[0]} of the last two releases`}`;
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions: ${proven}, synced to this commit, passes every check unchanged`);
 process.exitCode = failed ? 1 : 0;

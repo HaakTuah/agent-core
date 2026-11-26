@@ -36,7 +36,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { inProject, leadsOut, logged, unrooted } from "./guards.mjs";
+import { inProject, leadsOut, logged, parseBounded, unrooted } from "./guards.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { whole } from "./core-owned.mjs";
 import { readBlobs } from "./blobs.mjs";
@@ -60,9 +60,12 @@ const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 <
 const configPath = process.argv.slice(2).find(a => !a.startsWith("--"));
 if (!configPath) fail(`no config was named. Mend: name it: ${SELF} <config> [--write | --tools | --first]`);
 // (the config's path from the root, as git names it at the base: git says it, as it says the root, so no spelling of a
-// path can differ, and unquoted, -z, so a name outside plain ASCII is the name itself)
+// path can differ, and unquoted, -z, so a name outside plain ASCII is the name itself; for a config git does not list
+// yet, both folders are made real first (the config's own name kept, a link it is stays the project's), since on Windows git names the root by its long name where Node may name a
+// temporary folder by its short one, RUNNER~1, and a path made relative from one to the other leads out of the root)
+const real = p => { try { return fs.realpathSync.native(p); } catch { return p; } };
 let CONFIG_AT;
-try { CONFIG_AT = git(["ls-files", "-z", "--full-name", "--error-unmatch", "--", configPath]).split("\0")[0]; } catch { CONFIG_AT = path.relative(ROOT, path.resolve(configPath)).split(path.sep).join("/"); }
+try { CONFIG_AT = git(["ls-files", "-z", "--full-name", "--error-unmatch", "--", configPath]).split("\0")[0]; } catch { CONFIG_AT = path.relative(real(ROOT), path.join(real(path.dirname(path.resolve(configPath))), path.basename(configPath))).split(path.sep).join("/"); }
 let config;
 try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
 process.chdir(ROOT);
@@ -346,7 +349,7 @@ if (!base || typeof base.windows !== "object" || base.windows === null || Array.
 // A count is a whole number of places, at least two; anything else would let a copy through, so it fails.
 const counted = (w, where) => {
   const bad = Object.entries(w || {}).filter(([h, n]) => !/^[0-9a-f]{12}$/.test(h) || !Number.isInteger(n) || n < 2);
-  if (bad.length) { console.error(`FAIL: ${logged(where)} holds ${bad.length} windows without a whole count of two or more. Mend: take the baseline back as main holds it (git checkout origin/main -- ${BASELINE}), then run --write to lower it`); process.exit(1); }
+  if (bad.length) { console.error(`FAIL: ${logged(where)} holds ${bad.length} windows without a whole count of two or more. Mend: take the baseline back as main holds it (git checkout origin/main -- ${logged(BASELINE)}), then run --write to lower it`); process.exit(1); }
   return w;
 };
 counted(base.windows, BASELINE);
@@ -389,11 +392,11 @@ if (from) {
   }
   let there = true;
   try { git(["cat-file", "-e", `${from}:${BASELINE}`]); } catch { there = false; } // no baseline on that branch yet
-  const old = there ? counted(JSON.parse(git(["show", `${from}:${BASELINE}`])).windows, `${from}:${BASELINE}`) || null : null;
+  const old = there ? counted(parseBounded(git(["show", `${from}:${BASELINE}`])).windows, `${from}:${BASELINE}`) || null : null;
   // (save a window of a copy that stands in an agent tool's file and that the base held there in as many places:
   // listing what stood is what --tools does, and the base is the list until it is written; #405)
   const raised = old ? Object.entries(base.windows).filter(([h, n]) => (!(h in old) || n > old[h]) && !(toolWindows.has(h) && stood(h, n))) : [];
-  if (raised.length) { console.error(`FAIL: ${logged(BASELINE)} adds or raises ${raised.length} windows against ${from}, and the baseline only shrinks. Mend: take it back as ${from} holds it (git checkout ${from} -- ${BASELINE}), point the new copy to one place, and run --write`); process.exit(1); }
+  if (raised.length) { console.error(`FAIL: ${logged(BASELINE)} adds or raises ${raised.length} windows against ${logged(from)}, and the baseline only shrinks. Mend: take it back as ${logged(from)} holds it (git checkout ${logged(from)} -- ${logged(BASELINE)}), point the new copy to one place, and run --write`); process.exit(1); }
 }
 // Near-copies (tasks/code-shape.md, "Near-copies are reported"; #246): the runs of code that match once names and
 // numbers are set aside, and are no exact copy. Reported, never failed: code that only looks alike is no second copy

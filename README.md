@@ -107,7 +107,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    (`setup/sync-notes.md`, each entry a file of `setup/sync-notes/`, read whole by `scripts/sync-notes.mjs`), and its
    step of the same name in `scripts/steps/` tells it done or not (`scripts/steps.mjs`); the sync script prints the entries a sync brings, then every
    step not done, what the steps' writers wrote where a script does a step exactly, set aside in a git stash to commit
-   in a PR of its own once the sync is merged (`scripts/steps.mjs --write --aside`; #1091), every difference from what
+   in a PR of its own once the sync is merged (`scripts/steps.mjs --write --aside`; #1091), or, where a file a writer
+   writes holds what the sync changed, put back with the command to run once it merges (#1259), every difference from what
    the starter kit writes today (`scripts/fresh.mjs`), where the owner's
    inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`), the settings only the owner
    gives where the sync brings one the old copy's list did not hold (`scripts/owner-settings.mjs`; "Setting up (the
@@ -228,10 +229,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `STRENGTH_BASE` the pull request's base: it runs the project's mutation tool (the *mutation tool*) on the lines
      the pull request changes and shows how many faults put in on purpose a test caught; once a whole run at an audit
      has written its baseline, beside the shape check's, a fault that survives there unlisted fails
-     (`tasks/code-shape.md`). For code run by Node with tests that are files run by `node`, `stryker.mjs` runs
-     Stryker as such a tool, installed from a lock file of the project's (the core's own, in `tests/mutation/`), and
-     `mutate.mjs` is a tool the core wrote, with fewer kinds of fault, which with `--every` names each test that catches
-     one.
+     (`tasks/code-shape.md`). For code run by Node with tests that are files run by `node`, or by the project's own
+     vitest (`--runner vitest`), `stryker.mjs` runs Stryker as such a tool, installed from a lock file of the project's
+     (the core's own, in `tests/mutation/`), and `mutate.mjs` is a tool the core wrote, with fewer kinds of fault, which
+     with `--every` names each test that catches one.
    - **What the tests cost** (`tasks/tests.md`): `select.mjs`, a step of the same job before the tests, with
      `SELECT_BASE` the pull request's base, selects the tests the change can reach, with the project's proof, never
      selected out, and the whole suite where a changed file's reach cannot be told, the changed files, or the
@@ -264,7 +265,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `versions.yml` keep their triggers and call the core's of the same name
      (`uses: HaakTuah/agent-core/.github/workflows/<name>.yml@<full commit SHA>`), each with the triggers, the
      permissions and the inputs its template has (`setup/template/workflows/`, which `tests/init-test.mjs` holds to
-     the core's workflows; `versions.yml` has none yet).
+     the core's workflows; the starter kit writes `versions.yml` with `--versions`, and its config, #1095).
    - **The core's checks without a secret may run as one job** (#376): `core.yml`, given its inputs, runs after its own
      check of the copy the copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records'
      checks (`copies`, `sizes`), the description check (`description: true`, on a pull request that is no draft and not Dependabot's)
@@ -281,7 +282,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      moved past the project's pin (point 1; `core/scripts/core-moved.mjs`), then runs the scheduled look
      (`core/scripts/look.mjs`, `roles/orchestrator.md`), and opens no pull request, since one a workflow opens gets
      no checks. Once a month, with the state report, the look asks the registries again of every package the project
-     holds (`core/scripts/held.mjs`) and keeps the issue "Packages gone stale". Given the secret `PERSONAL_TERMS`,
+     holds (`core/scripts/held.mjs`, which each sync also runs among its reports) and keeps the issue "Packages gone
+     stale". Given the secret `PERSONAL_TERMS`,
      which the template's call passes, it last takes the personal terms out of the issues and comments written in the
      week before (`core/scripts/issue-terms.mjs`; floor rule 11). A project whose daily job still calls the core's `core-moved.yml` runs both there too, the look
      reading no pull request, check or status with that job's token, until it moves to the template's. A builder
@@ -306,7 +308,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      fails a run that uses one that is not pinned (core archive 152).
    - **A game served by GitHub Pages** publishes main with `bash core/scripts/site-publish.sh root`, and its pull
      requests' previews through a `preview.yml` of its own, on `workflow_run` of its build, that calls the core's (the
-     build uploads the artifact `preview`: `pr-number`, and the site in `site/`). A preview and the live site share one
+     build uploads the artifact `preview`: `pr-number`, and the site in `site/`), as its template has it (the starter
+     kit's `--pages <the build workflow's name>`, with `--game`; #1095). A preview and the live site share one
      browser origin, with every other Pages site of the account, so a preview's code, which no review has passed yet,
      reads whatever the live game keeps in the browser: a game keeps nothing there that matters beyond its own saves,
      and its threat model says so (core archive 201).
@@ -633,6 +636,9 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   saying how the session takes it out (core archive 207); only the random id of a link to a Claude Code session, which
   can hold a short term by chance, is left unread (#261), and `LICENSE` and `NOTICE`, at the root and in `core/`,
   while they keep the shape the check's header gives, so a copyright holder may stand there (floor rule 11; #257).
+  It fails too a commit of the pull request's own whose author's or committer's address is no no-reply one (the
+  account's, `noreply@github.com` or `noreply@anthropic.com`), with or without the secret, save one GitHub made, and
+  reads no commit `main` already holds (#460, point 2).
 - Where another tool is to take a role, any one of: the tool that runs the agents side by side (below); its plug-in in
   the orchestrator's tool, installed and signed in on the machine the sessions run on (for Codex in Claude Code,
   `/codex:setup` says whether it is); or another way, which the manifest's "Tools" table names (how the tool is handed

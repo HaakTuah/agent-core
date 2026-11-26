@@ -56,6 +56,18 @@ const plainEnv = { ...env };
     "and a field of its own, a spec naming git, a file or a tarball, a linked entry or one from another address, each is one it refuses; a range or a tag is none");
   const acted = { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], optional: true, integrity: "sha512-AAAA" } } };
   ok(lockFaults(list, acted).some(f => /field optional, which npm would act on and the core's lock never writes/u.test(f)), "an entry that holds a field npm would act on that the core's lock never writes is refused before npm runs, whatever else it holds", JSON.stringify(lockFaults(list, acted)));
+  // (a spec that names an address with a sign-in in it, in the package list and in a lock entry: the fault names the
+  // field and the package and says the spec is not of npm's registry, and quotes nothing of the address, so the sign-in
+  // never reaches a check's output (floor rule 1); the sign-in made up, built from pieces as the test runs)
+  const user = ["made", "up", "user"].join("-"), pass = ["not", "a", "sign", "in"].join("_"), signed = `git+https://${user}:${pass}@example.invalid/x.git`;
+  const signedFaults = [...lockFaults({ ...list, devDependencies: { ...list.devDependencies, x: signed } }, lock),
+    ...lockFaults(list, { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], dependencies: { x: signed } } } })];
+  ok(lockFaults({ ...list, devDependencies: { ...list.devDependencies, x: "^1.0.0" } }, lock).some(f => f.includes('package.json devDependencies: "x" at "^1.0.0", not one exact version')),
+    "a range of npm's registry where one exact version belongs is quoted, since it names no address", JSON.stringify(lockFaults({ ...list, devDependencies: { ...list.devDependencies, x: "^1.0.0" } }, lock)));
+  ok(signedFaults.length > 0 && signedFaults.every(f => !f.includes(user) && !f.includes(pass) && !f.includes("example.invalid"))
+    && signedFaults.some(f => /^package\.json devDependencies: the spec of "x" is not of npm's registry/u.test(f))
+    && signedFaults.some(f => /^package-lock\.json node_modules\/yaml dependencies: the spec of "x" is not of npm's registry/u.test(f)),
+    "a spec that names an address with a sign-in is refused by its field and package, and nothing of the address is quoted", JSON.stringify(signedFaults).replaceAll(user, "<user>").replaceAll(pass, "<pass>"));
   const unsorted = { ...list, devDependencies: Object.fromEntries(Object.entries(list.devDependencies).reverse()) };
   // (an override, as the core's own mutation tool's lock holds one (#581): there alone, at one exact version of npm's
   // registry, as a package of the list is, and no other spec)
@@ -113,6 +125,10 @@ const plainEnv = { ...env };
     [{ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a", license: "MIT" } }, /its license not the registry's/u],
     [{ ...held, "node_modules/spdx-exceptions": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /its folder names another package than its address fetches/u],
     [{ ...held, "node_modules/yaml\\..\\x": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /names no installed package's folder/u],
+    // (a version field that names an address with a sign-in in it, made up from pieces: quoted with the sign-in cut out)
+    [{ "node_modules/yaml": { version: `git+https://${["made", "up"].join("-")}:${["not", "a", "pass"].join("_")}@example.invalid/yaml.git`, resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /its version field git\+https:\/\/example\.invalid\/yaml\.git$/u],
+    // (and a key that is such an address, its sign-in cut out with the rest of the fault)
+    [{ ...held, [`git+https://${["made", "up"].join("-")}:${["not", "a", "pass"].join("_")}@example.invalid/x.git`]: { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /^git\+https:\/\/example\.invalid\/x\.git: a key that names no installed package's folder$/u],
   ];
   const results = await Promise.all(cases.map(([lock]) => tooYoung(lock, held, ask, now)));
   ok(cases.every(([, said], i) => results[i].length === 1 && said.test(results[i][0])) && (await tooYoung(held, held, ask, now)).length === 0
@@ -134,8 +150,12 @@ if (failed) { console.log(`FAIL ${failed} of the lock file's checks above failed
   // version list it, and the install's command names each one: #704)
   const { npmIgnores, npmReadsAll } = await import(pathToFileURL(path.join(root, "scripts/npm-reads.mjs")).href);
   ok(npmIgnores("10.9.9").length === 5 && npmIgnores("11.9.0").join() === "allow-remote,allow-file,allow-directory,min-release-age" && npmIgnores("11.13.0").join() === "allow-remote,allow-file,allow-directory"
-    && npmIgnores("11.14.0").length === 0 && npmIgnores("12.0.0").length === 0 && npmIgnores("").length === 5 && npmIgnores("11.13.9", ["allow-git"]).length === 0 && npmIgnores("11.14.0-pre.0").length === 3 && npmIgnores("11.14.1-pre.0").length === 0 && npmIgnores("eleven").length === 5 && npmReadsAll() === "11.14.0" && npmReadsAll(["allow-git"]) === "11.9.0",
-  "version 10 of npm reads none of the settings, its version 11 reads allow-git from 11.9.0, min-release-age from 11.10.0 and the others from 11.14.0, and an npm whose version cannot be read is taken to read none");
+    && npmIgnores("11.14.1").join() === "allow-remote" && npmIgnores("11.15.0").length === 0 && npmIgnores("12.0.0").length === 0 && npmIgnores("").length === 5 && npmIgnores("11.13.9", ["allow-git"]).length === 0 && npmIgnores("11.14.0-pre.0").length === 3 && npmIgnores("11.15.1-pre.0").length === 0 && npmIgnores("eleven").length === 5 && npmReadsAll() === "11.15.0" && npmReadsAll(["allow-git"]) === "11.9.0",
+  "version 10 of npm reads none of the settings, its version 11 reads allow-git from 11.9.0, min-release-age from 11.10.0, allow-remote from 11.15.0 (11.14 lists it, but refuses the registry's own packages under it: #1262) and the others from 11.14.0, and an npm whose version cannot be read is taken to read none");
+  // (the version the signature check's mend puts in place, which checks-test.mjs holds to the one its refusal names, is
+  // the one npm's single entry in the licence audit names)
+  const audited = json(".github/licences-audit.json").entries.filter(e => /^npm$/u.test(e.name)), [, named] = /--ignore-scripts npm@([^`\s]+)`/u.exec(fs.readFileSync(path.join(root, "scripts/checks.mjs"), "utf8")) ?? [];
+  ok(audited.length === 1 && !!named && audited[0].version === named, "the licence audit names, for the package manager, one entry, at the version the signature check's mend puts in place (#1262)", `${audited.map(e => e.version)} ${named}`);
   // (the .npmrc the copy carries holds the core's own two settings alone, which install.mjs holds it to too)
   const { npmrcOthers } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href), npmrc = fs.readFileSync(path.join(root, ".packages/.npmrc"), "utf8");
   ok(npmrcOthers(npmrc).length === 0, "the core's .npmrc holds nothing but its own two settings, so the install and the signatures' check ask npm's own registry, with no token, proxy or certificate of another's", npmrcOthers(npmrc).join(" | "));
@@ -200,6 +220,15 @@ try {
     const r = call(f, callOf(f)), out = `${r.stdout}${r.stderr}`;
     ok(r.status === (THROWS.has(f) ? 1 : 0) && /(?:did not run[^\n]*|^FAIL): the package \S+ could not be installed in \S+: npm could not be started\. Mend: /mu.test(out) && (THROWS.has(f) || /^::warning::/mu.test(r.stderr)) && !r.stdout.trim() && askedOf() === "all\n" && told(out),
       `${f}, with nothing installed beside the copy, runs the copy's installer once, and where it installs nothing says it did not run and why, ${THROWS.has(f) ? "to its caller" : "as a warning that fails nothing"}, and does not take the project's own package of the name`, `${r.status} ${out}${askedOf()}`);
+  }
+  // (the steps, with nothing installed beside the copy: the copy's installer run once, and where it installs nothing, one
+  // line in place of every step said unread, with why and the mend, failing nothing; #1095, point 2)
+  for (const args of [[], ["--write"], ["--write", "--aside"]]) {
+    fs.rmSync(asked, { force: true });
+    const r = spawnSync(process.execPath, [path.join(copy, "scripts/steps.mjs"), ...args], { cwd: project, encoding: "utf8", timeout: 60000, env });
+    const lines = r.stdout.trim().split("\n"), aside = args.includes("--aside");
+    ok(r.status === 0 && (aside ? !r.stdout.trim() && !r.stderr.trim() : lines.length === 1 && /^The steps were not read: the package \S+ could not be installed in \S+: npm could not be started\. Mend: .*\.$/u.test(lines[0]) && !/\.\.$/u.test(lines[0])) && askedOf() === "all\n",
+      `steps.mjs${args.length ? ` ${args.join(" ")}` : ""}, with nothing installed beside the copy, runs the copy's installer once, and where it installs nothing ${aside ? "runs no writer and says nothing, the sync having said it" : "says so in one line with its mend"}, and fails nothing`, `${r.status} ${r.stdout}${r.stderr}${askedOf()}`);
   }
   // (the code scan, with its engine not installed, on a change it would read: it did not run, and says how to install)
   const g = (...a) => execFileSync("git", a, { cwd: project, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
@@ -516,7 +545,7 @@ try {
   fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify(wrong, null, 2));
   fs.rmSync(path.join(pk, "node_modules"), { recursive: true, force: true });
   const refused = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...env, ...regEnv } });
-  ok(refused.status === 1 && /EINTEGRITY|integrity/iu.test(refused.stderr) && /runs again/u.test(refused.stderr) && /could not be installed .*twice/u.test(refused.stderr) && told(refused.stderr), "an install that fails is run once more, and a second failure fails, saying the mend", refused.stderr);
+  ok(refused.status === 1 && /EINTEGRITY|integrity/iu.test(refused.stderr) && /runs again/u.test(refused.stderr) && /could not be installed .*twice/u.test(refused.stderr) && told(refused.stderr) && !refused.stderr.split("\n").some(l => /^FAIL: /u.test(l) && (l.includes(path.dirname(copy)) || /n[p]m error|_logs|EINTEGRITY/u.test(l))), "an install that fails is run once more, and a second failure fails, saying the mend", refused.stderr);
   const mismatched = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: local });
   ok(mismatched.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "in a project's pull request an install that fails for anything but the registry not answering fails, and tells the job nothing", `${mismatched.status} ${mismatched.stdout}${mismatched.stderr}`);
   // (nor where npm's message echoes a network error's name from what the lock file holds, a version here: #714)
@@ -533,7 +562,7 @@ try {
   // (a registry that does not answer, in a project's pull request, fails nothing: the job is told, and each check after it says it did not run)
   fs.copyFileSync(path.join(root, ".packages/package-lock.json"), path.join(pk, "package-lock.json"));
   const warned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...plainEnv, GITHUB_EVENT_NAME: "pull_request", GITHUB_ENV: jobEnv, [["npm_config_regi", "stry"].join("")]: "http://127.0.0.1:9/", npm_config_fetch_retries: "0", npm_config_cache: path.join(tmp, "empty-cache") } });
-  ok(warned.status === 0 && /^::warning::The core's packages could not be installed .*twice/mu.test(warned.stdout) && /Mend: run this job again/u.test(warned.stdout) && /^CORE_PACKAGES_UNREACHED=1$/mu.test(fs.readFileSync(jobEnv, "utf8")), "in a project's pull request a registry that does not answer twice is a warning, and tells the job's later checks", `${warned.status} ${warned.stdout}${warned.stderr}`);
+  ok(warned.status === 0 && /^::warning::The core's packages could not be installed .*twice/mu.test(warned.stdout) && /Mend: run this job again/u.test(warned.stdout) && /failed too: /u.test(warned.stderr) && !/failed too|127\.0\.0\.1|ECONN/u.test(warned.stdout) && /^CORE_PACKAGES_UNREACHED=1$/mu.test(fs.readFileSync(jobEnv, "utf8")), "in a project's pull request a registry that does not answer twice is a warning, and tells the job's later checks", `${warned.status} ${warned.stdout}${warned.stderr}`);
   // (and PyPI's, for the code scan's engine: pip says in Python's words that it could not connect)
   fs.writeFileSync(jobEnv, "");
   const pipWarned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "pypi"], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...inPr, [["PIP_INDEX", "_URL"].join("")]: "http://127.0.0.1:9/simple", PIP_TIMEOUT: "2", PIP_RETRIES: "1", PIP_NO_CACHE_DIR: "1" } });
@@ -553,7 +582,7 @@ try {
     plant();
     const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), ...names], { cwd: project, encoding: "utf8", timeout: 300000, env });
     unplant();
-    ok(r.status === 1 && said.test(r.stderr) && told(r.stderr), `install.mjs installs nothing where ${what}, saying the mend`, `${r.status} ${r.stdout}${r.stderr}`);
+    ok(r.status === 1 && said.test(r.stderr) && !r.stderr.includes(tmp) && told(r.stderr), `install.mjs installs nothing where ${what}, saying the mend`, `${r.status} ${r.stdout}${r.stderr}`);
   };
   fs.rmSync(path.join(pk, "node_modules"), { recursive: true, force: true });
   refuses("a shrinkwrap stands beside the lock file", () => fs.copyFileSync(path.join(pk, "package-lock.json"), path.join(pk, "npm-shrinkwrap.json")), () => fs.rmSync(path.join(pk, "npm-shrinkwrap.json")), /npm-shrinkwrap\.json stands beside the lock file/u);
@@ -563,7 +592,11 @@ try {
   const copyNpmrc = fs.readFileSync(path.join(pk, ".npmrc"), "utf8");
   refuses("the .npmrc holds a line beside the core's own two settings", () => fs.appendFileSync(path.join(pk, ".npmrc"), `"${["regi", "stry"].join("")}" = https://example.invalid/\n`), () => fs.writeFileSync(path.join(pk, ".npmrc"), copyNpmrc), /holds a line beside the core's own two settings/u);
   const copyList = fs.readFileSync(path.join(pk, "package.json"), "utf8");
-  refuses("the package list names a dependency of git, before npm runs", () => fs.writeFileSync(path.join(pk, "package.json"), JSON.stringify({ ...JSON.parse(copyList), devDependencies: { x: "git+https://example.invalid/x.git" } })), () => fs.writeFileSync(path.join(pk, "package.json"), copyList), /names no version, range or tag of npm's registry/u);
+  refuses("the package list names a dependency of git, before npm runs", () => fs.writeFileSync(path.join(pk, "package.json"), JSON.stringify({ ...JSON.parse(copyList), devDependencies: { x: "git+https://example.invalid/x.git" } })), () => fs.writeFileSync(path.join(pk, "package.json"), copyList), /the spec of "x" is not of npm's registry/u);
+  // (a lock key that is an address with a sign-in in it: the refusal prints it with the sign-in cut out (floor rule 1),
+  // the sign-in made up, built from pieces as the test runs)
+  const keyUser = ["made", "up", "user"].join("-"), keyPass = ["not", "a", "sign", "in"].join("_"), copyLock = fs.readFileSync(path.join(pk, "package-lock.json"), "utf8");
+  refuses("the lock file holds a key that is an address with a sign-in, which it prints with the sign-in cut out", () => { const l = JSON.parse(copyLock); fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify({ ...l, packages: { ...l.packages, [`git+https://${keyUser}:${keyPass}@example.invalid/x.git`]: {} } })); }, () => fs.writeFileSync(path.join(pk, "package-lock.json"), copyLock), new RegExp(`^(?![^]*(?:${keyUser}|${keyPass}))[^]*"git\\+https://example\\.invalid/x\\.git": a key that names no folder`, "u"));
   const elsewhere = path.join(tmp, "elsewhere");
   fs.mkdirSync(elsewhere);
   fs.writeFileSync(path.join(elsewhere, "kept.txt"), "kept\n");

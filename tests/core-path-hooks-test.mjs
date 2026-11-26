@@ -81,7 +81,7 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
     ok(r.status !== 0 && /AGENTS\.md/.test(r.stderr) && /nowhere\.md/.test(r.stderr) && mended(r.stderr), "and fails the project's own pointer that leads nowhere, saying the mend", r.stdout + r.stderr);
     // (and the start hook names what a branch's changed paths call for, its reading script and the core's modules read
     // from the library's commit main pins, in the submodule's repository)
-    for (const f of ["work-saved.sh", "reading.mjs"]) put(lib2, `core/scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(`./${f}`, new URL("../scripts/", import.meta.url))), "utf8"));
+    for (const f of ["work-saved.sh", "reading.mjs", "guards.mjs"]) put(lib2, `core/scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(`./${f}`, new URL("../scripts/", import.meta.url))), "utf8"));
     put(lib2, "core/roles/builder.md", fs.readFileSync(fileURLToPath(new URL("../roles/builder.md", import.meta.url)), "utf8"));
     put(lib2, "core/tasks/notes.md", "# Notes\n\nRead when a note changes: the path `note.txt`.\n");
     git(lib2, "add", "-A"); git(lib2, "commit", "-q", "-m", "the reading script");
