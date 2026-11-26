@@ -13,7 +13,9 @@
 //   nothing that runs after it reads what a build could have changed.
 //
 // Each check runs even where one before it failed, so every failure is said, each with its mend; within the package
-// check a step runs only where the one before passed, as the steps of a job do. It exits 1 where any failed. What it
+// check a step runs only where the one before passed, as the steps of a job do. It exits 1 where any failed; where none
+// failed and a check could not run, since a program it starts is not on this machine, it says so and exits 127, as a
+// shell does for a command not found, so a run of the job elsewhere leaves it unrun, never failed (#1361, point 19). What it
 // does not run: the core's own check of the copy (core.yml), which runs the workflow's own shell and nothing of the
 // repository's, since it is what proves this copy is the core (by hand, node core/scripts/check.mjs runs it from plain
 // git, beside every other check); and personal-terms.yml, which needs a secret. By hand the package checks work in the
@@ -72,7 +74,9 @@ function main() {
   const coreAt = copyAt(root);
   const temp = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "core-checks-"));
   const results = [];
-  const check = (name, fn) => { console.log(`== ${name}`); const passed = fn(); results.push([name, passed]); return passed; };
+  // (a check that failed where a program it starts could not be found, and nothing it started failed, did not run:
+  // #1361, point 19)
+  const check = (name, fn) => { console.log(`== ${name}`); const { lacked, broke } = starts, passed = fn(); results.push([name, passed, !passed && starts.lacked > lacked && starts.broke === broke]); return passed; };
   try {
     // (first, each NuGet call's lookup of the packages new to the project, floor topic 15: before any part runs a
     // restore, which runs the pull request's own build files, so that no config's restore runs before another's lookup)
@@ -80,9 +84,11 @@ function main() {
     // (each part once for each call that runs it with settings of its own, as two calls for two lock files' folders)
     for (const part of PARTS.filter(p => o.parts.includes(p))) for (const settings of runsOf(o, part)) RUN[part]({ ...o, ...settings }, { coreAt, temp, check });
   } finally { fs.rmSync(temp, { recursive: true, force: true }); }
-  const failed = results.filter(([, passed]) => !passed).map(([name]) => name);
-  console.log(failed.length ? `${failed.length} of ${results.length} checks failed, each saying its mend above: ${failed.join("; ")}` : `ok   ${results.length} checks passed`);
-  process.exitCode = failed.length ? 1 : 0;
+  const failed = results.filter(([, passed, unrun]) => !passed && !unrun).map(([name]) => name);
+  const unrun = results.filter(([, , u]) => u).map(([name]) => name), wants = [...lacking].join(", ");
+  if (unrun.length) console.log(`FAIL ${unrun.length} of ${results.length} checks could not run here, since this machine lacks ${wants}: ${unrun.join("; ")}. ${MEND}install ${wants} on this machine, or run the job where it is (the host's runners), and run this again.`);
+  console.log(failed.length ? `${failed.length} of ${results.length} checks failed, each saying its mend above: ${failed.join("; ")}` : `ok   ${results.length - unrun.length} checks passed`);
+  process.exitCode = failed.length ? 1 : unrun.length ? 127 : 0;
 }
 
 // Where the copy of the core stands, from the project's root, ending in "/": as the workflow's step read it from the
@@ -188,11 +194,22 @@ function baseCommit(base, exits = true) {
   throw new Error(`FAIL ${what} ${MEND}${mend}`);
 }
 
+// The programs a check could not start, since they are not on this machine, and how many times one was not found and
+// one started failed, so that a check is read as not run only where it lacked a program and nothing it started failed
+// (#1361, point 19).
+const lacking = new Set(), starts = { lacked: 0, broke: 0 };
+// Whether a program started and passed; one that could not be started is said so, and one not found noted as lacking
+// (Node says ENOENT for a folder to run in that is not there too, which is no program lacking).
+function begun(r, what, cwd) {
+  if (!r.error) { if (r.status !== 0) starts.broke++; return r.status === 0; }
+  console.log(`${what} could not be started (${r.error.message}).`);
+  if (r.error.code === "ENOENT" && (!cwd || fs.existsSync(cwd))) { lacking.add(String(r.error.path)); starts.lacked++; }
+  return false;
+}
 // A program run with the variables given added to this script's own, its output passed on; whether it passed.
 function run(cmd, args, { env = {}, cwd = undefined } = {}) {
   const r = spawnSync(cmd, args, { cwd, env: { ...process.env, ...env }, stdio: ["ignore", "inherit", "inherit"], shell: false });
-  if (r.error) console.log(`${cmd} could not be started (${r.error.message}).`);
-  return r.status === 0;
+  return begun(r, cmd, cwd);
 }
 const node = (coreAt, script, args, opts) => run(process.execPath, [`${coreAt}scripts/${script}`, ...args], opts);
 // The registry's packages installed from the lock file, running no package's install script, and their signatures
@@ -200,7 +217,7 @@ const node = (coreAt, script, args, opts) => run(process.execPath, [`${coreAt}sc
 const shown = { stdio: ["ignore", "inherit", "inherit"] };
 // (Windows' shell, by the path the system names, never a cmd.exe the checked-out folder holds)
 const COMSPEC = process.env.ComSpec || "cmd.exe";
-const passed = r => { if (r.error) console.log(`The package manager could not be started (${r.error.message}).`); return r.status === 0; };
+const passed = (r, cwd) => begun(r, "The package manager", cwd);
 // (only under an npm that reads each setting that keeps the install to the registry: an older one, npm 10 that Node 22
 // brings among them, ignores them without a word and would fetch any git, web or file source the lock file names; #704)
 const ALLOWS = ["allow-git", "allow-remote", "allow-file"];
@@ -214,9 +231,9 @@ function unread(cwd) {
 }
 const install = cwd => !unread(cwd) && passed(process.platform === "win32"
   ? spawnSync(COMSPEC, ["/d", "/s", "/c", "npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none"], { cwd, ...shown })
-  : spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none"], { cwd, ...shown }));
+  : spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none"], { cwd, ...shown }), cwd);
 const signed = cwd => passed(process.platform === "win32" ? spawnSync(COMSPEC, ["/d", "/s", "/c", "npm audit signatures"], { cwd, ...shown })
-  : spawnSync("npm", ["audit", "signatures"], { cwd, ...shown }));
+  : spawnSync("npm", ["audit", "signatures"], { cwd, ...shown }), cwd);
 
 // Where advisory, a failure said and passed.
 const advised = o => passed => { if (passed) return true; if (!o.advisory) return false; console.log("Advisory: nothing fails for it yet."); return true; };
@@ -298,7 +315,7 @@ const RUN = {
           if (!run("dotnet", ["restore", "--locked-mode", ...from, `-p:RestorePackagesPath=${packages}`, "-p:NuGetLockFilePath=", `./${project}`], { env: { NUGET_PACKAGES: packages, ...dotnet } })) passed = false;
         }
       }
-      if (!passed) console.log(`FAIL A restore from a lock file failed (dotnet's errors above): the lock file is not what the project file asks for, a package is not what its lock file names or comes from no source named here (floor rules 7 and 15), or the config names its sources wrongly. ${MEND}where the project file changed, write its lock file anew (dotnet restore --force-evaluate) and commit it, never to take in a package whose content differs from what its lock file names; take out a package no source named in the config serves; or correct the config's sources.`);
+      if (!passed && !lacking.has("dotnet")) console.log(`FAIL A restore from a lock file failed (dotnet's errors above): the lock file is not what the project file asks for, a package is not what its lock file names or comes from no source named here (floor rules 7 and 15), or the config names its sources wrongly. ${MEND}where the project file changed, write its lock file anew (dotnet restore --force-evaluate) and commit it, never to take in a package whose content differs from what its lock file names; take out a package no source named in the config serves; or correct the config's sources.`);
       return verdict(passed);
     })) return;
     check("Every package one exact version, and under a licence on its list", () => node(coreAt, "nuget.mjs", [o.nuget, "--packages", packages, ...advisory], { env: { NUGET_PACKAGES: packages } }));
