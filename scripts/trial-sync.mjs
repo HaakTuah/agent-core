@@ -18,7 +18,7 @@ export function answerOf(text, sha) {
   // (an answer that names another commit is refused whatever its form, never counted not proved; one that names none
   // is no answer in its form)
   if (a !== null && typeof a === "object" && Object.hasOwn(a, "commit") && a.commit !== sha) return { why: `answers for ${String(a.commit).slice(0, 7)}, not the commit tried, ${sha.slice(0, 7)}` };
-  if (a === null || typeof a !== "object" || a.commit !== sha || typeof a.pure !== "boolean" || !FROM.test(String(a.from))) return { none: true, why: `holds no line \`${LINE}\` as pure-sync.mjs --trial prints it` };
+  if (a === null || typeof a !== "object" || a.commit !== sha || typeof a.pure !== "boolean" || typeof a.from !== "string" || !FROM.test(a.from)) return { none: true, why: `holds no line \`${LINE}\` as pure-sync.mjs --trial prints it` };
   return { answer: { pure: a.pure, from: a.from } };
 }
 
