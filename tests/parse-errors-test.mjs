@@ -20,6 +20,7 @@ import { parseToml } from "../scripts/toml.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
 import { check, duplicateKeys, failuresOf, outside, repoRoot, toRead, trackedJson } from "../scripts/json-keys.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 600).replace(/\n/g, "\n     ")}`}`); } };
@@ -213,8 +214,8 @@ for (const [text, lines, what] of [
 }
 {
   // A link is not read, so a key of a file outside the repository is never said; nor a dated record or a lock file.
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "json-keys-"));
-  try {
+  const dir = scratchDir("json-keys-");
+  {
     fs.mkdirSync(path.join(dir, "repo", "sub"), { recursive: true });
     fs.writeFileSync(path.join(dir, "outside.json"), '{"a": 1, "a": 2}');
     fs.writeFileSync(path.join(dir, "repo", "sub", "kept.json"), '{"a": 1}');
@@ -231,7 +232,7 @@ for (const [text, lines, what] of [
     // outside a repository the check fails with its mend, having read nothing
     const top = repoRoot(dir);
     ok(top === null ? mended(outside(dir)) && outside(dir).includes("no git repository") && !outside(dir).includes(os.tmpdir()) : top !== path.join(dir, "repo"), "a folder in no git repository is told, and its failure says the mend", String(top));
-  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  }
 }
 {
   const said = trackedJson(root).flatMap(f => failuresOf(f, fs.readFileSync(path.join(root, f), "utf8")));
