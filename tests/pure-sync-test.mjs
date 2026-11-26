@@ -290,10 +290,10 @@ fs.writeFileSync(path.join(silent, "gh"), "#!/bin/sh\necho 'gh: not signed in' >
 // (the read with no sign-in sent to a proxy that is not there, so it gives no answer and nothing leaves this machine;
 // a stranger's repository of the stand-in's name never answers for it; #1246)
 const offline = { HTTPS_PROXY: "http://127.0.0.1:9", https_proxy: "http://127.0.0.1:9", NO_PROXY: "", no_proxy: "" };
-const unanswered = given => {
+const unanswered = (given, ...args) => {
   git(p, "remote", "set-url", "origin", GH_ORIGIN);
   try {
-    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, ...offline, ...given, [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs"), ...args], { cwd: p, env: { ...env, ...offline, ...given, [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
     return `${r.status}\n${r.stdout}${r.stderr}`;
   } finally { git(p, "remote", "set-url", "origin", origin); }
 };
@@ -301,6 +301,11 @@ for (const [given, what] of [[{ CORE_HOST_ANSWERS: hostSays() }, "the test's sta
   const out = unanswered(given);
   ok(/^1\n/.test(out) && /NOT PURE[^\n]*AGENTS\.md: the project's kind or values cannot be read/.test(out), `  and with only ${what} answering, which the proof does not honour, it is not proved`, out);
 }
+// (a trial's reading, which proves no merge, takes the answer given as CORE_PRIVATE where the host gave none, and says
+// so; never the test's stand-in: #1361, point 16)
+const pinned = /[0-9a-f]{40}/u.exec(read(p, "core-manifest.md"))[0], givenTrial = unanswered({ CORE_PRIVATE: "false" }, "--trial", pinned), standInTrial = unanswered({ CORE_HOST_ANSWERS: hostSays() }, "--trial", pinned);
+ok(/^1\n/.test(givenTrial) && !/kind or values cannot be read/.test(givenTrial) && /^read as public from CORE_PRIVATE, as the host gave this machine no answer$/mu.test(givenTrial) && /^trial answer: \{"commit":"[0-9a-f]{40}","pure":true/mu.test(givenTrial) && !givenTrial.includes("sha=")
+  && /NOT PURE[^\n]*kind or values cannot be read/.test(standInTrial) && !/from CORE_PRIVATE/.test(standInTrial), "  a trial's reading takes CORE_PRIVATE where the host gave no answer, and says so, never the test's stand-in", `${givenTrial}\n${standInTrial}`);
 git(p, "push", "-q", "-f", "origin", `${base}:main`);
 git(p, "checkout", "-q", "sync");
 git(p, "reset", "-q", "--hard", LEGIT);
