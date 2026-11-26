@@ -23,6 +23,6 @@ export const host = (over = {}) => route => {
   if (route.startsWith(`repos/o/p/commits/${HEAD}/check-runs`)) return over.short ? { body: { check_runs: draftRuns, total_count: draftRuns.length + 1 } } : page(route, "check_runs", draftRuns);
   if (route.startsWith(`repos/o/p/actions/runs?head_sha=${HEAD}`)) return page(route, "workflow_runs", [...(over.unstarted ? [{ name: "audit", status: "completed", conclusion: "startup_failure" }] : []), ...(over.queued ? [{ name: "review", status: "queued", conclusion: null }] : []), { name: "tests", status: "completed", conclusion: "success" }, ...(over.draftFlows ?? [])]);
   if (route.startsWith(`repos/o/p/actions/runs?head_sha=${MAIN}`)) return page(route, "workflow_runs", [...(over.unstarted === "both" ? [{ name: "audit", status: "completed", conclusion: "startup_failure" }] : []), ...(over.mainWaits ? [{ name: over.mainWaits, status: "waiting", conclusion: null }] : []), ...(over.mainQueued ? [{ name: "tests", status: "queued", conclusion: null }] : []), ...(over.mainFlows ?? [])]);
-  if (/\/status\?/.test(route)) return page(route, "statuses", []);
+  if (/\/status\?/.test(route)) return page(route, "statuses", route.includes(HEAD) ? over.draftStatuses ?? [] : over.mainStatuses ?? []);
   return { why: "no such route in the stand-in" };
 };

@@ -15,7 +15,7 @@
 //         builder read as failing, or skipping after passing on main, only for being a draft (setup/sync-notes/680):
 //         counted apart, holding nothing, named on its own line. A check run is named `<workflow>: <job>` where GitHub ties it
 //         to a workflow run, so the same job name in two workflows is two checks, and `--gate` takes that name; one GitHub ties
-//         to none (an app's) named as a workflow's job is named `<its name> (no workflow)`.
+//         to none (an app's), or a status, named as a workflow's job is named `<its name> (no workflow)`.
 //   node scripts/trial-draft.mjs <owner>/<name> none <the commit tried>
 //         where no draft was opened: reads why (another owner's, a stop switch that stands) and prints it as the answer;
 //         none for a repository whose manifest pins no copy of this core or could not be read, or the owner's own
