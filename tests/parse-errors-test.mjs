@@ -18,7 +18,7 @@ import { load } from "../scripts/parser.mjs";
 import { LARGEST, budgetOf, parseWithin } from "../scripts/tree-walk.mjs";
 import { parseToml } from "../scripts/toml.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
-import { duplicateKeys, failuresOf, toRead, trackedJson } from "../scripts/json-keys.mjs";
+import { check, duplicateKeys, failuresOf, outside, repoRoot, toRead, trackedJson } from "../scripts/json-keys.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0, count = 0;
@@ -222,6 +222,13 @@ for (const [text, lines, what] of [
     try { fs.symlinkSync(path.join(dir, "outside.json"), path.join(dir, "repo", "link.json")); } catch { linked = false; }
     const read = toRead(path.join(dir, "repo"), ["sub/kept.json", "link.json", "archive/x.json", "words/y.json", "a/package-lock.json", ""]);
     ok(read.join() === "sub/kept.json", `a link, a dated record and a lock file are not read${linked ? "" : " (no link could be made here)"}`, read.join());
+    // a file named by its absolute path is read as itself, from whatever root, and only the files read are counted
+    fs.writeFileSync(path.join(dir, "twice.json"), '{"a": 1, "a": 2}');
+    const named = check(path.join(dir, "repo"), [path.join(dir, "twice.json"), "sub/kept.json", "gone.json"]);
+    ok(named.read === 2 && named.failures.length === 1 && named.failures[0].includes("twice.json"), "a file named by its absolute path is read, and a file not there is not counted", JSON.stringify(named));
+    // outside a repository the check fails with its mend, having read nothing
+    const top = repoRoot(dir);
+    ok(top === null ? mended(outside(dir)) && outside(dir).includes("no git repository") : top !== path.join(dir, "repo"), "a folder in no git repository is told, and its failure says the mend", String(top));
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 {

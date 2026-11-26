@@ -1,6 +1,7 @@
 // Fails a key that stands twice in one object of a JSON file the core reads (#1367): JSON.parse keeps the last and drops
 // the first without a word, so a list such as .github/sizes.json reads as two marks while one counts and no one can tell
-// which. Every tracked file ending .json is read, but the dated records (archive/, words/), lock files, which a tool writes,
+// which. Every tracked file ending .json is read, but the dated records whose words stay as written (archive/, words/;
+// the lists of reports/, which scripts read, are read), lock files, which a tool writes,
 // and a link, which may point out of the repository; a file that is no JSON is left to the readers of it. Node's own
 // modules only.
 //
@@ -71,18 +72,29 @@ export function failuresOf(file, text) {
   return duplicateKeys(text).map(d => `FAIL ${name} holds the key "${clip(d.key)}" twice in one object, at lines ${d.first} and ${d.again}, and JSON.parse keeps only the last. Mend: keep the key once in ${name}, with the value meant, and take the other out; where the two differ, keep the one the readers use now (the last)`);
 }
 
+// The top folder of the git repository `cwd` is in, or null where it is in none.
+export function repoRoot(cwd = process.cwd()) {
+  try { return execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return null; }
+}
+export const outside = dir => `FAIL ${clip(dir)} is in no git repository, so no tracked JSON file could be read. Mend: run the check from inside the repository, or name the files to read`;
+
+// The files of `files` that stand, read from `root` (a path that is absolute stays itself), and what their duplicates say.
+export function check(root, files) {
+  let read = 0;
+  const failures = files.flatMap(f => {
+    let text;
+    try { text = fs.readFileSync(path.resolve(root, f), "utf8"); } catch (e) { if (e?.code === "ENOENT") return []; throw e; }
+    read++;
+    return failuresOf(f, text);
+  });
+  return { read, failures };
+}
+
 if (started(import.meta.url)) {
-  const named = process.argv.slice(2);
-  let root = process.cwd();
-  if (!named.length) {
-    try { root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch {
-      console.error(`FAIL ${clip(root)} is in no git repository, so no tracked JSON file could be read. Mend: run the check from inside the repository, or name the files to read`);
-      process.exit(1);
-    }
-  }
-  const files = named.length ? named : trackedJson(root);
-  const out = files.flatMap(f => { try { return failuresOf(f, fs.readFileSync(path.join(root, f), "utf8")); } catch (e) { if (e?.code === "ENOENT") return []; throw e; } });
-  for (const line of out) console.error(line);
-  if (out.length) process.exit(1);
-  console.log(`ok   ${files.length} JSON files hold no key twice in one object`);
+  const named = process.argv.slice(2), root = named.length ? process.cwd() : repoRoot();
+  if (root === null) { console.error(outside(process.cwd())); process.exit(1); }
+  const { read, failures } = check(root, named.length ? named : trackedJson(root));
+  for (const line of failures) console.error(line);
+  if (failures.length) process.exit(1);
+  console.log(`ok   ${read} JSON files hold no key twice in one object`);
 }
