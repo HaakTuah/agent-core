@@ -1,4 +1,0 @@
-{
-  "_": "The toolchains a release's trial fetches for a project that pins them (scripts/toolchain.mjs; AGENTS.md, \"The trial's machine fetches what a project pins\"; #1361, point 21): each .NET SDK version for each machine, its download from the publisher's own host and the SHA-512 the publisher's release notes give for it, added in a pull request of the core as `node scripts/toolchain.mjs --entry <version>` prints it. A version or machine with no entry here is never fetched. tests/toolchain-test.mjs reads each entry's form.",
-  "dotnet-sdk": []
-}

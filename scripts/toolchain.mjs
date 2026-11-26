@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 // The toolchain a project pins, fetched for a release's trial at set-up (#1361, point 21; AGENTS.md, "The trial's machine
-// fetches what a project pins"), as scripts/node.sh fetches Node: one exact version, taken only where the core's list,
-// scripts/toolchains.json beside this file, holds its checksum for this machine, and checked against it before anything
-// of it runs. The one pin it reads is the .NET SDK a project's global.json names ("sdk": { "version" }), at that exact
+// fetches what a project pins"), as scripts/node.sh fetches Node: one exact version, taken only where the list SDKS
+// below holds its checksum for this machine, and checked against it before anything of it runs. The one pin it reads is the .NET SDK a project's global.json names ("sdk": { "version" }), at that exact
 // version, which meets any "rollForward" the file sets. It goes to a folder of its own under the home folder, outside
 // every repository, never over the machine's own; the line it prints says what to set for the trial's runs. Where the
 // machine's own dotnet already lists that SDK, it fetches nothing. A version or a machine the list holds no sum for, a
@@ -13,8 +12,9 @@
 // machine's curl and tar.
 //
 //   node <core>/scripts/toolchain.mjs [<project folder>]   fetch what the project pins (default: the current folder)
-//   node <core>/scripts/toolchain.mjs --entry <version>    print the list's entries for that SDK, read from the
-//                                                          publisher's release notes, for a pull request of the core
+//   node <core>/scripts/toolchain.mjs --entry <version>    print the list's entries for that SDK from the publisher's
+//                                                          release notes for its channel, given on standard input (as
+//                                                          the mend below names them), for a pull request of the core
 import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -22,13 +22,21 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-export const LIST = path.join(HERE, "toolchains.json");
 export const HOST = "builds.dotnet.microsoft.com";
 const VERSION = /^\d+\.\d+\.\d{3,}(?:-[0-9A-Za-z.-]+)?$/u;
 const RIDS = { "linux-x64": ["linux", "x64"], "linux-arm64": ["linux", "arm64"] };
 const urlOf = (version, rid) => `https://${HOST}/dotnet/Sdk/${version}/dotnet-sdk-${version}-${rid}.tar.gz`;
-const MEND_LIST = "Mend: add its entries to scripts/toolchains.json in a pull request of the core, as `node scripts/toolchain.mjs --entry <the version>` prints them from the publisher's release notes, then run this again from a clone of the core that holds them";
+const notesOf = (channel) => `https://${HOST}/dotnet/release-metadata/${channel}/releases.json`;
+const MEND_LIST = "Mend: add its entries to SDKS in scripts/toolchain.mjs in a pull request of the core, as `node scripts/toolchain.mjs --entry <the version>` prints them from the publisher's release notes for its channel, given on standard input, then run this again from a clone of the core that holds them";
+
+// The list: each .NET SDK version for each machine, its download from the publisher's own host and the SHA-512 the
+// publisher's release notes give for it, as --entry prints them, the review reading them against the same notes. A
+// version or machine with no entry here is never fetched. 10.0.404, the newest SDK of the newest long-term line, read on
+// 26 November 2026, its linux-x64 archive's sum checked against the file the same day.
+export const SDKS = [
+  { version: "10.0.404", rid: "linux-x64", url: "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-linux-x64.tar.gz", sha512: "577d0eb17fec33d029104c5c63a1ab0accc3e28776274abef2218dbac5af18d2109b5406d26b31d76f5c245215e3ba0926a94c20246c672c41847c9e1eb1dc50" },
+  { version: "10.0.404", rid: "linux-arm64", url: "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-linux-arm64.tar.gz", sha512: "3533a3869da219cac45c567aadac3d8e96cdf1c6a04fe1c1d5fdeefea5d45af8424488f0144730d11b4a751f7ad546fb11e4c2b2725cd8401efee726711f8f11" },
+];
 
 // Each entry of the list in its one form, the URL the publisher's own for that version and machine: what is wrong, or "".
 export function formed(entry) {
@@ -42,16 +50,14 @@ export function formed(entry) {
   return "";
 }
 
-// The list: { "dotnet-sdk": [entries] }, each formed, no version and machine twice. Throws where it is not so.
-export function readList(file = LIST) {
-  const list = JSON.parse(fs.readFileSync(file, "utf8"));
-  const entries = list?.["dotnet-sdk"];
-  if (!Array.isArray(entries)) throw new Error(`${file} holds no list "dotnet-sdk"`);
+// The list's entries, each formed, no version and machine twice. Throws where it is not so.
+export function readList(entries = SDKS) {
+  if (!Array.isArray(entries)) throw new Error("the list is not a list");
   const seen = new Set();
   for (const e of entries) {
     const wrong = formed(e);
-    if (wrong) throw new Error(`${file}: ${wrong}`);
-    if (seen.has(`${e.version} ${e.rid}`)) throw new Error(`${file}: ${e.version} for ${e.rid} stands twice`);
+    if (wrong) throw new Error(wrong);
+    if (seen.has(`${e.version} ${e.rid}`)) throw new Error(`${e.version} for ${e.rid} stands twice`);
     seen.add(`${e.version} ${e.rid}`);
   }
   return entries;
@@ -114,7 +120,7 @@ function install(entry, root, env) {
 
 // Fetch what the project pins; the lines to print. `env` is the environment curl, tar and dotnet are found by (PATH),
 // and `home` the folder under which the toolchain goes.
-export function fetchPinned({ project = process.cwd(), list = LIST, home = os.homedir(), env = process.env, platform = process.platform, arch = process.arch } = {}) {
+export function fetchPinned({ project = process.cwd(), list = SDKS, home = os.homedir(), env = process.env, platform = process.platform, arch = process.arch } = {}) {
   const place = placed({ project, home, env, platform, arch });
   if (place.said) return [place.said];
   const { version, rid, root } = place;
@@ -122,9 +128,9 @@ export function fetchPinned({ project = process.cwd(), list = LIST, home = os.ho
   const dotnet = path.join(root, "dotnet");
   if (fs.existsSync(dotnet) && run(dotnet, ["--version"], env).stdout?.trim() === version) return [`toolchain: the .NET SDK ${version} present in ${root}; ${exported}`];
   let entries;
-  try { entries = readList(list); } catch (e) { return [`NOT FETCHED: the .NET SDK ${version} (the core's list could not be read: ${e.message}). Mend: make the list as tests/toolchain-test.mjs reads it.`]; }
+  try { entries = readList(list); } catch (e) { return [`NOT FETCHED: the .NET SDK ${version} (the core's list could not be read: ${e.message}). Mend: make SDKS in scripts/toolchain.mjs as tests/toolchain-test.mjs reads it.`]; }
   const entry = entries.find(e => e.version === version && e.rid === rid);
-  if (!entry) return [`NOT FETCHED: the .NET SDK ${version} for ${rid} (the core's list, scripts/toolchains.json, holds no checksum for it). ${MEND_LIST}.`];
+  if (!entry) return [`NOT FETCHED: the .NET SDK ${version} for ${rid} (the core's list, SDKS in scripts/toolchain.mjs, holds no checksum for it). ${MEND_LIST}.`];
   const wrong = install(entry, root, env);
   return [wrong ? `NOT FETCHED: the .NET SDK ${version} (${wrong}` : `toolchain: the .NET SDK ${version} fetched to ${root}, its SHA-512 as the list holds it; ${exported}`];
 }
@@ -146,11 +152,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const version = args[1] ?? "";
     if (!VERSION.test(version)) { console.error(`FAIL ${JSON.stringify(version)} is not an SDK's exact version. Mend: give it as global.json names it, such as 8.0.404.`); process.exit(1); }
     const channel = version.split(".").slice(0, 2).join(".");
-    const got = run("curl", ["-fsS", "--proto", "=https", "--connect-timeout", "30", "--max-time", "120", `https://${HOST}/dotnet/release-metadata/${channel}/releases.json`], process.env);
     let entries = [];
-    try { entries = got.status === 0 ? entriesFrom(JSON.parse(got.stdout), version) : []; } catch { entries = []; }
-    if (!entries.length) { console.error(`FAIL the publisher's release notes for ${channel} gave no entry for the SDK ${version}${got.status === 0 ? "" : ` (${HOST} did not answer)`}. Mend: check the version against the notes at https://${HOST}/dotnet/release-metadata/${channel}/releases.json, and run this where that host answers.`); process.exit(1); }
-    console.log(entries.map(e => JSON.stringify(e)).join(",\n"));
+    try { entries = entriesFrom(JSON.parse(fs.readFileSync(0, "utf8")), version); } catch { entries = []; }
+    if (!entries.length) { console.error(`FAIL the release notes given on standard input hold no entry for the SDK ${version}. Mend: give it the publisher's notes for its channel, ${notesOf(channel)}, saved where that host answers, on standard input, and check the version against them.`); process.exit(1); }
+    console.log(entries.map(e => `  ${JSON.stringify(e).replace(/"(\w+)":/gu, "$1: ").replace(/,(\w+): /gu, ", $1: ").replace(/^\{/u, "{ ").replace(/\}$/u, " }")},`).join("\n"));
   } else {
     for (const line of fetchPinned({ project: path.resolve(args[0] ?? ".") })) console.log(line);
   }

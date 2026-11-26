@@ -20,7 +20,7 @@ const url = (v = V, rid = RID) => `https://${HOST}/dotnet/Sdk/${v}/dotnet-sdk-${
 
 // (the core's own list, read whole, and the form each entry is held to)
 const own = readList();
-ok(Array.isArray(own), "the core's list, scripts/toolchains.json, is read whole, each entry in its form", `${own.length} entries`);
+ok(own.length > 0, "the core's list, SDKS in scripts/toolchain.mjs, is read whole, each entry in its form", `${own.length} entries`);
 const good = { version: V, rid: RID, url: url(), sha512: "a".repeat(128) };
 ok(formed(good) === "", "an entry with the version, the machine, the publisher's own URL for both and a SHA-512 is formed");
 const wrong = [{ ...good, url: url().replace(HOST, "example.com") }, { ...good, url: url().replace("https:", "http:") }, { ...good, url: url("8.0.405") },
@@ -30,10 +30,8 @@ ok(wrong.every(e => formed(e) !== ""), "an entry whose URL is another host's, no
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "toolchain-test-"));
 const write = (file, text, mode) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); if (mode) fs.chmodSync(file, mode); return file; };
-const twice = path.join(root, "twice.json");
-write(twice, JSON.stringify({ "dotnet-sdk": [good, good] }));
 let threw = "";
-try { readList(twice); } catch (e) { threw = e.message; }
+try { readList([good, good]); } catch (e) { threw = e.message; }
 ok(/stands twice/u.test(threw), "a list holding one version and machine twice is refused", threw);
 
 // (the pin: global.json's sdk.version, exact; none, or one not read)
@@ -77,22 +75,21 @@ else {
     return { env: { ...process.env, PATH: dir }, log: () => (fs.existsSync(log) ? fs.readFileSync(log, "utf8") : null) };
   };
   const project = (name, version = V) => { const dir = path.join(root, `project-${name}`); write(path.join(dir, "global.json"), JSON.stringify({ sdk: { version, rollForward: "disable" } })); return dir; };
-  const list = (name, entries) => write(path.join(root, `list-${name}.json`), JSON.stringify({ "dotnet-sdk": entries }));
   const home = name => path.join(root, `home-${name}`);
   const nothingIn = name => { const dir = path.join(home(name), ".agent-core", "toolchains"); return !fs.existsSync(dir) || fs.readdirSync(dir).length === 0; };
   const linux = { platform: "linux", arch: "x64" };
 
   const none = bin("none", { give: right.file });
-  const noPin = fetchPinned({ project: path.join(root, "pin-0"), list: list("none", []), home: home("none"), env: none.env, ...linux });
+  const noPin = fetchPinned({ project: path.join(root, "pin-0"), list: [], home: home("none"), env: none.env, ...linux });
   ok(/pins no toolchain/u.test(noPin.join()) && none.log() === null, "a project that pins no SDK fetches nothing", noPin.join());
 
   const unlisted = bin("unlisted", { give: right.file });
-  const said = fetchPinned({ project: project("unlisted"), list: list("unlisted", []), home: home("unlisted"), env: unlisted.env, ...linux }).join();
-  ok(/^NOT FETCHED: the \.NET SDK 8\.0\.404 for linux-x64 \(the core's list, scripts\/toolchains\.json, holds no checksum for it\)\. Mend: .*--entry/u.test(said) && unlisted.log() === null,
+  const said = fetchPinned({ project: project("unlisted"), list: [], home: home("unlisted"), env: unlisted.env, ...linux }).join();
+  ok(/^NOT FETCHED: the \.NET SDK 8\.0\.404 for linux-x64 \(the core's list, SDKS in scripts\/toolchain\.mjs, holds no checksum for it\)\. Mend: .*--entry/u.test(said) && unlisted.log() === null,
     "a pin the list holds no sum for is never fetched, and its mend says how the entry is added", said);
 
   const fetched = bin("fetched", { give: right.file });
-  const at = { project: project("fetched"), list: list("fetched", [{ ...good, sha512: right.sum }]), home: home("fetched"), env: fetched.env, ...linux };
+  const at = { project: project("fetched"), list: [{ ...good, sha512: right.sum }], home: home("fetched"), env: fetched.env, ...linux };
   const first = fetchPinned(at).join(), sdk = path.join(home("fetched"), ".agent-core", "toolchains", `dotnet-sdk-${V}-${RID}`);
   ok(/^toolchain: the \.NET SDK 8\.0\.404 fetched to .*export DOTNET_ROOT=/u.test(first) && fs.existsSync(path.join(sdk, "dotnet")) && fs.existsSync(path.join(sdk, "sdk", V, "dotnet.dll")),
     "a listed pin is fetched to its own folder under the home folder, outside the project, checked by its sum, with what to set for the trial's runs", first);
@@ -103,30 +100,30 @@ else {
   ok(/present in/u.test(again) && fetched.log().trim().split("\n").length === 1, "run twice, it finds the SDK present and fetches nothing again", again);
 
   const differs = bin("differs", { give: other.file });
-  const bad = fetchPinned({ project: project("differs"), list: list("differs", [{ ...good, sha512: right.sum }]), home: home("differs"), env: differs.env, ...linux }).join();
+  const bad = fetchPinned({ project: project("differs"), list: [{ ...good, sha512: right.sum }], home: home("differs"), env: differs.env, ...linux }).join();
   ok(/^NOT FETCHED: .*SHA-512 is [0-9a-f]{128}, not the list's .*Mend: tell the owner/u.test(bad) && nothingIn("differs"),
     "a download whose sum differs from the list's is never opened, and nothing is installed", bad);
 
   const refused = bin("refused", { fail: true });
-  const host = fetchPinned({ project: project("refused"), list: list("refused", [{ ...good, sha512: right.sum }]), home: home("refused"), env: refused.env, ...linux }).join();
+  const host = fetchPinned({ project: project("refused"), list: [{ ...good, sha512: right.sum }], home: home("refused"), env: refused.env, ...linux }).join();
   ok(/^NOT FETCHED: .*did not give it: curl: \(56\).*only the owner can allow it.*reads alike before and after the update/u.test(host) && nothingIn("refused"),
     "a host the network refuses fetches nothing, and the mend says only the owner widens it", host);
 
   const lies = bin("lies", { give: other.file });
-  const another = fetchPinned({ project: project("lies"), list: list("lies", [{ ...good, sha512: other.sum }]), home: home("lies"), env: lies.env, ...linux }).join();
+  const another = fetchPinned({ project: project("lies"), list: [{ ...good, sha512: other.sum }], home: home("lies"), env: lies.env, ...linux }).join();
   ok(/^NOT FETCHED: .*its dotnet gave "8\.0\.100"/u.test(another) && nothingIn("lies"), "a binary that gives another version is not installed", another);
 
   const machine = bin("machine", { give: right.file, machine: true });
-  const kept = fetchPinned({ project: project("machine"), list: list("machine", [{ ...good, sha512: right.sum }]), home: home("machine"), env: machine.env, ...linux }).join();
+  const kept = fetchPinned({ project: project("machine"), list: [{ ...good, sha512: right.sum }], home: home("machine"), env: machine.env, ...linux }).join();
   ok(/is the machine's own; nothing fetched/u.test(kept) && machine.log() === null, "where the machine's own dotnet lists the SDK, nothing is fetched", kept);
 
   const elsewhere = bin("elsewhere", { give: right.file });
-  const mac = fetchPinned({ project: project("elsewhere"), list: list("elsewhere", [{ ...good, sha512: right.sum }]), home: home("elsewhere"), env: elsewhere.env, platform: "darwin", arch: "arm64" }).join();
+  const mac = fetchPinned({ project: project("elsewhere"), list: [{ ...good, sha512: right.sum }], home: home("elsewhere"), env: elsewhere.env, platform: "darwin", arch: "arm64" }).join();
   ok(/^NOT FETCHED: .*darwin on arm64, is none the list holds sums for/u.test(mac) && elsewhere.log() === null, "a machine the list holds no sums for fetches nothing", mac);
 
   const within = bin("within", { give: right.file });
   const dir = project("within");
-  const inside = fetchPinned({ project: dir, list: list("within", [{ ...good, sha512: right.sum }]), home: dir, env: within.env, ...linux }).join();
+  const inside = fetchPinned({ project: dir, list: [{ ...good, sha512: right.sum }], home: dir, env: within.env, ...linux }).join();
   ok(/would stand inside the project/u.test(inside) && within.log() === null, "a home folder inside the project fetches nothing there", inside);
 
   // (the entries --entry prints, from the publisher's release notes)

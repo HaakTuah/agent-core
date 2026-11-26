@@ -231,7 +231,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   a project's checks, its builder runs `scripts/toolchain.mjs` from the clone of the core under trial on the project's
   clone, which fetches the toolchain the project pins exactly (the .NET SDK its `global.json` names) to a folder outside
   every repository, as `scripts/node.sh` fetches Node: only at a version and for a machine whose SHA-512
-  `scripts/toolchains.json` holds, checked before anything of it runs; the builder sets what its line prints for both
+  the script's own list holds, checked before anything of it runs; the builder sets what its line prints for both
   runs. The one condition that changes it: the list holds no sum for the pin, or its host does not answer. Then nothing
   is fetched, the line says why with its mend (an entry added in a pull request of the core, as its `--entry` prints it
   from the publisher's release notes, or a host only the owner allows), and the job that needs it reads alike before and
