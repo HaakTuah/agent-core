@@ -25,8 +25,13 @@ const renamed = [F("CI checks", 6, "success"), null].map(f => at({ mainFlows: [F
 const held = at({ mainRuns: [J("lint", 50, "success")], draftFlows: [F("docs", 7, "success")], draftRuns: [J("lint", 51, "success"), J("lint", 7, "skipped")] });
 const ran = at({ mainFlows: [F("CI", 5, "success")], mainRuns: [J("lint", 5, "success")], draftFlows: [F("CI", 6, "success"), F("docs", 7, "success")], draftRuns: [J("build", 6, "success"), J("lint", 7, "skipped")] });
 const onMain = at({ mainFlows: [F("CI", 5, "success"), F("docs", 8, "success")], mainRuns: [J("lint", 5, "success"), J("build", 8, "success")], draftFlows: [F("docs", 7, "success")], draftRuns: [J("lint", 7, "skipped")] });
-ok([...renamed, onMain, ran].every(r => r.answer?.draftSkippedAfter === 1) && held.answer?.draftSkipped === 1 && held.answer.draftSkippedAfter === 0,
-  "  a skip after passing on main under a workflow renamed, tied to none, or a job moved to another workflow, whether or not its workflow still runs, is not run after, while a job of another workflow of the same name skipped on the draft is a skip alone where main's check is still on the draft", JSON.stringify([renamed, onMain, ran, held]));
+const lintOnMain = docs => at({ mainFlows: [F("CI", 5, "success"), F("docs", 8, "success")], mainRuns: [J("lint", 5, "success"), docs], draftFlows: [F("docs", 7, "success")], draftRuns: [J("lint", 7, "skipped")] });
+const skippedOnMain = [J("lint", 8, "skipped"), J("lint", 8, "failure"), { name: "lint", status: "waiting", check_suite: { id: 8 } }].map(lintOnMain);
+const failedRenamed = at({ mainFlows: [F("CI", 5, "success")], mainRuns: [J("lint", 5, "success")], draftFlows: [F("CI checks", 6, "success")], draftRuns: [J("lint", 6, "failure")] });
+ok(failedRenamed.failed?.includes("CI checks: lint") && failedRenamed.answer?.draftFailedAfter === 0,
+  "  a check that failed on the draft under a workflow renamed ran there alone, only a skip being read against main's job of another name", JSON.stringify(failedRenamed));
+ok([...renamed, onMain, ran, ...skippedOnMain].every(r => r.answer?.draftSkippedAfter === 1) && held.answer?.draftSkipped === 1 && held.answer.draftSkippedAfter === 0,
+  "  a skip after passing on main under a workflow renamed, tied to none, or a job moved to another workflow, whether or not its workflow still runs or main skipped, failed or held the name too, is not run after, while a job of another workflow of the same name skipped on the draft is a skip alone where main's check is still on the draft", JSON.stringify([renamed, onMain, ran, skippedOnMain, held]));
 
 // (two checks on one name: a check or status tied to no workflow kept apart; two workflows' pairs, in one commit or
 // across the two, none)
