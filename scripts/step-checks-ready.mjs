@@ -128,7 +128,8 @@ export function suitesOnPins(p) {
   const suites = Object.entries(p.workflows).map(([f, w]) => [f, filter(w, "paths-ignore"), new Set(names(w).filter(n => n !== null)), names(w).includes(null)]).filter(([, l]) => l !== null);
   const shares = (f, w) => suites.filter(([g, , c]) => g !== f && names(w).some(n => n !== null && c.has(n)));
   // (a suite one of whose checks a name not read exactly may be: one it reports starts so, or one it reports is not read)
-  const mayShare = (f, w) => suites.some(([g, , c, unread]) => g !== f && starts(w).some(at => unread || [...c].some(n => n.startsWith(at))));
+  // (a suite with such a name may share any of the workflow's names, all of them exact ones included: #1361, point 20)
+  const mayShare = (f, w) => suites.some(([g, , c, unread]) => g !== f && (unread || starts(w).some(at => [...c].some(n => n.startsWith(at)))));
   const standsIn = (f, w) => { const own = filter(w, "paths"), n = names(w); return own !== null && n.length > 0 && shares(f, w).some(([, l, c]) => [...l].every(x => own.has(x)) && n.every(x => x !== null && c.has(x))); };
   const started = Object.entries(p.workflows).filter(([f, w]) => !pins.includes(`.github/workflows/${f}`) && !selects.includes(`.github/workflows/${f}`) && !standsIn(f, w)).flatMap(([f, w]) => {
     const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];

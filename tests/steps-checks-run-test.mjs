@@ -102,6 +102,11 @@ ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths:
   const anyName = named();
   ok(/takes each out with `!<its path>`[^]*stand-in\.yml/u.test(unshared) && !/may stand in[^]*stand-in\.yml/u.test(unshared) && /may stand in[^]*stand-in\.yml/u.test(anyName),
     "a workflow with `paths` whose matrix job no check of a suite's can share gets the mend that does the step; one whose job's name is an expression may still stand in", `${unshared}\n${anyName}`);
+  // (a stand-in whose names are all exact, beside a suite whose job's name is a matrix's, may stand in: #1361, point 20)
+  fs.writeFileSync(suiteFile, `name: s\non:\n  pull_request:\n    paths-ignore: ${list(kept)}\njobs:\n  test:\n    strategy:\n      matrix:\n        os: [ubuntu-latest]\n    runs-on: \${{ matrix.os }}\n    steps:\n      - run: echo t\n`);
+  fs.writeFileSync(standIn, `name: s\non:\n  pull_request:\n    paths: ['src/**', '.github/workflows/**']\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`);
+  const besideUnread = named();
+  ok(/may stand in[^]*stand-in\.yml/u.test(besideUnread), "a workflow with `paths` whose names are all exact, beside a suite whose job's name is a matrix's, may still stand in", besideUnread);
   fs.rmSync(standIn);
 }
 fs.rmSync(suiteFile);
