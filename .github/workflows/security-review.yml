@@ -46,8 +46,9 @@
 # as through a plug-in), the repository's owner's counts with nothing to set, and the status proves that a review was
 # posted for the head, not who made it: builder and reviewer may post under one login (#187). Dependabot's own pull
 # request, every commit of it Dependabot's and signed by GitHub, passes it where no review of Codex's has begun on it
-# (floor rule 17), and one that needs no security review and gets none by itself (floor rule 8: it touches no way in)
-# says so in a comment that opens "Security review:", naming the head.
+# (floor rule 17) and the code-review status waits on nothing (#1339), and one that needs no security review and gets
+# none by itself (floor rule 8: it touches no way in) says so in a comment that opens "Security review:", naming the
+# head.
 #
 # In a private repository each run is a job its owner pays for, a dozen or so a pull request, for a status that only
 # advises: there the job is skipped, which GitHub does not bill (core archive 201), unless the caller turns it on with

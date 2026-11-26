@@ -389,11 +389,17 @@ try {
   const NONE = "no code review. Mend: a fresh reviewer posts Code review: <whole SHA>⏎Blocking findings: N.⏎Other findings: M.⏎Score: S of 10.";
   const passed = { sha: HEAD, done: true, why: "a security review is posted" };
   const shortWhy = { sha: HEAD, done: false, why: "Codex's code review of aaaaaaa is still running. Mend: wait for it" };
+  // (whys whose whole form, "code-review waits: " and all, is 112 and 127 characters: past the budget that leaves room for
+  // "Advisory: " and "; summary unreadable", within the 140 alone, so a budget raised past 110 cuts their mend)
+  const near = [112, 127].map((n) => ({ sha: HEAD, done: false, why: `${"r".repeat(30)}. Mend: ${"m".repeat(n - 57)}` }));
   const folds = [withCode(passed, shortWhy), withCode(passed, { sha: HEAD, done: false, why: NONE }), withCode(passed, { sha: HEAD, done: false, why: `${"x".repeat(100)}. Mend: wait` }),
+    ...near.map((code) => withCode(passed, code)),
     ...[null, {}, { sha: SEEN, done: true, why: "no code review is running" }, { sha: HEAD, done: "no", why: "" }, { sha: HEAD, done: true }].map((code) => withCode(passed, code))];
-  ok(folds.every((v) => v.done === false && [true, false].every((a) => status({ ...v, warning: UNREAD }, a).description.length <= 140 && !status(v, a).description.endsWith("…")) && mended(status(v, false).description))
+  ok(near.every((code) => `code-review waits: ${code.why}`.length > 110 && `code-review waits: ${code.why}`.length < 140)
+    && folds.every((v) => v.done === false && [true, false].every((a) => status({ ...v, warning: UNREAD }, a).description === `${a ? "Advisory: " : "Waiting: "}${v.why}; summary unreadable`) && mended(status(v, false).description))
     && folds[0].why === `code-review waits: ${shortWhy.why}` && folds[1].why === "code-review waits: no code review. Mend: do what the code-review status's own mend says" && folds[2].why === CODE_WAITS
-    && folds.slice(3).every((v) => v.why === CODE_UNREAD),
+    && folds.slice(3, 5).every((v) => v.why === `code-review waits: ${"r".repeat(30)}. Mend: do what the code-review status's own mend says`)
+    && folds.slice(5).every((v) => v.why === CODE_UNREAD),
   "while the code-review status waits, the security-review status waits too, saying why whole where it fits, else what it waits for and a mend that points to that status's, else the pointer; one not read, or of another commit, waits as not worked out; each within GitHub's 140 characters with its mend", folds.map((v) => v.why).join(" | "));
   const ownWait = { sha: HEAD, done: false, why: "no security review" };
   ok(withCode(passed, { sha: HEAD, done: true, why: "no code review is running" }) === passed && withCode(passed, undefined) === passed && withCode(passed, shortWhy, true) === passed && withCode(passed, null, true) === passed && withCode(undefined, null) === undefined && withCode(ownWait, shortWhy) === ownWait,

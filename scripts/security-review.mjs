@@ -31,7 +31,8 @@
 // where none is found, waits, as before.
 // Dependabot's own pull request (opened by it from a branch of the repository, every commit of it written by Dependabot
 // and signed by GitHub, so that one somebody else has pushed to, or brought up to date by a merge, is its own no
-// longer) passes where no review of Codex's has begun on it: floor rule 17 holds it (with a branch of the repository,
+// longer) passes where no review of Codex's has begun on it, save while the code-review verdict waits (withCode, below;
+// #1339): floor rule 17 holds it (with a branch of the repository,
 // its status is written when the first comment that counts arrives, which is Codex's summary once the code review rule
 // 17 asks for is asked). A pull request that needs no security review and gets none by itself says so in a comment of
 // that kind, which its code reviewer checks (tasks/reviews.md, point 3); the status then says a review is posted, and

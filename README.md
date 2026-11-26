@@ -374,7 +374,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      what the check would have done. Where every review is posted (none starts by itself, as through a plug-in), the
      *owner's account*'s counts with nothing to set, and the status proves that a review was posted for the head, not
      who made it, since builder and reviewer may post under one login. Dependabot's own pull request passes it (floor
-     rule 17); one that needs no security review and gets none by itself (floor rule 8) says so in such a comment.
+     rule 17), save while the `code-review` status below waits (#1339); one that needs no security review and gets
+     none by itself (floor rule 8) says so in such a comment.
      Beside it, in the same job, the status `code-review` waits while Codex's code review runs on the head commit, until
      it finishes or a comment that opens "Code review:", from an account the security review counts, names that commit
      by its whole SHA (`tasks/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
@@ -386,9 +387,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      core's own repository, while a pull request opened from that day that changes `floor/`, `roles/`, `tasks/` or
      `tools/` has no "Design check:" naming its head, or a commit only such updates follow (point 4); it advises as the
      first does, and while it waits, the `security-review` status waits too, saying why, so that the one status a
-     ruleset requires holds a pull request until the code review it needs is posted in its form (#1339). It runs a short job at each push and each "Code review:" or "Design check:" comment, a dozen or so a
-     pull request, which a private repository pays for: there the job is skipped, and so not billed, unless the project
-     turns it on (the input `private`) or has turned advisory off, since a ruleset may then wait for it.
+     ruleset requires holds a pull request until the code review it needs is posted in its form (#1339). It runs a
+     short job at each push and each "Code review:" or "Design check:" comment, a dozen or so a pull request, which a
+     private repository pays for: there the job is skipped, and so not billed, unless the project turns it on (the
+     input `private`) or has turned advisory off, since a ruleset may then wait for it.
    - **A private repository** has GitHub's dependency review and CodeQL only with its paid code security, so without
      it it calls neither `licences.yml` nor `codeql.yml`: a workflow of its own runs `core/scripts/licences.mjs` for
      what no package list holds, `core/scripts/exact-versions.mjs` and `core/scripts/lookup.mjs` for its lockfiles and
