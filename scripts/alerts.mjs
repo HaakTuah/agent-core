@@ -15,6 +15,7 @@
 
 import { spawnSync } from "node:child_process";
 import { repoOf } from "./inbox.mjs";
+import { parseBounded } from "./guards.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
 import { plain } from "./look-kinds.mjs";
 import { started } from "./started.mjs";
@@ -55,7 +56,7 @@ export const bodyOf = a => {
 
 // The open alerts, or { unread } with why they could not be read with this sign-in.
 export function readAlerts(repo, gh = ghApi) {
-  try { return { alerts: String(gh("--paginate", `repos/${repo}/dependabot/alerts?state=open&per_page=100`, "--jq", FIELDS)).split("\n").filter(l => l.trim()).map(l => JSON.parse(l)) }; }
+  try { return { alerts: String(gh("--paginate", `repos/${repo}/dependabot/alerts?state=open&per_page=100`, "--jq", FIELDS)).split("\n").filter(l => l.trim()).map(l => parseBounded(l)) }; }
   catch (e) {
     const why = /\bHTTP 403\b/.test(String(e?.message)) ? "this sign-in may not read them, or Dependabot alerts are off" : /\bHTTP 404\b/.test(String(e?.message)) ? "GitHub shows them to no one this sign-in stands for" : "GitHub gave no answer";
     return { unread: why };
