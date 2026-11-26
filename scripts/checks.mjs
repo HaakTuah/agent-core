@@ -74,8 +74,9 @@ function main() {
   const coreAt = copyAt(root);
   const temp = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "core-checks-"));
   const results = [];
-  // (a check that failed where a program it starts could not be found did not run: #1361, point 19)
-  const check = (name, fn) => { console.log(`== ${name}`); const before = lacking.size, passed = fn(); results.push([name, passed, !passed && lacking.size > before]); return passed; };
+  // (a check that failed where a program it starts could not be found, and nothing it started failed, did not run:
+  // #1361, point 19)
+  const check = (name, fn) => { console.log(`== ${name}`); const { lacked, broke } = starts, passed = fn(); results.push([name, passed, !passed && starts.lacked > lacked && starts.broke === broke]); return passed; };
   try {
     // (first, each NuGet call's lookup of the packages new to the project, floor topic 15: before any part runs a
     // restore, which runs the pull request's own build files, so that no config's restore runs before another's lookup)
@@ -193,20 +194,22 @@ function baseCommit(base, exits = true) {
   throw new Error(`FAIL ${what} ${MEND}${mend}`);
 }
 
-// The programs a check could not start, since they are not on this machine (#1361, point 19).
-const lacking = new Set();
-// Whether a program could not be started, said so; one not found is noted as lacking (Node says ENOENT for a folder to
-// run in that is not there too, which is no program lacking).
+// The programs a check could not start, since they are not on this machine, and how many times one was not found and
+// one started failed, so that a check is read as not run only where it lacked a program and nothing it started failed
+// (#1361, point 19).
+const lacking = new Set(), starts = { lacked: 0, broke: 0 };
+// Whether a program started and passed; one that could not be started is said so, and one not found noted as lacking
+// (Node says ENOENT for a folder to run in that is not there too, which is no program lacking).
 function begun(r, what, cwd) {
-  if (!r.error) return true;
+  if (!r.error) { if (r.status !== 0) starts.broke++; return r.status === 0; }
   console.log(`${what} could not be started (${r.error.message}).`);
-  if (r.error.code === "ENOENT" && (!cwd || fs.existsSync(cwd))) lacking.add(String(r.error.path));
+  if (r.error.code === "ENOENT" && (!cwd || fs.existsSync(cwd))) { lacking.add(String(r.error.path)); starts.lacked++; }
   return false;
 }
 // A program run with the variables given added to this script's own, its output passed on; whether it passed.
 function run(cmd, args, { env = {}, cwd = undefined } = {}) {
   const r = spawnSync(cmd, args, { cwd, env: { ...process.env, ...env }, stdio: ["ignore", "inherit", "inherit"], shell: false });
-  return begun(r, cmd, cwd) && r.status === 0;
+  return begun(r, cmd, cwd);
 }
 const node = (coreAt, script, args, opts) => run(process.execPath, [`${coreAt}scripts/${script}`, ...args], opts);
 // The registry's packages installed from the lock file, running no package's install script, and their signatures
@@ -214,7 +217,7 @@ const node = (coreAt, script, args, opts) => run(process.execPath, [`${coreAt}sc
 const shown = { stdio: ["ignore", "inherit", "inherit"] };
 // (Windows' shell, by the path the system names, never a cmd.exe the checked-out folder holds)
 const COMSPEC = process.env.ComSpec || "cmd.exe";
-const passed = (r, cwd) => begun(r, "The package manager", cwd) && r.status === 0;
+const passed = (r, cwd) => begun(r, "The package manager", cwd);
 // (only under an npm that reads each setting that keeps the install to the registry: an older one, npm 10 that Node 22
 // brings among them, ignores them without a word and would fetch any git, web or file source the lock file names; #704)
 const ALLOWS = ["allow-git", "allow-remote", "allow-file"];
