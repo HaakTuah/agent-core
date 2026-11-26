@@ -163,8 +163,7 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
   }
 }
 
-// A scratch repository of the cases below: its folder, git run in it with no account's own settings, and `put`, which
-// writes a file (its folders too) and stages it.
+// A scratch repository of the cases below: its folder, git in it without an account's settings, and `put` (write, stage).
 const scratchRepo = (prefix) => {
   const dir = scratchDir(prefix);
   const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
@@ -174,7 +173,7 @@ const scratchRepo = (prefix) => {
 };
 
 // A lock file named in another case than npm's own is read since #1349: where the pull request's base held it, it is
-// reported and passes; one the pull request adds, or any with no base to read, fails; so with a folder of that name at the base.
+// reported and passes; one the pull request adds, one with no base, and one where the base held a folder, fails.
 {
   const { dir, git, put } = scratchRepo("licence-scan-case-");
   const config = { ships: [], lockfiles: [], audit: "audit.json", scan: { served: [], skip: [] } };
@@ -185,9 +184,9 @@ const scratchRepo = (prefix) => {
     put("tools/Package-Lock.json", "{}"); git("commit", "-q", "-m", "a lock file in another case");
     put("README.md", "a change of its own\n"); git("commit", "-q", "-m", "c");
     let r = licenceCheck(config, dir, "HEAD^1", config);
-    ok(!said(r.failures) && said(r.reports), "a lock file of another case that stood at the base is reported and passes", JSON.stringify(r));
+    ok(!said(r.failures) && said(r.reports), "a lock file of another case that stood at the base is reported", JSON.stringify(r));
     r = licenceCheck(config, dir, "HEAD^1", { ...config, lockfiles: ["tools/Package-Lock.json"] });
-    ok(said(r.failures), "and one the base's config named fails when the pull request takes it out of the config", JSON.stringify(r));
+    ok(said(r.failures), "and one the base's config named fails once the config drops it", JSON.stringify(r));
     ok(said(licenceCheck(config, dir, "HEAD^2", config).failures), "and one the pull request adds fails");
     ok(said(licenceCheck(config, dir, null, config).failures), "and so does one with no base to read it against");
     git("reset", "-q", "--hard", "HEAD~2"); put("tools/Package-Lock.json/README.md", "x"); git("commit", "-q", "-m", "a folder");
@@ -198,8 +197,7 @@ const scratchRepo = (prefix) => {
   }
 }
 
-// A twin of the named lock file in another case than npm's own passes, reported, where the pair stood at the base,
-// whichever of the two the config names; with no base it fails.
+// A twin in another case than npm's own passes, reported, where the pair stood at the base, whichever the config names.
 {
   const { dir, git, put } = scratchRepo("licence-twin-case-");
   const config = { ships: [], lockfiles: ["package-lock.json"], audit: "audit.json" };
@@ -210,8 +208,13 @@ const scratchRepo = (prefix) => {
     git("commit", "-q", "-m", "base");
     const upper = { ...config, lockfiles: ["NPM-SHRINKWRAP.JSON"] };
     let r = licenceCheck(config, dir, "HEAD", config);
-    ok(!stands(r.failures, "NPM-SHRINKWRAP.JSON") && stands(r.reports, "NPM-SHRINKWRAP.JSON"), "a twin of another case that stood at the base is reported, not failed", JSON.stringify(r));
+    ok(!stands(r.failures, "NPM-SHRINKWRAP.JSON") && stands(r.reports, "NPM-SHRINKWRAP.JSON"), "a twin of another case that stood at the base is reported", JSON.stringify(r));
     ok(stands(licenceCheck(config, dir, null, config).failures, "NPM-SHRINKWRAP.JSON"), "and with no base to read it against it fails");
+    for (const f of ["Package-Lock.json", "NPM-SHRINKWRAP.JSON"]) {
+      put(f, JSON.stringify({ lockfileVersion: 3, packages: {} })); put("npm-shrinkwrap.json", "{}"); git("commit", "-q", "-m", f);
+      ok(stands(licenceCheck({ ...config, lockfiles: [f] }, dir, "HEAD^1", { ...config, lockfiles: [f] }).failures, "npm-shrinkwrap.json"), `${f} beside npm's own shrinkwrap file fails as before`);
+      git("reset", "-q", "--hard", "HEAD^1");
+    }
     r = licenceCheck(upper, dir, "HEAD", upper);
     ok(!stands(r.failures, "package-lock.json") && stands(r.reports, "package-lock.json"), "a pair named by its other file stands at the base too", JSON.stringify(r));
   } finally {

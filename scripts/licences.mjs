@@ -530,22 +530,22 @@ export function check(config, root, base = null, baseConfig = null) {
 const lockfilesOf = (config) => (Array.isArray(config?.lockfiles) ? config.lockfiles : []);
 const auditOf = (config) => (typeof config?.audit === "string" ? config.audit : null);
 
-const EXACT_NAME = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
 // (npm installs from a shrinkwrap file where one stands, whatever lock file a config names: only one of the two may)
 function shrinkwrapFaults(root, lockfiles, base) {
   const failures = [], reports = [];
   for (const f of lockfiles) {
-    const dir = posix.dirname(f), want = posix.basename(f).toLowerCase() === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json";
+    const dir = posix.dirname(f), name = posix.basename(f);
+    // (the twin the check read before #1349, in npm's own case: it fails as it did, where the base held the pair too)
+    const old = posix.join(dir, name === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json");
+    const want = name.toLowerCase() === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json";
     let names = [];
     try { names = readdirSync(join(root, dir)); } catch { /* (no folder, no file) */ }
-    // (whatever the case of its name: npm on a file system that ignores case installs from `NPM-SHRINKWRAP.JSON` too)
-    for (const n of names.filter((x) => x.toLowerCase() === want)) {
-      const twin = posix.join(dir, n), said = `${f}: ${twin} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`;
-      // (a pair with a name of another case than npm's own is seen only since #1349: one that stood so at the base passes, reported)
-      // (before it, only a lock file named in npm's own case with a twin in npm's own case was seen)
-      const seenBefore = n === want && EXACT_NAME.test(f);
-      const stood = !seenBefore && base && blobAt(root, base, twin) && blobAt(root, base, f);
-      (stood ? reports : failures).push(stood ? `${said}; the pair stood so at the pull request's base, so it passes` : said);
+    const twins = new Set([...(existsSync(join(root, old)) ? [old] : []), ...names.filter((x) => x.toLowerCase() === want).map((x) => posix.join(dir, x))]);
+    for (const twin of twins) {
+      const said = `${f}: ${twin} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`;
+      // (a pair seen only since #1349, in a case of another name than the one read before, passes, reported, where it stood as files at the base)
+      const newly = twin !== old && base && blobAt(root, base, twin) && blobAt(root, base, f);
+      (newly ? reports : failures).push(newly ? `${said}; the pair stood so at the pull request's base, so it passes` : said);
     }
   }
   return { failures, reports };
