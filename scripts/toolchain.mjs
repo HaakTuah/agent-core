@@ -3,8 +3,9 @@
 // fetches what a project pins"), as scripts/node.sh fetches Node: one exact version, taken only where the list SDKS
 // below holds its checksum for this machine, and checked against it before anything of it runs. The one pin it reads
 // is the .NET SDK a project's global.json names ("sdk": { "version" }), at that exact version, which meets any
-// "rollForward" the file sets; every dotnet it runs runs from the file system's root, so no global.json of the
-// project's, or of the folder it was started in, chooses what runs. It goes to a folder of its own under the home folder, outside
+// "rollForward" the file sets. It reads the global.json at the project's root alone, not one a subfolder's jobs run
+// under. Every dotnet it runs runs from the file system's root, so no global.json of the project's, or of the folder it
+// was started in, chooses what runs. A version out of form is named by its JSON type alone, nothing of it printed. It goes to a folder of its own under the home folder, outside
 // every repository, never over the machine's own; the line it prints says what to set for the trial's runs. Where the
 // machine's own dotnet already lists that SDK, it fetches nothing. A version or a machine the list holds no sum for, a
 // host that does not answer, a sum that differs, or a binary that does not give its version, and nothing is installed:
@@ -81,7 +82,9 @@ export function pinOf(project) {
   try { json = parseBounded(fs.readFileSync(file, "utf8").replace(/^\uFEFF/u, "")); } catch { return { wrong: "its global.json is not JSON, or nests too deep" }; }
   const version = json?.sdk?.version;
   if (version === undefined) return null;
-  return typeof version === "string" && VERSION.test(version) ? { version } : { wrong: `its global.json names ${JSON.stringify(version)}, not an SDK's exact version` };
+  if (typeof version === "string" && VERSION.test(version)) return { version };
+  const kind = version === null ? "null" : Array.isArray(version) ? "a list" : typeof version === "string" ? "a text" : `a ${typeof version}`;
+  return { wrong: `its global.json's sdk.version is ${kind} not in the form of an SDK's exact version` };
 }
 
 const ridOf = (platform, arch) => Object.keys(RIDS).find(r => RIDS[r][0] === platform && RIDS[r][1] === arch) ?? null;
@@ -116,8 +119,10 @@ function install(entry, root, env) {
   const tmp = fs.mkdtempSync(path.join(path.dirname(root), ".fetch-"));
   try {
     const archive = path.join(tmp, "sdk.tar.gz"), out = path.join(tmp, "sdk");
-    const got = run("curl", ["-fsS", "--proto", "=https", "--connect-timeout", "30", "--max-time", "900", "-o", archive, entry.url], env);
+    const got = run("curl", ["-fsS", "--proto", "=https", "--connect-timeout", "30", "--max-time", "900", "-w", "%{http_code}", "-o", archive, entry.url], env);
     if (got.error || got.status !== 0) return `${HOST} did not give it: ${why(got, "curl")}). Mend: where this machine's network does not allow ${HOST}, only the owner can allow it, in the environment's settings; until then the job that needs it reads alike before and after the update, so it stops no cut.`;
+    const code = got.stdout?.trim() ?? "";
+    if (code !== "200") return `${HOST} answered ${/^\d{3}$/u.test(code) ? code : "no status"}, not the file, which may have moved; nothing of it was opened). Mend: tell the owner the publisher's address for it changed; its entry is mended in a pull request of the core, as --entry prints it from the publisher's release notes.`;
     const sum = crypto.createHash("sha512").update(fs.readFileSync(archive)).digest("hex");
     if (sum !== entry.sha512) return `its download's SHA-512 is ${sum}, not the list's ${entry.sha512}; nothing of it was opened). Mend: tell the owner, since the publisher's file differs from what the core pinned; fetch nothing else in its place.`;
     fs.mkdirSync(out);
@@ -138,12 +143,13 @@ export function fetchPinned({ project = process.cwd(), list = SDKS, home = os.ho
   if (place.said) return [place.said];
   const { version, rid, root } = place;
   const exported = `for the trial's runs: export DOTNET_ROOT=${quoted(root)} PATH=${quoted(root)}:"$PATH" ${Object.entries(QUIET).map(([k, v]) => `${k}=${v}`).join(" ")}`;
-  const dotnet = path.join(root, "dotnet");
-  if (fs.existsSync(dotnet) && run(dotnet, ["--version"], env).stdout?.trim() === version) return [`toolchain: the .NET SDK ${version} present in ${root}; ${exported}`];
   let entries;
   try { entries = readList(list); } catch (e) { return [`NOT FETCHED: the .NET SDK ${version} (the core's list could not be read: ${e.message}). Mend: give each entry of SDKS in scripts/toolchain.mjs the form --entry prints, one entry for each version and machine.`]; }
   const entry = entries.find(e => e.version === version && e.rid === rid);
   if (!entry) return [`NOT FETCHED: the .NET SDK ${version} for ${rid} (the core's list, SDKS in scripts/toolchain.mjs, holds no checksum for it). ${MEND_LIST}.`];
+  // (a folder fetched before is trusted as the machine's own SDK is, but only for a version and machine the list holds)
+  const dotnet = path.join(root, "dotnet");
+  if (fs.existsSync(dotnet) && run(dotnet, ["--version"], env).stdout?.trim() === version) return [`toolchain: the .NET SDK ${version} present in ${root}; ${exported}`];
   const wrong = install(entry, root, env);
   return [wrong ? `NOT FETCHED: the .NET SDK ${version} (${wrong}` : `toolchain: the .NET SDK ${version} fetched to ${root}, its SHA-512 as the list holds it; ${exported}`];
 }

@@ -229,13 +229,13 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   of another owner's is not written to, by nothing yet.
   **The trial's machine fetches what a project pins** (#1361, point 21). By default, before a release's trial first runs
   a project's checks, its builder runs `scripts/toolchain.mjs` from the clone of the core under trial on the project's
-  clone, which fetches the toolchain the project pins exactly (the .NET SDK its `global.json` names) to a folder outside
-  every repository, as `scripts/node.sh` fetches Node: only at a version and for a machine whose SHA-512
-  the script's own list holds, checked before anything of it runs; the builder sets what its line prints for both
-  runs. The one condition that changes it: the list holds no sum for the pin, or its host does not answer. Then nothing
-  is fetched, the line says why with its mend (an entry added in a pull request of the core, as its `--entry` prints it
-  from the publisher's release notes, or a host only the owner allows), and the job that needs it reads alike before and
-  after the update, so it stops no cut. Its trigger is the trial of each release. It does not mean a session widens the
+  clone, which fetches the .NET SDK the project's `global.json` pins exactly, the one pin it reads yet, to a folder
+  outside every repository, as `scripts/node.sh` fetches Node: only at a version and for a machine whose SHA-512 the
+  script's own list holds, checked before anything of it runs; the builder sets what its line prints for both runs. The one condition that changes it: the list holds no sum for the pin or the machine, the host does not give the
+  file, what it gives differs from the list's sum or version, or the `global.json` is not read. Then nothing is fetched,
+  the line says why with its mend (an entry added in a pull request of the core, as its `--entry` prints it from the
+  publisher's release notes; a host only the owner allows; or, for a file that differs, word to the owner), and the job
+  that needs it reads alike before and after the update, so it stops no cut. Its trigger is the trial of each release. It does not mean a session widens the
   environment's network, which only the owner does, that a project's pin is changed, that a toolchain is fetched while a
   check runs, or that the machine's own is replaced. Reason: at release 7's trial a .NET SDK band a project pinned was
   neither in the distribution's packages nor reachable, and its job failed after the sync for a reason not the

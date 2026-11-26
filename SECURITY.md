@@ -187,7 +187,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      which reads only the file at the project's root, a plain file not reached through a link out of the project,
      fetches only a build its own list holds the SHA-512 of, checked before the archive is opened, and runs every
      `dotnet` from the file system's root, so no `global.json` of the project's or of the folder it was started in
-     chooses what runs; limits: 64 KB of the file, nested no deeper than JSON's bounded reader allows (200), 80
+     chooses what runs, and names a version out of form by its JSON type alone, nothing of it printed; a folder it
+     fetched before is trusted as the machine's own SDK is, and run only for a version and machine its list holds;
+     limits: 64 KB of the file, nested no deeper than JSON's bounded reader allows (200), 80
      characters of the SDK it names, 900 s for the download and for each run, 256 MB of a run's output; hostile tests:
      `tests/toolchain-test.mjs`.
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
