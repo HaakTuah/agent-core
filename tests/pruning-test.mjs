@@ -12,6 +12,7 @@ import { firedOf, stepsAt } from "../scripts/pruning-read.mjs";
 import { DIRECT, due, generation, open, said } from "../scripts/pruning-record.mjs";
 import { rulesOf } from "../scripts/rules.mjs";
 import * as facade from "../scripts/pruning.mjs";
+import { R, marked, agents, still, moved, quiet, loud, floor, passed, stand, young, unknown, own, numbers, named, p, cases } from "./pruning-fixtures.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -51,20 +52,6 @@ const core = await stepsAt();
 ok(core[".github/workflows/tests.yml"].length > 50 && core[".github/workflows/tests.yml"].some(x => x.run.includes("scripts/copies.mjs")) && stepsOf("scripts/holders.mjs", core).length > 0,
   "the core's own workflows are read for their steps, tests.yml's matrix set aside, and a check of the core's is found in a step");
 ok(rare({ file: "floor/topics/x.md" }) && rare({ file: "tasks/x.md" }, "check fires; outcome: robust; rare harm") && !rare({ file: "tasks/x.md" }, "check fires; outcome: robust"), "a rule of the floor, or one whose number says so, guards against rare harm");
-const R = (f, lead) => ({ file: f, lead, key: `${f}: ${lead}` });
-const marked = R("tasks/b.md", "Marked"), agents = R("AGENTS.md", "A process rule");
-const still = R("tasks/a.md", "Still"), moved = R("tasks/a.md", "Moved"), quiet = R("tasks/b.md", "Quiet"), loud = R("tasks/b.md", "Loud"), floor = R("floor/security.md", "1. Floor"),
-  passed = R("roles/shared/c.md", "Passed"), stand = R("tasks/d.md", "Stand-in"), young = R("tasks/a.md", "Young"), unknown = R("tasks/a.md", "Unknown"), own = R("tasks/d.md", "Own");
-const numbers = { [still.key]: "findings; outcome: robust", [moved.key]: "findings; outcome: robust", [stand.key]: "findings; outcome: asked", [own.key]: "correction: misread; outcome: asked",
-  [young.key]: "findings; outcome: robust", [unknown.key]: "findings; outcome: robust", [marked.key]: "check fires; outcome: robust; rare harm", [agents.key]: "findings; outcome: robust" };
-const named = { [quiet.key]: "check: scripts/c.mjs", [loud.key]: "check: scripts/a.mjs, in part", [floor.key]: "check: scripts/c.mjs", [marked.key]: "check: scripts/c.mjs", [still.key]: "check: GitHub's ruleset" };
-const p = [
-  { at: "2026-07-01", numbers: { [stand.key]: 1, [own.key]: 1 }, direct: { misread: 2, failed: 1, live: 3 } },
-  { at: "2026-09-01", numbers: { [still.key]: 3, [moved.key]: 3, [stand.key]: 2, [own.key]: 2, [young.key]: 1, [unknown.key]: 1, [agents.key]: 2 }, direct: { misread: 2, failed: 1, live: 3 } },
-  { at: "2026-11-01", from: "2026-09-01T00:00:00Z", numbers: { [still.key]: 3, [moved.key]: 4, [stand.key]: 3, [own.key]: 3, [young.key]: 1, [unknown.key]: 1, [agents.key]: 2 }, direct: { misread: 2, failed: 4, live: 3 },
-    fired: { ".github/workflows/tests.yml#A and B": 2, ".github/workflows/own.yml#D": 1 }, cited: { [still.key]: 4, [loud.key]: 1 }, without: { "c-case": { verdict: "pass" }, "d-case": { verdict: "fail" } } },
-];
-const cases = [{ name: "c-case", holds: [passed.key] }, { name: "d-case", holds: [still.key] }];
 const out = list({ all: [still, moved, quiet, loud, floor, passed, stand, young, unknown, own, marked, agents], named, numbers, record: rec(...p), cases, steps, starts: new Set([still.key, agents.key]),
   joined: r => (r === young ? 3 : r === unknown ? null : 40) });
 const line = r => out.find(l => l.startsWith(`- ${r.key}:`)) ?? "";
