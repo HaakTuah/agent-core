@@ -129,6 +129,9 @@ ok(!ships.has("MS-PL") && policy().allowedFor("x", false).has("MS-PL") && movedO
     const r = check(config, dir, "HEAD^1", config);
     ok(r.reports.length === 1 && r.reports[0].includes("held@1.0.0") && r.reports[0].includes("13 November 2026") && r.failures.length === 1 && r.failures[0].includes("added@2.0.0"), "held at the base, a package under MS-PL is reported and passes; one the pull request adds fails, it alone", JSON.stringify(r));
     commit([["held", "1.1.0", "MS-PL"], ["fine", "1.0.0", "MIT"]]);
+    let odd = null;
+    try { check(config, dir, "HEAD^1", { ships: [], lockfiles: [5] }); } catch (e) { odd = e; }
+    ok(odd?.constructor === Error && /"lockfiles" that is not a list of names.*\. Mend: /u.test(odd.message), "a base config whose \"lockfiles\" holds something other than text fails with its mend, not a TypeError", String(odd?.stack ?? odd));
     const u = check(config, dir, "HEAD^1", config);
     ok(u.reports.length === 0 && u.failures.length === 1 && u.failures[0].includes("held@1.1.0"), "one the pull request updates fails too: the yes is for that version", JSON.stringify(u));
     // (a package the base held only as a tool, which a pull request moves into what ships, was not shipped there)

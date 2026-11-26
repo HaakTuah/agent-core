@@ -502,7 +502,7 @@ export function check(config, root, base = null, baseConfig = null) {
     config, root, base, lists, failures: [], reports: [],
     // (what each lock file shipped at the base, by name@version, read once each, by the base's own config: a package the
     // base held only as a tool, or in a lock file whose packages did not ship then, was not shipped)
-    heldIn: new Map(), then: baseConfig ? normalised(baseConfig) : { ships: [] },
+    heldIn: new Map(), then: baseConfig ? normalised(baseListsOk(baseConfig)) : { ships: [] },
     // (the owner's yeses, by what each names; `needed`: those something off its list stood on, `onList`: those nothing did)
     accepted: config.accepted ?? [], needed: new Set(), onList: new Set(),
   };
@@ -526,6 +526,15 @@ export function check(config, root, base = null, baseConfig = null) {
   const all = [...new Set(failures)]; // (a package a lockfile holds twice fails once)
   const summary = summaryOf(ctx, packages, entries, scanned, all.length);
   return { failures: all, reports: [...reports, ...wait.reports, ...unnamed.reports, ...(scanned?.reports ?? [])], summary };
+}
+
+// (the base's config, as it stands where its lists hold text alone: one that does not would have failed loadConfig when it
+// merged, so this is rare, but it fails with its mend and not with a TypeError from normalised, #1352)
+function baseListsOk(config) {
+  for (const key of ["lockfiles", "ships", "ignoreScriptsIn", "pypi"]) {
+    if (Array.isArray(config[key]) && config[key].some((p) => typeof p !== "string")) throw new Error(`the base's licence config holds a "${key}" that is not a list of names, so what stood at the base cannot be read. Mend: correct "${key}" in the config on the base branch: a list of non-empty strings, in a pull request of its own, then run the check again`);
+  }
+  return config;
 }
 
 // (the audit's path a config names, or null)
