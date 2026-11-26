@@ -11,7 +11,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    shape and refuse where it fails, as floor topic 5 asks, its hostile tests trying each case. Each answers in 5 s at
    most, as its hostile tests time it (`scripts/hostile.mjs`), and each JSON it parses is nested 200 deep at most
    (`scripts/guards.mjs`); its limits name what it reads beyond that.
-   - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the lines it asks in `scripts/pr-waits.mjs`, `scripts/pr-cost.mjs`, `scripts/pr-number.mjs` and `scripts/pr-reasons.mjs`, and the line
+   - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the lines it asks in `pr-waits.mjs`, `pr-cost.mjs`, `pr-number.mjs`, `pr-reasons.mjs` and `pr-head.mjs` beside it, and the line
      "Read for it:" by `scripts/reading.mjs`, and the line "Never needed:" by `scripts/read-total.mjs`, line by line);
      limits: none of its own on the text, which GitHub holds to 65,536 characters; 100 commits, one page; 8 s for the
      reading list's calls; hostile tests: `tests/hostile-pr-text-test.mjs`.
@@ -29,9 +29,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
      a pull request adds under its manifest's "Differences" (`scripts/pr-reasons.mjs`), the rule files a checkout
-     holds, the manifest too (`scripts/reading.mjs`, and `scripts/rules.mjs` for the rules in them, which read only
-     regular files in real folders of the checkout's own, a pipe or device as no file and a link at any depth refused
-     with its mend, and the first tries the changed paths on the path patterns within 16 million steps for each
+     holds, the manifest too (`scripts/reading.mjs`, whose readers `scripts/pr-head.mjs` takes for the archive the keys
+     of a description are read against, noting each link met and passing, and `scripts/rules.mjs` for the rules in
+     them, which read only regular files in real folders of the checkout's own, a pipe or device as no file and a link
+     at any depth refused with its mend, and the first tries the changed paths on the path patterns within 16 million steps for each
      reading, a run of it or a pull request's description, each with a budget of its own, past which every pattern
      left matches), and the rule
      files the total read sums and reads for a cut or a join (`scripts/read-total.mjs`, which prints each name with its
@@ -168,12 +169,13 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
      lookup (`scripts/lookup.mjs`, with `scripts/lookup-pypi.mjs` for a requirements file in PyPI's lock form, which it
-     fails whole where pip or uv could read it otherwise) and its lookup again of what a project holds (`scripts/held.mjs`, through the
+     fails whole where pip or uv could read it otherwise, and fails a hash a line names that PyPI lists for none of that
+     release's files) and its lookup again of what a project holds (`scripts/held.mjs`, through the
      lookup's readers of npm's and NuGet's lock files); Node itself is checked against its SHA-256 by `scripts/node.sh`, and the code scan's wheel by
      its own, which pip checks against `.packages/requirements.txt` (`scripts/install.mjs pypi`); limits: 16 MB of a
      NuGet package's manifest, 100 pages of NuGet's registry, 20 lookups on GitHub in a run, 30 s for an answer (60 s
      for a NuGet package), 120 s for the whole look again; hostile tests: `tests/hostile-packages-test.mjs`, for the
-     requirements file `tests/lookup-pypi-test.mjs`, and for the scan `tests/code-scan-test.mjs`.
+     requirements file `tests/lookup-pypi-test.mjs` and `tests/lookup-pypi-read-test.mjs`, and for the scan `tests/code-scan-test.mjs`.
    - the code a pull request adds or alters, and its description's lines "Scan false alarm:" and "Scan unread:": read
      by the code scan (`scripts/code-scan.mjs`), which hands the files by name to Semgrep's engine, installed from its
      wheel's pinned hash, with no variable that holds a token, fails a file it could not read, and silences no finding a
