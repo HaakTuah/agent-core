@@ -143,16 +143,22 @@ function oneChange(f, { texts, tests, scripts, add, reaches, pace, before, whole
   if (none(f) || pinned.has(f)) return null;
   if (copy && f.startsWith(copy)) return copyChange(f, { add, wholes, copy, copyTests });
   if (isTest(f) && tests.has(f)) add(f, "added or changed"); // (and, a helper among the tests, what imports it)
-  // (a file gone, a helper among the tests too, leaves no import to follow; a package's manifest, read beside the code,
-  // links nothing: a change to either may reach every test)
-  if (!(f in texts) || !isCode(f)) return `${f} is no code the readers follow, or is gone, so what reaches it cannot be told`;
-  // (a script of the global space is reached by no import at all)
-  const cs = CS.test(f) ? csharpUnknown(f, texts, before, pace) : null;
-  if (cs) return cs;
-  if (f.endsWith(".d.ts") || scripts.has(f)) return `${f} is a declaration of types, or a script of the global space, whose users no import names, so what reaches it cannot be told`;
+  const unknown = unknownReach(f, texts, scripts, before, pace);
+  if (unknown) return unknown;
   for (const [t, files] of reaches) if (files.has(f)) add(t, `reaches ${f}`);
   // (a test's own file is no file of the project's a whole run tests; one of C# may be a helper a test reaches by reflection)
   if (!isTest(f) || CS.test(f)) for (const t of wholes()) add(t, `reaches every file (${f})`);
+  return null;
+}
+
+// Why what reaches a changed file cannot be told, or null where its reach is read.
+function unknownReach(f, texts, scripts, before, pace) {
+  // (a file gone, a helper among the tests too, leaves no import to follow; a package's manifest, read beside the code,
+  // links nothing: a change to either may reach every test)
+  if (!(f in texts) || !isCode(f)) return `${f} is no code the readers follow, or is gone, so what reaches it cannot be told`;
+  if (CS.test(f)) return csharpUnknown(f, texts, before, pace);
+  // (a script of the global space is reached by no import at all)
+  if (f.endsWith(".d.ts") || scripts.has(f)) return `${f} is a declaration of types, or a script of the global space, whose users no import names, so what reaches it cannot be told`;
   return null;
 }
 
