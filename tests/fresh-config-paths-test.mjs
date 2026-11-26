@@ -8,6 +8,7 @@
 //   node tests/fresh-config-paths-test.mjs
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { differences, fresh } from "../scripts/fresh.mjs";
 import { kits, plan } from "../scripts/converge.mjs";
 import { heldKitIn } from "../scripts/steps-kit.mjs";
@@ -60,7 +61,7 @@ for (const priv of [false, true]) {
 // workflows that name a config are the project's own, so the one process writes none of them back to the kit's paths)
 const older = path.join(scratchDir("fresh-config-paths-older-"), "kits");
 fs.mkdirSync(older);
-fs.symlinkSync(path.resolve(path.dirname(new URL(import.meta.url).pathname), ".."), path.join(older, "k1"));
+fs.symlinkSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), path.join(older, "k1"), "junction");
 const [unmarked] = moved("an-unmarked-moved-project", false, t => t.replace(/^# The core's file:[^\n]*\n/u, ""));
 const pu = project(unmarked), { kit: now, before } = kits(pu, older);
 const wrote = plan(pu, now, before).write.filter(w => w.to.startsWith(".github/workflows/") && /checks\/(?!holders|core-reading)/u.test(w.text)).map(w => w.to);
