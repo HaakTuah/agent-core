@@ -102,6 +102,21 @@ ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths:
   const anyName = named();
   ok(/takes each out with `!<its path>`[^]*stand-in\.yml/u.test(unshared) && !/may stand in[^]*stand-in\.yml/u.test(unshared) && /may stand in[^]*stand-in\.yml/u.test(anyName),
     "a workflow with `paths` whose matrix job no check of a suite's can share gets the mend that does the step; one whose job's name is an expression may still stand in", `${unshared}\n${anyName}`);
+  // (exact names beside a suite's expression may stand in; beside its matrix job `test (…)`, or `build (…)`'s, they get
+  // the mend that does the step; a matrix job of the same name may: #1361, point 20)
+  const m = "    strategy:\n      matrix:\n        os: [ubuntu-latest]\n", job = (file, on, name, extra = "") => fs.writeFileSync(file, `name: s\non:\n  pull_request:\n    ${on}\njobs:\n  ${name}:\n${extra}    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`);
+  const suiteAs = extra => job(suiteFile, `paths-ignore: ${list(kept)}`, "test", extra), standBy = (name, extra) => job(standIn, "paths: ['src/**', '.github/workflows/**']", name, extra);
+  standBy("test");
+  suiteAs("    name: ${{ github.workflow }}\n");
+  const reads = [named()];
+  suiteAs(m);
+  reads.push(named());
+  standBy("build", m);
+  reads.push(named());
+  standBy("test", m);
+  reads.push(named());
+  const mays = reads.map(r => /may stand in[^]*stand-in\.yml/u.test(r)), mended = reads.map(r => /takes each out with `!<its path>`[^]*stand-in\.yml/u.test(r));
+  ok(mays.join() === "true,false,false,true" && mended[1] && mended[2], "exact names may stand in beside a suite's expression, not beside its matrix job nor another's, and a matrix job of the same name may", reads.join("\n"));
   fs.rmSync(standIn);
 }
 fs.rmSync(suiteFile);
