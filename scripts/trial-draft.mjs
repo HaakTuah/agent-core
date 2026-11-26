@@ -67,11 +67,11 @@ function pagesOf(route, key, ask) {
   return { why: `more than 1000 ${key}, past what is read` };
 }
 
-// What a commit's checks said, through `ask` (ghAsk's form), every page read: { said, person, flows, unfinished }, or
+// What a commit's checks said, through `ask` (ghAsk's form), every page read: { said, active, flows, unfinished }, or
 // { why }. A workflow run of the commit that could not start is a check that failed, and one not finished waits, each
-// named by its workflow; `person` names each check run waiting on a person (GitHub's `waiting`, a deploy's reviewer
-// say), `flows` each workflow that ran and was not skipped whole, and `unfinished` each workflow run not finished, by
-// its name in `said`, its workflow's and whether it waits on a person.
+// named by its workflow; `active` is `said` with no run GitHub holds for a person (its own status `waiting`, a deploy's
+// reviewer say), `flows` names each workflow run, and `unfinished` each one not finished, by its name in `said`, its
+// workflow's and whether it waits on a person.
 function checksAt(repo, sha, ask) {
   const runs = pagesOf(`repos/${repo}/commits/${sha}/check-runs`, "check_runs", ask);
   if (runs.why) return runs;
@@ -80,10 +80,11 @@ function checksAt(repo, sha, ask) {
   const flows = pagesOf(`repos/${repo}/actions/runs?head_sha=${sha}`, "workflow_runs", ask);
   if (flows.why) return flows;
   const label = w => `${w.name ?? "a workflow"} (${w.status === "completed" ? "could not start" : "workflow"})`;
-  const unstarted = flows.items.filter(w => w?.conclusion === "startup_failure" || w?.status !== "completed").map(w => ({ name: label(w), status: w.status === "completed" ? "completed" : "queued", conclusion: "failure" }));
-  const unfinished = flows.items.filter(w => w?.status !== "completed").map(w => ({ name: label(w), flow: w.name, person: w.status === "waiting" }));
-  const person = new Set(runs.items.filter(r => r?.status === "waiting").map(r => r.name));
-  return { said: saidOf([...runs.items, ...unstarted], status.items), person, flows: new Set(flows.items.filter(w => w?.conclusion !== "skipped").map(w => w?.name)), unfinished };
+  const open = flows.items.filter(w => w?.conclusion === "startup_failure" || w?.status !== "completed");
+  const unstarted = open.map(w => ({ name: label(w), status: w.status === "completed" ? "completed" : "queued", conclusion: "failure", person: w.status === "waiting" }));
+  const unfinished = open.filter(w => w.status !== "completed").map(w => ({ name: label(w), flow: w.name, person: w.status === "waiting" }));
+  const notHeld = r => r?.status !== "waiting" && !r?.person;
+  return { said: saidOf([...runs.items, ...unstarted], status.items), active: saidOf([...runs.items, ...unstarted].filter(notHeld), status.items), flows: new Set(flows.items.map(w => w?.name)), unfinished };
 }
 
 // Whether the stop switch of `repo` stands, through `ask`: true or false, or { why } where it could not be read; GitHub's
@@ -139,12 +140,13 @@ function notPinned(repo, head, sha, ask) {
 }
 
 // How many checks wait, as checksAt gives them: [on main, on the draft]. On main only a check the draft holds, skipped
-// there or not, or a workflow it ran too, counts, and none waiting on a person: a deploy waiting for its reviewer
-// measures nothing of the draft, while one still running on main is read before a skip of it is named.
+// there or not, or a workflow it ran too, skipped whole or not, counts, and no run GitHub holds for a person: a deploy
+// waiting for its reviewer measures nothing of the draft, while one still running on main is read before a skip of it
+// is named.
 function waitingOf(then, now) {
   const flow = n => then.unfinished.filter(u => u.name === n);
-  const counts = ([n, v]) => v === "waiting" && !then.person.has(n) && (flow(n).length ? flow(n).some(u => !u.person && now.flows.has(u.flow)) : Object.hasOwn(now.said, n));
-  return [Object.entries(then.said).filter(counts).length, Object.values(now.said).filter(v => v === "waiting").length];
+  const counts = ([n, v]) => v === "waiting" && (flow(n).length ? flow(n).some(u => !u.person && now.flows.has(u.flow)) : Object.hasOwn(now.said, n));
+  return [Object.entries(then.active).filter(counts).length, Object.values(now.said).filter(v => v === "waiting").length];
 }
 
 // The draft `pr` of `repo` read for the commit tried, `sha`, through `ask`: { answer } (the commit, the repository's
