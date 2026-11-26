@@ -209,6 +209,31 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
     ok(!stands(r.failures) && stands(r.reports), "a twin of another case that stood at the base is reported, not failed", JSON.stringify(r));
     r = licenceCheck(config, dir, null, config);
     ok(stands(r.failures), "and with no base to read it against it fails");
+    const upper = { ...config, lockfiles: ["NPM-SHRINKWRAP.JSON"] };
+    r = licenceCheck(upper, dir, "HEAD", upper);
+    ok(r.failures.length === 0 && r.reports.some((m) => /package-lock\.json stands beside it/u.test(m)), "a pair named by its other file stands at the base too", JSON.stringify(r));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+{
+  // a folder of the base that held the name of a lock file is no lock file the base held
+  const dir = scratchDir("licence-scan-folder-");
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+  const git = (...args) => execFileSync("git", args, { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] });
+  const config = { ships: [], lockfiles: [], audit: "audit.json", scan: { served: [], skip: [] } };
+  try {
+    git("init", "-q");
+    fs.mkdirSync(path.join(dir, "tools/Package-Lock.json"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "tools/Package-Lock.json/README.md"), "x");
+    fs.writeFileSync(path.join(dir, "audit.json"), JSON.stringify({ entries: [] }));
+    git("add", "-A"); git("commit", "-q", "-m", "base");
+    git("rm", "-rq", "tools/Package-Lock.json");
+    fs.mkdirSync(path.join(dir, "tools"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "tools/Package-Lock.json"), "{}");
+    git("add", "-A"); git("commit", "-q", "-m", "a lock file where a folder stood");
+    const r = licenceCheck(config, dir, "HEAD^1", config);
+    ok(r.failures.some((m) => m.startsWith("tools/Package-Lock.json installs packages")), "a lock file where the base held a folder of that name fails", JSON.stringify(r));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

@@ -202,6 +202,8 @@ function pinnedIfRead(c, f, text) {
  *  base held unpinned with no download fewer is reported, as is every one with no base (AGENTS.md, "Nothing locks a
  *  project"). Read from the scan's own readers of fetches: what a package manager fetches by name is not read here. */
 // A file of the base, as text, or null where the base held none.
+/** Whether `file` is a file (not a folder) at commit `rev` of the repository at `root`. */
+export const blobAt = (root, rev, file) => { try { return execFileSync("git", ["cat-file", "-t", `${rev}:${file}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() === "blob"; } catch { return false; } };
 const atBase = (c, path) => { try { return execFileSync("git", ["show", `${c.base}:${path}`], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 << 20 }); } catch { return null; } };
 // The audit's entries as the base held them, at the path the base's own config named it (a pull request may move it),
 // read once for the scan.
@@ -233,7 +235,7 @@ function scanned(c, f) {
   if (LOCKFILE.test(f) && !c.lockfiles.includes(f)) {
     const said = `${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`;
     // (a name of another case than npm's own is read only since #1349: where the base held that file unnamed, it passes, reported)
-    if (!EXACT_CASE.test(f) && c.base && atBase(c, f) !== null && !c.baseLockfiles.includes(f)) c.reports.push(`${said}; it stood so at the pull request's base, so it passes`);
+    if (!EXACT_CASE.test(f) && c.base && blobAt(c.root, c.base, f) && !c.baseLockfiles.includes(f)) c.reports.push(`${said}; it stood so at the pull request's base, so it passes`);
     else c.fail(said);
   }
   const text = c.binary.has(f) ? "" : trackedText(c.root, f, c.fail);

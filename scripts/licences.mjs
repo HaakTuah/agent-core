@@ -38,7 +38,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, noSignInWhole, parseBounded, quotedAlone } from "./guards.mjs";
-import { scan } from "./licence-scan.mjs";
+import { blobAt, scan } from "./licence-scan.mjs";
 import { stoodAt, trackedIn, unnamedLocks } from "./licence-locks.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { shapeFaults } from "./schemas.mjs";
@@ -530,6 +530,7 @@ export function check(config, root, base = null, baseConfig = null) {
 const lockfilesOf = (config) => (Array.isArray(config?.lockfiles) ? config.lockfiles : []);
 const auditOf = (config) => (typeof config?.audit === "string" ? config.audit : null);
 
+const EXACT_NAME = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
 // (npm installs from a shrinkwrap file where one stands, whatever lock file a config names: only one of the two may)
 function shrinkwrapFaults(root, lockfiles, base) {
   const failures = [], reports = [];
@@ -540,8 +541,10 @@ function shrinkwrapFaults(root, lockfiles, base) {
     // (whatever the case of its name: npm on a file system that ignores case installs from `NPM-SHRINKWRAP.JSON` too)
     for (const n of names.filter((x) => x.toLowerCase() === want)) {
       const twin = posix.join(dir, n), said = `${f}: ${twin} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`;
-      // (a twin of another case than npm's own is seen only since #1349: a pair that stood so at the base passes, reported)
-      const stood = n !== want && base && textAt(root, base, twin) !== null && textAt(root, base, f) !== null;
+      // (a pair with a name of another case than npm's own is seen only since #1349: one that stood so at the base passes, reported)
+      // (before it, only a lock file named in npm's own case with a twin in npm's own case was seen)
+      const seenBefore = n === want && EXACT_NAME.test(f);
+      const stood = !seenBefore && base && blobAt(root, base, twin) && blobAt(root, base, f);
       (stood ? reports : failures).push(stood ? `${said}; the pair stood so at the pull request's base, so it passes` : said);
     }
   }
