@@ -59,6 +59,7 @@ const PROSE_FILE = /\.(md|markdown|txt|rst|adoc)$/iu;
 const NOTICE = /\/\*!|@license|SPDX-License-Identifier|Copyright\s+(\(c\)|©|\d{4})|Permission is hereby granted|Licensed under the/iu;
 const EXACT = /^((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*)@(\d+\.\d+\.\d+)$/iu;
 export const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/iu;
+const EXACT_CASE = new RegExp(LOCKFILE.source, "u");
 /** A tracked file's text, a link's that of the file it leads to, read as the link's own, where that lies inside the
  *  project; a link that leads out of it, or nowhere, is not read and fails, since what it holds cannot be audited. */
 function trackedText(root, f, fail) {
@@ -229,7 +230,12 @@ function pinned(c, f, text) {
 
 /** The scan of one tracked file `f` (scan, above): by what it is, and for a licence notice it carries. */
 function scanned(c, f) {
-  if (LOCKFILE.test(f) && !c.lockfiles.includes(f)) c.fail(`${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`);
+  if (LOCKFILE.test(f) && !c.lockfiles.includes(f)) {
+    const said = `${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`;
+    // (a name of another case than npm's own is read only since #1349: where the base held that file, it passes, reported)
+    if (!EXACT_CASE.test(f) && c.base && atBase(c, f) !== null) c.reports.push(`${said}; it stood so at the pull request's base, so it passes`);
+    else c.fail(said);
+  }
   const text = c.binary.has(f) ? "" : trackedText(c.root, f, c.fail);
   unaudited(c, f, byKind(c, f, text));
   pinnedIfRead(c, f, text);

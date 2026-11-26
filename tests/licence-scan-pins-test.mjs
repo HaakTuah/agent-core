@@ -163,4 +163,30 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
   }
 }
 
+// A lock file named in another case than npm's own is read since #1349: where the pull request's base held it, it is
+// reported and passes; one the pull request adds, or any with no base to read, fails.
+{
+  const dir = scratchDir("licence-scan-case-");
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+  const git = (...args) => execFileSync("git", args, { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] });
+  const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); git("add", "-A"); };
+  const config = { ships: [], lockfiles: [], audit: "audit.json", scan: { served: [], skip: [] } };
+  const said = (r, list) => list.some((m) => m.startsWith("tools/Package-Lock.json installs packages"));
+  try {
+    git("init", "-q");
+    put("audit.json", JSON.stringify({ entries: [] }));
+    git("commit", "-q", "-m", "base");
+    put("tools/Package-Lock.json", "{}"); git("commit", "-q", "-m", "a lock file in another case");
+    put("README.md", "a change of its own\n"); git("commit", "-q", "-m", "c");
+    let r = licenceCheck(config, dir, "HEAD^1", config);
+    ok(!said(r, r.failures) && said(r, r.reports), "a lock file of another case that stood at the base is reported and passes", JSON.stringify(r));
+    r = licenceCheck(config, dir, "HEAD^2", config);
+    ok(said(r, r.failures), "and one the pull request adds fails", JSON.stringify(r));
+    r = licenceCheck(config, dir, null, config);
+    ok(said(r, r.failures), "and so does one with no base to read it against", JSON.stringify(r));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 done();
