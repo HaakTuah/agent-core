@@ -192,7 +192,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    scan's own step for a project the host's CodeQL does not scan, the wheel checked by its SHA-256, no dependency
    taken and none of its code run, and which the scan runs with no Python; and, for a release's trial alone, the .NET
    SDK a project's `global.json` pins, which `scripts/toolchain.mjs` fetches by curl from the publisher's own host over
-   HTTPS, only at a version and for a machine whose SHA-512 `scripts/toolchains.json` holds, checked before the archive
+   HTTPS where `scripts/toolchains.json` holds the SHA-512 of that build for that machine, checked before the archive
    is opened, to a folder outside every repository (#1361, point 21).
 17. **Dependabot** updates the workflows' GitHub actions and the packages of the core's lock files, `package-lock.json`
     and `.packages/requirements.txt` (`.github/dependabot.yml`), each a week after its release.

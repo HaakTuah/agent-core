@@ -235,13 +235,13 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   runs. The one condition that changes it: the list holds no sum for the pin, or its host does not answer. Then nothing
   is fetched, the line says why with its mend (an entry added in a pull request of the core, as its `--entry` prints it
   from the publisher's release notes, or a host only the owner allows), and the job that needs it reads alike before and
-  after the update, so it stops no cut. The
-  trigger is each release's trial. It does not mean that a session widens the environment's network, which only the
-  owner does, that a project's pin is changed, that a toolchain is fetched while a check runs, or that the machine's own
-  is replaced. Reason: at release 7's trial a .NET SDK band a project pinned was neither in the distribution's packages
-  nor reachable, and its job failed after the sync for a reason not the release's. Held by `tests/toolchain-test.mjs`
-  (a pin with no sum, a sum that differs and a host that refuses each fetch nothing; a pin listed is fetched, checked by
-  its sum, outside the project); that the builder runs it, by nothing yet.
+  after the update, so it stops no cut. Its trigger is the trial of each release. It does not mean a session widens the
+  environment's network, which only the owner does, that a project's pin is changed, that a toolchain is fetched while a
+  check runs, or that the machine's own is replaced. Reason: at release 7's trial a .NET SDK band a project pinned was
+  neither in the distribution's packages nor reachable, and its job failed after the sync for a reason not the
+  release's. Held by `tests/toolchain-test.mjs` (a pin with no sum, a sum that differs and a host that refuses each
+  fetch nothing; a pin listed is fetched, checked by its sum, outside the project); that the builder runs it, by nothing
+  yet.
 - **Nothing locks a project,** in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
   what an agent can mend alone may bind, and what only the owner can do (a yes the floor names, a setting on the
