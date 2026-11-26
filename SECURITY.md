@@ -67,8 +67,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - the open Dependabot alerts' fields (never an advisory's text), the open pull requests' titles, branches, descriptions
      and authors, and the bug issues' titles and authors: read by the daily reading of the alerts (`scripts/alerts.mjs`),
      which counts a pull request only of Dependabot's own login and reads its description only ahead of the first
-     `<details>`; limits: 256 MB of an answer, 500 pages of 100 for the pull requests and the issues, 300 characters of a
-     title and a branch and 65,536 of a description; hostile tests: `tests/alerts-test.mjs`.
+     `<details>`; limits: 256 MB of an answer, every page of the alerts within it, 500 pages of 100 for the pull
+     requests and the issues, 300 characters of a title and a branch and 65,536 of a description; hostile tests:
+     `tests/alerts-test.mjs`.
    - whether a project's repository is private, read by `scripts/host-private.mjs`:
      - from the event of GitHub's job, for its own repository alone;
      - else from gh;
