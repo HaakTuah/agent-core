@@ -1,6 +1,6 @@
 // Checks the pointer check (scripts/pointers.mjs) on a small project made for it: its rule files with either
-// line ending, a pointer that leads nowhere, a project with no SECURITY.md yet, and its agent tools' files. Run by the
-// core's tests workflow (.github/workflows/tests.yml).
+// line ending, a pointer that leads nowhere, a project with no SECURITY.md yet and its agent tools' files; the names in
+// its descriptions: tests/names-test.mjs. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/pointers-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -18,7 +18,7 @@ const here = fileURLToPath(new URL("../scripts/", import.meta.url));
 // record of the install and the package itself, from the core's own install, which its tests' job runs)
 const carry = core => {
   fs.mkdirSync(path.join(core, "scripts"), { recursive: true });
-  for (const f of ["pointers.mjs", "links.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(core, "scripts", f));
+  for (const f of ["pointers.mjs", "links.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "names.mjs"]) fs.copyFileSync(path.join(here, f), path.join(core, "scripts", f));
   for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/marked"]) fs.cpSync(path.join(here, "../.packages", f), path.join(core, ".packages", f), { recursive: true });
 };
 const FILES = {

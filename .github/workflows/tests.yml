@@ -698,6 +698,9 @@ jobs:
       - name: The pointer check
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/pointers-test.mjs ')) }}
         run: node tests/pointers-test.mjs
+      - name: The pointer check's names in the descriptions, a project's list and the core's own run (#460, point 4)
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/names-test.mjs ')) }}
+        run: node tests/names-test.mjs
       - name: The pointer check's link checker, lychee, read and decided against a base, with a stand-in for it (#582)
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/links-test.mjs ')) }}
         run: node tests/links-test.mjs
