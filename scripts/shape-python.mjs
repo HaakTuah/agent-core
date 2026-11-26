@@ -5,6 +5,7 @@
 import path from "node:path";
 import { unreachedFor } from "./parser.mjs";
 import { pythonTree } from "./python-tree.mjs";
+import { normal } from "./pypi-name.mjs";
 
 // The standard library's modules, which lead to no file of the project and no package: Python 3.13's, with those that
 // earlier versions still hold.
@@ -221,8 +222,6 @@ export function resolvePython(from, imp, files, known) {
 
 // ---- the packages a project declares ----
 
-// A package's name as pip compares it.
-export const normal = name => name.toLowerCase().replace(/[-_.]+/gu, "-");
 const requirement = s => /^\s*([A-Za-z0-9][A-Za-z0-9._-]*)/u.exec(s)?.[1] ?? null;
 
 // The packages of a requirements file: each line's name (an option, -r or -e, left out).

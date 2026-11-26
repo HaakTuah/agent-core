@@ -9,6 +9,7 @@
 // on one line by the lookup's report, and an answer of another shape is a lookup that failed. The reader of a
 // repository's address is the lookup's own, passed in (`readRepo`), so neither file imports the other.
 
+import { normal } from "./pypi-name.mjs";
 import { reach } from "./reach.mjs";
 
 const PYPI = "https://pypi.org/";
@@ -28,9 +29,6 @@ const MOST_OWNERS = 5;
 const WRITE = "write the file anew with pip-compile --generate-hashes (or uv pip compile --generate-hashes), each package at one exact version with its hashes, never by hand";
 const object = (x) => Boolean(x) && typeof x === "object" && !Array.isArray(x);
 const when = (text) => (typeof text === "string" && /^\d{4}-\d\d-\d\dT/u.test(text) ? Date.parse(text) : NaN);
-
-/** A name as pip compares it. */
-export const normal = (name) => name.toLowerCase().replace(/[-_.]+/gu, "-");
 
 /** The packages of a requirements file's text in PyPI's lock form: each { name, version, path, direct, brings, by, pypi }. */
 export function pypiPackages(text, lockPath) {

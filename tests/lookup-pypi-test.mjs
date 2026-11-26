@@ -1,16 +1,13 @@
 #!/usr/bin/env node
 // Tests of the lookup's part for PyPI (lookup-pypi.mjs, run by lookup.mjs; #716): each package name invented, each
 // answer of PyPI recorded in the shape it gives, trimmed to what the lookup reads, and handed to it in place of the
-// network (floor rule 8: no live call, no real package): what a requirements file in PyPI's lock form holds, what PyPI
-// says, and the check run on a project whose licence config names one under "pypi". Run: node tests/lookup-pypi-test.mjs
-import { execFileSync } from "node:child_process";
-import { rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { lookUp, run, YOUNG } from "../scripts/lookup.mjs";
+// network (floor rule 8: no live call, no real package): what a requirements file in PyPI's lock form holds and what PyPI
+// says. The check run on a project whose licence config names one under "pypi" is lookup-run-test.mjs's. Run: node
+// tests/lookup-pypi-test.mjs
+import { lookUp, YOUNG } from "../scripts/lookup.mjs";
 import { pep440, pypiPackages } from "../scripts/lookup-pypi.mjs";
-import { INVENTED_SUM, NOW, ago, tgz } from "../scripts/lookup-stage.mjs";
+import { NOW, ago } from "../scripts/lookup-stage.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { if (!cond) { failed++; console.error(`FAIL ${what}`); } };
@@ -150,54 +147,6 @@ for (const name of ["flaky-moss", "listless-moss"]) {
 asked.length = 0;
 r = await one(pkg("bad/../name"));
 ok(r.failures.length === 1 && /not one PyPI gives/u.test(r.failures[0]) && !asked.length, "a name PyPI never gives is not asked of it");
-
-// ---- The check on a project
-const tmp = scratchDir("lookup-pypi-test-");
-const git = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: tmp, encoding: "utf8" }).trim();
-try {
-  git("init", "-q");
-  const config = join(tmp, "licences.json");
-  const settings = (pypi) => writeFileSync(config, JSON.stringify({ lockfiles: ["package-lock.json"], ships: [], ...(pypi ? { pypi } : {}) }));
-  settings(["requirements.txt"]);
-  writeFileSync(join(tmp, "package.json"), "{}");
-  writeFileSync(join(tmp, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/tidy-moss-format": { version: "1.1.0", resolved: tgz("tidy-moss-format"), integrity: INVENTED_SUM } } }));
-  writeFileSync(join(tmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n`);
-  writeFileSync(join(tmp, "data.txt"), `never-published-moss==1.0.0 ${H()}\n`);
-  git("add", "-A"); git("commit", "-qm", "base");
-  const base = git("rev-parse", "HEAD"), npmGet = async (url) => (url.startsWith("https://registry.npmjs.org/") ? { status: 404 } : get(url));
-  asked.length = 0;
-  r = await run(config, { root: tmp, base, get: npmGet, now: NOW });
-  ok(r.code === 0 && !asked.length && r.lines.includes("ok   0 new packages looked up in PyPI, each printed above for the review"), `what the base held is not looked up (${r.lines})`);
-  writeFileSync(join(tmp, "requirements.txt"), `Tidy_Moss_Format==2.0.0 ${H()}\nnever-published-moss==1.0.0 ${H()}\n`);
-  r = await run(config, { root: tmp, base, get: npmGet, now: NOW });
-  let out = r.lines.join("\n");
-  ok(r.code === 1 && mended(out) && /^FAIL: requirements\.txt: never-published-moss@1\.0\.0: PyPI has no such package/mu.test(out) && !/tidy-moss-format/u.test(out) && /1 of 1 new package fail/u.test(out) && /ok {3}0 new packages looked up in the npm registry/u.test(out), `an update passes unlooked, in any spelling, and a new name PyPI lacks fails, beside npm's lookup (${r.lines})`);
-  writeFileSync(join(tmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n`);
-  settings(["requirements.txt", "data.txt"]);
-  r = await run(config, { root: tmp, base, get: npmGet, now: NOW });
-  ok(r.code === 1 && /^FAIL: data\.txt: never-published-moss@1\.0\.0/mu.test(r.lines.join("\n")), `a file the pull request newly names under "pypi" makes no name held (${r.lines})`);
-  for (const pypi of [null, []]) {
-    settings(pypi);
-    writeFileSync(join(tmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\nnever-published-moss==1.0.0 ${H()}\n`);
-    r = await run(config, { root: tmp, base, get: npmGet, now: NOW });
-    ok(r.code === 1 && /^FAIL: requirements\.txt: never-published-moss@1\.0\.0/mu.test(r.lines.join("\n")), `a file the base's config named is read though the pull request takes it out of "pypi" (${JSON.stringify(pypi)}) (${r.lines})`);
-  }
-  writeFileSync(join(tmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n`);
-  git("add", "-A"); git("commit", "-qm", "no pypi");
-  r = await run(config, { root: tmp, base: git("rev-parse", "HEAD"), get: npmGet, now: NOW });
-  ok(r.code === 0 && !r.lines.some((l) => /PyPI/u.test(l)), `a config that names no "pypi", nor its base's, asks nothing of PyPI, and says nothing of it (${r.lines})`);
-  rmSync(join(tmp, "requirements.txt"));
-  r = await run(config, { root: tmp, base, get: npmGet, now: NOW });
-  ok(r.code === 0, `a file the base's config named, taken out of the project with its name, is not read (${r.lines})`);
-  writeFileSync(join(tmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n`);
-  writeFileSync(config, JSON.stringify({ ships: [], pypi: ["requirements.txt"] }));
-  r = await run(config, { root: tmp, base, get: npmGet, now: NOW });
-  ok(r.code === 0 && r.lines.includes("ok   0 new packages looked up in PyPI, each printed above for the review"), `a config that names PyPI's files alone, no lock file of npm's, is read (${r.lines})`);
-  settings(["requirements.txt"]);
-  writeFileSync(join(tmp, "requirements.txt"), "loose-moss>=1.0\n");
-  r = await run(config, { root: tmp, base, get: npmGet, now: NOW });
-  ok(r.code === 1 && mended(r.lines.join("\n")) && /requirements\.txt, line 1: a package not at one exact version/u.test(r.lines.join("\n")), `a file not in PyPI's lock form fails, saying the mend (${r.lines})`);
-} finally { rmSync(tmp, { recursive: true, force: true }); }
 
 console.log(failed ? `${failed} failing` : "ok   lookup-pypi.mjs");
 process.exit(failed ? 1 : 0);

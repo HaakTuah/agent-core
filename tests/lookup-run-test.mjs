@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Tests of lookup.mjs run as the check runs on a project: in a scratch git repository with a lock file, a licence config and
-// a workflow, each answer of a registry recorded (lookup-stage.mjs) and handed to it in place of the network (floor rule 8:
-// no live call, no real package). The lookup's own readers and answers are lookup-test.mjs's. Run: node tests/lookup-run-test.mjs
+// Tests of lookup.mjs run as the check runs on a project: in a scratch git repository with a lock file (or a requirements
+// file in PyPI's lock form, #716), a licence config and a workflow, each answer of a registry recorded (lookup-stage.mjs)
+// and handed to it in place of the network (floor rule 8: no live call, no real package). The lookup's own readers and
+// answers are lookup-test.mjs's and lookup-pypi-test.mjs's. Run: node tests/lookup-run-test.mjs
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -78,6 +79,60 @@ try {
   r = await run(config, { root: tmp, base, get, now: NOW });
   ok(r.code === 1 && mended(r.lines.join("\n")) && !/not json/u.test(r.lines.join("\n")), `a lock file that cannot be read fails, saying the mend and quoting none of it (${r.lines})`);
 } finally { rmSync(tmp, { recursive: true, force: true }); }
+
+// ---- PyPI's lock form on a project (#716): a config that names a requirements file under "pypi"
+{
+  const ptmp = scratchDir("lookup-pypi-run-");
+  const H = (c = "a") => `--hash=sha256:${c.repeat(64)}`;
+  const pypiAsked = [];
+  // (the stage's answers hold none of PyPI's, so each name PyPI is asked of reads as one it does not know)
+  const npmGet = async (url) => { if (url.startsWith("https://pypi.org/")) pypiAsked.push(url); return url.startsWith("https://registry.npmjs.org/") ? { status: 404 } : get(url); };
+  const pgit = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: ptmp, encoding: "utf8" }).trim();
+  try {
+    pgit("init", "-q");
+    const config = join(ptmp, "licences.json");
+    const settings = (pypi) => writeFileSync(config, JSON.stringify({ lockfiles: ["package-lock.json"], ships: [], ...(pypi ? { pypi } : {}) }));
+    settings(["requirements.txt"]);
+    writeFileSync(join(ptmp, "package.json"), "{}");
+    writeFileSync(join(ptmp, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/tidy-moss-format": { version: "1.1.0", resolved: tgz("tidy-moss-format"), integrity: INVENTED_SUM } } }));
+    writeFileSync(join(ptmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n`);
+    writeFileSync(join(ptmp, "data.txt"), `never-published-moss==1.0.0 ${H()}\n`);
+    pgit("add", "-A"); pgit("commit", "-qm", "base");
+    const base = pgit("rev-parse", "HEAD");
+    pypiAsked.length = 0;
+    r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });
+    ok(r.code === 0 && !pypiAsked.length && r.lines.includes("ok   0 new packages looked up in PyPI, each printed above for the review"), `what the base held is not looked up (${r.lines})`);
+    writeFileSync(join(ptmp, "requirements.txt"), `Tidy_Moss_Format==2.0.0 ${H()}\nnever-published-moss==1.0.0 ${H()}\n`);
+    r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });
+    let out = r.lines.join("\n");
+    ok(r.code === 1 && mended(out) && /^FAIL: requirements\.txt: never-published-moss@1\.0\.0: PyPI has no such package/mu.test(out) && !/tidy-moss-format/u.test(out) && /1 of 1 new package fail/u.test(out) && /ok {3}0 new packages looked up in the npm registry/u.test(out), `an update passes unlooked, in any spelling, and a new name PyPI lacks fails, beside npm's lookup (${r.lines})`);
+    writeFileSync(join(ptmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n`);
+    settings(["requirements.txt", "data.txt"]);
+    r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });
+    ok(r.code === 1 && /^FAIL: data\.txt: never-published-moss@1\.0\.0/mu.test(r.lines.join("\n")), `a file the pull request newly names under "pypi" makes no name held (${r.lines})`);
+    for (const pypi of [null, []]) {
+      settings(pypi);
+      writeFileSync(join(ptmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\nnever-published-moss==1.0.0 ${H()}\n`);
+      r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });
+      ok(r.code === 1 && /^FAIL: requirements\.txt: never-published-moss@1\.0\.0/mu.test(r.lines.join("\n")), `a file the base's config named is read though the pull request takes it out of "pypi" (${JSON.stringify(pypi)}) (${r.lines})`);
+    }
+    writeFileSync(join(ptmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n`);
+    pgit("add", "-A"); pgit("commit", "-qm", "no pypi");
+    r = await run(config, { root: ptmp, base: pgit("rev-parse", "HEAD"), get: npmGet, now: NOW });
+    ok(r.code === 0 && !r.lines.some((l) => /PyPI/u.test(l)), `a config that names no "pypi", nor its base's, asks nothing of PyPI, and says nothing of it (${r.lines})`);
+    rmSync(join(ptmp, "requirements.txt"));
+    r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });
+    ok(r.code === 0, `a file the base's config named, taken out of the project with its name, is not read (${r.lines})`);
+    writeFileSync(join(ptmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n`);
+    writeFileSync(config, JSON.stringify({ ships: [], pypi: ["requirements.txt"] }));
+    r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });
+    ok(r.code === 0 && r.lines.includes("ok   0 new packages looked up in PyPI, each printed above for the review"), `a config that names PyPI's files alone, no lock file of npm's, is read (${r.lines})`);
+    settings(["requirements.txt"]);
+    writeFileSync(join(ptmp, "requirements.txt"), "loose-moss>=1.0\n");
+    r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });
+    ok(r.code === 1 && mended(r.lines.join("\n")) && /requirements\.txt, line 1: a package not at one exact version/u.test(r.lines.join("\n")), `a file not in PyPI's lock form fails, saying the mend (${r.lines})`);
+  } finally { rmSync(ptmp, { recursive: true, force: true }); }
+}
 
 // ---- The base named HEAD^1 (#1231): the merge's first parent, taken only where HEAD is a merge
 {

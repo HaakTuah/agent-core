@@ -741,8 +741,8 @@ if (started(import.meta.url)) {
   }
 }
 
-// The exact-versions check (exact-versions.mjs) and the lookup of each package new to the project in npm's registry
-// (lookup.mjs), run beside the licence check on the config at `configPath`, each printing its lines: whether either
+// The exact-versions check (exact-versions.mjs) and the lookup of each package new to the project in its registry
+// (lookup.mjs: npm's, and PyPI's for a file the config names under "pypi"), run beside the licence check on the config at `configPath`, each printing its lines: whether either
 // failed. The base is the one the job names (LOOKUP_BASE), else the merge's first parent. What stood there before the
 // exact-versions check came is reported, never failed, and a pull request whose checkout holds no base has its lookup
 // said as a warning that it did not run, failing nothing ("Nothing locks a project" in the core's AGENTS.md), save
