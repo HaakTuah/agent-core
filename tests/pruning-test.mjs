@@ -12,7 +12,7 @@ import { firedOf, stepsAt } from "../scripts/pruning-read.mjs";
 import { DIRECT, due, generation, open, said } from "../scripts/pruning-record.mjs";
 import { rulesOf } from "../scripts/rules.mjs";
 import * as facade from "../scripts/pruning.mjs";
-import { R, marked, agents, still, moved, quiet, loud, floor, passed, stand, young, unknown, own, numbers, named, p, cases } from "./pruning-fixtures.mjs";
+import { R, marked, agents, still, moved, quiet, loud, floor, passed, stand, young, unknown, own, numbers, named, p, cases } from "../scripts/pruning-scratch.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };

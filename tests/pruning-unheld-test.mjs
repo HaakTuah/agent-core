@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { list, readUnheld } from "../scripts/pruning-list.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
-import { R, still, loud, floor, own, numbers, named, p, cases } from "./pruning-fixtures.mjs";
+import { R, still, loud, floor, own, numbers, named, p, cases } from "../scripts/pruning-scratch.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };

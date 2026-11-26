@@ -1,5 +1,6 @@
-// The fixtures the pruning's tests share (tests/pruning-test.mjs, tests/pruning-unheld-test.mjs; #895): rules, their numbers,
-// what holds them, and three prunings, as tests/pruning-test.mjs held them before the split. Node's own modules only.
+// The fixtures the pruning's tests share (tests/pruning-test.mjs, tests/pruning-unheld-test.mjs; #895): rules, their
+// numbers, what holds them, and three prunings, as tests/pruning-test.mjs held them before the split. It stands here, not
+// under tests/, which holds tests alone (#614). Tests only. Node's own modules only.
 
 export const R = (f, lead) => ({ file: f, lead, key: `${f}: ${lead}` });
 export const marked = R("tasks/b.md", "Marked"), agents = R("AGENTS.md", "A process rule");
