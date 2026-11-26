@@ -203,7 +203,7 @@ const refused = (r) => r.status === 1 && mended(r.stdout) && !/\n\s+at /u.test(r
   fs.writeFileSync(path.join(archive(foldered), "issue-9.md"), "#9. **A day**: an item.\n");
   ok(JSON.stringify(keysOf(foldered)) === '["#9"]', "keysAt: a folder named as an archive file is no file, with no error");
   const said = headMends("TBD ".repeat(16384), { keys: new Set() }).mends;
-  ok(said.length === SHOWN + 1 && said.at(-1).startsWith(`${16384 - SHOWN} more such lines`) && mended(said.map(m => `FAIL ${m}`).join("\n")), `headMends: 64 KB of "TBD " gives the first ${SHOWN} failures and one that counts the rest, each with its mend`);
+  ok(said.length === SHOWN + 1 && said.at(-1).startsWith(`${16384 - SHOWN} more such failures`) && mended(said.map(m => `FAIL ${m}`).join("\n")), `headMends: 64 KB of "TBD " gives the first ${SHOWN} failures and one that counts the rest, each with its mend`);
 }
 
 process.exit(failed ? 1 : 0);

@@ -113,6 +113,15 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
     && /no archive could be read/u.test(headOf("core archive 99999", null).oks.join()) && headOf("core archive 218", "").oks.at(-1).startsWith("the description names no archive key") && headOf("TBD", "").oks.length === 0
     && headOf("core archive 99999", scratchDir("pr-head-at-") + "/").mends.length === 0,
     "where the copy lies says which archive is read and whether the core's own form is: the core's own here, a project's copy there, none where none is found");
+  if (process.platform !== "win32") {
+    const linked = scratchDir("pr-head-links-"), outside = scratchDir("pr-head-links-out-"), back = process.cwd();
+    fs.mkdirSync(path.join(linked, "archive")); fs.mkdirSync(path.join(outside, "instructions"));
+    fs.writeFileSync(path.join(outside, "instructions", "items-001.md"), "1. **A day**: an item.\n");
+    fs.symlinkSync(path.join(outside, "instructions"), path.join(linked, "archive", "instructions"));
+    let said;
+    try { process.chdir(linked); said = headOf("core archive 1", "").oks; } finally { process.chdir(back); }
+    ok(said.includes(`the archive's "archive/instructions" is a link, read as no file`) && /no archive could be read/u.test(said.join()), "a link where the archive stands is named, and read as no archive");
+  }
   ok(headAsked(HEAD_SINCE, "export const HEAD_SINCE") && headAsked("2026-11-24T00:00:00Z", "export const HEAD_SINCE") && !headAsked("2026-11-22T23:59:59Z", "export const HEAD_SINCE") && !headAsked(HEAD_SINCE, "an older copy") && !headAsked(HEAD_SINCE, null) && !headAsked("", "export const HEAD_SINCE"),
     "the line is asked of a pull request opened on or after its day, its base's copy holding it");
 }
