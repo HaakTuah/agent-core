@@ -25,7 +25,7 @@ const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.e
 const commit = what => { git("add", "-A"); git("commit", "-q", "--allow-empty", "-m", what); };
 const write = (...args) => spawnSync(process.execPath, ["core/scripts/steps.mjs", "--write", ...args], { cwd: dir, encoding: "utf8" });
 const crlf = text => text.replace(/\r?\n/gu, "\r\n"), raw = f => fs.readFileSync(path.join(dir, f), "utf8"), read = f => raw(f).replace(/\r\n/gu, "\n");
-const put = (f, text) => fs.writeFileSync(path.join(dir, f), text);
+const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
 const missed = lead => notDone(dir).filter(m => m.lead === lead);
 const dirty = () => git("status", "--porcelain", "--untracked-files=all").trim();
 commit("the starter kit");
@@ -155,16 +155,21 @@ for (const l of WHOLE) {
   r = write();
   ok(read("notes/design.md") === "See `core/roles/shared/work-flow.md` and `core/floor/topics/`.\n" && read("gen/design.md") === "See `core/modules/git.md`.\n" && !missed(l).length,
     "  and once a line gives it its value, --write writes the notes' file (a pointer to the floor's topics.md, which now leads to a folder, to that folder), the marked one left, and the step reads done", `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
-  // (a pointer to topics.md that cites a section or rule, a pull-in, an exclusion or a permission's path would lead into
-  // no file or widen to the folder's every file, so only the bare one is written: #1361, point 8)
+  // (a pointer to topics.md that cites a section or rule, a pull-in, an exclusion, a permission's path, one in a fenced
+  // block or a path a script reads would lead into no file or widen to the folder's every file, so only the bare one in
+  // Markdown is written: #1361, point 8)
   const cited = ['"Reporting" in `core/floor/topics.md`.', "`core/floor/topics.md`, rule 10.", "rule 10 of `core/floor/topics.md`.", "`core/floor/topics.md` (point 2).",
-    "@core/floor/topics.md", "#[[file:core/floor/topics.md]]", "git ls-files ':!core/floor/topics.md'", "Edit(core/floor/topics.md)"];
+    "@core/floor/topics.md", "#[[file:core/floor/topics.md]]", "git ls-files ':!core/floor/topics.md'", "Edit(core/floor/topics.md)",
+    "Rule 10 of `core/floor/topics.md`.", "`core/floor/topics.md`'s rule 10.", 'The "Reporting" section of `core/floor/topics.md`.', "Section 3 of `core/floor/topics.md`.",
+    "`core/floor/topics.md`: \"Reporting\".", "```", "cat `core/floor/topics.md`", "```"];
+  const script = "fs.readFileSync(`core/floor/topics.md`);\n";
+  put(".claude/hooks/read.mjs", script);
   put("notes/cited.md", [...cited, "And `core/floor/topics.md` and `core/modules/git.md`.", ""].join("\n"));
   commit("pointers to topics.md that cite in it, pull it in or name it in a pattern");
   r = write();
   const citedLeft = missed(l)[0]?.mend ?? "";
-  ok(read("notes/cited.md") === [...cited, "And `core/floor/topics/` and `core/roles/shared/work-flow.md`.", ""].join("\n") && citedLeft.includes("`notes/cited.md`"),
-    "  and of the pointers to topics.md only the bare one is written as the folder: one citing a section or rule, a pull-in, an exclusion or a permission's path is left for the step's mend", `${r.stdout}${r.stderr}\n---\n${read("notes/cited.md")}\n---\n${citedLeft}`);
+  ok(read("notes/cited.md") === [...cited, "And `core/floor/topics/` and `core/roles/shared/work-flow.md`.", ""].join("\n") && read(".claude/hooks/read.mjs") === script && citedLeft.includes("`notes/cited.md`"),
+    "  and of the pointers to topics.md only the bare one in Markdown is written as the folder: one citing a section or rule, a pull-in, an exclusion, a permission's path, one in a fenced block or in a script is left for the step's mend", `${r.stdout}${r.stderr}\n---\n${read("notes/cited.md")}\n---\n${citedLeft}`);
   back();
 }
 

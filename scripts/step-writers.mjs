@@ -228,7 +228,7 @@ export function writeMoved(p, busy) {
   let marks = null;
   try { marks = marksConfig(p); } catch { /* (marks whose path cannot be read are read as any other file) */ }
   for (const f of sure(p, namers(p))) {
-    const text = p.read(f) ?? "", c = partCut(f, text), own = t => movedIn(f === marks ? marksMoved(t, map) : t, map, oldPath, c?.[1]?.split("\n").map(l => l.replace(/\r$/u, "")));
+    const text = p.read(f) ?? "", c = partCut(f, text), own = t => movedIn(f === marks ? marksMoved(t, map) : t, map, oldPath, c?.[1]?.split("\n").map(l => l.replace(/\r$/u, "")), /\.(?:md|mdc|markdown)$/iu.test(f));
     if (!c) continue;
     let next = c.length === 3 ? `${own(c[0])}${c[1]}${own(c[2])}` : own(text);
     if (oldPath && readsOldAlone(p, f, copy)) next = next.split(atCopy(MOVED_GLOB, copy)).join(atCopy(`${MOVED_GLOB}, ${MOVED_GLOBS}`, copy));
@@ -240,15 +240,16 @@ export function writeMoved(p, busy) {
   return writes.map(([f]) => f);
 }
 
-// A file's text with each old path it names written as the file it now is, where its move is an exact one; a rule that
+// A file's text with each old path it names written as the file it now is, where its move is an exact one, or as the
+// folder it now leads to where it stands alone in Markdown (`md`; leadsAlone); a rule that
 // left its file named with its lead, `core/<old>`, "<lead>", as the step words it, named where it stands now; and a
 // pull-in (an import, Kiro's `#[[file:`) this writes into one that a line above, or the core's part (`part`, its lines),
 // already makes left out.
-function movedIn(text, map, oldPath, part = []) {
+function movedIn(text, map, oldPath, part = [], md = false) {
   if (!oldPath) return text;
   const apart = moved.apart(), exact = old => !(apart[old]?.length);
   const led = Object.entries(apart).reduce((t, [old, parts]) => parts.reduce((u, a) => u.split(`\`core/${old}\`, "${a.lead}"`).join(`\`core/${a.to}\`, "${a.lead}"`), t), text);
-  const next = led.replace(oldPath, (all, old, at, whole) => exact(old) && (!map[old].endsWith("/") || leadsAlone(whole, at, all.length)) ? `core/${map[old]}` : all);
+  const next = led.replace(oldPath, (all, old, at, whole) => exact(old) && (!map[old].endsWith("/") || (md && leadsAlone(whole, at, all.length))) ? `core/${map[old]}` : all);
   if (next === text) return text;
   const was = text.split("\n"), now = next.split("\n");
   const twice = (l, i) => (now.indexOf(l) < i && !(was[i] === l && was.indexOf(l) < i)) || (was[i] !== l && part.includes(l.replace(/\r$/u, "")));
@@ -256,16 +257,19 @@ function movedIn(text, map, oldPath, part = []) {
 }
 
 // Whether the old path at `at` in `text` is a pointer to the file alone, so that it leads to the folder the file moved to:
-// a code span `core/<old>` with no quoted title or numbered rule or point joined to it, as the pointers check joins them
-// (scripts/pointers.mjs, GLUE). A section or rule cited through it, a pull-in (`@`, `#[[file:`), an exclusion (`:!`) or a
-// permission's path would lead into no file or widen to the folder's every file, so each is left for the step's mend
-// (#1361, point 8). The size marks keep their own guard: a mark of a folder means nothing (marksMoved).
-const CITED = String.raw`(?:"[A-Z][^"]{1,60}"|“[A-Z][^”]{1,60}”|\b(?:rules?|points?) \d+(?:(?:, | and | to | or )\d+)*)`;
-const JOINED = String.raw`(?:\s*,\s*|,?\s+and\s+|,?\s+in\s+|\s+of\s+|\s*\(\s*|\s*,\s*in\s+)`;
-const citedBefore = new RegExp(`${CITED}${JOINED}$`, "u"), citedAfter = new RegExp(`^${JOINED}${CITED}`, "u");
+// in a Markdown file, outside a fenced block, a code span `core/<old>` whose sentence names no quoted title, no
+// numbered rule, point, section, step or part and no `'s`. A section or rule cited through it would lead into no file,
+// and anything else (a pull-in, `@` or `#[[file:`, an exclusion, a permission's path, a path a script reads) would
+// lead into a folder no tool reads or widen to its every file, so each is left for the step's mend (#1361, point 8).
+// The test is the writer's own and wider than the pointers check's joining (scripts/pointers.mjs): where it errs, a
+// path is left for the mend. The size marks keep their own guard: a mark of a folder means nothing (marksMoved).
+const CITES = /["“”]|\b(?:rules?|points?|sections?|steps?|parts?)\s+\d|^['’]s\b/iu;
+const FENCE = /^ {0,3}(?:```|~~~)/gmu, BREAK = /\n\s*\n|\n\s*(?:[-*+]|\d+[.)])\s|[.!?;](?=\s)/gu;
 function leadsAlone(text, at, length) {
-  if (text[at - 1] !== "`" || text[at + length] !== "`") return false;
-  return !citedBefore.test(text.slice(Math.max(0, at - 201), at - 1)) && !citedAfter.test(text.slice(at + length + 1, at + length + 201));
+  if (text[at - 1] !== "`" || text[at + length] !== "`" || (text.slice(0, at).match(FENCE)?.length ?? 0) % 2) return false;
+  const before = text.slice(Math.max(0, at - 201), at - 1), after = text.slice(at + length + 1, at + length + 201);
+  const from = [...before.matchAll(BREAK)].at(-1), to = after.search(BREAK);
+  return !CITES.test(from ? before.slice(from.index + from[0].length) : before) && !CITES.test(to < 0 ? after : after.slice(0, to));
 }
 
 // The size marks' text with each file under "read" at an old path that leads to one file named as that file, two that
