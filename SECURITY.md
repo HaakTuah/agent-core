@@ -30,9 +30,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
      a pull request adds under its manifest's "Differences" (`scripts/pr-reasons.mjs`), the rule files a checkout
      holds, the manifest too (`scripts/reading.mjs`, whose readers `scripts/pr-head.mjs` takes for the archive the keys
-     of a description are read against, and `scripts/rules.mjs` for the rules in them, which read only
-     regular files in real folders of the checkout's own, a pipe or device as no file and a link at any depth refused
-     with its mend, and the first tries the changed paths on the path patterns within 16 million steps for each
+     of a description are read against, noting each link met and passing, and `scripts/rules.mjs` for the rules in
+     them, which read only regular files in real folders of the checkout's own, a pipe or device as no file and a link
+     at any depth refused with its mend, and the first tries the changed paths on the path patterns within 16 million steps for each
      reading, a run of it or a pull request's description, each with a budget of its own, past which every pattern
      left matches), and the rule
      files the total read sums and reads for a cut or a join (`scripts/read-total.mjs`, which prints each name with its

@@ -20,7 +20,7 @@
 //
 //   import { headMends, headOf, keysAt } from "./pr-head.mjs";
 import { items } from "./archive.mjs";
-import { realFiles, regular } from "./reading.mjs";
+import { realFiles, regular, shown } from "./reading.mjs";
 
 const PLACEHOLDERS = ["to be added", "TBD", "TODO", "XXX", "FIXME"];
 export const SHOWN = 10;
@@ -125,8 +125,17 @@ export function keysAt(root, prefix = "", links = new Set()) {
 // so that no archive is read. { mends, oks }: the failures, and the lines that pass.
 export function headOf(body, at) {
   const links = new Set(), { mends, notes } = headMends(body, { keys: at === null ? null : keysAt(".", at, links), own: at === "" });
-  if (links.size) notes.push(`the archive's ${[...links].sort().map(l => JSON.stringify(l)).join(", ")} ${links.size > 1 ? "are links" : "is a link"}, read as no file`);
+  if (links.size) notes.push(linksNote(links));
   return { mends, oks: mends.length ? notes : [...notes, "the description names no archive key its head does not hold, and leaves no placeholder in"] };
+}
+
+// The note on the links met where the archive stands, `links` as keysAt() gathers them: each by the folder it stands at
+// or lies behind, in quotes with a control character written out (shown(), reading.mjs), the first SHOWN of them and
+// then the count of the rest.
+export function linksNote(links) {
+  const all = [...links].sort(), q = l => (shown(l) === l ? JSON.stringify(l) : shown(l));
+  const listed = `${all.slice(0, SHOWN).map(q).join(", ")}${all.length > SHOWN ? ` and ${all.length - SHOWN} more` : ""}`;
+  return `the archive's ${listed} ${all.length > 1 ? "are links or lie behind one" : "is a link or lies behind one"}, read as no file`;
 }
 
 // The failures of a description, { mends, notes }: each mend a line naming where it stands and what it names, then its

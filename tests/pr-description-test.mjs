@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { asked, copyAtBase, doneAsked, DONE_SINCE, HEAD_SINCE, headAsked, missing, PARTS } from "../scripts/pr-description.mjs";
 import { costMend, NO_COST } from "../scripts/pr-cost.mjs";
-import { HEAD_MEND, PLACE_MEND, headMends, headOf, keysAt } from "../scripts/pr-head.mjs";
+import { HEAD_MEND, PLACE_MEND, SHOWN, headMends, headOf, keysAt, linksNote } from "../scripts/pr-head.mjs";
 import { numberMend } from "../scripts/pr-number.mjs";
 import { reasonsMend } from "../scripts/pr-reasons.mjs";
 import { heldAt, waitsMend, waitsOn } from "../scripts/pr-waits.mjs";
@@ -120,8 +120,10 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
     fs.symlinkSync(path.join(outside, "instructions"), path.join(linked, "archive", "instructions"));
     let said;
     try { process.chdir(linked); said = headOf("core archive 1", "").oks; } finally { process.chdir(back); }
-    ok(said.includes(`the archive's "archive/instructions" is a link, read as no file`) && /no archive could be read/u.test(said.join()), "a link where the archive stands is named, and read as no archive");
+    ok(said.includes(`the archive's "archive/instructions" is a link or lies behind one, read as no file`) && /no archive could be read/u.test(said.join()), "a link where the archive stands is named, and read as no archive");
   }
+  const many = linksNote(new Set(["a\u009b[31m", ...Array.from({ length: SHOWN + 2 }, (_, n) => `w${n}`)]));
+  ok(many.startsWith(`the archive's "a\\u009b[31m", "w0"`) && many.includes(` and 3 more are links`) && !/[\u0080-\u009f]/u.test(many), "the links are named in quotes, a control character written out, the first ones and then the count of the rest");
   ok(headAsked(HEAD_SINCE, "export const HEAD_SINCE") && headAsked("2026-11-24T00:00:00Z", "export const HEAD_SINCE") && !headAsked("2026-11-22T23:59:59Z", "export const HEAD_SINCE") && !headAsked(HEAD_SINCE, "an older copy") && !headAsked(HEAD_SINCE, null) && !headAsked("", "export const HEAD_SINCE"),
     "the line is asked of a pull request opened on or after its day, its base's copy holding it");
 }
