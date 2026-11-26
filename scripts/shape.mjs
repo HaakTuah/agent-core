@@ -80,7 +80,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE, append, cycles, lyingUnder, nameTree, resolve } from "./code-shape.mjs";
-import { inProject, logged } from "./guards.mjs";
+import { inProject, logged, loggedAlone } from "./guards.mjs";
 import { didNotRun, installStep, installed, notInstalled } from "./packages.mjs";
 import { shapeFaults } from "./schemas.mjs";
 import { CHANGE_MARKS, FIRST_READS, PACKAGE_FILES, REACH, READERS, WHOLE_ON_PARSER, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unreachedReaders } from "./shape-readers.mjs";
@@ -610,8 +610,66 @@ export function notLinked(file, root = ".") {
   return path.join(root, file);
 }
 
-// The config the manifest's *shape check* row names (its first path to a .json file, in backticks), else the kit's.
-export const where = manifest => /`([\w./-]+\.json)`/u.exec(/^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "")?.[1] ?? KIT;
+// The config the manifest's *shape check* row names: its first path to a .json file, in backticks; in a row that says
+// `none`, the one after "config" that ends the reason (configTail), which offBy takes off it, so that the config's
+// other readers keep reading it while the check is off and a path the reason quotes is not taken for it. Else the kit's.
+const rowNames = manifest => {
+  const token = rowToken(manifest, "*shape check*");
+  if (token?.said === "none") return /^[\w./-]+\.json$/u.exec(configTail(token.reason)?.path ?? "")?.[0] ?? null;
+  const row = /^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "";
+  return /`([\w./-]+\.json)`/u.exec(row)?.[1] ?? null;
+};
+export const where = manifest => rowNames(manifest) ?? KIT;
+
+// What a project's own scan does about the baseline at `baseline`, whose entries name the project's files by path, where
+// that scan counts a path named in its tracked text as a use of that code and fails on it (#1289): the core cannot know
+// a project's own scans, so `--first` and the step's writer say it.
+export const scanMend = baseline => `where a scan of the project's own that counts a path named in its tracked text as a use of that code (an unused-code or reference check) fails on \`${baseline}\`, which names the project's files by path, have the scan leave \`${baseline}\` out, as a file the shape check writes, and never take out an entry of the scan's own list for it`;
+// Printed where `--first` or `--write` wrote a path into the baseline that it did not name before.
+const noteScan = baseline => console.log(`note ${baseline} names the project's files by path. Mend: ${scanMend(baseline)}`);
+
+// A manifest row's first text in backticks after its name `label`: { said } (trimmed) and { reason }, where `said` is
+// `none`, what follows that token as it stands (padded or not), "" where it holds no letter or digit, which gives no
+// reason; null where the row or the token is not there. The rows *shape check* and *mutation tool* (strength.mjs) read
+// it so.
+export function rowToken(text, label) {
+  const row = String(text ?? "").split(/\r?\n/u).find(l => l.includes(label));
+  if (row === undefined) return null;
+  const rest = row.slice(row.indexOf(label) + label.length), token = /`([^`]*)`/u.exec(rest);
+  if (!token) return null;
+  const after = trimTail(rest.slice(token.index + token[0].length).replace(/^[\s:|,;-]+/u, ""));
+  return { said: token[1].trim(), reason: /[\p{L}\p{N}]/u.test(after) ? after : "" };
+}
+
+// `text` with its trailing spaces and table bars taken off, in one pass from its end (a pattern anchored at the end
+// alone would try each start in turn).
+const trimTail = text => {
+  let end = text.length;
+  while (end > 0 && /[\s|]/u.test(text[end - 1])) end -= 1;
+  return text.slice(0, end);
+};
+
+// Whether the manifest's *shape check* row turns the check off (tasks/code-shape.md, "Only the owner turns the shape
+// check off"; #1107, point 3): the reason given after a `none` that is the row's first text in backticks, "" where it
+// gives none, which turns nothing off; null where the row says no `none`.
+export function offBy(manifest) {
+  const token = rowToken(manifest, "*shape check*");
+  if (token?.said !== "none") return null;
+  const reason = withoutConfig(token.reason);
+  return /[\p{L}\p{N}]/u.test(reason) ? reason : "";
+}
+
+// The config's path a `none` row's reason ends with (`; config \`<path>\``): { path, before }, the reason before it
+// with the separators between taken off, which is all of the reason; null where it ends with none. Found from the end,
+// in one pass (a pattern that started at each place would not), and read so by rowNames and offBy alike.
+const configTail = reason => {
+  const at = reason.lastIndexOf("config `"), tail = /^config `([^`]*)`$/u.exec(reason.slice(at));
+  if (at < 0 || /\w/u.test(reason[at - 1] ?? "") || !tail) return null;
+  let end = at;
+  while (end > 0 && /[\s;,]/u.test(reason[end - 1])) end -= 1;
+  return { path: tail[1], before: reason.slice(0, end) };
+};
+const withoutConfig = reason => configTail(reason)?.before ?? reason;
 
 // ---- the verdict ----
 
@@ -876,6 +934,7 @@ function first(config, at, self, numbers) {
   fs.mkdirSync(path.dirname(config.baseline), { recursive: true });
   fs.writeFileSync(config.baseline, written(numbers, {}, null));
   console.log(`${config.baseline}: the first baseline, ${plural(numbers.size, "entry", "entries")} that stand today, to be cleaned over time`);
+  noteScan(config.baseline);
   return 0;
 }
 
@@ -897,6 +956,7 @@ function write(config, at, self, numbers, base, found, named) {
   const grown = Object.fromEntries(Object.entries(old.grown).filter(([id]) => kept.has(id) || id.startsWith("mark: ")));
   fs.writeFileSync(config.baseline, written(kept, grown, old.audited));
   console.log(`${config.baseline}: ${plural(kept.size, "entry", "entries")} listed, ${old.listed.size} before`);
+  if ([...kept.keys()].some(id => !old.listed.has(id))) noteScan(config.baseline);
   return 0;
 }
 
@@ -972,10 +1032,39 @@ function check(config, at, self, found, base, named) {
   return 0;
 }
 
+// Whether the project's manifest turns the check off with a reason: it then says so, and why, and where the pull
+// request's base did not, that this pull request turns it off, which only the owner does. A `none` with no reason turns
+// nothing off, and it says so.
+function isOff(named, rest, base) {
+  if (named !== null || rest.length) return false; // (a config named, or a write or a suite asked, reads the config)
+  const said = offBy(tolerant(() => fs.readFileSync("core-manifest.md", "utf8")));
+  if (said === "") console.log("note the manifest's *shape check* row says `none` with no reason, which turns nothing off: the check runs. Mend: where the owner turns it off, give the owner's reason after `none`; else name the config there, or take the `none` out");
+  if (!said) return false;
+  if (base && !offBy(base.show("core-manifest.md"))) {
+    console.log(`::warning::this pull request turns the shape check off (the manifest's *shape check* row says \`none\`: ${logged(said)}), which only the owner does; ${base.name} did not, so it runs here and is off from the next pull request on (core/tasks/code-shape.md, "Only the owner turns the shape check off")`);
+    return false;
+  }
+  console.log(`ok   the shape check is off: the manifest's *shape check* row says \`none\`: ${logged(said)} (core/tasks/code-shape.md, "Only the owner turns the shape check off")`);
+  return true;
+}
+
+// A row that says `none` keeps naming a config of the project's own path after its reason, which the config's other
+// readers (the selection, the strength, the mutation) read too: a pull request whose row says `none` and drops the path
+// its base names fails, whether or not the check is off by then.
+function pathKept(named, base) {
+  const manifest = tolerant(() => fs.readFileSync("core-manifest.md", "utf8"));
+  if (named || !base || offBy(manifest) === null || rowNames(manifest) !== null) return;
+  const was = baseFiles(base, null).at;
+  if (was !== KIT) refuse(`the manifest's *shape check* row says \`none\` and no longer names the config at ${was}, which ${base.name}'s names, so the config's other readers (the selection, the strength, the mutation) would read the starter kit's at ${KIT}`, `keep the path in the row after the reason: | *shape check* | \`none\`: <the owner's reason>; config \`${was}\` |`);
+}
+
 function main(argv) {
   const self = path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/"); // (as a mend names it)
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, rest = named ? argv.slice(1) : argv;
-  const base = baseOf(), at = configAt(named, self, base);
+  const base = baseOf();
+  pathKept(named, base);
+  if (isOff(named, rest, base)) return 0;
+  const at = configAt(named, self, base);
   if (at === null) return unwritten(self, base);
   const config = parseConfig(fs.readFileSync(at, "utf8"), at);
   unchecked();
@@ -996,5 +1085,5 @@ function main(argv) {
 if (started(import.meta.url)) {
   try { process.exitCode = main(process.argv.slice(2)); }
   // (a reader's own failure that says its mend, as the parser's that cannot be loaded, is told as the check's own)
-  catch (e) { if (!(e instanceof Refused) && !/\. Mend: /u.test(String(e?.message))) throw e; console.error(`FAIL: ${logged(e.message)}`); process.exitCode = 1; }
+  catch (e) { if (!(e instanceof Refused) && !/\. Mend: /u.test(String(e?.message))) throw e; console.error(`FAIL: ${loggedAlone(e.message)}`); process.exitCode = 1; }
 }

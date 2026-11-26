@@ -1,10 +1,11 @@
-// What the steps write themselves (#1091): where a step's work is exact, a check's own config or baseline, or a
-// pointer's path, its `write` does it, as `node core/scripts/steps.mjs --write` runs it (steps.mjs, beside this file).
-// Each writer takes the project as steps.mjs's `project` reads it and returns the files it wrote; where it cannot run
-// (a package missing, a file it cannot read, a check that did not run to its end), it throws `Unwritten` before it writes
-// anything. It never writes a word of a project's rule text but a pointer's path, nor a file with changes not yet
-// committed (`held`), nor through a link. The writers that run a check's own writer run the project's copy of it, as
-// the steps read them. Git and Node's own modules only.
+// What the steps write themselves (#1091): where a step's work is exact, a check's own config or baseline, a pointer's
+// path, or the manifest's module lines placed from what is read (#1094), its `write` does it, as `node
+// core/scripts/steps.mjs --write` runs it (steps.mjs, beside this file). Each writer takes the project as steps.mjs's
+// `project` reads it and returns the files it wrote; where it cannot run (a package missing, a file it cannot read, a
+// check that did not run to its end), it throws `Unwritten` before it writes anything. It never writes a word of a
+// project's rule text but a pointer's path and the manifest's module lines, nor a file with changes not yet committed
+// (`held`), nor through a link. The writers that run a check's own writer run the project's copy of it, as the steps
+// read them. Git and Node's own modules only.
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -14,7 +15,9 @@ import { READ_MOST } from "./own-files.mjs";
 import { parseConfig, where as shapeAt } from "./shape.mjs";
 import { copiesConfig, marksConfig } from "./check-configs.mjs";
 import { atCopy } from "./core-path.mjs";
-import { MOVED_GLOB, MOVED_GLOBS, moved, namers, readsOldAlone } from "./step-checks-moved.mjs";
+import { MOVED_GLOB, MOVED_GLOBS, moved, namers, partCut, readsOldAlone, sure } from "./step-checks-moved.mjs";
+import { rewritten } from "./step-checks-modules.mjs";
+import { MANIFEST, pinsOnly } from "./sync-pins.mjs";
 import { HERE, plain, shown } from "./step-checks.mjs";
 import { Unread, copyAt } from "./workflow-calls.mjs";
 import { installed } from "./packages.mjs";
@@ -23,13 +26,20 @@ import { asLF, asMended, reads as workflowsRead } from "./workflows.mjs";
 /** A writer that could not run: it wrote nothing, and its message says why; a check that reads with a writer's pieces
  * throws it as workflow-calls.mjs's `Unread`, which it is. */
 export class Unwritten extends Unread {}
+/** A writer kept from a file with changes not yet committed (`held`): at a sync, its own (#1259, point 2). */
+export class Busy extends Unwritten { constructor(message, file) { super(message); this.file = file; } }
 
 // The files of the project at `root` with changes not yet committed, new ones among them, as git lists them: none is
-// written, so that what a writer writes stays apart from a session's own changes and from a sync's (#1091).
+// written, so that what a writer writes stays apart from a session's own changes and from a sync's (#1091). Left out:
+// a file the sync changed in its pins alone, in the index and the tree, the manifest's `Core:` line (#1094) or a call
+// to one of the core's workflows (#1248, point 4), which the writers write around and setAside puts back (sync-pins.mjs).
 export function held(root) {
   const out = execFileSync("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--no-renames"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
-  return new Set(out.split("\0").filter(Boolean).map(l => l.slice(3)));
+  const busy = new Set(out.split("\0").filter(Boolean).map(l => l.slice(3)));
+  for (const f of busy) if (pinsOnly(root, f)) busy.delete(f);
+  return busy;
 }
+export { MANIFEST };
 
 // Whether `f` may be written: a plain path of the project's own outside the copy, no link and under none, no file with
 // changes not yet committed and none git ignores, which no stash could set aside; else Unwritten, naming it.
@@ -38,9 +48,15 @@ export function writable(p, f, busy) {
   if (path.posix.normalize(f) !== f || f.startsWith(copyAt(p)) || leadsOut(p.root, at)) throw new Unwritten(`\`${shown(f)}\` is no file of the project's own outside the copy`);
   const st = fs.lstatSync(at, { throwIfNoEntry: false });
   if (st && !st.isFile()) throw new Unwritten(`\`${shown(f)}\` is no regular file`);
-  if (busy.has(f)) throw new Unwritten(`\`${shown(f)}\` has changes not yet committed: commit them or set them aside, then run it again`);
+  // (the manifest's, beyond its `Core:` line, which a sync's move alone `held` lets through: #1248, point 2)
+  if (busy.has(f)) throw new Busy(`\`${shown(f)}\` has changes not yet committed${f === MANIFEST ? " beyond its `Core:` line, whose move by the sync alone is let through" : ""}: commit them or set them aside, then run it again`, f);
   if (spawnSync("git", ["check-ignore", "-q", "--", f], { cwd: p.root }).status === 0) throw new Unwritten(`git ignores \`${shown(f)}\`: take it out of the ignore list and commit it, then run it again`);
 }
+
+// A file's own line ends (#1238), from its raw text (`p.read` turns CRLF into LF): CRLF where every line ends so, else
+// LF; `inEnds` writes an LF text in them.
+export const eolOf = (p, f) => { const raw = p.read(f, true) ?? ""; return /\r\n/u.test(raw) && !/(^|[^\r])\n/u.test(raw) ? "\r\n" : "\n"; };
+export const inEnds = (p, f, text) => eolOf(p, f) === "\r\n" ? text.replace(/\r?\n/gu, "\r\n") : text;
 
 // A file written, its folders made, once `writable` passed.
 function put(p, f, text) {
@@ -83,13 +99,12 @@ export const totalNoted = run => {
 };
 
 // The marks file written again with `change` made to its JSON, its own line ends kept.
-function marksWritten(p, run, change, busy) {
+export function marksWritten(p, run, change, busy) {
   writable(p, run.marks, busy);
   if (!run.json || typeof run.json !== "object" || Array.isArray(run.json)) throw new Unwritten(`${run.marks} is no JSON object to write a mark in`);
   const json = structuredClone(run.json);
   change(json);
-  const eol = /\r\n/u.test(p.read(run.marks) ?? "") ? "\r\n" : "\n";
-  put(p, run.marks, `${JSON.stringify(json, null, 2)}\n`.replace(/\n/gu, eol));
+  put(p, run.marks, inEnds(p, run.marks, `${JSON.stringify(json, null, 2)}\n`));
   return [run.marks];
 }
 
@@ -113,9 +128,24 @@ export function writeTotal(p, busy) {
   return to === null ? [] : marksWritten(p, r, json => { json.total = to; }, busy);
 }
 
+// Each of `files`, which a script of the core's writes and only a script reads (a lock file a package manager writes,
+// a check's baseline), named under "skip" in the size marks where neither "skip" nor "past" names it, so that no pull
+// request that changes one fails the split mark, which no split of it answers (#1247, point 2): the marks' path where
+// it wrote them, else none. Where the marks cannot be read as a JSON object or written, it writes nothing, and the size
+// check's own failure says the mend.
+export function skipWritten(p, files, busy) {
+  let marks, json;
+  try { marks = marksConfig(p); json = JSON.parse(p.read(marks) ?? "null"); } catch { return []; }
+  const skip = Array.isArray(json?.skip) ? json.skip : [], past = json?.past && typeof json.past === "object" ? json.past : {};
+  const add = files.filter(f => !skip.some(s => typeof s === "string" && s && f.startsWith(s)) && !Object.hasOwn(past, f));
+  if (!add.length) return [];
+  try { return marksWritten(p, { marks, json }, j => { j.skip = [...skip, ...add]; }, busy); } catch (e) { if (e instanceof Unwritten) return []; throw e; }
+}
+
 // 16, 18 and 19 November 2026: the shape check's config, where none stands, as the starter kit writes it, which the
 // check holds the project to until then; its first baseline where none stands; else the baseline written again, which
-// names every reader. The parser's packages not installed, the check refuses to write, and so does this.
+// names every reader; and the baseline under the size marks' "skip" (skipWritten). The parser's packages not installed,
+// the check refuses to write, and so does this.
 export function writeShape(p, busy) {
   const at = shapeAt(p.manifest), wrote = [];
   let text = p.read(at);
@@ -134,7 +164,7 @@ export function writeShape(p, busy) {
     for (const f of wrote) fs.rmSync(path.join(p.root, f)); // (the config it wrote for the run taken out again: it wrote nothing)
     throw e;
   }
-  return [...wrote, config.baseline];
+  return [...wrote, config.baseline, ...skipWritten(p, [config.baseline], busy)];
 }
 
 // 16 November 2026: each copy an agent tool's files held before the copies check read them, listed in its baseline by
@@ -181,10 +211,12 @@ export function writeBreaks(p, busy) {
 
 // 16 November 2026: each path of a file the rules left (core/modules/, floor/topics.md) in the project's own files the
 // step reads, as the step's check finds it there, written as the file it now is; a copies config that reads the old
-// folder alone given the new folders' patterns beside it; and the manifest's "Paths:" line, where it is word for word the
-// one the starter kit of releases 1 to 5 wrote, written as the kit writes it now. Where a move is no exact one (the old
-// path leads to a folder, a rule of its file stands elsewhere since, or the file would name one file twice), that file
-// is left as it stands, and so is a "Paths:" line of the project's own words, for the step's mend.
+// folder alone given the new folders' patterns beside it; the size marks' "read" (marksMoved); and the manifest's
+// "Paths:" line, where it is word for word the one the starter kit of releases 1 to 5 wrote, written as the kit writes
+// it now. Each path is written on its own (#1248, point 5): one whose move is no exact one (it leads to a folder, or a
+// rule of its file stands elsewhere since and the line does not name that rule by its lead) is left as it stands for
+// the step's mend, and so is a "Paths:" line of the project's own words. Never written: the core's part, the one
+// process's, or a file whose part cannot be told apart; nor a file the writer cannot tell is the project's own (sure).
 export const OLD_PATHS = "Paths: in the core's files, one into floor/, modules/, scripts/, setup/ or archive/ is under core/; any other is ours.";
 const quoted = f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 // The old paths of `map` as a pattern: `core/<old>` alone, never inside a longer name (`hardcore/`, `<old>.bak`).
@@ -192,25 +224,51 @@ export const oldPathsIn = map => Object.keys(map).length ? new RegExp(`(?<![\\w-
 export function writeMoved(p, busy) {
   const map = moved(), copy = copyAt(p), writes = [];
   const oldPath = oldPathsIn(map);
-  for (const f of namers(p)) {
-    const text = p.read(f) ?? "";
-    let next = movedIn(text, map, oldPath);
+  let marks = null;
+  try { marks = marksConfig(p); } catch { /* (marks whose path cannot be read are read as any other file) */ }
+  for (const f of sure(p, namers(p))) {
+    const text = p.read(f) ?? "", c = partCut(f, text), own = t => movedIn(f === marks ? marksMoved(t, map) : t, map, oldPath, c?.[1]?.split("\n").map(l => l.replace(/\r$/u, "")));
+    if (!c) continue;
+    let next = c.length === 3 ? `${own(c[0])}${c[1]}${own(c[2])}` : own(text);
     if (oldPath && readsOldAlone(p, f, copy)) next = next.split(atCopy(MOVED_GLOB, copy)).join(atCopy(`${MOVED_GLOB}, ${MOVED_GLOBS}`, copy));
     if (next !== text) writes.push([f, next]);
   }
   pathsLine(p, writes);
   writes.forEach(([f]) => writable(p, f, busy));
-  for (const [f, text] of writes) put(p, f, text);
+  for (const [f, text] of writes) put(p, f, inEnds(p, f, text));
   return writes.map(([f]) => f);
 }
 
-// A file's text with each old path it names written as the file it now is, or as it stands where a move is no exact one.
-function movedIn(text, map, oldPath) {
-  const apart = moved.apart();
-  const named = oldPath ? [...new Set([...text.matchAll(oldPath)].map(m => m[1]))] : [];
-  const twice = named.some(a => named.some(b => a !== b && map[a] === map[b]) || text.includes(`core/${map[a]}`));
-  const exact = old => !map[old].endsWith("/") && !(apart[old]?.length);
-  return !named.length || twice || !named.every(exact) ? text : text.replace(oldPath, (all, old) => `core/${map[old]}`);
+// A file's text with each old path it names written as the file it now is, where its move is an exact one; a rule that
+// left its file named with its lead, `core/<old>`, "<lead>", as the step words it, named where it stands now; and a
+// pull-in (an import, Kiro's `#[[file:`) this writes into one that a line above, or the core's part (`part`, its lines),
+// already makes left out.
+function movedIn(text, map, oldPath, part = []) {
+  if (!oldPath) return text;
+  const apart = moved.apart(), exact = old => !map[old].endsWith("/") && !(apart[old]?.length);
+  const led = Object.entries(apart).reduce((t, [old, parts]) => parts.reduce((u, a) => u.split(`\`core/${old}\`, "${a.lead}"`).join(`\`core/${a.to}\`, "${a.lead}"`), t), text);
+  const next = led.replace(oldPath, (all, old) => exact(old) ? `core/${map[old]}` : all);
+  if (next === text) return text;
+  const was = text.split("\n"), now = next.split("\n");
+  const twice = (l, i) => (now.indexOf(l) < i && !(was[i] === l && was.indexOf(l) < i)) || (was[i] !== l && part.includes(l.replace(/\r$/u, "")));
+  return now.filter((l, i) => !(/^\s*(?:@|#\[\[file:)/u.test(l) && twice(l, i))).join("\n");
+}
+
+// The size marks' text with each file under "read" at an old path that leads to one file named as that file, two that
+// now lead to one merged at the larger mark, since a key named twice is no JSON a reader reads one way (#1247, point
+// 4); its own line ends kept, the rest laid out as `marksWritten` lays it out, two spaces deep, so a file kept in another
+// layout is written whole where a key moves. Marks that are no JSON object with "read" stand as they are.
+function marksMoved(text, map) {
+  let json;
+  try { json = JSON.parse(text); } catch { return text; }
+  if (!json?.read || typeof json.read !== "object" || Array.isArray(json.read)) return text;
+  const apart = moved.apart(), read = {};
+  for (const [f, mark] of Object.entries(json.read)) {
+    const old = /^core\/(.+)$/u.exec(f)?.[1], to = old && map[old] && !map[old].endsWith("/") && !(apart[old]?.length) ? `core/${map[old]}` : f;
+    read[to] = Object.hasOwn(read, to) && Number.isInteger(read[to]) && Number.isInteger(mark) ? Math.max(read[to], mark) : mark;
+  }
+  if (JSON.stringify(read) === JSON.stringify(json.read)) return text;
+  return `${JSON.stringify({ ...json, read }, null, 2)}\n`.replace(/\n/gu, /\r\n/u.test(text) ? "\r\n" : "\n");
 }
 
 // The manifest's "Paths:" line of releases 1 to 5, word for word, written as the kit writes it now, into `writes`.
@@ -221,3 +279,15 @@ function pathsLine(p, writes) {
   if (before) before[1] = manifest.replace(OLD_PATHS, now);
   else writes.push(["core-manifest.md", manifest.replace(OLD_PATHS, now)]);
 }
+
+// The manifest with each module its list neither takes nor leaves out placed from what is read exactly (#1094;
+// step-checks-modules.mjs, `rewritten`, which `opts` narrows), and, by the step that places every module, each name the
+// core moved brought to where its text went (#1259, point 1), where there is one to place or bring.
+export const writePlaced = opts => (p, busy) => {
+  const text = rewritten(p, opts);
+  if (text === p.manifest) return [];
+  writable(p, "core-manifest.md", busy);
+  // (its own line ends kept: #1227)
+  put(p, "core-manifest.md", inEnds(p, "core-manifest.md", text));
+  return ["core-manifest.md"];
+};

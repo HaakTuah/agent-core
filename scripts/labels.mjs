@@ -27,7 +27,7 @@
 //   node core/scripts/labels.mjs [--make] [--owner login] [--since 2026-11-16T00:00:00Z]
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import { seen } from "./guards.mjs";
+import { parseBounded, seen } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { KINDS, LABEL, kindOf } from "./outcomes.mjs";
 import { broughtBy } from "./review-record.mjs";
@@ -36,7 +36,7 @@ import { ownerOf } from "./releases.mjs";
 import { VERDICT, byAgent, verdict } from "./stand-in-record.mjs";
 import { started } from "./started.mjs";
 
-export const LIST = JSON.parse(fs.readFileSync(new URL("./labels.json", import.meta.url), "utf8"));
+export const LIST = parseBounded(fs.readFileSync(new URL("./labels.json", import.meta.url), "utf8"));
 export const STATES = Object.keys(LIST.state), SENDERS = Object.keys(LIST.sender);
 const OWN_VOICE = ["by:owner", "by:chat", "by:design"];
 // Items and comments before the rule came stand as they were written: those before the day the project's copy gained
@@ -197,7 +197,7 @@ export const ghApi = (...a) => { const r = spawnSync("gh", ["api", ...a], { enco
 export function pagesOf(route, gh = ghApi) {
   const rows = [];
   for (let page = 1; page <= 500; page++) {
-    const got = JSON.parse(gh(`${route}${route.includes("?") ? "&" : "?"}per_page=100&page=${page}`) || "[]");
+    const got = parseBounded(gh(`${route}${route.includes("?") ? "&" : "?"}per_page=100&page=${page}`) || "[]");
     if (!Array.isArray(got)) throw new Error(`GitHub gave no list for ${route}`);
     rows.push(...got);
     if (got.length < 100) break;
@@ -228,19 +228,22 @@ function optionError(args, at, by, since) {
   return null;
 }
 
-// --make: the labels the repository lacks made, those of the list set to its colour and description.
-function makeLabels(repo) {
-  const have = pagesOf(`repos/${repo}/labels`);
+// --make, and the daily look's job (look.mjs; #1092): the labels the repository lacks made, those of the list set to its
+// colour and description, through `gh` (ghApi's form), each line said by `say`; the names made or set. A write GitHub
+// refuses throws, with gh's words, and what was made before it stands.
+export function makeLabels(repo, gh = ghApi, say = console.log) {
+  const have = pagesOf(`repos/${repo}/labels`, gh);
   const todo = toMake(have);
   // (a label set anew is named with what it was before it is set, so a project that used the name otherwise can
   // restore it, even where a later call fails)
   const was = new Map(have.map(l => [String(l.name).toLowerCase(), l]));
   for (const l of todo) {
-    if (l.how === "set") console.log(`Setting ${l.name}: it was ${l.was}, colour ${was.get(l.name.toLowerCase())?.color}, "${was.get(l.name.toLowerCase())?.description ?? ""}".`);
-    if (l.how === "make") ghApi("-X", "POST", `repos/${repo}/labels`, "-f", `name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
-    else ghApi("-X", "PATCH", `repos/${repo}/labels/${encodeURIComponent(l.was)}`, "-f", `new_name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
+    if (l.how === "set") say(`Setting ${l.name}: it was ${l.was}, colour ${was.get(l.name.toLowerCase())?.color}, "${was.get(l.name.toLowerCase())?.description ?? ""}".`);
+    if (l.how === "make") gh("-X", "POST", `repos/${repo}/labels`, "-f", `name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
+    else gh("-X", "PATCH", `repos/${repo}/labels/${encodeURIComponent(l.was)}`, "-f", `new_name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
   }
-  console.log(todo.length ? `Made or set in ${repo}: ${todo.map(l => l.name).join(", ")}.` : `Every label of the list stands in ${repo} as it says.`);
+  say(todo.length ? `Made or set in ${repo}: ${todo.map(l => l.name).join(", ")}.` : `Every label of the list stands in ${repo} as it says.`);
+  return todo.map(l => l.name);
 }
 
 // What is said where gh gave no list: issues switched off, or no answer at all.

@@ -14,6 +14,7 @@ import { heldKitIn, declare } from "../scripts/steps-kit.mjs";
 import { STEPS, notDone, project, report } from "../scripts/steps.mjs";
 import { READ_MOST } from "../scripts/own-files.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 
 const { ok, done } = tally();
 const tmp = scratchDir("steps-fresh-");
@@ -57,6 +58,35 @@ fs.writeFileSync(path.join(plainProject, "checks/copies-baseline.json"), "{}\n")
 found = differences(project(plainProject), fresh(project(plainProject)));
 ok(found.includes("checks/sizes.json: missing (the starter kit writes it today)") && found.some(d => d.startsWith("checks/copies-baseline.json: lacks the key \"windows\"")) && found.length === 2,
   "a config the kit writes beside its templates, missing or lacking a key, is listed", found.join("\n"));
+// (the list of what holds the project's own rules, which the kit writes too: #1095, point 6)
+const holders = path.join(plainProject, "checks/holders.json"), heldList = fs.readFileSync(holders, "utf8");
+fs.rmSync(holders);
+found = differences(project(plainProject), fresh(project(plainProject)));
+const lost = found.includes("checks/holders.json: missing (the starter kit writes it today)");
+fs.writeFileSync(holders, '{ "about": {} }\n');
+found = differences(project(plainProject), fresh(project(plainProject)));
+ok(lost && found.includes('checks/holders.json: lacks the key "holders"'), "the list of what holds the project's own rules, missing or lacking its key, is listed", found.join("\n"));
+fs.writeFileSync(holders, heldList);
+// (a game's previews and the versions check, read from the project's calls to the core's preview.yml and versions.yml,
+// the build and the config's path taken from them, and compared with what the kit writes for them: #1095, point 6)
+const base = differences(project(plainProject), fresh(project(plainProject))).join("\n");
+const callsTo = { preview: path.join(plainProject, ".github/workflows/preview.yml"), versions: path.join(plainProject, ".github/workflows/versions.yml") };
+fs.writeFileSync(callsTo.preview, `on:\n  workflow_run:\n    workflows: ["Build (web)"]\njobs:\n  preview:\n    uses: ${CORE}/.github/workflows/preview.yml@${"a".repeat(40)}\n`);
+fs.writeFileSync(callsTo.versions, `on:\n  workflow_dispatch:\njobs:\n  versions:\n    uses: ${CORE}/.github/workflows/versions.yml@${"a".repeat(40)}\n    with:\n      config: tools/versions.json\n`);
+const read = kind(project(plainProject)).o;
+const kitted = Object.fromEntries(fresh(project(plainProject)).filter(([to]) => [...Object.values(callsTo), path.join(plainProject, "tools/versions.json")].includes(path.join(plainProject, to))));
+found = differences(project(plainProject), fresh(project(plainProject)));
+ok(read.pages === "Build (web)" && read.versions === "tools/versions.json" && found.includes("tools/versions.json: missing (the starter kit writes it today)") && found.some(d => d.startsWith(".github/workflows/preview.yml: lacks") && d.includes("pull-requests: write")) && found.some(d => d.startsWith(".github/workflows/versions.yml: lacks") && d.includes("issues: write")),
+  "a project that calls the core's preview.yml or versions.yml is read as one, its build and config taken from the call, and a line of the kit's its call lacks, or the config it names, is listed", found.join("\n"));
+for (const [to, text] of Object.entries(kitted)) { fs.mkdirSync(path.dirname(path.join(plainProject, to)), { recursive: true }); fs.writeFileSync(path.join(plainProject, to), text); }
+fs.writeFileSync(path.join(plainProject, "tools/versions.json"), '{ "about": "" }\n');
+found = differences(project(plainProject), fresh(project(plainProject)));
+ok(found.includes('tools/versions.json: lacks the key "entries"'), "the versions config lacking the key its check reads is listed", found.join("\n"));
+fs.writeFileSync(path.join(plainProject, "tools/versions.json"), '{ "entries": [{ "own": true }] }\n');
+found = differences(project(plainProject), fresh(project(plainProject)));
+ok(Object.keys(kitted).length === 3 && found.join("\n") === base && kitted[".github/workflows/versions.yml"].includes("config: tools/versions.json"), "and once it holds what the kit writes for them, nothing more is listed", found.join("\n"));
+for (const f of [...Object.values(callsTo), path.join(plainProject, "tools")]) fs.rmSync(f, { recursive: true });
+ok(differences(project(plainProject), fresh(project(plainProject))).join("\n") === base && kind(project(plainProject)).o.pages === undefined, "a project that calls neither is asked for neither");
 const secWorkflow = path.join(plainProject, ".github/workflows/security-review.yml");
 fs.writeFileSync(secWorkflow, fs.readFileSync(secWorkflow, "utf8").replace(/^jobs:/m, "env: [SAMPLE\n\njobs:"));
 const unread = notDone(plainProject);
@@ -151,5 +181,23 @@ const lacks = fresh(p1, older);
 ok(lacks.length === olderKit.length - 1 && !lacks.some(([to]) => to === "docs/choices.md") && differences(p1, fresh(p1), [lacks]).length === 2,
   "an earlier kit that lacks a template added since still gives its other files to compare", lacks.map(([to]) => to).join());
 
+// ---- a paragraph or line the kit rewords past where its label is cut: one line that shows what differs (#1265, point 2) ----
+const reworded = path.join(tmp, "reworded", "setup", "template");
+fs.cpSync(path.join(root, TEMPLATES), reworded, { recursive: true });
+const NOW_WORDS = "any other tool: open each file named):", OLD_WORDS = "any other tool: open each file, by name,):";
+const NOW_LINE = "(core/tasks/updates.md)", OLD_LINE = "(core/tasks/updates.md, point 2)";
+const reword = (at, from, to) => { const was = fs.readFileSync(at, "utf8"), now = was.replaceAll(from, to); ok(now !== was, `${path.basename(at)} is reworded as the earlier kit wrote it`); fs.writeFileSync(at, now); };
+reword(path.join(reworded, "AGENTS.md.tmpl"), NOW_WORDS, OLD_WORDS);
+for (const f of fs.readdirSync(reworded).filter(n => /^dependabot.*\.tmpl$/.test(n))) reword(path.join(reworded, f), NOW_LINE, OLD_LINE);
+const third = kit("a-third-npm-project", { packages: "." }, { held: false });
+reword(path.join(third, "AGENTS.md"), NOW_WORDS, OLD_WORDS);
+reword(path.join(third, ".github/dependabot.yml"), NOW_LINE, OLD_LINE);
+const p3 = project(third);
+found = differences(p3, fresh(p3), [fresh(p3, reworded)]);
+const differs = file => found.filter(d => d.startsWith(`${file}:`));
+const [para] = differs("AGENTS.md"), [line] = differs(".github/dependabot.yml");
+ok(found.length === 2 && /^AGENTS\.md: differs in the paragraph "This project takes the shared rules/.test(para) && para.includes("open each file named") && para.includes("open each file, by name,")
+  && /^\.github\/dependabot\.yml: differs in the line "update-types/.test(line) && line.includes("updates.md, point 2)") && line.includes("updates.md)"),
+  "a paragraph and a line an earlier kit wrote, reworded by the kit past where a label is cut, give one line each, which shows the words that differ", found.join("\n"));
 
 done("steps-fresh");

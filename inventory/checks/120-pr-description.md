@@ -1,4 +1,4 @@
-- `scripts/pr-description.mjs`, `scripts/pr-cost.mjs`, `scripts/pr-number.mjs`, `scripts/pr-reads.mjs`, `scripts/pr-reasons.mjs`, `scripts/pr-waits.mjs`, `tests/pr-description-reads-test.mjs`, `tests/pr-description-reasons-test.mjs`, `tests/pr-description-yes-test.mjs`, `.github/workflows/pr-description.yml`, `.github/workflows/own-description.yml`,
+- `scripts/pr-description.mjs`, `scripts/pr-cost.mjs`, `scripts/pr-number.mjs`, `scripts/pr-reads.mjs`, `scripts/pr-reasons.mjs`, `scripts/pr-waits.mjs`, `tests/pr-description-reads-test.mjs`, `tests/pr-description-reasons-test.mjs`, `tests/pr-description-yes-test.mjs`, `.github/workflows/pr-description.yml`, `.github/workflows/own-description.yml`, `tests/own-description-test.mjs`,
   `scripts/milestones.mjs`, `scripts/done-when.mjs`, `scripts/owner-yes.mjs`, `scripts/path-only.mjs`,
   `scripts/meaning-kept.mjs`, `scripts/weakened.mjs`, `tests/weakened-test.mjs`, `tests/path-only-test.mjs`: fail a ready pull request whose
   description lacks a heading the project names, and, here, the lines the core asks, a test file weakened among them

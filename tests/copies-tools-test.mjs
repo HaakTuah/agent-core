@@ -24,7 +24,7 @@ try {
   const g = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   const commit = what => { g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", what); return g("rev-parse", "HEAD").trim(); };
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of ["copies.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "schemas.mjs", "core-owned.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
+  for (const f of ["copies.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "schemas.mjs", "core-owned.mjs", "copies-values.mjs", "code-shape-lexer.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
   fs.cpSync(path.join(here, "schemas"), path.join(dir, "core/scripts/schemas"), { recursive: true });
   fs.cpSync(path.join(here, "..", ".packages"), path.join(dir, "core/.packages"), { recursive: true, filter: parserLeftOut });
   fs.copyFileSync(path.join(here, "..", ".gitignore"), path.join(dir, "core/.gitignore")); // (the copy's own: the installed packages, each install's, are no file of the project's)
@@ -154,7 +154,7 @@ try {
     put(odd, `# Odd\n\n${OTHER}.\n`);
     g("add", "-A");
     r = check({ COPIES_BASE: written });
-    ok(r.status === 1 && /^FAIL: a new copy: .*x%0A::error::y\.md/m.test(r.out) && !/^::error::/m.test(r.out), "a file in a tool's folder whose name holds a line break is named on one line, escaped", r.out);
+    ok(r.status === 1 && /^FAIL: a new copy: .*x%0A: :error: :y\.md/m.test(r.out) && !/::/.test(r.out), "a file in a tool's folder whose name holds a line break is named on one line, escaped, each \"::\" broken", r.out);
     g("rm", "-q", "-f", odd);
     // (a tool's file that is a link inside the project is read through it, at the base as in the work tree)
     fs.symlinkSync("../../docs/a.md", path.join(dir, ".kiro/steering/link.md"));

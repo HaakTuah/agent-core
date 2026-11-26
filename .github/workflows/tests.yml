@@ -31,7 +31,7 @@
 # registry, npm's or PyPI's (scripts/lookup.mjs; #716), the week's wait on each one a change brings or updates (scripts/week-wait.mjs), and the
 # registry's signature on each installed one (npm audit signatures); the
 # mutation tool's in tests/mutation/ in the job that installs it, the step after its install.
-# Each job of the suites, three on Linux and eight on Windows on each Node, the network's on both, and the upgrade
+# Each job of the suites, three on Linux and fifteen on Windows on each Node, the network's on both, and the upgrade
 # test, are measured against a time mark (the "suites" of .github/shape.json, by scripts/shape.mjs), which a job past
 # it says as a warning and never fails on (tasks/tests.md, "A time mark measures and never fails"; #733, point 5).
 # On a pull request each job runs only the suites its change can reach, against the merge's first parent, its base, and
@@ -61,7 +61,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: "Empty: the tests in full, on both systems. Else the jobs to run alone, by words: a system (linux, windows) and parts (projects, sync, kit, steps, core, faults, places, terms, licences, tools, network, rest, upgrade, staged), such as: windows kit"
+        description: "Empty: the tests in full, on both systems. Else the jobs to run alone, by words: a system (linux, windows) and parts (projects, sync, converge, hostile, kit, fresh, steps, writes, core, faults, places, terms, licences, scans, packages, tools, network, rest, second, third, upgrade, staged), such as: windows kit"
         type: string
         default: ''
         required: false
@@ -131,26 +131,29 @@ jobs:
           ONLY: ${{ inputs.only }}
         run: node scripts/tests-parts.mjs "$ONLY" --output "$GITHUB_OUTPUT"
 
-  # (the suites are split in parts that run side by side, each under a time mark of its own: the core's checks from
-  # plain git on whole scratch projects, and what they leave out for the copy, with the hostile tests of the core's
-  # inputs (projects); the sync and its proof (sync); the starter kit (kit); the steps' test (steps); the check of the
-  # core's copy (core.yml) on scratch projects (core), on
-  # Windows in two halves of its test, the faults it names and where the copy stands (faults, places); the
-  # personal-terms check's own job (terms); the licence, NuGet and lookup (and its lookup again) checks, with the hostile
-  # tests of build files and packages (licences); the agent-tools check (tools), on Windows alone, since its cases
-  # outgrew the licences' mark there (#603) and then, beside the rest, the rest's (#647); the tests that reach the
-  # network, in a job of their own on each system once an hour (network); and the rest (rest). Each step's condition
-  # names its part in the job's list "parts", read by substring: no name holds another, but that core is named beside
-  # its half. On Windows, where a suite that starts many processes runs several times slower, a job
-  # takes kit with steps, the second half with terms, and each other part alone; on Linux three jobs
-  # take them, kit, core, licences, terms and tools in one, projects and sync in the second, which keeps the name of the
-  # suite that was whole and so its mark, lowered, and rest and steps, the steps run once on Linux, in the third, since
-  # with the parser reading C# the second passed its mark (#529). Each part is sized by its steps' times on the slow runner, which takes half as long again as another, so
-  # that it ends within its mark there too, no mark raised: on Windows, by #506's run on 02b9c4e, about 375 of 600, 320
-  # of 600, 135 and 265 of 450, 300 of 450 and 240 of 480 seconds; on Linux, by that run, about 160 and 160 of 240
-  # (#504). The sync left projects in #540, when projects took 583 of its 600 seconds on a slow runner, its two longest
-  # steps the checks from plain git (249 to 349) and the sync (99 to 173). Beside them the upgrade job, which takes
-  # longer; #387, #405, #411, #424, #425, #489, #504, #540)
+  # (the suites are split in parts that run side by side, each under a time mark of its own. Each part is a word of the
+  # jobs' list "parts", which each step's condition names, read by substring: no name holds another, but that core is
+  # named beside its half. The parts: the core's checks from plain git on whole scratch projects (projects); the hostile
+  # tests of the core's inputs and what the checks leave out for the copy (hostile); the sync's proof (sync); the one
+  # process and each writer's round trip (converge); the starter kit (kit) and the steps' tests on a fresh start (fresh),
+  # the rest of the steps' tests in two (steps, writes); the check of the core's copy (core.yml) on scratch projects
+  # (core), on Windows in two halves of its test, the faults it names and where the copy stands (faults, places); the
+  # personal-terms check's own job (terms); the NuGet check's own steps with the checks of the core's own packages and tools list (licences); the licence, lookup and scan checks,
+  # with the hostile tests of build files and packages (scans); the core's packages from its lock file (packages); the
+  # agent-tools check (tools), on Windows alone, since its cases outgrew the licences' mark there (#603); the tests that
+  # reach the network, in a job of their own on each system once an hour (network); and the rest, in three (rest,
+  # second, third). On Windows, where a suite that starts many processes runs several times slower, a job takes each of
+  # these alone but kit with fresh, core with faults, core with places and terms, and tools with packages; on Linux
+  # three jobs take them all: kit, core, licences, terms, tools, scans and packages in one; projects, sync, converge and
+  # hostile in the second, which keeps the name of the suite that was whole and so its mark, lowered; and rest, steps,
+  # fresh, writes, second and third, the steps run once on Linux, in the third (#529). Each part is sized by its steps'
+  # times on the slow runner, which takes half as long again as another, so that it ends within its mark there too, no
+  # mark raised, and well within the job's limit: on Windows, by a run of every part on both Nodes (run 45339915083, #1213),
+  # the longer of the two, of 600 (projects) 481, of 300 (sync) 228 and (hostile) 164, of 600 (kit with fresh) 488, of
+  # 450 (converge) 239, (steps) 352, (writes) 354, (core with faults) 95, (core with places and terms) 380, (licences)
+  # 329, (scans) 329 and (tools with packages) 280, and the rest's three of 480, 325, 369 and 253 seconds (a part with a
+  # test failing for another cause may end early, so the figures of such a part are read again when it passes).
+  # Beside them the upgrade job, which takes longer; #387, #405, #411, #424, #425, #489, #504, #540, #514, #1213)
   suites:
     name: suites (${{ matrix.os }}, ${{ matrix.parts }}${{ matrix.node == '.node-least' && ', the least Node' || '' }})
     needs: [moved, pick]
@@ -160,18 +163,22 @@ jobs:
     strategy:
       fail-fast: false
       # (each job on the pin and on the least long-term Node, the file setup-node reads, #526; on a pull request and a
-      # push to main the three on Linux alone, on the hourly run the eight on Windows and the network's on both, and on
+      # push to main the three on Linux alone, on the hourly run the fifteen on Windows and the network's on both, and on
       # a start by hand all of them, the last list, or those of it the parts named pick; #733, points 3, 6 and 9; #954)
       # (set whole for each event, since GitHub adds back an entry of `include` that matches no combination left after
       # `exclude`: each job named with its Node, its suite, its runner and its parts)
       matrix:
-        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"}]' || github.event_name == 'schedule' && '[{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-version","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-version","suite":"suites-network","os":"windows-latest","parts":"network"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-least","suite":"suites-network","os":"windows-latest","parts":"network"}]' || inputs.only != '' && needs.pick.outputs.suites || '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-version","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-version","suite":"suites-network","os":"windows-latest","parts":"network"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-least","suite":"suites-network","os":"windows-latest","parts":"network"}]') }}
+        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools scans packages"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync converge hostile"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps fresh writes second third"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools scans packages"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync converge hostile"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps fresh writes second third"}]' || github.event_name == 'schedule' && '[{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-converge","os":"windows-latest","parts":"converge"},{"node":".node-version","suite":"suites-hostile","os":"windows-latest","parts":"hostile"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit fresh"},{"node":".node-version","suite":"suites-steps","os":"windows-latest","parts":"steps"},{"node":".node-version","suite":"suites-writes","os":"windows-latest","parts":"writes"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-scans","os":"windows-latest","parts":"scans"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-rest-two","os":"windows-latest","parts":"second"},{"node":".node-version","suite":"suites-rest-three","os":"windows-latest","parts":"third"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools packages"},{"node":".node-version","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-version","suite":"suites-network","os":"windows-latest","parts":"network"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-converge","os":"windows-latest","parts":"converge"},{"node":".node-least","suite":"suites-hostile","os":"windows-latest","parts":"hostile"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit fresh"},{"node":".node-least","suite":"suites-steps","os":"windows-latest","parts":"steps"},{"node":".node-least","suite":"suites-writes","os":"windows-latest","parts":"writes"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-scans","os":"windows-latest","parts":"scans"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-rest-two","os":"windows-latest","parts":"second"},{"node":".node-least","suite":"suites-rest-three","os":"windows-latest","parts":"third"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools packages"},{"node":".node-least","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-least","suite":"suites-network","os":"windows-latest","parts":"network"}]' || inputs.only != '' && needs.pick.outputs.suites || '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools scans packages"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync converge hostile"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps fresh writes second third"},{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-converge","os":"windows-latest","parts":"converge"},{"node":".node-version","suite":"suites-hostile","os":"windows-latest","parts":"hostile"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit fresh"},{"node":".node-version","suite":"suites-steps","os":"windows-latest","parts":"steps"},{"node":".node-version","suite":"suites-writes","os":"windows-latest","parts":"writes"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-scans","os":"windows-latest","parts":"scans"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-rest-two","os":"windows-latest","parts":"second"},{"node":".node-version","suite":"suites-rest-three","os":"windows-latest","parts":"third"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools packages"},{"node":".node-version","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-version","suite":"suites-network","os":"windows-latest","parts":"network"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools scans packages"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync converge hostile"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps fresh writes second third"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-converge","os":"windows-latest","parts":"converge"},{"node":".node-least","suite":"suites-hostile","os":"windows-latest","parts":"hostile"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit fresh"},{"node":".node-least","suite":"suites-steps","os":"windows-latest","parts":"steps"},{"node":".node-least","suite":"suites-writes","os":"windows-latest","parts":"writes"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-scans","os":"windows-latest","parts":"scans"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-rest-two","os":"windows-latest","parts":"second"},{"node":".node-least","suite":"suites-rest-three","os":"windows-latest","parts":"third"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools packages"},{"node":".node-least","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-least","suite":"suites-network","os":"windows-latest","parts":"network"}]') }}
     # (the run's token reads the checks too: the selection asks whether "tests" passed on the merged head, on a push)
     permissions:
       contents: read
       checks: read
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    # (15 minutes, but 22 for the one job that also runs the strength check on a pull request, the condition its steps
+    # name below: its suites take about 10.5 minutes, Stryker's set-up about 30 seconds and the check its whole budget,
+    # 240, so at 15 it stood within seconds of its limit and was cancelled with every step passed; 22 holds it on a
+    # runner half again as slow, as #232 and #387 gave the Windows jobs room; #1291)
+    timeout-minutes: ${{ matrix.os == 'ubuntu-latest' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' && 22 || 15 }}
     # (on Linux, but in the part network, each step runs with the network cut off, loopback still up, so a test that
     # reaches it fails there, saying its mend where its output shows the fetch refused, or stalls until its time runs
     # out; a step that must reach it names its own shell, bash, and
@@ -194,13 +201,13 @@ jobs:
         shell: bash
         run: node scripts/install.mjs all
       - name: zizmor and actionlint, which the workflow check and its test run, fetched at their pins outside the repository (scripts/workflow-tools.sh; #580)
-        if: ${{ contains(matrix.parts, 'rest') }}
+        if: ${{ contains(matrix.parts, 'second') || contains(matrix.parts, 'third') }}
         timeout-minutes: 5
         continue-on-error: true
         shell: bash
         run: bash scripts/workflow-tools.sh >> "$GITHUB_ENV"
       - name: lychee, which the pointer check runs, fetched at its pin outside the repository (scripts/lychee.sh; #582)
-        if: ${{ contains(matrix.parts, 'rest') }}
+        if: ${{ contains(matrix.parts, 'third') }}
         timeout-minutes: 5
         continue-on-error: true
         shell: bash
@@ -218,19 +225,19 @@ jobs:
       # script of its own, as the tools' fetches are, at the pins its header names: the wheels of the code scan's engine, and
       # Betterleaks' archive for the personal-terms check's tests; #772)
       - name: The code scan's engine, its wheels fetched at their pins for its test (Linux, where the suites run with the network cut off)
-        if: ${{ runner.os == 'Linux' && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-test.mjs ')) }}
+        if: ${{ runner.os == 'Linux' && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-test.mjs ')) }}
         timeout-minutes: 5
         shell: bash
         run: bash scripts/test-downloads.sh wheels >> "$GITHUB_ENV"
       - name: Betterleaks' release, its archive fetched at the check's pin for the tests of the personal-terms check (Linux, where the suites run with the network cut off)
-        if: ${{ runner.os == 'Linux' && runner.arch == 'X64' && (contains(matrix.parts, 'terms') || contains(matrix.parts, 'projects')) && (env.RUN == 'all' || contains(env.RUN, ' tests/personal-terms-test.mjs ') || contains(env.RUN, ' tests/copy-left-out-test.mjs ')) }}
+        if: ${{ runner.os == 'Linux' && runner.arch == 'X64' && (contains(matrix.parts, 'terms') || contains(matrix.parts, 'hostile')) && (env.RUN == 'all' || contains(env.RUN, ' tests/personal-terms-test.mjs ') || contains(env.RUN, ' tests/copy-left-out-test.mjs ')) }}
         timeout-minutes: 5
         shell: bash
         run: bash scripts/test-downloads.sh archives >> "$GITHUB_ENV"
-      # (only the part projects: the system's temp folder, a short name under the home folder on another drive than the
-      # checkout, is what the other Windows parts still test their scripts against; #882)
-      - name: Scratch folders of the part projects on the runner's own drive, where git writes a tree three times faster than under the system's temp folder (#951)
-        if: ${{ runner.os == 'Windows' && contains(matrix.parts, 'projects') }}
+      # (only the parts projects and hostile: the system's temp folder, a short name under the home folder on another drive
+      # than the checkout, is what the other Windows parts still test their scripts against; #882)
+      - name: Scratch folders of the parts projects and hostile on the runner's own drive, where git writes a tree three times faster than under the system's temp folder (#951)
+        if: ${{ runner.os == 'Windows' && (contains(matrix.parts, 'projects') || contains(matrix.parts, 'hostile')) }}
         run: echo "TEMP=$RUNNER_TEMP" >> "$GITHUB_ENV" && echo "TMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: The second the suites start at, for their time mark
         run: echo "SUITES_START=$(date +%s)" >> "$GITHUB_ENV"
@@ -238,37 +245,40 @@ jobs:
         if: ${{ contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/versions-test.mjs ')) }}
         run: node tests/versions-test.mjs
       - name: The licence check's lists and readers
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licences-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licences-test.mjs ')) }}
         run: node tests/licences-test.mjs
+      - name: The licence check's npm lock files its config does not name, and the core's own config's form
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-locks-test.mjs ')) }}
+        run: node tests/licence-locks-test.mjs
       - name: The licence check on a whole project, and its scan
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-test.mjs ')) }}
         run: node tests/licence-scan-test.mjs
       - name: The licence check's owner's yes, on the staged project
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-yes-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-yes-test.mjs ')) }}
         run: node tests/licence-yes-test.mjs
       - name: What the licence scan reads, its paths held to the project and JSON of any depth
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-limits-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-limits-test.mjs ')) }}
         run: node tests/licence-scan-limits-test.mjs
       - name: The licence scan on the programs a file downloads, pinned by version and checksum
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-pins-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-pins-test.mjs ')) }}
         run: node tests/licence-scan-pins-test.mjs
       - name: The licence scan on the forms of an npm command
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-test.mjs ')) }}
         run: node tests/licence-fetch-test.mjs
       - name: The licence scan on each place a command is written
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-places-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-places-test.mjs ')) }}
         run: node tests/licence-fetch-places-test.mjs
       - name: The licence scan on the fetchers it cannot read
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-other-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-other-test.mjs ')) }}
         run: node tests/licence-fetch-other-test.mjs
       - name: The licence scan on pages and components
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-pages-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-pages-test.mjs ')) }}
         run: node tests/licence-fetch-pages-test.mjs
       - name: The licences read back from the installed packages
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-installed-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-installed-test.mjs ')) }}
         run: node tests/licence-installed-test.mjs
       - name: The NuGet check
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-test.mjs ')) }}
         run: node tests/nuget-test.mjs
       - name: The NuGet check's fetch before the restore, against each package's content hash
         if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-fetch-test.mjs ')) }}
@@ -276,32 +286,38 @@ jobs:
       - name: The NuGet check's whole job, where its restore must succeed (it asks NuGet's registry; #772)
         if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-gate-network-test.mjs ')) }}
         run: node tests/nuget-gate-network-test.mjs
+      - name: The signature check's mend for an npm too old for it, followed as worded (it installs npm and a package from npm's registry; #1262)
+        if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/npm-mend-test.mjs ')) }}
+        run: node tests/npm-mend-test.mjs
+      - name: The code scan's own logic, which needs no engine (its reading of a description, the files the engine did not read, the verdicts)
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-logic-test.mjs ')) }}
+        run: node tests/code-scan-logic-test.mjs
       - name: The code scan of a private project, its engine fetched by its digest (#546)
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-test.mjs ')) }}
         run: node tests/code-scan-test.mjs
       - name: The hand-written readers, against SPDX's own parser and an XML parser (on Linux, where tar unpacks them)
         if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/readers-test.mjs ')) }}
         run: node tests/readers-test.mjs
       - name: The exact-versions check
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/exact-versions-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/exact-versions-test.mjs ')) }}
         run: node tests/exact-versions-test.mjs
       - name: The lookup of a new package, on recorded answers
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-test.mjs ')) }}
         run: node tests/lookup-test.mjs
       - name: The lookup of a new package, run on a project
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-run-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-run-test.mjs ')) }}
         run: node tests/lookup-run-test.mjs
       - name: The lookup of a new package from PyPI, on recorded answers
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-pypi-test.mjs ')) }}
         run: node tests/lookup-pypi-test.mjs
       - name: The sync's step that asks a lookup beside each check of exact versions
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-step-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-step-test.mjs ')) }}
         run: node tests/lookup-step-test.mjs
       - name: The lookup again of what a project holds, on recorded answers
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/held-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/held-test.mjs ')) }}
         run: node tests/held-test.mjs
       - name: The core's packages, from its lock file alone
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/packages-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'packages') && (env.RUN == 'all' || contains(env.RUN, ' tests/packages-test.mjs ')) }}
         run: node tests/packages-test.mjs
       - name: The agent-tools check, the kit's hooks and a project with no list
         if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-test.mjs ')) }}
@@ -478,87 +494,114 @@ jobs:
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-review-wait-test.mjs ')) }}
         run: node tests/code-review-wait-test.mjs
       - name: The proof that an update from main is the merge git makes, and the review statuses' run on one
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/clean-merges-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/clean-merges-test.mjs ')) }}
         run: node tests/clean-merges-test.mjs
+      - name: What runs with power, and the light commits that touch none of it
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/power-test.mjs ')) }}
+        run: node tests/power-test.mjs
       - name: The security-review workflow's shell, for each kind it branches on
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/security-review-workflow-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/security-review-workflow-test.mjs ')) }}
         run: node tests/security-review-workflow-test.mjs
+      - name: The description check's draft and ready branches, run as GitHub runs them (#809)
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/own-description-test.mjs ')) }}
+        run: node tests/own-description-test.mjs
       - name: The proof that a pull request changes only the progress file's lines, each for an issue it may name
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-only-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-only-test.mjs ')) }}
         run: node tests/queue-only-test.mjs
       - name: The workflow check
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/workflows-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/workflows-test.mjs ')) }}
         run: node tests/workflows-test.mjs
+      - name: The workflow check's glue that runs zizmor and actionlint
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/workflow-tools-test.mjs ')) }}
+        run: node tests/workflow-tools-test.mjs
       - name: The step's shell with the network cut off, and, run under it, that the cut stands (#770)
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/offline-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/offline-test.mjs ')) }}
         run: node tests/offline-test.mjs
       - name: The release jobs' install of every package
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/release-install-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/release-install-test.mjs ')) }}
         run: node tests/release-install-test.mjs
       - name: The core-moved check
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-moved-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-moved-test.mjs ')) }}
         run: node tests/core-moved-test.mjs
       - name: The one script of the core's checks without a secret (on Linux; the NuGet check's test runs it on Windows too)
         if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/checks-test.mjs ')) }}
         run: node tests/checks-test.mjs
+      - name: The base the core's workflows name on a pull request, HEAD^1, read by the lookup and the package checks (on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/base-parent-test.mjs ')) }}
+        run: node tests/base-parent-test.mjs
       - name: Where the core's copy stands, as the manifest names it
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-path-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-path-test.mjs ')) }}
         run: node tests/core-path-test.mjs
       - name: The copy's path, for Claude Code's hooks and the workflows a project calls
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-path-hooks-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-path-hooks-test.mjs ')) }}
         run: node tests/core-path-hooks-test.mjs
       - name: Where the owner's inbox is, issues or the folder
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/inbox-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/inbox-test.mjs ')) }}
         run: node tests/inbox-test.mjs
       - name: The labels and openers, and their check
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/labels-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/labels-test.mjs ')) }}
         run: node tests/labels-test.mjs
+      - name: A question or idea from a project that names a rule says which of its reasons does not hold
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/reasons-said-test.mjs ')) }}
+        run: node tests/reasons-said-test.mjs
       - name: The settings only the owner gives, in one checklist
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/owner-settings-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/owner-settings-test.mjs ')) }}
         run: node tests/owner-settings-test.mjs
+      - name: The host read and written for the steps, on a stand-in for GitHub
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/host-test.mjs ')) }}
+        run: node tests/host-test.mjs
+      - name: Whether a repository is private, as its host says it, on a stand-in for GitHub
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/host-private-test.mjs ')) }}
+        run: node tests/host-private-test.mjs
       - name: The reader of a project's call of the security review, for the owner's settings
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/review-caller-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') && (env.RUN == 'all' || contains(env.RUN, ' tests/review-caller-test.mjs ')) }}
         run: node tests/review-caller-test.mjs
       - name: The hostile tests of an input, a pull request's description
-        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-pr-text-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'hostile') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-pr-text-test.mjs ')) }}
         run: node tests/hostile-pr-text-test.mjs
       - name: The hostile tests of an input, comments and reviews on a pull request
-        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-pr-comments-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'hostile') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-pr-comments-test.mjs ')) }}
         run: node tests/hostile-pr-comments-test.mjs
       - name: The hostile tests of an input, what a pull request changes
-        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-pr-changes-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'hostile') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-pr-changes-test.mjs ')) }}
         run: node tests/hostile-pr-changes-test.mjs
       - name: The hostile tests of an input, issues, their comments and labels
-        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-issues-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'hostile') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-issues-test.mjs ')) }}
         run: node tests/hostile-issues-test.mjs
       - name: The hostile tests of an input, what GitHub's API answers
-        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-github-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'hostile') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-github-test.mjs ')) }}
         run: node tests/hostile-github-test.mjs
       - name: The hostile tests of an input, a project's configs of the core's checks, its manifest and SECURITY.md
-        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-configs-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'hostile') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-configs-test.mjs ')) }}
         run: node tests/hostile-configs-test.mjs
       - name: The hostile tests of an input, a project's build, package and workflow files
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-build-files-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-build-files-test.mjs ')) }}
         run: node tests/hostile-build-files-test.mjs
       - name: The hostile tests of an input, what a package brings
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-packages-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/hostile-packages-test.mjs ')) }}
         run: node tests/hostile-packages-test.mjs
       # (on every pull request, whatever the selection: a hostile test added with no step, which the selection would run
       # alone, is what it finds)
       - name: The core's own inputs, each named with its hostile tests (SECURITY.md, rule 5)
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'second') }}
         run: node tests/own-inputs-test.mjs
       - name: The core's releases, what a project follows, and cutting one
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/releases-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/releases-test.mjs ')) }}
         run: node tests/releases-test.mjs
+      - name: check.mjs as a release's trial runs it, and the trial's record
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-test.mjs ')) }}
+        run: node tests/trial-test.mjs
+      - name: A job the workflow runner cannot read, and the trial's not measured
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/unread-test.mjs ')) }}
+        run: node tests/unread-test.mjs
       - name: The jobs a start by hand that names parts runs alone
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/tests-parts-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/tests-parts-test.mjs ')) }}
         run: node tests/tests-parts-test.mjs
       - name: The core's address stands in one place, and is this repository's
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-address-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-address-test.mjs ')) }}
         run: node tests/core-address-test.mjs
       - name: The tree a copy must be
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/copy-tree-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/copy-tree-test.mjs ')) }}
         run: node tests/copy-tree-test.mjs
       - name: The copy of the core's check (core.yml), its own job on scratch projects
         if: ${{ !cancelled() && contains(matrix.parts, 'core') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-yml-test.mjs ')) }}
@@ -568,32 +611,35 @@ jobs:
       - name: The core's checks from plain git (check.mjs), on scratch projects
         if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/check-test.mjs ')) }}
         run: node tests/check-test.mjs
+      - name: The core's checks from plain git (check.mjs) on a sync, its own calls run and the base's left at an older pin
+        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/check-sync-test.mjs ')) }}
+        run: node tests/check-sync-test.mjs
       - name: What a project's checks leave out for the core's copy, held to README.md's list
-        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/copy-left-out-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'hostile') && (env.RUN == 'all' || contains(env.RUN, ' tests/copy-left-out-test.mjs ')) }}
         run: node tests/copy-left-out-test.mjs
       - name: The sync, and the proof that a sync is pure, against every way a sync branch can carry more
         if: ${{ !cancelled() && contains(matrix.parts, 'sync') && (env.RUN == 'all' || contains(env.RUN, ' tests/pure-sync-test.mjs ')) }}
         run: node tests/pure-sync-test.mjs
       - name: The one process that writes what the core owns, on projects the starter kit writes (#1083)
-        if: ${{ !cancelled() && contains(matrix.parts, 'sync') && (env.RUN == 'all' || contains(env.RUN, ' tests/converge-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'converge') && (env.RUN == 'all' || contains(env.RUN, ' tests/converge-test.mjs ')) }}
         run: node tests/converge-test.mjs
       - name: Each writer of the core's read back by its own readers, on projects of each kind the starter kit writes (#1108)
-        if: ${{ !cancelled() && contains(matrix.parts, 'sync') && (env.RUN == 'all' || contains(env.RUN, ' tests/round-trip-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'converge') && (env.RUN == 'all' || contains(env.RUN, ' tests/round-trip-test.mjs ')) }}
         run: node tests/round-trip-test.mjs
       - name: The proof that a change to what runs by itself is only comments and steps' names
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/comment-only-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/comment-only-test.mjs ')) }}
         run: node tests/comment-only-test.mjs
       - name: The proof that a change to what runs by itself is only comments and steps' names, the script run end to end
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/comment-only-run-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/comment-only-run-test.mjs ')) }}
         run: node tests/comment-only-run-test.mjs
       - name: The proof that a change to the floor or the review guidelines only follows files the pull request moves
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/path-only-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/path-only-test.mjs ')) }}
         run: node tests/path-only-test.mjs
       - name: The design check's word that a change to the floor or the review guidelines keeps its meaning
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/meaning-kept-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/meaning-kept-test.mjs ')) }}
         run: node tests/meaning-kept-test.mjs
       - name: Whether a script was started by itself
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/started-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/started-test.mjs ')) }}
         run: node tests/started-test.mjs
       - name: The starter kit, and the core's own checks on a project it writes
         if: ${{ !cancelled() && contains(matrix.parts, 'kit') && (env.RUN == 'all' || contains(env.RUN, ' tests/init-test.mjs ')) }}
@@ -608,28 +654,37 @@ jobs:
         if: ${{ !cancelled() && contains(matrix.parts, 'terms') && (env.RUN == 'all' || contains(env.RUN, ' tests/personal-terms-test.mjs ')) }}
         run: node tests/personal-terms-test.mjs
       - name: The words check, the dated records' added lines too
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/general-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/general-test.mjs ')) }}
         run: node tests/general-test.mjs
+      - name: A parse error names where, not what, and every JSON.parse of the scripts stands where its error is worded so
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/parse-errors-test.mjs ')) }}
+        run: node tests/parse-errors-test.mjs
+      - name: The marks check, a rule written read for its reason, its holder and its condition
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/pattern-test.mjs ')) }}
+        run: node tests/pattern-test.mjs
       - name: The cap's own check
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/size-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/size-test.mjs ')) }}
         run: node tests/size-test.mjs
       - name: The pointer check
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pointers-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/pointers-test.mjs ')) }}
         run: node tests/pointers-test.mjs
       - name: The pointer check's link checker, lychee, read and decided against a base, with a stand-in for it (#582)
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/links-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/links-test.mjs ')) }}
         run: node tests/links-test.mjs
       - name: The copies check on the agent tools' files, what stood there noted until it is listed
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/copies-tools-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/copies-tools-test.mjs ')) }}
         run: node tests/copies-tools-test.mjs
+      - name: The copies check's part for a value written twice, a pin or a pattern, what the base held noted (#1139)
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/copies-values-test.mjs ')) }}
+        run: node tests/copies-values-test.mjs
       - name: What a project holds twice, or against the core, listed and its exact part corrected
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/twice-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/twice-test.mjs ')) }}
         run: node tests/twice-test.mjs
       - name: What --fix of what a project holds twice cannot follow, and so keeps
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/twice-kept-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/twice-kept-test.mjs ')) }}
         run: node tests/twice-kept-test.mjs
       - name: The pointers in the core's own floor and modules lead somewhere, and their Markdown links and the headings they name, by lychee
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') }}
         run: node scripts/pointers.mjs --core
       - name: What a release asks of a project, step by step, and a project beside a fresh start
         if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-test.mjs ')) }}
@@ -638,103 +693,112 @@ jobs:
         if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-slots-test.mjs ')) }}
         run: node tests/steps-slots-test.mjs
       - name: A project beside a fresh start, and what the steps read of the files it holds
-        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-fresh-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'fresh') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-fresh-test.mjs ')) }}
         run: node tests/steps-fresh-test.mjs
       - name: The steps on a project whose copy of the core stands at a path of its own or in a library
-        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-vendored-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'fresh') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-vendored-test.mjs ')) }}
         run: node tests/steps-vendored-test.mjs
       - name: The configs a project's own workflows give its checks, as the steps and the fresh start read them
         if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-own-configs-test.mjs ')) }}
         run: node tests/steps-own-configs-test.mjs
       - name: The steps' writers, each step a script does whole written and read done after it, the rule files' words kept
-        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-write-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-write-test.mjs ')) }}
         run: node tests/steps-write-test.mjs
+      - name: The steps' writers keep a file's Windows line ends
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/step-writers-crlf-test.mjs ')) }}
+        run: node tests/step-writers-crlf-test.mjs
       - name: The reading of a run's configs, from its script, its argument and every source of a config
-        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-configs-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-configs-test.mjs ')) }}
         run: node tests/steps-run-configs-test.mjs
       - name: The reading of a run behind a shell, a wrapper, a here-document or a subshell
-        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-wrappers-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-wrappers-test.mjs ')) }}
         run: node tests/steps-run-wrappers-test.mjs
       - name: The reading of the words of a run, what names the script and what runs it
-        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-words-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-words-test.mjs ')) }}
         run: node tests/steps-run-words-test.mjs
       - name: The reading of a run's environment and of texts that try it, and the bash grammar
-        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-hostile-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-run-hostile-test.mjs ')) }}
         run: node tests/steps-run-hostile-test.mjs
       - name: The readers of when and how the checks run, which the steps read
-        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-checks-run-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-checks-run-test.mjs ')) }}
         run: node tests/steps-checks-run-test.mjs
       - name: The readers of what the project's files name, which the steps read
-        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-files-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-files-test.mjs ')) }}
         run: node tests/steps-files-test.mjs
       - name: The reader of the agent tools' files, which a step reads
-        if: ${{ !cancelled() && contains(matrix.parts, 'steps') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-tool-files-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-tool-files-test.mjs ')) }}
         run: node tests/steps-tool-files-test.mjs
+      - name: The steps read by a tool fetched at set-up, where a session fetched it
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-fetched-test.mjs ')) }}
+        run: node tests/steps-fetched-test.mjs
       - name: What holds each rule of the floor and the modules, read
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/holders-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/holders-test.mjs ')) }}
         run: node tests/holders-test.mjs
       - name: The rules of a commit, read once for each case set from it
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/rules-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/rules-test.mjs ')) }}
         run: node tests/rules-test.mjs
       - name: A rule's reasons, printed in one step
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/reasons-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/reasons-test.mjs ')) }}
         run: node tests/reasons-test.mjs
       - name: What holds each rule names only rules that stand
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') }}
         run: node scripts/holders.mjs
       - name: Which rules each role cites, counted for the state report
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/cited-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/cited-test.mjs ')) }}
         run: node tests/cited-test.mjs
+      - name: Which files two merged pull requests each added to within a week, for the busy-record step
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/busy-records-test.mjs ')) }}
+        run: node tests/busy-records-test.mjs
       - name: The outcomes the state report leads with, and how a correction is counted
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/outcomes-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/outcomes-test.mjs ')) }}
         run: node tests/outcomes-test.mjs
       - name: The blind sample the state report asks the owner to answer
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/blind-sample-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/blind-sample-test.mjs ')) }}
         run: node tests/blind-sample-test.mjs
       - name: The check that the core takes each module or gives its reason
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/own-modules-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/own-modules-test.mjs ')) }}
         run: node tests/own-modules-test.mjs
       - name: The core takes each of its own modules, or its AGENTS.md gives its reason
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') }}
         run: node scripts/own-modules.mjs
       - name: Each check's failure says its mend, and each check's test reads it
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/mend-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/mend-test.mjs ')) }}
         run: node tests/mend-test.mjs
       - name: The manifest check
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/manifest-reads-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/manifest-reads-test.mjs ')) }}
         run: node tests/manifest-reads-test.mjs
       - name: Each slot of the core's README carries its mark, read by a reader that stands here or with a default
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') }}
         run: node scripts/manifest-reads.mjs --core
       - name: The tools reader
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/tools-read-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/tools-read-test.mjs ')) }}
         run: node tests/tools-read-test.mjs
       - name: The order of a pull request's checks and reviews
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/stage-order-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/stage-order-test.mjs ')) }}
         run: node tests/stage-order-test.mjs
       - name: The entry-files check
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/entry-files-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/entry-files-test.mjs ')) }}
         run: node tests/entry-files-test.mjs
       - name: Each agent tool's entry file here pulls in what the core's own AGENTS.md names
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') }}
         run: node scripts/entry-files.mjs --core
       - name: The check of what the core offers each agent tool
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/tools-offer-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/tools-offer-test.mjs ')) }}
         run: node tests/tools-offer-test.mjs
       - name: What the core offers one agent tool it offers each, a cell for each tool
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') }}
         run: node scripts/tools-offer.mjs
       - name: The reading script, by role and by task
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/reading-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/reading-test.mjs ')) }}
         run: node tests/reading-test.mjs
       - name: The total read
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/read-total-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/read-total-test.mjs ')) }}
         run: node tests/read-total-test.mjs
       - name: Every module and role of the core says when it is read, in words the reading script matches
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') }}
         run: node scripts/reading.mjs --check
       - name: None of the core's own workflows names the forbidden trigger or is no YAML, and zizmor and actionlint find nothing in them
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') }}
         run: node scripts/workflows.mjs --core
       - name: What the core's own workflows and scripts use, each to its list
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
@@ -745,7 +809,7 @@ jobs:
       - name: Each package new to the core's own lock files looked up in its registry, npm's or PyPI's (floor rule 15; once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }}
         env:
-          LOOKUP_BASE: ${{ github.event.pull_request.base.sha }} # empty on a push to main, where nothing is new
+          LOOKUP_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }} # the merge's first parent, which the checkout holds (#1231); empty on a push to main, where nothing is new
         shell: bash
         run: node scripts/lookup.mjs .github/licences.json
       - name: The week's wait on each package the lock files bring or update (floor rule 7; once, on Linux)

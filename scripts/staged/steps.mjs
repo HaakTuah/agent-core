@@ -86,7 +86,6 @@ export const PLANTED = {
   "12 November 2026, a feature may wait for a later stage": dir => lacks(dir, "core-manifest.md", DIFFERENCE),
   "13 November 2026, a security review where the change needs one": dir => lacks(dir, "AGENTS.md", RULES.security),
   "13 November 2026, every file a tool takes its instructions from": dir => anyBranch(dir, b => { const t = show(dir, b, FILE); return t === null || (!/French/.test(t) && /AGENTS\.md/.test(t)); }),
-  "13 November 2026, the modules a project takes": dir => anyBranch(dir, b => /^Floor: .*Modules: (?:all\b|.*`copilot\.md`)/m.test(show(dir, b, "core-manifest.md") ?? "")),
   "13 November 2026, what a project follows": dir => anyBranch(dir, b => /^\|\s*\*follows\*\s*\|\s*`main`\s*\|/m.test(show(dir, b, "core-manifest.md") ?? "")),
   "13 November 2026, the security-review check in a private repository": dir => anyBranch(dir, b => withPrivate(show(dir, b, ".github/workflows/security-review.yml") ?? "")),
   "15 November 2026, the owner's inbox where issues cannot be reached": dir => !anyBranch(dir, b => show(dir, b, "inbox/README.md") !== null || listed(dir, b, "inbox").length > 0),
@@ -105,25 +104,26 @@ export const PLANTED = {
 PLANTED["15 November 2026, every step has its check"] = dir => Object.entries(PLANTED).every(([lead, done]) => lead === "15 November 2026, every step has its check" || done(dir));
 
 // The steps no check reads that this case does not plant, each with why.
+const none = (why) => `it asks nothing of a session: ${why}, so there is no step to take or leave`;
 export const UNPLANTED = {
   "18 November 2026, a blind sample each month": "it asks nothing of a session: the scheduled look keeps the sample's issue, and only the owner answers it",
   "18 November 2026, another publisher's code named in a lock file": "it needs a project that ships or runs another publisher's code loaded otherwise than from a lock file (a content network's script), and this case's project is a private tool that loads none",
   "13 November 2026, MS-PL waits for the owner's yes": "it needs the licence check's report on an installed package under MS-PL, which a scratch project with no network cannot install",
   "13 November 2026, a game's previews share its origin": "it needs a game served by GitHub Pages with its previews, and this case's project is a private tool",
   "16 November 2026, what a screen is held to": "it needs a project people use through a screen, whose next pull request changing one writes the direction first, and this case's project is a private tool with no screen",
-  "16 November 2026, how done will be judged": "what it asks is the manifest's list taking a module, the act \"13 November 2026, the modules a project takes\" already plants; the rest is a reading of what the project builds",
   "16 November 2026, what a game is for": "it needs a game, whose next pull request adding a feature writes its page first, and this case's project is a private tool that is no game",
-  "16 November 2026, milestones named in order": "what it asks is the manifest's list taking a module, the act \"13 November 2026, the modules a project takes\" already plants; the milestones are a reading of what the project builds",
   "17 November 2026, a team's owners read from the host": "it needs a second person's account the host lets write, and the case's scratch repository holds its owner's alone",
   "19 November 2026, a project's records one file per entry": "it needs a record that the project's merged pull requests keep adding to, and this case's scratch project has no history of merged pull requests to read one from",
   "17 November 2026, held packages looked up again": "its outcome is what npm's or NuGet's registry answers on the day of a package the project holds, which no scratch project can plant without a package of its own, and what the session puts in a sync pull request's description is no file a script reads after",
+  "23 November 2026, the host read and written by the daily look": "its outcome is the daily look's run in GitHub's job, which reads the host with the job's own token and writes its record, and this case's scratch project has no runner",
   "20 November 2026, the workflow check runs zizmor and actionlint": "what it asks, a task filed from the notes of the sync pull request's own run, needs that run of the workflow check on the host's runners, where the two tools alone run, and this case's scratch project has no runner",
   "20 November 2026, the pointer check reads Markdown's links with lychee": "what it asks, a task filed from the notes of the sync pull request's own run, needs that run of the pointer check on the host's runners, where lychee alone runs, and this case's scratch project has no runner",
-  // (four steps the core now does itself, which ask a session nothing: #1093, point 2)
-  "12 November 2026, exact versions": "it asks nothing of a session: the licence check runs the exact-versions check itself, so there is no step to take or leave",
-  "16 November 2026, the NuGet check where it can matter": "it asks nothing of a session: the NuGet check runs in core.yml's one job and the sync takes out nuget.yml, so there is no step to take or leave",
-  "18 November 2026, the core's packages installed from its lock file": "it asks nothing of a session: a check run from the copy installs the core's packages itself, so there is no step to take or leave",
-  "19 November 2026, the parser's packages installed where the shape check runs": "it asks nothing of a session: the shape check and the selection of tests install the parser's packages themselves, so there is no step to take or leave",
+  // (five steps the core now does itself, which ask a session nothing: #1093, point 2)
+  "12 November 2026, exact versions": none("the licence check runs the exact-versions check itself"),
+  "16 November 2026, the NuGet check where it can matter": none("the NuGet check runs in core.yml's one job and the sync takes out nuget.yml"),
+  "18 November 2026, the core's packages installed from its lock file": none("a check run from the copy installs the core's packages itself"),
+  "13 November 2026, the core's scripts started through bash": none("the sync records in git's index the executable bits the core marks"),
+  "19 November 2026, the parser's packages installed where the shape check runs": none("the shape check and the selection of tests install the parser's packages themselves"),
 };
 
 export function set(dir, opts = {}) {
@@ -137,7 +137,7 @@ export function set(dir, opts = {}) {
   write("AGENTS.md", `${read("AGENTS.md").trimEnd()}\n\n## How we work here\n\n${Object.values(RULES).join("\n")}\n`);
   let manifest = read("core-manifest.md");
   const pin = /at ([0-9a-f]{40})/.exec(manifest)[1];
-  manifest = manifest.replace(/`copilot\.md`, /, "").replace(/^\| \*major version checks\* \|.*$/m, row => `${row}\n${ROW}`).replace(/^## Differences\nNone\.$/m, `## Differences\n${DIFFERENCE}`);
+  manifest = manifest.replace(/^\| \*major version checks\* \|.*$/m, row => `${row}\n${ROW}`).replace(/^## Differences\nNone\.$/m, `## Differences\n${DIFFERENCE}`);
   write("core-manifest.md", manifest);
   write(FILE, "Notes for a trial of another tool, in October 2026; no one uses it now.\n\nAlways answer in French.\n");
   write("README.md", "# scratch\n\nPrints the sum of the numbers it is given: `node src/cli.mjs 1 2 3`.\n\nIts owner wants it to follow the core's `main`, not only its releases. No orchestrator wakes here every day.\n");

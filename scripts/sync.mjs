@@ -1,6 +1,6 @@
 // The sync (README, "How a project takes the core", point 1): run from a project's root, it brings the project's copy
 // of the core to a newer commit of the core, as a sync PR carries it. It writes the copy whole at that commit, at the path the
-// manifest's "Core:" line names (`core/` as a rule; core-path.mjs), moves that line to it, and moves each call to a core workflow whose workflow changed (as `core.yml` checks),
+// manifest's "Core:" line names (`core/` as a rule; core-path.mjs), with the executable bits the core marks staged in git's index (#1093), moves that line to it, and moves each call to a core workflow whose workflow changed (as `core.yml` checks),
 // listing those calls, and prints what the sync asks of the project beyond the copy (the core's setup/sync-notes.md, the
 // entries it gained between the two commits), then, from the copy it has just written, every step a release asks that
 // is not done, what the steps' writers wrote of them where a script does it exactly, set aside in a stash to be
@@ -17,7 +17,9 @@
 //                                           commit whose checks all passed (greenMain), or its newest
 //                                           release where it follows the releases (releases.mjs, beside this file),
 //                                           unless that release changes nothing the project takes (staysAt there)
-//   node core/scripts/sync.mjs <full SHA>   to that commit of the core's main, whatever the project follows
+//   node core/scripts/sync.mjs <full SHA>   to that commit of the core's main, whatever the project follows; at the
+//                                           pin the copy stands at, it moves nothing and does all else a sync does,
+//                                           what it asks since the pin before and every report (samePin; #1246)
 //
 // The first copy: a project with its manifest written and no copy yet runs this file from a clone of the core's main
 // (`node <the clone>/scripts/sync.mjs`, a full SHA after it for another commit), and the copy is written at the commit its
@@ -28,11 +30,12 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
+import { recordModes } from "./copy-tree.mjs";
 import { readCore } from "./core-path.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { everyInstall } from "./packages.mjs";
 import { started } from "./started.mjs";
-import { NOTES, asksBetween, fetchCore, followsOf, greenMain, hostSaid, inBare, jumped, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
+import { NOTES, asksLeft, fetchCore, followsOf, greenMain, hostSaid, inBare, jumped, newestRelease, past, pinsBefore, plainEnv, releasesIn, staysAt, untar } from "./releases.mjs";
 import { FOLDER } from "./sync-notes.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
@@ -43,12 +46,14 @@ const fail = msg => { throw new Failure(msg); };
 
 // What a sync prints for its pull request's description, each a script of the new copy with its arguments (`kits`:
 // the folder of the earlier starter kits, beside the bare repository of the core; `old`, the copy's pin before): the
-// steps not done, the differences from a fresh start, where the inbox is, what the labels lack, the owner's settings
+// steps not done, the differences from a fresh start, where the inbox is, what the labels lack, the steps read on the host (host.mjs; #1092), the
+// packages gone stale (held.mjs; #1095), the owner's settings
 // where one is new since `old`, what the project holds twice or against the core (#1087), the line that lists what the sync's own paths outside the copy call for, the
 // pins of the project's workflows above all (reading.mjs, by which the description check reads that line), then what the
 // steps' writers wrote, set aside in a stash for a pull request of its own after the sync's, which stays pure (steps.mjs
 // --write --aside; #1091), and last the line attached.mjs prints.
-const REPORTS = (kits, old) => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["owner-settings.mjs", "--since", old, "--fetched", path.dirname(kits), "--report"], ["twice.mjs", "--fetched", path.dirname(kits), "--since", old], ["reading.mjs", "builder", "--changed", "HEAD", "--line"], ["steps.mjs", "--write", "--aside"], ["attached.mjs", "--line", "--fetched", path.dirname(kits)]];
+// (`old` null, where the pin before cannot be read: every setting only the owner gives, as at the first copy)
+const REPORTS = (kits, old) => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["host.mjs"], ["held.mjs"], ["owner-settings.mjs", ...(old ? ["--since", old, "--fetched", path.dirname(kits)] : []), "--report"], ["twice.mjs", "--fetched", path.dirname(kits), ...(old ? ["--since", old] : [])], ["reading.mjs", "builder", "--changed", "HEAD", "--line"], ["steps.mjs", "--write", "--aside"], ["attached.mjs", "--line", "--fetched", path.dirname(kits)]];
 
 // Where the copy stands, as the manifest's "Core:" line names it (tasks/repositories.md; core-path.mjs); null, said,
 // where a library carries the core, which is synced in the library's own repository.
@@ -120,7 +125,7 @@ export function moveCalls(pin, tmp, own) {
   return { moved, unread };
 }
 
-// What the sync moved (the copy, the manifest's line and the workflow calls), and what it asks beyond the copy.
+// What the sync moved (the copy, the manifest's line and the workflow calls).
 function sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp) {
   const changed = git(["diff", "--stat", "--format=", old, pin], tmp).split("\n").pop() || "no files";
   console.log(`${at} ${old.slice(0, 7)} -> ${pin.slice(0, 7)}${release} (${changed.trim()}); ${manifest} moved.`);
@@ -128,26 +133,35 @@ function sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp) {
     ? `Workflow calls moved:\n  ${moved.join("\n  ")}`
     : "No workflow call moved: the PR changes no workflow.");
   if (unread.length) console.log(`Workflows not read, so no call in them moved, each no regular file of the project's own of at most ${READ_MOST} bytes: ${unread.join(", ")}. Make each a file of the project's own, then move its calls by hand to ${pin}.`);
+}
+
+// What a sync from `old` to `pin` asks of the project beyond the copy, and whether it jumps past two releases. An entry
+// whose step the new copy reads done here (`done`, doneHere) is given by its lead alone, the rest in full (#1264, point 2).
+function sayAsks({ at, old, pin }, tmp, done = null) {
   // What this sync asks of the project beyond the copy: the entries the core's sync notes gained between the two pins.
   // (A pin from before the notes gives every entry. Where the entries cannot be read, it says so: never an all-clear.)
-  const asks = asksBetween(old, pin, tmp);
+  // (an entry whose step says it asks nothing of what stands stays in the notes and is left out here, counted: #1094)
+  const read = asksLeft(old, pin, tmp), asks = read?.asks ?? null, left = read?.quiet ?? 0;
+  const lead = l => /^- \*\*([^*]+?)\.\*\*/u.exec(l)?.[1], given = (asks ?? []).map(l => done?.has(lead(l)) ? `- ${lead(l)}: done here, as its step reads.` : l);
+  const brief = given.filter((l, i) => l !== asks[i]).length, briefly = brief ? ` Each of the ${brief} whose step reads done here (\`${at}scripts/steps.mjs\`) is given by its lead alone.` : "";
+  const besides = left ? ` (${left} ${left === 1 ? "entry that asks" : "entries that ask"} nothing of what stands ${left === 1 ? "is" : "are"} left out here; ${left === 1 ? "it stands" : "they stand"} in ${at}${FOLDER}/.)` : "";
   console.log(asks === null
     ? `What this sync asks of the project beyond the copy could not be read: read the entries of ${at}${FOLDER}/ newer than the old pin.`
     : asks.length
-      ? `This sync asks more of the project than the copy (${at}${NOTES}). Not in this PR, a pure sync: do each in a PR of its own once this one is merged, or file it for the queue where it is large.\n${asks.join("\n")}`
-      : `This sync asks nothing of the project beyond the copy (${at}${NOTES}).`);
+      ? `This sync asks more of the project than the copy (${at}${NOTES}). Not in this PR, a pure sync: do each in a PR of its own once this one is merged, or file it for the queue where it is large.${briefly}${besides}\n${given.join("\n")}`
+      : `This sync asks nothing of the project beyond the copy (${at}${NOTES}).${besides}`);
   // (a jump past two releases makes the next reading of the project against the core whole: #464)
   if (jumped(old, tmp)) console.log(`This sync jumps from a copy older than the core's last two releases, so the project is read against the core whole again (${at}tasks/cleaning.md, "A project is read against the core once, then for what each release changes"): once this pull request is merged, take checks/core-reading.json out in a pull request of its own, and the step that reads it asks the whole reading.`);
 }
 
 // The folder of the earlier starter kits, each in a folder named for its commit.
-// (fresh.mjs is given the starter kit of the old pin and of every release, to find the wording the core has left)
-function kitsOf(old, tmp) {
+// (fresh.mjs is given the starter kit of each pin the manifest named and of every release, to find the wording the core has left)
+function kitsOf(pins, tmp) {
   const kits = path.join(tmp, "kits");
-  for (const sha of new Set([old, ...releasesIn(tmp).map(r => r.sha)])) {
+  for (const sha of new Set([...pins, ...releasesIn(tmp).map(r => r.sha)])) {
     const to = path.join(kits, sha);
     fs.mkdirSync(to, { recursive: true });
-    try { execFileSync("tar", ["-x", "-f", "-", "-C", to], { input: inBare(tmp, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 }) }); }
+    try { untar(to, inBare(tmp, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 })); }
     catch { fs.rmSync(to, { recursive: true, force: true }); } // (a commit from before the starter kit: no kit to compare)
   }
   return kits;
@@ -190,21 +204,38 @@ function sync(tmp) {
   if (!target) return;
   const { pin, release } = target;
   if (!past(pin, "refs/heads/main", tmp)) fail(`${pin} is not a commit of the core's main`);
-  if (pin === old && !first) { console.log(`${at} is already at ${pin}: nothing to sync`); converge(dir, kitsOf(old, tmp)); return; }
+  if (pin === old && !first) { samePin({ at, dir, pin, manifest }, tmp); return; }
 
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
-  // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
-  execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(tmp, ["archive", pin], { encoding: "buffer", maxBuffer: 1 << 28 }) });
+  untar(dir, inBare(tmp, ["archive", pin], { encoding: "buffer", maxBuffer: 1 << 28 }));
   fs.writeFileSync(manifest, text.replace(lineRe, line => line.replace(old, pin)));
+  recordModes(dir, pin, tmp);
   install(dir);
 
   const { moved, unread } = moveCalls(pin, tmp, own);
   if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); converge(dir, null, true); reportOf(at, dir, "owner-settings.mjs", ["--report"]); return; }
   sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp);
-  const kits = kitsOf(old, tmp);
+  const kits = kitsOf([old, ...pinsBefore(manifest, pin, tmp)], tmp);
   converge(dir, kits);
+  sayAsks({ at, old, pin }, tmp, doneHere(dir));
   report(at, dir, kits, old);
+}
+
+// A sync at the pin the copy stands at already: it moves nothing, and does all else a sync does, for the sync's pull
+// request (#1246, point 1). A copy an older sync script moved got from it the copy and the pins alone, so this run,
+// which the sync notes ask for once, gives what that script did not: the packages, the core's files and parts, what
+// the sync asks since the pin before, read from the project's own history of its manifest, and every report.
+function samePin({ at, dir, pin, manifest }, tmp) {
+  console.log(`${at} is already at ${pin}: nothing to move`);
+  recordModes(dir, pin, tmp);
+  install(dir);
+  const pins = pinsBefore(manifest, pin, tmp), before = pins[0] ?? null;
+  const kits = kitsOf([pin, ...pins], tmp);
+  converge(dir, kits);
+  if (before) sayAsks({ at, old: before, pin }, tmp, doneHere(dir));
+  else console.log(`The pin before ${pin.slice(0, 7)} could not be read from the history of ${manifest} (no commit of it names another pin of the core's main), so what the last sync asks beyond the copy is not listed: read the entries of ${at}${FOLDER}/ dated on or after the day of the project's sync before it, and every setting only the owner gives is listed below.`);
+  report(at, dir, kits, before);
 }
 
 // What the core owns, written from the new copy's own kit by the one process (#1083; converge.mjs, beside this file),
@@ -224,16 +255,25 @@ function converge(dir, kits, first = false) {
   }
 }
 
+// The leads of the steps the new copy reads done in the project, after the one process wrote what the core owns
+// (steps.mjs --done; #1264, point 2), or null where it cannot say: a copy from before it, or the steps not read.
+function doneHere(dir) {
+  const script = path.join(dir, "scripts", "steps.mjs");
+  if (!fs.existsSync(script)) return null;
+  const r = spawnSync(process.execPath, [script, "--done"], { encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
+  try { const leads = JSON.parse(r.stdout); return r.status === 0 && Array.isArray(leads) ? new Set(leads.map(String)) : null; } catch { return null; }
+}
+
 // The new copy's packages, installed from its lock file by its own install script, into its .packages/node_modules/,
 // which git does not track (#654); a copy from before it has none. One that fails twice leaves the copy written and says so, with the
 // command to run again: the sync's pull request holds the copy alone, and no registry's silence fails it.
-function install(dir) {
+export function install(dir) {
   const script = path.join(dir, "scripts", "install.mjs");
   if (!fs.existsSync(script)) return;
   // (every install of the copy's, the parser's too, for the session that works in the project: #719)
   const r = spawnSync(process.execPath, [script, ...everyInstall(dir)], { encoding: "utf8" });
   process.stdout.write(r.stdout ?? "");
-  if (r.status !== 0) console.log(`note the copy is written, but its packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: none is needed for the checks, which install them themselves before they read (#1093); to install them now, run \`if [ -f ${path.relative(process.cwd(), script)} ]; then node ${path.relative(process.cwd(), script)}; fi\``);
+  if (r.status !== 0) console.log(`note the copy is written, but its packages are not installed (the installer's own words are left out of this note: a line of them can name a path on this machine; to read them, run the command below). Mend: none is needed for the checks, which install them themselves before they read (#1093); to install them now, run \`if [ -f ${path.relative(process.cwd(), script)} ]; then node ${path.relative(process.cwd(), script)}; fi\``);
 }
 
 // The core is fetched into a temporary folder, removed however the sync ends.

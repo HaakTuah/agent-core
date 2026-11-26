@@ -7,7 +7,7 @@
 // shows it does not run the working tree's copy, which the branch it runs on can change. One that stood before is listed
 // in the baseline, its entry saying "from": "the working tree", and noted; the baseline only shrinks: a new hook marked
 // so fails, and so does a mark taken out while its hook stands, or a mark on a hook in the kit's form.
-import { fetchedBy, libraryOf } from "./hook-source.mjs";
+import { fetchedBy, fetchesMain, libraryOf } from "./hook-source.mjs";
 import { show, canonical, fold } from "./agent-tools-entries.mjs";
 
 // (the starter kit's hooks: each file it writes in a project, by the template it writes it from, beside this copy)
@@ -86,7 +86,7 @@ function readHelper(state, file, key, value) {
   addHook(state, file, { tool: "", event: key, matcher: "", hook: value, runs: true, text: value, commands: [value], setting: true });
 }
 // What no starter kit writes, given as a command so it is never read as the kit's form, and its failure's mend.
-export const NO_KIT = "(no form of the starter kit's)", NO_KIT_WHY = "is of a kind no starter kit writes";
+export const NO_KIT = "(no form of the starter kit's)", NO_KIT_WHY = "is of a kind no starter kit writes", NOT_KIT_WHY = "is not in the starter kit's form";
 const NO_KIT_HOW = "take it out of the project's files, the owner setting it in the tool's own configuration on the machine where it is wanted; or move what it runs into a hook of .claude/settings.json in the starter kit's form";
 // A marketplace that runs a command by itself, to print the headers it is fetched with, or as a plug-in's source: read
 // whole, as a setting no starter kit writes, so one the pull request adds or changes is new.
@@ -133,21 +133,24 @@ export function readCommands(state, file, settings) {
     addHook(state, file, { tool: "", event: key, matcher: "", hook: value, runs: true, text: command, commands: [command], setting: true });
   }
 }
-// Each hook with a command that is not the starter kit's form, into `state.sources` as { why, how }, why nothing shows it
-// runs its copy on main (hook-source.mjs) and its mend; so too where the file the kit's form fetches the project holds as
-// a link (`linked`), whose target's name main gives in the script's place, a file the branch can change, and where a
-// library's commit main pins holds the file it reads there as anything but a plain file (`inLibrary`: git prints a link's
-// target, which bash then runs). Where the library's objects are not at hand, the file is not read: said, never failed.
+// Each hook with a command that is not the starter kit's form, into `state.sources` as { why, how, main }, why nothing
+// shows it runs its copy on main (hook-source.mjs), its mend, and whether each command it may run fetches a file from
+// main all the same, which the mark of its entry follows ("from": "main", else "the working tree"); so too where the
+// file the kit's form fetches the project holds as a link (`linked`), whose target's name main gives in the script's
+// place, a file the branch can change, and where a library's commit main pins holds the file it reads there as anything
+// but a plain file (`inLibrary`: git prints a link's target, which bash then runs). Where the library's objects are not
+// at hand, the file is not read: said, never failed.
 function readSource(state, name, commands) {
+  const main = commands.every(fetchesMain);
   for (const command of commands) {
     const at = fetchedBy(command);
     if (command === NO_KIT) return void state.sources.set(name, { why: NO_KIT_WHY, how: NO_KIT_HOW });
-    if (at === null) return void state.sources.set(name, { why: "is not in the starter kit's form", how: HOW });
+    if (at === null) return void state.sources.set(name, { why: NOT_KIT_WHY, how: HOW, main });
     // (the command in the kit's form already, its mend is the fetched file's)
-    if (state.linked(at)) return void state.sources.set(name, { why: `fetches ${show(at)} from main, which the project holds as no plain file (a link, a folder or a submodule), so main gives no script but what git prints of it`, how: `make ${show(at)} a plain file committed in the project, the script itself in place of the link, folder or submodule, so main gives it` });
+    if (state.linked(at)) return void state.sources.set(name, { why: `fetches ${show(at)} from main, which the project holds as no plain file (a link, a folder or a submodule), so main gives no script but what git prints of it`, how: `make ${show(at)} a plain file committed in the project, the script itself in place of the link, folder or submodule, so main gives it`, main });
     const from = libraryOf(command), held = from && state.inLibrary(from.library, from.rest);
-    if (held === "link") return void state.sources.set(name, { why: `reads ${show(from.rest)} from the library ${show(from.library)}, which this project commits as a link, so the folder it leads to is the branch's to choose, not the submodule main pins`, how: `commit ${show(from.library)} as the submodule that carries the core (git submodule add), never as a link` });
-    if (held === "other") return void state.sources.set(name, { why: `reads ${show(from.rest)} from the commit of ${show(from.library)} that main pins, which holds it as no plain file (a link, a folder or a submodule), so what runs is what git prints of it`, how: `make ${show(from.rest)} a plain file committed in ${show(from.library)}, the script itself in place of the link, folder or submodule, and pin that commit` });
+    if (held === "link") return void state.sources.set(name, { why: `reads ${show(from.rest)} from the library ${show(from.library)}, which this project commits as a link, so the folder it leads to is the branch's to choose, not the submodule main pins`, how: `commit ${show(from.library)} as the submodule that carries the core (git submodule add), never as a link`, main });
+    if (held === "other") return void state.sources.set(name, { why: `reads ${show(from.rest)} from the commit of ${show(from.library)} that main pins, which holds it as no plain file (a link, a folder or a submodule), so what runs is what git prints of it`, how: `make ${show(from.rest)} a plain file committed in ${show(from.library)}, the script itself in place of the link, folder or submodule, and pin that commit`, main });
     if (held === "unread") state.notRead.add(`${name}: the file ${show(from.rest)} of the commit of ${show(from.library)} that main pins was not read, since the submodule's repository is not at hand here, so whether it is a plain file is not known. To mend: bring it in (git submodule update --init ${from.library}), a submodule named as its path (git submodule add --name ${from.library}), which a hook reads it by`);
   }
 }

@@ -5,7 +5,7 @@ sync (`core/scripts/converge.mjs`). An entry stands here when a project must cha
 of its own for a change to hold: a row of its manifest, a line of a rule file, a workflow, an audit.
 `core/scripts/sync.mjs` prints the entries a sync brings, then every step not done, a standing one too, by
 `core/scripts/steps.mjs`, where each entry has a step that tells it done exactly, what the steps' writers wrote where
-a script does a step exactly (a check's config or baseline, a pointer's path, never a word of a rule; #1091), set
+a script does a step exactly (a check's config or baseline, a pointer's path, the manifest's module lines, never another word of a rule; #1091, #1094), set
 aside in a stash that the PR after the sync's commits, and every difference from what the starter kit writes today (`core/scripts/fresh.mjs`); an orchestrator gives each a lane (`core/roles/orchestrator.md`). Each is done in a PR of its own once the sync PR is merged (a pure sync holds the
 copy, its pins and what that process writes alone: floor rule 8), or filed for the *progress file*'s queue where it is large; none waits for the owner beyond what
 the floor names. Each entry says how to tell it is done, and its step reads it, so a
@@ -21,6 +21,6 @@ Newest last, each on one line in a file of its own, named to stand after the ent
 step in `scripts/steps/` under the same name, so that two pull requests that add an entry never edit the same lines
 (#750, point 1); `node core/scripts/sync-notes.mjs` reads the notes whole.
 
-- A sync that brings `core/setup/sync-notes/` to a copy that did not hold it ran the copy's older script, which reads what a sync asks from this file alone, where no entry stands now: the session that syncs reads each entry of that folder dated on or after the day of the project's last sync as one the sync printed, and does what the project lacks of it in a pull request of its own, as `core/scripts/steps.mjs` reports and beyond.
+- A sync that brings `core/setup/sync-notes/` to a copy that did not hold it ran the copy's older script, which reads what a sync asks from this file alone, where no entry stands now, and printed nothing else a sync prints: the session that syncs runs `node core/scripts/sync.mjs <the manifest's pin>` once more in the sync's branch, which at the same pin moves nothing, installs the copy's packages, writes what the core owns, and prints what the sync asks since the pin before and every report a sync prints, for the sync pull request's description (#1246); it commits what that run writes in the sync's pull request, and does what the project lacks of each entry in a pull request of its own, as `core/scripts/steps.mjs` reports and beyond.
 
 Its entries stand in `setup/sync-notes/`, a file each, read in the order of their names.

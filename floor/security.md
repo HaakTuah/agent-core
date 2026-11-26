@@ -31,11 +31,11 @@ might attack: `floor/threat-model.md`.
   for the change as asked; one beyond it waits for a new yes.
   Reason: the yes keeps a session from widening its own mandate, a floor change made to get some other task through
   above all; it is never a second question about what the owner asked for.
-- A change to what runs by itself or with credentials passes two security reviews instead, the security reviewer's and
-  the fallback reviewer's, each by a session that did not write it, a fresh one of the same tool serving
-  (`tasks/reviews.md`).
+- A change to what runs with power (`tasks/reviews.md`, point 3) passes two security reviews instead, the security
+  reviewer's and the fallback reviewer's, each by a session that did not write it, a fresh one of the same tool
+  serving.
   - Save an action's pinned version alone (rule 17).
-  - One that changes, of what runs by itself or with credentials, only comments and steps' names passes rule 8's one:
+  - One that changes, of what runs with power, only comments and steps' names passes rule 8's one:
     the core's `scripts/comment-only.mjs`, run from the core's `main` on the head that merges, proves it of the files
     it reads, and the session says of each other file changed why it is not among them.
 - `.claude/settings.json` runs what Claude Code starts by itself from its copy on `main`, and denies Claude's file tools
