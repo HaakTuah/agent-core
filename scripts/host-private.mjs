@@ -48,25 +48,30 @@ export function privateOf(root, { env = process.env, ask = gh, bare = anonymous 
   return answer;
 }
 
-// The clone's origin as its own config holds it: git follows no include there, and is not run where the clone's git
-// folder or its common folder lies on another machine, so such a clone reads as one with no origin.
+// The clone's origin as its own config holds it: git follows no include there, and is not run where the clone, its git
+// folder, its common folder or an entry git reads in them lies on another machine, or a link on the way names one, so
+// such a clone reads as one with no origin.
 const originUrl = root => gitDirAfar(root) ? "" : spawnSync("git", ["config", "--no-includes", "--get", "remote.origin.url"], { cwd: root, encoding: "utf8" }).stdout?.trim() ?? "";
-// Whether the git folder of the clone at `at` (its .git, a link or a file naming it, or `at` itself where it is a bare
-// one) or the common folder that folder names lies on another machine, as afar() reads a path; each step read here,
-// a link by what it says and never by following it.
+// Whether the clone at `at`, its git folder (its .git, a link or a file naming it, or `at` itself where it is a bare
+// one), the common folder that folder names, or any entry of either git reads, lies on another machine, or may, as
+// linksAfar() reads a path; a file is read only once that says it is near.
 function gitDirAfar(at) {
-  const named = (from, to) => afar(to) || afar(path.resolve(from, to));
+  if (linksAfar(at)) return true;
   const dotGit = path.join(at, ".git");
   let dir = at;
   try {
     const kind = fs.lstatSync(dotGit);
-    if (kind.isSymbolicLink()) { const to = fs.readlinkSync(dotGit); if (named(at, to)) return true; dir = path.resolve(at, to); }
-    else if (kind.isFile()) { const to = /^gitdir:[ \t]*(.*?)[ \t\r]*$/m.exec(fs.readFileSync(dotGit, "utf8"))?.[1] ?? ""; if (!to || named(at, to)) return true; dir = path.resolve(at, to); }
+    if (kind.isSymbolicLink()) { if (linksAfar(dotGit)) return true; dir = dotGit; }
+    else if (kind.isFile()) { const to = /^gitdir:[ \t]*(.*?)[ \t\r]*$/m.exec(fs.readFileSync(dotGit, "utf8"))?.[1] ?? ""; if (!to || linksAfar(at, to)) return true; dir = under(at, to); }
     else dir = dotGit;
   } catch { /* (no .git: a bare clone, or none, which git answers itself) */ }
-  try { const common = fs.readFileSync(path.join(dir, "commondir"), "utf8").trim(); if (common && named(dir, common)) return true; } catch { /* (no common folder named) */ }
-  return false;
+  if (GIT_READS.some(name => linksAfar(dir, name))) return true;
+  let common = "";
+  try { common = fs.readFileSync(under(dir, "commondir"), "utf8").trim(); } catch { /* (no common folder named) */ }
+  return Boolean(common) && (linksAfar(dir, common) || GIT_READS.some(name => linksAfar(under(dir, common), name)));
 }
+// (what git opens in a git folder, or its common folder, to find the clone and read its config)
+const GIT_READS = ["HEAD", "commondir", "config", "config.worktree", "objects", "refs", "packed-refs"];
 // The origin that names the repository: where a clone was made from a folder (check.mjs's scratch clone, a clone of
 // the project's working copy; #1246, point 6), that folder's own origin, a few clones deep, so the repository is the
 // one its first clone names, read and never guessed; else the clone's own origin. A folder that is not itself a clone
@@ -77,7 +82,8 @@ function originOf(root, origin) {
     const local = /^file:\/\//i.test(url) ? fileFolder(url) : /^[a-z][\w+.-]*:\/\/|^[^/\\]+@[^:]+:/i.test(url) || afar(url) ? null : path.resolve(at, url);
     // (a folder that is itself a clone, its .git there or a bare one's HEAD and objects; never one inside another
     // clone, whose origin git would find by searching upward, nor one on another machine)
-    if (!local || afar(local) || !(fs.existsSync(path.join(local, ".git")) || (fs.existsSync(path.join(local, "HEAD")) && fs.existsSync(path.join(local, "objects"))))) break;
+    const there = name => !linksAfar(local, name) && fs.existsSync(path.join(local, name));
+    if (!local || linksAfar(local) || !(there(".git") || (there("HEAD") && there("objects")))) break;
     at = local;
     url = originUrl(at);
   }
@@ -94,10 +100,43 @@ const fileFolder = url => { try { const host = new URL(url).hostname; return hos
 // there probed or read, and it reads as one that names no repository (#1295).
 const afar = at => /^[\\/]{2}/.test(at);
 
+// Whether `to`, from the folder `from` (or `from` alone), names another machine, or may, at any step: each part of the
+// path is looked at in turn, a link by what it says and never by following it, its target walked the same way in place
+// of it, so a link to a link, a link at a folder a file names and a link inside a link's target are each read before
+// anything opens the path. Both the path as written and as node joins it are walked, since git and the system each
+// read one; more than 40 links in a row read as afar, as the system refuses them. A part not there is walked past, as
+// a later `..` may leave it.
+function linksAfar(from, to = "") {
+  return [under(from, to), path.resolve(from, to)].some(at => walkAfar(path.isAbsolute(at) ? at : `${process.cwd()}${path.sep}${at}`));
+}
+function walkAfar(start) {
+  if (afar(start)) return true;
+  const split = at => at.split(path.sep === "\\" ? /[\\/]+/ : "/").filter(Boolean);
+  let real = path.parse(start).root, parts = split(start.slice(real.length)), links = 0;
+  while (parts.length) {
+    const part = parts.shift();
+    if (part === ".") continue;
+    if (part === "..") { real = path.dirname(real); continue; }
+    const next = path.join(real, part);
+    let link = false;
+    try { link = fs.lstatSync(next).isSymbolicLink(); } catch { /* (not there: walked past) */ }
+    if (!link) { real = next; continue; }
+    let target = "";
+    try { target = fs.readlinkSync(next); } catch { return true; } // (a link gone or changed between the two reads: afar)
+    if (++links > 40 || afar(target)) return true;
+    const root = path.isAbsolute(target) ? path.parse(target).root : "";
+    if (root) real = root;
+    parts = [...split(target.slice(root.length)), ...parts];
+  }
+  return false;
+}
+// (`to` from the folder `from` as written, never joined by node, which would take a `..` after a link as the folder before it)
+const under = (from, to) => !to ? from : path.isAbsolute(to) ? to : `${from}${path.sep}${to}`;
+
 // A test's answer for the project, by its root or by its origin, which each clone of it shares; else null.
 function answered(env, root, origin) {
   if (!env.CORE_HOST_ANSWERS) return null;
-  const real = at => { try { return fs.realpathSync(at); } catch { return path.resolve(at); } };
+  const real = at => { try { return linksAfar(at) ? path.resolve(at) : fs.realpathSync(at); } catch { return path.resolve(at); } };
   let answers = {};
   try { answers = JSON.parse(fs.readFileSync(env.CORE_HOST_ANSWERS, "utf8")); } catch { /* (none: as no answer) */ }
   const found = Object.entries(answers).find(([at]) => real(at) === real(root) || (origin && !afar(origin) && real(at) === real(origin)))?.[1];

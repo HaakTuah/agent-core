@@ -98,9 +98,30 @@ fs.mkdirSync(common); fs.writeFileSync(path.join(common, ".git"), `gitdir: ${wor
 let links = true;
 const nearLinked = path.join(tmp, "near-linked");
 try { fs.mkdirSync(linked); fs.symlinkSync(elsewhere, path.join(linked, ".git"), "dir"); fs.mkdirSync(nearLinked); fs.symlinkSync(path.join(hosted, ".git"), path.join(nearLinked, ".git"), "dir"); } catch { links = false; }
-const gitDirs = [included, pointed, common, ...(links ? [linked] : [])];
+// (a link reached by way of another: an origin's folder through a link to another machine, a link of .git to a link
+// that names one, a link at the folder a .git file names, the path a .git file names passing such a link before a `..`,
+// and a common folder's or a config's file that is itself such a link; each names the real clone through it, so each
+// bites where links can be made)
+const farLink = path.join(tmp, "far-link"), nearLink = path.join(tmp, "near-link"), hop = path.join(tmp, "hop-link"), gdLink = path.join(tmp, "gitdir-link");
+const viaFar = path.join(tmp, "via-far"), viaNear = path.join(tmp, "via-near"), chained = path.join(tmp, "chained"), named = path.join(tmp, "named-link");
+const passed = path.join(tmp, "passed-link"), commonLinked = path.join(tmp, "common-linked"), configLinked = path.join(tmp, "config-linked");
+const farOf = at => `//${at.replace(/^[\\/]+/, "")}`;
+try {
+  fs.symlinkSync(farOf(tmp), farLink, "dir"); fs.symlinkSync(tmp, nearLink, "dir"); fs.symlinkSync(elsewhere, hop, "dir"); fs.symlinkSync(elsewhere, gdLink, "dir");
+  clone(viaFar, `..${path.sep}far-link${path.sep}clone`); clone(viaNear, `..${path.sep}near-link${path.sep}clone`);
+  fs.mkdirSync(chained); fs.symlinkSync(hop, path.join(chained, ".git"), "dir");
+  fs.mkdirSync(named); fs.writeFileSync(path.join(named, ".git"), `gitdir: ${gdLink}\n`);
+  fs.mkdirSync(passed); fs.mkdirSync(path.join(tmp, "sub")); fs.symlinkSync(farOf(path.join(tmp, "sub")), path.join(tmp, "far-sub"), "dir");
+  fs.writeFileSync(path.join(passed, ".git"), `gitdir: ${[tmp, "far-sub", "..", "clone", ".git"].join(path.sep)}\n`);
+  const linkedTree = path.join(tmp, "common-linked-git");
+  fs.mkdirSync(linkedTree); fs.writeFileSync(path.join(linkedTree, "HEAD"), "ref: refs/heads/main\n");
+  fs.writeFileSync(path.join(tmp, "commondir-file"), `${path.join(hosted, ".git")}\n`); fs.symlinkSync(farOf(path.join(tmp, "commondir-file")), path.join(linkedTree, "commondir"), "file");
+  fs.mkdirSync(commonLinked); fs.writeFileSync(path.join(commonLinked, ".git"), `gitdir: ${linkedTree}\n`);
+  clone(configLinked, path.join(tmp, "not-there")); fs.rmSync(path.join(configLinked, ".git", "config")); fs.symlinkSync(farOf(path.join(hosted, ".git", "config")), path.join(configLinked, ".git", "config"), "file");
+} catch { links = false; }
+const gitDirs = [included, pointed, common, ...(links ? [linked, viaFar, chained, named, passed, commonLinked, configLinked] : [])];
 ok(gitDirs.every(at => /names no repository on github\.com/.test(privateOf(at, { env: {}, ask: notAsked, bare: notAsked }).unread ?? "")),
-  `git follows no include of the clone's config, and reads no origin where the clone's .git file, its common folder${links ? " or a link of .git" : ""} names a folder on another machine`,
+  `git follows no include of the clone's config, and reads no origin where the clone's .git file, its common folder${links ? ", a link of .git, or a link reached by way of an origin's folder, another link or a file git reads," : ""} names a folder on another machine`,
   gitDirs.map(at => `${path.basename(at)}: ${JSON.stringify(privateOf(at, { env: {}, ask: () => "{}", bare: () => ({}) }))}`).join("; "));
 
 // (a worktree as git lays one out, its .git file naming a folder of a clone on this machine, whose commondir names the
@@ -110,9 +131,9 @@ fs.mkdirSync(treeGit, { recursive: true }); fs.mkdirSync(tree);
 fs.writeFileSync(path.join(treeGit, "HEAD"), "ref: refs/heads/tree\n"); fs.writeFileSync(path.join(treeGit, "commondir"), "../..\n"); fs.writeFileSync(path.join(treeGit, "gitdir"), `${path.join(tree, ".git")}\n`);
 fs.writeFileSync(path.join(tree, ".git"), `gitdir: ${treeGit}\n`);
 bareRoutes.length = 0;
-const near = [tree, ...(links ? [nearLinked] : [])].map(at => privateOf(at, { env: {}, ask: noGh, bare: bare({ status: 200, private: false }) }).private);
+const near = [tree, ...(links ? [nearLinked, viaNear] : [])].map(at => privateOf(at, { env: {}, ask: noGh, bare: bare({ status: 200, private: false }) }).private);
 ok(fs.statSync(path.join(tree, ".git")).isFile() && near.every(v => v === false) && bareRoutes.every(r => r === `repos/${repo}`),
-  `a worktree whose .git file names a clone on this machine${links ? ", and a link of .git to one," : ""} is read as before`, JSON.stringify(near));
+  `a worktree whose .git file names a clone on this machine${links ? ", a link of .git to one, and an origin's folder through a link on this machine," : ""} are read as before`, JSON.stringify(near));
 
 // ---- the read with no sign-in itself, its own process run, sent to a proxy that is not there ----
 // (the environment the reader is given, never this process's: here a proxy that is not there, so nothing leaves)
