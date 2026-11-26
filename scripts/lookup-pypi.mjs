@@ -4,7 +4,9 @@
 // check's config under "pypi" is read so: a line in any other form (a range, an address, a package with no hash, an
 // include, an index that is not PyPI's) fails it whole, since pip or uv would install what the lookup did not read.
 // Which package another brings, and which the project names, is read from the "# via" lines those tools write; a file
-// with none names every package itself, and says nothing of what each brings. Names are compared as pip compares them
+// with none names every package itself, and says nothing of what each brings. Each hash a line names is one PyPI lists
+// for a file of that version, or the package fails the lookup (#1368, point 1), since pip, given an index outside the
+// file, would install a file the lookup never read. Names are compared as pip compares them
 // (PEP 503: in lower case, each run of "-", "_" and "." one "-"). What PyPI answers is a publisher's text: it is said
 // on one line by the lookup's report, and an answer of another shape is a lookup that failed. The reader of a
 // repository's address is the lookup's own, passed in (`readRepo`), so neither file imports the other.
@@ -30,7 +32,8 @@ const WRITE = "write the file anew with pip-compile --generate-hashes (or uv pip
 const object = (x) => Boolean(x) && typeof x === "object" && !Array.isArray(x);
 const when = (text) => (typeof text === "string" && /^\d{4}-\d\d-\d\dT/u.test(text) ? Date.parse(text) : NaN);
 
-/** The packages of a requirements file's text in PyPI's lock form: each { name, version, path, direct, brings, by, pypi }. */
+/** The packages of a requirements file's text in PyPI's lock form: each { name, version, path, direct, brings, by, pypi,
+ *  hashes }. */
 export function pypiPackages(text, lockPath) {
   asciiOnly(text, lockPath);
   const entries = [];
@@ -39,7 +42,7 @@ export function pypiPackages(text, lockPath) {
     const refuse = (what, mend = WRITE) => { throw new Error(`${lockPath}, line ${n}: ${what}, so it is not PyPI's lock form. Mend: ${mend}`); };
     if (line.startsWith("#")) { via = viaLine(line, entries.at(-1) ?? null, via); continue; }
     via = null;
-    const entry = lineOf(line.replace(/\s+#.*$/u, ""), refuse);
+    const entry = lineOf(uncommented(line), refuse);
     if (entry) entries.push(entry);
   }
   return graphed(entries);
@@ -85,6 +88,14 @@ function* logical(text, lockPath) {
   if (joined !== null) yield [first, joined.trim()];
 }
 
+// A line with its comment taken off, as pip's COMMENT_RE (`(^|\s+)#.*$`) takes it: from the first "#" after a space on,
+// the spaces before it too; found in one pass, where that pattern, tried at each space of a long run, is quadratic
+// (#1368, point 4).
+function uncommented(line) {
+  const at = line.search(/\s#/u);
+  return at < 0 ? line : line.slice(0, at).trimEnd();
+}
+
 // The entry a comment's "# via" names go to, if any: "# via a, b" after an entry, or "# via" then a line "#   a" for
 // each; any other comment ends the list.
 function viaLine(line, last, via) {
@@ -108,27 +119,35 @@ function lineOf(bare, refuse) {
 }
 
 // The package a requirement names at one exact version, its options the hashes of its files alone, or the file refused.
+// Each run of spaces is read as one, as the pattern reads it either way, so that no run makes it try each split of it.
 // The version is PEP 440's with no local part ("+…"), which PyPI never holds and which can end as an archive's name
 // does ("1.0+x.zip"), a file pip installs in place of the package.
 function entryOf(args, options, refuse) {
-  const [, name, version] = PINNED.exec(args) ?? [];
+  const [, name, version] = PINNED.exec(args.replace(/ +/gu, " ")) ?? [];
   if (!name || !VERSION.test(version) || !pep440(version) || version.includes("+")) refuse("a package not at one exact version from PyPI (name==version)");
   if (!options.length || !options.every((o) => HASH.test(o))) refuse(`${name} names no hash of its files that pip checks, or an option beside them`);
-  return { name: normal(name), version, via: [] };
+  return { name: normal(name), version, via: [], hashes: options.map((o) => o.slice("--hash=".length)) };
 }
 
 // Each entry as the lookup reads it. One with no "# via" line, or whose line names anything but a package of the file
 // (the project's own file, "-r requirements.in", "(pyproject.toml)"), is named by the project; the packages a line
-// names bring it. A file with no "# via" line at all says nothing of what each brings.
+// names bring it. One that nothing so named brings, by any path, is named by the project too: a package "# via" itself,
+// or one of a cycle that no named package leads into (#1368, point 2), since the lines are the pull request's own text,
+// and GitHub's check is asked only of a package the project names. A file with no "# via" line at all says nothing of
+// what each brings.
 function graphed(entries) {
   const any = entries.some((e) => e.via.length), names = new Set(entries.map((e) => e.name));
   const parents = (e) => e.via.map((v) => normal(v.replace(/\[.*$/u, ""))).filter((v) => names.has(v));
-  const direct = (e) => !any || parents(e).length < e.via.length || !e.via.length;
+  const named = (e) => !any || parents(e).length < e.via.length || !e.via.length;
   const children = new Map(), byName = new Map(entries.map((e) => [e.name, e]));
   for (const e of entries) for (const p of parents(e)) children.set(p, (children.get(p) ?? new Set()).add(e.name));
-  return entries.map((e) => ({ name: e.name, version: e.version, path: e.name, direct: direct(e), pypi: true,
+  // (what a named package leads to, in one pass from all of them: each such package that is not named itself is brought)
+  const roots = entries.filter(named).map((e) => e.name), fed = reach("", (x) => (x === "" ? roots : children.get(x) ?? []));
+  const direct = new Map(entries.map((e) => [e.name, named(e) || !fed.has(e.name)]));
+  const ancestors = (e) => [...reach(e.name, (x) => parents(byName.get(x)))];
+  return entries.map((e) => ({ name: e.name, version: e.version, path: e.name, direct: direct.get(e.name), pypi: true, hashes: e.hashes,
     get brings() { return any ? reach(e.name, (x) => children.get(x) ?? []).size : null; },
-    get by() { return direct(e) ? [] : [...reach(e.name, (x) => parents(byName.get(x)))].filter((x) => direct(byName.get(x))); } }));
+    get by() { return direct.get(e.name) ? [] : ancestors(e).filter((x) => direct.get(x)); } }));
 }
 
 /** What PyPI says of the package `p` ({ name, version }), asked with `get(url)` ({ status, json }): its facts, or
@@ -139,7 +158,7 @@ export async function pypiRegistry(p, get, readRepo) {
   const r = await get(`${PYPI}pypi/${name}/json`);
   if (r.status === 404) return { missing: "the registry answers that it knows no such name" };
   if (r.status !== 200) throw new Error(`it answered ${r.status}`);
-  const facts = pypiFacts(r.json, p.version, readRepo);
+  const facts = pypiFacts(r.json, p.version, readRepo, p.hashes);
   if (facts.missing) return facts;
   facts.provenance = await provenance(name, facts, get);
   return facts;
@@ -159,9 +178,9 @@ export function pep440(version) {
     local ? `+${local.split(/[-_.]/u).map((x) => (/^\d+$/u.test(x) ? int(x) : x)).join(".")}` : ""].join("");
 }
 
-/** What PyPI's answer `doc` (its JSON of a project) says of the package at `version`: { first, last, repo, publisher,
- *  note, file } or { missing }. */
-export function pypiFacts(doc, version, readRepo) {
+/** What PyPI's answer `doc` (its JSON of a project) says of the package at `version`, whose lock line names `hashes`:
+ *  { first, last, repo, publisher, note, file, failure } or { missing }. */
+export function pypiFacts(doc, version, readRepo, hashes = null) {
   if (!object(doc) || !object(doc.releases)) throw new Error("its answer is no JSON object that lists releases");
   const releases = doc.releases;
   const files = (v) => (Array.isArray(releases[v]) ? releases[v].filter(object) : []);
@@ -174,7 +193,19 @@ export function pypiFacts(doc, version, readRepo) {
   if (!own.length) return { missing: `the registry knows the name, and no file of version ${version.slice(0, 64)} of it` };
   const kept = all.filter((f) => !f.yanked), info = object(doc.info) ? doc.info : {};
   return { first: Math.min(...all.map((f) => f.at)), last: Math.max(...(kept.length ? kept : all).map((f) => f.at)), repo: repoOf(info, readRepo),
-    publisher: publisher(doc.ownership, info), note: own.every((f) => f.yanked === true) ? "this version is yanked: PyPI asks that it not be installed" : "", version: key, file: fileOf(own) };
+    publisher: publisher(doc.ownership, info), note: own.every((f) => f.yanked === true) ? "this version is yanked: PyPI asks that it not be installed" : "", version: key, file: fileOf(own),
+    failure: unlisted(hashes, own, version) };
+}
+
+// Where the lock line names a hash that PyPI lists for no file of the version (each file's sha256, its digest as PyPI
+// gives it; a yanked file's too, which pip still installs at an exact version), what is wrong and its mend; else "".
+function unlisted(hashes, own, version) {
+  if (!Array.isArray(hashes)) return "";
+  const listed = new Set(own.map((f) => f.digests?.sha256).filter((d) => typeof d === "string" && /^[0-9a-f]{64}$/u.test(d)).map((d) => `sha256:${d}`));
+  const off = hashes.filter((h) => !listed.has(h));
+  if (!off.length) return "";
+  const shown = off.slice(0, 3).map((h) => `${h.slice(0, h.indexOf(":") + 13)}…`).join(", ");
+  return `${off.length} of the ${hashes.length} hash${hashes.length === 1 ? "" : "es"} its line names (${shown}${off.length > 3 ? " and more" : ""}) PyPI lists for no file of version ${version.slice(0, 64)}, so pip, where an index is set outside the file, could install a file the lookup never read. Mend: ${WRITE}, from PyPI's own index alone; where a hash is of a file built elsewhere, take the package from PyPI or leave it out`;
 }
 
 // The name of one file of the version that is not yanked, in the form PyPI gives, to ask its provenance of.

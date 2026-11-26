@@ -269,6 +269,8 @@ export async function lookUp(packages, { get, now = Date.now(), nuget = false, s
     if (facts.missing) { failures.push(`${at}: ${where} has no such package (${facts.missing}). Mend: take it out of the project's package list and its lock file, and name a package the registry has: a name a model gave may be one nobody published, or one someone registered to be taken`); return; }
     const young = tooYoung(p, facts, now);
     if (young) failures.push(`${at}: ${young}`);
+    // (what a registry's part found wrong beside the name's age: on PyPI, a hash it lists for no file of the version)
+    if (facts.failure) failures.push(`${at}: ${facts.failure}`);
     reports.push(`${at}: ${await described(p, facts, now, { get, nuget, github })}`);
   });
   return { failures: failures.sort(), reports: reports.sort() };

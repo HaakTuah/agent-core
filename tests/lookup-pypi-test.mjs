@@ -35,6 +35,27 @@ ok(read.length === 4 && read.every((p) => p.pypi) && by("tidy-moss-format")?.ver
 ok(by("tidy-moss-format")?.direct === true && by("tidy-moss-format")?.brings === 2, "a package the project's own file names is named by it, and brings what its \"# via\" lines say, deep too");
 ok(by("brand-new-moss")?.direct === false && by("brand-new-moss")?.by.join() === "tidy-moss-format" && by("deep-moss")?.by.join() === "tidy-moss-format", "a package another brings names the one the project names that brings it");
 ok(by("own-moss")?.direct === true, "a \"# via\" line that names the project itself, no package of the file, is named by the project");
+ok(by("tidy-moss-format")?.hashes?.join() === `sha256:${"a".repeat(64)},sha256:${"b".repeat(64)}` && by("own-moss")?.hashes?.join() === `sha256:${"e".repeat(64)}`, "each package keeps the hashes its line names, to compare with PyPI's");
+// (#1368, point 2: the "# via" lines are the pull request's own text, so none of them hides a package from GitHub's check)
+const looped = pypiPackages([
+  `self-moss==1.0.0 ${H()}`, "    # via self-moss",
+  `ring-moss==1.0.0 ${H()}`, "    # via loop-moss",
+  `loop-moss==1.0.0 ${H()}`, "    # via ring-moss",
+  `root-moss==1.0.0 ${H()}`, "    # via -r requirements.in",
+  `fed-moss==1.0.0 ${H()}`, "    # via", "    #   feed-moss", "    #   root-moss",
+  `feed-moss==1.0.0 ${H()}`, "    # via fed-moss",
+].join("\n"), "requirements.txt");
+const loop = (name) => looped.find((p) => p.name === name);
+ok(loop("self-moss")?.direct === true && loop("ring-moss")?.direct === true && loop("loop-moss")?.direct === true, `a package "# via" itself, and a cycle that no package the project names leads into, are named by the project (${JSON.stringify(looped.map((p) => [p.name, p.direct]))})`);
+ok(loop("fed-moss")?.direct === false && loop("feed-moss")?.direct === false && loop("fed-moss")?.by.join() === "root-moss" && loop("feed-moss")?.by.join() === "root-moss", `a cycle that a package the project names leads into is brought by it (${JSON.stringify(looped.map((p) => [p.name, p.direct, p.by]))})`);
+// (#1368, point 4: a long run of spaces is read in one pass, never by trying each split of it)
+for (const [what, line] of [["a comment's strip", `plain-moss==1.0.0${" ".repeat(200000)}x`], ["a requirement", `plain-moss${" ".repeat(200000)}x ${H()}`], ["a requirement's version", `plain-moss ==${" ".repeat(200000)}; ${H()}`]]) {
+  const started = performance.now();
+  const message = throws(() => pypiPackages(`${line}\n`, "requirements.txt"));
+  const took = performance.now() - started;
+  ok(message && took < 1000, `${what} on a run of 200,000 spaces is refused in under a second, not after one try for each split of it (${Math.round(took)} ms)`);
+}
+ok(pypiPackages(`plain-moss==1.0.0 ${H()}   # a note # and another\n`, "r.txt")[0]?.hashes.length === 1, "a comment after a requirement is taken off from its first \"#\" after a space, the spaces before it too");
 const plain = pypiPackages(`﻿plain-moss==1.0.0 ${H()}\r\nother-moss==2.0.0 ${H("b")} ${H("c")}\r\n`, "requirements.txt");
 ok(plain.length === 2 && plain.every((p) => p.direct && p.brings === null), `a file with no "# via" line names every package itself, and says nothing of what each brings (${JSON.stringify(plain)})`);
 const uv = pypiPackages([
@@ -89,7 +110,7 @@ for (const [what, text, said] of [
 }
 
 // ---- What PyPI says
-const file = (name, v, at, extra = {}) => ({ filename: `${name.replaceAll("-", "_")}-${v}-py3-none-any.whl`, upload_time_iso_8601: at, yanked: false, ...extra });
+const file = (name, v, at, extra = {}) => ({ filename: `${name.replaceAll("-", "_")}-${v}-py3-none-any.whl`, upload_time_iso_8601: at, yanked: false, digests: { sha256: (v === "2.0.0" ? "9" : "a").repeat(64) }, ...extra });
 const doc = (name, first, extra = {}) => ({
   info: { name, project_urls: { Homepage: "https://example.invalid/", "Source Code": `https://github.com/invented-org/${name}` } },
   ownership: { organization: null, roles: [{ role: "Owner", user: "invented-owner" }] },
@@ -147,6 +168,26 @@ for (const name of ["flaky-moss", "listless-moss"]) {
   r = await one(pkg(name));
   ok(r.failures.length === 1 && /PyPI could not be read/u.test(r.failures[0]) && mended(`FAIL: ${r.failures[0]}`), `${name}: an answer PyPI does not give in its shape fails the lookup, saying the mend (${r.failures})`);
 }
+// (#1368, point 1: each hash the lock line names is one PyPI lists for a file of the version)
+const sha = (c) => `sha256:${c.repeat(64)}`;
+r = await one(pkg("tidy-moss-format", { hashes: [sha("a")] }));
+ok(r.failures.length === 0, `a hash PyPI lists for a file of the version passes (${r.failures})`);
+r = await one(pkg("yanked-moss", { version: "2.0.0", hashes: [sha("9")] }));
+ok(r.failures.length === 0, `a hash of a yanked file of the version passes, since pip installs it at that exact version (${r.failures})`);
+r = await one(pkg("tidy-moss-format", { version: "v1.1", hashes: [sha("a")] }));
+ok(r.failures.length === 0, `a hash is compared with the files of the version PyPI keys, however the lock line spells it (${r.failures})`);
+r = await one(pkg("tidy-moss-format", { version: "v1.1", hashes: [sha("f")] }));
+ok(/PyPI lists for no file of version v1\.1,/u.test(r.failures[0] ?? ""), `the failure names the version as the lock line writes it, never PyPI's own text (${r.failures})`);
+for (const [what, hashes] of [["a hash PyPI lists for no file of it", [sha("a"), sha("f")]], ["a hash of another version's file", [sha("9")]], ["a hash of a kind PyPI does not list", [`sha512:${"a".repeat(128)}`]]]) {
+  r = await one(pkg("tidy-moss-format", { hashes }));
+  ok(r.failures.length === 1 && /^requirements\.txt: tidy-moss-format@1\.1\.0: 1 of the \d hash(?:es)? its line names \(sha\d+:[0-9a-f]{12}…\) PyPI lists for no file of version 1\.1\.0/u.test(r.failures[0]) && mended(`FAIL: ${r.failures[0]}`) && r.reports.length === 1, `${what} fails, saying the mend, the package still reported for the review (${r.failures})`);
+}
+r = await one(pkg("tidy-moss-format", { hashes: ["b", "c", "d", "e"].map(sha) }));
+ok(r.failures.length === 1 && r.failures[0].startsWith("requirements.txt: tidy-moss-format@1.1.0: 4 of the 4 hashes") && /and more\) PyPI lists/u.test(r.failures[0]), `many such hashes are shown three at most (${r.failures})`);
+answers["https://pypi.org/pypi/digestless-moss/json"] = { status: 200, json: doc("digestless-moss", ago(400), { releases: { "1.1.0": [file("digestless-moss", "1.1.0", ago(400), { digests: { md5: "0".repeat(32) } })] } }) };
+r = await one(pkg("digestless-moss", { hashes: [sha("a")] }));
+ok(r.failures.length === 1 && /PyPI lists for no file of version 1\.1\.0/u.test(r.failures[0]), `where PyPI lists no sha256 for the version's files, its hashes fail (${r.failures})`);
+
 asked.length = 0;
 r = await one(pkg("bad/../name"));
 ok(r.failures.length === 1 && /not one PyPI gives/u.test(r.failures[0]) && !asked.length, "a name PyPI never gives is not asked of it");
