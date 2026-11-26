@@ -63,7 +63,10 @@
 // input, on unless turned off) the status is always a pass that says what the check would have done, until the
 // project's owner turns that off (#99). What the status proves where every review is posted (none starts by itself, as
 // through a plug-in): that a review was posted for the head, not who made it, since builder and reviewer may post under
-// one login, which no check here tells apart (#187).
+// one login, which no check here tells apart (#187). Given the verdict scripts/code-review-wait.mjs printed for the
+// same head (CODE), it waits, too, while the code-review status waits, saying why, so that the one status a ruleset
+// requires holds a pull request that needs a code review until one is posted in its form (#1339); one it cannot read
+// waits too.
 //
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its review comments, the same> [<its commits, the same> [<its files, the same> [<the merges proved>]]]]
@@ -71,7 +74,8 @@
 //         the host's time the script first came to the default branch, which it was opened before (boundOf); RUN_URL for
 //         the link the status carries; REVIEWERS for the accounts named; RIGHTS for a file of GitHub's answers on
 //         their rights (collaborators/<login>/permission, as a JSON list); PURE for the head pure-sync.mjs proved;
-//         QUEUE for the head the caller's queue-only.mjs proved (#750).
+//         QUEUE for the head the caller's queue-only.mjs proved (#750); CODE for the file scripts/code-review-wait.mjs
+//         printed into for the same head, whose waiting this status waits for too (withCode; #1339).
 import { existsSync, readFileSync } from "node:fs";
 import { copyOf } from "./core-path.mjs";
 import { RUNS } from "./comment-only.mjs";
@@ -438,6 +442,26 @@ export function powerFilesOf(file, read) {
   return Array.isArray(power) && power.every((name) => typeof name === "string") ? new Set(power) : null;
 }
 
+// the code-review status's verdict folded in (#1339): the security-review status, which a ruleset requires (the core's; a
+// project's where its owner makes it so), also waits while the code-review status waits, which none requires,
+// so that a pull request that needs a code review merges only after one is posted, in its form. `code` is
+// what scripts/code-review-wait.mjs printed for the same head ({ sha, done, why }), or undefined where the workflow ran
+// none (a default branch whose core is older); one it ran that cannot be read is read as waiting, never as a pass
+// (its why carried whole where it fits, with room for "Advisory: " and "; summary unreadable" in GitHub's 140
+// characters; else what it waits for with a mend that points to that status's own, which GitHub shows beside this
+// one; else that pointer alone)
+export const CODE_UNREAD = "code-review not worked out. Mend: run this job again; failing again, mend scripts/code-review-wait.mjs";
+export const CODE_WAITS = "code-review waits. Mend: do what the code-review status's own mend says; this status then follows it";
+const POINTS = "Mend: do what the code-review status's own mend says";
+export function withCode(verdict, code) {
+  if (verdict === undefined || code === undefined || !verdict.done) return verdict;
+  const read = code !== null && typeof code === "object" && code.sha === verdict.sha && typeof code.done === "boolean" && typeof code.why === "string";
+  if (read && code.done) return verdict;
+  if (!read) return { ...verdict, done: false, why: CODE_UNREAD };
+  const whole = `code-review waits: ${code.why}`, short = `code-review waits: ${code.why.split(/\. Mend: /u)[0]}. ${POINTS}`;
+  return { ...verdict, done: false, why: [whole, short].find((why) => why.length <= 110) ?? CODE_WAITS };
+}
+
 // the commit status GitHub is given: while advisory always a pass, saying what the check would have done (context: the
 // status's name, this check's unless scripts/code-review-wait.mjs gives its own)
 export function status(verdict, advisory, url, context = CONTEXT) {
@@ -467,5 +491,12 @@ if (started(import.meta.url)) {
       merges: mergesFile ? read(mergesFile) : undefined,
       light: lightOf(process.env.POWER, read), power: powerFilesOf(process.env.POWER, read),
       copy: existsSync("core-manifest.md") ? copyOf(".") : undefined }); // (the copy at the path the default branch's manifest names, checked out here, as code-review-wait.mjs reads it)
-  console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
+  // (CODE: the file code-review-wait.mjs printed into, where the workflow ran it; missing, empty or not JSON, it is
+  // read as not worked out, which waits)
+  const code = (() => {
+    if (!process.env.CODE) return undefined;
+    try { return JSON.parse(readFileSync(process.env.CODE, "utf8")); } catch { return null; }
+  })();
+  const folded = withCode(verdict, code);
+  console.log(JSON.stringify(folded === undefined ? {} : { sha: folded.sha, status: status(folded, process.env.ADVISORY !== "false", process.env.RUN_URL), ...(folded.warning ? { warning: folded.warning } : {}) }));
 }

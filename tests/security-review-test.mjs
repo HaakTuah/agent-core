@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { CONTEXT, EDITED, NEW_LINE, UNREAD, boundOf, commentsAlone, form, judge, named, pinsAlone, powerFilesOf, reviewersOf, status } from "../scripts/security-review.mjs";
+import { CODE_UNREAD, CODE_WAITS, CONTEXT, EDITED, NEW_LINE, UNREAD, boundOf, commentsAlone, form, judge, named, pinsAlone, powerFilesOf, reviewersOf, status, withCode } from "../scripts/security-review.mjs";
 import { blockingOf, otherOf, postedKind } from "../scripts/review-record.mjs";
 import { judge as codeReview } from "../scripts/code-review-wait.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -385,6 +385,27 @@ try {
   ok(run(pull, [[as("helper")]], { ADVISORY: "false", REVIEWERS: "x helper" }).status.state === "success" && run(pull, [[as("helper")]], { ADVISORY: "false" }).status.state === "pending", "the accounts the workflow names count, and no others");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   ok(run(pull, [[real(REAL_CLEAN.replace("codex-review-state:v1", "codex-review-state:v2"))]]).warning === UNREAD && run(pull, [[real(REAL_CLEAN)]]).warning === undefined, "run as the workflow runs it, it prints the warning beside the status, for the workflow to show");
+  // ---- the code-review status's verdict folded in (#1339): the status a ruleset requires passes only where that one does ----
+  const NONE = "no code review. Mend: a fresh reviewer posts Code review: <whole SHA>⏎Blocking findings: N.⏎Other findings: M.⏎Score: S of 10.";
+  const passed = { sha: HEAD, done: true, why: "a security review is posted" };
+  const shortWhy = { sha: HEAD, done: false, why: "Codex's code review of aaaaaaa is still running. Mend: wait for it" };
+  const folds = [withCode(passed, shortWhy), withCode(passed, { sha: HEAD, done: false, why: NONE }), withCode(passed, { sha: HEAD, done: false, why: `${"x".repeat(100)}. Mend: wait` }),
+    ...[null, {}, { sha: SEEN, done: true, why: "no code review is running" }, { sha: HEAD, done: "no", why: "" }, { sha: HEAD, done: true }].map((code) => withCode(passed, code))];
+  ok(folds.every((v) => v.done === false && [true, false].every((a) => status({ ...v, warning: UNREAD }, a).description.length <= 140 && !status(v, a).description.endsWith("…")) && mended(status(v, false).description))
+    && folds[0].why === `code-review waits: ${shortWhy.why}` && folds[1].why === "code-review waits: no code review. Mend: do what the code-review status's own mend says" && folds[2].why === CODE_WAITS
+    && folds.slice(3).every((v) => v.why === CODE_UNREAD),
+  "while the code-review status waits, the security-review status waits too, saying why whole where it fits, else what it waits for and a mend that points to that status's, else the pointer; one not read, or of another commit, waits as not worked out; each within GitHub's 140 characters with its mend", folds.map((v) => v.why).join(" | "));
+  const ownWait = { sha: HEAD, done: false, why: "no security review" };
+  ok(withCode(passed, { sha: HEAD, done: true, why: "no code review is running" }) === passed && withCode(passed, undefined) === passed && withCode(undefined, null) === undefined && withCode(ownWait, shortWhy) === ownWait,
+    "  one that passes, or none given (an older default branch), leaves it as it was; nor where it waits on its own, which says its own why");
+  const codeFile = join(dir, "code.json");
+  const withFile = (code, env = {}) => { if (code === undefined) rmSync(codeFile, { force: true }); else writeFileSync(codeFile, typeof code === "string" ? code : JSON.stringify(code)); return run(pull, [[summary(done)]], { ADVISORY: "false", CODE: codeFile, ...env }); };
+  const waitsFile = withFile({ sha: HEAD, done: false, why: NONE }), passesFile = withFile({ sha: HEAD, done: true, why: "no code review is running" }), advisesFile = withFile({ sha: HEAD, done: false, why: NONE }, { ADVISORY: "" });
+  const brokenFile = withFile(""), goneFile = withFile(undefined);
+  ok(waitsFile.status.state === "pending" && waitsFile.status.description.startsWith("Waiting: code-review waits: no code review.") && passesFile.status.state === "success"
+    && advisesFile.status.state === "success" && advisesFile.status.description.startsWith("Advisory: code-review waits") && [brokenFile, goneFile].every((r) => r.status.state === "pending" && r.status.description === `Waiting: ${CODE_UNREAD}`)
+    && run(pull, [[summary(done)]], { ADVISORY: "false" }).status.state === "success",
+  "run as the workflow runs it, given CODE it waits while the code-review verdict waits, advises so where advisory, and waits where that file is empty or gone; given none, as before", [waitsFile, passesFile, advisesFile, brokenFile, goneFile].map((r) => r.status.description).join(" | "));
   let usage = 0;
   try { execFileSync(process.execPath, [script], { stdio: "ignore" }); } catch (e) { usage = e.status; }
   ok(usage === 2, "with no files named, it says how it is run");

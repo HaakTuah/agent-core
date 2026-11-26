@@ -385,7 +385,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      and "Other findings:", or, posted from 20 November, its line "Score:" (`tasks/reviews.md`, point 3); and, in the
      core's own repository, while a pull request opened from that day that changes `floor/`, `roles/`, `tasks/` or
      `tools/` has no "Design check:" naming its head, or a commit only such updates follow (point 4); it advises as the
-     first does. It runs a short job at each push and each "Code review:" or "Design check:" comment, a dozen or so a
+     first does, and while it waits, the `security-review` status waits too, saying why, so that the one status a
+     ruleset requires holds a pull request until the code review it needs is posted in its form (#1339). It runs a short job at each push and each "Code review:" or "Design check:" comment, a dozen or so a
      pull request, which a private repository pays for: there the job is skipped, and so not billed, unless the project
      turns it on (the input `private`) or has turned advisory off, since a ruleset may then wait for it.
    - **A private repository** has GitHub's dependency review and CodeQL only with its paid code security, so without
