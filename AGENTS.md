@@ -195,8 +195,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   answer stops nothing and proves no merge, though a trial recorded without it for each project stops the cut; #1261);
   it records the counts alone (`node scripts/release.mjs --trial`) in a pull request of its own. Another owner's project
   has its own code run only where no sign-in or key of the owner's is held (floor rule 18). The one condition that
-  changes it: no such project allows a trial; the record says so, and so does the release. It does not mean that a
-  project of another owner's is written to, that its private code leaves it, or that it is named anywhere. Reason: #1079 passed every check
+  changes it: no such project allows a trial; the record says so, and so does the release. It does not mean that
+  another owner's project is written to, that its private code leaves it, or that it is named anywhere. Reason: #1079 passed every check
   of the core and failed only on a real project, and the sync's proof was first met on one after the cut (#1261). Held
   by `scripts/release.mjs` with `scripts/release-trial.mjs`, which say the trial has not run, and cut nothing, where its
   record does not stand for the commit, cut nothing where a check passed before, or ran not before, and failed after, or
