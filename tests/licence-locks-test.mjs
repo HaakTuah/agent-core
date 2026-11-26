@@ -133,6 +133,9 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
   ok(/app\/package\.json/u.test(why("package-lock.json", "package.json", "app/package.json", "lib/package.json") ?? "") && !/lib\/package\.json/u.test(why("package-lock.json", "package.json", "app/package.json", "lib/package.json") ?? "")
     && why("empty/package.json") === null && why("a/yarn.lock", "b/yarn.lock", "c/yarn.lock", "d/yarn.lock").endsWith("and 1 more, which the check does not read (it reads npm's lock files alone), so only the host's dependency review reads them, by its allow-list"),
   "a lock file above hides a package.json only where it names it a workspace, a package.json that names no dependency is no packages, and more than three files are counted", JSON.stringify(why("package-lock.json", "app/package.json")));
+  const hostile = why("a\nb/yarn.lock", "x`y/yarn.lock", "c\u202e/yarn.lock") ?? "";
+  ok(!/[\n\u202e`]/u.test(hostile.replace(/`[^`]*`/gu, "")) && !/[\n\u202e]/u.test(hostile) && hostile.includes("a\\nb/yarn.lock") && hostile.includes("\\u202e") && hostile.includes("x\\u0060y"),
+  "a path with a line break, a backtick or a bidirectional character is written out, so it cannot leave its code span", JSON.stringify(hostile));
 }
 
 done();

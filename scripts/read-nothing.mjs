@@ -19,6 +19,7 @@ import { codeListed, offBy, parseConfig, where } from "./shape.mjs";
 import { measuredCode, toolOf } from "./strength.mjs";
 import { trackedIn } from "./licence-locks.mjs";
 import { copyAmong } from "./core-path.mjs";
+import { shown } from "./reading.mjs";
 import { readFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import { LOCKFILE } from "./licence-scan.mjs";
@@ -73,8 +74,8 @@ export function licenceUnread(tracked, root = ".", read = () => null) {
     ...mine.filter(f => posix.basename(f) === "package.json" && !held(posix.dirname(f)) && names(read(f))),
   ];
   if (!unread.length) return null;
-  const shown = unread.slice(0, 3).map(f => `\`${f}\``).join(", ") + (unread.length > 3 ? ` and ${unread.length - 3} more` : "");
-  return `the project's packages stand in ${shown}, which the check does not read (it reads npm's lock files alone), so only the host's dependency review reads them, by its allow-list`;
+  const list = unread.slice(0, 3).map(f => `\`${shown(f).replaceAll("`", "\\u0060")}\``).join(", ") + (unread.length > 3 ? ` and ${unread.length - 3} more` : "");
+  return `the project's packages stand in ${list}, which the check does not read (it reads npm's lock files alone), so only the host's dependency review reads them, by its allow-list`;
 }
 
 const licenceWhy = root => {
