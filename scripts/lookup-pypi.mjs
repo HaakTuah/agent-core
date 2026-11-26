@@ -144,11 +144,12 @@ function graphed(entries) {
   for (const e of entries) for (const p of parents(e)) children.set(p, (children.get(p) ?? new Set()).add(e.name));
   // (what a named package leads to, in one pass from all of them: each such package that is not named itself is brought)
   const roots = entries.filter(named).map((e) => e.name), fed = reach("", (x) => (x === "" ? roots : children.get(x) ?? []));
-  const direct = new Map(entries.map((e) => [e.name, named(e) || !fed.has(e.name)]));
+  // (each entry its own: a name the file gives twice, behind two markers, is named where either line names it)
+  const direct = entries.map((e) => named(e) || !fed.has(e.name)), shown = new Set(entries.filter((e, i) => direct[i]).map((e) => e.name));
   const ancestors = (e) => [...reach(e.name, (x) => parents(byName.get(x)))];
-  return entries.map((e) => ({ name: e.name, version: e.version, path: e.name, direct: direct.get(e.name), pypi: true, hashes: e.hashes,
+  return entries.map((e, i) => ({ name: e.name, version: e.version, path: e.name, direct: direct[i], pypi: true, hashes: e.hashes,
     get brings() { return any ? reach(e.name, (x) => children.get(x) ?? []).size : null; },
-    get by() { return direct.get(e.name) ? [] : ancestors(e).filter((x) => direct.get(x)); } }));
+    get by() { return direct[i] ? [] : ancestors(e).filter((x) => shown.has(x)); } }));
 }
 
 /** What PyPI says of the package `p` ({ name, version }), asked with `get(url)` ({ status, json }): its facts, or

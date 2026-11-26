@@ -24,6 +24,8 @@ const looped = pypiPackages([
 const loop = (name) => looped.find((p) => p.name === name);
 ok(loop("self-moss")?.direct === true && loop("ring-moss")?.direct === true && loop("loop-moss")?.direct === true, `a package "# via" itself, and a cycle that no package the project names leads into, are named by the project (${JSON.stringify(looped.map((p) => [p.name, p.direct]))})`);
 ok(loop("fed-moss")?.direct === false && loop("feed-moss")?.direct === false && loop("fed-moss")?.by.join() === "root-moss" && loop("feed-moss")?.by.join() === "root-moss", `a cycle that a package the project names leads into is brought by it (${JSON.stringify(looped.map((p) => [p.name, p.direct, p.by]))})`);
+const twice = pypiPackages([`root-moss==1.0.0 ${H()}`, `target-moss==1.0.0 ; python_version < "3.9" ${H()}`, "    # via -r requirements.in", `target-moss==1.0.0 ; python_version >= "3.9" ${H()}`, "    # via root-moss"].join("\n"), "requirements.txt");
+ok(twice.filter((p) => p.name === "target-moss").map((p) => p.direct).join() === "true,false", `a name the file gives twice keeps each line's own reading, the line that names it named by the project (${JSON.stringify(twice.map((p) => [p.name, p.direct]))})`);
 // (#1368, point 4: a long run of spaces is read in one pass, never by trying each split of it)
 for (const [what, line] of [["a comment's strip", `plain-moss==1.0.0${" ".repeat(200000)}x`], ["a requirement", `plain-moss${" ".repeat(200000)}x ${H()}`], ["a requirement's version", `plain-moss ==${" ".repeat(200000)}; ${H()}`]]) {
   ok(quick(() => throws(() => pypiPackages(`${line}\n`, "requirements.txt"))), `${what} on a run of 200,000 spaces is refused, quickly, not after one try for each split of it`);
