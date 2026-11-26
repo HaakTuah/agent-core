@@ -5,10 +5,12 @@
 // is the .NET SDK a project's global.json names ("sdk": { "version" }), at that exact version, which meets any
 // "rollForward" the file sets. It reads the global.json at the project's root alone, not one a subfolder's jobs run
 // under. Every dotnet it runs runs from the file system's root, so no global.json of the project's, or of the folder it
-// was started in, chooses what runs. A version out of form is named by its JSON type alone, nothing of it printed. It goes to a folder of its own under the home folder, outside
-// every repository, never over the machine's own; the line it prints says what to set for the trial's runs. Where the
-// machine's own dotnet already lists that SDK, it fetches nothing. A version or a machine the list holds no sum for, a
-// host that does not answer, a sum that differs, or a binary that does not give its version, and nothing is installed:
+// was started in, chooses what runs. A version out of form is named by its JSON type alone, nothing of it printed. It
+// goes to a folder of its own under the home folder, which it holds outside the project (the trial's builder keeps the
+// home outside every repository), never over the machine's own; the line it prints says what to set for the trial's
+// runs. Where the machine's own dotnet already lists that SDK, it fetches nothing. A version or a machine the list holds
+// no sum for, a host that does not give the file (any status but 200), a sum that differs, or a binary that does not
+// give its version, and nothing is installed:
 // it says so with its mend. It widens no network (only the owner does that) and changes nothing of the project. Safe to
 // run twice; it always exits 0 when it fetches, since it decides nothing: a job wanting what it could not fetch reads
 // alike before and after the update, so it stops no cut (scripts/release-trial.mjs). Node's own modules and the
@@ -119,7 +121,7 @@ function install(entry, root, env) {
   const tmp = fs.mkdtempSync(path.join(path.dirname(root), ".fetch-"));
   try {
     const archive = path.join(tmp, "sdk.tar.gz"), out = path.join(tmp, "sdk");
-    const got = run("curl", ["-fsS", "--proto", "=https", "--connect-timeout", "30", "--max-time", "900", "-w", "%{http_code}", "-o", archive, entry.url], env);
+    const got = run("curl", ["-sS", "--proto", "=https", "--connect-timeout", "30", "--max-time", "900", "-w", "%{http_code}", "-o", archive, entry.url], env);
     if (got.error || got.status !== 0) return `${HOST} did not give it: ${why(got, "curl")}). Mend: where this machine's network does not allow ${HOST}, only the owner can allow it, in the environment's settings; until then the job that needs it reads alike before and after the update, so it stops no cut.`;
     const code = got.stdout?.trim() ?? "";
     if (code !== "200") return `${HOST} answered ${/^\d{3}$/u.test(code) ? code : "no status"}, not the file, which may have moved; nothing of it was opened). Mend: tell the owner the publisher's address for it changed; its entry is mended in a pull request of the core, as --entry prints it from the publisher's release notes.`;

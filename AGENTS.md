@@ -231,17 +231,18 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   a project's checks, its builder runs `scripts/toolchain.mjs` from the clone of the core under trial on the project's
   clone, which fetches the .NET SDK the project's `global.json` pins exactly, the one pin it reads yet, to a folder
   outside every repository, as `scripts/node.sh` fetches Node: only at a version and for a machine whose SHA-512 the
-  script's own list holds, checked before anything of it runs; the builder sets what its line prints for both runs. The one condition that changes it: the list holds no sum for the pin or the machine, the host does not give the
-  file, what it gives differs from the list's sum or version, or the `global.json` is not read. Then nothing is fetched,
-  the line says why with its mend (an entry added in a pull request of the core, as its `--entry` prints it from the
-  publisher's release notes; a host only the owner allows; or, for a file that differs, word to the owner), and the job
-  that needs it reads alike before and after the update, so it stops no cut. Its trigger is the trial of each release. It does not mean a session widens the
-  environment's network, which only the owner does, that a project's pin is changed, that a toolchain is fetched while a
-  check runs, or that the machine's own is replaced. Reason: at release 7's trial a .NET SDK band a project pinned was
-  neither in the distribution's packages nor reachable, and its job failed after the sync for a reason not the
-  release's. Held by `tests/toolchain-test.mjs` (a pin with no sum, a sum that differs and a host that refuses each
-  fetch nothing; a pin listed is fetched, checked by its sum, outside the project); that the builder runs it, by nothing
-  yet.
+  script's own list holds, checked before anything of it runs; the builder sets what its line prints for both runs. The
+  one condition that changes it: the list holds no sum for the pin or the machine, the host does not give the file, what
+  it gives differs from the list's sum or version or does not open, the folder would stand in the project, or the
+  `global.json` is not read. Then nothing is fetched, the line says why with its mend (an entry added in a pull request
+  of the core, as its `--entry` prints it from the publisher's release notes; a host only the owner allows; or, for a
+  file that differs, word to the owner), and the job that needs it reads alike before and after the update, so it stops
+  no cut. Its trigger is the trial of each release. It does not mean a session widens the environment's network, which
+  only the owner does, that a project's pin is changed, that a toolchain is fetched while a check runs, or that the
+  machine's own is replaced. Reason: at release 7's trial a .NET SDK band a project pinned was neither in the
+  distribution's packages nor reachable, and its job failed after the sync for a reason not the release's. Held by
+  `tests/toolchain-test.mjs` (a pin with no sum, a sum that differs and a host that refuses each fetch nothing; a pin
+  listed is fetched, checked by its sum, outside the project); that the builder runs it, by nothing yet.
 - **Nothing locks a project,** in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
   what an agent can mend alone may bind, and what only the owner can do (a yes the floor names, a setting on the

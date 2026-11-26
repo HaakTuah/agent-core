@@ -56,6 +56,8 @@ const hostile = { link: dir => fs.symlinkSync(outside, path.join(dir, "global.js
   large: dir => write(path.join(dir, "global.json"), JSON.stringify({ sdk: { version: V }, pad: "x".repeat(70_000) })),
   deep: dir => write(path.join(dir, "global.json"), `${"[".repeat(500)}${"]".repeat(500)}`),
   long: dir => write(path.join(dir, "global.json"), JSON.stringify({ sdk: { version: `x\u2028${MARK}${"a".repeat(60_000)}` } })),
+  empty: dir => write(path.join(dir, "global.json"), ""),
+  blank: dir => write(path.join(dir, "global.json"), JSON.stringify({ sdk: { version: "" } })),
   number: dir => write(path.join(dir, "global.json"), JSON.stringify({ sdk: { version: 10 } })),
   object: dir => write(path.join(dir, "global.json"), JSON.stringify({ sdk: { version: { said: MARK } } })),
   list: dir => write(path.join(dir, "global.json"), JSON.stringify({ sdk: { version: [MARK] } })),
@@ -85,7 +87,7 @@ else {
     return [head, body, Buffer.alloc((512 - (body.length % 512)) % 512)];
   }), Buffer.alloc(1024)]);
   const archiveOf = (said, name) => {
-    const file = write(path.join(root, `${name}.tar.gz`), zlib.gzipSync(tarOf([["./dotnet", `#!/bin/sh\npwd >> "${wd}"\n[ "$1" = "--version" ] && echo ${said}\n`, 0o755], [`./sdk/${said}/dotnet.dll`, "stand-in", 0o644]])));
+    const file = write(path.join(root, `${name}.tar.gz`), zlib.gzipSync(tarOf([["./dotnet", `#!/bin/sh\necho "$(pwd) $DOTNET_CLI_TELEMETRY_OPTOUT$DOTNET_NOLOGO" >> "${wd}"\n[ "$1" = "--version" ] && echo ${said}\n`, 0o755], [`./sdk/${said}/dotnet.dll`, "stand-in", 0o644]])));
     return { file, sum: crypto.createHash("sha512").update(fs.readFileSync(file)).digest("hex") };
   };
   // (each tool the script and the stand-ins need, found on the runner's PATH)
@@ -102,7 +104,7 @@ else {
     write(path.join(dir, "curl"), `#!/bin/sh\necho "$@" >> "${log}"\n${fail ? `echo "curl: (56) CONNECT tunnel failed, response 403" >&2\nexit 56\n` : `while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done\ncp "${give}" "$out"\nprintf ${status}\n`}`, 0o755);
     const tarLog = path.join(dir, "tar.log");
     write(path.join(dir, "tar"), `#!/bin/sh\necho tar >> "${tarLog}"\nexec "${found("tar")}" "$@"\n`, 0o755);
-    if (machine) write(path.join(dir, "dotnet"), `#!/bin/sh\npwd >> "${wd}"\n[ "$1" = "--list-sdks" ] && echo "${V} [/usr/lib/dotnet/sdk]"\n`, 0o755);
+    if (machine) write(path.join(dir, "dotnet"), `#!/bin/sh\necho "$(pwd) $DOTNET_CLI_TELEMETRY_OPTOUT$DOTNET_NOLOGO" >> "${wd}"\n[ "$1" = "--list-sdks" ] && echo "${V} [/usr/lib/dotnet/sdk]"\n`, 0o755);
     for (const tool of ["gzip", "sh", "cp"]) if (found(tool) && !fs.existsSync(path.join(dir, tool))) fs.symlinkSync(found(tool), path.join(dir, tool));
     return { env: { ...process.env, PATH: dir }, log: () => (fs.existsSync(log) ? fs.readFileSync(log, "utf8") : null), untarred: () => fs.existsSync(tarLog) };
   };
@@ -131,7 +133,7 @@ else {
     "a listed pin is fetched to its own folder under the home folder, outside the project, checked by its sum, with what to set for the trial's runs", first);
   ok(/export DOTNET_ROOT='[^']+' PATH='[^']+':"\$PATH" DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1$/u.test(first), "the line to set quotes the folder and turns the SDK's telemetry and banner off", first);
   const curled = (fetched.log() ?? "").trim().split(" ");
-  ok(curled.length === 12 && curled.slice(0, 10).join(" ") === "-fsS --proto =https --connect-timeout 30 --max-time 900 -w %{http_code} -o" && curled[11] === url(),
+  ok(curled.length === 12 && curled.slice(0, 10).join(" ") === "-sS --proto =https --connect-timeout 30 --max-time 900 -w %{http_code} -o" && curled[11] === url(),
     "it fetches only the listed URL, over HTTPS alone", fetched.log());
   const again = fetchPinned(at).join();
   ok(/present in/u.test(again) && fetched.log().trim().split("\n").length === 1, "run twice, it finds the SDK present and fetches nothing again", again);
@@ -168,7 +170,7 @@ else {
   ok(/is the machine's own; nothing fetched/u.test(kept) && machine.log() === null, "where the machine's own dotnet lists the SDK, nothing is fetched", kept);
   process.chdir(started);
   const where = fs.readFileSync(wd, "utf8").trim().split("\n");
-  ok(where.length >= 3 && where.every(w => w === path.parse(planted).root), "every dotnet, the fetched one and the machine's own, runs from the file system's root, never where it was started, whose global.json chooses nothing", where.join(", "));
+  ok(where.length >= 3 && where.every(w => w === `${path.parse(planted).root} 11`), "every dotnet, the fetched one and the machine's own, runs from the file system's root, never where it was started, whose global.json chooses nothing, with the SDK's telemetry and banner off", where.join(", "));
 
   const elsewhere = bin("elsewhere", { give: right.file });
   const mac = fetchPinned({ project: project("elsewhere"), list: [{ ...good, sha512: right.sum }], home: home("elsewhere"), env: elsewhere.env, platform: "darwin", arch: "arm64" }).join();
