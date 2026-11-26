@@ -1,6 +1,6 @@
 // Tests of the core's releases (releases.mjs): which tags are releases, which is the newest and whether it is past a pin, what
 // a sync between two commits asks, and whether a release asks a sync of a project at all. What a project follows:
-// follows-test.mjs; cutting one (release.mjs, with the trial on a real project in release-trial.mjs): release-test.mjs
+// follows-test.mjs; cutting one (release.mjs): release-test.mjs; the trial on a real project (release-trial.mjs): release-trial-test.mjs
 // (#958). In a scratch repository that stands in for the core, fetched as the scripts fetch the core; on Linux and on
 // Windows. Git and Node's own modules only.
 //
