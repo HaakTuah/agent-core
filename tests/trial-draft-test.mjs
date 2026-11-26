@@ -9,7 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { OWNER } from "../scripts/core-address.mjs";
+import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { trial, trialAt, trialRecord } from "../scripts/release-trial.mjs";
 import { DRAFT_COUNTS, draftAnswerOf, draftCounts, draftsIn, readDraft, saidOf } from "../scripts/trial-draft.mjs";
@@ -36,7 +36,7 @@ const host = (over = {}) => route => {
   const pulls = { state: "open", draft: true, head: { sha: HEAD }, base: { ref: "main", repo: { owner: { login: OWNER }, default_branch: "main" } }, ...over.pull };
   if (route === "repos/o/p/pulls/7") return { body: pulls };
   if (route === "repos/o/p/branches/agents-stop") return over.stop ? { body: { name: "agents-stop" } } : { why: "GitHub answered 404" };
-  if (route === `repos/o/p/contents/core-manifest.md?ref=${HEAD}`) return { body: { content: Buffer.from(`Core: HaakTuah/agent-core at ${over.pin ?? TRIED}, copied whole under core/\n`).toString("base64") } };
+  if (route === `repos/o/p/contents/core-manifest.md?ref=${HEAD}`) return { body: { content: Buffer.from(`Core: ${CORE} at ${over.pin ?? TRIED}, copied whole under core/\n`).toString("base64") } };
   if (route === "repos/o/p/commits/main") return { body: { sha: MAIN } };
   if (route.startsWith(`repos/o/p/commits/${MAIN}/check-runs`)) return { body: { check_runs: [{ name: "tests", status: "completed", conclusion: "success" }] } };
   if (route.startsWith(`repos/o/p/commits/${HEAD}/check-runs`)) return { body: { check_runs: [{ name: "tests", status: "completed", conclusion: "success" }, { name: "dependency review", status: over.late ? "queued" : "completed", conclusion: over.late ? null : "failure" }] } };

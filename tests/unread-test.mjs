@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { compared, trialAt, trialRecord } from "../scripts/release-trial.mjs";
 // (a sync's reading for the project tried, which every record holds, #1261)
-const SYNC = { pure: true, from: "release-1" };
+const SYNC = { pure: true, from: "release-1" }, OTHER = { none: "another-owner" };
 import { runWorkflow, withAbsolutePath } from "../scripts/workflow-run.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 
@@ -93,13 +93,13 @@ jobs:
   const job = compared({ "a.yml/x": "failed", "b.yml": "failed" }, { "a.yml/x/y": "unread", "b.yml/z": "unread" });
   ok(job.unreadAfter.join() === "a.yml/x/y" && job.unreadNeither.join() === "b.yml/z" && !job.failedBeforeAlone.length,
     "  a job, or a call, failed before is read as run then, so one unread under it after holds the cut, never the record's guess that it measured nothing; only a whole file failed before is read so", JSON.stringify(job));
-  const record = trialRecord(SHA("d"), "2026-11-24", [[{ "ci.yml/gate": "passed" }, { "ci.yml/lint": "passed", "ci.yml/gate": "unread" }]], [SYNC]);
+  const record = trialRecord(SHA("d"), "2026-11-24", [[{ "ci.yml/gate": "passed" }, { "ci.yml/lint": "passed", "ci.yml/gate": "unread" }]], [SYNC], [OTHER]);
   const at = trialAt(SHA("d"), args => (args[0] === "show" ? JSON.stringify(record) : ""));
   ok(record.unreadAfter === 1 && record.failedBoth === 0 && record.failedBeforeAlone === 0 && /1 check was not measured in the trial on a real project, 1 of them run before and not read after the update and 0 not read before it and failed after[\s\S]*Mend: teach the core's workflow runner/u.test(at.held ?? "") && /1 run before and not read after it and 0 not read before it and failed after \(not measured\)/u.test(at.said),
     "  and the record counts it, and release.mjs reads the class as holding the cut, saying its mend", `${at.said}\n${at.held}`);
   const before = trialAt(SHA("d"), args => (args[0] === "show" ? JSON.stringify({ ...record, unreadAfter: 0, unreadBefore: 2 }) : ""));
   ok(/2 checks were not measured[\s\S]*0 of them run before and not read after the update and 2 not read before it and failed after[\s\S]*take the run before the update again with the release's check\.mjs/u.test(before.held ?? ""), "  one not read before and failed after holds it too, its mend the run before taken again by the release's check.mjs", before.held);
-  const neither = trialRecord(SHA("d"), "2026-11-24", [[{ "ci.yml": "failed", "own.yml/d": "unread" }, { "ci.yml/lint": "passed", "ci.yml/gate": "unread", "own.yml/d": "unread" }]], [SYNC]);
+  const neither = trialRecord(SHA("d"), "2026-11-24", [[{ "ci.yml": "failed", "own.yml/d": "unread" }, { "ci.yml/lint": "passed", "ci.yml/gate": "unread", "own.yml/d": "unread" }]], [SYNC], [OTHER]);
   const neitherAt = trialAt(SHA("d"), args => (args[0] === "show" ? JSON.stringify(neither) : ""));
   ok(neither.unreadNeither === 2 && neither.unreadAfter === 0 && neither.failedBoth === 0 && neitherAt.held === null && /2 read in neither run \(not measured, holding nothing\)/u.test(neitherAt.said),
     "  a job read in neither run is counted and said, never failed both, and holds nothing, as #1257 says of a check that ran neither before nor after", `${neitherAt.said}\n${neitherAt.held}`);
@@ -110,7 +110,7 @@ jobs:
     { "a.yml/f": "failed", "a.yml/x": "stopped", "b.yml/y": "stopped", "c.yml/z": "stopped", "d.yml": "stopped", "e.yml": "stopped" });
   ok(s.stoppedAfter.join() === "a.yml/x,e.yml" && s.stoppedNeither?.join() === "b.yml/y,c.yml/z,d.yml" && !s.failedBeforeAlone.length && !s.ranBeforeAlone.length,
     "a job stopped after that ran before, by its key or under its file, is stopped after; one that ran not before, stopped or unrun then too, or new, ran in neither run (#1257)", JSON.stringify(s));
-  const stopped = trialRecord(SHA("e"), "2026-11-24", [[{ "a.yml/x": "passed", "a.yml/y": "passed", "b.yml/n": "unrun" }, { "a.yml/x": "failed", "a.yml/y": "stopped", "b.yml/n": "stopped" }]], [SYNC]);
+  const stopped = trialRecord(SHA("e"), "2026-11-24", [[{ "a.yml/x": "passed", "a.yml/y": "passed", "b.yml/n": "unrun" }, { "a.yml/x": "failed", "a.yml/y": "stopped", "b.yml/n": "stopped" }]], [SYNC], [OTHER]);
   const held = trialAt(SHA("e"), args => (args[0] === "show" ? JSON.stringify({ ...stopped, failedAfter: 0 }) : ""));
   ok(stopped.stoppedAfter === 1 && stopped.stoppedNeither === 1 && /1 check that ran before measured nothing after the update in the trial on a real project, 1 stopped behind a failure and 0 not run on the trial's machine[\s\S]*Mend: find from the trial's run after the update what stopped it, mend that[\s\S]*try the release/u.test(held.held ?? "") && /1 stopped after it that ran not before \(holding nothing\)/u.test(held.said),
     "  the record counts each, and release.mjs reads one that ran before and was stopped after as holding the cut, with its mend: the trial run again once what stopped it is mended", `${held.said}\n${held.held}`);
@@ -118,7 +118,7 @@ jobs:
   ok(/2 checks that ran before measured nothing after the update[\s\S]*0 stopped behind a failure and 2 not run on the trial's machine/u.test(unrun.held ?? ""), "  one that ran before and was not run after holds it too", unrun.held);
   const neitherStopped = trialAt(SHA("e"), args => (args[0] === "show" ? JSON.stringify({ ...stopped, failedAfter: 0, stoppedAfter: 0 }) : ""));
   ok(neitherStopped.held === null && /0 ran before and stopped after it behind a failure, 1 stopped after it that ran not before \(holding nothing\)/u.test(neitherStopped.said), "  and one stopped after that ran not before holds nothing, as #1257 says of a check that ran neither before nor after", `${neitherStopped.said}\n${neitherStopped.held}`);
-  const unrunBoth = trialRecord(SHA("e"), "2026-11-24", [[{ "w.yml/x": "unrun" }, { "w.yml/x": "unrun", "a.yml/y": "passed" }]], [SYNC]);
+  const unrunBoth = trialRecord(SHA("e"), "2026-11-24", [[{ "w.yml/x": "unrun" }, { "w.yml/x": "unrun", "a.yml/y": "passed" }]], [SYNC], [OTHER]);
   const unrunBothAt = trialAt(SHA("e"), args => (args[0] === "show" ? JSON.stringify(unrunBoth) : ""));
   ok(unrunBoth.unrunAfter === 1 && unrunBoth.unrunAfterRan === 0 && unrunBothAt.held === null, "  and one unrun in both runs, a suite for another system's runner, holds nothing, as #1257 says", `${JSON.stringify(unrunBoth)}\n${unrunBothAt.held}`);
 }
