@@ -1,6 +1,7 @@
 - `scripts/copies.mjs`, `.github/workflows/copies.yml`, `scripts/blobs.mjs`, `scripts/whole-output.mjs`,
   `scripts/schemas.mjs`, `scripts/schemas/`, `.github/copies.json`, `.github/copies-baseline.json`,
-  `tests/copies-tools-test.mjs`, `scripts/copies-values.mjs`, `tests/copies-values-test.mjs`: fails a run of code (8
+  `tests/copies-tools-test.mjs`, `scripts/copies-values.mjs`, `tests/copies-values-test.mjs`,
+  `tests/copies-values-list-test.mjs`: fails a run of code (8
   lines) or of the rule files' prose (12 words) that stands in two places, unless its baseline lists it, and a pin or a
   long pattern written in more files of the project's own than the baseline's list "values" says (`copies-values.mjs`; #1139); `copies.yml` runs it and the other checks of the part "copies" through
   `scripts/checks.mjs`. *Runs:* any session and the runners. *Else:* jscpd (MIT, maintained, a program for each system,

@@ -229,7 +229,14 @@ function report({ asked, fresh, kept, stale, base, configPath, listed, raised = 
     const first = was[0] ?? [...places.keys()][0];
     console.error(`FAIL: ${logged(`a value written twice: ${shown(v)} stands in ${where(places)}`)}. Mend: read the value from ${logged(first)} (import it, or read the file), or say in ${logged(configPath)}'s "twice" why both must hold it`);
   }
-  if (raised) console.error(`FAIL: ${logged(baseline)}'s "values" adds or raises ${raised} ${raised === 1 ? "value" : "values"} against ${logged(base)}, and the list only shrinks. Mend: take it back as ${logged(base)} holds it (git checkout ${logged(base)} -- ${logged(baseline)}), read each value the change wrote again from one file, and run ${logged(self)} ${logged(configPath)} --write`);
-  if (shrunk) console.error(`FAIL: ${logged(baseline)}'s "values" lists ${shrunk} ${shrunk === 1 ? "value" : "values"} gone or in fewer files now. Mend: run ${logged(self)} ${logged(configPath)} --write and commit the baseline it lowers`);
+  listFailed({ raised, shrunk, base, baseline, self, configPath });
   if (!fresh.length && !raised && !shrunk) console.log(`ok   no value newly written twice (a pin or a pattern${kept.length ? `; ${kept.length} said in ${logged(configPath)}'s "twice"` : ""})`);
+}
+
+// The list's own failures: an entry the change added or raised against the base's list, and one whose value stands in
+// fewer files now, each with its mend.
+function listFailed({ raised, shrunk, base, baseline, self, configPath }) {
+  const values = n => (n === 1 ? "value" : "values");
+  if (raised) console.error(`FAIL: ${logged(baseline)}'s "values" adds or raises ${raised} ${values(raised)} against ${logged(base)}, and the list only shrinks. Mend: take it back as ${logged(base)} holds it (git checkout ${logged(base)} -- ${logged(baseline)}), read each value the change wrote again from one file, and run ${logged(self)} ${logged(configPath)} --write`);
+  if (shrunk) console.error(`FAIL: ${logged(baseline)}'s "values" lists ${shrunk} ${values(shrunk)} gone or in fewer files now. Mend: run ${logged(self)} ${logged(configPath)} --write and commit the baseline it lowers`);
 }
