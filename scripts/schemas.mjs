@@ -10,11 +10,13 @@
 //
 //   import { keysOf, shapeFaults } from "./schemas.mjs";   shapeFaults("copies", config, "core/"[, its path]) -> ["the config's ...",
 //                                                  ...], [] where it holds; null where ajv is not installed, which the
-//                                                  caller says; keysOf("copies") -> the keys its schema gives
+//                                                  caller says; keysOf("copies") -> the keys its schema gives;
+//                                                  requiredOf("copies") -> the keys it asks, at each depth
 import fs from "node:fs";
 import { installed, loadSync } from "./packages.mjs";
+import { parseBounded } from "./guards.mjs";
 
-const schemaOf = name => JSON.parse(fs.readFileSync(new URL(`./schemas/${name}.json`, import.meta.url), "utf8"));
+const schemaOf = name => parseBounded(fs.readFileSync(new URL(`./schemas/${name}.json`, import.meta.url), "utf8"));
 const checkers = new Map();
 function checker(name) {
   if (!checkers.has(name)) {
@@ -31,6 +33,21 @@ function checker(name) {
 /** The keys the schema `name` gives its file, read from the schema alone, with no package: for a script that tells its
  *  own file from another's by them. */
 export const keysOf = name => Object.keys(schemaOf(name).properties ?? {});
+/** The keys the schema `name` asks at each depth, read from the schema alone: { required, keys: { <key>: the same of its
+ *  value } }, for a writer that must never add a key whose absence the check fails (converge.mjs, `merged`). A key any
+ *  branch or dependency may ask counts as asked, so it reads more than ajv would, never less; a reference it cannot
+ *  follow throws. */
+export const requiredOf = name => {
+  const schema = schemaOf(name), at = node => {
+    if (!node?.$ref) return node ?? {};
+    if (!node.$ref.startsWith("#/$defs/") || !schema.$defs?.[node.$ref.slice(8)] || Object.keys(node).some(k => !["$ref", "mend", "mendFor"].includes(k))) throw new Error(`${name}'s schema refers to ${node.$ref}, or holds keys beside it, which requiredOf cannot follow`);
+    return schema.$defs[node.$ref.slice(8)];
+  };
+  const asked = n => [...(n.required ?? []), ...[n.dependencies, n.dependentRequired, n.dependentSchemas].flatMap(d => Object.values(d ?? {})).flatMap(v => Array.isArray(v) ? v : asked(at(v))),
+    ...[...(n.allOf ?? []), ...(n.anyOf ?? []), ...(n.oneOf ?? []), n.then, n.else].filter(Boolean).flatMap(v => asked(at(v)))];
+  const tree = node => { const n = at(node); return { required: asked(n), keys: Object.fromEntries(Object.entries(n.properties ?? {}).map(([k, v]) => [k, tree(v)])) }; };
+  return tree(schema);
+};
 
 // The mend of a failing rule: the nearest "mendFor" of its keyword, else "mend", up its schema's path.
 function mendOf(schema, schemaPath, keyword) {

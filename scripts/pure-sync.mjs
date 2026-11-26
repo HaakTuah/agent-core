@@ -18,30 +18,38 @@
 // that pin, compared as copy-tree.mjs compares (and says why), without the folder the core keeps to itself; and every
 // call to a core workflow is pinned to a commit of the core's main.
 // It prints the head it checked, for the merge call's `sha` (`tasks/github-calls.md`), so nothing pushed after the
-// check can merge. Git and Node's own modules only, and gh where no workflow's event says whose account holds the
+// check can merge.
+// With `--trial <full SHA>`, a release's trial asks it against that commit before it is a release (#1261): the pin must
+// be that commit, read as the release it is to be. A reading, no proof: it never exits 0 nor names a head to merge, and
+// ends with `trial answer: ` and JSON, for release-trial.mjs. The merge's gate gives no argument. Git and Node's own modules only, and gh where no workflow's event says whose account holds the
 // repository (releases.mjs, hostAccount); it changes nothing.
 import "./whole-output.mjs";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { copyTree, coreIsFolder, entries } from "./copy-tree.mjs";
+import { copyTree, coreIsFolder, entries, executable } from "./copy-tree.mjs";
 import { CORE as ADDRESS, CORE_SOURCE as A } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
-import { followsOf, hostSaid, inBare, releasesIn } from "./releases.mjs";
+import { followsOf, hostSaid, inBare, pinsBefore, releasesIn, untar } from "./releases.mjs";
 import { asEarlier, plan, unformed } from "./converge.mjs";
 import { BLOCKS, CORE_YML, whole } from "./core-owned.mjs";
+import { WORKFLOW } from "./power.mjs";
 import { fresh, kind } from "./fresh.mjs";
 import { privateOf } from "./host-private.mjs";
 import { project } from "./steps.mjs";
 
 const CORE = `https://github.com/${ADDRESS}.git`;
+const [mode, asked, ...more] = process.argv.slice(2), tried = mode === "--trial" && !more.length && /^[0-9a-f]{40}$/u.test(asked ?? "") ? asked : null;
+if (mode !== undefined && !tried) {
+  console.log("not a pure sync: give no argument, or `--trial <the full SHA of the commit tried>` in a release's trial");
+  process.exit(2);
+}
 const raw = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
 const git = (args, cwd) => raw(args, cwd).trim();
 // the only SHAs a sync may move: the manifest's pin, and a call's to a core workflow (any case, as GitHub reads it)
 const PIN_REF = new RegExp(`^(Core: ${A} at )([0-9a-f]{40})(?=, copied whole under )`, "gu");
 const CALL = new RegExp(`(?<![\\w./-])(${A}\\/\\.github\\/workflows\\/[\\w.-]+@)([0-9a-f]{40})(?![\\w./-])`, "giu");
-const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u;
 const fail = [];
 
 const head = git(["rev-parse", "HEAD"]);
@@ -52,6 +60,7 @@ const show = (rev, file) => { try { return git(["show", `${rev}:${file}`]); } ca
 // synced in the library's repository, so a change here is no sync of it)
 const was = readCore(show(base, "core-manifest.md")), now = readCore(show(head, "core-manifest.md"));
 const oldPin = was.pin, pin = now.pin, at = was.path ?? "core/";
+if (tried && pin && pin !== tried) fail.push(`the sync moves the copy to ${pin}, not to the commit tried, ${tried}`);
 if (!oldPin || !pin) fail.push(`core-manifest.md has no one "Core: ${ADDRESS} at <full SHA>, copied whole under <path>/" line on both sides${was.form === "carried" || now.form === "carried" ? ": a core a library carries is synced in the library's own repository" : ""}`);
 else if (now.path !== at) fail.push(`the copy's path moves from ${at} to ${now.path}: a sync moves the pin alone`);
 
@@ -125,22 +134,35 @@ function provedOwned(dir) {
   const unproved = (why) => { for (const f of later) { if (WORKFLOW.test(f)) pinsOnly(f); else fail.push(`${f}: ${why}`); } for (const f of gone) fail.push(`${f}: deleted, ${why}`); };
   const tmp = mkdtempSync(join(tmpdir(), "core-render-")), kits = join(tmp, "kits"), base_ = join(tmp, "project");
   try {
-    const tree = (sha, to) => { mkdirSync(to, { recursive: true }); execFileSync("tar", ["-x", "-f", "-", "-C", to], { input: inBare(dir, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 }) }); };
+    const tree = (sha, to) => { mkdirSync(to, { recursive: true }); untar(to, inBare(dir, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 })); };
     // (a pin whose core holds no kit, or one git cannot read, proves no file outside the copy: never a crash)
     try { tree(pin, join(kits, "now")); } catch { unproved(`the core at ${pin} holds no starter kit to render, so it is not proved what the core's process writes`); return; }
-    const older = [...new Set([oldPin, ...releasesIn(dir).map((r) => r.sha)])].flatMap((sha) => { try { tree(sha, join(kits, sha)); return [join(kits, sha)]; } catch { return []; } });
+    const older = [...new Set([oldPin, ...pinsBefore("core-manifest.md", pin, dir, base), ...releasesIn(dir).map((r) => r.sha)])].flatMap((sha) => { try { tree(sha, join(kits, sha)); return [join(kits, sha)]; } catch { return []; } });
     // (the project as its main holds it, the copy left out, its manifest the head's, whose one change is the pin, read above)
     mkdirSync(base_);
     execFileSync("git", ["init", "-q"], { cwd: base_ });
     tracked(base, base_);
     writeFileSync(join(base_, "core-manifest.md"), raw(["show", `${head}:core-manifest.md`]));
-    // (whether it is private, as the host says it of the checkout's repository, from GitHub's event or gh alone:
-    // host-private.mjs; never from a test's stand-in, which this gate, that waives the reviews, does not honour)
-    const p = project(base_), k = kind(p, privateOf(process.cwd(), { env: { ...process.env, CORE_HOST_ANSWERS: "" } })), bad = unformed(p, k);
+    // (whether it is private, as the host says it of the checkout's repository, from GitHub's event, gh or a read with
+    // no sign-in alone: host-private.mjs; never from a test's stand-in or an answer given as CORE_PRIVATE, which this
+    // gate, that waives the reviews, does not honour)
+    const p = project(base_), k = kind(p, privateOf(process.cwd(), { env: { ...process.env, CORE_HOST_ANSWERS: "", CORE_PRIVATE: "" } })), bad = unformed(p, k);
     if (bad.length) { unproved(`the project's kind or values cannot be read in their forms, so it is not proved what the core's process writes: ${bad.join("; ")}`); return; }
     const kit = fresh(p, join(kits, "now", "setup", "template"), { kitOnly: true, k });
     if (!kit.length) { unproved(`the kit at ${pin} gives no file this checkout of the core can render`); return; }
-    const { write, remove } = plan(p, kit, older.flatMap((at) => asEarlier(p, join(at, "setup", "template"), k, { kitOnly: true })));
+    // (whether an import's path is there, as the sync reads it with the copy at the new pin: a path in the copy, from the
+    // core at the pin, since the project here is written without it; any other, from the project; each path asked once)
+    const seen = new Map(), there = (f) => { if (!f.startsWith(at)) return existsSync(join(base_, f)); try { inBare(dir, ["cat-file", "-e", `${pin}:${f.slice(at.length)}`]); return true; } catch { return false; } };
+    const exists = (f) => { if (!seen.has(f)) seen.set(f, there(f)); return seen.get(f); };
+    // (a moved stub's text, read as the sync reads it, from the core at the pin; a path outside the copy is no stub, nor
+    // one the pin's tree, listed once, does not hold, so a project's many imports start no process each)
+    let pinned;
+    const stubText = (g) => {
+      pinned ??= new Set(inBare(dir, ["ls-tree", "-r", "-z", "--name-only", pin], { maxBuffer: 1 << 26 }).toString().split("\0"));
+      if (!g.startsWith(at) || !pinned.has(g.slice(at.length))) return null;
+      try { return inBare(dir, ["show", `${pin}:${g.slice(at.length)}`], { maxBuffer: 1 << 26 }).toString(); } catch { return null; }
+    };
+    const { write, remove } = plan(p, kit, older.flatMap((at) => asEarlier(p, join(at, "setup", "template"), k, { kitOnly: true })), { exists, stubText });
     provedGone(dir, write, remove);
     const onMain = (f) => { try { raw(["cat-file", "-e", `${base}:${f}`]); return true; } catch { return false; } };
     for (const f of later) {
@@ -176,6 +198,7 @@ for (const f of git(["ls-tree", "--name-only", head, "--", ".github/workflows/"]
 }
 // (the core's main, fetched into a bare repository of its own, which every call names outright: releases.mjs)
 const dir = mkdtempSync(join(tmpdir(), "core-main-"));
+let from = "unknown";
 const inCore = (args) => { try { inBare(dir, args); return true; } catch { return false; } };
 try {
   inBare(dir, ["init", "-q", "--bare", dir]);
@@ -185,23 +208,33 @@ try {
   // (a project that follows the core's releases takes, unreviewed, only what the core's owner chose to hand on: a sync
   // to any other commit of main is reviewed like any PR, and merges after its review; core archive 201)
   const follows = followsOf(show(head, "core-manifest.md"), hostSaid(console.error));
-  if (pin && follows !== "main" && !releasesIn(dir).some((r) => r.sha === pin)) {
+  if (pin && follows !== "main" && pin !== tried && !releasesIn(dir).some((r) => r.sha === pin)) {
     // (and how to take a release instead: a copy older than release-1 lands here, its own sync script taking main; #365)
     const [newest] = releasesIn(dir);
-    fail.push(`the project ${follows === "releases" ? "follows the core's releases" : "does not say what it follows"}, and ${pin} is no release of the core: the sync is reviewed like any PR${newest ? `, or made again from the project's main to a release with its full SHA, \`node ${at}scripts/sync.mjs ${newest.sha}\` (${newest.name}, the newest), as a copy older than release-1, whose sync script takes the core's main, must` : ""}`);
+    fail.push(`the project ${follows === "releases" ? "follows the core's releases" : "does not say what it follows"}, and ${pin} is no release of the core: the sync is reviewed like any PR${newest ? `, or made again from the project's main to a release with its full SHA, \`node ${at}scripts/sync.mjs ${newest.sha}\` (${newest.name}, the newest), as a copy older than release-1, whose sync script takes the core's main, must` : ""}${newest && inCore(["merge-base", "--is-ancestor", newest.sha, pin]) ? `; in a release's trial on a copy of a project (the core's AGENTS.md, "Each release is tried on a real project first"), ${pin} is a commit of main past the newest release, not yet a release: ask the trial's reading instead, \`--trial ${pin}\`, which proves no merge: outside a trial, this pull request gets its reviews (#1261)` : ""}`);
   }
   if (pin && oldPin && inCore(["merge-base", "--is-ancestor", pin, "refs/heads/main"])) provedOwned(dir);
   else if (later.length || gone.length) fail.push(`${[...later, ...gone].join(", ")}: no file outside the copy is proved where the pin is not a commit of the core's main`);
+  // (the copy main held, by the release at its pin, `main` for no release, for the trial's record)
+  if (tried) from = releasesIn(dir).find((r) => r.sha === oldPin)?.name ?? (oldPin && inCore(["merge-base", "--is-ancestor", oldPin, "refs/heads/main"]) ? "main" : "unknown");
   const own = git(["rev-parse", "--absolute-git-dir"]); // (the project's clone, named outright as copy-tree.mjs asks)
-  if (pin && inCore(["cat-file", "-e", `${pin}^{commit}`]) && (!coreIsFolder(head, own, at.slice(0, -1)) || entries(copyTree(pin, dir), dir) !== entries(`${head}:${at.slice(0, -1)}`, own))) {
-    fail.push(`${at} is not a folder holding the core's tree at ${pin} (copy-tree.mjs)`);
+  if (pin && inCore(["cat-file", "-e", `${pin}^{commit}`])) {
+    const theirs = copyTree(pin, dir), ours = `${head}:${at.slice(0, -1)}`;
+    if (!coreIsFolder(head, own, at.slice(0, -1)) || entries(theirs, dir) !== entries(ours, own)) fail.push(`${at} is not a folder holding the core's tree at ${pin} (copy-tree.mjs)`);
+    // (a bit the core marks, or none, as a copy made on Windows by an older sync holds; never one it does not: #1093)
+    else { const marks = executable(theirs, dir); for (const f of executable(ours, own).filter((f) => !marks.includes(f))) fail.push(`${at}${f} is marked executable, which the core at ${pin} does not mark it (copy-tree.mjs)`); }
   }
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }
 
+for (const f of fail) console.log(`  NOT PURE ${f.replace(/[\u0000-\u001f\u007f]/gu, "?")}`);
+if (tried) {
+  console.log(`${fail.length ? "not a pure sync" : "a pure sync"} against the commit tried, ${tried}: a trial's reading, which proves no merge (floor rule 8)`);
+  console.log(`trial answer: ${JSON.stringify({ commit: tried, pure: !fail.length, from })}`);
+  process.exit(1);
+}
 if (fail.length) {
-  for (const f of fail) console.log(`  NOT PURE ${f.replace(/[\u0000-\u001f\u007f]/gu, "?")}`);
   console.log("not a pure sync: it gets its reviews as any PR (floor rule 8)");
   process.exit(1);
 }

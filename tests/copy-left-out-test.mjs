@@ -70,13 +70,13 @@ const NOT_CHECKS = {
   "workflow-tools.sh": "it fetches the workflow check's two tools and reads no file of the tree; the check is the row workflows.mjs",
   "checks.mjs": "it runs its parts' checks, each a row or named here; its own look before it installs is the row `checks.mjs signatures`",
   "manifest-reads.mjs": "it reports and never fails, and reads the copy only as the source of the modules and slots",
-  "licences.mjs": "it reads the lock files and audit entries the project's config names; its scan of the tree is the row licence-scan.mjs",
-  "exact-versions.mjs": "it reads the lock files the project's config names",
+  "licences.mjs": "it reads the lock files and audit entries the project's config names, their exact versions and their new packages among them (#1093); its scan of the tree is the row licence-scan.mjs",
   "lookup.mjs": "it asks the registry of the packages new to the lock files the config names, or to the NuGet lock files the row nuget.mjs reads",
   "licence-installed.mjs": "it reads the installed packages' own files, in the folder the signature check installs into",
   "nuget-look.sh": "the NuGet check's first look, a part of the row nuget.mjs, which leaves the copy out as that row does",
   "nuget-fetch.mjs": "the NuGet check's fetch, a part of the row nuget.mjs, from the lock files that row reads",
   "clean-merges.mjs": "it reads the pull request's merge commits, never a file of the tree",
+  "power.mjs": "it reads which of the pull request's own commits touch what runs with power, the copy left out, and fails no pull request: where it reads none, each review is asked of the head as before, and each script or workflow changed asks floor rule 3's two",
   "queue-only.yml": "it runs queue-only.mjs, which fails no pull request: one it does not prove is reviewed as any other",
   "queue-only.mjs": "it reads the pull request's patch, its issues and the default branch's progress file, never the copy, and fails no pull request: one it does not prove is reviewed as any other",
   "core-moved.mjs": "it runs on the daily schedule (look.yml) and fails no pull request",
@@ -88,10 +88,14 @@ const NOT_CHECKS = {
   "pr-description.yml": "its one step runs checks.mjs description, whose script is the row pr-description.mjs",
   "signatures.yml": "its one step runs checks.mjs signatures, the row `checks.mjs signatures`",
   "nuget.yml": "its one step runs checks.mjs nuget, whose scripts are the row nuget.mjs and named here",
-  "licences.yml": "its steps run licences.mjs, exact-versions.mjs, lookup.mjs and agent-tools.mjs, each a row or named here",
-  "security-review.yml": "its steps run security-review.mjs, pure-sync.mjs, clean-merges.mjs and code-review-wait.mjs, each a row or named here",
+  "licences.yml": "its steps run licences.mjs, which runs exact-versions.mjs and npm's lookup itself (#1093), and agent-tools.mjs, each a row or named here",
+  "security-review.yml": "its steps run security-review.mjs, pure-sync.mjs, clean-merges.mjs, power.mjs and code-review-wait.mjs, each a row or named here",
   "delete-merged-branches.yml": "it deletes merged branches on the host and checks nothing",
   "look.yml": "it runs on the daily schedule and fails no pull request",
+  "preview.yml": "it runs once a game's build has run, publishes its preview to gh-pages and fails no pull request",
+  "site-publish.sh": "preview.yml runs it to publish a game's built site, and it judges no file of the tree",
+  "versions.yml": "it runs on the monthly schedule and fails no pull request",
+  "versions.mjs": "it runs on the monthly schedule (versions.yml), reads the versions its config names, and fails no pull request",
 };
 for (const [name, from] of [...[...workflows].map(w => [w, "the starter kit"]), ...scripts]) {
   held(rows.has(name) || Object.hasOwn(NOT_CHECKS, name), `${name} (run from ${from}) is a row of the list or named as no check of the copy`,
@@ -119,7 +123,10 @@ const tmp = scratchDir("copy-left-out-test-");
 // (no sign-in reaches a staged check: any variable named as a token, secret, password, credential, key or npm's auth
 // is left out)
 const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$|PR_|BASE_SHA$|CALLER$|CORE_AT$)|_BASE$|TOKEN|SECRET|PASSWORD|CREDENTIAL|_KEY$|_AUTH|^NPM_CONFIG_.*AUTH/iu.test(name)));
-Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid",
+// (an invented account's no-reply address, its id 0, which GitHub gives no account; the personal-terms workflow's
+// pair passes it: #460, point 2)
+const address = `0+t@${["users", "noreply", "github", "com"].join(".")}`;
+Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: address, GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: address,
   GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "core.autocrlf", GIT_CONFIG_VALUE_0: "false" });
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const put = (dir, files) => { for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); } };

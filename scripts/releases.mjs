@@ -9,11 +9,12 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { CORE, OWNER } from "./core-address.mjs";
+import { readCore } from "./core-path.mjs";
 import { aRepository, logged } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
 import { MODULES } from "./reading.mjs";
-import { entries, notesAt } from "./sync-notes.mjs";
+import { entries, notesAt, quietAt } from "./sync-notes.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
 // a release's name: the word and a whole number above zero, written without leading zeros
@@ -30,6 +31,12 @@ export const plainEnv = () => Object.fromEntries(Object.entries(process.env).fil
 // that makes such a repository (fetchCore, sync.mjs, pure-sync.mjs, release.mjs) reaches it through this alone.
 export const inBare = (dir, args, options = {}) =>
   execFileSync("git", [`--git-dir=${dir}`, ...args], { cwd: dir, env: plainEnv(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], ...options });
+// An archive git wrote (`input`), unpacked into the folder `dir`, which the caller has just made and which holds nothing yet, never a project's checkout. Tar is run in that folder and
+// never given its path: GNU tar, as Git for Windows carries it, unquotes a backslash's escape in the path -C names
+// (`kits\now`, a line's end), and Windows' own tar, which the PATH may find first, knows no --force-local (#1212).
+// ("-f -": Windows' own reads a tape drive unless told to read its input.) Every script that unpacks an archive of the
+// core's does it through this alone.
+export const untar = (dir, input) => execFileSync("tar", ["-x", "-f", "-"], { cwd: dir, input });
 const git = (args, dir) => inBare(dir, args).trim();
 const holds = (args, dir) => { try { git(args, dir); return true; } catch { return false; } };
 
@@ -102,6 +109,22 @@ export function fetchCore(dir, url = `https://github.com/${CORE}`) {
 
 // Whether the commit `older` is `newer` or one it came from; false too where either is no commit there.
 export const past = (older, newer, dir) => SHA.test(older) && holds(["merge-base", "--is-ancestor", older, newer], dir);
+
+// The pins the manifest named before `pin`, read from the project's history at `rev` (the sync's HEAD, the proof's
+// base), newest first, `rev` itself first: each other commit of the core's main, fetched to `dir`, that a "Core:" line
+// of it named, the first the pin before. Their kits are how the one process, and the proof that renders it, know a file
+// an earlier kit wrote and no sync since wrote again, as one before the process came (#1246, point 5).
+export function pinsBefore(manifest, pin, dir, rev = "HEAD") {
+  const run = args => { try { return execFileSync("git", args, { encoding: "utf8", env: plainEnv(), stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }); } catch { return null; } };
+  const commits = (run(["log", "--format=%H", "-n", "200", rev, "--", manifest]) ?? "").split("\n").filter(Boolean), pins = [];
+  for (const c of [rev, ...commits]) {
+    const text = run(["show", `${c}:${manifest}`]);
+    let was = null;
+    try { was = text === null ? null : readCore(text).pin; } catch { /* (a line out of its form names no pin) */ }
+    if (was && was !== pin && !pins.includes(was) && past(was, "refs/heads/main", dir)) pins.push(was);
+  }
+  return pins;
+}
 
 // Every tag there with a release's name, by its number, lowest first, with the commit it stands on: followed through
 // to a commit however the tag was made (a tag of a tag too), so a release is never anything but a commit; null where
@@ -188,6 +211,14 @@ export function asksBetween(old, pin, dir) {
     const before = new Set(at(old));
     return at(pin).filter(l => !before.has(l));
   } catch { return null; }
+}
+// What the report a sync prints asks of a project (#1094): the entries asksBetween gives, but those whose step says it
+// asks nothing of what stands, which stay in the notes and are counted: { asks, quiet }, or null where asksBetween is.
+export function asksLeft(old, pin, dir) {
+  const all = asksBetween(old, pin, dir);
+  if (all === null) return null;
+  const quiet = quietAt(pin, args => inBare(dir, args));
+  return { asks: all.filter(l => !quiet.has(l)), quiet: all.filter(l => quiet.has(l)).length };
 }
 
 // The core's own files that no project reads (#342): its queue, and each of its workflows that no project can call,

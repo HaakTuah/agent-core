@@ -134,7 +134,10 @@ const check = (number, head, posted = [], rights = {}, { names = scripts, opened
   const of = (context) => statuses.find((s) => s.context === context) ?? {};
   return { passed: job.passed, out: job.steps.map((x) => x.out).join(""), security: of("security-review"), code: of("code-review") };
 };
-const gits = check(1, GITS);
+// (its files are the check's scripts, which run with power, so floor rule 3's two are asked: Codex's, and one posted on
+// the same commit, #1134, point 4)
+const second = { user: { login: "someone", type: "User" }, author_association: "OWNER", created_at: "2026-11-15T10:30:00Z", updated_at: "2026-11-15T10:30:00Z", body: `Security review: ${SEEN}\nNo blocking finding.\nNo other finding.` };
+const gits = check(1, GITS, [second]);
 ok(gits.passed && gits.out.includes("Merges from main that are the ones git makes: 1.") && gits.security.state === "success" && gits.security.description.includes("only updates from main since")
   && gits.code.state === "success" && gits.code.description.includes("nothing but updates from main since"), "the workflow: a review of the commit before a merge git makes stands for the head, in both statuses", gits.out + JSON.stringify([gits.security, gits.code]));
 const own = check(2, OWN);

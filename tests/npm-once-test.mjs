@@ -11,6 +11,7 @@ import { root, scratchDir, scratchEnv, tally } from "../scripts/scratch-core.mjs
 import { npmOnce } from "../scripts/npm-once.mjs";
 
 const { ok, done } = tally();
+const win = process.platform === "win32";
 const tmp = scratchDir("npm-once-test-");
 // (the licence scan passes npm-once.mjs over, so what it may run is held here: Node's own modules alone, loaded by
 // name; one process started, the real npm's; and, run against a real npm that logs what it is given, every command
@@ -34,8 +35,8 @@ if (process.argv[2] === "ci") fs.mkdirSync("node_modules", { recursive: true });
 `);
   // (the fake is handed to npmOnce as the real one, so it needs no name of npm's, and this file stays one the licence
   // scan reads)
-  const realFake = path.join(fake, process.platform === "win32" ? "logger.cmd" : "logger");
-  if (process.platform === "win32") fs.writeFileSync(realFake, `@"${process.execPath}" "${logger}" %*\r\n`);
+  const realFake = path.join(fake, win ? "logger.cmd" : "logger");
+  if (win) fs.writeFileSync(realFake, `@"${process.execPath}" "${logger}" %*\r\n`);
   else fs.writeFileSync(realFake, `#!/bin/sh\nexec '${process.execPath}' '${logger}' "$@"\n`, { mode: 0o755 });
   // (from the scratch environment, which leaves the runner's npm settings and credentials out, so a failure prints none)
   const base = scratchEnv(tmp, tmp);
@@ -46,7 +47,7 @@ if (process.argv[2] === "ci") fs.mkdirSync("node_modules", { recursive: true });
   for (const [f, body] of Object.entries(files)) for (const d of [work, again, other]) fs.writeFileSync(path.join(d, f), f === "package-lock.json" && d === other ? body.replace("3", "4") : body);
   const asked = [["view", "left-pad", "version"], ["ci", "--ignore-scripts", "--no-audit"]];
   // (on Windows a .cmd runs through cmd.exe, so its path is quoted, as npm-once.mjs quotes the real npm's)
-  const runShim = (args, cwd) => spawnSync(process.platform === "win32" ? `"${shim}"` : shim, args, { cwd, env: probed, stdio: "ignore", shell: process.platform === "win32" });
+  const runShim = (args, cwd) => spawnSync(win ? `"${shim}"` : shim, args, { cwd, env: probed, stdio: "ignore", shell: win });
   for (const args of asked) runShim(args, work);
   runShim(asked[1], again); runShim(asked[1], other);
   const got = fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim().split("\n").map(l => JSON.parse(l)) : [];

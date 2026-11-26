@@ -12,7 +12,7 @@ export class Unread extends Error {}
 export const readable = (p, mentions) => {
   const unread = Object.entries(p.workflows).filter(([, w]) => !w.yaml && mentions(w.text ?? "")).map(([f]) => `.github/workflows/${f}`);
   if (unread.length) throw new Unread(installed("yaml") ? `the core's reader cannot read ${unread.join(", ")}, in a form it does not know`
-    : `the core's packages are not installed, so ${unread.join(", ")} could not be read: run \`node ${corePath(p.root) || "core/"}scripts/install.mjs\`, then this again`);
+    : `the core's packages are not installed, so ${unread.join(", ")} could not be read: run \`if [ -f ${corePath(p.root) || "core/"}scripts/install.mjs ]; then node ${corePath(p.root) || "core/"}scripts/install.mjs; fi\`, then this again`);
 };
 // A project's calls to a workflow of the core's, by the workflow's name: each as [where, job] (its file and its job,
 // with uses and with); `calls` the jobs alone, and `call` the first.
@@ -20,6 +20,8 @@ const calling = (p, name) => (readable(p, text => text.toLowerCase().includes(`/
   .flatMap(([f, { yaml }]) => Object.values(yaml?.jobs ?? {}).map(job => [`.github/workflows/${f}`, job]))
   .filter(([, job]) => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/.github/workflows/${name}@`.toLowerCase()));
 export const calls = (p, name) => calling(p, name).map(([, job]) => job);
+// The files that call it, each once.
+export const callers = (p, name) => [...new Set(calling(p, name).map(([where]) => where))];
 export const call = (p, name) => calls(p, name)[0] ?? null;
 // What each call to the core's workflow `name` passes as its input `key`, as { where, value }: undefined where it passes
 // none. One that names it only when the workflow runs (an expression) throws, so the check that needs it is not read.

@@ -50,7 +50,7 @@ file*, changes their order or names a milestone, as the orchestrator and the des
   where the order of a record's lines is what it records, as the *progress file*'s is, its lines stay in one file and
   leave in a batch (`roles/shared/inbox.md`). The trigger: such a record found standing whole. Whoever finds
   one, first the session that takes the sync's step
-  (`setup/sync-notes/740-a-project-s-records-one-file-per-entry.md`), splits it in a pull request of its own, its
+  (`setup/sync-notes/741-a-project-s-records-one-file-per-entry.md`), splits it in a pull request of its own, its
   readers following. It does not mean that what a record holds, or the order it is read in, changes, that a record read
   outside the repository as one file (a changelog its users get with a package) is split, nor that anything fails or
   waits while a record stands whole. Reason: two pull requests that each add an entry to one file conflict once the first

@@ -8,7 +8,9 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { KEPT, copyTree, coreIsFolder, entries } from "../scripts/copy-tree.mjs";
+import { KEPT, copyTree, coreIsFolder, entries, executable, recordModes } from "../scripts/copy-tree.mjs";
+import { untar } from "../scripts/releases.mjs";
+import { install } from "../scripts/sync.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -112,6 +114,22 @@ const blob = git(core, "hash-object", "-w", "floor/rules.md");
 const treeOf = (...lines) => execFileSync("git", ["mktree", "--missing"], { cwd: core, input: lines.map((l) => `${l}\n`).join(""), encoding: "utf8" }).trim();
 const plain = treeOf(`100644 blob ${blob}\trun.sh`);
 ok(entries(treeOf(`100755 blob ${blob}\trun.sh`), repo) === entries(plain, repo), "a file the copy records 100644 where the core's is 100755 is the same file: the executable bit is no difference");
+ok(JSON.stringify(executable(modes, repo)) === JSON.stringify(["scripts/run.sh"]) && !executable(plain, repo).length, "  the files a tree marks executable are read from it, the link and every file of 100644 left out (pure-sync.mjs refuses a bit the core does not mark)");
+// the sync records the bits the core marks on a plain file of the copy, never through a link below its folder (#1189)
+if (process.platform !== "win32") {
+  const project = path.join(tmp, "project"), outside = path.join(tmp, "outside");
+  fs.mkdirSync(path.join(project, "core/scripts"), { recursive: true }); fs.mkdirSync(outside);
+  fs.writeFileSync(path.join(project, "core/scripts/run.sh"), "x"); fs.writeFileSync(path.join(outside, "run.sh"), "x");
+  fs.chmodSync(path.join(outside, "run.sh"), 0o644); git(project, "init", "-q");
+  const here = process.cwd(); process.chdir(project);
+  try {
+    recordModes("core", modes, repo);
+    ok((fs.statSync("core/scripts/run.sh").mode & 0o111) && git(project, "ls-files", "-s", "core/scripts/run.sh").startsWith("100755 "), "the sync gives a file the core marks executable its bit, on disk and in the index");
+    fs.rmSync("core/scripts", { recursive: true }); fs.symlinkSync(outside, "core/scripts");
+    recordModes("core", modes, repo);
+    ok(!(fs.statSync(path.join(outside, "run.sh")).mode & 0o111), "  and never through a link to a folder outside the copy, a folder of it that is a link");
+  } finally { process.chdir(here); }
+}
 ok(entries(treeOf(`120000 blob ${blob}\trun.sh`), repo) !== entries(plain, repo), "a link in its place is not");
 ok(entries(treeOf(`160000 commit ${modes}\trun.sh`), repo) !== entries(plain, repo), "nor a submodule");
 ok(entries(treeOf(`100644 blob ${git(core, "hash-object", "-w", "reports/one.md")}\trun.sh`), repo) !== entries(plain, repo), "nor a file of other content");
@@ -153,6 +171,31 @@ ok(lines.includes("/tests export-ignore") && astray.length === 0, "every test of
 const tool = (file) => /^tests\/mutation\/(?:package\.json|package-lock\.json|\.npmrc)$/.test(file);
 const strays = tracked.filter((file) => file.startsWith("tests/") && !/^tests\/[^/]+-test\.mjs$/.test(file) && !tool(file));
 ok(strays.length === 0, "tests/ holds the core's tests alone, and the package files of the core's own mutation tool, so nothing a project runs can lean on a file the copy leaves out (#614)", strays.join(" "));
+
+// the core's archive unpacked into a folder whose path tar would misread were it given: GNU tar unquotes a backslash's
+// escape in it (`kits\now` as Windows writes the path, a line's end), and Windows' own tar knows no --force-local (#1212)
+{
+  const tmp = scratchDir("untar-"), from = path.join(tmp, "from");
+  fs.mkdirSync(from);
+  fs.writeFileSync(path.join(from, "f"), "unpacked\n");
+  const into = process.platform === "win32" ? path.join(tmp, "kits", "now") : path.join(tmp, "kits\\now", "a:b");
+  fs.mkdirSync(into, { recursive: true });
+  let read = null;
+  try { untar(into, execFileSync("tar", ["-c", "-f", "-", "f"], { cwd: from })); read = fs.readFileSync(path.join(into, "f"), "utf8"); } catch (e) { read = String(e.stderr ?? e); }
+  ok(read === "unpacked\n", "an archive is unpacked into a folder whose path holds a backslash's escape and a colon", read);
+}
+
+// the note a sync prints where the copy's packages cannot be installed says so and gives its mend, with no line of the
+// installer's own, which can name a path of the machine and goes into the sync pull request's description (#1200)
+{
+  const dir = path.join(tmp, "install-copy");
+  fs.mkdirSync(path.join(dir, "scripts"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "scripts", "install.mjs"), 'console.error("install error A complete log of this run can be found in: /home/someone/.npm/_logs/x-debug-0.log"); process.exit(1);\n');
+  const said = []; const log = console.log; console.log = (...a) => said.push(a.join(" "));
+  try { install(dir); } finally { console.log = log; }
+  const note = said.join("\n");
+  ok(/not installed/.test(note) && / Mend: .*install\.mjs/.test(note) && !/someone|_logs|install error/.test(note), "a failing install leaves the installer's own line, and the path in it, out of the sync's note, which still says it failed and its mend", note);
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);

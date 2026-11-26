@@ -6,7 +6,9 @@
 # one that uses a word true only for some of the projects that take the core, a gendered pronoun for the owner in a
 # line it adds to the dated records, or a phrase a rule may not use in a line it adds to a rule file or to a Markdown
 # template of the starter kit, read against the base, and reports the phrases that stood before it (AGENTS.md, "A rule
-# is written to one pattern"; tasks/helpers.md, "A brief is written as a rule is"); and the shape check on the core's
+# is written to one pattern"; tasks/helpers.md, "A brief is written as a rule is"); the marks check (scripts/pattern.mjs),
+# which fails a rule the pull request adds to the floor, a module or AGENTS.md that lacks its reason, its holder or its
+# one condition, and reports one it words anew (#1137); and the shape check on the core's
 # own scripts (scripts/shape.mjs, with .github/shape.json), which a project runs from the copies workflow; a file past
 # the core's split mark that the pull request changes, with no line under "past" saying why it stays whole or naming its
 # split's issue (scripts/reading-size.mjs, with .github/sizes.json, as a project's copies workflow runs it); and the total
@@ -99,6 +101,8 @@ jobs:
         run: node scripts/size.mjs --raise "$RUNNER_TEMP/raise/base.mjs" "$RUNNER_TEMP/raise/comments.json" "$RUNNER_TEMP/raise/rights.json"
       - name: The floor and the modules fit any project, and a rule written uses no phrase a rule may not use
         run: node scripts/general.mjs scripts/general.json --base HEAD^1
+      - name: A rule written has its reason, its holder and its one condition, read by their marks
+        run: node scripts/pattern.mjs --base HEAD^1
       - name: A file past the split mark that this pull request changes asks how a split lets someone read less
         if: ${{ github.event_name == 'pull_request' }}
         env:

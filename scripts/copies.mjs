@@ -8,7 +8,7 @@
 // one renamed by its new name, or by the file that took in most of its lines (#348, #371, #434); a path may be
 // added; and a config moved, with the call that names it, is held to the one the base called (#370). It also lists the near-copies, the runs of code that match once names and numbers are set aside, and fails
 // none of them. Node's own modules, and the schemas' checker (schemas.mjs) for its config's shape, which where the core's
-// packages are not installed it leaves unchecked, saying so, so the check needs no install. It runs from the project's
+// packages cannot be installed it leaves unchecked, saying so, so the check needs no install step. It runs from the project's
 // root, whatever the directory it is started from.
 // The files an agent tool takes its instructions from are rule files too, read since #405 (rule-files.mjs, `toolFiles`),
 // and a project may hold copies in them from before. Nothing locks a project (AGENTS.md of the core): until the
@@ -26,7 +26,9 @@
 // The config, a JSON file the project keeps (its *copies check* slot names it), says what is checked: "baseline", the
 // baseline's path; "code" and "prose", lists of git pathspecs (":!" leaves a path out); and "proseFromSecurity": true
 // to add the project's rule files: those floor rule 3 names, those its SECURITY.md adds, and an agent tool's
-// (rule-files.mjs, beside it).
+// (rule-files.mjs, beside it); "tests", git pathspecs of the files that are tests, and "twice", each value written in two
+// files to why both must hold it, for the part that reads a value too short for these runs, a pin or a pattern
+// (copies-values.mjs, beside it, which says what it reads and fails).
 import "./whole-output.mjs";
 import fs from "node:fs";
 import os from "node:os";
@@ -34,14 +36,15 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { inProject, leadsOut, logged, unrooted } from "./guards.mjs";
+import { inProject, leadsOut, logged, parseBounded, unrooted } from "./guards.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { whole } from "./core-owned.mjs";
 import { readBlobs } from "./blobs.mjs";
 import { projectAt } from "./core-path.mjs";
 import { keysOf, shapeFaults } from "./schemas.mjs";
-import { unreached } from "./packages.mjs";
+import { didNotRun } from "./packages.mjs";
 import { uncommented } from "./yaml-keys.mjs";
+import { valuesTwice } from "./copies-values.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
 // core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
 // (git says it, as the path from the root to this folder, so no spelling of a path, such as Windows' short names,
@@ -57,20 +60,21 @@ const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 <
 const configPath = process.argv.slice(2).find(a => !a.startsWith("--"));
 if (!configPath) fail(`no config was named. Mend: name it: ${SELF} <config> [--write | --tools | --first]`);
 // (the config's path from the root, as git names it at the base: git says it, as it says the root, so no spelling of a
-// path can differ, and unquoted, -z, so a name outside plain ASCII is the name itself)
+// path can differ, and unquoted, -z, so a name outside plain ASCII is the name itself; for a config git does not list
+// yet, both folders are made real first (the config's own name kept, a link it is stays the project's), since on Windows git names the root by its long name where Node may name a
+// temporary folder by its short one, RUNNER~1, and a path made relative from one to the other leads out of the root)
+const real = p => { try { return fs.realpathSync.native(p); } catch { return p; } };
 let CONFIG_AT;
-try { CONFIG_AT = git(["ls-files", "-z", "--full-name", "--error-unmatch", "--", configPath]).split("\0")[0]; } catch { CONFIG_AT = path.relative(ROOT, path.resolve(configPath)).split(path.sep).join("/"); }
+try { CONFIG_AT = git(["ls-files", "-z", "--full-name", "--error-unmatch", "--", configPath]).split("\0")[0]; } catch { CONFIG_AT = path.relative(real(ROOT), path.join(real(path.dirname(path.resolve(configPath))), path.basename(configPath))).split(path.sep).join("/"); }
 let config;
 try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
 process.chdir(ROOT);
 // A key it does not know, or one of the wrong shape, would check less without a word, so it fails: its schema holds
-// the config's shape (scripts/schemas/copies.json, schemas.mjs). Where the core's packages are not installed, as in a
-// job of a project's own that ran the check before they came, the shape is not checked, said as a warning, and the
-// check goes on (AGENTS.md of the core, "Nothing locks a project"; steps.mjs asks the install).
+// the config's shape (scripts/schemas/copies.json, schemas.mjs). Where the core's packages are not installed, they are
+// installed first (packages.mjs; #1093, point 1); where they cannot be, the shape is not checked, said as a warning,
+// and the check goes on (AGENTS.md of the core, "Nothing locks a project").
 const KEYS = keysOf("copies"), faults = shapeFaults("copies", config, CORE);
-// (a registry that did not answer asks the job again, as install.mjs's warning does)
-if (faults === null) console.log(unreached("ajv") ? "::warning::The config's shape was not checked: the package ajv could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault"
-  : `::warning::The config's shape was not checked: the package ajv is not installed beside the core's copy. Mend: in a pull request of its own, add the step node ${CORE}scripts/install.mjs to this job before the step that runs this check`);
+if (faults === null) console.log(didNotRun("The config's shape was not checked", "ajv"));
 for (const f of faults ?? []) console.error(`FAIL: ${logged(f)}`);
 if (faults?.length) process.exit(1);
 // (unchecked, what the check itself reads must still be there: an object that names its baseline, lists of paths alone)
@@ -345,7 +349,7 @@ if (!base || typeof base.windows !== "object" || base.windows === null || Array.
 // A count is a whole number of places, at least two; anything else would let a copy through, so it fails.
 const counted = (w, where) => {
   const bad = Object.entries(w || {}).filter(([h, n]) => !/^[0-9a-f]{12}$/.test(h) || !Number.isInteger(n) || n < 2);
-  if (bad.length) { console.error(`FAIL: ${logged(where)} holds ${bad.length} windows without a whole count of two or more. Mend: take the baseline back as main holds it (git checkout origin/main -- ${BASELINE}), then run --write to lower it`); process.exit(1); }
+  if (bad.length) { console.error(`FAIL: ${logged(where)} holds ${bad.length} windows without a whole count of two or more. Mend: take the baseline back as main holds it (git checkout origin/main -- ${logged(BASELINE)}), then run --write to lower it`); process.exit(1); }
   return w;
 };
 counted(base.windows, BASELINE);
@@ -388,11 +392,11 @@ if (from) {
   }
   let there = true;
   try { git(["cat-file", "-e", `${from}:${BASELINE}`]); } catch { there = false; } // no baseline on that branch yet
-  const old = there ? counted(JSON.parse(git(["show", `${from}:${BASELINE}`])).windows, `${from}:${BASELINE}`) || null : null;
+  const old = there ? counted(parseBounded(git(["show", `${from}:${BASELINE}`])).windows, `${from}:${BASELINE}`) || null : null;
   // (save a window of a copy that stands in an agent tool's file and that the base held there in as many places:
   // listing what stood is what --tools does, and the base is the list until it is written; #405)
   const raised = old ? Object.entries(base.windows).filter(([h, n]) => (!(h in old) || n > old[h]) && !(toolWindows.has(h) && stood(h, n))) : [];
-  if (raised.length) { console.error(`FAIL: ${logged(BASELINE)} adds or raises ${raised.length} windows against ${from}, and the baseline only shrinks. Mend: take it back as ${from} holds it (git checkout ${from} -- ${BASELINE}), point the new copy to one place, and run --write`); process.exit(1); }
+  if (raised.length) { console.error(`FAIL: ${logged(BASELINE)} adds or raises ${raised.length} windows against ${logged(from)}, and the baseline only shrinks. Mend: take it back as ${logged(from)} holds it (git checkout ${logged(from)} -- ${logged(BASELINE)}), point the new copy to one place, and run --write`); process.exit(1); }
 }
 // Near-copies (tasks/code-shape.md, "Near-copies are reported"; #246): the runs of code that match once names and
 // numbers are set aside, and are no exact copy. Reported, never failed: code that only looks alike is no second copy
@@ -437,6 +441,8 @@ if (WRITE) {
   if (fresh.length) process.exit(1);
 } else {
   if (shrunk.length) console.error(`FAIL: ${logged(BASELINE)} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run ${SELF} ${logged(configPath)} --write and commit the baseline it lowers`);
-  if (fresh.length || shrunk.length) process.exit(1);
-  console.log(`ok   no new copies (${found.length - unlisted.length} old ones, listed in ${logged(BASELINE)}, to be removed${unlisted.length ? `; ${unlisted.length} in an agent tool's files, noted above` : ""})`);
+  if (!fresh.length && !shrunk.length) console.log(`ok   no new copies (${found.length - unlisted.length} old ones, listed in ${logged(BASELINE)}, to be removed${unlisted.length ? `; ${unlisted.length} in an agent tool's files, noted above` : ""})`);
+  // (a value written out in two files, a pin or a pattern, too short for the runs above: copies-values.mjs)
+  const values = valuesTwice({ core: CORE, config, configPath, configAt: CONFIG_AT, base: process.env.COPIES_BASE || "", ls });
+  if (fresh.length || shrunk.length || values) process.exit(1);
 }
