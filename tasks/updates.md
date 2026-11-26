@@ -33,7 +33,7 @@ and leaves the forms' heading on its reasons out or empty.
 
 **An alert Dependabot does not mend** (#1142). By default a Dependabot alert's mend is Dependabot's own pull request,
 taken under floor rule 17. The one condition that changes it: the daily reading of the alerts (floor rule 9,
-`scripts/alerts.mjs`) files one as a bug issue, open more than a day with no open pull request of Dependabot's for it.
+`scripts/alerts.mjs`) files one as a bug issue, as that rule says.
 Then the builder that takes it takes a version that fixes the advisory, of the package itself or of the one that brings
 it in, or the package manager's override, through the lookup, the licence check, the tests and the reviews, as any
 update does; its pull request is worded as Dependabot's is: what it updates, and that it fixes a published advisory,
