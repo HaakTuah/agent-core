@@ -52,12 +52,11 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      reads no more and runs the whole suite (`scripts/hurry.mjs`); hostile tests: `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
-     of the work standing still (`scripts/look.mjs`, its reader `scripts/look-pulls.mjs`, through `queue.mjs`'s
-     placing and reading), with the open issues
-     titled as the orchestrator's notice and their authors' rights; limits: 1 MB of the file, past which it is refused
-     unread; 64 MB of an answer (256 MB to the look) and 100 pages of 100 for the open issues, past which it stops; for
-     the look, the search's first page and five authors' rights; hostile tests: `tests/queue-test.mjs`, and for the
-     look `tests/look-test.mjs`.
+     of the work standing still (`scripts/look.mjs`, its reader `scripts/look-pulls.mjs`, through `queue.mjs`'s placing
+     and reading), with the open issues titled as the orchestrator's notice and their authors' rights; limits: 1 MB of
+     the file, past which it is refused unread; 64 MB of an answer (256 MB to the look) and 100 pages of 100 for the
+     open issues, past which it stops; for the look, the search's first page and five authors' rights; hostile tests:
+     `tests/queue-test.mjs`, `tests/queue-form-test.mjs`, `tests/look-test.mjs`.
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the reviews'
      records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look (`scripts/look.mjs`,
      with `scripts/look-keep.mjs` and `scripts/look-pulls.mjs`), the
@@ -65,6 +64,12 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      insider's text); limits: 256 MB of an answer (16 MB for the inbox's own), 500 pages of 100, and for the take-out
      1,048,576 characters of a text, past which it is left unread, and the first 100 edits of its history; hostile
      tests: `tests/hostile-issues-test.mjs`, and for the take-out `tests/issue-terms-test.mjs`.
+   - the open Dependabot alerts' fields (never an advisory's text), the open pull requests' titles, branches, descriptions
+     and authors, and the bug issues' titles and authors: read by the daily reading of the alerts (`scripts/alerts.mjs`),
+     which counts a pull request only of Dependabot's own login and reads its description only ahead of the first
+     `<details>`; limits: 256 MB of an answer, every page of the alerts within it, 500 pages of 100 for the pull
+     requests and the issues, 300 characters of a title and a branch and 65,536 of a description; hostile tests:
+     `tests/alerts-test.mjs`.
    - whether a project's repository is private, read by `scripts/host-private.mjs`:
      - from the event of GitHub's job, for its own repository alone;
      - else from gh;

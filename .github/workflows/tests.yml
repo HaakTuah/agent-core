@@ -358,6 +358,9 @@ jobs:
       - name: The queue's reader
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-test.mjs ')) }}
         run: node tests/queue-test.mjs
+      - name: The queue's form, and its check where GitHub cannot be read
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-form-test.mjs ')) }}
+        run: node tests/queue-form-test.mjs
       - name: The core's own measurement
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-cost-test.mjs ')) }}
         run: node tests/core-cost-test.mjs
@@ -451,6 +454,9 @@ jobs:
       - name: The records' check a pull request runs
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-check-test.mjs ')) }}
         run: node tests/choices-check-test.mjs
+      - name: The daily reading of the Dependabot alerts
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/alerts-test.mjs ')) }}
+        run: node tests/alerts-test.mjs
       - name: The scheduled look's readers of the choice records
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-look-test.mjs ')) }}
         run: node tests/choices-look-test.mjs
@@ -695,6 +701,9 @@ jobs:
       - name: The pointer check
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/pointers-test.mjs ')) }}
         run: node tests/pointers-test.mjs
+      - name: The pointer check's names in the descriptions, a project's list and the core's own run (#460, point 4)
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/names-test.mjs ')) }}
+        run: node tests/names-test.mjs
       - name: The pointer check's link checker, lychee, read and decided against a base, with a stand-in for it (#582)
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/links-test.mjs ')) }}
         run: node tests/links-test.mjs

@@ -88,14 +88,14 @@ export function crossedOf(then, now) {
   return name === undefined ? null : clashWhy(name, "of main's newest commit and the draft");
 }
 
-// `main`'s checks with each the draft skipped under a name main lacks read as passed where its job passed on main
+// `main`'s checks with each the draft skipped read as passed where its job passed on main
 // under a name gone from the draft (a workflow renamed, or a job moved to another), so a skip after passing is not lost
 // to a new name; while one whose check still runs on the draft stands for no other workflow's job of its name.
 export function alignedOf(then, now) {
   const job = (side, n) => side.pairOf.get(n)?.[1] ?? n;
   const gone = n => then.active[n] === "passed" && !Object.hasOwn(now.said, n);
   const passed = new Set(Object.keys(then.active).filter(gone).map(n => job(then, n)));
-  const renamed = ([n, v]) => v === "skipped" && !Object.hasOwn(then.said, n) && passed.has(job(now, n));
+  const renamed = ([n, v]) => v === "skipped" && passed.has(job(now, n));
   return { ...then.active, ...Object.fromEntries(Object.entries(now.said).filter(renamed).map(([n]) => [n, "passed"])) };
 }
 

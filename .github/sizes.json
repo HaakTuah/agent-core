@@ -148,6 +148,10 @@
       "mark": 23333,
       "why": "One script's cases (pointers.mjs) on the small projects they write for it (rule files with either line ending, a pointer that leads nowhere, a project with no SECURITY.md, the agent tools' files); the one section of another kind, what the check reads of Markdown, is 3 KB, too little for a split to give a reader less, and the file is 14% past the mark (#1008)."
     },
+    "tests/round-trip-test.mjs": {
+      "mark": 20565,
+      "why": "Its list of the scripts that write a file and the round trips it runs are two things a reader looks up apart; the split is #1196, and until it lands each writer added takes the file past the mark."
+    },
     "tests/pure-sync-test.mjs": {
       "mark": 42307,
       "why": "The two programs (sync.mjs and the proof pure-sync.mjs) run end to end on one scratch copy of the core with a short history and a project made from it, the later cases taking the project as the earlier left it; split, each file would build them again, adding to the suite's time (tasks/tests.md); the cases of the core's own files and parts the proof admits (#1083) take the same project (#1008)."
