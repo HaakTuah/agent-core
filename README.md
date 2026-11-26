@@ -64,7 +64,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   A project's own rules are read the same way, against its list `checks/holders.json`, and those with none listed in
   its own monthly state report, failing nothing (`node core/scripts/holders.mjs --own`; `AGENTS.md`, "A project's own
   rules name what holds them"), where the session that takes that report also answers whom each rule is about, in the
-  list's "about", and files those about a kind or every project here. A check of the core's that read no file of a
+  list's "about", and files those about a kind or every project here. A check of the core's that read no file, or no package, of a
   project's says so in the sync's report (`scripts/read-nothing.mjs`; `AGENTS.md`, "A check that read nothing says
   so"), and a project's state report gives how many of its own rules, and of the core's it takes, a check holds there
   (`AGENTS.md`, "The share a check holds is reported").

@@ -19,7 +19,9 @@ import { codeListed, offBy, parseConfig, where } from "./shape.mjs";
 import { measuredCode, toolOf } from "./strength.mjs";
 import { trackedIn } from "./licence-locks.mjs";
 import { copyAmong } from "./core-path.mjs";
-import { posix } from "node:path";
+import { readFileSync } from "node:fs";
+import { join, posix } from "node:path";
+import { LOCKFILE } from "./licence-scan.mjs";
 
 // The rules each of the core's scripts holds, by its path under scripts/, as scripts/holders/ names them: those of the
 // modules a project takes alone, its manifest's text `manifest` (rules.mjs, takenRules).
@@ -55,24 +57,30 @@ function strengthWhy(manifest, root, read, { at, text, config }) {
 }
 
 // The packages the licence check (licences.mjs) cannot read, since it reads npm's lock files alone (#1351): a tracked
-// yarn.lock or pnpm-lock.yaml, and a package.json with no lock file of npm's, yarn's or pnpm's in its folder or above it
-// (a workspace's member is held by the root's lock file). The core's own copy and node_modules are no part of the project.
-const LOCKS = /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml)$/iu;
+// yarn.lock or pnpm-lock.yaml, and a package.json that names a dependency with no lock file of npm's, yarn's or pnpm's in
+// its folder and none above it that names it a workspace (`read` gives a file's text, null where unread, which counts as
+// naming one). The core's own copy and node_modules are no part of the project.
 const OTHER_LOCK = /(^|\/)(yarn\.lock|pnpm-lock\.yaml)$/iu;
-export function licenceUnread(tracked, root = ".") {
+const DEPENDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
+const names = (text) => { try { const pkg = JSON.parse(text); return text === null ? true : DEPENDS.some(k => pkg?.[k] && Object.keys(pkg[k]).length); } catch { return true; } };
+const member = (text, dir, at) => { try { return (JSON.parse(text)?.workspaces?.packages ?? JSON.parse(text)?.workspaces ?? []).some(w => typeof w === "string" && (dir === posix.join(at, w) || (/[*?[{]/u.test(w) && dir.startsWith(`${posix.join(at, w.split(/[*?[{]/u)[0])}`)))); } catch { return false; } };
+export function licenceUnread(tracked, root = ".", read = () => null) {
   const copy = copyAmong(tracked, root), mine = tracked.filter(f => !f.split("/").includes("node_modules") && !(copy !== null && f.startsWith(copy)));
-  const dirs = new Set(mine.filter(f => LOCKS.test(f)).map(f => posix.dirname(f)));
-  const held = d => { for (let x = d; ; x = posix.dirname(x)) { if (dirs.has(x)) return true; if (x === ".") return false; } };
+  const dirs = new Set(mine.filter(f => LOCKFILE.test(f) || OTHER_LOCK.test(f)).map(f => posix.dirname(f)));
+  const held = d => { for (let x = d; ; x = posix.dirname(x)) { if (x === d ? dirs.has(x) : dirs.has(x) && member(read(posix.join(x, "package.json")), d, x)) return true; if (x === ".") return false; } };
   const unread = [
     ...mine.filter(f => OTHER_LOCK.test(f)),
-    ...mine.filter(f => posix.basename(f) === "package.json" && !held(posix.dirname(f))),
+    ...mine.filter(f => posix.basename(f) === "package.json" && !held(posix.dirname(f)) && names(read(f))),
   ];
   if (!unread.length) return null;
   const shown = unread.slice(0, 3).map(f => `\`${f}\``).join(", ") + (unread.length > 3 ? ` and ${unread.length - 3} more` : "");
   return `the project's packages stand in ${shown}, which the check does not read (it reads npm's lock files alone), so only the host's dependency review reads them, by its allow-list`;
 }
 
-const licenceWhy = root => { const tracked = trackedIn(root); return tracked === null ? null : licenceUnread(tracked, root); };
+const licenceWhy = root => {
+  const tracked = trackedIn(root), read = f => { try { return readFileSync(join(root, f), "utf8"); } catch { return null; } };
+  return tracked === null ? null : licenceUnread(tracked, root, read);
+};
 
 // Each check that read nothing in the project at `root` (its manifest's text `manifest`, a file read by `read`, null
 // where there is none): [{ script, check, holds, why }], `script` its path in the core (scripts/shape.mjs), `check` the
@@ -86,7 +94,7 @@ export function readNothing(root, manifest, read) {
     .filter(([, why]) => why !== null).map(([script, why]) => ({ script, why }));
   if (!found.length) return [];
   const held = rulesHeldBy(manifest), copy = copyOf(root);
-  return found.map(f => ({ ...f, check: `${copy}${f.script}`, holds: held.get(f.script) ?? [] })).filter(f => f.holds.length);
+  return found.map(f => ({ ...f, check: `${copy}${f.script}`, holds: held.get(f.script) ?? [], ...(f.script === "scripts/licences.mjs" ? { partial: true } : {}) })).filter(f => f.holds.length);
 }
 
 // The lines a report gives of them, or none where every such check read something; `found` is null where which read
@@ -94,7 +102,7 @@ export function readNothing(root, manifest, read) {
 export function saidOf(found, copy = copyOf(), why = "") {
   if (found === null) return [`Which checks read nothing here could not be read (${why}): read \`${copy}scripts/read-nothing.mjs\` against the project; until then no rule of the core's here is known to be held by a check that read something.`];
   return found.length ? [
-    `Checks that read nothing here (\`${copy}scripts/read-nothing.mjs\`): each passes on nothing, so the rules it holds are held by nothing here; it fails nothing, and a project in a language its readers do not know reports it to the core (\`${copy}README.md\`, "Reporting to the core").`,
+    `Checks that read nothing here (\`${copy}scripts/read-nothing.mjs\`): each reads nothing of what its line names, so the rules it holds are held by nothing there for that; it fails nothing, and a project in a language its readers do not know reports it to the core (\`${copy}README.md\`, "Reporting to the core").`,
     ...found.map(f => `- \`${f.check}\`: ${f.why}. It holds ${f.holds.length === 1 ? "the rule" : `${f.holds.length} rules`}: ${f.holds.map(k => `\`${k}\``).join("; ")}.`),
   ] : [];
 }

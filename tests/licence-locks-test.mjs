@@ -124,11 +124,15 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
 // the packages the check does not read (#1351): the sync's report names the licence check as having read nothing where
 // they stand in a package.json with no lock file, a yarn.lock or a pnpm-lock.yaml, and not where npm's lock file holds them
 {
-  const why = (...files) => licenceUnread(files);
+  const texts = { "pkg/package.json": '{"dependencies":{"p":"1"},"workspaces":["inner"]}', "app/package.json": '{"dependencies":{"a":"1"}}', "lib/package.json": '{"dependencies":{"b":"1"}}', "package.json": '{"workspaces":["lib"]}', "empty/package.json": '{"type":"module"}' };
+  const why = (...files) => licenceUnread(files, ".", (f) => texts[f] ?? null);
   ok(why() === null && /pkg\/package\.json/u.test(why("pkg/package.json") ?? "") && why("pkg/package.json", "pkg/package-lock.json", "pkg/inner/package.json") === null
     && /web\/yarn\.lock/u.test(why("web/yarn.lock") ?? "") && /web\/pnpm-lock\.yaml/u.test(why("web/pnpm-lock.yaml") ?? "")
-    && why("node_modules/a/package.json") === null && why("core/package-lock.json", "core/x/package.json") === null,
+    && why("node_modules/a/package.json") === null,
   "the licence check is said to read nothing where packages stand in a package.json with no lock file, a yarn.lock or a pnpm-lock.yaml, and not under npm's lock file", JSON.stringify(why("web/yarn.lock")));
+  ok(/app\/package\.json/u.test(why("package-lock.json", "package.json", "app/package.json", "lib/package.json") ?? "") && !/lib\/package\.json/u.test(why("package-lock.json", "package.json", "app/package.json", "lib/package.json") ?? "")
+    && why("empty/package.json") === null && why("a/yarn.lock", "b/yarn.lock", "c/yarn.lock", "d/yarn.lock").endsWith("and 1 more, which the check does not read (it reads npm's lock files alone), so only the host's dependency review reads them, by its allow-list"),
+  "a lock file above hides a package.json only where it names it a workspace, a package.json that names no dependency is no packages, and more than three files are counted", JSON.stringify(why("package-lock.json", "app/package.json")));
 }
 
 done();
