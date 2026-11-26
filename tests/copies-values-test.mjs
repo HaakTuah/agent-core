@@ -143,6 +143,11 @@ try {
   r = check({ COPIES_BASE: base });
   ok(r.status === 0 && STOOD.test(r.out), "a value in the tests the config lists, a lock file or a dated record is not read", r.out);
   drop("test/fetch.test.mjs"); drop("web/package-lock.json"); drop("archive/old.md"); drop("core/reports/old.md");
+  // (the licence audit's config holds a tool's exact pin as its "version", the same as the file that fetches it)
+  put("checks/licences-audit.json", `{ "tools": [{ "name": "a tool", "version": "${DIGEST}" }] }\n`);
+  r = check({ COPIES_BASE: base });
+  ok(r.status === 0 && STOOD.test(r.out), "a pin the licence audit's config holds as a tool's version is not read as a value written twice", r.out);
+  drop("checks/licences-audit.json");
 
   // (git's pathspec magic is kept: a glob in "code" is read, and one in "tests" left out)
   config({ code: [":(glob)src/*.mjs", "core/scripts/*.mjs"], tests: [":(glob)test/*.mjs"] });
