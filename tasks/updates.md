@@ -41,7 +41,7 @@ never how to attack. Where no mend passes, the builder judges whether the weak c
 function never called, a development tool that never reads such input), it files an issue labelled `needs-owner` asking
 the owner to dismiss the alert as "Risk is tolerable", with that reason, and nothing waits on it; where it is, the
 weakness is reported privately (floor rule 9, "Reporting a weakness"), never in an issue. It does not mean that a session
-dismisses an alert. Reason: an advisory's text is outsiders' (floor rule 4), and the most a planted one could ask is a
+dismisses an alert, nor a package found bad, which floor rule 7 takes. Reason: an advisory's text is outsiders' (floor rule 4), and the most a planted one could ask is a
 version change, which passes every gate an update does. Held by `tests/alerts-test.mjs`, for the issue the reading
 files; the mend and the judgement, by none yet.
 

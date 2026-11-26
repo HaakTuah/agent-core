@@ -49,7 +49,7 @@ export const bodyOf = a => {
     `- Package: \`${bare(a.package.name)}\` (${bare(a.package.ecosystem)}), in \`${bare(a.manifest)}\``,
     `- Published advisory: ${ghsa ? `[${ghsa}](https://github.com/advisories/${ghsa})` : "named in the alert"}; first fixed version: ${fixed}`,
     `- The alert, which its repository's admins see: ${/^https:\/\/github\.com\/[\w./-]+$/.test(String(a.html_url ?? "")) ? a.html_url : "in the Security tab"}`, "",
-    "Take a version that fixes it, of the package or of the one that brings it in, or the package manager's override, through the lookup, the licence check, the tests and the reviews. Where none passes, judge whether the weak code is reached: where it is not, file an issue labelled `needs-owner` asking the owner to dismiss the alert as \"Risk is tolerable\", with that reason; where it is, report it privately (floor rule 9, \"Reporting a weakness\"), never in an issue. Say nothing here of how it could be attacked.", "",
+    "Take a version that fixes it, of the package or of the one that brings it in, or the package manager's override, through the lookup, the licence check, the tests and the reviews. Where none passes, judge whether the weak code is reached: where it is not, file an issue labelled `needs-owner` asking the owner to dismiss the alert as \"Risk is tolerable\", with that reason; where it is, report it privately (floor rule 9, \"Reporting a weakness\"), never in an issue. Where the advisory says the version is malicious, floor rule 7's \"A package found bad goes at once\" takes it instead. Say nothing here of how it could be attacked.", "",
     "Found while: the orchestrator's daily reading of the Dependabot alerts (`core/scripts/alerts.mjs`)."].join("\n");
 };
 
