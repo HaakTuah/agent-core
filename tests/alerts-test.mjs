@@ -10,7 +10,7 @@ let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
 
 const at = "2030-01-10T12:00:00Z", old = new Date(Date.parse(at) - 2 * DAY).toISOString(), fresh = new Date(Date.parse(at) - 3600 * 1000).toISOString();
-const alert = (number, name, created_at = old) => ({ number, created_at, html_url: `https://github.com/stand-in/repo/security/dependabot/${number}`, package: { ecosystem: "npm", name }, manifest: "package-lock.json", ghsa: "GHSA-aaaa-bbbb-cccc", fixed: "9.9.9" });
+const alert = (number, name, created_at = old) => ({ number, created_at, html_url: `https://github.com/stand-in/repo/security/dependabot/${number}`, package: { ecosystem: "pip", name }, manifest: "package-lock.json", ghsa: "GHSA-aaaa-bbbb-cccc", fixed: "9.9.9" });
 const pull = (title, ref, login = "dependabot[bot]") => ({ title, head: { ref }, body: "", user: { login }, state: "open" });
 
 // A stand-in for gh: the alerts (or a refusal), the open pull requests, the issues, and each issue it is asked to make.
