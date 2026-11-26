@@ -196,13 +196,36 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   it records the counts alone (`node scripts/release.mjs --trial`) in a pull request of its own. Another owner's project
   has its own code run only where no sign-in or key of the owner's is held (floor rule 18). The one condition that
   changes it: no such project allows a trial; the record says so, and so does the release. It does not mean that a
-  project is written to, that its private code leaves it, or that it is named anywhere. Reason: #1079 passed every check
+  project of another owner's is written to, that its private code leaves it, or that it is named anywhere. Reason: #1079 passed every check
   of the core and failed only on a real project, and the sync's proof was first met on one after the cut (#1261). Held
   by `scripts/release.mjs` with `scripts/release-trial.mjs`, which say the trial has not run, and cut nothing, where its
   record does not stand for the commit, cut nothing where a check passed before, or ran not before, and failed after, or
   ran before and was not measured, stopped or not run after, or was not read before and failed after, and refuse the
   record of none allowed where a project of the owner's takes the core, or a record without the sync's reading for each
   project tried (with `scripts/trial-sync.mjs`); where another owner's code may run, by nothing yet.
+  **A release's trial opens its update as a draft in the owner's own projects** (#1334). By default the trial runs as
+  #1084 says: on a copy of each project that takes the core and allows it, read-only, its checks run before and after
+  the sync. Beside that run, in each project of the owner's own, owned by the *owner's account* and found as
+  `scripts/state-report.mjs --projects` finds them, the builder of the trial also opens that project's real sync as a
+  draft pull request in the project, pinned to the commit under trial. The host's own services that run only on a pull
+  request then run on it, the dependency review among them. The builder reads their results with the trial's. A check
+  that passes on the project's `main` and fails on the draft is the release's, and stops the cut, as a check that passed
+  before and failed after does. Where a fix gives a new commit under trial, the builder moves the same draft forward to
+  it. Once the release is cut, the session that syncs that project moves the draft to the release's commit and takes it
+  as the project's sync, proven pure by `scripts/pure-sync.mjs`, then marked ready and merged by hand as any sync is
+  (floor rule 8). The one condition that changes it: a project the *owner's account* does not own, or one whose stop
+  switch stands. There the trial writes nothing, as now, and its record says why no draft was opened. The trigger is
+  each release's trial. It does not mean that a project of another owner's is written to, a branch or a pull request
+  included; that the draft merges, or is marked ready, before the cut; that the draft holds more than a pure sync, the
+  steps' writes coming after its merge as at any sync; nor that the trial adds a job of the core's own in the project:
+  the jobs that run are the project's own pull-request jobs, as at any sync. Reason: the host's dependency review runs
+  only on a pull request, so a read-only trial cannot see it; at release 6, both of the owner's games failed it at their
+  syncs after the cut (#1310). Held by `scripts/trial-draft.mjs`, which reads the draft's checks beside those of the
+  project's `main` and gives no answer for a draft of a repository the core's owner does not own, behind a stop switch,
+  no longer a draft or pinned elsewhere, and by `scripts/release.mjs` with `scripts/release-trial.mjs`, which cut nothing
+  where a check failed on the draft that passed on `main` or ran on the draft alone, or where the record holds fewer
+  drafts than the owner's own projects found; that the draft merges no sooner, by `scripts/pure-sync.mjs`, which proves
+  a sync pure only to a release; that a project of another owner's is not written to, by nothing yet.
 - **Nothing locks a project,** in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
   what an agent can mend alone may bind, and what only the owner can do (a yes the floor names, a setting on the

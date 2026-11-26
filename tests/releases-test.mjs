@@ -12,6 +12,7 @@ import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
 import { COUNTS, TRIAL, compared, ownCount, trialAt, trialRecord } from "../scripts/release-trial.mjs";
 import { answerOf } from "../scripts/trial-sync.mjs";
+import { DRAFT_COUNTS } from "../scripts/trial-draft.mjs";
 import { shownAs } from "../scripts/state-report.mjs";
 import { STEPS } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, POINTER, QUIET, entries, notesAt, quiet, quietAt } from "../scripts/sync-notes.mjs";
@@ -309,10 +310,10 @@ ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[
   const tried = commit({ "a.txt": "1\n" }, "the commit tried");
   const none = trialAt(tried, read);
   ok(/has not run for/.test(none.said) && /Mend: try the release on a copy of a project/.test(none.held ?? ""), "with no record, the release says the trial has not run, and the cut is held, saying its mend");
-  const SYNC = [{ pure: true, from: "release-1" }];
+  const SYNC = [{ pure: true, from: "release-1" }], OTHER = [{ none: "another-owner" }];
   const record = r => commit({ [TRIAL]: `${JSON.stringify(r)}\n` }, "the trial's record");
-  const passed = trialRecord(tried, "2026-11-22", [[{ "a.yml/x": "passed", "a.yml/y": "failed" }, { "a.yml/x": "passed", "a.yml/y": "failed" }]], SYNC);
-  ok(passed.projects === 1 && passed.passedBoth === 1 && passed.failedBoth === 1 && Object.keys(passed).join() === `commit,day,projects,${COUNTS},baselineFromClone,syncPure,syncNotPure,copiesFrom`, "the record holds the commit, the day and counts alone, nothing of the project");
+  const passed = trialRecord(tried, "2026-11-22", [[{ "a.yml/x": "passed", "a.yml/y": "failed" }, { "a.yml/x": "passed", "a.yml/y": "failed" }]], SYNC, OTHER);
+  ok(passed.projects === 1 && passed.passedBoth === 1 && passed.failedBoth === 1 && Object.keys(passed).join() === `commit,day,projects,${COUNTS},baselineFromClone,syncPure,syncNotPure,copiesFrom,ownProjects,drafts,draftsAnotherOwner,draftsStopped,${DRAFT_COUNTS}`, "the record holds the commit, the day and counts alone, nothing of the project");
   let at = record(passed);
   let r = trialAt(at, read);
   ok(r.held === null && /in 1 project: 1 check passed before and after the update, 0 failed before and passed after, 1 failed before and after \(standing before the release\), 0 passed before and failed after/.test(r.said), "a record of the commit before, which the release changes by the record alone, stands, and one failing both does not hold the cut", r.said);
@@ -320,13 +321,13 @@ ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[
   r = trialAt(at, read);
   ok(/changes more than the record since \(a\.txt\)/.test(r.held ?? ""), "a commit that changes more than the record since the commit tried holds the cut", r.held);
   const later = commit({ "a.txt": "3\n" }, "tried again");
-  at = record(trialRecord(later, "2026-11-23", [[{ "a.yml/x": "passed" }, { "a.yml/x": "failed" }]], SYNC));
+  at = record(trialRecord(later, "2026-11-23", [[{ "a.yml/x": "passed" }, { "a.yml/x": "failed" }]], SYNC, OTHER));
   r = trialAt(at, read);
   ok(/1 check failed after the release in the trial on a real project, 1 of them passing before it[\s\S]*Mend: find the release's fault/.test(r.held ?? ""), "a check that passed before and failed after holds the cut, saying its mend", r.held);
-  at = record(trialRecord(later, "2026-11-23", [[{ "a.yml/x": "passed", "a.yml/gate": "passed" }, { "a.yml/x": "passed", "a.yml/gate": "unread" }]], SYNC));
+  at = record(trialRecord(later, "2026-11-23", [[{ "a.yml/x": "passed", "a.yml/gate": "passed" }, { "a.yml/x": "passed", "a.yml/gate": "unread" }]], SYNC, OTHER));
   r = trialAt(at, read);
   ok(/1 check was not measured in the trial on a real project, 1 of them run before and not read after the update[\s\S]*Mend: teach the core's workflow runner/.test(r.held ?? "") && !/failed after the release/.test(r.held ?? ""), "a check that ran before and the trial's run after could not read holds the cut as not measured, saying its mend (#1257; #1263, point 2)", r.held);
-  at = record(trialRecord(later, "2026-11-23", [[{ "a.yml": "failed" }, { "a.yml/x": "passed", "a.yml/gate": "unread" }]], SYNC));
+  at = record(trialRecord(later, "2026-11-23", [[{ "a.yml": "failed" }, { "a.yml/x": "passed", "a.yml/gate": "unread" }]], SYNC, OTHER));
   r = trialAt(at, read);
   ok(r.held === null && /1 read in neither run \(not measured, holding nothing\)/.test(r.said), "one read in neither run, under a file an older check.mjs failed whole before, holds nothing and is no failure (#1257)", `${r.said}\n${r.held}`);
   at = record(trialRecord(later, "2026-11-23", []));
@@ -335,7 +336,7 @@ ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[
   // (the sync's reading against the commit tried, pure-sync.mjs --trial, and the copy each run before started from:
   // counted, and holding no cut, pure or not; #1261)
   const one = [{ "a.yml/x": "passed" }, { "a.yml/x": "passed" }];
-  const readings = trialRecord(later, "2026-11-23", [one, one, one], [{ pure: true, from: "release-5" }, { pure: false, from: "release-5" }, { pure: true, from: "main" }]);
+  const readings = trialRecord(later, "2026-11-23", [one, one, one], [{ pure: true, from: "release-5" }, { pure: false, from: "release-5" }, { pure: true, from: "main" }], [...OTHER, ...OTHER, ...OTHER]);
   ok(readings.syncPure === 2 && readings.syncNotPure === 1 && JSON.stringify(readings.copiesFrom) === JSON.stringify({ "release-5": 2, main: 1 }), "the record counts the syncs pure and not against the commit tried, and the copies the runs before started from, by the core's release", JSON.stringify(readings));
   r = trialAt(record(readings), read);
   ok(r.held === null && /2 of the syncs pure, 1 not; the runs before the update started from the copies their main held, 2 from release-5, 1 from a commit of the core's main that is no release\./.test(r.said), "  and says them, a sync not pure holding no cut: it is a reading", `${r.said}\n${r.held}`);
