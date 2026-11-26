@@ -4,7 +4,9 @@
 // every JSON.parse of scripts/ (read on the parser the core installs, scripts/parser.mjs, so a call is told from text
 // that names one) stands where its error is never printed: in a try whose catch reads nothing of the error but its kind
 // (instanceof, .code, .name), else it is parseBounded, which words it so. On Linux and on Windows. Node's own modules,
-// the parser, and the YAML and TOML packages the core installs.
+// the parser, and the YAML and TOML packages the core installs. It holds too that the JSON the core reads has no key
+// twice in one object (scripts/json-keys.mjs; #1367), which JSON.parse would read as the last alone: the check's cases, and
+// each JSON file git tracks here.
 //
 //   node tests/parse-errors-test.mjs
 import fs from "node:fs";
@@ -15,6 +17,8 @@ import { load } from "../scripts/parser.mjs";
 import { LARGEST, budgetOf, parseWithin } from "../scripts/tree-walk.mjs";
 import { parseToml } from "../scripts/toml.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
+import { duplicateKeys, failuresOf, trackedJson } from "../scripts/json-keys.mjs";
+import { mended } from "../scripts/mend.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 600).replace(/\n/g, "\n     ")}`}`); } };
@@ -183,6 +187,31 @@ ok(found.length === 0, "no JSON.parse of scripts/ has its error printed: each st
     if (got !== want) wrong.push(`${src}: ${got}, not ${want}`);
   }
   ok(!wrong.length, "the reader tells each way a JSON.parse's error may be printed from a catch that reads only its kind", wrong.join("\n"));
+}
+
+// A key that stands twice in one object of a JSON file (#1367): each case is the text and the lines of the key's two places, or null
+for (const [text, lines, what] of [
+  ['{\n  "a": 1,\n  "b": 2,\n  "a": 3\n}\n', [2, 4], "a key twice, the lines of both"],
+  ['{ "past": {\n"x": { "mark": 1 },\n"y": 1,\n"x": { "mark": 2 }\n} }', [2, 4], "a key twice inside a nested object"],
+  ['{"a": 1, "\\u0061": 2}', [1, 1], "a key and the same key written with an escape"],
+  ['{"a": {"k": 1}, "b": {"k": 2}}', null, "the same key in two objects"],
+  ['[{"k": 1}, {"k": 2}]', null, "the same key in the objects of an array"],
+  ['{"a": "a", "b": ["a", "b", "a"]}', null, "the same text as values"],
+  ['{"a": "x\\"a\\": 1, \\"a\\"", "b": 1}', null, "a key written inside a value"],
+  ['{"a": 1, "a": ', null, "a text that is no JSON, left to its readers"],
+  ['{"k": {"a": 1, "a": 2}, "k2": 1}', [1, 1], "a key twice in an object that is a value"],
+]) {
+  const found = duplicateKeys(text);
+  ok(lines === null ? found.length === 0 : found.length === 1 && found[0].first === lines[0] && found[0].again === lines[1], what, JSON.stringify(found));
+}
+{
+  const says = failuresOf("twice.json", '{\n  "mark": 1,\n  "mark": 2\n}\n').join("\n");
+  ok(says.includes('twice.json holds the key "mark" twice') && says.includes("lines 2 and 3") && mended(says), "a key twice is failed with its file, key, lines and mend", says);
+  ok(failuresOf("long.json", `{"${"k".repeat(200)}": 1, "${"k".repeat(200)}": 2}`).join("\n").length < 700, "a long key is cut in what is said");
+}
+{
+  const said = trackedJson().flatMap(f => failuresOf(f, fs.readFileSync(path.join(root, f), "utf8")));
+  ok(said.length === 0, "no JSON file this repository tracks holds a key twice in one object", said.join("\n"));
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on how a parse error is worded`);
