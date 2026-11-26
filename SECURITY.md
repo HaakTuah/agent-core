@@ -169,7 +169,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
      lookup (`scripts/lookup.mjs`, with `scripts/lookup-pypi.mjs` for a requirements file in PyPI's lock form, which it
      fails whole where pip or uv could read it otherwise) and its lookup again of what a project holds (`scripts/held.mjs`, through the
-     lookup's readers of npm's and NuGet's lock files); Node itself is checked against its SHA-256 by `scripts/node.sh`, and the code scan's wheel by
+     lookup's readers of npm's and NuGet's lock files); Node itself is checked against its SHA-256 by `scripts/node.sh`, a trial's .NET SDK, and the pin its project's `global.json` names, against the list's SHA-512 and form by `scripts/toolchain.mjs` (tests: `tests/toolchain-test.mjs`), and the code scan's wheel by
      its own, which pip checks against `.packages/requirements.txt` (`scripts/install.mjs pypi`); limits: 16 MB of a
      NuGet package's manifest, 100 pages of NuGet's registry, 20 lookups on GitHub in a run, 30 s for an answer (60 s
      for a NuGet package), 120 s for the whole look again; hostile tests: `tests/hostile-packages-test.mjs`, for the
@@ -190,7 +190,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    and checks against its SHA-256 before it runs; and Semgrep's engine (`semgrep-core` from the `semgrep` wheel on PyPI
    at the version and hashes in `.packages/requirements.txt`), which `scripts/install.mjs pypi` installs with pip in the code
    scan's own step for a project the host's CodeQL does not scan, the wheel checked by its SHA-256, no dependency
-   taken and none of its code run, and which the scan runs with no Python.
+   taken and none of its code run, and which the scan runs with no Python; and, for a release's trial alone, the .NET
+   SDK a project's `global.json` pins, which `scripts/toolchain.mjs` fetches by curl from the publisher's own host over
+   HTTPS, only at a version and for a machine whose SHA-512 `scripts/toolchains.json` holds, checked before the archive
+   is opened, to a folder outside every repository (#1361, point 21).
 17. **Dependabot** updates the workflows' GitHub actions and the packages of the core's lock files, `package-lock.json`
     and `.packages/requirements.txt` (`.github/dependabot.yml`), each a week after its release.
 
