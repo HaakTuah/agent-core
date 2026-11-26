@@ -1,15 +1,15 @@
 // Tests where a <Compile> item decides what a file of C# reaches, for the test selection
 // (scripts/select-csharp-project.mjs, through scripts/select-csharp.mjs; #675): every file unsure where one brings in a
 // file the reader never reads (outside the repository, one git does not hold, a path MSBuild expands, a wildcard that
-// climbs out, names files other than .cs or stands beside a target, any item of an imported file, a task's output into
-// Compile, the compiler called by hand, an assembly's attribute, a link git holds), and none where it names a file git
-// holds, a wildcard of .cs inside, or only removes or updates. Where other MSBuild files decide it:
+// climbs out or names files other than .cs, any item of an imported file), where a project may compile C# by other
+// means (any target, a task in the compiler's place, the compiler's own properties, an item the SDK writes C# from or a
+// generator, a link or a submodule git holds), and none where it names a file git holds, a wildcard of .cs inside, or
+// only removes or updates. Where other MSBuild files decide it:
 // select-csharp-msbuild-test.mjs. The cases: select-csharp-test.mjs.
 // Needs the parser (node scripts/install.mjs parser). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/select-csharp-compile-test.mjs
 import fs from "node:fs";
-import path from "node:path";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 import { csharpReach } from "../scripts/select-csharp.mjs";
 import { heldBeside } from "../scripts/select-csharp-project.mjs";
@@ -50,9 +50,23 @@ for (const [item, what, more] of [
   [`<Target Name="Gen"><WriteLinesToFile File="Gen/Made.cs" Lines="x" /><ItemGroup><Compile Include="Gen/*.cs" /></ItemGroup></Target>`, "a wildcard in a target, which may match a file the target wrote"],
   [`<Target Name="Build" /><ItemGroup><Compile Include="../lib/*.cs" /></ItemGroup>`, "a wildcard beside a target"],
   [`<ItemGroup><AssemblyAttribute Include="App.HookAttribute"><_Parameter1>App.Rules</_Parameter1></AssemblyAttribute></ItemGroup>`, "an assembly's attribute, which the SDK writes as C#"],
+  [`<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo"><_Parameter1>App.Rules</_Parameter1><_Parameter1_IsLiteral>true</_Parameter1_IsLiteral></AssemblyAttribute>`, "an assembly's attribute of the framework whose argument is written as code"],
+  ["", "an assembly's attribute of the framework whose argument an item definition elsewhere writes as a type", { "Directory.Build.props": `<Project><ItemDefinitionGroup><AssemblyAttribute><_Parameter1_TypeName>System.Type</_Parameter1_TypeName></AssemblyAttribute></ItemDefinitionGroup></Project>\n` }],
+  [`<Target Name="Gen" AfterTargets="Restore"><WriteLinesToFile File="Gen/Made.cs" Lines="x" /></Target>`, "a file a target writes, which the SDK's default glob takes"],
+  [`<Import Project="../build/Gen.targets" />`, "a file a target in an imported file writes", { "build/Gen.targets": `<Project><Target Name="Gen" BeforeTargets="Build"><WriteLinesToFile File="$(MSBuildProjectDirectory)/Gen/Made.cs" Lines="x" /></Target></Project>\n` }],
+  ["", "a file a target in Directory.Build.targets writes", { "Directory.Build.targets": `<Project><Target Name="Gen" /></Project>\n` }],
+  [`<Target Name="Gather"><CreateItem Include="x.txt"><Output TaskParameter="Include" ItemName="Notes" /></CreateItem></Target>`, "a task's output into any item, even one of another name"],
+  [`<Target Name="Gather"><CreateItem Include="App.HookAttribute"><Output TaskParameter="Include" ItemName="AssemblyAttribute" /></CreateItem></Target>`, "a task's output into AssemblyAttribute"],
+  [`<Target Name="Gather" BeforeTargets="GenerateGlobalUsings"><CreateItem Include="App"><Output TaskParameter="Include" ItemName="Using" /></CreateItem></Target>`, "a task's output into Using"],
+  [`<Target Name="Build" />`, "a target of any name, even an empty one"],
+  [`<UsingTask TaskName="Csc" AssemblyFile="tools/MyCsc.dll" />`, "a task of its own in the compiler's place"],
+  [`<PropertyGroup><CompilerResponseFile>extra.rsp</CompilerResponseFile></PropertyGroup>`, "a response file handed to the compiler"],
+  [`<PropertyGroup><CscToolPath>tools</CscToolPath><CscToolExe>mycsc</CscToolExe></PropertyGroup>`, "a compiler of its own"],
+  [`<ItemGroup><Analyzer Include="tools/Gen.dll" /></ItemGroup>`, "a generator held as a binary"],
+  [`<ItemGroup><TestingPlatformBuilderHook Include="Hook"><TypeFullName>App.Rules</TypeFullName></TestingPlatformBuilderHook></ItemGroup>`, "a hook the testing platform writes C# to call"],
 ]) {
   const r = reach(item, more);
-  ok(same([...r.unsure].sort(), every), `where a <Compile> brings in ${what}, every file of C# is unsure`, JSON.stringify([...r.unsure]));
+  ok(same([...r.unsure].sort(), every), `where a project brings in ${what}, every file of C# is unsure`, JSON.stringify([...r.unsure]));
 }
 
 for (const [item, what] of [
@@ -62,22 +76,24 @@ for (const [item, what] of [
   [`<Compile Remove="Old/*.cs" />`, "nothing, only a removal"],
   [`<Compile Update="A.cs" Link="B.cs" />`, "nothing, only an update"],
   ["", "nothing"],
-  [`<Target Name="Gather"><CreateItem Include="x.txt"><Output TaskParameter="Include" ItemName="Notes" /></CreateItem></Target>`, "nothing, only a task's output into another item"],
-  [`<Target Name="Build" />`, "nothing, only a target of another name"],
   [`<Compile Include="../lib/*.CS" />`, "a wildcard of .cs in upper case inside the repository"],
+  [`<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo"><_Parameter1>App.Tests</_Parameter1></AssemblyAttribute><AssemblyAttribute Include=" System.CLSCompliantAttribute "><_Parameter1>true</_Parameter1></AssemblyAttribute>`, "an assembly's attribute of the framework, written with strings alone"],
 ]) {
   const r = reach(item);
-  ok(r.unsure.size === 0 && r.links.get("tests/T.cs")?.has("lib/Rules.cs"), `where a <Compile> brings in ${what}, no file is unsure and the links stand`, JSON.stringify([...r.unsure]));
+  ok(r.unsure.size === 0 && r.links.get("tests/T.cs")?.has("lib/Rules.cs"), `where a project brings in ${what}, no file is unsure and the links stand`, JSON.stringify([...r.unsure]));
 }
 
-// (a link git holds, in a scratch repository: a wildcard inside, the SDK's default among them, would follow it out)
+// (a link and a submodule git holds, in a scratch repository, written to the index alone, as on a system with no
+// links: a wildcard inside, the SDK's default among them, would follow the link out or take the submodule's files)
 {
   const here = process.cwd(), dir = scratchDir("linked-");
   try {
-    process.chdir(dir); git(["init", "-q"]); fs.symlinkSync(path.join(dir, "..", "outside"), "shared");
-    const unheld = heldBeside({}); git(["add", "shared"]);
-    const held = heldBeside({});
-    ok(!unheld.unknown && held.unknown, "a link git holds anywhere, to a folder outside the repository say, leaves what git holds unknown, so every file is unsure", JSON.stringify([unheld, held]));
+    process.chdir(dir); git(["init", "-q"]); fs.writeFileSync("A.cs", "class A { }\n"); git(["add", "A.cs"]);
+    const blob = git(["hash-object", "-w", "A.cs"]).trim(), unheld = heldBeside({}), held = {};
+    for (const [mode, sha, name] of [["120000", blob, "shared"], ["160000", "1".repeat(40), "vendor/shared"]]) {
+      git(["update-index", "--add", "--cacheinfo", `${mode},${sha},${name}`]); held[mode] = heldBeside({}); git(["rm", "-q", "--cached", name]);
+    }
+    ok(!unheld.unknown && held["120000"].unknown && held["160000"].unknown, "a link or a submodule git holds anywhere leaves what git holds unknown, so every file is unsure", JSON.stringify([unheld, held]));
   } finally { process.chdir(here); }
 }
 
