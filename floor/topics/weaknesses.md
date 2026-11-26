@@ -16,8 +16,9 @@ Read before a task takes up a security alert or a weakness, and by a security re
   - Not meant: a key made so a workflow can read alerts (rule 1); a session acting on a secret-scanning alert, whose
     mend, revoking and replacing the secret, is the owner's; or any change for code-scanning alerts: a PR's own CodeQL
     findings are read as below, and the Security tab's list stays the owner's. Reason: an alert Dependabot cannot mend
-    otherwise waits on the owner (rule 14), and its advisory is published. Held by `tests/alerts-test.mjs`, in part;
-    that no session dismisses an alert or reads a secret-scanning one, by nothing yet.
+    otherwise waits on the owner (rule 14), and its advisory is published. Held by `tests/alerts-test.mjs`, in part,
+    which also fails a script, workflow or set-up of the core's that reads secret-scanning or code-scanning alerts or
+    writes to a Dependabot alert; that a session does neither by hand, by nothing yet.
 - **In a PR's own change:** a blocking finding holds the merge until fixed; any other is fixed in the PR, or filed and
   fixed next if it lies outside the change.
   - A CodeQL false alarm, explained in the PR and confirmed by its security reviewer, may merge, with no suppression
