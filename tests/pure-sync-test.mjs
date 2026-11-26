@@ -494,8 +494,8 @@ git(lone, "fetch", "-q", p, "unreleased:unreleased");
 git(lone, "checkout", "-q", "unreleased");
 const inLone = (...args) => { const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs"), ...args], { cwd: lone, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 const loneTried = inLone("--trial", C), loneGate = inLone();
-ok(loneTried.status === 1 && answer(loneTried.out)?.commit === C && answer(loneTried.out)?.from === "release-1" && !loneTried.out.includes("no origin") && !loneTried.out.includes("sha="),
-  "  a trial's clone with no origin gives its reading, read against the clone's own main", loneTried.out);
+ok(loneTried.status === 1 && answer(loneTried.out)?.commit === C && answer(loneTried.out)?.from === "release-1" && /^read against the clone's own branch main, as the clone has no origin/mu.test(loneTried.out) && !loneTried.out.includes("NOT PURE") && !loneTried.out.includes("sha="),
+  "  a trial's clone with no origin gives its reading, read against the clone's own main, which it names", loneTried.out);
 ok(loneGate.status === 1 && loneGate.out.includes("NOT PURE the clone has no origin to fetch the project's main from") && loneGate.out.includes("Mend: run it in a clone of the project's repository whose origin") && !loneGate.out.includes("sha="),
   "  and the merge's gate there says it is not proved, with its mend, never a head to merge", loneGate.out);
 git(lone, "branch", "-q", "-D", "main");

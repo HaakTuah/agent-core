@@ -249,6 +249,8 @@ function done(from) {
   for (const f of fail) console.log(`  NOT PURE ${f.replace(/[\u0000-\u001f\u007f]/gu, "?")}`);
   if (tried) {
     console.log(`${fail.length ? "not a pure sync" : "a pure sync"} against the commit tried, ${tried}: a trial's reading, which proves no merge (floor rule 8)`);
+    // (where the clone has no origin, which main it was read against, so a record of a main behind the project's is seen)
+    if (mainRef === "refs/heads/main") console.log("read against the clone's own branch main, as the clone has no origin: where that main is behind the project's, take the reading again in a clone whose origin is the project's address");
     console.log(`trial answer: ${JSON.stringify({ commit: tried, pure: !fail.length, from })}`);
     process.exit(1);
   }
