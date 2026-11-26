@@ -8,11 +8,10 @@
 //   node tests/toolchain-test.mjs
 import crypto from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
 import { HOST, entriesFrom, fetchPinned, formed, pinOf, readList } from "../scripts/toolchain.mjs";
-import { tally } from "../scripts/scratch-core.mjs";
+import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
 const V = "8.0.404", RID = "linux-x64";
@@ -28,7 +27,7 @@ const wrong = [{ ...good, url: url().replace(HOST, "example.com") }, { ...good, 
 ok(wrong.every(e => formed(e) !== ""), "an entry whose URL is another host's, not HTTPS or another version's, whose sum is not a SHA-512 in lower case, whose version is a band, whose machine is not listed, or with a key more or fewer, is refused",
   wrong.filter(e => formed(e) === "").map(e => JSON.stringify(e)).join("; "));
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "toolchain-test-"));
+const root = scratchDir("toolchain-test-");
 const write = (file, text, mode) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); if (mode) fs.chmodSync(file, mode); return file; };
 let threw = "";
 try { readList([good, good]); } catch (e) { threw = e.message; }
@@ -132,6 +131,5 @@ else {
   ok(entries.length === 2 && entries.every(e => !formed(e)) && entries[0].sha512 === "b".repeat(128) && entriesFrom(notes, "8.0.405").length === 0 && entriesFrom({ releases: [{ sdks: [{ version: V, files: [{ rid: RID, url: "https://elsewhere/x.tar.gz", hash: "b".repeat(128) }] }] }] }, V).length === 0,
     "the entries read from the release notes are the two machines', in the list's form; none for a version the notes lack, nor for a URL not the publisher's own", JSON.stringify(entries));
 
-  fs.rmSync(root, { recursive: true, force: true });
   done("the toolchain a release's trial fetches");
 }

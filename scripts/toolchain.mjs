@@ -20,7 +20,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { started } from "./started.mjs";
 
 export const HOST = "builds.dotnet.microsoft.com";
 const VERSION = /^\d+\.\d+\.\d{3,}(?:-[0-9A-Za-z.-]+)?$/u;
@@ -128,7 +128,7 @@ export function fetchPinned({ project = process.cwd(), list = SDKS, home = os.ho
   const dotnet = path.join(root, "dotnet");
   if (fs.existsSync(dotnet) && run(dotnet, ["--version"], env).stdout?.trim() === version) return [`toolchain: the .NET SDK ${version} present in ${root}; ${exported}`];
   let entries;
-  try { entries = readList(list); } catch (e) { return [`NOT FETCHED: the .NET SDK ${version} (the core's list could not be read: ${e.message}). Mend: make SDKS in scripts/toolchain.mjs as tests/toolchain-test.mjs reads it.`]; }
+  try { entries = readList(list); } catch (e) { return [`NOT FETCHED: the .NET SDK ${version} (the core's list could not be read: ${e.message}). Mend: give each entry of SDKS in scripts/toolchain.mjs the form --entry prints, one entry for each version and machine.`]; }
   const entry = entries.find(e => e.version === version && e.rid === rid);
   if (!entry) return [`NOT FETCHED: the .NET SDK ${version} for ${rid} (the core's list, SDKS in scripts/toolchain.mjs, holds no checksum for it). ${MEND_LIST}.`];
   const wrong = install(entry, root, env);
@@ -146,7 +146,7 @@ export function entriesFrom(notes, version) {
     .filter(e => !formed(e));
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (started(import.meta.url)) {
   const args = process.argv.slice(2);
   if (args[0] === "--entry") {
     const version = args[1] ?? "";
