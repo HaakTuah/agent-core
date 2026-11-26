@@ -626,4 +626,12 @@ exit 1
     "the daily look's step has a limit of its own, longer than a first run needs and shorter than the job's with room left for the step after it, which runs unless the job was cancelled (#1311)", JSON.stringify({ look: lookStep["timeout-minutes"], job: job["timeout-minutes"], terms: termsStep.if }));
 }
 
+// (#1346: each step of the daily look's job has a limit of its own, so a hang in one costs that step's minutes and not
+// the job's whole limit)
+{
+  const job = parseYaml(fs.readFileSync(path.join(wfDir, "look.yml"), "utf8")).jobs.look, steps = job.steps ?? [];
+  const without = steps.filter(s => !(s["timeout-minutes"] > 0 && s["timeout-minutes"] < job["timeout-minutes"])).map(s => s.name ?? s.uses ?? s.run);
+  ok(steps.length > 0 && without.length === 0, "each step of the daily look's job has a time limit of its own, shorter than the job's (#1346)", without.join("; "));
+}
+
 process.exit(failed ? 1 : 0);
