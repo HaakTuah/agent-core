@@ -86,7 +86,14 @@ try {
   const H = (c = "a") => `--hash=sha256:${c.repeat(64)}`;
   const pypiAsked = [];
   // (the stage's answers hold none of PyPI's, so each name PyPI is asked of reads as one it does not know)
-  const npmGet = async (url) => { if (url.startsWith("https://pypi.org/")) pypiAsked.push(url); return url.startsWith("https://registry.npmjs.org/") ? { status: 404 } : get(url); };
+  // (save the few of PyPI's this block records: a held package's releases, each file's digest of invented bytes, and what
+  // it requires at a version)
+  const release = (v, c) => [{ filename: `tidy_moss_format-${v}-py3-none-any.whl`, upload_time_iso_8601: "2024-01-01T00:00:00Z", yanked: false, digests: { sha256: c.repeat(64) } }];
+  const pypiAnswers = {
+    "https://pypi.org/pypi/tidy-moss-format/json": { status: 200, json: { info: {}, releases: { "1.1.0": release("1.1.0", "a"), "2.0.0": release("2.0.0", "b") } } },
+    "https://pypi.org/pypi/tidy-moss-format/1.1.0/json": { status: 200, json: { info: { requires_dist: ["brought-moss>=1; extra == 'fast'"] } } },
+  };
+  const npmGet = async (url) => { if (url.startsWith("https://pypi.org/")) pypiAsked.push(url); return url.startsWith("https://registry.npmjs.org/") ? { status: 404 } : pypiAnswers[url] ?? get(url); };
   const pgit = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: ptmp, encoding: "utf8" }).trim();
   try {
     pgit("init", "-q");
@@ -102,10 +109,36 @@ try {
     pypiAsked.length = 0;
     r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });
     ok(r.code === 0 && !pypiAsked.length && r.lines.includes("ok   0 new packages looked up in PyPI, each printed above for the review"), `what the base held is not looked up (${r.lines})`);
-    writeFileSync(join(ptmp, "requirements.txt"), `Tidy_Moss_Format==2.0.0 ${H()}\nnever-published-moss==1.0.0 ${H()}\n`);
+    pypiAsked.length = 0;
+    writeFileSync(join(ptmp, "requirements.txt"), `Tidy_Moss_Format==2.0.0 ${H("b")}\nnever-published-moss==1.0.0 ${H()}\n`);
     r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });
     let out = r.lines.join("\n");
-    ok(r.code === 1 && mended(out) && /^FAIL: requirements\.txt: never-published-moss@1\.0\.0: PyPI has no such package/mu.test(out) && !/tidy-moss-format/u.test(out) && /1 of 1 new package fail/u.test(out) && /ok {3}0 new packages looked up in the npm registry/u.test(out), `an update passes unlooked, in any spelling, and a new name PyPI lacks fails, beside npm's lookup (${r.lines})`);
+    ok(r.code === 1 && mended(out) && /^FAIL: requirements\.txt: never-published-moss@1\.0\.0: PyPI has no such package/mu.test(out) && !/tidy-moss-format/u.test(out) && /1 of 1 new package fail/u.test(out) && /ok {3}0 new packages looked up in the npm registry/u.test(out) && out.includes("ok   1 changed line of packages the base held, each hash compared with PyPI's list") && !pypiAsked.some((u) => u.includes("/integrity/")), `an update, in any spelling, is not looked up but for its hashes, which PyPI lists, and a new name PyPI lacks fails, beside npm's lookup (${r.lines})`);
+    // (#1388, point 1: the hashes of each line the pull request adds or changes of a package its base held)
+    for (const [what, text, names] of [
+      ["an update to a hash PyPI lists for another version's file", `tidy-moss-format==2.0.0 ${H("a")}\n`, "tidy-moss-format@2.0.0"],
+      ["a hash added beside the one the base held", `tidy-moss-format==1.1.0 ${H()} ${H("f")}\n`, "tidy-moss-format@1.1.0"],
+    ]) {
+      writeFileSync(join(ptmp, "requirements.txt"), text);
+      r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });
+      out = r.lines.join("\n");
+      ok(r.code === 1 && mended(out) && new RegExp(`^FAIL: requirements\\.txt: ${names.replaceAll(".", "\\.")}: 1 of the \\d hash(?:es)? its line names \\(sha256:[0-9a-f]{12}…\\) PyPI lists for no file`, "mu").test(out) && out.includes("1 of 1 changed line of packages the base held name a hash PyPI does not list"), `${what} fails, saying the mend (${r.lines})`);
+    }
+    writeFileSync(join(ptmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n`);
+    writeFileSync(join(ptmp, "more.txt"), `tidy-moss-format==1.1.0 ${H("f")}\n`);
+    settings(["requirements.txt", "more.txt"]);
+    r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });
+    ok(r.code === 1 && /^FAIL: more\.txt: tidy-moss-format@1\.1\.0: 1 of the 1 hash/mu.test(r.lines.join("\n")) && !/^FAIL: requirements\.txt/mu.test(r.lines.join("\n")), `a held package named in a file the pull request newly names has its hashes compared there, and the line that stood is not (${r.lines})`);
+    // (#1388, point 2: a "# via" parent counts only where PyPI lists it as requiring the package)
+    for (const [what, line, named] of [["a parent that does not require it", "unrequired-moss==1.0.0", true], ["a parent that requires it", "brought-moss==1.0.0", false]]) {
+      writeFileSync(join(ptmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n    # via -r requirements.in\n${line} ${H()}\n    # via tidy-moss-format\n`);
+      settings(["requirements.txt"]);
+      r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });
+      out = r.lines.join("\n");
+      const reported = named ? /^FAIL: requirements\.txt: unrequired-moss@1\.0\.0: PyPI has no such package/mu.test(out) : /^FAIL: requirements\.txt: brought-moss@1\.0\.0: PyPI has no such package/mu.test(out);
+      ok(reported && pypiAsked.includes("https://pypi.org/pypi/tidy-moss-format/1.1.0/json"), `${what}: its parent's requirements are asked of PyPI at the version the file holds (${r.lines})`);
+    }
+    rmSync(join(ptmp, "more.txt"));
     writeFileSync(join(ptmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n`);
     settings(["requirements.txt", "data.txt"]);
     r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });

@@ -18,7 +18,9 @@
 // against every package-lock.json and npm-shrinkwrap.json of the base; NuGet (--nuget): its "nuget" lock files, read
 // against every packages.lock.json and packages.<name>.lock.json of the base; PyPI, beside npm: its "pypi"
 // requirements files in PyPI's lock form (lookup-pypi.mjs, beside this file, reads them and PyPI's answers; #716), read
-// against those the base's config named. A package from anywhere else is not looked up here. What a registry, or GitHub, answers is a publisher's text: it is printed on one line (guards.mjs's
+// against those the base's config named; of PyPI's, each line a pull request adds or changes of a package the base held
+// has its hashes compared with what PyPI lists for its version, and nothing else asked of it (#1388, point 1), and a
+// "# via" parent brings a new package only where PyPI lists it as requiring it (point 2). A package from anywhere else is not looked up here. What a registry, or GitHub, answers is a publisher's text: it is printed on one line (guards.mjs's
 // logged), and an answer of another shape is a lookup that failed. Repositories are asked of GitHub's API without a
 // token, for the packages the project names itself alone (at most GITHUB_MOST), so the hour's limit is never reached.
 // Node's own modules; run by the licence workflow (npm and PyPI) and the NuGet workflow (--nuget).
@@ -31,7 +33,7 @@ import { fileURLToPath } from "node:url";
 import { leadsOut, logged, loggedCause, noSignInWhole, parseBounded } from "./guards.mjs";
 import { baseOf, configAt, loadConfig, lockInstalled, registryName, textAt } from "./licences.mjs";
 import { lockPackages, nugetConfig } from "./nuget.mjs";
-import { pypiPackages, pypiRegistry } from "./lookup-pypi.mjs";
+import { pypiGraphed, pypiHashes, pypiPackages, pypiRegistry, pypiRequires } from "./lookup-pypi.mjs";
 import { reach } from "./reach.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
 import { started } from "./started.mjs";
@@ -300,7 +302,8 @@ async function described(p, facts, now, { get, nuget, github }) {
   let repo = facts.repo ? said(facts.repo.url) : "not named";
   if (p.direct && facts.repo?.owner) repo += github.asked++ < GITHUB_MOST ? await onGitHub(facts.repo, p.name, get, nuget || p.pypi) : `, GitHub not asked: past the ${GITHUB_MOST} packages a lookup asks of it`;
   const brings = p.brings === null ? "what it brings, its lock file does not say" : `brings ${p.brings} package${p.brings === 1 ? "" : "s"} with it`;
-  return `${p.direct ? "named by the project" : `brought by ${brought(p) || "another"}`}; first published ${day(facts.first)} (${age} days ago); last release ${day(facts.last)}; repository ${repo}; published by ${said(facts.publisher)}; ${brings}; provenance: ${said(facts.provenance)}${facts.note ? `; ${said(facts.note)}` : ""}`;
+  const unborne = p.unborne?.length ? ` (its "# via" names ${p.unborne.slice(0, 3).map(said).join(", ")}${p.unborne.length > 3 ? " and more" : ""}, which PyPI does not list as requiring it at the version the file holds)` : "";
+  return `${p.direct ? `named by the project${unborne}` : `brought by ${brought(p) || "another"}`}; first published ${day(facts.first)} (${age} days ago); last release ${day(facts.last)}; repository ${repo}; published by ${said(facts.publisher)}; ${brings}; provenance: ${said(facts.provenance)}${facts.note ? `; ${said(facts.note)}` : ""}`;
 }
 
 // What the registry says of the package: its facts, { missing } where it has no such package, or, on NuGet where the
@@ -363,7 +366,7 @@ export async function pool(items, size, work) {
  *  held, so no file merged as data first, and named in the config only by the pull request, makes a name count as held:
  *  a lock file the pull request newly names is new, and each of its packages is looked up. A lock file the base's config
  *  named and the pull request's no longer names is read all the same, where it stands, so no change to it goes unread
- *  by taking it out of the config. */
+ *  by taking it out of the config. `held` pairs each of the base's lock files with its list. */
 export function packagesOf(config, root, base, kind, baseConfig = null) {
   const pypi = kind === "pypi", nuget = !pypi && Boolean(kind), list = (v) => (Array.isArray(v) ? v : []);
   const named = (c) => { try { return pypi ? list(c?.pypi) : nuget ? [...nugetConfig(c, copyOf(root)).ships, ...nugetConfig(c, copyOf(root)).tools] : list(c?.lockfiles); } catch { return []; } };
@@ -376,7 +379,7 @@ export function packagesOf(config, root, base, kind, baseConfig = null) {
   });
   const baseFiles = [...new Set(named(baseConfig).map((f) => posix.normalize(f)))];
   const baseLists = baseFiles.map((f) => { try { return read(textAt(root, base, f) ?? "", f); } catch { return []; } });
-  return { head, base: baseLists };
+  return { head, base: baseLists, held: baseFiles.map((f, i) => [f, baseLists[i]]) };
 }
 
 export async function fetched(url) {
@@ -395,7 +398,7 @@ const mended = (message, mend) => (/Mend: /u.test(message) ? message : `${messag
 export async function run(configPath, { root, base, nuget = false, get = fetched, now = Date.now(), event = process.env.GITHUB_EVENT_NAME }) {
   if (!base && event?.startsWith("pull_request")) return { lines: ["FAIL: this is a pull request, and its checkout holds no base to read it against, so the lookup would read nothing. Mend: give the job's checkout fetch-depth: 2 (the pull request merged into its base, with both parents)"], code: 1 };
   if (!base) return { lines: ["ok   no pull request's base here, so no package is new: nothing looked up"], code: 0 };
-  let found, head, held, sources = 0, py = null;
+  let found, head, held, sources = 0, lists = null;
   try {
     // (the config is the pull request's: a link out of the project is refused before it is opened, and loadConfig's
     // error quotes none of its text; the project's folder and the config's are each read by the system's own spelling,
@@ -405,25 +408,88 @@ export async function run(configPath, { root, base, nuget = false, get = fetched
     ({ head, base: held } = packagesOf(config, root, base, nuget, configAt(root, base, configPath)));
     found = newPackages(head, held, nuget);
     if (nuget) sources = nugetConfig(config, copyOf(root)).sources.length;
-    else py = pypiNew(config, root, base, configAt(root, base, configPath));
+    else lists = pypiLists(config, root, base, configAt(root, base, configPath));
   } catch (e) { return { lines: [`FAIL: ${logged(mended(e.message, "write the config as JSON, and each lock file it names anew with its package manager, never by hand"))}`], code: 1 }; }
   const { failures, reports } = await lookUp(found, { get, now, nuget, sources });
-  const pypi = py ? await lookUp(py, { get, now }) : { failures: [], reports: [] };
+  const pypi = lists ? await pypiLooked(lists, { get, now }) : { failures: [], reports: [], sums: [] };
   // (on NuGet the lock file's content hash is held by the NuGet check, and where each package comes from by its restore)
   const sourced = nuget ? { failures: [], reports: [] } : sourceFaults(head, held);
   const off = sourced.failures.length;
   return { lines: [...reports.map((r) => `REPORT: ${r}`), ...sourced.reports.map((r) => `REPORT: ${r}`), ...pypi.reports.map((r) => `REPORT: ${r}`), ...failures.map((f) => `FAIL: ${f}`), ...sourced.failures.map((f) => `FAIL: ${f}`), ...pypi.failures.map((f) => `FAIL: ${f}`),
-    summed(failures.length, found.length, registryOf(nuget)), ...(py ? [summed(pypi.failures.length, py.length, "PyPI")] : []),
+    summed(failures.length, found.length, registryOf(nuget)), ...pypi.sums,
     ...(off ? [`${off} lock entr${off === 1 ? "y" : "ies"} the pull request brings not from npm's registry with an integrity value (floor rule 7)`] : [])], code: failures.length || off || pypi.failures.length ? 1 : 0 };
 }
 
-// Beside npm, the packages new to the requirements files the config names under "pypi", or its base's did: null where
-// neither names any.
-function pypiNew(config, root, base, baseConfig) {
-  if (!config.pypi?.length && !baseConfig?.pypi?.length) return null;
-  const lists = packagesOf(config, root, base, "pypi", baseConfig);
-  return newPackages(lists.head, lists.base);
+// PyPI's part of the run, from its `lists`: the new packages looked up, and the hashes of the lines changed of those the
+// base held compared, as { failures, reports, sums }, `sums` the line that sums up each.
+async function pypiLooked(lists, { get, now }) {
+  const py = await pypiNew(lists, get), looked = await lookUp(py.fresh, { get, now }), hashed = await hashesHeld(py.changed, get);
+  return { failures: [...looked.failures, ...hashed], reports: looked.reports, sums: [summed(looked.failures.length, py.fresh.length, "PyPI"), hashesSummed(hashed.length, py.changed)] };
 }
+
+// Beside npm, the requirements files the config names under "pypi", or its base's did, each read to packages, and the
+// base's: null where neither names any.
+function pypiLists(config, root, base, baseConfig) {
+  if (!config.pypi?.length && !baseConfig?.pypi?.length) return null;
+  return packagesOf(config, root, base, "pypi", baseConfig);
+}
+
+// PyPI's part of the lookup, from its `lists`: `fresh`, the packages new to the project, each "# via" parent of one held
+// to what PyPI lists that parent as requiring at the version its file holds (#1388, point 2); and `changed`, the lines
+// the pull request adds or changes of a package its base held, whose hashes alone are compared with PyPI's (point 1).
+async function pypiNew(lists, get) {
+  const names = new Set(newPackages(lists.head, lists.base).map((p) => p.name));
+  // (each parent a new package's line names, at each version its file holds it, asked of PyPI once)
+  const asked = new Map();
+  for (const [, packages] of lists.head) {
+    const versions = versionsOf(packages);
+    for (const p of packages) if (names.has(p.name)) for (const parent of p.parents) for (const at of versions.get(parent)) asked.set(`${parent}\u0000${at}`, null);
+  }
+  await pool([...asked.keys()], 8, async (k) => { const [name, version] = k.split("\u0000"); asked.set(k, await pypiRequires(name, version, get)); });
+  const head = lists.head.map(([f, packages]) => {
+    const versions = versionsOf(packages);
+    return [f, pypiGraphed(packages, (parent, child) => !names.has(child) || (versions.get(parent) ?? []).some((v) => asked.get(`${parent}\u0000${v}`)?.has(child)))];
+  });
+  return { fresh: newPackages(head, lists.base), changed: changedLines(head, lists.held, names) };
+}
+
+// Each name of a file's packages, and the versions the file holds it at.
+function versionsOf(packages) {
+  const out = new Map();
+  for (const p of packages) out.set(p.name, [...new Set([...(out.get(p.name) ?? []), p.version])]);
+  return out;
+}
+
+/** The lines of `head` (each lock file of PyPI's with its packages) that no list of `held` (the base's, each with its
+ *  path) holds as they stand in the same file, at the same version with the same hashes, of a package not among `fresh`
+ *  (the names new to the project, whose lines the lookup holds whole): one for each name, each line kept with its file. */
+export function changedLines(head, held, fresh) {
+  const line = (f, p) => `${posix.normalize(f)}\u0000${p.name}\u0000${p.version}\u0000${[...p.hashes].sort().join(" ")}`;
+  const stood = new Set(held.flatMap(([f, packages]) => packages.map((p) => line(f, p)))), out = new Map();
+  for (const [f, packages] of head) for (const p of packages) {
+    if (fresh.has(p.name) || stood.has(line(f, p))) continue;
+    if (!out.has(p.name)) out.set(p.name, { name: p.name, version: p.version, lockPath: f, lines: [] });
+    out.get(p.name).lines.push({ lockPath: f, version: p.version, hashes: p.hashes });
+  }
+  return [...out.values()];
+}
+
+// Each changed line's hashes held to PyPI's list: a failure for each that names one PyPI lists for no file of its version.
+async function hashesHeld(changed, get) {
+  const failures = [];
+  await pool(changed, 8, async (p) => {
+    try { for (const f of await pypiHashes(p, get)) failures.push(`${said(f.lockPath)}: ${said(p.name)}@${said(f.version)}: ${f.text}`); } catch (e) {
+      failures.push(`${said(p.lockPath)}: ${said(p.name)}@${said(p.version)}: PyPI could not be read (${said(e.message)}), so the hashes of the lines the pull request changes are not compared with its list. Mend: run the job again; if it fails the same way, say so in the pull request and leave the change out until it passes`);
+    }
+  });
+  return failures.sort();
+}
+
+// The line that sums up the hashes of the changed lines.
+const hashesSummed = (failed, changed) => {
+  const of = changed.reduce((n, p) => n + p.lines.length, 0);
+  return failed ? `${failed} of ${of} changed line${of === 1 ? "" : "s"} of packages the base held name a hash PyPI does not list (floor rule 15)` : `ok   ${of} changed line${of === 1 ? "" : "s"} of packages the base held, each hash compared with PyPI's list`;
+};
 
 // The line that sums up one registry's lookup.
 const summed = (failed, of, where) => (failed ? `${failed} of ${of} new package${of === 1 ? "" : "s"} fail the lookup (floor rule 15)` : `ok   ${of} new package${of === 1 ? "" : "s"} looked up in ${where}, each printed above for the review`);
