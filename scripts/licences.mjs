@@ -14,7 +14,8 @@
 //   node core/scripts/licences.mjs <config> --action   the dependency review's lists, as lines for $GITHUB_OUTPUT
 //
 // The config, a JSON file the project keeps (its SECURITY.md names it under rule 10; protected like the check), names:
-// "lockfiles", the npm lockfiles whose every package is checked; "ships", the package.json files (each beside one of
+// "lockfiles", the npm lockfiles whose every package is checked (one the project tracks and it does not name is said:
+// licence-locks.mjs, beside this file, says how; #1316); "ships", the package.json files (each beside one of
 // those lockfiles) whose runtime dependencies, and those of the workspaces it declares, ship ([] if no package ships);
 // "data" and "fonts", the packages checked by hand to be data or assets, or fonts; "audit", the project's audit of what
 // no lockfile holds, a JSON file whose "entries" each have a "name", a "licence", "ships": true if it ships, and
@@ -31,13 +32,15 @@
 // font package is known by its registry address. "accepted" holds what is off its list and the owner wants anyway,
 // each with the owner's yes (licence-yes.mjs, beside this file, says how one is written and what it never takes in).
 // A project whose packages come from NuGet names its lock files under "nuget", which the NuGet check reads (nuget.mjs,
-// beside this file) with this file's lists, the same audit and an "accepted" of its own.
+// beside this file) with this file's lists, the same audit and an "accepted" of its own. "pypi" names requirements
+// files in PyPI's lock form, which the lookup alone reads (lookup.mjs, beside this file; #716).
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { inProject, leadsOut, logged, parseBounded } from "./guards.mjs";
-import { scan } from "./licence-scan.mjs";
+import { inProject, leadsOut, logged, noSignInWhole, parseBounded, quotedAlone } from "./guards.mjs";
+import { blobAt, scan } from "./licence-scan.mjs";
+import { stoodAt, trackedIn, unnamedLocks } from "./licence-locks.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { shapeFaults } from "./schemas.mjs";
 import { started } from "./started.mjs";
@@ -332,7 +335,7 @@ function npmrcFiles(root, dir = "") {
 /** One spelling for every path in a config ("./package.json" is "package.json"), so "ships" matches its lockfile's. */
 function normalised(config) {
   const out = { ...config };
-  for (const key of ["lockfiles", "ships", "ignoreScriptsIn"]) if (Array.isArray(out[key])) out[key] = out[key].map((p) => posix.normalize(p));
+  for (const key of ["lockfiles", "ships", "ignoreScriptsIn", "pypi"]) if (Array.isArray(out[key])) out[key] = out[key].map((p) => posix.normalize(p));
   if (typeof out.audit === "string") out.audit = posix.normalize(out.audit);
   return out;
 }
@@ -365,7 +368,8 @@ function configRead(path) {
   return config;
 }
 
-const NOTHING = 'the config names nothing to check. Mend: name the lockfiles in "lockfiles", or the audit\'s file in "audit"';
+const NOTHING = 'the config names nothing to check. Mend: name the lockfiles in "lockfiles", the requirements files in PyPI\'s lock form in "pypi", or the audit\'s file in "audit"';
+const nothing = (config) => !config.lockfiles?.length && !config.pypi?.length && !config.audit;
 
 /** The config's form: its schema's, the first fault refused, where ajv is installed; else the checks below. Then, either
  *  way, what a schema cannot say: that it names something to check, and that each path of its scan is written as git
@@ -377,7 +381,7 @@ function configShape(config) {
     configPaths(config);
     if (config.scan !== undefined) configScan(config);
   } else if (faults.length) throw new Error(faults[0]);
-  if (!config.lockfiles?.length && !config.audit) throw new Error(NOTHING);
+  if (nothing(config)) throw new Error(NOTHING);
   for (const key of ["served", "tools", "skip"]) {
     if (!(config.scan?.[key] ?? []).every((p) => scanPathOk(key, p))) throw new Error(`the config's "scan.${key}" is not a list of paths in the project. Mend: list each as a path from the project's root`);
   }
@@ -385,7 +389,7 @@ function configShape(config) {
 
 /** The config's keys, each one it knows, its lists each a list of names, and "ships" among them. */
 function configLists(config) {
-  const lists = ["lockfiles", "ships", "data", "fonts", "ignoreScriptsIn"];
+  const lists = ["lockfiles", "ships", "data", "fonts", "ignoreScriptsIn", "pypi"];
   // ("nuget" is the NuGet check's own, which reads and checks it: nuget.mjs, beside this file; "agentTools" the agent-tools
   // check's: agent-tools.mjs)
   const unknown = Object.keys(config).filter((k) => !lists.includes(k) && !["audit", "notices", "scan", "nuget", "accepted", "agentTools"].includes(k));
@@ -400,7 +404,7 @@ function configLists(config) {
 /** The config's "audit" and "notices", each a path where it stands, and something named to check. */
 function configPaths(config) {
   if (config.audit !== undefined && (typeof config.audit !== "string" || !config.audit)) throw new Error('the config\'s "audit" is not a path. Mend: name the audit\'s file, or take "audit" out');
-  if (!config.lockfiles?.length && !config.audit) throw new Error(NOTHING);
+  if (nothing(config)) throw new Error(NOTHING);
   if (config.notices !== undefined && (typeof config.notices !== "string" || !config.notices || !config.audit)) throw new Error('the config\'s "notices" is not a path, or the config names no "audit" whose entries it holds. Mend: name the notices file by its path, beside an "audit", or take "notices" out');
 }
 
@@ -427,7 +431,7 @@ function scanPathOk(key, p) {
  *  refused, and, given the project's `root`, so is one whose file is reached through a link that leads out of it: the
  *  config, where none is. */
 function within(config, root) {
-  const named = [...(config.lockfiles ?? []), ...(config.ships ?? []), ...(config.ignoreScriptsIn ?? []), config.audit, config.notices].filter((p) => p !== undefined);
+  const named = [...(config.lockfiles ?? []), ...(config.ships ?? []), ...(config.ignoreScriptsIn ?? []), ...(config.pypi ?? []), config.audit, config.notices].filter((p) => p !== undefined);
   const out = named.filter((p) => !inProject(p) || (root !== undefined && leadsOut(root, join(root, p))));
   if (out.length) throw new Error(`the config names a path outside the project: ${out.map((p) => logged(p)).join(", ")}. Mend: name each file by its path from the project's root, with no ".." that leads above it, and make it a file of the project's own, reached through no link that leads out of it`);
   return config;
@@ -475,7 +479,7 @@ function lockfilePackages(root, lockPath, ships, text = (f) => ownText(root, f))
   const lock = read(posix.basename(lockPath));
   if (!lock.packages || typeof lock.packages !== "object" || Array.isArray(lock.packages)) throw new Error(`${lockPath} has no "packages" (npm's lockfile version 2 or 3). Mend: write it anew with npm, version 7 or later: its install, given --package-lock-only`);
   const odd = Object.entries(lock.packages).find(([path, entry]) => !lockPathOk(path) || !entry || typeof entry !== "object" || Array.isArray(entry));
-  if (odd) throw new Error(`${lockPath} holds an entry at ${JSON.stringify(odd[0]).slice(0, 200)} that is not written as npm writes one. Mend: write it anew with npm, never by hand: its install, given --package-lock-only`);
+  if (odd) throw new Error(`${lockPath} holds an entry at ${quotedAlone(odd[0]).slice(0, 200)} that is not written as npm writes one. Mend: write it anew with npm, never by hand: its install, given --package-lock-only`);
   const workspaces = workspacesIn(read("package.json"), posix.join(base, "package.json"));
   const shipped = ships ? shippedPaths(lock.packages, workspaces, (dir) => read(posix.join(dir, "package.json"))) : new Set();
   return lockRead(lock.packages, workspaces)
@@ -504,34 +508,50 @@ export function check(config, root, base = null, baseConfig = null) {
   };
   const { failures, reports } = ctx;
   const packages = (config.lockfiles ?? []).flatMap((f) => lockfilePackages(root, f, config.ships.includes(posix.join(posix.dirname(f), "package.json"))));
-  failures.push(...shrinkwrapFaults(root, config.lockfiles ?? []));
+  const twins = shrinkwrapFaults(root, config.lockfiles ?? [], base);
+  failures.push(...twins.failures);
+  reports.push(...twins.reports);
   for (const p of packages) checkPackage(ctx, p);
   const entries = config.audit ? checkAudit(ctx) : [];
   unneededYeses(ctx);
-  const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? [], base, auditOf(ctx.then)) : undefined;
+  const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? [], base, auditOf(ctx.then), lockfilesOf(ctx.then)) : undefined;
   if (scanned) failures.push(...scanned.failures);
   failures.push(...npmrcFailures(root));
   for (const f of config.ignoreScriptsIn ?? []) {
     if (!existsSync(join(root, f)) || !scriptsOff(readFileSync(join(root, f), "utf8"))) failures.push(`${f} does not set ignore-scripts=true (floor rule 15). Mend: add the line ignore-scripts=true to ${f}`);
   }
   const wait = waitFaults(root, base, config.ignoreScriptsIn ?? []);
-  failures.push(...wait.failures);
+  const unnamed = unnamedLocks(root, trackedIn(root), config, base, stoodAt(root, base, ctx.then));
+  failures.push(...wait.failures, ...unnamed.failures);
   const all = [...new Set(failures)]; // (a package a lockfile holds twice fails once)
   const summary = summaryOf(ctx, packages, entries, scanned, all.length);
-  return { failures: all, reports: [...reports, ...wait.reports, ...(scanned?.reports ?? [])], summary };
+  return { failures: all, reports: [...reports, ...wait.reports, ...unnamed.reports, ...(scanned?.reports ?? [])], summary };
 }
 
 // (the audit's path a config names, or null)
+const lockfilesOf = (config) => (Array.isArray(config?.lockfiles) ? config.lockfiles : []);
 const auditOf = (config) => (typeof config?.audit === "string" ? config.audit : null);
 
+const isFile = (p) => { try { return statSync(p).isFile(); } catch { return false; } };
 // (npm installs from a shrinkwrap file where one stands, whatever lock file a config names: only one of the two may)
-function shrinkwrapFaults(root, lockfiles) {
-  const faults = [];
+function shrinkwrapFaults(root, lockfiles, base) {
+  const failures = [], reports = [];
   for (const f of lockfiles) {
-    const other = posix.join(posix.dirname(f), posix.basename(f) === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json");
-    if (existsSync(join(root, other))) faults.push(`${f}: ${other} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`);
+    const dir = posix.dirname(f), name = posix.basename(f);
+    // (the twin the check read before #1349, in npm's own case: it fails as it did, where the base held the pair too)
+    const old = posix.join(dir, name === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json");
+    const want = name.toLowerCase() === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json";
+    let names = [];
+    try { names = readdirSync(join(root, dir)); } catch { /* (no folder, no file) */ }
+    const twins = new Set([...(existsSync(join(root, old)) ? [old] : []), ...names.filter((x) => x.toLowerCase() === want && isFile(join(root, dir, x))).map((x) => posix.join(dir, x))]);
+    for (const twin of twins) {
+      const said = `${f}: ${twin} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`;
+      // (a pair seen only since #1349, in a case of another name than the one read before, passes, reported, where it stood as files at the base)
+      const newly = twin !== old && base && blobAt(root, base, twin) && blobAt(root, base, f);
+      (newly ? reports : failures).push(newly ? `${said}; the pair stood so at the pull request's base, so it passes` : said);
+    }
   }
-  return faults;
+  return { failures, reports };
 }
 
 // (a package is known by what it is, not the name it is installed under: its registry's name and version, or where it
@@ -574,7 +594,7 @@ function checkPackage(ctx, p) {
 /** The failure of a package off its list. */
 function offList(p) {
   const never = p.license !== undefined && NEVER.test(typeof p.license === "string" ? p.license : JSON.stringify(p.license));
-  return `off the ${p.shipped ? "list for what ships" : "tools' list"}: ${p.name}@${p.version} (${p.license === undefined ? "no licence" : typeof p.license === "string" ? p.license : JSON.stringify(p.license)}), in ${p.lockPath}${never ? ". Mend: replace it with a package under a licence on that list; floor rule 10 never takes these terms in" : `. Mend: replace it with a package under a licence on that list; or, where the owner wants it anyway, file an issue asking the owner's yes, which goes in the config's "accepted" with the owner's words (floor rule 10)`}`;
+  return `off the ${p.shipped ? "list for what ships" : "tools' list"}: ${noSignInWhole(p.name)}@${noSignInWhole(p.version)} (${p.license === undefined ? "no licence" : typeof p.license === "string" ? noSignInWhole(p.license) : quotedAlone(p.license)}), in ${p.lockPath}${never ? ". Mend: replace it with a package under a licence on that list; floor rule 10 never takes these terms in" : `. Mend: replace it with a package under a licence on that list; or, where the owner wants it anyway, file an issue asking the owner's yes, which goes in the config's "accepted" with the owner's words (floor rule 10)`}`;
 }
 
 /** The audit the config names, each entry held to its list and its notice: its entries, for the scan. */
@@ -677,12 +697,37 @@ function summaryOf(ctx, packages, entries, scanned, failing) {
  * cannot tell what ships), and lets the named data and font packages through to this check, which holds each to its
  * own list; and, of those the owner accepted, the ones whose accepted licence the tools' list would refuse, which this
  * check holds to its yes for that exact version (the review knows a package by its name alone, so it reads no version
- * of such a one).
+ * of such a one). It lets through, too, those the core's own config (`core`) names so, since the review reads every
+ * lock file a pull request changes, the core's copy among them, and the core's own lock files are held under the core's
+ * config in the core's own repository, the copy held to it byte for byte (#1310): a sync never fails on what the
+ * project did not change ("Nothing locks a project" in the core's AGENTS.md). A package of the project's own of such a
+ * name is still held by this check to the project's config, in each lock file it names; the review matches a name
+ * whatever its version, so each one it does not name is said (licence-locks.mjs, beside this file; #1316).
  */
-export function actionLists(config) {
+export function actionLists(config, core = coreConfig()) {
   const lists = policy(config), tools = new Set(lists.tools);
-  const yeses = (config.accepted ?? []).filter((a) => a.package !== undefined && !licenceOk(a.licence, tools)).map((a) => a.package.slice(0, a.package.lastIndexOf("@")));
-  return [`allow-licenses=${lists.tools.join(",")}`, `allow-dependencies-licenses=${[...new Set([...(config.data ?? []), ...(config.fonts ?? []), ...yeses])].map((n) => `pkg:npm/${n}`).join(",")}`];
+  const through = (c) => [...(c.data ?? []), ...(c.fonts ?? []), ...(c.accepted ?? []).filter((a) => a.package !== undefined && !licenceOk(a.licence, tools)).map((a) => a.package.slice(0, a.package.lastIndexOf("@")))];
+  return [`allow-licenses=${lists.tools.join(",")}`, `allow-dependencies-licenses=${[...new Set([...through(config), ...through(core)])].map((n) => `pkg:npm/${n}`).join(",")}`];
+}
+
+// (the core's own config is an object whose "data", "fonts" and "accepted" are each a list, if there, of entries of
+// "accepted" that are each an object)
+const object = (o) => o !== null && typeof o === "object" && !Array.isArray(o);
+const coreForm = (core) => object(core) && [core.data, core.fonts, core.accepted].every((l) => l === undefined || Array.isArray(l)) && (core.accepted ?? []).every(object);
+
+// The core's own licence config, beside this script's folder (.github/licences.json, which the copy holds too), or
+// none where it is not there; each name it would let through held to npm's form.
+export function coreConfig(at = fileURLToPath(new URL("../.github/licences.json", import.meta.url))) {
+  if (!existsSync(at)) return {};
+  const mend = "Mend: take the core's .github/licences.json back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)";
+  let core;
+  try { core = JSON.parse(readFileSync(at, "utf8")); } catch { throw new Error(`the core's own licence config, ${at}, cannot be read as JSON. ${mend}`); }
+  // (each list's form first, then the names in it, so a list of another form fails with its mend, never by a spread)
+  if (!coreForm(core)) throw new Error(`the core's own licence config, ${at}, is not an object whose "data", "fonts" and "accepted" are each a list, each entry of "accepted" an object. ${mend}`);
+  const npmName = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/u;
+  const names = [...(core.data ?? []), ...(core.fonts ?? []), ...(core.accepted ?? []).filter((a) => a.package !== undefined).map((a) => (typeof a.package === "string" && ACCEPTED_NPM.test(a.package) ? a.package.slice(0, a.package.lastIndexOf("@")) : null))];
+  if (names.some((n) => typeof n !== "string" || !npmName.test(n))) throw new Error(`the core's own licence config, ${at}, names what is no npm package name in "data" or "fonts", or no <name>@<version> in "accepted". ${mend}`);
+  return core;
 }
 
 if (started(import.meta.url)) {
@@ -695,7 +740,9 @@ if (started(import.meta.url)) {
     root = projectAt(fileURLToPath(new URL(".", import.meta.url))).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();
   } catch (e) { fail(e.message); }
   if (process.argv.includes("--action")) {
-    for (const line of actionLists(config)) console.log(line);
+    let lines;
+    try { lines = actionLists(config); } catch (e) { fail(e.message); }
+    for (const line of lines) console.log(line);
   } else {
     let result;
     try { const base = baseOf(root); result = check(config, root, base, configAt(root, base, configPath)); } catch (e) { fail(e.message); }
@@ -709,28 +756,31 @@ if (started(import.meta.url)) {
   }
 }
 
-// The exact-versions check (exact-versions.mjs) and the lookup of each package new to the project in npm's registry
-// (lookup.mjs), run beside the licence check on the config at `configPath`, each printing its lines: whether either
+// The exact-versions check (exact-versions.mjs) and the lookup of each package new to the project in its registry
+// (lookup.mjs: npm's, and PyPI's for a file the config names under "pypi"), run beside the licence check on the config at `configPath`, each printing its lines: whether either
 // failed. The base is the one the job names (LOOKUP_BASE), else the merge's first parent. What stood there before the
 // exact-versions check came is reported, never failed, and a pull request whose checkout holds no base has its lookup
 // said as a warning that it did not run, failing nothing ("Nothing locks a project" in the core's AGENTS.md), save
 // where the job names a base its checkout lacks, as the core's licences.yml does, which fails as lookup.mjs does.
 export async function alongside(configPath, root) {
   const { report } = await import("./exact-versions.mjs");
-  const { run, namedBase, summarise } = await import("./lookup.mjs");
+  const { run, namedBase, summarise, NAMED_BASE } = await import("./lookup.mjs");
   const at = namedBase(root) ?? baseOf(root);
   const exact = report(resolve(configPath), root, at ? (f) => textAt(root, at, f) : null, !at);
   for (const line of exact.err) console.error(line);
   for (const line of exact.out) console.log(line);
   if (!at && process.env.GITHUB_EVENT_NAME?.startsWith("pull_request")) {
     const mend = "give the job's checkout fetch-depth: 2 (the pull request merged into its base, with both parents)";
-    if (/^[0-9a-f]{40}$/u.test(process.env.LOOKUP_BASE ?? "")) {
+    if (NAMED_BASE.test(process.env.LOOKUP_BASE ?? "")) {
       console.error(`FAIL: the lookup of the packages new to the project cannot run: the job names the pull request's base (LOOKUP_BASE), and its checkout does not hold that commit. Mend: ${mend}`);
       return true;
     }
     console.log(`::warning::The lookup of the packages new to the project did not run: this is a pull request, and its checkout holds no base to read it against. Mend: ${mend}`);
     return exact.status !== 0;
   }
+  // (where the run's network is cut off, as the core's own suites cut it, scripts/offline.sh, no registry answers: the
+  // lookup is left to the step of its own that reaches them, and said so)
+  if (process.env.CORE_OFFLINE) { console.log("ok   the lookup of the packages new to the project is left to its own step: this run's network is cut off (scripts/offline.sh)"); return exact.status !== 0; }
   const { lines, code } = await run(configPath, { root, base: at });
   for (const line of lines) (line.startsWith("FAIL") ? console.error : console.log)(line);
   summarise(lines, false);

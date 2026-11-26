@@ -1,6 +1,7 @@
 // Stryker run as a *mutation tool* (tasks/code-shape.md, "How strong the tests are"; #581): the core's own, as its
-// AGENTS.md names it, and one any project whose code is JavaScript run by Node, and whose tests are files run by
-// `node <file>`, may name too, with Stryker installed where it says. Stryker puts faults into the lines named (more
+// AGENTS.md names it, and one any project whose code is JavaScript or TypeScript, and whose tests are files run by
+// `node <file>`, or by its own vitest (`vitest run <file>`, with --runner vitest; #1274), may name too, with Stryker
+// installed where it says. Stryker puts faults into the lines named (more
 // kinds of fault than mutate.mjs, beside this file, puts in) and this script gives it what the core's measure needs:
 // - the tests: Stryker's command runner runs, for each fault, this script again (with --tests), which runs the tests
 //   that name the fault's file (mutate.mjs's testsOf), one after the other until one fails, as mutate.mjs runs them:
@@ -18,9 +19,11 @@
 // Stryker itself is a tool that only runs, installed at one exact version from a lock file of the project's (the
 // core's: tests/mutation/), never with its install scripts (floor rules 7 and 15); --tool names that folder.
 //
-//   node core/scripts/stryker.mjs --tool <folder> --report <file> [--budget <seconds>] [<file>[:<first>-<last>],...]
+//   node core/scripts/stryker.mjs --tool <folder> [--runner vitest] --report <file> [--budget <seconds>] [<file>[:<first>-<last>],...]
 //       the faults on those lines, or with no file named every file of the config's "code" that is no test; the
-//       config is the one the shape check reads (shape.mjs, where()). The budget, where none is given, is
+//       config is the one the shape check reads (shape.mjs, where()). A file of a language the core's list does not
+//       give Stryker (mutation-tools.json, beside this file) is left out, and the run says so, since a project in
+//       more than one is measured in its main language alone (#1247, point 5). The budget, where none is given, is
 //       MUTATE_BUDGET's, else none.
 // Reads the project; writes the report, and its working copy, which it takes away. git, Node's own modules and
 // Stryker.
@@ -31,6 +34,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LONGEST, Refused, copyOf, limitOf, projectOf, refuse, run, stopAll, takeAway, testsOf, wantedOf } from "./mutate.mjs";
 import { started } from "./started.mjs";
+import { parseBounded } from "./guards.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ACTIVE = "__STRYKER_ACTIVE_MUTANT__"; // (the variable Stryker's command runner names the fault to switch on by)
@@ -44,20 +48,40 @@ export const word = (p, windows = process.platform === "win32") => {
 
 // The tests to run for one fault, those of the file the plan names for it; none in the run before any fault
 // (Stryker's dry run): from `map`, { files: { file: [tests] }, plan: <its path>, asIs: <a folder> }.
-export function testsFor(map, active, readPlan = p => JSON.parse(fs.readFileSync(p, "utf8"))) {
+export function testsFor(map, active, readPlan = p => parseBounded(fs.readFileSync(p, "utf8"))) {
   if (active === undefined || active === "") return [];
   return map.files[readPlan(map.plan)[active]] ?? [];
 }
 
 // The folder the tests now running are named in by their process ids, each a group of its own off Windows, so that
-// the run that stops Stryker stops them too (stopTests); set from the map by dispatch.
-let groups = null;
+// the run that stops Stryker stops them too (stopTests), and the words node is given before a test's file (none, or
+// the project's vitest and run); both set from the map by dispatch.
+let groups = null, runner = [];
+
+// The words node is given to run one test: its file alone, or after the runner's (`prefix`), as vitest is given it.
+export const argsOf = (prefix, test) => [...prefix, test];
+
+// The program of the vitest installed at the project's root (`root`), as its package.json names it: its path from the
+// root, or null where none is installed, it names none, or the one it names, its links followed, is no file inside
+// the folder, its links followed too (a folder would have node run its own package's main, wherever that stands).
+export function vitestAt(root) {
+  const folder = "node_modules/vitest";
+  let bin;
+  try { bin = JSON.parse(fs.readFileSync(path.join(root, folder, "package.json"), "utf8")).bin; } catch { return null; }
+  const named = typeof bin === "string" ? bin : bin?.vitest;
+  if (typeof named !== "string") return null;
+  const at = path.posix.join(folder, named.replaceAll("\\", "/"));
+  try {
+    const real = fs.realpathSync(path.join(root, at)), inside = path.relative(fs.realpathSync(path.join(root, folder)), real);
+    return at.startsWith(`${folder}/`) && inside && inside.split(path.sep)[0] !== ".." && !path.isAbsolute(inside) && fs.statSync(real).isFile() ? at : null;
+  } catch { return null; }
+}
 
 // One run of a test with `node`, its fault switched on or not: mutate.mjs's run, which stops past its time the test
 // and all it started, named in `groups` while it runs.
 async function once(test, seconds, env) {
   let at = null;
-  const r = await run(test, process.cwd(), seconds, env, pid => { if (groups) fs.writeFileSync(at = path.join(groups, String(pid)), ""); });
+  const r = await run(argsOf(runner, test), process.cwd(), seconds, env, pid => { if (groups) fs.writeFileSync(at = path.join(groups, String(pid)), ""); });
   if (at) fs.rmSync(at, { force: true });
   return r;
 }
@@ -90,6 +114,7 @@ export async function asItStands(test, asIs, run1 = once) {
 // the exit code Stryker's command runner reads, 1 where the fault was caught.
 export async function dispatch(map, active, run1 = once) {
   groups = map.groups ?? null;
+  runner = map.runner ?? [];
   for (const test of testsFor(map, active)) {
     const was = await asItStands(test, map.asIs, run1);
     if (was.result !== "passed") continue;
@@ -99,7 +124,7 @@ export async function dispatch(map, active, run1 = once) {
 }
 
 // The tests left out, failing or past LONGEST as they stood, from the folder the faults kept them in.
-const leftOut = asIs => fs.readdirSync(asIs).filter(f => f.endsWith(".json")).map(f => [Buffer.from(f.slice(0, -5), "hex").toString(), JSON.parse(fs.readFileSync(path.join(asIs, f), "utf8"))]).filter(([, r]) => r.result !== "passed").map(([t]) => t).sort();
+const leftOut = asIs => fs.readdirSync(asIs).filter(f => f.endsWith(".json")).map(f => [Buffer.from(f.slice(0, -5), "hex").toString(), parseBounded(fs.readFileSync(path.join(asIs, f), "utf8"))]).filter(([, r]) => r.result !== "passed").map(([t]) => t).sort();
 
 // The run's options for Stryker: its command runner starting this script with --tests, in place in the working copy,
 // with the core's reporter and nothing else.
@@ -140,24 +165,26 @@ export function counted(report) {
 // registry, as a job runs it before the strength check.
 export const installIn = folder => `npm ci --ignore-scripts --allow-git=none --allow-remote=none --allow-file=none --allow-directory=none --workspaces=false --prefix ${folder}`;
 
-// What the command line asks: { out, tool, bin, budget, named }, or a refusal.
+// What the command line asks: { out, tool, bin, budget, vitest, named }, or a refusal.
 function askedOf(argv) {
   const value = flag => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] : null; };
   const out = value("--report"), tool = value("--tool"), budget = Number(value("--budget") ?? (process.env.MUTATE_BUDGET || Infinity));
   if (!out || !tool || !(budget > 0)) refuse("Stryker's run was not told where Stryker is installed, where to write its report, or its budget in seconds", "run node scripts/stryker.mjs --tool <the folder Stryker is installed in> --report <file> [--budget <seconds>] [<file>[:<first>-<last>],...]");
+  const by = value("--runner");
+  if (by !== null && by !== "vitest") refuse(`Stryker's run was told to run its tests with ${by}`, "give --runner vitest, for tests vitest runs, or no --runner, for tests run by node <file>");
   const bin = path.resolve(tool, "node_modules", "@stryker-mutator", "core", "bin", "stryker.js");
   if (!fs.existsSync(bin)) refuse(`Stryker is not installed in ${tool}`, `install it there from its lock file, with no install scripts: ${installIn(tool)} (in the core: node scripts/install.mjs mutation)`);
-  const flags = new Set(["--report", "--tool", "--budget"]);
-  return { out: path.resolve(out), bin, budget, named: argv.filter((a, i) => !flags.has(a) && !flags.has(argv[i - 1])) };
+  const flags = new Set(["--report", "--tool", "--budget", "--runner"]);
+  return { out: path.resolve(out), bin, budget, vitest: by === "vitest", named: argv.filter((a, i) => !flags.has(a) && !flags.has(argv[i - 1])) };
 }
 
 // The run's files in `scratch`: the tests of each file wanted, the folder the tests' runs as they stand are kept in,
 // the folder the tests running are named in, and Stryker's options. Gives the options' path and the first folder.
-function setUp(scratch, { wanted, named, texts, testTexts, report }) {
+function setUp(scratch, { wanted, named, texts, testTexts, report, prefix }) {
   const mapAt = path.join(scratch, "tests.json"), plan = path.join(scratch, "plan.json"), configAt = path.join(scratch, "stryker.json"), asIs = path.join(scratch, "as-is");
   fs.mkdirSync(asIs);
   fs.mkdirSync(path.join(scratch, "groups"));
-  fs.writeFileSync(mapAt, JSON.stringify({ files: Object.fromEntries([...wanted.keys()].map(f => [f, testsOf(f, testTexts)])), plan, asIs, groups: path.join(scratch, "groups") }));
+  fs.writeFileSync(mapAt, JSON.stringify({ files: Object.fromEntries([...wanted.keys()].map(f => [f, testsOf(f, testTexts)])), plan, asIs, groups: path.join(scratch, "groups"), runner: prefix }));
   const mutate = named.length ? named.flatMap(a => a.split(",")).filter(Boolean) : [...wanted.keys()];
   // (each file's text as it stands, for the report: Stryker writes its own into the files in place)
   const sources = path.join(scratch, "sources.json");
@@ -166,26 +193,48 @@ function setUp(scratch, { wanted, named, texts, testTexts, report }) {
   return { configAt, asIs };
 }
 
+// The report of a run that measured nothing, in the open form strength.mjs reads.
+const EMPTY = `${JSON.stringify({ schemaVersion: "1", thresholds: { high: 80, low: 60 }, files: {} })}\n`;
 // What the run says once it ends: the tests left out, and the counts.
 function said(report, { asIs, ended, files }) {
-  if (!fs.existsSync(report)) fs.writeFileSync(report, `${JSON.stringify({ schemaVersion: "1", thresholds: { high: 80, low: 60 }, files: {} })}\n`);
-  const c = counted(JSON.parse(fs.readFileSync(report, "utf8"))), all = Object.values(c).reduce((a, b) => a + b, 0), left = leftOut(asIs);
+  if (!fs.existsSync(report)) fs.writeFileSync(report, EMPTY);
+  const c = counted(parseBounded(fs.readFileSync(report, "utf8"))), all = Object.values(c).reduce((a, b) => a + b, 0), left = leftOut(asIs);
   if (left.length) console.log(`left out, failing or past ${LONGEST} s as they stand: ${left.join(", ")}`);
   if (!ended && !all) console.log("the budget ran out before Stryker had planned its faults: nothing was measured");
   console.log(`stryker: ${all} faults in ${files} files: ${(c.Killed ?? 0) + (c.Timeout ?? 0)} caught, ${(c.Survived ?? 0) + (c.NoCoverage ?? 0)} survived, ${c.Pending ?? 0} not run${ended ? "" : " (the budget)"}; the report is written`);
 }
 
+// Of the files named (`named`, as the command line gives them) and of the code (`code`), those Stryker measures, of the
+// endings the core's list gives it, and `left` the others: { named, code, left }. Where files were named and none is
+// Stryker's, `named` is null: there is nothing to measure.
+const ENDINGS = parseBounded(fs.readFileSync(path.join(HERE, "mutation-tools.json"), "utf8")).languages.filter(l => l.tool === "Stryker").flatMap(l => l.endings);
+export function strykers(named, code, endings = ENDINGS) {
+  const fileOf = part => /^(.+?)(?::\d+-\d+)?$/u.exec(part)[1], ours = f => endings.includes(path.posix.extname(f));
+  const parts = named.flatMap(a => a.split(",")).filter(Boolean), mine = parts.filter(p => ours(fileOf(p)));
+  const left = [...new Set((parts.length ? parts.map(fileOf) : code).filter(f => !ours(f)))];
+  return { named: parts.length && !mine.length ? null : mine, code: code.filter(ours), left };
+}
+
 async function main(argv) {
   const t = argv.indexOf("--tests");
-  if (t >= 0) return dispatch(JSON.parse(fs.readFileSync(argv[t + 1], "utf8")), process.env[ACTIVE]);
-  const { out, bin, budget, named } = askedOf(argv), until = Date.now() + budget * 1000;
-  const { code, texts, testTexts } = projectOf(), wanted = wantedOf(named, code);
+  if (t >= 0) return dispatch(parseBounded(fs.readFileSync(argv[t + 1], "utf8")), process.env[ACTIVE]);
+  const { out, bin, budget, vitest, named: asked } = askedOf(argv), until = Date.now() + budget * 1000;
+  const program = vitest ? vitestAt(".") : null;
+  if (vitest && !program) refuse("the tests are to be run by vitest, and node_modules/vitest at the project's root names no program", "install the project's packages first (npm ci --ignore-scripts), as its job does before its tests, then run this again");
+  const project = projectOf(), { named, code, left } = strykers(asked, project.code), { texts, testTexts } = project;
+  if (left.length) console.log(`left out, of languages the core's list does not give Stryker: ${left.join(", ")}`);
+  if (named === null || !code.length) {
+    fs.writeFileSync(out, EMPTY);
+    console.log("stryker: no file of a language Stryker measures, so nothing was measured; the report is written");
+    return 0;
+  }
+  const wanted = wantedOf(named, code);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "stryker-")), copies = [];
   const stop = () => { stopStryker(); stopTests(path.join(scratch, "groups")); stopAll(); takeAway(copies, scratch); process.exit(130); };
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, stop);
   try {
     copies.push(copyOf(path.join(scratch, "copy")));
-    const { configAt, asIs } = setUp(scratch, { wanted, named, texts, testTexts, report: out });
+    const { configAt, asIs } = setUp(scratch, { wanted, named, texts, testTexts, report: out, prefix: program ? [program, "run"] : [] });
     fs.rmSync(out, { force: true });
     const ran = await stryker(bin, configAt, copies[0], (until - Date.now()) / 1000);
     stopTests(path.join(scratch, "groups"));

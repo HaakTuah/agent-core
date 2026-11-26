@@ -60,6 +60,21 @@ try {
     ok(linked.status === 1 && mended(linked.stderr) && fs.readFileSync(outside, "utf8") === "{\"listed\": {}}\n", "a baseline reached through a link is refused, with its mend, and what it leads to is left as it was", linked.stdout + linked.stderr);
     fs.rmSync(path.join(dir, "checks/strength-baseline.json")); fs.rmSync(outside);
   }
+  // (the shape check's config, whose code it measures, is read only inside the project, wherever the manifest's row
+  // names it: a path that leads out of it, or a link to a file outside, fails with its mend, and nothing of it is read)
+  {
+    const away = scratchDir("strength-away-"), mark = `made-up-${process.pid}`, kept = fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8");
+    fs.writeFileSync(path.join(away, "x.json"), JSON.stringify({ baseline: `${mark}.json`, code: [mark], [mark]: 1 }));
+    const cases = [[path.relative(dir, path.join(away, "x.json")).split(path.sep).join("/"), /lies outside the project/u]];
+    if (process.platform !== "win32") { fs.symlinkSync(path.join(away, "x.json"), path.join(dir, "checks/linked.json")); cases.push(["checks/linked.json", /reached through a link/u]); }
+    const missed = cases.map(([at, said]) => {
+      write("core-manifest.md", `${kept}| *shape check* | \`${at}\` |\n`);
+      const x = run(["--whole"]), out = x.stdout + x.stderr;
+      return x.status === 1 && mended(x.stderr) && said.test(x.stderr) && !out.includes(mark) ? "" : `${at}\n${out}`;
+    }).filter(Boolean);
+    ok(missed.length === 0, "a shape config the manifest names outside the project, or through a link, is refused with its mend, and nothing of what it leads to is read", missed.join("\n"));
+    fs.rmSync(path.join(dir, "checks/linked.json"), { force: true }); write("core-manifest.md", kept);
+  }
   r = run(["--whole"], { STATUS: "Pending" });
   ok(r.status === 1 && mended(r.stderr) && !fs.existsSync(path.join(dir, "checks/strength-baseline.json")), "a whole run that left faults not run writes no baseline, and says the mend", r.stdout + r.stderr);
   r = run(["--whole"]);

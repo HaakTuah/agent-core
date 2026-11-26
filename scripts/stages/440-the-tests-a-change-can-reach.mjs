@@ -20,7 +20,7 @@ export default {
     for (const f of ["test/staged.test.mjs", ".github/workflows/tests-selected.yml"]) fs.rmSync(at(dir, f), { force: true });
   },
   // (as the step words it: a step that selects, with its base, before the tests, which run what it names)
-  mend: dir => write(dir, ".github/workflows/tests-selected.yml", "name: tests-selected\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/install.mjs all\n      - run: node core/scripts/select.mjs --env RUN\n        env:\n          SELECT_BASE: HEAD^1\n      - run: if [ \"$RUN\" = all ]; then node --test; else node --test $RUN; fi\n"),
+  mend: dir => write(dir, ".github/workflows/tests-selected.yml", "name: tests-selected\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n          persist-credentials: false\n      - run: node core/scripts/install.mjs all\n      - run: node core/scripts/select.mjs --env RUN\n        env:\n          SELECT_BASE: HEAD^1\n      - run: if [ \"$RUN\" = all ]; then node --test; else node --test $RUN; fi\n"),
   // (the test and the job that selects go after, so that a later stage of it finds neither: the mutation row stays as
   // the stage wrote it, which no step reads as undone)
   after: dir => {

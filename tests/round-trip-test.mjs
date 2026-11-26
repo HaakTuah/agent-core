@@ -1,7 +1,5 @@
 // The round trips of #1108: in projects the kit writes of each kind the upgrade test holds, each file the kit, a check, a
-// step or a sync writes is read back by each reader of the core's that reads it, to the meaning written. The list:
-// each script that writes a file is a writer here, with where its round trip stands, or named with why no reader of the
-// core reads it in a project.
+// step or a sync writes is read back by each reader of the core's that reads it, to the meaning written.
 //
 //   node tests/round-trip-test.mjs
 import fs from "node:fs";
@@ -38,7 +36,7 @@ const WRITERS = {
   "shape.mjs": ["here", "the shape baseline, read by the shape check and the dose"],
   "dose.mjs": ["here", "the last audit in the shape baseline, read by the dose and the shape check"],
   "holders-own.mjs": ["here", "checks/holders.json, read by holders.mjs --own"],
-  "mutation-tools.mjs": ["tests/mutation-tools-test.mjs", "its row and list"],
+  "mutation-tools.mjs": ["tests/mutation-tools-test.mjs", "its row, list, size marks"],
   "core-reading.mjs": ["here", "checks/core-reading.json, read by its own `due`"],
   "look-keep.mjs": ["here", "an inbox file, read by the inbox's reader"],
   "pointers.mjs": ["tests/names-test.mjs", "checks/names.json, read back as its list"],
@@ -46,11 +44,12 @@ const WRITERS = {
   "screens.mjs": ["tests/screens-test.mjs", "the screens' baseline --write rewrites, read by readBaseline"],
   "strength.mjs": ["tests/strength-test.mjs", "the strength baseline --whole and --lower write, read by the check"],
   "step-writers.mjs": ["tests/steps-write-test.mjs", "read by each step's check"],
+  "sync-pins.mjs": ["tests/steps-write-test.mjs", "the pins put back"],
   "twice.mjs": ["tests/twice-test.mjs", "the workflows and pointers --fix corrects, read again by its YAML reader: nothing exact left"],
 };
 // The scripts that write a file no reader of the core reads in a project, each with why.
 const ELSEWHERE = {
-  "agent-tools-scratch.mjs": "a scratch project for a test", "stage-helpers.mjs": "a test's stage", "steps-kit.mjs": "a test's kit project",
+  "agent-tools-scratch.mjs": "a scratch project for a test", "releases-scratch.mjs": "a test's scratch core", "stage-helpers.mjs": "a test's stage", "steps-kit.mjs": "a test's kit project",
   "licence-scan-stage.mjs": "a test's stage", "nuget-gate-scratch.mjs": "a test's scratch project", "scratch-core.mjs": "a test's scratch folders", "twice-scratch.mjs": "a test's scratch project",
   "check.mjs": "the verdicts, to a file outside every repository, read by release-trial.mjs in the core",
   "checks.mjs": "a job's output (GITHUB_OUTPUT)", "install.mjs": "a job's environment (GITHUB_ENV)", "select.mjs": "a job's output",
@@ -88,7 +87,7 @@ const { tmp, env, git, run, core, pin, project: kitProject } = scratch("round-tr
 const md = await markdownReader();
 const CASES = [
   { args: ["--name", "An npm project", "--npm", "."] },
-  { args: ["--name", "A game (the 2nd), its packages in a folder", "--npm", "web", "--game"] },
+  { args: ["--name", "A game (the 2nd), its packages in a folder", "--npm", "web", "--game", "--pages", "Build (web)", "--versions"] },
   { args: ["--name", "A private .NET project", "--nuget", ".", "--private"], crlf: true },
 ];
 const fenced = text => { let inFence = false; return text.split("\n").map(l => { if (/^ {0,3}(```|~~~)/u.test(l)) { inFence = !inFence; return null; } return inFence ? null : l; }); };
@@ -162,7 +161,7 @@ for (const c of CASES) {
 
   // the manifest's readers: the kit's options, its pin, its copy, its modules
   const k = kind(held);
-  const want = { owner: o.owner, name: o.name, ...(o.packages ? { packages: o.packages } : {}), ...(o.nuget ? { nuget: o.nuget } : {}), ...(o.private ? { private: true } : {}), ...(o.game ? { game: true } : {}) };
+  const want = Object.fromEntries(["owner", "name", "packages", "nuget", "private", "game", "pages", "versions"].filter(key => o[key]).map(key => [key, o[key]]));
   ok(JSON.stringify(k.o) === JSON.stringify(want) && k.pin === pin && !k.unread, `${o.name}: the kind is read back as the kit was given it`, `${JSON.stringify(k)} / ${JSON.stringify(want)}`);
   const line = readCore(held.manifest);
   ok(line.form === "copied" && line.pin === pin && line.path === "core/" && ownerOf(held.manifest) === o.owner && JSON.stringify(differencesOf(held.manifest)) === '["None."]',

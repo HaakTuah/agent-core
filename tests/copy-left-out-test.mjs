@@ -92,6 +92,10 @@ const NOT_CHECKS = {
   "security-review.yml": "its steps run security-review.mjs, pure-sync.mjs, clean-merges.mjs, power.mjs and code-review-wait.mjs, each a row or named here",
   "delete-merged-branches.yml": "it deletes merged branches on the host and checks nothing",
   "look.yml": "it runs on the daily schedule and fails no pull request",
+  "preview.yml": "it runs once a game's build has run, publishes its preview to gh-pages and fails no pull request",
+  "site-publish.sh": "preview.yml runs it to publish a game's built site, and it judges no file of the tree",
+  "versions.yml": "it runs on the monthly schedule and fails no pull request",
+  "versions.mjs": "it runs on the monthly schedule (versions.yml), reads the versions its config names, and fails no pull request",
 };
 for (const [name, from] of [...[...workflows].map(w => [w, "the starter kit"]), ...scripts]) {
   held(rows.has(name) || Object.hasOwn(NOT_CHECKS, name), `${name} (run from ${from}) is a row of the list or named as no check of the copy`,
@@ -119,7 +123,10 @@ const tmp = scratchDir("copy-left-out-test-");
 // (no sign-in reaches a staged check: any variable named as a token, secret, password, credential, key or npm's auth
 // is left out)
 const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$|PR_|BASE_SHA$|CALLER$|CORE_AT$)|_BASE$|TOKEN|SECRET|PASSWORD|CREDENTIAL|_KEY$|_AUTH|^NPM_CONFIG_.*AUTH/iu.test(name)));
-Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid",
+// (an invented account's no-reply address, its id 0, which GitHub gives no account; the personal-terms workflow's
+// pair passes it: #460, point 2)
+const address = `0+t@${["users", "noreply", "github", "com"].join(".")}`;
+Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: address, GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: address,
   GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "core.autocrlf", GIT_CONFIG_VALUE_0: "false" });
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const put = (dir, files) => { for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); } };

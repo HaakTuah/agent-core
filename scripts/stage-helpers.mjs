@@ -6,9 +6,11 @@ import path from "node:path";
 import { CORE } from "./core-address.mjs";
 import { copiesConfig } from "./check-configs.mjs";
 import { project } from "./steps.mjs";
+import { parseBounded } from "./guards.mjs";
 
 export const at = (dir, f) => path.join(dir, f);
 export const read = (dir, f) => fs.readFileSync(at(dir, f), "utf8");
+export const readJson = (dir, f) => parseBounded(read(dir, f));
 export const write = (dir, f, text) => { fs.mkdirSync(path.dirname(at(dir, f)), { recursive: true }); fs.writeFileSync(at(dir, f), text); };
 // The manifest's line "Not taken:" without the module named, the line gone where it names no other.
 export const notTakenWithout = (text, name) => text.replace(/^Not taken: (.*?)\.?(\r?\n|$)/m, (all, items, end) => {
@@ -24,7 +26,7 @@ export const SLOTS = /^(\| Slot \| Here \|\r?\n\| --- \| --- \|\r?\n)/m;
 export const PIN = "0".repeat(40);
 // (whether the project's call to core.yml runs the NuGet check in its one job: #376)
 export const folds = (dir, key) => fs.existsSync(at(dir, ".github/workflows/core.yml")) && new RegExp(`^ {6}${key}: `, "m").test(read(dir, ".github/workflows/core.yml"));
-export const NUGET = `name: nuget\n\non:\n  pull_request:\n\njobs:\n  nuget:\n    uses: ${CORE}/.github/workflows/nuget.yml@${PIN}\n    with:\n      config: checks/licences.json\n`;
+export const NUGET = `name: nuget\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  nuget:\n    uses: ${CORE}/.github/workflows/nuget.yml@${PIN}\n    with:\n      config: checks/licences.json\n`;
 
 // (a suite of the project's own that reads the core's scripts, run on a change to them and to its own code)
 export const SCRIPTS = "name: scripts-staged\n\non:\n  pull_request:\n    paths:\n      - 'src/**'\n      - 'core/scripts/**'\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n";
@@ -42,7 +44,7 @@ export const TWICE = "name: twice-staged\n\non:\n  push:\n\npermissions:\n  cont
 // A job of the tests on a pull request and on a push, which selects them; PASSED is where --passed stands (#457). It
 // names no SELECT_BASE, which the step of the tests a change can reach reads, so that staging this one leaves that
 // one's reading as it was.
-export const PUSHED = "name: tests-pushed\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      checks: read\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/install.mjs all\n      - run: node core/scripts/select.mjs --env RUNPASSED\n        env:\n          SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}\n          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}\n      - run: if [ \"$RUN\" = all ]; then node --test; elif [ \"$RUN\" != none ]; then node --test $RUN; fi\n";
+export const PUSHED = "name: tests-pushed\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      checks: read\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n          persist-credentials: false\n      - run: node core/scripts/install.mjs all\n      - run: node core/scripts/select.mjs --env RUNPASSED\n        env:\n          SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}\n          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}\n      - run: if [ \"$RUN\" = all ]; then node --test; elif [ \"$RUN\" != none ]; then node --test $RUN; fi\n";
 
 // A job of the project's own that starts a suite through the shape check (#733, point 7): TYPES, its trigger's types,
 // and IF, its job's condition, filled in by the stage and the mend.

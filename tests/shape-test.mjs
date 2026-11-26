@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { fileOf, groupOf, LONG, MARKS, notLinked, offBy, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
+import { fileOf, groupOf, LONG, MARKS, notLinked, offBy, parseBaseline, parseConfig, readerOf, scanMend, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
 import { READERS } from "../scripts/shape-readers.mjs";
 import { LARGEST } from "../scripts/tree-walk.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -521,7 +521,7 @@ r = run([]);
 ok(r.status === 1 && mended(r.out) && /--first/.test(r.out), "a config with no baseline fails, saying how the first is written", r.out);
 r = run(["checks/shape.json", "--first"]);
 const baseline = () => JSON.parse(fs.readFileSync(path.join(dir, "checks/shape-baseline.json"), "utf8"));
-ok(r.status === 0 && same(Object.keys(baseline().listed), ["function: src/rules/index.js#tall"]) && same(baseline().listed["function: src/rules/index.js#tall"], { lines: 100, depth: 0, branches: 0 }), "--first lists what stands, its numbers and no line", r.out);
+ok(r.status === 0 && same(Object.keys(baseline().listed), ["function: src/rules/index.js#tall"]) && same(baseline().listed["function: src/rules/index.js#tall"], { lines: 100, depth: 0, branches: 0 }) && r.out.includes(`note checks/shape-baseline.json names the project's files by path. Mend: ${scanMend("checks/shape-baseline.json")}`), "--first lists what stands, its numbers and no line, and says what a project's own scan of paths named does about the baseline (#1289)", r.out);
 ok(run(["checks/shape.json", "--first"]).status === 1 && mended(run(["checks/shape.json", "--first"]).out), "--first writes no second baseline");
 commit("the shape check, with its first baseline");
 git("branch", "base");
@@ -549,11 +549,12 @@ r = run([], { SHAPE_BASE: "base" });
 ok(r.status === 1 && mended(r.out) && /neither listed nor held/.test(r.out), "an entry written into the baseline by hand, of code the base did not hold, fails against the base", r.out);
 git("checkout", "-q", "base", "--", "checks/shape-baseline.json");
 r = run(["--write"]);
-ok(r.status === 0 && same(Object.keys(baseline().listed), ["function: src/rules/index.js#tall"]) && baseline().listed["function: src/rules/index.js#tall"].lines === 80 && /passes? a mark/.test(run([], { SHAPE_BASE: "base" }).out),
-  "taken back as the base holds it and lowered, the baseline holds no more than before: --write never adds, and the new function fails as new", r.out);
+ok(r.status === 0 && same(Object.keys(baseline().listed), ["function: src/rules/index.js#tall"]) && baseline().listed["function: src/rules/index.js#tall"].lines === 80 && !/names the project's files by path/.test(r.out) && /passes? a mark/.test(run([], { SHAPE_BASE: "base" }).out),
+  "taken back as the base holds it and lowered, the baseline holds no more than before: --write never adds, and the new function fails as new, and no note of paths is printed", r.out);
 fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), JSON.stringify({ grown: { "function: src/rules/index.js#wide": "a table of the standard, read as one" }, listed: baseline().listed }));
 r = run(["--write"]);
-ok(r.status === 0 && baseline().listed["function: src/rules/index.js#wide"].lines === 70 && run([], { SHAPE_BASE: "base" }).status === 0, "but for one \"grown\" gives a reason for, which then passes against the base", r.out);
+ok(r.status === 0 && baseline().listed["function: src/rules/index.js#wide"].lines === 70 && run([], { SHAPE_BASE: "base" }).status === 0 && r.out.includes(`note checks/shape-baseline.json names the project's files by path. Mend: ${scanMend("checks/shape-baseline.json")}`),
+  "but for one \"grown\" gives a reason for, which then passes against the base, the entry it added printing the note of paths (#1289)", r.out);
 commit("a function with its reason");
 git("branch", "-f", "base");
 put("checks/shape.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"uses": [\n        "rules"\n      ]', '"uses": []'));
@@ -661,6 +662,25 @@ if (process.platform !== "win32") { // (a link is made without a privilege only 
     "a baseline that is a link is neither read nor written through", run([]).out);
   fs.rmSync(path.join(dir, "checks/shape-baseline.json"));
   fs.renameSync(path.join(dir, "elsewhere.json"), path.join(dir, "checks/shape-baseline.json"));
+}
+
+// (the config itself is read only inside the project, wherever the manifest's row names it: a path that leads out of
+// it, or a link at the file or at a folder on its way, fails with its mend, and nothing of what it leads to is read)
+{
+  const away = scratchDir("shape-away-"), mark = `made-up-${process.pid}`, rules = path.join(dir, "core-manifest.md");
+  fs.writeFileSync(path.join(away, "x.json"), JSON.stringify({ baseline: `${mark}.json`, code: [mark], [mark]: 1 }));
+  const kept = fs.existsSync(rules) ? fs.readFileSync(rules, "utf8") : null, named = at => put("core-manifest.md", `| *shape check* | \`${at}\` |\n`);
+  const refusedAs = (at, said) => { named(at); const x = run([]); return x.status === 1 && mended(x.out) && said.test(x.out) && !x.out.includes(mark) ? "" : x.out; };
+  const cases = [[path.relative(dir, path.join(away, "x.json")).split(path.sep).join("/"), /lies outside the project/u], ["checks/../../x.json", /lies outside the project/u]];
+  if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)
+    fs.symlinkSync(path.join(away, "x.json"), path.join(dir, "checks/linked.json"));
+    fs.symlinkSync(away, path.join(dir, "away"));
+    cases.push(["checks/linked.json", /reached through a link \(checks\/linked\.json\)/u], ["away/x.json", /reached through a link \(away\)/u]);
+  }
+  const missed = cases.map(([at, said]) => [at, refusedAs(at, said)]).filter(([, out]) => out !== "");
+  ok(missed.length === 0, "a config the manifest names outside the project, or through a link at the file or a folder on its way, is refused with its mend, and nothing of what it leads to is read", missed.flat().join("\n"));
+  for (const f of ["checks/linked.json", "away"]) fs.rmSync(path.join(dir, f), { force: true });
+  if (kept === null) fs.rmSync(rules); else fs.writeFileSync(rules, kept);
 }
 
 // (an entry an earlier pull request mended and left listed lists nothing in its place, --write told the base: #751's

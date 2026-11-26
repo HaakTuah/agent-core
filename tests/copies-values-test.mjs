@@ -105,6 +105,15 @@ try {
     "a pattern of a script written into another fails, naming the first, with its mend", r.out);
   drop("src/other.mjs");
 
+  // (a pattern that holds an address's sign-in, made up and built from pieces, its "@" past where the value is cut short)
+  const user = ["made", "up"].join("-"), pass = ["not", "a", "pass"].join("_"), padded = "a".repeat(80);
+  const SIGNED = `/^https:\\/\\/${user}:${pass}${padded}@example\\.invalid\\/[a-z]+$/u`;
+  put("src/signed.mjs", `export const A = ${SIGNED};\n`); put("src/signed-too.mjs", `export const B = ${SIGNED};\n`);
+  r = check({ COPIES_BASE: base });
+  ok(r.status === 1 && r.out.includes("FAIL: a value written twice: /^https:\\/\\/example\\.invalid") && !r.out.includes(user) && !r.out.includes(pass),
+    "a value written twice is printed with its address's sign-in cut out before it is cut short", r.out.replaceAll(user, "<user>").replaceAll(pass, "<pass>"));
+  drop("src/signed.mjs"); drop("src/signed-too.mjs");
+
   // (a value moved, from one file to another, passes: the places do not grow)
   fs.renameSync(path.join(dir, "deploy.sh"), path.join(dir, "release.sh"));
   r = check({ COPIES_BASE: base });
@@ -160,6 +169,18 @@ try {
   config({ twice: { [OTHER]: "said long ago" } });
   r = check({ COPIES_BASE: base });
   ok(r.status === 0 && r.out.includes(`note checks/copies.json's "twice" names ${OTHER.slice(0, 12)}..., which no longer stands in two files: take it out of "twice"`), "a value said that no longer stands twice is noted, failing nothing", r.out);
+  // (a config git does not list yet, named by another spelling of the project's folder than git's root, as Windows' short
+  // names are of its long ones (RUNNER~1): its own exclusion still points inside the project, not above it; #1224)
+  const spelled = path.join(path.dirname(dir), `${path.basename(dir)}-link`);
+  try {
+    fs.symlinkSync(dir, spelled, process.platform === "win32" ? "junction" : "dir");
+    g("rm", "-q", "--cached", "checks/copies.json");
+    const s = spawnSync(process.execPath, ["core/scripts/copies.mjs", path.join(spelled, "checks/copies.json")], { cwd: dir, encoding: "utf8", env: { ...process.env, COPIES_BASE: base } });
+    ok(s.status === 0 && !/outside repository|could not read the values/.test(`${s.stdout}${s.stderr}`), "a config git does not list, named through another spelling of the project's folder, is excluded from the values by its path inside the project", `${s.stdout}${s.stderr}`);
+    g("add", "-A");
+  } catch (e) {
+    ok(false, "a config named through another spelling of the project's folder could be tried", String(e.message));
+  } finally { fs.rmSync(spelled, { recursive: true, force: true }); }
   // (a pathspec git cannot read fails with its mend, never a stack)
   config({ tests: [":(bogus)test/"] });
   r = check({ COPIES_BASE: base });

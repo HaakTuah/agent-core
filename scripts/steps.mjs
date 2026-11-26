@@ -6,7 +6,9 @@
 //     with no rule file open;
 //   - "held": a check of the project's own, named, fails where the step is not done, and its failure says the mend;
 //   - "unread": no check reads it exactly, and the step says why; the staged case "steps" plants it and reads what a
-//     session did, or says why it cannot (staged/steps.mjs, beside this file);
+//     session did, or says why it cannot (staged/steps.mjs, beside this file). Where a tool fetched at set-up alone reads
+//     it, the step gives as well "fetched", the variables the tool's set-up script sets and the check run where the
+//     session's environment holds each, as "check" is (step-checks-fetched.mjs; #1095, point 4); elsewhere it stays unread;
 //   - "host": its state is GitHub's, not a file's, and a check reads it from what GitHub answered (host.mjs and
 //     step-checks-host.mjs, beside this file; #1092), run where the host was read (the daily look, and host.mjs at a
 //     sync) and left out elsewhere; one GitHub gave no answer for is said not read, never done or missing.
@@ -24,8 +26,10 @@
 //   node core/scripts/steps.mjs                  from a project's root: the steps not done, each with its mend; nothing else
 //   node core/scripts/steps.mjs --write          each writer of a step not done run, and what it wrote listed, for a pull
 //                                                request of its own with the usual reviews
-//   node core/scripts/steps.mjs --write --aside  the same, then what it wrote set aside in a stash, as the sync runs it,
-//                                                so the sync's pull request stays a pure sync (sync.mjs, beside this file)
+//   node core/scripts/steps.mjs --write --aside  the same, then what it wrote set aside in a stash named by the pin and
+//                                                the time, as the sync runs it, so the sync's pull request stays a pure
+//                                                sync (sync.mjs, beside this file)
+//   node core/scripts/steps.mjs --done           the leads of the steps read done, as JSON, for the sync's report
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -38,7 +42,9 @@ import { started } from "./started.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { copyAt } from "./workflow-calls.mjs";
 import { HERE, mendAt, plain, shown } from "./step-checks.mjs";
-import { MANIFEST, held, pinBack, pinOf } from "./step-writers.mjs";
+import { Busy, held } from "./step-writers.mjs";
+import { ASIDE, asideName, pinsBack, pinsOf, stashed } from "./sync-pins.mjs";
+import { installed, listed, notInstalled } from "./packages.mjs";
 
 // What a step reads a project with, and the words of an error with no path of the machine's in them: step-checks.mjs
 // and the files named step-checks-<what it reads>.mjs, beside this file.
@@ -79,6 +85,9 @@ export const STEPS = await Promise.all(fs.readdirSync(FOLDER).filter(f => f.ends
 // Whether the manifest declares a step undone on purpose: a line of its "Differences" that quotes the step's lead.
 export const declared = (p, step) => p.differences.some(l => l.includes(`"${step.lead}"`));
 
+// A step's check run where the session fetched its tools ("fetched"), or null where one is not there.
+export const fetched = (step, env = process.env) => step.fetched?.tools.every(t => env[t]) ? step.fetched.check : null;
+
 // The steps not done in the project at `root`: each { lead, owner, cost, mend }. A check that throws is not read as
 // done: it is reported, with what went wrong. `host`, what GitHub answered (host.mjs's readHost), runs the steps read on
 // the host too; one of those that cannot read what it needs is listed in `hostUnread`, { lead, why }, and not reported.
@@ -89,11 +98,11 @@ export function notDone(root, steps = STEPS, host = null) {
   const mine = p.files.filter(f => !f.startsWith(copy)), own = at => mine.some(f => f === at || f.startsWith(`${at}/`));
   const out = [], hostUnread = [];
   for (const step of steps) {
-    const read = step.check ?? (host && step.host ? q => step.host(q, host) : null);
+    const local = step.check ?? fetched(step), read = local ?? (host && step.host ? q => step.host(q, host) : null);
     if (!read || declared(p, step)) continue;
     let mend, unread = false;
     try { mend = read(p); } catch (e) {
-      if (!step.check) { hostUnread.push({ lead: step.lead, why: plain(e.message, root) }); continue; }
+      if (!local) { hostUnread.push({ lead: step.lead, why: plain(e.message, root) }); continue; }
       unread = true; mend = `Its check could not read the project (${plain(e.message, root)}): read its entry in \`core/${NOTES_FOLDER}/\` against it.`;
     }
     // (the entries and the checks say core/, the starter kit's path for the copy; a project that keeps it elsewhere is
@@ -105,6 +114,14 @@ export function notDone(root, steps = STEPS, host = null) {
   out.copy = copy;
   try { out.nothing = readNothing(p.root, p.manifest, p.read); } catch (e) { out.nothing = null; out.nothingWhy = plain(e.message, root); }
   return out;
+}
+
+// The leads of the steps a check of the project's own reads done at `root`: the sync gives each such entry of the notes
+// by its lead alone (sync.mjs; #1264, point 2). A step read on the host alone, by no check, by one that leaves a part to
+// a review (`partly`), or that the manifest's "Differences" leaves undone, is none, and its entry is given in full.
+export function doneLeads(root, steps = STEPS) {
+  const p = project(root), missed = new Set(notDone(root, steps).map(m => m.lead));
+  return steps.filter(s => !declared(p, s) && (s.check ?? fetched(s)) && !s.partly && !missed.has(s.lead)).map(s => s.lead);
 }
 
 // The report a sync prints for its pull request's description: the steps not done, and nothing where all are; and the
@@ -122,10 +139,12 @@ function steps(missed) {
 }
 
 // Each writer of a step not done in the project at `root` run, in the steps' order, and the step read again after it:
-// each { lead, wrote (the files it wrote), mend (what is left of the step, null where it is done now) } or { lead, why }
-// where it wrote nothing (it could not run, or its check could not read the project). A step the manifest declares
-// undone on purpose, or done already, is left; a file with changes not yet committed when the run began is never written.
-export function written(root, steps = STEPS) {
+// each { lead, wrote (the files it wrote), mend (what is left of the step, null where it is done now), left (its step's
+// `left`, which no check reads and never throws; #1289) } or { lead, why } where it wrote nothing (it could not run, or its
+// check could not read the project). A step the manifest declares undone on purpose, or done already, is left; a file
+// with changes not yet committed when the run began is never written. `merge`, last, the one process's key-merge mode
+// (converge.mjs, `merged`; #1095, point 5), given so, since that script reads the project with this one.
+export function written(root, steps = STEPS, merge = null) {
   const busy = held(root), copy = copyAt(project(root)), out = [];
   // (a writer runs the copy's own scripts and reads what the copy holds: this script must be the copy's)
   if (path.resolve(root, copy) !== HERE) throw new Error(`the writers run only as the copy's own script, from the project's root: node ${copy}scripts/steps.mjs --write`);
@@ -134,55 +153,83 @@ export function written(root, steps = STEPS) {
     if (declared(p, step)) continue;
     try { if (step.check && !step.check(p)) continue; } catch (e) { out.push({ lead: step.lead, why: `its check could not read the project (${plain(e.message, root)})` }); continue; }
     let wrote;
-    try { wrote = step.write(p, busy); } catch (e) { out.push({ lead: step.lead, why: lower(plain(e.message, root)) }); continue; }
+    try { wrote = step.write(p, busy); } catch (e) { out.push({ lead: step.lead, why: lower(plain(e.message, root)), ...(e instanceof Busy ? { busy: e.file } : {}) }); continue; }
     if (!wrote.length) continue;
     let mend;
     try { mend = step.check ? step.check(project(root)) : null; } catch (e) { mend = `its check could not read the project after it (${plain(e.message, root)})`; }
-    out.push({ lead: step.lead, wrote, mend: mend && mendAt(mend, copy, own) });
+    out.push({ lead: step.lead, wrote, mend: mend && mendAt(mend, copy, own), left: step.left?.(project(root)) });
   }
-  return out;
+  return merge ? [...out, ...merge(root, busy)] : out;
 }
 
 // What --write prints: each step written, with its files and what is left of it, and each it could not write, with why;
-// `how` "aside" where they stand in the stash ASIDE, "put back" where git could not make one and each was put back.
-export function writeReport(done, how = null) {
+// `how` "aside" where they stand in the stash `name` (asideName), "put back" where git could not make one and each was put back,
+// "again" where, at a sync, a writer was kept from a file the sync left with changes not yet committed, and each was put
+// back so that all are written once the sync merges (#1259, point 2).
+export function writeReport(done, how = null, name = ASIDE) {
   if (!done.length) return "No step left a script could write (`core/scripts/steps.mjs --write`).";
   const kept = " No word of a rule's text is written, but a pointer's path and the manifest's module lines.", later = "once this sync's pull request merges, on a fresh branch from `main`,";
-  const head = !done.some(d => d.wrote?.length) ? "The steps' writers wrote nothing (`core/scripts/steps.mjs --write`)."
-    : how === "aside" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), then set aside in the stash "${ASIDE}", so this sync stays a pure one: ${later} run \`git stash list\` and \`git stash pop stash@{N}\`, N the number it gives the stash "${ASIDE}" (or \`node core/scripts/steps.mjs --write\` again, which writes the same) and commit them in a pull request of its own, with the usual reviews.${kept}`
+  const wrote = done.some(d => d.wrote?.length);
+  if (how === "again") return [`${wrote ? "Written by the steps' writers (`core/scripts/steps.mjs --write`), and put back as they stood" : "The steps' writers wrote nothing (`core/scripts/steps.mjs --write`)"}, since a file a writer writes holds changes not yet committed, as this sync leaves it: ${later} run \`node core/scripts/steps.mjs --write\`, which writes then what each wrote or would write here, and commit it in a pull request of its own, with the usual reviews.${kept}`,
+    ...done.map(d => d.busy ? `- ${d.lead}: to write once this sync merges, since \`${shown(d.busy)}\` has changes not yet committed.` : d.why ? `- ${d.lead}: wrote nothing, since ${d.why}.` : `- ${d.lead}: to write once this sync merges (\`core/scripts/steps.mjs --write\` wrote ${d.wrote.map(f => `\`${shown(f)}\``).join(", ")}, and it was put back).`)].join("\n");
+  const head = !wrote ? "The steps' writers wrote nothing (`core/scripts/steps.mjs --write`)."
+    : how === "aside" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), then set aside in the stash "${name}", so this sync stays a pure one: ${later} run \`git stash list\` and \`git stash pop stash@{N}\`, N the number it gives the stash "${name}", never another of the writers' from an earlier run (or \`node core/scripts/steps.mjs --write\` again, which writes the same) and commit them in a pull request of its own, with the usual reviews.${kept}`
     : how === "put back" ? `Written by the steps' writers (\`core/scripts/steps.mjs --write\`), and put back as they stood, since git could not set them aside, so this sync stays a pure one: ${later} run \`node core/scripts/steps.mjs --write\` and commit what it writes in a pull request of its own, with the usual reviews.${kept}`
     : `Written by the steps' writers (\`core/scripts/steps.mjs --write\`): commit them in a pull request of their own, with the usual reviews.${kept}`;
-  return [head, ...done.map(d => d.why ? `- ${d.lead}: wrote nothing, since ${d.why}.` : `- ${d.lead}: wrote ${d.wrote.map(f => `\`${shown(f)}\``).join(", ")}${d.mend ? `; still to do: ${d.mend}` : "; the step is done"}.`)].join("\n");
+  return [head, ...done.map(d => d.why ? `- ${d.lead}: wrote nothing, since ${d.why}.` : `- ${d.lead}: wrote ${d.wrote.map(f => `\`${shown(f)}\``).join(", ")}${d.mend ? `; still to do: ${d.mend}` : "; the step is done"}${d.left ? `; left to the project: ${d.left}` : ""}.`)].join("\n");
 }
 // What the writers wrote set aside in a stash, so the tree stands as it stood before them; where git cannot make one (no
 // name to make it under, a file it refuses), each file put back as it stood, and false: a file git holds taken back from
 // its last commit, index and tree, since a writer writes none with changes not yet committed, and a new one taken out.
-// Paths are read as written, never as patterns. The manifest's `Core:` line as it stood is put back after either, so a
-// pin the sync moved stays in its pull request (#1094). (`push`, git's own, is given another only by the test, to fail.)
-export function setAside(root, files, push = () => execFileSync("git", ["--literal-pathspecs", "stash", "push", "--include-untracked", "--quiet", "-m", ASIDE, "--", ...files], { cwd: root, stdio: ["ignore", "ignore", "pipe"] })) {
-  const pin = files.includes(MANIFEST) ? pinOf(root) : null;
+// Paths are read as written, never as patterns. The pins as they stood, the manifest's `Core:` line and each call to the
+// core's workflows, are put back after either, so a pin the sync moved stays in its pull request (#1094; #1248, point 4). (`push`, git's own, is given another only by the test, to fail.)
+export function setAside(root, files, push = stashed(root, files, ASIDE)) {
+  const pins = pinsOf(root, files), back = () => {
+    for (const f of pinsBack(root, pins)) console.log(`note ${f}: the sync's pins in it were not put back, since the writers changed how many it holds. Mend: set its \`Core:\` line and each call to the core's workflows to the commit the sync moved the core's copy to, before the sync's pull request is committed`);
+  };
   try {
     push();
-    pinBack(root, pin);
+    back();
     return true;
   } catch {
     const tracked = execFileSync("git", ["--literal-pathspecs", "ls-tree", "-r", "-z", "--name-only", "HEAD", "--", ...files], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
     execFileSync("git", ["--literal-pathspecs", "reset", "-q", "--", ...files], { cwd: root, stdio: "ignore" });
     if (tracked.length) execFileSync("git", ["--literal-pathspecs", "checkout", "-q", "HEAD", "--", ...tracked], { cwd: root, stdio: "ignore" });
     for (const f of files.filter(f => !tracked.includes(f))) fs.rmSync(path.join(root, f), { force: true });
-    pinBack(root, pin);
+    back();
     return false;
   }
 }
 const lower = text => text.replace(/^[A-Z](?=[a-z ])/u, c => c.toLowerCase());
-export const ASIDE = "the steps' writes (#1091)";
+export { ASIDE };
 
-if (started(import.meta.url) && process.argv.includes("--write")) {
-  try {
-    const root = process.cwd(), done = written(root), aside = process.argv.includes("--aside"), files = [...new Set(done.flatMap(d => d.wrote ?? []))];
-    console.log(writeReport(done, !aside || !files.length ? null : setAside(root, files) ? "aside" : "put back"));
-  } catch (e) {
+// The one line said in place of the steps where the core's packages their readers load are not there, installed first in
+// a copy (packages.mjs), or null where each is: the steps are then read by none, never each said unread for want of one
+// (#1095, point 2).
+export function packagesFirst() {
+  const lacking = listed().find(n => !installed(n));
+  return lacking ? `The steps were not read: ${notInstalled(lacking).replace(/\.$/u, "")}.` : null;
+}
+
+// (the key-merge mode's script reads the project with this one, so it is loaded once this one has run, never awaited
+// while it runs, which would wait on itself)
+const stop = started(import.meta.url) ? packagesFirst() : null;
+if (stop) { if (!process.argv.includes("--aside")) console.log(stop); } // (the sync's run of the writers, after the steps', does not say it twice)
+else if (started(import.meta.url) && process.argv.includes("--write")) {
+  import("./converge.mjs").then(({ merged }) => {
+    const root = process.cwd(), done = written(root, STEPS, merged), aside = process.argv.includes("--aside"), files = [...new Set(done.flatMap(d => d.wrote ?? []))];
+    // (at a sync, a writer kept from a file the sync changed: all are put back, never a part set aside, and written once it merges)
+    const again = aside && done.some(d => d.busy);
+    if (again && files.length) setAside(root, files, () => { throw new Error("put back: written again once the sync merges"); });
+    const name = asideName(root);
+    console.log(writeReport(done, again ? "again" : !aside || !files.length ? null : setAside(root, files, stashed(root, files, name)) ? "aside" : "put back", name));
+  }).catch(e => {
     console.error(`FAIL: the steps' writers could not run here (${plain(e.message)}). Mend: run it as the copy's own script, node core/scripts/steps.mjs --write, from the project's root, a git repository`);
+    process.exitCode = 1;
+  });
+} else if (started(import.meta.url) && process.argv.includes("--done")) {
+  try { console.log(JSON.stringify(doneLeads(process.cwd()))); } catch (e) {
+    console.error(`FAIL: the steps could not be read here (${plain(e.message)}): run it from the project's root, a git repository`);
     process.exitCode = 1;
   }
 } else if (started(import.meta.url)) {

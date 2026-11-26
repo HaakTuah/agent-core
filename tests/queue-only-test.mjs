@@ -13,7 +13,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { changed, formFault, formOf, judge, namesPoints, rulesHere, typed } from "../scripts/queue-only.mjs";
+import { changed, formFault, formOf, judge, namesPoints, printed, rulesHere, typed } from "../scripts/queue-only.mjs";
 import { ruleFiles } from "../scripts/rule-files.mjs";
 import { linesOf } from "../scripts/queue.mjs";
 
@@ -134,6 +134,10 @@ ok([38, 39, 40, 41].every((n) => not(of(`@@ -1 +1,2 @@\n+${row(n)}`), "carries t
 // fall: a reading that backtracks out of step, as one did, takes some 2^118 steps over this line, and never ends)
 const slow = `- #1${"\t&".repeat(118)}`, slowFault = formFault(slow, formOf("- #5 builder\n"));
 ok(slow.length === 240 && /^says "& & &/u.test(String(slowFault)), "a line of 240 characters of joins with no issue after them is read, and its joins are its text", String(slowFault));
+// (a refusal that quotes a line the pull request adds prints it as text alone, no workflow command read in it; #1348)
+const marked = printed({ head: null, why: formFault("- #1 ::a ##[group]b :\u00e9: #\u00e9#[c", formOf("- #5 builder\n")) });
+ok(/^not queue-only: says ": :a # #\[group\]b /u.test(marked.out) && !/:[^\0-\x7f]*:|#[^\0-\x7f]*#[^\0-\x7f]*\[/u.test(marked.out) && marked.err === null
+  && printed({ head: "a".repeat(40), why: "q::\nx" }).err === "q: :?x", "an added line quoted in a refusal, or in a proof's reason, is printed with no workflow command in it", marked.out);
 ok(changed({ patch: "@@ -1 +1 @@\n-a\n+b\n c", additions: 1, deletions: 1 })?.added.join() === "b" && changed({ patch: "", additions: 0, deletions: 0 }) === null
   && changed({ patch: "diff --git", additions: 0, deletions: 0 }) === null && changed(undefined) === null, "a patch's lines are read from GitHub's form alone");
 ok(changed({ patch: "@@ -1 +1,2 @@\n+a", additions: 2, deletions: 0 }) === null && changed({ patch: "@@ -1 +1 @@\n-a\n+b", additions: 1, deletions: 2 }) === null

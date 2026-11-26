@@ -9,6 +9,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KEPT, copyTree, coreIsFolder, entries, executable, recordModes } from "../scripts/copy-tree.mjs";
+import { untar } from "../scripts/releases.mjs";
+import { install } from "../scripts/sync.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -169,6 +171,31 @@ ok(lines.includes("/tests export-ignore") && astray.length === 0, "every test of
 const tool = (file) => /^tests\/mutation\/(?:package\.json|package-lock\.json|\.npmrc)$/.test(file);
 const strays = tracked.filter((file) => file.startsWith("tests/") && !/^tests\/[^/]+-test\.mjs$/.test(file) && !tool(file));
 ok(strays.length === 0, "tests/ holds the core's tests alone, and the package files of the core's own mutation tool, so nothing a project runs can lean on a file the copy leaves out (#614)", strays.join(" "));
+
+// the core's archive unpacked into a folder whose path tar would misread were it given: GNU tar unquotes a backslash's
+// escape in it (`kits\now` as Windows writes the path, a line's end), and Windows' own tar knows no --force-local (#1212)
+{
+  const tmp = scratchDir("untar-"), from = path.join(tmp, "from");
+  fs.mkdirSync(from);
+  fs.writeFileSync(path.join(from, "f"), "unpacked\n");
+  const into = process.platform === "win32" ? path.join(tmp, "kits", "now") : path.join(tmp, "kits\\now", "a:b");
+  fs.mkdirSync(into, { recursive: true });
+  let read = null;
+  try { untar(into, execFileSync("tar", ["-c", "-f", "-", "f"], { cwd: from })); read = fs.readFileSync(path.join(into, "f"), "utf8"); } catch (e) { read = String(e.stderr ?? e); }
+  ok(read === "unpacked\n", "an archive is unpacked into a folder whose path holds a backslash's escape and a colon", read);
+}
+
+// the note a sync prints where the copy's packages cannot be installed says so and gives its mend, with no line of the
+// installer's own, which can name a path of the machine and goes into the sync pull request's description (#1200)
+{
+  const dir = path.join(tmp, "install-copy");
+  fs.mkdirSync(path.join(dir, "scripts"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "scripts", "install.mjs"), 'console.error("install error A complete log of this run can be found in: /home/someone/.npm/_logs/x-debug-0.log"); process.exit(1);\n');
+  const said = []; const log = console.log; console.log = (...a) => said.push(a.join(" "));
+  try { install(dir); } finally { console.log = log; }
+  const note = said.join("\n");
+  ok(/not installed/.test(note) && / Mend: .*install\.mjs/.test(note) && !/someone|_logs|install error/.test(note), "a failing install leaves the installer's own line, and the path in it, out of the sync's note, which still says it failed and its mend", note);
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);
