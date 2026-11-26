@@ -15,10 +15,10 @@ export function answerOf(text, sha) {
   const line = String(text).split("\n").map(l => l.trimEnd()).filter(l => l.startsWith(LINE)).at(-1);
   let a = null;
   try { a = JSON.parse(line.slice(LINE.length)); } catch { /* (none, or not read) */ }
-  // (an answer for another commit is refused whatever its form, never counted not proved)
-  if (typeof a?.commit === "string" && a.commit !== sha) return { why: `answers for ${a.commit.slice(0, 7)}, not the commit tried, ${sha.slice(0, 7)}` };
-  if (a === null || typeof a !== "object" || typeof a.pure !== "boolean" || !FROM.test(String(a.from))) return { none: true, why: `holds no line \`${LINE}\` as pure-sync.mjs --trial prints it` };
-  if (a.commit !== sha) return { why: `answers for ${String(a.commit).slice(0, 7)}, not the commit tried, ${sha.slice(0, 7)}` };
+  // (an answer that names another commit is refused whatever its form, never counted not proved; one that names none
+  // is no answer in its form)
+  if (a !== null && typeof a === "object" && Object.hasOwn(a, "commit") && a.commit !== sha) return { why: `answers for ${String(a.commit).slice(0, 7)}, not the commit tried, ${sha.slice(0, 7)}` };
+  if (a === null || typeof a !== "object" || a.commit !== sha || typeof a.pure !== "boolean" || !FROM.test(String(a.from))) return { none: true, why: `holds no line \`${LINE}\` as pure-sync.mjs --trial prints it` };
   return { answer: { pure: a.pure, from: a.from } };
 }
 

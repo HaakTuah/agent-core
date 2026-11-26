@@ -104,8 +104,10 @@ const { tmp, git } = scratchCore("release-trial-test-");
   const elsewhereNoForm = path.join(tmp, "elsewhere-no-form.txt");
   fs.writeFileSync(elsewhereNoForm, `trial answer: ${JSON.stringify({ commit: tried, pure: "yes", from: "a project" })}\n`);
   const [unreadFile, other, otherNoForm, never] = [answersOf([path.join(tmp, "not-there.txt")], later, 1), answersOf([elsewhere], later, 1), answersOf([elsewhereNoForm], later, 1), answersOf([], later, 1)];
-  ok(/not-there\.txt, given with --sync for project 1, cannot be read/.test(unreadFile.why) && [other, otherNoForm].every(o => /answers for [0-9a-f]{7}, not the commit tried/.test(o.why)) && /given with no --sync after them/.test(never.why),
-    "  and a file not read, an answer for another commit, in its form or not, and a reading never asked are refused all the same", [unreadFile, other, otherNoForm, never].map(r => r.why).join("\n"));
+  const otherKinds = [null, 7, { sha: later }].map(commit => answerOf(`trial answer: ${JSON.stringify({ commit, pure: true, from: "main" })}`, later)), noCommit = answerOf(`trial answer: ${JSON.stringify({ pure: true, from: "main" })}`, later);
+  ok(/not-there\.txt, given with --sync for project 1, cannot be read/.test(unreadFile.why) && [other, otherNoForm].every(o => /answers for [0-9a-f]{7}, not the commit tried/.test(o.why)) && /given with no --sync after them/.test(never.why)
+    && otherKinds.every(o => !o.none && /not the commit tried/.test(o.why)) && noCommit.none === true,
+    "  and a file not read, an answer for another commit, in its form or not and whatever names it, and a reading never asked are refused all the same; one naming no commit is no answer", [unreadFile, other, otherNoForm, never].map(r => r.why).join("\n"));
   const unprovedSaid = trialAt(record(trialRecord(later, "2026-11-23", [one, one], counted.answers.slice(0, 2), [...OTHER, ...OTHER])), read);
   ok(unprovedSaid.held === null && /1 of the syncs pure, 1 not, 1 of them not proved, their reading holding no answer;/.test(unprovedSaid.said), "  the record counts the syncs not proved apart and says them, holding no cut", unprovedSaid.said);
   const unprovedNoForm = [{ ...readings, syncUnproved: 2 }, { ...readings, syncUnproved: -1 }, { ...readings, syncUnproved: "one" }].map(bad => trialAt(record(bad), read));
