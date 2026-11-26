@@ -163,77 +163,57 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
   }
 }
 
-// A lock file named in another case than npm's own is read since #1349: where the pull request's base held it, it is
-// reported and passes; one the pull request adds, or any with no base to read, fails.
-{
-  const dir = scratchDir("licence-scan-case-");
+// A scratch repository of the cases below: its folder, git run in it with no account's own settings, and `put`, which
+// writes a file (its folders too) and stages it.
+const scratchRepo = (prefix) => {
+  const dir = scratchDir(prefix);
   const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
   const git = (...args) => execFileSync("git", args, { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] });
-  const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); git("add", "-A"); };
+  git("init", "-q");
+  return { dir, git, put: (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); git("add", "-A"); } };
+};
+
+// A lock file named in another case than npm's own is read since #1349: where the pull request's base held it, it is
+// reported and passes; one the pull request adds, or any with no base to read, fails; so with a folder of that name at the base.
+{
+  const { dir, git, put } = scratchRepo("licence-scan-case-");
   const config = { ships: [], lockfiles: [], audit: "audit.json", scan: { served: [], skip: [] } };
-  const said = (r, list) => list.some((m) => m.startsWith("tools/Package-Lock.json installs packages"));
+  const said = (list) => list.some((m) => m.startsWith("tools/Package-Lock.json installs packages"));
   try {
-    git("init", "-q");
     put("audit.json", JSON.stringify({ entries: [] }));
     git("commit", "-q", "-m", "base");
     put("tools/Package-Lock.json", "{}"); git("commit", "-q", "-m", "a lock file in another case");
     put("README.md", "a change of its own\n"); git("commit", "-q", "-m", "c");
     let r = licenceCheck(config, dir, "HEAD^1", config);
-    ok(!said(r, r.failures) && said(r, r.reports), "a lock file of another case that stood at the base is reported and passes", JSON.stringify(r));
+    ok(!said(r.failures) && said(r.reports), "a lock file of another case that stood at the base is reported and passes", JSON.stringify(r));
     r = licenceCheck(config, dir, "HEAD^1", { ...config, lockfiles: ["tools/Package-Lock.json"] });
-    ok(said(r, r.failures), "and one the base's config named fails when the pull request takes it out of the config"
-      , JSON.stringify(r));
-    r = licenceCheck(config, dir, "HEAD^2", config);
-    ok(said(r, r.failures), "and one the pull request adds fails", JSON.stringify(r));
-    r = licenceCheck(config, dir, null, config);
-    ok(said(r, r.failures), "and so does one with no base to read it against", JSON.stringify(r));
+    ok(said(r.failures), "and one the base's config named fails when the pull request takes it out of the config", JSON.stringify(r));
+    ok(said(licenceCheck(config, dir, "HEAD^2", config).failures), "and one the pull request adds fails");
+    ok(said(licenceCheck(config, dir, null, config).failures), "and so does one with no base to read it against");
+    git("reset", "-q", "--hard", "HEAD~2"); put("tools/Package-Lock.json/README.md", "x"); git("commit", "-q", "-m", "a folder");
+    git("rm", "-rq", "tools/Package-Lock.json"); put("tools/Package-Lock.json", "{}"); git("commit", "-q", "-m", "a lock file where a folder stood");
+    ok(said(licenceCheck(config, dir, "HEAD^1", config).failures), "and one where the base held a folder of that name fails");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
 
+// A twin of the named lock file in another case than npm's own passes, reported, where the pair stood at the base,
+// whichever of the two the config names; with no base it fails.
 {
-  // a differently cased twin of the named lock file that stood at the base passes, reported; with no base it fails
-  const dir = scratchDir("licence-twin-case-");
-  const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
-  const git = (...args) => execFileSync("git", args, { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] });
+  const { dir, git, put } = scratchRepo("licence-twin-case-");
   const config = { ships: [], lockfiles: ["package-lock.json"], audit: "audit.json" };
-  const stands = (list) => list.some((m) => /NPM-SHRINKWRAP\.JSON stands beside it/u.test(m));
+  const stands = (list, twin) => list.some((m) => m.includes(`${twin} stands beside it`));
   try {
-    git("init", "-q");
-    for (const f of ["package-lock.json", "NPM-SHRINKWRAP.JSON"]) fs.writeFileSync(path.join(dir, f), JSON.stringify({ lockfileVersion: 3, packages: {} }));
-    fs.writeFileSync(path.join(dir, "audit.json"), JSON.stringify({ entries: [] }));
-    fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "x", version: "1.0.0" }));
-    git("add", "-A"); git("commit", "-q", "-m", "base");
-    let r = licenceCheck(config, dir, "HEAD", config);
-    ok(!stands(r.failures) && stands(r.reports), "a twin of another case that stood at the base is reported, not failed", JSON.stringify(r));
-    r = licenceCheck(config, dir, null, config);
-    ok(stands(r.failures), "and with no base to read it against it fails");
+    for (const f of ["package-lock.json", "NPM-SHRINKWRAP.JSON"]) put(f, JSON.stringify({ lockfileVersion: 3, packages: {} }));
+    put("audit.json", JSON.stringify({ entries: [] })); put("package.json", JSON.stringify({ name: "x", version: "1.0.0" }));
+    git("commit", "-q", "-m", "base");
     const upper = { ...config, lockfiles: ["NPM-SHRINKWRAP.JSON"] };
+    let r = licenceCheck(config, dir, "HEAD", config);
+    ok(!stands(r.failures, "NPM-SHRINKWRAP.JSON") && stands(r.reports, "NPM-SHRINKWRAP.JSON"), "a twin of another case that stood at the base is reported, not failed", JSON.stringify(r));
+    ok(stands(licenceCheck(config, dir, null, config).failures, "NPM-SHRINKWRAP.JSON"), "and with no base to read it against it fails");
     r = licenceCheck(upper, dir, "HEAD", upper);
-    ok(r.failures.length === 0 && r.reports.some((m) => /package-lock\.json stands beside it/u.test(m)), "a pair named by its other file stands at the base too", JSON.stringify(r));
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
-}
-{
-  // a folder of the base that held the name of a lock file is no lock file the base held
-  const dir = scratchDir("licence-scan-folder-");
-  const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
-  const git = (...args) => execFileSync("git", args, { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] });
-  const config = { ships: [], lockfiles: [], audit: "audit.json", scan: { served: [], skip: [] } };
-  try {
-    git("init", "-q");
-    fs.mkdirSync(path.join(dir, "tools/Package-Lock.json"), { recursive: true });
-    fs.writeFileSync(path.join(dir, "tools/Package-Lock.json/README.md"), "x");
-    fs.writeFileSync(path.join(dir, "audit.json"), JSON.stringify({ entries: [] }));
-    git("add", "-A"); git("commit", "-q", "-m", "base");
-    git("rm", "-rq", "tools/Package-Lock.json");
-    fs.mkdirSync(path.join(dir, "tools"), { recursive: true });
-    fs.writeFileSync(path.join(dir, "tools/Package-Lock.json"), "{}");
-    git("add", "-A"); git("commit", "-q", "-m", "a lock file where a folder stood");
-    const r = licenceCheck(config, dir, "HEAD^1", config);
-    ok(r.failures.some((m) => m.startsWith("tools/Package-Lock.json installs packages")), "a lock file where the base held a folder of that name fails", JSON.stringify(r));
+    ok(!stands(r.failures, "package-lock.json") && stands(r.reports, "package-lock.json"), "a pair named by its other file stands at the base too", JSON.stringify(r));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
