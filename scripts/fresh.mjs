@@ -2,10 +2,9 @@
 // copy this file lies in would write for a new project of the same kind today, against what the project holds, so
 // that an earlier sync taken in part, or a row filled poorly, shows where no step's check reads it (steps.mjs, beside
 // this file). It lists each difference: a file the kit writes that the project lacks (the configs it writes beside
-// its templates too, at the paths the project names for them, and the kit's words that name a config read with the
-// project's path in its place, #1361, point 5); of a rule file, the manifest or
-// an issue form, a paragraph of the kit's that the project holds nowhere in that file (the words compared with their
-// spacing made one, so a reflowed line is no difference), and of a table, a row whose first cell it lacks (a row's
+// its templates too, at the paths the project names for them, as the kit's words that name them: kit-paths.mjs); of a
+// rule file, the manifest or an issue form, a paragraph of the kit's that the project holds nowhere in that file (the
+// words compared with their spacing made one, so a reflowed line is no difference), and of a table, a row whose first cell it lacks (a row's
 // value is the project's to fill); of a workflow or the hooks' settings, a line of the kit's it lacks (a pin and its
 // version comment made one, since a sync and Dependabot move them); of a check's config, and of the list of what holds the project's own rules, a key of the kit's it lacks.
 // A paragraph the kit leaves to the project ("FILL IN") and the progress file, the project's own, are not compared.
@@ -39,6 +38,7 @@ import { atCopy } from "./step-checks.mjs";
 import { privateOf } from "./host-private.mjs";
 import { OWN as OWN_HOLDERS } from "./holders-own.mjs";
 import { call as callOf, configs, plain, project } from "./steps.mjs";
+import { ownPaths, shapeBaseline } from "./kit-paths.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // (a call that cannot be read, a workflow in a form the core's reader does not know, counts as none here: steps.mjs
@@ -65,7 +65,6 @@ function calledKind(p) {
 // Whether the project calls the NuGet check: the core's nuget.yml, or core.yml with its input nuget (#376).
 const nugetCalled = p => { try { return !!call(p, "nuget.yml") || folded(p, "nuget").length > 0; } catch { return false; } };
 const SKIPPED = new Set(["docs/PROGRESS.md"]); // (the progress file: the project's own from its first task)
-const SHAPE_BASELINE = "checks/shape-baseline.json"; // (where the kit writes the shape check's baseline)
 
 // The project's own files: neither the core's copy, at the path its manifest names (core-path.mjs), nor an install's.
 const ownFiles = p => { const at = corePath(p.root) || "core/"; return p.files.filter(f => !f.startsWith(at) && !f.split("/").includes("node_modules")); };
@@ -186,27 +185,6 @@ export function differences(p, kit, older = []) {
   return out;
 }
 
-// The shape check's baseline, at the path the project's config names for it, else where the kit writes it.
-function shapeBaseline(p) {
-  let config = null;
-  try { config = JSON.parse(p.read(shapeAt(p.manifest)) ?? "null"); } catch { /* (the kit's path, below) */ }
-  return typeof config?.baseline === "string" ? config.baseline : SHAPE_BASELINE;
-}
-
-// The kit's words with each path of a check's config the kit writes (KIT_CONFIGS, the shape check's and its baseline)
-// as the path the project runs that check with (`at`, configs; #1361, point 5), so that a config that stands elsewhere
-// is no difference in the workflow that calls its check or the text that names it: `(to, text) => text`. The NuGet
-// check's config, which the kit names as the licence check's, is the NuGet check's own on the lines that pass it (the
-// `config:` of nuget.yml, the `nuget:` of core.yml's one job). A config that cannot be read keeps the kit's path.
-function ownPaths(p, at) {
-  const moved = new Map([[KIT_CONFIGS.copies, at.copies], [KIT_CONFIGS.baseline, at.baseline], [KIT_CONFIGS.sizes, at.sizes], [KIT_CONFIGS.licences, at.licences], [KIT_CONFIGS.audit, at.audit], [SHAPE, shapeAt(p.manifest)], [SHAPE_BASELINE, shapeBaseline(p)]]);
-  const kitPath = new RegExp(`(?<![\\w./-])(?:${[...moved.keys()].map(k => k.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("|")})(?![\\w/-])`, "gu");
-  return (to, text) => text.split("\n").map(line => {
-    const nuget = (to === ".github/workflows/nuget.yml" && /^\s*config:/u.test(line)) || /^\s*nuget:/u.test(line);
-    return line.replace(kitPath, kit => (nuget && kit === KIT_CONFIGS.licences ? at.nuget : moved.get(kit)) ?? kit);
-  }).join("\n");
-}
-
 // A file of the kit's as a project whose manifest names the copy's path holds it (#628): the kit writes the copy as core/, and
 // its hooks for that path as the commands core-path.mjs gives for another; a core a library carries, which the kit does not
 // write, is the manifest's own line, with the floor's own copy's line that follows it. The manifest's "Differences" is the
@@ -242,8 +220,7 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES), { kitOnly = fal
     // read)
     const at = configs(p);
     const placed = { [CHOICES]: where(p.manifest) ?? CHOICES, [SHAPE]: shapeAt(p.manifest), [KIT_CONFIGS.copies]: at.copies, [KIT_CONFIGS.audit]: at.audit };
-    // (compared, each config's path in the kit's words is the one the project runs that check with: what the one
-    // process writes, kitOnly, stays the kit's own)
+    // (compared, the kit's words name each config where the project runs its check with it: kit-paths.mjs)
     const own = kitOnly ? (to, text) => text : ownPaths(p, at);
     const kit = built.filter(([to]) => !gone.has(to) && placed[to] !== null).map(([to, text]) => [placed[to] ?? to, own(to, asHeld(p, to, text))]);
     if (older || kitOnly) return kit;

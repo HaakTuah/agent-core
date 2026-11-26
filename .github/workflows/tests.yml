@@ -725,6 +725,9 @@ jobs:
       - name: A project beside a fresh start, and what the steps read of the files it holds
         if: ${{ !cancelled() && contains(matrix.parts, 'fresh') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-fresh-test.mjs ')) }}
         run: node tests/steps-fresh-test.mjs
+      - name: A project beside a fresh start whose checks' configs stand where its calls name them, not the kit's paths
+        if: ${{ !cancelled() && contains(matrix.parts, 'fresh') && (env.RUN == 'all' || contains(env.RUN, ' tests/fresh-config-paths-test.mjs ')) }}
+        run: node tests/fresh-config-paths-test.mjs
       - name: The steps on a project whose copy of the core stands at a path of its own or in a library
         if: ${{ !cancelled() && contains(matrix.parts, 'fresh') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-vendored-test.mjs ')) }}
         run: node tests/steps-vendored-test.mjs
