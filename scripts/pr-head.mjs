@@ -14,12 +14,17 @@
 // - A placeholder, outside code marks: a word of PLACEHOLDERS in capitals, whole, as written; and "to be added", in any
 //   case, where it opens a bracket, a line or a list item, or follows a colon, as a placeholder stands (in a sentence it
 //   is ordinary words).
-// Node's own modules.
+// The archive is a file of the checkout, which a fork's branch may make a link, a pipe or a folder, so it is read through
+// the guards of reading.mjs (#848): what is not a regular file of the checkout's own reads as nothing. At most SHOWN
+// failures are given, then the count of the rest. Node's own modules.
 //
 //   import { headMends, headOf, keysAt } from "./pr-head.mjs";
 import { items } from "./archive.mjs";
+import { realFiles, regular } from "./reading.mjs";
 
 const PLACEHOLDERS = ["to be added", "TBD", "TODO", "XXX", "FIXME"];
+export const SHOWN = 10;
+const GUARDED = { list: (root, folder) => realFiles(root, folder, new Set()), read: regular };
 export const HEAD_MEND = "Mend: bring the description to the head in one edit: name the item that stands, or take the line out";
 export const PLACE_MEND = "Mend: in one edit, write what the placeholder stands for, or take the line out; where the word is meant as it stands, put it in code marks";
 
@@ -105,9 +110,10 @@ function named(body, own) {
   return { keys, placeholders };
 }
 
-// The keys the archive at `root` holds, as text ("218", "#733.2"), both its forms; null where it holds none.
-export function keysAt(root) {
-  const { reasons, words } = items(root);
+// The keys the archive under `prefix` of the checkout at `root` holds, as text ("218", "#733.2"), both its forms; null
+// where it holds none. Each part of the path is read as reading.mjs reads it, so a link on the way reads as no archive.
+export function keysAt(root, prefix = "") {
+  const { reasons, words } = items(root, prefix, GUARDED);
   const keys = new Set([...reasons.keys(), ...words.keys()].map(String));
   return keys.size ? keys : null;
 }
@@ -116,16 +122,18 @@ export function keysAt(root) {
 // gives it: "" in the core's own, whose archive "archive item N" names; its path in a project; null where none is found,
 // so that no archive is read. { mends, oks }: the failures, and the lines that pass.
 export function headOf(body, at) {
-  const { mends, notes } = headMends(body, { keys: at === null ? null : keysAt(at || "."), own: at === "" });
+  const { mends, notes } = headMends(body, { keys: at === null ? null : keysAt(".", at), own: at === "" });
   return { mends, oks: mends.length ? notes : [...notes, "the description names no archive key its head does not hold, and leaves no placeholder in"] };
 }
 
 // The failures of a description, { mends, notes }: each mend a line naming where it stands and what it names, then its
-// mend; `notes`, what was not read and why. `keys` is as keysAt() gives it, `own` as named() takes it.
+// mend, the first SHOWN of them and then one that counts the rest; `notes`, what was not read and why. `keys` is as
+// keysAt() gives it, `own` as named() takes it.
 export function headMends(body, { keys, own = true }) {
   const { keys: said, placeholders } = named(body, own), mends = [], notes = [];
   if (said.length && keys === null) notes.push("the archive keys the description names are not read here: no archive could be read");
   else for (const k of said) if (!keys.has(k.token.replace(/^0+(?=\d)/u, ""))) mends.push(`line ${k.at} of the description names "${k.said}", which the head's archive does not hold. ${HEAD_MEND}`);
   for (const p of placeholders) mends.push(`line ${p.at} of the description holds the placeholder "${p.said}". ${PLACE_MEND}`);
+  if (mends.length > SHOWN) return { mends: [...mends.slice(0, SHOWN), `${mends.length - SHOWN} more such lines of the description, not shown. Mend: take them out or bring them to the head in the same edit, then run the check again`], notes };
   return { mends, notes };
 }

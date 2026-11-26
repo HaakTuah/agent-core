@@ -8,12 +8,15 @@
 //
 //   node tests/hostile-pr-text-test.mjs
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { PARTS, missing, reasonsMend, waitsMend, waitsOn } from "../scripts/pr-description.mjs";
 import { lineMend, listed } from "../scripts/reading.mjs";
 import { neverNeeded } from "../scripts/read-total.mjs";
-import { headMends } from "../scripts/pr-head.mjs";
+import { SHOWN, headMends } from "../scripts/pr-head.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -167,6 +170,40 @@ const refused = (r) => r.status === 1 && mended(r.stdout) && !/\n\s+at /u.test(r
     && fails("Tests: <!-- to be added").length === 0 && fails("Tests: <!-- x --> to be added").length === 1
     && fails("A note <!-- \"TBD\" here").length === 0 && fails("Notes:<!---->to be added").length === 1,
     "  on the first line and the last, past a line of blanks, indented up to three; and a \"<!--\" that is text stays in its place, one that opens goes");
+}
+
+// the archive the keys are read from (pr-head.mjs's keysAt, #1136), which a fork's branch may make a pipe, a link or a
+// folder: each reads as no file, the check is never stopped, and nothing outside the checkout is read as its archive
+// (#848); and a description that names many is told of the first SHOWN, then the count of the rest
+{
+  const head = fileURLToPath(new URL("../scripts/pr-head.mjs", import.meta.url));
+  // (in a process of its own with a time limit, so a reader that waits on a pipe fails rather than hangs)
+  const keysOf = (root, prefix = "") => {
+    const r = spawnSync(process.execPath, ["--input-type=module", "-e", `import(${JSON.stringify(`file://${head}`)}).then(m => { const k = m.keysAt(${JSON.stringify(root)}, ${JSON.stringify(prefix)}); console.log(JSON.stringify(k && [...k])); })`], { encoding: "utf8", timeout: 10000 });
+    return r.status === 0 ? JSON.parse(r.stdout) : `failed: ${r.error?.code ?? r.stderr.split("\n").find(Boolean)}`;
+  };
+  const archive = (dir, prefix = "") => { const at = path.join(dir, prefix, "archive/instructions"); fs.mkdirSync(at, { recursive: true }); return at; };
+  const outside = scratchDir("pr-head-outside-");
+  fs.writeFileSync(path.join(archive(outside), "items-001.md"), "1. **A day**: an item outside the checkout.\n");
+  if (process.platform !== "win32") {
+    const piped = scratchDir("pr-head-pipe-"), at = archive(piped);
+    fs.writeFileSync(path.join(at, "items-001.md"), "1. **A day**: an item.\n");
+    if (spawnSync("mkfifo", [path.join(at, "items-002.md")]).status === 0) ok(JSON.stringify(keysOf(piped)) === '["1"]', "keysAt: a pipe among the archive's files is read as no file, and the check is not stopped");
+    const linked = scratchDir("pr-head-link-");
+    fs.mkdirSync(path.join(linked, "archive"));
+    fs.symlinkSync(path.join(outside, "archive/instructions"), path.join(linked, "archive/instructions"));
+    const viaCore = scratchDir("pr-head-core-link-");
+    fs.symlinkSync(outside, path.join(viaCore, "core"));
+    const fileLink = scratchDir("pr-head-file-link-");
+    fs.symlinkSync(path.join(outside, "archive/instructions/items-001.md"), path.join(archive(fileLink), "items-001.md"));
+    ok(keysOf(linked) === null && keysOf(viaCore, "core/") === null && keysOf(fileLink) === null, "keysAt: a link to a folder outside the checkout, as the archive, as the copy on the way to it or as one of its files, is read as no archive");
+  }
+  const foldered = scratchDir("pr-head-folder-");
+  fs.mkdirSync(path.join(archive(foldered), "items-001.md"));
+  fs.writeFileSync(path.join(archive(foldered), "issue-9.md"), "#9. **A day**: an item.\n");
+  ok(JSON.stringify(keysOf(foldered)) === '["#9"]', "keysAt: a folder named as an archive file is no file, with no error");
+  const said = headMends("TBD ".repeat(16384), { keys: new Set() }).mends;
+  ok(said.length === SHOWN + 1 && said.at(-1).startsWith(`${16384 - SHOWN} more such lines`) && mended(said.map(m => `FAIL ${m}`).join("\n")), `headMends: 64 KB of "TBD " gives the first ${SHOWN} failures and one that counts the rest, each with its mend`);
 }
 
 process.exit(failed ? 1 : 0);
