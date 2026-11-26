@@ -25,7 +25,6 @@
     "scripts/sync.mjs": { "mark": 22147, "why": "the question of a split is asked in #1250" },
     "scripts/comment-only.mjs": { "mark": 28954, "why": "the question of a split is asked in #1341" },
     "SECURITY.md": { "mark": 21346, "why": "the question of a split is asked in #1255" },
-    ".github/sizes.json": { "mark": 20901, "why": "a list a script reads, each entry looked up by its path; no split lets anyone read less" },
     "scripts/licences.mjs": { "mark": 52937, "why": "the question of a split is asked in #1151" },
     "scripts/packages.mjs": { "mark": 25772, "why": "the question of a split is asked in #1151" },
     "tests/exact-versions-test.mjs": { "mark": 20990, "why": "the question of a split is asked in #1151" },
@@ -245,10 +244,10 @@
       "mark": 25951,
       "why": "#943: the selection's rules apart from those of the suites' time and of the run of a tree that passed."
     },
-    "scripts/select.mjs": { "mark": 23161, "why": "the question of a split is asked in #943" },
+    "scripts/select.mjs": { "mark": 23161, "why": "the question of a split is asked in #1380" },
     "tests/select-test.mjs": {
       "mark": 41729,
-      "why": "#943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
+      "why": "#1380: the timed C# cases, which read none of the fixture, are to move beside the other select-csharp tests. #943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
     },
     ".github/shape-baseline.json": {
       "mark": 27000,
