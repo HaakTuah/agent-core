@@ -78,14 +78,17 @@ export function repoRoot(cwd = process.cwd()) {
 }
 export const outside = dir => `FAIL ${clip(dir)} is in no git repository, so no tracked JSON file could be read. Mend: run the check from inside the repository, or name the files to read`;
 
-// The files of `files` that stand, read from `root` (a path that is absolute stays itself), and what their duplicates say.
+// The files of `files` that stand, read from `root` (a path that is absolute stays itself) and named from it, so that no
+// failure prints a folder above it (floor rule 1), and what their duplicates say; a folder named is told with its mend.
+export const folder = name => `FAIL ${clip(name)} is a folder, not a JSON file. Mend: name the JSON files in it, or run the check with no names to read every tracked one`;
 export function check(root, files) {
   let read = 0;
   const failures = files.flatMap(f => {
+    const at = path.resolve(root, f), name = path.relative(root, at) || f;
     let text;
-    try { text = fs.readFileSync(path.resolve(root, f), "utf8"); } catch (e) { if (e?.code === "ENOENT") return []; throw e; }
+    try { text = fs.readFileSync(at, "utf8"); } catch (e) { if (e?.code === "ENOENT") return []; if (e?.code === "EISDIR") return [folder(name)]; throw e; }
     read++;
-    return failuresOf(f, text);
+    return failuresOf(name, text);
   });
   return { read, failures };
 }
