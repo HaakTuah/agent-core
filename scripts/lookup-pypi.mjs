@@ -4,9 +4,9 @@
 // check's config under "pypi" is read so: a line in any other form (a range, an address, a package with no hash, an
 // include, an index that is not PyPI's) fails it whole, since pip or uv would install what the lookup did not read.
 // Which package another brings, and which the project names, is read from the "# via" lines those tools write; a file
-// with none names every package itself, and says nothing of what each brings. Each hash a line names is one PyPI lists
-// for a file of that version, or the package fails the lookup (#1368, point 1), since pip, given an index outside the
-// file, would install a file the lookup never read. Names are compared as pip compares them
+// with none names every package itself, and says nothing of what each brings. Each hash the line of a package new to
+// the project names is one PyPI lists for a file of that version, or the package fails the lookup (#1368, point 1),
+// since pip, given an index outside the file, would install a file the lookup never read. Names are compared as pip compares them
 // (PEP 503: in lower case, each run of "-", "_" and "." one "-"). What PyPI answers is a publisher's text: it is said
 // on one line by the lookup's report, and an answer of another shape is a lookup that failed. The reader of a
 // repository's address is the lookup's own, passed in (`readRepo`), so neither file imports the other.
@@ -101,7 +101,8 @@ function uncommented(line) {
 function viaLine(line, last, via) {
   const head = /^#\s*via\b(.*)$/u.exec(line), item = /^#\s{2,}(\S.*)$/u.exec(line);
   const to = head ? last : item ? via : null;
-  to?.via.push(...(head ?? item)[1].split(/[\s,]+/u).filter(Boolean));
+  // (one name at a time: a list of any length is read, never spread into the arguments of one call)
+  for (const name of to ? (head ?? item)[1].split(/[\s,]+/u) : []) if (name) to.via.push(name);
   return to;
 }
 
