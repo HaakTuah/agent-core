@@ -55,6 +55,7 @@ nothing yet.
     lane, one only the owner can do labelled `needs-owner`;
   - sync the core in a routine lane;
   - run the scheduled look, which does nothing more where it ran less than 20 hours before;
+  - once a day, read the Dependabot alerts (`core/scripts/alerts.mjs`; floor rule 9) and give each bug it files a lane;
   - turn back on any scheduled workflow GitHub switched off for want of activity (`gh workflow enable`);
   - act on what is new in the *progress file*, planned as `tasks/planning.md` says;
   - once an open idea has waited a week with no verdict of the stand-in's, call the stand-in.
