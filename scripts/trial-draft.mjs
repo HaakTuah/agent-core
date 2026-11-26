@@ -9,9 +9,10 @@
 //         list could not be read whole, or for a pull request no open draft from the project's own branch by the
 //         owner's account, against the default branch, pinned to the commit, or of a repository another owner's, whose
 //         default branch's manifest pins no copy of this core or could not be read, or behind a stop switch that stands
-//         or cannot be read. A workflow that could not start counts as a failed check; one skipped on the draft is
-//         counted and named apart, saying where it passed on main. `--gate` names a check its builder read as failing
-//         only for being a draft (setup/sync-notes/680): counted apart, holding nothing, named on its own line.
+//         or cannot be read. A workflow that could not start or ended with no job counts as a failed check; one skipped on the draft is
+//         counted and named apart, and where it passed on main, not run after, holds the cut. `--gate` names a check its
+//         builder read as failing, or skipping after passing on main, only for being a draft (setup/sync-notes/680):
+//         counted apart, holding nothing, named on its own line.
 //   node scripts/trial-draft.mjs <owner>/<name> none <the commit tried>
 //         where no draft was opened: reads why (another owner's, a stop switch that stands) and prints it as the answer;
 //         none for a repository whose manifest pins no copy of this core or could not be read, or the owner's own
@@ -41,12 +42,12 @@ export function saidOf(runs, statuses) {
 }
 
 // The counts of the draft's checks beside main's; one run on main alone (a push's job) is not counted, and one skipped
-// on the draft is counted apart, measuring nothing there.
+// on the draft is counted apart, measuring nothing there, as not run after where it passed on main, save one gated.
 export function draftCounts(main, draft, gates = []) {
   const out = Object.fromEntries(DRAFT_COUNTS.map(k => [k, 0]));
   for (const [name, now] of Object.entries(draft)) {
     const then = main[name];
-    if (now === "skipped") out[then === "passed" ? "draftSkippedAfter" : "draftSkipped"]++;
+    if (now === "skipped") out[then !== "passed" ? "draftSkipped" : gates.includes(name) ? "draftGated" : "draftSkippedAfter"]++;
     else if (now === "failed" && gates.includes(name)) out.draftGated++;
     else if (then === "passed" || then === "failed") out[now === "passed" ? (then === "passed" ? "draftPassedBoth" : "draftFixedAfter") : (then === "passed" ? "draftFailedAfter" : "draftFailedBoth")]++;
     else out[now === "passed" ? "draftPassedAlone" : "draftFailedAlone"]++;
@@ -68,7 +69,8 @@ function pagesOf(route, key, ask) {
 }
 
 // What a commit's checks said, through `ask` (ghAsk's form), every page read: { said, active, flows, unfinished }, or
-// { why }. A workflow run of the commit that could not start is a check that failed, and one not finished waits, each
+// { why }. A workflow run of the commit that could not start or ended with no job is a check that failed (its jobs,
+// where it ran any, say what failed), and one not finished waits, each
 // named by its workflow; `active` is `said` with no run GitHub holds for a person (its own status `waiting`, a deploy's
 // reviewer say), `flows` names each workflow run, and `unfinished` each one not finished, by its name in `said` and its
 // workflow's.
@@ -80,7 +82,8 @@ function checksAt(repo, sha, ask) {
   const flows = pagesOf(`repos/${repo}/actions/runs?head_sha=${sha}`, "workflow_runs", ask);
   if (flows.why) return flows;
   const label = w => `${w.name ?? "a workflow"} (${w.status === "completed" ? "could not start" : "workflow"})`;
-  const open = flows.items.filter(w => w?.conclusion === "startup_failure" || w?.status !== "completed");
+  const jobless = w => RUN[w?.conclusion] === "failed" && !runs.items.some(r => r?.check_suite?.id != null && r.check_suite.id === w.check_suite_id);
+  const open = flows.items.filter(w => w?.status !== "completed" || jobless(w));
   const unstarted = open.map(w => ({ name: label(w), status: w.status === "completed" ? "completed" : "queued", conclusion: "failure", person: w.status === "waiting" }));
   const unfinished = open.filter(w => w.status !== "completed").map(w => ({ name: label(w), flow: w.name }));
   const notHeld = r => r?.status !== "waiting" && !r?.person;
@@ -164,9 +167,16 @@ export function readDraft(repo, pr, sha, gates = [], ask = ghAsk) {
   if (!Object.values(now.said).some(v => v !== "skipped")) return { why: "no check has run on the draft yet (a skipped one does not), and a draft with none measures nothing. Mend: read again once its checks have started and finished, without polling" };
   const waiting = waitingOf(then, now);
   if (waiting[0] + waiting[1]) return { why: `${waiting[1]} checks on the draft and ${waiting[0]} on main's newest commit have not finished. Mend: read again once they finish, without polling` };
-  const skipped = Object.keys(now.said).filter(n => now.said[n] === "skipped");
-  const failedHere = Object.entries(now.said).filter(([n, v]) => v === "failed" && then.active[n] !== "failed").map(([n]) => n);
-  return { answer: { commit: sha, repo: repoHash(pull.base.repo.id), ...draftCounts(then.active, now.said, gates) }, failed: failedHere.filter(n => !gates.includes(n)), gated: failedHere.filter(n => gates.includes(n)), skipped, skippedAfter: skipped.filter(n => then.active[n] === "passed") };
+  return { answer: { commit: sha, repo: repoHash(pull.base.repo.id), ...draftCounts(then.active, now.said, gates) }, ...namedOf(then.active, now.said, gates) };
+}
+
+// The draft's checks by name, beside main's `active`: those `failed` that did not fail on main, those `gated`, failed
+// there or skipped after passing on main, and those `skipped`, `skippedAfter` those of them that passed on main.
+function namedOf(active, said, gates) {
+  const after = n => said[n] === "skipped" && active[n] === "passed";
+  const failedHere = Object.keys(said).filter(n => said[n] === "failed" && active[n] !== "failed");
+  const skipped = Object.keys(said).filter(n => said[n] === "skipped" && !(after(n) && gates.includes(n)));
+  return { failed: failedHere.filter(n => !gates.includes(n)), gated: [...failedHere, ...Object.keys(said).filter(after)].filter(n => gates.includes(n)), skipped, skippedAfter: skipped.filter(after) };
 }
 
 // Why no draft was opened in `repo`, read through `ask`: { answer } (the commit, the repository's hash and `none`), or
@@ -198,6 +208,6 @@ if (started(import.meta.url)) {
   if (!got.answer) { console.error(`FAIL no answer for the ${pr === "none" ? "project" : "draft"}: ${got.why}.`); process.exit(1); }
   for (const name of got.failed ?? []) console.log(`  failed on the draft: ${asText(name)}`);
   for (const name of got.gated ?? []) console.log(`  set apart as the draft's gate: ${asText(name)}`);
-  for (const name of got.skipped ?? []) console.log(`  skipped on the draft, measuring nothing there${got.skippedAfter.includes(name) ? ", passed on main (the record's pull request says why)" : ""}: ${asText(name)}`);
+  for (const name of got.skipped ?? []) console.log(`  skipped on the draft, measuring nothing there${got.skippedAfter.includes(name) ? ", passed on main, so not run after: it holds the cut unless set apart with --gate" : ""}: ${asText(name)}`);
   console.log(`${LINE}${JSON.stringify(got.answer)}`);
 }
