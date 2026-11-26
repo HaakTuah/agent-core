@@ -196,7 +196,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   it records the counts alone (`node scripts/release.mjs --trial`) in a pull request of its own. Another owner's project
   has its own code run only where no sign-in or key of the owner's is held (floor rule 18). The one condition that
   changes it: no such project allows a trial; the record says so, and so does the release. It does not mean that
-  another owner's project is written to, that its private code leaves it, or that it is named anywhere. Reason: #1079 passed every check
+  another owner's project is written to, that a project's private code leaves it, or that a project is named anywhere. Reason: #1079 passed every check
   of the core and failed only on a real project, and the sync's proof was first met on one after the cut (#1261). Held
   by `scripts/release.mjs` with `scripts/release-trial.mjs`, which say the trial has not run, and cut nothing, where its
   record does not stand for the commit, cut nothing where a check passed before, or ran not before, and failed after, or
@@ -224,8 +224,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   project's `main` and gives no answer for a draft of a repository the core's owner does not own, behind a stop switch,
   no longer a draft or pinned elsewhere, and by `scripts/release.mjs` with `scripts/release-trial.mjs`, which cut nothing
   where a check failed on the draft that passed on `main` or ran on the draft alone, or where the record holds fewer
-  drafts than the owner's own projects found; that the draft merges no sooner, by `scripts/pure-sync.mjs`, which proves
-  a sync pure only to a release; that a project of another owner's is not written to, by nothing yet.
+  drafts than the owner's own projects found; that the draft merges no sooner, by the host, which merges no draft, and
+  by `scripts/trial-draft.mjs`, which reads none no longer a draft; that it is marked ready no sooner, and that a project
+  of another owner's is not written to, by nothing yet.
 - **Nothing locks a project,** in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
   what an agent can mend alone may bind, and what only the owner can do (a yes the floor names, a setting on the

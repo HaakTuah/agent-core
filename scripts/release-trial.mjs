@@ -93,7 +93,7 @@ function formed(r) {
 
 // How the runs are taken, for a mend that asks a trial: check.mjs from the project's clone, before the update and after,
 // and, where the copy holds none, or one without --verdicts, the baseline by the release's, from a clone of the core.
-export const RUNS = "in a clone of the project, `node core/scripts/check.mjs --base <its main> --own --verdicts <a file outside every repository>` before the update and after it; where the copy holds no check.mjs, or one without --verdicts, the run before with `node <a clone of the core at the commit tried>/scripts/check.mjs` and the same options, from the project's clone; and, with the sync's branch checked out and committed, `node <a clone of the core at the commit tried>/scripts/pure-sync.mjs --trial <the commit tried> > <a file outside every repository>`, the sync's reading, which holds no cut; and, in each of the owner's own projects whose stop switch does not stand, that sync pushed and opened as a draft pull request in the project, its description saying it is the release's trial and that the session that syncs takes it once the release is cut, and, once its checks finish, `node <a clone of the core at the commit tried>/scripts/trial-draft.mjs <owner>/<name> <its number> <the commit tried> > <a file outside every repository>`";
+export const RUNS = "in a clone of the project, `node core/scripts/check.mjs --base <its main> --own --verdicts <a file outside every repository>` before the update and after it; where the copy holds no check.mjs, or one without --verdicts, the run before with `node <a clone of the core at the commit tried>/scripts/check.mjs` and the same options, from the project's clone; and, with the sync's branch checked out and committed, `node <a clone of the core at the commit tried>/scripts/pure-sync.mjs --trial <the commit tried> > <a file outside every repository>`, the sync's reading, which holds no cut; and, in each of the owner's own projects whose stop switch does not stand, that sync pushed and opened as a draft pull request in the project, its description saying it is the release's trial and that the session that syncs takes it once the release is cut, and, once its checks finish, `node <a clone of the core at the commit tried>/scripts/trial-draft.mjs <owner>/<name> <its number> <the commit tried> > <a file outside every repository>`; in any other project, the same script with `none` in place of the number";
 
 // What the trial's record says of the release at `sha`, read through `git` (its arguments give its output), and why it
 // holds the cut, or null: the record stands for the commit where it names it, or one before it from which the release
@@ -105,7 +105,7 @@ export const RUNS = "in a clone of the project, `node core/scripts/check.mjs --b
 export function trialAt(sha, git) {
   let r = null;
   try { r = JSON.parse(git(["show", `${sha}:${TRIAL}`])); } catch { /* (not there, or not read) */ }
-  const again = `try the release on a copy of a project that takes the core and whose owner allows it, before the release workflow is started, as AGENTS.md says ("A release is cut on the owner's word"): ${RUNS}; record it with \`node scripts/release.mjs --trial <the commit tried> <before> <after> --sync <the reading> --draft <the draft's reading>\` (\`--no-draft another-owner\` or \`--no-draft stop-switch\` in place of \`--draft\` where none was opened; \`--trial <the commit>\` alone where no project allows one), in a pull request of its own; then start the release again`;
+  const again = `try the release on a copy of a project that takes the core and whose owner allows it, before the release workflow is started, as AGENTS.md says ("A release is cut on the owner's word"): ${RUNS}; record it with \`node scripts/release.mjs --trial <the commit tried> <before> <after> --sync <the reading> --draft <the draft's reading>\` (\`--trial <the commit>\` alone where no project allows one), in a pull request of its own; then start the release again`;
   if (!formed(r)) return { said: `The trial on a real project has not run for ${sha.slice(0, 7)}: ${TRIAL} ${r === null ? "is not there or cannot be read" : "is in no form this script writes"}.`, held: `the trial on a real project has not run for ${sha.slice(0, 7)}. Mend: ${again}` };
   let more;
   try { git(["merge-base", "--is-ancestor", r.commit, sha]); more = git(["diff", "--no-renames", "--name-only", r.commit, sha]).split("\n").map(f => f.trim()).filter(f => f && f !== TRIAL); } catch { more = null; }
@@ -172,9 +172,9 @@ function pairsOf(files) {
   return { pairs };
 }
 
-// --trial <sha> [<before> <after> --sync <reading> (--draft <reading> | --no-draft <why>)]...: writes the trial's record,
+// --trial <sha> [<before> <after> --sync <reading> --draft <reading>]...: writes the trial's record,
 // each pair one project's runs of check.mjs --verdicts, each `--sync` after it what pure-sync.mjs --trial printed of that
-// project's sync (#1261), and each `--draft` what trial-draft.mjs printed of its draft, or `--no-draft` why none (#1334).
+// project's sync (#1261), and each `--draft` what trial-draft.mjs printed of its draft, or why none was opened (#1334).
 export function trial([sha, ...given], fail) {
   const { rest: args, drafts, why: draftWhy } = draftsIn(given);
   const { files, syncs } = syncsIn(args ?? []);

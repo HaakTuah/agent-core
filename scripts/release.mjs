@@ -23,7 +23,7 @@
 //                                     all passed, and the tests' hourly or hand-started runs in --full, its answer to
 //                                     repos/<core>/actions/workflows/tests.yml/runs?head_sha=<sha>&branch=main, are none
 //                                     unfinished, the newest passed (fullRun); without the three it cuts nothing
-//   node scripts/release.mjs --trial <sha> [<before> <after> --sync <reading> (--draft <reading> | --no-draft <why>)]...
+//   node scripts/release.mjs --trial <sha> [<before> <after> --sync <reading> --draft <reading>]...
 //                                     writes the trial's record for the commit <sha>: for each project tried, the file
 //                                     check.mjs --verdicts wrote before the update and the one after, each outside
 //                                     every repository, counted, and after them, with --sync, which each pair needs, the file with what
@@ -33,7 +33,7 @@
 //                                     the owner's own; where the trial holds the cut, it says how the runs are taken,
 //                                     the baseline from a clone of the core where the copy cannot (#1244); and after
 //                                     each pair, with --draft, the file with what trial-draft.mjs printed of the draft
-//                                     of its sync, or --no-draft another-owner or stop-switch where none was opened, the
+//                                     of its sync, or of why none was opened (its `none` form), the
 //                                     owner's own projects each given one (#1334)
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
