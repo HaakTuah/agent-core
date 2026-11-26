@@ -96,7 +96,8 @@ else {
   const first = fetchPinned(at).join(), sdk = path.join(home("fetched"), ".agent-core", "toolchains", `dotnet-sdk-${V}-${RID}`);
   ok(/^toolchain: the \.NET SDK 8\.0\.404 fetched to .*export DOTNET_ROOT=/u.test(first) && fs.existsSync(path.join(sdk, "dotnet")) && fs.existsSync(path.join(sdk, "sdk", V, "dotnet.dll")),
     "a listed pin is fetched to its own folder under the home folder, outside the project, checked by its sum, with what to set for the trial's runs", first);
-  ok(new RegExp(`^-fsS --proto =https --connect-timeout 30 --max-time 900 -o \\S+ ${url().replaceAll(".", "\\.")}$`, "u").test(fetched.log()?.trim() ?? ""),
+  const curled = (fetched.log() ?? "").trim().split(" ");
+  ok(curled.length === 10 && curled.slice(0, 8).join(" ") === "-fsS --proto =https --connect-timeout 30 --max-time 900 -o" && curled[9] === url(),
     "it fetches only the listed URL, over HTTPS alone", fetched.log());
   const again = fetchPinned(at).join();
   ok(/present in/u.test(again) && fetched.log().trim().split("\n").length === 1, "run twice, it finds the SDK present and fetches nothing again", again);
