@@ -6,8 +6,8 @@
 // Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/licence-locks-test.mjs
-import { rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { stoodAt, unnamedLocks } from "../scripts/licence-locks.mjs";
@@ -48,8 +48,8 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
 // a config with a scan: what it reads is the scan's to fail, what it skips, and a name the scan does not read, is said here
 {
   const r = unnamedLocks(".", ["tools/package-lock.json", "docs/package-lock.json", "tools/NPM-Shrinkwrap.json"], { ...config, scan: { served: [], skip: ["docs/"] } }, "HEAD^1", () => false);
-  ok(r.failures.length === 2 && says(r.failures, "docs/package-lock.json").length === 1 && says(r.failures, "tools/NPM-Shrinkwrap.json").length === 1,
-    "where the config scans, a lock file the scan reads is left to it, and one it skips or whose name differs only in case is said", JSON.stringify(r));
+  ok(r.failures.length === 1 && says(r.failures, "docs/package-lock.json").length === 1,
+    "where the config scans, a lock file the scan reads, whatever the case of its name, is left to it, and one it skips is said", JSON.stringify(r));
 }
 
 // a name that differs from npm's only in case is no twin of a named lock file, which the check reads by npm's own name
@@ -95,6 +95,18 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
     ok(forms.every((m) => /is not an object whose "data", "fonts" and "accepted" are each a list, each entry of "accepted" an object\. Mend: /u.test(m)) && names.every((m) => /no npm package name.*\. Mend: /u.test(m))
       && refuses('{"data":["x"]}') === "" && refuses('{"accepted":[{"package":"a@1.0.0"},{"files":["x"]}]}') === "",
       "the core's own config whose lists or entries are of another form, or that is no object, is refused with its mend, and its names are read after", [...forms, ...names].join("\n"));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+// a folder named like the other lock file of a pair is no twin of the named one: nothing installs from it
+{
+  const dir = scratchDir("licence-locks-folder-");
+  try {
+    for (const [f, text] of [["package-lock.json", { lockfileVersion: 3, packages: {} }], ["package.json", { name: "x", version: "1.0.0" }], ["audit.json", { entries: [] }], ["NPM-SHRINKWRAP.JSON/x", {}]]) {
+      mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), JSON.stringify(text));
+    }
+    const r = check({ ships: [], lockfiles: ["package-lock.json"], audit: "audit.json" }, dir, "HEAD", null);
+    ok(![...r.failures, ...r.reports].some((m) => m.includes("stands beside it")), "a folder beside the lock file is no twin", JSON.stringify(r));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 

@@ -38,7 +38,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, noSignInWhole, parseBounded, quotedAlone } from "./guards.mjs";
-import { scan } from "./licence-scan.mjs";
+import { blobAt, scan } from "./licence-scan.mjs";
 import { stoodAt, trackedIn, unnamedLocks } from "./licence-locks.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { shapeFaults } from "./schemas.mjs";
@@ -506,11 +506,13 @@ export function check(config, root, base = null, baseConfig = null) {
   };
   const { failures, reports } = ctx;
   const packages = (config.lockfiles ?? []).flatMap((f) => lockfilePackages(root, f, config.ships.includes(posix.join(posix.dirname(f), "package.json"))));
-  failures.push(...shrinkwrapFaults(root, config.lockfiles ?? []));
+  const twins = shrinkwrapFaults(root, config.lockfiles ?? [], base);
+  failures.push(...twins.failures);
+  reports.push(...twins.reports);
   for (const p of packages) checkPackage(ctx, p);
   const entries = config.audit ? checkAudit(ctx) : [];
   unneededYeses(ctx);
-  const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? [], base, auditOf(ctx.then)) : undefined;
+  const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? [], base, auditOf(ctx.then), lockfilesOf(ctx.then)) : undefined;
   if (scanned) failures.push(...scanned.failures);
   failures.push(...npmrcFailures(root));
   for (const f of config.ignoreScriptsIn ?? []) {
@@ -525,16 +527,29 @@ export function check(config, root, base = null, baseConfig = null) {
 }
 
 // (the audit's path a config names, or null)
+const lockfilesOf = (config) => (Array.isArray(config?.lockfiles) ? config.lockfiles : []);
 const auditOf = (config) => (typeof config?.audit === "string" ? config.audit : null);
 
+const isFile = (p) => { try { return statSync(p).isFile(); } catch { return false; } };
 // (npm installs from a shrinkwrap file where one stands, whatever lock file a config names: only one of the two may)
-function shrinkwrapFaults(root, lockfiles) {
-  const faults = [];
+function shrinkwrapFaults(root, lockfiles, base) {
+  const failures = [], reports = [];
   for (const f of lockfiles) {
-    const other = posix.join(posix.dirname(f), posix.basename(f) === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json");
-    if (existsSync(join(root, other))) faults.push(`${f}: ${other} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`);
+    const dir = posix.dirname(f), name = posix.basename(f);
+    // (the twin the check read before #1349, in npm's own case: it fails as it did, where the base held the pair too)
+    const old = posix.join(dir, name === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json");
+    const want = name.toLowerCase() === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json";
+    let names = [];
+    try { names = readdirSync(join(root, dir)); } catch { /* (no folder, no file) */ }
+    const twins = new Set([...(existsSync(join(root, old)) ? [old] : []), ...names.filter((x) => x.toLowerCase() === want && isFile(join(root, dir, x))).map((x) => posix.join(dir, x))]);
+    for (const twin of twins) {
+      const said = `${f}: ${twin} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`;
+      // (a pair seen only since #1349, in a case of another name than the one read before, passes, reported, where it stood as files at the base)
+      const newly = twin !== old && base && blobAt(root, base, twin) && blobAt(root, base, f);
+      (newly ? reports : failures).push(newly ? `${said}; the pair stood so at the pull request's base, so it passes` : said);
+    }
   }
-  return faults;
+  return { failures, reports };
 }
 
 // (a package is known by what it is, not the name it is installed under: its registry's name and version, or where it

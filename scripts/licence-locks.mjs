@@ -14,9 +14,8 @@ import { posix } from "node:path";
 import { copyOf } from "./core-path.mjs";
 import { LOCKFILE } from "./licence-scan.mjs";
 
-// (npm on a file system that ignores case opens a lock file whose name differs from its own only in case, so this
-// check says such a name too, wherever it stands)
-const ANY_CASE = new RegExp(LOCKFILE.source, "iu");
+// (its twin is left to the check's own failure only in npm's own case: another case is said here too)
+const EXACT = new RegExp(LOCKFILE.source, "u");
 
 // (a path of the config's "scan" holds a file where it is that file, or a folder ending in "/" above it, as the scan reads it)
 const under = (f, paths) => (paths ?? []).some((p) => p === "" || p === f || (p.endsWith("/") && f.startsWith(p)));
@@ -47,7 +46,7 @@ function unlisted(base) {
  *  core's copy at `copy` (or null), or one the config's scan reads. */
 function leftOut(f, named, copy, config) {
   const twin = posix.join(posix.dirname(f), posix.basename(f) === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json");
-  if (!ANY_CASE.test(f) || named.has(f) || (LOCKFILE.test(f) && named.has(twin))) return true;
+  if (!LOCKFILE.test(f) || named.has(f) || (EXACT.test(f) && named.has(twin))) return true;
   if (copy !== null && f.startsWith(copy)) return true;
   return Boolean(config.scan) && LOCKFILE.test(f) && !under(f, config.scan.skip);
 }
