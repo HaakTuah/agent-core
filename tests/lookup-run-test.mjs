@@ -165,7 +165,7 @@ try {
     process.env.CORE_OFFLINE = "1";
     const cut = await beside("HEAD^1");
     delete process.env.CORE_OFFLINE;
-    ok(!cut.failed && /^ok {3}the lookup of the packages new to the project is left to its own step: this run's network is cut off/mu.test(cut.out) && !/looked up in the npm registry/u.test(cut.out), `where the run's network is cut off, the lookup beside the licence check is left to its own step, and said so (${cut.out})`);
+    ok(!cut.failed && /^::warning::The lookup of the packages new to the project did not run: this run's network is cut off.*Mend: run the licence check/mu.test(cut.out) && !/^ok .*lookup/mu.test(cut.out) && !/looked up in the npm registry/u.test(cut.out), `where the run's network is cut off, the lookup beside the licence check does not run, said as a warning with its mend, never as a line that passed (#1368, point 3) (${cut.out})`);
     for (const other of ["HEAD^2", "HEAD~1", "--all", "main", "HEAD^1 "]) ok(named(other) === null, `a base named ${JSON.stringify(other)}, neither a commit nor HEAD^1, is not taken`);
   } finally {
     for (const [k, v] of [["GITHUB_EVENT_NAME", was.event], ["LOOKUP_BASE", was.base], ["CORE_OFFLINE", was.offline]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }

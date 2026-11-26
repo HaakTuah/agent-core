@@ -167,7 +167,12 @@ export function newPackages(head, base, nuget = false) {
   for (const [lockPath, packages] of head) for (const p of packages) {
     if (held.has(key(p))) continue;
     const was = out.get(key(p));
-    if (!was || (p.direct && !was.direct)) out.set(key(p), { ...p, lockPath });
+    // (a package of PyPI's keeps the hashes of each file that names it, each held to PyPI's list: #1368, point 1; one
+    // list for each name, added to in place, so a name given any number of times is kept in one pass)
+    const lines = p.hashes ? (was?.lines ?? []) : was?.lines;
+    if (p.hashes) lines.push({ lockPath, version: p.version, hashes: p.hashes });
+    if (!was || (p.direct && !was.direct)) out.set(key(p), { ...p, lockPath, ...(lines && { lines }) });
+    else if (lines) was.lines = lines;
   }
   return [...out.values()];
 }
@@ -269,6 +274,9 @@ export async function lookUp(packages, { get, now = Date.now(), nuget = false, s
     if (facts.missing) { failures.push(`${at}: ${where} has no such package (${facts.missing}). Mend: take it out of the project's package list and its lock file, and name a package the registry has: a name a model gave may be one nobody published, or one someone registered to be taken`); return; }
     const young = tooYoung(p, facts, now);
     if (young) failures.push(`${at}: ${young}`);
+    // (what a registry's part found wrong beside the name's age: on PyPI, a hash it lists for no file of the version,
+    // in each file of the pull request that names the package)
+    for (const f of facts.failures ?? []) failures.push(`${said(f.lockPath)}: ${said(p.name)}@${said(f.version)}: ${f.text}`);
     reports.push(`${at}: ${await described(p, facts, now, { get, nuget, github })}`);
   });
   return { failures: failures.sort(), reports: reports.sort() };

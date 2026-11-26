@@ -15,6 +15,7 @@
       "mark": 22438,
       "why": "One runner of a workflow as GitHub runs it: its expression evaluator and job runner, read by their headings, found by searching; its YAML reader is split out (parse-yaml.mjs, #1056), and no other part stands alone for a reader of either."
     },
+    "scripts/pr-description.mjs": { "mark": 21429, "why": "the question of a split is asked in #1154" },
     "scripts/copies.mjs": { "mark": 34376, "why": "the question of a split is asked in #1102" },
     "scripts/mutation-tools.mjs": { "mark": 23365, "why": "the question of a split is asked in #1253" },
     "tests/mutation-tools-test.mjs": { "mark": 20863, "why": "the question of a split is asked in #1253" },
@@ -23,6 +24,7 @@
     "tests/converge-test.mjs": { "mark": 22202, "why": "the question of a split is asked in #1283" },
     "scripts/labels.mjs": { "mark": 22008, "why": "the question of a split is asked in #1186" },
     "scripts/sync.mjs": { "mark": 22147, "why": "the question of a split is asked in #1250" },
+    "scripts/pure-sync.mjs": { "mark": 22253, "why": "the question of a split is asked in #1385" },
     "scripts/comment-only.mjs": { "mark": 28954, "why": "the question of a split is asked in #1341" },
     "SECURITY.md": { "mark": 21346, "why": "the question of a split is asked in #1255" },
     ".github/sizes.json": { "mark": 20901, "why": "a list a script reads, each entry looked up by its path; no split lets anyone read less" },
@@ -64,7 +66,7 @@
       "why": "The shape check's one baseline (scripts/shape.mjs), which it reads whole and a session reads by the id of the one entry it adds or takes out, found by its name; main stood past the mark at 20,580 bytes with no entry here when #582 added its test's."
     },
     ".github/workflows/tests.yml": {
-      "mark": 75194,
+      "mark": 94371,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {
