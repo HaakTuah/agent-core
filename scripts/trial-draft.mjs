@@ -70,8 +70,8 @@ function pagesOf(route, key, ask) {
 // What a commit's checks said, through `ask` (ghAsk's form), every page read: { said, active, flows, unfinished }, or
 // { why }. A workflow run of the commit that could not start is a check that failed, and one not finished waits, each
 // named by its workflow; `active` is `said` with no run GitHub holds for a person (its own status `waiting`, a deploy's
-// reviewer say), `flows` names each workflow run, and `unfinished` each one not finished, by its name in `said`, its
-// workflow's and whether it waits on a person.
+// reviewer say), `flows` names each workflow run, and `unfinished` each one not finished, by its name in `said` and its
+// workflow's.
 function checksAt(repo, sha, ask) {
   const runs = pagesOf(`repos/${repo}/commits/${sha}/check-runs`, "check_runs", ask);
   if (runs.why) return runs;
@@ -82,7 +82,7 @@ function checksAt(repo, sha, ask) {
   const label = w => `${w.name ?? "a workflow"} (${w.status === "completed" ? "could not start" : "workflow"})`;
   const open = flows.items.filter(w => w?.conclusion === "startup_failure" || w?.status !== "completed");
   const unstarted = open.map(w => ({ name: label(w), status: w.status === "completed" ? "completed" : "queued", conclusion: "failure", person: w.status === "waiting" }));
-  const unfinished = open.filter(w => w.status !== "completed").map(w => ({ name: label(w), flow: w.name, person: w.status === "waiting" }));
+  const unfinished = open.filter(w => w.status !== "completed").map(w => ({ name: label(w), flow: w.name }));
   const notHeld = r => r?.status !== "waiting" && !r?.person;
   return { said: saidOf([...runs.items, ...unstarted], status.items), active: saidOf([...runs.items, ...unstarted].filter(notHeld), status.items), flows: new Set(flows.items.map(w => w?.name)), unfinished };
 }
@@ -145,7 +145,7 @@ function notPinned(repo, head, sha, ask) {
 // is named.
 function waitingOf(then, now) {
   const flow = n => then.unfinished.filter(u => u.name === n);
-  const counts = ([n, v]) => v === "waiting" && (flow(n).length ? flow(n).some(u => !u.person && now.flows.has(u.flow)) : Object.hasOwn(now.said, n));
+  const counts = ([n, v]) => v === "waiting" && (flow(n).length ? flow(n).some(u => now.flows.has(u.flow)) : Object.hasOwn(now.said, n));
   return [Object.entries(then.active).filter(counts).length, Object.values(now.said).filter(v => v === "waiting").length];
 }
 
