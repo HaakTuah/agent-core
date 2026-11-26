@@ -12,7 +12,8 @@ import { fileURLToPath } from "node:url";
 import { differences, fresh } from "../scripts/fresh.mjs";
 import { kits, plan } from "../scripts/converge.mjs";
 import { heldKitIn } from "../scripts/steps-kit.mjs";
-import { project } from "../scripts/steps.mjs";
+import { configs, project } from "../scripts/steps.mjs";
+import { ownPaths } from "../scripts/kit-paths.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -53,6 +54,13 @@ for (const priv of [false, true]) {
   if (priv) rewrite(".github/workflows/core.yml", t => t.replace(/^\s*sizes: .*\n/m, ""));
   const pl = project(dir);
   found = differences(pl, fresh(pl));
+  // (a path the project's call gives that is no plain file path, a quote in it, keeps the kit's: it lands in the kit's
+  // JSON and YAML as text)
+  if (!priv) {
+    const odd = ownPaths(pm, { ...configs(pm), copies: 'x.json", "k": "', baseline: "config/" });
+    const line = '  "baseline": "checks/copies-baseline.json", "config": "checks/copies.json"';
+    ok(odd("checks/copies.json", line) === line, `${name}: a path that is no plain file path keeps the kit's`, odd("checks/copies.json", line));
+  }
   ok(found.length === (priv ? 2 : 1) && found.includes("config/shape-baseline.json: missing (the starter kit writes it today)") && (!priv || found.includes(".github/workflows/core.yml: lacks the line \"sizes: config/sizes.json\"")),
     `${name}: a config lost, and a call's line lost, are still listed, at the project's paths`, found.join("\n"));
 }

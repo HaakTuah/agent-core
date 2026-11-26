@@ -8,25 +8,28 @@ import { KIT as SHAPE, plainPath, where as shapeAt } from "./shape.mjs";
 
 // Where the kit writes the shape check's baseline.
 const SHAPE_BASELINE = "checks/shape-baseline.json";
+// A path of a file inside the project, in the form the shape check reads one (no quote, backslash or control
+// character can stand in it, so it lands in the kit's JSON and YAML as it is), else null.
+const plainFile = s => plainPath(s) && !s.endsWith("/") ? s : null;
 
 // The shape check's baseline in the project `p`, at the path its config names for it where that is a plain path inside
 // the project, as the shape check reads it, else where the kit writes it.
 export function shapeBaseline(p) {
   let config = null;
   try { config = JSON.parse(p.read(shapeAt(p.manifest)) ?? "null"); } catch { /* (the kit's path, below) */ }
-  return plainPath(config?.baseline) && !config.baseline.endsWith("/") ? config.baseline : SHAPE_BASELINE;
+  return plainFile(config?.baseline) ?? SHAPE_BASELINE;
 }
 
 // (to, text) => the kit's text of the file `to` with each kit path of a config as the project `p` holds it: `at` the
 // paths it runs its checks with (check-configs.mjs, `configs`), the shape check's config and baseline as its manifest
 // and that config name them. The NuGet check's config, which the kit names as the licence check's, is the NuGet check's
 // own on the lines that pass it (the `config:` of nuget.yml, the `nuget:` of core.yml's one job). A config that cannot
-// be read (null) keeps the kit's path.
+// be read (null), or whose path is not a plain file path inside the project, keeps the kit's path.
 export function ownPaths(p, at) {
-  const moved = new Map([[KIT_CONFIGS.copies, at.copies], [KIT_CONFIGS.baseline, at.baseline], [KIT_CONFIGS.sizes, at.sizes], [KIT_CONFIGS.licences, at.licences], [KIT_CONFIGS.audit, at.audit], [SHAPE, shapeAt(p.manifest)], [SHAPE_BASELINE, shapeBaseline(p)]]);
+  const moved = new Map([[KIT_CONFIGS.copies, at.copies], [KIT_CONFIGS.baseline, at.baseline], [KIT_CONFIGS.sizes, at.sizes], [KIT_CONFIGS.licences, at.licences], [KIT_CONFIGS.audit, at.audit], [SHAPE, shapeAt(p.manifest)], [SHAPE_BASELINE, shapeBaseline(p)]].map(([kit, own]) => [kit, plainFile(own)]));
   const kitPath = new RegExp(`(?<![\\w./-])(?:${[...moved.keys()].map(k => k.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("|")})(?![\\w/-])`, "gu");
   return (to, text) => text.split("\n").map(line => {
     const nuget = (to === ".github/workflows/nuget.yml" && /^\s*config:/u.test(line)) || /^\s*nuget:/u.test(line);
-    return line.replace(kitPath, kit => (nuget && kit === KIT_CONFIGS.licences ? at.nuget : moved.get(kit)) ?? kit);
+    return line.replace(kitPath, kit => (nuget && kit === KIT_CONFIGS.licences ? plainFile(at.nuget) : moved.get(kit)) ?? kit);
   }).join("\n");
 }
