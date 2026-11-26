@@ -1,101 +1,28 @@
-// Tests of the core's releases (releases.mjs) and of cutting one (release.mjs, with the trial on a real project in release-trial.mjs): what a project follows, which tags are
-// releases, which is the newest and whether it is past a pin, what a sync between two commits asks, whether a release
-// asks a sync of a project at all, and what the next release would be. In a scratch repository that stands in for the core, fetched as the scripts fetch the core; on
-// Linux and on Windows. Git and Node's own modules only.
+// Tests of the core's releases (releases.mjs): which tags are releases, which is the newest and whether it is past a pin, what
+// a sync between two commits asks, and whether a release asks a sync of a project at all. What a project follows:
+// follows-test.mjs; cutting one (release.mjs): release-test.mjs; the trial on a real project (release-trial.mjs): release-trial-test.mjs
+// (#958). In a scratch repository that stands in for the core, fetched as the scripts fetch the core; on Linux and on
+// Windows. Git and Node's own modules only.
 //
 //   node tests/releases-test.mjs
-import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { CORE, OWNER } from "../scripts/core-address.mjs";
-import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
-import { COUNTS, TRIAL, compared, ownCount, trialAt, trialRecord } from "../scripts/release-trial.mjs";
-import { answerOf } from "../scripts/trial-sync.mjs";
-import { shownAs } from "../scripts/state-report.mjs";
 import { STEPS } from "../scripts/steps.mjs";
-import { FOLDER, NOTICE, POINTER, QUIET, entries, notesAt, quiet, quietAt } from "../scripts/sync-notes.mjs";
-import { NOTES, OWN_FILES, RELEASE, asksBetween, asksLeft, elsewhere, fetchCore, inBare, followsOf, hostAccount, hostSaid, jumped, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { FOLDER, POINTER, QUIET, entries, notesAt, quiet, quietAt } from "../scripts/sync-notes.mjs";
+import { NOTES, OWN_FILES, RELEASE, asksBetween, asksLeft, fetchCore, inBare, jumped, matters, namedReleases, newestRelease, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
+import { scratchCore, victimRepo } from "../scripts/releases-scratch.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
 
-// what a project follows
-const manifest = (owner, row = "") =>
-  `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under core/ (never edited here).\n\n| Slot | Here |\n| --- | --- |\n| *owner's account* | \`${owner}\` |\n${row}`;
-ok(ownerOf(manifest("someone")) === "someone" && ownerOf("no manifest") === null, "the owner's account is read from its one row");
-ok(followsOf(manifest(OWNER)) === "main" && followsOf(manifest(OWNER.toUpperCase())) === "main", "with no row, the core's own owner's project follows main, however the login is cased");
-ok(followsOf(manifest("someone-else")) === "releases", "with no row, another owner's project follows the releases");
-ok(followsOf(manifest(OWNER, "| *follows* | `releases` |\n")) === "releases" && followsOf(manifest("someone-else", "| *follows* | `main` |\n")) === "main", "a row decides it, either way");
-ok(followsOf(manifest("someone-else", "|*follows*|  `main`  |\n")) === "main", "the row is read whatever its blanks");
-ok(followsOf(manifest(OWNER, "| *follows* | releases |\n")) === null && followsOf(manifest(OWNER, "| *follows* | `main` or `releases` |\n")) === null && followsOf(manifest(OWNER, "| *follows* | `tags` |\n")) === null, "a row that says anything else, or says it without backticks, gives no answer");
-ok(followsOf(manifest(OWNER, "| *follows* | `main` |\n| *follows* | `releases` |\n")) === null, "two rows give no answer");
-ok(followsOf("| *owner's account* | someone |\n") === null, "no row and no owner's account to go by give no answer");
-// (#481: with no row at all, the repository's own account where the host says a person holds it; a row still decides)
-const PERSON = { login: "someone", type: "User" }, ORG = { login: "a-team", type: "Organization" }, BARE = "# Core manifest\n\n| Slot | Here |\n| --- | --- |\n";
-ok(ownerOf(BARE, PERSON) === "someone" && ownerOf(BARE, ORG) === null && ownerOf(BARE) === null, "with no row, the owner's account is read where a person's account holds the repository, and only there");
-ok(ownerOf(manifest("other"), PERSON) === "other" && ownerOf("| *owner's account* | someone |\n", PERSON) === null && ownerOf(`${manifest("a")}| *owner's account* | \`b\` |\n`, PERSON) === null, "a row decides over what was read, and a row of another form, or two, give no answer and are never read past");
-ok(["| *Owner's Account* | `x` |", "| *owner’s account* | `x` |", "|**owner's account**| `x` |", "| *owners account* | x |", "| *owner's account* (a team's) | `x` |", "| the Owner's  Account | `x` |"].every(row => ownerOf(`${BARE}${row}\n`, PERSON) === null), "a row whose lead is cased or spelt otherwise is still a row: no answer, and the host's account is never read past it");
-ok(ownerOf(`${manifest("other")}| *Owner's account* | \`x\` |\n`, PERSON) === "other", "the one row of its form decides beside a row spelt otherwise, as before");
-ok(ownerOf(BARE, { login: "a;b", type: "User" }) === null && ownerOf(BARE, { login: "x", type: "user" }) === null, "a login of no form, and a type other than the host's own word, read as nothing");
-ok(followsOf(BARE, { login: OWNER, type: "User" }) === "main" && followsOf(BARE, PERSON) === "releases" && followsOf(BARE, ORG) === null, "with no row, what the project follows goes by the account read");
-{ // asked once, only when called, saying what it read
-  const lines = [], calls = [];
-  const host = hostSaid(l => lines.push(l), () => { calls.push(1); return PERSON; });
-  ok(ownerOf(manifest("other"), host) === "other" && !calls.length && !lines.length, "with a row, the host is not asked and nothing is said");
-  ok(ownerOf(BARE, host) === "someone" && followsOf(BARE, host) === "releases" && calls.length === 1 && lines.length === 1 && /^read from the host: someone, a person's account, holds the repository; a row/.test(lines[0]), "with none, it is asked once and says what it read", lines.join("\n"));
-  const none = [];
-  ok(ownerOf(BARE, hostSaid(l => none.push(l), () => null)) === null && /nothing/.test(none[0]) && /an account of the type x%0Ay/.test((() => { const l = []; hostSaid(x => l.push(x), () => ({ login: "a", type: "x\ny" }))(); return l[0]; })()), "nothing read is said so, and a type of no form is only quoted");
-}
-{ // the host's account: from the workflow's event, else from gh, else nothing
-  const dir = scratchDir("host-account-"), event = path.join(dir, "event.json"), asked = [];
-  try {
-    fs.writeFileSync(event, JSON.stringify({ repository: { owner: { login: "someone", type: "User", id: 1 } } }));
-    const gh = text => args => { asked.push(args.join(" ")); return text; };
-    ok(JSON.stringify(hostAccount({ GITHUB_EVENT_PATH: event }, gh("{}"))) === JSON.stringify(PERSON) && !asked.length, "the event's own account is read, and gh is not asked");
-    fs.writeFileSync(event, JSON.stringify({ repository: { full_name: "Someone/Project", owner: { login: "someone", type: "User" } } }));
-    ok(JSON.stringify(hostAccount({ GITHUB_EVENT_PATH: event, GITHUB_REPOSITORY: "someone/project" }, gh("{}"))) === JSON.stringify(PERSON), "an event of the repository asked about is read, whatever its case");
-    ok(JSON.stringify(hostAccount({ GITHUB_EVENT_PATH: event, GITHUB_REPOSITORY: "a-team/x" }, gh(JSON.stringify(ORG)))) === JSON.stringify(ORG), "an event of another repository is passed over for gh's answer on the one asked about");
-    ok(JSON.stringify(hostAccount({ GITHUB_REPOSITORY: "a-team/x" }, gh(JSON.stringify(ORG)))) === JSON.stringify(ORG) && asked.at(-1) === "api repos/a-team/x --jq .owner | {login, type}", "with no event, gh is asked of the repository's own route", asked.join("; "));
-    ok(hostAccount({ GITHUB_REPOSITORY: "../x" }, gh(JSON.stringify(PERSON))) === null && hostAccount({ GITHUB_REPOSITORY: "a/x" }, () => { throw new Error("no gh"); }) === null && hostAccount({ GITHUB_REPOSITORY: "a/x" }, gh("not json")) === null, "no repository's name, no gh, or an answer of no form: nothing read, never a guess");
-    fs.writeFileSync(event, JSON.stringify({ repository: { owner: { login: "a b", type: "User" } } }));
-    ok(JSON.stringify(hostAccount({ GITHUB_EVENT_PATH: event, GITHUB_REPOSITORY: "a-team/x" }, gh(JSON.stringify(ORG)))) === JSON.stringify(ORG), "an event's login of no form is passed over for gh's answer");
-  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
-}
 ok(RELEASE.test("release-1") && RELEASE.test("release-120") && !RELEASE.test("release-0") && !RELEASE.test("release-01") && !RELEASE.test("release-1a") && !RELEASE.test("v1") && !RELEASE.test("release-1\n"), "a release's name is the word and a whole number above zero");
 
 // a scratch core: main with four commits, a side branch, and tags
-const tmp = scratchDir("releases-test-");
-// (git's own variables that point at a repository are left out, so every call lands in the scratch one)
-for (const name of Object.keys(process.env)) if (elsewhere.test(name)) delete process.env[name];
-// (and git finds no bare repository by itself, as Git 3.0 has it by default: the scripts name each one they make)
-Object.assign(process.env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1",
-  GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "safe.bareRepository", GIT_CONFIG_VALUE_0: "explicit" });
-// (the test's own calls never take a variable that points elsewhere, even while one is set to try the scripts)
-const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env: Object.fromEntries(Object.entries(process.env).filter(([name]) => !elsewhere.test(name))), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-const core = path.join(tmp, "core");
-fs.mkdirSync(path.join(core, path.dirname(NOTES)), { recursive: true });
-git(core, "init", "-q", "-b", "main");
-let n = 0;
-const commit = (notes) => {
-  fs.writeFileSync(path.join(core, NOTES), notes);
-  fs.writeFileSync(path.join(core, "n"), String(++n));
-  git(core, "add", "-A");
-  git(core, "commit", "-q", "-m", `commit ${n}`);
-  return git(core, "rev-parse", "HEAD");
-};
-const head = "# What a sync asks of a project\n\n";
-const c1 = commit(head), c2 = commit(`${head}- **First.** Done when one.\n`);
-git(core, "checkout", "-q", "-b", "side");
-const side = commit(`${head}- **First.** Done when one.\n- **Aside.** Never on main.\n`);
-git(core, "checkout", "-q", "main");
-const c3 = commit(`${head}- **First.** Done when one.\n- **Second.** Done when two.\n`), c4 = commit(`${head}- **First.** Done when one.\n- **Second.** Done when two.\n`);
-const fetched = () => { const dir = fs.mkdtempSync(path.join(tmp, "fetched-")); fetchCore(dir, core); return dir; };
+const { tmp, git, core, commit, head, c1, c2, c3, c4, side, fetched } = scratchCore("releases-test-");
 
 let dir = fetched();
 ok(releasesIn(dir).length === 0 && newestRelease(c1, dir) === null && !jumped(c1, dir), "a core with no tag has no release, and no copy is older than its last two");
-ok(next(dir).name === "release-1" && next(dir).sha === c4 && next(dir).before === null && next(dir).asks.length === 0, "the first release would stand on main's newest commit");
 ok(past(c1, c3, dir) && past(c3, c3, dir) && !past(c3, c1, dir) && !past("0".repeat(40), c3, dir) && !past("not-a-commit", c3, dir), "a commit is past the ones it came from, and itself; what is no commit there is past nothing");
 
 git(core, "tag", "release-1", c2);
@@ -144,8 +71,6 @@ ok(asksBetween("f".repeat(40), c3, dir) === null, "notes that cannot be read giv
   const oldReader = (a, b) => git(notes, "diff", "--unified=0", "--no-color", a, b, "--", NOTES).split("\n").filter(l => l.startsWith("+- ")).map(l => l.slice(1));
   ok(notice.length === 1 && oldReader(filed, moved).join("|") === notice[0] && notice[0].includes("`core/setup/sync-notes/`"), "a sync from a copy older than the folder, by its own old reader, prints the notice that sends it to the folder", oldReader(filed, moved).join("\n"));
 }
-const coming = next(dir);
-ok(coming.name === "release-4" && coming.sha === c4 && coming.before.name === "release-2" && coming.asks.length === 0, "the next release stands on main's newest commit, numbered after every tag with a release's name, the one that is no release too, so its name is never taken");
 
 // a tag of a tag, and a number out of main's order
 git(core, "tag", "-a", "-m", "inner", "inner", c4);
@@ -155,20 +80,6 @@ dir = fetched();
 const five = releasesIn(dir)[0];
 ok(five.name === "release-5" && five.sha === c4 && git(dir, `--git-dir=${dir}`, "cat-file", "-t", five.sha) === "commit", "a release made as a tag of a tag is the commit it leads to, never a tag", JSON.stringify(five));
 ok(!releasesIn(dir).some(r => r.name === "release-6") && namedReleases(dir).at(-1).name === "release-6" && newestRelease(c1, dir).name === "release-5", "a tag numbered newest on an older commit is no release: the newest by number is the newest in main's history");
-ok(next(dir) === null, "with the newest release on main's newest commit there is nothing to release");
-commit(`${head}- **First.** Done when one.\n- **Second.** Done when two.\n- **Third.** Done when three.\n`);
-dir = fetched();
-ok(next(dir).name === "release-7" && next(dir).before.name === "release-5" && next(dir).asks.join() === "- **Third.** Done when three.", "the next one is numbered past the mistaken tag, and carries what the notes gained since the newest release");
-git(core, "tag", "release-999999999", c1);
-let refused = false;
-try { next(fetched()); } catch { refused = true; }
-ok(refused, "a tag numbered so high that the next would be no release's name stops the cut, and says so");
-git(core, "tag", "-d", "release-999999999");
-dir = fetched();
-const tip = git(core, "rev-parse", "main");
-let moved = "";
-try { next(dir, c4); } catch (e) { moved = e.message; }
-ok(next(dir, tip).sha === tip && moved.includes("main has moved on"), "asked for one commit, the cut is refused where main's newest commit is another");
 
 // a release that brings nothing a project takes asks no sync of it (#242)
 const taking = (list, left = "`b.md` (no use here)") => `# Core manifest\n\nFloor: whole. Modules: ${list}.\nNot taken: ${left}.\n`;
@@ -231,144 +142,17 @@ change({ [NOTES]: `${head}- **New.** Done when new.\n` }, "release-5");
 dir = otherDir();
 ok(!staysAt(r4, onlyA, dir), "a release whose notes ask something new asks a sync");
 
-// the checks on the commit a release would stand on
-const run = (name, status, conclusion, path = `.github/workflows/${name}.yml`) => ({ name, path, status, conclusion });
-const list = (...runs) => ({ total_count: runs.length, workflow_runs: runs });
-// the core's tests in full on that commit (#733): of the tests' runs there once an hour or by hand, which hold the
-// Windows suites, none is unfinished and the newest, by when it last started (a re-run moves it), passed
-// (each bears the workflow's own name, as GitHub gives a run whose run-name is empty: tests-parts-test.mjs reads the rest)
-const full = (event, conclusion, id, status = "completed", at = `2026-11-19T10:${String(id).padStart(2, "0")}:00Z`) => ({ ...run("tests", status, conclusion), event, id, run_started_at: at, display_title: "tests" });
-ok(/have not run in full on it yet/.test(fullRun(list({ ...run("tests", "completed", "success"), event: "push" }))), "a commit whose tests ran only on its push, on Linux, has not had them in full, and the release waits, saying how to start them");
-ok(fullRun(list(full("schedule", "success", 10))) === null && fullRun(list(full("workflow_dispatch", "success", 10))) === null, "an hourly or a hand-started run that passed lets the release stand");
-ok(fullRun(list(full("workflow_dispatch", "success", 10), full("schedule", "failure", 9))) === null && /hourly run\): failure/.test(fullRun(list(full("schedule", "failure", 10), full("workflow_dispatch", "success", 9)))), "the newest of them, by when it last started, decides, in whatever order GitHub lists them: a pass started after a failure lets it stand, a failure started after a pass holds it");
-ok(/hand-started run\): failure/.test(fullRun(list(full("schedule", "success", 20), full("workflow_dispatch", "failure", 10, "completed", "2026-11-19T11:00:00Z")))) && fullRun(list(full("schedule", "failure", 20, "completed", "2026-11-19T10:00:00Z"), full("schedule", "success", 10, "completed", "2026-11-19T10:00:00Z"))) !== null, "an older run started again by hand, which failed, holds it over a skipped run made before; two that started together, the one made last decides");
-ok(/hand-started run\): in_progress/.test(fullRun(list(full("schedule", "success", 11), full("workflow_dispatch", null, 10, "in_progress")))), "and a full run still going on the commit holds it, though a skipped hourly run was made after it");
-ok(/in_progress/.test(fullRun(list(full("schedule", null, 10, "in_progress")))) && /not run in full/.test(fullRun(list({ ...full("schedule", "success", 10), path: ".github/workflows/other.yml" }))), "one still going holds it, and another workflow's run is no run of the tests");
-ok(held(list(run("tests", "completed", "success"), run("size", "completed", "success"))).length === 0, "a commit whose every check has passed may carry a release");
-ok(held(list(run("tests", "completed", "success"), run("size", "completed", "skipped"), run("other", "completed", "neutral"))).length === 0, "a check that was skipped holds nothing where another passed");
-ok(held(list(run("tests", "in_progress", null), run("size", "completed", "success"))).join() === "tests: in_progress" && held(list(run("tests", "queued", null))).join() === "tests: queued", "a check still going holds it");
-ok(held(list(run("tests", "completed", "failure"), run("size", "completed", "cancelled"), run("x", "completed", "timed_out"))).join() === "tests: failure,size: cancelled,x: timed_out", "so does each that failed, was cancelled or ran out of time");
-ok(held(list()).join() === "no check has passed on it yet" && held(list(run("size", "completed", "skipped"))).join() === "no check has passed on it yet", "so does a commit no check has run on yet, or on which every check only skipped");
-ok(held(list(run("release", "completed", "failure", OWN), run("tests", "completed", "success"))).length === 0 && held(list(run("release", "in_progress", null, OWN))).join() === "no check has passed on it yet", "the release workflow's own runs, an earlier try that failed too, are no check of the commit");
-ok(held({ total_count: 3, workflow_runs: [run("tests", "completed", "success")] }).join().includes("3 runs stand on it and 1 were read"), "a list read only in part holds it");
-ok([null, undefined, {}, [], "text", { workflow_runs: [] }, { total_count: "1", workflow_runs: [run("tests", "completed", "success")] }, { total_count: 1, workflow_runs: {} }].every(l => held(l).join() === "the list of the checks on it could not be read"), "so does a list in any other form");
-const handed = older("release-7", "b".repeat(40));
-ok(handed.includes(`node core/scripts/sync.mjs ${"b".repeat(40)}`) && handed.includes("older than release-1") && handed.includes("release-7"), "each release says how a copy older than release-1 takes it: once, with the release's full SHA (#365)", handed);
-// (asked of the script itself, in this repository: each stops before anything is fetched or pushed)
-const cutting = (...args) => { const r = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/release.mjs", import.meta.url)), "--cut", ...args], { encoding: "utf8" }); return r.status === 1 && /--cut needs --at <sha>, --runs <file> and --full <file>|needs a value/.test(r.stderr) && !r.stdout; };
-ok(cutting() && cutting("--at", "a".repeat(40)) && cutting("--runs", "runs.json") && cutting("--runs", "runs.json", "--at") && cutting("--at", "a".repeat(40), "--runs", "runs.json"), "a cut asked for without the commit it is for, without the checks on it, or without the tests' runs there, is refused before anything is fetched");
-ok(held({ total_count: 2, workflow_runs: [null, run("tests", "completed", "success")] }).join() === "a check: unreadable" && held(list({ name: "tests", path: "p" })).join() === "tests: unreadable", "and a run in it that cannot be read");
-
 // git's own variables that point elsewhere: a project's repository is never touched, and the guard is not fooled
-const victim = path.join(tmp, "victim");
-fs.mkdirSync(path.join(victim, "core", "scripts"), { recursive: true });
-git(victim, "init", "-q", "-b", "main");
-fs.writeFileSync(path.join(victim, "f"), "x");
-git(victim, "add", "-A");
-git(victim, "commit", "-q", "-m", "its own");
-const own = git(victim, "rev-parse", "HEAD");
+const { victim, own } = victimRepo(tmp, git);
 process.env.GIT_DIR = path.join(victim, ".git");
 process.env.GIT_WORK_TREE = victim;
-let pointed, fooled;
+let pointed;
 try {
   pointed = fs.mkdtempSync(path.join(tmp, "pointed-"));
   fetchCore(pointed, core);
-  fooled = inTheCore(path.join(victim, "core", "scripts", "release.mjs"));
 } finally { delete process.env.GIT_DIR; delete process.env.GIT_WORK_TREE; }
 ok(releasesIn(pointed)[0]?.name === "release-5" && git(victim, "rev-parse", "HEAD") === own && git(victim, "config", "--get", "core.bare") === "false" && git(victim, "tag").trim() === "", "with git pointed at a project's repository, the core is still fetched into its own folder and the project's is left as it was");
-ok(fooled === false, "and a project's copy is still no place to cut a release from");
 
-// where a release may be cut
-ok(inTheCore(), "this file lies in the core's own repository");
-const project = path.join(tmp, "project");
-fs.mkdirSync(path.join(project, "core", "scripts"), { recursive: true });
-git(project, "init", "-q");
-ok(!inTheCore(path.join(project, "core", "scripts", "release.mjs")), "a copy under a project's core/ is not the core: a project cuts no release");
-ok(!inTheCore(path.join(tmp, "nowhere", "scripts", "release.mjs")), "nor is a folder that is no repository");
-// a copy kept as a repository of its own under a project's core/, the project's manifest beside it
-const nested = path.join(tmp, "nested");
-fs.mkdirSync(path.join(nested, "core", "scripts"), { recursive: true });
-fs.writeFileSync(path.join(nested, "core-manifest.md"), "# Core manifest\n");
-git(path.join(nested, "core"), "init", "-q");
-ok(!inTheCore(path.join(nested, "core", "scripts", "release.mjs")), "nor is a clone or submodule of the core under a project's core/");
-
-// what a release asks, each with roughly what it costs a project where it is not done yet (steps.mjs)
-const owners = STEPS.find(s => s.owner === true), hosts = STEPS.find(s => typeof s.owner === "function");
-ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[0].cost}.`) && costed(`- **${owners.lead}.** Done when two.`).endsWith("(the owner's).") && costed(`- **${hosts.lead}.** Done when two.`).endsWith("(the owner's in a private repository).")
-  && costed("- **No such entry.** Done when three.").includes("unknown") && costed(`${NOTICE}: and so on.`).includes("each entry it sends the session to") && costed("- A line of no form.").includes("unknown"), "each ask of a release says what it costs, the owner's marked so, one with no step or of no form says so, and the notice costs what it sends to");
-
-// the trial on a real project (#1084): a run before the update beside one after it, and its record, which holds the cut
-// where it does not stand for the commit, or where a check passed before and failed after
-{
-  const c = compared({ "a.yml/x": "passed", "a.yml/y": "failed", "a.yml/z": "passed", "a.yml/gone": "failed" }, { "a.yml/x": "passed", "a.yml/y": "failed", "a.yml/z": "failed", "b.yml/new": "failed", "b.yml/more": "passed" });
-  ok(Object.values(c).join(";") === "a.yml/x;;a.yml/y;a.yml/z;b.yml/new;;;b.yml/more;;a.yml/gone;;;;;", "each job is in its class of COUNTS: passed both, failed both (standing before), failed after where it passed before or did not run (the update's), ran after alone, and failed before alone", JSON.stringify(c));
-  const t = path.join(tmp, "trial");
-  git(tmp, "init", "-q", "-b", "main", t);
-  const commit = (files, msg) => { for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(t, f)), { recursive: true }); fs.writeFileSync(path.join(t, f), text); } git(t, "add", "-A"); git(t, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", msg); return git(t, "rev-parse", "HEAD"); };
-  const read = args => git(t, ...args);
-  const tried = commit({ "a.txt": "1\n" }, "the commit tried");
-  const none = trialAt(tried, read);
-  ok(/has not run for/.test(none.said) && /Mend: try the release on a copy of a project/.test(none.held ?? ""), "with no record, the release says the trial has not run, and the cut is held, saying its mend");
-  const SYNC = [{ pure: true, from: "release-1" }];
-  const record = r => commit({ [TRIAL]: `${JSON.stringify(r)}\n` }, "the trial's record");
-  const passed = trialRecord(tried, "2026-11-22", [[{ "a.yml/x": "passed", "a.yml/y": "failed" }, { "a.yml/x": "passed", "a.yml/y": "failed" }]], SYNC);
-  ok(passed.projects === 1 && passed.passedBoth === 1 && passed.failedBoth === 1 && Object.keys(passed).join() === `commit,day,projects,${COUNTS},baselineFromClone,syncPure,syncNotPure,copiesFrom`, "the record holds the commit, the day and counts alone, nothing of the project");
-  let at = record(passed);
-  let r = trialAt(at, read);
-  ok(r.held === null && /in 1 project: 1 check passed before and after the update, 0 failed before and passed after, 1 failed before and after \(standing before the release\), 0 passed before and failed after/.test(r.said), "a record of the commit before, which the release changes by the record alone, stands, and one failing both does not hold the cut", r.said);
-  at = commit({ "a.txt": "2\n" }, "more since");
-  r = trialAt(at, read);
-  ok(/changes more than the record since \(a\.txt\)/.test(r.held ?? ""), "a commit that changes more than the record since the commit tried holds the cut", r.held);
-  const later = commit({ "a.txt": "3\n" }, "tried again");
-  at = record(trialRecord(later, "2026-11-23", [[{ "a.yml/x": "passed" }, { "a.yml/x": "failed" }]], SYNC));
-  r = trialAt(at, read);
-  ok(/1 check failed after the release in the trial on a real project, 1 of them passing before it[\s\S]*Mend: find the release's fault/.test(r.held ?? ""), "a check that passed before and failed after holds the cut, saying its mend", r.held);
-  at = record(trialRecord(later, "2026-11-23", [[{ "a.yml/x": "passed", "a.yml/gate": "passed" }, { "a.yml/x": "passed", "a.yml/gate": "unread" }]], SYNC));
-  r = trialAt(at, read);
-  ok(/1 check was not measured in the trial on a real project, 1 of them run before and not read after the update[\s\S]*Mend: teach the core's workflow runner/.test(r.held ?? "") && !/failed after the release/.test(r.held ?? ""), "a check that ran before and the trial's run after could not read holds the cut as not measured, saying its mend (#1257; #1263, point 2)", r.held);
-  at = record(trialRecord(later, "2026-11-23", [[{ "a.yml": "failed" }, { "a.yml/x": "passed", "a.yml/gate": "unread" }]], SYNC));
-  r = trialAt(at, read);
-  ok(r.held === null && /1 read in neither run \(not measured, holding nothing\)/.test(r.said), "one read in neither run, under a file an older check.mjs failed whole before, holds nothing and is no failure (#1257)", `${r.said}\n${r.held}`);
-  at = record(trialRecord(later, "2026-11-23", []));
-  r = trialAt(at, read);
-  ok(r.held === null && /No project that takes the core allowed a trial/.test(r.said), "where no project allowed a trial, the release says so, and it is not held");
-  // (the sync's reading against the commit tried, pure-sync.mjs --trial, and the copy each run before started from:
-  // counted, and holding no cut, pure or not; #1261)
-  const one = [{ "a.yml/x": "passed" }, { "a.yml/x": "passed" }];
-  const readings = trialRecord(later, "2026-11-23", [one, one, one], [{ pure: true, from: "release-5" }, { pure: false, from: "release-5" }, { pure: true, from: "main" }]);
-  ok(readings.syncPure === 2 && readings.syncNotPure === 1 && JSON.stringify(readings.copiesFrom) === JSON.stringify({ "release-5": 2, main: 1 }), "the record counts the syncs pure and not against the commit tried, and the copies the runs before started from, by the core's release", JSON.stringify(readings));
-  r = trialAt(record(readings), read);
-  ok(r.held === null && /2 of the syncs pure, 1 not; the runs before the update started from the copies their main held, 2 from release-5, 1 from a commit of the core's main that is no release\./.test(r.said), "  and says them, a sync not pure holding no cut: it is a reading", `${r.said}\n${r.held}`);
-  const printed = `  NOT PURE something\nnot a pure sync against the commit tried, ${later}: a trial's reading\ntrial answer: ${JSON.stringify({ commit: later, pure: false, from: "main" })}\n`;
-  ok(JSON.stringify(answerOf(printed, later)) === JSON.stringify({ answer: { pure: false, from: "main" } }) && /not the commit tried/.test(answerOf(printed, tried).why) && /holds no line/.test(answerOf("a pure sync: core a -> b\nmerge it with sha=x\n", later).why)
-    && /holds no line/.test(answerOf(`trial answer: ${JSON.stringify({ commit: later, pure: "yes", from: "main" })}`, later).why) && /holds no line/.test(answerOf(`trial answer: ${JSON.stringify({ commit: later, pure: true, from: "my-project" })}`, later).why),
-    "the sync's reading is read from what pure-sync.mjs --trial printed: its answer for the commit tried alone, never the proof's lines, a verdict of no form or a copy named otherwise than by the core");
-  const noForm = [{ commit: later, projects: "one" }, { ...trialRecord(later, "2026-11-23", []), failedAfter: 2 }, { ...trialRecord(later, "2026-11-23", []), day: "<b>soon</b>" },
-    { ...readings, syncPure: 3 }, { ...readings, syncPure: 1, copiesFrom: { "release-5": 1, main: 1 } }, { ...readings, copiesFrom: { "release-5": 1, main: 1 } }, { ...readings, copiesFrom: { "a project": 3 } }, { ...readings, copiesFrom: null }, (({ syncPure, syncNotPure, ...rest }) => rest)(readings)]
-    .map(bad => trialAt(record(bad), read));
-  ok(noForm.every(n => /no form/.test(n.said) && n.held !== null), "a record in no form holds the cut: a count that is no count, one of no project that counts a check, a day of no form, syncs read more or fewer than its projects, copies that do not add up to them, one named otherwise than by the core, copies of no form, and no syncs' counts at all");
-  const noCopies = trialAt(record((({ copiesFrom, ...rest }) => rest)(readings)), read);
-  ok(!/no form/.test(noCopies.said) && /2 of the syncs pure, 1 not\./.test(noCopies.said), "a record without the copies, data it may leave out, is in its form and says the syncs alone (#1261's design check)", noCopies.said);
-  // (a later commit that takes out a file git would read as renamed into the record is still more than the record)
-  commit({ "old.json": `${JSON.stringify({ a: 1, b: 2, c: 3, d: 4, e: 5 }, null, 2)}\n` }, "a file like the record");
-  const like = git(t, "rev-parse", "HEAD");
-  git(t, "rm", "-q", "old.json");
-  at = record({ ...trialRecord(like, "2026-11-23", []) });
-  ok(/changes more than the record since \(old\.json\)/.test(trialAt(at, read).held ?? ""), "a file taken out beside the record is no rename of it: the cut is held", trialAt(at, read).held);
-  const cli = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", "abc"], { encoding: "utf8" });
-  ok(cli.status === 1 && /--trial needs the full SHA/.test(cli.stderr), "--trial with no full SHA writes nothing and says what it needs", cli.stderr);
-  const listed = ["**The projects that take the core** (read 2026-11-22)", `- ${shownAs("o/a", true, false)}: it has no state report yet.`, `- ${shownAs("o/b", true, true)}: from its report of 2026-10: 3.`, `- ${shownAs("x/c", false, false)}: it has no state report yet.`, "- (GitHub's code search gave no answer.)"].join("\n");
-  ok(ownCount(listed) === 2 && ownCount("**The projects that take the core**\n- None found.") === 0, "the owner's projects are counted from what state-report.mjs --projects prints, in shownAs's words: its own public and private, never another owner's, a note or none found");
-  const inCore = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", later, path.join(path.dirname(fileURLToPath(import.meta.url)), "before.json"), path.join(tmp, "after.json")], { encoding: "utf8" });
-  ok(inCore.status === 1 && /lies in the core's own repository/.test(inCore.stderr), "--trial refuses a run's verdicts kept in the core's own repository, where a project's job names could be committed", inCore.stderr);
-  const releaseMjs = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), runs = path.join(tmp, "runs.json"), said = path.join(tmp, "said.txt");
-  fs.writeFileSync(runs, JSON.stringify(one[0])); fs.writeFileSync(said, "a pure sync: core a -> b\nmerge it with sha=x\n");
-  const cliRun = (...args) => spawnSync(process.execPath, [releaseMjs, "--trial", later, ...args], { encoding: "utf8" });
-  const [syncFirst, syncTwice, syncInCore, syncNoAnswer, syncNone] = [cliRun("--sync", said, runs, runs), cliRun(runs, runs, "--sync", said, "--sync", said), cliRun(runs, runs, "--sync", path.join(path.dirname(fileURLToPath(import.meta.url)), "said.txt")), cliRun(runs, runs, "--sync", said), cliRun(runs, runs)];
-  ok([syncFirst, syncTwice].every(c => c.status === 1 && /--trial needs the full SHA[^\n]*--sync/.test(c.stderr)) && syncInCore.status === 1 && /lies in the core's own repository/.test(syncInCore.stderr)
-    && syncNoAnswer.status === 1 && /given with --sync for project 1, holds no line `trial answer: `/.test(syncNoAnswer.stderr) && syncNone.status === 1 && /project 1's runs are given with no --sync after them: run `node <a clone/.test(syncNone.stderr),
-    "--trial takes one --sync after each pair, never none, kept outside the core's own repository, holding pure-sync.mjs --trial's answer, and writes nothing otherwise (a reading never asked is no reading)", [syncFirst, syncTwice, syncInCore, syncNoAnswer, syncNone].map(c => c.stderr).join("\n"));
-}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the core's releases`);
 process.exitCode = failed ? 1 : 0;

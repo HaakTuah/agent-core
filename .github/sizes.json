@@ -83,10 +83,6 @@
       "mark": 24130,
       "why": "#946: its header names licence-pages.mjs, so that the mutation tool still runs it on the page reader as before the split; a split of its cases by the input each reads is a cleaning task."
     },
-    "tests/releases-test.mjs": {
-      "mark": 32769,
-      "why": "#958: the tests of cutting a release (release.mjs) apart from those of what a project follows (releases.mjs)."
-    },
     "choices/010-the-core-s-foundations-judged-again-as-if.md": {
       "mark": 29908,
       "why": "#870: a choice record is one argued text, its criteria, long list and judgments read together; the foundations record was split from CHOICES.md, whole as it stood, and is read when the core's foundations are judged again."
@@ -205,10 +201,6 @@
     "tests/reading-test.mjs": { "mark": 31106, "why": "Split by the part of reading.mjs each case tests in #852." },
     "tests/shape-readers-test.mjs": { "mark": 41453, "why": "#884: by language, each reader's cases apart." },
     "tests/shape-test.mjs": { "mark": 91943, "why": "#884: along its sections, in step with scripts/shape.mjs." },
-    "tests/releases-test.mjs": {
-      "mark": 41671,
-      "why": "One module's cases (releases.mjs, and release.mjs that cuts one) on the one scratch core it sets up with its release tags; split, each file would set it up again, adding to the suite's time (tasks/tests.md), and a session changing the module reads every case."
-    },
     "tests/code-review-wait-test.mjs": {
       "mark": 33431,
       "why": "One script's cases (code-review-wait.mjs: judge() on a pull request's comments, on its commits and files, and the reviews' marks, then the command) on the fixtures they share (`pull`, `summary`, `said`, `is`); split along the script's parts, each file would write them again, and a session changing judge() reads each case (#1008)."
