@@ -15,6 +15,7 @@
       "mark": 22438,
       "why": "One runner of a workflow as GitHub runs it: its expression evaluator and job runner, read by their headings, found by searching; its YAML reader is split out (parse-yaml.mjs, #1056), and no other part stands alone for a reader of either."
     },
+    "scripts/pr-description.mjs": { "mark": 21429, "why": "the question of a split is asked in #1154" },
     "scripts/copies.mjs": { "mark": 34376, "why": "the question of a split is asked in #1102" },
     "scripts/mutation-tools.mjs": { "mark": 23365, "why": "the question of a split is asked in #1253" },
     "tests/mutation-tools-test.mjs": { "mark": 20863, "why": "the question of a split is asked in #1253" },

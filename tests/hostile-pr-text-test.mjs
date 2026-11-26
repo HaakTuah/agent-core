@@ -8,11 +8,15 @@
 //
 //   node tests/hostile-pr-text-test.mjs
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { PARTS, missing, reasonsMend, waitsMend, waitsOn } from "../scripts/pr-description.mjs";
 import { lineMend, listed } from "../scripts/reading.mjs";
 import { neverNeeded } from "../scripts/read-total.mjs";
+import { SHOWN, headMends } from "../scripts/pr-head.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -133,6 +137,73 @@ const refused = (r) => r.status === 1 && mended(r.stdout) && !/\n\s+at /u.test(r
   const named = neverNeeded("Never needed: `../../etc/passwd`, `C:\\x`, `<script>`, which a polish task never opens.");
   ok(named.size === 3 && named.has("../../etc/passwd") && named.has("<script>"), "neverNeeded: a path or markup in backticks is a name and no more, which only ever spares a file from the list of those lost");
   ok(neverNeeded("").size === 0 && neverNeeded("Never needed:").size === 0, "neverNeeded: nothing at all names nothing");
+}
+
+// the archive keys and placeholders the description names (pr-head.mjs, #1136): too long, the wrong type, markup, a
+// file path, a number out of range, nothing at all; none is taken for a key the archive holds, none hides what shows,
+// and none makes the reading slow
+{
+  const keys = new Set(["218", "#1084"]), fails = body => headMends(body, { keys }).mends;
+  const marks = [" ", "\"", "“", "“x ", "`", "` ", "<!--", "a <!-- ", "`<!--` ", "core archive "];
+  for (const mark of marks) {
+    const slow = Date.now(), said = fails(`${mark.repeat(Math.floor(65536 / mark.length))}\n`);
+    ok(Array.isArray(said) && Date.now() - slow < 2000, `headMends: 64 KB of ${JSON.stringify(mark)}, opened and never closed, is read in no time`);
+  }
+  const slow = Date.now();
+  fails(`${Array.from({ length: 360 }, (_, n) => "`".repeat(n + 1)).join(" ")}\n${" ".repeat(200000)}x\n- ${" ".repeat(200000)}x\n:${" ".repeat(200000)}x\n`);
+  ok(Date.now() - slow < 2000, "headMends: runs of backticks of every length, and long runs of blanks before a list mark or after a colon, are read in no time");
+  ok([42, NaN, true, {}, [], ["TBD"], { toString: () => "TBD" }, () => "TBD", Symbol("TBD")].every(body => fails(body).length === 0), "headMends: a body of the wrong type is no body, and names nothing");
+  ok(fails("a <!-- TBD\n**TODO** <b>XXX</b> [FIXME](x)\n`<!--` core archive 999\n").length === 5 && fails("<!-- TBD -->\n<!--\nTODO\n").length === 0,
+    "headMends: markup hides nothing that shows (an unclosed comment mid-line, bold, a tag, a link, a comment's opening in code marks), and a comment hides what it holds");
+  ok(fails("core archive ../218\ncore archive /etc/passwd\ncore archive C:\\218").length === 0 && fails("core archive 999/../218").length === 1, "headMends: a path is no key, and a key before one is read as written");
+  ok(["core archive -1", "core archive 1e9", "core archive \u0661\u0662", "core archive 0x10"].every(b => fails(b).length === 0) && ["core archive 99999999999999999999", "core archive #0", "core archive #1084.1.2"].every(b => fails(b).length === 1) && fails("core archive 000218").length === 0,
+    "headMends: a number out of its form is no key, one too large or past the archive fails, and leading zeros name the item they lead to");
+  ok([undefined, null, "", "\n\r\n \t\n"].every(body => fails(body).length === 0 && headMends(body, { keys: null }).notes.length === 0), "headMends: nothing at all names nothing, and says nothing of an archive not read");
+  const lines = body => fails(body).map(m => Number(/^line (\d+)/u.exec(m)[1])).join();
+  ok(lines("Document the `<!--` opening.\nNotes: TBD\nBehind it: core archive 999999\n") === "3,2" && lines("``a`<!--`` TBD\n`a` <!-- TBD --> `b`\n<!-- `x --> TBD `\n`\"` TBD `\"`\n“a “b” TBD\nx \" TBD `\"`\n") === "1,3,4,5,6",
+    "headMends: code marks are read before a comment's opening, as whichever opens first: a \"<!--\" in code marks opens no comment, and a backtick in a comment opens no code; a quote mark in code marks opens no quote, and a quote closes at the first closing mark");
+  ok(lines("<!-- -->TBD\"x\"\n<!-- -->\"x\"TBD\nx `\"` TBD `\"`\na`x`\"y\"TBD\na`x`TBD\"y\"\n`TBD` \"y\" `TODO`\n\"`x` TBD\" y\na `b` <!-- TBD --> c\n") === "1,2,3,4,5",
+    "  what is read stays in its place after a comment, a code span or a quote, whichever stands first, one inside another going with it");
+  ok(lines("A note <!-- with no end\nNotes: TBD\n\nA note <!-- that ends\nTBD -->\nTODO\n\nA note <!-- that would end\n\nTBD -->\n<!-- one\n\nTODO -->XXX\n") === "2,6,10,13",
+    "  a \"<!--\" opens a comment where it opens the line or where a \"-->\" closes it in its paragraph; elsewhere it is text, which shows");
+  ok(lines("x <!-- TBD") === "1" && lines("a <!-- x\nTBD -->") === "" && lines("a <!-- x\n \nTBD -->") === "3" && lines("   <!-- TBD") === "" && lines("x<!-- TBD") === "1"
+    && fails("Tests: <!-- to be added").length === 0 && fails("Tests: <!-- x --> to be added").length === 1
+    && fails("A note <!-- \"TBD\" here").length === 0 && fails("Notes:<!---->to be added").length === 1,
+    "  on the first line and the last, past a line of blanks, indented up to three; and a \"<!--\" that is text stays in its place, one that opens goes");
+}
+
+// the archive the keys are read from (pr-head.mjs's keysAt, #1136), which a fork's branch may make a pipe, a link or a
+// folder: each reads as no file, the check is never stopped, and nothing outside the checkout is read as its archive
+// (#848); and a description that names many is told of the first SHOWN, then the count of the rest
+{
+  const head = fileURLToPath(new URL("../scripts/pr-head.mjs", import.meta.url));
+  // (in a process of its own with a time limit, so a reader that waits on a pipe fails rather than hangs)
+  const keysOf = (root, prefix = "") => {
+    const r = spawnSync(process.execPath, ["--input-type=module", "-e", `import(${JSON.stringify(`file://${head}`)}).then(m => { const k = m.keysAt(${JSON.stringify(root)}, ${JSON.stringify(prefix)}); console.log(JSON.stringify(k && [...k])); })`], { encoding: "utf8", timeout: 10000 });
+    return r.status === 0 ? JSON.parse(r.stdout) : `failed: ${r.error?.code ?? r.stderr.split("\n").find(Boolean)}`;
+  };
+  const archive = (dir, prefix = "") => { const at = path.join(dir, prefix, "archive/instructions"); fs.mkdirSync(at, { recursive: true }); return at; };
+  const outside = scratchDir("pr-head-outside-");
+  fs.writeFileSync(path.join(archive(outside), "items-001.md"), "1. **A day**: an item outside the checkout.\n");
+  if (process.platform !== "win32") {
+    const piped = scratchDir("pr-head-pipe-"), at = archive(piped);
+    fs.writeFileSync(path.join(at, "items-001.md"), "1. **A day**: an item.\n");
+    if (spawnSync("mkfifo", [path.join(at, "items-002.md")]).status === 0) ok(JSON.stringify(keysOf(piped)) === '["1"]', "keysAt: a pipe among the archive's files is read as no file, and the check is not stopped");
+    const linked = scratchDir("pr-head-link-");
+    fs.mkdirSync(path.join(linked, "archive"));
+    fs.symlinkSync(path.join(outside, "archive/instructions"), path.join(linked, "archive/instructions"));
+    const viaCore = scratchDir("pr-head-core-link-");
+    fs.symlinkSync(outside, path.join(viaCore, "core"));
+    const fileLink = scratchDir("pr-head-file-link-");
+    fs.symlinkSync(path.join(outside, "archive/instructions/items-001.md"), path.join(archive(fileLink), "items-001.md"));
+    ok(keysOf(linked) === null && keysOf(viaCore, "core/") === null && keysOf(fileLink) === null, "keysAt: a link to a folder outside the checkout, as the archive, as the copy on the way to it or as one of its files, is read as no archive");
+  }
+  const foldered = scratchDir("pr-head-folder-");
+  fs.mkdirSync(path.join(archive(foldered), "items-001.md"));
+  fs.writeFileSync(path.join(archive(foldered), "issue-9.md"), "#9. **A day**: an item.\n");
+  ok(JSON.stringify(keysOf(foldered)) === '["#9"]', "keysAt: a folder named as an archive file is no file, with no error");
+  const said = headMends("TBD ".repeat(16384), { keys: new Set() }).mends;
+  ok(said.length === SHOWN + 1 && said.at(-1).startsWith(`${16384 - SHOWN} more such failures`) && mended(said.map(m => `FAIL ${m}`).join("\n")), `headMends: 64 KB of "TBD " gives the first ${SHOWN} failures and one that counts the rest, each with its mend`);
 }
 
 process.exit(failed ? 1 : 0);
