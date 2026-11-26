@@ -76,15 +76,16 @@ export function failuresOf(file, text) {
 export function repoRoot(cwd = process.cwd()) {
   try { return execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return null; }
 }
-export const outside = dir => `FAIL ${clip(dir)} is in no git repository, so no tracked JSON file could be read. Mend: run the check from inside the repository, or name the files to read`;
+export const outside = dir => `FAIL ${clip(path.basename(dir) || dir)} is in no git repository, so no tracked JSON file could be read. Mend: run the check from inside the repository, or name the files to read`;
 
-// The files of `files` that stand, read from `root` (a path that is absolute stays itself) and named from it, so that no
-// failure prints a folder above it (floor rule 1), and what their duplicates say; a folder named is told with its mend.
+// The files of `files` that stand, read from `root` (a path that is absolute stays itself) and named from it, or by
+// their own name where they lie outside it, so that no failure prints a folder above it (floor rule 1), and what their
+// duplicates say; a folder named is told with its mend.
 export const folder = name => `FAIL ${clip(name)} is a folder, not a JSON file. Mend: name the JSON files in it, or run the check with no names to read every tracked one`;
 export function check(root, files) {
   let read = 0;
   const failures = files.flatMap(f => {
-    const at = path.resolve(root, f), name = path.relative(root, at) || f;
+    const at = path.resolve(root, f), from = path.relative(root, at), name = from.startsWith("..") || path.isAbsolute(from) ? path.basename(at) : from || f;
     let text;
     try { text = fs.readFileSync(at, "utf8"); } catch (e) { if (e?.code === "ENOENT") return []; if (e?.code === "EISDIR") return [folder(name)]; throw e; }
     read++;

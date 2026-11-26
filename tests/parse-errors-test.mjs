@@ -226,11 +226,11 @@ for (const [text, lines, what] of [
     // folders above it; only the files read are counted, and a folder named is told with its mend
     fs.writeFileSync(path.join(dir, "twice.json"), '{"a": 1, "a": 2}');
     const named = check(path.join(dir, "repo"), [path.join(dir, "twice.json"), "sub/kept.json", "gone.json", "sub"]);
-    ok(named.read === 2 && named.failures.length === 2 && named.failures[0].includes("FAIL ../twice.json ") && !named.failures.join().includes(dir) && mended(named.failures[1]) && named.failures[1].includes("FAIL sub is a folder"),
-      "a file named by its absolute path is read and named from the root, a file not there is not counted, and a folder named is told with its mend", JSON.stringify(named));
+    ok(named.read === 2 && named.failures.length === 2 && named.failures[0].includes("FAIL twice.json ") && !named.failures.join().includes(dir) && mended(named.failures[1]) && named.failures[1].includes("FAIL sub is a folder"),
+      "a file named by its absolute path is read and named from the root, or by its own name outside it, a file not there is not counted, and a folder named is told with its mend", JSON.stringify(named));
     // outside a repository the check fails with its mend, having read nothing
     const top = repoRoot(dir);
-    ok(top === null ? mended(outside(dir)) && outside(dir).includes("no git repository") : top !== path.join(dir, "repo"), "a folder in no git repository is told, and its failure says the mend", String(top));
+    ok(top === null ? mended(outside(dir)) && outside(dir).includes("no git repository") && !outside(dir).includes(os.tmpdir()) : top !== path.join(dir, "repo"), "a folder in no git repository is told, and its failure says the mend", String(top));
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 {
