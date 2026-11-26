@@ -8,7 +8,8 @@
 //         > <a file outside every repository>
 //         reads the draft and its checks on the host and prints, on its last line `draft answer: `, the counts that
 //         release.mjs --trial takes with --draft after the project's pair; it gives no answer while a check has not
-//         finished, on a pull request that is no open draft, pinned elsewhere, or in a repository the core's owner does
+//         finished, on a pull request that is no open draft, opened against a branch not the default, pinned
+//         elsewhere, or in a repository the core's owner does
 //         not own, or where the project's stop switch stands. `--gate` names a check the builder read, from its own log,
 //         as failing on the draft only for being one (the form of a project's test gate, setup/sync-notes/680): it is
 //         counted apart and holds nothing, and the record's pull request says why.
@@ -67,11 +68,13 @@ function checksAt(repo, sha, ask) {
 }
 
 // Why the pull request `pull` of `repo` is no draft a trial reads, through `ask`, or null: a repository the core's owner
-// does not own, a stop switch that stands, or a pull request that is not an open draft.
+// does not own, a stop switch that stands, a base that is not the default branch, or a pull request that is not an open draft.
 function notDraft(repo, pr, pull, ask) {
   if (!pull || typeof pull !== "object") return `pull request ${pr} could not be read. Mend: run it where gh answers for the owner's account, with the draft's number`;
   if (String(pull.base?.repo?.owner?.login ?? "").toLowerCase() !== OWNER.toLowerCase()) return `the repository is not owned by the core's owner's account, ${OWNER}, where a trial opens no draft. Mend: close that pull request at once, delete its branch, and give the project's pair \`--no-draft another-owner\``;
   if (ask(`repos/${repo}/branches/agents-stop`).body) return "the project's stop switch stands (the branch agents-stop), where a trial opens no draft. Mend: close the draft if one was opened, and give the project's pair `--no-draft stop-switch`";
+  const base = pull.base?.ref, main = pull.base?.repo?.default_branch;
+  if (typeof main !== "string" || !main || base !== main) return `pull request ${pr} is opened against ${base || "no branch that could be read"}, not the project's default branch${main ? `, ${main}` : ""}, whose checks the draft's are read beside. Mend: open the sync as a draft against the default branch, and read that one`;
   if (pull.state !== "open" || pull.draft !== true) return `pull request ${pr} is ${pull.state !== "open" ? "not open" : "no draft"}: the trial's draft stays open and a draft until the cut. Mend: open the sync as a draft again, or mark it a draft`;
   return null;
 }

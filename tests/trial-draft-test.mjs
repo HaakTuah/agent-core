@@ -33,7 +33,7 @@ ok(Object.keys(counts).join() === DRAFT_COUNTS.join() && Object.values(counts).j
 
 // (the draft read on a stand-in for the host)
 const host = (over = {}) => route => {
-  const pulls = { state: "open", draft: true, head: { sha: HEAD }, base: { ref: "main", repo: { owner: { login: OWNER } } }, ...over.pull };
+  const pulls = { state: "open", draft: true, head: { sha: HEAD }, base: { ref: "main", repo: { owner: { login: OWNER }, default_branch: "main" } }, ...over.pull };
   if (route === "repos/o/p/pulls/7") return { body: pulls };
   if (route === "repos/o/p/branches/agents-stop") return over.stop ? { body: { name: "agents-stop" } } : { why: "GitHub answered 404" };
   if (route === `repos/o/p/contents/core-manifest.md?ref=${HEAD}`) return { body: { content: Buffer.from(`Core: HaakTuah/agent-core at ${over.pin ?? TRIED}, copied whole under core/\n`).toString("base64") } };
@@ -46,11 +46,11 @@ const host = (over = {}) => route => {
 const read = readDraft("o/p", "7", TRIED, [], host());
 ok(read.answer?.commit === TRIED && read.answer.draftPassedBoth === 1 && read.answer.draftFailedAlone === 1 && read.failed.join() === "dependency review",
   "a draft pinned to the commit tried is read beside main's newest commit: the dependency review, on the draft alone, failed", JSON.stringify(read));
-const refused = [readDraft("o/p", "7", TRIED, [], host({ pull: { base: { ref: "main", repo: { owner: { login: "someone-else" } } } } })), readDraft("o/p", "7", TRIED, [], host({ stop: true })),
-  readDraft("o/p", "7", TRIED, [], host({ pull: { draft: false } })), readDraft("o/p", "7", TRIED, [], host({ pin: SHA("d") })), readDraft("o/p", "7", TRIED, [], host({ late: true }))];
+const refused = [readDraft("o/p", "7", TRIED, [], host({ pull: { base: { ref: "main", repo: { owner: { login: "someone-else" }, default_branch: "main" } } } })), readDraft("o/p", "7", TRIED, [], host({ stop: true })),
+  readDraft("o/p", "7", TRIED, [], host({ pull: { draft: false } })), readDraft("o/p", "7", TRIED, [], host({ pull: { base: { ref: "crafted", repo: { owner: { login: OWNER }, default_branch: "main" } } } })), readDraft("o/p", "7", TRIED, [], host({ pin: SHA("d") })), readDraft("o/p", "7", TRIED, [], host({ late: true }))];
 ok(refused.every(r => !r.answer && mended(`FAIL no answer for the draft: ${r.why}.`)) && /not owned by the core's owner's account[\s\S]*--no-draft another-owner/.test(refused[0].why) && /stop switch stands[\s\S]*--no-draft stop-switch/.test(refused[1].why)
-  && /no draft/.test(refused[2].why) && /pins ddddddd, not the commit tried, aaaaaaa[\s\S]*sync\.mjs a{40}/.test(refused[3].why) && /1 checks on the draft and 0 on main's newest commit have not finished/.test(refused[4].why),
-  "no answer, each saying its mend, for a repository the core's owner does not own, a stop switch that stands, a pull request that is no draft, one pinned elsewhere, and a check not finished", refused.map(r => r.why).join("\n"));
+  && /no draft/.test(refused[2].why) && /against crafted, not the project's default branch, main/.test(refused[3].why) && /pins ddddddd, not the commit tried, aaaaaaa[\s\S]*sync\.mjs a{40}/.test(refused[4].why) && /1 checks on the draft and 0 on main's newest commit have not finished/.test(refused[5].why),
+  "no answer, each saying its mend, for a repository the core's owner does not own, a stop switch that stands, a pull request that is no draft, one against a branch that is not the default, one pinned elsewhere, and a check not finished", refused.map(r => r.why).join("\n"));
 ok(readDraft("o/p", "7", TRIED, ["dependency review"], host()).answer?.draftGated === 1, "  a check the builder named as failing for being a draft is counted apart");
 
 // (what trial-draft.mjs printed, read for the commit tried, and what release.mjs --trial takes after each pair)
