@@ -6,8 +6,8 @@
 // Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/licence-locks-test.mjs
-import { rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { stoodAt, unnamedLocks } from "../scripts/licence-locks.mjs";
@@ -95,6 +95,18 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
     ok(forms.every((m) => /is not an object whose "data", "fonts" and "accepted" are each a list, each entry of "accepted" an object\. Mend: /u.test(m)) && names.every((m) => /no npm package name.*\. Mend: /u.test(m))
       && refuses('{"data":["x"]}') === "" && refuses('{"accepted":[{"package":"a@1.0.0"},{"files":["x"]}]}') === "",
       "the core's own config whose lists or entries are of another form, or that is no object, is refused with its mend, and its names are read after", [...forms, ...names].join("\n"));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+// a folder named like the other lock file of a pair is no twin of the named one: nothing installs from it
+{
+  const dir = scratchDir("licence-locks-folder-");
+  try {
+    for (const [f, text] of [["package-lock.json", { lockfileVersion: 3, packages: {} }], ["package.json", { name: "x", version: "1.0.0" }], ["audit.json", { entries: [] }], ["NPM-SHRINKWRAP.JSON/x", {}]]) {
+      mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), JSON.stringify(text));
+    }
+    const r = check({ ships: [], lockfiles: ["package-lock.json"], audit: "audit.json" }, dir, "HEAD", null);
+    ok(![...r.failures, ...r.reports].some((m) => m.includes("stands beside it")), "a folder beside the lock file is no twin", JSON.stringify(r));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 

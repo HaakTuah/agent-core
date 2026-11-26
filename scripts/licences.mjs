@@ -530,6 +530,7 @@ export function check(config, root, base = null, baseConfig = null) {
 const lockfilesOf = (config) => (Array.isArray(config?.lockfiles) ? config.lockfiles : []);
 const auditOf = (config) => (typeof config?.audit === "string" ? config.audit : null);
 
+const isFile = (p) => { try { return statSync(p).isFile(); } catch { return false; } };
 // (npm installs from a shrinkwrap file where one stands, whatever lock file a config names: only one of the two may)
 function shrinkwrapFaults(root, lockfiles, base) {
   const failures = [], reports = [];
@@ -540,7 +541,7 @@ function shrinkwrapFaults(root, lockfiles, base) {
     const want = name.toLowerCase() === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json";
     let names = [];
     try { names = readdirSync(join(root, dir)); } catch { /* (no folder, no file) */ }
-    const twins = new Set([...(existsSync(join(root, old)) ? [old] : []), ...names.filter((x) => x.toLowerCase() === want).map((x) => posix.join(dir, x))]);
+    const twins = new Set([...(existsSync(join(root, old)) ? [old] : []), ...names.filter((x) => x.toLowerCase() === want && isFile(join(root, dir, x))).map((x) => posix.join(dir, x))]);
     for (const twin of twins) {
       const said = `${f}: ${twin} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`;
       // (a pair seen only since #1349, in a case of another name than the one read before, passes, reported, where it stood as files at the base)
