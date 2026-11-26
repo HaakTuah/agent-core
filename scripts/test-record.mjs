@@ -25,7 +25,7 @@ import { matcher } from "./select-matcher.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 import { median } from "./wait.mjs";
-import { parseBounded } from "./guards.mjs";
+import { loggedAlone, parseBounded } from "./guards.mjs";
 
 class Refused extends Error {}
 const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
@@ -198,5 +198,5 @@ function main(argv) {
 
 if (started(import.meta.url)) {
   try { process.exitCode = main(process.argv.slice(2)); }
-  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${e.message}`); process.exitCode = 1; }
+  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${loggedAlone(e.message)}`); process.exitCode = 1; }
 }

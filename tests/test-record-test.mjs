@@ -118,6 +118,12 @@ for (const [args, what] of [[["checks/shape.json", "--junit", "nowhere"], "a fol
   r = run(args);
   ok(r.status === 1 && mended(r.out) && (args[0] !== awayAt || /lies outside the project/u.test(r.out)), `refused, with its mend: ${what}`, r.out);
 }
+// (a config named by an address that holds a sign-in: refused with its mend, the sign-in cut as shape.mjs cuts it, #1236)
+{
+  const secret = ["made", "up", String(process.pid)].join("-"), at = `https://someone:${secret}@example.invalid/shape.json`;
+  r = run([at]);
+  ok(r.status === 1 && mended(r.out) && !r.out.includes(secret), "refused, with its mend: a config named by an address that holds a sign-in, the sign-in never printed", r.out);
+}
 
 console.log(`${count - failed} of ${count} passed`);
 process.exitCode = failed ? 1 : 0;
