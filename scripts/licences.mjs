@@ -506,7 +506,9 @@ export function check(config, root, base = null, baseConfig = null) {
   };
   const { failures, reports } = ctx;
   const packages = (config.lockfiles ?? []).flatMap((f) => lockfilePackages(root, f, config.ships.includes(posix.join(posix.dirname(f), "package.json"))));
-  failures.push(...shrinkwrapFaults(root, config.lockfiles ?? []));
+  const twins = shrinkwrapFaults(root, config.lockfiles ?? [], base);
+  failures.push(...twins.failures);
+  reports.push(...twins.reports);
   for (const p of packages) checkPackage(ctx, p);
   const entries = config.audit ? checkAudit(ctx) : [];
   unneededYeses(ctx);
@@ -529,16 +531,21 @@ const lockfilesOf = (config) => (Array.isArray(config?.lockfiles) ? config.lockf
 const auditOf = (config) => (typeof config?.audit === "string" ? config.audit : null);
 
 // (npm installs from a shrinkwrap file where one stands, whatever lock file a config names: only one of the two may)
-function shrinkwrapFaults(root, lockfiles) {
-  const faults = [];
+function shrinkwrapFaults(root, lockfiles, base) {
+  const failures = [], reports = [];
   for (const f of lockfiles) {
     const dir = posix.dirname(f), want = posix.basename(f).toLowerCase() === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json";
     let names = [];
     try { names = readdirSync(join(root, dir)); } catch { /* (no folder, no file) */ }
     // (whatever the case of its name: npm on a file system that ignores case installs from `NPM-SHRINKWRAP.JSON` too)
-    for (const n of names.filter((x) => x.toLowerCase() === want)) faults.push(`${f}: ${posix.join(dir, n)} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`);
+    for (const n of names.filter((x) => x.toLowerCase() === want)) {
+      const twin = posix.join(dir, n), said = `${f}: ${twin} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`;
+      // (a twin of another case than npm's own is seen only since #1349: a pair that stood so at the base passes, reported)
+      const stood = n !== want && base && textAt(root, base, twin) !== null && textAt(root, base, f) !== null;
+      (stood ? reports : failures).push(stood ? `${said}; the pair stood so at the pull request's base, so it passes` : said);
+    }
   }
-  return faults;
+  return { failures, reports };
 }
 
 // (a package is known by what it is, not the name it is installed under: its registry's name and version, or where it

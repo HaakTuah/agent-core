@@ -192,4 +192,25 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
   }
 }
 
+{
+  // a differently cased twin of the named lock file that stood at the base passes, reported; with no base it fails
+  const dir = scratchDir("licence-twin-case-");
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+  const git = (...args) => execFileSync("git", args, { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] });
+  const config = { ships: [], lockfiles: ["package-lock.json"], audit: "audit.json" };
+  const stands = (list) => list.some((m) => /NPM-SHRINKWRAP\.JSON stands beside it/u.test(m));
+  try {
+    git("init", "-q");
+    for (const f of ["package-lock.json", "NPM-SHRINKWRAP.JSON"]) fs.writeFileSync(path.join(dir, f), JSON.stringify({ lockfileVersion: 3, packages: {} }));
+    fs.writeFileSync(path.join(dir, "audit.json"), JSON.stringify({ entries: [] }));
+    fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "x", version: "1.0.0" }));
+    git("add", "-A"); git("commit", "-q", "-m", "base");
+    let r = licenceCheck(config, dir, "HEAD", config);
+    ok(!stands(r.failures) && stands(r.reports), "a twin of another case that stood at the base is reported, not failed", JSON.stringify(r));
+    r = licenceCheck(config, dir, null, config);
+    ok(stands(r.failures), "and with no base to read it against it fails");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
 done();
