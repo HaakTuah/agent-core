@@ -126,7 +126,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
    **What a project follows:** the core's `main`, or its releases (core archive 195). A release is a tag `release-N` on
    a commit of `main`, cut on the owner's word by this repository's `release` workflow, only where that commit's checks
-   have passed and its trial on a real project found no check it broke (`AGENTS.md`, "A release is cut on the owner's word"; `scripts/release.mjs`). A project whose *owner's
+   have passed and its trial on a real project, with the draft of its sync in each of the owner's own projects, found no check it broke (`AGENTS.md`, "A release is cut on the owner's word"; `scripts/release.mjs`). A project whose *owner's
    account* is not the account the core is under follows the releases, unless its manifest's *follows* row says `main`;
    the projects of the core's own owner follow `main`, unless theirs says `releases` (`scripts/releases.mjs`). Following
    `main`, the sync script and the core-moved check take its newest commit whose checks all passed, never one ahead of
