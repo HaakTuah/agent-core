@@ -60,7 +60,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the reviews'
      records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look (`scripts/look.mjs`,
      with `scripts/look-keep.mjs` and `scripts/look-pulls.mjs`), the
-     inbox (`scripts/inbox.mjs`) and the personal terms' take-out (`scripts/issue-terms.mjs`, which edits only an
+     inbox (`scripts/inbox.mjs`, which sends GitHub GETs alone, and in a GitHub job reads its token's grant of issues
+     from the workflow that started it, at the commit GitHub names, through `scripts/parse-yaml.mjs`; #1363) and the
+     personal terms' take-out (`scripts/issue-terms.mjs`, which edits only an
      insider's text); limits: 256 MB of an answer (16 MB for the inbox's own), 500 pages of 100, and for the take-out
      1,048,576 characters of a text, past which it is left unread, and the first 100 edits of its history; hostile
      tests: `tests/hostile-issues-test.mjs`, and for the take-out `tests/issue-terms-test.mjs`.
