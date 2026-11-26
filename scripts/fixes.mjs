@@ -4,7 +4,8 @@
 // #12", or closes or resolves) and that changed a script that is no test (scripts/*.mjs, not *-test.mjs); printed with
 // that commit, the tree before it (its first parent) and the lines of each such script the fix changed, as they stood
 // in that tree. The pass runs the type checker on each tree as the record says and counts the fixes where a finding
-// points at a line printed here. It reads only. git, gh and Node's own modules.
+// points at a line printed here. It reads only, and a shallow clone that cannot hold the days read is refused, with its
+// mend (shallow.mjs; #1422). git, gh and Node's own modules.
 //
 //   node scripts/fixes.mjs --since YYYY-MM-DD
 import { execFileSync } from "node:child_process";

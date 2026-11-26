@@ -21,7 +21,8 @@
 // Each listed with its step of the pruning: a rule read at a role's start (an AGENTS.md rule is, here) is at step 1, to
 // move to a module read on need; one read on need is at step 2, to go where nothing changed since it moved. A rule
 // fewer than EARLY merged pull requests came under since it joined (read from git: the first commit that wrote its lead
-// in bold, and the merges on the first-parent line since) is "too early" and not judged; one that guards against rare
+// in bold, and the merges on the first-parent line since; a shallow clone that cannot hold that span fails the list, with its
+// mend, #1422) is "too early" and not judged; one that guards against rare
 // and severe harm, of the floor or with a number marked "; rare harm", is never listed for its check alone. Beside the list, under "in use", the citations of each rule in the span
 // (cited.mjs, beside this file), which say a rule is applied and never that it helps. It removes nothing: the owner
 // decides which go. The record is RECORD, written by --read and --record into the pruning in progress (open()), which

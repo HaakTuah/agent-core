@@ -13,7 +13,9 @@
 //     moved by MOVED since. Where, in debt, an audit comes due by its days and the baseline is no smaller than at
 //     the last, the issue is the owner's to see (`owner`), and nothing fails.
 // The numbers are first guesses, which use tunes. It reads, and with --audited writes the day and the counts of an
-// audit into the baseline; it fails nothing but a run it cannot make. git and Node's own modules.
+// audit into the baseline; it fails nothing but a run it cannot make, a shallow clone that cannot hold the history the
+// cleaning's counts read among them (shallow.mjs; #1422: the look leaves that task as it stands, unread, with the mend).
+// git and Node's own modules.
 //
 //   node core/scripts/dose.mjs             from a project's root: the state, the shares, what to clean first, and
 //                                          whether an audit is due (in the core: node scripts/dose.mjs)
