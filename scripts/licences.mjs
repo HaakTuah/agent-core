@@ -333,9 +333,10 @@ function npmrcFiles(root, dir = "") {
 }
 
 /** One spelling for every path in a config ("./package.json" is "package.json"), so "ships" matches its lockfile's. */
+const PATH_LISTS = ["lockfiles", "ships", "ignoreScriptsIn", "pypi"];
 function normalised(config) {
   const out = { ...config };
-  for (const key of ["lockfiles", "ships", "ignoreScriptsIn", "pypi"]) if (Array.isArray(out[key])) out[key] = out[key].map((p) => posix.normalize(p));
+  for (const key of PATH_LISTS) if (Array.isArray(out[key])) out[key] = out[key].map((p) => posix.normalize(p));
   if (typeof out.audit === "string") out.audit = posix.normalize(out.audit);
   return out;
 }
@@ -531,8 +532,8 @@ export function check(config, root, base = null, baseConfig = null) {
 // (the base's config, as it stands where its lists hold text alone: one that does not would have failed loadConfig when it
 // merged, so this is rare, but it fails with its mend and not with a TypeError from normalised, #1352)
 function baseListsOk(config) {
-  for (const key of ["lockfiles", "ships", "ignoreScriptsIn", "pypi"]) {
-    if (Array.isArray(config[key]) && config[key].some((p) => typeof p !== "string")) throw new Error(`the base's licence config holds a "${key}" that is not a list of names, so what stood at the base cannot be read. Mend: correct "${key}" in the config on the base branch: a list of non-empty strings, in a pull request of its own, then run the check again`);
+  for (const key of PATH_LISTS) {
+    if (Array.isArray(config[key]) && config[key].some((p) => typeof p !== "string" || !p)) throw new Error(`the base's licence config holds a "${key}" that is not a list of names, so what stood at the base cannot be read. Mend: correct "${key}" in the config on the base branch: a list of non-empty strings, in a pull request of its own, then run the check again`);
   }
   return config;
 }

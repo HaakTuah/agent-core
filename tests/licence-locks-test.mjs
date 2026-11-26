@@ -112,9 +112,10 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
 
 // a base config whose list holds something other than text fails with its mend, not a TypeError from the check (#1352)
 {
-  let odd = null;
-  try { check({ ships: [], lockfiles: [] }, ".", "HEAD", { ships: [], lockfiles: [5] }); } catch (e) { odd = e; }
-  ok(odd?.constructor === Error && /"lockfiles" that is not a list of names.*\. Mend: /u.test(odd.message), "a base config whose \"lockfiles\" holds something other than text fails with its mend, not a TypeError", String(odd?.stack ?? odd));
+  const refused = (base) => { try { check({ ships: [], lockfiles: [] }, ".", "HEAD", base); return null; } catch (e) { return e; } };
+  const odd = ["lockfiles", "ships", "ignoreScriptsIn", "pypi"].map((k) => refused({ ships: [], lockfiles: [], [k]: [5] })), blank = refused({ ships: [], lockfiles: [""] });
+  ok(odd.every((e, i) => e?.constructor === Error && e.message.includes(`"${["lockfiles", "ships", "ignoreScriptsIn", "pypi"][i]}" that is not a list of names`) && mended(asOutput([e.message]))) && mended(asOutput([blank?.message ?? ""])),
+    "a base config whose list holds something other than text, or an empty name, fails with its mend, not a TypeError", JSON.stringify([...odd, blank].map(String)));
 }
 
 done();
