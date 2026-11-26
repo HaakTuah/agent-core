@@ -47,8 +47,7 @@
 //
 //   node core/scripts/look.mjs            the look (GITHUB_REPOSITORY and GH_TOKEN set by GitHub's job; else the
 //                                         clone's origin and gh's own sign-in)
-//   node core/scripts/look.mjs --dry      what it would open, update, reopen or close; it writes nothing (inbox.mjs's
-//                                         asked() may send an empty body, which creates nothing)
+//   node core/scripts/look.mjs --dry      what it would open, update, reopen or close; it writes nothing
 //   node core/scripts/look.mjs --now      a session's run though the record shows one less than SOON hours before
 //   node core/scripts/look.mjs --inbox    where issues cannot be reached, writes what it would open to inbox/
 
@@ -150,7 +149,7 @@ function reachOf(repo) {
   if (!repo) return { yes: false, why: "its origin is not on github.com" };
   let got = null, refused = false;
   try { got = parseBounded(ghApi(`repos/${repo}`)); } catch (e) { refused = /\bHTTP 404\b/.test(String(e.message)); }
-  return got && typeof got === "object" && got.permissions ? asked(repo, got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
+  return got && typeof got === "object" && got.permissions ? asked(got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
 }
 
 function findingsOf(ctx, reach, last) {
@@ -223,7 +222,7 @@ function main(args) {
 
   // whether issues can be read and written here, as inbox.mjs asks it: no answer, nothing is done
   const reach = reachOf(repo);
-  if (!reach) { say(`The scheduled look could not ask GitHub here (gh is not installed, answers for no account, or gave no answer): nothing was looked at. Run \`node ${scripts}/look.mjs\` where gh answers.`); return 0; }
+  if (!reach) { say(`The scheduled look could not ask GitHub here (gh is not installed, answers for no account, answers for an app's token, such as a GitHub job's, whose grant of \`issues:\` its workflow does not say, or gave no answer): nothing was looked at. Run \`node ${scripts}/look.mjs\` where gh answers.`); return 0; }
 
   // the record, and whether a session's run is due
   let kept = new Map();

@@ -61,7 +61,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the reviews'
      records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look (`scripts/look.mjs`,
      with `scripts/look-keep.mjs` and `scripts/look-pulls.mjs`), the
-     inbox (`scripts/inbox.mjs`) and the personal terms' take-out (`scripts/issue-terms.mjs`, which edits only an
+     inbox (`scripts/inbox.mjs`, which sends GitHub GETs alone, and in a GitHub job reads its token's grant of issues
+     from the workflow that started it, at the commit GitHub names, through `scripts/parse-yaml.mjs`; #1363) and the
+     personal terms' take-out (`scripts/issue-terms.mjs`, which edits only an
      insider's text); limits: 256 MB of an answer (16 MB for the inbox's own), 500 pages of 100, and for the take-out
      1,048,576 characters of a text, past which it is left unread, and the first 100 edits of its history; hostile
      tests: `tests/hostile-issues-test.mjs`, and for the take-out `tests/issue-terms-test.mjs`.
@@ -170,12 +172,13 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
      lookup (`scripts/lookup.mjs`, with `scripts/lookup-pypi.mjs` for a requirements file in PyPI's lock form, which it
-     fails whole where pip or uv could read it otherwise) and its lookup again of what a project holds (`scripts/held.mjs`, through the
+     fails whole where pip or uv could read it otherwise, and fails a hash a line names that PyPI lists for none of that
+     release's files) and its lookup again of what a project holds (`scripts/held.mjs`, through the
      lookup's readers of npm's and NuGet's lock files); Node itself is checked against its SHA-256 by `scripts/node.sh`, and the code scan's wheel by
      its own, which pip checks against `.packages/requirements.txt` (`scripts/install.mjs pypi`); limits: 16 MB of a
      NuGet package's manifest, 100 pages of NuGet's registry, 20 lookups on GitHub in a run, 30 s for an answer (60 s
      for a NuGet package), 120 s for the whole look again; hostile tests: `tests/hostile-packages-test.mjs`, for the
-     requirements file `tests/lookup-pypi-test.mjs`, and for the scan `tests/code-scan-test.mjs`.
+     requirements file `tests/lookup-pypi-test.mjs` and `tests/lookup-pypi-read-test.mjs`, and for the scan `tests/code-scan-test.mjs`.
    - the code a pull request adds or alters, and its description's lines "Scan false alarm:" and "Scan unread:": read
      by the code scan (`scripts/code-scan.mjs`), which hands the files by name to Semgrep's engine, installed from its
      wheel's pinned hash, with no variable that holds a token, fails a file it could not read, and silences no finding a
