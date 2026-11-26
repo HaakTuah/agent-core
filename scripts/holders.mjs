@@ -18,7 +18,8 @@
 // It reads too the archive's items behind each rule ("behind" in an entry; #252): it fails a key that is no rule nor
 // rule file, an item's key that names no issue (#744), an item that is not in the archive, a pointer to the archive ("core archive N") written in a rule file
 // itself, and the archive's two forms out of step (archive.mjs, beside this file). And the number each rule names
-// ("number" in an entry; #303): it fails a key that is no rule, and a number in no form outcomes.mjs's NUMBER reads.
+// ("number" in an entry; #303): it fails a key that is no rule, a number in no form outcomes.mjs's NUMBER reads, and
+// "check fires" where none of the rule's holders is a check, a number that could never move (#1138, part 1).
 // The list's form, read as the one list the entries make (each part an object, a holder a string or a list of them, a list behind a rule of keys in the
 // archive's form, a number a string) is its schema's, scripts/schemas/holders.json, read by ajv (schemas.mjs; #530);
 // where ajv is not installed the form goes unchecked, said as a warning, and what holds its form is read as ever.
@@ -132,6 +133,14 @@ function numbersWrong(root, numbers) {
   return wrong;
 }
 
+// The numbers that can never move (#1138, part 1), each a line with its mend: a rule's "check fires" where none of its
+// holders is a check, so that the pruning (pruning.mjs, beside this file), which counts the failed steps of a rule's
+// own checks, counts none, whatever happens. `of`: a rule's holders as holders() reads them, a staged case's among them.
+function stillNumbers(numbers, of) {
+  return Object.entries(numbers).filter(([key, n]) => typeof n === "string" && NUMBER.exec(n)?.[1] === "check fires" && of(key) && !of(key).some(x => x.kind === "check"))
+    .map(([key]) => `${FILE}/${entryFile(key)} gives "${key}" the number "check fires", but none of its holders is a check, so the pruning counts no fire of it and the number never moves. Mend: give the rule a number a holder of its own can move ("findings", or "correction: <kind>") in its entry's "number", or name under "holder" the check that fails where it is broken`);
+}
+
 // The rules whose entries would stand in one file, each set a line with its mend.
 function sharedFiles(all) {
   const files = new Map();
@@ -155,7 +164,7 @@ export function holders(root = ROOT, cases = CASES) {
   }
   for (const c of cases) for (const key of c.holds) mapOf(key)?.push({ kind: "case", by: c.name, part: c.inPart.includes(key) });
   wrong.push(...sharedFiles(every));
-  if (!read.wrong) wrong.push(...behindWrong(root, read.behind), ...numbersWrong(root, read.numbers));
+  if (!read.wrong) wrong.push(...behindWrong(root, read.behind), ...numbersWrong(root, read.numbers), ...stillNumbers(read.numbers, mapOf));
   return { rules: all, by, wrong, own: { rules: mine, by: ownBy } };
 }
 
