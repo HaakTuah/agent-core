@@ -34,7 +34,7 @@ const { tmp, git } = scratchCore("release-trial-test-");
   const SYNC = [{ pure: true, from: "release-1" }], OTHER = [{ none: "another-owner" }];
   const record = r => commit({ [TRIAL]: `${JSON.stringify(r)}\n` }, "the trial's record");
   const passed = trialRecord(tried, "2026-11-22", [[{ "a.yml/x": "passed", "a.yml/y": "failed" }, { "a.yml/x": "passed", "a.yml/y": "failed" }]], SYNC, OTHER);
-  ok(passed.projects === 1 && passed.passedBoth === 1 && passed.failedBoth === 1 && Object.keys(passed).join() === `commit,day,projects,${COUNTS},baselineFromClone,syncPure,syncNotPure,copiesFrom,ownProjects,drafts,draftsAnotherOwner,draftsStopped,${DRAFT_COUNTS}`, "the record holds the commit, the day and counts alone, nothing of the project");
+  ok(passed.projects === 1 && passed.passedBoth === 1 && passed.failedBoth === 1 && Object.keys(passed).join() === `commit,day,projects,${COUNTS},baselineFromClone,syncPure,syncNotPure,syncUnproved,copiesFrom,ownProjects,drafts,draftsAnotherOwner,draftsStopped,${DRAFT_COUNTS}`, "the record holds the commit, the day and counts alone, nothing of the project");
   let at = record(passed);
   let r = trialAt(at, read);
   ok(r.held === null && /in 1 project: 1 check passed before and after the update, 0 failed before and passed after, 1 failed before and after \(standing before the release\), 0 passed before and failed after/.test(r.said), "a record of the commit before, which the release changes by the record alone, stands, and one failing both does not hold the cut", r.said);
@@ -98,12 +98,19 @@ const { tmp, git } = scratchCore("release-trial-test-");
   fs.writeFileSync(pureOne, `a pure sync against the commit tried, ${later}: a trial's reading\ntrial answer: ${JSON.stringify({ commit: later, pure: true, from: "release-5" })}\n`);
   fs.writeFileSync(elsewhere, `trial answer: ${JSON.stringify({ commit: tried, pure: true, from: "release-5" })}\n`);
   const counted = answersOf([pureOne, crashed, empty, said], later, 4);
-  ok(JSON.stringify(counted.answers) === JSON.stringify([{ pure: true, from: "release-5" }, ...Array(3).fill({ pure: false, from: "unknown" })]) && counted.unproved.length === 3
+  ok(JSON.stringify(counted.answers) === JSON.stringify([{ pure: true, from: "release-5" }, ...Array(3).fill({ pure: false, from: "unknown", unproved: true })]) && counted.unproved.length === 3
     && counted.unproved.every((l, i) => l.startsWith(`project ${i + 2}'s sync, counted not proved: `) && l.includes("holds no line `trial answer: `")) && counted.why === undefined,
     "a sync's reading that crashed, is empty or holds no answer is counted not proved, from a copy not read, and says so for each", JSON.stringify(counted));
-  const [unreadFile, other, never] = [answersOf([path.join(tmp, "not-there.txt")], later, 1), answersOf([elsewhere], later, 1), answersOf([], later, 1)];
-  ok(/not-there\.txt, given with --sync for project 1, cannot be read/.test(unreadFile.why) && /answers for [0-9a-f]{7}, not the commit tried/.test(other.why) && /given with no --sync after them/.test(never.why),
-    "  and a file not read, an answer for another commit and a reading never asked are refused all the same", [unreadFile, other, never].map(r => r.why).join("\n"));
+  const elsewhereNoForm = path.join(tmp, "elsewhere-no-form.txt");
+  fs.writeFileSync(elsewhereNoForm, `trial answer: ${JSON.stringify({ commit: tried, pure: "yes", from: "a project" })}\n`);
+  const [unreadFile, other, otherNoForm, never] = [answersOf([path.join(tmp, "not-there.txt")], later, 1), answersOf([elsewhere], later, 1), answersOf([elsewhereNoForm], later, 1), answersOf([], later, 1)];
+  ok(/not-there\.txt, given with --sync for project 1, cannot be read/.test(unreadFile.why) && [other, otherNoForm].every(o => /answers for [0-9a-f]{7}, not the commit tried/.test(o.why)) && /given with no --sync after them/.test(never.why),
+    "  and a file not read, an answer for another commit, in its form or not, and a reading never asked are refused all the same", [unreadFile, other, otherNoForm, never].map(r => r.why).join("\n"));
+  const unprovedSaid = trialAt(record(trialRecord(later, "2026-11-23", [one, one], counted.answers.slice(0, 2), [...OTHER, ...OTHER])), read);
+  ok(unprovedSaid.held === null && /1 of the syncs pure, 1 not, 1 of them not proved, their reading holding no answer;/.test(unprovedSaid.said), "  the record counts the syncs not proved apart and says them, holding no cut", unprovedSaid.said);
+  const unprovedNoForm = [{ ...readings, syncUnproved: 2 }, { ...readings, syncUnproved: -1 }, { ...readings, syncUnproved: "one" }].map(bad => trialAt(record(bad), read));
+  ok(unprovedNoForm.every(n => /no form/.test(n.said) && n.held !== null) && !/no form/.test(trialAt(record((({ syncUnproved, ...rest }) => rest)(readings)), read).said),
+    "  a record with more syncs not proved than not pure, or a count of them that is no count, is in no form; one written before them, without it, is in its form");
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the trial of a release`);
