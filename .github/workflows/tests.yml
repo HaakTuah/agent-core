@@ -605,6 +605,9 @@ jobs:
         env:
           PART: ${{ contains(matrix.parts, 'faults') && 'faults' || contains(matrix.parts, 'places') && 'places' || 'all' }}
         run: node tests/core-yml-test.mjs --part "$PART"
+      - name: The stand-in for npm's install, what it may load and run (npm-once.mjs)
+        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/npm-once-test.mjs ')) }}
+        run: node tests/npm-once-test.mjs
       - name: The core's checks from plain git (check.mjs), on scratch projects
         if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/check-test.mjs ')) }}
         run: node tests/check-test.mjs
