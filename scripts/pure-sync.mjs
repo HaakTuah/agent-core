@@ -134,6 +134,17 @@ function tracked(sha, to) {
   }
 }
 
+// Whether the project is private, as the host says it of the checkout's repository, from GitHub's event, gh or a read
+// with no sign-in alone (host-private.mjs); never from a test's stand-in, nor in the merge's gate, that waives the
+// reviews, from an answer given as CORE_PRIVATE. A trial's reading, which proves no merge, takes that answer where the
+// host gave none, as a trial holding no sign-in on a private project must, and says so (#1361, point 16).
+function heldPrivate() {
+  const held = privateOf(process.cwd(), { env: { ...process.env, CORE_HOST_ANSWERS: "", CORE_PRIVATE: "" } });
+  if (!tried || !held.unread || !/^(true|false)$/u.test(process.env.CORE_PRIVATE ?? "")) return held;
+  givenPrivate = true;
+  return { private: process.env.CORE_PRIVATE === "true" };
+}
+
 // The core's own files and parts the sync changed, each proved equal, byte for byte, to what the one process writes
 // (converge.mjs, as this checkout of the core's main holds it) from the kit at the new pin, with the project as main
 // holds it and the new pin, every byte outside the core's part kept. Only the core's own: a whole file of the core's
@@ -157,13 +168,7 @@ function provedOwned(dir) {
     execFileSync("git", ["init", "-q"], { cwd: base_ });
     tracked(base, base_);
     writeFileSync(join(base_, "core-manifest.md"), raw(["show", `${head}:core-manifest.md`]));
-    // (whether it is private, as the host says it of the checkout's repository, from GitHub's event, gh or a read with
-    // no sign-in alone: host-private.mjs; never from a test's stand-in, nor in this gate, that waives the reviews, from an
-    // answer given as CORE_PRIVATE; a trial's reading, which proves no merge, takes that answer where the host gave none,
-    // as a trial holding no sign-in on a private project must, and says so: #1361, point 16)
-    let held = privateOf(process.cwd(), { env: { ...process.env, CORE_HOST_ANSWERS: "", CORE_PRIVATE: "" } });
-    if (tried && held.unread && /^(true|false)$/u.test(process.env.CORE_PRIVATE ?? "")) [held, givenPrivate] = [{ private: process.env.CORE_PRIVATE === "true" }, true];
-    const p = project(base_), k = kind(p, held), bad = unformed(p, k);
+    const p = project(base_), k = kind(p, heldPrivate()), bad = unformed(p, k);
     if (bad.length) { unproved(`the project's kind or values cannot be read in their forms, so it is not proved what the core's process writes: ${bad.join("; ")}`); return; }
     const kit = fresh(p, join(kits, "now", "setup", "template"), { kitOnly: true, k });
     if (!kit.length) { unproved(`the kit at ${pin} gives no file this checkout of the core can render`); return; }
