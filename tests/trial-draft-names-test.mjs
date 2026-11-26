@@ -7,7 +7,7 @@
 //   node tests/trial-draft-names-test.mjs
 import { readDraft } from "../scripts/trial-draft.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
-import { TRIED, host } from "./trial-draft-host.mjs";
+import { TRIED, host } from "./trial-draft-host-test.mjs";
 
 const { ok, done } = tally();
 const F = (name, id, c = "failure") => ({ name, status: "completed", conclusion: c, check_suite_id: id }), J = (name, id, c) => ({ name, status: "completed", conclusion: c, check_suite: { id } });

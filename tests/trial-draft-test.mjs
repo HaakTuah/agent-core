@@ -11,7 +11,7 @@ import { draftCounts, readDraft, readNone, repoHash } from "../scripts/trial-dra
 import { saidOf } from "../scripts/trial-draft-checks.mjs";
 import { DRAFT_COUNTS, LINE, draftAnswerOf } from "../scripts/trial-draft-record.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
-import { HEAD, SHA, TRIED, host } from "./trial-draft-host.mjs";
+import { HEAD, SHA, TRIED, host } from "./trial-draft-host-test.mjs";
 
 const { ok, done } = tally();
 

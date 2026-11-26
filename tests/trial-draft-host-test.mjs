@@ -1,7 +1,12 @@
 // A stand-in for the host, for the tests of the draft in a release's trial (tests/trial-draft-test.mjs,
 // tests/trial-draft-names-test.mjs): a draft pull request of the owner's own project pinned to the commit tried, beside
-// main's newest commit, each list given page by page, and what `over` changes of it. No call reaches the network.
+// main's newest commit, each list given page by page, and what `over` changes of it. No call reaches the network. Run
+// by itself, it checks its own pages.
+//
+//   node tests/trial-draft-host-test.mjs
 import { CORE, OWNER } from "../scripts/core-address.mjs";
+import { tally } from "../scripts/scratch-core.mjs";
+import { started } from "../scripts/started.mjs";
 
 export const SHA = n => String(n).repeat(40);
 export const TRIED = SHA("a"), MAIN = SHA("b"), HEAD = SHA("c");
@@ -26,3 +31,11 @@ export const host = (over = {}) => route => {
   if (/\/status\?/.test(route)) return page(route, "statuses", route.includes(HEAD) ? over.draftStatuses ?? [] : over.mainStatuses ?? []);
   return { why: "no such route in the stand-in" };
 };
+
+if (started(import.meta.url)) {
+  const { ok, done } = tally(), ask = host({ many: true });
+  const [one, two] = [1, 2].map(n => ask(`repos/o/p/commits/${HEAD}/check-runs?per_page=100&page=${n}`).body);
+  ok(one?.check_runs.length === 100 && two?.check_runs.length === one.total_count - 100 && ask(`repos/o/p/commits/${HEAD}/check-runs`).why && ask("repos/o/q").why,
+    "the stand-in gives each list a hundred to a page, all of its count, and no answer to a route it does not hold", JSON.stringify([one?.total_count, two?.check_runs.length]));
+  done("the stand-in for the host in the draft's tests");
+}
