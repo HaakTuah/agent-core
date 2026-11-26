@@ -4,16 +4,17 @@
 // the project's calls name it is no difference in the workflow that calls its check, nor in the text that names it.
 // What the one process writes (converge.mjs) stays the kit's own. Node's own modules alone.
 import { KIT_CONFIGS } from "./check-configs.mjs";
-import { KIT as SHAPE, where as shapeAt } from "./shape.mjs";
+import { KIT as SHAPE, plainPath, where as shapeAt } from "./shape.mjs";
 
 // Where the kit writes the shape check's baseline.
 const SHAPE_BASELINE = "checks/shape-baseline.json";
 
-// The shape check's baseline in the project `p`, at the path its config names for it, else where the kit writes it.
+// The shape check's baseline in the project `p`, at the path its config names for it where that is a plain path inside
+// the project, as the shape check reads it, else where the kit writes it.
 export function shapeBaseline(p) {
   let config = null;
   try { config = JSON.parse(p.read(shapeAt(p.manifest)) ?? "null"); } catch { /* (the kit's path, below) */ }
-  return typeof config?.baseline === "string" ? config.baseline : SHAPE_BASELINE;
+  return plainPath(config?.baseline) && !config.baseline.endsWith("/") ? config.baseline : SHAPE_BASELINE;
 }
 
 // (to, text) => the kit's text of the file `to` with each kit path of a config as the project `p` holds it: `at` the

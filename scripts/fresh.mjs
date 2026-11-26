@@ -220,8 +220,9 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES), { kitOnly = fal
     // read)
     const at = configs(p);
     const placed = { [CHOICES]: where(p.manifest) ?? CHOICES, [SHAPE]: shapeAt(p.manifest), [KIT_CONFIGS.copies]: at.copies, [KIT_CONFIGS.audit]: at.audit };
-    // (compared, the kit's words name each config where the project runs its check with it: kit-paths.mjs)
-    const own = kitOnly ? (to, text) => text : ownPaths(p, at);
+    // (compared, the kit's words name each config where the project runs its check with it: kit-paths.mjs; an earlier
+    // kit's, which tell the one process a file of the core's, and what it writes stay as written)
+    const own = older || kitOnly ? (to, text) => text : ownPaths(p, at);
     const kit = built.filter(([to]) => !gone.has(to) && placed[to] !== null).map(([to, text]) => [placed[to] ?? to, own(to, asHeld(p, to, text))]);
     if (older || kitOnly) return kit;
     // the configs the kit writes beside its templates, by the paths the project runs its checks with, each read by its keys
