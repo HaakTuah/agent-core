@@ -76,7 +76,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
        origin read from the clone's own config, no include followed, and git not run where the clone's git folder (a
        `.git` file's or link's) or the common folder it names lies on another machine, a worktree on this machine read;
        and no path it probes or reads, nor one git reads, opened where a link on its way, followed link by link without
-       opening it, names a folder on another machine;
+       opening it, names a folder on another machine, each file that names a folder read as git reads it, and git given
+       the git folder and work tree so found, so it searches no folder above and takes no work tree from the config;
      - limits: 16 MB of gh's answer; 20 s for the read with no sign-in, and 30 s for its process; of each answer only a
        boolean field `private` is taken, from the read with no sign-in only with status 200, all else reading nothing;
      - hostile tests: `tests/host-private-test.mjs`.
