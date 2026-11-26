@@ -110,4 +110,11 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
+// a base config whose list holds something other than text fails with its mend, not a TypeError from the check (#1352)
+{
+  let odd = null;
+  try { check({ ships: [], lockfiles: [] }, ".", "HEAD", { ships: [], lockfiles: [5] }); } catch (e) { odd = e; }
+  ok(odd?.constructor === Error && /"lockfiles" that is not a list of names.*\. Mend: /u.test(odd.message), "a base config whose \"lockfiles\" holds something other than text fails with its mend, not a TypeError", String(odd?.stack ?? odd));
+}
+
 done();
