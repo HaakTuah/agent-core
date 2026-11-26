@@ -112,9 +112,9 @@ export const callers = p => (readable(p, text => text.toLowerCase().includes(`${
 // reports a check that one reports, by a name read exactly, so that a check a ruleset asks for reports where the suite
 // is skipped (#1248, point 3; #1260); it is meant to start where the suite does not. A name is read exactly where it is
 // the job's `name` or key with no expression in it and the job has no matrix, which adds to the name GitHub reports. A
-// workflow with `paths` that shares a check with a suite, or may (a name not read exactly whose start a suite's check
-// has, or a suite whose names are not read exactly), and is no stand-in is still reported, with the mend that makes it
-// one, never `!<its path>`, which could leave that check unreported: "Nothing locks a project".
+// workflow with `paths` that shares a check with a suite, or may (a name of either not read exactly whose start the
+// other's name has, or whose start is the other's start or begins it), and is no stand-in is still reported, with the
+// mend that makes it one, never `!<its path>`, which could leave that check unreported: "Nothing locks a project".
 export function suitesOnPins(p) {
   const pins = callers(p);
   readable(p, text => /paths(-ignore)?\s*:/.test(text));
