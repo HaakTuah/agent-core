@@ -12,7 +12,8 @@
 //         or cannot be read. A workflow that could not start or ended with no job counts as a failed check; one skipped on the draft is
 //         counted and named apart, and where it passed on main, not run after, holds the cut. `--gate` names a check its
 //         builder read as failing, or skipping after passing on main, only for being a draft (setup/sync-notes/680):
-//         counted apart, holding nothing, named on its own line.
+//         counted apart, holding nothing, named on its own line. A check run is named `<workflow>: <job>` where GitHub ties it
+//         to a workflow run, so the same job name in two workflows is two checks, and `--gate` takes that name.
 //   node scripts/trial-draft.mjs <owner>/<name> none <the commit tried>
 //         where no draft was opened: reads why (another owner's, a stop switch that stands) and prints it as the answer;
 //         none for a repository whose manifest pins no copy of this core or could not be read, or the owner's own
@@ -82,12 +83,20 @@ function checksAt(repo, sha, ask) {
   const flows = pagesOf(`repos/${repo}/actions/runs?head_sha=${sha}`, "workflow_runs", ask);
   if (flows.why) return flows;
   const label = w => `${w.name ?? "a workflow"} (${w.status === "completed" ? "could not start" : "workflow"})`;
+  const jobs = keyed(runs.items, flows.items);
   const jobless = w => RUN[w?.conclusion] === "failed" && !runs.items.some(r => r?.check_suite?.id != null && r.check_suite.id === w.check_suite_id);
   const open = flows.items.filter(w => w?.status !== "completed" || jobless(w));
   const unstarted = open.map(w => ({ name: label(w), status: w.status === "completed" ? "completed" : "queued", conclusion: "failure", person: w.status === "waiting" }));
   const unfinished = open.filter(w => w.status !== "completed").map(w => ({ name: label(w), flow: w.name }));
   const notHeld = r => r?.status !== "waiting" && !r?.person;
-  return { said: saidOf([...runs.items, ...unstarted], status.items), active: saidOf([...runs.items, ...unstarted].filter(notHeld), status.items), flows: new Set(flows.items.map(w => w?.name)), unfinished };
+  return { said: saidOf([...jobs, ...unstarted], status.items), active: saidOf([...jobs, ...unstarted].filter(notHeld), status.items), flows: new Set(flows.items.map(w => w?.name)), unfinished };
+}
+
+// Each check run named by its workflow and job, `<workflow>: <job>`, where GitHub ties its check suite to a workflow
+// run, so a job of one workflow is never read against another's of the same name; by its job alone where none is tied.
+function keyed(runs, flows) {
+  const flowOf = new Map(flows.filter(w => w?.check_suite_id != null).map(w => [w.check_suite_id, w.name]));
+  return runs.map(r => (flowOf.has(r?.check_suite?.id) ? { ...r, name: `${flowOf.get(r.check_suite.id)}: ${r.name}` } : r));
 }
 
 // Whether the stop switch of `repo` stands, through `ask`: true or false, or { why } where it could not be read; GitHub's
