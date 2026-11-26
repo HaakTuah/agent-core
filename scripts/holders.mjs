@@ -37,11 +37,12 @@ import { inStep, items, KEY, LAST_NUMBERED } from "./archive.mjs";
 import { FILE, HOOKS, counts, hook, holderOf } from "./holder-form.mjs";
 import { OWN, ownHolders, ownMain, ownReport, writeOwn } from "./holders-own.mjs";
 import { NUMBER } from "./outcomes.mjs";
-import { installed, unreached } from "./packages.mjs";
+import { didNotRun, installed } from "./packages.mjs";
 import { FOLDERS, ROOT, rules } from "./rules.mjs";
 import { shapeFaults } from "./schemas.mjs";
 import { started } from "./started.mjs";
 import { CASES } from "./staged.mjs";
+import { asText, parseBounded } from "./guards.mjs";
 
 // (what a project's own list reads, and the shared pieces, stay importable from here, as they were before the split)
 export { FILE, HOOKS, OWN, counts, ownHolders, ownReport, writeOwn };
@@ -72,7 +73,7 @@ export function named(root) {
 function entryOf(dir, f) {
   if (!f.endsWith(".json")) return { fault: `${FILE}/${f} is no entry, which is a file of JSON. Mend: move it out of ${FILE}/, or write the rule's entry in a file named ${f.replace(/\.[^.]*$/u, "")}.json` };
   let e;
-  try { e = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); }
+  try { e = parseBounded(fs.readFileSync(path.join(dir, f), "utf8")); }
   catch (x) { return { fault: `${FILE}/${f} cannot be read (${String(x.message).split("\n")[0]}). Mend: write it as JSON, an object with the rule's "rule" and its "holder", "behind" and "number"` }; }
   if (e === null || typeof e !== "object" || Array.isArray(e) || typeof e.rule !== "string" || !e.rule) return { fault: `${FILE}/${f} is no object with a "rule". Mend: write it as {"rule": "<the rule's file and lead>", "holder": ..., "behind": [...], "number": "..."}, each but "rule" only where the rule has one` };
   return { entry: e };
@@ -191,9 +192,7 @@ export const shareLine = (own, core) => `- rules held by a check: the project's 
 
 // Where ajv is not installed the file's form went unchecked: said as a warning, and the check goes on.
 function unchecked() {
-  if (installed("ajv")) return;
-  console.log(unreached("ajv") ? `::warning::The form of ${FILE}/ was not checked: the package ajv could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`
-    : `::warning::The form of ${FILE}/ was not checked: the package ajv is not installed. Mend: run node scripts/install.mjs, then this check again`);
+  if (!installed("ajv")) console.log(didNotRun(`The form of ${FILE}/ was not checked`, "ajv"));
 }
 
 if (started(import.meta.url) && process.argv.includes("--own")) {
@@ -202,7 +201,7 @@ if (started(import.meta.url) && process.argv.includes("--own")) {
   unchecked();
   const h = holders();
   const lines = report().map(l => l.slice(2));
-  console.log(process.argv.includes("--list") ? lines.join("\n") : lines[0]);
-  for (const w of h.wrong) console.error(`FAIL ${w}`);
+  console.log((process.argv.includes("--list") ? lines : lines.slice(0, 1)).map(asText).join("\n"));
+  for (const w of h.wrong) console.error(asText(`FAIL ${w}`));
   if (h.wrong.length) process.exitCode = 1;
 }

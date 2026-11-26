@@ -16,20 +16,23 @@
 //
 // npm: the licence check's "lockfiles", each package that npm's registry gives (licences.mjs's registryName), read
 // against every package-lock.json and npm-shrinkwrap.json of the base; NuGet (--nuget): its "nuget" lock files, read
-// against every packages.lock.json and packages.<name>.lock.json of the base. A package from anywhere else is not
-// looked up here. What a registry, or GitHub, answers is a publisher's text: it is printed on one line (guards.mjs's
+// against every packages.lock.json and packages.<name>.lock.json of the base; PyPI, beside npm: its "pypi"
+// requirements files in PyPI's lock form (lookup-pypi.mjs, beside this file, reads them and PyPI's answers; #716), read
+// against those the base's config named. A package from anywhere else is not looked up here. What a registry, or GitHub, answers is a publisher's text: it is printed on one line (guards.mjs's
 // logged), and an answer of another shape is a lookup that failed. Repositories are asked of GitHub's API without a
 // token, for the packages the project names itself alone (at most GITHUB_MOST), so the hour's limit is never reached.
-// Node's own modules; run by the licence workflow (npm) and the NuGet workflow (--nuget).
+// Node's own modules; run by the licence workflow (npm and PyPI) and the NuGet workflow (--nuget).
 //
 //   node core/scripts/lookup.mjs <the licence check's config> [--nuget]
 import { execFileSync } from "node:child_process";
-import { appendFileSync, readFileSync, realpathSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, realpathSync } from "node:fs";
 import path, { posix } from "node:path";
 import { fileURLToPath } from "node:url";
-import { leadsOut, logged, parseBounded } from "./guards.mjs";
+import { leadsOut, logged, loggedCause, noSignInWhole, parseBounded } from "./guards.mjs";
 import { baseOf, configAt, loadConfig, lockInstalled, registryName, textAt } from "./licences.mjs";
 import { lockPackages, nugetConfig } from "./nuget.mjs";
+import { pypiPackages, pypiRegistry } from "./lookup-pypi.mjs";
+import { reach } from "./reach.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
 import { started } from "./started.mjs";
 
@@ -43,7 +46,8 @@ const NUGET_PAGES = 100;
 // (a name as npm's registry gives one, an old one in capitals too: at most a scope and a name, nothing an address reads)
 const NPM_NAME = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/iu;
 const KINDS = ["dependencies", "optionalDependencies", "peerDependencies"];
-const said = (value) => logged(String(value).slice(0, 200));
+// (any sign-in cut out before the text is cut short, so an "@" past the cut still ends it: floor rule 1)
+const said = (value) => logged(noSignInWhole(String(value)).slice(0, 200));
 const day = (ms) => new Date(ms).toISOString().slice(0, 10);
 const when = (text) => (typeof text === "string" && /^\d{4}-\d\d-\d\dT/u.test(text) ? Date.parse(text) : NaN);
 
@@ -97,7 +101,8 @@ function source(resolved) {
   if (typeof resolved !== "string" || !resolved) return "no address the lock file names";
   if (/^(?:git\+|git:|github:|gitlab:|bitbucket:)/u.test(resolved)) return "a git address";
   if (resolved.startsWith("file:")) return "a packed file named by its path";
-  const host = /^https?:\/\/([^/:@?#]{1,100})/u.exec(resolved)?.[1];
+  // (the host after any user and password, which are never printed: floor rule 1)
+  const host = /^https?:\/\/(?:[^/\\?#]*@)?([^/\\:@?#]{1,100})/u.exec(resolved)?.[1];
   return host ? `a web address on ${host}` : "an address of another kind";
 }
 
@@ -119,14 +124,6 @@ function resolve(packages, from, name) {
     if (Object.hasOwn(packages, key)) return key;
     if (dir === "") return null;
   }
-}
-
-// Every node `next` leads to from `start`, itself left out.
-function reach(start, next) {
-  const seen = new Set([start]), todo = [start];
-  while (todo.length) for (const n of next(todo.pop())) if (!seen.has(n)) { seen.add(n); todo.push(n); }
-  seen.delete(start);
-  return seen;
 }
 
 /** The packages of a NuGet lock file's text: each { name, version, path, direct, brings }, a framework's entries read together. */
@@ -261,7 +258,7 @@ export async function nugetFacts(index, page) {
 export async function lookUp(packages, { get, now = Date.now(), nuget = false, sources = 0 }) {
   const failures = [], reports = [], github = { asked: 0 };
   await pool(packages, 8, async (p) => {
-    const at = `${said(p.lockPath)}: ${said(p.name)}@${said(p.version)}`, where = registryOf(nuget);
+    const at = `${said(p.lockPath)}: ${said(p.name)}@${said(p.version)}`, where = p.pypi ? "PyPI" : registryOf(nuget);
     if (p.from) { reports.push(`${at}: not from ${where} but from ${said(p.from)}, so not looked up: the review reads where it comes from`); return; }
     let facts;
     try { facts = await registry(p, get, nuget, sources); } catch (e) {
@@ -293,14 +290,16 @@ function tooYoung(p, facts, now) {
 async function described(p, facts, now, { get, nuget, github }) {
   const age = Math.floor((now - facts.first) / DAY);
   let repo = facts.repo ? said(facts.repo.url) : "not named";
-  if (p.direct && facts.repo?.owner) repo += github.asked++ < GITHUB_MOST ? await onGitHub(facts.repo, p.name, get, nuget) : `, GitHub not asked: past the ${GITHUB_MOST} packages a lookup asks of it`;
-  return `${p.direct ? "named by the project" : `brought by ${brought(p) || "another"}`}; first published ${day(facts.first)} (${age} days ago); last release ${day(facts.last)}; repository ${repo}; published by ${said(facts.publisher)}; brings ${p.brings} package${p.brings === 1 ? "" : "s"} with it; provenance: ${facts.provenance}`;
+  if (p.direct && facts.repo?.owner) repo += github.asked++ < GITHUB_MOST ? await onGitHub(facts.repo, p.name, get, nuget || p.pypi) : `, GitHub not asked: past the ${GITHUB_MOST} packages a lookup asks of it`;
+  const brings = p.brings === null ? "what it brings, its lock file does not say" : `brings ${p.brings} package${p.brings === 1 ? "" : "s"} with it`;
+  return `${p.direct ? "named by the project" : `brought by ${brought(p) || "another"}`}; first published ${day(facts.first)} (${age} days ago); last release ${day(facts.last)}; repository ${repo}; published by ${said(facts.publisher)}; ${brings}; provenance: ${said(facts.provenance)}${facts.note ? `; ${said(facts.note)}` : ""}`;
 }
 
 // What the registry says of the package: its facts, { missing } where it has no such package, or, on NuGet where the
 // config names sources of its own, { elsewhere } where NuGet's registry has no such id or version, which one of those
 // gives (the NuGet check holds what is restored to the lock file's content hash).
 export async function registry(p, get, nuget, sources = 0) {
+  if (p.pypi) return pypiRegistry(p, get, repository);
   if (!nuget) {
     if (!NPM_NAME.test(p.name)) throw new Error("its name is not one npm's registry gives");
     const r = await get(`${NPM}${p.name.replaceAll("/", "%2F")}`);
@@ -351,15 +350,18 @@ export async function pool(items, size, work) {
 
 // ---- The project
 
-/** The lock files of `nuget` or npm the config names, and the base's own of the same kind, each read to packages. */
-/** The lock files of `nuget` or npm the config names, each read to packages, and the base's: those the config as the
+/** The lock files of NuGet (`kind` true), PyPI ("pypi") or npm the config names, each read to packages, and the base's: those the config as the
  *  base held it named (`baseConfig`), as the base held them. Only a lock file the base's own config named counts as
  *  held, so no file merged as data first, and named in the config only by the pull request, makes a name count as held:
- *  a lock file the pull request newly names is new, and each of its packages is looked up. */
-export function packagesOf(config, root, base, nuget, baseConfig = null) {
-  const named = (c) => { try { return nuget ? [...nugetConfig(c, copyOf(root)).ships, ...nugetConfig(c, copyOf(root)).tools] : Array.isArray(c?.lockfiles) ? c.lockfiles : []; } catch { return []; } };
-  const read = nuget ? nugetPackages : npmPackages;
-  const head = named(config).map((f) => {
+ *  a lock file the pull request newly names is new, and each of its packages is looked up. A lock file the base's config
+ *  named and the pull request's no longer names is read all the same, where it stands, so no change to it goes unread
+ *  by taking it out of the config. */
+export function packagesOf(config, root, base, kind, baseConfig = null) {
+  const pypi = kind === "pypi", nuget = !pypi && Boolean(kind), list = (v) => (Array.isArray(v) ? v : []);
+  const named = (c) => { try { return pypi ? list(c?.pypi) : nuget ? [...nugetConfig(c, copyOf(root)).ships, ...nugetConfig(c, copyOf(root)).tools] : list(c?.lockfiles); } catch { return []; } };
+  const read = pypi ? pypiPackages : nuget ? nugetPackages : npmPackages;
+  const kept = named(baseConfig).filter((f) => typeof f === "string" && !named(config).some((g) => typeof g === "string" && posix.normalize(g) === posix.normalize(f)) && existsSync(posix.join(root, f)));
+  const head = [...named(config), ...kept].map((f) => {
     // (a lock file the pull request makes a link out of the project is never read: floor rule 5)
     if (leadsOut(root, posix.join(root, f))) throw new Error(`${logged(f)} leads out of the project, through a link. Mend: make it a file of the project's own, written by its package manager`);
     return [f, read(readFileSync(posix.join(root, f), "utf8"), f)];
@@ -385,7 +387,7 @@ const mended = (message, mend) => (/Mend: /u.test(message) ? message : `${messag
 export async function run(configPath, { root, base, nuget = false, get = fetched, now = Date.now(), event = process.env.GITHUB_EVENT_NAME }) {
   if (!base && event?.startsWith("pull_request")) return { lines: ["FAIL: this is a pull request, and its checkout holds no base to read it against, so the lookup would read nothing. Mend: give the job's checkout fetch-depth: 2 (the pull request merged into its base, with both parents)"], code: 1 };
   if (!base) return { lines: ["ok   no pull request's base here, so no package is new: nothing looked up"], code: 0 };
-  let found, head, held, sources = 0;
+  let found, head, held, sources = 0, py = null;
   try {
     // (the config is the pull request's: a link out of the project is refused before it is opened, and loadConfig's
     // error quotes none of its text; the project's folder and the config's are each read by the system's own spelling,
@@ -395,23 +397,47 @@ export async function run(configPath, { root, base, nuget = false, get = fetched
     ({ head, base: held } = packagesOf(config, root, base, nuget, configAt(root, base, configPath)));
     found = newPackages(head, held, nuget);
     if (nuget) sources = nugetConfig(config, copyOf(root)).sources.length;
+    else py = pypiNew(config, root, base, configAt(root, base, configPath));
   } catch (e) { return { lines: [`FAIL: ${logged(mended(e.message, "write the config as JSON, and each lock file it names anew with its package manager, never by hand"))}`], code: 1 }; }
   const { failures, reports } = await lookUp(found, { get, now, nuget, sources });
+  const pypi = py ? await lookUp(py, { get, now }) : { failures: [], reports: [] };
   // (on NuGet the lock file's content hash is held by the NuGet check, and where each package comes from by its restore)
   const sourced = nuget ? { failures: [], reports: [] } : sourceFaults(head, held);
-  const s = found.length === 1 ? "" : "s", off = sourced.failures.length;
-  return { lines: [...reports.map((r) => `REPORT: ${r}`), ...sourced.reports.map((r) => `REPORT: ${r}`), ...failures.map((f) => `FAIL: ${f}`), ...sourced.failures.map((f) => `FAIL: ${f}`),
-    failures.length ? `${failures.length} of ${found.length} new package${s} fail the lookup (floor rule 15)` : `ok   ${found.length} new package${s} looked up in ${registryOf(nuget)}, each printed above for the review`,
-    ...(off ? [`${off} lock entr${off === 1 ? "y" : "ies"} the pull request brings not from npm's registry with an integrity value (floor rule 7)`] : [])], code: failures.length || off ? 1 : 0 };
+  const off = sourced.failures.length;
+  return { lines: [...reports.map((r) => `REPORT: ${r}`), ...sourced.reports.map((r) => `REPORT: ${r}`), ...pypi.reports.map((r) => `REPORT: ${r}`), ...failures.map((f) => `FAIL: ${f}`), ...sourced.failures.map((f) => `FAIL: ${f}`), ...pypi.failures.map((f) => `FAIL: ${f}`),
+    summed(failures.length, found.length, registryOf(nuget)), ...(py ? [summed(pypi.failures.length, py.length, "PyPI")] : []),
+    ...(off ? [`${off} lock entr${off === 1 ? "y" : "ies"} the pull request brings not from npm's registry with an integrity value (floor rule 7)`] : [])], code: failures.length || off || pypi.failures.length ? 1 : 0 };
 }
 
-// The pull request's base as its workflow names it (LOOKUP_BASE, from the event's base commit), where the checkout holds
-// that commit: a checkout of the head alone, or of a head that merges main, would read no base, or the pull request's
-// own earlier commit as its first parent.
-function namedBase(root) {
-  const sha = process.env.LOOKUP_BASE;
-  if (typeof sha !== "string" || !/^[0-9a-f]{40}$/u.test(sha)) return null;
-  try { execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd: root, stdio: "ignore" }); return sha; } catch { return null; }
+// Beside npm, the packages new to the requirements files the config names under "pypi", or its base's did: null where
+// neither names any.
+function pypiNew(config, root, base, baseConfig) {
+  if (!config.pypi?.length && !baseConfig?.pypi?.length) return null;
+  const lists = packagesOf(config, root, base, "pypi", baseConfig);
+  return newPackages(lists.head, lists.base);
+}
+
+// The line that sums up one registry's lookup.
+const summed = (failed, of, where) => (failed ? `${failed} of ${of} new package${of === 1 ? "" : "s"} fail the lookup (floor rule 15)` : `ok   ${of} new package${of === 1 ? "" : "s"} looked up in ${where}, each printed above for the review`);
+
+/** What the lookup printed, for the review, also on the run's summary page, where a reviewer finds it beside the checks. */
+export function summarise(lines, nuget) {
+  if (!process.env.GITHUB_STEP_SUMMARY || lines.length <= 1) return;
+  try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### The lookup${nuget ? " (NuGet)" : ""}\n\n${lines.map((l) => `- ${l.replace(/[<>&`*_[\]|]/gu, "?")}`).join("\n")}\n`); } catch { /* (a summary is a convenience: the log holds every line) */ }
+}
+
+// The forms a job names its pull request's base in (LOOKUP_BASE): a commit, or HEAD^1, the first parent of the merge its
+// checkout holds, as the core's workflows name it, since the event's base commit may not be in a shallow checkout (#1231).
+export const NAMED_BASE = /^(?:[0-9a-f]{40}|HEAD\^1)$/u;
+
+// The pull request's base as its workflow names it (LOOKUP_BASE), as a commit, where the checkout holds it: a checkout
+// of the head alone, or of a head that merges main, would read no base, or the pull request's own earlier commit as its
+// first parent, so HEAD^1 is read only where HEAD is a merge.
+export function namedBase(root) {
+  const name = process.env.LOOKUP_BASE;
+  if (typeof name !== "string" || !NAMED_BASE.test(name)) return null;
+  const commit = (rev) => execFileSync("git", ["rev-parse", "--verify", "-q", `${rev}^{commit}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  try { if (name === "HEAD^1") commit("HEAD^2"); return commit(name) || null; } catch { return null; }
 }
 
 if (started(import.meta.url)) {
@@ -419,12 +445,10 @@ if (started(import.meta.url)) {
   if (!configPath) { console.error("FAIL: no config was named. Mend: name it: node core/scripts/lookup.mjs <the licence check's config> [--nuget]"); process.exit(1); }
   let root;
   try { root = projectAt(fileURLToPath(new URL(".", import.meta.url))).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim(); }
-  catch (e) { console.error(`FAIL: ${logged(e.message)}. Mend: run it from the project's root, a git repository`); process.exit(1); }
-  const { lines, code } = await run(configPath, { root, base: namedBase(root) ?? baseOf(root), nuget: process.argv.includes("--nuget") });
+  catch (e) { console.error(`FAIL: ${loggedCause(e.message)}. Mend: run it from the project's root, a git repository`); process.exit(1); }
+  const nuget = process.argv.includes("--nuget");
+  const { lines, code } = await run(configPath, { root, base: namedBase(root) ?? baseOf(root), nuget });
   for (const line of lines) (line.startsWith("FAIL") ? console.error : console.log)(line);
-  // (what is printed for the review, also on the run's summary page, where a reviewer finds it beside the checks)
-  if (process.env.GITHUB_STEP_SUMMARY && lines.length > 1) {
-    try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### The lookup${process.argv.includes("--nuget") ? " (NuGet)" : ""}\n\n${lines.map((l) => `- ${l.replace(/[<>&`*_[\]|]/gu, "?")}`).join("\n")}\n`); } catch { /* (a summary is a convenience: the log holds every line) */ }
-  }
+  summarise(lines, nuget);
   process.exit(code);
 }

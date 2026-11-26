@@ -9,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { CORE } from "../scripts/core-address.mjs";
-import { run, pr, project, script, listing, KIT, HOOKS, LINKS, git, front, withSetting, TREE_HOOK, withHook, entry, fromWorkingTree, NOT_KIT, KIT_HOOK, withPlugins, PLUGIN, codexHook, change, env, asserting } from "../scripts/agent-tools-scratch.mjs";
+import { run, pr, project, script, listing, KIT, HOOKS, LINKS, git, front, withSetting, TREE_HOOK, withHook, entry, fromWorkingTree, fromMain, MAIN_HOOK, NOT_KIT, KIT_HOOK, withPlugins, PLUGIN, codexHook, change, env, asserting } from "../scripts/agent-tools-scratch.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -60,6 +60,15 @@ fails(run(pr(project({ ...script, ".claude/settings.json": withHook(KIT_HOOK), .
 fails(run(project({ ...script, ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK, fromWorkingTree)) })), "a mark on a hook in the kit's form fails", 'but its command is the starter kit\'s form, which runs its copy on main. Mend: take "from" out');
 fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-market": true }), ...listing({ ...PLUGIN, ...fromWorkingTree }) })), "a mark on what is no hook fails", 'only a hook\'s entry may say "from"');
 fails(run(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK, fromWorkingTree)) }), "--core"), "in the core's own repository none may stand, marked or not", "none may stand");
+// (a hook that fetches its file from main in a form of its own is listed by "from": "main", read from its command; one
+// that fetches nothing from main is listed by "the working tree" alone; #1273, point 2)
+const mainStood = project({ ...script, ".claude/settings.json": withHook(MAIN_HOOK) });
+const mainFirst = run(pr(mainStood, listing(entry(MAIN_HOOK))));
+ok(mainFirst.status === 0 && /note as the base held it[\s\S]*give its entry in checks\/licences\.json "from": "main"/.test(mainFirst.out), "a hook the base held that fetches its file from main is noted, saying to list it with \"from\": \"main\"", mainFirst.out);
+const mainMarked = run(pr(mainStood, listing(entry(MAIN_HOOK, fromMain))));
+ok(mainMarked.status === 0 && /note .*lists it in the baseline \("from": "main"\)/.test(mainMarked.out), "and passes once marked so, listed in the baseline", mainMarked.out);
+fails(run(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK, fromMain)) })), "\"from\": \"main\" on a hook whose command fetches nothing from main fails", 'fetches no file from main', '"from": "the working tree"');
+fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-market": true }), ...listing({ ...PLUGIN, ...fromMain }) })), "and on what is no hook", 'only a hook\'s entry may say "from"');
 const kiroTree = { version: "v1", hooks: [{ name: "fmt", trigger: "Stop", action: { type: "command", command: "node \"$CLAUDE_PROJECT_DIR/scripts/fmt.mjs\"" } }] };
 fails(run(pr(project({ ...listing() }), { "scripts/fmt.mjs": "", ".kiro/hooks/fmt.json": kiroTree, ".codex/config.toml": "notify = [\"python3\", \"scripts/notify.py\"]\n", "scripts/notify.py": "", ...listing({ kind: "hook", name: "Kiro Stop: node \"$CLAUDE_PROJECT_DIR/scripts/fmt.mjs\"", publisher: "this project" }, { kind: "hook", name: "Codex notify: python3 scripts/notify.py", publisher: "this project" }) })),
     "Kiro's and Codex's hooks are held to it too", `the hook "Kiro Stop: node`, `the hook "Codex notify: python3 scripts/notify.py", configured in .codex/config.toml, ${NOT_KIT}`);
@@ -92,13 +101,20 @@ git(sub, "merge", "-q", "--no-ff", "-m", "merge", "change");
 fails(run(sub), "and one whose fetched path is a submodule's entry", NOT_FILE);
 // (#476's fallback security review of bf7b3b2: what git shows at the path is asked of git, whatever the listing says,
   // as of an empty folder, which the listing leaves out)
-const emptyBase = project({ ...listing() }), inEmpty = { cwd: emptyBase, env, encoding: "utf8" };
-const emptyTree = execFileSync("git", ["mktree"], { ...inEmpty, input: "" }).trim();
-const withEmpty = execFileSync("git", ["mktree"], { ...inEmpty, input: `${git(emptyBase, "ls-tree", "HEAD")}\n040000 tree ${emptyTree}\tformat.sh\n` }).trim();
-git(emptyBase, "update-ref", "refs/heads/main", git(emptyBase, "commit-tree", withEmpty, "-p", "HEAD", "-m", "an empty folder at the path"));
-git(emptyBase, "reset", "-q", "--hard");
+const emptyMain = () => {
+  const base = project({ ...listing() }), inEmpty = { cwd: base, env, encoding: "utf8" };
+  const emptyTree = execFileSync("git", ["mktree"], { ...inEmpty, input: "" }).trim();
+  const withEmpty = execFileSync("git", ["mktree"], { ...inEmpty, input: `${git(base, "ls-tree", "HEAD")}\n040000 tree ${emptyTree}\tformat.sh\n` }).trim();
+  git(base, "update-ref", "refs/heads/main", git(base, "commit-tree", withEmpty, "-p", "HEAD", "-m", "an empty folder at the path"));
+  git(base, "reset", "-q", "--hard");
+  return base;
+};
 const rootKit = KIT_HOOK.replace("main:scripts/format.sh", "main:format.sh");
-fails(run(pr(emptyBase, { ".claude/settings.json": withHook(rootKit), ...listing(entry(rootKit)) })), "and one whose fetched path main holds as an empty folder", 'fetches "format.sh" from main, which the project holds as no plain file');
+fails(run(pr(emptyMain(), { ".claude/settings.json": withHook(rootKit), ...listing(entry(rootKit)) })), "and one whose fetched path main holds as an empty folder", 'fetches "format.sh" from main, which the project holds as no plain file');
+// (#1277's fallback review of 253908e: such a hook marked "from": "main", whose command does fetch from main, is told
+// what is wrong with its file, never that it fetches nothing from main)
+const notFileMarked = run(pr(emptyMain(), { ".claude/settings.json": withHook(rootKit), ...listing(entry(rootKit, fromMain)) }));
+ok(!/fetches no file from main/.test(notFileMarked.out), "and, marked \"from\": \"main\", is not told its command fetches nothing from main", notFileMarked.out);
 // (#476's fallback security review of de6baf6: and where the merge itself holds an empty folder there, main a file)
 const emptyHead = project({ "format.sh": "echo a file\n", ...listing() }), inHead = { cwd: emptyHead, env, encoding: "utf8" };
 pr(emptyHead, { ".claude/settings.json": withHook(rootKit), ...listing(entry(rootKit)) });

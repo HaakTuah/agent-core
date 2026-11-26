@@ -37,6 +37,7 @@ import { readHere, ruleFiles } from "./rule-files.mjs";
 import { ROOT, rules } from "./rules.mjs";
 import { started } from "./started.mjs";
 import { billedLine, line as waitLine, measure as measureWait, selfHosted } from "./wait.mjs";
+import { parseBounded } from "./guards.mjs";
 
 export const TITLE = "State report";
 export const COUNTS = "Counts for the core";
@@ -255,7 +256,7 @@ function reached(gh, account, named) {
   // (a named repository counts as given access where it is private and readable, or the account is its collaborator,
   // read-only too, as GitHub answers; else, a public one of another owner, only by its row)
   if (named.length) for (const name of named) {
-    const r = JSON.parse(gh(`repos/${name}`)), theirs = String(r.owner?.login).toLowerCase() !== account.toLowerCase();
+    const r = parseBounded(gh(`repos/${name}`)), theirs = String(r.owner?.login).toLowerCase() !== account.toLowerCase();
     found.set(r.full_name, { private: r.private, owner: r.owner?.login, shared: theirs && !r.private && !r.permissions?.push && !collaboratorOf(gh, account, r.full_name) });
   }
   else for (const r of pagesOf("user/repos?affiliation=owner,collaborator", gh)) found.set(r.full_name, { private: r.private, owner: r.owner?.login, shared: false });
@@ -283,10 +284,12 @@ function countsOf(gh, name, r, own) {
 }
 
 // A project's row, or null where it is the core, has no readable manifest that pins one, or does not share its counts.
-function rowOf(gh, account, name, r) {
+// Only GitHub's answer that the manifest is not there (404) reads as "not a project"; any other failure (an outage, no
+// sign-in) throws, so that a reading that could not be taken is never taken for none (#1112).
+export function rowOf(gh, account, name, r) {
   if (name.toLowerCase() === CORE.toLowerCase()) return null;
   let manifest;
-  try { manifest = Buffer.from(JSON.parse(gh(`repos/${name}/contents/core-manifest.md`)).content ?? "", "base64").toString("utf8"); } catch { return null; }
+  try { manifest = Buffer.from(parseBounded(gh(`repos/${name}/contents/core-manifest.md`)).content ?? "", "base64").toString("utf8"); } catch (e) { if (/\(HTTP 404\)\s*$/.test(String(e?.message).trim())) return null; throw e; }
   if (!pinOf(manifest) || (r.shared && !SHARES.test(manifest))) return null;
   const own = String(r.owner).toLowerCase() === account.toLowerCase();
   const shown = shownAs(name, own, r.private);
@@ -294,10 +297,10 @@ function rowOf(gh, account, name, r) {
 }
 
 // --projects: each project the account reaches, with its kind and the counts from its own newest state report.
-function projects(named) {
-  const gh = ghApi;
+export function projects(named, gh = ghApi) {
   const account = gh("user", "--jq", ".login").trim();
   const found = reached(gh, account, named);
+  if (!found.size) throw new Error("GitHub listed no repository");
   if (!named.length) addSharing(gh, found);
   const rows = [];
   for (const [name, r] of found) {
@@ -313,5 +316,5 @@ if (started(import.meta.url)) {
   if (what !== "--projects" || rest.some((a, i) => a !== "--repo" && rest[i - 1] !== "--repo") || !named.every(n => /^[\w-]+\/[\w.-]+$/.test(n) && !/\/\.+$/.test(n))) {
     console.error("FAIL: it takes --projects, and --repo owner/name for each repository to read in place of the account's (the look writes the monthly report itself)");
     process.exitCode = 1;
-  } else try { projects(named); } catch { console.error("FAIL: gh gave no answer here for the account or a repository named: run it where gh answers for the owner's account, or name the repositories it can reach by --repo"); process.exitCode = 1; }
+  } else try { projects(named); } catch { console.error("FAIL: gh gave no answer, or none that could be read, for the account, a repository named or a manifest, so no project was read (not none found). Mend: run it again where gh answers for the owner's account, or name the repositories it can reach by --repo"); process.exitCode = 1; }
 }

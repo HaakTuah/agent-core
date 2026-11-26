@@ -29,8 +29,9 @@
 # by its sums (floor rule 7), each term a rule of its own written as the job runs and removed with it, letter case aside,
 # nothing of the scanner's own rules, ignore files, inline marks, decoding or archives used (#579; INVENTORY.md); where
 # it could not be fetched (no network to its releases, or no pin below for the machine's system) the check fails, saying
-# how to mend it. Without the secret (a fork, Dependabot, a project that has not set it) it passes with a note that nothing
-# was checked: the check is optional. It checks this repository, and every project that takes the core calls it (workflow_call), pinned to a full
+# how to mend it. Without the secret (a fork, Dependabot, a project that has not set it) the terms pass with a note that
+# none was looked for: that part is optional. Its step before it, which needs no secret, fails a commit of the pull
+# request's own whose author's or committer's address is no no-reply one (#460, point 2), save GitHub's own as above. It checks this repository, and every project that takes the core calls it (workflow_call), pinned to a full
 # commit SHA (README.md, point 5), passing only that secret: the caller's event, checkout and token are the caller's own.
 name: Personal terms
 
@@ -90,22 +91,29 @@ jobs:
           # (the store kept only in folders of this user's own, no link, so that another account's folder or link at
           # that name takes nothing in; a new copy written to a file of its own first, never through a name made before)
           owned() { [ -d "$1" ] && [ ! -L "$1" ] && [ -O "$1" ] || { echo "$1 is not a folder of this user's own" >&2; return 1; }; }
-          tools="${TMPDIR:-/tmp}/agent-core-tools" store="${TMPDIR:-/tmp}/agent-core-tools/betterleaks-$version" bl="betterleaks$exe" got="archive.${file#*.}"
+          # (the store named from the temporary folder, never by its full path, in the log and in the path the scan
+          # step is given, which the runner prints in that step's log: on a runner on the owner's own computer the
+          # temporary and home folders hold the account's name; #1223)
+          tmp="${TMPDIR:-/tmp}" where=${TMPDIR:+TMPDIR}; where=${where:-/tmp}
+          kept="agent-core-tools/betterleaks-$version" bl="betterleaks$exe" got="archive.${file#*.}"
           # (one kept from an earlier run is taken only where it holds its sum; otherwise it is fetched again, into a
-          # folder of this run's own, the archive and then the program checked before it is kept)
-          if [ "$(digest "$store/$bl")" != "$sum" ]; then
-            dir=$(mktemp -d) || { echo "Betterleaks $version is not fetched: no temporary folder could be made."; exit 0; }
+          # folder of this run's own straight in the temporary folder, so that `..` is that folder, the archive and
+          # then the program checked before it is kept; each path in its log written from there, and PowerShell's own
+          # words kept out, so the log shows no temporary or home folder)
+          if [ "$(digest "$tmp/$kept/$bl")" != "$sum" ]; then
+            dir=$(mktemp -d "$tmp/betterleaks.XXXXXX" 2> /dev/null) || { echo "Betterleaks $version is not fetched: no temporary folder could be made in $where."; exit 0; }
             if (cd "$dir" && curl -fsSL --proto =https --proto-redir =https --connect-timeout 30 --max-time 300 --retry 2 -o "$got" \
                 "https://github.com/betterleaks/betterleaks/releases/download/v$version/betterleaks_${version}_$file" \
               && [ "$(digest "$got")" = "$archive" ] \
               && case $file in
                    *.zip) if command -v unzip > /dev/null 2>&1; then unzip -q "$got" "$bl"
-                          else powershell -NoProfile -NonInteractive -Command "Expand-Archive -LiteralPath $got -DestinationPath out" && mv out/"$bl" .; fi ;;
+                          else powershell -NoProfile -NonInteractive -Command "Expand-Archive -LiteralPath $got -DestinationPath out" > /dev/null 2>&1 \
+                            && mv out/"$bl" . || { echo "PowerShell's Expand-Archive could not unpack $got, or $bl was not in it"; false; }; fi ;;
                    *) tar -xzf "$got" "$bl" ;;
                  esac \
               && [ "$(digest "$bl")" = "$sum" ] \
-              && mkdir -p "$tools" && owned "$tools" && mkdir -p "$store" && owned "$store" && new=$(mktemp "$store/new.XXXXXX") \
-              && cp "$bl" "$new" && chmod 755 "$new" && mv -f "$new" "$store/$bl") > "$dir/log" 2>&1; then :
+              && t="../${kept%/*}" && s="../$kept" && mkdir -p "$t" && owned "$t" && mkdir -p "$s" && owned "$s" \
+              && new=$(mktemp "$s/new.XXXXXX") && cp "$bl" "$new" && chmod 755 "$new" && mv -f "$new" "$s/$bl") > "$dir/log" 2>&1; then :
             else
               echo "Betterleaks $version is not fetched: its release for $(uname -s)/$(uname -m) could not be downloaded, differs from its sum here, or could not be kept. Of the fetch:"
               tail -n 5 "$dir/log" 2> /dev/null; echo "the archive's SHA-256: $(digest "$dir/$got")"
@@ -113,10 +121,79 @@ jobs:
             fi
             rm -rf "$dir"
           fi
-          echo "Betterleaks $version: $store/$bl, its SHA-256 $sum"
-          { echo "path=$store/$bl"; echo "sum=$sum"; } >> "$GITHUB_OUTPUT"
-      - name: Look for personal terms
+          echo "Betterleaks $version: $where/$kept/$bl, its SHA-256 $sum"
+          { echo "path=$kept/$bl"; echo "sum=$sum"; } >> "$GITHUB_OUTPUT"
+      # (the address in each commit's author and committer line (floor rule 11; #460, point 2): of the pull request's
+      # own commits, as the step after reads them, each address is the host's no-reply one, the account's
+      # (<login>@users.noreply.github.com, its id and "+" before it where the account has one, a bot's "[bot]" after
+      # it), GitHub's own (noreply@github.com) or an agent tool's own (noreply@anthropic.com, which Claude Code writes),
+      # none of them anyone's personal address; save a commit GitHub itself made under a profile it writes on the base's
+      # side, which rule 11 excepts and the step after leaves out too, so it reads this step's list. It needs no secret,
+      # so it runs in every pull request; a commit main already holds is never read, since history is not rewritten.
+      # It prints the commit and which line, never the address)
+      - name: Look for personal addresses in commits
+        id: addresses
         env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -z "$BASE" ]; then echo "Not a pull request, so no commit's address was read."; exit 0; fi
+          # (its folders made under a mask that keeps them this run's alone where the system sets modes, as the step
+          # after makes its own; on Windows, where Git's mkdir refuses a mode and the mask sets none, they are only as
+          # private as the runner's temp folder, which holds the keyring below)
+          umask 077
+          work="$RUNNER_TEMP/commit-addresses"; rm -rf "$work"
+          mkdir -p "$work" 2> /dev/null || { echo "FAIL the folder this step works in, RUNNER_TEMP/commit-addresses, could not be made, so no commit's address was read. Mend: run the check again; where it fails again, give the account the runner runs as the right to write in the runner's temp folder (RUNNER_TEMP) and run it once more."; exit 1; }
+          # (the pull request's own commits, as the step after takes them: GitHub's merge of it into its base checked
+          # out, whose first parent is the base's side and is left out, with that merge itself)
+          side=$BASE head=HEAD; if git rev-parse -q --verify 'HEAD^2' > /dev/null; then side=HEAD^1 head=HEAD^2; fi
+          commits=$(git rev-list "$BASE..$head" "^$side") || { echo "FAIL git could not list this pull request's commits. Mend: run the check again; where it fails again, report it to the core (core/README.md, \"Reporting to the core\")."; exit 1; }
+          # (GitHub's own signing key, from GitHub itself, in a keyring of this run's alone: a commit counts as GitHub's
+          # only where its committer is GitHub and an OpenPGP signature on it is good by a key of that keyring, named
+          # by its fingerprint; git's other signature formats, which may carry their own certificate, are read by no
+          # program, so one written by hand to look so does not)
+          keys="$work/github-keys"; mkdir -p "$keys" 2> /dev/null
+          if ! curl -fsS --max-time 30 --retry 3 https://github.com/web-flow.gpg | GNUPGHOME="$keys" gpg -q --batch --import 2> /dev/null; then
+            echo "::notice::GitHub's signing key could not be fetched, so no commit is taken for one GitHub made: re-run the check"
+          fi
+          github=$(GNUPGHOME="$keys" gpg --batch --with-colons --list-keys 2> /dev/null \
+            | awk -F: '$1 == "pub" { p = 1; next } p && $1 == "fpr" { print $10; p = 0 }')
+          made() {
+            local sig
+            [ "$(git log -1 --format='%cn <%ce>' "$1")" = "GitHub <noreply@github.com>" ] && [ -n "$github" ] \
+              && sig=$(GNUPGHOME="$keys" git -c gpg.program=gpg -c gpg.x509.program=false -c gpg.ssh.program=false \
+                       log -1 --format='%G? %GP' "$1" 2> /dev/null) \
+              && printf '%s\n' "$github" | sed 's/^/G /; p; s/^G /U /' | grep -q -x -F -e "$sig"
+          }
+          # (the profiles GitHub writes as the author of what it made on the base's side, each pull request's merge or
+          # squash into main: a commit it made on the pull request's side, a merge or an edit on github.com, is
+          # GitHub's only under one of them, since one made through GitHub's API takes whatever author its caller names)
+          profiles=$(for m in $(git rev-list --max-count=100 --committer='noreply@github.com' "$side"); do
+            made "$m" && git log -1 --format='%an <%ae>' "$m"; done | sort -u)
+          # (the account's no-reply form, and the allowed list: each other no-reply address by name, naming no person)
+          form='^([0-9]+[+])?[a-z0-9][a-z0-9-]{0,38}(\[bot\])?@users[.]noreply[.]github[.]com$'
+          allowed='noreply@github.com
+          noreply@anthropic.com'
+          noreply() { LC_ALL=C grep -q -i -x -E "$form" <<< "$1" || LC_ALL=C grep -q -i -x -F -e "$allowed" <<< "$1"; }
+          own= bad=
+          for c in $commits; do
+            if made "$c" && printf '%s\n' "$profiles" | grep -q -x -F -e "$(git log -1 --format='%an <%ae>' "$c")"; then own+="$c "; continue; fi
+            short=$(git rev-parse --short "$c")
+            noreply "$(git log -1 --format='%ae' "$c")" || bad+="$short author"$'\n'
+            noreply "$(git log -1 --format='%ce' "$c")" || bad+="$short committer"$'\n'
+          done
+          echo "made=$own" >> "$GITHUB_OUTPUT"
+          rm -rf "$work"
+          if [ -n "$bad" ]; then
+            echo "FAIL These commits' author or committer address is not a no-reply one (below: the commit and which line), so it may be someone's personal address (floor rule 11). Mend: on the machine that made them, set git's address in this repository to the account's no-reply address (git config user.email <the address under Settings, Emails, ending @users.noreply.github.com>), or to the agent tool's own (noreply@anthropic.com for Claude Code), rewrite this pull request's commits with it (git rebase --exec 'git commit --amend --no-edit --reset-author' origin/main) and push the branch again (git push --force-with-lease). main is never rewritten."
+            printf '%s' "$bad"; exit 1
+          fi
+          echo "Every commit of this pull request is under a no-reply address."
+      # (run where the step before failed too, so that a pull request is read for both at once; GitHub's own commits are
+      # those that step lists, none where it stopped before listing them)
+      - name: Look for personal terms
+        if: ${{ !cancelled() }}
+        env:
+          MADE: ${{ steps.addresses.outputs.made }}
           TERMS: ${{ secrets.PERSONAL_TERMS }}
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}
@@ -128,18 +205,19 @@ jobs:
           if [ -z "$TERMS" ]; then echo "::notice::PERSONAL_TERMS is not set here, so nothing was checked."; exit 0; fi
           # (a pipeline's last command in this shell, so that what it sets stays set)
           umask 077; shopt -s lastpipe
-          work="$RUNNER_TEMP/personal-terms"; rm -rf "$work"; mkdir -p "$work/none" || exit 1
+          work="$RUNNER_TEMP/personal-terms"; rm -rf "$work"
+          mkdir -p "$work/none" 2> /dev/null || { echo "FAIL the folder this step works in, RUNNER_TEMP/personal-terms, could not be made, so nothing was read. Mend: run the check again; where it fails again, give the account the runner runs as the right to write in RUNNER_TEMP, and run it once more."; exit 1; }
           list="$work/terms"
           # (each term without the blanks around it, a carriage return among them, and no empty one)
           printf '%s\n' "$TERMS" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' > "$list"
           if [ ! -s "$list" ]; then echo "::notice::PERSONAL_TERMS holds no term, so nothing was checked."; rm -rf "$work"; exit 0; fi
           found=0
-          # (Betterleaks, as the step before fetched it: copied into this run's own folder and run only where the copy
+          # (Betterleaks, as the step before fetched it, its path from the temporary folder: copied into this run's own folder and run only where the copy
           # holds the sum that step checked it by, so that one changed after that step never runs; where that step
           # fetched none, the check fails, since it guards what may not leak (floor rule 14))
           digest() { { sha256sum < "$1" || shasum -a 256 < "$1"; } 2> /dev/null | cut -c1-64; }
           bl="$work/${BETTERLEAKS##*/}"
-          if [ -z "$BETTERLEAKS" ] || [ -z "$BETTERLEAKS_SUM" ] || ! cp -- "$BETTERLEAKS" "$bl" 2> /dev/null || [ "$(digest "$bl")" != "$BETTERLEAKS_SUM" ]; then
+          if [ -z "$BETTERLEAKS" ] || [ -z "$BETTERLEAKS_SUM" ] || ! cp -- "${TMPDIR:-/tmp}/$BETTERLEAKS" "$bl" 2> /dev/null || [ "$(digest "$bl")" != "$BETTERLEAKS_SUM" ]; then
             echo "FAIL Betterleaks, which matches the terms, was not fetched at its pin (the step \"Fetch Betterleaks\" says why), so nothing was read. Mend: run the check again; where it fails again, run it where Betterleaks' releases on github.com can be reached, on Linux, macOS or Windows, on x64 or arm64, as on GitHub's runners; the check guards what may not leak, so it never passes unread."
             rm -rf "$work"; exit 1
           fi
@@ -287,36 +365,13 @@ jobs:
             side=$BASE head=HEAD; if git rev-parse -q --verify 'HEAD^2' > /dev/null; then side=HEAD^1 head=HEAD^2; fi
             commits=$(git rev-list "$BASE..$head" "^$side")
             rewrite="Mend: rewrite those commits without it, though a later one took it away, since merging keeps every commit (git rebase -i origin/main, a message reworded, a commit edited), and push the branch again (git push --force-with-lease); main is never rewritten."
-            # (GitHub's own signing key, from GitHub itself, in a keyring of this run's alone: a merge counts as GitHub's
-            # only where its committer is GitHub and an OpenPGP signature on it is good by a key of that keyring, named
-            # by its fingerprint; git's other signature formats, which may carry their own certificate, are read by no
-            # program, so one written by hand to look so does not)
-            keys="$work/github-keys"; mkdir -p -m 700 "$keys"
-            if ! curl -fsS --max-time 30 --retry 3 https://github.com/web-flow.gpg | GNUPGHOME="$keys" gpg -q --batch --import 2> /dev/null; then
-              echo "::notice::GitHub's signing key could not be fetched, so no commit is taken for one GitHub made: re-run the check"
-            fi
-            github=$(GNUPGHOME="$keys" gpg --batch --with-colons --list-keys 2> /dev/null \
-              | awk -F: '$1 == "pub" { p = 1; next } p && $1 == "fpr" { print $10; p = 0 }')
-            # (a commit GitHub itself made: committed as GitHub, an OpenPGP signature on it good by a key of GitHub's, by
-            # its fingerprint)
-            made() {
-              local sig
-              [ "$(git log -1 --format='%cn <%ce>' "$1")" = "GitHub <noreply@github.com>" ] && [ -n "$github" ] \
-                && sig=$(GNUPGHOME="$keys" git -c gpg.program=gpg -c gpg.x509.program=false -c gpg.ssh.program=false \
-                         log -1 --format='%G? %GP' "$1" 2> /dev/null) \
-                && printf '%s\n' "$github" | sed 's/^/G /; p; s/^G /U /' | grep -q -x -F -e "$sig"
-            }
-            # (the profiles GitHub writes as the author of what it made on the base's side, each pull request's merge or
-            # squash into main: a commit it made on the pull request's side, a merge or an edit on github.com, passes
-            # only under one of them, since one made through GitHub's API takes whatever author its caller names)
-            profiles=$(for m in $(git rev-list --max-count=100 --committer='noreply@github.com' "$side"); do
-              made "$m" && git log -1 --format='%an <%ae>' "$m"; done | sort -u)
             for c in $commits; do
               short=$(git rev-parse --short "$c")
               git log -1 --format=%B "$c" | unlinked | tr '\n' ' ' | add message "$short"
-              # (save a commit GitHub itself made under a profile above, the acting account's, as floor rule 11 excepts:
-              # a merge, "update branch" too, or an edit on github.com)
-              if ! { made "$c" && printf '%s\n' "$profiles" | grep -q -x -F -e "$(git log -1 --format='%an <%ae>' "$c")"; }; then
+              # (save a commit GitHub itself made under a profile it writes on the base's side, the acting account's, as
+              # floor rule 11 excepts: a merge, "update branch" too, or an edit on github.com; the step before tells
+              # them, signed by GitHub's key, apart from one made to look so)
+              if ! case " $MADE " in *" $c "*) true ;; *) false ;; esac; then
                 git log -1 --format='%an%n%ae%n%cn%n%ce' "$c" | add people "$short"
               fi
               # (the lines it adds, a merge's those its own resolution adds; an octopus merge, which git's remerge-diff

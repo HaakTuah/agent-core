@@ -25,6 +25,18 @@ one declared entrance.
   debt, worked down by tasks (`tasks/cleaning.md`), and no project is asked to rewrite. Reason: the rules are there
   for a reason, and one earns from them only where they cannot slip. Held by the shape check, which reads the baseline
   against the pull request's base, and by the reviews for the reason given (`roles/shared/review-guidelines.md`).
+- **Only the owner turns the shape check off** (#1107). By default the shape check runs on every pull request, on the
+  config the manifest's *shape check* row names, else the starter kit's. The one condition that changes it: that row
+  says `none` with a reason, on the owner's word, and the pull request's base says so too; the check then passes,
+  saying it is off and why, and no step asks for its config or baseline. The trigger is the owner's word that the
+  check is to be off: the session it is given to writes the row, and the pull request that writes it is still checked,
+  with a warning that it turns the check off; the row keeps naming a config of the project's own path after the reason
+  (`none`: <reason>; config `<path>`), and any pull request that drops it fails. It does not mean that a `none` with
+  no reason, or a config left out, turns it off, nor that the config's other readers (the selection, the time marks,
+  the strength) stop. Reason: a check a project could leave off by writing nothing would hold nothing. Held by the
+  shape check, which is off only for a `none` with a reason its base holds too and fails a pull request that drops the
+  config's path from the row, and by `core/scripts/read-nothing.mjs`, which names it as reading nothing; that the
+  owner's word is behind the row, by none.
 - **Each project names its systems, under the same domains.** By default every file of code lies in a system the
   config names, each with its paths, the systems it uses, its entrance and its domain. The domains: the rules; saved
   data; the display; input; the network; storage; code bound to a platform; wrappers of third-party packages; tools;
@@ -102,10 +114,13 @@ one declared entrance.
   by discipline alone.
 - **How strong the tests are is measured on the lines a pull request changes** (#253). By default the job that runs a
   project's tests runs its *mutation tool* on those lines through `core/scripts/strength.mjs`, which shows on the pull
-  request how many of the faults put in on purpose a test caught, and fails nothing. The project names the tool in its
-  manifest, a tool of development only, under the floor's rules for dependencies and licences, that writes its report
-  in an open form, the mutation-testing-elements schema; a project with no such tool for its language, or with no
-  tests yet, says `none` there with its reason, and the measure is left out. The one condition that changes it: once
+  request how many of the faults put in on purpose a test caught, and fails nothing. The tool is the core's list's
+  for the language of the project's code (`core/scripts/mutation-tools.json`), a tool of development only, under the
+  floor's rules for dependencies and licences, that writes its report in an open form, the mutation-testing-elements
+  schema: the starter kit names it in the manifest's row, and `core/scripts/mutation-tools.mjs --write` once the
+  project's code or tests change what the list gives, where the row holds no tool or reason of the project's own
+  (#1107). Where the list has no tool that fits, or there are no tests yet, the row says `none` with that reason and
+  the measure is left out; else only the owner turns it off, with `none` and a reason of the owner's. The one condition that changes it: once
   the project's baseline stands, a fault that survives on a changed line and the baseline does not list fails, and the
   session writes a test that catches it; only where the fault changes nothing the program does, it lists it with that
   reason, as "Never worse" says of any entry. The baseline lists what survives a whole run, which is the audit's,
@@ -115,7 +130,8 @@ one declared entrance.
   a changed line is the change's own. Reason: the projects lean on their suites as the proof that a
   change kept behaviour, and nothing measured whether a test fails where the code is wrong. Held by the strength
   check, which counts each kind of fault a file holds against what the baseline lists of it and fails a survivor past
-  it, an entry that joins with no reason, and one dropped while its fault survives, and by the reviews of that reason.
+  it, an entry that joins with no reason, and one dropped while its fault survives, and by the reviews of that reason;
+  the row, by `tests/mutation-tools-test.mjs`, and that only the owner writes a `none` of the project's own, by none.
 - **A test taken out or weakened is said.** By default a pull request keeps its tests and what they assert. The
   trigger is a pull request that leaves a test file with fewer lines that assert, deletes it, or skips a case in it:
   its builder names that file on the description's line `Tests changed:`, with why, and the reviewer rules on it,

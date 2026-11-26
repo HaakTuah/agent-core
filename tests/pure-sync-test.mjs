@@ -9,8 +9,9 @@
 // another manifest line, a call moved to an older commit of main or renamed to another core workflow, the pin off main,
 // text beside a pin, carriage returns, a root .gitattributes, the pin moved backwards; each is refused for the reason
 // it means, so a check of pure-sync.mjs's gone fails the suite. Where the change lies under core/, the core's own
-// core.yml job, run as GitHub runs it (workflow-run.mjs), fails it too; a file's executable bit alone is no difference
-// to either (copy-tree.mjs). And the sync script's own refusals, and its following of the core's releases: a project
+// core.yml job, run as GitHub runs it (workflow-run.mjs), fails it too; a file's executable bit the core marks, lost, is
+// no difference to either, and one it does not mark is refused by the proof alone (copy-tree.mjs), which the sync run
+// again at the same pin, where git records no bit, mends by recording the core's. And the sync script's own refusals, and its following of the core's releases: a project
 // that follows them takes a commit that is no release only through review. On Linux and on Windows. Git, tar, bash and
 // Node's own modules.
 //
@@ -41,15 +42,32 @@ fs.cpSync(root, theCore, { recursive: true, filter: src => !["/.git", "/node_mod
 git(theCore, "init", "-q", "-b", "main");
 const NOTE_LINE = "- **13 November 2026, a note for the test.** Done when nothing: an entry that B gains over A.\n";
 const terms = read(theCore, ".github/workflows/personal-terms.yml");
-const commit = (message) => { git(theCore, "add", "-A"); git(theCore, "commit", "-q", "--allow-empty", "-m", message); return git(theCore, "rev-parse", "HEAD"); };
+// (the core's bits, none on Windows' disk)
+const x = git(root, "ls-files", "-s", "-z").split("\0").filter(e => e.startsWith("100755 ")).map(e => e.slice(50));
+const commit = (message) => { git(theCore, "add", "-A"); git(theCore, "update-index", "--chmod=+x", "--", ...x); git(theCore, "commit", "-q", "--allow-empty", "-m", message); return git(theCore, "rev-parse", "HEAD"); };
 write(theCore, "z.md", "only in Z\n");
 write(theCore, ".github/workflows/personal-terms.yml", `${terms}# Z\n`);
+const bugTmpl = read(theCore, "setup/template/issue-bug.md.tmpl"), Z_LINE = "<!-- as Z's kit writes it -->\n";
+write(theCore, "setup/template/issue-bug.md.tmpl", `${bugTmpl}${Z_LINE}`); // (Z's kit writes a file of the core's otherwise: #1246, point 5)
+const claudeTmpl = read(theCore, "setup/template/CLAUDE.md.tmpl"), KEPT = "@core/tasks/tools.md\n";
+write(theCore, "setup/template/CLAUDE.md.tmpl", claudeTmpl.replace("@core/tools/claude.md\n", `@core/tools/claude.md\n${KEPT}`)); // (and imports a file A's and B's do not: point 4)
 const Z = commit("Z");
+write(theCore, "setup/template/issue-bug.md.tmpl", bugTmpl);
+write(theCore, "setup/template/CLAUDE.md.tmpl", claudeTmpl);
 fs.rmSync(path.join(theCore, "z.md"));
 write(theCore, ".github/workflows/personal-terms.yml", `${terms}# A\n`);
 const A = commit("A");
 write(theCore, ".github/workflows/personal-terms.yml", terms);
 write(theCore, "setup/sync-notes/999-a-note-for-the-test.md", NOTE_LINE); // (an entry is a file of the folder: #750, point 1)
+// (and one whose step reads it done, which the sync gives by its lead alone: #1264, point 2)
+write(theCore, "setup/sync-notes/998-a-done-note.md", "- **13 November 2026, a done note.** Done when its step reads so, as it always does.\n");
+write(theCore, "scripts/steps/998-a-done-note.mjs", 'import { COST } from "../step-checks.mjs";\n\nexport default { lead: "13 November 2026, a done note", cost: COST.line, check: () => null };\n');
+// (and one whose check passes but leaves a part to the review, `partly`, which stays in full: what is left is still asked)
+write(theCore, "setup/sync-notes/997-a-partly-note.md", "- **13 November 2026, a partly note.** Its check reads one half; the review reads the other half.\n");
+write(theCore, "scripts/steps/997-a-partly-note.mjs", 'import { COST } from "../step-checks.mjs";\n\nexport default { lead: "13 November 2026, a partly note", cost: COST.line, check: () => null, partly: "the other half, read by the review" };\n');
+// (and one the manifest's "Differences" leaves undone on purpose, which no check reads done, so it stays in full)
+write(theCore, "setup/sync-notes/996-a-declared-note.md", "- **13 November 2026, a declared note.** Asked of every project; this one leaves it undone on purpose.\n");
+write(theCore, "scripts/steps/996-a-declared-note.mjs", 'import { COST } from "../step-checks.mjs";\n\nexport default { lead: "13 November 2026, a declared note", cost: COST.line, check: () => "the declared note is not done. Mend: do it" };\n');
 const B = commit("B");
 const SIDE = git(theCore, "commit-tree", `${B}^{tree}`, "-p", B, "-m", "off main");
 // (packed once: every later fetch, clone and archive of the core reuses the pack, where the loose objects each time are compressed again, which was about half of a run's time in them; #812)
@@ -68,7 +86,7 @@ git(tmp, "init", "-q", "--bare", "-b", "main", origin);
 fs.mkdirSync(p);
 git(p, "init", "-q", "-b", "main");
 git(p, "remote", "add", "origin", origin);
-const manifest = (owner, pin = A) => `# Core manifest\n\nCore: ${CORE} at ${pin}, copied whole under core/ (never edited here).\nFloor: whole. Modules: all.\n\n## Slots\n| Slot | Here |\n| --- | --- |\n| *owner's account* | \`${owner}\` |\n`;
+const manifest = (owner, pin = A) => `# Core manifest\n\nCore: ${CORE} at ${pin}, copied whole under core/ (never edited here).\nFloor: whole. Modules: all.\n\n## Slots\n| Slot | Here |\n| --- | --- |\n| *owner's account* | \`${owner}\` |\n\n## Differences\n\n- "13 November 2026, a declared note": left undone here on purpose.\n`;
 write(p, "core-manifest.md", manifest(OWNER));
 const first = node(p, path.join(clone, "scripts", "sync.mjs"));
 ok(first.status === 0 && first.out.includes("the first copy"), "the first copy: the sync script, run from a clone of the core, writes core/ at the manifest's pin", first.out);
@@ -95,7 +113,10 @@ const s = (r => ({ status: r.status, out: `${r.stdout}${r.stderr}` }))(spawnSync
 const calls = read(p, ".github/workflows/core.yml");
 ok(s.status === 0 && s.out.includes(`${SHA(A)} -> ${SHA(B)}`) && read(p, "core-manifest.md") === manifest(OWNER, B), "the sync takes a project that follows main to the core's newest commit, and moves the manifest's pin", s.out);
 ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) && s.out.includes("personal-terms.yml"), "  it moves a call whose workflow changed, and leaves one whose workflow did not", calls);
-ok(s.out.includes("a note for the test"), "  and prints the sync notes the core gained between the two pins", s.out);
+ok(s.out.includes("Done when nothing: an entry that B gains over A."), "  and prints the sync notes the core gained between the two pins", s.out);
+ok(s.out.includes("- 13 November 2026, a done note: done here, as its step reads.") && !s.out.includes("as it always does"), "  each whose step the new copy reads done here by its lead alone (#1264)", s.out);
+ok(s.out.includes("this one leaves it undone on purpose") && !s.out.includes("a declared note: done here"), "  one the manifest's \"Differences\" leaves undone on purpose in full, never told done (#1264)", s.out);
+ok(s.out.includes("the review reads the other half") && !s.out.includes("a partly note: done here"), "  one whose check leaves a part to the review in full, though its check passes (#1264)", s.out);
 ok(/The core's files and parts written[\s\S]*\.github\/workflows\/look\.yml[\s\S]*For the sync PR's description[\s\S]*Steps not done[\s\S]*Beside a fresh start/.test(s.out),
   "  then, from the copy it wrote, what the core owns written by the one process (#1083), and every step not done, a standing one too, and every difference from a fresh start, for the PR's description", s.out);
 ok(/\n(No setting only the owner gives is new since [0-9a-f]{7}: the sitting is not asked again|The settings only the owner gives)/.test(s.out), "  and asks the owner's settings again only where one is new since the old pin, saying so where none is (owner-settings.mjs; #1085)", s.out);
@@ -113,10 +134,10 @@ ok(entries(git(p, "rev-parse", "HEAD:core"), path.join(p, ".git")) === entries(c
 const GH_ORIGIN = "https://github.com/someone/project.git", event = path.join(tmp, "event.json");
 fs.writeFileSync(event, JSON.stringify({ repository: { full_name: "someone/project", private: false } }));
 git(p, "config", `url.${slash(origin)}.insteadOf`, GH_ORIGIN);
-const pure = () => {
+const pure = (...args) => {
   git(p, "remote", "set-url", "origin", GH_ORIGIN);
   try {
-    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs"), ...args], { cwd: p, env: { ...env, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
     return { status: r.status, out: `${r.stdout}${r.stderr}` };
   } finally { git(p, "remote", "set-url", "origin", origin); }
 };
@@ -266,10 +287,37 @@ ok(mends.status === 0 && read(p, "AGENTS.md").includes("@core/roles/builder.md\n
 const silent = path.join(tmp, "gh-silent");
 fs.mkdirSync(silent, { recursive: true });
 fs.writeFileSync(path.join(silent, "gh"), "#!/bin/sh\necho 'gh: not signed in' >&2\nexit 1\n", { mode: 0o755 });
-git(p, "remote", "set-url", "origin", GH_ORIGIN);
-const standIn = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, CORE_HOST_ANSWERS: hostSays(), [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
-git(p, "remote", "set-url", "origin", origin);
-ok(standIn.status === 1 && /NOT PURE[^\n]*AGENTS\.md: the project's kind or values cannot be read/.test(`${standIn.stdout}${standIn.stderr}`), "  and with only the test's stand-in for the host answering, which the proof does not honour, it is not proved", `${standIn.stdout}${standIn.stderr}`);
+// (the read with no sign-in sent to a proxy that is not there, so it gives no answer and nothing leaves this machine;
+// a stranger's repository of the stand-in's name never answers for it; #1246)
+const offline = { HTTPS_PROXY: "http://127.0.0.1:9", https_proxy: "http://127.0.0.1:9", NO_PROXY: "", no_proxy: "" };
+const unanswered = given => {
+  git(p, "remote", "set-url", "origin", GH_ORIGIN);
+  try {
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, ...offline, ...given, [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
+    return `${r.status}\n${r.stdout}${r.stderr}`;
+  } finally { git(p, "remote", "set-url", "origin", origin); }
+};
+for (const [given, what] of [[{ CORE_HOST_ANSWERS: hostSays() }, "the test's stand-in for the host"], [{ CORE_PRIVATE: "false" }, "an answer given as CORE_PRIVATE"]]) {
+  const out = unanswered(given);
+  ok(/^1\n/.test(out) && /NOT PURE[^\n]*AGENTS\.md: the project's kind or values cannot be read/.test(out), `  and with only ${what} answering, which the proof does not honour, it is not proved`, out);
+}
+git(p, "push", "-q", "-f", "origin", `${base}:main`);
+git(p, "checkout", "-q", "sync");
+git(p, "reset", "-q", "--hard", LEGIT);
+git(p, "clean", "-q", "-fd");
+// main imports, above CLAUDE.md's part, a module of its copy that the new pin makes a moved stub whose target the part
+// imports, and the sync takes the import out, as the one process does with the copy at the new pin: pure, the stub read
+// from the core at the pin, never from main's copy (#1272, point 2)
+git(p, "checkout", "-q", "-B", "main-stub", base);
+write(p, "core/modules/claude.md", "# Claude's part\n\nThe rules as the old pin held them.\n");
+write(p, "CLAUDE.md", read(p, "CLAUDE.md").replace("<!-- The core's part: a sync writes it;", "@core/modules/claude.md\n<!-- The core's part: a sync writes it;"));
+git(p, "commit", "-q", "-am", "an import of a module, before the module moved");
+git(p, "push", "-q", "-f", "origin", "main-stub:main");
+git(p, "checkout", "-q", "-B", "sync-stub");
+git(p, "checkout", "-q", LEGIT, "--", ".");
+git(p, "commit", "-q", "-m", "the sync, the moved stub's import taken out");
+const stubbed = pure();
+ok(stubbed.status === 0 && !read(p, "CLAUDE.md").includes("@core/modules/claude.md"), "a sync that takes out an import of a module the new pin moves is pure, the stub read from the core at the pin", stubbed.out);
 git(p, "push", "-q", "-f", "origin", `${base}:main`);
 git(p, "checkout", "-q", "sync");
 git(p, "reset", "-q", "--hard", LEGIT);
@@ -312,13 +360,35 @@ const drops = (what, change, isPure, said) => {
 drops("a private project's sync that writes core.yml's one job and takes out the calls it folds", () => {}, true);
 drops("  the same deletions with core.yml left as main holds it", () => git(p, "checkout", "-q", publicMain, "--", ".github/workflows/core.yml"), false, /NOT PURE[^\n]*copies\.yml: deleted, and not a workflow of the core's whose check the one job/);
 drops("  a deletion of the licence check, which the one job does not run", () => fs.rmSync(path.join(p, ".github/workflows/licences.yml"), { force: true }), false, /NOT PURE[^\n]*licences\.yml: deleted/);
-// a file's executable bit alone: no difference to either (a copy made on Windows records none)
-git(p, "update-index", "--chmod=+x", "core/README.md");
+// a file's executable bit: one the core marks, lost, is no difference to either (a copy made on Windows by a sync from
+// before #1093 records none); one the core does not mark is none to the core's check, which reads no bit, but the proof
+// refuses it; and the sync run again at the same pin, where git records no bit (core.fileMode off, as on Windows),
+// records the core's in the index, a stray one taken off, and is pure, and where git reads the bit from the disk, a
+// later `git add` keeps them, the files' own bits set too (#1093)
+const mode = f => git(p, "ls-files", "-s", f).slice(0, 6);
 git(p, "update-index", "--chmod=-x", "core/scripts/work-saved.sh");
-git(p, "commit", "-q", "-m", "modes");
-const modes = pure();
-ok(modes.status === 0 && git(p, "ls-files", "-s", "core/scripts/work-saved.sh").startsWith("100644"), "a copy whose files' executable bits differ from the core's, as one made on Windows, is still pure", modes.out);
+fs.chmodSync(path.join(p, "core/scripts/work-saved.sh"), 0o644);
+git(p, "commit", "-q", "-m", "a bit lost");
+const lost = pure();
+ok(lost.status === 0 && mode("core/scripts/work-saved.sh") === "100644", "a copy that lost an executable bit the core marks, as one made on Windows by an older sync, is still pure", lost.out);
 ok(coreCheck().passed, "  and the core's own check of the copy passes it");
+git(p, "update-index", "--chmod=+x", "core/README.md");
+fs.chmodSync(path.join(p, "core/README.md"), 0o755);
+git(p, "commit", "-q", "-m", "a bit added");
+const added = pure();
+ok(added.status === 1 && /NOT PURE core\/README\.md is marked executable, which the core at [0-9a-f]{40} does not mark it/.test(added.out), "a copy that marks executable a file the core does not mark: not pure", added.out);
+ok(coreCheck().passed, "  though the core's own check of the copy, which reads no bit, passes it");
+const fm = git(p, "config", "core.fileMode");
+git(p, "config", "core.fileMode", "false");
+const again = node(p, "core/scripts/sync.mjs", B);
+git(p, "config", "core.fileMode", fm);
+ok(again.status === 0 && mode("core/scripts/work-saved.sh") === "100755" && mode("core/README.md") === "100644" && mode("core/scripts/sync.mjs") === "100644",
+  "the sync run again at the same pin, where git records no executable bit, stages each the core marks and takes off one it does not, read from the core's tree", `${again.out}\n${git(p, "ls-files", "-s", "core/scripts")}`);
+git(p, "add", "-A");
+if (process.platform !== "win32") ok(mode("core/scripts/work-saved.sh") === "100755" && mode("core/README.md") === "100644", "  and a `git add` after it, where git reads the bit from the disk, keeps them", git(p, "ls-files", "-s", "core/scripts/work-saved.sh", "core/README.md"));
+git(p, "commit", "-q", "-m", "the bits recorded");
+const recorded = pure();
+ok(recorded.status === 0, "  and that sync is pure", recorded.out);
 git(p, "reset", "-q", "--hard", LEGIT);
 
 // the pin moved backwards, as the sync script itself would move it given an older commit
@@ -337,6 +407,50 @@ const off = node(p, "core/scripts/sync.mjs", SIDE);
 ok(off.status === 1 && off.out.includes("not a commit of the core's main") && git(p, "status", "--porcelain") === "", "so is one off the core's main", off.out);
 const same = node(p, "core/scripts/sync.mjs", A);
 ok(same.status === 0 && same.out.includes("already at") && git(p, "status", "--porcelain") === "", "at the pin already, there is nothing to sync", same.out);
+// (#1246, point 1: a copy an older sync script moved got the copy and the pins alone; the run at the same pin gives the
+// rest, what the sync asks since the pin before, read from the project's own history, and every report)
+ok(/could not be read from the history of core-manifest\.md[\s\S]*For the sync PR's description[\s\S]*Steps not done/.test(same.out) && /The settings only the owner gives|setting only the owner gives/.test(same.out),
+  "  and does all else a sync does, saying where no pin before it stands in the manifest's history, and listing every setting only the owner gives", same.out);
+for (const [how, at] of [["committed", LEGIT], ["left in the working tree by an older script", base]]) {
+  git(p, "checkout", "-q", "-B", "again", at);
+  if (at === base) { git(p, "checkout", "-q", LEGIT, "--", "core"); write(p, "core-manifest.md", manifest(OWNER, B)); }
+  const rerun = node(p, "core/scripts/sync.mjs", B);
+  ok(rerun.status === 0 && rerun.out.includes("already at") && rerun.out.includes("a note for the test") && /For the sync PR's description[\s\S]*Steps not done[\s\S]*Beside a fresh start[\s\S]*\nattached: /.test(rerun.out),
+    `  a sync at the same pin, ${how}, prints what the sync asks since the pin before, read from the manifest's history, and every report`, rerun.out);
+  git(p, "reset", "-q", "--hard");
+  git(p, "clean", "-qfd");
+  git(p, "stash", "clear");
+}
+// (#1246, point 5: a file of the core's an earlier kit wrote, at a pin no release holds and no sync wrote again, is
+// known by the kit of each pin the manifest's history names)
+git(p, "checkout", "-q", "-B", "earlier", LEGIT);
+const BUG = ".github/ISSUE_TEMPLATE/bug_report.md", bugB = read(p, BUG);
+write(p, BUG, `${bugB}${Z_LINE}`);
+git(p, "commit", "-qam", "as Z's kit wrote it");
+const unknown = node(p, "core/scripts/sync.mjs", B);
+for (const pin of [Z, B]) { write(p, "core-manifest.md", manifest(OWNER, pin)); git(p, "commit", "-qam", `the manifest at ${SHA(pin)}`); }
+const known = node(p, "core/scripts/sync.mjs", B);
+ok(unknown.out.includes(`${BUG} is not the core's`) && read(p, BUG) === bugB && !known.out.includes(`${BUG} is not the core's`),
+  "a file as the kit of a pin the manifest's history names wrote it, and no release's, is the core's, written again as the kit writes it", `${unknown.out}\n${known.out}`);
+// (and the proof knows it by the same kits, read from the history of the project's main: a main whose manifest named Z
+// before A, the file as Z's kit wrote it, synced to B, is a pure sync)
+git(p, "reset", "-q", "--hard");
+git(p, "checkout", "-q", "-B", "earlier-main", base);
+write(p, BUG, `${bugB}${Z_LINE}`);
+// (and its CLAUDE.md holds Z's part and, outside it, an import Z's kit wrote whose path B's copy holds: the sync keeps
+// it, and so does the proof, which reads a path in the copy from the core at the pin, not from the project; point 4)
+write(p, "CLAUDE.md", read(p, "CLAUDE.md").replace("@core/tools/claude.md\n", `@core/tools/claude.md\n${KEPT}`).replace("<!-- The core's part:", `${KEPT}\n<!-- The core's part:`));
+for (const pin of [Z, A]) { write(p, "core-manifest.md", manifest(OWNER, pin)); git(p, "commit", "-qam", `the manifest at ${SHA(pin)}, the file as Z's kit wrote it`); }
+git(p, "push", "-q", "-f", "origin", "HEAD:main");
+const fromZ = node(p, "core/scripts/sync.mjs", B);
+git(p, "stash", "clear"); git(p, "add", "-A"); git(p, "commit", "-qm", "sync, the file as Z's kit wrote it");
+const provedZ = pure();
+ok(fromZ.status === 0 && read(p, BUG) === bugB && provedZ.status === 0 && provedZ.out.includes("a pure sync"),
+  "  and the proof renders it by the same kits, read from the history of the project's main, so the sync is pure", `${fromZ.out}\n---\n${provedZ.out}`);
+ok(read(p, "CLAUDE.md").startsWith(`# Claude's part\n`) && read(p, "CLAUDE.md").split(KEPT).length === 2 && read(p, "CLAUDE.md").includes(`${KEPT}\n<!-- The core's part:`) && provedZ.status === 0,
+  "  and an earlier kit's import outside the core's part, its path in the copy, is kept by the sync and by the proof (#1246, point 4)", read(p, "CLAUDE.md"));
+git(p, "reset", "-q", "--hard");
+git(p, "checkout", "-q", "more");
 write(p, "core-manifest.md", manifest("someone-else"));
 git(p, "commit", "-q", "-am", "another owner");
 const other = git(p, "rev-parse", "HEAD");
@@ -359,8 +473,21 @@ git(p, "checkout", "-q", "-B", "unreleased", other);
 const toC = node(p, "core/scripts/sync.mjs", C);
 git(p, "add", "-A"); git(p, "commit", "-q", "-m", "to C");
 const unreleased = pure();
-ok(toC.status === 0 && read(p, "core-manifest.md") === manifest("someone-else", C) && unreleased.status === 1 && unreleased.out.includes(`${C} is no release of the core: the sync is reviewed like any PR`) && unreleased.out.includes(`node core/scripts/sync.mjs ${B}\` (release-2, the newest)`),
-  "a sync to a commit that is no release, in a project that follows the releases, is made, and is no pure sync: it is reviewed like any PR, or made again with the newest release's full SHA, which the refusal names", `${toC.out}\n${unreleased.out}`);
+ok(toC.status === 0 && read(p, "core-manifest.md") === manifest("someone-else", C) && unreleased.status === 1 && unreleased.out.includes(`${C} is no release of the core: the sync is reviewed like any PR`) && unreleased.out.includes(`node core/scripts/sync.mjs ${B}\` (release-2, the newest)`) && unreleased.out.includes(`ask the trial's reading instead, \`--trial ${C}\``),
+  "a sync to a commit no release, where the releases are followed, is no pure sync: it is reviewed, or made again at the newest release, and in a trial asks the trial's reading", `${toC.out}\n${unreleased.out}`);
+// (a release's trial asks the same proof against the commit it tries, as a reading: it reads that commit as the release
+// it is to be, prints no head to merge and never exits 0, so nothing that waits on the proof takes it for one; #1261)
+const answer = out => { const m = /^trial answer: (.*)$/mu.exec(out); try { return m && JSON.parse(m[1]); } catch { return null; } };
+const triedC = pure("--trial", C);
+ok(triedC.status === 1 && triedC.out.includes(`a pure sync against the commit tried, ${C}: a trial's reading, which proves no merge`) && !triedC.out.includes("sha=") && !triedC.out.includes("NOT PURE")
+  && JSON.stringify(answer(triedC.out)) === JSON.stringify({ commit: C, pure: true, from: "release-1" }),
+  "  a trial's reading against the commit tried finds the same sync pure, names the release main's copy stood at, and gives no head to merge", triedC.out);
+const triedB = pure("--trial", B);
+ok(triedB.status === 1 && triedB.out.includes(`moves the copy to ${C}, not to the commit tried, ${B}`) && answer(triedB.out)?.pure === false && answer(triedB.out)?.commit === B,
+  "  a trial's reading against another commit than the sync's is not pure", triedB.out);
+const triedName = pure("--trial", "main"), triedMore = pure("--trial", C, "--merge");
+ok([triedName, triedMore].every(r => r.status === 2 && !/^a pure sync/mu.test(r.out) && !r.out.includes("sha=") && answer(r.out) === null),
+  "  and one that names no full SHA, or more than it, is refused before anything is read", `${triedName.out}\n${triedMore.out}`);
 // (and a manifest that does not say what it follows, two rows of it, is read as following nothing: no sync to a commit
 // that is no release is pure there either)
 git(p, "checkout", "-q", "-B", "unclear", other);

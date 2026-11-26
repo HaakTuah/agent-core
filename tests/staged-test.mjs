@@ -44,9 +44,11 @@ for (const c of CASES) {
   ok(c.holds.length && c.holds.every(k => keys.has(k)) && c.inPart.every(k => c.holds.includes(k)), `${c.name}: names rules that stand, and holds in part only rules it holds`, c.holds.filter(k => !keys.has(k)).join("; "));
   ok(typeof c.task === "string" && !/staged|scratch|test/i.test(`${c.task}\n${c.role ?? ""}`), `${c.name}: its task and its role do not say it is a staged case's`);
 }
-const unread = STEPS.filter(st => st.unread).map(st => st.lead);
+// (a step read on the host, #1092, is read by no check of the project's files, and only where the host was read: the
+// case reads what a session does with it as before)
+const unread = STEPS.filter(st => st.unread || st.host).map(st => st.lead);
 ok(unread.every(l => l in PLANTED || l in UNPLANTED) && Object.keys(PLANTED).every(l => unread.includes(l)) && Object.values(UNPLANTED).every(Boolean),
-  "every step no check reads is planted by the steps case, or listed there with why not, and it plants no other",
+  "every step no check of the project's files reads is planted by the steps case, or listed there with why not, and it plants no other",
   `neither: ${unread.filter(l => !(l in PLANTED) && !(l in UNPLANTED)).join("; ")}; planted but read by a check: ${Object.keys(PLANTED).filter(l => !unread.includes(l)).join("; ")}`);
 
 }
@@ -92,7 +94,7 @@ const ready = (dir, p) => { gh(dir, "POST", `pulls/${p.number}/ccr/ready_for_rev
 // (the steps case's session: each planted step done in a pull request of its own, as the notes ask; one left where named)
 const takeSteps = (d, leave = null) => {
   const agents = read(d, "AGENTS.md").replace(/\n## How we work here\n[\s\S]*$/, "\n");
-  const manifest = read(d, "core-manifest.md").replace(/^(Floor: whole\. Modules: )/m, "$1`copilot.md`, ").replace(/^## Differences\n- .*$/m, "## Differences\nNone.").replace(/^(\| \*owner's account\* \|.*)$/m, "$1\n| *follows* | `main` |");
+  const manifest = read(d, "core-manifest.md").replace(/^## Differences\n- .*$/m, "## Differences\nNone.").replace(/^(\| \*owner's account\* \|.*)$/m, "$1\n| *follows* | `main` |");
   const look = fs.readFileSync(path.join(s.core, "setup", "template", "workflows", "look.yml.tmpl"), "utf8").replace("{{core}}", CORE).replace("{{pin}}", "b".repeat(40));
   const work = {
     rules: { "AGENTS.md": agents },
@@ -413,8 +415,6 @@ check("review", fresh("review"),
   const section = fresh("review");
   gh(section, "POST", "issues/2/comments", { body: REVIEW.replace("9. Blocking: `description` quotes", "9. Blocking: The owner’s word quotes") });
   ok(verdict("review", section).pass, "review: the owner's quote named by its section, \"The owner's word\", counts as named", verdict("review", section).why);
-  const fpReview = fingerprints(caseOf("review"), s.core);
-  ok(typeof fpReview["file: roles/shared/review-guidelines.md"] === "string", "review: the whole guidelines are fingerprinted, so any change to them makes the case due", JSON.stringify(Object.keys(fpReview)));
 }
 // a weakness in merged code: kept, reported privately and fixed, the fix's hostile test feeding the input it refuses;
 // broken, an issue that says how; then, in the kept project, each other way of saying too much, one at a time
@@ -741,6 +741,10 @@ const changedRule = { runs: [run("2026-12-01")] };
 changedRule.runs[0].cases.stop.rules = { "roles/shared/work-flow.md: The owner's stop switch": "000000000000" };
 const d1 = due({ at: "2026-12-02T00:00:00Z", record: changedRule, root: s.core });
 ok(d1.length === 1 && d1[0].name === "stop" && /changed since its last run/.test(d1[0].why), "a case whose rule changed since its run is due again at once", JSON.stringify(d1));
+const changedReview = { runs: [run("2026-12-01")] };
+changedReview.runs[0].cases.review.rules = Object.fromEntries(Object.keys(changedReview.runs[0].cases.review.rules).map(k => [k, "000000000000"]));
+ok(due({ at: "2026-12-02T00:00:00Z", record: changedReview, root: s.core }).length === 0, "the reviewers' case, monthly alone, is not due again when its rules change (#1134, point 6)");
+ok(due({ at: "2027-01-01T05:00:00Z", record: changedReview, root: s.core }).some(d => d.name === "review"), "  and is due in the next month as the others are");
 ok(dueIssue({ manifest: "# Core manifest", at: "2026-12-02T00:00:00Z" }) === null, "in a project nothing is due");
 const own = dueIssue({ manifest: null, at: new Date().toISOString() });
 ok(own && own.title === "Staged cases to run" && (own.body === null || /^- \S+: /m.test(own.body)), "in the core, the look keeps one issue for the cases due, with no body where none is", JSON.stringify(own));

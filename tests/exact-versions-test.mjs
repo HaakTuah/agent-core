@@ -162,10 +162,41 @@ if (run("1.2.3", "../tools/package-lock.json") !== 1 || run("1.2.3", join(tmpdir
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
+// Beside the licence check (licences.mjs; #1093, point 2), read against the pull request's base: a range the base held
+// is reported, never failed, and one the pull request brings fails, saying its mend.
+{
+  const dir = scratchDir("exact-versions-");
+  try {
+    mkdirSync(join(dir, "t"));
+    const list = (deps) => JSON.stringify({ dependencies: deps });
+    writeFileSync(join(dir, "c.json"), JSON.stringify({ lockfiles: ["t/package-lock.json"] }));
+    const lock = JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/a": { version: "1.2.3" }, "node_modules/b": { version: "2.0.0" } } });
+    writeFileSync(join(dir, "t/package-lock.json"), lock);
+    writeFileSync(join(dir, "t/package.json"), list({ a: "^1.2.3", b: "~2.0.0" }));
+    const base = { "t/package-lock.json": lock, "t/package.json": list({ a: "^1.2.3", b: "2.0.0" }) };
+    const r = report("c.json", dir, (f) => base[f] ?? null);
+    if (r.status !== 1 || r.err.length !== 1 || !/"b": "~2\.0\.0"/u.test(r.err[0]) || !mended(r.err[0]) || !r.out.some((l) => /^REPORT: [^\n]*"a": "\^1\.2\.3"[^\n]*stood so at the pull request's base/u.test(l))) { failed++; console.error(`FAIL a range the base held is reported and a new one fails: ${JSON.stringify(r)}`); }
+    const none = report("c.json", dir, () => null);
+    if (none.status !== 1 || none.err.length !== 2) { failed++; console.error(`FAIL where the base held no lock file, every range fails: ${JSON.stringify(none)}`); }
+    base["t/package.json"] = list({ a: "^1.2.3", b: "~2.0.0" });
+    const old = report("c.json", dir, (f) => base[f] ?? null);
+    if (old.status !== 0 || old.err.length || !/^ok .*, but 2 that stood so before$/mu.test(old.out.join("\n"))) { failed++; console.error(`FAIL what all stood before passes, reported: ${JSON.stringify(old)}`); }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
 // A package list or lock file nested past the bound is refused, saying its mend, never read by recursion.
 const deep = (inner) => `${"{\"a\":".repeat(20000)}${inner}${"}".repeat(20000)}`;
 expect("overrides nested past the bound are refused", check("package-lock.json", reader({ "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {} } }), "package.json": `{"overrides":${deep('"1.2.3"')}}` })), ["cannot be read as JSON (it nests deeper than 200 objects and lists). Mend: "]);
 expect("a lock file nested past the bound is refused", check("package-lock.json", reader({ "package-lock.json": `{"lockfileVersion":3,"packages":{"":${deep("{}")}}}` })), ["cannot be read as JSON (it nests deeper than 200 objects and lists). Mend: "]);
+{
+  // (a spec and an override that name an address with a sign-in in it, the sign-in made up and built from pieces as the
+  // test runs: each is refused, and the address is quoted with its user and password cut out; floor rule 1)
+  const user = ["made", "up"].join("-"), pass = ["not", "a", "pass"].join("_"), signed = `git+https://${user}:${pass}@example.invalid/a.git`;
+  const said = [...one(signed, signed), ...project({ "": { dependencies: { a: "1.2.3" }, overrides: { a: signed } } }, { "": { dependencies: { a: "1.2.3" } }, "node_modules/a": { version: "1.2.3" } })];
+  if (said.length !== 2 || said.some((p) => p.includes(user) || p.includes(pass)) || !said.every((p) => p.includes('"git+https://example.invalid/a.git" is not one exact version'))) { failed++; console.error(`FAIL a spec with a sign-in is quoted without it: ${JSON.stringify(said).replaceAll(user, "<user>").replaceAll(pass, "<pass>")}`); }
+  const saidQuote = [`${pass}"tail`, `${pass} tail`, `${pass}\ttail`].flatMap((p) => one(`https://${user}:${p}@example.invalid/a.tgz`, `https://${user}:${p}@example.invalid/a.tgz`));
+  if (saidQuote.length !== 3 || saidQuote.some((p) => p.includes(user) || p.includes(pass))) { failed++; console.error(`FAIL a spec whose sign-in holds a quote, a space or a tab is quoted without it: ${JSON.stringify(saidQuote).replaceAll(user, "<user>").replaceAll(pass, "<pass>")}`); }
+}
 
 console.log(failed ? `${failed} FAILED` : "ok   the exact-versions check tells every case apart");
 process.exit(failed ? 1 : 0);

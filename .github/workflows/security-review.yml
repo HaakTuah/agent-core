@@ -16,8 +16,9 @@
 # names (the input "reviewers"), which is how the fallback reviewer's or another reviewer's is posted
 # (tasks/reviews.md, point 3); a review of an
 # earlier commit than the head only where updates from main alone follow it, each the merge git makes of its parents
-# (scripts/clean-merges.mjs proves which, #323), so that any other later commit needs such a comment naming the head,
-# or the merge where that stops, by its whole SHA; while Codex's own is running, only such a comment posted after it began,
+# (scripts/clean-merges.mjs proves which, #323), or, of a review that found nothing blocking, light commits too, which
+# touch nothing that runs with power (scripts/power.mjs reads which, #1134), so that any other later commit needs such
+# a comment naming the head, or the merge where that stops, by its whole SHA; while Codex's own is running, only such a comment posted after it began,
 # as Codex's summary shows; where Codex marks a finding of its security review open, only such a comment settles it,
 # posted after Codex's summary last changed and, where one is to be found, after its newest finding; nothing else
 # counts. A pure sync needs none where no review starts by itself (floor rule 8): the job runs the default branch's
@@ -58,7 +59,8 @@
 # whose token could not write the status (theirs is written when the first comment that counts arrives: on Dependabot's own, Codex's
 # summary, once the code review that floor rule 17 asks for is asked); and the token can read, and write a commit
 # status, nothing more. The proofs of a pure sync and of the merges from main fetch the head's commits into a clone of
-# their own and check out nothing, so no file of the pull request's is written to disk or run (git's merge of two
+# their own and check out nothing, as power.mjs's reading of the light commits does, so no file of the pull request's
+# is written to disk or run (git's merge of two
 # commits writes only the trees it makes, into that clone); git is given the token for this repository's own address
 # alone, in the fetch's and pure-sync.mjs's environment, and nothing writes it to disk. A posted review that is later
 # edited away or deleted is seen at the next push, not at once.
@@ -257,14 +259,22 @@ jobs:
               and (.parents | length) == 2 and (.parents[1].sha as $p | any($s[]; . == $p) | not))' \
               "$d/commits.json" > /dev/null
           then merge=1; fi
-          if [ -n "$shape$merge" ]; then
+          # and, for which of its files run with power and which of its commits are light, touching none of it (#1134,
+          # points 1 and 4: power.mjs reads the set from each commit's tree, never checking one out), every pull request,
+          # its own commits and their parents alone where neither proof above needs the history whole
+          many= depth=()
+          if [ -f "$ROOT/scripts/power.mjs" ] && [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
+            many=1
+            [ -n "$shape$merge" ] || depth=(--depth "$(($(jq '[.[][]] | length' "$d/commits.json") + 1))")
+          fi
+          if [ -n "$shape$merge$many" ]; then
             key=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
             echo "::add-mask::$key"
             n=${GIT_CONFIG_COUNT:-0}
             auth=("GIT_CONFIG_COUNT=$((n + 1))" "GIT_CONFIG_KEY_$n=http.$SERVER/$REPO.git.extraheader"
               "GIT_CONFIG_VALUE_$n=AUTHORIZATION: basic $key")
             if git init -q -b pr "$d/pr" && git -C "$d/pr" remote add origin "$SERVER/$REPO.git" \
-              && env "${auth[@]}" timeout "$(proof_time 90)" git -C "$d/pr" fetch -q --no-tags --update-head-ok origin "+$head:refs/heads/pr" \
+              && env "${auth[@]}" timeout "$(proof_time 90)" git -C "$d/pr" fetch -q --no-tags "${depth[@]}" --update-head-ok origin "+$head:refs/heads/pr" \
               && [ "$(git -C "$d/pr" rev-parse refs/heads/pr)" = "$head" ]
             then cloned=1; fi
           fi
@@ -289,6 +299,21 @@ jobs:
               && jq -e 'type == "array"' "$d/proved.json" > /dev/null
             then mv "$d/proved.json" "$d/merges.json"; echo "Merges from main that are the ones git makes: $(jq -r 'length' "$d/merges.json")."
             else echo "The merges from main could not be proved the ones git makes: a review of the head is asked."; fi
+          fi
+          # the files that run with power and the light commits, read by the default branch's power.mjs in that clone with
+          # no token, the light ones within its time (DEADLINE: a commit it has not read by then is not light); where it
+          # cannot, every changed script or workflow is read as running with power and no commit as light, so floor
+          # rule 3's two and a review of the head are asked (a default branch whose core is older has no such script, and
+          # its script reads what runs by itself as before)
+          power=()
+          if [ -n "$many" ]; then
+            proof="$PWD/$ROOT/scripts/power.mjs" checkout=$PWD
+            t=$(proof_time 60)
+            if [ -n "$cloned" ] && (cd "$d/pr" && env -u GH_TOKEN DEADLINE=$(($(date +%s) + t - 5)) timeout "$t" node "$proof" "$d/pull.json" "$d/commits.json" "$d/files.json" "$checkout" > "$d/power.json") \
+              && jq -e '(.light | type) == "array" and (.power | type) == "array"' "$d/power.json" > /dev/null
+            then echo "Files that run with power: $(jq -r '.power | length' "$d/power.json"); light commits, which touch none of it: $(jq -r '.light | length' "$d/power.json")."
+            else echo '{}' > "$d/power.json"; echo "What runs with power could not be read: each changed script and workflow is read as running with it, and a review of the head is asked."; fi
+            power=("POWER=$d/power.json")
           fi
           # whose posted review counts besides the owner's and the accounts named: a person the host lets write (#412),
           # read from GitHub's rights for each account, at most twenty, that posted a "Security review:", a "Code
@@ -321,7 +346,7 @@ jobs:
           done
           jq -s '.' "$d/rights.txt" > "$d/rights.json"
           bound security-review.mjs
-          PURE="$pure" RIGHTS="$d/rights.json" node "$ROOT/scripts/security-review.mjs" "$d/pull.json" \
+          env "${power[@]}" PURE="$pure" RIGHTS="$d/rights.json" node "$ROOT/scripts/security-review.mjs" "$d/pull.json" \
             "$d/comments.json" "$d/findings.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/out.json"
           sha=$(jq -r '.sha // empty' "$d/out.json")
           if [ -z "$sha" ]; then
@@ -340,7 +365,7 @@ jobs:
           # (a fault in it warns and leaves the job as green as the security-review status left it)
           if [ -f "$ROOT/scripts/code-review-wait.mjs" ]; then
             bound code-review-wait.mjs
-            if RIGHTS="$d/rights.json" node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
+            if RIGHTS="$d/rights.json" FINDINGS="$d/findings.json" node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
               "$d/comments.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/code.json" \
               && jq -r '.status | "\(.state): \(.description)"' "$d/code.json" \
               && jq '.status' "$d/code.json" | timeout 20 gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then :

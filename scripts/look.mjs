@@ -19,7 +19,12 @@
 //     findings inline of the last LATE_DAYS days made after their pull request merged, with no reply from an account
 //     the host lets write.
 //   - Steps of a release not done (steps.mjs), in a project.
-//   - Labels and openers to mend (labels.mjs).
+//   - Labels and openers to mend (labels.mjs); in GitHub's job, the labels of the core's list made first (#1092); in
+//     the core, beside them, a question or idea from a project that names a rule of the core and leaves its reasons
+//     unsaid (reasons-said.mjs).
+//   - In a project, the settings only the owner gives that the job's token reads as not given (host.mjs), with each
+//     write GitHub refused the job, labelled needs-owner; the host is read once, and the steps read on it run with
+//     the rest.
 //   - The scheduled look missed a run: where its record shows no run for longer than MISSED hours. The look never
 //     closes this one: a session closes it once it has found why.
 //   - What the dose makes due (dose.mjs; tasks/cleaning.md): cleaning, while the codebase is not in standard, and an
@@ -56,6 +61,9 @@ import { report as outcomesReport } from "./outcomes-read.mjs";
 import { auditIsDue, cleaningDue } from "./dose.mjs";
 import { asked, FOLDER, repoOf } from "./inbox.mjs";
 import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
+import { settingsOf, settingsTask } from "./host.mjs";
+import { hostOf, recordRead, staleOf } from "./look-host.mjs";
+import { reasonsUnsaid } from "./reasons-said.mjs";
 import { pathIn } from "./reading.mjs";
 import { ownerOf } from "./releases.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
@@ -65,11 +73,12 @@ import { dueIssue as stagedCases } from "./staged.mjs";
 import { line as blindLine, reader as blindSample, shareNow, TITLE as BLIND } from "./blind-sample.mjs";
 import { ownReport } from "./holders.mjs";
 import { before as monthBefore, copies, monthOf, pushWait, readCounts, shape, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
-import { notDone, report as stepsReport } from "./steps.mjs";
-import { TITLES } from "./look-kinds.mjs";
+import { STEPS, notDone, report as stepsReport } from "./steps.mjs";
+import { MISSED, TITLES } from "./look-kinds.mjs";
 import { idleFinding } from "./look-pulls.mjs";
 import { lateFinding, redFinding, staleFinding } from "./look-checks.mjs";
 import { keepIssues, lastRun, mine, RECORD, slug, toFolder } from "./look-keep.mjs";
+import { parseBounded } from "./guards.mjs";
 
 // What the look is made of stands in the files beside this one, each read for one thing: look-kinds.mjs (the title of
 // each kind of issue), look-pulls.mjs (the pull requests: idle, and the work standing still), look-checks.mjs (the
@@ -80,8 +89,9 @@ export { checksOf, idleBody, NOTICE_LOGINS, noticesOf, stillFinding } from "./lo
 export { FAILED, LATE_DAYS, LATE_PAGES, LATE_PULLS, lateFinding, redBody, staleFinding } from "./look-checks.mjs";
 export { BOT, inboxFile, LABELS, lastRun, mine, OWNERS, plan, RECORD, relabelled, reopening, slug, text, updating } from "./look-keep.mjs";
 
-// A daily look with a few hours' slack; and how soon a session's run after another does nothing more.
-export const MISSED = 30, SOON = 20;
+// How soon a session's run after another does nothing more; MISSED, a daily look's slack, stands in look-kinds.mjs.
+export const SOON = 20;
+export { MISSED } from "./look-kinds.mjs";
 
 // A project's own rules by what holds them, as holders.mjs --own reads them (#662); null where it cannot.
 const ownHeld = scripts => { try { return ownReport(process.cwd(), scripts); } catch { return null; } };
@@ -139,15 +149,15 @@ function settingOf(options, manifest) {
 function reachOf(repo) {
   if (!repo) return { yes: false, why: "its origin is not on github.com" };
   let got = null, refused = false;
-  try { got = JSON.parse(ghApi(`repos/${repo}`)); } catch (e) { refused = /\bHTTP 404\b/.test(String(e.message)); }
+  try { got = parseBounded(ghApi(`repos/${repo}`)); } catch (e) { refused = /\bHTTP 404\b/.test(String(e.message)); }
   return got && typeof got === "object" && got.permissions ? asked(repo, got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
 }
 
-// What the look finds, kind by kind, each { title, what, unread }; and `stepsLeft`, the count of a release's steps not
-// done (null where they were not read), for the state report.
-function findingsOf({ repo, manifest, owner, at }, reach, last) {
+function findingsOf(ctx, reach, last) {
+  const { repo, manifest, owner, at, say } = ctx;
   const findings = [];
   const add = (title, what, unread = null) => findings.push({ title, what, unread });
+  const { host, refused } = hostOf(ctx, reach);
   // pull requests that stand idle, the work standing still, and late review findings
   idleFinding(repo, add, manifest, owner);
   lateFinding(repo, add, at);
@@ -156,12 +166,22 @@ function findingsOf({ repo, manifest, owner, at }, reach, last) {
   // steps of a release not done, in a project
   let stepsLeft = null;
   if (manifest !== null) {
-    try { const missed = notDone(process.cwd()); stepsLeft = missed.length; add(TITLES.steps, stepsBody(missed)); }
-    catch { add(TITLES.steps, null, "the steps could not be read here"); }
+    try {
+      const missed = notDone(process.cwd(), STEPS, host); stepsLeft = missed.length; add(TITLES.steps, stepsBody(missed));
+      if (missed.hostUnread?.length) say(`Steps not read on the host this run: ${missed.hostUnread.map(u => `${u.lead} (${u.why})`).join("; ")}.`);
+    } catch { add(TITLES.steps, null, "the steps could not be read here"); }
+    // the settings only the owner gives, as the job's token reads them, and each write refused (#1092)
+    if (host) { ctx.hostRead = at; findings.push({ title: TITLES.settings, what: settingsTask(repo, settingsOf(host, process.cwd()), refused), unread: null, owner: true }); }
+    else add(TITLES.settings, null, "GitHub's answers for the repository could not be read here");
   }
   // labels and openers
   if (reach.yes) {
-    try { const since = sinceHere(), found = check({ ...gather(repo, since), owner, since, core: manifest === null }); add(TITLES.labels, found.length ? labelsReport(found, repo) : null); }
+    try {
+      const since = sinceHere(), got = gather(repo, since), core = manifest === null;
+      // (in the core alone, beside them: a question or idea from a project that names a rule says which reasons do not hold)
+      const found = [...check({ ...got, owner, since, core }), ...(core ? reasonsUnsaid({ issues: got.issues, owner, since }) : [])];
+      add(TITLES.labels, found.length ? labelsReport(found, repo) : null);
+    }
     catch { add(TITLES.labels, null, "the labels and openers could not be read"); }
   }
   // a missed run
@@ -212,12 +232,12 @@ function main(args) {
   }
   const record = kept.get(RECORD) ?? null, last = lastRun(record?.body);
   if (!job && !now && last && hoursBetween(last, at) < SOON) { say(`The scheduled look ran ${hoursBetween(last, at)} h ago (${last}): nothing more to do until ${SOON} h have passed.`); return 0; }
+  const stale = recordRead(ctx, record);
 
   const { findings, stepsLeft } = findingsOf(ctx, reach, last);
   // the state report, once a month
   const report = monthlyOf(ctx, reach, kept, stepsLeft);
-  // (what the project holds, looked up again once a month, with the state report: #488, point 8)
-  if (report.monthly !== null && ctx.manifest !== null) findings.push(staleFinding());
+  findings.push(...staleOf(ctx, report, stale));
 
   // what is done with each
   if (!reach.yes) { toFolder(ctx, reach, findings, report); return 0; }

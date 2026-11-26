@@ -40,22 +40,23 @@ import fs from "node:fs";
 import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { corePath, projectAt } from "./core-path.mjs";
-import { logged } from "./guards.mjs";
+import { logged, loggedAlone } from "./guards.mjs";
 import { checkRules } from "./links.mjs";
 import { markdownReader } from "./markdown.mjs";
-import { installed, unreached } from "./packages.mjs";
+import { didNotRun, installed } from "./packages.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 
-const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+// (a listing of the project's tracked paths grows with it, so git's output is read into a buffer of 256 MB, the bound the
+// core's other checks of a project's listing keep, and not Node's default 1 MB, which a project of about 20,000 files
+// passes: #1204)
+const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
-// (in a project, where the package is not installed, the check did not run, said as a warning that fails nothing: a job
-// of the project's own that ran it before the core's packages came installs nothing yet, and the sync never turns it
-// red (AGENTS.md of the core, "Nothing locks a project"; steps.mjs asks the step), nor does a registry that did not
-// answer (#654, point 4); in the core's own run a package not installed fails, saying the mend: packages.mjs)
+// (in a project, the package is installed first where it is not (packages.mjs; #1093, point 1); where it cannot be, the
+// check did not run, said as a warning that fails nothing (AGENTS.md of the core, "Nothing locks a project"; #654, point
+// 4); in the core's own run a package not installed fails, saying the mend: packages.mjs)
 if (!process.argv.includes("--core") && !installed("marked")) {
-  console.log(unreached("marked") ? "::warning::The pointer check did not run: the package marked could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault"
-    : `::warning::The pointer check did not run: the package marked is not installed beside the core's copy. Mend: in a pull request of its own, add the step node ${corePath(".") || "core/"}scripts/install.mjs to this job before the step that runs this check`);
+  console.log(didNotRun("The pointer check did not run", "marked"));
   process.exit(0);
 }
 const readMarkdown = await markdownReader();
@@ -67,7 +68,9 @@ if (AT !== null && !/^[0-9a-f]{40}$/u.test(AT ?? "")) { console.error("FAIL: --t
 const atCommit = AT ? readAt(AT) : null;
 const text = f => (AT ? atCommit(f) ?? "" : fs.readFileSync(f, 'utf8'));
 // (a submodule's files too, at their paths from here: a library that carries the core brings its copy so; core-path.mjs)
-const tracked = (AT ? git(['ls-tree', '-r', '-z', '--name-only', AT]) : git(['ls-files', '-z', '--recurse-submodules'])).split('\0').filter(Boolean);
+let tracked;
+try { tracked = (AT ? git(['ls-tree', '-r', '-z', '--name-only', AT]) : git(['ls-files', '-z', '--recurse-submodules'])).split('\0').filter(Boolean); }
+catch (e) { console.error(`FAIL: ${logged(`git could not list the tracked paths${AT ? ` at ${AT}` : ""} (${e.code ?? e.message.split("\n")[0]})`)}. Mend: run \`git ls-files\` here and mend what it reports (an unreadable index, a submodule not set up, more paths than the 256 MB the check reads), then run this again`); process.exit(1); }
 const CORE = process.argv.includes("--core");
 const show = AT ? f => (tracked.includes(f) ? atCommit(f) : null) : undefined, under = AT ? dir => tracked.filter(f => f.startsWith(`${dir}/`)) : undefined;
 let RULES, TOOLS;
@@ -79,7 +82,7 @@ try {
   const old = CORE ? tracked.filter(f => /^(floor|floor\/topics|modules|roles|roles\/shared|tasks|tools)\/[^/]+\.md$/.test(f)) : listed();
   TOOLS = new Set(toolFiles(show, under).filter(f => tracked.includes(f) && !old.includes(f)));
   RULES = AT ? [...TOOLS] : [...old, ...TOOLS];
-} catch (e) { console.error(`FAIL: ${logged(e.message)}`); process.exit(1); }
+} catch (e) { console.error(`FAIL: ${loggedAlone(e.message)}`); process.exit(1); }
 for (const rf of RULES.filter(f => !tracked.includes(f))) { console.error(`FAIL: ${logged(`the rule file ${rf} is no tracked file`)}. Mend: add it to git, or take out the pointer that names it as a rule file`); process.exitCode = 1; }
 if (process.exitCode) process.exit(1);
 const files = new Set(tracked), dirs = new Set(tracked.flatMap(f => f.split('/').slice(0, -1).map((_, i, p) => p.slice(0, i + 1).join('/') + '/')));

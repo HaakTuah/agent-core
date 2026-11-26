@@ -31,6 +31,9 @@ ok(same(faults("a === b;\nc === d;\n", line => line === 2).map(f => f.at), [11])
 // ---- the tests a file's faults run against ----
 ok(same(testsOf("scripts/shape.mjs", { "scripts/dose-test.mjs": "from './shape.mjs'", "scripts/code-shape-test.mjs": "from './code-shape.mjs'", "scripts/shape-test.mjs": "from './shape.mjs'" }), ["scripts/shape-test.mjs", "scripts/dose-test.mjs"]),
   "a file's tests are those that name it, not a longer name ending in it, its own first");
+// (a test that imports a file without its ending, or by its JavaScript ending, as TypeScript's are written: #1274)
+ok(same(testsOf("src/game.ts", { "test/game.test.ts": "import { play } from '../src/game';", "test/board.test.ts": "import { play } from \"../src/game.js\";", "test/other.test.ts": "import '../src/game-board';\nimport '../src/endgame';", "test/data.test.ts": "const game = 1;" }), ["test/game.test.ts", "test/board.test.ts"]),
+  "a test that imports the file without its ending, or by its JavaScript ending, names it; one that names a longer file, or holds the word alone, does not (#1274)");
 
 // ---- the report ----
 const r = report({ "a.js": "x === 1;\n" }, [{ file: "a.js", text: "x === 1;\n", at: 2, length: 3, original: "===", replacement: "!==", mutatorName: "EqualityOperator", status: "Killed" }]);

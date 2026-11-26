@@ -22,6 +22,10 @@ const SCRIPT = fileURLToPath(new URL("../scripts/strength.mjs", import.meta.url)
 // ---- the row, the baseline's place, the lines ----
 ok(same(toolOf("| *mutation tool* | `mutator run --mutate {lines}` |"), { command: ["mutator", "run", "--mutate", "{lines}"] }) && same(toolOf("| *mutation tool* | `none`: no tool reads GDScript |"), { none: "no tool reads GDScript" }) && toolOf("| *dose* | `in debt` |") === null && toolOf("| *mutation tool* | soon |") === null,
   "the row names the tool's command, or none with its reason; a project with no row, or a row with nothing in backticks, has none named");
+// (a row of any length is read in one pass: a reason of 400,000 spaces then a word, read far inside the time a reading
+// that tries each start in turn would take; #1107)
+{ const at = Date.now(), long = toolOf(`| *mutation tool* | \`none\`: r${" ".repeat(400000)}a${" ".repeat(1000)}|`);
+  ok(long?.none?.length === 400002 && Date.now() - at < 2000, "a row of any length is read in one pass", `${Date.now() - at} ms`); }
 ok(baselineOf({ baseline: "checks/shape-baseline.json" }) === "checks/strength-baseline.json" && baselineOf({ baseline: ".github/shape-baseline.json" }) === ".github/strength-baseline.json", "the baseline stands beside the shape check's");
 ok(linesArg(new Map([["a.js", new Set([3, 1, 2, 7])], ["b.js", new Set([5])]])) === "a.js:1-3,a.js:7-7,b.js:5-5", "the lines are told as runs, <file>:<first>-<last>, joined by commas");
 
@@ -55,6 +59,21 @@ try {
     const linked = run(["--whole"]);
     ok(linked.status === 1 && mended(linked.stderr) && fs.readFileSync(outside, "utf8") === "{\"listed\": {}}\n", "a baseline reached through a link is refused, with its mend, and what it leads to is left as it was", linked.stdout + linked.stderr);
     fs.rmSync(path.join(dir, "checks/strength-baseline.json")); fs.rmSync(outside);
+  }
+  // (the shape check's config, whose code it measures, is read only inside the project, wherever the manifest's row
+  // names it: a path that leads out of it, or a link to a file outside, fails with its mend, and nothing of it is read)
+  {
+    const away = scratchDir("strength-away-"), mark = `made-up-${process.pid}`, kept = fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8");
+    fs.writeFileSync(path.join(away, "x.json"), JSON.stringify({ baseline: `${mark}.json`, code: [mark], [mark]: 1 }));
+    const cases = [[path.relative(dir, path.join(away, "x.json")).split(path.sep).join("/"), /lies outside the project/u]];
+    if (process.platform !== "win32") { fs.symlinkSync(path.join(away, "x.json"), path.join(dir, "checks/linked.json")); cases.push(["checks/linked.json", /reached through a link/u]); }
+    const missed = cases.map(([at, said]) => {
+      write("core-manifest.md", `${kept}| *shape check* | \`${at}\` |\n`);
+      const x = run(["--whole"]), out = x.stdout + x.stderr;
+      return x.status === 1 && mended(x.stderr) && said.test(x.stderr) && !out.includes(mark) ? "" : `${at}\n${out}`;
+    }).filter(Boolean);
+    ok(missed.length === 0, "a shape config the manifest names outside the project, or through a link, is refused with its mend, and nothing of what it leads to is read", missed.join("\n"));
+    fs.rmSync(path.join(dir, "checks/linked.json"), { force: true }); write("core-manifest.md", kept);
   }
   r = run(["--whole"], { STATUS: "Pending" });
   ok(r.status === 1 && mended(r.stderr) && !fs.existsSync(path.join(dir, "checks/strength-baseline.json")), "a whole run that left faults not run writes no baseline, and says the mend", r.stdout + r.stderr);

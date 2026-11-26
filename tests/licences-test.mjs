@@ -9,7 +9,7 @@
 import { readable } from "../scripts/licence-yes.mjs";
 import { installed } from "../scripts/packages.mjs";
 import { keysOf } from "../scripts/schemas.mjs";
-import { actionLists, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
+import { actionLists, alongside, coreConfig, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
 import { execFileSync } from "node:child_process";
 import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -73,9 +73,31 @@ const ids = new Set(lists.tools);
 ok(["MIT", "(MIT OR GPL-2.0-only)", "GPL-2.0-only WITH Classpath-exception-2.0", "LicenseRef-A AND (MIT OR LGPL-3.0-only)", "LicenseRef-Vendor-EULA"].every((l) => readable(l, ids))
   && ["", "AND", "()", "MIT AND", "(MIT", "MIT)", "MIT OR OR MIT", "MIT WITH", "MIT WITH AND", "WITH x", "MIT MIT", "Some-Words", "LicenseRef-", "LicenseRef-.", "LicenseRef--", "MIT WITH -x", `${"(".repeat(60)}MIT${")".repeat(60)}`, `${"(".repeat(200000)}MIT`, undefined, 7].every((l) => !readable(l, ids)),
   "reads a yes's licence as one whole expression of ids it knows and names the owner gave, and nothing else");
-const lines = actionLists({ ships: [], data: ["mossgrip-data"], accepted: [{ package: "mossgrip-lib@1.0.0", licence: "LGPL-3.0-only", ships: true, yes: "y", notice: "n" }, { package: "@moss/bought@2.1.0", licence: "LicenseRef-Vendor-EULA", ships: false, yes: "y" }, { entry: "Bark pack", licence: "LicenseRef-Vendor-EULA", ships: true, yes: "y" }] });
+const lines = actionLists({ ships: [], data: ["mossgrip-data"], accepted: [{ package: "mossgrip-lib@1.0.0", licence: "LGPL-3.0-only", ships: true, yes: "y", notice: "n" }, { package: "@moss/bought@2.1.0", licence: "LicenseRef-Vendor-EULA", ships: false, yes: "y" }, { entry: "Bark pack", licence: "LicenseRef-Vendor-EULA", ships: true, yes: "y" }] }, {});
 ok(lines.length === 2 && lines[0].startsWith("allow-licenses=0BSD,") && lines[1] === "allow-dependencies-licenses=pkg:npm/mossgrip-data,pkg:npm/@moss/bought",
   "the dependency review is told to let through, of what the owner accepted, only a package under a licence it would refuse", lines[1]);
+// a project's sync brings the core's lock files into its pull request, which the dependency review reads under the
+// project's lists: with a config of a project's that names none of the core's data packages, as the starter kit writes
+// it, every package of each lock file the copy holds passes them, by its licence or its name (#1310)
+{
+  const kit = { lockfiles: ["package-lock.json"], ships: ["package.json"] };
+  const [allow, through] = actionLists(kit).map((l) => l.slice(l.indexOf("=") + 1).split(","));
+  const licences = new Set(allow), names = new Set(through);
+  const copied = execFileSync("git", ["archive", "HEAD"], { cwd: new URL("..", import.meta.url), maxBuffer: 1 << 28 }).toString("latin1");
+  const locks = (coreConfig().lockfiles ?? []).filter((f) => copied.includes(`${f}\0`));
+  const refused = locks.flatMap((f) => Object.entries(JSON.parse(readFileSync(new URL(`../${f}`, import.meta.url), "utf8")).packages)
+    .filter(([path, p]) => path && !p.link && !licenceOk(p.license, licences) && !names.has(`pkg:npm/${path.slice(path.lastIndexOf("node_modules/") + 13)}`))
+    .map(([path, p]) => `${f}: ${path} (${p.license})`));
+  ok(locks.includes(".packages/package-lock.json") && !refused.length && !actionLists(kit, {})[1].includes("spdx-exceptions"),
+    "every package of the core's lock files the copy holds passes the dependency review's lists of a project that names none of them, by the core's own config", refused.join("\n"));
+  const dir = scratchDir("core-licences-"), at = join(dir, "licences.json");
+  try {
+    const refuses = (text) => { writeFileSync(at, text); try { coreConfig(at); return ""; } catch (e) { return e.message; } };
+    ok(JSON.stringify(coreConfig(join(dir, "none.json"))) === "{}" && /cannot be read as JSON\. Mend: /u.test(refuses("{")) && /no npm package name.*\. Mend: /u.test(refuses('{"data":["Not A Name"]}'))
+      && /no npm package name/u.test(refuses('{"accepted":[{"package":7}]}')) && refuses('{"data":["x"],"accepted":[{"entry":"e"}]}') === "",
+      "the core's own config is none where it is not there, and refused, saying its mend, where it cannot be read or names what is no package");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
 const npmrc = ["registry=https://mossgrip.example/", "replace-registry-host=always", "@x:registry = https://mossgrip.example/", '"registry"=https://mossgrip.example/', '"replace-registry-host"=always', "${KEY}=https://mossgrip.example/"];
 ok(JSON.stringify(registryOverrides(npmrc.join("\n"))) === JSON.stringify(npmrc) && registryOverrides("fund=false\naudit=false\n# registry=x\n; registry=x\n").length === 0
   && JSON.stringify(registryOverrides("ignore-scripts=true\nregistry=https://mossgrip.example/\n")) === JSON.stringify(["registry=https://mossgrip.example/"])
@@ -201,6 +223,44 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
         apart.slice(0, 5).map((x) => JSON.stringify(x)).join("\n"));
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+// The checks run beside the licence check (#1093, point 2) read against the base the job names (LOOKUP_BASE), as the
+// lookup does, where the checkout holds the head and not a merge: a range that stood there is reported, never failed;
+// where it names none and the checkout holds none, what stands cannot be told from what is new, so a range is reported,
+// never failed (Codex's review of ea0438a); and a base the job names that the checkout does not hold fails, saying its
+// mend, where the lookup would warn.
+{
+  const dir = scratchDir("licences-test-alongside-");
+  const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+  const git = (...args) => execFileSync("git", args, { cwd: dir, env: gitEnv, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  const was = { log: console.log, error: console.error, event: process.env.GITHUB_EVENT_NAME, base: process.env.LOOKUP_BASE };
+  const run = async (base) => {
+    const lines = [];
+    console.log = console.error = (l) => lines.push(String(l));
+    process.env.GITHUB_EVENT_NAME = "pull_request";
+    if (base === undefined) delete process.env.LOOKUP_BASE; else process.env.LOOKUP_BASE = base;
+    try { return { failed: await alongside(join(dir, "c.json"), dir), out: lines.join("\n") }; } finally { console.log = was.log; console.error = was.error; }
+  };
+  try {
+    git("init", "-q");
+    writeFileSync(join(dir, "c.json"), JSON.stringify({ ships: ["package.json"], lockfiles: ["package-lock.json"] }));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", dependencies: { a: "^1.2.3" } }));
+    writeFileSync(join(dir, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": { name: "p", dependencies: { a: "^1.2.3" } }, "node_modules/a": { version: "1.2.3", license: "MIT", resolved: "https://registry.npmjs.org/a/-/a-1.2.3.tgz" } } }));
+    git("add", "-A"); git("commit", "-q", "-m", "base");
+    const base = git("rev-parse", "HEAD");
+    writeFileSync(join(dir, "x.txt"), "x"); git("add", "-A"); git("commit", "-q", "-m", "head");
+    const named = await run(base);
+    ok(!named.failed && /stood so at the pull request's base: reported, never failed/u.test(named.out) && !/^FAIL/mu.test(named.out), "on a checkout of the head, a range that stood at the base the job names is reported, never failed", named.out);
+    const lacking = await run("f".repeat(40));
+    const none = await run(undefined);
+    ok(!none.failed && /no base to read it against: reported, never failed/u.test(none.out) && /^::warning::The lookup of the packages new to the project did not run/mu.test(none.out) && !/^FAIL/mu.test(none.out),
+      "where the job names no base and its checkout holds none, a range is reported, never failed, beside the lookup's warning", none.out);
+    ok(lacking.failed && /^FAIL: the lookup of the packages new to the project cannot run: the job names the pull request's base \(LOOKUP_BASE\), and its checkout does not hold that commit\. Mend: /mu.test(lacking.out), "a base the job names that its checkout does not hold fails the lookup, saying its mend", lacking.out);
+  } finally {
+    for (const [k, v] of [["GITHUB_EVENT_NAME", was.event], ["LOOKUP_BASE", was.base]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 process.exit(failed ? 1 : 0);

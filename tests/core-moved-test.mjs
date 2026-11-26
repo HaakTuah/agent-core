@@ -17,7 +17,7 @@ let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (!cond) { failed++; console.error(`FAIL: ${what}${detail && `\n     ${detail}`}`); } };
 const A = "a".repeat(40), B = "b".repeat(40);
 const realGit = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout?.trim() ?? "git";
-// (the scratch project follows the core's main unless a test says otherwise: what a project follows is releases-test.mjs's)
+// (the scratch project follows the core's main unless a test says otherwise: what a project follows is follows-test.mjs's)
 const manifest = (pin, owner = "| *owner's account* | `someone` |", follows = "| *follows* | `main` |") =>
   `# Core manifest\n\nCore: ${CORE} at ${pin}, copied whole under core/ (never edited here).\n\n| Slot | Here |\n| --- | --- |\n${owner}\n${follows}\n`;
 

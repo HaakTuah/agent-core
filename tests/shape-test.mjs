@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { fileOf, groupOf, LONG, MARKS, notLinked, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
+import { fileOf, groupOf, LONG, MARKS, notLinked, offBy, parseBaseline, parseConfig, readerOf, scanMend, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
 import { READERS } from "../scripts/shape-readers.mjs";
 import { LARGEST } from "../scripts/tree-walk.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -492,9 +492,21 @@ put("README.md", "A scratch project.\n");
 commit("a project");
 let r = run([]);
 ok(r.status === 0 && /has not written its config of the shape check yet/.test(r.out) && /nothing was held/.test(r.out), "a project with no config and no base passes, and says that nothing was held", r.out);
+put("core-manifest.md", "| *shape check* | `none` |\n"); r = run([]);
+let noReason = /turns nothing off/.test(r.out) && /nothing was held/.test(r.out);
+put("core-manifest.md", "| *shape check* | `none ` |\n"); r = run([]);
+noReason &&= /turns nothing off/.test(r.out) && /nothing was held/.test(r.out); // (padded inside its backticks, no reason all the same)
 git("branch", "before");
 r = run([], { SHAPE_BASE: "before" });
 ok(r.status === 0 && /nothing new in how the code is put together against before, by the starter kit's config/.test(r.out), "with a base, a project with no config is held to the starter kit's, the base as its baseline: what stood passes", r.out);
+put("core-manifest.md", "| *shape check* | `none`: . |\n"); r = run([]);
+noReason &&= /turns nothing off/.test(r.out); // (a reason with no letter or digit is none)
+put("core-manifest.md", "| *shape check* | `none`: kept off |\n"); r = run([], { SHAPE_BASE: "before" });
+const turning = r.status === 0 && /::warning::this pull request turns the shape check off .*kept off.*so it runs here/.test(r.out) && /nothing new in how the code is put together/.test(r.out);
+commit("off"); git("branch", "off"); git("reset", "-q", "HEAD~1"); // (a base that is off, the commit taken back out of the branch's history)
+r = run([], { SHAPE_BASE: "off" });
+ok(noReason && turning && r.status === 0 && /^ok {3}the shape check is off: .*kept off/m.test(r.out) && !/nothing new/.test(r.out), "only a `none` with a reason that its base holds too turns the check off: one this pull request writes runs, saying so, and one with no reason turns nothing off, padded or not", r.out);
+fs.rmSync(path.join(dir, "core-manifest.md"));
 put("src/rules/more.js", long("another", 61));
 put("src/rules/more.test.js", long("inATest", 200));
 put("core/scripts/copied.js", long("theCores", 200));
@@ -509,7 +521,7 @@ r = run([]);
 ok(r.status === 1 && mended(r.out) && /--first/.test(r.out), "a config with no baseline fails, saying how the first is written", r.out);
 r = run(["checks/shape.json", "--first"]);
 const baseline = () => JSON.parse(fs.readFileSync(path.join(dir, "checks/shape-baseline.json"), "utf8"));
-ok(r.status === 0 && same(Object.keys(baseline().listed), ["function: src/rules/index.js#tall"]) && same(baseline().listed["function: src/rules/index.js#tall"], { lines: 100, depth: 0, branches: 0 }), "--first lists what stands, its numbers and no line", r.out);
+ok(r.status === 0 && same(Object.keys(baseline().listed), ["function: src/rules/index.js#tall"]) && same(baseline().listed["function: src/rules/index.js#tall"], { lines: 100, depth: 0, branches: 0 }) && r.out.includes(`note checks/shape-baseline.json names the project's files by path. Mend: ${scanMend("checks/shape-baseline.json")}`), "--first lists what stands, its numbers and no line, and says what a project's own scan of paths named does about the baseline (#1289)", r.out);
 ok(run(["checks/shape.json", "--first"]).status === 1 && mended(run(["checks/shape.json", "--first"]).out), "--first writes no second baseline");
 commit("the shape check, with its first baseline");
 git("branch", "base");
@@ -537,11 +549,12 @@ r = run([], { SHAPE_BASE: "base" });
 ok(r.status === 1 && mended(r.out) && /neither listed nor held/.test(r.out), "an entry written into the baseline by hand, of code the base did not hold, fails against the base", r.out);
 git("checkout", "-q", "base", "--", "checks/shape-baseline.json");
 r = run(["--write"]);
-ok(r.status === 0 && same(Object.keys(baseline().listed), ["function: src/rules/index.js#tall"]) && baseline().listed["function: src/rules/index.js#tall"].lines === 80 && /passes? a mark/.test(run([], { SHAPE_BASE: "base" }).out),
-  "taken back as the base holds it and lowered, the baseline holds no more than before: --write never adds, and the new function fails as new", r.out);
+ok(r.status === 0 && same(Object.keys(baseline().listed), ["function: src/rules/index.js#tall"]) && baseline().listed["function: src/rules/index.js#tall"].lines === 80 && !/names the project's files by path/.test(r.out) && /passes? a mark/.test(run([], { SHAPE_BASE: "base" }).out),
+  "taken back as the base holds it and lowered, the baseline holds no more than before: --write never adds, and the new function fails as new, and no note of paths is printed", r.out);
 fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), JSON.stringify({ grown: { "function: src/rules/index.js#wide": "a table of the standard, read as one" }, listed: baseline().listed }));
 r = run(["--write"]);
-ok(r.status === 0 && baseline().listed["function: src/rules/index.js#wide"].lines === 70 && run([], { SHAPE_BASE: "base" }).status === 0, "but for one \"grown\" gives a reason for, which then passes against the base", r.out);
+ok(r.status === 0 && baseline().listed["function: src/rules/index.js#wide"].lines === 70 && run([], { SHAPE_BASE: "base" }).status === 0 && r.out.includes(`note checks/shape-baseline.json names the project's files by path. Mend: ${scanMend("checks/shape-baseline.json")}`),
+  "but for one \"grown\" gives a reason for, which then passes against the base, the entry it added printing the note of paths (#1289)", r.out);
 commit("a function with its reason");
 git("branch", "-f", "base");
 put("checks/shape.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"uses": [\n        "rules"\n      ]', '"uses": []'));
@@ -610,6 +623,37 @@ put("checks/new.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf
 r = run(["checks/new.json"], { SHAPE_BASE: "base" });
 ok(r.status === 1 && mended(r.out) && /raises or drops 1 mark/.test(r.out), "a config named anew on the command line is compared with the one the base's rules name", r.out);
 fs.rmSync(path.join(dir, "checks/new.json"));
+// (a pull request that turns the check off keeps the config's path of the project's own in the row, which the config's
+// other readers read, and runs on it: Codex's findings on #1188)
+git("mv", "checks/shape.json", "checks/other.json");
+put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/other.json` |\n");
+commit("the config at a path of the project's own"); git("branch", "named");
+put("core-manifest.md", "| *shape check* | `none`: kept off |\n");
+r = run([], { SHAPE_BASE: "named" });
+ok(r.status === 1 && mended(r.out) && /no longer names the config at checks\/other\.json/.test(r.out) && /config `checks\/other\.json`/.test(r.out),
+  "a pull request that turns the check off and drops the config's path its base names fails, its mend keeping the path in the row", r.out);
+put("core-manifest.md", "| *shape check* | `none`: kept off; config `checks/other.json` |\n");
+r = run([], { SHAPE_BASE: "named" });
+ok(r.status === 0 && /::warning::this pull request turns the shape check off/.test(r.out) && /nothing new in how the code is put together/.test(r.out) && where(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8")) === "checks/other.json",
+  "a pull request that turns the check off and keeps the config's path in the row runs on that config, which the other readers read too", r.out);
+// (and so does one a pull request later, once the check is off, and a path the reason quotes is not taken for the config
+// nor the path for part of the reason: round 5 of #1188's review)
+commit("turned off, the path kept"); git("branch", "-f", "named");
+put("core-manifest.md", "| *shape check* | `none`: kept off |\n");
+r = run([], { SHAPE_BASE: "named" });
+ok(r.status === 1 && mended(r.out) && /no longer names the config at checks\/other\.json/.test(r.out),
+  "a pull request that drops the config's path where its base turned the check off fails all the same, with the mend", r.out);
+put("core-manifest.md", "| *shape check* | `none`: kept off, as `old.json` said; config `checks/other.json` |\n");
+r = run([], { SHAPE_BASE: "named" });
+ok(r.status === 0 && /ok {3}the shape check is off: the manifest's \*shape check\* row says `none`: kept off, as `old\.json` said \(/.test(r.out) && where(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8")) === "checks/other.json" && offBy("| *shape check* | `none`; config `checks/other.json` |") === "",
+  "in a row that says `none`, the config is the path after \"config\", and the reason stops before it", r.out);
+git("reset", "-q", "--hard", "base"); git("branch", "-D", "-q", "named");
+// (a reason of any length is read in one pass: 400,000 spaces then a word, read far inside the time a reading that
+// tries each start in turn would take; #1107)
+{ const at = Date.now(), long = offBy(`| *shape check* | \`none\`: r${" ".repeat(400000)}a |`), path = offBy("| *shape check* | `none`: r;  config `x.json` |"), not = offBy("| *shape check* | `none`: r; myconfig `x.json` |");
+  ok(long?.length === 400002 && path === "r" && not === "r; myconfig `x.json`" && Date.now() - at < 2000, "a reason of any length is read in one pass, and only a path after the word \"config\" is taken off it", `${Date.now() - at} ms`); }
+{ const row = "| *shape check* | `none`: config `a.json` broke; config `b.json` |";
+  ok(where(row) === "b.json" && offBy(row) === "config `a.json` broke", "the config is the path the reason ends with, the one taken off it, where the reason names another", `${where(row)} / ${offBy(row)}`); }
 
 if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)
   fs.renameSync(path.join(dir, "checks/shape-baseline.json"), path.join(dir, "elsewhere.json"));
@@ -618,6 +662,25 @@ if (process.platform !== "win32") { // (a link is made without a privilege only 
     "a baseline that is a link is neither read nor written through", run([]).out);
   fs.rmSync(path.join(dir, "checks/shape-baseline.json"));
   fs.renameSync(path.join(dir, "elsewhere.json"), path.join(dir, "checks/shape-baseline.json"));
+}
+
+// (the config itself is read only inside the project, wherever the manifest's row names it: a path that leads out of
+// it, or a link at the file or at a folder on its way, fails with its mend, and nothing of what it leads to is read)
+{
+  const away = scratchDir("shape-away-"), mark = `made-up-${process.pid}`, rules = path.join(dir, "core-manifest.md");
+  fs.writeFileSync(path.join(away, "x.json"), JSON.stringify({ baseline: `${mark}.json`, code: [mark], [mark]: 1 }));
+  const kept = fs.existsSync(rules) ? fs.readFileSync(rules, "utf8") : null, named = at => put("core-manifest.md", `| *shape check* | \`${at}\` |\n`);
+  const refusedAs = (at, said) => { named(at); const x = run([]); return x.status === 1 && mended(x.out) && said.test(x.out) && !x.out.includes(mark) ? "" : x.out; };
+  const cases = [[path.relative(dir, path.join(away, "x.json")).split(path.sep).join("/"), /lies outside the project/u], ["checks/../../x.json", /lies outside the project/u]];
+  if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)
+    fs.symlinkSync(path.join(away, "x.json"), path.join(dir, "checks/linked.json"));
+    fs.symlinkSync(away, path.join(dir, "away"));
+    cases.push(["checks/linked.json", /reached through a link \(checks\/linked\.json\)/u], ["away/x.json", /reached through a link \(away\)/u]);
+  }
+  const missed = cases.map(([at, said]) => [at, refusedAs(at, said)]).filter(([, out]) => out !== "");
+  ok(missed.length === 0, "a config the manifest names outside the project, or through a link at the file or a folder on its way, is refused with its mend, and nothing of what it leads to is read", missed.flat().join("\n"));
+  for (const f of ["checks/linked.json", "away"]) fs.rmSync(path.join(dir, f), { force: true });
+  if (kept === null) fs.rmSync(rules); else fs.writeFileSync(rules, kept);
 }
 
 // (an entry an earlier pull request mended and left listed lists nothing in its place, --write told the base: #751's

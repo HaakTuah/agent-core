@@ -13,6 +13,8 @@ import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
 import { COPIES } from "../scripts/checks.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { npmRefused } from "../scripts/npm-reads.mjs";
+import { unrunWhy } from "../scripts/check-calls.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -28,7 +30,7 @@ let n = 0;
 function project(files = {}) {
   const dir = path.join(tmp, `p${++n}`);
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of ["checks.mjs", "core-address.mjs", "core-path.mjs", "mend.mjs", "started.mjs", "workflow-run.mjs", "parse-yaml.mjs", "yaml-keys.mjs", "packages.mjs", "npm-reads.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
+  for (const f of ["checks.mjs", "core-address.mjs", "core-path.mjs", "mend.mjs", "started.mjs", "workflow-run.mjs", "parse-yaml.mjs", "guards.mjs", "yaml-keys.mjs", "packages.mjs", "npm-reads.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
   // (the YAML package its reader of workflows loads, as the core's install leaves it: the lock file, npm's record of the
   // install and the package, from the core's own install, which its tests' job runs)
   for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/yaml"]) fs.cpSync(path.join(root, ".packages", f), path.join(dir, "core/.packages", f), { recursive: true });
@@ -76,6 +78,31 @@ const run = (dir, args, extra = {}) => {
   ok(r.status === 1 && [...r.out.matchAll(/^ran (\S+)/gm)].length === COPIES.length && /^FAIL --base origin\/nowhere is no commit here/m.test(r.out) && mended(r.out),
     "a base that cannot be fetched fails as a check of its own, saying its mend, and each of the seven checks still runs", r.out);
 }
+// (#674) in a checkout as the workflows make one, the merge commit and its parents with no branch of origin's, whose
+// origin refuses a fetch with no token as a private repository's does: origin/main cannot be had, and HEAD^1, which the
+// workflows give, is had with no fetch and given to each check as its commit
+{
+  const origin = project();
+  git(origin, "switch", "-q", "-c", "change");
+  fs.writeFileSync(path.join(origin, "a.txt"), "a\n");
+  git(origin, "add", "-A");
+  git(origin, "commit", "-q", "-m", "change");
+  git(origin, "switch", "-q", "main");
+  git(origin, "merge", "-q", "--no-ff", "--no-edit", "change");
+  const base = git(origin, "rev-parse", "HEAD^1");
+  const ws = path.join(tmp, "checkout");
+  git(tmp, "init", "-q", ws);
+  git(ws, "remote", "add", "origin", path.join(tmp, "refuses.git")); // (no repository there: every fetch fails)
+  git(ws, "fetch", "-q", "--depth=2", "--no-tags", `file://${origin}`, git(origin, "rev-parse", "HEAD"));
+  git(ws, "checkout", "-q", "--detach", "FETCH_HEAD");
+  const refused = run(ws, ["copies", "--copies", "c.json", "--sizes", "s.json", "--base", "origin/main"]);
+  ok(refused.status === 1 && /^FAIL --base origin\/main is no commit here, and could not be fetched/m.test(refused.out) && mended(refused.out),
+    "where origin refuses a fetch, the base given as origin/<branch> cannot be had, which the workflows gave before #674", refused.out);
+  const r = run(ws, ["copies", "--copies", "c.json", "--sizes", "s.json", "--base", "HEAD^1"]);
+  const given = [...r.out.matchAll(/^ran \S+ \[[^\]]*\] (\w+_BASE)=([^,\s]*)/gm)];
+  ok(r.status === 0 && given.length === COPIES.filter(([, , , v]) => v).length && given.every(m => m[2] === base),
+    "the base given as HEAD^1, the merge's first parent, is had with no fetch, and each check is given it as its commit", r.out);
+}
 // with no part named: what the project's calls run, folded into core.yml, or each in its own
 {
   const folded = project({ ".github/workflows/core.yml": CALLS("    with:\n      copies: checks/copies.json\n      sizes: checks/sizes.json\n      description: true\n      nuget: checks/licences.json\n") });
@@ -105,6 +132,17 @@ const run = (dir, args, extra = {}) => {
   const at = what => order.out.indexOf(what);
   ok(at("ran lookup.mjs [checks/a.json") >= 0 && at("ran lookup.mjs [checks/b.json") >= 0 && at("ran lookup.mjs [checks/b.json") < at("ran nuget-look.sh"),
     "two calls of the NuGet check: every config's lookup runs before any look, which may run the change's build files", order.out);
+}
+// a changed file's name is listed as text alone (#1348)
+{
+  const dir = project(), base = git(dir, "rev-parse", "HEAD");
+  git(dir, "update-index", "--add", "--cacheinfo", `100644,${git(dir, "rev-parse", "HEAD:core/.node-version")},web/a::b##[c\u0001\n:\u00e9:#\u00e9#[d/package.json`);
+  git(dir, "commit", "-qm", "n");
+  for (const q of ["true", "false"]) {
+    git(dir, "config", "core.quotePath", q);
+    const r = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base }), at = r.out.split("\n").find(l => l.includes("web/a"));
+    ok(at.startsWith('- "web/a: :b# #[c') && !/:[^\0-\x7f]*:|#[^\0-\x7f]*#[^\0-\x7f]*\[/u.test(at), `signatures: a name listed as text (quotePath ${q})`, r.out);
+  }
 }
 // the package checks look first: with nothing they read changed, nothing is installed or restored
 {
@@ -139,7 +177,7 @@ const run = (dir, args, extra = {}) => {
   fs.rmSync(path.join(dir, "fails.txt"));
 }
 // the signature check's install, under an npm that reads none of --allow-git, --allow-remote and --allow-file (npm 10,
-// which Node 22 brings, and npm 11 before 11.14.0), installs nothing and fails saying the mend, since that npm would
+// which Node 22 brings, and npm 11 before 11.15.0, since 11.14 refuses the registry's own packages under --allow-remote=none), installs nothing and fails saying the mend, since that npm would
 // fetch any git, web or file source the lock file names; under one that reads them all, it installs (#704). A stand-in
 // npm on the PATH says the version it is given and records each install; on Linux, where it is a script of the shell's.
 if (process.platform !== "win32") {
@@ -152,12 +190,17 @@ if (process.platform !== "win32") {
   // (its name built from pieces, so that the licence scan reads no npm command here)
   fs.writeFileSync(path.join(bin, ["n", "pm"].join("")), '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "$NPM_STANDS_AS"; exit 0; fi\necho "ran $(basename "$0") $*"\n', { mode: 0o755 });
   const under = version => run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base, NPM_STANDS_AS: version, PATH: `${bin}${path.delimiter}${env.PATH}` });
-  for (const v of ["10.9.9", "11.13.0", ""]) {
+  for (const v of ["10.9.9", "11.14.1", ""]) {
     const old = under(v);
-    ok(old.status === 1 && !/^ran npm ci/m.test(old.out) && /^FAIL .*--allow-remote.*Mend: /m.test(old.out) && mended(old.out), `signatures: under npm ${v || "whose version cannot be read"} it installs nothing and fails, saying the mend`, old.out);
+    ok(old.status === 1 && !/^ran npm ci/m.test(old.out) && /^FAIL .*--allow-remote.*Mend: /m.test(old.out) && mended(old.out) && npmRefused(old.out) === (v ? "11.15.0" : null) && (!v || old.out.includes(`--ignore-scripts npm@${npmRefused(old.out)}`)), `signatures: under npm ${v || "whose version cannot be read"} it installs nothing and fails, saying the mend${v ? ", in the words check.mjs reads to leave the job unrun on this machine" : ", which check.mjs leaves failed, since the change may be why"} (#1262)`, old.out);
+    // (#1262: a job failed by that refusal alone is unrun on this machine, naming the least version of npm, as check.mjs writes
+    // its verdict; one with another failure beside it, or a passed job, is not)
+    const jobOf = (...outs) => ({ passed: false, ran: true, steps: [{ passed: true, ran: true, out: "" }, ...outs.map((out, i) => ({ name: i ? "A step of the change" : "The signature check", passed: false, ran: true, out }))] });
+    if (v === "10.9.9") ok(/^it needs npm 11\.15\.0 or later, .*\.node-version.*, which this machine lacks$/u.test(unrunWhy(jobOf(old.out)) ?? "") && unrunWhy(jobOf(old.out, "a real fault\n")) === null && unrunWhy(jobOf("a real fault\n")) === null && unrunWhy({ ...jobOf(old.out), passed: true }) === null && [`${old.out}FAIL a real fault\n`, `FAIL: a real fault\n${old.out}`, `assertion failed\n${old.out}`, old.out.replace(/^FAIL npm/mu, "a real fault\rFAIL npm")].every(o => npmRefused(o) === null) && unrunWhy({ ...jobOf(old.out), steps: [{ name: "A step of the change", passed: false, ran: true, out: old.out }] }) === null,
+      "  and check.mjs writes a job failed by it alone unrun on this machine, naming the least version of npm; one with another failure beside it, in its step or another, or such words printed by another step, stays failed", unrunWhy(jobOf(old.out)));
   }
-  const now = under("11.14.0");
-  ok(now.status === 0 && /^ran npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none$/m.test(now.out) && /^ran npm audit signatures$/m.test(now.out), "and under npm 11.14.0, which reads them all, it installs and checks the signatures", now.out);
+  const now = under("11.15.0");
+  ok(now.status === 0 && /^ran npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none$/m.test(now.out) && /^ran npm audit signatures$/m.test(now.out), "and under npm 11.15.0, which reads them all, it installs and checks the signatures", now.out);
 }
 
 done("the one script of the core's checks");
