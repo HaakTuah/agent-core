@@ -112,22 +112,23 @@ function importsOther(text, f, { known, folders, found }, pace) {
 // Whether the text of the file `f` compiles C# the reader never reads (#675). A tag (in any case) of what may bring it
 // in by its own means: a <Target>, which may hold any task, an <Output> into any item or a write of files the SDK's
 // default **/*.cs then takes; a <UsingTask>, which may replace the compiler's; a property that hands the compiler a
-// response file or names a compiler of its own; or an item the SDK or a package writes C# from or compiles with
+// response file or names its own compiler; or an item the SDK or a package writes C# from or compiles with
 // (<Analyzer>, <TestingPlatformBuilderHook>, and an <AssemblyAttribute> but one of ASSEMBLY_STRINGS with no metadata
 // that writes its arguments as code, "_IsLiteral" or "_TypeName", anywhere in the file). Or a <Compile> item whose Include names, in a part
 // split at ";" and trimmed, what MSBuild expands ("$", "@", "%", "&"), a path that leads, from `f`'s folder, outside
 // the repository or to a file `cs` (the files of C# read) does not hold, or a wildcard whose path climbs out of the
-// repository anywhere along it or whose name ends other than in ".cs"; any part at all in a file but a .csproj or the
+// repository anywhere or whose name ends other than in ".cs"; any part at all in a file but a .csproj or the
 // .user beside it, since MSBuild reads an item's path from the project's folder, not the imported file's; or such a tag
-// that is no run of attributes. A wildcard of .cs inside reads only files the checkout holds, as the SDK's own default
-// does where no target runs; a Remove or an Update alone brings in nothing. `pace` is asked for each part.
+// not a run of attributes. A wildcard of .cs inside reads only files the checkout holds, as the SDK's own default
+// does where no target runs; a Remove or an Update alone brings in nothing. `pace` is asked for each item and part.
 const BY_ITS_OWN = /<(?:Target|UsingTask|CompilerResponseFile|CscToolPath|CscToolExe|Analyzer|TestingPlatformBuilderHook)\b/iu;
 // The assembly's attributes of the framework that the SDK writes with strings alone, which reach no type of the
-// repository (InternalsVisibleTo, a test project's commonest; CLSCompliant), in lower case.
+// repository (InternalsVisibleTo, a test project's commonest; CLSCompliant), lower-cased.
 const ASSEMBLY_STRINGS = new Set(["system.runtime.compilerservices.internalsvisibleto", "system.runtime.compilerservices.internalsvisibletoattribute", "system.clscompliant", "system.clscompliantattribute"]);
 function compilesOther(text, f, cs, pace) {
   if (BY_ITS_OWN.test(text)) return true;
-  for (const m of text.matchAll(/<AssemblyAttribute\b([^<>]*)>/giu)) if (/_(?:IsLiteral|TypeName)/iu.test(text) || !ASSEMBLY_STRINGS.has((attributes(m[1])?.include ?? "").trim().toLowerCase())) return true;
+  const code = /_(?:IsLiteral|TypeName)/iu.test(text);
+  for (const m of text.matchAll(/<AssemblyAttribute\b([^<>]*)>/giu)) { pace(); if (code || !ASSEMBLY_STRINGS.has((attributes(m[1])?.include ?? "").trim().toLowerCase())) return true; }
   const own = /\.csproj(?:\.user)?$/iu.test(f);
   for (const m of text.matchAll(/<Compile\b([^<>]*)>/giu)) {
     const attrs = attributes(m[1]);

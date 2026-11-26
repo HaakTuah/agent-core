@@ -12,7 +12,7 @@
 import fs from "node:fs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 import { csharpReach } from "../scripts/select-csharp.mjs";
-import { heldBeside } from "../scripts/select-csharp-project.mjs";
+import { heldBeside, msbuildUsings } from "../scripts/select-csharp-project.mjs";
 import { git } from "../scripts/select-passed.mjs";
 import { done, ok, same } from "./select-csharp-test.mjs";
 
@@ -82,6 +82,10 @@ for (const [item, what] of [
   const r = reach(item);
   ok(r.unsure.size === 0 && r.links.get("tests/T.cs")?.has("lib/Rules.cs"), `where a project brings in ${what}, no file is unsure and the links stand`, JSON.stringify([...r.unsure]));
 }
+
+let paced = 0;
+const attrs = msbuildUsings([["src/App.csproj", `<Project><ItemGroup>${"<AssemblyAttribute Include=\"System.CLSCompliant\" />".repeat(1000)}</ItemGroup></Project>`]], () => paced++);
+ok(attrs !== null && paced >= 1000, "the budget is asked for each assembly's attribute, which leaves the links standing", `${paced} ${attrs === null}`);
 
 // (a link and a submodule git holds, in a scratch repository, written to the index alone, as on a system with no
 // links: a wildcard inside, the SDK's default among them, would follow the link out or take the submodule's files)
