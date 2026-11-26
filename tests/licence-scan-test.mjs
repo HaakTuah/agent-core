@@ -94,6 +94,7 @@ for (const [what, change, why] of [
   ["a lockfile the config does not name", write("tools/package-lock.json", JSON.stringify({ lockfileVersion: 3, packages: { "": {} } })), /"lockfiles" does not name/],
   ...["tools/Package-Lock.json", "tools/NPM-SHRINKWRAP.JSON"].map((f) => [`a lockfile the config does not name, written ${f.split("/")[1]}`, write(f, JSON.stringify({ lockfileVersion: 3, packages: { "": {} } })), /"lockfiles" does not name/]),
   ["a package.json with dependencies no named lockfile installs", write("tools/package.json", JSON.stringify({ devDependencies: { "mossgrip-lint": "1.0.0" } })), /no lockfile the config names installs/],
+  ["a core-manifest.md at the root of the core's own repository, where no copy stands (#1350)", (dir) => { write("core-manifest.md", "# Core manifest\n")(dir); write("scripts/core-path.mjs", "export {};\n")(dir); write("core/scripts/moss.min.js", "/*! moss v1 */\n")(dir); }, /core\/scripts\/moss\.min\.js/],
   ["third-party code copied into what ships", write("site/lib/mossgrip.min.js", "/*! mossgrip v1 | MIT */\nvar m=1;\n"), /licence notice\) is not in/],
   ["third-party code that ships, audited as a tool", (dir) => { write("site/lib/mossgrip.min.js", "/*! mossgrip v1 | MIT */\nvar m=1;\n")(dir); entry({ name: "site/lib/mossgrip.min.js", licence: "MIT" })(dir); }, /reaches users/],
   ["third-party code copied into a tool", write("scripts/lichen.mjs", "// SPDX-License-Identifier: MIT\nexport const l = 1;\n"), /licence notice/],
