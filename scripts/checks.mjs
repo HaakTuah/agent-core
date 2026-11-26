@@ -218,7 +218,7 @@ const node = (coreAt, script, args, opts) => run(process.execPath, [`${coreAt}sc
 const shown = { stdio: ["ignore", "inherit", "inherit"] };
 // (Windows' shell, by the path the system names, never a cmd.exe the checked-out folder holds)
 const COMSPEC = process.env.ComSpec || "cmd.exe";
-const passed = (r, cwd) => begun(r, "The package manager", cwd, "install npm beside Node (scripts/node.sh brings Node alone), then run this check again.");
+const passed = (r, cwd) => begun(r, "The package manager", cwd, "install npm beside Node (the script that fetches Node brings Node alone), then run this check again.");
 // (only under an npm that reads each setting that keeps the install to the registry: an older one, npm 10 that Node 22
 // brings among them, ignores them without a word and would fetch any git, web or file source the lock file names; #704)
 const ALLOWS = ["allow-git", "allow-remote", "allow-file"];
