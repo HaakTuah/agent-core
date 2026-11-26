@@ -1,4 +1,4 @@
-// The step of setup/sync-notes/820-the-pointer-check-reads-the-names-in-the-descriptions.md, which steps.mjs, beside this
+// The step of setup/sync-notes/825-the-pointer-check-reads-the-names-in-the-descriptions.md, which steps.mjs, beside this
 // folder, loads with the rest in the order of their names.
 import fs from "node:fs";
 import path from "node:path";
@@ -16,7 +16,7 @@ const pointers = (p, args = []) => {
   return spawnSync(process.execPath, [at, ...args], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28, env: { ...process.env, POINTERS_BASE: "" } });
 };
 
-export default { lead: "23 November 2026, the pointer check reads the names in the descriptions", cost: COST.config,
+export default { lead: "26 November 2026, the pointer check reads the names in the descriptions", cost: COST.config,
   // (the list stands and reads, or nothing is left to list; a run that never reached its verdict read nothing)
   check: p => {
     const text = p.read(LIST);

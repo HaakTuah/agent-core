@@ -1,4 +1,4 @@
-// The stage of scripts/steps/820-the-pointer-check-reads-the-names-in-the-descriptions.mjs: how a project that missed
+// The stage of scripts/steps/825-the-pointer-check-reads-the-names-in-the-descriptions.mjs: how a project that missed
 // that step holds it, and its mend as the step words it. scripts/steps-stage.mjs loads it, in the order of the names.
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
