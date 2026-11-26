@@ -4,7 +4,7 @@
 // network (floor rule 8: no live call, no real package): what a requirements file in PyPI's lock form holds and what PyPI
 // says. The check run on a project whose licence config names one under "pypi" is lookup-run-test.mjs's. Run: node
 // tests/lookup-pypi-test.mjs
-import { lookUp, YOUNG } from "../scripts/lookup.mjs";
+import { lookUp, newPackages, YOUNG } from "../scripts/lookup.mjs";
 import { pep440, pypiPackages } from "../scripts/lookup-pypi.mjs";
 import { NOW, ago } from "../scripts/lookup-stage.mjs";
 import { mended } from "../scripts/mend.mjs";
@@ -165,6 +165,9 @@ for (const [what, hashes] of [["a hash PyPI lists for no file of it", [sha("a"),
 r = await one(pkg("tidy-moss-format", { hashes: ["b", "c", "d", "e"].map(sha) }));
 ok(r.failures.length === 1 && r.failures[0].startsWith("requirements.txt: tidy-moss-format@1.1.0: 4 of the 4 hashes") && /and more\) PyPI lists/u.test(r.failures[0]), `many such hashes are shown three at most (${r.failures})`);
 answers["https://pypi.org/pypi/digestless-moss/json"] = { status: 200, json: doc("digestless-moss", ago(400), { releases: { "1.1.0": [file("digestless-moss", "1.1.0", ago(400), { digests: { md5: "0".repeat(32) } })] } }) };
+// (a package new in two files of the pull request is asked of once, and the hashes of each file held to PyPI's list)
+r = await lookUp(newPackages([["requirements.txt", [pkg("tidy-moss-format", { hashes: [sha("a")] })]], ["dev.txt", [pkg("tidy-moss-format", { direct: false, hashes: [sha("f")] })]]], []), { get, now: NOW });
+ok(r.failures.length === 1 && r.failures[0].startsWith("dev.txt: tidy-moss-format@1.1.0: 1 of the 1 hash its line names") && r.reports.length === 1, `a hash PyPI does not list fails in each file that names the package new, one file's listed hash covering no other's (${r.failures})`);
 r = await one(pkg("digestless-moss", { hashes: [sha("a")] }));
 ok(r.failures.length === 1 && /PyPI lists for no file of version 1\.1\.0/u.test(r.failures[0]), `where PyPI lists no sha256 for the version's files, its hashes fail (${r.failures})`);
 

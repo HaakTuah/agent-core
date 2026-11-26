@@ -158,7 +158,7 @@ export async function pypiRegistry(p, get, readRepo) {
   const r = await get(`${PYPI}pypi/${name}/json`);
   if (r.status === 404) return { missing: "the registry answers that it knows no such name" };
   if (r.status !== 200) throw new Error(`it answered ${r.status}`);
-  const facts = pypiFacts(r.json, p.version, readRepo, p.hashes);
+  const facts = pypiFacts(r.json, p.version, readRepo, p.lines ?? [{ lockPath: p.lockPath, version: p.version, hashes: p.hashes }]);
   if (facts.missing) return facts;
   facts.provenance = await provenance(name, facts, get);
   return facts;
@@ -178,23 +178,24 @@ export function pep440(version) {
     local ? `+${local.split(/[-_.]/u).map((x) => (/^\d+$/u.test(x) ? int(x) : x)).join(".")}` : ""].join("");
 }
 
-/** What PyPI's answer `doc` (its JSON of a project) says of the package at `version`, whose lock line names `hashes`:
- *  { first, last, repo, publisher, note, file, failure } or { missing }. */
-export function pypiFacts(doc, version, readRepo, hashes = null) {
+/** What PyPI's answer `doc` (its JSON of a project) says of the package at `version`, each of whose `lines` ({ lockPath,
+ *  version, hashes }, one for each file of the pull request that brings it in) names hashes: { first, last, repo,
+ *  publisher, note, file, failures } or { missing }, `failures` each { lockPath, version, text }. */
+export function pypiFacts(doc, version, readRepo, lines = []) {
   if (!object(doc) || !object(doc.releases)) throw new Error("its answer is no JSON object that lists releases");
   const releases = doc.releases;
   const files = (v) => (Array.isArray(releases[v]) ? releases[v].filter(object) : []);
   const all = Object.keys(releases).flatMap((v) => files(v).map((f) => ({ at: when(f.upload_time_iso_8601), yanked: f.yanked === true }))).filter((f) => !Number.isNaN(f.at));
   if (!all.length) return { missing: "the registry knows the name, and holds no file of it" };
   // (a version as written in the lock file, else the one PyPI keys that PEP 440 holds equal to it)
-  const asked = pep440(version);
-  const key = Object.hasOwn(releases, version) ? version : Object.keys(releases).find((v) => (asked ? pep440(v) === asked : v.toLowerCase() === version.toLowerCase()));
-  const own = key ? files(key) : [];
+  const keyOf = (v) => { const asked = pep440(v); return Object.hasOwn(releases, v) ? v : Object.keys(releases).find((k) => (asked ? pep440(k) === asked : k.toLowerCase() === v.toLowerCase())); };
+  const key = keyOf(version), own = key ? files(key) : [];
   if (!own.length) return { missing: `the registry knows the name, and no file of version ${version.slice(0, 64)} of it` };
   const kept = all.filter((f) => !f.yanked), info = object(doc.info) ? doc.info : {};
   return { first: Math.min(...all.map((f) => f.at)), last: Math.max(...(kept.length ? kept : all).map((f) => f.at)), repo: repoOf(info, readRepo),
     publisher: publisher(doc.ownership, info), note: own.every((f) => f.yanked === true) ? "this version is yanked: PyPI asks that it not be installed" : "", version: key, file: fileOf(own),
-    failure: unlisted(hashes, own, version) };
+    // (each file's line held to the files of its own version: two files of the pull request may name it at two)
+    failures: lines.flatMap((l) => { const k = keyOf(l.version), text = unlisted(l.hashes, k ? files(k) : [], l.version); return text ? [{ lockPath: l.lockPath, version: l.version, text }] : []; }) };
 }
 
 // Where the lock line names a hash that PyPI lists for no file of the version (each file's sha256, its digest as PyPI
