@@ -1,6 +1,7 @@
 // Tests of cutting a core release (release.mjs, with the trial on a real project in release-trial.mjs): the next release and
 // its number, the checks on the commit it would stand on, the full run of the tests, how a copy older than the last two
-// takes one, where a release may be cut, what each ask of a release costs, and the trial's record, which holds the cut.
+// takes one, where a release may be cut and what each ask of a release costs. The trial on a real project and its record,
+// which holds the cut: release-trial-test.mjs.
 // In a scratch repository that stands in for the core, fetched as the scripts fetch the core (which tags are releases and
 // what a sync asks: releases-test.mjs; what a project follows: follows-test.mjs); on Linux and on Windows. Git and Node's own
 // modules only.
@@ -11,8 +12,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
-import { TRIAL, compared, ownCount, trialAt, trialRecord } from "../scripts/release-trial.mjs";
-import { shownAs } from "../scripts/state-report.mjs";
 import { STEPS } from "../scripts/steps.mjs";
 import { NOTICE } from "../scripts/sync-notes.mjs";
 import { scratchCore, victimRepo } from "../scripts/releases-scratch.mjs";
@@ -107,54 +106,9 @@ git(path.join(nested, "core"), "init", "-q");
 ok(!inTheCore(path.join(nested, "core", "scripts", "release.mjs")), "nor is a clone or submodule of the core under a project's core/");
 
 // what a release asks, each with roughly what it costs a project where it is not done yet (steps.mjs)
-const owners = STEPS.find(s => s.owner);
-ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[0].cost}.`) && costed(`- **${owners.lead}.** Done when two.`).includes("(the owner's)")
+const owners = STEPS.find(s => s.owner === true), hosts = STEPS.find(s => typeof s.owner === "function");
+ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[0].cost}.`) && costed(`- **${owners.lead}.** Done when two.`).endsWith("(the owner's).") && costed(`- **${hosts.lead}.** Done when two.`).endsWith("(the owner's in a private repository).")
   && costed("- **No such entry.** Done when three.").includes("unknown") && costed(`${NOTICE}: and so on.`).includes("each entry it sends the session to") && costed("- A line of no form.").includes("unknown"), "each ask of a release says what it costs, the owner's marked so, one with no step or of no form says so, and the notice costs what it sends to");
-
-// the trial on a real project (#1084): a run before the update beside one after it, and its record, which holds the cut
-// where it does not stand for the commit, or where a check passed before and failed after
-{
-  const c = compared({ "a.yml/x": "passed", "a.yml/y": "failed", "a.yml/z": "passed", "a.yml/gone": "failed" }, { "a.yml/x": "passed", "a.yml/y": "failed", "a.yml/z": "failed", "b.yml/new": "failed", "b.yml/more": "passed" });
-  ok(c.passedAfter.join() === "a.yml/x,b.yml/more" && c.failedBoth.join() === "a.yml/y" && c.failedAfter.join() === "a.yml/z,b.yml/new" && c.ranBeforeAlone.join() === "a.yml/gone", "each job is passed, failed both (standing before), or failed after where it passed before or did not run (the update's); one that ran before alone is counted apart");
-  const t = path.join(tmp, "trial");
-  git(tmp, "init", "-q", "-b", "main", t);
-  const commit = (files, msg) => { for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(t, f)), { recursive: true }); fs.writeFileSync(path.join(t, f), text); } git(t, "add", "-A"); git(t, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", msg); return git(t, "rev-parse", "HEAD"); };
-  const read = args => git(t, ...args);
-  const tried = commit({ "a.txt": "1\n" }, "the commit tried");
-  const none = trialAt(tried, read);
-  ok(/has not run for/.test(none.said) && /Mend: try the release on a copy of a project/.test(none.held ?? ""), "with no record, the release says the trial has not run, and the cut is held, saying its mend");
-  const record = r => commit({ [TRIAL]: `${JSON.stringify(r)}\n` }, "the trial's record");
-  const passed = trialRecord(tried, "2026-11-22", [[{ "a.yml/x": "passed", "a.yml/y": "failed" }, { "a.yml/x": "passed", "a.yml/y": "failed" }]]);
-  ok(passed.projects === 1 && passed.passedAfter === 1 && passed.failedBoth === 1 && passed.failedAfter === 0 && passed.ranBeforeAlone === 0 && Object.keys(passed).join() === "commit,day,projects,passedAfter,failedBoth,failedAfter,ranBeforeAlone", "the record holds the commit, the day and counts alone, nothing of the project");
-  let at = record(passed);
-  let r = trialAt(at, read);
-  ok(r.held === null && /in 1 project: 1 check passed after the update, 1 failed before and after \(standing before the release\), 0 passed before and failed after/.test(r.said), "a record of the commit before, which the release changes by the record alone, stands, and one failing both does not hold the cut", r.said);
-  at = commit({ "a.txt": "2\n" }, "more since");
-  r = trialAt(at, read);
-  ok(/changes more than the record since \(a\.txt\)/.test(r.held ?? ""), "a commit that changes more than the record since the commit tried holds the cut", r.held);
-  const later = commit({ "a.txt": "3\n" }, "tried again");
-  at = record(trialRecord(later, "2026-11-23", [[{ "a.yml/x": "passed" }, { "a.yml/x": "failed" }]]));
-  r = trialAt(at, read);
-  ok(/1 check passed before the release and failed after it[\s\S]*Mend: find the release's fault/.test(r.held ?? ""), "a check that passed before and failed after holds the cut, saying its mend", r.held);
-  at = record(trialRecord(later, "2026-11-23", []));
-  r = trialAt(at, read);
-  ok(r.held === null && /No project that takes the core allowed a trial/.test(r.said), "where no project allowed a trial, the release says so, and it is not held");
-  const noForm = [{ commit: later, projects: "one" }, { ...trialRecord(later, "2026-11-23", []), failedAfter: 2 }, { ...trialRecord(later, "2026-11-23", []), day: "<b>soon</b>" }]
-    .map(bad => trialAt(record(bad), read));
-  ok(noForm.every(n => /no form/.test(n.said) && n.held !== null), "a record in no form holds the cut: a count that is no count, one of no project that counts a check, a day of no form");
-  // (a later commit that takes out a file git would read as renamed into the record is still more than the record)
-  commit({ "old.json": `${JSON.stringify({ a: 1, b: 2, c: 3, d: 4, e: 5 }, null, 2)}\n` }, "a file like the record");
-  const like = git(t, "rev-parse", "HEAD");
-  git(t, "rm", "-q", "old.json");
-  at = record({ ...trialRecord(like, "2026-11-23", []) });
-  ok(/changes more than the record since \(old\.json\)/.test(trialAt(at, read).held ?? ""), "a file taken out beside the record is no rename of it: the cut is held", trialAt(at, read).held);
-  const cli = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", "abc"], { encoding: "utf8" });
-  ok(cli.status === 1 && /--trial needs the full SHA/.test(cli.stderr), "--trial with no full SHA writes nothing and says what it needs", cli.stderr);
-  const listed = ["**The projects that take the core** (read 2026-11-22)", `- ${shownAs("o/a", true, false)}: it has no state report yet.`, `- ${shownAs("o/b", true, true)}: from its report of 2026-10: 3.`, `- ${shownAs("x/c", false, false)}: it has no state report yet.`, "- (GitHub's code search gave no answer.)"].join("\n");
-  ok(ownCount(listed) === 2 && ownCount("**The projects that take the core**\n- None found.") === 0, "the owner's projects are counted from what state-report.mjs --projects prints, in shownAs's words: its own public and private, never another owner's, a note or none found");
-  const inCore = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", later, path.join(path.dirname(fileURLToPath(import.meta.url)), "before.json"), path.join(tmp, "after.json")], { encoding: "utf8" });
-  ok(inCore.status === 1 && /lies in the core's own repository/.test(inCore.stderr), "--trial refuses a run's verdicts kept in the core's own repository, where a project's job names could be committed", inCore.stderr);
-}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on cutting a release`);
 process.exitCode = failed ? 1 : 0;

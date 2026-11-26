@@ -9,7 +9,7 @@
 import { readable } from "../scripts/licence-yes.mjs";
 import { installed } from "../scripts/packages.mjs";
 import { keysOf } from "../scripts/schemas.mjs";
-import { actionLists, alongside, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
+import { actionLists, alongside, coreConfig, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
 import { execFileSync } from "node:child_process";
 import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -73,9 +73,31 @@ const ids = new Set(lists.tools);
 ok(["MIT", "(MIT OR GPL-2.0-only)", "GPL-2.0-only WITH Classpath-exception-2.0", "LicenseRef-A AND (MIT OR LGPL-3.0-only)", "LicenseRef-Vendor-EULA"].every((l) => readable(l, ids))
   && ["", "AND", "()", "MIT AND", "(MIT", "MIT)", "MIT OR OR MIT", "MIT WITH", "MIT WITH AND", "WITH x", "MIT MIT", "Some-Words", "LicenseRef-", "LicenseRef-.", "LicenseRef--", "MIT WITH -x", `${"(".repeat(60)}MIT${")".repeat(60)}`, `${"(".repeat(200000)}MIT`, undefined, 7].every((l) => !readable(l, ids)),
   "reads a yes's licence as one whole expression of ids it knows and names the owner gave, and nothing else");
-const lines = actionLists({ ships: [], data: ["mossgrip-data"], accepted: [{ package: "mossgrip-lib@1.0.0", licence: "LGPL-3.0-only", ships: true, yes: "y", notice: "n" }, { package: "@moss/bought@2.1.0", licence: "LicenseRef-Vendor-EULA", ships: false, yes: "y" }, { entry: "Bark pack", licence: "LicenseRef-Vendor-EULA", ships: true, yes: "y" }] });
+const lines = actionLists({ ships: [], data: ["mossgrip-data"], accepted: [{ package: "mossgrip-lib@1.0.0", licence: "LGPL-3.0-only", ships: true, yes: "y", notice: "n" }, { package: "@moss/bought@2.1.0", licence: "LicenseRef-Vendor-EULA", ships: false, yes: "y" }, { entry: "Bark pack", licence: "LicenseRef-Vendor-EULA", ships: true, yes: "y" }] }, {});
 ok(lines.length === 2 && lines[0].startsWith("allow-licenses=0BSD,") && lines[1] === "allow-dependencies-licenses=pkg:npm/mossgrip-data,pkg:npm/@moss/bought",
   "the dependency review is told to let through, of what the owner accepted, only a package under a licence it would refuse", lines[1]);
+// a project's sync brings the core's lock files into its pull request, which the dependency review reads under the
+// project's lists: with a config of a project's that names none of the core's data packages, as the starter kit writes
+// it, every package of each lock file the copy holds passes them, by its licence or its name (#1310)
+{
+  const kit = { lockfiles: ["package-lock.json"], ships: ["package.json"] };
+  const [allow, through] = actionLists(kit).map((l) => l.slice(l.indexOf("=") + 1).split(","));
+  const licences = new Set(allow), names = new Set(through);
+  const copied = execFileSync("git", ["archive", "HEAD"], { cwd: new URL("..", import.meta.url), maxBuffer: 1 << 28 }).toString("latin1");
+  const locks = (coreConfig().lockfiles ?? []).filter((f) => copied.includes(`${f}\0`));
+  const refused = locks.flatMap((f) => Object.entries(JSON.parse(readFileSync(new URL(`../${f}`, import.meta.url), "utf8")).packages)
+    .filter(([path, p]) => path && !p.link && !licenceOk(p.license, licences) && !names.has(`pkg:npm/${path.slice(path.lastIndexOf("node_modules/") + 13)}`))
+    .map(([path, p]) => `${f}: ${path} (${p.license})`));
+  ok(locks.includes(".packages/package-lock.json") && !refused.length && !actionLists(kit, {})[1].includes("spdx-exceptions"),
+    "every package of the core's lock files the copy holds passes the dependency review's lists of a project that names none of them, by the core's own config", refused.join("\n"));
+  const dir = scratchDir("core-licences-"), at = join(dir, "licences.json");
+  try {
+    const refuses = (text) => { writeFileSync(at, text); try { coreConfig(at); return ""; } catch (e) { return e.message; } };
+    ok(JSON.stringify(coreConfig(join(dir, "none.json"))) === "{}" && /cannot be read as JSON\. Mend: /u.test(refuses("{")) && /no npm package name.*\. Mend: /u.test(refuses('{"data":["Not A Name"]}'))
+      && /no npm package name/u.test(refuses('{"accepted":[{"package":7}]}')) && refuses('{"data":["x"],"accepted":[{"entry":"e"}]}') === "",
+      "the core's own config is none where it is not there, and refused, saying its mend, where it cannot be read or names what is no package");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
 const npmrc = ["registry=https://mossgrip.example/", "replace-registry-host=always", "@x:registry = https://mossgrip.example/", '"registry"=https://mossgrip.example/', '"replace-registry-host"=always', "${KEY}=https://mossgrip.example/"];
 ok(JSON.stringify(registryOverrides(npmrc.join("\n"))) === JSON.stringify(npmrc) && registryOverrides("fund=false\naudit=false\n# registry=x\n; registry=x\n").length === 0
   && JSON.stringify(registryOverrides("ignore-scripts=true\nregistry=https://mossgrip.example/\n")) === JSON.stringify(["registry=https://mossgrip.example/"])

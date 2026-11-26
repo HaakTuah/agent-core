@@ -15,7 +15,7 @@
 //     with what it pulls in. A fetch it cannot read fails, but npm pack's, which runs nothing it fetches, and another
 //     fetcher's (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone, dotnet tool install, choco, winget,
 //     PowerShell's Invoke-WebRequest and the like): each of those passes
-//     only in a file an entry's "files" names, that entry its hand audit; and where such a file downloads by address
+//     only in a file an entry's "files" names, that entry its hand audit, each fetch that stood at the base reported; and where such a file downloads by address
 //     (curl, wget, PowerShell's) and an entry covering it audits what may be a program (no data, asset, font, service
 //     of GitHub's or the owner's own work), each such entry names its version and the file holds, for each download,
 //     a checksum of its own and a command that checks by one (sha256sum, shasum, Get-FileHash and the like) (floor
@@ -36,9 +36,9 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import { join, posix } from "node:path";
 import { OWNER } from "./core-address.mjs";
-import { DEEPEST, leadsOut, tooDeep } from "./guards.mjs";
+import { DEEPEST, leadsOut, parseBounded, tooDeep } from "./guards.mjs";
 import { commandLines, commands } from "./licence-commands.mjs";
-import { downloads, otherFetch } from "./licence-fetchers.mjs";
+import { downloads, otherFetches } from "./licence-fetchers.mjs";
 import { fetched } from "./licence-npm.mjs";
 import { executable } from "./licence-pages.mjs";
 import { copyOf } from "./core-path.mjs";
@@ -58,7 +58,7 @@ const ASSET = new RegExp(
 const PROSE_FILE = /\.(md|markdown|txt|rst|adoc)$/iu;
 const NOTICE = /\/\*!|@license|SPDX-License-Identifier|Copyright\s+(\(c\)|©|\d{4})|Permission is hereby granted|Licensed under the/iu;
 const EXACT = /^((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*)@(\d+\.\d+\.\d+)$/iu;
-const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
+export const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
 /** A tracked file's text, a link's that of the file it leads to, read as the link's own, where that lies inside the
  *  project; a link that leads out of it, or nowhere, is not read and fails, since what it holds cannot be audited. */
 function trackedText(root, f, fail) {
@@ -92,7 +92,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = [], base = 
 
   for (const key of ["served", "tools", "skip"]) for (const p of settings[key] ?? []) if (p !== "" && !tracked.some((f) => holds(p, f))) fail(`the config's "scan.${key}": ${p} names no tracked file. Mend: correct the path, a folder ending in "/", or take it out`);
   for (const e of entries) entryFaults(c, e);
-  c.locks = lockfiles.map((l) => ({ dir: posix.dirname(l) === "." ? "" : `${posix.dirname(l)}/`, packages: JSON.parse(readFileSync(join(root, l), "utf8")).packages ?? {} }));
+  c.locks = lockfiles.map((l) => ({ dir: posix.dirname(l) === "." ? "" : `${posix.dirname(l)}/`, packages: parseBounded(readFileSync(join(root, l), "utf8")).packages ?? {} }));
   for (const f of files) scanned(c, f);
   return { failures, reports, scanned: files.length };
 }
@@ -146,8 +146,21 @@ function fetches(c, text, f, literal = false) {
   }
   if (/\bnpm_config_(@[\w-]+:)?registry\b|\bnpm_config_replace_registry_host\b|\bnpm_config_(user|global)config\b/iu.test(text)) c.fail(`${f}: it points npm at another registry than npm's, so no audited name can be trusted there. Mend: take that setting out`);
   if (/\bnpm_config_(package_lock|shrinkwrap)\b/iu.test(text)) c.fail(`${f}: it installs without the lockfile, so what it installs is not what the lockfile's check read. Mend: take that setting out`);
-  const other = byHand(c, f) ? undefined : otherFetch(text);
-  if (other) c.fail(`${f}: ${other.trim()} fetches what no entry's "files" says. Mend: name ${f} in the "files" of the entry that audits it`);
+  if (!byHand(c, f)) c.others.push(...otherFetches(text));
+}
+
+// The fetches `found` in the file `f` that the scan cannot read and no entry audits (byKind), each its line with those
+// that run on to it or it runs on to, fail, but where each stood word for word at the pull request's base, unaudited by the base's own
+// audit, which are reported (AGENTS.md, "Nothing locks a project": a reader that reads more turns no file red that
+// stood; #1074); with no base, as in a run by hand, they fail. A fetch changed, or added, fails: the base allows what
+// it held, not as many others. A source held in a variable set on another line is not read, as `heldAtBase` reads none.
+function unaudited(c, f, found) {
+  if (!found.length) return;
+  const was = c.base ? atBase(c, f) : null, held = was === null ? [] : byKind({ ...c, entries: baseEntries(c), fail() {}, reports: [] }, f, was);
+  const fresh = found.filter((line) => { const i = held.indexOf(line); if (i < 0) return true; held.splice(i, 1); return false; });
+  const shown = (line) => (line.length > 80 ? `${line.slice(0, 79)}…` : line), mend = `name ${f} in the "files" of the entry that audits it`;
+  if (fresh.length) c.fail(`${f}: ${shown(fresh[0])} fetches what no entry's "files" says. Mend: ${mend}`);
+  else c.reports.push(`${f}: ${shown(found[0])} fetches what no entry's "files" says; it stood so at the pull request's base, so it passes: ${mend}`);
 }
 
 // What is no program a download could fetch: the owner's own work, data, an asset, a font, a service of GitHub's.
@@ -218,15 +231,27 @@ function pinned(c, f, text) {
 function scanned(c, f) {
   if (LOCKFILE.test(f) && !c.lockfiles.includes(f)) c.fail(`${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`);
   const text = c.binary.has(f) ? "" : trackedText(c.root, f, c.fail);
-  const { other, runs } = readAs(c, f, text);
-  if (runs) scanRunning(c, f, text);
-  else if (/\.json[c5]?$/u.test(f) && f !== c.auditPath && !LOCKFILE.test(f)) scanJson(c, f, text);
-  else if (other) scanOther(c, f);
+  unaudited(c, f, byKind(c, f, text));
   pinnedIfRead(c, f, text);
   // (a notice in any file but prose, the notices a project writes itself among them: code copied in, in any language)
   if (!c.binary.has(f) && !PROSE_FILE.test(f) && NOTICE.test(text)) needFile(c, f, "a file carrying a licence notice", { own: false });
   if (ASSET.test(f) || c.binary.has(f)) needFile(c, f, c.binary.has(f) && !ASSET.test(f) ? "a binary file" : "a font, image, sound, video, model or data file");
 }
+
+/** The scan of the file `f`, holding `text`, by what it is (scanned, above): what it fetches by another fetcher that no
+ *  entry of `c` audits by hand, which `unaudited` holds. */
+function byKind(c, f, text) {
+  const { other, runs } = readAs(c, f, text);
+  c.others = [];
+  if (runs) scanRunning(c, f, text);
+  else if (/\.json[c5]?$/u.test(f) && f !== c.auditPath && !LOCKFILE.test(f)) scanJson(c, f, text);
+  else if (other) scanOther(c, f);
+  return c.others;
+}
+/** What the scan reads in the file `f`, holding `text`, as fetched by another fetcher that no entry of `entries` audits
+ *  by hand, and nothing else it says of it: the step that lists what stood so reads it (step-checks-packages.mjs). */
+export const unauditedIn = (settings, entries, auditPath, f, text) =>
+  byKind({ settings, entries, auditPath, binary: new Set(), locks: [], fail() {}, reports: [] }, f, text);
 
 /** How the scan reads the file `f` holding `text` (scanned, above): `other`, in a language it cannot read; `runs`, as
  *  shell, JavaScript or a page. */

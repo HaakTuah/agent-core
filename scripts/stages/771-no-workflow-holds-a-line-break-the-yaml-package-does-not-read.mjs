@@ -1,4 +1,4 @@
-// The stage of scripts/steps/770-no-workflow-holds-a-line-break-the-yaml-package-does-not-read.mjs: how a project that missed that step holds it, and its mend as the step words it.
+// The stage of scripts/steps/771-no-workflow-holds-a-line-break-the-yaml-package-does-not-read.mjs: how a project that missed that step holds it, and its mend as the step words it.
 // scripts/steps-stage.mjs loads it, in the order of the names.
 import fs from "node:fs";
 import { at, write } from "../stage-helpers.mjs";

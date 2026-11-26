@@ -8,8 +8,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { FOLDER, POINTER, entries, notesAt } from "../scripts/sync-notes.mjs";
-import { NOTES, OWN_FILES, RELEASE, asksBetween, fetchCore, jumped, matters, namedReleases, newestRelease, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
+import { STEPS } from "../scripts/steps.mjs";
+import { FOLDER, POINTER, QUIET, entries, notesAt, quiet, quietAt } from "../scripts/sync-notes.mjs";
+import { NOTES, OWN_FILES, RELEASE, asksBetween, asksLeft, fetchCore, inBare, jumped, matters, namedReleases, newestRelease, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
 import { scratchCore, victimRepo } from "../scripts/releases-scratch.mjs";
 
 let failed = 0, count = 0;
@@ -51,6 +52,18 @@ ok(asksBetween("f".repeat(40), c3, dir) === null, "notes that cannot be read giv
   ok(asksBetween(filed, foldered, bare).length === 0, "a sync across the notes' move into a folder asks nothing the file did not hold", asksBetween(filed, foldered, bare).join("\n"));
   ok(asksBetween(filed, gained, bare).join("|") === three && asksBetween(foldered, gained, bare).join("|") === three, "an entry the folder gains is asked, from a commit before the move or after it");
   ok(entries(notesAt(gained, args => git(notes, ...args))).join("|") === [one, three, two].join("|"), "the notes read whole at a commit hold the folder's entries in the order of the files' names");
+  // (#1094: the entries that ask nothing)
+  const quietRev = save({ "scripts/steps/015-third.mjs": `export default { lead: "Third", cost: "x", ${QUIET}, unread: "-" };\n`, "scripts/steps/010-first.mjs": "export default { lead: \"First\", cost: \"x\", unread: \"\" };\n" });
+  const run = args => inBare(bare, args);
+  fetchCore(bare, notes);
+  ok([...quietAt(quietRev, run)].join("|") === three && !quietAt(gained, run).size && !quietAt("f".repeat(40), run).size, "the entries that ask nothing are those whose step says so", [...quietAt(quietRev, run)].join("|"));
+  ok(quiet(`export default { lead: "T", ${QUIET} };`) && quiet(`export default {\n  lead: "T",\n  ${QUIET},\n};`) && !quiet(`// (it once said ${QUIET})\nexport default { lead: "T", check };`) && !quiet(`export default { lead: "T", check }, // ${QUIET}`) && !quiet(`export default { unread: "it ${QUIET}" };`),
+    "a step asks nothing by its field, never by a comment or another field");
+  const left = asksLeft(filed, quietRev, bare);
+  ok(!left.asks.length && left.quiet === 1 && asksLeft(filed, gained, bare).asks.join("|") === three && asksLeft("f".repeat(40), quietRev, bare) === null, "a sync's report leaves out and counts the quiet entries; unread notes give no all-clear", JSON.stringify(left));
+  const sd = new URL("../scripts/steps/", import.meta.url), stepFiles = fs.readdirSync(sd).filter(f => f.endsWith(".mjs")).sort();
+  const wrong = STEPS.filter((st, k) => ![undefined, "nothing"].includes(st.asks) || (st.asks === "nothing") !== quiet(fs.readFileSync(new URL(stepFiles[k], sd), "utf8")) || (st.asks && (st.check || st.write)));
+  ok(STEPS.filter(st => st.asks).length >= 9 && !wrong.length, `each step that asks nothing says \`${QUIET}\`, with no check or writer`, wrong.map(st => st.lead).join("\n"));
   // (a copy older than the folder syncs with its own script, whose reader took the lines a diff of the file alone
   // added: across the move it reads the notice the core's file holds, which sends the session to the folder)
   const notice = entries(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", NOTES), "utf8"));

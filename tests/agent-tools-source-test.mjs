@@ -5,6 +5,7 @@
 // share.
 //
 //   node tests/agent-tools-source-test.mjs
+import { fetchesMain } from "../scripts/hook-source.mjs";
 import { run, pr, project, script, listing, withHook, entry, TREE_HOOK, NOT_KIT, MAIN_HOOK, kitCommand, KIT_HOOK, withSetting, KIT, front, HOOKS, asserting } from "../scripts/agent-tools-scratch.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
 
@@ -87,4 +88,26 @@ for (const body of ["# c\n> ```!\nbash x.sh\n```\n", "# c\n````!\nbash x.sh\n```
 fails(run(pr(project({ ...script, ...listing(SK), ".claude/skills/s/SKILL.md": "# s\n" }), { ".claude/skills/s/SKILL.md": "---\nname: s\nallowed-tools: Bash(*)\n---\n# s\n" })), "a skill's tools it lets run without asking fail as a setting", NOKIT);
 }
 
+// (whether a command fetches a file from main, in any form, read from its words: what its entry's mark follows; #1273)
+ok([MAIN_HOOK, KIT_HOOK, `bash -c 'git -C "$CLAUDE_PROJECT_DIR" show "refs/remotes/origin/main:scripts/a.sh" | bash'`, "f=$(git --no-pager show refs/remotes/origin/main:a.sh) && bash -c \"$f\"",
+  "git show refs/remotes/origin/main:.claude/hooks/format.sh | bash"].every(fetchesMain)
+  && ![TREE_HOOK, "git show HEAD:scripts/a.sh | bash", "git show refs/remotes/origin/main | bash", "echo show refs/remotes/origin/main:a.sh; bash a.sh", "git log; show refs/remotes/origin/main:a.sh",
+    // (the fallback reviewer's: git's words in an echo or a comment, a path git reads from the folder it runs in, and
+    // the file fetched only to be thrown away while the working tree's copy runs)
+    "echo git show refs/remotes/origin/main:a.sh; bash a.sh", "bash a.sh # git show refs/remotes/origin/main:a.sh",
+    "echo do git show refs/remotes/origin/main:a.sh; bash a.sh", "echo then git show refs/remotes/origin/main:a.sh; bash a.sh",
+    "git show refs/remotes/origin/main:./a.sh | bash", "git show refs/remotes/origin/main:../a.sh | bash",
+    "bash -c 'git show refs/remotes/origin/main:scripts/format.sh >/dev/null; bash scripts/format.sh'",
+    'git show "refs/remotes/origin/main:a.sh" >/dev/null; bash a.sh', "git show refs/remotes/origin/main:a.sh &>/dev/null; bash a.sh",
+    "git show refs/remotes/origin/main:a.sh 1>/dev/null; bash a.sh",
+    // (past the length a hook's command takes, read as fetching nothing, the safe mark, and at once; and variables
+    // set in a run with no git after them, which this suite would never finish where they split more than one way)
+    `git show refs/remotes/origin/main:a.sh | bash # ${"x".repeat(5000)}`, `${"a=b".repeat(40)}!`,
+    `bash -c 'X=${"a=b".repeat(40)}'`].some(fetchesMain),
+  "a command that has git show a file of the remote's main is read as fetching from main, whatever its form, a path under a dot folder too; one that shows another ref, no file, no git's, git's words after an echo's then or do, a path from the folder it runs in, output sent to a file right after the path, a command past the length a hook's takes, or variables set with no git after them, is not");
+// (the forms a hook written by hand takes: git on a line of its own, in a group, after then or exec, or after variables)
+ok(["cd x\ngit show refs/remotes/origin/main:a.sh | bash", "{ git show refs/remotes/origin/main:a.sh; } | bash",
+  "if true; then git show refs/remotes/origin/main:a.sh | bash; fi", "exec git show refs/remotes/origin/main:a.sh | bash",
+  "GIT_PAGER=cat git show refs/remotes/origin/main:a.sh | bash"].every(fetchesMain),
+  "git where a command starts, on a later line, in a group, after then or exec or variables set before it, is read as fetching from main");
 done("where each hook's command comes from");

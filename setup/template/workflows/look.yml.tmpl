@@ -18,11 +18,11 @@ permissions:
 jobs:
   look:
     permissions:
-      contents: read
-      issues: write
-      pull-requests: read
-      checks: read
-      statuses: read
+      contents: read # the default branch's files, which the steps and the look read
+      issues: write # the look's issues and its record, and the labels of the core's list it makes (#1092)
+      pull-requests: read # the pull requests that stand idle, and the late review findings
+      checks: read # the checks failed on the default branch
+      statuses: read # the statuses on the default branch's newest commit
     uses: {{core}}/.github/workflows/look.yml@{{pin}}
     secrets:
       PERSONAL_TERMS: ${{ secrets.PERSONAL_TERMS }}

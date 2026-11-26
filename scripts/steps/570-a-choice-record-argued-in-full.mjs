@@ -2,4 +2,4 @@
 // of their names.
 import { COST } from "../step-checks.mjs";
 
-export default { lead: "17 November 2026, a choice record argued in full", cost: COST.check, held: "the choice records' check" };
+export default { lead: "17 November 2026, a choice record argued in full", cost: COST.check, asks: "nothing", held: "the choice records' check" };

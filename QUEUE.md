@@ -7,20 +7,19 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #1083, with #1095, point 1 | rule builder; floor rule 8 | |
+| #1295, #1348 | builder; release 7, one PR each | |
+| #1358, #1349 to #1352 | builder; release 8, one PR each | release 7's cut |
+| #1334 | rule builder; release 8 | release 7's cut |
 | #1093, with #1090 | rule builder | |
-| #1092 | rule builder | #1091 |
-| #1094 | rule builder | #1092 |
 | #1095, points 2 to 6 | rule builder | #1094 |
-| #1107, #1108 | rule builder; one PR each | |
-| #1134 | rule builder; release 6; the floor (rule 3), `tasks/reviews.md`, the review guidelines, `tools/claude.md`, one PR or more | #1087 (the auditor's start, one at a time) |
-| #1136 to #1140 | builder; release 7, one PR each | release 6's cut |
-| #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 7, one PR each | release 6's cut |
-| #1123 | rule builder; release 7 | release 6's cut; #974, #1060 (`roles/adviser.md`) |
-| #1112, #1074, #1073, #1098, #1133 | builder; release 7, one PR each | release 6's cut |
-| #1142 | rule builder; release 7; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md` | release 6's cut |
-| #1180, #1181, #1185 | rule builder; release 7, one PR each | release 6's cut |
-| #1182 | rule builder; release 7 | #1134 |
+| #1136 to #1140 | builder; release 8, one PR each | release 7's cut |
+| #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 8, one PR each | release 7's cut |
+| #1123 | rule builder; release 8 | #974, #1060 (`roles/adviser.md`); release 7's cut |
+| #1073, #1098, #1133, #1356 | builder; release 8, one PR each | release 7's cut |
+| #1142 | rule builder; release 8; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md` | release 7's cut |
+| #1180, #1181 | rule builder; release 8, one PR each | release 7's cut |
+| #1182 | rule builder; release 8 | release 7's cut |
+| #1202 | rule builder; release 8; `AGENTS.md` and what every session here reads at its start | #1046 and #1052 (`AGENTS.md`, one at a time); release 7's cut |
 | #810 | the orchestrator | the batch's end |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
@@ -55,6 +54,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1046 | rule builder; #767's third kind, `AGENTS.md` | |
 | #1051 | rule builder; each pull request records its own cost | |
 | #1052 | rule builder; `AGENTS.md`, the workflow tries its own settings | #1051 (its point 6); #1046 (`AGENTS.md`, one at a time) |
+| #1185 | rule builder; release 8 | #1052 (its trial of when a builder hands over); release 7's cut |
 | #1060 | rule builder; `roles/adviser.md` | #1052 (its record holds it in part); #974 (`roles/adviser.md`, one at a time) |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
@@ -64,7 +64,7 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #732, #550, #765, #809, #552 | builder; one PR each; #732 a faster check, #550 a case a PR | |
+| #732, #550, #765, #552 | builder; one PR each; #732 a faster check, #550 a case a PR | |
 | #553 | builder | #552 |
 | #554 | builder | #553 |
 | #555 | builder | #534's tools, and #554 |
@@ -72,7 +72,7 @@ They read and change no rule.
 | #557 | builder | #556 |
 | #558 | builder | #557 |
 | #895, #931, #884, #852, #860, #857, #685, #937, #958, #1017 | builder; one PR each; #895 a test split, #1017 a split, its meaning kept; `tests.yml` naming each split's new suite | |
-| #1064 | builder; splits weighed, each its meaning kept | #772 (`scripts/check.mjs`, `scripts/checks.mjs`, one at a time) |
+| #1064 | builder; splits weighed, each its meaning kept | |
 
 ## Not taken up
 

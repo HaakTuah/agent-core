@@ -4,5 +4,5 @@
     "check: scripts/security-review.mjs, in part",
     "check: GitHub's ruleset on the default branch, in part"
   ],
-  "behind": [130]
+  "behind": [130, "#1134.2"]
 }

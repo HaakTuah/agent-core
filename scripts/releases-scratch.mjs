@@ -1,4 +1,4 @@
-// What the tests of the core's releases (releases-test.mjs, release-test.mjs) stand on: a scratch repository that stands
+// What the tests of the core's releases (releases-test.mjs, release-test.mjs, release-trial-test.mjs) stand on: a scratch repository that stands
 // in for the core (main with four commits, a side branch), with git's own variables that point at another repository left
 // out of the process and git finding no bare repository by itself (as Git 3.0 has it by default), and a project's own
 // repository to try the scripts' guard against those variables. Tests only. Git and Node's own modules only.
