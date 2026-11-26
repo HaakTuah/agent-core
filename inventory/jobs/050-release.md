@@ -1,4 +1,4 @@
-- `scripts/release.mjs`, `scripts/release-trial.mjs`, `scripts/trial-sync.mjs`, `scripts/trial-draft.mjs`, `scripts/trial-draft-checks.mjs`, `scripts/trial-draft-record.mjs`, `.github/workflows/release.yml`: cuts
+- `scripts/release.mjs`, `scripts/release-trial.mjs`, `scripts/trial-sync.mjs`, `scripts/trial-draft.mjs`, `scripts/trial-draft-checks.mjs`, `scripts/trial-draft-record.mjs`, `.github/workflows/release.yml`, `tests/release-test.mjs`, `tests/release-trial-test.mjs`: cuts
   `release-N` on `main`'s newest commit once every check passed, its own run of the upgrade test on Windows, which it
   also runs once a day, cutting nothing, and the trial on a real project, whose record `release-trial.mjs` writes and
   reads, with the sync's reading against the commit tried that `trial-sync.mjs` reads (#1261), and the checks of the

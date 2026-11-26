@@ -664,6 +664,25 @@ if (process.platform !== "win32") { // (a link is made without a privilege only 
   fs.renameSync(path.join(dir, "elsewhere.json"), path.join(dir, "checks/shape-baseline.json"));
 }
 
+// (the config itself is read only inside the project, wherever the manifest's row names it: a path that leads out of
+// it, or a link at the file or at a folder on its way, fails with its mend, and nothing of what it leads to is read)
+{
+  const away = scratchDir("shape-away-"), mark = `made-up-${process.pid}`, rules = path.join(dir, "core-manifest.md");
+  fs.writeFileSync(path.join(away, "x.json"), JSON.stringify({ baseline: `${mark}.json`, code: [mark], [mark]: 1 }));
+  const kept = fs.existsSync(rules) ? fs.readFileSync(rules, "utf8") : null, named = at => put("core-manifest.md", `| *shape check* | \`${at}\` |\n`);
+  const refusedAs = (at, said) => { named(at); const x = run([]); return x.status === 1 && mended(x.out) && said.test(x.out) && !x.out.includes(mark) ? "" : x.out; };
+  const cases = [[path.relative(dir, path.join(away, "x.json")).split(path.sep).join("/"), /lies outside the project/u], ["checks/../../x.json", /lies outside the project/u]];
+  if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)
+    fs.symlinkSync(path.join(away, "x.json"), path.join(dir, "checks/linked.json"));
+    fs.symlinkSync(away, path.join(dir, "away"));
+    cases.push(["checks/linked.json", /reached through a link \(checks\/linked\.json\)/u], ["away/x.json", /reached through a link \(away\)/u]);
+  }
+  const missed = cases.map(([at, said]) => [at, refusedAs(at, said)]).filter(([, out]) => out !== "");
+  ok(missed.length === 0, "a config the manifest names outside the project, or through a link at the file or a folder on its way, is refused with its mend, and nothing of what it leads to is read", missed.flat().join("\n"));
+  for (const f of ["checks/linked.json", "away"]) fs.rmSync(path.join(dir, f), { force: true });
+  if (kept === null) fs.rmSync(rules); else fs.writeFileSync(rules, kept);
+}
+
 // (an entry an earlier pull request mended and left listed lists nothing in its place, --write told the base: #751's
 // fifth round)
 {

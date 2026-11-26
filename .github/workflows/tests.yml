@@ -439,6 +439,9 @@ jobs:
       - name: The rules' pruning, when it is due and what it lists
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pruning-test.mjs ')) }}
         run: node tests/pruning-test.mjs
+      - name: The pruning's list of rules with no holder
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pruning-unheld-test.mjs ')) }}
+        run: node tests/pruning-unheld-test.mjs
       - name: The choice records
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-test.mjs ')) }}
         run: node tests/choices-test.mjs
@@ -582,9 +585,18 @@ jobs:
       - name: The core's own inputs, each named with its hostile tests (SECURITY.md, rule 5)
         if: ${{ !cancelled() && contains(matrix.parts, 'second') }}
         run: node tests/own-inputs-test.mjs
-      - name: The core's releases, what a project follows, and cutting one
+      - name: The core's releases, which tags are one, and what a sync between two asks
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/releases-test.mjs ')) }}
         run: node tests/releases-test.mjs
+      - name: What a project follows
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/follows-test.mjs ')) }}
+        run: node tests/follows-test.mjs
+      - name: Cutting a release
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/release-test.mjs ')) }}
+        run: node tests/release-test.mjs
+      - name: The trial of a release on a real project
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/release-trial-test.mjs ')) }}
+        run: node tests/release-trial-test.mjs
       - name: check.mjs as a release's trial runs it, and the trial's record
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-test.mjs ')) }}
         run: node tests/trial-test.mjs
@@ -617,6 +629,9 @@ jobs:
         env:
           PART: ${{ contains(matrix.parts, 'faults') && 'faults' || contains(matrix.parts, 'places') && 'places' || 'all' }}
         run: node tests/core-yml-test.mjs --part "$PART"
+      - name: The stand-in for npm's install, what it may load and run (npm-once.mjs)
+        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/npm-once-test.mjs ')) }}
+        run: node tests/npm-once-test.mjs
       - name: The core's checks from plain git (check.mjs), on scratch projects
         if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/check-test.mjs ')) }}
         run: node tests/check-test.mjs

@@ -294,11 +294,16 @@ ok(unread(notDone(p, inputs)), "steps.mjs: SECURITY.md that is a folder, the wro
   // verdict of no config at all)
   fs.writeFileSync(path.join(outside, "x.json"), JSON.stringify({ ...SHAPE, code: ["."] }));
   // (markup is no path, so the kit's config is read in its place; a path out is read as no config)
-  for (const [m, none] of [["| *shape check* | `<img src=x>.json` |", false], ["| *shape check* | `../outside/x.json` |", true]]) {
+  // (and a link in the project to that config, at the file or at a folder on its way, is read as no config too)
+  const links = process.platform === "win32" ? [] : [["checks/linked.json", path.join(outside, "x.json")], ["away", outside]];
+  for (const [at, to] of links) { fs.symlinkSync(to, path.join(p, at)); gitP("add", "-A"); }
+  for (const [m, none] of [["| *shape check* | `<img src=x>.json` |", false], ["| *shape check* | `../outside/x.json` |", true], ...(links.length ? [["| *shape check* | `checks/linked.json` |", true], ["| *shape check* | `away/x.json` |", true]] : [])]) {
     let thrownBy = null, said = null;
     try { said = named(SHAPE, m); } catch (e) { thrownBy = e; }
     ok(thrownBy === null && /holds no `/u.test(shapeSaid(said)?.why ?? "") === none, `read-nothing.mjs: a manifest that names the shape config as ${m.split("`")[1]} is read with nothing thrown and nothing outside read`);
   }
+  for (const [at] of links) fs.rmSync(path.join(p, at));
+  if (links.length) gitP("add", "-A");
   fs.rmSync(path.join(outside, "x.json"));
   fs.rmSync(path.join(p, shapeAt), { force: true });
   gitP("add", "-A");

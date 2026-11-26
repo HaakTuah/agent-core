@@ -141,7 +141,7 @@ function ownProjects() {
 
 // Of what state-report.mjs --projects prints, how many lines name a project of the owner's: each project is a line
 // "- <how shownAs names it>: <its counts>.", another owner's named "a project of another owner"; its other lines (a
-// heading, "None found.", a note in brackets) name none. releases-test.mjs holds it to shownAs's words.
+// heading, "None found.", a note in brackets) name none. release-trial-test.mjs holds it to shownAs's words.
 export const ownCount = printed => printed.split("\n").filter(l => /^- (`[^`]+`|a private project of the owner's): /.test(l)).length;
 
 
