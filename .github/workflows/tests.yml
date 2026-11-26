@@ -358,6 +358,9 @@ jobs:
       - name: The queue's reader
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-test.mjs ')) }}
         run: node tests/queue-test.mjs
+      - name: The queue's form, and its check where GitHub cannot be read
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-form-test.mjs ')) }}
+        run: node tests/queue-form-test.mjs
       - name: The core's own measurement
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-cost-test.mjs ')) }}
         run: node tests/core-cost-test.mjs
