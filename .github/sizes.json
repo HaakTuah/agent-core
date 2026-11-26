@@ -64,7 +64,7 @@
       "why": "The shape check's one baseline (scripts/shape.mjs), which it reads whole and a session reads by the id of the one entry it adds or takes out, found by its name; main stood past the mark at 20,580 bytes with no entry here when #582 added its test's."
     },
     ".github/workflows/tests.yml": {
-      "mark": 75194,
+      "mark": 94413,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {
