@@ -213,7 +213,7 @@ export function writeBreaks(p, busy) {
 // step reads, as the step's check finds it there, written as the file it now is; a copies config that reads the old
 // folder alone given the new folders' patterns beside it; the size marks' "read" (marksMoved); and the manifest's
 // "Paths:" line, where it is word for word the one the starter kit of releases 1 to 5 wrote, written as the kit writes
-// it now. Each path is written on its own (#1248, point 5): one whose move is no exact one (it leads to a folder, or a
+// it now. Each path is written on its own (#1248, point 5): one whose move is no exact one (a
 // rule of its file stands elsewhere since and the line does not name that rule by its lead) is left as it stands for
 // the step's mend, and so is a "Paths:" line of the project's own words. Never written: the core's part, the one
 // process's, or a file whose part cannot be told apart; nor a file the writer cannot tell is the project's own (sure).
@@ -245,7 +245,7 @@ export function writeMoved(p, busy) {
 // already makes left out.
 function movedIn(text, map, oldPath, part = []) {
   if (!oldPath) return text;
-  const apart = moved.apart(), exact = old => !map[old].endsWith("/") && !(apart[old]?.length);
+  const apart = moved.apart(), exact = old => !(apart[old]?.length);
   const led = Object.entries(apart).reduce((t, [old, parts]) => parts.reduce((u, a) => u.split(`\`core/${old}\`, "${a.lead}"`).join(`\`core/${a.to}\`, "${a.lead}"`), t), text);
   const next = led.replace(oldPath, (all, old) => exact(old) ? `core/${map[old]}` : all);
   if (next === text) return text;

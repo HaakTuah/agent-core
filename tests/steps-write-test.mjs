@@ -133,7 +133,7 @@ for (const l of WHOLE) {
   // written only once .gitattributes says which files a tool writes, and one marked so is left: #1272, point 3)
   fs.mkdirSync(path.join(dir, "notes"));
   fs.mkdirSync(path.join(dir, "gen"));
-  put("notes/design.md", "See `core/modules/git.md`.\n");
+  put("notes/design.md", "See `core/modules/git.md` and `core/floor/topics.md`.\n");
   put("gen/design.md", "See `core/modules/git.md`.\n");
   commit("old paths in a folder no attribute marks");
   r = write();
@@ -153,8 +153,8 @@ for (const l of WHOLE) {
   put(".gitattributes", "* -linguist-generated\ngen/** linguist-generated\n");
   commit("every other file marked as the project's own");
   r = write();
-  ok(read("notes/design.md") === "See `core/roles/shared/work-flow.md`.\n" && read("gen/design.md") === "See `core/modules/git.md`.\n" && !missed(l).length,
-    "  and once a line gives it its value, --write writes the notes' file, the marked one left, and the step reads done", `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
+  ok(read("notes/design.md") === "See `core/roles/shared/work-flow.md` and `core/floor/topics/`.\n" && read("gen/design.md") === "See `core/modules/git.md`.\n" && !missed(l).length,
+    "  and once a line gives it its value, --write writes the notes' file (a pointer to the floor's topics.md, which now leads to a folder, to that folder), the marked one left, and the step reads done", `${r.stdout}${r.stderr}\n---\n${report(notDone(dir))}`);
   back();
 }
 
