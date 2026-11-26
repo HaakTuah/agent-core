@@ -5,15 +5,15 @@
 // holds: tests/trial-draft-record-test.mjs. No call reaches the network, and no process is started. Node's own modules.
 //
 //   node tests/trial-draft-test.mjs
-import { CORE, OWNER } from "../scripts/core-address.mjs";
+import { OWNER } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { draftCounts, readDraft, readNone, repoHash, saidOf } from "../scripts/trial-draft.mjs";
+import { draftCounts, readDraft, readNone, repoHash } from "../scripts/trial-draft.mjs";
+import { saidOf } from "../scripts/trial-draft-checks.mjs";
 import { DRAFT_COUNTS, LINE, draftAnswerOf } from "../scripts/trial-draft-record.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
+import { HEAD, SHA, TRIED, host } from "./trial-draft-host.mjs";
 
 const { ok, done } = tally();
-const SHA = n => String(n).repeat(40);
-const TRIED = SHA("a"), MAIN = SHA("b"), HEAD = SHA("c");
 
 // (each check run and status in its verdict: a job skipped, as on a draft, did not run; one not finished waits)
 const said = saidOf([{ name: "lint", status: "completed", conclusion: "success" }, { name: "skip", status: "completed", conclusion: "skipped" }, { name: "late", status: "in_progress", conclusion: null },
@@ -26,27 +26,6 @@ const counts = draftCounts({ pp: "passed", fp: "failed", pf: "passed", ff: "fail
 ok(Object.keys(counts).join() === DRAFT_COUNTS.join() && Object.values(counts).join() === "1,1,1,1,1,1,1,1,1",
   "passed on both, fixed on the draft, failed on both, failed on the draft where it passed on main, failed and passed on the draft alone, a gate the builder named and a check skipped on the draft, apart where it passed on main, are each counted, and a job of main's alone is not", JSON.stringify(counts));
 
-// (the draft read on a stand-in for the host, each list given page by page)
-const page = (route, key, all) => {
-  const n = Number(/[?&]page=(\d+)/.exec(route)?.[1] ?? 0);
-  return n ? { body: { [key]: all.slice((n - 1) * 100, n * 100), total_count: all.length } } : { why: "no page asked" };
-};
-const host = (over = {}) => route => {
-  const pulls = { state: "open", draft: true, user: { login: OWNER }, head: { sha: HEAD, repo: { id: 41 } }, base: { ref: "main", repo: { id: 41, owner: { login: OWNER }, default_branch: "main" } }, ...over.pull };
-  const draftRuns = over.empty ? (over.empty === "skipped" ? [{ name: "tests", status: "completed", conclusion: "skipped" }] : []) : [{ name: "tests", status: "completed", conclusion: "success" }, ...(over.deployRun ? [{ name: "deploy", status: "completed", conclusion: "skipped" }] : []), ...(over.draftRuns ?? []), { name: "dependency review", status: over.late ? "queued" : "completed", conclusion: over.late ? null : over.skipReview ? "skipped" : "failure" }, ...(over.many ? Array.from({ length: 150 }, (_, i) => ({ name: `job ${i}`, status: "completed", conclusion: "success" })) : [])];
-  if (route === "repos/o/p/pulls/7") return { body: pulls };
-  if (route === "repos/o/p") return { body: { id: 41, owner: { login: over.owner ?? OWNER } } };
-  if (route === "repos/o/p/contents/core-manifest.md") return over.manifest === "unread" ? { why: "GitHub answered 502 (Bad Gateway)" } : over.noCore ? { why: "GitHub answered 404 (Not Found)" } : { body: { content: Buffer.from(over.carried ? `Core: ${CORE}, carried by lib/ under lib/core/\n` : `Core: ${CORE} at ${MAIN}, copied whole under core/\n`).toString("base64") } };
-  if (route === "repos/o/p/branches/agents-stop") return over.stop === "unread" ? { why: "GitHub answered 403 (forbidden)" } : over.stop ? { body: { name: "agents-stop" } } : { why: "GitHub answered 404 (Not Found)" };
-  if (route === `repos/o/p/contents/core-manifest.md?ref=${HEAD}`) return { body: { content: Buffer.from(`Core: ${CORE} at ${over.pin ?? TRIED}, copied whole under core/\n`).toString("base64") } };
-  if (route === "repos/o/p/commits/main") return { body: { sha: MAIN } };
-  if (route.startsWith(`repos/o/p/commits/${MAIN}/check-runs`)) return page(route, "check_runs", [{ name: "tests", status: over.mainLate ? "in_progress" : "completed", conclusion: over.mainLate ? null : "success" }, ...(over.deployRun ? [{ name: "deploy", status: "waiting", conclusion: null }] : []), ...(over.skipReview === "after" ? [{ name: "dependency review", status: "completed", conclusion: "success" }] : []), ...(over.mainRuns ?? [])]);
-  if (route.startsWith(`repos/o/p/commits/${HEAD}/check-runs`)) return over.short ? { body: { check_runs: draftRuns, total_count: draftRuns.length + 1 } } : page(route, "check_runs", draftRuns);
-  if (route.startsWith(`repos/o/p/actions/runs?head_sha=${HEAD}`)) return page(route, "workflow_runs", [...(over.unstarted ? [{ name: "audit", status: "completed", conclusion: "startup_failure" }] : []), ...(over.queued ? [{ name: "review", status: "queued", conclusion: null }] : []), { name: "tests", status: "completed", conclusion: "success" }, ...(over.draftFlows ?? [])]);
-  if (route.startsWith(`repos/o/p/actions/runs?head_sha=${MAIN}`)) return page(route, "workflow_runs", [...(over.unstarted === "both" ? [{ name: "audit", status: "completed", conclusion: "startup_failure" }] : []), ...(over.mainWaits ? [{ name: over.mainWaits, status: "waiting", conclusion: null }] : []), ...(over.mainQueued ? [{ name: "tests", status: "queued", conclusion: null }] : []), ...(over.mainFlows ?? [])]);
-  if (/\/status\?/.test(route)) return page(route, "statuses", []);
-  return { why: "no such route in the stand-in" };
-};
 const read = readDraft("o/p", "7", TRIED, [], host());
 ok(read.answer?.commit === TRIED && read.answer.repo === repoHash(41) && read.answer.draftPassedBoth === 1 && read.answer.draftFailedAlone === 1 && read.failed.join() === "dependency review",
   "a draft pinned to the commit tried is read beside main's newest commit, with its repository's id hashed: the dependency review, on the draft alone, failed", JSON.stringify(read));
@@ -84,15 +63,8 @@ ok(heldJob.answer && pushOnly.answer && mainOnly.answer && heldBeside[0].skipped
   "  on main, a job held for a person, a workflow the draft did not run and a check it does not hold give an answer, a run held for a person beside a finished one of its name read as that one, in the counts and the failures named, while a check the draft skipped still running there, beside a run of its name held for a person or not, a workflow it skipped whole queued there, and a workflow it ran queued beside one held for a person in either order, give none", JSON.stringify([heldJob, pushOnly, mainOnly, heldBeside, lateSkip, twoJobs, flowSkipped, twoRuns]));
 ok(gate.answer?.draftGated === 1 && gate.gated.join() === "dependency review" && gate.failed.length === 0, "  a check the builder named as failing for being a draft is counted apart and named apart", JSON.stringify(gate));
 const gatedSkip = readDraft("o/p", "7", TRIED, ["dependency review"], host({ skipReview: "after" }));
-const jobless = readDraft("o/p", "7", TRIED, [], host({ draftFlows: [{ name: "lint", status: "completed", conclusion: "failure", check_suite_id: 9 }, { name: "build", status: "completed", conclusion: "failure", check_suite_id: 8 }], draftRuns: [{ name: "compile", status: "completed", conclusion: "failure", check_suite: { id: 8 } }] }));
-const twoFlows = readDraft("o/p", "7", TRIED, [], host({ mainFlows: [{ name: "push-ci", status: "completed", conclusion: "failure", check_suite_id: 5 }], mainRuns: [{ name: "test", status: "completed", conclusion: "failure", check_suite: { id: 5 } }], draftFlows: [{ name: "pr-ci", status: "completed", conclusion: "failure", check_suite_id: 6 }], draftRuns: [{ name: "test", status: "completed", conclusion: "failure", check_suite: { id: 6 } }] }));
-const F = (name, id, c = "failure") => ({ name, status: "completed", conclusion: c, check_suite_id: id }), J = (name, id, c) => ({ name, status: "completed", conclusion: c, check_suite: { id } });
-const passedJob = readDraft("o/p", "7", TRIED, [], host({ draftFlows: [F("e2e", 3)], draftRuns: [J("run", 3, "success")] })), clash = readDraft("o/p", "7", TRIED, [], host({ draftFlows: [F("A", 3, "success"), F("A: B", 4, "success")], draftRuns: [J("B: x", 3, "success"), J("x", 4, "success")] }));
-const renamed = [F("CI checks", 6, "success"), null].map(f => readDraft("o/p", "7", TRIED, [], host({ mainFlows: [F("CI", 5, "success")], mainRuns: [J("lint", 5, "success")], draftFlows: f ? [f] : [], draftRuns: [J("lint", 6, "skipped")] })));
-ok(passedJob.failed.includes("e2e (failed outside its jobs)") && /^two checks of \w+ meet on the name "A: B: x"[^]*Mend: give one[^]*read again$/.test(clash.why ?? "") && renamed.every(r => r.answer?.draftSkippedAfter === 1),
-  "  a workflow run failed with its jobs passing is a failed check, two checks on one name give no answer, and a skip after passing on main under a workflow renamed, or tied to none, is not run after", JSON.stringify([passedJob, clash, renamed]));
-ok(gatedSkip.answer?.draftGated === 1 && gatedSkip.answer.draftSkippedAfter === 0 && gatedSkip.gated.join() === "dependency review" && gatedSkip.skippedAfter.length === 0 && jobless.failed.includes("lint (failed outside its jobs)") && jobless.failed.includes("build: compile") && !jobless.failed.includes("build (could not start)") && twoFlows.failed.includes("pr-ci: test") && twoFlows.answer?.draftFailedAlone === 2 && twoFlows.answer.draftFailedBoth === 0,
-  "  so is one it named as skipping after passing on main, and a workflow run on the draft that failed with no job is a failed check, one with jobs failing by them, each job named by its workflow, so a failure of one workflow's job on main stands for no other's", JSON.stringify([gatedSkip, jobless, twoFlows]));
+ok(gatedSkip.answer?.draftGated === 1 && gatedSkip.answer.draftSkippedAfter === 0 && gatedSkip.gated.join() === "dependency review" && gatedSkip.skippedAfter.length === 0,
+  "  so is one it named as skipping after passing on main", JSON.stringify(gatedSkip));
 ok(many.answer?.draftPassedAlone === 150 && unstarted.answer?.draftFailedAlone === 2 && unstarted.failed.includes("audit (could not start)") && unstartedBoth.answer?.draftFailedBoth === 1 && !unstartedBoth.failed.includes("audit (could not start)"),
   "  every page of the checks is read, and a workflow that could not start counts as failed: on the draft alone the release's, on main too standing before", JSON.stringify([many.answer, unstarted.failed, unstartedBoth.answer]));
 

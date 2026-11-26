@@ -10,11 +10,12 @@
 //         owner's account, against the default branch, pinned to the commit, or of a repository another owner's, whose
 //         default branch's manifest pins no copy of this core or could not be read, or behind a stop switch that stands
 //         or cannot be read. A workflow run that failed with no failed job of its own counts as a failed check, and two
-//         checks meeting on one name give none; one skipped on the draft is
-//         counted and named apart, and where it passed on main, not run after, holds the cut. `--gate` names a check its
+//         checks meeting on one name from two workflows or jobs, in one commit or across main's and the draft's, give
+//         none; one skipped on the draft is counted and named apart, and where it passed on main, not run after, holds the cut. `--gate` names a check its
 //         builder read as failing, or skipping after passing on main, only for being a draft (setup/sync-notes/680):
 //         counted apart, holding nothing, named on its own line. A check run is named `<workflow>: <job>` where GitHub ties it
-//         to a workflow run, so the same job name in two workflows is two checks, and `--gate` takes that name.
+//         to a workflow run, so the same job name in two workflows is two checks, and `--gate` takes that name; one GitHub ties
+//         to none (an app's) named as a workflow's job is named `<its name> (no workflow)`.
 //   node scripts/trial-draft.mjs <owner>/<name> none <the commit tried>
 //         where no draft was opened: reads why (another owner's, a stop switch that stands) and prints it as the answer;
 //         none for a repository whose manifest pins no copy of this core or could not be read, or the owner's own
@@ -26,22 +27,11 @@ import { readCore } from "./core-path.mjs";
 import { ghAsk } from "./owner-settings.mjs";
 import { started } from "./started.mjs";
 import { DRAFT_COUNTS, LINE } from "./trial-draft-record.mjs";
+import { alignedOf, checksAt, crossedOf, waitingOf } from "./trial-draft-checks.mjs";
 
 // A short hash of a repository's id on the host, which ties a reading to its project under any name; the line that
 // carries it goes to a file outside every repository alone, and the record keeps none.
 export const repoHash = id => createHash("sha256").update(String(id)).digest("hex").slice(0, 12);
-
-// What each check said, from GitHub's check runs and statuses: skipped, passed, failed or waiting, a name twice its worse.
-const RANK = { skipped: 0, passed: 1, failed: 2, waiting: 3 };
-const RUN = { skipped: "skipped", success: "passed", neutral: "passed", failure: "failed", timed_out: "failed", cancelled: "failed", action_required: "failed", startup_failure: "failed", stale: "failed" };
-const STATUS = { success: "passed", failure: "failed", error: "failed", pending: "waiting" };
-export function saidOf(runs, statuses) {
-  const out = Object.create(null);
-  const put = (name, v) => { if (typeof name === "string" && !(RANK[out[name]] >= RANK[v])) out[name] = v; };
-  for (const r of runs ?? []) put(r?.name, r?.status !== "completed" ? "waiting" : RUN[r?.conclusion] ?? "failed");
-  for (const s of statuses ?? []) put(s?.context, STATUS[s?.state] ?? "failed");
-  return out;
-}
 
 // The counts of the draft's checks beside main's; one run on main alone (a push's job) is not counted, and one skipped
 // on the draft is counted apart, measuring nothing there, as not run after where it passed on main, save one gated.
@@ -54,68 +44,6 @@ export function draftCounts(main, draft, gates = []) {
     else if (then === "passed" || then === "failed") out[now === "passed" ? (then === "passed" ? "draftPassedBoth" : "draftFixedAfter") : (then === "passed" ? "draftFailedAfter" : "draftFailedBoth")]++;
     else out[now === "passed" ? "draftPassedAlone" : "draftFailedAlone"]++;
   }
-  return out;
-}
-
-// Each item of a list GitHub gives page by page at `route` under `key`, all of `total_count`: { items } or { why }.
-function pagesOf(route, key, ask) {
-  const items = [];
-  for (let page = 1; page <= 10; page++) {
-    const got = ask(`${route}${route.includes("?") ? "&" : "?"}per_page=100&page=${page}`);
-    const list = got.body?.[key], total = got.body?.total_count;
-    if (!Array.isArray(list) || !Number.isInteger(total)) return { why: got.why ?? `GitHub gave no ${key}` };
-    items.push(...list);
-    if (items.length >= total || list.length < 100) return items.length >= total ? { items } : { why: `GitHub gave ${items.length} of ${total} ${key}` };
-  }
-  return { why: `more than 1000 ${key}, past what is read` };
-}
-
-// What a commit's checks said, through `ask` (ghAsk's form), every page read: { said, active, flows, unfinished,
-// jobOf }, or { why }. A workflow run of the commit that failed with no failed job of its own (one that could not start
-// among them) is a check that failed, and one not finished waits, each named by its workflow; `active` is `said` with
-// no run GitHub holds for a person (its own status `waiting`, a deploy's reviewer say), `flows` names each workflow run,
-// `unfinished` each one not finished, by its name in `said` and its workflow's, and `jobOf` each check's job.
-function checksAt(repo, sha, ask) {
-  const runs = pagesOf(`repos/${repo}/commits/${sha}/check-runs`, "check_runs", ask);
-  if (runs.why) return runs;
-  const status = pagesOf(`repos/${repo}/commits/${sha}/status`, "statuses", ask);
-  if (status.why) return status;
-  const flows = pagesOf(`repos/${repo}/actions/runs?head_sha=${sha}`, "workflow_runs", ask);
-  if (flows.why) return flows;
-  const label = w => `${w.name ?? "a workflow"} (${w.status !== "completed" ? "workflow" : w.conclusion === "startup_failure" ? "could not start" : "failed outside its jobs"})`;
-  const { jobs, jobOf, clash } = keyed(runs.items, flows.items);
-  if (clash) return { why: `two checks of ${sha.slice(0, 7)} meet on the name "${asText(clash)}", one of them a workflow's job, so neither can be told apart. Mend: give one of them another name in its workflow, and read again` };
-  const ownFailed = w => runs.items.some(r => r?.check_suite?.id != null && r.check_suite.id === w.check_suite_id && RUN[r.conclusion] === "failed");
-  const open = flows.items.filter(w => w?.status !== "completed" || (RUN[w?.conclusion] === "failed" && !ownFailed(w)));
-  const unstarted = open.map(w => ({ name: label(w), status: w.status === "completed" ? "completed" : "queued", conclusion: "failure", person: w.status === "waiting" }));
-  const unfinished = open.filter(w => w.status !== "completed").map(w => ({ name: label(w), flow: w.name }));
-  const notHeld = r => r?.status !== "waiting" && !r?.person;
-  return { said: saidOf([...jobs, ...unstarted], status.items), active: saidOf([...jobs, ...unstarted].filter(notHeld), status.items), flows: new Set(flows.items.map(w => w?.name)), unfinished, jobOf };
-}
-
-// Each check run named by its workflow and job, `<workflow>: <job>`, where GitHub ties its check suite to a workflow
-// run, so a job of one workflow is never read against another's of the same name; by its job alone where none is tied.
-// { jobs, jobOf (each name's job), clash }: `clash` a name two pairs of workflow and job meet on.
-function keyed(runs, flows) {
-  const flowOf = new Map(flows.filter(w => w?.check_suite_id != null).map(w => [w.check_suite_id, w.name]));
-  const pairs = new Map(), jobOf = new Map();
-  let clash = null;
-  const jobs = runs.map(r => {
-    const flow = flowOf.get(r?.check_suite?.id), name = flowOf.has(r?.check_suite?.id) ? `${flow}: ${r?.name}` : r?.name, pair = JSON.stringify([flow ?? null, r?.name]);
-    if (pairs.has(name) && pairs.get(name) !== pair) clash ??= name;
-    pairs.set(name, pair);
-    jobOf.set(name, r?.name);
-    return { ...r, name };
-  });
-  return { jobs, jobOf, clash };
-}
-
-// `main`'s checks with each the draft skipped and `main` names not, a workflow renamed or a job tied to none, read as
-// passed where its job passed on main, so a skip after passing is not lost to a new name.
-function alignedOf(then, now) {
-  const passed = new Set(Object.keys(then.active).filter(n => then.active[n] === "passed").map(n => then.jobOf.get(n) ?? n));
-  const out = { ...then.active };
-  for (const [n, v] of Object.entries(now.said)) if (v === "skipped" && !Object.hasOwn(out, n) && passed.has(now.jobOf.get(n) ?? n)) out[n] = "passed";
   return out;
 }
 
@@ -171,16 +99,6 @@ function notPinned(repo, head, sha, ask) {
   return pin === sha ? null : `the draft's head pins ${pin ? pin.slice(0, 7) : "no copy that could be read"}, not the commit tried, ${sha.slice(0, 7)}. Mend: on its branch, run \`node core/scripts/sync.mjs ${sha}\` (the copy's sync script), commit what it writes, push it, and read again once its checks finish`;
 }
 
-// How many checks wait, as checksAt gives them: [on main, on the draft]. On main only a check the draft holds, skipped
-// there or not, or a workflow it ran too, skipped whole or not, counts, and no run GitHub holds for a person: a deploy
-// waiting for its reviewer measures nothing of the draft, while one still running on main is read before a skip of it
-// is named.
-function waitingOf(then, now) {
-  const flow = n => then.unfinished.filter(u => u.name === n);
-  const counts = ([n, v]) => v === "waiting" && (flow(n).length ? flow(n).some(u => now.flows.has(u.flow)) : Object.hasOwn(now.said, n));
-  return [Object.entries(then.active).filter(counts).length, Object.values(now.said).filter(v => v === "waiting").length];
-}
-
 // The draft `pr` of `repo` read for the commit tried, `sha`, through `ask`: { answer } (the commit, the repository's
 // hash and the counts) with the checks `failed` on it that did not fail on main, those `gated` and those `skipped`
 // (`skippedAfter`, those of them that passed on main), or { why } it gives none, with its mend.
@@ -192,7 +110,7 @@ export function readDraft(repo, pr, sha, gates = [], ask = ghAsk) {
   const main = ask(`repos/${repo}/commits/${encodeURIComponent(base)}`).body?.sha;
   if (!aCommit(main)) return { why: `the newest commit of ${base || "its base"} could not be read. Mend: run it again where gh answers for the owner's account` };
   const [then, now] = [checksAt(repo, main, ask), checksAt(repo, head, ask)];
-  const unread = then.why ?? now.why;
+  const unread = then.why ?? now.why ?? crossedOf(then, now);
   if (unread) return { why: /Mend:/.test(unread) ? unread : `the checks could not be read: ${unread}. Mend: run it again where gh answers for the owner's account` };
   if (!Object.values(now.said).some(v => v !== "skipped")) return { why: "no check has run on the draft yet (a skipped one does not), and a draft with none measures nothing. Mend: read again once its checks have started and finished, without polling" };
   const waiting = waitingOf(then, now);

@@ -591,6 +591,9 @@ jobs:
       - name: The draft of the sync in a release's trial, read beside main's checks
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-draft-test.mjs ')) }}
         run: node tests/trial-draft-test.mjs
+      - name: The draft of the sync in a release's trial, each check named by its workflow and job
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-draft-names-test.mjs ')) }}
+        run: node tests/trial-draft-names-test.mjs
       - name: The record of the drafts in a release's trial, and the cut it holds
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-draft-record-test.mjs ')) }}
         run: node tests/trial-draft-record-test.mjs
