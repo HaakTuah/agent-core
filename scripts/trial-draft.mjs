@@ -46,7 +46,7 @@ export function draftCounts(main, draft, gates = []) {
   const out = Object.fromEntries(DRAFT_COUNTS.map(k => [k, 0]));
   for (const [name, now] of Object.entries(draft)) {
     const then = main[name];
-    if (now === "skipped") out.draftSkipped++;
+    if (now === "skipped") out[then === "passed" ? "draftSkippedAfter" : "draftSkipped"]++;
     else if (now === "failed" && gates.includes(name)) out.draftGated++;
     else if (then === "passed" || then === "failed") out[now === "passed" ? (then === "passed" ? "draftPassedBoth" : "draftFixedAfter") : (then === "passed" ? "draftFailedAfter" : "draftFailedBoth")]++;
     else out[now === "passed" ? "draftPassedAlone" : "draftFailedAlone"]++;
@@ -67,10 +67,11 @@ function pagesOf(route, key, ask) {
   return { why: `more than 1000 ${key}, past what is read` };
 }
 
-// What a commit's checks said, through `ask` (ghAsk's form), every page read: { said, flows, unfinished }, or { why }.
-// A workflow run of the commit that could not start is a check that failed, and one not finished waits, each named by
-// its workflow; `flows` names every workflow run, and `unfinished` each one not finished, by its name in `said`, its
-// workflow's and whether it waits on a person (GitHub's `waiting`, a deploy's reviewer say).
+// What a commit's checks said, through `ask` (ghAsk's form), every page read: { said, person, flows, unfinished }, or
+// { why }. A workflow run of the commit that could not start is a check that failed, and one not finished waits, each
+// named by its workflow; `person` names each check run waiting on a person (GitHub's `waiting`, a deploy's reviewer
+// say), `flows` each workflow that ran and was not skipped whole, and `unfinished` each workflow run not finished, by
+// its name in `said`, its workflow's and whether it waits on a person.
 function checksAt(repo, sha, ask) {
   const runs = pagesOf(`repos/${repo}/commits/${sha}/check-runs`, "check_runs", ask);
   if (runs.why) return runs;
@@ -81,7 +82,8 @@ function checksAt(repo, sha, ask) {
   const label = w => `${w.name ?? "a workflow"} (${w.status === "completed" ? "could not start" : "workflow"})`;
   const unstarted = flows.items.filter(w => w?.conclusion === "startup_failure" || w?.status !== "completed").map(w => ({ name: label(w), status: w.status === "completed" ? "completed" : "queued", conclusion: "failure" }));
   const unfinished = flows.items.filter(w => w?.status !== "completed").map(w => ({ name: label(w), flow: w.name, person: w.status === "waiting" }));
-  return { said: saidOf([...runs.items, ...unstarted], status.items), flows: new Set(flows.items.map(w => w?.name)), unfinished };
+  const person = new Set(runs.items.filter(r => r?.status === "waiting").map(r => r.name));
+  return { said: saidOf([...runs.items, ...unstarted], status.items), person, flows: new Set(flows.items.filter(w => w?.conclusion !== "skipped").map(w => w?.name)), unfinished };
 }
 
 // Whether the stop switch of `repo` stands, through `ask`: true or false, or { why } where it could not be read; GitHub's
@@ -136,12 +138,12 @@ function notPinned(repo, head, sha, ask) {
   return pin === sha ? null : `the draft's head pins ${pin ? pin.slice(0, 7) : "no copy that could be read"}, not the commit tried, ${sha.slice(0, 7)}. Mend: on its branch, run \`node core/scripts/sync.mjs ${sha}\` (the copy's sync script), commit what it writes, push it, and read again once its checks finish`;
 }
 
-// How many checks wait, as checksAt gives them: [on main, on the draft]. On main only a check the draft ran, or a
-// workflow it ran too, waiting on no person counts: a deploy waiting for its reviewer, or one the draft skipped,
-// measures nothing of the draft.
+// How many checks wait, as checksAt gives them: [on main, on the draft]. On main only a check the draft holds, skipped
+// there or not, or a workflow it ran too, counts, and none waiting on a person: a deploy waiting for its reviewer
+// measures nothing of the draft, while one still running on main is read before a skip of it is named.
 function waitingOf(then, now) {
-  const flowOnMain = new Map(then.unfinished.map(u => [u.name, u]));
-  const counts = ([n, v]) => v === "waiting" && (flowOnMain.has(n) ? !flowOnMain.get(n).person && now.flows.has(flowOnMain.get(n).flow) : Object.hasOwn(now.said, n) && now.said[n] !== "skipped");
+  const flow = n => then.unfinished.filter(u => u.name === n);
+  const counts = ([n, v]) => v === "waiting" && !then.person.has(n) && (flow(n).length ? flow(n).some(u => !u.person && now.flows.has(u.flow)) : Object.hasOwn(now.said, n));
   return [Object.entries(then.said).filter(counts).length, Object.values(now.said).filter(v => v === "waiting").length];
 }
 
@@ -166,8 +168,8 @@ export function readDraft(repo, pr, sha, gates = [], ask = ghAsk) {
 }
 
 // Why no draft was opened in `repo`, read through `ask`: { answer } (the commit, the repository's hash and `none`), or
-// { why } it gives none: a repository whose manifest names no copy of this core is no project tried, and a project of
-// the owner's own whose stop switch does not stand takes a draft.
+// { why } it gives none: a repository whose default branch's manifest pins no copy of this core, or could not be read,
+// is no project tried, and a project of the owner's own whose stop switch does not stand takes a draft.
 export function readNone(repo, sha, ask = ghAsk) {
   const got = ask(`repos/${repo}`);
   const owner = got.body?.owner?.login, id = got.body?.id;
