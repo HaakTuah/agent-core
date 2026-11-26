@@ -391,6 +391,9 @@ jobs:
       - name: Where MSBuild's files decide what a file of C# reaches, for the selection
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-csharp-msbuild-test.mjs ')) }}
         run: node tests/select-csharp-msbuild-test.mjs
+      - name: Where a <Compile> item decides what a file of C# reaches, for the selection
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-csharp-compile-test.mjs ')) }}
+        run: node tests/select-csharp-compile-test.mjs
       - name: The pathspecs the selection matches a path against
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-matcher-test.mjs ')) }}
         run: node tests/select-matcher-test.mjs

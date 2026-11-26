@@ -259,8 +259,8 @@ export function csharpReach(texts, pace = () => {}, beside = heldBeside) {
   const held = beside(texts, pace), read = Object.entries(texts).filter(([f]) => MSBUILD.test(f));
   // (an MSBuild text read as UTF-8 that was not, UTF-16 say, holds a NUL or U+FFFD; one whose XML declaration names
   // another encoding, Latin-1 say, MSBuild reads by it, as plainText says of a held one: MSBuild reads what this cannot)
-  const msbuild = held.unknown || read.some(([, t]) => /[\0\uFFFD]/u.test(t) || plainText(Buffer.from(t, "utf8")) === null) ? null : msbuildUsings([...Object.entries(held.msbuild), ...read], pace);
   const all = { ...held.cs, ...texts }, files = Object.keys(all).filter(f => CS.test(f));
+  const msbuild = held.unknown || read.some(([, t]) => /[\0\uFFFD]/u.test(t) || plainText(Buffer.from(t, "utf8")) === null) ? null : msbuildUsings([...Object.entries(held.msbuild), ...read], pace, new Set(files));
   // (where the usings every file holds are untold, every file is unsure)
   if (msbuild === null) return { links, unsure: new Set(files) };
   const facts = new Map(files.map(f => { pace(); return [f, factsOf(readCsharp(all[f]), all[f])]; }));

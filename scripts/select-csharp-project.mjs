@@ -109,6 +109,32 @@ function importsOther(text, f, { known, folders, found }, pace) {
   return false;
 }
 
+// Whether the text of the file `f` compiles a file of C# the reader never reads (#675): a <Compile> item (in any case)
+// whose Include names, in a part split at ";" and trimmed, what MSBuild expands ("$", "@", "%", "&"), a path that
+// leads, from `f`'s folder, outside the repository or to a file `cs` (the files of C# read) does not hold, or a
+// wildcard whose path climbs out of the repository anywhere along it; or a tag that is no run of attributes. A
+// wildcard inside reads only files the checkout holds, as the SDK's own default does; a Remove or an Update alone
+// brings in nothing. `pace` is asked for each part.
+function compilesOther(text, f, cs, pace) {
+  for (const m of text.matchAll(/<Compile\b([^<>]*)>/giu)) {
+    const attrs = attributes(m[1]);
+    if (!attrs) return true;
+    for (const part of (attrs.include ?? "").split(";")) { pace(); if (bringsIn(part.trim().replace(/\\/gu, "/"), f, cs)) return true; }
+  }
+  return false;
+}
+// Whether one part `p` of a <Compile>'s Include, in `f`, brings in a file of C# not among `cs`, as compilesOther says.
+function bringsIn(p, f, cs) {
+  if (!p) return false;
+  if (/[$@%&]/u.test(p)) return true;
+  if (!/[*?]/u.test(p)) { const at = importPath(f, p); return at === null || at === "" || !cs.has(at); }
+  if (p.startsWith("/") || /^[A-Za-z]:/u.test(p)) return true;
+  // (each folder the wildcard's path passes through, its depth below the top counted word by word: none outside)
+  let depth = path.posix.dirname(f) === "." ? 0 : path.posix.dirname(f).split("/").length;
+  for (const w of p.split("/")) if (w === "..") { if (--depth < 0) return true; } else if (w && w !== ".") depth++;
+  return false;
+}
+
 // The folder at or above `d` that holds `name` among `known`, or null: climbed a folder at a time, each a slice of the
 // last, until one whose answer `found` keeps, which then keeps the answer for each folder climbed.
 function climb(d, name, { known, found }, pace) {
@@ -139,15 +165,15 @@ function foldersOf(known, pace) {
 // "@(...)" an item, "%" metadata or an escape, "%2E" a "."; "&" an XML reference, "&#46;" a "."), what the reader
 // cannot tell from its metadata (children), or a target or alias that is no plain name (an array's, a tuple's, a
 // nullable type's), whose value cannot be told here; or null where one imports a file other than a .props or
-// .targets git holds (importsOther). `entries` gives each file's name and text; `pace` is asked for each file and each
-// target; past CHARACTERS of them together, Late.
-export function msbuildUsings(entries, pace) {
+// .targets git holds (importsOther), or compiles a file of C# not among `cs` (compilesOther). `entries` gives each
+// file's name and text; `pace` is asked for each file and each target; past CHARACTERS of them together, Late.
+export function msbuildUsings(entries, pace, cs = new Set()) {
   const out = IMPLICIT.map(target => ({ target, alias: null })), seen = new Set(), n = entries.reduce((sum, [, t]) => sum + t.length, 0);
   const known = new Set(entries.map(([f]) => f)), found = new Map(), folders = foldersOf(known, pace);
   if (n > CHARACTERS) throw tooMuch("the project's MSBuild files", n);
   for (const [f, text] of entries) {
     pace();
-    if (importsOther(text, f, { known, folders, found }, pace)) return null;
+    if (importsOther(text, f, { known, folders, found }, pace) || compilesOther(text, f, cs, pace)) return null;
     for (const m of text.matchAll(/<Using\b([^<>]*)>/giu)) { // (an item type in any case; each try ends at the next "<": linear)
       const attrs = attributes(m[1]), meta = !attrs || m[1].trimEnd().endsWith("/") ? {} : children(text, m.index + m[0].length);
       if (!attrs || meta === null || "update" in attrs) return null; // (an Update changes an item the reader took already)
