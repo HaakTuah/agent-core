@@ -5,6 +5,7 @@
 //
 //   node tests/alerts-test.mjs
 import { DAY, LABELS, bodyOf, reading, tasksOf, titleOf } from "../scripts/alerts.mjs";
+import { quick } from "../scripts/hostile.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -87,12 +88,20 @@ ok(tasksOf([alert(13, "made-up-thing")], [pull("Bump the npm group across 1 dire
   ok(LABELS.includes("bug") && LABELS.includes("queued"), "it is filed as a bug, which needs no line in the queue");
 }
 
+// ---- hostile input (SECURITY.md, rule 5): a pull request's description and title of GitHub's most, within 5 s ----
+{
+  const big = "Bumps " + "[".repeat(65530), many = Array.from({ length: 50 }, (_, i) => alert(100 + i, `made-up-${i}`));
+  const pulls = Array.from({ length: 20 }, () => ({ ...pull("Bump " + "a ".repeat(150) + "from 1 to 2", `dependabot/pip/${"a-".repeat(150)}`), body: big }));
+  ok(quick(() => tasksOf(many, pulls, at).length === 50), "fifty alerts against twenty pull requests whose descriptions are a 65,536-character run of [ answer within 5 s");
+  ok(quick(() => tasksOf(many, [{ ...pull("Bump x", "dependabot/pip/x-1"), body: `Bumps ${"[a](".repeat(16000)}` }], at).length === 50), "and a run of unclosed links too");
+}
+
 // ---- what holds "the owner alone dismisses" and "no session reads secret-scanning alerts", in part ----
 {
-  const { readdirSync, readFileSync, statSync } = await import("node:fs");
+  const { existsSync, readdirSync, readFileSync, statSync } = await import("node:fs");
   const files = dir => readdirSync(dir).flatMap(n => { const p = `${dir}/${n}`; return statSync(p).isDirectory() ? (n === "node_modules" ? [] : files(p)) : [p]; });
   const root = new URL("..", import.meta.url).pathname, mine = "tests/alerts-test.mjs";
-  const all = ["scripts", ".github", ".claude", "setup", "tests"].flatMap(d => files(`${root}${d}`).map(p => p.slice(root.length))).filter(p => p !== mine);
+  const all = ["scripts", ".github", ".claude", ".codex", ".kiro", ".agents", "setup", "tests"].filter(d => existsSync(root + d)).flatMap(d => files(`${root}${d}`).map(p => p.slice(root.length))).filter(p => p !== mine);
   const reads = all.filter(p => /(?:secret|code)-scanning\/alerts/.test(readFileSync(root + p, "utf8")));
   ok(reads.length === 0, "no script, workflow, hook or set-up of the core's reads secret-scanning or code-scanning alerts", reads.join(", "));
   const others = all.filter(p => p !== "scripts/alerts.mjs" && /dependabot\/alerts/.test(readFileSync(root + p, "utf8")));
