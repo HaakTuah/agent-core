@@ -36,26 +36,6 @@ ok(by("tidy-moss-format")?.direct === true && by("tidy-moss-format")?.brings ===
 ok(by("brand-new-moss")?.direct === false && by("brand-new-moss")?.by.join() === "tidy-moss-format" && by("deep-moss")?.by.join() === "tidy-moss-format", "a package another brings names the one the project names that brings it");
 ok(by("own-moss")?.direct === true, "a \"# via\" line that names the project itself, no package of the file, is named by the project");
 ok(by("tidy-moss-format")?.hashes?.join() === `sha256:${"a".repeat(64)},sha256:${"b".repeat(64)}` && by("own-moss")?.hashes?.join() === `sha256:${"e".repeat(64)}`, "each package keeps the hashes its line names, to compare with PyPI's");
-// (#1368, point 2: the "# via" lines are the pull request's own text, so none of them hides a package from GitHub's check)
-const looped = pypiPackages([
-  `self-moss==1.0.0 ${H()}`, "    # via self-moss",
-  `ring-moss==1.0.0 ${H()}`, "    # via loop-moss",
-  `loop-moss==1.0.0 ${H()}`, "    # via ring-moss",
-  `root-moss==1.0.0 ${H()}`, "    # via -r requirements.in",
-  `fed-moss==1.0.0 ${H()}`, "    # via", "    #   feed-moss", "    #   root-moss",
-  `feed-moss==1.0.0 ${H()}`, "    # via fed-moss",
-].join("\n"), "requirements.txt");
-const loop = (name) => looped.find((p) => p.name === name);
-ok(loop("self-moss")?.direct === true && loop("ring-moss")?.direct === true && loop("loop-moss")?.direct === true, `a package "# via" itself, and a cycle that no package the project names leads into, are named by the project (${JSON.stringify(looped.map((p) => [p.name, p.direct]))})`);
-ok(loop("fed-moss")?.direct === false && loop("feed-moss")?.direct === false && loop("fed-moss")?.by.join() === "root-moss" && loop("feed-moss")?.by.join() === "root-moss", `a cycle that a package the project names leads into is brought by it (${JSON.stringify(looped.map((p) => [p.name, p.direct, p.by]))})`);
-// (#1368, point 4: a long run of spaces is read in one pass, never by trying each split of it)
-for (const [what, line] of [["a comment's strip", `plain-moss==1.0.0${" ".repeat(200000)}x`], ["a requirement", `plain-moss${" ".repeat(200000)}x ${H()}`], ["a requirement's version", `plain-moss ==${" ".repeat(200000)}; ${H()}`]]) {
-  const started = performance.now();
-  const message = throws(() => pypiPackages(`${line}\n`, "requirements.txt"));
-  const took = performance.now() - started;
-  ok(message && took < 1000, `${what} on a run of 200,000 spaces is refused in under a second, not after one try for each split of it (${Math.round(took)} ms)`);
-}
-ok(pypiPackages(`plain-moss==1.0.0 ${H()}   # a note # and another\n`, "r.txt")[0]?.hashes.length === 1, "a comment after a requirement is taken off from its first \"#\" after a space, the spaces before it too");
 const plain = pypiPackages(`﻿plain-moss==1.0.0 ${H()}\r\nother-moss==2.0.0 ${H("b")} ${H("c")}\r\n`, "requirements.txt");
 ok(plain.length === 2 && plain.every((p) => p.direct && p.brings === null), `a file with no "# via" line names every package itself, and says nothing of what each brings (${JSON.stringify(plain)})`);
 const uv = pypiPackages([

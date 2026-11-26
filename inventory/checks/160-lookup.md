@@ -1,4 +1,4 @@
-- `scripts/lookup.mjs`, `scripts/lookup-pypi.mjs`, `scripts/reach.mjs`, `scripts/pypi-name.mjs`, `tests/lookup-pypi-test.mjs`, `scripts/week-wait.mjs`, `scripts/lookup-stage.mjs`, `tests/lookup-run-test.mjs`, `tests/lookup-step-test.mjs`, `tests/base-parent-test.mjs`, `scripts/held.mjs`: asks its registry of each package a pull request brings in new, and fails a
+- `scripts/lookup.mjs`, `scripts/lookup-pypi.mjs`, `scripts/reach.mjs`, `scripts/pypi-name.mjs`, `tests/lookup-pypi-test.mjs`, `tests/lookup-pypi-read-test.mjs`, `scripts/week-wait.mjs`, `scripts/lookup-stage.mjs`, `tests/lookup-run-test.mjs`, `tests/lookup-step-test.mjs`, `tests/base-parent-test.mjs`, `scripts/held.mjs`: asks its registry of each package a pull request brings in new, and fails a
   name the registry does not know or one first published days ago, and on PyPI a hash it lists for no file of the
   version (#1368), printing the rest for the review (#488, point 1,
   merged later the same day; PyPI's requirements files in its lock form, #716). *Runs:* any session and the runners, with the registry reachable. *Else:* npm's own `npm
