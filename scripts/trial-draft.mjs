@@ -165,8 +165,8 @@ export function readDraft(repo, pr, sha, gates = [], ask = ghAsk) {
   const waiting = waitingOf(then, now);
   if (waiting[0] + waiting[1]) return { why: `${waiting[1]} checks on the draft and ${waiting[0]} on main's newest commit have not finished. Mend: read again once they finish, without polling` };
   const skipped = Object.keys(now.said).filter(n => now.said[n] === "skipped");
-  const failedHere = Object.entries(now.said).filter(([n, v]) => v === "failed" && then.said[n] !== "failed").map(([n]) => n);
-  return { answer: { commit: sha, repo: repoHash(pull.base.repo.id), ...draftCounts(then.said, now.said, gates) }, failed: failedHere.filter(n => !gates.includes(n)), gated: failedHere.filter(n => gates.includes(n)), skipped, skippedAfter: skipped.filter(n => then.said[n] === "passed") };
+  const failedHere = Object.entries(now.said).filter(([n, v]) => v === "failed" && then.active[n] !== "failed").map(([n]) => n);
+  return { answer: { commit: sha, repo: repoHash(pull.base.repo.id), ...draftCounts(then.active, now.said, gates) }, failed: failedHere.filter(n => !gates.includes(n)), gated: failedHere.filter(n => gates.includes(n)), skipped, skippedAfter: skipped.filter(n => then.active[n] === "passed") };
 }
 
 // Why no draft was opened in `repo`, read through `ask`: { answer } (the commit, the repository's hash and `none`), or
