@@ -9,6 +9,7 @@
 //   fetchedBy(command) -> the path of the project it fetches from main, or null where it is in neither form
 //   libraryOf(command) -> { library, rest } where it reads the script from the commit main pins of a library, at `rest`
 //                         there, or null
+//   fetchesMain(command) -> whether, in any form, it has git show a file of the remote's main (#1273, point 2)
 
 // The starter kit's two forms of a hook's command, as setup/'s templates write them: its script fetched from main into
 // "$f" and run, perhaps with plain words after it, and nothing else, the second after one or more tests that a file is
@@ -52,3 +53,14 @@ export function libraryOf(command) {
   const found = matched(command);
   return found?.library === undefined ? null : { library: found.library, rest: found.rest };
 }
+// Whether a command, in the kit's form or one of its own, has git show a file of the remote's `main` (`git … show
+// refs/remotes/origin/main:<path>`, the ref perhaps quoted), read from its words alone: git where a command starts
+// (after a line's start, a separator, a brace or a quote, then perhaps then, do, else or exec, then perhaps variables set
+// before it, each ending at a space, so a run of them splits one way alone; never in an echo's words or a comment), the path from the repository's root (never ./ or ../, which git reads from the folder it
+// runs in), and no redirection of its output (`>`, `1>` or `&>`, never `2>`, which sends only errors aside) right after
+// the path. A command past MAIN_MAX characters reads as fetching nothing (the safe mark), so a crafted one costs no
+// long match. It does not show that what is fetched is what runs: a hook so read is only marked as it stands ("from":
+// "main", agent-tools-entries.mjs), and whether it runs main's copy stays a security judgement.
+const MAIN_MAX = 4096;
+const FROM_MAIN = /(?:^|[\n;&|({`'"])\s*(?:(?:then|do|else|exec)\s+)?(?:\w+=[^\s;&|]*\s+)*git\b[^;&|\n#]{0,512}?\sshow\s{1,16}["']?refs\/remotes\/origin\/main:(?!\.{1,2}\/)(?=([^\s;&|"'`)]+))\1(?!["']?\s*(?:1|&)?>)/u;
+export const fetchesMain = command => String(command).length <= MAIN_MAX && FROM_MAIN.test(String(command));

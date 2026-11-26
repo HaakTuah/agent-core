@@ -5,21 +5,20 @@
 //   node tests/workflows-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TEMPLATES } from "../scripts/init.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
 import { holds } from "../scripts/workflow-run.mjs";
-import { baseFolder, draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, twiceUnfetched, unlinked, unparsed, unreadied } from "../scripts/workflows.mjs";
+import { draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, unlinked, unparsed, unreadied } from "../scripts/workflows.mjs";
 import { Unread } from "../scripts/workflow-calls.mjs";
 import { readyOnlyHolds } from "../scripts/step-checks-ready.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { keysOnce } from "../scripts/step-checks-workflow-text.mjs";
 import { LONGEST, twice, uncommented } from "../scripts/yaml-keys.mjs";
-import { actionlintFindings, compared, isAction, isWorkflow, run, zizmorFindings } from "../scripts/workflow-tools.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
+import { STAGES } from "../scripts/steps-stage.mjs";
 
 let failed = 0;
 const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}${cond || !detail ? "" : `\n     ${String(detail).slice(0, 1200)}`}`); if (!cond) failed++; };
@@ -124,50 +123,6 @@ ok(dup("env: &defaults { FOO: one, FOO: two }\nx:\n- !t [ {c: 1, c: 2} ]\n") ===
   "a flow value behind an anchor or a tag is read, a node in it behind one too, and a doubled quote inside single quotes ends neither the quote nor the line");
 ok(dup("matrix: { include: [{ os: ubuntu-latest, }], os: [windows-latest] }\n") === "" && dup("jobs: { build: { runs-on: x, }, build: { runs-on: y } }\n") === "build@1<1", "a blank between a last comma and the bracket that closes a flow value closes it there");
 ok(uncommented("a: 'x # y' # z") === "a: 'x # y'" && uncommented(`a: "x \\" # y" # z`) === `a: "x \\" # y"` && uncommented("a: b#c") === "a: b#c" && uncommented("a: b# c") === "a: b# c" && uncommented("a: 'b\\' # c") === "a: 'b\\'" && uncommented("# all") === "" && uncommented("a: it's # x") === "a: it's", "a comment starts at a # after a blank, outside quotes, and a quote inside a word opens none");
-// (the tools' findings against the base's (workflow-tools.mjs; #580): of each kind in a file, as many as the base held are
-// noted, the rest fail, a line moved is no new finding, and with no base each is noted)
-const finding = (file, line, rule = "syntax-check", said = 'key "x" is duplicated') => ({ file, line, tool: "actionlint", rule, said, url: "u" });
-const vsBase = compared([finding("a.yml", 4), finding("a.yml", 5), finding("b.yml", 2), finding("a.yml", 9, "expression", "y")], [finding("a.yml", 3)]);
-ok(vsBase.notes.length === 1 && /^note a\.yml:4: actionlint's syntax-check: key "x" is duplicated, as on the base\. Mend: /u.test(vsBase.notes[0]) && vsBase.fails.length === 3 && /^FAIL a\.yml:5: /u.test(vsBase.fails[0]) && /^FAIL b\.yml:2: /u.test(vsBase.fails[1]) && vsBase.fails.every(mended),
-  "against a base, as many of a kind in a file as the base held are noted, its line aside, and the rest fail, each with its mend; a file or a kind the base lacked fails", [...vsBase.fails, ...vsBase.notes].join("\n"));
-// (actionlint writes where a key was first given into what it says: a finding moved down the file, its first one too,
-// is the same finding)
-const dupKey = (line, first) => finding("a.yml", line, "syntax-check", `key "push" is duplicated in "on" section. previously defined at line:${first},col:3`);
-const moved = compared([dupKey(5, 4)], [dupKey(3, 2)]), another = compared([dupKey(5, 4), dupKey(6, 4)], [dupKey(3, 2)]);
-ok(moved.fails.length === 0 && moved.notes.length === 1 && /previously defined at line:4,col:3, as on the base\./u.test(moved.notes[0]) && another.fails.length === 1,
-  "a key given twice moved down the file, the place actionlint names for its first one with it, is noted, and said as the head says it; a second such finding fails", [...moved.fails, ...moved.notes, ...another.fails].join("\n"));
-// (zizmor's severity and the text it flags are of the kind: a finding swapped for another of the same words is new)
-const swapped = compared([{ ...finding("a.yml", 4, "template-injection", "code injection"), what: "High\0${{ github.event.issue.title }}" }], [{ ...finding("a.yml", 4, "template-injection", "code injection"), what: "Low\0${{ github.event.issue.number }}" }]);
-const kept = compared([{ ...finding("a.yml", 9, "template-injection", "code injection"), what: "High\0x" }], [{ ...finding("a.yml", 4, "template-injection", "code injection"), what: "High\0x" }]);
-ok(swapped.fails.length === 1 && kept.fails.length === 0, "a zizmor finding the base held, swapped for one of the same words on other text or at another severity, fails; the same one moved is noted", [...swapped.fails, ...kept.fails].join("\n"));
-const noBase = compared([finding("a.yml", 4)], null), fresh = compared([finding("a.yml", 4)], []);
-ok(noBase.fails.length === 0 && noBase.notes.length === 1 && !noBase.notes[0].includes("base") && fresh.fails.length === 1, "with no base each is noted and none fails, and where nothing stood before (the core's own) each fails");
-const zz = zizmorFindings(JSON.stringify([{ ident: "template-injection", desc: "code injection via template expansion", url: "https://docs.zizmor.sh/audits/#template-injection", ignored: false, determinations: { severity: "High" }, locations: [{ symbolic: { kind: "Related", annotation: "x" }, concrete: { location: { start_point: { row: 2 } } } }, { symbolic: { kind: "Primary", annotation: "may expand into attacker-controllable code" }, concrete: { location: { start_point: { row: 6 } }, feature: "${{ github.event.issue.title }}" } }] }, { ident: "artipacked", desc: "d", ignored: true, locations: [] }]), "w.yml");
-const al = actionlintFindings(JSON.stringify([{ kind: "syntax-check", message: "key \"if\" is duplicated", filepath: "w.yml", line: 9 }, { kind: "runner-label", message: "label \"mine\" is unknown", filepath: "w.yml", line: 4 }]), "w.yml");
-ok(zz.length === 1 && zz[0].line === 7 && zz[0].what === "High\0${{ github.event.issue.title }}" && zz[0].rule === "template-injection" && /\(may expand into attacker-controllable code\)$/u.test(zz[0].said) && zizmorFindings("not json", "w.yml") === null
-  && al.length === 1 && al[0].line === 9 && al[0].rule === "syntax-check" && actionlintFindings("", "w.yml").length === 0 && actionlintFindings("{", "w.yml") === null,
-  "zizmor's finding is read at its primary location's line, one it marks ignored left out; actionlint's by its line, a runner label it does not know let pass; output that is no JSON is no answer", JSON.stringify([zz, al]));
- // (a workflow zizmor could not load is said by zizmor where actionlint said nothing of it, and left to actionlint where it did)
-if (process.platform !== "win32") {
-  const fake = scratchDir("workflow-tools-"), tool = (name, body) => { fs.writeFileSync(path.join(fake, name), `#!/bin/sh\n${body}\n`, { mode: 0o755 }); return path.join(fake, name); };
-  try {
-    const z = tool("zizmor", "exit 3"), quiet = tool("quiet", "echo '[]'"), loud = tool("loud", `echo '[{"kind":"syntax-check","message":"key \\"on\\" is duplicated","line":2}]'; exit 1`), other = tool("other", `echo '[{"kind":"expression","message":"x","line":2}]'; exit 1`);
-    const alone = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: quiet }).found, both = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: loud }).found, unfetched = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: "" }).found, beside = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: other }).found;
-    ok(alone.length === 1 && alone[0].tool === "zizmor" && alone[0].rule === "unread" && !("quiet" in alone[0]) && both.length === 1 && both[0].tool === "actionlint" && unfetched.length === 1 && unfetched[0].rule === "unread" && beside.some(f => f.tool === "zizmor" && f.rule === "unread"),
-      "a workflow zizmor could not load is said by zizmor where actionlint did not refuse it (said nothing, said only another kind, or did not run), and left to actionlint where it refused it", JSON.stringify({ alone, both, unfetched, beside }));
-  } finally { fs.rmSync(fake, { recursive: true, force: true }); }
-}
-// (the base's texts are read in a git repository of their own, as the head's are, so actionlint reads both with their project)
-const bf = baseFolder(os.tmpdir());
-try { ok(fs.existsSync(path.join(bf, ".git")) && bf.startsWith(os.tmpdir()), "the base's folder is a git repository of its own under the run's temporary folder, so actionlint reads it as a project", bf); } finally { fs.rmSync(bf, { recursive: true, force: true }); }
-// (where actionlint did not run, the core's own reading of a key given twice stands in for it in the core's own files)
-const tw = twiceUnfetched([{ file: "a.yml", text: "on:\n  push:\n  push:\n" }, { file: "b.yml", text: "on: push\n" }]).fails;
-const twLong = twiceUnfetched([{ file: "l.yml", text: `on: push\n# ${"x".repeat(LONGEST)}\n` }]).fails;
-ok(twLong.length === 1 && /longer than .*Mend: cut the file/u.test(twLong[0]) && mended(twLong[0]), "where actionlint did not run, a file past the length read is told to be cut shorter", twLong.join("\n"));
-ok(tw.length === 1 && /^FAIL a\.yml:3: the key "push" is given twice in one mapping, first on line 2/u.test(tw[0]) && mended(tw[0]), "where actionlint did not run, a key given twice in the core's own file fails by the core's own reading, with its mend", tw.join("\n"));
-const unrun = run(".", [".github/workflows/a.yml", "tools/action.yml", ".github/actions/x/steps.yml"], { zizmor: "", actionlint: "" });
-ok(unrun.found.length === 0 && unrun.unrun.join() === "zizmor,actionlint" && run(".", [".github/actions/x/steps.yml"], {}).unrun.length === 0 && isWorkflow(".github/workflows/a.YML") && !isWorkflow("tools/action.yml") && isAction("tools/action.yml"),
-  "a tool not fetched is said not run, and finds nothing; none is said not run where it had no file to read");
 
 // a call skipped on a draft whose trigger leaves out ready_for_review (#502): by its if:, or by a check that skips a draft
 // itself (the description check, or core.yml's description:); the full trigger, another's workflow and a call that
@@ -266,11 +221,13 @@ ok(noYaml.fails.length === 4 && /^FAIL a\.yml:4:\d+: the core's reader cannot re
   "a file the core's reader throws on fails with its file, line and column and a mend (a \": \" in an unquoted step name says to quote it), a quoted name, which parses, does not, and a key given twice is left to actionlint, which says it, but two keys the package reads as one (true and True) are failed here", noYaml.fails.join("\n"));
 ok(unparsed([]).fails.length === 0 && own.every(f => unparsed([{ file: f, text: fs.readFileSync(`${core}.github/workflows/${f}`, "utf8") }]).fails.length === 0), "the core's own workflows each parse");
 
+// the workflow check's own files, which a scratch project's copy of the core holds
+const CHECK_FILES = ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "parse-yaml.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"];
 // run on a scratch project: each failure says its mend
 const tmp = scratchDir("workflows-test-");
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "parse-yaml.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
+  for (const f of CHECK_FILES) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
   // (the install with the lock file it is read against)
   fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(tmp, "core/.packages"), { recursive: true });
   fs.writeFileSync(path.join(tmp, "core/.gitignore"), "/.packages/node_modules/\n"); // (as the copy holds it)
@@ -333,7 +290,7 @@ const vend = scratchDir("workflows-vendored-");
 try {
   const at = "vendor/core/", put = (f, text) => { fs.mkdirSync(path.dirname(path.join(vend, f)), { recursive: true }); fs.writeFileSync(path.join(vend, f), text); };
   fs.mkdirSync(path.join(vend, at, "scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "parse-yaml.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(vend, at, "scripts", f));
+  for (const f of CHECK_FILES) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(vend, at, "scripts", f));
   fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(vend, at, ".packages"), { recursive: true });
   put("core-manifest.md", `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${at} (never edited here).\n`);
   put(`${at}tools/action.yml`, "on:\n  pull_request_target:\n"); // (the copy's own, which the core's run holds)
@@ -460,7 +417,7 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
   const suites = lists(tests.jobs.suites.strategy.matrix.include), upgrades = lists(tests.jobs.upgrade.strategy.matrix.include);
   const only = (l, os) => l.length > 0 && l.every(x => x.os === os);
   const NETWORK = "suites-network";
-  const WINDOWS = ["suites-projects", "suites-sync", "suites-kit", "suites-core", "suites-core-places", "suites-licences", "suites-rest", "suites-tools"];
+  const WINDOWS = ["suites-projects", "suites-sync", "suites-converge", "suites-hostile", "suites-kit", "suites-steps", "suites-writes", "suites-core", "suites-core-places", "suites-licences", "suites-scans", "suites-rest", "suites-rest-two", "suites-rest-three", "suites-tools"];
   const named = l => [...new Set(l.map(x => x.suite))].sort().join();
   ok(suites && Object.keys(tests.jobs.suites.strategy.matrix).join() === "include" && suites.every(l => l.every(x => x.node && x.suite && x.os && x.parts))
     && only(suites[0], "ubuntu-latest") && only(suites[1].filter(x => x.suite !== NETWORK), "windows-latest") && named(suites[1].filter(x => x.suite !== NETWORK)) === [...WINDOWS].sort().join()
@@ -472,7 +429,7 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
   const steps = tests.jobs.suites.steps.filter(s => /contains\(matrix\.parts, 'network'\)/.test(String(s.if))).map(s => s.run).sort();
   const nets = l => l.filter(x => x.parts.split(" ").includes("network"));
   ok(suites && nets(suites[0]).length === 0 && nets(suites[1]).length === 4 && nets(suites[1]).every(x => x.suite === NETWORK && x.parts === "network") && ["ubuntu-latest", "windows-latest"].every(os => [".node-version", ".node-least"].every(n => nets(suites[1]).some(x => x.os === os && x.node === n))) && nets(suites[2]).length === 4
-    && steps.join() === ["node tests/init-dotnet-test.mjs", "node tests/nuget-fetch-test.mjs", "node tests/nuget-gate-network-test.mjs"].join(),
+    && steps.join() === ["node tests/init-dotnet-test.mjs", "node tests/npm-mend-test.mjs", "node tests/nuget-fetch-test.mjs", "node tests/nuget-gate-network-test.mjs"].join(),
     "the tests that reach the network run in no pull request's run nor a push's, and once an hour and by hand in a job of their own on each system and Node (point 9)", steps.join(", "));
   // (#770: on Linux, but in the part network, each step runs with the network cut off, and those that must reach it
   // name their shell, bash, each listed here with why; #772 made the last tests self-contained)
@@ -527,6 +484,13 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     && /^\$\{\{ runner\.os == 'Linux' && (matrix\.part != '[\w ]+' && )?\(env\.RUN == 'all' \|\| contains\(env\.RUN, ' tests\/upgrade-test\.mjs '\)\) \}\}$/.test(String(testsUpgrade?.if)),
     "the upgrade test runs on Windows in the release workflow alone, once a day where minutes are free and before each release, never in a pull request's run (tasks/tests.md, \"A test that guards only what a release brings runs where the release is made\")",
     JSON.stringify({ schedule: release.on.schedule, if: release.jobs.upgrade?.if, tests: testsUpgrade?.if }));
+  // (#1240: the parts the release workflow's job runs on Windows are each a part the test takes and a suite with its own mark,
+  // and together they hold what the whole of it does, one release or one project kind of it each)
+  const shape = JSON.parse(fs.readFileSync(path.join(wfDir, "..", "shape.json"), "utf8")), parts = release.jobs.upgrade?.strategy?.matrix?.part ?? [];
+  const declared = /const PARTS = (\[[^\]]*\]);/.exec(fs.readFileSync(path.join(wfDir, "..", "..", "tests", "upgrade-test.mjs"), "utf8"));
+  ok(declared && parts.join() === JSON.parse(declared[1]).join() && parts.length === 5 && /--suite "upgrade-\$PART" -- node tests\/upgrade-test\.mjs --part "\$PART"$/.test(upgradeStep?.run ?? "")
+    && parts.every(x => shape.suites[`upgrade-${x}`]?.win32 > 0) && release.jobs.upgrade["timeout-minutes"] <= 30,
+    "the upgrade test's Windows job in the release workflow is five parts, a release's project kind each and the copy older than the first, each its own suite with a mark in .github/shape.json, inside its job's time", JSON.stringify(parts));
 }
 
 // (#802: the copy's check removes the folders it fetched into, so no fetch there may leave git's own upkeep running
@@ -542,6 +506,124 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
   ok(fetches.length >= 3 && fetches.every(l => l.includes("--no-auto-maintenance")) && checkouts.length >= 1 && checkouts.every(off),
     "each fetch of the copy's check, and its checkout of the core into a folder, starts no upkeep of git's own, which would race the check's removal of what it fetched (#802)",
     [...fetches.filter(l => !l.includes("--no-auto-maintenance")), ...checkouts.filter(s => !off(s)).map(s => s.with.path)].join(" | "));
+}
+
+// (#674: the copies checks read the base the change merges into; their checkout keeps no token, so in a private
+// repository a fetch of origin/<branch> after it fails. Each job that runs them gives HEAD^1, the merge's first parent,
+// from a checkout of the project that holds the merge's parents)
+for (const file of ["copies.yml", "core.yml"]) {
+  const wf = parseYaml(fs.readFileSync(path.join(wfDir, file), "utf8"));
+  const jobs = Object.values(wf.jobs).filter(j => (j.steps ?? []).some(s => /scripts\/checks\.mjs copies\b/.test(String(s.run ?? ""))));
+  const bad = jobs.flatMap(j => {
+    const own = j.steps.find(s => String(s.uses ?? "").startsWith("actions/checkout@") && !s.with?.repository && !s.with?.path);
+    const runs = j.steps.filter(s => /scripts\/checks\.mjs copies\b/.test(String(s.run ?? "")));
+    return [
+      ...(Number(own?.with?.["fetch-depth"]) >= 2 && own?.with?.["persist-credentials"] === false ? [] : ["its checkout of the project: fetch-depth 2 or more, persist-credentials false"]),
+      ...runs.filter(s => s.env?.BASE !== "${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}").map(s => `BASE ${s.env?.BASE}`),
+    ];
+  });
+  ok(jobs.length === 1 && bad.length === 0, `${file}: the copies checks read their base as HEAD^1 of a checkout that holds it, with no fetch that would need a token (#674)`, bad.join(" | "));
+}
+
+// (#1223) the two fetch scripts name the temporary and home folders where they show a failed fetch's log, never write
+// them out: on a runner on the owner's own computer each holds the account's name
+if (process.platform !== "win32") {
+  const runnerTemp = scratchDir("fetch-temp-"), home = scratchDir("fetch-home-"), stubs = scratchDir("fetch-stubs-");
+  const fail = `#!/bin/sh\necho "could not write to $PWD/x and $HOME/.cache/x" >&2\necho "args: $*"\nexit 1\n`;
+  for (const name of ["python3", "python", "curl"]) fs.writeFileSync(path.join(stubs, name), fail, { mode: 0o755 });
+  for (const script of ["workflow-tools.sh", "lychee.sh"]) {
+    const run = spawnSync("bash", [path.join(core, "scripts", script)], { encoding: "utf8", env: { ...process.env, RUNNER_TEMP: runnerTemp, HOME: home, PATH: `${stubs}:${process.env.PATH}` } });
+    const err = run.stderr || "";
+    ok(run.status === 0 && err.includes("<temp>/") && err.includes("~/.cache") && !err.includes(runnerTemp) && !err.includes(home),
+      `${script} shows a failed fetch's log with the temporary and home folders named, never written out (#1223)`, err);
+  }
+  // (where cygpath stands, as in Git for Windows, each form a Windows tool writes is named too, letter case aside: a
+  // stand-in for cygpath gives each form under a drive of its own making)
+  const win = scratchDir("fetch-win-");
+  fs.writeFileSync(path.join(win, "cygpath"), String.raw`#!/bin/sh
+case $1 in -w) printf 'C:%s\n' "$2" | tr / '\\' ;; -m) printf 'C:%s\n' "$2" ;; -u) printf '/c%s\n' "$2" ;; -d) printf '%s\n' "$2" | awk -F/ '{ s = "C:"; for (i = 2; i <= NF; i++) s = s "\\" (length($i) > 8 ? toupper(substr($i, 1, 6)) "~1" : toupper($i)); print s }' ;; *) exit 1 ;; esac
+`, { mode: 0o755 });
+  const forms = String.raw`#!/bin/sh
+w=$(cygpath -w "$PWD"); printf '%s\n' "at $w, $(cygpath -m "$PWD"), $(cygpath -u "$HOME"), $(printf %s "$w" | tr A-Z a-z) and $(cygpath -w "$HOME" | sed 's/\\/\\\\/g')\\x, short $(cygpath -d "$PWD")" >&2
+exit 1
+`;
+  for (const name of ["python3", "python", "curl"]) fs.writeFileSync(path.join(win, name), forms, { mode: 0o755 });
+  for (const script of ["workflow-tools.sh", "lychee.sh"]) {
+    const run = spawnSync("bash", [path.join(core, "scripts", script)], { encoding: "utf8", env: { ...process.env, RUNNER_TEMP: runnerTemp, HOME: home, PATH: `${win}:${process.env.PATH}` } });
+    const err = (run.stderr || "").toLowerCase(), names = [runnerTemp, home].map(p => path.basename(p).toLowerCase());
+    const short = folder => `${path.basename(folder).slice(0, 6).toLowerCase()}~1`;
+    ok(run.status === 0 && err.includes("at <temp>") && err.includes("short <temp>") && names.every(n => !err.includes(n)) && !err.includes(short(runnerTemp)),
+      `${script} names the temporary and home folders in each form Windows writes them, letter case aside (#1223)`, run.stderr);
+  }
+  // (with no mapfile, as in macOS's own bash, 3.2, the folders are named all the same)
+  const old = spawnSync("bash", ["-c", 'enable -n mapfile; . "$1"; printf "%s\\n" "$2/x $HOME/y" | unnamed "$2"', "-", path.join(core, "scripts", "unnamed.sh"), runnerTemp], { encoding: "utf8", env: { ...process.env, HOME: home } });
+  ok(old.stdout === "<temp>/x ~/y\n" && !old.stderr, "unnamed() names the folders with no mapfile, as in macOS's own bash (#1223)", old.stdout + old.stderr);
+}
+
+// ---- the queue job's step followed as worded on the caller the kits before it wrote, its rights at the workflow's
+// level: the workflow check, zizmor included, finds nothing in what the mend leaves (#1273, point 1) ----
+{
+  const QUEUE_LEAD = "19 November 2026, a pull request of the progress file alone proved by a script", caller = scratchDir("workflows-queue-");
+  fs.mkdirSync(path.join(caller, ".github/workflows"), { recursive: true });
+  fs.writeFileSync(path.join(caller, ".github/workflows/security-review.yml"), fs.readFileSync(path.join(core, TEMPLATES, "workflows/security-review.yml.tmpl"), "utf8").replace(/\{\{core\}\}/g, CORE).replace(/\{\{pin\}\}/g, "0".repeat(40)));
+  STAGES[QUEUE_LEAD].stage(caller);
+  const staged = parseYaml(fs.readFileSync(path.join(caller, ".github/workflows/security-review.yml"), "utf8"));
+  ok(staged.permissions?.statuses === "write" && Object.keys(staged.jobs).length === 1, "the stage holds the caller as the kits before the queue job wrote it, its rights at the workflow's level", JSON.stringify(staged));
+  STAGES[QUEUE_LEAD].mend(caller);
+  if (process.env.ZIZMOR && process.env.ACTIONLINT) {
+    // (the workflow check whole, as the copies job runs it, from the project's copy of the core)
+    fs.mkdirSync(path.join(caller, "core/scripts"), { recursive: true });
+    for (const f of CHECK_FILES) fs.copyFileSync(path.join(core, "scripts", f), path.join(caller, "core/scripts", f));
+    fs.cpSync(path.join(core, ".packages"), path.join(caller, "core/.packages"), { recursive: true });
+    for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: caller, stdio: "ignore" });
+    const checked = spawnSync(process.execPath, [path.join(caller, "core/scripts/workflows.mjs")], { cwd: caller, encoding: "utf8", env: { ...process.env, WORKFLOWS_BASE: "" } });
+    // (no base, so a finding of either tool is a note, never a failure: none is to stand, nor a tool that did not run)
+    ok(checked.status === 0 && !/^(?:note|FAIL) |did not run/m.test(checked.stdout + checked.stderr), "and once its mend is made as the step words it, the workflow check, zizmor and actionlint included, passes it, no write right at the workflow's level beside two jobs", checked.stdout + checked.stderr);
+  } else console.log("ok   (not run here: zizmor and actionlint are fetched by the job's set-up on the runners alone, where this case runs)");
+}
+
+// ---- the base a check reads from the checkout (#1231) ----
+// A checkout at depth 2 holds the merge a pull request's run checks out and its two parents, and may not hold the
+// event's base commit, which a private repository's job cannot fetch with no token: every step that gives the base to a
+// check that reads it from the checkout names HEAD^1, the merge's first parent; the event's base commit stands only where
+// it is read through GitHub's API alone (the description check's BASE_SHA) or the checkout holds the whole history.
+{
+  const steps = [];
+  for (const file of fs.readdirSync(wfDir).filter((f) => /\.ya?ml$/u.test(f))) {
+    const wf = parseYaml(fs.readFileSync(path.join(wfDir, file), "utf8"));
+    for (const [jobName, job] of Object.entries(wf?.jobs ?? {})) for (const step of job?.steps ?? []) steps.push({ file, jobName, job, wf, step });
+  }
+  const event = "pull_request.base.sha";
+  const fromCheckout = steps.filter(({ job, wf, step }) => {
+    // (the job's own checkout, of the repository under check, not another it checks out into a folder, as core.yml's of the core)
+    const whole = (job.steps ?? []).some((s) => String(s.uses ?? "").startsWith("actions/checkout@") && !s.with?.path && !s.with?.repository && String(s.with?.["fetch-depth"]) === "0");
+    // (the exemption is the description check alone: `checks.mjs description` as a whole word, not `description signatures`)
+    const api = /pr-description\.mjs|checks\.mjs"? description(?![\w-])(?!\s+\w)/u.test(String(step.run ?? ""));
+    const envs = [wf.env, job.env, step.env].flatMap((e) => Object.entries(e ?? {}));
+    const named = [...envs.filter(([key]) => !(api && key === "BASE_SHA")).map(([, v]) => v), step.run, ...Object.values(step.with ?? {})];
+    return !whole && named.some((v) => String(v ?? "").includes(event));
+  }).map(({ file, jobName, step }) => `${file}: ${jobName}: ${step.name ?? step.id}`);
+  ok(steps.length > 50 && fromCheckout.length === 0, "no step gives the event's base commit to a check that reads it from a checkout that may not hold it", fromCheckout.join("\n"));
+  const at = (file, name) => steps.find((s) => s.file === file && String(s.step.name ?? "").startsWith(name))?.step ?? {};
+  const given = [["core.yml", "The signature check"], ["core.yml", "The NuGet check, last"], ["signatures.yml", "The signature check"], ["nuget.yml", "The NuGet check"]]
+    .filter(([file, name]) => { const step = at(file, name); return !(String(step.env?.BASE).includes("HEAD^1") && /--base "\$BASE"/u.test(String(step.run))); });
+  ok(given.length === 0, "the signature and NuGet steps give their check HEAD^1, the merge's first parent, as --base", given.join("; "));
+  const looked = [["licences.yml", "Every package and audit entry"], ["tests.yml", "Each package new to the core's own lock file"]]
+    .filter(([file, name]) => !String(at(file, name).env?.LOOKUP_BASE).includes("'HEAD^1'"));
+  ok(looked.length === 0, "the lookup's steps name HEAD^1 as LOOKUP_BASE on a pull request", looked.join("; "));
+}
+
+// (#1311: a job's own limit cancels the whole job, which skips the steps after it; so the daily look's step has a limit
+// of its own, lower than the job's, that fails that step alone, and the personal-terms step after it runs whatever
+// the look did)
+{
+  const job = parseYaml(fs.readFileSync(path.join(wfDir, "look.yml"), "utf8")).jobs.look, steps = job.steps ?? [];
+  const look = steps.findIndex(s => /^node "\$CORE_AT"scripts\/look\.mjs$/.test(String(s.run ?? "")));
+  const terms = steps.findIndex(s => /issue-terms\.mjs/.test(String(s.run ?? "")));
+  const lookStep = steps[look] ?? {}, termsStep = steps[terms] ?? {};
+  ok(look >= 0 && terms > look && lookStep["timeout-minutes"] > 5 && lookStep["timeout-minutes"] < job["timeout-minutes"]
+    && lookStep["timeout-minutes"] + 5 <= job["timeout-minutes"] && termsStep.if === "${{ !cancelled() }}" && lookStep.if === "${{ !cancelled() }}",
+    "the daily look's step has a limit of its own, longer than a first run needs and shorter than the job's with room left for the step after it, which runs unless the job was cancelled (#1311)", JSON.stringify({ look: lookStep["timeout-minutes"], job: job["timeout-minutes"], terms: termsStep.if }));
 }
 
 process.exit(failed ? 1 : 0);

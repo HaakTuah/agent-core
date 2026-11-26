@@ -5,7 +5,8 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { run } from "../scripts/lookup.mjs";
+import { alongside } from "../scripts/licences.mjs";
+import { namedBase, run } from "../scripts/lookup.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 import { INVENTED_SUM, NOW, asked, get, tgz } from "../scripts/lookup-stage.mjs";
@@ -77,6 +78,41 @@ try {
   r = await run(config, { root: tmp, base, get, now: NOW });
   ok(r.code === 1 && mended(r.lines.join("\n")) && !/not json/u.test(r.lines.join("\n")), `a lock file that cannot be read fails, saying the mend and quoting none of it (${r.lines})`);
 } finally { rmSync(tmp, { recursive: true, force: true }); }
+
+// ---- The base named HEAD^1 (#1231): the merge's first parent, taken only where HEAD is a merge
+{
+  const dir = scratchDir("lookup-parent-test-");
+  const g = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: dir, encoding: "utf8" }).trim();
+  const was = { log: console.log, error: console.error, event: process.env.GITHUB_EVENT_NAME, base: process.env.LOOKUP_BASE };
+  const named = (name) => { process.env.LOOKUP_BASE = name; return namedBase(dir); };
+  const beside = async (name) => {
+    const lines = [];
+    console.log = console.error = (l) => lines.push(String(l));
+    process.env.GITHUB_EVENT_NAME = "pull_request"; process.env.LOOKUP_BASE = name;
+    try { return { failed: await alongside(join(dir, "c.json"), dir), out: lines.join("\n") }; } finally { console.log = was.log; console.error = was.error; }
+  };
+  try {
+    g("init", "-q", "-b", "main");
+    writeFileSync(join(dir, "c.json"), JSON.stringify({ ships: ["package.json"], lockfiles: ["package-lock.json"] }));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", dependencies: { a: "^1.2.3" } }));
+    writeFileSync(join(dir, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": { name: "p", dependencies: { a: "^1.2.3" } }, "node_modules/a": { version: "1.2.3", license: "MIT", resolved: "https://registry.npmjs.org/a/-/a-1.2.3.tgz" } } }));
+    g("add", "-A"); g("commit", "-q", "-m", "base");
+    writeFileSync(join(dir, "y.txt"), "y"); g("add", "-A"); g("commit", "-q", "-m", "an earlier commit of the head");
+    ok(named("HEAD^1") === null, "HEAD^1 named on a head that is no merge is not taken: it would be the pull request's own earlier commit");
+    const alone = await beside("HEAD^1");
+    ok(alone.failed && mended(alone.out) && /the job names the pull request's base \(LOOKUP_BASE\), and its checkout does not hold that commit/u.test(alone.out), `and beside the licence check it fails as a base not held, saying its mend (${alone.out})`);
+    const first = g("rev-parse", "HEAD~1"), head = g("rev-parse", "HEAD");
+    g("checkout", "-q", "--detach", first); g("merge", "-q", "--no-ff", "-m", "the merge", head);
+    ok(named("HEAD^1") === first, "HEAD^1 named on a merge is read as its first parent, the base, as a commit");
+    ok(named(first) === first && named("f".repeat(40)) === null, "a commit named is read where the checkout holds it, and not where it does not");
+    const read = await beside("HEAD^1");
+    ok(!read.failed && /stood so at the pull request's base: reported, never failed/u.test(read.out) && !/^FAIL/mu.test(read.out), `and beside the licence check it reads what stood at the base, reported, never failed (${read.out})`);
+    for (const other of ["HEAD^2", "HEAD~1", "--all", "main", "HEAD^1 "]) ok(named(other) === null, `a base named ${JSON.stringify(other)}, neither a commit nor HEAD^1, is not taken`);
+  } finally {
+    for (const [k, v] of [["GITHUB_EVENT_NAME", was.event], ["LOOKUP_BASE", was.base]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 console.log(failed ? `${failed} failing` : "ok   lookup.mjs on a project");
 process.exit(failed ? 1 : 0);

@@ -1,18 +1,19 @@
 // How a comment on a pull request is read as a review (review-record.mjs, beside this file, counts what they found): which
-// posted review a comment is (postedKind), the counts and the score and the stance its lines declare (blockingOf,
-// otherOf, scoreOf, stanceOf), what a find of Codex's is (codexFind), what each of the reviews did on one pull request
+// posted review a comment is (postedKind), the counts and the score its lines declare (blockingOf, otherOf, scoreOf,
+// read by review-lines.mjs and given on from here) and the stance (stanceOf), what a find of Codex's is (codexFind), what each of the reviews did on one pull request
 // (perPull), the heads they were asked or posted on (reviewEvents), the rules a pull request's findings name
 // (rulesNamed) and the pull request a bug names (broughtBy). Split from review-record.mjs, whose counts, report and reads
 // of GitHub it keeps; nothing here changed in the split. It reads; it writes nothing. Node's own modules.
 import { seen } from "./guards.mjs";
+import { blockingOf, lines, otherOf, scoreOf } from "./review-lines.mjs";
 import { FINDING, codexState, codexs, named } from "./security-review.mjs";
+
+export { blockingOf, otherOf, scoreOf };
 
 const RECEIPT = /^<!-- codex-review-receipt:v1 -->/u;
 const REVIEWED = /^\*\*Reviewed commit:\*\* `([0-9a-f]{7,40})`/mu; // (the commit a receipt of Codex's names, as its app writes it)
 const BADGE = /!\[(P[0-3]) Badge\]/u;
 
-// A comment's text as its lines, each carriage return taken out (the web editor ends a line with one before the line feed).
-const lines = body => String(body ?? "").replaceAll("\r", "").split("\n");
 const firstLine = body => lines(body).find(l => l.trim()) ?? "";
 
 // Which posted review a comment is, from its first line unquoted: security, code, design, or none-needed (a note that
@@ -27,25 +28,6 @@ export function postedKind(body) {
   return /^(?:\*\*)?\s*none needed\b/iu.test(m[2]) ? "none-needed" : "security";
 }
 
-// The one count that the lines of a posted review matching `count` (its number) or `none` (zero) declare, or null where
-// none declares it or they disagree.
-function declared(body, count, none) {
-  const said = new Set();
-  for (const raw of lines(seen(body))) { // (as the reader sees it: no line in an HTML comment or a fenced block of code)
-    const line = raw.replaceAll("**", "").trim();
-    const n = count.exec(line);
-    if (n) said.add(Number(n[1]));
-    else if (none.test(line)) said.add(0);
-  }
-  return said.size === 1 ? [...said][0] : null;
-}
-
-// The blocking points, and the other points, a posted review declares, each a number or null (not read).
-export const blockingOf = body => declared(body, /^Blocking findings: (\d{1,6})\.(?:\s|$)/u, /^(?:No blocking findings?|No findings?|Nothing blocks|Blocking: none)\.(?:\s|$)/iu);
-export const otherOf = body => declared(body, /^Other findings: (\d{1,6})\.(?:\s|$)/u, /^(?:No other findings?|No findings?)\.(?:\s|$)/iu);
-// The score a posted review declares, on a line "Score: N of 10." of its own, N a whole number from 1 to 10
-// (roles/shared/review-guidelines.md, "Every reviewer"; #710), or null (not read).
-export const scoreOf = body => declared(body, /^Score: (10|[1-9]) of 10\.(?:\s|$)/u, /(?!)/u);
 
 // The stance a posted code review declares on a line of its own (tasks/reviews.md, "A review's stance follows the kind
 // of change"; #397): "adversarial", "regular", or null where no line says one or two lines disagree.

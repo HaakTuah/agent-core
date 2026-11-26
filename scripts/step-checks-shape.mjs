@@ -4,16 +4,18 @@
 // none runs by itself. It reads only. Node's own modules and git only.
 import fs from "node:fs";
 import path from "node:path";
-import { parseBaseline, parseConfig } from "./shape.mjs";
+import { offBy, parseBaseline, parseConfig, scanMend, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { HERE, plain } from "./step-checks.mjs";
-import { where as shapeAt } from "./shape.mjs";
+import { parseBounded } from "./guards.mjs";
 
 // The shape check's config and baseline as a project holds them: { at, config, reads } (the readers its baseline names),
-// or { mend } where the config or the baseline is not there or cannot be read.
+// or { mend } where the config or the baseline is not there or cannot be read; { off } where the manifest turns the
+// check off with the owner's reason (shape.mjs, offBy), which asks nothing of either.
 function shapeHeld(p) {
+  if (offBy(p.manifest)) return { off: true };
   const at = shapeAt(p.manifest), text = p.read(at);
-  const first = `write its first baseline with \`node core/scripts/install.mjs all\` and then \`node core/scripts/shape.mjs ${at} --first\` (the parser's packages, which the readers of JavaScript, TypeScript, C# and Python need, are installed only where named: #719), commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
+  const first = `write its first baseline with \`if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs all; fi\` and then \`node core/scripts/shape.mjs ${at} --first\` (the parser's packages, which the readers of JavaScript, TypeScript, C# and Python need, are installed only where named: #719), commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
   if (text === null) return { none: true, mend: `Write \`${at}\` as the starter kit does (\`core/setup/template/shape.json.tmpl\`), with the project's own code under "code" and its test files under "tests", as git pathspecs; then ${first}. Until then the shape check holds the project to the starter kit's config, with each pull request's base as its baseline.` };
   let config;
   try { config = parseConfig(text, at); } catch (e) { return { mend: `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.` }; }
@@ -39,6 +41,7 @@ const readersNamed = (held, readers) => {
 // shape-readers.mjs), so that it lists what each finds. Null where all of it stands; else the mend.
 export function shapeWritten(p) {
   const held = shapeHeld(p);
+  if (held.off) return null;
   return held.mend ?? readersNamed(held, Object.keys(READERS).filter(r => !LATER_READERS.includes(r)));
 }
 
@@ -48,11 +51,19 @@ export function shapeWritten(p) {
 // the step of 16 November reports: the first baseline it asks for names every reader.
 export function shapeReadsParsed(p, reader) {
   const held = shapeHeld(p);
+  if (held.off) return null;
   if (!held.mend) return readersNamed(held, [reader]);
   if (!held.none) return null;
-  const config = JSON.parse(fs.readFileSync(path.join(HERE, "setup/template/shape.json.tmpl"), "utf8")), baseline = p.read(config.baseline);
+  const config = parseBounded(fs.readFileSync(path.join(HERE, "setup/template/shape.json.tmpl"), "utf8")), baseline = p.read(config.baseline);
   if (baseline === null) return null;
   let reads = [];
   try { reads = parseBaseline(baseline, config.baseline, "").reads; } catch { /* (read as naming no reader) */ }
   return readersNamed({ at: shapeAt(p.manifest), config, reads }, [reader]);
+}
+
+// What is left to the project once a step's writer wrote the baseline (each step that writes it gives it as its `left`):
+// its own scans of paths named, which the core cannot read (#1289); none where the config cannot be read again, which
+// the step's check then says.
+export function shapeLeft(p) {
+  try { const at = shapeAt(p.manifest); return scanMend(parseConfig(p.read(at), at).baseline); } catch { return null; }
 }

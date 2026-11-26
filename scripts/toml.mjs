@@ -7,10 +7,10 @@
 //
 //   import { parseToml } from "./toml.mjs";   parseToml(text) -> an object, or throws a SyntaxError naming the line, or,
 //                                             where the whole nests too deep, saying so of the file; or a
-//                                             TomlUnreached where the package could not be installed, the
-//                                             registry not answering
-import { DEEPEST, tooDeep } from "./guards.mjs";
-import { loadSync, unreached } from "./packages.mjs";
+//                                             TomlUnreached where the package could not be installed
+//                                             (packages.mjs, unreached())
+import { DEEPEST, parseFault, tooDeep } from "./guards.mjs";
+import { loadSync, notInstalled, unreached } from "./packages.mjs";
 
 // (loaded where parseToml first runs, so a script that imports this module for nothing it reads runs with nothing
 // installed; plain and scalar run only under parseToml)
@@ -19,22 +19,23 @@ let toml;
 // (a key set as a plain property, never through a setter: "__proto__" is a key like any other)
 const put = (table, key, value) => Object.defineProperty(table, key, { value, enumerable: true, writable: true, configurable: true });
 
-// (where the job's install could not reach the registry, in a project's pull request, what the caller reads did not
-// run: thrown as its own kind, which the caller tells from a file that is no TOML; #654, point 4)
+// (where the package could not be installed, the registry not answering or a copy's install failing, what the caller
+// reads did not run: thrown as its own kind, which the caller tells from a file that is no TOML; #654, point 4)
 export class TomlUnreached extends Error {}
 
 export function parseToml(text) {
-  if (unreached("smol-toml")) throw new TomlUnreached("the package smol-toml could not be installed, the registry not answering");
+  if (unreached("smol-toml")) throw new TomlUnreached(notInstalled("smol-toml"));
   // (a CRLF line end is read as LF, inside a string of several lines too, as the reader before the package read it;
   // where a CR stands alone anywhere, the text is left as it is, for the package to refuse: "\r\r\n" never becomes CRLF)
   const raw = String(text), s = /\r(?!\n)/u.test(raw) ? raw : raw.replace(/\r\n/gu, "\n"), lost = quotesLost(s);
-  if (lost >= 0) throw new SyntaxError(`line ${s.slice(0, lost).split("\n").length}: a string's line-ending backslash runs into its closing quotes, which the TOML package reads wrong`);
+  if (lost >= 0) throw parseFault("a string's line-ending backslash runs into its closing quotes, which the TOML package reads wrong", s, lost);
   let read;
   toml ??= loadSync("smol-toml");
   try { read = toml.parse(s, { integersAsBigInt: true, maxDepth: DEEPEST }); } catch (e) {
-    if (!(e instanceof toml.TomlError)) throw new SyntaxError(`the file cannot be read as TOML (${String(e?.message ?? e).split("\n")[0]})`);
+    // (the package's own words, which quote nothing of the text, and its place: parseFault's form, guards.mjs; #1333)
+    if (!(e instanceof toml.TomlError)) throw new SyntaxError("not valid TOML");
     const what = e.message.split("\n")[0].replace(/^Invalid TOML document: /u, "");
-    throw new SyntaxError(`line ${e.line}: ${/excessively nested/u.test(what) ? `a value nests deeper than ${DEEPEST}` : what}`);
+    throw parseFault(/excessively nested/u.test(what) ? `a value nests deeper than ${DEEPEST}` : what, s, { line: e.line, col: e.column });
   }
   const root = plain(read);
   // (the package counts its depth its own way: the whole is counted once more, as guards.mjs counts JSON)

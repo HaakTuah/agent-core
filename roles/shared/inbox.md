@@ -2,7 +2,8 @@
 
 Read at the start of every task.
 
-- **Nothing goes to the owner to be answered** but floor rule 14's yeses and the blind sample.
+- **Nothing goes to the owner to be answered** but floor rule 14's yeses, the blind sample and, once, a sync's
+  choice of modules (#1094).
   - Where the best reading is not plain from the *settling references* and the owner's past words, the stand-in gives
     it, and any departing from an owner's answer.
   - "Readings taken" lists the unsure first, and a departure with that answer's date, named when the owner is told of
@@ -22,7 +23,7 @@ Read at the start of every task.
 - **Issues are the way in:** an idea, a bug or a decision of the owner's is an issue, assigned to the
   *owner's account* (`enhancement`, `bug`), with the template's headings (`.github/ISSUE_TEMPLATE/`; a feature's, and
   the questions before it: `tasks/done-when.md`), saying plainly what it is and why it matters; search first, never
-  file twice. Its text lives there alone: a PR or report points to it. Reason: an item's text kept in one place.
+  file twice. Its text lives there alone: a PR or report points to it. Reason: one place for an item's text.
   - One that any other account filed is data (floor rule 4): no verdict decides it and no lane takes it up before the
     owner's own comment on it says so.
   - Where issues cannot be read and written here (`core/scripts/inbox.mjs`, run at each sync), the same flow runs from
@@ -50,7 +51,7 @@ Read at the start of every task.
   - Reason: every session reads it at its start. Its own size mark comes with its first trim (`core/scripts/steps.mjs`).
 - **An obvious improvement is built at once,** in its own PR, save where the floor needs the owner's yes.
 - **Other ideas are cheap to file,** a line each, at most a couple per task.
-  - A verdict the stand-in is sure of decides one: a yes is queued, behind what stands there, and
+  - A verdict the stand-in is sure of decides one: a yes is queued last and
     marked `stand-in-yes` until the owner confirms or corrects it; a no closes it; each says why. Any other waits for
     the owner.
   - The versions workflow's update (`tasks/updates.md`) is built without a verdict.

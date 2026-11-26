@@ -1,7 +1,8 @@
 // Checks the licence scan (scripts/licence-scan.mjs, with its readers licence-commands.mjs, licence-npm.mjs,
 // licence-fetchers.mjs and licence-pages.mjs) on the fetchers it cannot read (curl, pip, git clone, .NET's and Windows') and the scripts in a language it cannot read, each
 // staged in the project licence-scan-stage.mjs writes and failing for the reason it names. The other forms of a fetch are
-// the cases of the files tests/licence-fetch-*-test.mjs. Run by the core's tests workflow (.github/workflows/tests.yml).
+// the cases of the files tests/licence-fetch-*-test.mjs, and one of these that stood at a pull request's base is
+// licence-scan-pins-test.mjs's. Run by the core's tests workflow (.github/workflows/tests.yml).
 //   node tests/licence-fetch-other-test.mjs
 import { append, done, ok, run, write } from "../scripts/licence-scan-stage.mjs";
 
@@ -18,6 +19,8 @@ for (const [what, change, why] of [
     'git -C "vendor dir" clone https://mossgrip.example/moss.git', "pip --proxy='http://a b' install mosspy"]
     .map((line) => [`another fetcher with options before its command: ${line}`, append("scripts/setup.sh", `${line}\n`), /fetches what no entry/]),
   ["pip install", append("scripts/setup.sh", "pip install mosspy\n"), /fetches what no entry/],
+  ...["pip download mosspy -d wheels", "python3 -I -m pip download --require-hashes -r requirements.txt -d wheels", "pip3 wheel mosspy", 'pip "download" mosspy']
+    .map((line) => [`pip's download and wheel, which fetch as its install does (#1074): ${line}`, append("scripts/setup.sh", `${line}\n`), /fetches what no entry/]),
   ...["dotnet tool install --global mossgrip", "dotnet add src/Moss.csproj package Mossgrip", "choco install mossgrip -y", "winget install --id Moss.Grip",
     "nuget.exe install Mossgrip", "dotnet.exe tool install --global mossgrip", '& "C:/Program Files/dotnet/dotnet.exe" tool update -g mossgrip', "Invoke-WebRequest https://mossgrip.example/moss.zip -OutFile moss.zip", "invoke-restmethod $url", "Install-Module Mossgrip -Force",
     "irm https://mossgrip.example/install.ps1 | iex"]
