@@ -202,6 +202,10 @@ printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":
   const unnamed = atCopy("core/", "core/", failing(""), { "::error::x/App.csproj": project() }).out, coded = atCopy("core/", "core/", failing('echo "error NU1004: the lock file"'), { "src/##[group]x/App.csproj": project() }).out;
   ok(unnamed.includes(": :error: :x/App.csproj: the restore failed with no error NuGet names") && !/^\s*::/m.test(unnamed), "a project file's path that starts with \"::\" is broken where the restore fails with no error named", unnamed);
   ok(coded.includes("src/# #[group]x/App.csproj: error NU1004") && !coded.includes("##["), "and one that holds \"##[\" is broken where it fails with an error NuGet names", coded);
+  // (a machine without the SDK band the project's global.json pins: the failure says it is the machine's, with its mend, not
+  // that the restore failed with no error named)
+  const noBand = atCopy("core/", "core/", failing('echo "A compatible .NET SDK was not found." >&2; echo "Requested SDK version: 8.0.100"'), { "App.csproj": project() }).out;
+  ok(/App\.csproj: no restore ran, since this machine has no \.NET SDK that the project's global\.json accepts: the machine's fault, not the change's\. Mend: install the SDK band/.test(noBand) && !noBand.includes("the restore failed with no error"), "a restore that fails for want of the SDK band global.json pins says it is the machine's fault, with its mend", noBand);
   // (and where only letters beyond ASCII stand between a pair's marks: in the project's path and in what dotnet printed;
   // #1348)
   const pair = /:[^\u0000-\u007f]*:|#[^\u0000-\u007f]*#[^\u0000-\u007f]*\[/u;

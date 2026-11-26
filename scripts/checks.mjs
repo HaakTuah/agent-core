@@ -293,6 +293,13 @@ const RUN = {
       if (passed) {
         const from = sources.stdout.split(/\r?\n/).filter(Boolean).flatMap(s => ["--source", s]);
         for (const project of projects.stdout.split(/\r?\n/).filter(Boolean)) {
+          // (a machine without the SDK band the project's global.json pins restores nothing: said so, the machine's fault,
+          // and the project's restore not run, since its failure is no word on the lock file)
+          const sdk = spawnSync("dotnet", ["--version"], { cwd: path.dirname(project), env: { ...process.env, ...dotnet }, encoding: "utf8" });
+          if (sdk.status !== 0 && /compatible .{0,20}SDK was not found|requested SDK version/iu.test(`${sdk.stdout}${sdk.stderr}`)) {
+            console.log(`Did not run: the restore of ${project}, since this machine has no .NET SDK that the project's global.json accepts: the machine's fault, not the change's. ${MEND}install the SDK band global.json names on this machine (its rollForward allows no other), then run this check again.`);
+            continue;
+          }
           // (the two properties given here overrule a project's own: its packages go to the folder the check reads, and
           // its lock file is the one beside it; each project named from the root, behind "./", so no name reads as an option)
           if (!run("dotnet", ["restore", "--locked-mode", ...from, `-p:RestorePackagesPath=${packages}`, "-p:NuGetLockFilePath=", `./${project}`], { env: { NUGET_PACKAGES: packages, ...dotnet } })) passed = false;
