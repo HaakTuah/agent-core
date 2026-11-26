@@ -125,11 +125,13 @@ export function suitesOnPins(p) {
   // (the start of each name not read exactly as GitHub reports it: an expression's literal part before it, or a matrix
   // job's name and " (", which GitHub follows with the matrix's values)
   const starts = w => Object.entries(w.yaml?.jobs ?? {}).map(([k, j]) => String(j?.name ?? k)).filter((n, i) => names(w)[i] === null).map(n => n.includes("${{") ? n.slice(0, n.indexOf("${{")) : `${n} (`);
-  const suites = Object.entries(p.workflows).map(([f, w]) => [f, filter(w, "paths-ignore"), new Set(names(w).filter(n => n !== null)), names(w).includes(null)]).filter(([, l]) => l !== null);
+  const suites = Object.entries(p.workflows).map(([f, w]) => [f, filter(w, "paths-ignore"), new Set(names(w).filter(n => n !== null)), starts(w)]).filter(([, l]) => l !== null);
   const shares = (f, w) => suites.filter(([g, , c]) => g !== f && names(w).some(n => n !== null && c.has(n)));
-  // (a suite one of whose checks a name not read exactly may be: one it reports starts so, or one it reports is not read)
-  // (a suite with such a name may share any of the workflow's names, all of them exact ones included: #1361, point 20)
-  const mayShare = (f, w) => suites.some(([g, , c, unread]) => g !== f && (unread || starts(w).some(at => [...c].some(n => n.startsWith(at)))));
+  // (a suite one of whose checks the workflow's may be: a name of its not read exactly starts as one the suite reports,
+  // or as the start of one the suite does not read exactly, or that start as it; or an exact name of its starts as such
+  // a start of the suite's, so that a stand-in whose names are all exact still meets it: #1361, point 20)
+  const mayShare = (f, w) => suites.some(([g, , c, at]) => g !== f && (starts(w).some(s => [...c].some(n => n.startsWith(s)) || at.some(t => s.startsWith(t) || t.startsWith(s)))
+    || names(w).some(n => n !== null && at.some(t => n.startsWith(t)))));
   const standsIn = (f, w) => { const own = filter(w, "paths"), n = names(w); return own !== null && n.length > 0 && shares(f, w).some(([, l, c]) => [...l].every(x => own.has(x)) && n.every(x => x !== null && c.has(x))); };
   const started = Object.entries(p.workflows).filter(([f, w]) => !pins.includes(`.github/workflows/${f}`) && !selects.includes(`.github/workflows/${f}`) && !standsIn(f, w)).flatMap(([f, w]) => {
     const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];

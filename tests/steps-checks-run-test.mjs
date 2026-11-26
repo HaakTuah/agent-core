@@ -102,11 +102,23 @@ ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths:
   const anyName = named();
   ok(/takes each out with `!<its path>`[^]*stand-in\.yml/u.test(unshared) && !/may stand in[^]*stand-in\.yml/u.test(unshared) && /may stand in[^]*stand-in\.yml/u.test(anyName),
     "a workflow with `paths` whose matrix job no check of a suite's can share gets the mend that does the step; one whose job's name is an expression may still stand in", `${unshared}\n${anyName}`);
-  // (a stand-in whose names are all exact, beside a suite whose job's name is a matrix's, may stand in: #1361, point 20)
-  fs.writeFileSync(suiteFile, `name: s\non:\n  pull_request:\n    paths-ignore: ${list(kept)}\njobs:\n  test:\n    strategy:\n      matrix:\n        os: [ubuntu-latest]\n    runs-on: \${{ matrix.os }}\n    steps:\n      - run: echo t\n`);
+  // (a workflow whose names are all exact, beside a suite whose job's name is an expression's, may stand in; beside one
+  // whose job is a matrix's, `test (…)`, which no exact `test` is, or `build (…)`, it gets the mend that does the step;
+  // one whose job is a matrix's too may share a suite's as named: #1361, point 20)
+  const suiteNamed = (name, extra = "") => fs.writeFileSync(suiteFile, `name: s\non:\n  pull_request:\n    paths-ignore: ${list(kept)}\njobs:\n  test:\n${name}${extra}    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`);
+  const matrixOf = "    strategy:\n      matrix:\n        os: [ubuntu-latest]\n";
   fs.writeFileSync(standIn, `name: s\non:\n  pull_request:\n    paths: ['src/**', '.github/workflows/**']\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`);
-  const besideUnread = named();
-  ok(/may stand in[^]*stand-in\.yml/u.test(besideUnread), "a workflow with `paths` whose names are all exact, beside a suite whose job's name is a matrix's, may still stand in", besideUnread);
+  suiteNamed("    name: ${{ github.workflow }}\n");
+  const besideExpression = named();
+  suiteNamed("", matrixOf);
+  const besideMatrix = named();
+  fs.writeFileSync(standIn, `name: s\non:\n  pull_request:\n    paths: ['src/**', '.github/workflows/**']\njobs:\n  build:\n${matrixOf}    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`);
+  const otherMatrix = named();
+  fs.writeFileSync(standIn, `name: s\non:\n  pull_request:\n    paths: ['src/**', '.github/workflows/**']\njobs:\n  test:\n${matrixOf}    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`);
+  const sameMatrix = named();
+  const mended = out => /takes each out with `!<its path>`[^]*stand-in\.yml/u.test(out) && !/may stand in[^]*stand-in\.yml/u.test(out);
+  ok(/may stand in[^]*stand-in\.yml/u.test(besideExpression) && mended(besideMatrix) && mended(otherMatrix) && /may stand in[^]*stand-in\.yml/u.test(sameMatrix),
+    "a workflow with `paths` whose names are all exact may stand in beside a suite whose job's name is an expression's; beside a matrix's it shares no check, nor one of another matrix job, and gets the mend that does the step; a matrix job of the same name may stand in", [besideExpression, besideMatrix, otherMatrix, sameMatrix].join("\n"));
   fs.rmSync(standIn);
 }
 fs.rmSync(suiteFile);
