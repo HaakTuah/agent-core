@@ -64,7 +64,7 @@
       "why": "The shape check's one baseline (scripts/shape.mjs), which it reads whole and a session reads by the id of the one entry it adds or takes out, found by its name; main stood past the mark at 20,580 bytes with no entry here when #582 added its test's."
     },
     ".github/workflows/tests.yml": {
-      "mark": 75194,
+      "mark": 94137,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {
@@ -245,8 +245,9 @@
       "mark": 25951,
       "why": "#943: the selection's rules apart from those of the suites' time and of the run of a tree that passed."
     },
+    "scripts/select.mjs": { "mark": 23161, "why": "the question of a split is asked in #943" },
     "tests/select-test.mjs": {
-      "mark": 32013,
+      "mark": 41729,
       "why": "#943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
     },
     ".github/shape-baseline.json": {
