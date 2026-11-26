@@ -5,8 +5,8 @@
 // advisory's id and the first fixed version), never an advisory's own text, which is outsiders' (floor rule 4). Each
 // alert open more than a day with no open pull request of Dependabot's for its package becomes one bug issue, labelled
 // bug, queued and by:orchestrator, worded as Dependabot's pull requests are: what it updates, and that it fixes a
-// published advisory. An alert whose issue stands, in any state, is never filed again: the alert's number is in its
-// title. Where the sign-in cannot read the alerts (the host's job token cannot; floor rule 1 makes no key for it), it
+// published advisory. An alert whose issue stands, in any state, opened by the owner's account or this sign-in, is never
+// filed again: the alert's number is in its title. Where the sign-in cannot read the alerts (the host's job token cannot; floor rule 1 makes no key for it), it
 // says it read nothing and why, and fails nothing. It reads no secret-scanning or code-scanning alert, and dismisses
 // none. It writes issues alone, and fails nothing (exit 0), save on a wrong option. gh, git and Node's own modules.
 //
@@ -69,7 +69,10 @@ export function reading({ repo, at = new Date().toISOString(), dry = false, gh =
   let pulls, issues;
   try { pulls = pagesOf(`repos/${repo}/pulls?state=open`, gh); issues = pagesOf(`repos/${repo}/issues?state=all&labels=bug`, gh); }
   catch { say(`The pull requests or issues of ${repo} could not be read, so no alert was filed. Run it again where gh answers.`); return { unread: "the pull requests or issues", filed: [] }; }
-  const titles = new Set(issues.map(i => i.title)), filed = [];
+  // (an issue counts only where the owner's account or this sign-in opened it: anyone may file a bug under the same title)
+  let me = null; try { me = String(gh("user", "--jq", ".login")).trim() || null; } catch { /* the owner's account alone */ }
+  const trusted = new Set([repo.split("/")[0], me].filter(Boolean).map(l => l.toLowerCase()));
+  const titles = new Set(issues.filter(i => trusted.has(String(i.user?.login ?? "").toLowerCase())).map(i => i.title)), filed = [];
   for (const a of tasksOf(read.alerts, pulls, at)) {
     const title = titleOf(a);
     if (titles.has(title)) continue;

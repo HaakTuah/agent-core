@@ -18,6 +18,7 @@ function stand({ alerts = [], pulls = [], issues = [], refuse = null }) {
   const made = [];
   const gh = (...a) => {
     if (a[0] === "--method") { made.push(Object.fromEntries(a.filter((_, i) => a[i - 1] === "-f").map(f => f.split(/=(.*)/s).slice(0, 2)).filter(([k]) => k !== "labels[]")).title); return "{}"; }
+    if (a[0] === "user") return "session-account\n";
     const route = a.find(x => x.startsWith("repos/"));
     if (route.includes("/dependabot/alerts")) { if (refuse) throw new Error(`gh: ${refuse}`); return alerts.map(x => JSON.stringify(x)).join("\n"); }
     if (route.includes("/pulls")) return JSON.stringify(route.includes("page=1&") || route.endsWith("page=1") ? pulls : []);
@@ -54,8 +55,12 @@ ok(tasksOf([alert(11, "made-up-thing")], [pull("Bump made-up-thing from 1 to 2",
 ok(tasksOf([alert(12, "made-up-thing")], [pull("Bump made-up-thing-extra from 1 to 2", "dependabot/npm_and_yarn/made-up-thing-extra-2")], at).length === 1, "a pull request for a package whose name only starts with the alert's does not count");
 ok(tasksOf([alert(13, "made-up-thing")], [pull("Bump the npm group across 1 directory with 3 updates", "dependabot/npm_and_yarn/npm-1a2b3c")].map(p => ({ ...p, body: "Bumps [made-up-thing](https://example.invalid) from 1 to 2." })), at).length === 0, "a grouped pull request whose description names the package counts");
 {
-  const s = stand({ alerts: [alert(14, "made-up-part")], issues: [{ title: titleOf(alert(14, "made-up-part")), state: "closed" }] });
-  ok(run(s).filed.length === 0 && s.made.length === 0, "an alert whose issue stands, even closed, is never filed again");
+  const s = stand({ alerts: [alert(14, "made-up-part")], issues: [{ title: titleOf(alert(14, "made-up-part")), state: "closed", user: { login: "stand-in" } }] });
+  ok(run(s).filed.length === 0 && s.made.length === 0, "an alert whose issue the owner's account opened stands, even closed, is never filed again");
+  const mine = stand({ alerts: [alert(18, "made-up-part")], issues: [{ title: titleOf(alert(18, "made-up-part")), state: "open", user: { login: "Session-Account" } }] });
+  ok(run(mine).filed.length === 0, "nor one whose issue this sign-in opened");
+  const theirs = stand({ alerts: [alert(19, "made-up-part")], issues: [{ title: titleOf(alert(19, "made-up-part")), state: "closed", user: { login: "an-outsider" } }] });
+  ok(run(theirs).filed.length === 1 && theirs.made.length === 1, "an issue another account filed under the same title does not stop it being filed");
 }
 {
   const s = stand({ alerts: [alert(15, "made-up-piece")] });
