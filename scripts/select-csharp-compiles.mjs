@@ -11,7 +11,11 @@ export const CS = /\.cs$/iu; // (a file of C#, in any case, as MSBuild compiles 
 export function attributes(tag) {
   const pair = /\s*([\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/uy, out = {};
   let at = 0;
-  for (let m; (pair.lastIndex = at, m = pair.exec(tag)); at = pair.lastIndex) out[m[1].toLowerCase()] = m[2] ?? m[3];
+  for (let m; (pair.lastIndex = at, m = pair.exec(tag)); at = pair.lastIndex) {
+    const name = m[1].toLowerCase();
+    if (Object.hasOwn(out, name)) return null; // (two names alike but in case: which one a reader takes is not known)
+    out[name] = m[2] ?? m[3];
+  }
   return /^\s*\/?$/u.test(tag.slice(at).trimEnd()) ? out : null; // (one "\s*": two would backtrack)
 }
 
@@ -54,11 +58,13 @@ const ASSEMBLY_STRINGS = new Set(["System.Runtime.CompilerServices.InternalsVisi
 // importsOther reads exactly, since one may return a line break (System.Environment::NewLine) or a file's text.
 const HIDDEN = /<\?|<!DOCTYPE|<!\[CDATA\[|&#|%0[ad]|\$\(\s*\[(?!MSBuild\]::Get(?:PathOf|DirectoryNameOf)FileAbove\()/iu;
 const DECLARATION = /^\uFEFF?<\?xml\s[^<>?]*\?>/u;
-const TAG = /<(\/?)([^\s<>/]*)([^<>]*)>/gu;
+const TAG = /<(\/?)([^\s<>/]*)(?![^\s<>/])([^<>]*)>/gu; // (the name taken whole, never given back to the rest: linear)
+// The SDKs whose own files bring in no C# of the repository that the reader does not read, as Sdk="Name" or "Name/1.0".
+const SDK = /^(?:Microsoft\.NET\.Sdk(?:\.(?:Web|Razor|Worker|BlazorWebAssembly|WindowsDesktop|StaticWebAssets))?|MSTest\.Sdk)(?:\/[\w.+-]+)?$/iu;
 
 // Whether the text of the file `f` compiles C# the reader never reads (#675): what HIDDEN names, a comment with no end,
-// a tag the reader does not know (unknown); a value that holds a line break (between two tags, beside other text),
-// which may carry a switch of its own into the compiler's response file; an <AssemblyAttribute> but one of
+// a tag the reader does not know (unknown); a value that holds a line break (between two tags, beside other text) or a
+// quote, either of which may carry a switch of its own into the compiler's response file; an <AssemblyAttribute> but one of
 // ASSEMBLY_STRINGS. Or an item whose Include names, in a part split at ";" and trimmed, in a .csproj or the .user beside
 // it: of <Compile>, a file of C# not among `cs` (bringsIn); of <ProjectReference>, anything but a .csproj among `known`
 // (the MSBuild files read), written out; and any part at all in another file, since MSBuild reads an item's path from
@@ -68,7 +74,7 @@ const TAG = /<(\/?)([^\s<>/]*)([^<>]*)>/gu;
 export function compilesOther(text, f, { cs, known }, pace) {
   const plain = uncommented(text.replace(DECLARATION, ""));
   if (plain === null || HIDDEN.test(plain) || unknown(plain, pace)) return true;
-  if (plain.split(/<[^<>]*>/u).some(t => /[\r\n]/u.test(t) && /\S/u.test(t))) return true;
+  if (plain.split(/<[^<>]*>/u).some(t => (/[\r\n]/u.test(t) && /\S/u.test(t)) || /"|&quot;|%22/iu.test(t))) return true;
   for (const m of plain.matchAll(/<AssemblyAttribute\b([^<>]*)>/giu)) { pace(); if (!ASSEMBLY_STRINGS.has((attributes(m[1])?.include ?? "").trim())) return true; }
   const own = /\.csproj(?:\.user)?$/iu.test(f);
   return anyPart(plain, /<Compile\b([^<>]*)>/giu, pace, p => !own || bringsIn(p, f, cs))
@@ -90,15 +96,26 @@ function uncommented(text) {
   return plain;
 }
 
-// Whether a text, its comments out, holds a tag of an element the reader does not know, or an attribute of one; a tag
-// that is no run of attributes, or closes with any; or a "<" outside every tag. Each try ends at the next "<": linear.
+// Whether a text, its comments out, holds a tag of an element the reader does not know, or an attribute of one; a Link
+// or LinkBase but on a <Compile>; an SDK but those of SDK; a tag that is no run of attributes, or closes with any; or a
+// "<" outside every tag. Each try ends at the next "<": linear.
 function unknown(plain, pace) {
   for (const m of plain.matchAll(TAG)) {
     pace();
     const attrs = m[1] ? (/^\s*$/u.test(m[3]) ? {} : null) : attributes(m[3]);
-    if (!known(ELEMENTS, m[2]) || !attrs || Object.keys(attrs).some(a => !known(ATTRIBUTES, a))) return true;
+    if (!known(ELEMENTS, m[2]) || !attrs || Object.keys(attrs).some(a => !known(ATTRIBUTES, a)) || (!m[1] && unsafe(m[2], attrs))) return true;
   }
   return plain.replace(TAG, "").includes("<");
+}
+
+// Whether the known attributes `attrs` of an opening tag of `name` are not safe there: a Link or LinkBase but on a
+// <Compile>, where it names only how a file is shown, sets where a copy is written; an SDK but those of SDK, in an Sdk
+// attribute's parts or an <Sdk>'s Name, which must be there.
+function unsafe(name, attrs) {
+  if (!/^compile$/iu.test(name) && ("link" in attrs || "linkbase" in attrs)) return true;
+  const element = /^sdk$/iu.test(name);
+  if (element && !(attrs.name ?? "").trim()) return true;
+  return [...(attrs.sdk ?? "").split(";"), ...(element ? [attrs.name] : [])].some(n => n.trim() && !SDK.test(n.trim()));
 }
 
 // Whether a part of the Include of an item `tag` matches, trimmed and with Windows' separators turned, or a tag of it is
@@ -125,20 +142,23 @@ function bringsIn(p, f, cs) {
   return false;
 }
 
-// The solution files, and the files the SDK compiles to C# the reader never reads (Razor's, XAML's), in any case.
-export const SOLUTION = /\.(?:sln|slnx|slnf)$/iu, COMPILED = /\.(?:razor|cshtml|xaml)$/iu;
+// The solution files, and the files the SDK or a package compiles to C# the reader never reads (Razor's, XAML's,
+// Avalonia's), in any case.
+export const SOLUTION = /\.(?:sln|slnx|slnf)$/iu, COMPILED = /\.(?:razor|cshtml|xaml|axaml)$/iu;
 // (a .sln's solution folder, which builds nothing)
 const FOLDER = "2150E333-8FDC-42A3-9474-1A3956D46DE8";
 
 // Whether the solution file `f` (its text `text`) builds anything but a .csproj of `projects` (the lower-cased paths of
 // those git or the change holds): a solution builds a project of any extension under C#'s GUID, whose targets may write
-// files of C#. Of a .sln, each line that opens "Project(" names a solution folder or a .csproj of them; of a .slnx, each
+// files of C#. Of a .sln, read as ASCII alone, each line that holds "Project(" names a solution folder or a .csproj of them; of a .slnx, each
 // <Project>'s Path does, with no Type; of a .slnf, its solution is a .sln or .slnx git holds and each project it lists
 // a .csproj of them, read from that solution's folder. Anything else, a line or a file not read whole among it, is
 // another.
 export function buildsOther(f, text, projects, solutions) {
   const held = (from, p) => /\.csproj$/iu.test(p) && projects.has(importPath(from, p)?.toLowerCase());
-  if (/\.sln$/iu.test(f)) return text.split(/\r?\n/u).filter(l => /^\s*Project\s*\(/iu.test(l)).some(l => {
+  // (a .sln is read line by line as .NET reads one, a "\r" alone ending a line too; any character but a tab and
+  // ASCII's printable ones, which .NET's trimming might take as a blank, makes it another)
+  if (/\.sln$/iu.test(f)) return /[^\t\r\n\x20-\x7e]/u.test(text.replace(/^\uFEFF/u, "")) || text.split(/\r\n|\r|\n/u).filter(l => /Project\s*\(/iu.test(l)).some(l => {
     const m = /^\s*Project\s*\(\s*"\{([0-9A-F-]+)\}"\s*\)\s*=\s*"[^"]*"\s*,\s*"([^"]*)"\s*,\s*"\{[0-9A-F-]+\}"\s*$/iu.exec(l);
     return !m || (m[1].toUpperCase() !== FOLDER && !held(f, m[2]));
   });

@@ -93,6 +93,13 @@ for (const [item, what, more] of [
   [`<PropertyGroup><CscEnvironment>DOTNET_STARTUP_HOOKS=../../outside/Hook.dll</CscEnvironment></PropertyGroup>`, "the compiler's environment"],
   [`</ItemGroup><ProjectExtensions><X /></ProjectExtensions><ItemGroup>`, "an element the reader does not know"],
   [`<Using Include="App" Note="x" />`, "an attribute the reader does not know"],
+  [`<Using Include="App" include="Other" />`, "two attributes alike but in case, of which a reader may take either"],
+  [`<None Include="docs/x.md" Link="../../tests/Gen.cs" CopyToOutputDirectory="Always" />`, "a Link on another item than <Compile>, which sets where a copy is written"],
+  [`<Content Include="docs/**" LinkBase="../../../tests" CopyToOutputDirectory="Always" />`, "a LinkBase on another item than <Compile>"],
+  [`<PropertyGroup><NoWarn>CS1591&quot; /x:y</NoWarn></PropertyGroup>`, "a quote in a value, which may close the compiler's argument"],
+  [`<PropertyGroup><NoWarn>CS1591%22 /x:y</NoWarn></PropertyGroup>`, "a quote in a value, by MSBuild's escape"],
+  ["", "an SDK the reader does not know, whose files may write C#", { "Directory.Build.props": "<Project Sdk=\"Aspire.AppHost.Sdk/9.5.0\" />\n" }],
+  [`</ItemGroup><Sdk Name="Aspire.AppHost.Sdk" Version="9.5.0" /><ItemGroup>`, "an SDK the reader does not know, as an element"],
 ]) {
   const r = reach(item, more);
   ok(same([...r.unsure].sort(), every), `where a project brings in ${what}, every file of C# is unsure`, JSON.stringify([...r.unsure]));
@@ -109,6 +116,7 @@ for (const [item, what, more] of [
   [`<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo"><_Parameter1>App.Tests</_Parameter1></AssemblyAttribute><AssemblyAttribute Include=" System.CLSCompliantAttribute "><_Parameter1>true</_Parameter1></AssemblyAttribute>`, "an assembly's attribute of the framework, written with strings alone"],
   [`<ProjectReference Include="../lib/Lib.csproj" />`, "a project git holds", LIB],
   [`<ProjectReference Include="..\\lib\\Lib.csproj" />`, "a project git holds, by Windows' separators", LIB],
+  [`</ItemGroup><Sdk Name="MSTest.Sdk" Version="3.6.3"></Sdk><ItemGroup><Compile Update="A.cs" Link="Shown/A.cs" />`, "an SDK the reader knows, and a Link on a <Compile>"],
   ["", "a project of the usual properties, packages and files, in a file that opens with a byte order mark and the XML declaration", { "Directory.Build.props": "\uFEFF<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<Project><PropertyGroup Condition=\"'$(Configuration)' == 'Debug'\"><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><NoWarn>$(NoWarn);CS1591</NoWarn></PropertyGroup><ItemGroup><PackageReference Include=\"xunit\" Version=\"2.9.0\"><PrivateAssets>all</PrivateAssets></PackageReference><None Include=\"data.json\" CopyToOutputDirectory=\"PreserveNewest\" /></ItemGroup></Project>\n" }],
   [`<Compile\n    Include="../lib/Rules.cs"\n    />\n  </ItemGroup>\n  <PropertyGroup>\n    <LangVersion>latest</LangVersion>\n    <!-- a note\n      over lines -->\n  </PropertyGroup><ItemGroup>`, "a file git holds, its tags and comments over lines"],
 ]) {
@@ -131,7 +139,7 @@ ok(!reach("", { "tests/Guard.cs": "namespace Tests;\npublic class Guard { string
 const held = (texts, listed = []) => heldBeside(texts, () => {}, () => listed, () => false).unknown === true;
 const other = [held({}, ["gen/Gen.vbproj"]), held({ "tools/Gen.proj": "<Project />" }), held({ "gen/Gen.my-proj": "<Project />" }), held({ "gen/Gen.ñproj": "<Project />" }), held({})];
 ok(same(other, [true, true, true, true, false]), "a project of another kind git holds or the change holds leaves what git holds unknown, so every file is unsure", JSON.stringify(other));
-const odd = [held({}, ["src/A.cs\n/recurse:x\n#.cs"]), held({ "src/B\r.cs": "class B { }\n" }), held({}, ["src/Counter.razor"]), held({}, ["src/Pages/Index.CSHTML"]), held({}, ["src/App.xaml"])];
+const odd = [held({}, ["src/A.cs\n/recurse:x\n#.cs"]), held({ "src/B\r.cs": "class B { }\n" }), held({ "src/Counter.razor": "<p />\n" }), held({ "src/Pages/Index.CSHTML": "<p />\n" }), held({ "src/App.xaml": "<Application />\n" }), held({ "src/Views/Main.axaml": "<UserControl />\n" })];
 ok(odd.every(Boolean), "a path with a control character, which splits the compiler's response file, or a file the SDK compiles from Razor or XAML, leaves what git holds unknown", JSON.stringify(odd));
 const SLN = (...lines) => `Microsoft Visual Studio Solution File, Format Version 12.00\n${lines.join("\n")}\nGlobal\nEndGlobal\n`, APP = { "src/App.csproj": "<Project />" };
 const project = (guid, p) => `Project("{${guid}}") = "X", "${p}", "{11111111-2222-3333-4444-555555555555}"\nEndProject`, CSG = "FAE04EC0-301F-11D3-BF4B-00C04F79EFBC";
@@ -146,8 +154,12 @@ const sln = [
   held({ ...APP, "App.slnx": "<Solution><Project Path=\"src/App.csproj\" Type=\"Classic C#\" /></Solution>\n" }),
   held({ ...APP, "App.slnf": JSON.stringify({ solution: { path: "../outside/App.sln", projects: ["src\\App.csproj"] } }) }),
   held({ ...APP, "App.slnf": "{" }),
+  held({ ...APP, "App.sln": SLN(`${project(CSG, "src\\App.csproj")}\r${project(CSG, "gen\\gen.build")}`) }),
+  held({ ...APP, "App.sln": SLN(`\u0085${project(CSG, "gen\\gen.build")}`) }),
+  held({ ...APP, "App.slnx": "<Solution><Project Path=\"gen/gen.build\" PATH=\"src/App.csproj\" /></Solution>\n" }),
+  held({ ...APP, "App.sln": `\uFEFF${SLN(project(CSG, "src\\App.csproj")).replace(/\n/gu, "\r\n")}` }),
 ];
-ok(same(sln, [false, false, false, true, true, true, true, true, true, true]), "a solution that builds a .csproj held, or a folder alone, leaves what git holds read; one that lists another project, a path outside, a line it cannot read, a type, or a filter of a solution not held, leaves it unknown", JSON.stringify(sln));
+ok(same(sln, [false, false, false, true, true, true, true, true, true, true, true, true, true, false]), "a solution that builds a .csproj held, or a folder alone, leaves what git holds read; one that lists another project, a path outside, a line it cannot read (a bare carriage return ending one, a character past ASCII), a type, an attribute twice, or a filter of a solution not held, leaves it unknown; a byte order mark and Windows' line ends are read", JSON.stringify(sln));
 
 // (a link and a submodule git holds, in a scratch repository, written to the index alone, as on a system with no
 // links: a wildcard inside, the SDK's default among them, would follow the link out or take the submodule's files)
@@ -163,7 +175,8 @@ ok(same(sln, [false, false, false, true, true, true, true, true, true, true]), "
     // (git's own list, by the default patterns: a project of another kind, written to the index alone, read so)
     git(["update-index", "--add", "--cacheinfo", `100644,${blob},gen/Gen.proj`]);
     ok(heldBeside({}).unknown === true, "a project of another kind git holds, listed by the default patterns, leaves what git holds unknown");
+    git(["rm", "-q", "--cached", "gen/Gen.proj"]); git(["update-index", "--add", "--cacheinfo", `100644,${blob},src/Views/Main.axaml`]);
+    ok(heldBeside({}).unknown === true, "a file of Avalonia's XAML git holds, listed by the default patterns, leaves what git holds unknown");
   } finally { process.chdir(here); }
 }
-
 done();

@@ -169,7 +169,7 @@ export const MSBUILD = /\.(?:csproj|props|targets|csproj\.user|pubxml|pubxml\.us
 // them, would follow a link out of the repository or take a submodule's files, which git does not list here; past
 // CHARACTERS bytes of them, Late. `pace` is asked before each file is read; `listed` gives the files git holds of those
 // kinds, `linked` whether git holds a link or a submodule (mode 120000 or 160000).
-export function heldBeside(texts, pace = () => {}, listed = () => git(["ls-files", "-z", "--", ...["*.csproj", "*.props", "*.targets", "*.csproj.user", "*.pubxml", "*.pubxml.user", "Directory.Build.rsp", "*.*proj", "*.sln", "*.slnx", "*.slnf", "*.razor", "*.cshtml", "*.xaml", "*.cs"].map(p => `:(glob,icase)**/${p}`)]).split("\0"),
+export function heldBeside(texts, pace = () => {}, listed = () => git(["ls-files", "-z", "--", ...["*.csproj", "*.props", "*.targets", "*.csproj.user", "*.pubxml", "*.pubxml.user", "Directory.Build.rsp", "*.*proj", "*.sln", "*.slnx", "*.slnf", "*.razor", "*.cshtml", "*.xaml", "*.axaml", "*.cs"].map(p => `:(glob,icase)**/${p}`)]).split("\0"),
   linked = () => git(["ls-files", "-s", "-z"]).split("\0").some(e => /^1[26]0000 /u.test(e))) {
   let n = 0;
   try {
