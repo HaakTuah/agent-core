@@ -180,6 +180,9 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
     put("README.md", "a change of its own\n"); git("commit", "-q", "-m", "c");
     let r = licenceCheck(config, dir, "HEAD^1", config);
     ok(!said(r, r.failures) && said(r, r.reports), "a lock file of another case that stood at the base is reported and passes", JSON.stringify(r));
+    r = licenceCheck(config, dir, "HEAD^1", { ...config, lockfiles: ["tools/Package-Lock.json"] });
+    ok(said(r, r.failures), "and one the base's config named fails when the pull request takes it out of the config"
+      , JSON.stringify(r));
     r = licenceCheck(config, dir, "HEAD^2", config);
     ok(said(r, r.failures), "and one the pull request adds fails", JSON.stringify(r));
     r = licenceCheck(config, dir, null, config);

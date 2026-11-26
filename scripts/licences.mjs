@@ -510,7 +510,7 @@ export function check(config, root, base = null, baseConfig = null) {
   for (const p of packages) checkPackage(ctx, p);
   const entries = config.audit ? checkAudit(ctx) : [];
   unneededYeses(ctx);
-  const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? [], base, auditOf(ctx.then)) : undefined;
+  const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? [], base, auditOf(ctx.then), Array.isArray(ctx.then?.lockfiles) ? ctx.then.lockfiles : []) : undefined;
   if (scanned) failures.push(...scanned.failures);
   failures.push(...npmrcFailures(root));
   for (const f of config.ignoreScriptsIn ?? []) {

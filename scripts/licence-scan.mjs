@@ -80,7 +80,7 @@ function linesIn(json, f, byHand, fail) {
 }
 
 /** The failures of the scan of the project at `root`, against its audit's `entries` (read from `auditPath`). */
-export function scan(settings, root, entries, auditPath, lockfiles = [], base = null, baseAudit = null) {
+export function scan(settings, root, entries, auditPath, lockfiles = [], base = null, baseAudit = null, baseLockfiles = []) {
   const failures = [], reports = [];
   const fail = (m) => { if (!failures.includes(m)) failures.push(m); };
   const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
@@ -89,7 +89,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = [], base = 
   const files = tracked.filter((f) => !(project && f.startsWith(copyOf(root))) && !under(f, settings.skip)); // (at the manifest's path)
   const binary = new Set(git("ls-files", "--eol", "-z").split("\0").filter((l) => /^i\/-text\s/u.test(l)).map((l) => l.slice(l.indexOf("\t") + 1)));
   // (what the scan's parts share: scanned, below)
-  const c = { settings, root, entries, auditPath, lockfiles, tracked, files, binary, fail, reports, base, baseAudit };
+  const c = { settings, root, entries, auditPath, lockfiles, tracked, files, binary, fail, reports, base, baseAudit, baseLockfiles };
 
   for (const key of ["served", "tools", "skip"]) for (const p of settings[key] ?? []) if (p !== "" && !tracked.some((f) => holds(p, f))) fail(`the config's "scan.${key}": ${p} names no tracked file. Mend: correct the path, a folder ending in "/", or take it out`);
   for (const e of entries) entryFaults(c, e);
@@ -232,8 +232,8 @@ function pinned(c, f, text) {
 function scanned(c, f) {
   if (LOCKFILE.test(f) && !c.lockfiles.includes(f)) {
     const said = `${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`;
-    // (a name of another case than npm's own is read only since #1349: where the base held that file, it passes, reported)
-    if (!EXACT_CASE.test(f) && c.base && atBase(c, f) !== null) c.reports.push(`${said}; it stood so at the pull request's base, so it passes`);
+    // (a name of another case than npm's own is read only since #1349: where the base held that file unnamed, it passes, reported)
+    if (!EXACT_CASE.test(f) && c.base && atBase(c, f) !== null && !c.baseLockfiles.includes(f)) c.reports.push(`${said}; it stood so at the pull request's base, so it passes`);
     else c.fail(said);
   }
   const text = c.binary.has(f) ? "" : trackedText(c.root, f, c.fail);
