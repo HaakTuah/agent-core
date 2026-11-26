@@ -31,6 +31,20 @@ and leaves the forms' heading on its reasons out or empty.
 - One is held back only for a reason (it breaks something, runs worse, changes its licence, or its project is abandoned
   or changes hands), written in the closed PR and an open issue.
 
+**An alert Dependabot does not mend** (#1142). By default a Dependabot alert's mend is Dependabot's own pull request,
+taken under floor rule 17. The one condition that changes it: the daily reading of the alerts (floor rule 9,
+`scripts/alerts.mjs`) files one as a bug issue, open more than a day with no open pull request of Dependabot's for it.
+Then the builder that takes it takes a version that fixes the advisory, of the package itself or of the one that brings
+it in, or the package manager's override, through the lookup, the licence check, the tests and the reviews, as any
+update does; its pull request is worded as Dependabot's is: what it updates, and that it fixes a published advisory,
+never how to attack. Where no mend passes, the builder judges whether the weak code is reached: where it is not (the
+function never called, a development tool that never reads such input), it files an issue labelled `needs-owner` asking
+the owner to dismiss the alert as "Risk is tolerable", with that reason, and nothing waits on it; where it is, the
+weakness is reported privately (floor rule 9, "Reporting a weakness"), never in an issue. It does not mean that a session
+dismisses an alert. Reason: an advisory's text is outsiders' (floor rule 4), and the most a planted one could ask is a
+version change, which passes every gate an update does. Held by `tests/alerts-test.mjs`, for the issue the reading
+files; the mend and the judgement, by none yet.
+
 **Node** runs the core's scripts in every project.
 - By default CI runs the exact version in the core's `.node-version`, the pin, and a cloud setup runs
   `scripts/node.sh`, which keeps a machine's own Node where it is at or above the least long-term line in the core's

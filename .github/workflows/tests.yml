@@ -451,6 +451,9 @@ jobs:
       - name: The records' check a pull request runs
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-check-test.mjs ')) }}
         run: node tests/choices-check-test.mjs
+      - name: The daily reading of the Dependabot alerts
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/alerts-test.mjs ')) }}
+        run: node tests/alerts-test.mjs
       - name: The scheduled look's readers of the choice records
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-look-test.mjs ')) }}
         run: node tests/choices-look-test.mjs
