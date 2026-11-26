@@ -200,7 +200,7 @@ const node = (coreAt, script, args, opts) => run(process.execPath, [`${coreAt}sc
 const shown = { stdio: ["ignore", "inherit", "inherit"] };
 // (Windows' shell, by the path the system names, never a cmd.exe the checked-out folder holds)
 const COMSPEC = process.env.ComSpec || "cmd.exe";
-const passed = r => { if (r.error) console.log(`The package manager could not be started (${r.error.message}).`); return r.status === 0; };
+const passed = r => { if (r.error) console.log(`The package manager could not be started (${r.error.message}). ${MEND}install npm beside Node (scripts/node.sh brings Node alone), then run this check again.`); return r.status === 0; };
 // (only under an npm that reads each setting that keeps the install to the registry: an older one, npm 10 that Node 22
 // brings among them, ignores them without a word and would fetch any git, web or file source the lock file names; #704)
 const ALLOWS = ["allow-git", "allow-remote", "allow-file"];

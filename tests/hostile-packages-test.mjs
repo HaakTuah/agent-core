@@ -209,6 +209,10 @@ if (process.platform !== "win32") {
     ok(r.status === 0 && fetched === null && /NOT INSTALLED: .*not on PATH/u.test(r.stdout), "with no node and /usr/local/bin not on PATH, node.sh fetches nothing and says where the pin would have gone");
   }
   {
+    const none = run({ node: "v24.1.0", bin: {} }).r, some = run({ node: "v24.1.0", bin: { [NPM]: fetchers[NPM] } }).r;
+    ok(none.status === 0 && /^note: npm is not here, and this script brings Node alone\. Mend: install npm beside Node/mu.test(none.stdout) && !/npm is not here/u.test(some.stdout), "node.sh says, with its mend, that it brings Node alone where the machine has no npm, and says nothing where it has one");
+  }
+  {
     const { r, fetched } = run({ bin: {} });
     ok(r.status === 0 && fetched === null && /NOT INSTALLED: .*no curl/u.test(r.stdout), `with no ${NPM} and no ${CURL}, node.sh fetches nothing and says so`);
   }
