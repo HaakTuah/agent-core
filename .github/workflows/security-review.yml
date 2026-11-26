@@ -11,7 +11,8 @@
 # and, in the core's own repository, while a design-checked pull request has no "Design check:" of its head, which
 # starts the job as "Code review:" does (scripts/review-marks.mjs; tasks/reviews.md, points 3 and 4; #551, #710).
 # While the code-review status waits, the security-review status waits too, saying why, since a ruleset requires the
-# one and not the other: a pull request that needs a code review merges only after one is posted (#1339).
+# one and not the other: a pull request that needs a code review merges only after one is posted (#1339); not a
+# pure sync the job proved, which needs no review (floor rule 8).
 # Proof is the summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment
 # that opens "Security review:" from the repository's owner, a person the host lets write (in a team's project, each
 # owner: roles/shared/teams.md; the job reads each such commenter's rights from GitHub, #412), or an account the caller

@@ -396,16 +396,16 @@ try {
     && folds.slice(3).every((v) => v.why === CODE_UNREAD),
   "while the code-review status waits, the security-review status waits too, saying why whole where it fits, else what it waits for and a mend that points to that status's, else the pointer; one not read, or of another commit, waits as not worked out; each within GitHub's 140 characters with its mend", folds.map((v) => v.why).join(" | "));
   const ownWait = { sha: HEAD, done: false, why: "no security review" };
-  ok(withCode(passed, { sha: HEAD, done: true, why: "no code review is running" }) === passed && withCode(passed, undefined) === passed && withCode(undefined, null) === undefined && withCode(ownWait, shortWhy) === ownWait,
-    "  one that passes, or none given (an older default branch), leaves it as it was; nor where it waits on its own, which says its own why");
+  ok(withCode(passed, { sha: HEAD, done: true, why: "no code review is running" }) === passed && withCode(passed, undefined) === passed && withCode(passed, shortWhy, true) === passed && withCode(passed, null, true) === passed && withCode(undefined, null) === undefined && withCode(ownWait, shortWhy) === ownWait,
+    "  one that passes, or none given (an older default branch), leaves it as it was, and so does a head proved a pure sync, which needs no review; nor where it waits on its own, which says its own why");
   const codeFile = join(dir, "code.json");
   const withFile = (code, env = {}) => { if (code === undefined) rmSync(codeFile, { force: true }); else writeFileSync(codeFile, typeof code === "string" ? code : JSON.stringify(code)); return run(pull, [[summary(done)]], { ADVISORY: "false", CODE: codeFile, ...env }); };
   const waitsFile = withFile({ sha: HEAD, done: false, why: NONE }), passesFile = withFile({ sha: HEAD, done: true, why: "no code review is running" }), advisesFile = withFile({ sha: HEAD, done: false, why: NONE }, { ADVISORY: "" });
   const brokenFile = withFile(""), goneFile = withFile(undefined);
   ok(waitsFile.status.state === "pending" && waitsFile.status.description.startsWith("Waiting: code-review waits: no code review.") && passesFile.status.state === "success"
     && advisesFile.status.state === "success" && advisesFile.status.description.startsWith("Advisory: code-review waits") && [brokenFile, goneFile].every((r) => r.status.state === "pending" && r.status.description === `Waiting: ${CODE_UNREAD}`)
-    && run(pull, [[summary(done)]], { ADVISORY: "false" }).status.state === "success",
-  "run as the workflow runs it, given CODE it waits while the code-review verdict waits, advises so where advisory, and waits where that file is empty or gone; given none, as before", [waitsFile, passesFile, advisesFile, brokenFile, goneFile].map((r) => r.status.description).join(" | "));
+    && run(pull, [[summary(done)]], { ADVISORY: "false" }).status.state === "success" && withFile({ sha: HEAD, done: false, why: NONE }, { PURE: HEAD }).status.state === "success",
+  "run as the workflow runs it, given CODE it waits while the code-review verdict waits, advises so where advisory, and waits where that file is empty or gone; given none, or a head proved a pure sync, as before", [waitsFile, passesFile, advisesFile, brokenFile, goneFile].map((r) => r.status.description).join(" | "));
   let usage = 0;
   try { execFileSync(process.execPath, [script], { stdio: "ignore" }); } catch (e) { usage = e.status; }
   ok(usage === 2, "with no files named, it says how it is run");

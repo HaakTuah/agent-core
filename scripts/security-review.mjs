@@ -66,7 +66,7 @@
 // one login, which no check here tells apart (#187). Given the verdict scripts/code-review-wait.mjs printed for the
 // same head (CODE), it waits, too, while the code-review status waits, saying why, so that the one status a ruleset
 // requires holds a pull request that needs a code review until one is posted in its form (#1339); one it cannot read
-// waits too.
+// waits too; a head proved a pure sync (PURE) needs no review, and waits on none.
 //
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its review comments, the same> [<its commits, the same> [<its files, the same> [<the merges proved>]]]]
@@ -446,15 +446,18 @@ export function powerFilesOf(file, read) {
 // project's where its owner makes it so), also waits while the code-review status waits, which none requires,
 // so that a pull request that needs a code review merges only after one is posted, in its form. `code` is
 // what scripts/code-review-wait.mjs printed for the same head ({ sha, done, why }), or undefined where the workflow ran
-// none (a default branch whose core is older); one it ran that cannot be read is read as waiting, never as a pass
+// none (a default branch whose core is older); one it ran that cannot be read is read as waiting, never as a pass;
+// `pure`, where pure-sync.mjs proved the head a pure sync, which needs no review at all (floor rule 8), whatever the
+// code-review status reads of a shape it does not prove (a workflow the kit renders anew, beyond its pins), so that the
+// sync, merged by hand, is held by no wait of a review
 // (its why carried whole where it fits, with room for "Advisory: " and "; summary unreadable" in GitHub's 140
 // characters; else what it waits for with a mend that points to that status's own, which GitHub shows beside this
 // one; else that pointer alone)
 export const CODE_UNREAD = "code-review not worked out. Mend: run this job again; failing again, mend scripts/code-review-wait.mjs";
 export const CODE_WAITS = "code-review waits. Mend: do what the code-review status's own mend says; this status then follows it";
 const POINTS = "Mend: do what the code-review status's own mend says";
-export function withCode(verdict, code) {
-  if (verdict === undefined || code === undefined || !verdict.done) return verdict;
+export function withCode(verdict, code, pure = false) {
+  if (verdict === undefined || code === undefined || !verdict.done || pure) return verdict;
   const read = code !== null && typeof code === "object" && code.sha === verdict.sha && typeof code.done === "boolean" && typeof code.why === "string";
   if (read && code.done) return verdict;
   if (!read) return { ...verdict, done: false, why: CODE_UNREAD };
@@ -497,6 +500,6 @@ if (started(import.meta.url)) {
     if (!process.env.CODE) return undefined;
     try { return JSON.parse(readFileSync(process.env.CODE, "utf8")); } catch { return null; }
   })();
-  const folded = withCode(verdict, code);
+  const folded = withCode(verdict, code, typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.PURE === pull.head.sha);
   console.log(JSON.stringify(folded === undefined ? {} : { sha: folded.sha, status: status(folded, process.env.ADVISORY !== "false", process.env.RUN_URL), ...(folded.warning ? { warning: folded.warning } : {}) }));
 }
