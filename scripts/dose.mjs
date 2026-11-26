@@ -186,7 +186,7 @@ function historyOf(r, at, root) {
 }
 export const cleaningDue = reader(TITLES.cleaning, (r, at, home, root) => {
   const h = historyOf(r, at, root);
-  return h.gap ? { body: null, unread: h.gap } : { body: cleaningBody(r, h.changes, h.got, home) };
+  return h.gap ? { body: null, unread: h.gap.split(". Mend: ")[0] } : { body: cleaningBody(r, h.changes, h.got, home) };
 });
 export const auditIsDue = reader(TITLES.audit, (r, at, home) => auditBody(r, at, home) ?? { body: null });
 

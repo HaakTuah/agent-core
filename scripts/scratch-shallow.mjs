@@ -21,3 +21,10 @@ export function scratchHistory(prefix, steps) {
   }
   return { dir, src, clone: (name, ...options) => { at(dir, steps[0].day, "clone", "-q", ...options, `file://${src}`, name); return path.join(dir, name); } };
 }
+
+// A shallow clone of the repository `src`, to `depth` commits, beside it as `<its folder>-<name>`: its path.
+export function shallowCopy(src, name, depth) {
+  const to = `${src}-${name}`;
+  execFileSync("git", ["clone", "-q", "--depth", String(depth), `file://${src}`, to], { stdio: "ignore" });
+  return to;
+}

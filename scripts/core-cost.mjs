@@ -46,8 +46,6 @@ export function classify(branch, files, rules, ours = true) {
   return "own";
 }
 
-// The day (UTC) a moment falls on, as YYYY-MM-DD, whatever offset it was written with.
-
 // The branch whose merges are read: the default branch as the clone knows its origin's, else origin's main, else its
 // own main (the core's projects all name it so: core.yml), by the first of them `has`; never the branch checked out,
 // which may be a task's. Null where there is none of them.
