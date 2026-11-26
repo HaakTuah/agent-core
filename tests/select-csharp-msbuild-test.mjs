@@ -115,10 +115,10 @@ ok(!unread.length && rooted("", { "Directory.Build.props": group("<RootNamespace
   try {
     add("A.cs", "class A { }\n"); add("Directory.Build.props", "<Project />\n"); add("B.cs", "class B { }\n");
     process.chdir(dir);
-    const held = heldBeside({ "B.cs": "" }, undefined, () => files);
+    const held = heldBeside({ "B.cs": "" }, undefined, () => files, () => false);
     ok(same(Object.keys(held.cs), ["A.cs"]) && same(Object.keys(held.msbuild), ["Directory.Build.props"]), "what git holds of C# and MSBuild beside the texts is read", JSON.stringify(held));
     let asked = 0, paced;
-    try { heldBeside({}, () => { if (++asked > 2) throw new Late("past the budget"); }, () => files); } catch (e) { paced = e; }
+    try { heldBeside({}, () => { if (++asked > 2) throw new Late("past the budget"); }, () => files, () => false); } catch (e) { paced = e; }
     ok(paced instanceof Late && asked === 3, "the budget is asked before each file git holds beside the texts is read, so many empty files cannot outlast it", String(paced));
     // (git lists them in any case, as MSBuild finds them on Windows)
     git(["init", "-q"]); fs.writeFileSync(path.join(dir, "directory.build.rsp"), "-p:A=b\n"); fs.writeFileSync(path.join(dir, "Low.PROPS"), "<Project />\n"); fs.writeFileSync(path.join(dir, "Up.CSPROJ"), "<Project />\n"); git(["add", "directory.build.rsp", "Low.PROPS", "Up.CSPROJ"]);

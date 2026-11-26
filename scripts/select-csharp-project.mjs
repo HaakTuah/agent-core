@@ -112,23 +112,33 @@ function importsOther(text, f, { known, folders, found }, pace) {
 // Whether the text of the file `f` compiles a file of C# the reader never reads (#675): a <Compile> item (in any case)
 // whose Include names, in a part split at ";" and trimmed, what MSBuild expands ("$", "@", "%", "&"), a path that
 // leads, from `f`'s folder, outside the repository or to a file `cs` (the files of C# read) does not hold, or a
-// wildcard whose path climbs out of the repository anywhere along it; or a tag that is no run of attributes. A
-// wildcard inside reads only files the checkout holds, as the SDK's own default does; a Remove or an Update alone
-// brings in nothing. `pace` is asked for each part.
+// wildcard whose path climbs out of the repository anywhere along it or whose name ends other than in ".cs", and any
+// wildcard in a file that holds a <Target>, which may write the files it matches before it is expanded; any part at
+// all in a file but a .csproj or the .user beside it, since MSBuild reads an item's path from the project's folder, not
+// the imported file's; a task's <Output> into the item Compile, a <Csc> task, a target named CoreCompile, or an
+// <AssemblyAttribute>, which the SDK writes into C# of its own; or such a tag that is no run of attributes. A wildcard
+// inside, in a file with no target, reads only files the checkout holds, as the SDK's own default does; a Remove or an
+// Update alone brings in nothing. `pace` is asked for each part.
 function compilesOther(text, f, cs, pace) {
-  for (const m of text.matchAll(/<Compile\b([^<>]*)>/giu)) {
-    const attrs = attributes(m[1]);
-    if (!attrs) return true;
-    for (const part of (attrs.include ?? "").split(";")) { pace(); if (bringsIn(part.trim().replace(/\\/gu, "/"), f, cs)) return true; }
+  const own = /\.csproj(?:\.user)?$/iu.test(f), wild = !/<Target\b/iu.test(text);
+  for (const m of text.matchAll(/<(Compile|Output|Target|Csc|AssemblyAttribute)\b([^<>]*)>/giu)) {
+    const attrs = attributes(m[2]), tag = m[1].toLowerCase();
+    if (!attrs || compiles(tag, attrs)) return true;
+    if (tag === "compile") for (const part of (attrs.include ?? "").split(";")) { pace(); if (part.trim() && (!own || bringsIn(part.trim().replace(/\\/gu, "/"), f, cs, wild))) return true; }
   }
   return false;
 }
-// Whether one part `p` of a <Compile>'s Include, in `f`, brings in a file of C# not among `cs`, as compilesOther says.
-function bringsIn(p, f, cs) {
-  if (!p) return false;
+// Whether the tag `tag` (in lower case), with its attributes, compiles what no <Compile> names, as compilesOther says.
+function compiles(tag, attrs) {
+  const is = (v, name) => v !== undefined && (/[$@%&]/u.test(v) || v.trim().toLowerCase() === name);
+  return tag === "csc" || tag === "assemblyattribute" || (tag === "target" && is(attrs.name, "corecompile")) || (tag === "output" && is(attrs.itemname, "compile"));
+}
+// Whether one part `p` of a <Compile>'s Include, in `f`, brings in a file of C# not among `cs`, as compilesOther says;
+// a wildcard only where `wild`.
+function bringsIn(p, f, cs, wild) {
   if (/[$@%&]/u.test(p)) return true;
   if (!/[*?]/u.test(p)) { const at = importPath(f, p); return at === null || at === "" || !cs.has(at); }
-  if (p.startsWith("/") || /^[A-Za-z]:/u.test(p)) return true;
+  if (!wild || p.startsWith("/") || /^[A-Za-z]:/u.test(p) || !CS.test(p)) return true;
   // (each folder the wildcard's path passes through, its depth below the top counted word by word: none outside)
   let depth = path.posix.dirname(f) === "." ? 0 : path.posix.dirname(f).split("/").length;
   for (const w of p.split("/")) if (w === "..") { if (--depth < 0) return true; } else if (w && w !== ".") depth++;
@@ -195,11 +205,14 @@ export const MSBUILD = /\.(?:csproj|props|targets|csproj\.user|pubxml|pubxml\.us
 // publish profile, cs: { path: text } of each file of C# }; { unknown: true } where git cannot be asked, a file cannot
 // be read or is not UTF-8 (nuget.mjs's plainText: UTF-16, say, which MSBuild and the compiler read and this would not),
 // a link among them (never followed) too, or a Directory.Build.rsp stands, whose switches may set any property with no
-// element to read; past CHARACTERS bytes of them, Late. `pace` is asked before each file is read; `listed`
-// gives the files git holds of those kinds.
-export function heldBeside(texts, pace = () => {}, listed = () => git(["ls-files", "-z", "--", ...["*.csproj", "*.props", "*.targets", "*.csproj.user", "*.pubxml", "*.pubxml.user", "Directory.Build.rsp", "*.cs"].map(p => `:(glob,icase)**/${p}`)]).split("\0")) {
+// element to read, or git holds a link anywhere, since a wildcard inside, the SDK's default **/*.cs among them, would
+// follow a link to a folder out of the repository; past CHARACTERS bytes of them, Late. `pace` is asked before each
+// file is read; `listed` gives the files git holds of those kinds, `linked` whether git holds a link (mode 120000).
+export function heldBeside(texts, pace = () => {}, listed = () => git(["ls-files", "-z", "--", ...["*.csproj", "*.props", "*.targets", "*.csproj.user", "*.pubxml", "*.pubxml.user", "Directory.Build.rsp", "*.cs"].map(p => `:(glob,icase)**/${p}`)]).split("\0"),
+  linked = () => git(["ls-files", "-s", "-z"]).split("\0").some(e => e.startsWith("120000 "))) {
   let n = 0;
   try {
+    if (linked()) return { unknown: true };
     const held = listed().filter(f => f && !(f in texts));
     if (held.some(f => path.posix.basename(f).toLowerCase() === "directory.build.rsp")) return { unknown: true };
     const text = f => { pace(); const st = fs.lstatSync(f); if (!st.isFile()) throw new Error(`${f} is no file`); if ((n += st.size) > CHARACTERS) throw tooMuch("the files git holds beside", n, "bytes"); const t = plainText(fs.readFileSync(f)); if (t === null) throw new Error(`${f} is not UTF-8`); return t; };
