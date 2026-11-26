@@ -8,7 +8,7 @@ import path from "node:path";
 import { CHARACTERS, Late } from "./hurry.mjs";
 import { importPath, plainText } from "./nuget.mjs";
 import { git } from "./select-passed.mjs";
-import { CS, attributes, compilesOther } from "./select-csharp-compiles.mjs";
+import { COMPILED, CS, SOLUTION, attributes, buildsOther, compilesOther } from "./select-csharp-compiles.mjs";
 
 export { CS };
 
@@ -161,21 +161,25 @@ export const MSBUILD = /\.(?:csproj|props|targets|csproj\.user|pubxml|pubxml\.us
 // another case, say, which MSBuild builds on Windows), .props, .targets, .csproj.user, which MSBuild imports beside its .csproj, and .pubxml and .pubxml.user, which the SDK imports by a
 // publish profile, cs: { path: text } of each file of C# }; { unknown: true } where git cannot be asked, a file cannot
 // be read or is not UTF-8 (nuget.mjs's plainText: UTF-16, say, which MSBuild and the compiler read and this would not),
-// a link among them (never followed) too, or a Directory.Build.rsp stands, whose switches may set any property with no
-// element to read, or a project of another kind (a .proj, a .vbproj: any *.*proj but a .csproj), which a solution or a
-// <ProjectReference> may build and whose targets may write files, or git holds a link or a submodule anywhere, since a wildcard inside, the SDK's default **/*.cs among
+// a link among them (never followed) too, or a path holds a control character (a line break in a file's name splits
+// the compiler's response file), or a Directory.Build.rsp stands, whose switches may set any property with no element
+// to read, or a project of another kind (a .proj, a .vbproj: any *.*proj but a .csproj), which a <ProjectReference> may
+// build and whose targets may write files, or a solution builds anything but a .csproj held (buildsOther), or a file
+// the SDK compiles to C# stands (COMPILED), or git holds a link or a submodule anywhere, since a wildcard inside, the SDK's default **/*.cs among
 // them, would follow a link out of the repository or take a submodule's files, which git does not list here; past
 // CHARACTERS bytes of them, Late. `pace` is asked before each file is read; `listed` gives the files git holds of those
 // kinds, `linked` whether git holds a link or a submodule (mode 120000 or 160000).
-export function heldBeside(texts, pace = () => {}, listed = () => git(["ls-files", "-z", "--", ...["*.csproj", "*.props", "*.targets", "*.csproj.user", "*.pubxml", "*.pubxml.user", "Directory.Build.rsp", "*.*proj", "*.cs"].map(p => `:(glob,icase)**/${p}`)]).split("\0"),
+export function heldBeside(texts, pace = () => {}, listed = () => git(["ls-files", "-z", "--", ...["*.csproj", "*.props", "*.targets", "*.csproj.user", "*.pubxml", "*.pubxml.user", "Directory.Build.rsp", "*.*proj", "*.sln", "*.slnx", "*.slnf", "*.razor", "*.cshtml", "*.xaml", "*.cs"].map(p => `:(glob,icase)**/${p}`)]).split("\0"),
   linked = () => git(["ls-files", "-s", "-z"]).split("\0").some(e => /^1[26]0000 /u.test(e))) {
   let n = 0;
   try {
     if (linked()) return { unknown: true };
-    const every = listed().filter(Boolean), held = every.filter(f => !(f in texts));
-    if ([...every, ...Object.keys(texts)].some(f => path.posix.basename(f).toLowerCase() === "directory.build.rsp" || /\.\w*proj$/iu.test(f) && !/\.csproj$/iu.test(f))) return { unknown: true };
+    const every = listed().filter(Boolean), held = every.filter(f => !(f in texts)), all = [...every, ...Object.keys(texts)];
+    if (all.some(f => /[\0-\x1f\x7f]/u.test(f) || path.posix.basename(f).toLowerCase() === "directory.build.rsp" || /\.[^/.]*proj$/iu.test(f) && !/\.csproj$/iu.test(f) || COMPILED.test(f))) return { unknown: true };
     const text = f => { pace(); const st = fs.lstatSync(f); if (!st.isFile()) throw new Error(`${f} is no file`); if ((n += st.size) > CHARACTERS) throw tooMuch("the files git holds beside", n, "bytes"); const t = plainText(fs.readFileSync(f)); if (t === null) throw new Error(`${f} is not UTF-8`); return t; };
-    return { msbuild: Object.fromEntries(held.filter(f => !CS.test(f)).map(f => [f, text(f)])), cs: Object.fromEntries(held.filter(f => CS.test(f)).map(f => [f, text(f)])) };
+    const lower = re => new Set(all.filter(f => re.test(f)).map(f => f.toLowerCase())), projects = lower(/\.csproj$/iu), solutions = lower(/\.slnx?$/iu);
+    if (all.filter(f => SOLUTION.test(f)).some(f => buildsOther(f, f in texts ? texts[f] : text(f), projects, solutions))) return { unknown: true };
+    return { msbuild: Object.fromEntries(held.filter(f => !CS.test(f) && !SOLUTION.test(f)).map(f => [f, text(f)])), cs: Object.fromEntries(held.filter(f => CS.test(f)).map(f => [f, text(f)])) };
   } catch (e) { if (e instanceof Late) throw e; return { unknown: true }; }
 }
 

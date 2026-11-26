@@ -2,11 +2,13 @@
 // (scripts/select-csharp-compiles.mjs, through scripts/select-csharp.mjs; #675): every file unsure where one brings in a
 // file the reader never reads (outside the repository, one git does not hold, a path MSBuild expands, a wildcard that
 // climbs out or names files other than .cs, any item of an imported file, a project of another kind or outside),
-// where a project may compile C# by other means (any target, a task in the compiler's place, the compiler's own
-// properties, an item the SDK writes C# from or a generator, a referenced project's output or properties, the project
-// extensions' folder moved, a value's line break, a link or a submodule git holds), and none where it names a file or a
-// project git holds, a wildcard of .cs inside, or only removes or updates; a file of C# that declares a type of System,
-// or holds a Unicode escape, reached from every file. Where other MSBuild files decide it:
+// where a project may compile C# by other means (an element or attribute not on the list known safe, so any target,
+// task, compiler property, generator item or referenced project's properties among them; a property function, a
+// character reference, a processing instruction or a document type; a value's line break; a link, a submodule, a path
+// with a control character, a file of Razor or XAML, or a solution that builds what is not a .csproj held), and none
+// where it names a file or project git holds, a wildcard of .cs inside, or only removes or updates, or a solution builds
+// only a .csproj held; a file of C# that declares a type of System or Microsoft, or holds a Unicode escape, reached from
+// every file. Where other MSBuild files decide it:
 // select-csharp-msbuild-test.mjs. The cases: select-csharp-test.mjs.
 // Needs the parser (node scripts/install.mjs parser). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
@@ -81,6 +83,16 @@ for (const [item, what, more] of [
   [`<PropertyGroup><Features>strict%0a/recurse:x.cs</Features></PropertyGroup>`, "a value with a line break's MSBuild escape"],
   [`<PropertyGroup><RootNamespace><![CDATA[App]]></RootNamespace></PropertyGroup>`, "a CDATA section, which may carry a line break"],
   [`<PropertyGroup><!-- a comment with no end</PropertyGroup>`, "a comment with no end"],
+  [`<PropertyGroup><PathMap>a=b$([System.Environment]::NewLine)x.cs</PathMap></PropertyGroup>`, "a property function, which may return a line break"],
+  [`<PropertyGroup><RootNamespace>App$( [System.Environment]::NewLine)</RootNamespace></PropertyGroup>`, "a property function, spaced"],
+  [`<PropertyGroup><RootNamespace>Lib&#46;Core</RootNamespace></PropertyGroup>`, "a numeric character reference, which may spell a line break or a \"$\""],
+  ["", "a processing instruction whose \"<!--\" would hide a line break from the comments' reading", { "Directory.Build.props": "<?x <!-- ?><Project><PropertyGroup><PathMap>a=b\nx.cs</PathMap></PropertyGroup></Project><!-- -->" }], // (no line break past it, which would stand beside what the cut leaves)
+  ["", "a <!DOCTYPE>, which may define entities", { "Directory.Build.props": "<!DOCTYPE Project [<!ENTITY e \"x\">]><Project />\n" }],
+  [`<ProjectReference Include="../lib/Lib.csproj" Properties="DirectoryBuildPropsPath=../hook.xml" />`, "a referenced project's Properties", LIB],
+  [`</ItemGroup><ItemDefinitionGroup><ProjectReference><Properties>X=Y</Properties></ProjectReference></ItemDefinitionGroup><ItemGroup>`, "a referenced project's Properties, as an item definition's element", LIB],
+  [`<PropertyGroup><CscEnvironment>DOTNET_STARTUP_HOOKS=../../outside/Hook.dll</CscEnvironment></PropertyGroup>`, "the compiler's environment"],
+  [`</ItemGroup><ProjectExtensions><X /></ProjectExtensions><ItemGroup>`, "an element the reader does not know"],
+  [`<Using Include="App" Note="x" />`, "an attribute the reader does not know"],
 ]) {
   const r = reach(item, more);
   ok(same([...r.unsure].sort(), every), `where a project brings in ${what}, every file of C# is unsure`, JSON.stringify([...r.unsure]));
@@ -97,6 +109,7 @@ for (const [item, what, more] of [
   [`<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo"><_Parameter1>App.Tests</_Parameter1></AssemblyAttribute><AssemblyAttribute Include=" System.CLSCompliantAttribute "><_Parameter1>true</_Parameter1></AssemblyAttribute>`, "an assembly's attribute of the framework, written with strings alone"],
   [`<ProjectReference Include="../lib/Lib.csproj" />`, "a project git holds", LIB],
   [`<ProjectReference Include="..\\lib\\Lib.csproj" />`, "a project git holds, by Windows' separators", LIB],
+  ["", "a project of the usual properties, packages and files, in a file that opens with a byte order mark and the XML declaration", { "Directory.Build.props": "\uFEFF<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<Project><PropertyGroup Condition=\"'$(Configuration)' == 'Debug'\"><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><NoWarn>$(NoWarn);CS1591</NoWarn></PropertyGroup><ItemGroup><PackageReference Include=\"xunit\" Version=\"2.9.0\"><PrivateAssets>all</PrivateAssets></PackageReference><None Include=\"data.json\" CopyToOutputDirectory=\"PreserveNewest\" /></ItemGroup></Project>\n" }],
   [`<Compile\n    Include="../lib/Rules.cs"\n    />\n  </ItemGroup>\n  <PropertyGroup>\n    <LangVersion>latest</LangVersion>\n    <!-- a note\n      over lines -->\n  </PropertyGroup><ItemGroup>`, "a file git holds, its tags and comments over lines"],
 ]) {
   const r = reach(item, more);
@@ -110,12 +123,31 @@ ok(attrs !== null && paced >= 1000, "the budget is asked for each assembly's att
 // (a type of System, where an attribute the SDK writes binds, or a Unicode escape, which may spell one, reached from every file)
 for (const [guard, what] of [["namespace System;\npublic class ClsCompliantAttribute : Attribute { }\n", "declares a type in System"],
   ["namespace System.Runtime.CompilerServices;\npublic class InternalsVisibleToAttribute : Attribute { }\n", "declares a type below System"],
+  ["namespace Microsoft.Extensions.Configuration.UserSecrets;\npublic class UserSecretsIdAttribute : Attribute { }\n", "declares a type below Microsoft, where the SDK writes UserSecretsIdAttribute"],
   ["namespace Tests;\npublic class Gu\\u0061rd { }\n", "holds a Unicode escape outside a literal"]]) {
   ok(reach("", { "tests/Guard.cs": guard }).links.get("tests/T.cs")?.has("tests/Guard.cs"), `a file that ${what} is reached from every file`);
 }
 ok(!reach("", { "tests/Guard.cs": "namespace Tests;\npublic class Guard { string s = \"\\u0061\"; }\n" }).links.get("tests/T.cs")?.has("tests/Guard.cs"), "a file whose escape stands in a literal alone is reached by name alone");
-const other = [heldBeside({}, () => {}, () => ["gen/Gen.vbproj"], () => false), heldBeside({ "tools/Gen.proj": "<Project />" }, () => {}, () => [], () => false), heldBeside({}, () => {}, () => [], () => false)];
-ok(other[0].unknown && other[1].unknown && !other[2].unknown, "a project of another kind git holds or the change holds leaves what git holds unknown, so every file is unsure", JSON.stringify(other));
+const held = (texts, listed = []) => heldBeside(texts, () => {}, () => listed, () => false).unknown === true;
+const other = [held({}, ["gen/Gen.vbproj"]), held({ "tools/Gen.proj": "<Project />" }), held({ "gen/Gen.my-proj": "<Project />" }), held({ "gen/Gen.ñproj": "<Project />" }), held({})];
+ok(same(other, [true, true, true, true, false]), "a project of another kind git holds or the change holds leaves what git holds unknown, so every file is unsure", JSON.stringify(other));
+const odd = [held({}, ["src/A.cs\n/recurse:x\n#.cs"]), held({ "src/B\r.cs": "class B { }\n" }), held({}, ["src/Counter.razor"]), held({}, ["src/Pages/Index.CSHTML"]), held({}, ["src/App.xaml"])];
+ok(odd.every(Boolean), "a path with a control character, which splits the compiler's response file, or a file the SDK compiles from Razor or XAML, leaves what git holds unknown", JSON.stringify(odd));
+const SLN = (...lines) => `Microsoft Visual Studio Solution File, Format Version 12.00\n${lines.join("\n")}\nGlobal\nEndGlobal\n`, APP = { "src/App.csproj": "<Project />" };
+const project = (guid, p) => `Project("{${guid}}") = "X", "${p}", "{11111111-2222-3333-4444-555555555555}"\nEndProject`, CSG = "FAE04EC0-301F-11D3-BF4B-00C04F79EFBC";
+const sln = [
+  held({ ...APP, "App.sln": SLN(project(CSG, "src\\App.csproj"), project("2150E333-8FDC-42A3-9474-1A3956D46DE8", "Tools")) }),
+  held({ ...APP, "App.slnx": "<Solution><Folder Name=\"/t/\"><File Path=\"README.md\" /></Folder><Project Path=\"src/App.csproj\" /></Solution>\n" }),
+  held({ ...APP, "App.sln": SLN(project(CSG, "src\\App.csproj")), "App.slnf": JSON.stringify({ solution: { path: "App.sln", projects: ["src\\App.csproj"] } }) }),
+  held({ ...APP, "App.sln": SLN(project(CSG, "src\\App.csproj"), project(CSG, "gen\\gen.build")) }),
+  held({ ...APP, "App.sln": SLN(project(CSG, "..\\outside\\App.csproj")) }),
+  held({ ...APP, "App.sln": SLN("Project(\"{x}\") = broken") }),
+  held({ ...APP, "App.slnx": "<Solution><Project Path=\"gen/gen.build\" /></Solution>\n" }),
+  held({ ...APP, "App.slnx": "<Solution><Project Path=\"src/App.csproj\" Type=\"Classic C#\" /></Solution>\n" }),
+  held({ ...APP, "App.slnf": JSON.stringify({ solution: { path: "../outside/App.sln", projects: ["src\\App.csproj"] } }) }),
+  held({ ...APP, "App.slnf": "{" }),
+];
+ok(same(sln, [false, false, false, true, true, true, true, true, true, true]), "a solution that builds a .csproj held, or a folder alone, leaves what git holds read; one that lists another project, a path outside, a line it cannot read, a type, or a filter of a solution not held, leaves it unknown", JSON.stringify(sln));
 
 // (a link and a submodule git holds, in a scratch repository, written to the index alone, as on a system with no
 // links: a wildcard inside, the SDK's default among them, would follow the link out or take the submodule's files)
@@ -123,11 +155,14 @@ ok(other[0].unknown && other[1].unknown && !other[2].unknown, "a project of anot
   const here = process.cwd(), dir = scratchDir("linked-");
   try {
     process.chdir(dir); git(["init", "-q"]); fs.writeFileSync("A.cs", "class A { }\n"); git(["add", "A.cs"]);
-    const blob = git(["hash-object", "-w", "A.cs"]).trim(), unheld = heldBeside({}), held = {};
+    const blob = git(["hash-object", "-w", "A.cs"]).trim(), unheld = heldBeside({}), linked = {};
     for (const [mode, sha, name] of [["120000", blob, "shared"], ["160000", "1".repeat(40), "vendor/shared"]]) {
-      git(["update-index", "--add", "--cacheinfo", `${mode},${sha},${name}`]); held[mode] = heldBeside({}); git(["rm", "-q", "--cached", name]);
+      git(["update-index", "--add", "--cacheinfo", `${mode},${sha},${name}`]); linked[mode] = heldBeside({}); git(["rm", "-q", "--cached", name]);
     }
-    ok(!unheld.unknown && held["120000"].unknown && held["160000"].unknown, "a link or a submodule git holds anywhere leaves what git holds unknown, so every file is unsure", JSON.stringify([unheld, held]));
+    ok(!unheld.unknown && linked["120000"].unknown && linked["160000"].unknown, "a link or a submodule git holds anywhere leaves what git holds unknown, so every file is unsure", JSON.stringify([unheld, linked]));
+    // (git's own list, by the default patterns: a project of another kind, written to the index alone, read so)
+    git(["update-index", "--add", "--cacheinfo", `100644,${blob},gen/Gen.proj`]);
+    ok(heldBeside({}).unknown === true, "a project of another kind git holds, listed by the default patterns, leaves what git holds unknown");
   } finally { process.chdir(here); }
 }
 

@@ -43,7 +43,7 @@ const items = ["<Using Include=\"App.Data.Store\" Alias=\"S\" />", "<Using Inclu
 ok(!items.length, "a <Using> with an Alias (an attribute's too), or Static, reaches the type it names from every file", items.join(", "));
 const store = (item, held = {}) => csharpReach({ "src/App.csproj": PROJ, "src/Store.cs": "namespace App.Data;\npublic class Store { }\n", "tests/Tests.csproj": `<Project><ItemGroup>${item}</ItemGroup></Project>`,
   "tests/T.cs": "namespace Tests;\nclass T { D.Data.Store s; }\n" }, undefined, () => ({ msbuild: held, cs: {} }));
-const tags = ["<Using Note=\"Alias='Q'\" Include=\"App\" Alias=\"D\" />", "<using Include=\"App\" Alias=\"D\" />", "<USING Include=\"App\" Alias=\"D\"></USING>", "<Using Include=\"App\" Alias=\"Q\"><Alias>D</Alias></Using>", "<Using Include=\"App\" Alias=\"@D\" />",
+const tags = ["<Using Label=\"Alias='Q'\" Include=\"App\" Alias=\"D\" />", "<using Include=\"App\" Alias=\"D\" />", "<USING Include=\"App\" Alias=\"D\"></USING>", "<Using Include=\"App\" Alias=\"Q\"><Alias>D</Alias></Using>", "<Using Include=\"App\" Alias=\"@D\" />",
   "<Using Include=\"App\">\n  <alias>D</alias>\n  <Visible>false</Visible>\n</Using>"]
   .filter(item => !store(item).links.get("tests/T.cs")?.has("src/Store.cs"));
 ok(!tags.length, "a <Using> is read in any case, each attribute from its own pair, both aliases where an attribute and an element each give one, and an alias's \"@\" dropped", tags.join(" | "));
@@ -80,7 +80,7 @@ ok(heldUpper.links.get("tests/T.cs")?.has("src/Store.cs"), "a .CSPROJ git holds 
 const above1 = "<Project><Import Project=\"$([MSBuild]::GetPathOfFileAbove('a.props'))\" /></Project>";
 const siblings = n => [...Array(n)].map((_, i) => [`${"d/".repeat(600)}s${i}/x.props`, above1]).concat([["a.props", "<Project />"]]);
 let one300 = 0, all300 = 0;
-msbuildUsings(siblings(300).map(([f, t]) => [f, f === "a.props" ? t : "<Project />"]), () => one300++);
+msbuildUsings(siblings(300).map(([f, t]) => [f, f === "a.props" ? t : "<Project><ItemGroup /></Project>"]), () => one300++); // (as many tags as above1: the climbs alone differ)
 msbuildUsings(siblings(300), () => all300++);
 ok(all300 - one300 < 2000, "searches from sibling folders climb what they share once", `${all300 - one300}`);
 const deep = [[`${"d/".repeat(600)}x.props`, `<Project>${`<Import Project="$([MSBuild]::GetPathOfFileAbove('a.props'))" />`.repeat(500)}</Project>`], ["a.props", "<Project />"]];
@@ -99,9 +99,9 @@ const used = { "tests/T.cs": "namespace Tests;\nclass T { bool b = \"x\".Allowed
 ok(ext("Aspire.Hosting") && !ext("App.Inner"), "a namespace declared outside every project's root, which a package's own .props may import, is seen by every file; one under a root is not");
 const ext2 = "namespace App.Inner;\npublic static class Ext { public static bool Allowed(this string s) => true; }\n", group = x => `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>${x}</PropertyGroup></Project>`;
 const rooted = (x, beside = {}, more = {}) => csharpReach({ "src/App.csproj": group(x), "src/X.cs": ext2, ...used, ...more }, undefined, () => ({ msbuild: beside, cs: {} })).links.get("tests/T.cs")?.has("src/X.cs");
-const unread = ["Lib&#46;Core", "Lib%2ECore", "$(Company).App", "App<!-- c -->", " Lib "].map(v => `<RootNamespace>${v}</RootNamespace>`)
+const unread = ["Lib%2ECore", "$(Company).App", "App<!-- c -->", " Lib "].map(v => `<RootNamespace>${v}</RootNamespace>`)
   .concat("<RootNamespace Condition=\"'$(A)' == ''\">App</RootNamespace>", "<RootNamespace>App</RootNamespace><RootNamespace>Lib</RootNamespace>", "<!-- <RootNamespace>Lib</RootNamespace> -->",
-    "</PropertyGroup><PropertyGroup Condition=\"false\"><RootNamespace>Lib</RootNamespace>", "</PropertyGroup><ProjectExtensions><RootNamespace>Lib</RootNamespace></ProjectExtensions><PropertyGroup>").filter(x => !rooted(x));
+    "</PropertyGroup><PropertyGroup Condition=\"false\"><RootNamespace>Lib</RootNamespace>").filter(x => !rooted(x));
 if (!rooted("</PropertyGroup><Import Project=\"root.props\" /><PropertyGroup>", { "src/root.props": "<Project />" })) unread.push("an <Import> of a .props git holds");
 ok(!unread.length && rooted("", { "Directory.Build.props": group("<RootNamespace>Lib</RootNamespace>") }) && rooted("", [], { "Directory.Build.props": group("<RootNamespace>Lib</RootNamespace>") }) && !rooted(""),
   "a project that names a <RootNamespace> anywhere or imports a file, or beside a .props or .targets git holds that names one, adds no root, so its namespaces are seen by every file; its name is a root", unread.join(" | "));

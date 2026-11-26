@@ -15,36 +15,90 @@ export function attributes(tag) {
   return /^\s*\/?$/u.test(tag.slice(at).trimEnd()) ? out : null; // (one "\s*": two would backtrack)
 }
 
-// What brings C# in by its own means, in any case: a <Target>, which may hold any task, an <Output> into any item or a
-// write of files the SDK's default **/*.cs then takes; a <UsingTask>, which may replace the compiler's; an item the SDK
-// or a package writes C# from or compiles with (<Analyzer>, <TestingPlatformBuilderHook>); and, anywhere, a word that
-// hands the compiler a response file or names its own compiler, puts what a referenced project returns into an item
-// (OutputItemType), moves the folder whose project extensions the SDK imports, or sets the properties a referenced
-// project is built with.
-const BY_ITS_OWN = /<(?:Target|UsingTask|Analyzer|TestingPlatformBuilderHook)\b|CompilerResponseFile|CscTool(?:Path|Exe)|OutputItemType|BaseIntermediateOutputPath|MSBuildProjectExtensionsPath|AdditionalProperties|UndefineProperties|GlobalPropertiesToRemove|Set(?:Configuration|Platform|TargetFramework)/iu;
+// The names an MSBuild file may hold for the reader to read it (#675), in lower case, as MSBuild reads a property's: of
+// an element, the project's own structure, the items the reader reads (<Compile>, <ProjectReference>, <Using>,
+// <AssemblyAttribute>, <Import>) or that bring no C# of the repository in (packages, frameworks, files copied or
+// embedded), their metadata that changes nothing the compiler reads, and the properties that name no file, tool, task,
+// target or folder (a property the reader reads, RootNamespace, or the importsOther's switches beside them); of an
+// attribute, those the same items and structure take. An element or attribute of any other name, a <Target>, a
+// <UsingTask>, an <Analyzer>, a property of the compiler's own, a referenced project's Properties among them, is one
+// whose effect is not known, so the file is not read: a list of what is known safe, not of what is refused, so a way
+// in no one listed reads as unknown (each review of a refused list found another).
+const ELEMENTS = new Set(["project", "propertygroup", "itemgroup", "import", "importgroup", "choose", "when", "otherwise", "sdk",
+  "compile", "projectreference", "using", "assemblyattribute", "packagereference", "packageversion", "globalpackagereference", "frameworkreference",
+  "none", "content", "embeddedresource", "folder", "internalsvisibleto",
+  "alias", "static", "version", "versionoverride", "privateassets", "includeassets", "excludeassets", "copytooutputdirectory", "copytopublishdirectory", "visible",
+  "targetframework", "targetframeworks", "outputtype", "nullable", "implicitusings", "langversion", "ispackable", "istestproject", "ispublishable", "rootnamespace",
+  "assemblyname", "generatedocumentationfile", "treatwarningsaserrors", "warningsaserrors", "warningsnotaserrors", "warninglevel", "nowarn", "defineconstants",
+  "versionprefix", "versionsuffix", "assemblyversion", "fileversion", "informationalversion", "authors", "company", "product", "copyright", "description",
+  "packageid", "packagetags", "packagelicenseexpression", "packageprojecturl", "repositoryurl", "repositorytype", "packagereadmefile", "title", "neutrallanguage",
+  "managepackageversionscentrally", "centralpackagetransitivepinningenabled", "invariantglobalization", "deterministic", "continuousintegrationbuild",
+  "analysislevel", "analysismode", "enforcecodestyleinbuild", "enablenetanalyzers", "allowunsafeblocks", "checkforoverflowunderflow", "debugtype", "debugsymbols",
+  "optimize", "configurations", "platforms", "platformtarget", "runtimeidentifier", "runtimeidentifiers", "selfcontained", "publishaot", "publishtrimmed",
+  "isaotcompatible", "istrimmable", "usersecretsid", "importdirectorybuildprops", "importdirectorybuildtargets", "importdirectorypackagesprops",
+  "targetframeworkprofile", "enabledefaultcompileitems", "enabledefaultitems", "generateassemblyinfo", "generatepackageonbuild", "includesymbols",
+  "symbolpackageformat", "nugetaudit", "nugetauditmode", "nugetauditlevel", "restorepackageswithlockfile", "satelliteresourcelanguages"]);
+const ATTRIBUTES = new Set(["include", "remove", "update", "exclude", "condition", "label", "sdk", "name", "project", "toolsversion", "xmlns", "version",
+  "versionoverride", "privateassets", "includeassets", "excludeassets", "alias", "static", "copytooutputdirectory", "copytopublishdirectory", "visible", "link", "linkbase"]);
+// (an assembly's attribute's arguments, _Parameter1 and on, as an element or an attribute; never _Parameter1_IsLiteral
+// or _Parameter1_TypeName, which write an argument as code)
+const known = (names, n) => names.has(n.toLowerCase()) || /^_parameter\d+$/iu.test(n);
 // The assembly's attributes of the framework that the SDK writes with strings alone, as C# names them, in its case
 // (InternalsVisibleTo, which test projects use most; CLSCompliant). A repository type of such a name is reached from
 // every file (select-csharp.mjs, runsUnnamed).
 const ASSEMBLY_STRINGS = new Set(["System.Runtime.CompilerServices.InternalsVisibleTo", "System.Runtime.CompilerServices.InternalsVisibleToAttribute", "System.CLSCompliant", "System.CLSCompliantAttribute"]);
-// A line break's escape ("&#10;", "&#xD;", "%0A", in any case) or a CDATA section, which may carry one.
-const BREAK = /<!\[CDATA\[|&#(?:0*1[03]|x0*[ad]);|%0[ad]/iu;
+// What MSBuild or XML reads that a tag's name does not show, anywhere in the text: a processing instruction (<?) past
+// the XML declaration at the start, in which a "<!--" would hide what follows from the comments' reading; a <!DOCTYPE>,
+// which may define entities; a CDATA section; a numeric character reference (&#10;, &#36;), which may spell a line break
+// or a "$"; MSBuild's escape of a line break (%0A); and a property function ("$([", spaced or not) but the two that
+// importsOther reads exactly, since one may return a line break (System.Environment::NewLine) or a file's text.
+const HIDDEN = /<\?|<!DOCTYPE|<!\[CDATA\[|&#|%0[ad]|\$\(\s*\[(?!MSBuild\]::Get(?:PathOf|DirectoryNameOf)FileAbove\()/iu;
+const DECLARATION = /^\uFEFF?<\?xml\s[^<>?]*\?>/u;
+const TAG = /<(\/?)([^\s<>/]*)([^<>]*)>/gu;
 
-// Whether the text of the file `f` compiles C# the reader never reads (#675): what BY_ITS_OWN names; an
-// <AssemblyAttribute> but one of ASSEMBLY_STRINGS, or any where metadata that writes its arguments as code ("_IsLiteral",
-// "_TypeName") stands anywhere in the file; a value that holds a line break (breaks), which may carry a switch of its own
-// into the compiler's response file. Or an item whose Include names, in a part split at ";" and trimmed, in a .csproj
-// or the .user beside it: of <Compile>, a file of C# not among `cs` (bringsIn); of <ProjectReference>, anything but a
-// .csproj among `known` (the MSBuild files read), written out; and any part at all in another file, since MSBuild reads
-// an item's path from the project's folder, not the imported file's; or such a tag not a run of attributes. A wildcard of
-// .cs inside reads only files the checkout holds, as the SDK's own default does where no target runs; a Remove or an
-// Update alone brings in nothing. `pace` is asked for each item and part.
+// Whether the text of the file `f` compiles C# the reader never reads (#675): what HIDDEN names, a comment with no end,
+// a tag the reader does not know (unknown); a value that holds a line break (between two tags, beside other text),
+// which may carry a switch of its own into the compiler's response file; an <AssemblyAttribute> but one of
+// ASSEMBLY_STRINGS. Or an item whose Include names, in a part split at ";" and trimmed, in a .csproj or the .user beside
+// it: of <Compile>, a file of C# not among `cs` (bringsIn); of <ProjectReference>, anything but a .csproj among `known`
+// (the MSBuild files read), written out; and any part at all in another file, since MSBuild reads an item's path from
+// the project's folder, not the imported file's. A wildcard of .cs inside reads only files the checkout holds, as the
+// SDK's own default does where no target runs; a Remove or an Update alone brings in nothing. `pace` is asked for each
+// tag, item and part.
 export function compilesOther(text, f, { cs, known }, pace) {
-  if (BY_ITS_OWN.test(text) || breaks(text)) return true;
-  const code = /_(?:IsLiteral|TypeName)/iu.test(text);
-  for (const m of text.matchAll(/<AssemblyAttribute\b([^<>]*)>/giu)) { pace(); if (code || !ASSEMBLY_STRINGS.has((attributes(m[1])?.include ?? "").trim())) return true; }
+  const plain = uncommented(text.replace(DECLARATION, ""));
+  if (plain === null || HIDDEN.test(plain) || unknown(plain, pace)) return true;
+  if (plain.split(/<[^<>]*>/u).some(t => /[\r\n]/u.test(t) && /\S/u.test(t))) return true;
+  for (const m of plain.matchAll(/<AssemblyAttribute\b([^<>]*)>/giu)) { pace(); if (!ASSEMBLY_STRINGS.has((attributes(m[1])?.include ?? "").trim())) return true; }
   const own = /\.csproj(?:\.user)?$/iu.test(f);
-  return anyPart(text, /<Compile\b([^<>]*)>/giu, pace, p => !own || bringsIn(p, f, cs))
-    || anyPart(text, /<ProjectReference\b([^<>]*)>/giu, pace, p => !own || /[$@%&*?]/u.test(p) || !/\.csproj$/iu.test(p) || !known.has(importPath(f, p)));
+  return anyPart(plain, /<Compile\b([^<>]*)>/giu, pace, p => !own || bringsIn(p, f, cs))
+    || anyPart(plain, /<ProjectReference\b([^<>]*)>/giu, pace, p => !own || /[$@%&*?]/u.test(p) || !/\.csproj$/iu.test(p) || !known.has(importPath(f, p)));
+}
+
+// The text with its comments taken out, each found by indexOf (linear); null where a "<?" stands before the first, in
+// which its "<!--" is no comment, or one has no end.
+function uncommented(text) {
+  let plain = "";
+  for (let at = 0; at < text.length;) {
+    const open = text.indexOf("<!--", at);
+    if (open < 0) return plain + text.slice(at);
+    const close = text.indexOf("-->", open + 4);
+    if (close < 0 || text.slice(at, open).includes("<?")) return null;
+    plain += text.slice(at, open);
+    at = close + 3;
+  }
+  return plain;
+}
+
+// Whether a text, its comments out, holds a tag of an element the reader does not know, or an attribute of one; a tag
+// that is no run of attributes, or closes with any; or a "<" outside every tag. Each try ends at the next "<": linear.
+function unknown(plain, pace) {
+  for (const m of plain.matchAll(TAG)) {
+    pace();
+    const attrs = m[1] ? (/^\s*$/u.test(m[3]) ? {} : null) : attributes(m[3]);
+    if (!known(ELEMENTS, m[2]) || !attrs || Object.keys(attrs).some(a => !known(ATTRIBUTES, a))) return true;
+  }
+  return plain.replace(TAG, "").includes("<");
 }
 
 // Whether a part of the Include of an item `tag` matches, trimmed and with Windows' separators turned, or a tag of it is
@@ -58,22 +112,6 @@ function anyPart(text, tag, pace, brings) {
   return false;
 }
 
-// Whether a text, its comments taken out, holds a line break beside other text between two tags, or BREAK; or a
-// comment with no end. Each comment is found by indexOf, and each try of the split ends at the next "<": linear.
-function breaks(text) {
-  if (BREAK.test(text)) return true;
-  let plain = "";
-  for (let at = 0; at < text.length;) {
-    const open = text.indexOf("<!--", at);
-    if (open < 0) { plain += text.slice(at); break; }
-    const close = text.indexOf("-->", open + 4);
-    if (close < 0) return true;
-    plain += text.slice(at, open);
-    at = close + 3;
-  }
-  return plain.split(/<[^<>]*>/u).some(t => /[\r\n]/u.test(t) && /\S/u.test(t));
-}
-
 // Whether one part `p` of a <Compile>'s Include, in `f`, brings in a file of C# not among `cs`: what MSBuild expands
 // ("$", "@", "%", "&"), a path that leads, from `f`'s folder, outside the repository or to a file `cs` does not hold,
 // or a wildcard whose path climbs out of the repository anywhere or whose name ends other than in ".cs".
@@ -85,4 +123,28 @@ function bringsIn(p, f, cs) {
   let depth = path.posix.dirname(f) === "." ? 0 : path.posix.dirname(f).split("/").length;
   for (const w of p.split("/")) if (w === "..") { if (--depth < 0) return true; } else if (w && w !== ".") depth++;
   return false;
+}
+
+// The solution files, and the files the SDK compiles to C# the reader never reads (Razor's, XAML's), in any case.
+export const SOLUTION = /\.(?:sln|slnx|slnf)$/iu, COMPILED = /\.(?:razor|cshtml|xaml)$/iu;
+// (a .sln's solution folder, which builds nothing)
+const FOLDER = "2150E333-8FDC-42A3-9474-1A3956D46DE8";
+
+// Whether the solution file `f` (its text `text`) builds anything but a .csproj of `projects` (the lower-cased paths of
+// those git or the change holds): a solution builds a project of any extension under C#'s GUID, whose targets may write
+// files of C#. Of a .sln, each line that opens "Project(" names a solution folder or a .csproj of them; of a .slnx, each
+// <Project>'s Path does, with no Type; of a .slnf, its solution is a .sln or .slnx git holds and each project it lists
+// a .csproj of them, read from that solution's folder. Anything else, a line or a file not read whole among it, is
+// another.
+export function buildsOther(f, text, projects, solutions) {
+  const held = (from, p) => /\.csproj$/iu.test(p) && projects.has(importPath(from, p)?.toLowerCase());
+  if (/\.sln$/iu.test(f)) return text.split(/\r?\n/u).filter(l => /^\s*Project\s*\(/iu.test(l)).some(l => {
+    const m = /^\s*Project\s*\(\s*"\{([0-9A-F-]+)\}"\s*\)\s*=\s*"[^"]*"\s*,\s*"([^"]*)"\s*,\s*"\{[0-9A-F-]+\}"\s*$/iu.exec(l);
+    return !m || (m[1].toUpperCase() !== FOLDER && !held(f, m[2]));
+  });
+  if (/\.slnx$/iu.test(f)) return [...text.matchAll(/<Project\b([^<>]*)>/giu)].some(m => { const a = attributes(m[1]); return !a || "type" in a || !held(f, a.path ?? ""); }) || /<Project\b[^<>]*$/iu.test(text);
+  try {
+    const { solution } = JSON.parse(text), from = importPath(f, String(solution.path));
+    return !solutions.has(from?.toLowerCase()) || !/\.slnx?$/iu.test(from) || !Array.isArray(solution.projects) || solution.projects.some(p => typeof p !== "string" || !held(from, p));
+  } catch { return true; }
 }
