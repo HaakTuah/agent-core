@@ -222,8 +222,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   only on a pull request, so a read-only trial cannot see it; at release 6, both of the owner's games failed it at their
   syncs after the cut (#1310). Held by `scripts/trial-draft.mjs`, which reads the draft's checks beside those of the
   project's `main` and gives no answer for a draft of a repository the core's owner does not own, behind a stop switch,
-  no longer a draft or pinned elsewhere, and by `scripts/release.mjs` with `scripts/release-trial.mjs`, which cut nothing
-  where a check failed on the draft that passed on `main` or ran on the draft alone, or where the record holds fewer
+  no longer a draft or pinned elsewhere, and by `scripts/release.mjs` with `scripts/release-trial.mjs` and `scripts/trial-draft-record.mjs`, which cut
+  nothing where a check failed on the draft that passed on `main` or ran on the draft alone, or where the record holds fewer
   drafts than the owner's own projects found; that the draft merges no sooner, by the host, which merges no draft, and
   by `scripts/trial-draft.mjs`, which reads none no longer a draft; that it is marked ready no sooner, and that a project
   of another owner's is not written to, by nothing yet.

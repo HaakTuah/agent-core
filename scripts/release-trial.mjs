@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { leadsOut } from "./guards.mjs";
 import { answersOf, syncCounts, syncFormed, syncSaid, syncsIn } from "./trial-sync.mjs";
-import { draftFormed, draftHeld, draftRecord, draftSaid, draftReadingsOf, draftsIn, draftsShort } from "./trial-draft.mjs";
+import { draftFormed, draftHeld, draftRecord, draftSaid, draftReadingsOf, draftsIn, draftsShort } from "./trial-draft-record.mjs";
 
 // The key check.mjs --verdicts adds where it was run from outside the project, a clone of the core (check.mjs's RUN_FROM,
 // which the test holds to this one; #1244): no job's place.
