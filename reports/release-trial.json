@@ -1,20 +1,26 @@
 {
-  "commit": "a19c6b6a188b98adb421a7c343773ed3c51e4d28",
-  "day": "2026-11-25",
-  "projects": 3,
-  "passedBoth": 19,
-  "fixedAfter": 0,
+  "commit": "921e13b76d1e936363c61ea76f115365a0a19f1d",
+  "day": "2026-11-26",
+  "projects": 2,
+  "passedBoth": 15,
+  "fixedAfter": 2,
   "failedBoth": 0,
   "failedAfter": 0,
   "failedAfterAlone": 0,
   "stoppedAfter": 0,
-  "ranAfterAlone": 15,
+  "stoppedNeither": 0,
+  "ranAfterAlone": 18,
   "ranBeforeAlone": 0,
   "failedBeforeAlone": 0,
-  "unrunAfter": 2,
+  "unrunAfter": 0,
   "unrunAfterRan": 0,
   "unreadAfter": 0,
   "unreadBefore": 0,
   "unreadNeither": 0,
-  "baselineFromClone": 3
+  "baselineFromClone": 0,
+  "syncPure": 2,
+  "syncNotPure": 0,
+  "copiesFrom": {
+    "release-6": 2
+  }
 }
