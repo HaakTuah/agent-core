@@ -1,16 +1,18 @@
 // Fails a key that stands twice in one object of a JSON file the core reads (#1367): JSON.parse keeps the last and drops
 // the first without a word, so a list such as .github/sizes.json reads as two marks while one counts and no one can tell
-// which. Every tracked file ending .json is read, but the dated records (archive/, reports/, words/) and lock files, which a
-// tool writes; a file that is no JSON is left to the readers of it. Node's own modules only.
+// which. Every tracked file ending .json is read, but the dated records (archive/, words/), lock files, which a tool writes,
+// and a link, which may point out of the repository; a file that is no JSON is left to the readers of it. Node's own
+// modules only.
 //
 // Its cases and a run over the tracked files are in tests/parse-errors-test.mjs.
 //
 //   node scripts/json-keys.mjs [<file> ...]     (no file: those git tracks)
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
 import { started } from "./started.mjs";
 
-const SKIP = ["archive/", "reports/", "words/"];
+const SKIP = ["archive/", "words/"];
 const LOCKS = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
 
 // A string literal of valid JSON, as the text it stands for.
@@ -49,23 +51,37 @@ export function duplicateKeys(text) {
   return found;
 }
 
-const clip = key => (key.length > 80 ? `${key.slice(0, 80)}...` : key).replace(/[^\x20-\x7e]/gu, "?");
+// A key or a file's name as it is said: cut at 80 characters, all but printable ASCII written as "?".
+const clip = text => (text.length > 80 ? `${text.slice(0, 80)}...` : text).replace(/[^\x20-\x7e]/gu, "?");
 
-// The JSON files git tracks that the check reads, from the folder it is run in.
-export function trackedJson() {
-  return execFileSync("git", ["ls-files", "-z", "*.json"], { encoding: "utf8" }).split("\0")
-    .filter(f => f && !SKIP.some(s => f.startsWith(s)) && !LOCKS.test(f));
+// Of `files`, paths from `root`, those the check reads: no dated record, lock file or link.
+export function toRead(root, files) {
+  return files.filter(f => f && !SKIP.some(s => f.startsWith(s)) && !LOCKS.test(f))
+    .filter(f => { try { return !fs.lstatSync(path.join(root, f)).isSymbolicLink(); } catch { return false; } });
+}
+
+// The JSON files git tracks under `root` that the check reads, their paths from `root`.
+export function trackedJson(root = process.cwd()) {
+  return toRead(root, execFileSync("git", ["ls-files", "-z", "*.json"], { cwd: root, encoding: "utf8" }).split("\0"));
 }
 
 // What a file's duplicates say, one failure each, in the form of scripts/mend.mjs.
 export function failuresOf(file, text) {
-  return duplicateKeys(text).map(d => `FAIL ${file} holds the key "${clip(d.key)}" twice in one object, at lines ${d.first} and ${d.again}, and JSON.parse keeps only the last. Mend: keep the key once in ${file}, with the value meant, and take the other out; where the two differ, keep the one the readers use now (the last)`);
+  const name = clip(file);
+  return duplicateKeys(text).map(d => `FAIL ${name} holds the key "${clip(d.key)}" twice in one object, at lines ${d.first} and ${d.again}, and JSON.parse keeps only the last. Mend: keep the key once in ${name}, with the value meant, and take the other out; where the two differ, keep the one the readers use now (the last)`);
 }
 
 if (started(import.meta.url)) {
-  let files = process.argv.slice(2);
-  if (files.length === 0) files = trackedJson();
-  const out = files.flatMap(f => { try { return failuresOf(f, fs.readFileSync(f, "utf8")); } catch (e) { if (e?.code === "ENOENT") return []; throw e; } });
+  const named = process.argv.slice(2);
+  let root = process.cwd();
+  if (!named.length) {
+    try { root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch {
+      console.error(`FAIL ${clip(root)} is in no git repository, so no tracked JSON file could be read. Mend: run the check from inside the repository, or name the files to read`);
+      process.exit(1);
+    }
+  }
+  const files = named.length ? named : trackedJson(root);
+  const out = files.flatMap(f => { try { return failuresOf(f, fs.readFileSync(path.join(root, f), "utf8")); } catch (e) { if (e?.code === "ENOENT") return []; throw e; } });
   for (const line of out) console.error(line);
   if (out.length) process.exit(1);
   console.log(`ok   ${files.length} JSON files hold no key twice in one object`);

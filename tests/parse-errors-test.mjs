@@ -10,6 +10,7 @@
 //
 //   node tests/parse-errors-test.mjs
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SEEK, parseBounded } from "../scripts/guards.mjs";
@@ -17,7 +18,7 @@ import { load } from "../scripts/parser.mjs";
 import { LARGEST, budgetOf, parseWithin } from "../scripts/tree-walk.mjs";
 import { parseToml } from "../scripts/toml.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
-import { duplicateKeys, failuresOf, trackedJson } from "../scripts/json-keys.mjs";
+import { duplicateKeys, failuresOf, toRead, trackedJson } from "../scripts/json-keys.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0, count = 0;
@@ -207,10 +208,24 @@ for (const [text, lines, what] of [
 {
   const says = failuresOf("twice.json", '{\n  "mark": 1,\n  "mark": 2\n}\n').join("\n");
   ok(says.includes('twice.json holds the key "mark" twice') && says.includes("lines 2 and 3") && mended(says), "a key twice is failed with its file, key, lines and mend", says);
+  ok(!failuresOf("x\u001b[31m.json", '{"a": 1, "a": 2}').join("\n").includes("\u001b"), "a file's name is said with its control characters written out");
   ok(failuresOf("long.json", `{"${"k".repeat(200)}": 1, "${"k".repeat(200)}": 2}`).join("\n").length < 700, "a long key is cut in what is said");
 }
 {
-  const said = trackedJson().flatMap(f => failuresOf(f, fs.readFileSync(path.join(root, f), "utf8")));
+  // A link is not read, so a key of a file outside the repository is never said; nor a dated record or a lock file.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "json-keys-"));
+  try {
+    fs.mkdirSync(path.join(dir, "repo", "sub"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "outside.json"), '{"a": 1, "a": 2}');
+    fs.writeFileSync(path.join(dir, "repo", "sub", "kept.json"), '{"a": 1}');
+    let linked = true;
+    try { fs.symlinkSync(path.join(dir, "outside.json"), path.join(dir, "repo", "link.json")); } catch { linked = false; }
+    const read = toRead(path.join(dir, "repo"), ["sub/kept.json", "link.json", "archive/x.json", "words/y.json", "a/package-lock.json", ""]);
+    ok(read.join() === "sub/kept.json", `a link, a dated record and a lock file are not read${linked ? "" : " (no link could be made here)"}`, read.join());
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+{
+  const said = trackedJson(root).flatMap(f => failuresOf(f, fs.readFileSync(path.join(root, f), "utf8")));
   ok(said.length === 0, "no JSON file this repository tracks holds a key twice in one object", said.join("\n"));
 }
 
