@@ -153,7 +153,7 @@ const sha = (c) => `sha256:${c.repeat(64)}`;
 r = await one(pkg("tidy-moss-format", { hashes: [sha("a")] }));
 ok(r.failures.length === 0, `a hash PyPI lists for a file of the version passes (${r.failures})`);
 r = await one(pkg("yanked-moss", { version: "2.0.0", hashes: [sha("9")] }));
-ok(r.failures.length === 0, `a hash of a yanked file of the version passes, since pip installs it at that exact version (${r.failures})`);
+ok(r.failures.length === 0, `a hash of a yanked file of the version passes, since a pin to that exact version still takes it (${r.failures})`);
 r = await one(pkg("tidy-moss-format", { version: "v1.1", hashes: [sha("a")] }));
 ok(r.failures.length === 0, `a hash is compared with the files of the version PyPI keys, however the lock line spells it (${r.failures})`);
 r = await one(pkg("tidy-moss-format", { version: "v1.1", hashes: [sha("f")] }));
