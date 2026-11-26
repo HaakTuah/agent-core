@@ -5,13 +5,13 @@
 //   node scripts/trial-draft.mjs <owner>/<name> <the draft's number> <the commit tried> [--gate <a check's name>]...
 //         prints, last, `draft answer: ` and the counts release.mjs --trial takes with --draft, with a short hash of the
 //         repository's id so no project is given twice; none while a check or workflow on the draft waits, or one on
-//         main that the draft ran too waits on no person, where none but skipped ones ran on the draft or a list could
-//         not be read whole, or for a pull request no open draft from the project's own branch by the owner's account,
-//         against the default branch, pinned to the commit, or of a repository another owner's, whose default branch's
-//         manifest pins no copy of this core or could not be read, or behind a stop switch that stands or cannot be
-//         read. A workflow that could not start counts as a failed check; one skipped on the draft is counted and named
-//         apart, saying where it passed on main. `--gate` names a check its builder read as failing only for being a
-//         draft (setup/sync-notes/680): counted apart, holding nothing, named on its own line.
+//         main the draft holds, skipped or not, waits on no person, where none but skipped ones ran on the draft or a
+//         list could not be read whole, or for a pull request no open draft from the project's own branch by the
+//         owner's account, against the default branch, pinned to the commit, or of a repository another owner's, whose
+//         default branch's manifest pins no copy of this core or could not be read, or behind a stop switch that stands
+//         or cannot be read. A workflow that could not start counts as a failed check; one skipped on the draft is
+//         counted and named apart, saying where it passed on main. `--gate` names a check its builder read as failing
+//         only for being a draft (setup/sync-notes/680): counted apart, holding nothing, named on its own line.
 //   node scripts/trial-draft.mjs <owner>/<name> none <the commit tried>
 //         where no draft was opened: reads why (another owner's, a stop switch that stands) and prints it as the answer;
 //         none for a repository whose manifest pins no copy of this core or could not be read, or the owner's own

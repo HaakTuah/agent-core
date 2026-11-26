@@ -8,7 +8,7 @@
 import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { draftCounts, readDraft, readNone, repoHash, saidOf } from "../scripts/trial-draft.mjs";
-import { DRAFT_COUNTS } from "../scripts/trial-draft-record.mjs";
+import { DRAFT_COUNTS, LINE, draftAnswerOf } from "../scripts/trial-draft-record.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -88,5 +88,11 @@ ok(many.answer?.draftPassedAlone === 150 && unstarted.answer?.draftFailedAlone =
 const [other, stop, own, unread, noCore] = [readNone("o/p", TRIED, host({ owner: "someone-else" })), readNone("o/p", TRIED, host({ stop: true })), readNone("o/p", TRIED, host()), readNone("o/p", TRIED, host({ stop: "unread" })), readNone("o/p", TRIED, host({ stop: true, noCore: true }))];
 ok(other.answer?.none === "another-owner" && other.answer.repo === repoHash(41) && stop.answer?.none === "stop-switch" && !own.answer && /opens a draft there/.test(own.why) && !unread.answer && /pins no copy of this core/.test(noCore.why ?? "") && [own, noCore].every(r => mended(`FAIL no answer for the project: ${r.why}.`)),
   "`none` reads another owner's repository and a stop switch that stands, and gives no answer for the owner's own project whose stop switch does not stand or cannot be read, nor for a repository that takes no copy of this core", JSON.stringify([other, stop, own, unread]));
+
+// (each answer, printed as the command prints it, read back by the reader release.mjs --trial runs on it: #1108)
+const back = [read, skippedAfter, other, stop].map(r => draftAnswerOf(`${LINE}${JSON.stringify(r.answer)}\n`, TRIED));
+ok(JSON.stringify(back[0]) === JSON.stringify({ answer: Object.fromEntries(DRAFT_COUNTS.map(k => [k, read.answer[k]])), repo: read.answer.repo }) && back[1].answer?.draftSkippedAfter === 1
+  && back[2].none === "another-owner" && back[3].none === "stop-switch" && back.every(b => b.repo === repoHash(41)),
+  "each answer, a draft's or a `none`, printed as the command prints it, is read back to the same counts and reason", JSON.stringify(back));
 
 done("the draft in a release's trial");
