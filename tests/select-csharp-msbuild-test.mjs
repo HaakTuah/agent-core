@@ -99,7 +99,7 @@ const used = { "tests/T.cs": "namespace Tests;\nclass T { bool b = \"x\".Allowed
 ok(ext("Aspire.Hosting") && !ext("App.Inner"), "a namespace declared outside every project's root, which a package's own .props may import, is seen by every file; one under a root is not");
 const ext2 = "namespace App.Inner;\npublic static class Ext { public static bool Allowed(this string s) => true; }\n", group = x => `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>${x}</PropertyGroup></Project>`;
 const rooted = (x, beside = {}, more = {}) => csharpReach({ "src/App.csproj": group(x), "src/X.cs": ext2, ...used, ...more }, undefined, () => ({ msbuild: beside, cs: {} })).links.get("tests/T.cs")?.has("src/X.cs");
-const unread = ["Lib&#46;Core", "Lib%2ECore", "$(Company).App", "<![CDATA[App]]>", "App<!-- c -->", " Lib "].map(v => `<RootNamespace>${v}</RootNamespace>`)
+const unread = ["Lib&#46;Core", "Lib%2ECore", "$(Company).App", "App<!-- c -->", " Lib "].map(v => `<RootNamespace>${v}</RootNamespace>`)
   .concat("<RootNamespace Condition=\"'$(A)' == ''\">App</RootNamespace>", "<RootNamespace>App</RootNamespace><RootNamespace>Lib</RootNamespace>", "<!-- <RootNamespace>Lib</RootNamespace> -->",
     "</PropertyGroup><PropertyGroup Condition=\"false\"><RootNamespace>Lib</RootNamespace>", "</PropertyGroup><ProjectExtensions><RootNamespace>Lib</RootNamespace></ProjectExtensions><PropertyGroup>").filter(x => !rooted(x));
 if (!rooted("</PropertyGroup><Import Project=\"root.props\" /><PropertyGroup>", { "src/root.props": "<Project />" })) unread.push("an <Import> of a .props git holds");

@@ -1,22 +1,16 @@
 // What C# compiles with beyond a file's own text, for the test selection (select-csharp.mjs, beside this file; #675):
 // the global using directives MSBuild's <Using> items write, the files of C# and MSBuild git holds that the config does
-// not read, and whether a file of C# lies under a .csproj's folder. Each read is held to the selection's budget (Late
-// past it, which runs the whole suite). Node's own modules and git.
+// not read (and whether one compiles C# it never reads: select-csharp-compiles.mjs), and whether a file of C# lies under
+// a .csproj's folder. Each read is held to the selection's budget (Late past it, which runs the whole suite). Node's own
+// modules and git.
 import fs from "node:fs";
 import path from "node:path";
 import { CHARACTERS, Late } from "./hurry.mjs";
 import { importPath, plainText } from "./nuget.mjs";
 import { git } from "./select-passed.mjs";
+import { CS, attributes, compilesOther } from "./select-csharp-compiles.mjs";
 
-// The attributes of an XML tag's text ({ include: "App" }, each name in lower case: MSBuild's metadata), read as a run
-// of name="value" pairs (either quotes) from its start, so a name in another's value is none; null where anything else
-// stands there.
-function attributes(tag) {
-  const pair = /\s*([\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/uy, out = {};
-  let at = 0;
-  for (let m; (pair.lastIndex = at, m = pair.exec(tag)); at = pair.lastIndex) out[m[1].toLowerCase()] = m[2] ?? m[3];
-  return /^\s*\/?$/u.test(tag.slice(at).trimEnd()) ? out : null; // (one "\s*": two would backtrack)
-}
+export { CS };
 
 // The namespaces a project's SDK or test framework imports with no <Using> git holds, where ImplicitUsings is on (the
 // SDKs' own .props, Web, Worker, Windows desktop and Blazor's; xUnit v3's, MSTest's and TUnit's). Each is taken as a
@@ -109,45 +103,6 @@ function importsOther(text, f, { known, folders, found }, pace) {
   return false;
 }
 
-// Whether the text of the file `f` compiles C# the reader never reads (#675). A tag (in any case) of what may bring it
-// in by its own means: a <Target>, which may hold any task, an <Output> into any item or a write of files the SDK's
-// default **/*.cs then takes; a <UsingTask>, which may replace the compiler's; a property that hands the compiler a
-// response file or names its own compiler; or an item the SDK or a package writes C# from or compiles with
-// (<Analyzer>, <TestingPlatformBuilderHook>, and an <AssemblyAttribute> but one of ASSEMBLY_STRINGS with no metadata
-// that writes its arguments as code, "_IsLiteral" or "_TypeName", anywhere in the file). Or a <Compile> item whose Include names, in a part
-// split at ";" and trimmed, what MSBuild expands ("$", "@", "%", "&"), a path that leads, from `f`'s folder, outside
-// the repository or to a file `cs` (the files of C# read) does not hold, or a wildcard whose path climbs out of the
-// repository anywhere or whose name ends other than in ".cs"; any part at all in a file but a .csproj or the
-// .user beside it, since MSBuild reads an item's path from the project's folder, not the imported file's; or such a tag
-// not a run of attributes. A wildcard of .cs inside reads only files the checkout holds, as the SDK's own default
-// does where no target runs; a Remove or an Update alone brings in nothing. `pace` is asked for each item and part.
-const BY_ITS_OWN = /<(?:Target|UsingTask|CompilerResponseFile|CscToolPath|CscToolExe|Analyzer|TestingPlatformBuilderHook)\b/iu;
-// The assembly's attributes of the framework that the SDK writes with strings alone, which reach no type of the
-// repository (InternalsVisibleTo, a test project's commonest; CLSCompliant), lower-cased.
-const ASSEMBLY_STRINGS = new Set(["system.runtime.compilerservices.internalsvisibleto", "system.runtime.compilerservices.internalsvisibletoattribute", "system.clscompliant", "system.clscompliantattribute"]);
-function compilesOther(text, f, cs, pace) {
-  if (BY_ITS_OWN.test(text)) return true;
-  const code = /_(?:IsLiteral|TypeName)/iu.test(text);
-  for (const m of text.matchAll(/<AssemblyAttribute\b([^<>]*)>/giu)) { pace(); if (code || !ASSEMBLY_STRINGS.has((attributes(m[1])?.include ?? "").trim().toLowerCase())) return true; }
-  const own = /\.csproj(?:\.user)?$/iu.test(f);
-  for (const m of text.matchAll(/<Compile\b([^<>]*)>/giu)) {
-    const attrs = attributes(m[1]);
-    if (!attrs) return true;
-    for (const part of (attrs.include ?? "").split(";")) { pace(); if (part.trim() && (!own || bringsIn(part.trim().replace(/\\/gu, "/"), f, cs))) return true; }
-  }
-  return false;
-}
-// Whether one part `p` of a <Compile>'s Include, in `f`, brings in a file of C# not among `cs`, as compilesOther says.
-function bringsIn(p, f, cs) {
-  if (/[$@%&]/u.test(p)) return true;
-  if (!/[*?]/u.test(p)) { const at = importPath(f, p); return at === null || at === "" || !cs.has(at); }
-  if (p.startsWith("/") || /^[A-Za-z]:/u.test(p) || !CS.test(p)) return true;
-  // (each folder the wildcard's path passes through, its depth below the top counted word by word: none outside)
-  let depth = path.posix.dirname(f) === "." ? 0 : path.posix.dirname(f).split("/").length;
-  for (const w of p.split("/")) if (w === "..") { if (--depth < 0) return true; } else if (w && w !== ".") depth++;
-  return false;
-}
-
 // The folder at or above `d` that holds `name` among `known`, or null: climbed a folder at a time, each a slice of the
 // last, until one whose answer `found` keeps, which then keeps the answer for each folder climbed.
 function climb(d, name, { known, found }, pace) {
@@ -186,7 +141,7 @@ export function msbuildUsings(entries, pace, cs = new Set()) {
   if (n > CHARACTERS) throw tooMuch("the project's MSBuild files", n);
   for (const [f, text] of entries) {
     pace();
-    if (importsOther(text, f, { known, folders, found }, pace) || compilesOther(text, f, cs, pace)) return null;
+    if (importsOther(text, f, { known, folders, found }, pace) || compilesOther(text, f, { cs, known }, pace)) return null;
     for (const m of text.matchAll(/<Using\b([^<>]*)>/giu)) { // (an item type in any case; each try ends at the next "<": linear)
       const attrs = attributes(m[1]), meta = !attrs || m[1].trimEnd().endsWith("/") ? {} : children(text, m.index + m[0].length);
       if (!attrs || meta === null || "update" in attrs) return null; // (an Update changes an item the reader took already)
@@ -199,7 +154,6 @@ export function msbuildUsings(entries, pace, cs = new Set()) {
   return out;
 }
 
-export const CS = /\.cs$/iu; // (a file of C#, in any case, as MSBuild compiles it on Windows)
 // The texts MSBuild reads as a project's: a .csproj and what it imports by name or beside it.
 export const MSBUILD = /\.(?:csproj|props|targets|csproj\.user|pubxml|pubxml\.user)$/iu; // (in any case, as MSBuild finds them on Windows)
 
@@ -208,17 +162,18 @@ export const MSBUILD = /\.(?:csproj|props|targets|csproj\.user|pubxml|pubxml\.us
 // publish profile, cs: { path: text } of each file of C# }; { unknown: true } where git cannot be asked, a file cannot
 // be read or is not UTF-8 (nuget.mjs's plainText: UTF-16, say, which MSBuild and the compiler read and this would not),
 // a link among them (never followed) too, or a Directory.Build.rsp stands, whose switches may set any property with no
-// element to read, or git holds a link or a submodule anywhere, since a wildcard inside, the SDK's default **/*.cs among
+// element to read, or a project of another kind (a .proj, a .vbproj: any *.*proj but a .csproj), which a solution or a
+// <ProjectReference> may build and whose targets may write files, or git holds a link or a submodule anywhere, since a wildcard inside, the SDK's default **/*.cs among
 // them, would follow a link out of the repository or take a submodule's files, which git does not list here; past
 // CHARACTERS bytes of them, Late. `pace` is asked before each file is read; `listed` gives the files git holds of those
 // kinds, `linked` whether git holds a link or a submodule (mode 120000 or 160000).
-export function heldBeside(texts, pace = () => {}, listed = () => git(["ls-files", "-z", "--", ...["*.csproj", "*.props", "*.targets", "*.csproj.user", "*.pubxml", "*.pubxml.user", "Directory.Build.rsp", "*.cs"].map(p => `:(glob,icase)**/${p}`)]).split("\0"),
+export function heldBeside(texts, pace = () => {}, listed = () => git(["ls-files", "-z", "--", ...["*.csproj", "*.props", "*.targets", "*.csproj.user", "*.pubxml", "*.pubxml.user", "Directory.Build.rsp", "*.*proj", "*.cs"].map(p => `:(glob,icase)**/${p}`)]).split("\0"),
   linked = () => git(["ls-files", "-s", "-z"]).split("\0").some(e => /^1[26]0000 /u.test(e))) {
   let n = 0;
   try {
     if (linked()) return { unknown: true };
-    const held = listed().filter(f => f && !(f in texts));
-    if (held.some(f => path.posix.basename(f).toLowerCase() === "directory.build.rsp")) return { unknown: true };
+    const every = listed().filter(Boolean), held = every.filter(f => !(f in texts));
+    if ([...every, ...Object.keys(texts)].some(f => path.posix.basename(f).toLowerCase() === "directory.build.rsp" || /\.\w*proj$/iu.test(f) && !/\.csproj$/iu.test(f))) return { unknown: true };
     const text = f => { pace(); const st = fs.lstatSync(f); if (!st.isFile()) throw new Error(`${f} is no file`); if ((n += st.size) > CHARACTERS) throw tooMuch("the files git holds beside", n, "bytes"); const t = plainText(fs.readFileSync(f)); if (t === null) throw new Error(`${f} is not UTF-8`); return t; };
     return { msbuild: Object.fromEntries(held.filter(f => !CS.test(f)).map(f => [f, text(f)])), cs: Object.fromEntries(held.filter(f => CS.test(f)).map(f => [f, text(f)])) };
   } catch (e) { if (e instanceof Late) throw e; return { unknown: true }; }

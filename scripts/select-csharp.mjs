@@ -113,10 +113,13 @@ function runsOf(toks) {
 // tuple too), or an extension block ("extension(" or "extension<", whose header the grammar reads as "class _").
 const extending = toks => toks.some((k, i) => (k.v === "this" && ["(", "]", "ref", "in", "scoped", "readonly"].includes(toks[i - 1]?.v) && (toks[i + 1]?.t === "id" || toks[i + 1]?.v === "("))
   || (k.v === "extension" && ["(", "<"].includes(toks[i + 1]?.v)) || (k.v === "class" && toks[i + 1]?.v === "_"));
-// Whether C# or a test framework runs a file with no name: a hook's word, an assembly's or a module's attribute, or
-// TUnit's Before or After beside a word Assembly, TestSession or TestDiscovery.
-const runsUnnamed = (toks, words) => words.some(hookWord) || toks.some((k, i) => k.v === "[" && ["assembly", "module"].includes(toks[i + 1]?.v) && toks[i + 2]?.v === ":")
-  || (toks.some(k => TUNIT.test(k.v)) && toks.some(k => ["Assembly", "TestSession", "TestDiscovery"].includes(k.v)));
+// Whether C# or a test framework runs a file with no name: a hook's word, an assembly's or a module's attribute, TUnit's
+// Before or After beside a word Assembly, TestSession or TestDiscovery; a type or a namespace declared in System or
+// below it (r the parser's reading), in any case, where an attribute the SDK writes may bind (select-csharp-compiles.mjs);
+// or a "\" outside a literal, a Unicode escape that may spell any of these.
+const runsUnnamed = (toks, words, r) => words.some(hookWord) || toks.some((k, i) => k.v === "\\" || (k.v === "[" && ["assembly", "module"].includes(toks[i + 1]?.v) && toks[i + 2]?.v === ":"))
+  || (toks.some(k => TUNIT.test(k.v)) && toks.some(k => ["Assembly", "TestSession", "TestDiscovery"].includes(k.v)))
+  || [...r.types, ...r.namespaces].some(n => /^system(?:\.|$)/iu.test(n));
 // Whether a file reflects (each GetType but "GetType()") or scans an assembly for types; "Before(Assembly)" scans none.
 const hookOf = (toks, i) => toks[i - 1]?.v === "(" && ["Before", "After"].includes(toks[i - 2]?.v);
 const reflecting = (toks, words) => words.some(w => REFLECTS.has(w) || w.startsWith("CreateInstance"))
@@ -134,7 +137,7 @@ function factsOf(read, src) {
   const toks = (read.toks ?? []).map(k => (k.t === "str" ? LITERAL : k)), r = { ...read, toks }, raw = lost ? 2 : leftOut(src);
   const words = ids(toks), placed = new Set(r.namespaces);
   if (!r.namespaces.length || r.types.some(t => !t.includes("."))) placed.add("");
-  return { r, words: new Set(words), ...runsOf(toks), placed: [...placed], extensions: extending(toks), hook: runsUnnamed(toks, words),
+  return { r, words: new Set(words), ...runsOf(toks), placed: [...placed], extensions: extending(toks), hook: runsUnnamed(toks, words, r),
     reflects: reflecting(toks, words), unread: raw > 1, raw, program: !lost && topLevel(toks, src) };
 }
 
