@@ -41,7 +41,7 @@ import { commandLines, commands } from "./licence-commands.mjs";
 import { downloads, otherFetches } from "./licence-fetchers.mjs";
 import { fetched } from "./licence-npm.mjs";
 import { executable } from "./licence-pages.mjs";
-import { copyOf } from "./core-path.mjs";
+import { copyAmong } from "./core-path.mjs";
 
 const OWN = `${OWNER}/`;
 const SHELL = /\.(ya?ml|sh|bash|zsh|fish|mk|toml|envrc)$|(^|\/)(Dockerfile[^/]*|Makefile|GNUmakefile|\.envrc)$/iu;
@@ -85,8 +85,8 @@ export function scan(settings, root, entries, auditPath, lockfiles = [], base = 
   const fail = (m) => { if (!failures.includes(m)) failures.push(m); };
   const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
   const tracked = git("ls-files", "-z").split("\0").filter(Boolean);
-  const project = tracked.includes("core-manifest.md"); // (a project, whose copy of the core the core audits)
-  const files = tracked.filter((f) => !(project && f.startsWith(copyOf(root))) && !under(f, settings.skip)); // (at the manifest's path)
+  const copy = copyAmong(tracked, root); // (a project's copy of the core, which the core audits; none in the core itself)
+  const files = tracked.filter((f) => !(copy !== null && f.startsWith(copy)) && !under(f, settings.skip));
   const binary = new Set(git("ls-files", "--eol", "-z").split("\0").filter((l) => /^i\/-text\s/u.test(l)).map((l) => l.slice(l.indexOf("\t") + 1)));
   // (what the scan's parts share: scanned, below)
   const c = { settings, root, entries, auditPath, lockfiles, tracked, files, binary, fail, reports, base, baseAudit, baseLockfiles };

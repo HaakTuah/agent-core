@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { RUN_FROM } from "../scripts/check.mjs";
 import { sameNode, standIns } from "../scripts/check-actions.mjs";
-import { closing, movesForward, ownJobs, syncCalls, triggered } from "../scripts/check-calls.mjs";
+import { closing, movesForward, ownJobs, syncCalls, triggered, unrunWhy } from "../scripts/check-calls.mjs";
 import { BLIND, COUNTS, compared, trialAt, trialRecord } from "../scripts/release-trial.mjs";
 // (a sync's reading for each project tried, which every record holds, #1261)
 const SYNC = { pure: true, from: "release-1" }, OTHER = { none: "another-owner" };
@@ -157,6 +157,14 @@ jobs:
   ok(close({ failed: 1, ran: 3, unrun: 0 }) === 1 && lines[0] === "1 of the jobs run here failed, 0 not run (the core's checks that run from plain git and, with --own, the project's own jobs)" && close({ failed: 0, ran: 3, unrun: 0 }) === 0 && lines[1] === "ok   every job run here passed (3: the core's checks that run from plain git and, with --own, the project's own jobs)",
     "the summary names the project's own jobs beside the core's checks, never counting them as the core's (#1275, point 2)", lines.join("\n"));
   ok(!lacking.passed && lacking.steps.find(s => !s.passed)?.missing === "no-such-program-of-the-trial", "a step that wants a program this machine lacks names it, for check.mjs to leave the job unrun (#1245, point 9)", JSON.stringify(lacking.steps));
+  // (#1361, point 19: a script that could not spawn a program, Node's ENOENT, and exits 127 as checks.mjs then does, names
+  // it too, so the job is unrun; one that exits 1 with the same words beside them failed)
+  fs.writeFileSync(path.join(ws, "spawns.mjs"), 'import { spawnSync } from "node:child_process";\nconst r = spawnSync("no-such-program-of-the-trial", ["restore"]);\nconsole.log(`could not be started (${r.error.message}).`);\nprocess.exit(Number(process.argv[2]));\n');
+  const spawned = runWorkflow(`on: pull_request\njobs:\n  unrun:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node spawns.mjs 127\n  failed:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node spawns.mjs 1\n`,
+    { github: { event_name: "pull_request" }, base: env, temp: tmp, workspace: () => ws, uses: {}, machine: "linux" });
+  const [unrunJob, failedJob] = ["unrun", "failed"].map(id => spawned.find(j => j.job === id));
+  ok(unrunJob.steps[0]?.missing === "no-such-program-of-the-trial" && unrunWhy(unrunJob) === "it needs no-such-program-of-the-trial, which this machine lacks" && failedJob.steps[0]?.missing === undefined && unrunWhy(failedJob) === null,
+    "a step whose program a script could not spawn (ENOENT), exiting 127, names it and its job is unrun; one exiting 1 with the same words failed (#1361, point 19)", JSON.stringify(spawned.map(j => j.steps)));
 
   // (point 10: each job in its class, the record counting each, and a job failed after alone holding the cut as the release's)
   const all = compared({ p: "passed", f: "failed", pf: "passed", ff: "failed", gone: "passed", lost: "failed", was: "stopped", off: "unrun", ranThen: "passed" },

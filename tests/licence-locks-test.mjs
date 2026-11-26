@@ -45,6 +45,16 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
+// in the core's own repository a manifest at the root skips no folder: its scripts/core-path.mjs is there (#1350)
+{
+  const dir = scratchDir("licence-locks-");
+  try {
+    writeFileSync(join(dir, "core-manifest.md"), `Core: ${CORE} at ${"0".repeat(40)}, copied whole under vendor/core/ (never edited here).\n`);
+    const r = unnamedLocks(dir, ["core-manifest.md", "scripts/core-path.mjs", "vendor/core/.packages/package-lock.json"], { ships: [], lockfiles: [] }, "HEAD^1", () => false);
+    ok(r.failures.length === 1 && says(r.failures, "vendor/core/.packages/package-lock.json").length === 1, "the core's own repository leaves no folder to a manifest at its root", JSON.stringify(r));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
 // a config with a scan: what it reads is the scan's to fail, what it skips, and a name the scan does not read, is said here
 {
   const r = unnamedLocks(".", ["tools/package-lock.json", "docs/package-lock.json", "tools/NPM-Shrinkwrap.json"], { ...config, scan: { served: [], skip: ["docs/"] } }, "HEAD^1", () => false);

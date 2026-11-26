@@ -44,7 +44,7 @@ jobs:
   # is billed nothing)
   terms:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10 # (about twice the slowest of its recent runs, 299 s done and one cut at 315 s of the 5 minutes it had, 24 November 2026; #1376)
     permissions:
       contents: read # the default branch's scripts/issue-terms.mjs, which it runs
       issues: write # the personal terms taken out of issues and their comments
