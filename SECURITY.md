@@ -75,6 +75,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
        backslashes, as written or once mapped, as a UNC or device path does, is not followed, and names none; the
        origin read from the clone's own config, no include followed, and git not run where the clone's git folder (a
        `.git` file's or link's) or the common folder it names lies on another machine, a worktree on this machine read;
+       and no path it probes or reads, nor one git reads, opened where a link on its way, followed link by link without
+       opening it, names a folder on another machine, each file that names a folder read as git reads it, and git given
+       the git folder and work tree so found, so it searches no folder above and takes no work tree from the config;
      - limits: 16 MB of gh's answer; 20 s for the read with no sign-in, and 30 s for its process; of each answer only a
        boolean field `private` is taken, from the read with no sign-in only with status 200, all else reading nothing;
      - hostile tests: `tests/host-private-test.mjs`.
@@ -159,12 +162,13 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
-     lookup (`scripts/lookup.mjs`) and its lookup again of what a project holds (`scripts/held.mjs`, through the
-     lookup's readers); Node itself is checked against its SHA-256 by `scripts/node.sh`, and the code scan's wheel by
+     lookup (`scripts/lookup.mjs`, with `scripts/lookup-pypi.mjs` for a requirements file in PyPI's lock form, which it
+     fails whole where pip or uv could read it otherwise) and its lookup again of what a project holds (`scripts/held.mjs`, through the
+     lookup's readers of npm's and NuGet's lock files); Node itself is checked against its SHA-256 by `scripts/node.sh`, and the code scan's wheel by
      its own, which pip checks against `.packages/requirements.txt` (`scripts/install.mjs pypi`); limits: 16 MB of a
      NuGet package's manifest, 100 pages of NuGet's registry, 20 lookups on GitHub in a run, 30 s for an answer (60 s
-     for a NuGet package), 120 s for the whole look again; hostile tests: `tests/hostile-packages-test.mjs`, and for the
-     scan `tests/code-scan-test.mjs`.
+     for a NuGet package), 120 s for the whole look again; hostile tests: `tests/hostile-packages-test.mjs`, for the
+     requirements file `tests/lookup-pypi-test.mjs`, and for the scan `tests/code-scan-test.mjs`.
    - the code a pull request adds or alters, and its description's lines "Scan false alarm:" and "Scan unread:": read
      by the code scan (`scripts/code-scan.mjs`), which hands the files by name to Semgrep's engine, installed from its
      wheel's pinned hash, with no variable that holds a token, fails a file it could not read, and silences no finding a

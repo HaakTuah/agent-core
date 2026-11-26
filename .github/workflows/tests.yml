@@ -27,8 +27,8 @@
 # Each job first installs the core's own packages from its lock files in .packages/, the parser's in .packages/parser/
 # among them (#719), from npm's registry, running no install script (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
 # tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
-# Once, on Linux, the core's own lock files are held as a project's are: each package it brings looked up in npm's
-# registry (scripts/lookup.mjs), the week's wait on each one a change brings or updates (scripts/week-wait.mjs), and the
+# Once, on Linux, the core's own lock files are held as a project's are: each package it brings looked up in its
+# registry, npm's or PyPI's (scripts/lookup.mjs; #716), the week's wait on each one a change brings or updates (scripts/week-wait.mjs), and the
 # registry's signature on each installed one (npm audit signatures); the
 # mutation tool's in tests/mutation/ in the job that installs it, the step after its install.
 # Each job of the suites, three on Linux and fifteen on Windows on each Node, the network's on both, and the upgrade
@@ -307,6 +307,9 @@ jobs:
       - name: The lookup of a new package, run on a project
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-run-test.mjs ')) }}
         run: node tests/lookup-run-test.mjs
+      - name: The lookup of a new package from PyPI, on recorded answers
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-pypi-test.mjs ')) }}
+        run: node tests/lookup-pypi-test.mjs
       - name: The sync's step that asks a lookup beside each check of exact versions
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-step-test.mjs ')) }}
         run: node tests/lookup-step-test.mjs
@@ -439,6 +442,9 @@ jobs:
       - name: The rules' pruning, when it is due and what it lists
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pruning-test.mjs ')) }}
         run: node tests/pruning-test.mjs
+      - name: The pruning's list of rules with no holder
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pruning-unheld-test.mjs ')) }}
+        run: node tests/pruning-unheld-test.mjs
       - name: The choice records
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-test.mjs ')) }}
         run: node tests/choices-test.mjs
@@ -582,12 +588,33 @@ jobs:
       - name: The core's own inputs, each named with its hostile tests (SECURITY.md, rule 5)
         if: ${{ !cancelled() && contains(matrix.parts, 'second') }}
         run: node tests/own-inputs-test.mjs
-      - name: The core's releases, what a project follows, and cutting one
+      - name: The core's releases, which tags are one, and what a sync between two asks
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/releases-test.mjs ')) }}
         run: node tests/releases-test.mjs
+      - name: What a project follows
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/follows-test.mjs ')) }}
+        run: node tests/follows-test.mjs
+      - name: Cutting a release
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/release-test.mjs ')) }}
+        run: node tests/release-test.mjs
+      - name: The trial of a release on a real project
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/release-trial-test.mjs ')) }}
+        run: node tests/release-trial-test.mjs
       - name: check.mjs as a release's trial runs it, and the trial's record
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-test.mjs ')) }}
         run: node tests/trial-test.mjs
+      - name: The draft of the sync in a release's trial, read beside main's checks
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-draft-test.mjs ')) }}
+        run: node tests/trial-draft-test.mjs
+      - name: The stand-in for the host in the tests of the draft in a release's trial
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-draft-host-test.mjs ')) }}
+        run: node tests/trial-draft-host-test.mjs
+      - name: The draft of the sync in a release's trial, each check named by its workflow and job
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-draft-names-test.mjs ')) }}
+        run: node tests/trial-draft-names-test.mjs
+      - name: The record of the drafts in a release's trial, and the cut it holds
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-draft-record-test.mjs ')) }}
+        run: node tests/trial-draft-record-test.mjs
       - name: A job the workflow runner cannot read, and the trial's not measured
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/unread-test.mjs ')) }}
         run: node tests/unread-test.mjs
@@ -605,6 +632,9 @@ jobs:
         env:
           PART: ${{ contains(matrix.parts, 'faults') && 'faults' || contains(matrix.parts, 'places') && 'places' || 'all' }}
         run: node tests/core-yml-test.mjs --part "$PART"
+      - name: The stand-in for npm's install, what it may load and run (npm-once.mjs)
+        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/npm-once-test.mjs ')) }}
+        run: node tests/npm-once-test.mjs
       - name: The core's checks from plain git (check.mjs), on scratch projects
         if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/check-test.mjs ')) }}
         run: node tests/check-test.mjs
@@ -803,7 +833,7 @@ jobs:
       - name: Every package of the core's own lock files at one exact version, from npm's registry (floor rule 7)
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
         run: node scripts/exact-versions.mjs .github/licences.json
-      - name: Each package new to the core's own lock file looked up in its registry (floor rule 15; once, on Linux)
+      - name: Each package new to the core's own lock files looked up in its registry, npm's or PyPI's (floor rule 15; once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }}
         env:
           LOOKUP_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }} # the merge's first parent, which the checkout holds (#1231); empty on a push to main, where nothing is new

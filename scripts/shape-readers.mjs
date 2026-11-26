@@ -14,7 +14,8 @@ import { CODE, globals, imports, isModule, isP, jsxIn, lyingUnder, nameTree, tok
 import { javascriptFunctions } from "./javascript-functions.mjs";
 import { OWN as CS_OWN, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "./shape-csharp.mjs";
 import { unreachedFor } from "./parser.mjs";
-import { OWN as PY_OWN, STDLIB, normal, pythonPackages, readPython, resolvePython } from "./shape-python.mjs";
+import { OWN as PY_OWN, STDLIB, pythonPackages, readPython, resolvePython } from "./shape-python.mjs";
+import { normal } from "./pypi-name.mjs";
 
 // Each reader by its name, with what it reads, as a note says it.
 export const READERS = {

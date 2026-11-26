@@ -15,7 +15,7 @@ import { sameNode, standIns } from "../scripts/check-actions.mjs";
 import { closing, movesForward, ownJobs, syncCalls, triggered } from "../scripts/check-calls.mjs";
 import { BLIND, COUNTS, compared, trialAt, trialRecord } from "../scripts/release-trial.mjs";
 // (a sync's reading for each project tried, which every record holds, #1261)
-const SYNC = { pure: true, from: "release-1" };
+const SYNC = { pure: true, from: "release-1" }, OTHER = { none: "another-owner" };
 import { sideOf } from "../scripts/attached.mjs";
 import { notInstalled } from "../scripts/packages.mjs";
 import { mended } from "../scripts/mend.mjs";
@@ -163,12 +163,12 @@ jobs:
     { p: "passed", f: "passed", pf: "failed", ff: "failed", newp: "passed", newf: "failed", was: "passed", off: "unrun", w: "unrun", ranThen: "unrun" });
   ok(Object.keys(all).join() === COUNTS.join() && Object.values(all).map(j => j.join()).join(";") === "p;f;ff;pf;newf;;;newp,was;gone;lost;off,w;ranThen;;;",
     "passed both, fixed after, failed both, failed after, failed after alone, stopped after, stopped in neither run, ran after alone, ran before alone, failed before alone, unrun after, and unrun after where it ran before are each counted as named (#1245, point 10)", JSON.stringify(all));
-  const alone = trialRecord(SHA("b"), "2026-11-24", [[{}, { "new.yml/x": "failed", "w.yml/x": "unrun" }]], [SYNC]);
+  const alone = trialRecord(SHA("b"), "2026-11-24", [[{}, { "new.yml/x": "failed", "w.yml/x": "unrun" }]], [SYNC], [OTHER]);
   const aloneAt = trialAt(SHA("b"), args => (args[0] === "show" ? JSON.stringify(alone) : ""));
   ok(alone.failedAfterAlone === 1 && alone.unrunAfter === 1 && /1 check failed after the release .*0 of them passing before it and 1 not run before/u.test(aloneAt.held) && /1 not run after on this machine, and 0 not run after it there though they ran before/u.test(aloneAt.said),
     "  a job that ran after alone and failed holds the cut as the release's, and one unrun after is said and holds nothing", `${aloneAt.said}\n${aloneAt.held}`);
 
-  const lost = trialRecord(SHA("c"), "2026-11-24", [[{ "a.yml/x": "passed" }, { "a.yml/x": "unrun" }]], [SYNC]);
+  const lost = trialRecord(SHA("c"), "2026-11-24", [[{ "a.yml/x": "passed" }, { "a.yml/x": "unrun" }]], [SYNC], [OTHER]);
   const lostAt = trialAt(SHA("c"), args => (args[0] === "show" ? JSON.stringify(lost) : ""));
   ok(lost.unrunAfterRan === 1 && /1 check that ran before measured nothing after the update in the trial on a real project, 0 stopped behind a failure and 1 not run on the trial's machine/u.test(lostAt.held ?? "") && /1 not run after it there though they ran before/u.test(lostAt.said),
     "  a job that ran before and was unrun after holds the cut, saying its mend (#1257)", `${lostAt.said}\n${lostAt.held}`);
@@ -178,7 +178,7 @@ jobs:
   const afterRun = { "core.yml/core": "failed", "core.yml/tests": "stopped", "own.yml": "stopped" };
   const c = compared(before, afterRun);
   ok(c.failedAfter.join() === "core.yml/core" && c.stoppedAfter.join() === "core.yml/tests,own.yml" && c.ranBeforeAlone.length === 0 && c.passedBoth.length === 0, "a job stopped after a failure is counted apart, with the jobs of its place before, and the key that says where check.mjs ran from is no job (#1245, point 2)", JSON.stringify(c));
-  const record = trialRecord(SHA("a"), "2026-11-24", [[before, afterRun], [{ "x.yml/y": "passed" }, { "x.yml/y": "passed" }]], [SYNC, SYNC]);
+  const record = trialRecord(SHA("a"), "2026-11-24", [[before, afterRun], [{ "x.yml/y": "passed" }, { "x.yml/y": "passed" }]], [SYNC, SYNC], [OTHER, OTHER]);
   ok(record.stoppedAfter === 2 && record.baselineFromClone === 1 && record.projects === 2, "the record counts the jobs stopped after, and the baselines taken from a clone of the core (#1244)", JSON.stringify(record));
   const showing = r => args => { if (args[0] === "show") return JSON.stringify(r); if (args[0] === "diff") return ""; return ""; };
   const stopped = trialAt(SHA("a"), showing({ ...record, failedAfter: 0 }));

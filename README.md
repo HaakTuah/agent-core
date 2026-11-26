@@ -126,7 +126,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
    **What a project follows:** the core's `main`, or its releases (core archive 195). A release is a tag `release-N` on
    a commit of `main`, cut on the owner's word by this repository's `release` workflow, only where that commit's checks
-   have passed and its trial on a real project found no check it broke (`AGENTS.md`, "A release is cut on the owner's word"; `scripts/release.mjs`). A project whose *owner's
+   have passed and its trial on a real project, with the draft of its sync in each of the owner's own projects, found no check it broke (`AGENTS.md`, "A release is cut on the owner's word"; `scripts/release.mjs`). A project whose *owner's
    account* is not the account the core is under follows the releases, unless its manifest's *follows* row says `main`;
    the projects of the core's own owner follow `main`, unless theirs says `releases` (`scripts/releases.mjs`). Following
    `main`, the sync script and the core-moved check take its newest commit whose checks all passed, never one ahead of
@@ -192,7 +192,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `licence-scan.mjs` holds whole, every action, fetched package, asset and copied-in code it uses, and each entry
      that ships with its notice; beside it `exact-versions.mjs`, which reads the same config's lockfiles and fails a
      dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7; `lookup.mjs`,
-     which asks npm's registry of each package new to the lockfiles, as floor topic 15's "A new one is looked up in
+     which asks npm's registry of each package new to the lockfiles (and PyPI of each new to a requirements file the
+     config names under "pypi"), as floor topic 15's "A new one is looked up in
      its registry" says, and fails a lock entry a pull request brings from anywhere but npm's registry or with no
      integrity value: floor rule 7; the licence check also holds each `.npmrc` of "ignoreScriptsIn" to the week's wait
      (`min-release-age=7`), and a program a file downloads by address to a version and a checksum, failing only what

@@ -58,7 +58,8 @@ const ASSET = new RegExp(
 const PROSE_FILE = /\.(md|markdown|txt|rst|adoc)$/iu;
 const NOTICE = /\/\*!|@license|SPDX-License-Identifier|Copyright\s+(\(c\)|©|\d{4})|Permission is hereby granted|Licensed under the/iu;
 const EXACT = /^((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*)@(\d+\.\d+\.\d+)$/iu;
-export const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
+export const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/iu;
+const EXACT_CASE = new RegExp(LOCKFILE.source, "u");
 /** A tracked file's text, a link's that of the file it leads to, read as the link's own, where that lies inside the
  *  project; a link that leads out of it, or nowhere, is not read and fails, since what it holds cannot be audited. */
 function trackedText(root, f, fail) {
@@ -79,7 +80,7 @@ function linesIn(json, f, byHand, fail) {
 }
 
 /** The failures of the scan of the project at `root`, against its audit's `entries` (read from `auditPath`). */
-export function scan(settings, root, entries, auditPath, lockfiles = [], base = null, baseAudit = null) {
+export function scan(settings, root, entries, auditPath, lockfiles = [], base = null, baseAudit = null, baseLockfiles = []) {
   const failures = [], reports = [];
   const fail = (m) => { if (!failures.includes(m)) failures.push(m); };
   const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
@@ -88,7 +89,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = [], base = 
   const files = tracked.filter((f) => !(project && f.startsWith(copyOf(root))) && !under(f, settings.skip)); // (at the manifest's path)
   const binary = new Set(git("ls-files", "--eol", "-z").split("\0").filter((l) => /^i\/-text\s/u.test(l)).map((l) => l.slice(l.indexOf("\t") + 1)));
   // (what the scan's parts share: scanned, below)
-  const c = { settings, root, entries, auditPath, lockfiles, tracked, files, binary, fail, reports, base, baseAudit };
+  const c = { settings, root, entries, auditPath, lockfiles, tracked, files, binary, fail, reports, base, baseAudit, baseLockfiles };
 
   for (const key of ["served", "tools", "skip"]) for (const p of settings[key] ?? []) if (p !== "" && !tracked.some((f) => holds(p, f))) fail(`the config's "scan.${key}": ${p} names no tracked file. Mend: correct the path, a folder ending in "/", or take it out`);
   for (const e of entries) entryFaults(c, e);
@@ -201,6 +202,8 @@ function pinnedIfRead(c, f, text) {
  *  base held unpinned with no download fewer is reported, as is every one with no base (AGENTS.md, "Nothing locks a
  *  project"). Read from the scan's own readers of fetches: what a package manager fetches by name is not read here. */
 // A file of the base, as text, or null where the base held none.
+/** Whether `file` is a file (not a folder) at commit `rev` of the repository at `root`. */
+export const blobAt = (root, rev, file) => { try { return execFileSync("git", ["cat-file", "-t", `${rev}:${file}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() === "blob"; } catch { return false; } };
 const atBase = (c, path) => { try { return execFileSync("git", ["show", `${c.base}:${path}`], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 << 20 }); } catch { return null; } };
 // The audit's entries as the base held them, at the path the base's own config named it (a pull request may move it),
 // read once for the scan.
@@ -229,7 +232,12 @@ function pinned(c, f, text) {
 
 /** The scan of one tracked file `f` (scan, above): by what it is, and for a licence notice it carries. */
 function scanned(c, f) {
-  if (LOCKFILE.test(f) && !c.lockfiles.includes(f)) c.fail(`${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`);
+  if (LOCKFILE.test(f) && !c.lockfiles.includes(f)) {
+    const said = `${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`;
+    // (a name of another case than npm's own is read only since #1349: where the base held that file unnamed, it passes, reported)
+    if (!EXACT_CASE.test(f) && c.base && blobAt(c.root, c.base, f) && !c.baseLockfiles.includes(f)) c.reports.push(`${said}; it stood so at the pull request's base, so it passes`);
+    else c.fail(said);
+  }
   const text = c.binary.has(f) ? "" : trackedText(c.root, f, c.fail);
   unaudited(c, f, byKind(c, f, text));
   pinnedIfRead(c, f, text);

@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { leadsOut } from "./guards.mjs";
 import { answersOf, syncCounts, syncFormed, syncSaid, syncsIn } from "./trial-sync.mjs";
+import { draftFormed, draftHeld, draftRecord, draftSaid, draftReadingsOf, draftsIn, draftsShort } from "./trial-draft-record.mjs";
 
 // The key check.mjs --verdicts adds where it was run from outside the project, a clone of the core (check.mjs's RUN_FROM,
 // which the test holds to this one; #1244): no job's place.
@@ -72,11 +73,13 @@ const ranClass = (now, then) => {
 
 // The record of a trial at `sha` on the day `day`: each project's runs, [before, after], counted, and how many baselines
 // the release's check.mjs took from a clone of the core, where the copy's could not (#1244); no pair where no project
-// that takes the core allowed one; and the syncs' readings, `answers`, one for each pair (trial-sync.mjs; #1261).
-export function trialRecord(sha, day, pairs, answers = []) {
+// that takes the core allowed one; the syncs' readings, `answers`, one for each pair (trial-sync.mjs; #1261); and the
+// drafts' readings, `drafts`, one for each pair, with the count of the owner's own projects found, `own` (trial-draft.mjs;
+// #1334).
+export function trialRecord(sha, day, pairs, answers = [], drafts = [], own = 0) {
   const counts = Object.fromEntries(COUNTS.map(k => [k, 0]));
   for (const [before, after] of pairs) for (const [k, jobs] of Object.entries(compared(before, after))) counts[k] += jobs.length;
-  return { commit: sha, day, projects: pairs.length, ...counts, baselineFromClone: pairs.filter(([before]) => Object.hasOwn(before ?? {}, RUN_FROM)).length, ...syncCounts(answers) };
+  return { commit: sha, day, projects: pairs.length, ...counts, baselineFromClone: pairs.filter(([before]) => Object.hasOwn(before ?? {}, RUN_FROM)).length, ...syncCounts(answers), ownProjects: own, ...draftRecord(drafts) };
 }
 
 
@@ -85,12 +88,12 @@ function formed(r) {
   if (r === null || typeof r !== "object") return false;
   const counts = [...COUNTS, "baselineFromClone"].map(k => r[k]);
   return /^[0-9a-f]{40}$/.test(String(r.commit)) && /^\d{4}-\d\d-\d\d$/.test(String(r.day)) && [r.projects, ...counts].every(n => Number.isInteger(n) && n >= 0)
-    && (r.projects > 0 || counts.every(n => n === 0)) && r.baselineFromClone <= r.projects && syncFormed(r);
+    && (r.projects > 0 || counts.every(n => n === 0)) && r.baselineFromClone <= r.projects && syncFormed(r) && draftFormed(r);
 }
 
 // How the runs are taken, for a mend that asks a trial: check.mjs from the project's clone, before the update and after,
 // and, where the copy holds none, or one without --verdicts, the baseline by the release's, from a clone of the core.
-export const RUNS = "in a clone of the project, `node core/scripts/check.mjs --base <its main> --own --verdicts <a file outside every repository>` before the update and after it; where the copy holds no check.mjs, or one without --verdicts, the run before with `node <a clone of the core at the commit tried>/scripts/check.mjs` and the same options, from the project's clone; and, with the sync's branch checked out and committed, `node <a clone of the core at the commit tried>/scripts/pure-sync.mjs --trial <the commit tried> > <a file outside every repository>`, the sync's reading, which holds no cut";
+export const RUNS = "in a clone of the project, `node core/scripts/check.mjs --base <its main> --own --verdicts <a file outside every repository>` before the update and after it; where the copy holds no check.mjs, or one without --verdicts, the run before with `node <a clone of the core at the commit tried>/scripts/check.mjs` and the same options, from the project's clone; and, with the sync's branch checked out and committed, `node <a clone of the core at the commit tried>/scripts/pure-sync.mjs --trial <the commit tried> > <a file outside every repository>`, the sync's reading, which holds no cut; and, in each of the owner's own projects whose stop switch does not stand, that sync pushed and opened as a draft pull request in the project, its description saying it is the release's trial and that the session that syncs takes it once the release is cut, and, once its checks finish, `node <a clone of the core at the commit tried>/scripts/trial-draft.mjs <owner>/<name> <its number> <the commit tried> > <a file outside every repository>`; in any other project, the same script with `none` in place of the number";
 
 // What the trial's record says of the release at `sha`, read through `git` (its arguments give its output), and why it
 // holds the cut, or null: the record stands for the commit where it names it, or one before it from which the release
@@ -102,7 +105,7 @@ export const RUNS = "in a clone of the project, `node core/scripts/check.mjs --b
 export function trialAt(sha, git) {
   let r = null;
   try { r = JSON.parse(git(["show", `${sha}:${TRIAL}`])); } catch { /* (not there, or not read) */ }
-  const again = `try the release on a copy of a project that takes the core and whose owner allows it, before the release workflow is started, as AGENTS.md says ("A release is cut on the owner's word"): ${RUNS}; record it with \`node scripts/release.mjs --trial <the commit tried> <before> <after> --sync <the reading>\` (\`--trial <the commit>\` alone where no project allows one), in a pull request of its own; then start the release again`;
+  const again = `try the release on a copy of a project that takes the core and whose owner allows it, before the release workflow is started, as AGENTS.md says ("A release is cut on the owner's word"): ${RUNS}; record it with \`node scripts/release.mjs --trial <the commit tried> <before> <after> --sync <the reading> --draft <the draft's reading>\` (\`--trial <the commit>\` alone where no project allows one), in a pull request of its own; then start the release again`;
   if (!formed(r)) return { said: `The trial on a real project has not run for ${sha.slice(0, 7)}: ${TRIAL} ${r === null ? "is not there or cannot be read" : "is in no form this script writes"}.`, held: `the trial on a real project has not run for ${sha.slice(0, 7)}. Mend: ${again}` };
   let more;
   try { git(["merge-base", "--is-ancestor", r.commit, sha]); more = git(["diff", "--no-renames", "--name-only", r.commit, sha]).split("\n").map(f => f.trim()).filter(f => f && f !== TRIAL); } catch { more = null; }
@@ -112,18 +115,20 @@ export function trialAt(sha, git) {
     failed && `${plural(failed, "check")} failed after the release in the trial on a real project, ${r.failedAfter} of them passing before it and ${r.failedAfterAlone} not run before. Mend: find the release's fault from the trial's run after the update, mend it in the core in a pull request of its own, and ${again}`,
     unread && `${plural(unread, "check")} ${unread === 1 ? "was" : "were"} not measured in the trial on a real project, ${r.unreadAfter} of them run before and not read after the update and ${r.unreadBefore} not read before it and failed after. Mend: teach the core's workflow runner (scripts/workflow-run.mjs) each form the run after's FAIL lines name as one it cannot read, in a pull request of its own; where only the run before could not read it, take the run before the update again with the release's check.mjs from a clone of the core, run from the project's clone; and ${again}`,
     lost && `${plural(lost, "check")} that ran before measured nothing after the update in the trial on a real project, ${r.stoppedAfter} stopped behind a failure and ${r.unrunAfterRan} not run on the trial's machine. Mend: find from the trial's run after the update what stopped it, mend that (in the core, in a pull request of its own, where the release brought it), and ${again}`,
+    draftHeld(r, again),
   ].filter(Boolean);
   return { said: trialSaid(r), held: r.projects === 0 || !why.length ? null : why.join("; and ") };
 }
 
-// What the trial cannot measure (#1310): a step of GitHub's own service runs only on a real pull request, so the runs
-// of check.mjs measure none; the core's own tests hold the dependency review's lists over the core's lock files.
-export const BLIND = "GitHub's own services (its dependency review, CodeQL) run only on a real pull request, so the trial measured none of them: the core's own tests hold the dependency review's lists over the core's lock files, on every pull request of the core's.";
+// What the runs of check.mjs cannot measure (#1310): a step of GitHub's own service runs only on a real pull request, so
+// the drafts in the owner's own projects measure it (#1334), and in another owner's nothing does but the core's own tests,
+// which hold the dependency review's lists over the core's lock files.
+export const BLIND = "GitHub's own services (its dependency review, CodeQL) run only on a real pull request, so the runs of check.mjs measured none of them: the drafts of the sync measured them in the owner's own projects, and in another owner's only the core's own tests hold the dependency review's lists over the core's lock files, on every pull request of the core's.";
 
 // What a record in its form says.
 const trialSaid = r => (r.projects === 0
   ? `No project that takes the core allowed a trial of this release (${TRIAL}, ${r.day}), so none ran.`
-  : `The trial on a real project ran on ${r.commit.slice(0, 7)} on ${r.day}, in ${plural(r.projects, "project")}: ${plural(r.passedBoth, "check")} passed before and after the update, ${r.fixedAfter} failed before and passed after, ${r.failedBoth} failed before and after (standing before the release), ${r.failedAfter} passed before and failed after (the release's), ${r.failedAfterAlone} ran after alone and failed (the release's too), ${r.stoppedAfter} ran before and stopped after it behind a failure, ${r.stoppedNeither} stopped after it that ran not before (holding nothing), ${r.unreadAfter} run before and not read after it and ${r.unreadBefore} not read before it and failed after (not measured), ${r.unreadNeither} read in neither run (not measured, holding nothing), ${r.ranAfterAlone} ran after alone and passed, ${r.ranBeforeAlone} ran before alone and passed, ${r.failedBeforeAlone} ran before alone and failed, ${r.unrunAfter} not run after on this machine, and ${r.unrunAfterRan} not run after it there though they ran before; ${r.baselineFromClone} of the baselines taken by the release's check.mjs from a clone of the core, the copy's holding none that writes verdicts. ${syncSaid(r)} ${BLIND}`);
+  : `The trial on a real project ran on ${r.commit.slice(0, 7)} on ${r.day}, in ${plural(r.projects, "project")}: ${plural(r.passedBoth, "check")} passed before and after the update, ${r.fixedAfter} failed before and passed after, ${r.failedBoth} failed before and after (standing before the release), ${r.failedAfter} passed before and failed after (the release's), ${r.failedAfterAlone} ran after alone and failed (the release's too), ${r.stoppedAfter} ran before and stopped after it behind a failure, ${r.stoppedNeither} stopped after it that ran not before (holding nothing), ${r.unreadAfter} run before and not read after it and ${r.unreadBefore} not read before it and failed after (not measured), ${r.unreadNeither} read in neither run (not measured, holding nothing), ${r.ranAfterAlone} ran after alone and passed, ${r.ranBeforeAlone} ran before alone and passed, ${r.failedBeforeAlone} ran before alone and failed, ${r.unrunAfter} not run after on this machine, and ${r.unrunAfterRan} not run after it there though they ran before; ${r.baselineFromClone} of the baselines taken by the release's check.mjs from a clone of the core, the copy's holding none that writes verdicts. ${syncSaid(r)} ${draftSaid(r)} ${BLIND}`);
 
 
 // How many of the owner's own projects take the core, as scripts/state-report.mjs --projects lists them (a line each,
@@ -136,30 +141,54 @@ function ownProjects() {
 
 // Of what state-report.mjs --projects prints, how many lines name a project of the owner's: each project is a line
 // "- <how shownAs names it>: <its counts>.", another owner's named "a project of another owner"; its other lines (a
-// heading, "None found.", a note in brackets) name none. releases-test.mjs holds it to shownAs's words.
+// heading, "None found.", a note in brackets) name none. release-trial-test.mjs holds it to shownAs's words.
 export const ownCount = printed => printed.split("\n").filter(l => /^- (`[^`]+`|a private project of the owner's): /.test(l)).length;
 
 
-// --trial <sha> [<before> <after> --sync <reading>]...: writes the trial's record, each pair one project's runs of
-// check.mjs --verdicts, and each `--sync` after it what pure-sync.mjs --trial printed of that project's sync (#1261).
-export function trial([sha, ...args], fail) {
-  const { files, syncs } = syncsIn(args);
-  if (!/^[0-9a-f]{40}$/.test(sha ?? "") || files.length % 2) return fail(`--trial needs the full SHA of the commit tried, then for each project tried the file check.mjs --verdicts wrote before the update and the one it wrote after, each pair followed by \`--sync\` and the file that holds what pure-sync.mjs --trial printed of its sync (${RUNS}); no file where no project allowed a trial`);
-  const inside = [...files, ...syncs.filter(Boolean)].find(f => !leadsOut(ROOT, f));
-  if (inside) return fail(`${inside} lies in the core's own repository, where a project's job names could be committed: write the runs' verdicts to a scratch folder outside every repository, and give those files`);
-  if (!files.length) { const own = ownProjects(); if (own === null || own > 0) return fail(own === null ? "which of the owner's projects take the core could not be read (scripts/state-report.mjs --projects), and nothing read is not none found. Mend: run it where gh answers for the owner's account, then --trial again" : `${plural(own, "project")} of the owner's take the core, as scripts/state-report.mjs --projects finds them. Mend: try the release on one of them, and record its runs before and after`); }
+// Why the arguments of --trial are refused, or null: a commit that is no full SHA, a file of no pair, or one kept in the
+// core's own repository.
+function argsRefused(sha, files, syncs, drafts) {
+  if (!/^[0-9a-f]{40}$/.test(sha ?? "") || files.length % 2) return `--trial needs the full SHA of the commit tried, then for each project tried the file check.mjs --verdicts wrote before the update and the one it wrote after, each pair followed by \`--sync\` and the file that holds what pure-sync.mjs --trial printed of its sync (${RUNS}); no file where no project allowed a trial`;
+  const inside = [...files, ...syncs.filter(Boolean), ...drafts.filter(d => d?.file).map(d => d.file)].find(f => !leadsOut(ROOT, f));
+  return inside ? `${inside} lies in the core's own repository, where a project's job names could be committed: write the runs' verdicts to a scratch folder outside every repository, and give those files` : null;
+}
+
+// Why the owner's own projects, as state-report.mjs --projects found them (`own`, null where it could not), refuse a
+// trial with no pair, or null where none takes the core.
+const noneRefused = own => (own === null ? "which of the owner's projects take the core could not be read (scripts/state-report.mjs --projects), and nothing read is not none found. Mend: run it where gh answers for the owner's account, then --trial again"
+  : own > 0 ? `${plural(own, "project")} of the owner's take the core, as scripts/state-report.mjs --projects finds them. Mend: try the release on one of them, and record its runs before and after` : null);
+
+// Each project's runs, [before, after], from the files given, or { why } one is none.
+function pairsOf(files) {
   const pairs = [];
   for (let i = 0; i < files.length; i += 2) {
     const verdict = ([job, x]) => (job === RUN_FROM ? typeof x === "string" : ["passed", "failed", "stopped", "unrun", "unread"].includes(x));
     const read = f => { try { const v = JSON.parse(fs.readFileSync(f, "utf8")); return v && typeof v === "object" && !Array.isArray(v) && Object.entries(v).every(verdict) ? v : null; } catch { return null; } };
     const pair = [read(files[i]), read(files[i + 1])];
-    if (pair.includes(null)) return fail(`${pair[0] === null ? files[i] : files[i + 1]} is no run's verdicts: give the files check.mjs --verdicts wrote`);
-    if (Object.keys(pair[0]).some(j => j !== RUN_FROM) && !Object.keys(pair[1]).some(j => j !== RUN_FROM)) return fail(`${files[i + 1]} holds no job, where the run before the update held some: check.mjs ran nothing after it, so run it again and give what it writes`);
+    if (pair.includes(null)) return { why: `${pair[0] === null ? files[i] : files[i + 1]} is no run's verdicts: give the files check.mjs --verdicts wrote` };
+    if (Object.keys(pair[0]).some(j => j !== RUN_FROM) && !Object.keys(pair[1]).some(j => j !== RUN_FROM)) return { why: `${files[i + 1]} holds no job, where the run before the update held some: check.mjs ran nothing after it, so run it again and give what it writes` };
     pairs.push(pair);
   }
+  return { pairs };
+}
+
+// --trial <sha> [<before> <after> --sync <reading> --draft <reading>]...: writes the trial's record,
+// each pair one project's runs of check.mjs --verdicts, each `--sync` after it what pure-sync.mjs --trial printed of that
+// project's sync (#1261), and each `--draft` what trial-draft.mjs printed of its draft, or why none was opened (#1334).
+export function trial([sha, ...given], fail) {
+  const { rest: args, drafts, why: draftWhy } = draftsIn(given);
+  const { files, syncs } = syncsIn(args ?? []);
+  const refused = draftWhy ?? argsRefused(sha, files, syncs, drafts) ?? (files.length ? null : noneRefused(ownProjects()));
+  if (refused) return fail(refused);
+  const { pairs, why: pairWhy } = pairsOf(files);
+  if (pairWhy) return fail(pairWhy);
   const { answers, why } = answersOf(syncs, sha, pairs.length);
   if (why) return fail(why);
-  const record = trialRecord(sha, new Date().toISOString().slice(0, 10), pairs, answers);
+  const { readings, why: notRead } = draftReadingsOf(drafts, sha, pairs.length);
+  if (notRead) return fail(notRead);
+  const own = pairs.length ? ownProjects() : 0, short = pairs.length ? draftsShort(own, readings) : null;
+  if (short) return fail(short);
+  const record = trialRecord(sha, new Date().toISOString().slice(0, 10), pairs, answers, readings, own);
   fs.writeFileSync(path.join(ROOT, TRIAL), `${JSON.stringify(record, null, 2)}\n`);
   console.log(`${TRIAL} written. ${trialSaid(record)}`);
 }

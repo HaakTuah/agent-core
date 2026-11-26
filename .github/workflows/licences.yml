@@ -21,9 +21,10 @@
 # a package list of the project's own asks for is one version as SemVer writes one and, letter for letter, the version
 # its lockfile installs; what stood so at the pull request's base is reported, never failed.
 # The lookup, core/scripts/lookup.mjs, asks npm's registry of each package the pull request brings into a lockfile that
-# no lockfile of its base held (floor topic 15, "A new one is looked up in its registry"): it fails a name the registry
-# does not know and one first published under 90 days ago, and prints the rest for the review; it reaches npm's
-# registry and GitHub's public API and raw files, with no token.
+# no lockfile of its base held, and PyPI of each new to a requirements file the config names under "pypi" (floor topic
+# 15, "A new one is looked up in its registry"): it fails a name the registry does not know and one first published
+# under 90 days ago, and prints the rest for the review; it reaches npm's registry, PyPI where the config names such a
+# file, and GitHub's public API and raw files, with no token.
 # The third, core/scripts/agent-tools.mjs, holds floor topic 15's list of the agents' own tools against what the
 # project configures for them, in Claude Code's, Kiro's and Codex's files (read against the base, the first parent of
 # the merge, until the list is written), a plug-in's or tool server's listed version against the pin its configuration
@@ -80,7 +81,7 @@ jobs:
           allow-licenses: ${{ steps.lists.outputs.allow-licenses }}
           allow-dependencies-licenses: ${{ steps.lists.outputs.allow-dependencies-licenses }}
           comment-summary-in-pr: never
-      - name: Every package and audit entry, each to its own list; every dependency at the one exact version its lock file installs (floor rule 7); each package new to the project looked up in npm's registry (floor topic 15)
+      - name: Every package and audit entry, each to its own list; every dependency at the one exact version its lock file installs (floor rule 7); each package new to the project looked up in its registry (floor topic 15)
         if: ${{ !cancelled() }}
         env:
           CONFIG: ${{ inputs.config }}
