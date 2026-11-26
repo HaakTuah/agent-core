@@ -88,7 +88,7 @@ function notPinned(repo, head, sha, ask) {
 export function readDraft(repo, pr, sha, gates = [], ask = ghAsk) {
   const pull = ask(`repos/${repo}/pulls/${pr}`).body;
   const head = String(pull?.head?.sha ?? ""), base = String(pull?.base?.ref ?? "");
-  const refused = notDraft(repo, pr, pull, ask) ?? notPinned(repo, head, sha, ask);
+  const refused = notDraft(repo, pr, pull, ask) ?? (aCommit(head) ? notPinned(repo, head, sha, ask) : "GitHub gave the draft no head commit. Mend: run it again where gh answers for the owner's account");
   if (refused) return { why: refused };
   const main = ask(`repos/${repo}/commits/${encodeURIComponent(base)}`).body?.sha;
   if (!aCommit(main)) return { why: `the newest commit of ${base || "its base"} could not be read. Mend: run it again where gh answers for the owner's account` };
