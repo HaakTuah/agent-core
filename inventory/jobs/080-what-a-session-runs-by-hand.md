@@ -1,5 +1,5 @@
 - **What a session runs by hand** (`scripts/session-cost.mjs`, `scripts/labels.mjs`, `scripts/reasons-said.mjs`, `scripts/labels.json`,
-  `scripts/inbox.mjs`, `scripts/state-report.mjs`, `scripts/pruning.mjs`, `scripts/pruning-list.mjs`, `scripts/pruning-read.mjs`, `scripts/pruning-record.mjs`, `tests/pruning-unheld-test.mjs`, `scripts/cited.mjs`, `scripts/outcomes.mjs`,
+  `scripts/inbox.mjs`, `scripts/state-report.mjs`, `scripts/pruning.mjs`, `scripts/pruning-list.mjs`, `scripts/pruning-read.mjs`, `scripts/pruning-record.mjs`, `tests/pruning-unheld-test.mjs`, `tests/pruning-fixtures.mjs`, `scripts/cited.mjs`, `scripts/outcomes.mjs`,
   `scripts/outcomes-read.mjs`, `scripts/stand-in-record.mjs`, `scripts/review-record.mjs`, `scripts/review-comments.mjs`, `scripts/review-lines.mjs`, `scripts/review-rounds.mjs`, `scripts/review-checks.mjs`,
   `scripts/core-cost.mjs`, `scripts/builder-trial.mjs`, `scripts/fixes.mjs`, `scripts/test-record.mjs`,
   `scripts/tools-read.mjs`, `scripts/tool-bots.json`, `scripts/stage-order.mjs`, `scripts/merge-line.mjs`, `scripts/reasons.mjs`, `scripts/busy-records.mjs`), a part the
