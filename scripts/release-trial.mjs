@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { leadsOut } from "./guards.mjs";
 import { answersOf, syncCounts, syncFormed, syncSaid, syncsIn } from "./trial-sync.mjs";
-import { draftFormed, draftHeld, draftRecord, draftSaid, draftReadingsOf, draftsIn } from "./trial-draft.mjs";
+import { draftFormed, draftHeld, draftRecord, draftSaid, draftReadingsOf, draftsIn, draftsShort } from "./trial-draft.mjs";
 
 // The key check.mjs --verdicts adds where it was run from outside the project, a clone of the core (check.mjs's RUN_FROM,
 // which the test holds to this one; #1244): no job's place.
@@ -153,14 +153,10 @@ function argsRefused(sha, files, syncs, drafts) {
   return inside ? `${inside} lies in the core's own repository, where a project's job names could be committed: write the runs' verdicts to a scratch folder outside every repository, and give those files` : null;
 }
 
-// Why the owner's own projects, `own` as state-report.mjs --projects found them (null where it could not), are not each
-// tried as they must be, or null: with no pair, none of them; with pairs, a draft's reading or a stop switch for each.
-function ownRefused(own, readings) {
-  if (own === null) return `which of the owner's projects take the core could not be read (scripts/state-report.mjs --projects), ${readings ? "so the drafts cannot be told one for each" : "and nothing read is not none found"}. Mend: run it where gh answers for the owner's account, then --trial again`;
-  if (!readings) return own > 0 ? `${plural(own, "project")} of the owner's take the core, as scripts/state-report.mjs --projects finds them. Mend: try the release on one of them, and record its runs before and after` : null;
-  const opened = readings.filter(r => !r.none || r.none === "stop-switch").length;
-  return opened < own ? `${plural(own, "project")} of the owner's take the core, as scripts/state-report.mjs --projects finds them, and ${opened} ${opened === 1 ? "was" : "were"} given a draft's reading or a stop switch. Mend: try each of them, its sync opened as a draft pull request and read with trial-draft.mjs, and give its pair` : null;
-}
+// Why the owner's own projects, as state-report.mjs --projects found them (`own`, null where it could not), refuse a
+// trial with no pair, or null where none takes the core.
+const noneRefused = own => (own === null ? "which of the owner's projects take the core could not be read (scripts/state-report.mjs --projects), and nothing read is not none found. Mend: run it where gh answers for the owner's account, then --trial again"
+  : own > 0 ? `${plural(own, "project")} of the owner's take the core, as scripts/state-report.mjs --projects finds them. Mend: try the release on one of them, and record its runs before and after` : null);
 
 // Each project's runs, [before, after], from the files given, or { why } one is none.
 function pairsOf(files) {
@@ -182,7 +178,7 @@ function pairsOf(files) {
 export function trial([sha, ...given], fail) {
   const { rest: args, drafts, why: draftWhy } = draftsIn(given);
   const { files, syncs } = syncsIn(args ?? []);
-  const refused = draftWhy ?? argsRefused(sha, files, syncs, drafts) ?? (files.length ? null : ownRefused(ownProjects(), null));
+  const refused = draftWhy ?? argsRefused(sha, files, syncs, drafts) ?? (files.length ? null : noneRefused(ownProjects()));
   if (refused) return fail(refused);
   const { pairs, why: pairWhy } = pairsOf(files);
   if (pairWhy) return fail(pairWhy);
@@ -190,7 +186,7 @@ export function trial([sha, ...given], fail) {
   if (why) return fail(why);
   const { readings, why: notRead } = draftReadingsOf(drafts, sha, pairs.length);
   if (notRead) return fail(notRead);
-  const own = pairs.length ? ownProjects() : 0, short = pairs.length ? ownRefused(own, readings) : null;
+  const own = pairs.length ? ownProjects() : 0, short = pairs.length ? draftsShort(own, readings) : null;
   if (short) return fail(short);
   const record = trialRecord(sha, new Date().toISOString().slice(0, 10), pairs, answers, readings, own);
   fs.writeFileSync(path.join(ROOT, TRIAL), `${JSON.stringify(record, null, 2)}\n`);

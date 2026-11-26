@@ -146,6 +146,14 @@ export function draftReadingsOf(drafts, sha, pairs) {
   return { readings };
 }
 
+// Why the readings of a trial with pairs fall short of the owner's own projects, `own` as state-report.mjs --projects
+// found them (null where it could not), or null: each needs a draft's reading or a stop switch that stood.
+export function draftsShort(own, readings) {
+  if (own === null) return "which of the owner's projects take the core could not be read (scripts/state-report.mjs --projects), so the drafts cannot be told one for each. Mend: run it where gh answers for the owner's account, then --trial again";
+  const opened = readings.filter(r => !r.none || r.none === "stop-switch").length;
+  return opened < own ? `${own} of the owner's projects take the core, as scripts/state-report.mjs --projects finds them, and ${opened} ${opened === 1 ? "was" : "were"} given a draft's reading or a stop switch. Mend: try each of them, its sync opened as a draft pull request and read with trial-draft.mjs, and give its pair` : null;
+}
+
 // The record's counts of the drafts, from each pair's reading: how many were read, how many projects had none and why,
 // and the counts of the drafts' checks summed.
 export function draftRecord(readings) {
