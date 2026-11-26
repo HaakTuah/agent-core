@@ -35,8 +35,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      at any depth refused with its mend, and the first tries the changed paths on the path patterns within 16 million steps for each
      reading, a run of it or a pull request's description, each with a budget of its own, past which every pattern
      left matches), and the rule
-     files the total read sums and reads for a cut or a join (`scripts/read-total.mjs`, which prints each name with its
-     control characters written out, and reads a link, what is no regular file of the checkout's own, and a name a rule
+     files the total read sums and reads for a cut or a join (`scripts/read-total.mjs`, which prints each name, as
+     `scripts/reading.mjs` prints a changed path, with its control and bidirectional formatting characters written out
+     as `\uXXXX`, and reads a link, what is no regular file of the checkout's own, and a name a rule
      file gives that is absolute or holds a ".." segment as no file); limits: 64 MB of git's answer (256 MB for the
      comments proof, the selection and the total read, 16 MB for the manifest, past which it is reported unread), and
      none in count, since every changed path is read, save the total read's 1 MB of a file's text, past which its size
