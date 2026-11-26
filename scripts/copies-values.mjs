@@ -2,8 +2,8 @@
 // place" in the core's roles/shared/how-to-work.md; #1139): the copies too short for its runs of lines or words to read.
 // A value is one of two fixed forms, compared as exact strings, never guessed at:
 //   - a pin: 40 or 64 hexadecimal characters standing alone (a commit hash, a SHA-256), in lower case, in any tracked
-//     file; save one after `uses: <action>@`, which the host asks of each workflow on its own and Dependabot moves, and a
-//     run of digits alone, which is a number;
+//     file; save one after `uses: <action>@`, which the host asks of each workflow on its own and Dependabot moves, one
+//     after the manifest's `Core: <address> at `, which each sync moves, and a run of digits alone, which is a number;
 //   - a pattern: a regular expression literal of JavaScript or TypeScript, as the measures' lexer reads it
 //     (code-shape-lexer.mjs), of at least 30 characters, in a file the config's "code" lists; save one that matches one
 //     text alone (no ., [, *, +, ?, {, | or class escape such as \d), since that is a script's printed wording read, which
@@ -20,8 +20,10 @@
 // against the base's list fails, and so does one whose value now stands in fewer files, until --write lowers it. Until
 // the list is written, what the pull request's base held counts as it: a value fails only where a file of the project's
 // own holds it now and the base held it in fewer such files, and with no base (a push to main) none fails. Either way a
-// sync, which changes the core's files alone, never fails here, and a value moved from one file to another passes; every
-// value written twice that does not fail is noted, at every run, a debt to work down. Node's own modules and git.
+// sync, which changes the core's files and those two kinds of pin alone, never fails here, and a value moved from one file
+// to another passes; every value written twice that does not fail is noted, at every run, a debt to work down. A release
+// that changes what this part reads, once lists stand, fails syncs as a change of the copies' measure would: it brings
+// a sync note whose step writes each project's list anew, the pull request's base counting as the list until then. Node's own modules and git.
 import crypto from "node:crypto";
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -37,6 +39,7 @@ export const keyOf = v => crypto.createHash("sha256").update(v).digest("hex").sl
 export const listForm = l => !!l && typeof l === "object" && !Array.isArray(l) && Object.entries(l).every(([h, n]) => /^[0-9a-f]{12}$/u.test(h) && Number.isInteger(n) && n >= 1);
 const PIN = /(?<![0-9A-Za-z_])(?:[0-9a-fA-F]{64}|[0-9a-fA-F]{40})(?![0-9A-Za-z_])/gu;
 const USES = /uses:[ \t]*["']?[^\s"'@]+@(?:sha256:)?$/u;
+const CORE_PIN = /^Core: \S+ at $/u;
 const LOCKS = ["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lock", "packages.lock.json", "Cargo.lock", "poetry.lock", "Pipfile.lock", "uv.lock", "Gemfile.lock", "composer.lock", "go.sum"];
 const RECORDS = ["archive/", "reports/", "words/"];
 const SCRIPT = /\.(?:[cm]?js|jsx|[cm]?ts|tsx)$/u;
@@ -47,7 +50,7 @@ export function pinsIn(text) {
   const found = new Map();
   String(text).split("\n").forEach((line, i) => {
     for (const m of line.matchAll(PIN)) {
-      if (/^\d+$/u.test(m[0]) || USES.test(line.slice(0, m.index))) continue;
+      if (/^\d+$/u.test(m[0]) || USES.test(line.slice(0, m.index)) || CORE_PIN.test(line.slice(0, m.index))) continue;
       const v = m[0].toLowerCase();
       if (!found.has(v)) found.set(v, i + 1);
     }

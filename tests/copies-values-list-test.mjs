@@ -109,7 +109,17 @@ try {
   // (no baseline yet: --first writes the copies and the list together)
   drop(BASELINE); put("deploy.sh", `sum=${DIGEST}\n`);
   r = run("--first");
-  ok(r.status === 0 && "windows" in baselineNow() && JSON.stringify(baselineNow().values) === JSON.stringify({ [keyOf(DIGEST)]: 2 }), "--first, with no baseline, writes the copies and the list of values in one", `${r.out}\n${JSON.stringify(baselineNow())}`);} finally {
+  ok(r.status === 0 && "windows" in baselineNow() && JSON.stringify(baselineNow().values) === JSON.stringify({ [keyOf(DIGEST)]: 2 }), "--first, with no baseline, writes the copies and the list of values in one", `${r.out}\n${JSON.stringify(baselineNow())}`);
+  // (the manifest's pin of the core, which each sync moves, is not counted: a sync that moves it beside the same pin in
+  // a file of the project's own fails nothing)
+  drop(BASELINE); put("core-manifest.md", `Core: X at ${OTHER}, copied whole under core/.\n`); put("docs/notes.md", `We took the core at ${OTHER}.\n`);
+  r = run("--first");
+  ok(r.status === 0 && JSON.stringify(baselineNow().values) === JSON.stringify({ [keyOf(DIGEST)]: 2 }), "--first lists no pin the manifest's \"Core:\" line holds beside one file of the project's own", `${r.out}\n${JSON.stringify(baselineNow())}`);
+  const pinned = commit("the list, beside the manifest's pin");
+  put("core-manifest.md", `Core: X at ${SHA}, copied whole under core/.\n`); put("core/setup/new.txt", "x\n");
+  r = run("", { COPIES_BASE: pinned });
+  ok(r.status === 0, "a sync that moves the manifest's pin passes against a base with the list", r.out);
+} finally {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 console.log(failed ? `${failed} failed` : "all passed");

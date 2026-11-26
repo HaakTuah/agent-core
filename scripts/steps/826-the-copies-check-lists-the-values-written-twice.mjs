@@ -28,9 +28,9 @@ export default { lead: "26 November 2026, the copies check lists the values writ
     const text = p.read(baseline);
     if (text === null) return `The copies check's baseline \`${shown(baseline)}\` is not there: ${mend(config)}.`;
     let json;
-    try { json = JSON.parse(text); } catch { return `\`${shown(baseline)}\` cannot be read as JSON: take it back as the project's \`main\` holds it, then ${mend(config)}.`; }
+    try { json = JSON.parse(text); } catch { return `\`${shown(baseline)}\` cannot be read as JSON: take it back as the project's \`main\` holds it, and where \`main\` holds no list either, ${mend(config)}.`; }
     if (!json || typeof json !== "object" || Array.isArray(json) || !("values" in json)) return `\`${shown(baseline)}\` holds no list "values": ${mend(config)}.`;
-    return listForm(json.values) ? null : `\`${shown(baseline)}\`'s "values" is no object of keys of 12 hexadecimal characters, each to a whole count of one or more: take it back as the project's \`main\` holds it, then ${mend(config)}.`;
+    return listForm(json.values) ? null : `\`${shown(baseline)}\`'s "values" is no object of keys of 12 hexadecimal characters, each to a whole count of one or more: take it back as the project's \`main\` holds it, and where \`main\` holds no list either, ${mend(config)}.`;
   },
   write: (p, busy) => {
     const { config, baseline } = baselineOf(p);
