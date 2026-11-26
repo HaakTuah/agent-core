@@ -122,8 +122,8 @@ try {
   // project's, left alone, and one that stands nowhere fails)
   const readme = core("README.md", "# The core\n\nIt holds `core/tasks/a.md` and `floor/topics.md`; a project holds `docs/PROGRESS.md`.\n");
   ok(readme.status === 0 && /and [1-9]\d* names in the descriptions lead somewhere/.test(readme.out), "in the core's own run its README's names are read: core/ is the core, and a folder it does not hold a project's", readme.out);
-  const gone = core("README.md", "# The core\n\nIt holds `tasks/b.md`.\n");
-  ok(gone.status === 1 && mended(gone.out) && /FAIL: a broken pointer: README\.md:3: `tasks\/b\.md` names no file the project tracks\. Mend: /.test(gone.out), "and a name there that stands nowhere fails", gone.out);
+  const gone = core("README.md", "# The core\n\nIt holds `tasks/names-test-gone.md`.\n");
+  ok(gone.status === 1 && mended(gone.out) && /FAIL: a broken pointer: README\.md:3: `tasks\/names-test-gone\.md` names no file the project tracks\. Mend: /.test(gone.out), "and a name there that stands nowhere fails", gone.out);
   fs.rmSync(path.join(coreDir, "README.md"));
   execFileSync("git", ["add", "-A"], { cwd: coreDir, stdio: "ignore" });
   const listless = spawnSync(process.execPath, [path.join(coreDir, "scripts/pointers.mjs"), "--core", "--write-names"], { cwd: coreDir, encoding: "utf8" });
