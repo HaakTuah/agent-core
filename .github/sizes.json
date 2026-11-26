@@ -35,6 +35,8 @@
     ".github/workflows/security-review.yml": { "mark": 29919, "why": "One job that each project calls pinned, its shell inline so that nothing the pull request checks out runs with its token; a session reads the step it changes, found by its name, and a second called workflow would start a second job, billed a whole minute on a private repository's free plan" },
     "scripts/staged.mjs": { "mark": 30534, "why": "the question of a split is asked in #1157" },
     "scripts/init.mjs": { "mark": 30906, "why": "the question of a split is asked in #1098" },
+    "tests/checks-test.mjs": { "mark": 22191, "why": "the question of a split is asked in #1391" },
+    "tests/trial-test.mjs": { "mark": 21844, "why": "the question of a split is asked in #1391" },
     "tests/check-test.mjs": { "mark": 31544, "why": "#1073: npm stand-in's test split off; the rest is one scratch project's cases, written again by a split" },
     "scripts/check.mjs": { "mark": 33867, "why": "the question of a split is asked in #1064" },
     "scripts/checks.mjs": { "mark": 24179, "why": "the question of a split is asked in #1064" },

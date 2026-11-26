@@ -176,6 +176,23 @@ const run = (dir, args, extra = {}) => {
   ok(advised.status === 0 && /Advisory: nothing fails for it yet/.test(advised.out), "where advisory, it fails nothing", advised.out);
   fs.rmSync(path.join(dir, "fails.txt"));
 }
+// (#1361, point 19: a restore whose dotnet is not on this machine did not run, the run exiting 127 with its mend; with a
+// check that failed beside it, the run failed)
+if (process.platform !== "win32") {
+  const dir = project({ "checks/licences.json": "{}\n" });
+  const base = git(dir, "rev-parse", "HEAD");
+  fs.writeFileSync(path.join(dir, "core/scripts/nuget-look.sh"), 'echo "run=true" >> "$GITHUB_OUTPUT"\necho "built=true" >> "$GITHUB_OUTPUT"\n');
+  const bin = path.join(tmp, "no-dotnet-bin");
+  fs.mkdirSync(bin, { recursive: true });
+  for (const p of ["bash", "git"]) fs.symlinkSync(execFileSync("bash", ["-c", `command -v ${p}`], { encoding: "utf8" }).trim(), path.join(bin, p));
+  const lacked = () => run(dir, ["nuget", "--nuget", "checks/licences.json"], { BASE_SHA: base, PATH: bin });
+  const alone = lacked();
+  ok(alone.status === 127 && /^dotnet could not be started \(spawnSync dotnet ENOENT\)\.$/m.test(alone.out) && /^FAIL 1 of \d+ checks could not run here, since this machine lacks dotnet: Restore each project file from its lock file alone\. Mend: /m.test(alone.out)
+    && !/A restore from a lock file failed/.test(alone.out) && !/checks failed/.test(alone.out) && mended(alone.out), "nuget: a restore whose dotnet is not on this machine did not run: it says so with its mend and exits 127, as a shell does for a command not found", alone.out);
+  fs.writeFileSync(path.join(dir, "fails.txt"), "lookup.mjs");
+  const beside = lacked();
+  ok(beside.status === 1 && /^1 of \d+ checks failed, each saying its mend above: Each package new/m.test(beside.out) && /could not run here, since this machine lacks dotnet/.test(beside.out), "  and where a check failed beside it, the run fails", beside.out);
+}
 // the signature check's install, under an npm that reads none of --allow-git, --allow-remote and --allow-file (npm 10,
 // which Node 22 brings, and npm 11 before 11.15.0, since 11.14 refuses the registry's own packages under --allow-remote=none), installs nothing and fails saying the mend, since that npm would
 // fetch any git, web or file source the lock file names; under one that reads them all, it installs (#704). A stand-in
