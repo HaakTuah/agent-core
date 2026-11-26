@@ -164,7 +164,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
      lookup (`scripts/lookup.mjs`, with `scripts/lookup-pypi.mjs` for a requirements file in PyPI's lock form, which it
      fails whole where pip could read it otherwise) and its lookup again of what a project holds (`scripts/held.mjs`, through the
-     lookup's readers); Node itself is checked against its SHA-256 by `scripts/node.sh`, and the code scan's wheel by
+     lookup's readers of npm's and NuGet's lock files); Node itself is checked against its SHA-256 by `scripts/node.sh`, and the code scan's wheel by
      its own, which pip checks against `.packages/requirements.txt` (`scripts/install.mjs pypi`); limits: 16 MB of a
      NuGet package's manifest, 100 pages of NuGet's registry, 20 lookups on GitHub in a run, 30 s for an answer (60 s
      for a NuGet package), 120 s for the whole look again; hostile tests: `tests/hostile-packages-test.mjs`, for the
