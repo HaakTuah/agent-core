@@ -60,8 +60,12 @@ const shows = text => { const seen = []; return { seen, show: (sha, file) => { s
 let g = shows(kit);
 ok(granted(jobEnv("look.yml"), g.show) === "write" && g.seen.join() === `${SHA}:.github/workflows/look.yml`, "the starter kit's daily job, calling the core's look.yml: its grant `issues: write`, read from its file as it ran", g.seen);
 ok(granted(jobEnv("own-look.yml", { GITHUB_JOB: "own-look", GITHUB_EVENT_NAME: "workflow_dispatch" }), shows(own).show) === "write", "the core's own daily job, started by hand: `issues: write`");
-const called = parseYaml(fs.readFileSync(new URL("../.github/workflows/look.yml", import.meta.url), "utf8"));
-ok(Object.values(called.jobs).every(j => j.permissions?.issues === "write"), "the core's look.yml grants its job `issues: write`, so a caller's grant is what the token holds");
+for (const flow of ["look.yml", "core-moved.yml"]) {
+  const called = parseYaml(fs.readFileSync(new URL(`../.github/workflows/${flow}`, import.meta.url), "utf8"));
+  ok(Object.values(called.jobs).every(j => j.permissions?.issues === "write"), `the core's ${flow} grants its job \`issues: write\`, so a caller's grant is what the token holds`);
+}
+const moved = `on: schedule\njobs:\n  moved:\n    permissions: { contents: read, issues: write }\n    uses: ${CORE}/.github/workflows/core-moved.yml@${PIN}\n`;
+ok(granted(jobEnv("core-moved.yml", { GITHUB_JOB: "moved" }), shows(moved).show) === "write", "a project's daily job that still calls the core's core-moved.yml, which runs the look too: `issues: write`");
 const flowOf = (jobPerms, flowPerms) => `on: schedule\n${flowPerms === undefined ? "" : `permissions: ${flowPerms}\n`}jobs:\n  look:\n${jobPerms === undefined ? "" : `    permissions: ${jobPerms}\n`}    uses: ${CORE}/.github/workflows/look.yml@${PIN}\n`;
 for (const [jobPerms, flowPerms, want, what] of [
   ["{ issues: read }", undefined, "read", "a job that grants `issues: read`"], ["{ contents: read }", "write-all", "none", "a job whose grant leaves out issues, over the workflow's"],

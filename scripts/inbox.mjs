@@ -71,7 +71,9 @@ const gitShow = (sha, file) => {
 // not in a GitHub job, an event other than a schedule or a start by hand (on others GitHub may give less than the file
 // grants: a fork's pull request, Dependabot's), that file not at hand or not read, no grant written (the repository's
 // default, which no file says), or not one job that is the run's own (the job `GITHUB_JOB` names, with steps of its
-// own) or calls the core's look.yml, whose job grants `issues: write`, so the caller's grant is what the token holds.
+// own) or calls the core's look.yml or core-moved.yml, each of whose jobs grants `issues: write`, so the caller's grant
+// is what the token holds. The token read is the job's own, as every job of the core's passes it (`GH_TOKEN:
+// ${{ github.token }}`); a job that gives gh another app's token is outside what this reads.
 export function granted(env = process.env, show = gitShow) {
   const flow = ranFlow(env, show);
   const job = flow && runJob(flow.jobs, env.GITHUB_JOB);
@@ -91,8 +93,9 @@ function ranFlow(env, show) {
 }
 
 // Of the workflow's `jobs`, the one that is the run's own (`id`, GITHUB_JOB, with steps of its own) or calls the core's
-// look.yml; null where not one is.
-const LOOK = new RegExp(`^${CORE_SOURCE}/\\.github/workflows/look\\.yml@`);
+// look.yml or core-moved.yml (a project's daily job before it moved to look.yml, which runs the look too); null where not
+// one is.
+const LOOK = new RegExp(`^${CORE_SOURCE}/\\.github/workflows/(?:look|core-moved)\\.yml@`);
 function runJob(jobs, id) {
   const own = Object.entries(jobs).filter(([key, job]) => job && typeof job === "object"
     && (key === id && job.uses === undefined || typeof job.uses === "string" && LOOK.test(job.uses)));
