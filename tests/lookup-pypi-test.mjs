@@ -48,8 +48,8 @@ const separated = ["\r", "\r\n"].map((sep) => pypiPackages(`# a note${sep}hidden
 ok(separated.every((n) => n === "hidden-moss"), `a line ends at a lone carriage return as pip ends one, so no package hides behind a comment (${separated})`);
 const declared = pypiPackages(`# -*- coding: utf-8 -*-\n# vim: set fileencoding=UTF8 :\nplain-moss==1.0.0 ${H()}`, "r.txt").map((p) => p.name).join();
 ok(declared === "plain-moss", `a file that declares UTF-8 is read (${declared})`);
-const joined = pypiPackages(`# a note that ends so \\\nhidden-moss==1.0.0 ${H()}\nsplit-\\\nmoss==1.0.0 \\\n  ${H()}\n`, "r.txt");
-ok(joined.map((p) => p.name).join() === "hidden-moss,split-moss", `lines join as pip joins them: a comment ending in "\\" takes no package with it, and a package's name runs on unbroken (${joined.map((p) => p.name)})`);
+const joined = pypiPackages(`# a note that ends so \\\nhidden-moss==1.0.0 ${H()}\nrun-moss==1.0.0 \\\n  ${H()}\n`, "r.txt");
+ok(joined.map((p) => p.name).join() === "hidden-moss,run-moss", `lines join as pip and uv join them: a comment ending in "\\" takes no package with it, and a line runs on after a space (${joined.map((p) => p.name)})`);
 const harmless = ["--require-hashes", "--index-url https://pypi.org/simple", "--index-url=https://pypi.org/simple", "-i https://pypi.org/simple/", "--only-binary=:all:", "--no-binary :none:", "--pre", "--prefer-binary"];
 ok(pypiPackages(`${harmless.join("\n")}\nplain-moss==1.0.0 ${H()}`, "r.txt").length === 1, "an option that changes neither what is installed nor where from passes");
 for (const [what, text, said] of [
@@ -80,6 +80,9 @@ for (const [what, text, said] of [
   ["an index after \"=\" and a space", `--index-url= https://pypi.org/simple\nplain-moss==1.0.0 ${H()}`, /line 1: an option the lookup does not read/u],
   ["a hash apart from its option", `plain-moss==1.0.0 --hash sha256:${"a".repeat(64)}`, /line 1: plain-moss names no hash/u],
   ["a hash after \"==\"", `plain-moss==1.0.0 --hash==sha256:${"a".repeat(64)}`, /line 1: plain-moss names no hash/u],
+  ["a hash split across two lines, the end of which uv reads as a package", `plain-moss==1.0.0 --hash=sha256:${"a".repeat(60)}\\\ncafe`, /line 1: a line that runs on into the next otherwise than after a space/u],
+  ["a comment after the hashes ending in \"\\\", which uv ends where pip runs on", `plain-moss==1.0.0 ${H()} # a note \\\nhidden-moss==1.0.0 ${H()}`, /line 1: a line that runs on into the next otherwise than after a space, or with a "#"/u],
+  ["a name split across two lines", `\nsplit-\\\nmoss==1.0.0 ${H()}`, /line 2: a line that runs on/u],
 ]) {
   const message = throws(() => pypiPackages(text, "requirements.txt"));
   ok(said.test(message) && mended(`FAIL: ${message}`) && /^requirements\.txt, line/u.test(message), `a file with ${what} is refused whole, saying the mend (${message})`);

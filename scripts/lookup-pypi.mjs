@@ -2,9 +2,9 @@
 // each package at one exact version (==) with the hashes of its files, as `pip-compile --generate-hashes` and `uv pip
 // compile --generate-hashes` write one, read to packages; and what PyPI says of each new one. A file of the licence
 // check's config under "pypi" is read so: a line in any other form (a range, an address, a package with no hash, an
-// include, an index that is not PyPI's) fails it whole, since pip would install what the lookup did not read. Which
-// package another brings, and which the project names, is read from the "# via" lines those tools write; a file with
-// none names every package itself, and says nothing of what each brings. Names are compared as pip compares them
+// include, an index that is not PyPI's) fails it whole, since pip or uv would install what the lookup did not read.
+// Which package another brings, and which the project names, is read from the "# via" lines those tools write; a file
+// with none names every package itself, and says nothing of what each brings. Names are compared as pip compares them
 // (PEP 503: in lower case, each run of "-", "_" and "." one "-"). What PyPI answers is a publisher's text: it is said
 // on one line by the lookup's report, and an answer of another shape is a lookup that failed. The reader of a
 // repository's address is the lookup's own, passed in (`readRepo`), so neither file imports the other.
@@ -35,7 +35,7 @@ export function pypiPackages(text, lockPath) {
   asciiOnly(text, lockPath);
   const entries = [];
   let via = null;
-  for (const [n, line] of logical(text)) {
+  for (const [n, line] of logical(text, lockPath)) {
     const refuse = (what, mend = WRITE) => { throw new Error(`${lockPath}, line ${n}: ${what}, so it is not PyPI's lock form. Mend: ${mend}`); };
     if (line.startsWith("#")) { via = viaLine(line, entries.at(-1) ?? null, via); continue; }
     via = null;
@@ -63,17 +63,20 @@ function asciiOnly(text, lockPath) {
 }
 
 // Each logical line, trimmed, with the number of its first, as pip's join_lines reads them: a line ending in "\\" runs
-// on into the next, its backslashes taken off both ends, but a comment line never does, and one ends a line that ran
-// on into it, joined after a space.
-function* logical(text) {
+// on into the next, but a comment line never does, and one ends a line that ran on into it, joined after a space. A
+// line runs on only as pip-compile and uv write one, after a space, with no "#" and no other "\\" in it, where uv joins
+// it as pip does; any other (a word split across two lines, a comment after the hashes that ends in "\\") fails the
+// file, since uv, which installs the same file, reads a package there that pip and the lookup do not.
+function* logical(text, lockPath) {
   // (as Python's str.splitlines() splits a file of ASCII alone, as pip does: a lone carriage return ends a line too)
   const lines = text.replace(/^\uFEFF/u, "").split(/\r\n|[\n\r]/u);
   let joined = null, first = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i], comment = /^\s*#/u.test(line);
     if (line.endsWith("\\") && !comment) {
+      if (!/^[^#\\]* \\$/u.test(line)) throw new Error(`${lockPath}, line ${i + 1}: a line that runs on into the next otherwise than after a space, or with a "#" in it, which uv reads otherwise than pip, so it is not PyPI's lock form. Mend: ${WRITE}`);
       if (joined === null) { joined = ""; first = i + 1; }
-      joined += line.replace(/^\\+|\\+$/gu, "");
+      joined += line.slice(0, -1);
       continue;
     }
     yield joined === null ? [i + 1, line.trim()] : [first, `${joined}${comment ? " " : ""}${line}`.trim()];
