@@ -59,9 +59,7 @@ function strengthWhy(manifest, root, read, { at, text, config }) {
 // (a workspace's member is held by the root's lock file). The core's own copy and node_modules are no part of the project.
 const LOCKS = /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml)$/iu;
 const OTHER_LOCK = /(^|\/)(yarn\.lock|pnpm-lock\.yaml)$/iu;
-function licenceWhy(root) {
-  const tracked = trackedIn(root);
-  if (tracked === null) return null;
+export function licenceUnread(tracked, root = ".") {
   const copy = copyAmong(tracked, root), mine = tracked.filter(f => !f.split("/").includes("node_modules") && !(copy !== null && f.startsWith(copy)));
   const dirs = new Set(mine.filter(f => LOCKS.test(f)).map(f => posix.dirname(f)));
   const held = d => { for (let x = d; ; x = posix.dirname(x)) { if (dirs.has(x)) return true; if (x === ".") return false; } };
@@ -73,6 +71,8 @@ function licenceWhy(root) {
   const shown = unread.slice(0, 3).map(f => `\`${f}\``).join(", ") + (unread.length > 3 ? ` and ${unread.length - 3} more` : "");
   return `the project's packages stand in ${shown}, which the check does not read (it reads npm's lock files alone), so only the host's dependency review reads them, by its allow-list`;
 }
+
+const licenceWhy = root => { const tracked = trackedIn(root); return tracked === null ? null : licenceUnread(tracked, root); };
 
 // Each check that read nothing in the project at `root` (its manifest's text `manifest`, a file read by `read`, null
 // where there is none): [{ script, check, holds, why }], `script` its path in the core (scripts/shape.mjs), `check` the

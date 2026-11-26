@@ -6,9 +6,7 @@
 // Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/licence-locks-test.mjs
-import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
@@ -16,7 +14,7 @@ import { stoodAt, unnamedLocks } from "../scripts/licence-locks.mjs";
 import { check, coreConfig } from "../scripts/licences.mjs";
 import { asOutput, done, ok } from "../scripts/licence-scan-stage.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { readNothing } from "../scripts/read-nothing.mjs";
+import { licenceUnread } from "../scripts/read-nothing.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 const says = (list, f) => list.filter((m) => m.startsWith(`${f} is a lock file of npm's that the licence config's "lockfiles" does not name`));
@@ -123,21 +121,14 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
-// the packages the check does not read (#1351): the sync's report names the licence check as having read nothing where they
-// stand in a package.json with no lock file, a yarn.lock or a pnpm-lock.yaml, and not where npm's lock file holds them
+// the packages the check does not read (#1351): the sync's report names the licence check as having read nothing where
+// they stand in a package.json with no lock file, a yarn.lock or a pnpm-lock.yaml, and not where npm's lock file holds them
 {
-  const dir = mkdtempSync(join(tmpdir(), "licread-"));
-  try {
-    execFileSync("git", ["init", "-q"], { cwd: dir });
-    const said = (...put) => {
-      for (const f of put) { mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), "{}\n"); }
-      execFileSync("git", ["add", "-A"], { cwd: dir });
-      return readNothing(dir, "", () => null).find((n) => n.script === "scripts/licences.mjs");
-    };
-    const none = said(), bare = said("pkg/package.json"), held = said("pkg/package-lock.json", "pkg/inner/package.json"), yarn = said("web/yarn.lock"), pnpm = said("web/pnpm-lock.yaml");
-    ok(!none && /pkg\/package\.json/u.test(bare?.why ?? "") && bare.holds.length && bare.check === "core/scripts/licences.mjs" && !held && /web\/yarn\.lock/u.test(yarn?.why ?? "") && /web\/pnpm-lock\.yaml/u.test(pnpm?.why ?? ""),
-      "the licence check is said to read nothing where packages stand in a package.json with no lock file, a yarn.lock or a pnpm-lock.yaml, and not under npm's lock file", JSON.stringify({ none, bare, held, yarn, pnpm }));
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  const why = (...files) => licenceUnread(files);
+  ok(why() === null && /pkg\/package\.json/u.test(why("pkg/package.json") ?? "") && why("pkg/package.json", "pkg/package-lock.json", "pkg/inner/package.json") === null
+    && /web\/yarn\.lock/u.test(why("web/yarn.lock") ?? "") && /web\/pnpm-lock\.yaml/u.test(why("web/pnpm-lock.yaml") ?? "")
+    && why("node_modules/a/package.json") === null && why("core/package-lock.json", "core/x/package.json") === null,
+  "the licence check is said to read nothing where packages stand in a package.json with no lock file, a yarn.lock or a pnpm-lock.yaml, and not under npm's lock file", JSON.stringify(why("web/yarn.lock")));
 }
 
 done();
