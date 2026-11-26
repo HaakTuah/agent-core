@@ -9,7 +9,8 @@
 //         list could not be read whole, or for a pull request no open draft from the project's own branch by the
 //         owner's account, against the default branch, pinned to the commit, or of a repository another owner's, whose
 //         default branch's manifest pins no copy of this core or could not be read, or behind a stop switch that stands
-//         or cannot be read. A workflow that could not start or ended with no job counts as a failed check; one skipped on the draft is
+//         or cannot be read. A workflow run that failed with no failed job of its own counts as a failed check, and two
+//         checks meeting on one name give none; one skipped on the draft is
 //         counted and named apart, and where it passed on main, not run after, holds the cut. `--gate` names a check its
 //         builder read as failing, or skipping after passing on main, only for being a draft (setup/sync-notes/680):
 //         counted apart, holding nothing, named on its own line. A check run is named `<workflow>: <job>` where GitHub ties it
@@ -69,12 +70,11 @@ function pagesOf(route, key, ask) {
   return { why: `more than 1000 ${key}, past what is read` };
 }
 
-// What a commit's checks said, through `ask` (ghAsk's form), every page read: { said, active, flows, unfinished }, or
-// { why }. A workflow run of the commit that could not start or ended with no job is a check that failed (its jobs,
-// where it ran any, say what failed), and one not finished waits, each
-// named by its workflow; `active` is `said` with no run GitHub holds for a person (its own status `waiting`, a deploy's
-// reviewer say), `flows` names each workflow run, and `unfinished` each one not finished, by its name in `said` and its
-// workflow's.
+// What a commit's checks said, through `ask` (ghAsk's form), every page read: { said, active, flows, unfinished,
+// jobOf }, or { why }. A workflow run of the commit that failed with no failed job of its own (one that could not start
+// among them) is a check that failed, and one not finished waits, each named by its workflow; `active` is `said` with
+// no run GitHub holds for a person (its own status `waiting`, a deploy's reviewer say), `flows` names each workflow run,
+// `unfinished` each one not finished, by its name in `said` and its workflow's, and `jobOf` each check's job.
 function checksAt(repo, sha, ask) {
   const runs = pagesOf(`repos/${repo}/commits/${sha}/check-runs`, "check_runs", ask);
   if (runs.why) return runs;
@@ -82,21 +82,41 @@ function checksAt(repo, sha, ask) {
   if (status.why) return status;
   const flows = pagesOf(`repos/${repo}/actions/runs?head_sha=${sha}`, "workflow_runs", ask);
   if (flows.why) return flows;
-  const label = w => `${w.name ?? "a workflow"} (${w.status === "completed" ? "could not start" : "workflow"})`;
-  const jobs = keyed(runs.items, flows.items);
-  const jobless = w => RUN[w?.conclusion] === "failed" && !runs.items.some(r => r?.check_suite?.id != null && r.check_suite.id === w.check_suite_id);
-  const open = flows.items.filter(w => w?.status !== "completed" || jobless(w));
+  const label = w => `${w.name ?? "a workflow"} (${w.status !== "completed" ? "workflow" : w.conclusion === "startup_failure" ? "could not start" : "failed outside its jobs"})`;
+  const { jobs, jobOf, clash } = keyed(runs.items, flows.items);
+  if (clash) return { why: `two checks of ${sha.slice(0, 7)} meet on the name "${asText(clash)}", one of them a workflow's job, so neither can be told apart. Mend: give one of them another name in its workflow, and read again` };
+  const ownFailed = w => runs.items.some(r => r?.check_suite?.id != null && r.check_suite.id === w.check_suite_id && RUN[r.conclusion] === "failed");
+  const open = flows.items.filter(w => w?.status !== "completed" || (RUN[w?.conclusion] === "failed" && !ownFailed(w)));
   const unstarted = open.map(w => ({ name: label(w), status: w.status === "completed" ? "completed" : "queued", conclusion: "failure", person: w.status === "waiting" }));
   const unfinished = open.filter(w => w.status !== "completed").map(w => ({ name: label(w), flow: w.name }));
   const notHeld = r => r?.status !== "waiting" && !r?.person;
-  return { said: saidOf([...jobs, ...unstarted], status.items), active: saidOf([...jobs, ...unstarted].filter(notHeld), status.items), flows: new Set(flows.items.map(w => w?.name)), unfinished };
+  return { said: saidOf([...jobs, ...unstarted], status.items), active: saidOf([...jobs, ...unstarted].filter(notHeld), status.items), flows: new Set(flows.items.map(w => w?.name)), unfinished, jobOf };
 }
 
 // Each check run named by its workflow and job, `<workflow>: <job>`, where GitHub ties its check suite to a workflow
 // run, so a job of one workflow is never read against another's of the same name; by its job alone where none is tied.
+// { jobs, jobOf (each name's job), clash }: `clash` a name two pairs of workflow and job meet on.
 function keyed(runs, flows) {
   const flowOf = new Map(flows.filter(w => w?.check_suite_id != null).map(w => [w.check_suite_id, w.name]));
-  return runs.map(r => (flowOf.has(r?.check_suite?.id) ? { ...r, name: `${flowOf.get(r.check_suite.id)}: ${r.name}` } : r));
+  const pairs = new Map(), jobOf = new Map();
+  let clash = null;
+  const jobs = runs.map(r => {
+    const flow = flowOf.get(r?.check_suite?.id), name = flowOf.has(r?.check_suite?.id) ? `${flow}: ${r?.name}` : r?.name, pair = JSON.stringify([flow ?? null, r?.name]);
+    if (pairs.has(name) && pairs.get(name) !== pair) clash ??= name;
+    pairs.set(name, pair);
+    jobOf.set(name, r?.name);
+    return { ...r, name };
+  });
+  return { jobs, jobOf, clash };
+}
+
+// `main`'s checks with each the draft skipped and `main` names not, a workflow renamed or a job tied to none, read as
+// passed where its job passed on main, so a skip after passing is not lost to a new name.
+function alignedOf(then, now) {
+  const passed = new Set(Object.keys(then.active).filter(n => then.active[n] === "passed").map(n => then.jobOf.get(n) ?? n));
+  const out = { ...then.active };
+  for (const [n, v] of Object.entries(now.said)) if (v === "skipped" && !Object.hasOwn(out, n) && passed.has(now.jobOf.get(n) ?? n)) out[n] = "passed";
+  return out;
 }
 
 // Whether the stop switch of `repo` stands, through `ask`: true or false, or { why } where it could not be read; GitHub's
@@ -172,11 +192,13 @@ export function readDraft(repo, pr, sha, gates = [], ask = ghAsk) {
   const main = ask(`repos/${repo}/commits/${encodeURIComponent(base)}`).body?.sha;
   if (!aCommit(main)) return { why: `the newest commit of ${base || "its base"} could not be read. Mend: run it again where gh answers for the owner's account` };
   const [then, now] = [checksAt(repo, main, ask), checksAt(repo, head, ask)];
-  if (!then.said || !now.said) return { why: `the checks could not be read: ${then.why ?? now.why}. Mend: run it again where gh answers for the owner's account` };
+  const unread = then.why ?? now.why;
+  if (unread) return { why: /Mend:/.test(unread) ? unread : `the checks could not be read: ${unread}. Mend: run it again where gh answers for the owner's account` };
   if (!Object.values(now.said).some(v => v !== "skipped")) return { why: "no check has run on the draft yet (a skipped one does not), and a draft with none measures nothing. Mend: read again once its checks have started and finished, without polling" };
   const waiting = waitingOf(then, now);
   if (waiting[0] + waiting[1]) return { why: `${waiting[1]} checks on the draft and ${waiting[0]} on main's newest commit have not finished. Mend: read again once they finish, without polling` };
-  return { answer: { commit: sha, repo: repoHash(pull.base.repo.id), ...draftCounts(then.active, now.said, gates) }, ...namedOf(then.active, now.said, gates) };
+  const mainNow = alignedOf(then, now);
+  return { answer: { commit: sha, repo: repoHash(pull.base.repo.id), ...draftCounts(mainNow, now.said, gates) }, ...namedOf(mainNow, now.said, gates) };
 }
 
 // The draft's checks by name, beside main's `active`: those `failed` that did not fail on main, those `gated`, failed
