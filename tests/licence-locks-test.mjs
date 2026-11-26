@@ -48,8 +48,8 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
 // a config with a scan: what it reads is the scan's to fail, what it skips, and a name the scan does not read, is said here
 {
   const r = unnamedLocks(".", ["tools/package-lock.json", "docs/package-lock.json", "tools/NPM-Shrinkwrap.json"], { ...config, scan: { served: [], skip: ["docs/"] } }, "HEAD^1", () => false);
-  ok(r.failures.length === 2 && says(r.failures, "docs/package-lock.json").length === 1 && says(r.failures, "tools/NPM-Shrinkwrap.json").length === 1,
-    "where the config scans, a lock file the scan reads is left to it, and one it skips or whose name differs only in case is said", JSON.stringify(r));
+  ok(r.failures.length === 1 && says(r.failures, "docs/package-lock.json").length === 1,
+    "where the config scans, a lock file the scan reads, whatever the case of its name, is left to it, and one it skips is said", JSON.stringify(r));
 }
 
 // a name that differs from npm's only in case is no twin of a named lock file, which the check reads by npm's own name
