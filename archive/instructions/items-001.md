@@ -187,6 +187,7 @@ The index, and how an item is written: `archive/instructions.md`.
     be able to read the alerts, and whether they get the full picture of the diagnosis so they can address them; keeping
     the alerts private, no agent token, CodeQL on every pull request and the owner passing on what needs fixing were
     proposed. Decided: The proposals were agreed to, both parts.
+    Changed by: #1142.
 
 36. **2 November 2026** (Amarna Letters, item 153; for both games). Asked: a set of review rules, among them "a test
     weakened or skipped, or changed beyond what the task forces". Decided: Everything was agreed to.

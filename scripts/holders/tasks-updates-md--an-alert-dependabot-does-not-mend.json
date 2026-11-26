@@ -1,0 +1,6 @@
+{
+  "rule": "tasks/updates.md: An alert Dependabot does not mend",
+  "holder": "check: tests/alerts-test.mjs, in part",
+  "behind": ["#1142"],
+  "number": "check fires; outcome: robust"
+}

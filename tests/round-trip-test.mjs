@@ -39,6 +39,7 @@ const WRITERS = {
   "mutation-tools.mjs": ["tests/mutation-tools-test.mjs", "its row, list, size marks"],
   "core-reading.mjs": ["here", "checks/core-reading.json, read by its own `due`"],
   "look-keep.mjs": ["here", "an inbox file, read by the inbox's reader"],
+  "pointers.mjs": ["tests/names-test.mjs", "checks/names.json, read back as its list"],
   "queue.mjs": ["tests/queue-test.mjs", "the progress file --clear rewrites, read by its reader"],
   "screens.mjs": ["tests/screens-test.mjs", "the screens' baseline --write rewrites, read by readBaseline"],
   "strength.mjs": ["tests/strength-test.mjs", "the strength baseline --whole and --lower write, read by the check"],
