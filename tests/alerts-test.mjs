@@ -61,6 +61,8 @@ ok(tasksOf([alert(12, "made-up-thing")], [pull("Bump made-up-thing-extra from 1 
   ok(left("widget", bot("Bump widget.merge from 1 to 2", "dependabot/pip/widget.merge-2", "")), "nor one whose name runs on past the alert's with a dot");
   ok(left("made-up-thing", bot("Update the made-up-thing docs", "made-up-thing-2", "made-up-thing")), "nor a title, branch or line that is not in Dependabot's form");
   ok(!left("@made-up/scoped", bot("Bump the npm group with 2 updates", "dependabot/npm_and_yarn/made-up/scoped-2", "")), "a scoped package's branch counts");
+  ok(left("made-up-foo", bot("Bump @made-up/made-up-foo from 1 to 2", "dependabot/npm_and_yarn/made-up/made-up-foo-2", "Bumps [@made-up/made-up-foo](https://example.invalid) from 1 to 2.")), "a scoped package's pull request does not count for the bare name its branch ends in");
+  ok(!left("made-up-thing", bot("chore(deps): bump made-up-thing", "dependabot/pip/site/made-up-thing-2", "")), "where the title and description name none, the branch counts, in a folder too");
   ok(!left("made-up-thing", bot("Bump the pip group with 2 updates", "dependabot/pip/pip-1a2b3c", "Bumps the pip group with 2 updates.\nUpdates `made-up-thing` from 1 to 2")), "a grouped pull request's line \"Updates `<name>` from\" counts");
   ok(!left("made-up-thing", bot("Bump made-up-a and made-up-thing in /app", "dependabot/pip/app/multi-1", "")), "a title that names several packages counts for each");
 }
@@ -90,9 +92,9 @@ ok(tasksOf([alert(13, "made-up-thing")], [pull("Bump the npm group across 1 dire
   const { readdirSync, readFileSync, statSync } = await import("node:fs");
   const files = dir => readdirSync(dir).flatMap(n => { const p = `${dir}/${n}`; return statSync(p).isDirectory() ? (n === "node_modules" ? [] : files(p)) : [p]; });
   const root = new URL("..", import.meta.url).pathname, mine = "tests/alerts-test.mjs";
-  const all = ["scripts", ".github", "setup", "tests"].flatMap(d => files(`${root}${d}`).map(p => p.slice(root.length))).filter(p => p !== mine);
+  const all = ["scripts", ".github", ".claude", "setup", "tests"].flatMap(d => files(`${root}${d}`).map(p => p.slice(root.length))).filter(p => p !== mine);
   const reads = all.filter(p => /(?:secret|code)-scanning\/alerts/.test(readFileSync(root + p, "utf8")));
-  ok(reads.length === 0, "no script, workflow or set-up of the core's reads secret-scanning or code-scanning alerts", reads.join(", "));
+  ok(reads.length === 0, "no script, workflow, hook or set-up of the core's reads secret-scanning or code-scanning alerts", reads.join(", "));
   const others = all.filter(p => p !== "scripts/alerts.mjs" && /dependabot\/alerts/.test(readFileSync(root + p, "utf8")));
   ok(others.length === 0, "only alerts.mjs calls the Dependabot alerts", others.join(", "));
   const calls = readFileSync(`${root}scripts/alerts.mjs`, "utf8").split("\n").filter(l => /dependabot\/alerts/.test(l) && !l.trim().startsWith("//"));

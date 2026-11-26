@@ -36,11 +36,13 @@ export const titleOf = a => `Update ${bare(a.package?.name)} (${bare(a.package?.
 // Whether an open pull request of Dependabot's is for the package, by Dependabot's own forms alone: its title ("Bump <name>
 // from …", names joined by ", " or " and "), its branch (`dependabot/<ecosystem>/[<folder>/]<name>-<version>`), and its
 // description's lines "Bumps [<name>](…)" and "Updates `<name>` from" ahead of the first `<details>`, where the release
-// notes, outsiders' text, begin. A name is matched whole, ignoring case.
+// notes, outsiders' text, begin. A name is matched whole, ignoring case; the branch, which drops a scope's `@`, is read only
+// where the title and the description name no package.
 const lower = s => String(s ?? "").toLowerCase();
 const namesOf = pull => {
   const names = new Set(), title = /^Bump (.+?)(?: from \S+ to \S+)?(?: in \S+)?$/i.exec(String(pull.title ?? "").trim().slice(0, 300))?.[1];
-  if (title) for (const n of title.split(/, | and /)) names.add(lower(n.trim()));
+  if (title) for (const n of title.split(/, | and /).map(n => n.trim())) if (n && !/\s/.test(n)) names.add(lower(n));
+  // (a group's title, "Bump the pip group with 2 updates", names no package: no name holds a space)
   for (const line of String(pull.body ?? "").split(/<details>/i)[0].split("\n")) {
     if (/^Bumps /.test(line)) for (const m of line.matchAll(/\[([^\]\s]+)\]\(/g)) names.add(lower(m[1]));
     const updates = /^Updates `([^`\s]+)` from /.exec(line);
@@ -51,7 +53,9 @@ const namesOf = pull => {
 const named = (pull, name) => {
   const esc = lower(name).replace(/^@/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const branch = lower(pull.head?.ref).replace(/^dependabot\/[^/]+\//, "");
-  return namesOf(pull).has(lower(name)) || (lower(pull.head?.ref).startsWith("dependabot/") && new RegExp(`(?:^|/)${esc}-\\d[\\w.+-]*$`).test(branch));
+  const names = namesOf(pull);
+  if (names.size) return names.has(lower(name));
+  return lower(pull.head?.ref).startsWith("dependabot/") && new RegExp(`(?:^|/)${esc}-\\d[\\w.+-]*$`).test(branch);
 };
 
 // The alerts that are tasks: open more than a day at `at`, with no open pull request of Dependabot's for the package.
