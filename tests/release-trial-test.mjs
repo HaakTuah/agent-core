@@ -10,7 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { COUNTS, TRIAL, compared, ownCount, trialAt, trialRecord } from "../scripts/release-trial.mjs";
 import { DRAFT_COUNTS } from "../scripts/trial-draft-record.mjs";
-import { answerOf } from "../scripts/trial-sync.mjs";
+import { answerOf, answersOf } from "../scripts/trial-sync.mjs";
 import { scratchCore } from "../scripts/releases-scratch.mjs";
 import { shownAs } from "../scripts/state-report.mjs";
 
@@ -88,8 +88,22 @@ const { tmp, git } = scratchCore("release-trial-test-");
   const cliRun = (...args) => spawnSync(process.execPath, [releaseMjs, "--trial", later, ...args], { encoding: "utf8" });
   const [syncFirst, syncTwice, syncInCore, syncNoAnswer, syncNone] = [cliRun("--sync", said, runs, runs), cliRun(runs, runs, "--sync", said, "--sync", said), cliRun(runs, runs, "--sync", path.join(path.dirname(fileURLToPath(import.meta.url)), "said.txt")), cliRun(runs, runs, "--sync", said), cliRun(runs, runs)];
   ok([syncFirst, syncTwice].every(c => c.status === 1 && /--trial needs the full SHA[^\n]*--sync/.test(c.stderr)) && syncInCore.status === 1 && /lies in the core's own repository/.test(syncInCore.stderr)
-    && syncNoAnswer.status === 1 && /given with --sync for project 1, holds no line `trial answer: `/.test(syncNoAnswer.stderr) && syncNone.status === 1 && /project 1's runs are given with no --sync after them: run `node <a clone/.test(syncNone.stderr),
-    "--trial takes one --sync after each pair, never none, kept outside the core's own repository, holding pure-sync.mjs --trial's answer, and writes nothing otherwise (a reading never asked is no reading)", [syncFirst, syncTwice, syncInCore, syncNoAnswer, syncNone].map(c => c.stderr).join("\n"));
+    && syncNoAnswer.status === 1 && !/given with --sync/.test(syncNoAnswer.stderr) && /project 1's runs are given with no --draft after them/.test(syncNoAnswer.stderr) && syncNone.status === 1 && /project 1's runs are given with no --sync after them: run `node <a clone/.test(syncNone.stderr),
+    "--trial takes one --sync after each pair, never none, kept outside the core's own repository, and a file that holds no answer goes on to the next reading (a reading never asked is no reading)", [syncFirst, syncTwice, syncInCore, syncNoAnswer, syncNone].map(c => c.stderr).join("\n"));
+  // (a reading that crashed, stopped before its answer or holds none in its form is counted not proved, so the record
+  // still stands; one never asked, a file not read and an answer for another commit are refused; #1361, point 18)
+  const crashed = path.join(tmp, "crashed.txt"), empty = path.join(tmp, "empty.txt"), pureOne = path.join(tmp, "pure.txt"), elsewhere = path.join(tmp, "elsewhere.txt");
+  fs.writeFileSync(crashed, "node:internal/errors: Command failed: git fetch -q --no-tags origin refs/heads/main\nfatal: 'origin' does not appear to be a git repository\n");
+  fs.writeFileSync(empty, "");
+  fs.writeFileSync(pureOne, `a pure sync against the commit tried, ${later}: a trial's reading\ntrial answer: ${JSON.stringify({ commit: later, pure: true, from: "release-5" })}\n`);
+  fs.writeFileSync(elsewhere, `trial answer: ${JSON.stringify({ commit: tried, pure: true, from: "release-5" })}\n`);
+  const counted = answersOf([pureOne, crashed, empty, said], later, 4);
+  ok(JSON.stringify(counted.answers) === JSON.stringify([{ pure: true, from: "release-5" }, ...Array(3).fill({ pure: false, from: "unknown" })]) && counted.unproved.length === 3
+    && counted.unproved.every((l, i) => l.startsWith(`project ${i + 2}'s sync, counted not proved: `) && l.includes("holds no line `trial answer: `")) && counted.why === undefined,
+    "a sync's reading that crashed, is empty or holds no answer is counted not proved, from a copy not read, and says so for each", JSON.stringify(counted));
+  const [unreadFile, other, never] = [answersOf([path.join(tmp, "not-there.txt")], later, 1), answersOf([elsewhere], later, 1), answersOf([], later, 1)];
+  ok(/not-there\.txt, given with --sync for project 1, cannot be read/.test(unreadFile.why) && /answers for [0-9a-f]{7}, not the commit tried/.test(other.why) && /given with no --sync after them/.test(never.why),
+    "  and a file not read, an answer for another commit and a reading never asked are refused all the same", [unreadFile, other, never].map(r => r.why).join("\n"));
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the trial of a release`);
