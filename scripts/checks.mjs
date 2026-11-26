@@ -200,7 +200,7 @@ function baseCommit(base, exits = true) {
 const lacking = new Set(), starts = { lacked: 0, broke: 0 };
 // (the host's words where the SDK band a project's global.json pins is not on this machine, and the program said lacking
 // for it, which the mend asks installed: #1361, point 10)
-const SDK_LACKING = /compatible .{0,20}SDK was not found|requested SDK version/iu, SDK_BAND = "the .NET SDK band the project's global.json names";
+const SDK_LACKING = /compatible .{0,20}SDK was not found|requested SDK version/iu, SDK_BAND = "the .NET SDK band the global.json names";
 // Whether a program started and passed; one that could not be started is said so, and one not found noted as lacking
 // (Node says ENOENT for a folder to run in that is not there too, which is no program lacking).
 function begun(r, what, cwd) {
@@ -310,18 +310,17 @@ const RUN = {
       const projects = list(["--projects"]), sources = list([o.nuget, "--sources"]);
       if (projects.status !== 0) return false;
       let passed = sources.status === 0, restored = true;
-      if (passed) {
+      const named = projects.stdout.split(/\r?\n/).filter(Boolean);
+      // (a machine without the SDK band the global.json pins that dotnet reads from the folder the restores run in, its
+      // rollForward allowing no other, restores nothing: the restores did not run, the machine's fault, not the change's,
+      // since their failure is no word on the lock files; asked once, as each restore would ask it; #1361, point 10)
+      const sdk = passed && named.length ? spawnSync("dotnet", ["--version"], { env: { ...process.env, ...dotnet }, encoding: "utf8" }) : undefined;
+      if (sdk && !sdk.error && sdk.status !== 0 && SDK_LACKING.test(`${sdk.stdout}${sdk.stderr}`)) {
+        console.log("The restores could not run: this machine has no .NET SDK that the global.json here accepts.");
+        lacking.add(SDK_BAND); starts.lacked++; passed = false;
+      } else if (passed) {
         const from = sources.stdout.split(/\r?\n/).filter(Boolean).flatMap(s => ["--source", s]);
-        for (const project of projects.stdout.split(/\r?\n/).filter(Boolean)) {
-          // (a machine without the SDK band the project's global.json pins, its rollForward allowing no other, restores
-          // nothing: that restore did not run, the machine's fault, not the change's, since its failure is no word on the
-          // lock file; #1361, point 10)
-          const sdk = spawnSync("dotnet", ["--version"], { cwd: path.dirname(project), env: { ...process.env, ...dotnet }, encoding: "utf8" });
-          if (!sdk.error && sdk.status !== 0 && SDK_LACKING.test(`${sdk.stdout}${sdk.stderr}`)) {
-            console.log(`The restore of ${project} could not run: this machine has no .NET SDK that the project's global.json accepts.`);
-            lacking.add(SDK_BAND); starts.lacked++; passed = false;
-            continue;
-          }
+        for (const project of named) {
           // (the two properties given here overrule a project's own: its packages go to the folder the check reads, and
           // its lock file is the one beside it; each project named from the root, behind "./", so no name reads as an option)
           if (!run("dotnet", ["restore", "--locked-mode", ...from, `-p:RestorePackagesPath=${packages}`, "-p:NuGetLockFilePath=", `./${project}`], { env: { NUGET_PACKAGES: packages, ...dotnet } })) passed = restored = false;

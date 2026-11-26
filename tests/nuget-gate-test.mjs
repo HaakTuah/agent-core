@@ -164,7 +164,7 @@ else {
   env.PATH = `${bin}${path.delimiter}${kept}`;
   const lacked = whole({ "README.md": "# More\n" });
   env.PATH = kept;
-  ok(!lacked.passed && lacked.out.includes("could not run: this machine has no .NET SDK that the project's global.json accepts") && /could not run here, since this machine lacks the \.NET SDK band the project's global\.json names: Restore each project file from its lock file alone\. Mend: /.test(lacked.out) && mended(lacked.out) && !lacked.out.includes("A restore from a lock file failed"),
+  ok(!lacked.passed && lacked.out.includes("The restores could not run: this machine has no .NET SDK that the global.json here accepts") && /could not run here, since this machine lacks the \.NET SDK band the global\.json names: Restore each project file from its lock file alone\. Mend: /.test(lacked.out) && mended(lacked.out) && !lacked.out.includes("A restore from a lock file failed"),
     "a machine without the SDK band global.json pins leaves the restore not run, saying what it lacks with its mend, and no lock file is said to have failed", lacked.out.slice(-1500));
 }
 
