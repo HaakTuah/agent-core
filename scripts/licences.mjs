@@ -32,7 +32,8 @@
 // font package is known by its registry address. "accepted" holds what is off its list and the owner wants anyway,
 // each with the owner's yes (licence-yes.mjs, beside this file, says how one is written and what it never takes in).
 // A project whose packages come from NuGet names its lock files under "nuget", which the NuGet check reads (nuget.mjs,
-// beside this file) with this file's lists, the same audit and an "accepted" of its own.
+// beside this file) with this file's lists, the same audit and an "accepted" of its own. "pypi" names requirements
+// files in PyPI's lock form, which the lookup alone reads (lookup.mjs, beside this file; #716).
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, posix, relative, resolve, sep } from "node:path";
@@ -334,7 +335,7 @@ function npmrcFiles(root, dir = "") {
 /** One spelling for every path in a config ("./package.json" is "package.json"), so "ships" matches its lockfile's. */
 function normalised(config) {
   const out = { ...config };
-  for (const key of ["lockfiles", "ships", "ignoreScriptsIn"]) if (Array.isArray(out[key])) out[key] = out[key].map((p) => posix.normalize(p));
+  for (const key of ["lockfiles", "ships", "ignoreScriptsIn", "pypi"]) if (Array.isArray(out[key])) out[key] = out[key].map((p) => posix.normalize(p));
   if (typeof out.audit === "string") out.audit = posix.normalize(out.audit);
   return out;
 }
@@ -367,7 +368,8 @@ function configRead(path) {
   return config;
 }
 
-const NOTHING = 'the config names nothing to check. Mend: name the lockfiles in "lockfiles", or the audit\'s file in "audit"';
+const NOTHING = 'the config names nothing to check. Mend: name the lockfiles in "lockfiles", the requirements files in PyPI\'s lock form in "pypi", or the audit\'s file in "audit"';
+const nothing = (config) => !config.lockfiles?.length && !config.pypi?.length && !config.audit;
 
 /** The config's form: its schema's, the first fault refused, where ajv is installed; else the checks below. Then, either
  *  way, what a schema cannot say: that it names something to check, and that each path of its scan is written as git
@@ -379,7 +381,7 @@ function configShape(config) {
     configPaths(config);
     if (config.scan !== undefined) configScan(config);
   } else if (faults.length) throw new Error(faults[0]);
-  if (!config.lockfiles?.length && !config.audit) throw new Error(NOTHING);
+  if (nothing(config)) throw new Error(NOTHING);
   for (const key of ["served", "tools", "skip"]) {
     if (!(config.scan?.[key] ?? []).every((p) => scanPathOk(key, p))) throw new Error(`the config's "scan.${key}" is not a list of paths in the project. Mend: list each as a path from the project's root`);
   }
@@ -387,7 +389,7 @@ function configShape(config) {
 
 /** The config's keys, each one it knows, its lists each a list of names, and "ships" among them. */
 function configLists(config) {
-  const lists = ["lockfiles", "ships", "data", "fonts", "ignoreScriptsIn"];
+  const lists = ["lockfiles", "ships", "data", "fonts", "ignoreScriptsIn", "pypi"];
   // ("nuget" is the NuGet check's own, which reads and checks it: nuget.mjs, beside this file; "agentTools" the agent-tools
   // check's: agent-tools.mjs)
   const unknown = Object.keys(config).filter((k) => !lists.includes(k) && !["audit", "notices", "scan", "nuget", "accepted", "agentTools"].includes(k));
@@ -402,7 +404,7 @@ function configLists(config) {
 /** The config's "audit" and "notices", each a path where it stands, and something named to check. */
 function configPaths(config) {
   if (config.audit !== undefined && (typeof config.audit !== "string" || !config.audit)) throw new Error('the config\'s "audit" is not a path. Mend: name the audit\'s file, or take "audit" out');
-  if (!config.lockfiles?.length && !config.audit) throw new Error(NOTHING);
+  if (nothing(config)) throw new Error(NOTHING);
   if (config.notices !== undefined && (typeof config.notices !== "string" || !config.notices || !config.audit)) throw new Error('the config\'s "notices" is not a path, or the config names no "audit" whose entries it holds. Mend: name the notices file by its path, beside an "audit", or take "notices" out');
 }
 
@@ -429,7 +431,7 @@ function scanPathOk(key, p) {
  *  refused, and, given the project's `root`, so is one whose file is reached through a link that leads out of it: the
  *  config, where none is. */
 function within(config, root) {
-  const named = [...(config.lockfiles ?? []), ...(config.ships ?? []), ...(config.ignoreScriptsIn ?? []), config.audit, config.notices].filter((p) => p !== undefined);
+  const named = [...(config.lockfiles ?? []), ...(config.ships ?? []), ...(config.ignoreScriptsIn ?? []), ...(config.pypi ?? []), config.audit, config.notices].filter((p) => p !== undefined);
   const out = named.filter((p) => !inProject(p) || (root !== undefined && leadsOut(root, join(root, p))));
   if (out.length) throw new Error(`the config names a path outside the project: ${out.map((p) => logged(p)).join(", ")}. Mend: name each file by its path from the project's root, with no ".." that leads above it, and make it a file of the project's own, reached through no link that leads out of it`);
   return config;
@@ -754,8 +756,8 @@ if (started(import.meta.url)) {
   }
 }
 
-// The exact-versions check (exact-versions.mjs) and the lookup of each package new to the project in npm's registry
-// (lookup.mjs), run beside the licence check on the config at `configPath`, each printing its lines: whether either
+// The exact-versions check (exact-versions.mjs) and the lookup of each package new to the project in its registry
+// (lookup.mjs: npm's, and PyPI's for a file the config names under "pypi"), run beside the licence check on the config at `configPath`, each printing its lines: whether either
 // failed. The base is the one the job names (LOOKUP_BASE), else the merge's first parent. What stood there before the
 // exact-versions check came is reported, never failed, and a pull request whose checkout holds no base has its lookup
 // said as a warning that it did not run, failing nothing ("Nothing locks a project" in the core's AGENTS.md), save
@@ -776,6 +778,9 @@ export async function alongside(configPath, root) {
     console.log(`::warning::The lookup of the packages new to the project did not run: this is a pull request, and its checkout holds no base to read it against. Mend: ${mend}`);
     return exact.status !== 0;
   }
+  // (where the run's network is cut off, as the core's own suites cut it, scripts/offline.sh, no registry answers: the
+  // lookup is left to the step of its own that reaches them, and said so)
+  if (process.env.CORE_OFFLINE) { console.log("ok   the lookup of the packages new to the project is left to its own step: this run's network is cut off (scripts/offline.sh)"); return exact.status !== 0; }
   const { lines, code } = await run(configPath, { root, base: at });
   for (const line of lines) (line.startsWith("FAIL") ? console.error : console.log)(line);
   summarise(lines, false);

@@ -27,8 +27,8 @@
 # Each job first installs the core's own packages from its lock files in .packages/, the parser's in .packages/parser/
 # among them (#719), from npm's registry, running no install script (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
 # tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
-# Once, on Linux, the core's own lock files are held as a project's are: each package it brings looked up in npm's
-# registry (scripts/lookup.mjs), the week's wait on each one a change brings or updates (scripts/week-wait.mjs), and the
+# Once, on Linux, the core's own lock files are held as a project's are: each package it brings looked up in its
+# registry, npm's or PyPI's (scripts/lookup.mjs; #716), the week's wait on each one a change brings or updates (scripts/week-wait.mjs), and the
 # registry's signature on each installed one (npm audit signatures); the
 # mutation tool's in tests/mutation/ in the job that installs it, the step after its install.
 # Each job of the suites, three on Linux and fifteen on Windows on each Node, the network's on both, and the upgrade
@@ -307,6 +307,9 @@ jobs:
       - name: The lookup of a new package, run on a project
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-run-test.mjs ')) }}
         run: node tests/lookup-run-test.mjs
+      - name: The lookup of a new package from PyPI, on recorded answers
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-pypi-test.mjs ')) }}
+        run: node tests/lookup-pypi-test.mjs
       - name: The sync's step that asks a lookup beside each check of exact versions
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-step-test.mjs ')) }}
         run: node tests/lookup-step-test.mjs
@@ -830,7 +833,7 @@ jobs:
       - name: Every package of the core's own lock files at one exact version, from npm's registry (floor rule 7)
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
         run: node scripts/exact-versions.mjs .github/licences.json
-      - name: Each package new to the core's own lock file looked up in its registry (floor rule 15; once, on Linux)
+      - name: Each package new to the core's own lock files looked up in its registry, npm's or PyPI's (floor rule 15; once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }}
         env:
           LOOKUP_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }} # the merge's first parent, which the checkout holds (#1231); empty on a push to main, where nothing is new
