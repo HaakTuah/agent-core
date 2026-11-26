@@ -101,6 +101,11 @@ put("src/a.mjs", "export const a = 1;\n"); put("test/a-test.mjs", "import '../sr
 put("reports/1.xml", '<testcase classname="test/a-test.mjs" name="a" time="1"/><testcase classname="test/e2e-test.mjs" name="e" time="9"/>');
 put("reports/2.xml", '<testcase classname="test/a-test.mjs" name="a" time="3"><failure/></testcase><testcase classname="test/e2e-test.mjs" name="e" time="7"/>');
 put("mutation.json", JSON.stringify({ files: { "src/a.mjs": { mutants: [{ killedBy: ["test/a-test.mjs"] }] } } }));
+put("checks/broken.json", "{");
+// (a config that stands, outside the project: refused as outside, never read as none there)
+const away = scratchDir("test-record-away-");
+fs.writeFileSync(path.join(away, "shape.json"), fs.readFileSync(path.join(dir, "checks/shape.json")));
+const awayAt = path.relative(dir, path.join(away, "shape.json")).split(path.sep).join("/");
 const script = fileURLToPath(new URL("../scripts/test-record.mjs", import.meta.url));
 const run = args => { const r = spawnSync(process.execPath, [script, ...args], { cwd: dir, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 let r = run(["checks/shape.json", "--junit", "reports", "--mutation", "mutation.json"]);
@@ -108,9 +113,16 @@ ok(r.status === 0 && /\| `test\/a-test\.mjs` \| 2 \| 2 \| 1 \(2\.xml\) \| 0 \| 1
   && /1 reach a real clock, 2 s of it \(20%\); 1 start another process, 2 s of it \(20%\)/.test(r.out) && /\| `test\/b-test\.mjs` \| 0 .*kept: it guards a stated rule/.test(r.out),
   "a whole run reads the reports, the faults and the tests that open a screen, reach a real clock or start another process, and prints the table", r.out);
 for (const [args, what] of [[["checks/shape.json", "--junit", "nowhere"], "a folder of reports that is not there"], [["checks/shape.json", "--mutation", "reports/1.xml"], "a mutation report that is no JSON"],
-  [["checks/shape.json", "--repo", "o/n"], "a repository with no workflow named"], [["checks/none.json"], "no config"], [["checks/shape.json", "--every"], "a word it does not know"]]) {
+  [["checks/shape.json", "--repo", "o/n"], "a repository with no workflow named"], [["checks/none.json"], "no config"], [["checks/shape.json", "--every"], "a word it does not know"],
+  [[awayAt], "a config outside the project"], [["checks/broken.json"], "a config that is no JSON"]]) {
   r = run(args);
-  ok(r.status === 1 && mended(r.out), `refused, with its mend: ${what}`, r.out);
+  ok(r.status === 1 && mended(r.out) && (args[0] !== awayAt || /lies outside the project/u.test(r.out)), `refused, with its mend: ${what}`, r.out);
+}
+// (a config named by an address that holds a sign-in: refused with its mend, the sign-in cut as shape.mjs cuts it, #1236)
+{
+  const secret = ["made", "up", String(process.pid)].join("-"), at = `https://someone:${secret}@example.invalid/shape.json`;
+  r = run([at]);
+  ok(r.status === 1 && mended(r.out) && !r.out.includes(secret), "refused, with its mend: a config named by an address that holds a sign-in, the sign-in never printed", r.out);
 }
 
 console.log(`${count - failed} of ${count} passed`);

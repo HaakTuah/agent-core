@@ -83,10 +83,6 @@
       "mark": 24130,
       "why": "#946: its header names licence-pages.mjs, so that the mutation tool still runs it on the page reader as before the split; a split of its cases by the input each reads is a cleaning task."
     },
-    "tests/pruning-test.mjs": {
-      "mark": 23922,
-      "why": "#895: its section on the rules with no holder moves to a test of its own."
-    },
     "choices/010-the-core-s-foundations-judged-again-as-if.md": {
       "mark": 29908,
       "why": "#870: a choice record is one argued text, its criteria, long list and judgments read together; the foundations record was split from CHOICES.md, whole as it stood, and is read when the core's foundations are judged again."
@@ -191,7 +187,7 @@
       "mark": 39601,
       "why": "Split by the reader each case tests in #852: its archive cases apart from the rest, and a project's own rules and share apart from the core's."
     },
-    "tests/hostile-configs-test.mjs": { "mark": 24643, "why": "Split by the reader each case tests in #852." },
+    "tests/hostile-configs-test.mjs": { "mark": 31351, "why": "Split by the reader each case tests in #852." },
     "tests/hostile-pr-changes-test.mjs": { "mark": 44725, "why": "Split by the reader each case tests in #852." },
     "tests/init-test.mjs": {
       "mark": 61827,
