@@ -5,9 +5,10 @@
 // says. The check run on a project whose licence config names one under "pypi" is lookup-run-test.mjs's. Run: node
 // tests/lookup-pypi-test.mjs
 import { lookUp, newPackages, YOUNG } from "../scripts/lookup.mjs";
-import { pep440, pypiPackages } from "../scripts/lookup-pypi.mjs";
+import { pep440, pypiFacts, pypiPackages } from "../scripts/lookup-pypi.mjs";
 import { NOW, ago } from "../scripts/lookup-stage.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { quick } from "../scripts/hostile.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { if (!cond) { failed++; console.error(`FAIL ${what}`); } };
@@ -168,6 +169,12 @@ answers["https://pypi.org/pypi/digestless-moss/json"] = { status: 200, json: doc
 // (a package new in two files of the pull request is asked of once, and the hashes of each file held to PyPI's list)
 r = await lookUp(newPackages([["requirements.txt", [pkg("tidy-moss-format", { hashes: [sha("a")] })]], ["dev.txt", [pkg("tidy-moss-format", { direct: false, hashes: [sha("f")] })]]], []), { get, now: NOW });
 ok(r.failures.length === 1 && r.failures[0].startsWith("dev.txt: tidy-moss-format@1.1.0: 1 of the 1 hash its line names") && r.reports.length === 1, `a hash PyPI does not list fails in each file that names the package new, one file's listed hash covering no other's (${r.failures})`);
+// (a name given any number of times, across files, is kept in one pass, each of its lines held to PyPI's list, and each
+// version as written found among PyPI's once)
+const many = Array.from({ length: 50000 }, () => pkg("tidy-moss-format", { version: "v1.1", direct: false, hashes: [sha("a")] }));
+let kept = [];
+ok(quick(() => (kept = newPackages([["requirements.txt", many], ["dev.txt", many]], []))) && kept.length === 1 && kept[0].lines.length === 100000, `a name given 100,000 times in two files is kept once, with each line, quickly, never copying what it kept at each repeat (${kept.length})`);
+ok(quick(() => pypiFacts(doc("tidy-moss-format", ago(800)), "v1.1", () => null, kept[0].lines).failures.length === 0), "each of 100,000 lines at a version PyPI keys otherwise is held to its list, quickly, the version found and its digests gathered once");
 r = await one(pkg("digestless-moss", { hashes: [sha("a")] }));
 ok(r.failures.length === 1 && /PyPI lists for no file of version 1\.1\.0/u.test(r.failures[0]), `where PyPI lists no sha256 for the version's files, its hashes fail (${r.failures})`);
 

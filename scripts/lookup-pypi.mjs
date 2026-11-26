@@ -140,13 +140,17 @@ function graphed(entries) {
   const any = entries.some((e) => e.via.length), names = new Set(entries.map((e) => e.name));
   const parents = (e) => e.via.map((v) => normal(v.replace(/\[.*$/u, ""))).filter((v) => names.has(v));
   const named = (e) => !any || parents(e).length < e.via.length || !e.via.length;
-  const children = new Map(), byName = new Map(entries.map((e) => [e.name, e]));
-  for (const e of entries) for (const p of parents(e)) children.set(p, (children.get(p) ?? new Set()).add(e.name));
+  // (a name given twice is brought by what either of its lines names)
+  const children = new Map(), brought = new Map();
+  for (const e of entries) for (const p of parents(e)) {
+    children.set(p, (children.get(p) ?? new Set()).add(e.name));
+    brought.set(e.name, (brought.get(e.name) ?? new Set()).add(p));
+  }
   // (what a named package leads to, in one pass from all of them: each such package that is not named itself is brought)
   const roots = entries.filter(named).map((e) => e.name), fed = reach("", (x) => (x === "" ? roots : children.get(x) ?? []));
   // (each entry its own: a name the file gives twice, behind two markers, is named where either line names it)
   const direct = entries.map((e) => named(e) || !fed.has(e.name)), shown = new Set(entries.filter((e, i) => direct[i]).map((e) => e.name));
-  const ancestors = (e) => [...reach(e.name, (x) => parents(byName.get(x)))];
+  const ancestors = (e) => [...reach(e.name, (x) => brought.get(x) ?? [])];
   return entries.map((e, i) => ({ name: e.name, version: e.version, path: e.name, direct: direct[i], pypi: true, hashes: e.hashes,
     get brings() { return any ? reach(e.name, (x) => children.get(x) ?? []).size : null; },
     get by() { return direct[i] ? [] : ancestors(e).filter((x) => shown.has(x)); } }));
@@ -189,22 +193,24 @@ export function pypiFacts(doc, version, readRepo, lines = []) {
   const files = (v) => (Array.isArray(releases[v]) ? releases[v].filter(object) : []);
   const all = Object.keys(releases).flatMap((v) => files(v).map((f) => ({ at: when(f.upload_time_iso_8601), yanked: f.yanked === true }))).filter((f) => !Number.isNaN(f.at));
   if (!all.length) return { missing: "the registry knows the name, and holds no file of it" };
-  // (a version as written in the lock file, else the one PyPI keys that PEP 440 holds equal to it)
-  const keyOf = (v) => { const asked = pep440(v); return Object.hasOwn(releases, v) ? v : Object.keys(releases).find((k) => (asked ? pep440(k) === asked : k.toLowerCase() === v.toLowerCase())); };
+  // (a version as written in the lock file, else the one PyPI keys that PEP 440 holds equal to it; each found, and its
+  // files' digests gathered, once however many lines name it)
+  const once = (f, m = new Map()) => (v) => (m.has(v) ? m.get(v) : m.set(v, f(v)).get(v));
+  const keyOf = once((v) => { const asked = pep440(v); return Object.hasOwn(releases, v) ? v : Object.keys(releases).find((k) => (asked ? pep440(k) === asked : k.toLowerCase() === v.toLowerCase())); });
+  const listedOf = once((k) => new Set((k ? files(k) : []).map((f) => f.digests?.sha256).filter((d) => typeof d === "string" && /^[0-9a-f]{64}$/u.test(d)).map((d) => `sha256:${d}`)));
   const key = keyOf(version), own = key ? files(key) : [];
   if (!own.length) return { missing: `the registry knows the name, and no file of version ${version.slice(0, 64)} of it` };
   const kept = all.filter((f) => !f.yanked), info = object(doc.info) ? doc.info : {};
   return { first: Math.min(...all.map((f) => f.at)), last: Math.max(...(kept.length ? kept : all).map((f) => f.at)), repo: repoOf(info, readRepo),
     publisher: publisher(doc.ownership, info), note: own.every((f) => f.yanked === true) ? "this version is yanked: PyPI asks that it not be installed" : "", version: key, file: fileOf(own),
     // (each file's line held to the files of its own version: two files of the pull request may name it at two)
-    failures: lines.flatMap((l) => { const k = keyOf(l.version), text = unlisted(l.hashes, k ? files(k) : [], l.version); return text ? [{ lockPath: l.lockPath, version: l.version, text }] : []; }) };
+    failures: lines.flatMap((l) => { const text = unlisted(l.hashes, listedOf(keyOf(l.version)), l.version); return text ? [{ lockPath: l.lockPath, version: l.version, text }] : []; }) };
 }
 
-// Where the lock line names a hash that PyPI lists for no file of the version (each file's sha256, its digest as PyPI
-// gives it; a yanked file's too, which pip still installs at an exact version), what is wrong and its mend; else "".
-function unlisted(hashes, own, version) {
+// Where the lock line names a hash not `listed` for a file of the version (each file's sha256 as PyPI gives it; a
+// yanked file's too, which pip still installs at an exact version), what is wrong and its mend; else "".
+function unlisted(hashes, listed, version) {
   if (!Array.isArray(hashes)) return "";
-  const listed = new Set(own.map((f) => f.digests?.sha256).filter((d) => typeof d === "string" && /^[0-9a-f]{64}$/u.test(d)).map((d) => `sha256:${d}`));
   const off = hashes.filter((h) => !listed.has(h));
   if (!off.length) return "";
   const shown = off.slice(0, 3).map((h) => `${h.slice(0, h.indexOf(":") + 13)}…`).join(", ");

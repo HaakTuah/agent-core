@@ -167,8 +167,10 @@ export function newPackages(head, base, nuget = false) {
   for (const [lockPath, packages] of head) for (const p of packages) {
     if (held.has(key(p))) continue;
     const was = out.get(key(p));
-    // (a package of PyPI's keeps the hashes of each file that names it, each held to PyPI's list: #1368, point 1)
-    const lines = p.hashes ? [...(was?.lines ?? []), { lockPath, version: p.version, hashes: p.hashes }] : undefined;
+    // (a package of PyPI's keeps the hashes of each file that names it, each held to PyPI's list: #1368, point 1; one
+    // list for each name, added to in place, so a name given any number of times is kept in one pass)
+    const lines = p.hashes ? (was?.lines ?? []) : was?.lines;
+    if (p.hashes) lines.push({ lockPath, version: p.version, hashes: p.hashes });
     if (!was || (p.direct && !was.direct)) out.set(key(p), { ...p, lockPath, ...(lines && { lines }) });
     else if (lines) was.lines = lines;
   }
