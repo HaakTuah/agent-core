@@ -42,10 +42,10 @@ export function checksAt(repo, sha, ask) {
   const flows = pagesOf(`repos/${repo}/actions/runs?head_sha=${sha}`, "workflow_runs", ask);
   if (flows.why) return flows;
   const label = w => `${w.name ?? "a workflow"} (${w.status !== "completed" ? "workflow" : w.conclusion === "startup_failure" ? "could not start" : "failed outside its jobs"})`;
-  const { jobs, statuses, pairOf, clash } = keyed(runs.items, flows.items, status.items);
-  if (clash) return { why: clashWhy(clash, `of ${sha.slice(0, 7)}`) };
   const ownFailed = w => runs.items.some(r => r?.check_suite?.id != null && r.check_suite.id === w.check_suite_id && RUN[r.conclusion] === "failed");
   const open = flows.items.filter(w => w?.status !== "completed" || (RUN[w?.conclusion] === "failed" && !ownFailed(w)));
+  const { jobs, statuses, pairOf, clash } = keyed(runs.items, flows.items, status.items, open.map(w => [label(w), w.name ?? "a workflow"]));
+  if (clash) return { why: clashWhy(clash, `of ${sha.slice(0, 7)}`) };
   const unstarted = open.map(w => ({ name: label(w), status: w.status === "completed" ? "completed" : "queued", conclusion: "failure", person: w.status === "waiting" }));
   const unfinished = open.filter(w => w.status !== "completed").map(w => ({ name: label(w), flow: w.name }));
   const notHeld = r => r?.status !== "waiting" && !r?.person;
@@ -58,12 +58,14 @@ const clashWhy = (name, where) => `two checks ${where} meet on the name "${asTex
 
 // Each check run named by its workflow and job, `<workflow>: <job>`, where GitHub ties its check suite to a workflow
 // run, so a job of one workflow is never read against another's of the same name; by its job alone where none is tied,
-// and as `<job> (no workflow)` where that is a tied one's name, as is a status whose context is. { jobs, statuses,
-// pairOf (each name's [workflow, job]), clash }: `clash` a name two pairs of workflow and job meet on.
-function keyed(runs, flows, statusList = []) {
+// and as `<job> (no workflow)` where that is a tied one's name or a workflow run's own, `labels` ([its name, its
+// workflow]); a status as `<context> (status)` where a check run or a run's own holds its context. { jobs, statuses,
+// pairOf (each name's [workflow, job], a run's own with the job "(run)", a status's with the workflow "(status)"),
+// clash }: `clash` a name two pairs meet on.
+function keyed(runs, flows, statusList = [], labels = []) {
   const flowOf = new Map(flows.filter(w => w?.check_suite_id != null).map(w => [w.check_suite_id, w.name]));
   const tiedTo = r => (flowOf.has(r?.check_suite?.id) ? flowOf.get(r.check_suite.id) ?? "a workflow" : null);
-  const tied = new Set(runs.filter(r => tiedTo(r) !== null).map(r => `${tiedTo(r)}: ${r?.name}`));
+  const tied = new Set([...runs.filter(r => tiedTo(r) !== null).map(r => `${tiedTo(r)}: ${r?.name}`), ...labels.map(([n]) => n)]);
   const pairOf = new Map(), apart = n => (tied.has(n) ? `${n} (no workflow)` : n);
   let clash = null;
   const put = (name, pair) => {
@@ -71,8 +73,10 @@ function keyed(runs, flows, statusList = []) {
     pairOf.set(name, pair);
     return name;
   };
+  for (const [n, flow] of labels) put(n, [flow, "(run)"]);
   const jobs = runs.map(r => ({ ...r, name: put(tiedTo(r) !== null ? `${tiedTo(r)}: ${r?.name}` : apart(r?.name), [tiedTo(r), r?.name]) }));
-  const statuses = statusList.map(s => (typeof s?.context === "string" ? { ...s, context: put(apart(s.context), [null, s.context]) } : s));
+  const taken = new Set(pairOf.keys()), own = c => (taken.has(c) ? `${c} (status)` : c);
+  const statuses = statusList.map(s => (typeof s?.context === "string" ? { ...s, context: put(own(s.context), ["(status)", s.context]) } : s));
   return { jobs, statuses, pairOf, clash };
 }
 
@@ -85,12 +89,11 @@ export function crossedOf(then, now) {
 }
 
 // `main`'s checks with each the draft skipped under a name main lacks read as passed where its job passed on main
-// under a name gone from the draft, whose workflow did not run there or is tied to none: a workflow renamed, or a job
-// moved to another, so a skip after passing is not lost to a new name; while one whose check still runs on the draft
-// stands for no other workflow's job of its name.
+// under a name gone from the draft (a workflow renamed, or a job moved to another), so a skip after passing is not lost
+// to a new name; while one whose check still runs on the draft stands for no other workflow's job of its name.
 export function alignedOf(then, now) {
-  const flow = (side, n) => side.pairOf.get(n)?.[0] ?? null, job = (side, n) => side.pairOf.get(n)?.[1] ?? n;
-  const gone = n => then.active[n] === "passed" && !Object.hasOwn(now.said, n) && !now.flows.has(flow(then, n));
+  const job = (side, n) => side.pairOf.get(n)?.[1] ?? n;
+  const gone = n => then.active[n] === "passed" && !Object.hasOwn(now.said, n);
   const passed = new Set(Object.keys(then.active).filter(gone).map(n => job(then, n)));
   const renamed = ([n, v]) => v === "skipped" && !Object.hasOwn(then.said, n) && passed.has(job(now, n));
   return { ...then.active, ...Object.fromEntries(Object.entries(now.said).filter(renamed).map(([n]) => [n, "passed"])) };
