@@ -1,11 +1,9 @@
 // The step of setup/sync-notes/480-a-project-in-several-repositories.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { modulesOf } from "../manifest-reads.mjs";
 import { COST } from "../step-checks.mjs";
+import { placing } from "../step-checks-modules.mjs";
+import { writePlaced } from "../step-writers.mjs";
 
 export default { lead: "16 November 2026, a project in several repositories", cost: COST.line,
-  check: p => {
-    const { taken, notTaken } = modulesOf(p.manifest);
-    return taken === "all" || taken?.has("repositories.md") || notTaken.has("repositories.md") ? null
-      : 'In one small pull request, add `repositories.md` to the "Modules:" line of `core-manifest.md` where the project is, or may become, more than one repository, or else add it to the line "Not taken:" under it as "`repositories.md` (one repository, which no library carries the core into)".';
-  } };
+  // (one repository, its copy whole under core/, leaves it out; a library or another path takes it: step-checks-modules.mjs, #1094)
+  check: placing({ only: ["repositories.md"] }), write: writePlaced({ only: ["repositories.md"] }) };

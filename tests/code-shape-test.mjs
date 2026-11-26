@@ -232,7 +232,7 @@ try {
   git("config", "commit.gpgsign", "false"); // the machine's own git settings sign and hook nothing here
   git("config", "core.hooksPath", path.join(dir, ".no-hooks"));
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of ["code-shape.mjs", "code-shape-lexer.mjs", "code-shape-readers.mjs", "started.mjs", "core-path.mjs", "core-address.mjs", "javascript-functions.mjs", "tree-walk.mjs", "parser.mjs", "parser-worker.mjs", "packages.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
+  for (const f of ["code-shape.mjs", "code-shape-lexer.mjs", "code-shape-readers.mjs", "started.mjs", "core-path.mjs", "core-address.mjs", "guards.mjs", "javascript-functions.mjs", "tree-walk.mjs", "parser.mjs", "parser-worker.mjs", "packages.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
   // (the copy's packages, as the sync installs them: the core's own, linked)
   fs.symlinkSync(path.join(here, "../.packages"), path.join(dir, "core/.packages"), "junction");
   fs.mkdirSync(path.join(dir, "src"));

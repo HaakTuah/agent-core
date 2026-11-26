@@ -171,28 +171,38 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `scripts/size.mjs`, against the pull request's base, and `.github/workflows/size.yml`, which fails a raise of more
   than one step, and one in a PR with no "Leanness check:" comment; the task, by the scheduled look's reader of it
   (`scripts/look.mjs`, from `due` in `scripts/size.mjs`).
-- **A release is cut on the owner's word:** another owner's project takes the core only
-  from a release (`README.md`, "How a project takes the core", point 1), so one is cut when the owner says the core as
-  it stands may be handed on, never by a session's own choice: the owner's standing word is that it may each time the
-  queue is worked through ("One batch, then one release"). The owner tags nothing by hand:
-  the owner, or a session the owner tells and whose own limits let it, starts the `release` workflow on `main` (its
-  page under Actions has the button; `.github/workflows/release.yml`), and the workflow cuts it only
-  where every check on `main`'s newest commit has passed and, once the staged cases hold a release ("Staged cases hold
-  what no check reads"), no case failed in its last run: the tag `release-N` on that commit, never moved or deleted
-  afterwards. `node scripts/release.mjs` says what the next one would carry. **Each release is tried on a real project
-  first** (#1084). By default, before the `release` workflow is started, the orchestrator has a builder at the
-  strongest tier try the release on a copy of a project that takes the core and whose owner allows it, the owner's own
-  as `scripts/state-report.mjs --projects` finds them, read-only, nothing written there: its checks run as on a pull
-  request (`scripts/check.mjs --base <its main> --own --verdicts <a file outside every repository>`) once before the
-  update, as a baseline, and again after it, the sync between, each passed both, failed both (standing before) or
-  passed before and failed after (the release's, which stops the cut); it records the counts alone (`node
-  scripts/release.mjs --trial`) in a pull request of its own. Another owner's project has its own code run only where
-  no sign-in or key of the owner's is held (floor rule 18). The one condition that changes it: no such project allows
-  a trial; the record says so, and so does the release. It does not mean that a project is written to, that its
-  private code leaves it, or that it is named anywhere. Reason: #1079 passed every check of the core and failed only on
-  a real project. Held by `scripts/release.mjs`, which says the trial has not run, and cuts nothing, where its record
-  does not stand for the commit, cuts nothing where a check passed before and failed after, and refuses the record of
-  none allowed where a project of the owner's takes the core; where another owner's code may run, by nothing yet.
+- **A release is cut on the owner's word:** another owner's project takes the core only from a release (`README.md`,
+  "How a project takes the core", point 1), so one is cut when the owner says the core as it stands may be handed on,
+  never by a session's own choice: the owner's standing word is that it may each time the queue is worked through ("One
+  batch, then one release"). The owner tags nothing by hand: the owner, or a session the owner tells and whose own
+  limits let it, starts the `release` workflow on `main` (its page under Actions has the button;
+  `.github/workflows/release.yml`), and the workflow cuts it only where every check on `main`'s newest commit has passed
+  and, once the staged cases hold a release ("Staged cases hold what no check reads"), no case failed in its last run:
+  the tag `release-N` on that commit, never moved or deleted afterwards. `node scripts/release.mjs` says what the next
+  one would carry. **Each release is tried on a real project first** (#1084). By default, before the `release` workflow
+  is started, the orchestrator has a builder at the strongest tier try the release on a copy of a project that takes the
+  core and whose owner allows it, the owner's own as `scripts/state-report.mjs --projects` finds them, read-only,
+  nothing written there: its checks run as on a pull request (`scripts/check.mjs --base <its main> --own --verdicts <a
+  file outside every repository>`) once before the update, as a baseline, and again after it, the sync between; where
+  the copy holds no `check.mjs`, or one without `--verdicts`, the baseline is taken with the release's, from a clone of
+  the core at the release's commit, run from the project's clone, the core's clone outside it, its verdicts still
+  outside every repository, and the record says which way each was taken (#1244); each passed both, failed both
+  (standing before), or passed before, or ran not before, and failed after (the release's, which stops the cut), or ran
+  before and could not be read after, or could not be read before and failed after (not measured, which stops it too;
+  #1257), or ran before and was stopped behind a failure or not run after (which stops it too, the trial run again once
+  what stopped it is mended), or ran or was read in neither run (which stops nothing); the sync is read pure or not
+  against the release's commit by floor rule 8's proof (`scripts/pure-sync.mjs --trial <the commit>`, a reading whose
+  answer stops nothing and proves no merge, though a trial recorded without it for each project stops the cut; #1261);
+  it records the counts alone (`node scripts/release.mjs --trial`) in a pull request of its own. Another owner's project
+  has its own code run only where no sign-in or key of the owner's is held (floor rule 18). The one condition that
+  changes it: no such project allows a trial; the record says so, and so does the release. It does not mean that a
+  project is written to, that its private code leaves it, or that it is named anywhere. Reason: #1079 passed every check
+  of the core and failed only on a real project, and the sync's proof was first met on one after the cut (#1261). Held
+  by `scripts/release.mjs` with `scripts/release-trial.mjs`, which say the trial has not run, and cut nothing, where its
+  record does not stand for the commit, cut nothing where a check passed before, or ran not before, and failed after, or
+  ran before and was not measured, stopped or not run after, or was not read before and failed after, and refuse the
+  record of none allowed where a project of the owner's takes the core, or a record without the sync's reading for each
+  project tried (with `scripts/trial-sync.mjs`); where another owner's code may run, by nothing yet.
 - **Nothing locks a project,** in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
   what an agent can mend alone may bind, and what only the owner can do (a yes the floor names, a setting on the
@@ -239,7 +249,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   setting is changed, a difference it keeps on purpose lost, a check that nothing else runs taken out, or what only the
   owner can do done; nor that the manifest,
   `SECURITY.md`, the threat model, the progress file, the choice records or a check's config is written where it
-  stands, nor after the first copy where it does not: each is then a step's to ask, with what it needs beside it. Reason: a release asked 63 things of each project, 19 of them workflow changes each with two security
+  stands, nor after the first copy where it does not: each is then a step's to ask, with what it needs beside it, save the keys of the kit's that the copies, shape and licence checks' configs lack whose value
+  reads nothing (an empty list, mapping or text, false or null) and whose absence fails no check (a missing "ships" does), which the
+  steps' writers add after the sync with every value of the project's kept (#1095, point 5). Reason: a release asked 63 things of each project, 19 of them workflow changes each with two security
   reviews, built by hand from the notes, and a project of another owner held 25 differences from what the kit writes
   for a new one. Held by `tests/converge-test.mjs` and `tests/pure-sync-test.mjs` (a render that differs, a word outside
   the core's part changed, a value out of its form, a deletion the one job does not cover, each refused), by `tests/upgrade-test.mjs`, which takes
@@ -247,6 +259,23 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   a new repository of the same kind, and by the copies part's check of
   `scripts/checks.mjs`, in `core.yml`'s job and `copies.yml`'s, which fails a pull request that changes a file or part
   the core marks so that it is not as the core writes it.
+- **The core's checks run in a project's own jobs as they stand** (#1093). By default a script of the core that a
+  project's own job may run takes what it needs from the core itself: run from a copy, it installs the core's packages
+  it needs from the core's lock file (`scripts/packages.mjs`, by `scripts/install.mjs`) once, before it reads, and the
+  licence check, the shape check and the suites' selection (`scripts/select.mjs`) bring what a project's workflow once
+  carried for them, so no step asks a project to edit its own workflow for an install. The one condition that changes it:
+  the install cannot be made (the registry does not answer, the installer is missing); the script then says, as a
+  warning, that it did not run and why, with its mend, and fails nothing. The trigger is a check written or widened
+  that a project's own job may run: whoever builds it has it take what it needs so, and every mend that names an
+  install gives the guarded form (`if [ -f core/scripts/install.mjs ]; then …; fi`). It does not mean that a project's
+  own workflow is rewritten by the core, nor that no step asks where its own lookup stands or what its own suites skip
+  (#1093), nor that the core's own repository installs as it runs: its jobs name what
+  they install, and a package not there fails there. Reason: #1079 turned a project's sync pull request red over
+  nothing it changed, and seven steps asked an agent to edit a project's own workflows by hand. Held by
+  `tests/upgrade-test.mjs` (a project's own job that runs the copy's scripts on a runner with nothing installed passes
+  after the sync with no change of its own) and `tests/packages-test.mjs` (a copy's script with its packages missing,
+  installed first, or, where the install cannot be made, a warning that fails nothing), and, for the guarded form,
+  `tests/mend-test.mjs`.
 - **A writer of the core's and its readers meet in a round trip** (#1108). By default each file the core writes into a
   project (the starter kit, the one process, the sync, and the baselines and records a check or a step writes there) is
   read back in a test by each of the core's own readers that reads it (the YAML and Markdown readers, the readers of
@@ -260,22 +289,53 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   Held by `tests/round-trip-test.mjs`, in `.github/workflows/tests.yml`, which fails a script that writes a file and
   stands in neither of its lists, and a writer whose round trip did not run; that a new reader brings its round trip,
   by none.
+- **The host is read and written by the look** (#1092). By default a step of the sync notes whose state is the host's,
+  not a file's (a label, a setting, the look's own record, an account's right), is told done by a check of what the host
+  answers (its `host` in `scripts/steps/`, `scripts/step-checks-host.mjs`, read through `scripts/host.mjs`), and what a
+  step needs written on the host, the labels of the core's list and the look's issues, the daily look's own job writes
+  with that job's token, each right it uses named in its workflow's `permissions:` with a comment saying what it is for
+  (`.github/workflows/look.yml`, the starter kit's call of it). The one condition that changes it: GitHub refuses the
+  read or the write to that token, or shows a setting to the repository's admins alone; then the step is said not read,
+  never done, and the look files in one issue, "Settings only the owner gives", labelled `needs-owner`, each setting
+  only the owner gives it read as not given, with its link, and each write refused, with the right it would need, naming
+  there too the settings it could not read, which the owner's sitting reads. The trigger is the look's run in a project,
+  each day, and each sync, which prints what `host.mjs` reads and writes nothing. It does not mean that an agent session
+  edits the host for a step with its own sign-in, save where the floor asks it (secret scanning in a public repository,
+  floor topic 9), that the look's token gains a right to give a setting only the owner gives, that the value of the
+  secret `PERSONAL_TERMS` is read (the workflow says only whether it is given), nor that a step not read fails anything.
+  Reason: a step the host holds was left to a session's own sign-in, which reaches past the project and an agent tool's
+  automatic mode may refuse, the step then waiting on the owner. Held by `tests/host-test.mjs`, on a stand-in for the
+  host: each step read done, not done and not read, the host only read where nothing is to be written, the labels made,
+  a write refused said with its right, the issue's text, and each right of the look's workflows named with what it is
+  for.
 - **A release says what it asks, step by step.** Whoever adds an entry to the sync notes (`setup/sync-notes/`)
   gives it a step in `scripts/steps/` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
   is not done; or, where no check reads it, why, held by the staged case `steps`. Every standing entry has one. Every sync
   runs them all (`scripts/sync.mjs`) and prints, for the sync pull request's description, only the steps not done, and
-  every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`); each is
+  every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`), and the packages it holds gone stale (`scripts/held.mjs`; #1095); where the core's packages cannot be installed it reads no step and says so
+  in one line with its mend, and a step only a tool fetched at set-up reads is read where the session fetched it (#1095,
+  points 2 and 4); each is
   a task the project's agents take (`roles/orchestrator.md`; with no orchestrator, the session that syncs), a step
   only the owner can do labelled so, and each difference kept on purpose declared in the manifest's "Differences".
-  Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
+  Where a script does a step exactly, the sync runs it (`scripts/steps.mjs --write`; #1091): it writes a check's config
+  or baseline, a pointer's path or the manifest's module lines alone, lists it and sets it aside for the session that
+  syncs to commit after the sync's merge, or says why it wrote nothing. The module lines (#1094): where the manifest's
+  "Modules:" is a list, each module it neither takes nor leaves out is placed from what `scripts/manifest-reads.mjs`
+  reads exactly, and one no fact decides is taken, as the kit takes it, and named on the line "Modules to confirm:",
+  which the owner answers once while nothing waits. An entry whose step asks nothing of what stands (`asks: "nothing"`)
+  stays in the notes and leaves the report a sync prints. Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
   owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps beyond what the core writes (it stays pure), nor
-  that a step not done fails or stops anything. Reason: a step written only in prose is where one is missed, and
-  nothing showed that it was. Held by `tests/steps-test.mjs`, which fails an entry with no step and a step with a
+  that a step not done fails or stops anything, nor that a step is told done that no check reads, nor that a step that needs judgement is written by a script, nor that a module the line "Not taken:" names is
+  taken without the owner's word. Reason: a
+  step written only in prose is where one is missed, and nothing showed that it was; modules placed by hand took a
+  judgement a fact settles, and entries that ask nothing hid those that ask. Held by
+  `tests/steps-write-test.mjs` (no rule's words changed but the module lines), by `tests/manifest-reads-test.mjs`
+  (the modules placed) and `tests/releases-test.mjs` (the entries that ask nothing), by `tests/steps-test.mjs`, which fails an entry with no step and a step with a
   check that cannot be taken out and mended, and by `tests/upgrade-test.mjs`: after the sync every step reads done,
   but one the release adds that it asks of every project (a check's own list to write), which is reported and done
   by its mend as written; each step added since the release started from, taken out, is reported and its mend as
-  written makes it done, and steps taken out at random are reported, exactly those.
+  written makes it done, and steps taken out at random are reported, exactly those, and done by the writers.
 - **A pull request says what it asks of a project:** one that changes the floor, a module, a script,
   the setup or a workflow has the heading "What it asks of a project", saying what happens in a project that changes
   nothing of its own: nothing, a baseline written, or an ask in the sync notes with its cost. It does not mean that
@@ -466,8 +526,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   may react), and a new game of that kind would have had to find them again. Held by none yet.
 - **A check that read nothing says so** (#459, point 2). By default a check of the core's that reads a project's code
   passes where it finds nothing wrong. The one condition that changes it: it found no file there it could read, the
-  shape check where its config is missing or its "code" and "tests" name no file of a language its readers know, the
-  tests' strength where the manifest names no *mutation tool*, or `none`, or the shape check's config, whose files it
+  shape check where its config is missing, its "code" and "tests" name no file of a language its readers know, or the
+  manifest turns it off with `none` and the owner's reason, the tests' strength where the manifest names no *mutation
+  tool*, or `none`, or Stryker from a folder that holds no lock file, or the shape check's config, whose files it
   measures, is missing or names no file it measures. Then `scripts/read-nothing.mjs` names it, with the rules of the
   modules the project takes that it holds, in the report every sync prints (`scripts/steps.mjs`), and where it cannot
   tell, the report says so. The trigger is such a check, written or widened: whoever builds it gives it its case in
@@ -489,7 +550,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by
   the case's script on what the session did, read from the project (its commits, its pushes, what it wrote to GitHub),
   never on what it says of itself. A case is due on the first scheduled look of each month, and once the words of a
-  rule it holds change (`node scripts/staged.mjs`); the look then keeps the issue "Staged cases to run". The session
+  rule it holds change (`node scripts/staged.mjs`), save the reviewers' case `review`, due monthly alone
+  (`tasks/reviews.md`, point 9); the look then keeps the issue "Staged cases to run". The session
   that takes it runs each due case in a fresh helper at the builder's model and high effort, records the verdicts in
   `reports/staged-cases.json` in a pull request of its own, and says there of each failure whether the rule, the case
   or the session was wrong. The cases advise until three months in a row have run every one with no verdict found

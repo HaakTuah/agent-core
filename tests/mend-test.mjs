@@ -56,6 +56,7 @@ const CHECKS = {
   "scripts/size.mjs": "tests/size-test.mjs",
   "scripts/queue.mjs": "tests/queue-test.mjs",
   "scripts/general.mjs": "tests/general-test.mjs",
+  "scripts/pattern.mjs": "tests/pattern-test.mjs",
   "scripts/own-modules.mjs": "tests/own-modules-test.mjs",
   "scripts/manifest-reads.mjs": "tests/manifest-reads-test.mjs",
   "scripts/holders.mjs": "tests/holders-test.mjs",
@@ -98,6 +99,7 @@ const NOT_CHECKS = {
   "scripts/sync.mjs": "named in core.yml's mends, as what a session runs to mend the copy",
   "scripts/pure-sync.mjs": "run by security-review.yml as a proof alone: where it fails, the sync is not proved pure and the status says its own mend",
   "scripts/clean-merges.mjs": "run by security-review.yml as a proof alone: a merge it does not prove stops a review of an earlier commit, and the status says its own mend",
+  "scripts/power.mjs": "run by security-review.yml as a proof alone: where it fails or reads a commit too late, no later commit is light, each review is asked of the head as before, and each script or workflow changed asks floor rule 3's two",
   "scripts/queue-only.mjs": "run by own-security-review.yml as a proof alone: a pull request it does not prove gets its reviews as any other, the job passing and the status saying its own mend",
   ".github/workflows/preview.yml": "publishes a preview of a pull request's site",
   ".github/workflows/release.yml": "cuts a release, started by hand on main, and runs the upgrade test on Windows on main once a day: no pull request runs it",
@@ -228,6 +230,17 @@ const notReplayed = unreplayed(inventoryText);
 ok(notReplayed.length === 0, `each part of the inventory that records a trial says which of the part's bugs the tool reads and which it does not${notReplayed.length
   ? `: not so for ${notReplayed.join(", ")}. Mend: for each bug filed against the part, run the tool on the test cases its merged fix added or changed, taken from those on the default branch and never from the issue's text, and add to its line "*Replayed:*" with each bug's number and whether the tool reads its case or not ("none" where no bug was filed; a bug whose fix added or changed no test case named as not run), as tasks/choices.md says ("A trial of a maintained tool replays the part's past bugs")`
   : ""}`);
+
+// Every mend a script of the core gives that names the installer by its path gives it guarded, so that a step written
+// ahead of a sync passes on a copy that holds no installer yet ("The core's checks run in a project's own jobs as they
+// stand" in AGENTS.md; #1093): each `node <path>install.mjs` on a line that says "Mend" stands after `then `, or after
+// "in the core, " where the mend gives the core's own repository its form too, the installer always there.
+const unguarded = line => /Mend/u.test(line) && [...line.matchAll(/node\s+\S*install\.mjs/gu)].some(m => !/(?:then |in the core, )$/u.test(line.slice(0, m.index)));
+ok(unguarded("FAIL x. Mend: run node core/scripts/install.mjs, then the check") && !unguarded("FAIL x. Mend: run `if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs all; fi`") && !unguarded("FAIL x. Mend: run `if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi` (in the core, node scripts/install.mjs)") && !unguarded("node core/scripts/install.mjs # no mend here"),
+  "an install mend with the installer unguarded is found; a guarded one, the core's own form beside it, and a line that gives no mend, are not");
+const openInstalls = (tracked ?? []).filter(f => /^scripts\/.*\.(?:mjs|sh)$/u.test(f))
+  .flatMap(f => fs.readFileSync(path.join(root, f), "utf8").split("\n").flatMap((l, i) => (unguarded(l) ? [`${f}:${i + 1}`] : [])));
+ok(openInstalls.length === 0, `every mend of the core's scripts that names the installer gives it guarded${openInstalls.length ? `: not so at ${openInstalls.join(", ")}. Mend: write it as \`if [ -f <the path> ]; then node <the path>; fi\` (installStep() of scripts/packages.mjs builds it)` : ""}`);
 
 for (const [check, test] of Object.entries(CHECKS)) {
   let text = "";

@@ -12,7 +12,7 @@ import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
-const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
+const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}${!cond && detail ? `\n     ${detail}` : ""}`); if (!cond) failed++; };
 const here = fileURLToPath(new URL("../scripts/", import.meta.url));
 // (the check's scripts, and the package its Markdown is read with as the core's install leaves it: the lock file, npm's
 // record of the install and the package itself, from the core's own install, which its tests' job runs)
@@ -26,13 +26,18 @@ const FILES = {
   "SECURITY.md": "# Security\n\n**3. The protected files,** here, **the rule files:** `docs/developing.md`;\n",
   "docs/developing.md": "# Developing\n\n## Running it\n\nAs \"Where things are\" in `AGENTS.md` says.\n",
 };
-function run(files, { installed = true } = {}) {
+function run(files, { installed = true, prepare } = {}) {
   const dir = scratchDir("pointers-test-");
   try {
     for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
     carry(path.join(dir, "core"));
-    if (!installed) fs.rmSync(path.join(dir, "core/.packages/node_modules"), { recursive: true, force: true });
+    // (with nothing installed, the copy's installer, which the check runs first, stands in for one that cannot install)
+    if (!installed) {
+      fs.rmSync(path.join(dir, "core/.packages/node_modules"), { recursive: true, force: true });
+      fs.writeFileSync(path.join(dir, "core/scripts/install.mjs"), `console.log("FAIL: the core's packages were not installed: npm could not be started. Mend: install npm beside Node, then run this again");\nprocess.exit(1);\n`);
+    }
     for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: dir, stdio: "ignore" });
+    prepare?.(dir);
     const r = spawnSync(process.execPath, [path.join(dir, "core/scripts/pointers.mjs")], { cwd: dir, encoding: "utf8" });
     return { code: r.status, out: r.stdout + r.stderr };
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
@@ -43,12 +48,25 @@ const { "SECURITY.md": _, ...bare } = FILES;
 
 let r = run(FILES);
 ok(r.code === 0 && /^ok /m.test(r.out), "rule files whose pointers all lead somewhere pass");
-// (a project's own job that ran the check before the core's packages came installs nothing: the sync never turns it red)
+// (a project's own job that runs the check with nothing installed has the copy install the core's packages first, and
+// where that fails, the sync never turns it red: #1093, point 1)
 r = run(broken, { installed: false });
-ok(r.code === 0 && /::warning::The pointer check did not run: the package marked is not installed[^\n]*Mend: /.test(r.out) && /core\/scripts\/install\.mjs/.test(r.out), "in a project with the core's packages not installed, the check says as a warning that it did not run, with the install step as its mend, and fails nothing", r.out);
+ok(r.code === 0 && /::warning::The pointer check did not run: the package marked could not be installed in \S+: npm could not be started\. Mend: install npm/.test(r.out), "in a project with the core's packages not installed, the check runs the copy's installer, and where it installs nothing says as a warning that it did not run, with its mend, and fails nothing", r.out);
 // (a rule file nested deeper than the lexer follows fails, saying so, never in silence: the fallback reviewer's finding)
 r = run({ ...FILES, "docs/developing.md": `${FILES["docs/developing.md"]}${">".repeat(5000)} deep\n` });
 ok(r.code === 1 && mended(r.out) && /docs\/developing\.md could not be read as Markdown/.test(r.out), "a rule file nested deeper than the lexer can follow fails, naming the file, with its mend");
+// (a project whose tracked paths list past 1 MB, Node's default buffer for what git prints, crashed the check with ENOBUFS and
+// no mend: #1204. The paths are made cheaply, entries of the index that point at the empty blob, no file written)
+r = run(FILES, { prepare: dir => {
+  const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: dir, input: "", encoding: "utf8" }).trim();
+  const entries = Array.from({ length: 30000 }, (_, i) => `100644 ${blob} 0\tgenerated/folder-${i}/a-file-with-a-path-of-fifty-characters-${i}.txt\n`).join("");
+  execFileSync("git", ["update-index", "--add", "--index-info"], { cwd: dir, input: entries });
+  ok(execFileSync("git", ["ls-files", "-z"], { cwd: dir, maxBuffer: 1 << 28 }).length > (1 << 20), "the scratch project's tracked paths list past 1 MB");
+} });
+ok(r.code === 0 && /^ok /m.test(r.out) && !/ENOBUFS/.test(r.out), "a project whose tracked paths list past 1 MB passes, the listing read whole", r.out);
+// (where git cannot list at all, the check fails saying what is wrong, with its mend, never a stack trace)
+r = run(FILES, { prepare: dir => fs.writeFileSync(path.join(dir, ".git/index"), "not an index") });
+ok(r.code === 1 && mended(r.out) && /git could not list the tracked paths/.test(r.out) && !/at .*\.mjs:\d+/.test(r.out), "where git cannot list the tracked paths, the check fails saying so, with its mend", r.out);
 // (lists nested a couple of thousand deep ran the lexer out of memory, which no try catches; a bound before it reads refuses them: #1032)
 const deepList = n => Array.from({ length: n }, (_, k) => `${"  ".repeat(k)}- x`).join("\n");
 const read = await markdownReader();

@@ -3,7 +3,7 @@
 // passes or fails on what the session did, read from the scratch project by the case's own script, never on what the
 // session says of itself. The cases are the files of staged/ that CASES lists, each naming the rules it holds. Their
 // runs are kept in RECORD, each verdict with a fingerprint of the rules' text, so that a case is due again in a month
-// with no run of it, or once a rule it holds has changed; the scheduled look opens an issue for what is due (due(),
+// with no run of it, or once a rule it holds has changed (save a case marked `monthly`); the scheduled look opens an issue for what is due (due(),
 // look.mjs's DUE). They advise until three months in a row have run every case with no verdict found wrong; from then
 // release.mjs cuts no release while a case's last verdict fails (gate()). Each run names its agent tool, and a tool
 // works with the core once it has passed every case since the newest release (tools(); tasks/tools.md, "Proven by
@@ -48,6 +48,7 @@ import * as stackChoice from "./staged/stack-choice.mjs";
 import * as steps from "./staged/steps.mjs";
 import * as stop from "./staged/stop.mjs";
 import * as weakness from "./staged/weakness.mjs";
+import { parseBounded } from "./guards.mjs";
 
 export const CASES = [outsider, stop, noQuestion, secret, finish, oldContent, orderForNow, steps, stackChoice, carried, noFloor, fetched, weakness, relay, redMain, review, adviserRemark, adviserOrders, adviserStarts];
 export const RECORD = "reports/staged-cases.json";
@@ -57,7 +58,7 @@ export const MONTHS = 3;
 // The agent tools a run may name, each with its part in tools/ (tasks/tools.md, "Each tool's part"), in
 // staged-tools.json, beside this file, which core.yml reads too: a run of a tool that has none is not recorded. Read case
 // and spacing aside, so "claude code" is TOOL, the first.
-export const TOOLS = JSON.parse(fs.readFileSync(new URL("./staged-tools.json", import.meta.url), "utf8")).tools;
+export const TOOLS = parseBounded(fs.readFileSync(new URL("./staged-tools.json", import.meta.url), "utf8")).tools;
 export const TOOL = TOOLS[0];
 export const toolNamed = name => TOOLS.find(t => t.toLowerCase() === String(name ?? "").toLowerCase().replace(/\s+/gu, " ").trim()) ?? null;
 
@@ -65,13 +66,9 @@ export const caseOf = name => CASES.find(c => c.name === name) ?? null;
 
 // The fingerprint of each rule a case holds, as the rules stand under `root` (in its commit `commit`, where one is
 // named); a rule that no longer stands reads null.
-// A case may name, under `dueOn`, whole files whose change makes it due beside the rules it holds (the reviewers' case,
-// the review guidelines: tasks/reviews.md, point 9), each fingerprinted whole under "file: <its path>".
 export function fingerprints(c, root = ROOT, commit = null) {
   const all = new Map((commit ? rulesAt(root, commit, { agents: true }) : rules(root, { agents: true })).map(r => [r.key, r.text]));
-  const file = f => { try { return commit ? execFileSync("git", ["show", `${commit}:${f}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }) : fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
-  return Object.fromEntries([...c.holds.map(k => [k, all.has(k) ? fingerprint(all.get(k)) : null]),
-    ...(c.dueOn ?? []).map(f => { const text = file(f); return [`file: ${f}`, text === null ? null : fingerprint(text)]; })]);
+  return Object.fromEntries(c.holds.map(k => [k, all.has(k) ? fingerprint(all.get(k)) : null]));
 }
 
 // The brief a fresh session is given for a case set in `dir`: its role (a builder's, unless the case names its own
@@ -162,7 +159,8 @@ export function toolsSaid(record, since = null, ways = wayNames()) {
 export const wayNames = (ways = waysOf()) => ways.ways.map(w => w.name);
 
 // The cases due on the day `at` (an ISO time): each with why, and the tool where it is not TOOL. A case is due where no
-// run of it falls in the month of `at`, where a rule it holds reads otherwise than at its last run, or where it has no
+// run of it falls in the month of `at`, where a rule it holds reads otherwise than at its last run (save a case marked
+// `monthly`, the reviewers': tasks/reviews.md, point 9; #1134, point 6), or where it has no
 // run on or after `since` (the newest release's day, or null); and for each other tool that has run, where that tool
 // has no run of it on or after `since`.
 export function due({ at, record = readRecord(), root = ROOT, cases = CASES, since = null }) {
@@ -174,7 +172,7 @@ export function due({ at, record = readRecord(), root = ROOT, cases = CASES, sin
 // Why the case `c` is due for TOOL, its last verdict `was`, or null where it is not.
 function whyDue(c, was, { record, root, month, since }) {
   if (!was) return "it has never run";
-  const now = fingerprints(c, root), moved = Object.keys(now).filter(k => (was.rules ?? {})[k] !== now[k]);
+  const now = c.monthly ? {} : fingerprints(c, root), moved = Object.keys(now).filter(k => (was.rules ?? {})[k] !== now[k]);
   if (moved.length) return `a rule it holds changed since its last run (${was.at}): ${moved.join("; ")}`;
   const ran = from => record.runs.some(r => toolOf(r) === TOOL && from(String(r.at)) && r.cases?.[c.name]);
   if (!ran(day => day.startsWith(month))) return `no run in ${month}`;

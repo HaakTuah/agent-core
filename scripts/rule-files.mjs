@@ -20,7 +20,7 @@ export const FOLDERS = Object.freeze([".kiro/steering", ".kiro/agents", ".agents
 // (a file of the work tree is read only where, every link on its way followed, it lies inside the project and is a
 // file: one that leads out, or to a folder, reads as not there)
 const inside = f => !leadsOut(process.cwd(), f);
-const tracked = dir => { try { return execFileSync("git", ["ls-files", "-z", "--", dir], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(f => f && inside(f)); } catch { return []; } };
+const tracked = dir => { try { return execFileSync("git", ["ls-files", "-z", "--", dir], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(f => f && inside(f)); } catch { return []; } };
 export const readHere = f => { try { return inside(f) && fs.statSync(f).isFile() ? fs.readFileSync(f, "utf8") : null; } catch { return null; } };
 export const FLOOR = Object.freeze(["AGENTS.md", "CLAUDE.md", "SECURITY.md", "core-manifest.md"]);
 export const TOOL_FILES = Object.freeze(["GEMINI.md", ...Object.values(ENTRY_FILES)]);

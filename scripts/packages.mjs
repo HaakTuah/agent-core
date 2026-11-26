@@ -5,20 +5,27 @@
 // read against the lock file beside it, the package's own entry too; never one the lock flags dev, which only the core's
 // own tests run, reading it themselves), so a folder an earlier install
 // of another lock file left is never run. Where it is not so, the check that needs it did not run, and says so with the command that installs it
-// (#254, #457); it never passes. In a project's pull request whose install could not reach the registry, a script asks
-// unreached() first, and says that part did not run as a warning (#654, point 4).
+// (#254, #457). In a copy of the core it is first installed: the script that needs it runs the copy's installer for its
+// install, once, before it reads, so that a project's own job needs no install step of its own; where that cannot install
+// it, the check says it did not run and why, as a warning, and fails nothing (#1093, point 1). In the core, whose jobs name
+// what they install, a package not there never passes. A script that can go on without one asks unreached() first, and
+// says that part did not run (didNotRun(); #654, point 4).
 //
 //   import { load, loadSync } from "./packages.mjs";   const { Lexer } = await load("yaml");
 //                                                     loadSync("yaml"): the same, at once, for a package of CommonJS,
 //                                                     so a script loads it only where it is used, never on import
 //   pypiFile("semgrep/bin/semgrep-core"): a file of a PyPI package, installed by `install.mjs pypi` into the core's
 //                                                     .packages/pypi/ alone (code-scan.mjs's engine; #546)
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { isMainThread } from "node:worker_threads";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
+// (the core's own repository, which holds its tests: a copy holds none, .gitattributes keeping them out)
+const own = fs.existsSync(path.join(root, "tests"));
 // The core's installs, each by the name install.mjs knows it by, and its folder below the core, which holds its own
 // package list, lock file, .npmrc and install: the first in every job, the parser's only where a job names it (#719).
 export const INSTALLS = { npm: ".packages", parser: ".packages/parser" };
@@ -46,6 +53,9 @@ function installOf(name) {
   return null;
 }
 const dirOf = install => path.join(root, INSTALLS[install]);
+// The packages the first install's list names, which every job installs: what a script that reads with all of them asks
+// for first (steps.mjs; #1095, point 2).
+export const listed = () => Object.keys(listOf(FIRST).dependencies ?? {});
 const needs = {};
 const need = install => (needs[install] ??= createRequire(path.join(dirOf(install), "package.json")));
 
@@ -92,6 +102,7 @@ function matches(install) {
 // it, or null.
 function entry(name) {
   const install = installOf(name);
+  if (install && !matches(install)) selfInstall(install, () => matches(install));
   // (the package's own entry too, so a folder an earlier install left is never taken for it; and never one the lock flags
   // dev, which only the core's own tests run, reading it themselves: no script loads one, nor what it brings; #719)
   const k = `node_modules/${name}`;
@@ -127,20 +138,25 @@ const LIST_FIELDS = ["name", "private", "description", "license", "dependencies"
 const SPEC_FIELDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
 // (a range or tag of the registry: no ".tgz" or ".tar" anywhere, which some npm reads as a file however it ends)
 const registrySpec = v => typeof v === "string" && /^[\w.^~<>=|*+ -]*$/u.test(v) && !/^\./u.test(v) && !/\.t(?:gz|ar)/iu.test(v);
+// (a spec as a fault quotes it: one of npm's registry as it stands, which names no address; any other never)
+const quoted = v => (registrySpec(v) ? JSON.stringify(v) : "a spec not of npm's registry");
 const KEY = /^(?:node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*\/)*node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*$/u;
 const plainAddress = r => { try { return /^https:\/\/registry\.npmjs\.org\//u.test(r) && new URL(r).href === r; } catch { return false; } };
+// A spec not of npm's registry is never quoted, since it may name an address with a sign-in in it (floor rule 1): its
+// field and package say where it stands; a name or key, quoted as it stands, is cut of any sign-in where it is printed
+// (install.mjs, by guards.mjs's noSignInWhole, which this file does not import: it is copied alone; work-saved.sh).
 // `overrides` lets the package list hold npm's field of that name, each at one exact version of npm's registry: given
 // for the core's own mutation tool's install alone (install.mjs, #581), never for an install a copy carries, since npm
 // acts on it in place of what the packages ask.
 export function lockFaults(list, lock, { overrides = false } = {}) {
-  const out = [], specs = (where, o) => { for (const [n, v] of Object.entries(o ?? {})) if (!registrySpec(v)) out.push(`${where}: the spec ${JSON.stringify(n)}: ${JSON.stringify(v)} names no version, range or tag of npm's registry`); };
+  const out = [], specs = (where, o) => { for (const [n, v] of Object.entries(o ?? {})) if (!registrySpec(v)) out.push(`${where}: the spec of ${JSON.stringify(n)} is not of npm's registry: it names no version, range or tag there`); };
   if (!plainObject(list)) return ["package.json: not an object of fields"];
   if (!plainObject(lock)) return ["package-lock.json: not an object of fields"];
   const own = overrides ? ["overrides"] : [];
   for (const k of Object.keys(list ?? {})) if (![...LIST_FIELDS, ...own].includes(k)) out.push(`package.json: the field ${JSON.stringify(k)}, which the core's package list does not hold`);
   for (const f of [...SPEC_FIELDS, ...own]) specs(`package.json ${f}`, list?.[f]);
   // (the package list's own packages at one exact version each: floor rule 7)
-  for (const f of ["dependencies", "devDependencies", ...own]) for (const [n, v] of Object.entries(list?.[f] ?? {})) if (!/^\d+\.\d+\.\d+$/u.test(String(v))) out.push(`package.json ${f}: ${JSON.stringify(n)} at ${JSON.stringify(v)}, not one exact version`);
+  for (const f of ["dependencies", "devDependencies", ...own]) for (const [n, v] of Object.entries(list?.[f] ?? {})) if (!/^\d+\.\d+\.\d+$/u.test(String(v))) out.push(`package.json ${f}: ${JSON.stringify(n)} at ${quoted(v)}, not one exact version`);
   out.push(...formFaults(lock));
   for (const [k, e] of Object.entries(lock?.packages ?? {})) out.push(...(k ? entryFaults(k, e ?? {}, specs) : rootFaults(e, list)));
   return out;
@@ -196,28 +212,74 @@ function entryFaults(k, e, specs) {
   return out;
 }
 
-// Whether the package could not be installed because the registry did not answer, in a project's pull request
-// (install.mjs), or unnamed(): a script that reads it checks this first and says that part did not run, as a warning,
-// keeping every failure it found without the package (#654, point 4).
-export function unreached(name) {
-  return !installed(name) && (process.env.CORE_PACKAGES_UNREACHED === "1" || unnamed(name));
+// The core's installer, beside this file; and, for each install a script ran it for (by the name it knows the install by,
+// pypi too), what it said where it did not install it, or null where it did.
+const INSTALLER = path.join(root, "scripts", "install.mjs");
+const tried = {};
+const lockOf = install => (install === "pypi" ? ".packages/requirements.txt" : `${INSTALLS[install]}/package-lock.json`);
+// In a copy, an install a script needs that is not there as its lock names it is run once, by the copy's own installer,
+// before the script reads (#1093, point 1): a project's own job that runs a script of the copy then needs no install step
+// of its own, whether it was written before the core's packages came or names the first install alone (#719). Not in the
+// core, whose jobs name what they install; not in a worker thread (the parser's), whose caller asks first on the main
+// one; not where the job was told its install could not reach the registry, which a second try would only wait on.
+// `done` reads, after it, whether it installed. The installer's own words are kept out of the script's output, which a
+// job may write to a file of its own: one line on stderr says it ran.
+function selfInstall(install, done) {
+  if (own || !isMainThread || Object.hasOwn(tried, install) || process.env.CORE_PACKAGES_UNREACHED === "1") return;
+  const r = fs.existsSync(INSTALLER) ? spawnSync(process.execPath, [INSTALLER, ...(install === FIRST ? [] : [install])], { cwd: root, encoding: "utf8", timeout: 900000 }) : null;
+  for (const cache of [records, current, needs]) delete cache[install];
+  tried[install] = done() ? null : r ? lastWords(r) : `the copy holds no ${shownPath(INSTALLER)}. Mend: take the core's copy back as the core holds it (node ${shownPath(path.join(root, "scripts", "sync.mjs"))})`;
+  if (tried[install] === null) console.error(`note the core's packages of ${lockOf(install)} were not installed beside its copy, so this check installed them first`);
 }
-// Whether, in a copy, the job installed the core's first install but never the one whose list names the package (npm's
-// record of it absent): as a job of the project's own written before that install came stands, said as a warning with
-// the mend, never failed (#719; "Nothing locks a project"). It is not compared with the base: a pull request that takes
-// `all` out of such a job is warned the same, the workflow being a protected file and the sync's step reporting the job.
-// In the core, which holds its tests, every job names what it runs, and a package not there fails.
-const own = fs.existsSync(path.join(root, "tests"));
-export function unnamed(name) {
-  const install = installOf(name);
-  return !own && install !== null && install !== FIRST && !installed(name) && matches(FIRST) && recordOf(install).had === null;
+// What the installer said last, where it did not install: its failure, or its warning that the registry did not answer,
+// without the mark a job reads.
+function lastWords(r) {
+  const lines = `${r.stdout ?? ""}\n${r.stderr ?? ""}`.split("\n").map(l => l.trim()).filter(Boolean);
+  const said = lines.filter(l => /^(?:FAIL: |::warning::)/u.test(l)).pop() ?? `the installer ended with ${r.status ?? r.signal ?? "no status"}, printing no failure line; to read its words, run \`node ${shownPath(INSTALLER)}\``;
+  return said.replace(/^(?:FAIL: |::warning::)/u, "").replace(/^the core's packages were not installed: /u, "");
+}
+// A path as a step of a job names it, from where the script runs, with "/" between its parts on any system.
+const shownPath = f => (path.relative(process.cwd(), f) || f).split(path.sep).join("/");
+
+/** The command that installs `which` (an install's name, "all", or none for the first), as every mend that names an
+ *  install gives it: guarded, so that a step written ahead of a sync passes on a copy that holds no installer yet (#1080,
+ *  #1090; #1093, point 1). */
+export function installStep(which = FIRST) {
+  const at = shownPath(INSTALLER);
+  return `if [ -f ${at} ]; then node ${at}${which === FIRST ? "" : ` ${which}`}; fi`;
+}
+
+// Whether the package could not be installed here, so that what needs it did not run, said as a warning that fails
+// nothing (didNotRun()): in a copy, wherever it is not installed once its install was tried (#1093, point 1); in the
+// core, only where the job was told its install could not reach the registry, in a pull request (install.mjs; #654,
+// point 4). A script that can go on without the package checks this first, keeping every failure it found without it.
+// In a copy this takes in an install the installer refused, its lock file changed among them: a warning, not a failure,
+// rests on core.yml's step "The copy is the core at its pin", which fails a changed copy; a change there weighs this too.
+export function unreached(name) {
+  return !installed(name) && (process.env.CORE_PACKAGES_UNREACHED === "1" || (!own && installOf(name) !== null));
+}
+
+// Why the package `name` is not there, with the mend, in words a session acts on with no rule file open: the registry
+// that did not answer; what the installer said where it ran for this script and did not install it; or, where it did
+// not run (in the core), the install step, guarded (installStep()).
+export function notInstalled(name, rel) {
+  const install = installOf(name) ?? FIRST, at = shownPath(path.join(dirOf(install), "node_modules"));
+  if (process.env.CORE_PACKAGES_UNREACHED === "1") return `the package ${name} could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`;
+  if (tried[install]) return `the package ${name} could not be installed in ${at}: ${tried[install]}${/ Mend: /u.test(tried[install]) ? "" : ". Mend: run this again; if it fails again, file it as a fault"}`;
+  return `the package ${name} is not installed in ${at} as ${lockOf(install)} names it${rel ? ` (${rel})` : ""}. Mend: run \`${installStep(install)}\`, which installs the core's packages from its lock file (in a job, as a step before the one that runs this check), then run the check again`;
+}
+
+/** The warning that `what` did not run for want of the package `name`, with why and the mend (notInstalled()). A
+ *  warning only: what reads it decides nothing ("Nothing locks a project" in the core's AGENTS.md). */
+export function didNotRun(what, name) {
+  return `::warning::${what}: ${notInstalled(name)}`;
 }
 
 // The failure where no package list of the core's names the package: no install puts it there, so the mend is the core's
 // copy taken back as the core holds it, or, in the core, the package added to a list and its lock (#254, #719).
 function unlisted(name) {
   const lists = Object.values(INSTALLS).map(f => `${f}/package.json`).join(", ");
-  console.error(`FAIL: the check did not run: the package ${name} is not installed: no package list of the core's names it (${lists}). Mend: in a project, take the core's copy back as the core holds it (node core/scripts/sync.mjs); in the core, add the package to the package list and lock file the script's install reads (${lists}), as npm's own install there writes them, then run node scripts/install.mjs and the check again`);
+  console.error(`FAIL: the check did not run: the package ${name} is not installed: no package list of the core's names it (${lists}). Mend: in a project, take the core's copy back as the core holds it (node core/scripts/sync.mjs); in the core, add the package to the package list and lock file the script's install reads (${lists}), as npm's own install there writes them, then run \`${installStep()}\` and the check again`);
   process.exit(1);
 }
 
@@ -231,44 +293,44 @@ function pypiAt(rel) {
   } catch { return null; }
 }
 
-// That file; where it is not there, the same failure as a package's, with the command that installs it.
+// That file; where it is not there once a copy's installer was run for it (selfInstall()), the check did not run, said
+// as a package's is (stopped()), with the command that installs it.
 export function pypiFile(rel) {
+  if (!pypiAt(rel)) selfInstall("pypi", () => pypiAt(rel) !== null);
   const file = pypiAt(rel);
-  if (!file) {
-    console.error(`FAIL: the check did not run: ${rel} is not installed in ${path.relative(process.cwd(), path.join(root, ".packages", "pypi"))}. Mend: run node ${path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"))} pypi, which installs it from the core's .packages/requirements.txt with Python's pip, then run the check again`);
-    process.exit(1);
-  }
+  if (!file) stopped(pypiNotInstalled(rel));
   return file;
 }
 
-// Whether that file could not be installed because the registry did not answer, in a project's pull request, as
-// unreached() says of a package.
-export function pypiUnreached(rel) {
-  return process.env.CORE_PACKAGES_UNREACHED === "1" && !pypiAt(rel);
+/** Why that file is not there, and the mend, as notInstalled() says of a package. */
+export function pypiNotInstalled(rel) {
+  const at = shownPath(path.join(root, ".packages", "pypi"));
+  if (process.env.CORE_PACKAGES_UNREACHED === "1") return `${rel} could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`;
+  if (tried.pypi) return `${rel} could not be installed in ${at}: ${tried.pypi}${/ Mend: /u.test(tried.pypi) ? "" : ". Mend: run this again; if it fails again, file it as a fault"}`;
+  return `${rel} is not installed in ${at}. Mend: run \`${installStep("pypi")}\`, which installs it from the core's .packages/requirements.txt with Python's pip, then run the check again`;
 }
 
-// The package's entry file; where it is not installed, the failure, which never passes: in a job of a workflow, the
-// mend is the install step the job lacks, in a pull request of its own, so that a sync pull request stays pure.
+// Whether that file could not be installed here, as unreached() says of a package.
+export function pypiUnreached(rel) {
+  if (!pypiAt(rel)) selfInstall("pypi", () => pypiAt(rel) !== null);
+  return !pypiAt(rel) && (process.env.CORE_PACKAGES_UNREACHED === "1" || (!own && Object.hasOwn(tried, "pypi")));
+}
+
+// The package's entry file; where it is not installed, the check did not run (stopped()).
 function found(name) {
   const file = entry(name);
   if (!file && !installOf(name)) unlisted(name);
-  if (!file) {
-    console.error(`FAIL: ${missing(installOf(name), name)}`);
-    process.exit(1);
-  }
+  if (!file) stopped(notInstalled(name));
   return file;
 }
 
-// The words where the package `name` of the install `which` is not installed as its lock names it, with the mend: in a
-// job of a workflow, the install step the job lacks or must name; elsewhere, the install to run (#254, #719).
-function missing(which, name, rel) {
-  const named = which === FIRST ? "" : ` ${which}`;
-  const install = path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"));
-  const at = path.relative(process.cwd(), path.join(dirOf(which), "node_modules"));
-  const mend = process.env.GITHUB_ACTIONS === "true"
-    ? `in a pull request of its own, never a sync pull request, add the step if [ -f ${install} ]; then node ${install}${named}; fi to this job before the step that runs this check, then run the job again; where the job has such a step${named ? `, name${named} in it` : ""}, run the job again`
-    : `run node ${install}${named}, which installs the core's packages from its lock file, then run the check again`;
-  return `the check did not run: the package ${name} is not installed in ${at} as ${INSTALLS[which]}/package-lock.json names it${rel ? ` (${rel})` : ""}. Mend: ${mend}`;
+// A check that did not run for want of what the core installs, with `why` and its mend: in a copy, a warning, and the
+// check fails nothing, the copy's installer having been run for it (#1093, point 1; "Nothing locks a project"); in the
+// core, whose jobs name what they install, a failure, never a pass. On stderr, which a job reads for its marks as it
+// reads stdout, so that a script whose output a job writes to a file of its own writes no warning there.
+function stopped(why) {
+  console.error(`${own ? "FAIL: " : "::warning::"}the check did not run: ${why}`);
+  process.exit(own ? 1 : 0);
 }
 
 // The file `rel` of the package `name`, inside that package's own folder in the core's install that names it, and only
@@ -280,5 +342,5 @@ export function installedFile(name, rel) {
   // (the package's folder inside its install's node_modules/, and the file inside that folder, each by its real path)
   const inside = (f, d) => fs.realpathSync(f).startsWith(fs.realpathSync(d) + path.sep);
   try { if (entry(name) && inside(dir, own) && inside(file, dir)) return file; } catch { /* said below */ }
-  throw new Error(missing(which, name, rel));
+  throw new Error(`the check did not run: ${notInstalled(name, rel)}`);
 }

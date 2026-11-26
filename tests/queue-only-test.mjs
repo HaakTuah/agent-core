@@ -13,7 +13,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { changed, formFault, formOf, judge, namesPoints, rulesHere, typed } from "../scripts/queue-only.mjs";
+import { changed, formFault, formOf, judge, namesPoints, printed, rulesHere, typed } from "../scripts/queue-only.mjs";
 import { ruleFiles } from "../scripts/rule-files.mjs";
 import { linesOf } from "../scripts/queue.mjs";
 
@@ -90,9 +90,13 @@ ok(not(of(`@@ -1 +1,2 @@\n+${row(10)}`, file(`@@ -1 +1,2 @@\n+${row(10)}`, { fil
   "nor where the progress file is a rule file, by its name or as the project's SECURITY.md lists it (floor rule 8)");
 const queue = readFileSync(path.join(root, "QUEUE.md"), "utf8"), form = formOf(queue), off = linesOf(queue).filter((l) => formFault(l.text, form) !== null);
 ok(linesOf(queue).length > 0 && !off.length, "every line of the core's own QUEUE.md is in its form", off.map((l) => l.text).join("\n     "));
-const copies = ["| #900 | builder | |", "| #900 | rule builder | |", "| #900 | builder | #715 |", "| #900 | rule builder; it changes what every role reads at its start | |",
-  "| #900 | builder; `tests.yml` | #704 |", "| #900 | rule builder; it changes the floor (rules 7 and 10) | |", "| #900 | the owner | on hold |", "| #900 to #903 | rule builder; one PR each | |"];
-const offCopies = copies.filter((l) => formFault(l, form) !== null || namesPoints(l));
+// (the copies are taken from the lines that stand in the file, so that the case holds as the queue changes: each row of
+// three cells, its first cell an issue of its own, the numbers in the others its own too; a copy naming points is left to the reviews)
+const cellsOf = (line) => line.trimEnd().split("|").slice(1, -1);
+const copies = linesOf(queue).map((l) => l.text).filter((t) => cellsOf(t).length === 3)
+  .map((t) => `| #900 |${cellsOf(t).slice(1).join("|").replace(/\d+/gu, "901")}|`).filter((c) => !namesPoints(c));
+ok(copies.length > 0, "  the file holds a line to copy from", "none of its rows of three cells is one a copy can be made of");
+const offCopies = copies.filter((l) => formFault(l, form) !== null);
 ok(!offCopies.length, "  and a new line copied from one of them, its issues and numbers its own, is in it too", offCopies.join("\n     "));
 ok(not(of(`@@ -1 +1,2 @@\n+${row(10)}`, undefined, { ...pull, head: { ...pull.head, repo: { full_name: "outsider/project" } } }), "no branch of the repository's own")
   && not(of(`@@ -1 +1,2 @@\n+${row(10)}`, undefined, { ...pull, head: { ...pull.head, repo: null } }), "no branch of the repository's own"),
@@ -130,6 +134,10 @@ ok([38, 39, 40, 41].every((n) => not(of(`@@ -1 +1,2 @@\n+${row(n)}`), "carries t
 // fall: a reading that backtracks out of step, as one did, takes some 2^118 steps over this line, and never ends)
 const slow = `- #1${"\t&".repeat(118)}`, slowFault = formFault(slow, formOf("- #5 builder\n"));
 ok(slow.length === 240 && /^says "& & &/u.test(String(slowFault)), "a line of 240 characters of joins with no issue after them is read, and its joins are its text", String(slowFault));
+// (a refusal that quotes a line the pull request adds prints it as text alone, no workflow command read in it; #1348)
+const marked = printed({ head: null, why: formFault("- #1 ::a ##[group]b :\u00e9: #\u00e9#[c", formOf("- #5 builder\n")) });
+ok(/^not queue-only: says ": :a # #\[group\]b /u.test(marked.out) && !/:[^\0-\x7f]*:|#[^\0-\x7f]*#[^\0-\x7f]*\[/u.test(marked.out) && marked.err === null
+  && printed({ head: "a".repeat(40), why: "q::\nx" }).err === "q: :?x", "an added line quoted in a refusal, or in a proof's reason, is printed with no workflow command in it", marked.out);
 ok(changed({ patch: "@@ -1 +1 @@\n-a\n+b\n c", additions: 1, deletions: 1 })?.added.join() === "b" && changed({ patch: "", additions: 0, deletions: 0 }) === null
   && changed({ patch: "diff --git", additions: 0, deletions: 0 }) === null && changed(undefined) === null, "a patch's lines are read from GitHub's form alone");
 ok(changed({ patch: "@@ -1 +1,2 @@\n+a", additions: 2, deletions: 0 }) === null && changed({ patch: "@@ -1 +1 @@\n-a\n+b", additions: 1, deletions: 2 }) === null

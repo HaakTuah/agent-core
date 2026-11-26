@@ -19,6 +19,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
+import { stepEnv } from "../scripts/check.mjs";
 import { nugetScratch } from "../scripts/nuget-gate-scratch.mjs";
 import { root, tally } from "../scripts/scratch-core.mjs";
 import { CORE } from "../scripts/core-address.mjs";
@@ -47,7 +48,8 @@ const START = {
 };
 let n = 0;
 // The step's answer on a pull request that changes `files` (null removes one) from a project that starts as `start`.
-function gate(files, { start = {}, base = true, caller = "nuget.yml", link = null } = {}) {
+// With `steps`, the look runs in the environment check.mjs gives the steps it runs (stepEnv), not the scratch's own.
+function gate(files, { start = {}, base = true, caller = "nuget.yml", link = null, steps = false } = {}) {
   const dir = path.join(tmp, `repo-${++n}`);
   fs.mkdirSync(dir);
   git(dir, "init", "-q", "-b", "main");
@@ -63,7 +65,8 @@ function gate(files, { start = {}, base = true, caller = "nuget.yml", link = nul
   git(dir, "commit", "-q", "--allow-empty", "-m", "a change");
   const output = path.join(tmp, `look-${n}`);
   fs.writeFileSync(output, "");
-  const r = spawnSync("bash", ["-e", "core/scripts/nuget-look.sh"], { cwd: dir, encoding: "utf8", env: { ...env, BASE: base ? baseSha : "", CONFIG: "checks/licences.json",
+  const from = steps ? { ...stepEnv(path.join(tmp, `step-home-${n}`)), MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_USE_MSBUILD_SERVER: "0" } : env;
+  const r = spawnSync("bash", ["-e", "core/scripts/nuget-look.sh"], { cwd: dir, encoding: "utf8", env: { ...from, BASE: base ? baseSha : "", CONFIG: "checks/licences.json",
     CALLER: `someone/project/.github/workflows/${caller}@refs/pull/1/merge`, GITHUB_REPOSITORY: "someone/project", CORE_AT: "core/", NUGET_PACKAGES: path.join(tmp, `look-packages-${n}`),
     GITHUB_OUTPUT: output, DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_NOLOGO: "1", EnableWindowsTargeting: "true" } });
   const said = /^run=(.*)$/m.exec(fs.readFileSync(output, "utf8"))?.[1]?.trim();
@@ -94,6 +97,26 @@ if (!sdk) console.log("skip NuGet's own word: no .NET SDK here");
 else {
   skips("a pull request that changes only a doc", { "README.md": "# A project\n\nMore.\n" });
   skips("one that changes only another workflow", { ".github/workflows/other.yml": "name: other\n" });
+  // (as check.mjs runs it, which hands its steps only the variables it keeps: on Windows NuGet reads the system's and
+  // the user's folders from the environment, and a restore with one missing failed with no code of its own; #1239)
+  skips("a pull request that changes only a doc, the look run in the environment check.mjs gives its steps", { "README.md": "# A project\n\nMore.\n" }, { steps: true });
+  // (a restore that fails with no code of NuGet's prints its error lines whole, so the cause is seen, and none of them
+  // is read as a workflow command: neither "::" after leading spaces nor "##[" anywhere; #1239)
+  const failing = "a failure of the project's own, with no code, printed whole to its last word";
+  const own = restores("a pull request that changes only a doc, in a project whose restore fails with no code of NuGet's", { "README.md": "# A project\n\nMore.\n" },
+    { start: { "Directory.Build.targets": `<Project>\n  <Target Name="Fails" BeforeTargets="Restore">\n    <Message Importance="high" Text="::error::two" />\n    <Error Text="${failing} ##[error]one" />\n  </Target>\n</Project>\n` } });
+  ok(own.out.includes("src/App/App.csproj: the restore failed with no error NuGet names. It printed:") && new RegExp(`^  \\| .*error.*${failing}`, "m").test(own.out), "and the look prints the restore's error line whole, behind \"  | \"", own.out);
+  ok(/error::two/.test(own.out) && !own.out.includes("##[") && !/^\s*::/m.test(own.out), "and none of the lines it prints is read as a workflow command", own.out);
+  // (nor does a NuGet call in a step that names no config of its own, as the restore from the lock files does, read a
+  // machine-wide config of the caller's, which may name a source with its sign-in: that folder is the step's own; #1239)
+  const machine = path.join(tmp, "machine"), work = path.join(tmp, "machine-work");
+  for (const d of [path.join(machine, "NuGet", "Config"), work]) fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(machine, "NuGet", "Config", "planted.config"), '<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <packageSources>\n    <add key="planted" value="https://planted.invalid/v3/index.json" />\n  </packageSources>\n</configuration>\n');
+  const planted = { ...env, ...Object.fromEntries(["PROGRAMFILES(X86)", "PROGRAMDATA", "NUGET_COMMON_APPLICATION_DATA"].map(k => [Object.keys(env).find(e => e.toUpperCase() === k) ?? k, machine])) };
+  const sources = from => spawnSync("dotnet", ["nuget", "list", "source"], { cwd: work, env: from, encoding: "utf8" }).stdout ?? "";
+  const given = spawnSync(process.execPath, ["--input-type=module", "-e", `import { stepEnv } from ${JSON.stringify(new URL("../scripts/check.mjs", import.meta.url).href)}; console.log(JSON.stringify(stepEnv(${JSON.stringify(path.join(tmp, "machine-home"))})));`], { env: planted, encoding: "utf8" });
+  const read = sources(planted), inStep = given.status === 0 ? sources(JSON.parse(given.stdout)) : given.stderr;
+  ok(read.includes("planted") && given.status === 0 && !inStep.includes("planted") && /nuget\.org|No sources/i.test(inStep), "a NuGet call in a step reads no machine-wide config of the caller's, where the caller's own call reads it", `${read}\n${inStep}`);
   // (a NuGet.Config that maps every package to the registry, against a confusion of sources: the empty source the look
   // restores from is mapped to none, which NuGet names as its own error, NU1100, not as a package not found; #380)
   const MAPPED = '<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <packageSources>\n    <clear />\n    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />\n  </packageSources>\n  <packageSourceMapping>\n    <packageSource key="nuget.org">\n      <package pattern="*" />\n    </packageSource>\n  </packageSourceMapping>\n</configuration>\n';
@@ -129,6 +152,12 @@ if (sdk) {
   ok(!stale.passed && /NU1004/.test(stale.out) && /A restore from a lock file failed .*\. Mend: /.test(stale.out) && mended(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
 }
 
+// a changed file whose name holds "##[" is listed broken, behind its dash
+{
+  const r = gate({ "src/##[group]x/App.csproj": project() });
+  ok(r.run === "true" && r.out.includes("- src/# #[group]x/App.csproj") && !r.out.includes("##["), "a changed file whose name holds \"##[\" is listed with it broken", r.out);
+}
+
 // the second look, where the copy of the core stands at another path than core/ (#918): the restore's own records are read
 // outside the copy, at the path the caller gives (CORE_AT), whatever the copy holds. A stand-in for dotnet writes one for
 // the project and, inside the copy, one that downloads a package beside a lock file, which only a look that reads the
@@ -144,11 +173,11 @@ mkdir -p "$dir/obj" "$COPY/obj"
 printf '{"project":{"restore":{"projectPath":"%s/%s"},"frameworks":{}}}' "$PWD" "\${last#./}" > "$dir/obj/project.assets.json"
 printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":{"downloadDependencies":[{"name":"Beside.Lock"}]}}}}' "$PWD" "$COPY" > "$COPY/obj/project.assets.json"
 `, { mode: 0o755 });
-  const atCopy = (copy, at) => {
+  const atCopy = (copy, at, bin = standIn, files = {}) => {
     const dir = path.join(tmp, `copy-${++n}`);
     fs.mkdirSync(dir);
     git(dir, "init", "-q", "-b", "main");
-    for (const [f, text] of Object.entries({ ...START, "core-manifest.md": `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${copy} (never edited here).\n` })) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
+    for (const [f, text] of Object.entries({ ...START, ...files, "core-manifest.md": `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${copy} (never edited here).\n` })) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
     fs.cpSync(path.join(root, "scripts"), path.join(dir, copy, "scripts"), { recursive: true });
     git(dir, "add", "-A");
     git(dir, "commit", "-q", "-m", "base");
@@ -158,7 +187,7 @@ printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":
     git(dir, "commit", "-q", "-m", "a change");
     const output = path.join(tmp, `look-${n}`);
     fs.writeFileSync(output, "");
-    const r = spawnSync("bash", ["-e", `${copy}scripts/nuget-look.sh`], { cwd: dir, encoding: "utf8", env: { ...env, PATH: `${standIn}${path.delimiter}${env.PATH}`, COPY: at, BASE: baseSha, CONFIG: "checks/licences.json",
+    const r = spawnSync("bash", ["-e", `${copy}scripts/nuget-look.sh`], { cwd: dir, encoding: "utf8", env: { ...env, PATH: `${bin}${path.delimiter}${env.PATH}`, COPY: at, BASE: baseSha, CONFIG: "checks/licences.json",
       CALLER: "someone/project/.github/workflows/restore.yml@refs/pull/1/merge", GITHUB_REPOSITORY: "someone/project", CORE_AT: copy, NUGET_PACKAGES: path.join(tmp, `look-packages-${n}`), GITHUB_OUTPUT: output } });
     return { run: r.status === 0 ? /^run=(.*)$/m.exec(fs.readFileSync(output, "utf8"))?.[1]?.trim() : undefined, out: `${r.stdout}${r.stderr}` };
   };
@@ -166,6 +195,19 @@ printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":
   ok(vendor.run === "false" && deeper.run === "false" && usual.run === "false", "the restore's records inside the copy of the core, at core/ or at the path the caller gives, are no project's own: the look says no restore", [vendor, deeper, usual].map(r => r.out).join("\n"));
   const elsewhere = atCopy("vendor/core/", "vendor/other/");
   ok(elsewhere.run === "true", "and a record in a folder that is not the copy still makes it run", elsewhere.out);
+
+  // a project file whose path starts with "::" or holds "##[" is named broken in each failure line, as NuGet's own output
+  // is: a stand-in for dotnet whose restore fails, with no error named and with one NuGet names
+  const failing = said => { const bin = path.join(tmp, `fails-${++n}`); fs.mkdirSync(bin); fs.writeFileSync(path.join(bin, "dotnet"), `#!/bin/sh\n${said}\nexit 1\n`, { mode: 0o755 }); return bin; };
+  const unnamed = atCopy("core/", "core/", failing(""), { "::error::x/App.csproj": project() }).out, coded = atCopy("core/", "core/", failing('echo "error NU1004: the lock file"'), { "src/##[group]x/App.csproj": project() }).out;
+  ok(unnamed.includes(": :error: :x/App.csproj: the restore failed with no error NuGet names") && !/^\s*::/m.test(unnamed), "a project file's path that starts with \"::\" is broken where the restore fails with no error named", unnamed);
+  ok(coded.includes("src/# #[group]x/App.csproj: error NU1004") && !coded.includes("##["), "and one that holds \"##[\" is broken where it fails with an error NuGet names", coded);
+  // (and where only letters beyond ASCII stand between a pair's marks: in the project's path and in what dotnet printed;
+  // #1348)
+  const pair = /:[^\u0000-\u007f]*:|#[^\u0000-\u007f]*#[^\u0000-\u007f]*\[/u;
+  const beyond = atCopy("core/", "core/", failing('echo "the restore of #\u00e9#[group]y stopped"'), { "src/:\u00e9:a#\u00e9#[group]x/App.csproj": project() }).out;
+  ok(beyond.includes("src/: \u00e9:a# \u00e9#[group]x/App.csproj: the restore failed with no error NuGet names") && beyond.includes("  | the restore of # \u00e9#[group]y stopped") && !pair.test(beyond),
+    "and a letter beyond ASCII between a pair's marks breaks nothing: the path and dotnet's lines are shown with each pair broken", beyond);
 }
 
 done("the NuGet check's own steps");

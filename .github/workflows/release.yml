@@ -55,8 +55,10 @@ jobs:
           echo "private: ${private:-not read}"
           echo "public=$([ "$private" = false ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
-  # (the upgrade test on Windows in two jobs side by side, each a part of it under the test's time mark: the older of
-  # the two releases with the copy older than the first, and the newer release; #304, #515, #715)
+  # (the upgrade test on Windows in five jobs side by side, each a part of it under its own time mark in .github/shape.json,
+  # "upgrade-" and the part's name, and well inside the job's time: a project kind of the older of the last two releases,
+  # of the newer, and the copy older than the first; a part takes 7 to 17 minutes on Windows, where the two parts of two
+  # projects each ran past 30; #304, #515, #715, #1240)
   upgrade:
     needs: main
     if: ${{ github.event_name != 'schedule' || needs.main.outputs.public == 'true' }}
@@ -64,7 +66,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [older, newer]
+        part: [older-npm, older-dotnet, older-pre, newer-npm, newer-dotnet]
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -80,10 +82,10 @@ jobs:
           node-version-file: .node-version # the one exact Node, as the cut's
       - name: The core's packages, installed from their lock files before the upgrade test on Windows, the parser's among them (#654, #719)
         run: node scripts/install.mjs all # (the steps the test reads run the shape check, which reads on the parser; as tests.yml installs them)
-      - name: A project of each of the last two releases, or of the one this job's part names, synced to this commit, passes every check unchanged
+      - name: A project of the kind and release this job's part names, or the copy older than the first, synced to this commit, passes every check unchanged
         env:
           PART: ${{ matrix.part }}
-        run: node scripts/shape.mjs .github/shape.json --suite upgrade -- node tests/upgrade-test.mjs --part "$PART"
+        run: node scripts/shape.mjs .github/shape.json --suite "upgrade-$PART" -- node tests/upgrade-test.mjs --part "$PART"
 
   release:
     needs: [main, upgrade]

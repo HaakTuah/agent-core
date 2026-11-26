@@ -13,6 +13,7 @@ import { FOLDER, NOTES, NOTICE, POINTER, entries, notes as notesWhole } from "..
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { only, heldKitIn } from "../scripts/steps-kit.mjs";
 import { COST, STEPS, leads, notDone, project, report } from "../scripts/steps.mjs";
+import { shapeReadsParsed, shapeWritten } from "../scripts/step-checks-shape.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -29,14 +30,18 @@ const named = f => f.replace(/\.(md|mjs)$/u, "");
 const unpaired = [...noteFiles.filter(f => !f.endsWith(".md") || !stepFiles.includes(`${named(f)}.mjs`)).map(f => `${FOLDER}/${f}`),
   ...stepFiles.filter(f => !f.endsWith(".mjs") || !noteFiles.includes(`${named(f)}.md`)).map(f => `scripts/steps/${f}`)];
 ok(noteFiles.length === STEPS.length && !unpaired.length, `each entry stands in a file of ${FOLDER}/ and its step in a file of scripts/steps/ of the same name, NNN-<name>`, `without its pair: ${unpaired.join(", ")}`);
+// (#1246, point 3: the number alone orders the entries, so no two share one and none lacks one)
+const numberShared = names => names.filter(f => { const n = /^(\d{3})-/u.exec(f)?.[1]; return !n || names.filter(g => g.startsWith(`${n}-`)).length > 1; });
+ok(!numberShared(noteFiles).length, `each file of ${FOLDER}/ opens with a number of three digits that no other entry shares, so the number alone says its place`, `a number shared or missing: ${numberShared(noteFiles).join(", ")}. Give each a number of its own between the entries before and after it, and its step and stage the same name`);
+ok(numberShared(["740-a.md", "740-b.md", "750-c.md", "d.md"]).join() === "740-a.md,740-b.md,d.md", "  a number two entries share, or none, fails");
 const notOne = noteFiles.filter(f => !/^- \*\*[^\n]+\n$/u.test(fs.readFileSync(path.join(root, FOLDER, f), "utf8")));
 ok(!notOne.length, `each file of ${FOLDER}/ holds one entry, on one line`, notOne.join(", "));
 const own = fs.readFileSync(path.join(root, NOTES), "utf8");
 ok(!leads(own).length && entries(own).length === 1 && entries(own)[0].startsWith(NOTICE) && entries(own)[0].includes("`core/setup/sync-notes/`") && own.split("\n").filter(l => l === POINTER).length === 1, `${NOTES} holds no entry of its own, only the notice to a sync from an older copy, and names the folder once: a new entry is a file of ${FOLDER}/, named to stand after the one before it`, entries(own).join("\n"));
 const printed = execFileSync(process.execPath, [path.join(root, "scripts", "sync-notes.mjs")], { cwd: tmp, encoding: "utf8" });
 ok(printed === notesWhole(root), "node core/scripts/sync-notes.mjs, run from another folder (a project's root), prints the notes of the copy it stands in", printed.slice(0, 300));
-const ways = STEPS.filter(s => [s.check, s.held, s.unread].filter(Boolean).length !== 1 || !Object.values(COST).includes(s.cost));
-ok(!ways.length, "each step is told done one way (a check, a check of the project's that holds it, or why none reads it) and says what it costs", ways.map(s => s.lead).join("\n"));
+const ways = STEPS.filter(s => [s.check, s.held, s.unread, s.host].filter(Boolean).length !== 1 || !Object.values(COST).includes(s.cost));
+ok(!ways.length, "each step is told done one way (a check, a check of the project's that holds it, a check of what the host answers, or why none reads it) and says what it costs", ways.map(s => s.lead).join("\n"));
 const unstaged = STEPS.filter(s => s.check && !STAGES[s.lead]).map(s => s.lead);
 ok(!unstaged.length, "each step with a check has a stage and a mend, in a file of scripts/stages/ of its step's name, so the tests can take it out and put it back", unstaged.join("\n"));
 // (a stage whose file has no step of the same name that holds a check is read by nothing)
@@ -75,16 +80,6 @@ for (const step of STEPS.filter(s => s.check)) {
   const mended = notDone(dir);
   ok(!mended.length, `and its mend as written makes it done`, report(mended));
   STAGES[step.lead].after?.(dir);
-}
-// (the parser's packages installed where the selection of tests runs too, which reads through the shape check's
-// readers, all of Python on the parser: a job that selects after the first install alone reads not done; #530, item 6)
-{
-  const PARSER_LEAD = "19 November 2026, the parser's packages installed where the shape check runs", file = path.join(dir, ".github/workflows/select-staged.yml");
-  const flow = named => `name: select-staged\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/install.mjs${named}\n      - run: node core/scripts/select.mjs --env RUN\n`;
-  const said = named => { fs.writeFileSync(file, flow(named)); execFileSync("git", ["add", "-A", "--", file], { cwd: dir }); const m = notDone(dir, only(PARSER_LEAD)).find(x => x.lead === PARSER_LEAD); fs.rmSync(file); execFileSync("git", ["add", "-A", "--", file], { cwd: dir }); return m; };
-  const first = said("");
-  ok(first && /`\.github\/workflows\/select-staged\.yml` that runs the shape check or the selection of tests/u.test(first.mend) && !said(" all") && !said(" parser"),
-    "a job that selects the tests after the core's first install alone reads not done, its mend naming the workflow; one that installs the parser's too reads done", JSON.stringify(first));
 }
 // (the project's tests at the pace of a release, read exactly: all four types, and a condition that skips a draft;
 // #733, point 7)
@@ -158,5 +153,13 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
   ok(!notDone(lockProject).length, "and their mends make both done", report(notDone(lockProject)));
 }
 
+
+// ---- no step of the shape check asks for its config or baseline while the owner's `none` turns it off (#1107) ----
+// (370, 640, 690 and 720; a `none` with no reason turns nothing off, so 370 still asks)
+{
+  const asked = row => { const p = { manifest: `# Core manifest\n\n| Slot | Value |\n| --- | --- |\n${row}\n`, read: () => null, root: tmp }; return [shapeWritten(p), ...["csharp-tree", "javascript-tree", "python-tree"].map(r => shapeReadsParsed(p, r))]; };
+  const askedOff = asked("| *shape check* | `none`: the owner's reason |"), askedOn = asked("| *shape check* | `none` |");
+  ok(askedOff.every(m => m === null) && askedOn[0] !== null, "no step of the shape check asks for its config or baseline while the owner's `none` turns it off, and one with no reason still asks", JSON.stringify({ askedOff, askedOn }));
+}
 
 done("steps");

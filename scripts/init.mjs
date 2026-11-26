@@ -13,7 +13,7 @@
 //
 //   node <the clone>/scripts/init.mjs --owner <login> [--name <the project's name>] [--at <full SHA>]
 //                                     [--npm <the folder of package-lock.json>] [--nuget <the folder of the solution>]
-//                                     [--private] [--game]
+//                                     [--private] [--game] [--pages <its build workflow's name>] [--versions]
 //
 //   --owner    the owner's GitHub login: the *owner's account* (floor rule 4), the issue forms' assignee
 //   --name     the project's name in its rule files; left out, its folder's
@@ -26,6 +26,9 @@
 //              steps of core.yml's one job (oneJob), and each pull-request check started only once a pull request is
 //              no draft (READY_ONLY)
 //   --game     a game: the module game-design.md with the others
+//   --pages    (with --game) a game served by GitHub Pages: its preview.yml, which calls the core's once the build of
+//              that name has run on a pull request (README.md, point 5, "A game served by GitHub Pages")
+//   --versions it has versions Dependabot cannot see: its versions.yml, monthly, with the config checks/versions.json
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -34,7 +37,7 @@ import { CORE } from "./core-address.mjs";
 import { sizeOf } from "./file-size.mjs";
 import { everyInstall } from "./packages.mjs";
 import { MODULES } from "./reading.mjs";
-import { plainEnv } from "./releases.mjs";
+import { plainEnv, untar } from "./releases.mjs";
 import { started } from "./started.mjs";
 import { MARK, converged, marked } from "./core-owned.mjs";
 import { privateOf } from "./host-private.mjs";
@@ -53,6 +56,14 @@ const git = (args, cwd, env) => raw(args, cwd, env).trim();
 const guarded = () => ({ ...plainEnv(), GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: "core.fsmonitor", GIT_CONFIG_VALUE_0: "false", GIT_CONFIG_KEY_1: "core.hooksPath", GIT_CONFIG_VALUE_1: "/dev/null" });
 class Failure extends Error {}
 const fail = msg => { throw new Failure(msg); };
+
+// A game's build workflow, by the name its preview.yml runs after (#1095, point 6): written into that file in double
+// quotes, so its form keeps it one YAML string that no expression or quote can leave.
+const BUILD_FORM = "the name of its build workflow: at most 100 letters, digits and blanks, with . _ ( ) - where it needs them, beginning with a letter or digit";
+export const BUILD = /^[A-Za-z0-9][A-Za-z0-9 ._()-]{0,99}$/;
+// The versions check's config, where the kit writes it and its versions.yml names it.
+export const VERSIONS = "checks/versions.json";
+const VERSIONS_START = { about: "The versions this project pins that Dependabot cannot see, read by the core's scripts/versions.mjs from where each is written (its header gives an entry's form); the monthly versions.yml opens an enhancement issue for each one behind.", entries: [] };
 
 // Each template and the file it becomes, with when it is written (left out: always). One line a file, so the kit is
 // read here whole: setup/starter-kit.md says only how a template is written.
@@ -87,17 +98,23 @@ export const FILES = [
   ["workflows/licences.yml.tmpl", ".github/workflows/licences.yml", o => !o.private],
   ["workflows/signatures.yml.tmpl", ".github/workflows/signatures.yml", o => o.packages !== undefined && !o.private],
   ["workflows/nuget.yml.tmpl", ".github/workflows/nuget.yml", o => o.nuget !== undefined && !o.private],
+  ["workflows/preview.yml.tmpl", ".github/workflows/preview.yml", o => o.pages !== undefined],
+  ["workflows/versions.yml.tmpl", ".github/workflows/versions.yml", o => o.versions !== undefined],
 ];
 // What the script makes itself, beside the templates' files: none of these may exist either.
-const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "checks/holders.json", "core"];
+const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "checks/holders.json", VERSIONS, "core"];
 // What a builder's session reads at its start in a project the kit writes at any commit, as the kit's own entry files
 // there name it: the files of READ that are the project's own, each file of the core its AGENTS.md and CLAUDE.md pull
 // in on a line of its own, and the part for every tool but Claude beside Claude's: the reading-size check's marks. For
 // the kit as it stands it is READ.
 export function startOf(written) {
-  const pulled = [...`${written["AGENTS.md"] ?? ""}\n${written["CLAUDE.md"] ?? ""}`.matchAll(/^@(core\/[\w./-]+\.md)[ \t]*$/gmu)].map(m => m[1]);
-  const claude = pulled.find(f => f.endsWith("/claude.md"));
-  return [...new Set([...READ.filter(f => !f.startsWith("core/")), ...pulled, ...(claude ? [claude.replace(/claude\.md$/u, "other-builders.md")] : [])])];
+  return [...new Set([...READ.filter(f => !f.startsWith("core/")), ...pulledIn([written["AGENTS.md"] ?? "", written["CLAUDE.md"] ?? ""]).filter(f => f.startsWith("core/"))])];
+}
+// What rule files at the root pull in, from the root, and the core's file for every other tool beside Claude's part,
+// which Claude reads too: the size marks' step reads it of the core's part (step-marks-start.mjs; #1272, point 4).
+export function pulledIn(texts) {
+  const pulled = [...texts.join("\n").matchAll(/^@([\w./-]+\.md)[ \t]*$/gmu)].map(m => m[1]), claude = pulled.find(f => f.endsWith("/claude.md"));
+  return [...pulled, ...(claude ? [claude.replace(/claude\.md$/u, "other-builders.md")] : [])];
 }
 // The files every session reads at its start, as the AGENTS.md template of the kit as it stands imports them, and of
 // the core's own (those under core/) what the core's cap counts (size.mjs).
@@ -137,8 +154,8 @@ export function linked(root, to) {
 // before it reaches a file: a login, a commit, a folder inside the project, a name on one line.
 export function options(argv) {
   const o = {};
-  const VALUE = { "--owner": "owner", "--name": "name", "--npm": "packages", "--nuget": "nuget", "--at": "at" };
-  const FLAG = { "--private": "private", "--game": "game" };
+  const VALUE = { "--owner": "owner", "--name": "name", "--npm": "packages", "--nuget": "nuget", "--at": "at", "--pages": "pages" };
+  const FLAG = { "--private": "private", "--game": "game", "--versions": "versions" };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a in FLAG) o[FLAG[a]] = true;
@@ -149,12 +166,20 @@ export function options(argv) {
   if (o.at !== undefined && !/^[0-9a-f]{40}$/.test(o.at)) fail("--at <full SHA>: the core's commit as 40 hex characters");
   if (o.name !== undefined && !named(o.name)) fail(`--name: ${NAME}`);
   o.name = o.name?.normalize("NFC");
+  callsAsked(o);
   for (const [flag, key] of [["--npm", "packages"], ["--nuget", "nuget"]]) {
     if (o[key] === undefined) continue;
     o[key] = o[key].replace(/\\/g, "/").replace(/\/+$/, "") || ".";
     if (!/^(\.|[A-Za-z0-9_][A-Za-z0-9._-]*(\/[A-Za-z0-9_][A-Za-z0-9._-]*)*)$/.test(o[key])) fail(`${flag} <folder>: a folder inside the project, from its root (. for the root itself)`);
   }
   return o;
+}
+
+// A game's previews and the versions check, where asked (#1095, point 6): the build's name held to its form, for a game
+// alone, and the versions check given the kit's config.
+function callsAsked(o) {
+  if (o.pages !== undefined && !(o.game && BUILD.test(o.pages))) fail(`--pages <name>: with --game, ${BUILD_FORM}`);
+  if (o.versions) o.versions = VERSIONS;
 }
 
 // The modules a project takes, as its manifest lists them: all of them for a game, and for any other project each but
@@ -193,7 +218,9 @@ export function files(o, pin, moduleNames, read) {
   const words = { owner: o.owner, project: o.name, core: CORE, pin, npm: o.packages, nuget: o.nuget, modules: modules(moduleNames, o.game), declined: o.game ? "" : "\nNot taken: `game-design.md` (the project is no game).",
     games: o.game ? GAME_ROWS.map(([slot, what]) => `\n| *${slot}* | FILL IN: ${what} |`).join("") : "",
     // (the mutation tool the core's list gives the project's code and tests, read by the kit; #1107)
-    mutation: lineOf(o.mutation ?? { none: NO_TESTS }) };
+    mutation: lineOf(o.mutation ?? { none: NO_TESTS }),
+    // (a game's build, and the versions check's config, where the project has them: #1095, point 6)
+    build: o.pages === undefined ? undefined : JSON.stringify(o.pages), versions: o.versions };
   return FILES.filter(([, , when]) => !when || when(o)).map(([template, to]) => {
     let text = fill(read(template), words);
     // (Dependabot's own part for each installer the project named, after the part every project has)
@@ -232,10 +259,11 @@ export const readyOnly = text => text
 
 // The reading-size check's first marks: each file every session reads at about 20 KB, and the total of the project's
 // own among them (the core's copy under core/ is held to the core's own cap) at what they come to today, rounded up
-// to a whole KB with one to spare, so the first task has room and the mark means something.
-export function sizes(bytes) {
+// to a whole KB with one to spare, so the first task has room and the mark means something; under "skip", `skip`, the
+// files the kit's scripts write that only a script reads (#1247, point 2).
+export function sizes(bytes, skip = []) {
   const total = Object.entries(bytes).filter(([f]) => !f.startsWith("core/")).reduce((a, [, b]) => a + b, 0);
-  return { each: 20 * KB, read: Object.fromEntries(Object.keys(bytes).map(f => [f, 20 * KB])), total: (Math.ceil(total / KB) + 1) * KB, split: 50 * KB, skip: [], past: {} };
+  return { each: 20 * KB, read: Object.fromEntries(Object.keys(bytes).map(f => [f, 20 * KB])), total: (Math.ceil(total / KB) + 1) * KB, split: 50 * KB, skip, past: {} };
 }
 
 // The licence check's first config: nothing ships yet, and of npm's files only those that stand today are named,
@@ -319,30 +347,40 @@ function writeKit(o, here, pin, out) {
   }
   // the first copy, as the sync makes every copy: the core's tree at the pin, without what it keeps to itself
   fs.mkdirSync(path.join(here, "core"));
-  // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
-  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: here, input: execFileSync("git", ["archive", pin], { cwd: ROOT, env: plainEnv(), maxBuffer: 1 << 28 }) });
+  untar(path.join(here, "core"), execFileSync("git", ["archive", pin], { cwd: ROOT, env: plainEnv(), maxBuffer: 1 << 28 }));
   // (and its packages, installed from its lock file as the sync installs them, into core/.packages/node_modules/, which the copy's
   // own .gitignore keeps out of the commit; a failure leaves the kit written and says the mend: #654)
   const installer = path.join(here, "core", "scripts", "install.mjs");
   if (fs.existsSync(installer)) {
     // (every install of the copy's, an older pin's (--at) as its installer knows them: #719)
     const r = spawnSync(process.execPath, [installer, ...everyInstall(path.join(here, "core"))], { cwd: here, encoding: "utf8" });
-    if (r.status !== 0) console.log(`note the core's packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node core/scripts/install.mjs before running a check`);
+    if (r.status !== 0) console.log(`note the core's packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: none is needed for the checks, which install them themselves before they read (#1093); to install them now, run \`if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\``);
   }
   // (the folder of the mutation tool the manifest names, its package list and npm config written as mutation-tools.mjs
   // --write writes them, before the licence check's config, which names that npm config)
   const tool = setUp(here, o.mutation), mutation = MUTATION.tools[o.mutation?.tool];
   const made = [...tool.written];
-  if (!there("checks/sizes.json")) { write("checks/sizes.json", `${JSON.stringify(sizes(Object.fromEntries(startOf(Object.fromEntries(out)).filter(there).map(f => [f, sizeOf(path.join(here, f))]))), null, 2)}\n`); made.push("checks/sizes.json"); }
+  // (the shape check's baseline and the tool's lock file, which a script writes and a split of answers nothing, skipped)
+  const skip = ["checks/shape-baseline.json", ...(mutation?.folder ? [`${mutation.folder}/package-lock.json`] : [])];
+  if (!there("checks/sizes.json")) { write("checks/sizes.json", `${JSON.stringify(sizes(Object.fromEntries(startOf(Object.fromEntries(out)).filter(there).map(f => [f, sizeOf(path.join(here, f))])), skip), null, 2)}\n`); made.push("checks/sizes.json"); }
+  // (the versions check's config, with no entry yet: the project names each version Dependabot cannot see; #1095, point 6)
+  if (o.versions && !there(VERSIONS)) { write(VERSIONS, `${JSON.stringify(VERSIONS_START, null, 2)}\n`); made.push(VERSIONS); }
   let config = null;
   if (!there("checks/licences.json")) {
-    config = licences(o, there);
-    if (mutation?.folder && there(`${mutation.folder}/.npmrc`)) config.ignoreScriptsIn = [...(config.ignoreScriptsIn ?? []), `${mutation.folder}/.npmrc`];
+    config = withTool(licences(o, there), mutation, there);
     write("checks/licences.json", `${JSON.stringify(config, null, 2)}\n`); made.push("checks/licences.json");
   }
   git(["add", "--", ...written, ...made, "core"], here, guarded());
   // (what is left for the tool: where the licence check's config stood, the project's own, each entry it would name is asked)
   return { written, left, made: [...made, ...firstBaselines(here)], tool: [tool.blocked, ...leftFor(mutation, there, config)].filter(Boolean) };
+}
+
+// The licence check's first config with what the mutation tool needs of it: its npm config, where it stands, and the
+// packages of data its lock brings under CC-BY, which floor rule 10 allows for data (#1247, point 1).
+function withTool(config, tool, there) {
+  if (tool?.folder && there(`${tool.folder}/.npmrc`)) config.ignoreScriptsIn = [...(config.ignoreScriptsIn ?? []), `${tool.folder}/.npmrc`];
+  if (tool?.data?.length) config.data = [...new Set([...(config.data ?? []), ...tool.data])];
+  return config;
 }
 
 // What the kit wrote, and what it leaves for the project and for the owner.

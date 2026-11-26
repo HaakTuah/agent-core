@@ -30,6 +30,9 @@ ok(options(["--owner", "some-one"]).owner === "some-one" && options(["--owner", 
 ok(throws(() => options([])) && throws(() => options(["--owner"])) && throws(() => options(["--owner", "a b"])) && throws(() => options(["--owner", "-x"])) && throws(() => options(["--owner", "x`; rm -rf y`"])), "an owner is one GitHub login, and is asked for");
 ok(throws(() => options(["--owner", "x", "--force"])) && throws(() => options(["--owner", "x", "y"])), "an argument it does not know stops it");
 ok(options(["--owner", "x", "--at", A]).at === A && throws(() => options(["--owner", "x", "--at", "main"])) && throws(() => options(["--owner", "x", "--at", A.slice(1)])), "a commit is 40 hex characters");
+ok(options(["--owner", "x", "--game", "--pages", "Build (web)"]).pages === "Build (web)" && options(["--owner", "x", "--versions"]).versions === "checks/versions.json"
+  && throws(() => options(["--owner", "x", "--pages", "build"])) && ["", "a\"b", "${{ github.token }}", "a\nb", "-x", "x".repeat(101)].every(n => throws(() => options(["--owner", "x", "--game", "--pages", n]))),
+  "a game's build is named in one plain form, for a game alone, and the versions check takes the kit's config (#1095, point 6)");
 ok(options(["--owner", "x", "--npm", "tools/"]).packages === "tools" && options(["--owner", "x", "--npm", "."]).packages === "." && options(["--owner", "x", "--npm", "a\\b"]).packages === "a/b", "the npm folder is read from the project's root, either slash");
 ok(throws(() => options(["--owner", "x", "--npm", "../out"])) && throws(() => options(["--owner", "x", "--npm", "/abs"])) && throws(() => options(["--owner", "x", "--npm", "a b"])) && throws(() => options(["--owner", "x", "--npm", "a/../../b"])) && throws(() => options(["--owner", "x", "--npm", "$(x)"])), "a folder outside the project, or one that is more than a path, stops it");
 ok(options(["--owner", "x", "--nuget", "src\\"]).nuget === "src" && options(["--owner", "x", "--nuget", "."]).nuget === "." && options(["--owner", "x", "--npm", "web", "--nuget", "."]).packages === "web" && throws(() => options(["--owner", "x", "--nuget", "../out"])) && throws(() => options(["--owner", "x", "--nuget"])), "the NuGet folder is held to the same form, with the npm folder or without it");
@@ -74,7 +77,9 @@ for (const [template] of FILES.filter(([t]) => t.startsWith("workflows/"))) {
 const template = name => fs.readFileSync(path.join(root, TEMPLATES, "workflows", name), "utf8").replace(/\r\n/g, "\n");
 ok(template("pr-description.yml.tmpl").includes("on:\n  pull_request:\n    types: [opened, edited, reopened, synchronize, ready_for_review]\n"), "the description check runs when a pull request opens, is edited, reopened, pushed to or marked ready");
 ok(template("security-review.yml.tmpl").includes("on:\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\n  issue_comment:\n    types: [created, edited]\n") && template("security-review.yml.tmpl").includes("    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n"), "the security-review check has its two triggers, and its job its three permissions");
-ok(/^on:\n  schedule:\n    - cron: '\d+ \d+ \* \* \*'.*\n  workflow_dispatch:\n/m.test(template("look.yml.tmpl")) && template("look.yml.tmpl").includes("    permissions:\n      contents: read\n      issues: write\n      pull-requests: read\n      checks: read\n      statuses: read\n"), "the daily look runs daily or by hand, in a job that may read the repository, its pull requests, checks and statuses, and write issues");
+ok(/^on:\n  schedule:\n    - cron: '\d+ \d+ \* \* \*'.*\n  workflow_dispatch:\n/m.test(template("look.yml.tmpl")) && template("look.yml.tmpl").replace(/ # .*$/gm, "").includes("    permissions:\n      contents: read\n      issues: write\n      pull-requests: read\n      checks: read\n      statuses: read\n"), "the daily look runs daily or by hand, in a job that may read the repository, its pull requests, checks and statuses, and write issues");
+ok(template("preview.yml.tmpl").includes("on:\n  workflow_run:\n    workflows: [{{build}}]\n    types: [completed]\n") && template("preview.yml.tmpl").replace(/ # .*$/gm, "").includes("    permissions:\n      contents: write\n      actions: read\n      pull-requests: write\n    uses:"), "a game's previews run once its build has run, in a job that may push gh-pages, read the build's artifact and comment, as the core's preview.yml asks of its caller");
+ok(/^on:\n  schedule:\n    - cron: '\d+ \d+ \d+ \* \*'.*\n  workflow_dispatch:\n/m.test(template("versions.yml.tmpl")) && template("versions.yml.tmpl").replace(/ # .*$/gm, "").includes("    permissions:\n      contents: read\n      issues: write\n    uses:"), "the versions check runs monthly or by hand, in a job that may read the repository and write issues, as the core's versions.yml asks of its caller");
 const fromFolder = name => fs.readFileSync(path.join(root, TEMPLATES, name), "utf8");
 const whole = files({ owner: "someone", name: "P", packages: "tools" }, A, ["git.md"], fromFolder).map(([, text]) => text).join("\n");
 ok(JSON.stringify(startOf(Object.fromEntries(files({ owner: "someone", name: "P" }, A, ["git.md"], fromFolder)))) === JSON.stringify(READ)
@@ -87,6 +92,9 @@ ok(dependabot({ nuget: "." }).includes('package-ecosystem: "nuget"\n    director
 // check's config and marks, the description check, whose types it takes, and the package check of the project's kind,
 // with no call of its own to those checks; a public one keeps a call to each
 const kitOf = o => Object.fromEntries(files({ owner: "someone", name: "P", ...o }, A, ["git.md"], fromFolder).map(([to, text]) => [to, text]));
+ok(!kitOf({ game: true })[".github/workflows/preview.yml"] && !kitOf({})[".github/workflows/versions.yml"] && kitOf({ game: true, pages: "Build (web)" })[".github/workflows/preview.yml"].includes('    workflows: ["Build (web)"]\n') && parseYaml(kitOf({ game: true, pages: "Build (web)" })[".github/workflows/preview.yml"]).on.workflow_run.workflows[0] === "Build (web)"
+  && parseYaml(kitOf({ versions: "checks/versions.json" })[".github/workflows/versions.yml"]).jobs.versions.with.config === "checks/versions.json",
+  "the kit writes a game's preview.yml, its build named, and the versions check's call, only where they were asked for (#1095, point 6)");
 const oneCall = o => parseYaml(kitOf({ private: true, ...o })[".github/workflows/core.yml"]);
 const withNuget = oneCall({ nuget: "." }), withNpm = oneCall({ packages: "tools" }), withBoth = oneCall({ packages: "web", nuget: "." }), withNone = oneCall({});
 const separate = to => /\/(copies|pr-description|signatures|nuget)\.yml$/.test(to);
@@ -112,7 +120,7 @@ ok(fs.readFileSync(path.join(root, ".claude/settings.json"), "utf8") === fromFol
 ok(!/\{\{[a-z]+\}\}/.test(whole) && whole.includes("${{ secrets.PERSONAL_TERMS }}") && whole.includes(`uses: ${CORE}/.github/workflows/core.yml@${A}`) && whole.includes(`dependency-name: "${CORE}*"`), "filled in, no template word is left and GitHub's own expressions stand as written, each call is to the core's own address at the pin, and Dependabot leaves those calls alone");
 
 // the program whole: a scratch copy of the core as it stands here, and a scratch project
-const { tmp, env, git, run, core, pin, script, project } = scratch("init-test-");
+const { tmp, env, git, run, core, pin, script, fresh, project } = scratch("init-test-");
 
 const p = project("a-project", "--owner", "someone-else", "--npm", "tools");
 const has = f => fs.existsSync(path.join(p.dir, f)), read = f => fs.readFileSync(path.join(p.dir, f), "utf8");
@@ -147,6 +155,21 @@ if (p.status === 0) {
   const ownGrew = sizeCheck();
   undo();
   ok(coreGrew.status === 0 && ownGrew.status === 1 && /project's own files every session reads total .*\. Mend: make them smaller/.test(ownGrew.stderr) && mended(ownGrew.stderr), "the core's copy grown by a sync fails no project's total; the project's own files grown past it do", `${coreGrew.stderr}${ownGrew.stdout}`);
+  // (a listing of the tracked paths past 1 MB, Node's default buffer for what git prints, is read whole, and where git cannot
+  // list at all the check fails saying so, with its mend: #1204; the index is put back after each)
+  const indexAt = path.join(p.dir, ".git/index"), indexWas = fs.readFileSync(indexAt);
+  const blob = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: p.dir, input: "", encoding: "utf8" }).stdout.trim();
+  // (the form is "mode SP sha SP stage TAB path": a tab before the stage names a path with a tab, which Windows refuses, and the
+  // refusals, 30000 lines, kill git past the buffer and leave index.lock behind: #1234)
+  const added = spawnSync("git", ["update-index", "--add", "--index-info"], { cwd: p.dir, encoding: "utf8", input: Array.from({ length: 30000 }, (_, i) => `100644 ${blob} 0\tgenerated/folder-${i}/a-file-with-a-path-of-fifty-characters-${i}.txt\n`).join("") });
+  const firstAt = "generated/folder-0/a-file-with-a-path-of-fifty-characters-0.txt";
+  ok(added.status === 0 && spawnSync("git", ["ls-files", "--", firstAt], { cwd: p.dir, encoding: "utf8" }).stdout.trim() === firstAt, "the 30000 tracked paths the listing test needs are written to the index, each as the path it names", `${added.error ?? ""} ${String(added.stderr).slice(0, 300)}`);
+  const longList = sizeCheck();
+  fs.writeFileSync(indexAt, "not an index");
+  const noList = sizeCheck();
+  fs.writeFileSync(indexAt, indexWas);
+  ok(longList.status === 0 && !/ENOBUFS/.test(longList.stderr), "a project whose tracked paths list past 1 MB passes the reading-size check, the listing read whole", `${longList.stdout}${longList.stderr}`);
+  ok(noList.status === 1 && mended(noList.stderr) && /git could not list the tracked paths/.test(noList.stderr) && !/at .*\.mjs:\d+/.test(noList.stderr), "where git cannot list the tracked paths, the reading-size check fails saying so, with its mend", noList.stderr);
   // (a file past the split mark that a pull request changes asks the question: no line in "past", or one with no why
   // or grown a quarter past its mark, fails with its mend; one whose line says why it stays whole passes, and one of a
   // mark alone that stood before stands as it did; #469)
@@ -249,11 +272,19 @@ if (p.status === 0) {
   for (const f of ["src", "checks/near.json", "checks/near-baseline.json"]) fs.rmSync(path.join(p.dir, f), { recursive: true, force: true });
   // (the core runs the same check on itself, with its own config and baseline (#339): it passes as the core stands, a
   // copy added fails, and its mend names the path a session types there, with no "core/" before it)
-  // (the core without its own tests/, which are most of the code the check reads and which no case here is about: a run
-  // costs what it reads, so each of the 23 below took about a quarter less; the check on the core whole is the pull request's
-  // own run of it, #812)
+  // (the core without its own tests/ and the scripts the check does not import, which are most of the code it reads and
+  // which no case here is about: a run costs what it reads, so each of the 23 below took about half as long; the check
+  // on the core whole is the pull request's own run of it, #812)
+  const imported = new Set(), queue = ["scripts/copies.mjs"];
+  for (let f; (f = queue.pop()) !== undefined;) {
+    if (imported.has(f)) continue;
+    imported.add(f);
+    for (const [, rel] of fs.readFileSync(path.join(core, f), "utf8").matchAll(/["'](\.{1,2}\/[^"'\n]+\.m?js)["']/g)) queue.push(path.posix.join(path.posix.dirname(f), rel));
+  }
   git(core, "rm", "-rq", "tests");
-  git(core, "commit", "-q", "-m", "without the core's tests");
+  const unread = git(core, "ls-files", "scripts/*.mjs", "scripts/*.sh").split("\n").filter(f => f && !imported.has(f));
+  for (let i = 0; i < unread.length; i += 100) git(core, "rm", "-q", ...unread.slice(i, i + 100)); // a command line is capped on Windows
+  git(core, "commit", "-q", "-m", "without the core's tests and the scripts the copies check does not import");
   const coreRun = run(core, "scripts/copies.mjs", ".github/copies.json");
   const how = path.join(core, "roles/shared/how-to-work.md"), howWas = fs.readFileSync(how, "utf8");
   fs.appendFileSync(how, `\n${fs.readFileSync(path.join(core, "floor/security.md"), "utf8").split(/\r?\n/u).find(l => /^- It is never pushed to/u.test(l))}\n`);
@@ -264,7 +295,7 @@ if (p.status === 0) {
   git(core, "checkout", "-q", "--", ".github/copies-baseline.json");
   ok(coreRun.status === 0 && ownCopy.status === 1 && /a new copy: .*roles\/shared\/how-to-work\.md:.*\. Mend: keep it in the one place/u.test(ownCopy.out) && mended(ownCopy.out)
     && ownNone.status === 1 && /Mend: write the project's first with node scripts\/copies\.mjs \.github\/copies\.json --first/u.test(ownNone.out) && mended(ownNone.out),
-    "the core's own copies check passes on the core without its tests, and fails a copy added there, its mends naming the core's own paths", `${coreRun.out}${ownCopy.out}${ownNone.out}`);
+    "the core's own copies check passes on the core without its tests and the scripts it does not import, and fails a copy added there, its mends naming the core's own paths", `${coreRun.out}${ownCopy.out}${ownNone.out}`);
   // (against the base, the config is held to the base's (#348): a baseline moved, or a file the base's config read and
   // this one does not, fails with its mend, and the mend as worded passes; a config widened passes)
   const cfgAt = path.join(core, ".github/copies.json"), cfgWas = fs.readFileSync(cfgAt, "utf8");
@@ -452,6 +483,9 @@ if (p.status === 0) {
     && movedBaseline.status === 1 && calledInPlace.test(movedBaseline.out) && /moves the baseline from \.github\/copies-baseline\.json to \.github\/moved\.json against main/u.test(movedBaseline.out) && mended(movedBaseline.out)
     && movedWhole.status === 0 && beside.status === 0 && withShape.status === 0,
     "against the base, a config moved with its call is held to the one the base called, narrowed or its baseline moved failing with its mend; moved whole, or beside one still called, or with another check's config moved too, it passes; a call left to the old config, deleted, counts for nothing", `${movedNarrow.out}${narrowDropped.out}${movedBaseline.out}${movedWhole.out}${beside.out}${withShape.out}`);
+  // (the scripts back, for what runs the core's own from here: the kit's second run)
+  git(core, "checkout", "-q", pin, "--", "scripts");
+  git(core, "commit", "-q", "-m", "its scripts again");
   // (a total set when it counted the core's copy too passes, and a note gives the mark to set, even after the core
   // grew past the room that total had left; a total of the project's own says nothing)
   const sizesAt = path.join(p.dir, "checks/sizes.json"), was = fs.readFileSync(sizesAt, "utf8"), own = JSON.parse(was).total;
@@ -476,7 +510,9 @@ if (p.status === 0) {
   ok(again.status === 0 && said.includes("taken by the sync") && said.includes("nothing to write") && git(p.dir, "status", "--porcelain") === "", "run again, it takes the project the sync's way, the same process, and changes nothing", said);
 }
 git(core, "reset", "-q", "--hard", pin); // (the copies cases are over: the projects below take the core whole again, tests/ and the pin as scratch() made them)
-const q = project("private-game", "--owner", "x", "--private", "--game", "--name", "A private game");
+const q = project("private-game", "--owner", "x", "--private", "--game", "--name", "A private game", "--pages", "Build", "--versions");
+ok(q.status === 0 && fs.readFileSync(path.join(q.dir, ".github/workflows/preview.yml"), "utf8").includes('workflows: ["Build"]') && fs.readFileSync(path.join(q.dir, ".github/workflows/versions.yml"), "utf8").includes("config: checks/versions.json") && JSON.stringify(JSON.parse(fs.readFileSync(path.join(q.dir, "checks/versions.json"), "utf8")).entries) === "[]",
+  "a game served by the host's pages gets its preview.yml, and a project with versions Dependabot cannot see its versions.yml and the config it names, with no entry yet (#1095, point 6)", q.out.slice(0, 400));
 ok(q.status === 0 && !fs.existsSync(path.join(q.dir, ".github/workflows/codeql.yml")) && !fs.existsSync(path.join(q.dir, ".github/workflows/licences.yml")) && !fs.existsSync(path.join(q.dir, ".github/workflows/signatures.yml")) && fs.existsSync(path.join(q.dir, "checks/licences.json")), "a private project without npm gets no call to CodeQL, the licence workflow or the signature check, and still its licence config", q.out.slice(0, 400));
 // (every kind the program writes: the core's manifest check, run in the project, gives no note on its first day, #329)
 for (const [what, r] of [["an npm project", p], ["a private game", q]]) {
@@ -490,6 +526,14 @@ if (q.status === 0) {
     "a game's manifest has a row for each slot game-design.md uses, each left to fill and named, without its table's bar, in what is left", q.out.slice(0, 1500));
 }
 if (q.status === 0) ok(/^Floor: whole\. Modules: all\.$/m.test(fs.readFileSync(path.join(q.dir, "core-manifest.md"), "utf8")) && fs.readFileSync(path.join(q.dir, "AGENTS.md"), "utf8").startsWith("# A private game\n"), "a game takes every module, and a name given is the name used");
+// (a project that holds JavaScript and its tests gets Stryker, and its licence config names the data the lock brings: #1247, point 1)
+{
+  const dir = fresh("a-project-with-tests");
+  fs.writeFileSync(path.join(dir, "a.js"), "export const a = 1;\n");
+  fs.writeFileSync(path.join(dir, "a.test.js"), "import { a } from './a.js';\n");
+  const r = run(dir, script, "--owner", "x"), config = JSON.parse(fs.readFileSync(path.join(dir, "checks/licences.json"), "utf8"));
+  ok(r.status === 0 && fs.existsSync(path.join(dir, "checks/mutation/.npmrc")) && config.data?.includes("caniuse-lite") && !r.out.includes('under "data"'), "a project with code and tests gets the list's tool, and its licence config names the data its lock brings, so nothing is left to ask of it", r.out.slice(0, 1500));
+}
 const t = project("a-folder-named-true", "--owner", "x", "--npm", "true");
 ok(t.status === 0 && fs.readFileSync(path.join(t.dir, ".github/workflows/signatures.yml"), "utf8").includes('directory: "true"') && fs.readFileSync(path.join(t.dir, ".github/dependabot.yml"), "utf8").includes('directory: "/true"'), "a folder whose name YAML would read as something else is written in quotes, so it stays a name");
 const n = project("a-dotnet-project", "--owner", "x", "--nuget", "src", "--private");
