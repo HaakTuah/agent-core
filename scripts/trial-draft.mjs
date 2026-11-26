@@ -7,8 +7,9 @@
 //         repository's id so no project is given twice; none while a check or workflow waits or none ran, where a list
 //         could not be read whole, or for a pull request no open draft from the project's own branch by the owner's
 //         account, against the default branch, pinned to the commit, or of another owner's repository, or behind a stop
-//         switch that stands or cannot be read. A workflow that could not start counts as a failed check. `--gate` names a check its builder read as failing only for being a
-//         draft (setup/sync-notes/680): counted apart, holding nothing, named on its own line.
+//         switch that stands or cannot be read. A workflow that could not start counts as a failed check, and one
+//         skipped on the draft is counted and named apart. `--gate` names a check its builder read as failing only for
+//         being a draft (setup/sync-notes/680): counted apart, holding nothing, named on its own line.
 //   node scripts/trial-draft.mjs <owner>/<name> none <the commit tried>
 //         where no draft was opened: reads why (another owner's, a stop switch that stands) and prints it as the answer;
 //         none for a repository whose manifest names no copy of this core, or the owner's own without a stop switch.
@@ -20,26 +21,30 @@ import { ghAsk } from "./owner-settings.mjs";
 import { started } from "./started.mjs";
 import { DRAFT_COUNTS, LINE } from "./trial-draft-record.mjs";
 
-// A short hash of a repository's id on the host, which ties a reading to its project under any name and names none.
+// A short hash of a repository's id on the host, which ties a reading to its project under any name; the line that
+// carries it goes to a file outside every repository alone, and the record keeps none.
 export const repoHash = id => createHash("sha256").update(String(id)).digest("hex").slice(0, 12);
 
-// What each check said, from GitHub's check runs and statuses: passed, failed or waiting; a skipped run is left out.
-const RUN = { success: "passed", neutral: "passed", failure: "failed", timed_out: "failed", cancelled: "failed", action_required: "failed", startup_failure: "failed", stale: "failed" };
+// What each check said, from GitHub's check runs and statuses: skipped, passed, failed or waiting, a name twice its worse.
+const RANK = { skipped: 0, passed: 1, failed: 2, waiting: 3 };
+const RUN = { skipped: "skipped", success: "passed", neutral: "passed", failure: "failed", timed_out: "failed", cancelled: "failed", action_required: "failed", startup_failure: "failed", stale: "failed" };
 const STATUS = { success: "passed", failure: "failed", error: "failed", pending: "waiting" };
 export function saidOf(runs, statuses) {
-  const out = {};
-  const put = (name, v) => { if (typeof name !== "string" || v === null) return; const was = out[name]; out[name] = was === "waiting" || v === "waiting" ? "waiting" : was === "failed" || v === "failed" ? "failed" : v; };
-  for (const r of runs ?? []) put(r?.name, r?.status !== "completed" ? "waiting" : RUN[r?.conclusion] ?? (r?.conclusion === "skipped" ? null : "failed"));
+  const out = Object.create(null);
+  const put = (name, v) => { if (typeof name === "string" && !(RANK[out[name]] >= RANK[v])) out[name] = v; };
+  for (const r of runs ?? []) put(r?.name, r?.status !== "completed" ? "waiting" : RUN[r?.conclusion] ?? "failed");
   for (const s of statuses ?? []) put(s?.context, STATUS[s?.state] ?? "failed");
   return out;
 }
 
-// The counts of the draft's checks beside main's; one run on main alone (a push's job) is not counted.
+// The counts of the draft's checks beside main's; one run on main alone (a push's job) is not counted, and one skipped
+// on the draft is counted apart, measuring nothing there.
 export function draftCounts(main, draft, gates = []) {
   const out = Object.fromEntries(DRAFT_COUNTS.map(k => [k, 0]));
   for (const [name, now] of Object.entries(draft)) {
     const then = main[name];
-    if (now === "failed" && gates.includes(name)) out.draftGated++;
+    if (now === "skipped") out.draftSkipped++;
+    else if (now === "failed" && gates.includes(name)) out.draftGated++;
     else if (then === "passed" || then === "failed") out[now === "passed" ? (then === "passed" ? "draftPassedBoth" : "draftFixedAfter") : (then === "passed" ? "draftFailedAfter" : "draftFailedBoth")]++;
     else out[now === "passed" ? "draftPassedAlone" : "draftFailedAlone"]++;
   }
@@ -87,7 +92,7 @@ const NONE_MEND = "give the project's pair the reading of `node scripts/trial-dr
 function notPlaced(pr, pull, ours) {
   const base = pull.base?.ref, main = pull.base?.repo?.default_branch;
   if (typeof main !== "string" || !main || base !== main) return `pull request ${pr} is opened against ${base || "no branch that could be read"}, not the project's default branch${main ? `, ${main}` : ""}, whose checks the draft's are read beside. Mend: open the sync as a draft against the default branch, and read that one`;
-  if (pull.head?.repo?.id !== pull.base?.repo?.id || !ours(pull.user?.login)) return `pull request ${pr} comes from ${pull.head?.repo?.id !== pull.base?.repo?.id ? "another repository than the project's" : "another account than the core's owner's"}, and the trial's draft is opened from a branch of the project itself, by the owner's account. Mend: write nothing more there, tell the owner that it stands, and open the trial's own draft as the release's trial says`;
+  if (!Number.isInteger(pull.base?.repo?.id) || pull.head?.repo?.id !== pull.base.repo.id || !ours(pull.user?.login)) return `pull request ${pr} comes from ${ours(pull.user?.login) ? "another repository than the project's, or one GitHub gave no id" : "another account than the core's owner's"}, and the trial's draft is opened from a branch of the project itself, by the owner's account. Mend: write nothing more there, tell the owner that it stands, and open the trial's own draft as the release's trial says`;
   return null;
 }
 
@@ -108,6 +113,15 @@ function notDraft(repo, pr, pull, ask) {
   return null;
 }
 
+// Why `repo` is no project that takes this core, as state-report.mjs --projects finds one (its default branch's manifest
+// pins a copy), read through `ask`, or null; a manifest not read is said so, never read as none.
+function notTaking(repo, ask) {
+  const got = ask(`repos/${repo}/contents/core-manifest.md`);
+  if (!got.body && !/^GitHub answered 404\b/.test(got.why ?? "")) return `the repository's manifest could not be read (${got.why ?? "no answer"}). Mend: run it again where gh answers for the owner's account`;
+  const text = typeof got.body?.content === "string" ? Buffer.from(got.body.content, "base64").toString("utf8") : "";
+  return readCore(text).pin ? null : "the manifest on the repository's default branch pins no copy of this core, so it is no project state-report.mjs --projects finds. Mend: give the reading of a project the trial ran in";
+}
+
 // Why the draft's head, `head`, does not pin the commit tried, `sha`, as its manifest reads through `ask`, or null.
 function notPinned(repo, head, sha, ask) {
   const manifest = ask(`repos/${repo}/contents/core-manifest.md?ref=${head}`).body;
@@ -121,17 +135,18 @@ function notPinned(repo, head, sha, ask) {
 export function readDraft(repo, pr, sha, gates = [], ask = ghAsk) {
   const pull = ask(`repos/${repo}/pulls/${pr}`).body;
   const head = String(pull?.head?.sha ?? ""), base = String(pull?.base?.ref ?? "");
-  const refused = notDraft(repo, pr, pull, ask) ?? (aCommit(head) ? notPinned(repo, head, sha, ask) : "GitHub gave the draft no head commit. Mend: run it again where gh answers for the owner's account");
+  const refused = notDraft(repo, pr, pull, ask) ?? notTaking(repo, ask) ?? (aCommit(head) ? notPinned(repo, head, sha, ask) : "GitHub gave the draft no head commit. Mend: run it again where gh answers for the owner's account");
   if (refused) return { why: refused };
   const main = ask(`repos/${repo}/commits/${encodeURIComponent(base)}`).body?.sha;
   if (!aCommit(main)) return { why: `the newest commit of ${base || "its base"} could not be read. Mend: run it again where gh answers for the owner's account` };
   const [then, now] = [checksAt(repo, main, ask), checksAt(repo, head, ask)];
   if (!then.said || !now.said) return { why: `the checks could not be read: ${then.why ?? now.why}. Mend: run it again where gh answers for the owner's account` };
-  if (!Object.keys(now.said).length) return { why: "no check has run on the draft yet (a skipped one does not), and a draft with none measures nothing. Mend: read again once its checks have started and finished, without polling" };
-  const waiting = [then.said, now.said].map(s => Object.values(s).filter(v => v === "waiting").length);
+  if (!Object.values(now.said).some(v => v !== "skipped")) return { why: "no check has run on the draft yet (a skipped one does not), and a draft with none measures nothing. Mend: read again once its checks have started and finished, without polling" };
+  // (on main, only what the draft also holds: a run there waiting on a person, a deploy's reviewer say, measures nothing of it)
+  const waiting = [Object.entries(then.said).filter(([n]) => Object.hasOwn(now.said, n)), Object.entries(now.said)].map(s => s.filter(([, v]) => v === "waiting").length);
   if (waiting[0] + waiting[1]) return { why: `${waiting[1]} checks on the draft and ${waiting[0]} on main's newest commit have not finished. Mend: read again once they finish, without polling` };
   const failedHere = Object.entries(now.said).filter(([n, v]) => v === "failed" && then.said[n] !== "failed").map(([n]) => n);
-  return { answer: { commit: sha, repo: repoHash(pull.base.repo.id), ...draftCounts(then.said, now.said, gates) }, failed: failedHere.filter(n => !gates.includes(n)), gated: failedHere.filter(n => gates.includes(n)) };
+  return { answer: { commit: sha, repo: repoHash(pull.base.repo.id), ...draftCounts(then.said, now.said, gates) }, failed: failedHere.filter(n => !gates.includes(n)), gated: failedHere.filter(n => gates.includes(n)), skipped: Object.keys(now.said).filter(n => now.said[n] === "skipped") };
 }
 
 // Why no draft was opened in `repo`, read through `ask`: { answer } (the commit, the repository's hash and `none`), or
@@ -141,8 +156,8 @@ export function readNone(repo, sha, ask = ghAsk) {
   const got = ask(`repos/${repo}`);
   const owner = got.body?.owner?.login, id = got.body?.id;
   if (typeof owner !== "string" || !Number.isInteger(id)) return { why: `the repository could not be read (${got.why ?? "no owner or id in GitHub's answer"}). Mend: run it again where gh answers for the owner's account` };
-  const manifest = ask(`repos/${repo}/contents/core-manifest.md`).body;
-  if (typeof manifest?.content !== "string" || readCore(Buffer.from(manifest.content, "base64").toString("utf8")).wrong) return { why: "the repository's manifest names no copy of this core, so it is no project that takes it. Mend: give the reading of a project the trial ran in" };
+  const taking = notTaking(repo, ask);
+  if (taking) return { why: taking };
   const answer = none => ({ answer: { commit: sha, repo: repoHash(id), none } });
   if (owner.toLowerCase() !== OWNER.toLowerCase()) return answer("another-owner");
   const stop = stopOf(repo, ask);
@@ -163,5 +178,6 @@ if (started(import.meta.url)) {
   if (!got.answer) { console.error(`FAIL no answer for the ${pr === "none" ? "project" : "draft"}: ${got.why}.`); process.exit(1); }
   for (const name of got.failed ?? []) console.log(`  failed on the draft: ${asText(name)}`);
   for (const name of got.gated ?? []) console.log(`  set apart as the draft's gate: ${asText(name)}`);
+  for (const name of got.skipped ?? []) console.log(`  skipped on the draft, measuring nothing there: ${asText(name)}`);
   console.log(`${LINE}${JSON.stringify(got.answer)}`);
 }

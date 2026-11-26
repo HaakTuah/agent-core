@@ -7,7 +7,7 @@ export const LINE = "draft answer: ";
 
 // Each class of a check by what it said on main and on the draft; failed on the draft after passing on main, or run on
 // it alone (the dependency review) and failed, is the release's and holds the cut; `--gate` sets a failure apart.
-export const DRAFT_COUNTS = ["draftPassedBoth", "draftFixedAfter", "draftFailedBoth", "draftFailedAfter", "draftFailedAlone", "draftPassedAlone", "draftGated"];
+export const DRAFT_COUNTS = ["draftPassedBoth", "draftFixedAfter", "draftFailedBoth", "draftFailedAfter", "draftFailedAlone", "draftPassedAlone", "draftGated", "draftSkipped"];
 
 // Why no draft was opened, as `none` reads it, with the record's count it adds to.
 export const NO_DRAFT = { "another-owner": "draftsAnotherOwner", "stop-switch": "draftsStopped" };
@@ -19,7 +19,8 @@ export function draftAnswerOf(text, sha) {
   let a = null;
   try { a = JSON.parse(line.slice(LINE.length)); } catch { /* (none, or not read) */ }
   const counted = a !== null && typeof a === "object" && DRAFT_COUNTS.every(k => Number.isInteger(a[k]) && a[k] >= 0);
-  if (!counted && !Object.hasOwn(NO_DRAFT, a?.none ?? "") || !/^[0-9a-f]{12}$/.test(a?.repo ?? "")) return { why: `holds no line \`${LINE}\` as trial-draft.mjs prints it` };
+  const said = typeof a?.repo === "string" && typeof a?.commit === "string" && (counted ? a.none === undefined : typeof a?.none === "string" && Object.hasOwn(NO_DRAFT, a.none));
+  if (!said || !/^[0-9a-f]{12}$/.test(a.repo)) return { why: `holds no line \`${LINE}\` as trial-draft.mjs prints it` };
   if (a.commit !== sha) return { why: `answers for ${String(a.commit).slice(0, 7)}, not the commit tried, ${sha.slice(0, 7)}` };
   return counted ? { answer: Object.fromEntries(DRAFT_COUNTS.map(k => [k, a[k]])), repo: a.repo } : { none: a.none, repo: a.repo };
 }
@@ -87,7 +88,7 @@ export function draftFormed(r) {
 }
 
 // What a record says of them, the gated checks in a sentence of their own.
-export const draftSaid = r => (r.projects === 0 ? "" : `On the drafts of the sync in the owner's own projects, ${r.drafts} read of ${r.ownProjects} such projects found, ${r.draftsAnotherOwner} projects of another owner's with none and ${r.draftsStopped} with none for a stop switch: ${r.draftPassedBoth} checks passed on main and the draft, ${r.draftFixedAfter} failed on main and passed on it, ${r.draftFailedBoth} failed on both (standing before), ${r.draftFailedAfter} passed on main and failed on the draft (the release's), ${r.draftFailedAlone} ran on the draft alone and failed (the release's too), and ${r.draftPassedAlone} ran on it alone and passed. ${r.draftGated} failed on the draft and were set apart by its builder as failing for being a draft, holding nothing: the record's pull request names each and why.`);
+export const draftSaid = r => (r.projects === 0 ? "" : `On the drafts of the sync in the owner's own projects, ${r.drafts} read of ${r.ownProjects} such projects found, ${r.draftsAnotherOwner} projects of another owner's with none and ${r.draftsStopped} with none for a stop switch: ${r.draftPassedBoth} checks passed on main and the draft, ${r.draftFixedAfter} failed on main and passed on it, ${r.draftFailedBoth} failed on both (standing before), ${r.draftFailedAfter} passed on main and failed on the draft (the release's), ${r.draftFailedAlone} ran on the draft alone and failed (the release's too), and ${r.draftPassedAlone} ran on it alone and passed. ${r.draftGated} failed on the draft and were set apart by its builder as failing for being a draft, holding nothing: the record's pull request names each and why. ${r.draftSkipped} were skipped on the draft, measuring nothing there and holding nothing.`);
 
 // Why the drafts hold the cut, or null: a check the release's, or one of the owner's own projects found with no draft
 // read and no stop switch.
