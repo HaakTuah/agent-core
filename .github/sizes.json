@@ -195,7 +195,7 @@
       "mark": 39601,
       "why": "Split by the reader each case tests in #852: its archive cases apart from the rest, and a project's own rules and share apart from the core's."
     },
-    "tests/hostile-configs-test.mjs": { "mark": 24643, "why": "Split by the reader each case tests in #852." },
+    "tests/hostile-configs-test.mjs": { "mark": 31351, "why": "Split by the reader each case tests in #852." },
     "tests/hostile-pr-changes-test.mjs": { "mark": 44725, "why": "Split by the reader each case tests in #852." },
     "tests/init-test.mjs": {
       "mark": 61827,
