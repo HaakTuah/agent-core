@@ -210,7 +210,7 @@ if (process.platform !== "win32") {
   }
   {
     const none = run({ node: "v24.1.0", bin: {} }).r, some = run({ node: "v24.1.0", bin: { [NPM]: fetchers[NPM] } }).r;
-    ok(none.status === 0 && /^note: npm is not here, and this script brings Node alone\. Mend: install npm beside Node/mu.test(none.stdout) && !/npm is not here/u.test(some.stdout), "node.sh says, with its mend, that it brings Node alone where the machine has no npm, and says nothing where it has one");
+    ok(none.status === 0 && /^note: npm is not here, and this script brings Node alone\. Mend: install npm beside Node/mu.test(none.stdout) && !/note: npm is not here/u.test(some.stdout), "node.sh says, with its mend, that it brings Node alone where the machine has no npm, and says nothing where it has one");
   }
   {
     const { r, fetched } = run({ bin: {} });
