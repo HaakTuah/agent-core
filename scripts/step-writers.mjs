@@ -210,7 +210,8 @@ export function writeBreaks(p, busy) {
 }
 
 // 16 November 2026: each path of a file the rules left (core/modules/, floor/topics.md) in the project's own files the
-// step reads, as the step's check finds it there, written as the file it now is; a copies config that reads the old
+// step reads, as the step's check finds it there, written as the file it now is, or as the folder it now leads to where
+// it stands alone (floor/topics.md, as the folder's pointing file says; leadsAlone); a copies config that reads the old
 // folder alone given the new folders' patterns beside it; the size marks' "read" (marksMoved); and the manifest's
 // "Paths:" line, where it is word for word the one the starter kit of releases 1 to 5 wrote, written as the kit writes
 // it now. Each path is written on its own (#1248, point 5): one whose move is no exact one (a
@@ -247,11 +248,24 @@ function movedIn(text, map, oldPath, part = []) {
   if (!oldPath) return text;
   const apart = moved.apart(), exact = old => !(apart[old]?.length);
   const led = Object.entries(apart).reduce((t, [old, parts]) => parts.reduce((u, a) => u.split(`\`core/${old}\`, "${a.lead}"`).join(`\`core/${a.to}\`, "${a.lead}"`), t), text);
-  const next = led.replace(oldPath, (all, old) => exact(old) ? `core/${map[old]}` : all);
+  const next = led.replace(oldPath, (all, old, at, whole) => exact(old) && (!map[old].endsWith("/") || leadsAlone(whole, at, all.length)) ? `core/${map[old]}` : all);
   if (next === text) return text;
   const was = text.split("\n"), now = next.split("\n");
   const twice = (l, i) => (now.indexOf(l) < i && !(was[i] === l && was.indexOf(l) < i)) || (was[i] !== l && part.includes(l.replace(/\r$/u, "")));
   return now.filter((l, i) => !(/^\s*(?:@|#\[\[file:)/u.test(l) && twice(l, i))).join("\n");
+}
+
+// Whether the old path at `at` in `text` is a pointer to the file alone, so that it leads to the folder the file moved to:
+// a code span `core/<old>` with no quoted title or numbered rule or point joined to it, as the pointers check joins them
+// (scripts/pointers.mjs, GLUE). A section or rule cited through it, a pull-in (`@`, `#[[file:`), an exclusion (`:!`) or a
+// permission's path would lead into no file or widen to the folder's every file, so each is left for the step's mend
+// (#1361, point 8). The size marks keep their own guard: a mark of a folder means nothing (marksMoved).
+const CITED = String.raw`(?:"[A-Z][^"]{1,60}"|“[A-Z][^”]{1,60}”|\b(?:rules?|points?) \d+(?:(?:, | and | to | or )\d+)*)`;
+const JOINED = String.raw`(?:\s*,\s*|,?\s+and\s+|,?\s+in\s+|\s+of\s+|\s*\(\s*|\s*,\s*in\s+)`;
+const citedBefore = new RegExp(`${CITED}${JOINED}$`, "u"), citedAfter = new RegExp(`^${JOINED}${CITED}`, "u");
+function leadsAlone(text, at, length) {
+  if (text[at - 1] !== "`" || text[at + length] !== "`") return false;
+  return !citedBefore.test(text.slice(Math.max(0, at - 201), at - 1)) && !citedAfter.test(text.slice(at + length + 1, at + length + 201));
 }
 
 // The size marks' text with each file under "read" at an old path that leads to one file named as that file, two that
