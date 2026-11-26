@@ -2,8 +2,9 @@
 // AGENTS.md, "The trial's machine fetches what a project pins"): the core's list read in its one form, and each case of
 // a fetch, on a stand-in curl that hands over an archive made here and a stand-in dotnet, so no call reaches the network:
 // a project that pins none, a pin the list holds no sum for, one fetched and checked by its sum, then present, a sum that
-// differs, a host that does not answer, a binary that gives another version, the machine's own SDK kept, a machine the
-// list holds none for, and a folder that would stand in the project. (Not on Windows, where no trial machine runs it.)
+// differs (never opened), a host that does not answer, a binary that gives another version, the machine's own SDK kept,
+// a machine the list holds none for, a folder that would stand in the project, and each dotnet run from the file
+// system's root, a global.json where it was started in chosen by none; and a hostile global.json, read bounded. (Not on Windows, where no trial machine runs it.)
 //
 //   node tests/toolchain-test.mjs
 import crypto from "node:crypto";
@@ -44,6 +45,23 @@ ok(pins.every(([text, want], i) => {
   return want === "wrong" ? typeof got?.wrong === "string" : JSON.stringify(got) === JSON.stringify(want);
 }), "the pin is the exact version global.json names, none where it names none or is not there, and not read where it is not JSON or names a band");
 
+// (a hostile global.json: a link out of the project, a folder, past 64 KB, nested past the bounded reader, a version
+// past 80 characters or with a part of seven digits; each said not read, none followed or parsed whole)
+const outside = write(path.join(root, "outside", "global.json"), JSON.stringify({ sdk: { version: V } }));
+const hostile = { link: dir => fs.symlinkSync(outside, path.join(dir, "global.json")), folder: dir => fs.mkdirSync(path.join(dir, "global.json")),
+  large: dir => write(path.join(dir, "global.json"), JSON.stringify({ sdk: { version: V }, pad: "x".repeat(70_000) })),
+  deep: dir => write(path.join(dir, "global.json"), `${"[".repeat(500)}${"]".repeat(500)}`),
+  long: dir => write(path.join(dir, "global.json"), JSON.stringify({ sdk: { version: `${V}-${"a".repeat(80)}` } })),
+  wide: dir => write(path.join(dir, "global.json"), JSON.stringify({ sdk: { version: "8.0.4040404" } })) };
+const read = Object.entries(hostile).filter(([kind]) => kind !== "link" || process.platform !== "win32").map(([kind, make]) => {
+  const dir = path.join(root, `hostile-${kind}`);
+  fs.mkdirSync(dir, { recursive: true });
+  make(dir);
+  return [kind, pinOf(dir)];
+});
+ok(read.every(([, got]) => typeof got?.wrong === "string"), "a global.json that links out of the project, is a folder, is past 64 KB, nests too deep or names a version past its bounds is not read",
+  JSON.stringify(read.filter(([, got]) => typeof got?.wrong !== "string")));
+
 if (process.platform === "win32") { console.log("skip the fetches on Windows, where no trial machine runs them"); done("the toolchain a release's trial fetches"); }
 else {
   // (an archive as the publisher gives one, a gzipped tar written here: a dotnet that says its version, and an SDK's
@@ -57,21 +75,26 @@ else {
     return [head, body, Buffer.alloc((512 - (body.length % 512)) % 512)];
   }), Buffer.alloc(1024)]);
   const archiveOf = (said, name) => {
-    const file = write(path.join(root, `${name}.tar.gz`), zlib.gzipSync(tarOf([["./dotnet", `#!/bin/sh\n[ "$1" = "--version" ] && echo ${said}\n`, 0o755], [`./sdk/${said}/dotnet.dll`, "stand-in", 0o644]])));
+    const file = write(path.join(root, `${name}.tar.gz`), zlib.gzipSync(tarOf([["./dotnet", `#!/bin/sh\npwd >> "${wd}"\n[ "$1" = "--version" ] && echo ${said}\n`, 0o755], [`./sdk/${said}/dotnet.dll`, "stand-in", 0o644]])));
     return { file, sum: crypto.createHash("sha512").update(fs.readFileSync(file)).digest("hex") };
   };
   // (each tool the script and the stand-ins need, found on the runner's PATH)
   const found = tool => process.env.PATH.split(path.delimiter).map(d => path.join(d, tool)).find(f => fs.existsSync(f));
+  // (each dotnet, the fetched one and the machine's own, writes where it runs to one log)
+  const wd = path.join(root, "pwd.log");
   const right = archiveOf(V, "right"), other = archiveOf("8.0.100", "other");
   // (a bin holding a stand-in curl, which logs its arguments and copies the archive to -o, or fails as a refused host;
-  // and, where asked, a stand-in dotnet of the machine's own that lists the pinned SDK)
+  // a tar that logs that it ran, then runs the runner's own; and, where asked, a stand-in dotnet of the machine's own that
+// lists the pinned SDK)
   const bin = (name, { give, fail, machine } = {}) => {
     const dir = path.join(root, `bin-${name}`);
     const log = path.join(dir, "curl.log");
     write(path.join(dir, "curl"), `#!/bin/sh\necho "$@" >> "${log}"\n${fail ? `echo "curl: (56) CONNECT tunnel failed, response 403" >&2\nexit 56\n` : `while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done\ncp "${give}" "$out"\n`}`, 0o755);
-    if (machine) write(path.join(dir, "dotnet"), `#!/bin/sh\n[ "$1" = "--list-sdks" ] && echo "${V} [/usr/lib/dotnet/sdk]"\n`, 0o755);
-    for (const tool of ["tar", "gzip", "sh", "cp"]) if (found(tool) && !fs.existsSync(path.join(dir, tool))) fs.symlinkSync(found(tool), path.join(dir, tool));
-    return { env: { ...process.env, PATH: dir }, log: () => (fs.existsSync(log) ? fs.readFileSync(log, "utf8") : null) };
+    const tarLog = path.join(dir, "tar.log");
+    write(path.join(dir, "tar"), `#!/bin/sh\necho tar >> "${tarLog}"\nexec "${found("tar")}" "$@"\n`, 0o755);
+    if (machine) write(path.join(dir, "dotnet"), `#!/bin/sh\npwd >> "${wd}"\n[ "$1" = "--list-sdks" ] && echo "${V} [/usr/lib/dotnet/sdk]"\n`, 0o755);
+    for (const tool of ["gzip", "sh", "cp"]) if (found(tool) && !fs.existsSync(path.join(dir, tool))) fs.symlinkSync(found(tool), path.join(dir, tool));
+    return { env: { ...process.env, PATH: dir }, log: () => (fs.existsSync(log) ? fs.readFileSync(log, "utf8") : null), untarred: () => fs.existsSync(tarLog) };
   };
   const project = (name, version = V) => { const dir = path.join(root, `project-${name}`); write(path.join(dir, "global.json"), JSON.stringify({ sdk: { version, rollForward: "disable" } })); return dir; };
   const home = name => path.join(root, `home-${name}`);
@@ -87,11 +110,16 @@ else {
   ok(/^NOT FETCHED: the \.NET SDK 8\.0\.404 for linux-x64 \(the core's list, SDKS in scripts\/toolchain\.mjs, holds no checksum for it\)\. Mend: .*--entry/u.test(said) && unlisted.log() === null,
     "a pin the list holds no sum for is never fetched, and its mend says how the entry is added", said);
 
+  // (started from a folder that holds a global.json of its own, as a project's root would)
+  const started = process.cwd(), planted = path.join(root, "planted");
+  write(path.join(planted, "global.json"), JSON.stringify({ sdk: { paths: ["./evil"], version: "8.0.100" } }));
+  process.chdir(planted);
   const fetched = bin("fetched", { give: right.file });
   const at = { project: project("fetched"), list: [{ ...good, sha512: right.sum }], home: home("fetched"), env: fetched.env, ...linux };
   const first = fetchPinned(at).join(), sdk = path.join(home("fetched"), ".agent-core", "toolchains", `dotnet-sdk-${V}-${RID}`);
   ok(/^toolchain: the \.NET SDK 8\.0\.404 fetched to .*export DOTNET_ROOT=/u.test(first) && fs.existsSync(path.join(sdk, "dotnet")) && fs.existsSync(path.join(sdk, "sdk", V, "dotnet.dll")),
     "a listed pin is fetched to its own folder under the home folder, outside the project, checked by its sum, with what to set for the trial's runs", first);
+  ok(/export DOTNET_ROOT='[^']+' PATH='[^']+':"\$PATH" DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1$/u.test(first), "the line to set quotes the folder and turns the SDK's telemetry and banner off", first);
   const curled = (fetched.log() ?? "").trim().split(" ");
   ok(curled.length === 10 && curled.slice(0, 8).join(" ") === "-fsS --proto =https --connect-timeout 30 --max-time 900 -o" && curled[9] === url(),
     "it fetches only the listed URL, over HTTPS alone", fetched.log());
@@ -102,6 +130,7 @@ else {
   const bad = fetchPinned({ project: project("differs"), list: [{ ...good, sha512: right.sum }], home: home("differs"), env: differs.env, ...linux }).join();
   ok(/^NOT FETCHED: .*SHA-512 is [0-9a-f]{128}, not the list's .*Mend: tell the owner/u.test(bad) && nothingIn("differs"),
     "a download whose sum differs from the list's is never opened, and nothing is installed", bad);
+  ok(!differs.untarred() && fetched.untarred(), "tar runs only once the sum matches", `differs ${differs.untarred()}, fetched ${fetched.untarred()}`);
 
   const refused = bin("refused", { fail: true });
   const host = fetchPinned({ project: project("refused"), list: [{ ...good, sha512: right.sum }], home: home("refused"), env: refused.env, ...linux }).join();
@@ -115,6 +144,9 @@ else {
   const machine = bin("machine", { give: right.file, machine: true });
   const kept = fetchPinned({ project: project("machine"), list: [{ ...good, sha512: right.sum }], home: home("machine"), env: machine.env, ...linux }).join();
   ok(/is the machine's own; nothing fetched/u.test(kept) && machine.log() === null, "where the machine's own dotnet lists the SDK, nothing is fetched", kept);
+  process.chdir(started);
+  const where = fs.readFileSync(wd, "utf8").trim().split("\n");
+  ok(where.length >= 3 && where.every(w => w === path.parse(planted).root), "every dotnet, the fetched one and the machine's own, runs from the file system's root, never where it was started, whose global.json chooses nothing", where.join(", "));
 
   const elsewhere = bin("elsewhere", { give: right.file });
   const mac = fetchPinned({ project: project("elsewhere"), list: [{ ...good, sha512: right.sum }], home: home("elsewhere"), env: elsewhere.env, platform: "darwin", arch: "arm64" }).join();

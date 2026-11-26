@@ -1,5 +1,6 @@
 {
   "rule": "roles/shared/how-to-work.md: No description left untrue",
-  "holder": "check: scripts/pointers.mjs, in part",
-  "behind": [16, 64]
+  "holder": ["check: scripts/pointers.mjs, in part", "check: scripts/pr-head.mjs, in part"],
+  "behind": [16, 64],
+  "number": "findings; outcome: readable"
 }

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // The toolchain a project pins, fetched for a release's trial at set-up (#1361, point 21; AGENTS.md, "The trial's machine
 // fetches what a project pins"), as scripts/node.sh fetches Node: one exact version, taken only where the list SDKS
-// below holds its checksum for this machine, and checked against it before anything of it runs. The one pin it reads is the .NET SDK a project's global.json names ("sdk": { "version" }), at that exact
-// version, which meets any "rollForward" the file sets. It goes to a folder of its own under the home folder, outside
+// below holds its checksum for this machine, and checked against it before anything of it runs. The one pin it reads
+// is the .NET SDK a project's global.json names ("sdk": { "version" }), at that exact version, which meets any
+// "rollForward" the file sets; every dotnet it runs runs from the file system's root, so no global.json of the
+// project's, or of the folder it was started in, chooses what runs. It goes to a folder of its own under the home folder, outside
 // every repository, never over the machine's own; the line it prints says what to set for the trial's runs. Where the
 // machine's own dotnet already lists that SDK, it fetches nothing. A version or a machine the list holds no sum for, a
 // host that does not answer, a sum that differs, or a binary that does not give its version, and nothing is installed:
@@ -20,10 +22,13 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { leadsOut, parseBounded } from "./guards.mjs";
 import { started } from "./started.mjs";
 
 export const HOST = "builds.dotnet.microsoft.com";
-const VERSION = /^\d+\.\d+\.\d{3,}(?:-[0-9A-Za-z.-]+)?$/u;
+// (an SDK's exact version, 80 characters at most; global.json read at 64 KB at most)
+const VERSION = /^(?=.{1,80}$)\d{1,4}\.\d{1,4}\.\d{3,6}(?:-[0-9A-Za-z.-]{1,64})?$/u;
+const MOST = 64 * 1024;
 const RIDS = { "linux-x64": ["linux", "x64"], "linux-arm64": ["linux", "arm64"] };
 const urlOf = (version, rid) => `https://${HOST}/dotnet/Sdk/${version}/dotnet-sdk-${version}-${rid}.tar.gz`;
 const notesOf = (channel) => `https://${HOST}/dotnet/release-metadata/${channel}/releases.json`;
@@ -66,16 +71,25 @@ export function readList(entries = SDKS) {
 // The .NET SDK the project pins: its exact version, null where it pins none, or { wrong } where global.json is not read.
 export function pinOf(project) {
   const file = path.join(project, "global.json");
-  if (!fs.existsSync(file)) return null;
+  const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+  if (!stat) return null;
+  if (leadsOut(project, file)) return { wrong: "its global.json leads out of the project" };
+  const real = fs.statSync(file, { throwIfNoEntry: false });
+  if (!real?.isFile()) return { wrong: "its global.json is not a plain file" };
+  if (real.size > MOST) return { wrong: `its global.json is past ${MOST} bytes` };
   let json;
-  try { json = JSON.parse(fs.readFileSync(file, "utf8").replace(/^﻿/u, "")); } catch { return { wrong: "its global.json is not JSON" }; }
+  try { json = parseBounded(fs.readFileSync(file, "utf8").replace(/^\uFEFF/u, "")); } catch { return { wrong: "its global.json is not JSON, or nests too deep" }; }
   const version = json?.sdk?.version;
   if (version === undefined) return null;
   return typeof version === "string" && VERSION.test(version) ? { version } : { wrong: `its global.json names ${JSON.stringify(version)}, not an SDK's exact version` };
 }
 
 const ridOf = (platform, arch) => Object.keys(RIDS).find(r => RIDS[r][0] === platform && RIDS[r][1] === arch) ?? null;
-const run = (cmd, args, env) => spawnSync(cmd, args, { encoding: "utf8", env, timeout: 900_000, maxBuffer: 256 * 1024 * 1024 });
+// (each run from the file system's root, where dotnet finds no global.json but one only its owner writes, and with the
+// SDK's telemetry and banner off)
+const QUIET = { DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_NOLOGO: "1" };
+const run = (cmd, args, env) => spawnSync(cmd, args, { encoding: "utf8", cwd: path.parse(process.cwd()).root, env: { ...env, ...QUIET }, timeout: 900_000, maxBuffer: 256 * 1024 * 1024 });
+const quoted = text => `'${text.replace(/'/gu, "'\\''")}'`;
 const sdkListed = (dotnet, version, env) => run(dotnet, ["--list-sdks"], env).stdout?.split(/\r?\n/u).some(l => l.split(" ")[0] === version) ?? false;
 
 const NOT_RUN = "Mend: none here; the job that needs it reads alike before and after the update, so it stops no cut.";
@@ -91,8 +105,7 @@ function placed({ project, home, env, platform, arch }) {
   const rid = ridOf(platform, arch);
   if (!rid) return { said: `NOT FETCHED: the .NET SDK ${version} (this machine, ${platform} on ${arch}, is none the list holds sums for: ${Object.keys(RIDS).join(", ")}). ${NOT_RUN}` };
   const root = path.resolve(home, ".agent-core", "toolchains", `dotnet-sdk-${version}-${rid}`);
-  const inside = path.relative(path.resolve(project), root);
-  if (!inside.startsWith("..") && !path.isAbsolute(inside)) return { said: `NOT FETCHED: the .NET SDK ${version} (its folder, ${root}, would stand inside the project). Mend: run this with a home folder outside the project.` };
+  if (!leadsOut(project, root)) return { said: `NOT FETCHED: the .NET SDK ${version} (its folder, ${root}, would stand inside the project). Mend: run this with a home folder outside the project.` };
   return { version, rid, root };
 }
 
@@ -124,7 +137,7 @@ export function fetchPinned({ project = process.cwd(), list = SDKS, home = os.ho
   const place = placed({ project, home, env, platform, arch });
   if (place.said) return [place.said];
   const { version, rid, root } = place;
-  const exported = `for the trial's runs: export DOTNET_ROOT=${root} PATH=${root}:$PATH`;
+  const exported = `for the trial's runs: export DOTNET_ROOT=${quoted(root)} PATH=${quoted(root)}:"$PATH" ${Object.entries(QUIET).map(([k, v]) => `${k}=${v}`).join(" ")}`;
   const dotnet = path.join(root, "dotnet");
   if (fs.existsSync(dotnet) && run(dotnet, ["--version"], env).stdout?.trim() === version) return [`toolchain: the .NET SDK ${version} present in ${root}; ${exported}`];
   let entries;

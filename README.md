@@ -250,8 +250,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`), or the cost
      line, or in its place "No cost line: the script printed none.", or, where it asks the part "What holds it", a
      line there "Number:" in its form, or, where it adds a line under the manifest's "Differences", the line "Reasons
-     read:"; the lines only of a pull request opened since the project's copy held them. A line passes where it begins
-     in its form, whatever follows: it fails what is missing, never phrasing (#750).
+     read:", or whose description names a "core archive N" the copy's archive does not hold or leaves a placeholder in (`TBD`,
+     `TODO`, `XXX`, `FIXME`, "to be added"; `pr-head.mjs`, #1136); the lines only of a pull request opened since the
+     project's copy held them. A line passes where it begins in its form, whatever follows: it fails what is missing,
+     never phrasing (#750).
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
      spent so far, where Claude Code's own record of it can be read, and nothing where it cannot. It keeps a tally of
      its own beside that record (ids, counts and the models' families), so the line does not drop where the record
