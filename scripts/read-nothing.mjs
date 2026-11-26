@@ -78,6 +78,8 @@ export function licenceUnread(tracked, root = ".", read = () => null) {
   return `the project's packages stand in ${list}, which the check does not read (it reads npm's lock files alone), so only the host's dependency review reads them, by its allow-list`;
 }
 
+// Whether the check reads some lock file of npm's there (then it reads part of the project, and no more is said of it).
+export const licenceReads = (tracked, root = ".") => { const copy = copyAmong(tracked, root); return tracked.some(f => LOCKFILE.test(f) && !f.split("/").includes("node_modules") && !(copy !== null && f.startsWith(copy))); };
 const licenceWhy = root => {
   const tracked = trackedIn(root), read = f => { try { return readFileSync(join(root, f), "utf8"); } catch { return null; } };
   return tracked === null ? null : licenceUnread(tracked, root, read);
@@ -95,7 +97,7 @@ export function readNothing(root, manifest, read) {
     .filter(([, why]) => why !== null).map(([script, why]) => ({ script, why }));
   if (!found.length) return [];
   const held = rulesHeldBy(manifest), copy = copyOf(root);
-  return found.map(f => ({ ...f, check: `${copy}${f.script}`, holds: held.get(f.script) ?? [], ...(f.script === "scripts/licences.mjs" ? { partial: true } : {}) })).filter(f => f.holds.length);
+  return found.map(f => ({ ...f, check: `${copy}${f.script}`, holds: held.get(f.script) ?? [], ...(f.script === "scripts/licences.mjs" && licenceReads(trackedIn(root) ?? [], root) ? { partial: true } : {}) })).filter(f => f.holds.length);
 }
 
 // The lines a report gives of them, or none where every such check read something; `found` is null where which read

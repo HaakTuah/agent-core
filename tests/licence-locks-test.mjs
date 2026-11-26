@@ -14,7 +14,7 @@ import { stoodAt, unnamedLocks } from "../scripts/licence-locks.mjs";
 import { check, coreConfig } from "../scripts/licences.mjs";
 import { asOutput, done, ok } from "../scripts/licence-scan-stage.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { licenceUnread } from "../scripts/read-nothing.mjs";
+import { licenceUnread, licenceReads } from "../scripts/read-nothing.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 const says = (list, f) => list.filter((m) => m.startsWith(`${f} is a lock file of npm's that the licence config's "lockfiles" does not name`));
@@ -136,6 +136,8 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
   const hostile = why("a\nb/yarn.lock", "x`y/yarn.lock", "c\u202e/yarn.lock") ?? "";
   ok(!/[\n\u202e`]/u.test(hostile.replace(/`[^`]*`/gu, "")) && !/[\n\u202e]/u.test(hostile) && hostile.includes("a\\nb/yarn.lock") && hostile.includes("\\u202e") && hostile.includes("x\\u0060y"),
   "a path with a line break, a backtick or a bidirectional character is written out, so it cannot leave its code span", JSON.stringify(hostile));
+  ok(licenceReads(["a/package-lock.json"]) && !licenceReads(["a/yarn.lock", "b/package.json"]) && !licenceReads(["node_modules/x/package-lock.json"]),
+  "the licence check's case is partial only where a lock file of npm's stands in the project");
 }
 
 done();
