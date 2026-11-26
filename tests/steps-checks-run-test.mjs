@@ -35,8 +35,9 @@ const dirs = { "an-npm-project": lockProject };
   const inline = said("      - run: STRENGTH_BASE=origin/main node core/scripts/strength.mjs\n");
   const exported = said("      - run: |\n          export STRENGTH_BASE=origin/${{ github.base_ref }}\n          node core/scripts/strength.mjs\n");
   const empty = said("      - run: STRENGTH_BASE= node core/scripts/strength.mjs\n");
+  const quoted = said("      - run: STRENGTH_BASE=\"\" node core/scripts/strength.mjs\n");
   const commented = said("      - run: |\n          # STRENGTH_BASE=origin/main\n          node core/scripts/strength.mjs\n");
-  ok(inline === null && exported === null && empty !== null && commented !== null, "a base set inline in the step's script counts as given, an empty one or one in a comment does not", `${inline}\n${exported}\n${empty}\n${commented}`);
+  ok(inline === null && exported === null && empty !== null && quoted !== null && commented !== null, "a base set inline in the step's script counts as given, an empty one or one in a comment does not", `${inline}\n${exported}\n${empty}\n${quoted}\n${commented}`);
   ok(comment !== null && bare !== null && runs === null, "a named mutation tool reads done only where a workflow on pull requests runs the strength check with its base, never where one only mentions it", `${comment}\n${bare}\n${runs}`);
   fs.writeFileSync(manifest, was); fs.rmSync(flow);
 }

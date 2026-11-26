@@ -33,7 +33,7 @@ const based = (...envs) => envs.some(e => typeof e?.STRENGTH_BASE === "string" &
 
 // (a base set in the step's own script, `STRENGTH_BASE=origin/main node …` or `export STRENGTH_BASE=…`, on a line that is
 // no comment, is as good as one under `env:`)
-const inlineBase = run => run.split(/\r?\n/u).some(line => !/^\s*#/u.test(line) && /(^|[\s;&|])STRENGTH_BASE=(?!["']?(\s|$|[;&|]))/u.test(line));
+const inlineBase = run => run.split(/\r?\n/u).some(line => !/^\s*#/u.test(line) && /(^|[\s;&|])STRENGTH_BASE=(?!""|''|["']?(\s|$|[;&|]))/u.test(line));
 
 function strengthRuns(p) {
   readable(p, text => text.includes("strength.mjs"));
