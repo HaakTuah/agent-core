@@ -134,6 +134,20 @@ ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks
   // (a rule of a module the manifest leaves out is not named among those a check holds there)
   ok(all?.holds.some(k => k.startsWith("tasks/repositories.md:")) && without && !without.holds.some(k => k.startsWith("tasks/repositories.md:")) && without.holds.length === all.holds.filter(k => !k.startsWith("tasks/repositories.md:")).length,
     "a rule of a module the manifest leaves out is not named among those a check that read nothing holds", JSON.stringify({ all, without }));
+  // (the licence check, which reads npm's lock files alone: packages in a package.json with no lock file, a yarn.lock or a
+  // pnpm-lock.yaml are read by the host's dependency review alone, #1351; a lock file of npm's above or beside a package.json holds it)
+  const licenceOf = () => readNothing(bare, withTool, readBare).find(n => n.script === "scripts/licences.mjs");
+  const put = (f, t) => { fs.mkdirSync(path.dirname(path.join(bare, f)), { recursive: true }); fs.writeFileSync(path.join(bare, f), t); execFileSync("git", ["add", "-A"], { cwd: bare }); };
+  const drop = f => { execFileSync("git", ["rm", "-q", "-f", "--", f], { cwd: bare }); };
+  const hadLicence = licenceOf();
+  put("pkg/package.json", "{}\n");
+  const bareJson = licenceOf(); put("pkg/package-lock.json", "{}\n");
+  const withLock = licenceOf(); put("web/package.json", "{}\n"); put("web/inner/package.json", "{}\n"); put("web/yarn.lock", "\n");
+  const yarn = licenceOf(); drop("web/yarn.lock"); put("web/pnpm-lock.yaml", "\n");
+  const pnpm = licenceOf();
+  ok(!hadLicence && /pkg\/package\.json/u.test(bareJson?.why ?? "") && bareJson.holds.length && bareJson.check === "core/scripts/licences.mjs" && !withLock
+    && /web\/yarn\.lock/u.test(yarn?.why ?? "") && !/web\/package\.json/u.test(yarn.why) && /web\/pnpm-lock\.yaml/u.test(pnpm?.why ?? ""),
+    "the licence check is said to read nothing where packages stand in a package.json with no lock file, a yarn.lock or a pnpm-lock.yaml, and not where npm's lock file holds them", JSON.stringify({ hadLicence, bareJson, withLock, yarn, pnpm }));
 }
 
 ok(!missedOwn.some(m => m.lead === "16 November 2026, an agent's own tools listed"), "the agent-tools step reads the config the project passes, not the word after a comment that names the licence script", report(missedOwn));
