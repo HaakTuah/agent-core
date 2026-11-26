@@ -138,7 +138,7 @@ try {
 {
   const dir = scratchDir("lookup-parent-test-");
   const g = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: dir, encoding: "utf8" }).trim();
-  const was = { log: console.log, error: console.error, event: process.env.GITHUB_EVENT_NAME, base: process.env.LOOKUP_BASE };
+  const was = { log: console.log, error: console.error, event: process.env.GITHUB_EVENT_NAME, base: process.env.LOOKUP_BASE, offline: process.env.CORE_OFFLINE };
   const named = (name) => { process.env.LOOKUP_BASE = name; return namedBase(dir); };
   const beside = async (name) => {
     const lines = [];
@@ -162,9 +162,13 @@ try {
     ok(named(first) === first && named("f".repeat(40)) === null, "a commit named is read where the checkout holds it, and not where it does not");
     const read = await beside("HEAD^1");
     ok(!read.failed && /stood so at the pull request's base: reported, never failed/u.test(read.out) && !/^FAIL/mu.test(read.out), `and beside the licence check it reads what stood at the base, reported, never failed (${read.out})`);
+    process.env.CORE_OFFLINE = "1";
+    const cut = await beside("HEAD^1");
+    delete process.env.CORE_OFFLINE;
+    ok(!cut.failed && /^ok {3}the lookup of the packages new to the project is left to its own step: this run's network is cut off/mu.test(cut.out) && !/looked up in the npm registry/u.test(cut.out), `where the run's network is cut off, the lookup beside the licence check is left to its own step, and said so (${cut.out})`);
     for (const other of ["HEAD^2", "HEAD~1", "--all", "main", "HEAD^1 "]) ok(named(other) === null, `a base named ${JSON.stringify(other)}, neither a commit nor HEAD^1, is not taken`);
   } finally {
-    for (const [k, v] of [["GITHUB_EVENT_NAME", was.event], ["LOOKUP_BASE", was.base]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    for (const [k, v] of [["GITHUB_EVENT_NAME", was.event], ["LOOKUP_BASE", was.base], ["CORE_OFFLINE", was.offline]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
     rmSync(dir, { recursive: true, force: true });
   }
 }

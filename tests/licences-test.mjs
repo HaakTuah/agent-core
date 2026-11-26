@@ -252,11 +252,6 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
     writeFileSync(join(dir, "x.txt"), "x"); git("add", "-A"); git("commit", "-q", "-m", "head");
     const named = await run(base);
     ok(!named.failed && /stood so at the pull request's base: reported, never failed/u.test(named.out) && !/^FAIL/mu.test(named.out), "on a checkout of the head, a range that stood at the base the job names is reported, never failed", named.out);
-    const offline = process.env.CORE_OFFLINE;
-    process.env.CORE_OFFLINE = "1";
-    const cut = await run(base);
-    if (offline === undefined) delete process.env.CORE_OFFLINE; else process.env.CORE_OFFLINE = offline;
-    ok(!cut.failed && /^ok {3}the lookup of the packages new to the project is left to its own step: this run's network is cut off/mu.test(cut.out) && !/looked up in the npm registry/u.test(cut.out), "where the run's network is cut off, the lookup is left to its own step, and said so", cut.out);
     const lacking = await run("f".repeat(40));
     const none = await run(undefined);
     ok(!none.failed && /no base to read it against: reported, never failed/u.test(none.out) && /^::warning::The lookup of the packages new to the project did not run/mu.test(none.out) && !/^FAIL/mu.test(none.out),
