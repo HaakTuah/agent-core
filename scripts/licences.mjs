@@ -531,8 +531,11 @@ const auditOf = (config) => (typeof config?.audit === "string" ? config.audit : 
 function shrinkwrapFaults(root, lockfiles) {
   const faults = [];
   for (const f of lockfiles) {
-    const other = posix.join(posix.dirname(f), posix.basename(f) === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json");
-    if (existsSync(join(root, other))) faults.push(`${f}: ${other} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`);
+    const dir = posix.dirname(f), want = posix.basename(f).toLowerCase() === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json";
+    let names = [];
+    try { names = readdirSync(join(root, dir)); } catch { /* (no folder, no file) */ }
+    // (whatever the case of its name: npm on a file system that ignores case installs from `NPM-SHRINKWRAP.JSON` too)
+    for (const n of names.filter((x) => x.toLowerCase() === want)) faults.push(`${f}: ${posix.join(dir, n)} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`);
   }
   return faults;
 }

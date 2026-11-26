@@ -58,7 +58,7 @@ const ASSET = new RegExp(
 const PROSE_FILE = /\.(md|markdown|txt|rst|adoc)$/iu;
 const NOTICE = /\/\*!|@license|SPDX-License-Identifier|Copyright\s+(\(c\)|©|\d{4})|Permission is hereby granted|Licensed under the/iu;
 const EXACT = /^((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*)@(\d+\.\d+\.\d+)$/iu;
-export const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
+export const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/iu;
 /** A tracked file's text, a link's that of the file it leads to, read as the link's own, where that lies inside the
  *  project; a link that leads out of it, or nowhere, is not read and fails, since what it holds cannot be audited. */
 function trackedText(root, f, fail) {
