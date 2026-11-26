@@ -87,10 +87,6 @@
       "mark": 32769,
       "why": "#958: the tests of cutting a release (release.mjs) apart from those of what a project follows (releases.mjs)."
     },
-    "tests/pruning-test.mjs": {
-      "mark": 23922,
-      "why": "#895: its section on the rules with no holder moves to a test of its own."
-    },
     "choices/010-the-core-s-foundations-judged-again-as-if.md": {
       "mark": 29908,
       "why": "#870: a choice record is one argued text, its criteria, long list and judgments read together; the foundations record was split from CHOICES.md, whole as it stood, and is read when the core's foundations are judged again."

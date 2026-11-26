@@ -439,6 +439,9 @@ jobs:
       - name: The rules' pruning, when it is due and what it lists
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pruning-test.mjs ')) }}
         run: node tests/pruning-test.mjs
+      - name: The pruning's list of rules with no holder
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pruning-unheld-test.mjs ')) }}
+        run: node tests/pruning-unheld-test.mjs
       - name: The choice records
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-test.mjs ')) }}
         run: node tests/choices-test.mjs
