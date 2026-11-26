@@ -3,6 +3,10 @@
 // the calls to git and gh are the program's own and are not made here, save that it refuses a day that is none.
 //
 //   node tests/fixes-test.mjs
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { mended } from "../scripts/mend.mjs";
+import { scratchHistory } from "../scripts/scratch-shallow.mjs";
 import { changedLines, fixedBy, fixesOf, NO_DAY, parentsOf, scriptOf, sinceOf } from "../scripts/fixes.mjs";
 
 let failed = 0, count = 0;
@@ -37,6 +41,15 @@ ok(sinceOf(["--since", "2026-11-01"]) === "2026-11-01" && sinceOf(["x", "--since
 ok(sinceOf(["--since", "soon"]) === null && sinceOf(["--since"]) === null && sinceOf([]) === null && sinceOf(["2026-11-01"]) === null && sinceOf(["--since", "2026-11-01\nx"]) === null,
   "a day that is none, none given, or a day without the word that asks it is refused");
 ok(/^--since takes a day/.test(NO_DAY), "and the refusal says what it takes");
+
+// A shallow clone holds no fix older than its boundary: the lister refuses it, with the mend, before it counts a part as the whole (#1422).
+{
+  const steps = ["2026-11-01", "2026-11-05", "2026-11-10", "2026-11-15"].map((day, i) => ({ day, subject: `Change ${i + 1} (#${i + 1})`, files: { "scripts/a.mjs": `export const n = ${i};\n` } }));
+  const h = scratchHistory("fixes-shallow-", steps), cut = h.clone("cut", "--depth", "2");
+  const run = (cwd, since) => spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/fixes.mjs", import.meta.url)), "--since", since], { cwd, encoding: "utf8", env: { ...process.env, GITHUB_REPOSITORY: "o/r" } });
+  const early = run(cut, "2026-11-02"), out = `${early.stdout}${early.stderr}`;
+  ok(early.status === 1 && /shallow/.test(out) && /--since 2026-11-02 reaches before it/.test(out) && /git fetch --unshallow/.test(out) && mended(out), "in a shallow clone a day before its boundary is refused: it says the clone could not hold the span, and its mend", out);
+}
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

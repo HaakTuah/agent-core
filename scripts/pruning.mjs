@@ -45,7 +45,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { git, holdersAt, joinedIn, stepsAt, counts } from "./pruning-read.mjs";
+import { git, holdersAt, joinedCounter, joinedIn, stepsAt, counts } from "./pruning-read.mjs";
 import { checksOf, list, readUnheld, stepsOf, without } from "./pruning-list.mjs";
 import { EVERY, RECORD, due, open, ordered, readRecord, writeRecord } from "./pruning-record.mjs";
 import { ROOT, rules } from "./rules.mjs";
@@ -131,7 +131,10 @@ async function main(argv) {
   // (the core's AGENTS.md, which every builder here reads at its start, with the floor and the modules)
   const all = rules(ROOT, { agents: true }), h = await holdersAt(ROOT), starts = new Set([...all.filter(r => r.file === "AGENTS.md").map(r => r.key), ...[...startRules(all).values()].flatMap(x => [...x])]);
   const { counts: heldCounts, holders } = await import("./holders.mjs");
-  console.log(list({ all, named: h.holders ?? {}, numbers: h.numbers ?? {}, record: readRecord(), cases: CASES, steps: await stepsAt(ROOT), starts, toolStarts: new Set(all.filter(r => r.file.startsWith("tools/")).map(r => r.key)), joined: r => joinedIn(r), none: heldCounts(holders()).none, ...readUnheld() }).join("\n"));
+  const counter = joinedCounter(), lines = list({ all, named: h.holders ?? {}, numbers: h.numbers ?? {}, record: readRecord(), cases: CASES, steps: await stepsAt(ROOT), starts, toolStarts: new Set(all.filter(r => r.file.startsWith("tools/")).map(r => r.key)), joined: counter.joined, none: heldCounts(holders()).none, ...readUnheld() });
+  // (a count refused for a shallow clone is no "too early" and no unread rule: the list is not printed, and the failure says why)
+  if (counter.gap()) return fail(`the list could not be made: ${counter.gap()}`);
+  console.log(lines.join("\n"));
 }
 
 if (started(import.meta.url)) await main(process.argv.slice(2));
