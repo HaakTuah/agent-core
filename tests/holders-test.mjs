@@ -183,6 +183,18 @@ ok([...[0, 1, 2].map(i => `"tasks/x.md: Its own item", item ${i} `), "core archi
   ok([...seen.values()].every(k => k.length === 1), "no two rules of the core share the file name their entry would stand in", [...seen.values()].filter(k => k.length > 1).join("\n"));
 }
 
+// ---- an entry and a rule file are read only as regular files of the checkout's own, to a bound (core-path.mjs's regularText) ----
+{
+  const dir = project({ "tasks/x.md: Numbered": "describes" }, { "tasks/y.md": `# Y\n\n- **A rule** (core archive 1).\n${" ".repeat(1 << 20)}\n` }), at = f => path.join(dir, "scripts", "holders", f);
+  fs.writeFileSync(at("big.json"), `${JSON.stringify({ rule: "tasks/x.md: Its own item", holder: "audit" })}${" ".repeat(1 << 20)}`);
+  let linked = true;
+  try { fs.writeFileSync(path.join(tmp, "outside.json"), JSON.stringify({ rule: "tasks/x.md: A last item", holder: "audit" })); fs.symlinkSync(path.join(tmp, "outside.json"), at(entryFile("tasks/x.md: A last item"))); } catch { linked = false; }
+  const faults = named(dir).faults, wrong = holders(dir, []).wrong;
+  ok(faults.some(f => f.includes("big.json cannot be read") && /Mend: /.test(f)), "an entry past the bound is unread, and fails with its mend", faults.join("\n"));
+  ok(!linked || faults.some(f => f.includes(`${entryFile("tasks/x.md: A last item")} cannot be read`) && /Mend: /.test(f)), "a tracked link in an entry's place is refused, with its mend", faults.join("\n"));
+  ok(!wrong.some(w => w.includes("tasks/y.md:3 points to the archive")) && wrong.some(w => w.startsWith("tasks/y.md is no regular file") && /Mend: /.test(w)), "a rule file past the bound is unread, and fails with its mend", wrong.join("\n"));
+}
+
 // ---- the list's form, its schema's (#530) ----
 const formOf = j => shapeFaults("holders", j, "", "scripts/holders");
 const shapes = [null, [], { holders: [] }, { behind: "a" }, { numbers: 3 }, { holders: { a: 5 } }, { holders: { a: "" } }, { holders: { a: ["audit", ""] } }, { holders: { a: [4] } },

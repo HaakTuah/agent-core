@@ -112,6 +112,17 @@ fails("a difference from the floor", "names the floor or the review guidelines",
 fails("a difference from the review guidelines, under a heading spelt otherwise", "names the floor or the review guidelines", { "core-manifest.md": MANIFEST(B, "\n### DIFFERENCES\n- the Review Guidelines: none here.\n") });
 passes("a difference from a module", { "core-manifest.md": MANIFEST(B, "\n## Differences\n- `core/tasks/roles.md`, \"The builders\": Codex alone builds here, since no other tool is set up.\n") });
 passes("a heading inside a fenced block, and the floor named outside the section", { "core-manifest.md": MANIFEST(B, "\n## Differences\n- `core/tasks/roles.md`, \"The builders\": none.\n\n## Notes\nThe floor holds whole.\n\n```\n# Differences\nthe floor\n```\n") });
+// (the manifest is read only as a regular file of the checkout's own within a mebibyte, a link to one there too)
+let canLink = true;
+try { fs.symlinkSync("nowhere", path.join(tmp, "probe")); } catch { canLink = false; }
+const linked = to => dir => { const at = path.join(dir, "core-manifest.md"), text = fs.readFileSync(at, "utf8"), target = to(dir); write(path.dirname(target), path.basename(target), text); fs.rmSync(at); fs.symlinkSync(path.relative(dir, target), at); };
+if (canLink) {
+  passes("a manifest that is a tracked link to a file of the project's own", {}, { then: linked(dir => path.join(dir, "docs/manifest.md")) });
+  fails("a manifest that is a tracked link leading out of the checkout", "core-manifest.md is no regular file of this repository's own", {}, { then: linked(dir => path.join(tmp, `outside-${path.basename(dir)}.md`)) });
+}
+fails("a manifest past the bound", "core-manifest.md is no regular file of this repository's own", { "core-manifest.md": `${MANIFEST()}\n${"x".repeat(1 << 20)}\n` });
+if (canLink && process.platform !== "win32") fails("a manifest that is a tracked link to a device", "core-manifest.md is no regular file of this repository's own", {}, { then: dir => { fs.rmSync(path.join(dir, "core-manifest.md")); fs.symlinkSync("/dev/zero", path.join(dir, "core-manifest.md")); } });
+fails("no manifest", "has no core-manifest.md", {}, { then: dir => fs.rmSync(path.join(dir, "core-manifest.md")) });
 fails("a manifest without its pin line", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^Core: .*\n/m, "") });
 fails("a manifest with two", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^(Core: .*\n)/m, "$1$1") });
 fails("a manifest without the owner's account, an organisation's account holding the repository", "owner's account", { "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") });

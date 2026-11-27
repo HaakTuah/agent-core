@@ -6,8 +6,9 @@
 //   node tests/queue-test.mjs
 import fs from "node:fs";
 import path from "node:path";
+import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { LARGEST, cleared, closedAt, command, fileAt, linesOf, read, statesOf, unplaced } from "../scripts/queue.mjs";
+import { LARGEST, cleared, closedAt, command, fileAt, linesOf, placed, read, statesOf, unplaced } from "../scripts/queue.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -149,6 +150,23 @@ try {
   ok(mended(unplaced(true, "inside.md")) && mended(unplaced(true, "docs/PROGRESS.md")) && unplaced(true, "plain.md") === null, "a progress file reached through a link inside the project, to a protected file or through a linked folder, is refused (the fallback reviewer's second check of #757's fixes)");
   ok(mended(core) && /make QUEUE\.md a plain file/u.test(core) && !/manifest/u.test(core) && mended(project) && /manifest/u.test(project), "a queue reached through a link fails, its mend in the core naming QUEUE.md and in a project the manifest's row (the fallback reviewer's finding on #757's fixes)", core);
 } finally { process.chdir(here); fs.rmSync(scratch, { recursive: true, force: true }); }
+
+// a project's manifest is read by the shared reader (core-path.mjs's manifestText): past its bound it is unread, and the
+// progress file is then the starter kit's, as with no row
+{
+  const dir = scratchDir("queue-test-manifest-"), away = scratchDir("queue-test-away-"), was = process.cwd(), repo = process.env.GITHUB_REPOSITORY;
+  try {
+    process.chdir(dir); process.env.GITHUB_REPOSITORY = "someone/project";
+    const row = `Core: ${CORE} at ${"a".repeat(40)}, copied whole under core/\n\n| *progress file* | \`SECURITY.md\` |\n`;
+    const at = text => { fs.writeFileSync("core-manifest.md", text); return placed("core/"); };
+    const read = at(row), past = at(`${row}${" ".repeat(1 << 20)}\n`);
+    ok(/the progress file core-manifest\.md names is no plain Markdown file/u.test(read.fail ?? "") && past.file === "docs/PROGRESS.md", "a manifest past the bound is unread, its progress file then the starter kit's", JSON.stringify({ read, past }));
+    fs.writeFileSync(path.join(away, "core-manifest.md"), row); fs.rmSync("core-manifest.md");
+    let linked = null;
+    try { fs.symlinkSync(path.join(away, "core-manifest.md"), "core-manifest.md"); linked = placed("core/"); } catch { /* (no links here: nothing to prove) */ }
+    ok(linked === null || linked.file === "docs/PROGRESS.md", "a manifest reached through a link that leads out of the project is unread, its progress file then the starter kit's", JSON.stringify(linked));
+  } finally { process.chdir(was); if (repo === undefined) delete process.env.GITHUB_REPOSITORY; else process.env.GITHUB_REPOSITORY = repo; fs.rmSync(dir, { recursive: true, force: true }); fs.rmSync(away, { recursive: true, force: true }); }
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the queue's reader`);
 process.exit(failed ? 1 : 0);
