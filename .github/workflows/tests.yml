@@ -414,9 +414,12 @@ jobs:
       - name: What a push waits on, against its mark
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/wait-test.mjs ')) }}
         run: node tests/wait-test.mjs
-      - name: The merge line read from the host, its measure and the runs it cancels
+      - name: The merge line read from the host and the runs it cancels
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/merge-line-test.mjs ')) }}
         run: node tests/merge-line-test.mjs
+      - name: The merge line's measure
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/merge-line-measure-test.mjs ')) }}
+        run: node tests/merge-line-measure-test.mjs
       - name: Where a project's tests run and who pays, read from its workflows and its host
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/runners-test.mjs ')) }}
         run: node tests/runners-test.mjs
