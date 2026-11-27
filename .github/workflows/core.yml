@@ -100,7 +100,18 @@ jobs:
           if [ -n "$DEFAULT" ] && [ "$DEFAULT" != main ]; then
             echo "FAIL The default branch here is $DEFAULT, and the core's hooks read their scripts from main, so here they stop nothing. Mend: rename the default branch to main."; exit 1
           fi
+      - name: The manifest is a file of the checkout's own
+        timeout-minutes: 1
+        run: |
+          set -euo pipefail
+          # (the steps below read it whole, so it is read only where it is a regular file inside the checkout, a link to
+          # one there too, as the scripts' manifestText follows one: anything else would hold a runner, or read beyond it)
+          real=$(realpath -e -- core-manifest.md 2>/dev/null || true) here=$(realpath -e -- .)
+          if [ ! -f core-manifest.md ] || [[ "$real" != "$here"/* ]] || [ "$(stat -L -c %s -- core-manifest.md)" -gt 1048576 ]; then
+            echo "FAIL core-manifest.md is no regular file of this repository's own within a mebibyte (missing, a folder, a device, or a link that leads out of the checkout). Mend: write the manifest as a plain file at the repository's root, as the sync writes it, in place of anything else there."; exit 1
+          fi
       - name: The manifest's differences name no floor rule and not the review guidelines
+        timeout-minutes: 1
         run: |
           set -euo pipefail
           # (README, "How a project takes the core", point 7: a project differs from a module's rule alone. A tripwire

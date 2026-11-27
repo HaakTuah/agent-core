@@ -194,6 +194,25 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
+// the project's files the check reads: each a regular file of its own, read to a bound (core-path.mjs's regularText)
+{
+  const dir = scratchDir("licences-test-bound-");
+  const big = (text, past) => `${text}${"x".repeat(past)}\n`;
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: dir, stdio: "ignore" });
+    writeFileSync(join(dir, ".npmrc"), big("ignore-scripts=true\nmin-release-age=7\n#", 1 << 20));
+    writeFileSync(join(dir, "audit.json"), '{ "entries": [] }\n');
+    writeFileSync(join(dir, "NOTICES.txt"), big("", 1 << 24));
+    const r = check({ ships: [], lockfiles: [], ignoreScriptsIn: [".npmrc"], audit: "audit.json", notices: "NOTICES.txt" }, dir, null, null);
+    ok(r.failures.some((m) => m.includes(".npmrc does not set ignore-scripts=true") && m.includes("Mend:")), "an npm config file past the bound is unread, and fails with its mend", JSON.stringify(r.failures));
+    ok(r.failures.some((m) => m.includes('"notices", NOTICES.txt, names no file it reads') && m.includes("Mend:")), "a notices file past the bound is unread, and fails with its mend", JSON.stringify(r.failures));
+    writeFileSync(join(dir, "audit.json"), `{ "entries": [] }${" ".repeat(1 << 24)}\n`);
+    let thrown = "";
+    try { check({ ships: [], lockfiles: [], audit: "audit.json" }, dir, null, null); } catch (e) { thrown = e.message; }
+    ok(thrown.includes("audit.json cannot be read as JSON") && thrown.includes("Mend:"), "an audit past the bound is unread, and fails with its mend", thrown);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
 // the config's form (#530): its schema, read by ajv, and the check's own checks of it, which read it where ajv is not
 // installed (a copy of the scripts with no packages), refuse the same configs, each with its mend, and pass the same
 {

@@ -93,6 +93,14 @@ for (const [what, files, opts] of [
   ["a pull request with no base to read it against", { "README.md": "# More\n" }, { base: false }],
 ]) { const r = restores(what, files, opts); if (what !== "a pull request with no base to read it against") ok(r.out.includes("Changed:"), `${what}: named by the first look`, r.out); }
 
+// the config is read only as a file of the project's own: a tracked link in its place is refused, with its mend
+let canLink = true;
+try { fs.symlinkSync("nowhere", path.join(tmp, "probe")); } catch { canLink = false; }
+if (canLink) {
+  const r = gate(dir => { const at = path.join(dir, "checks/licences.json"); fs.writeFileSync(path.join(dir, "checks/real.json"), fs.readFileSync(at)); fs.rmSync(at); fs.symlinkSync("real.json", at); });
+  ok(r.run === undefined && r.out.includes("checks/licences.json, the licence check's config, is no file of the project's own") && mended(r.out), "a tracked link in the config's place is refused, with its mend", r.out);
+}
+
 // the second look, NuGet's own word, where no file the first names changed
 if (!sdk) console.log("skip NuGet's own word: no .NET SDK here");
 else {

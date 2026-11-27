@@ -88,13 +88,13 @@
 // --advisory it says what it would fail and passes, for a project where the check itself is at fault, while that is
 // mended.
 import { execFileSync } from "node:child_process";
-import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { asText, leadsOut, oneLine, parseBounded } from "./guards.mjs";
 import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
-import { copyAside, projectAt } from "./core-path.mjs";
+import { copyAside, projectAt, regularText } from "./core-path.mjs";
 import { guard } from "./mend.mjs";
 
 const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
@@ -366,14 +366,14 @@ export function projectFilesByContent(root, own) {
     try {
       const at = join(root, f);
       if (leadsOut(root, at)) continue; // (a link that leads out of the project: no file of its own, never opened)
-      const st = statSync(at);
-      if (!st.isFile() || st.size === 0) continue;
-      fd = openSync(at, "r");
+      fd = openSync(at, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
+      const st = fstatSync(fd);
+      if (!st.isFile() || st.size === 0 || st.size > BOUND) continue;
       const head = Buffer.alloc(Math.min(st.size, 4096));
       readSync(fd, head, 0, head.length, 0);
       const start = markedText(head).replace(/^[ \t\r\n\uFEFF]+/u, "");
       if (start === "" ? st.size <= head.length : !start.startsWith("<")) continue;
-      if (projectRooted(markedText(readFileSync(at)))) out.push(f);
+      if (projectRooted(markedText(readFileSync(fd)))) out.push(f);
     } catch { /* (a file that cannot be read is no project) */ } finally { if (fd !== null) closeSync(fd); }
   }
   return out;
@@ -382,9 +382,18 @@ export function projectFilesByContent(root, own) {
 // never read: a device can be endless, a pipe never ends, and a file outside the project is none of its own (#446)
 export const NOT_A_FILE = Symbol("not a file");
 export const NOT_A_FILE_IS = "no file of bytes of the project's own (a link that leads out of the project, or to a device, a folder or a pipe)";
-/** The bytes of the project's file at `f`, NOT_A_FILE where it leads to none, or null where it is not there. */
+// The most a file is read to here: a lock file or a package's manifest past it is none this check reads.
+const BOUND = 1 << 24;
+/** The bytes of the project's file at `f`, NOT_A_FILE where it leads to none or is past BOUND, or null where it is not
+ *  there: read through the one descriptor that was checked, opened without waiting (a pipe stops nothing). */
 export function readProject(root, f) {
-  try { if (leadsOut(root, join(root, f)) || !statSync(join(root, f)).isFile()) return NOT_A_FILE; return readFileSync(join(root, f)); } catch { return null; }
+  let fd;
+  try {
+    if (leadsOut(root, join(root, f))) return NOT_A_FILE;
+    fd = openSync(join(root, f), constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
+    const st = fstatSync(fd);
+    return st.isFile() && st.size <= BOUND ? readFileSync(fd) : NOT_A_FILE;
+  } catch { return existsSync(join(root, f)) ? NOT_A_FILE : null; } finally { if (fd !== undefined) closeSync(fd); }
 }
 export function importsOf(own, read, roots = []) {
   const byName = new Map(), files = new Map(), brought = new Map(), unread = [], typed = [], unreadable = new Map();
@@ -973,7 +982,7 @@ function auditEntries(config, root) {
   if (config.audit) {
     const bytes = readProject(root, config.audit);
     if (bytes === NOT_A_FILE) throw new Error(`${config.audit} is ${NOT_A_FILE_IS}. Mend: make it a file of the project's own`);
-    try { entries = parseBounded(bytes === null ? readFileSync(join(root, config.audit), "utf8") : bytes.toString("utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
+    try { entries = parseBounded(bytes === null ? "" : bytes.toString("utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
     if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list. Mend: write it as { "entries": [...] }`);
   }
   return entries;
@@ -989,7 +998,9 @@ function judge(c, k, p) {
   if (c.fetched && (!packagesDir || !existsSync(manifest))) { c.used.add(k); c.read.add(k); return; }
   if (!packagesDir || !existsSync(manifest)) { failures.push(`${name} (${where}): its manifest is not in the restore's folder, so its licence cannot be read. Mend: restore from the lock files first (dotnet restore --locked-mode), then run the check`); return; }
   takenFaults(c, name, where, manifest);
-  const licence = manifestLicence(readFileSync(manifest, "utf8"));
+  const text = regularText(manifest, { bound: BOUND });
+  if (text === null) { failures.push(`${name} (${where}): its manifest in the restore's folder is no file of bytes, or is past ${BOUND} bytes, so its licence cannot be read. Mend: restore from the lock files again (dotnet restore --locked-mode) into an empty folder`); return; }
+  const licence = manifestLicence(text);
   const entry = c.audited.get(k), a = c.yes.get(k);
   // (the lists hold a package as a package: a name the config gives data or a font, for npm's, widens nothing here)
   const allowed = c.allowedFor(p.id, p.shipped, null);
@@ -1006,7 +1017,7 @@ function judge(c, k, p) {
 // (where NuGet took it from, by NuGet's own record of this restore: nothing a project file says is read for it)
 function takenFaults(c, name, where, manifest) {
   let taken;
-  try { taken = JSON.parse(readFileSync(join(dirname(manifest), TAKEN), "utf8"))?.source; } catch { /* (no record) */ }
+  try { taken = JSON.parse(regularText(join(dirname(manifest), TAKEN)) ?? "")?.source; } catch { /* (no record) */ }
   if (typeof taken !== "string" || !taken) c.failures.push(`${name} (${where}): the restore left no record of where it took it from (${TAKEN}), so its source cannot be read. Mend: restore again from the lock files (dotnet restore --locked-mode) into an empty folder`);
   else if (!takenFromGiven(c, taken)) c.failures.push(`${name} (${where}): the restore took it from ${taken}, which is neither NuGet's own registry nor a source the config's "nuget.sources" names (floor rule 7). Mend: take the package from NuGet's registry, or name its source in "nuget.sources" where the project keeps it`);
 }

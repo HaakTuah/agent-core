@@ -21,7 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { copyOf, readCore } from "./core-path.mjs";
+import { copyOf, manifestText, readCore } from "./core-path.mjs";
 import { progressOf } from "./done-when.mjs";
 import { aRepository, inProject, parseBounded } from "./guards.mjs";
 import { formFails } from "./queue-form.mjs";
@@ -231,7 +231,7 @@ export function unplaced(copy, file) {
 
 // Where the command runs: { copy, file, repo } or { fail }, the failure with its mend.
 function placed() {
-  const copy = inCopy(), manifest = copy && fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null;
+  const copy = inCopy(), manifest = copy ? manifestText("core-manifest.md") : null;
   // (never inside the copy, nor inside the library that carries it, whose files are its own repository's)
   const file = copy ? fileAt(manifest ?? "", ownRules(), readCore(manifest ?? "").library ?? copy) : FILE, fail = unplaced(copy, file);
   if (fail) return { fail };

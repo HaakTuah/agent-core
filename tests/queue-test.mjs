@@ -4,8 +4,10 @@
 // and the form: queue-form-test.mjs). Node's own modules only; GitHub and the file stand in as functions.
 //
 //   node tests/queue-test.mjs
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { LARGEST, cleared, closedAt, command, fileAt, linesOf, read, statesOf, unplaced } from "../scripts/queue.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -149,6 +151,19 @@ try {
   ok(mended(unplaced(true, "inside.md")) && mended(unplaced(true, "docs/PROGRESS.md")) && unplaced(true, "plain.md") === null, "a progress file reached through a link inside the project, to a protected file or through a linked folder, is refused (the fallback reviewer's second check of #757's fixes)");
   ok(mended(core) && /make QUEUE\.md a plain file/u.test(core) && !/manifest/u.test(core) && mended(project) && /manifest/u.test(project), "a queue reached through a link fails, its mend in the core naming QUEUE.md and in a project the manifest's row (the fallback reviewer's finding on #757's fixes)", core);
 } finally { process.chdir(here); fs.rmSync(scratch, { recursive: true, force: true }); }
+
+// a project's manifest is read by the shared reader (core-path.mjs's manifestText): past its bound it is unread, and the
+// progress file is then the starter kit's, as with no row
+{
+  const dir = scratchDir("queue-test-manifest-");
+  try {
+    fs.cpSync(fileURLToPath(new URL("../scripts", import.meta.url)), path.join(dir, "core", "scripts"), { recursive: true });
+    const row = `Core: HaakTuah/agent-core at ${"a".repeat(40)}, copied whole under core/\n\n| *progress file* | \`SECURITY.md\` |\n`;
+    const run = text => { fs.writeFileSync(path.join(dir, "core-manifest.md"), text); const r = spawnSync(process.execPath, ["core/scripts/queue.mjs", "--check"], { cwd: dir, encoding: "utf8", env: { ...process.env, GITHUB_REPOSITORY: "someone/project" } }); return `${r.stdout}${r.stderr}`; };
+    const read = run(row), past = run(`${row}${" ".repeat(1 << 20)}\n`);
+    ok(/the progress file core-manifest\.md names is no plain Markdown file/u.test(read) && /docs\/PROGRESS\.md is not here/u.test(past) && mended(past), "a manifest past the bound is unread, its progress file then the starter kit's", `${read}\n${past}`);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the queue's reader`);
 process.exit(failed ? 1 : 0);

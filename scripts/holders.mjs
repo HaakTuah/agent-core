@@ -39,7 +39,8 @@ import { FILE, HOOKS, counts, hook, holderOf } from "./holder-form.mjs";
 import { OWN, ownHolders, ownMain, ownReport, writeOwn } from "./holders-own.mjs";
 import { NUMBER } from "./outcomes.mjs";
 import { didNotRun, installed } from "./packages.mjs";
-import { HERE } from "./reading.mjs";
+import { HERE, real } from "./reading.mjs";
+import { regularText } from "./core-path.mjs";
 import { FOLDERS, ROOT, ownFile, rules } from "./rules.mjs";
 import { shapeFaults } from "./schemas.mjs";
 import { CASES } from "./staged.mjs";
@@ -71,11 +72,15 @@ export function named(root) {
   return { json, named: json.holders, behind: json.behind, numbers: json.numbers, faults };
 }
 
+// The text of the file at `rel` under `root`, where it and each folder on its way is a real one of the checkout's
+// (reading.mjs's real), read to at most a mebibyte (core-path.mjs's regularText); else null.
+const own = (root, rel) => real(root, rel) === "file" ? regularText(path.join(root, rel), { linked: false }) : null;
+
 // The entry the file `f` of FILE/ holds, or the line of why it is none, with its mend.
 function entryOf(dir, f) {
   if (!f.endsWith(".json")) return { fault: `${FILE}/${f} is no entry, which is a file of JSON. Mend: move it out of ${FILE}/, or write the rule's entry in a file named ${f.replace(/\.[^.]*$/u, "")}.json` };
   let e;
-  try { e = parseBounded(fs.readFileSync(path.join(dir, f), "utf8")); }
+  try { const text = own(dir, f); if (text === null) throw new Error("no regular file of the checkout's own, within a mebibyte"); e = parseBounded(text); }
   catch (x) { return { fault: `${FILE}/${f} cannot be read (${String(x.message).split("\n")[0]}). Mend: write it as JSON, an object with the rule's "rule" and its "holder", "behind" and "number"` }; }
   if (e === null || typeof e !== "object" || Array.isArray(e) || typeof e.rule !== "string" || !e.rule) return { fault: `${FILE}/${f} is no object with a "rule". Mend: write it as {"rule": "<the rule's file and lead>", "holder": ..., "behind": [...], "number": "..."}, each but "rule" only where the rule has one` };
   return { entry: e };
@@ -116,7 +121,7 @@ function behindWrong(root, behind) {
     for (const n of list.filter(n => inForm(n) && !reasons.has(n))) wrong.push(`${FILE}/${entryFile(key)} ("behind"): core archive ${n} is no item of the archive. Mend: name an item that stands in archive/instructions/, or add the item first, keyed by its issue (archive/instructions.md)`);
   }
   for (const f of files) {
-    fs.readFileSync(path.join(root, f), "utf8").split(/\r?\n/u).forEach((line, i) => {
+    (own(root, f) ?? "").split(/\r?\n/u).forEach((line, i) => {
       if (/\bcore\s+archive\s+#?\d/iu.test(line) || /\bcore\s+archive\s*$/iu.test(line)) wrong.push(`${f}:${i + 1} points to the archive in the rule's own text ("core archive"). Mend: take the pointer out and add its items to the rule's list under "behind" in ${FILE}`);
     });
   }

@@ -45,7 +45,7 @@ import { blobAt, scan } from "./licence-scan.mjs";
 import { stoodAt, trackedIn, unnamedLocks } from "./licence-locks.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { shapeFaults } from "./schemas.mjs";
-import { projectAt } from "./core-path.mjs";
+import { projectAt, regularText } from "./core-path.mjs";
 import { guard } from "./mend.mjs";
 
 // Every licence the Open Source Initiative approves, as the SPDX licence list marks them (isOsiApproved, deprecated ids
@@ -310,18 +310,24 @@ function waitFaults(root, base, files) {
 }
 
 /** A file of the project's own at `f`, from its root `root`, as text: one reached through a link that leads out of the
- *  project is refused, never read. */
+ *  project is refused, never read; one that is no regular file, or is past a mebibyte, reads as empty. */
 function ownText(root, f) {
   if (leadsOut(root, join(root, f))) throw new Error(`${f} is reached through a link that leads out of the project, so it is not read. Mend: make it a file of the project's own, in place of the link`);
-  return readFileSync(join(root, f), "utf8");
+  return ownRegular(root, f) ?? "";
 }
+
+// The most an audit or notices file is read to, larger than a config's mebibyte: a notices file holds licence texts whole.
+const BOUND = 1 << 24;
+/** The text of the regular file at `f` under `root` (core-path.mjs's regularText, at most `bound` bytes), or null where
+ *  none stands there, it is no regular file, it is past the bound or a link on its way leads out of the project. */
+const ownRegular = (root, f, bound = 1 << 20) => leadsOut(root, join(root, f)) ? null : regularText(join(root, f), { bound });
 
 /** What every npm config file of the project sets that is not allowed: each line, or the file, where a link leads it
  *  out of the project, which is not read. */
 function npmrcFailures(root) {
   return npmrcFiles(root).flatMap((f) => {
     if (leadsOut(root, join(root, f))) return [`${f} is reached through a link that leads out of the project, so it is not read. Mend: make it a file of the project's own, in place of the link, or take it out`];
-    return registryOverrides(readFileSync(join(root, f), "utf8")).map((l) => `${f}: npm setting not allowed (a package is known by the npm registry it comes from): ${l}. Mend: take that line out of ${f}`);
+    return registryOverrides(ownRegular(root, f) ?? "").map((l) => `${f}: npm setting not allowed (a package is known by the npm registry it comes from): ${l}. Mend: take that line out of ${f}`);
   });
 }
 
@@ -366,7 +372,7 @@ export function loadConfig(path) {
 /** The config at `path`, read as JSON: a JSON object, or refused. */
 function configRead(path) {
   let config;
-  try { config = JSON.parse(readFileSync(path, "utf8")); } catch { throw new Error(`cannot read the config ${path} as JSON. Mend: name the config the licence workflow is given, and write it as JSON`); }
+  try { config = JSON.parse(regularText(path) ?? ""); } catch { throw new Error(`cannot read the config ${path} as JSON. Mend: name the config the licence workflow is given, and write it as JSON`); }
   if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("the config is not a JSON object. Mend: write it as one, as the starter kit writes it");
   return config;
 }
@@ -521,7 +527,8 @@ export function check(config, root, base = null, baseConfig = null) {
   if (scanned) failures.push(...scanned.failures);
   failures.push(...npmrcFailures(root));
   for (const f of config.ignoreScriptsIn ?? []) {
-    if (!existsSync(join(root, f)) || !scriptsOff(readFileSync(join(root, f), "utf8"))) failures.push(`${f} does not set ignore-scripts=true (floor rule 15). Mend: add the line ignore-scripts=true to ${f}`);
+    const text = ownRegular(root, f);
+    if (text === null || !scriptsOff(text)) failures.push(`${f} does not set ignore-scripts=true (floor rule 15). Mend: add the line ignore-scripts=true to ${f}`);
   }
   const wait = waitFaults(root, base, config.ignoreScriptsIn ?? []);
   const unnamed = unnamedLocks(root, trackedIn(root), config, base, stoodAt(root, base, ctx.then));
@@ -615,7 +622,7 @@ function checkAudit(ctx) {
   const entries = auditEntries(root, config.audit);
   const auditHeld = heldInAudit(root, base, config.audit);
   const notices = noticesText(root, config.notices);
-  if (notices === null) ctx.failures.push(`the config's "notices", ${config.notices}, names no file. Mend: write the notices file there, or correct the path`);
+  if (notices === null) ctx.failures.push(`the config's "notices", ${config.notices}, names no file it reads (none there, no regular file, or past ${BOUND} bytes). Mend: write the notices file there, or correct the path`);
   for (const e of entries) checkEntry(ctx, e, notices, auditHeld);
   return entries;
 }
@@ -623,7 +630,7 @@ function checkAudit(ctx) {
 /** The audit's entries, or refused. */
 function auditEntries(root, audit) {
   let entries;
-  try { entries = parseBounded(readFileSync(join(root, audit), "utf8")).entries; } catch { throw new Error(`${audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
+  try { entries = parseBounded(ownRegular(root, audit, BOUND) ?? "").entries; } catch { throw new Error(`${audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
   if (!Array.isArray(entries)) throw new Error(`${audit} has no "entries" list. Mend: write it as { "entries": [...] }, as the starter kit does`);
   return entries;
 }
@@ -636,10 +643,7 @@ function heldInAudit(root, base, audit) {
 }
 
 // (the notices file the config names; null when it names none there, which fails once, not for every entry)
-function noticesText(root, notices) {
-  const noticesFile = notices === undefined ? undefined : join(root, notices);
-  return noticesFile === undefined ? undefined : existsSync(noticesFile) && statSync(noticesFile).isFile() ? readFileSync(noticesFile, "utf8") : null;
-}
+const noticesText = (root, notices) => notices === undefined ? undefined : ownRegular(root, notices, BOUND);
 
 /** One entry of the audit, held to its shape, its list or the owner's yes, and, where it ships, its notice. */
 function checkEntry(ctx, e, notices, auditHeld) {
