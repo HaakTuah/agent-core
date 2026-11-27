@@ -28,8 +28,8 @@ import { fileURLToPath } from "node:url";
 import { baseOf, configAt, loadConfig, textAt } from "./licences.mjs";
 import { NOT_A_FILE, NOT_A_FILE_IS, REGISTRY, heldBefore, lockPackages, nugetConfig, readProject, sourcesOf, twoHashes, unmarked } from "./nuget.mjs";
 import { asText } from "./guards.mjs";
-import { started } from "./started.mjs";
 import { copyAside, projectAt } from "./core-path.mjs";
+import { guard } from "./mend.mjs";
 
 const FLAT = "https://api.nuget.org/v3-flatcontainer/"; // the registry's own address for package files
 const TOOLS = "dotnet-tools.json"; // its name, in any case, in .config/ or in any folder, as dotnet reads it
@@ -381,7 +381,7 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
 export const printed = ({ notes, reports, failures }) => ({
   out: [...notes.map(n => `note ${shown(n)}`), ...reports.map(r => `REPORT: ${shown(r)}`)], err: failures.map(f => `FAIL: ${shown(f)}`) });
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const args = process.argv.slice(2), at = args.indexOf("--into");
   const fail = (msg) => { console.error(`FAIL: ${shown(msg)}`); process.exit(1); };
   const configPath = args.find((a, i) => !a.startsWith("--") && i !== at + 1), into = at >= 0 ? args[at + 1] : undefined;

@@ -21,7 +21,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { DEEPEST, leadsOut, parseBounded, quotedAlone } from "./guards.mjs";
 import { lockInstalled, lockPathOk, lockRead, workspacesIn } from "./licences.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
 
 /** A licence as npm writes one into a lock file from a package.json's "license": the type of one written the old way,
  *  as an object; nothing for none or an empty one; else the value as it stands. */
@@ -194,7 +194,7 @@ function unnamed(context, folder) {
   }
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const [dir = "."] = process.argv.slice(2);
   let result;
   try { result = check(dir); } catch (e) { console.error(`FAIL: ${e.message}`); process.exit(1); }

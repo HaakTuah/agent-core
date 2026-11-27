@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import { counted } from "./file-size.mjs";
 import { FLOOR, FLOOR_WHEN, STEPS, budget, gather, kindsOf, reading, shown, textOf } from "./reading.mjs";
 import { asText } from "./guards.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
 
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 // A file opened costs this many bytes beside its own: the call that opens it and the frame its answer comes in, about
@@ -211,7 +211,7 @@ function own() {
   try { return fs.realpathSync(git(["rev-parse", "--show-toplevel"]).trim()) === fs.realpathSync(ROOT); } catch { return false; }
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const args = process.argv.slice(2), at = flag => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
   const known = ["--compare", "--from", "--candidates", "--line"];
   const bad = args.find((a, i) => a.startsWith("--") ? !known.includes(a) : !["--compare", "--from"].includes(args[i - 1]));

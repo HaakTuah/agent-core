@@ -31,7 +31,7 @@ import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { selection } from "./select-reach.mjs";
 import { copyOf, pinsOnly } from "./select-copy.mjs";
 import { git, passedWhole } from "./select-passed.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
 
 class Refused extends Error {}
 const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
@@ -129,7 +129,7 @@ async function main(argv) {
   return 0;
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   try { process.exitCode = await main(process.argv.slice(2)); }
   catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${loggedAlone(e.message)}`); process.exitCode = 1; }
 }
