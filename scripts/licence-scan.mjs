@@ -171,10 +171,10 @@ function unaudited(c, f, found) {
 const NO_PROGRAM = new Set(["own", "data", "asset", "font", "github-service"]);
 // A package of the machine's distribution, which its package manager installs: a program, whose version is the
 // distribution's, so its entry is asked none, only where a command of the file (a line, or a part of one after `&&` or
-// `;`, as a shell or a Dockerfile's RUN gives it, by sudo or not) is one of these package managers' installs naming a
+// `;`, as a shell, a Dockerfile's RUN or a workflow's one-line run gives it, by sudo or not) is one of these package managers' installs naming a
 // package of its name (#1361, point 11); an entry of that kind for anything else is asked its version.
 const DISTRIBUTION = "distribution";
-const INSTALL = /^(?:RUN[ \t]+)?(?:sudo(?:[ \t]+-\S+)*[ \t]+)?(?:(?:apt-get|apt|dnf|yum|zypper|brew|choco|winget)(?:[ \t]+-\S+)*[ \t]+install|zypper(?:[ \t]+-\S+)*[ \t]+in|apk(?:[ \t]+-\S+)*[ \t]+add|pacman(?:[ \t]+-\S+)*[ \t]+-S[a-z]*)((?:[ \t]+[^ \t;&|]+)+)$/u;
+const INSTALL = /^(?:RUN[ \t]+|(?:-[ \t]+)?run:[ \t]+)?(?:sudo(?:[ \t]+-\S+)*[ \t]+)?(?:(?:apt-get|apt|dnf|yum|zypper|brew|choco|winget)(?:[ \t]+-\S+)*[ \t]+install|zypper(?:[ \t]+-\S+)*[ \t]+in|apk(?:[ \t]+-\S+)*[ \t]+add|pacman(?:[ \t]+-\S+)*[ \t]+-S[a-z]*)((?:[ \t]+[^ \t;&|]+)+)$/u;
 const installs = (code, name) => typeof name === "string" && /^[\w.+-]+$/u.test(name)
   && String(code).split(/\r?\n|&&|;/u).some((part) => INSTALL.exec(part.trim())?.[1].trim().split(/[ \t]+/u).includes(name));
 // A checksum written out: SHA-256 or SHA-512 as hex, or an integrity value as npm writes one; and the commands that

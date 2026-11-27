@@ -10,11 +10,11 @@ import { programDownloads } from "../scripts/licence-reads.mjs";
 import { pinFault } from "../scripts/licence-scan.mjs";
 
 const INDEX = "https://dl.example/release-metadata/releases-index.json", TXT = "https://dl.example/release/stable.txt";
-const READ = `v=$(curl -fsS ${INDEX} | jq -r '.[0].sdk')`, GET = `curl -fsSLo moss.tgz "https://dl.example/moss-\${v}.tgz"`;
+const VER = "grep -Ex '[0-9][0-9A-Za-z.+-]*'", READ = `v=$(curl -q -fsS ${INDEX} | jq -r '.[0].sdk' | ${VER})`, GET = `curl -fsSLo moss.tgz "https://dl.example/moss-\${v}.tgz"`;
 // (how many downloads of `code` are a program's)
 const programs = (code) => programDownloads(code).length;
 
-ok(programs(`${READ}\n${GET}\n`) === 1 && programs(`v=$(curl -s "${TXT}")\ncurl -fsSLo m.tgz "https://dl.example/m-$v.tgz"\n`) === 1,
+ok(programs(`${READ}\n${GET}\n`) === 1 && programs(`v=$(curl -q -s "${TXT}" | ${VER})\ncurl -fsSLo m.tgz "https://dl.example/m-$v.tgz"\n`) === 1,
   "a read of a version index in the one form, its variable used only in another download's quoted address, is no program's download; that download is");
 ok(programs(`${READ}\n`) === 0 && programs(`  ${READ}\n`) === 0, "a read whose variable is used nowhere is no program's download, indented or not");
 
@@ -48,6 +48,10 @@ const forms = {
   "a second command on the line": `v=$(curl -fsS ${INDEX}); bash run.sh`,
   "a read in JavaScript": `const s = execSync('curl -fsS ${TXT}').toString(); new Function(s)();`,
   "a read in PowerShell": `$s = irm ${INDEX}`,
+  "a read whose output no grep holds to versions": `v=$(curl -q -fsS ${INDEX} | jq -r '.[0].sdk')`,
+  "a read by curl that a config file of curl's may write": `v=$(curl -fsS ${INDEX} | jq -r '.[0].sdk' | ${VER})`,
+  "a read held by another grep": `v=$(curl -q -fsS ${INDEX} | grep -Ex '.*')`,
+  "a read held by a grep that is not whole lines": `v=$(curl -q -fsS ${INDEX} | grep -E '[0-9][0-9A-Za-z.+-]*')`,
 };
 const missed = Object.entries(forms).filter(([, line]) => programs(`${line}\n`) !== 1).map(([what]) => what);
 ok(!missed.length, "each other form of a download, in a shell or another language, is a program's download", missed.join(" | "));
@@ -79,11 +83,15 @@ const around = {
   "the address of another command on a download's line": `${READ}\n${ONE}; bash -c "https://dl.example/$v"\n`,
   "a here-string on a download's line": `${READ}\n${ONE} && bash <<< "https://dl.example/$v"\n`,
   "node on a download's line": `${READ}\n${ONE} && node -e "https://dl.example/$v"\n`,
-  "a name the shell traces by": `PS4=$(curl -fsS ${TXT})\nset -x\n${GET}\n`,
-  "the search path": `PATH=$(curl -fsS ${TXT})\n${GET}\n`,
-  "a proxy's name": `https_proxy=$(curl -fsS ${TXT})\n${GET}\n`,
-  "a name zsh ties to the search path": `path=$(curl -fsS ${TXT})\n${GET}\n`,
-  "an uppercase name": `V=$(curl -fsS ${TXT})\ncurl -fsSLo m.tgz "https://dl.example/m-$V.tgz"\n`,
+  "a name the shell traces by": `PS4=$(curl -q -fsS ${TXT} | ${VER})\nset -x\n${GET}\n`,
+  "the search path": `PATH=$(curl -q -fsS ${TXT} | ${VER})\n${GET}\n`,
+  "a proxy's name": `https_proxy=$(curl -q -fsS ${TXT} | ${VER})\n${GET}\n`,
+  "a name zsh ties to the search path": `path=$(curl -q -fsS ${TXT} | ${VER})\n${GET}\n`,
+  "zsh's arguments": `argv=$(curl -q -fsS ${TXT} | ${VER})\n${GET}\n`,
+  "an uppercase name": `V=$(curl -q -fsS ${TXT} | ${VER})\ncurl -fsSLo m.tgz "https://dl.example/m-$V.tgz"\n`,
+  "the last word of the command before": `${READ}\n${GET}\nbash -c "$_"\n`,
+  "grep a function": `grep() { cat; }\n${READ}\n${GET}\n`,
+  "jq an alias": `alias jq='bash -c'\n${READ}\n${GET}\n`,
   "a string spanning lines": `bash -c "\n${READ}\n"\n${GET}\n`,
   "a here-document": `bash <<EOF\n${READ}\nEOF\n${GET}\n`,
   "a continued line": `bash -c \\\n${READ}\n${GET}\n`,
@@ -93,13 +101,22 @@ const around = {
 };
 const through = Object.entries(around).filter(([, code]) => programs(code) < 2).map(([what]) => what);
 ok(!through.length, "a read whose variable a shell reads by itself, or that stands other than it reads, is a program's download", through.join(" | "));
+// The three ways #1455's third review found for a read's output to run, each a program's download: `$_` after a use,
+// a config file of curl's that keeps the read in a file, and zsh's arguments.
+const found = {
+  "the last word of a use": `v=$(curl -fsS ${TXT})\ncurl -fsSLo t.tgz "https://dl.example/$v"\nbash -c "$_"\n`,
+  "a config file of curl's": `printf 'output = "run.sh"\\n' > "$HOME/.curlrc"\nv=$(curl -fsS ${TXT})\nbash run.sh\n`,
+  "zsh's arguments": `#!/bin/zsh\nargv=$(curl -fsS ${TXT})\nsh -c "$1"\n`,
+};
+const ran = Object.entries(found).filter(([, code]) => programs(code) < 1).map(([what]) => what);
+ok(!ran.length, "a read whose output reaches what runs by a name it never mentions, or that a config file of curl's keeps, is a program's download", ran.join(" | "));
 ok(programs(`# set up the tool's version; it's read below\n${READ}\n${GET}\n`) === 1, "a comment with a quote in it before the read leaves the read one of data");
 // Through the scan's pin check (licence-scan.mjs's pinFault): a read of a version index asks no checksum, and a
 // package of the machine's distribution that the file installs, kind "distribution", is asked no version, its
 // download by address still asked a checksum (#1361, point 11).
 {
   const SH = "scripts/setup.sh", sdk = { name: "dotnet-sdk-8.0", licence: "MIT", files: [SH] }, moss = { name: "mosstool", licence: "MIT", version: "1.2.0", files: [SH] };
-  const INDEX = "v=$(curl -fsS https://dotnet.example/release-metadata/releases-index.json | jq -r '.[0].sdk')\n", APT = "apt-get install -y dotnet-sdk-8.0\n";
+  const INDEX = "v=$(curl -q -fsS https://dotnet.example/release-metadata/releases-index.json | jq -r '.[0].sdk' | grep -Ex '[0-9][0-9A-Za-z.+-]*')\n", APT = "apt-get install -y dotnet-sdk-8.0\n";
   const GET = "curl -fsSLo moss.tgz \"https://mossgrip.example/moss-${v}.tgz\"\n", CHECKED = `echo "${"0a1b2c3d".repeat(8)}  moss.tgz" | sha256sum -c -\n`;
   ok(pinFault([sdk], "audit.json", SH, `${APT}${INDEX}`) === null, "a file that reads a version index and downloads no program asks no pin of the distribution's package that covers it");
   ok(pinFault([moss], "audit.json", SH, `${INDEX}${GET}${CHECKED}`) === null, "a version index read for a program's address asks no checksum of its own");
@@ -110,9 +127,9 @@ ok(programs(`# set up the tool's version; it's read below\n${READ}\n${GET}\n`) =
   ok(/dotnet-sdk-8\.0, in audit\.json, names no version/u.test(pinFault([{ ...sdk, kind: "distribution" }, moss], "audit.json", SH, `${GET}${CHECKED}`)?.what ?? ""),
     "one of kind distribution whose package the file installs by no package manager is asked its version (#1455)");
   const dist = (code) => pinFault([{ ...sdk, kind: "distribution" }, moss], "audit.json", SH, `${code}${GET}${CHECKED}`);
-  ok(["sudo apt-get install -y dotnet-sdk-8.0\n", "RUN apk add --no-cache dotnet-sdk-8.0\n", "apt-get update && apt-get install -y curl dotnet-sdk-8.0\n"].every((c) => dist(c) === null)
+  ok(["sudo apt-get install -y dotnet-sdk-8.0\n", "RUN apk add --no-cache dotnet-sdk-8.0\n", "apt-get update && apt-get install -y curl dotnet-sdk-8.0\n", "      - run: sudo apt-get install -y dotnet-sdk-8.0\n"].every((c) => dist(c) === null)
     && ["apt-get remove dotnet-sdk-8.0\n", "echo \"brew users: brew install dotnet-sdk-8.0\"\n", "apt-get install -y dotnet-sdk-8.0-extra\n"].every((c) => /names no version/u.test(dist(c)?.what ?? "")),
-  "an install by a package manager's own command, by sudo, in a RUN or after &&, counts; a removal, an echo naming one or another package's name does not (#1455)");
+  "an install by a package manager's own command, by sudo, in a RUN, after && or in a workflow's one-line run, counts; a removal, an echo naming one or another package's name does not (#1455)");
   ok(/holds no checksum/u.test(pinFault([{ ...sdk, kind: "distribution" }], "audit.json", SH, `${APT}${GET}`)?.what ?? ""), "a download covered by a distribution's package alone is still asked its checksum");
   ok(/holds no checksum/u.test(pinFault([moss], "audit.json", SH, "curl -o payload.txt https://mossgrip.example/payload.txt\nbash payload.txt\n")?.what ?? ""), "a text file kept and run on a later line is asked its checksum (#1455)");
   ok(/holds no checksum/u.test(pinFault([moss], "audit.json", SH, `${INDEX}eval "$v"\n`)?.what ?? ""), "a read in a file that runs text as code is asked its checksum");
