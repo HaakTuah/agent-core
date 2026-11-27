@@ -196,9 +196,16 @@ ok(keyRule.pattern === KEY.source && keyRule.maximum === LAST_NUMBERED && keyRul
 
 // ---- the core's own, and the script as a check ----
 const own = spawnSync(process.execPath, [path.join(root, "scripts", "holders.mjs")], { encoding: "utf8" });
-const numbersBad = holders(project({}, { numbers: { "tasks/x.md: Gone": "findings; outcome: robust", "tasks/x.md: Numbered": "findings", "tasks/x.md: Its own item": "check fires; outcome: fast" } }), []);
+const numbersBad = holders(project({ "tasks/x.md: Its own item": "check: scripts/a-check.mjs" }, { numbers: { "tasks/x.md: Gone": "findings; outcome: robust", "tasks/x.md: Numbered": "findings", "tasks/x.md: Its own item": "check fires; outcome: fast" } }), []);
 ok(numbersBad.wrong.length === 2 && numbersBad.wrong.some(w => w.includes("(\"number\") names \"tasks/x.md: Gone\"")) && numbersBad.wrong.some(w => w.includes("tasks-x-md--numbered.json (\"number\"): \"findings\" is in no form")) && numbersBad.wrong.every(w => /Mend: /.test(w)),
   "numbers: a key that is no rule, and a number with no outcome, each fail, saying the mend; one in its form passes", numbersBad.wrong.join("\n"));
+// (#1138, part 1: "check fires" where no holder is a check, a number the pruning can never move)
+const fires = "check fires; outcome: robust";
+const still = holders(project({ "tasks/x.md: 1. A rule of a paragraph": "audit", "tasks/x.md: A rule inside it": "describes", "tasks/x.md: Numbered": "check: scripts/a-check.mjs, in part", "tasks/x.md: Its own item": ["audit", "check: GitHub's ruleset"] },
+  { numbers: { "tasks/x.md: 1. A rule of a paragraph": fires, "tasks/x.md: A rule inside it": `${fires}; rare harm`, "tasks/x.md: 2. The next one": fires, "tasks/x.md: The second numbered": fires, "tasks/x.md: Numbered": fires, "tasks/x.md: Its own item": fires, "tasks/x.md: A last item": "findings; outcome: robust" } }), [aCase]);
+const stillOf = key => still.wrong.filter(w => w.includes(`gives "${key}" the number "check fires", but none of its holders is a check`) && /Mend: give the rule a number a holder of its own can move \("findings", or "correction: <kind>"\)/.test(w));
+ok(["1. A rule of a paragraph", "A rule inside it", "2. The next one", "The second numbered"].every(k => stillOf(`tasks/x.md: ${k}`).length === 1) && still.wrong.length === 4 && mended(still.wrong.map(w => `FAIL ${w}`).join("\n")),
+  "\"check fires\" fails where the rule is held by the audit, by what describes, by a staged case or by nothing, saying the mend; held by a check, whole or in part, or with another number, it passes", still.wrong.join("\n"));
 ok(own.status === 0 && !own.stderr, "the core's own entries in scripts/holders/ name only rules that stand, and checks that are there", own.stderr);
 const failing = project({ "tasks/x.md: Gone": "audit" });
 fs.mkdirSync(path.join(failing, "scripts", "staged"));
