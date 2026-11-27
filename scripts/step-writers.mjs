@@ -240,10 +240,10 @@ export function writeMoved(p, busy) {
   return writes.map(([f]) => f);
 }
 
-// A file's text with each old path it names written as the file it now is, where its move is an exact one; a rule that
-// left its file named with its lead, `core/<old>`, "<lead>", as the step words it, named where it stands now; and a
-// pull-in (an import, Kiro's `#[[file:`) this writes into one that a line above, or the core's part (`part`, its
-// lines), already makes left out.
+// A file's text with each old path it names written as the file it now is (or its folder), where its move is an exact
+// one; a rule that left its file named with its lead, `core/<old>`, "<lead>", as the step words it, named where it
+// stands now; and a pull-in (an import, Kiro's `#[[file:`) this writes into one that a line above, or the core's part
+// (`part`, its lines), already makes left out.
 function movedIn(text, map, oldPath, part = [], f = "") {
   if (!oldPath) return text;
   const apart = moved.apart(), exact = old => !(apart[old]?.length);
