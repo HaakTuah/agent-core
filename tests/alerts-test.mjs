@@ -4,6 +4,7 @@
 // or advisory here is real. Node's own modules.
 //
 //   node tests/alerts-test.mjs
+import { fileURLToPath } from "node:url";
 import { DAY, LABELS, bodyOf, reading, tasksOf, titleOf } from "../scripts/alerts.mjs";
 import { quick } from "../scripts/hostile.mjs";
 
@@ -100,7 +101,7 @@ ok(tasksOf([alert(13, "made-up-thing")], [pull("Bump the npm group across 1 dire
 {
   const { existsSync, readdirSync, readFileSync, statSync } = await import("node:fs");
   const files = dir => readdirSync(dir).flatMap(n => { const p = `${dir}/${n}`; return statSync(p).isDirectory() ? (n === "node_modules" ? [] : files(p)) : [p]; });
-  const root = new URL("..", import.meta.url).pathname, mine = "tests/alerts-test.mjs";
+  const root = fileURLToPath(new URL("..", import.meta.url)).replaceAll("\\", "/"), mine = "tests/alerts-test.mjs";
   const all = ["scripts", ".github", ".claude", ".codex", ".kiro", ".agents", "setup", "tests"].filter(d => existsSync(root + d)).flatMap(d => files(`${root}${d}`).map(p => p.slice(root.length))).filter(p => p !== mine);
   const reads = all.filter(p => /(?:secret|code)-scanning\/alerts/.test(readFileSync(root + p, "utf8")));
   ok(reads.length === 0, "no script, workflow, hook or set-up of the core's reads secret-scanning or code-scanning alerts", reads.join(", "));

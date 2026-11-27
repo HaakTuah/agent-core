@@ -7,6 +7,7 @@
 // shows it does not run the working tree's copy, which the branch it runs on can change. One that stood before is listed
 // in the baseline, its entry saying "from": "the working tree", and noted; the baseline only shrinks: a new hook marked
 // so fails, and so does a mark taken out while its hook stands, or a mark on a hook in the kit's form.
+import { createHash } from "node:crypto";
 import { fetchedBy, fetchesMain, libraryOf } from "./hook-source.mjs";
 import { show, canonical, fold } from "./agent-tools-entries.mjs";
 
@@ -33,23 +34,52 @@ export function addServers(state, file, servers, tool) {
 // What one hook of these runs: { runs, whether it is a command hook; text, its name's command; commands, each command
 // it may run }, the command Codex runs on Windows in its place among them ("commandWindows", or "command_windows" in
 // TOML), whatever the hook's type, each held to the kit's form and named, so its entry in the list reads otherwise than
-// the kit's.
+// the kit's. A hook of any other type (a prompt, an agent, a web address) runs no command the kit's form can be read in,
+// and is weighed as such (NO_COMMAND); a command or a Windows command given that is no text is refused as the wrong shape.
 const WINDOWS = ["commandWindows", "command_windows"];
 function commandsOf(hook) {
   const runs = hook?.type === "command" && typeof hook.command === "string";
-  const windows = WINDOWS.filter(k => hook && typeof hook === "object" && Object.hasOwn(hook, k)).map(k => hook[k]);
-  if (!runs) return { runs, text: JSON.stringify(hook), commands: windows };
-  return { runs, text: `${hook.command}${windows.length ? ` (Windows: ${windows.map(String).join(", ")})` : ""}`, commands: [hook.command, ...windows] };
+  const has = k => hook && typeof hook === "object" && Object.hasOwn(hook, k);
+  const windows = WINDOWS.filter(has).map(k => hook[k]);
+  const bad = [...(hook?.type === "command" && given(hook.command) && !runs ? ["command"] : []), ...WINDOWS.filter(k => has(k) && typeof hook[k] !== "string")];
+  if (!runs) return { runs, bad, text: JSON.stringify(hook), commands: [...windows, NO_COMMAND] };
+  return { runs, bad, text: `${hook.command}${windows.length ? ` (Windows: ${windows.map(String).join(", ")})` : ""}`, commands: [hook.command, ...windows] };
+}
+// A value in a shape its tool does not take, refused as a problem with that value's own text and where it stands, so one
+// the base held is noted while it stands, whatever else of the file changes, as readEnv's are. The problem names the
+// value (cut short, with its digest, where long), so two values in one place are two problems, never one whose text the
+// later read overwrote; the same value twice in one place is one problem whose text counts both.
+export function flagShape(state, file, what, form, value, mend = "write it as one, as the tool that reads it takes it") {
+  const json = JSON.stringify(value) ?? "undefined";
+  const seen = json.length > 40 ? `${json.slice(0, 32)}… (${createHash("sha256").update(json).digest("hex").slice(0, 12)})` : json;
+  const problem = `${file}: ${what} is not ${form} (it reads ${seen}). Mend: ${mend}`, text = `${file}\0${what}\0${json}`;
+  if (state.texts.has(problem)) return void state.texts.set(problem, `${state.texts.get(problem)}\0again`);
+  state.problems.push(problem);
+  state.texts.set(problem, text);
+  state.baselined.add(problem);
 }
 // The hooks one settings file configures, into configured()'s `state`: Claude Code's, or, with `tool`, another tool's
-// written the same way (Codex's).
+// written the same way (Codex's). A value in a shape the tool's hooks are not written in (an event's that is no list, a
+// group that is no object, a group's "hooks" that is no list) is refused, never passed over unread; so is a "hooks" that
+// is no object in Claude Code's files (Codex's, `state.entries` refuses).
+const given = v => v !== undefined && v !== null, object = v => v && typeof v === "object" && !Array.isArray(v);
 export function readHooks(state, file, settings, tool = "") {
   const all = settings?.hooks;
-  for (const [event, groups] of Object.entries(all && typeof all === "object" && !Array.isArray(all) ? all : {})) {
-    for (const group of Array.isArray(groups) ? groups : []) {
-      const matcher = typeof group?.matcher === "string" && group.matcher ? group.matcher : "";
-      for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) addHook(state, file, { tool, event, matcher, given: group?.matcher, hook, ...commandsOf(hook) });
-    }
+  if (!tool && given(all) && !object(all)) flagShape(state, file, `"hooks"`, "a JSON object, of each event to its hooks", all);
+  for (const [event, groups] of Object.entries(object(all) ? all : {})) {
+    if (given(groups) && !Array.isArray(groups)) flagShape(state, file, `"hooks.${event}"`, "a list of hook groups", groups);
+    for (const group of Array.isArray(groups) ? groups : []) readGroup(state, file, tool, event, group);
+  }
+}
+// One group of an event's hooks, its matcher and each hook, into configured()'s `state`, a part in the wrong shape refused.
+function readGroup(state, file, tool, event, group) {
+  if (!object(group)) return void flagShape(state, file, `a group of "hooks.${event}"`, "an object of a matcher and its hooks", group);
+  if (given(group.hooks) && !Array.isArray(group.hooks)) flagShape(state, file, `the "hooks" of a group of "hooks.${event}"`, "a list of hooks", group.hooks);
+  const matcher = typeof group.matcher === "string" && group.matcher ? group.matcher : "";
+  for (const hook of Array.isArray(group.hooks) ? group.hooks : []) {
+    const { bad, ...read } = commandsOf(hook);
+    for (const k of bad) flagShape(state, file, `the "${k}" of a hook of "hooks.${event}"`, "a text, the one command it runs", hook[k]);
+    addHook(state, file, { tool, event, matcher, given: group.matcher, hook, ...read });
   }
 }
 // One hook, into configured()'s `state`: its name, as the list writes it, `tool`, `event`, `matcher` and `text`; its
@@ -90,6 +120,9 @@ function readHelper(state, file, key, value) {
 }
 // What no starter kit writes, given as a command so it is never read as the kit's form, and its failure's mend.
 export const NO_KIT = "(no form of the starter kit's)", NO_KIT_WHY = "is of a kind no starter kit writes", NOT_KIT_WHY = "is not in the starter kit's form";
+// A hook of a type that runs no command (a prompt, an agent, a web address), given as a command so it is never read as the
+// kit's form: a hook all the same, weighed as one whose command is not the kit's is (sync step 360).
+export const NO_COMMAND = "(no command: a hook of another type)", NO_COMMAND_WHY = "is of a type that runs no command the check can read";
 const NO_KIT_HOW = "take it out of the project's files, the owner setting it in the tool's own configuration on the machine where it is wanted; or move what it runs into a hook of .claude/settings.json in the starter kit's form";
 // A marketplace that runs a command by itself, to print the headers it is fetched with, or as a plug-in's source: read
 // whole, as a setting no starter kit writes, so one the pull request adds or changes is new.
@@ -148,6 +181,7 @@ function readSource(state, name, commands) {
   for (const command of commands) {
     const at = fetchedBy(command);
     if (command === NO_KIT) return void state.sources.set(name, { why: NO_KIT_WHY, how: NO_KIT_HOW });
+    if (command === NO_COMMAND) return void state.sources.set(name, { why: NO_COMMAND_WHY, how: NO_KIT_HOW });
     if (at === null) return void state.sources.set(name, { why: NOT_KIT_WHY, how: HOW, main });
     // (the command in the kit's form already, its mend is the fetched file's)
     if (state.linked(at)) return void state.sources.set(name, { why: `fetches ${show(at)} from main, which the project holds as no plain file (a link, a folder or a submodule), so main gives no script but what git prints of it`, how: `make ${show(at)} a plain file committed in the project, the script itself in place of the link, folder or submodule, so main gives it`, main });

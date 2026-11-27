@@ -113,11 +113,11 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
 {
   const dir = scratchDir("licence-locks-folder-");
   try {
-    for (const [f, text] of [["package-lock.json", { lockfileVersion: 3, packages: {} }], ["package.json", { name: "x", version: "1.0.0" }], ["audit.json", { entries: [] }], ["NPM-SHRINKWRAP.JSON/x", {}]]) {
+    for (const [f, text] of [["package-lock.json", { lockfileVersion: 3, packages: {} }], ["package.json", { name: "x", version: "1.0.0" }], ["audit.json", { entries: [] }], ["NPM-SHRINKWRAP.JSON/x", {}], ["npm-shrinkwrap.json/x", {}]]) {
       mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), JSON.stringify(text));
     }
     const r = check({ ships: [], lockfiles: ["package-lock.json"], audit: "audit.json" }, dir, "HEAD", null);
-    ok(![...r.failures, ...r.reports].some((m) => m.includes("stands beside it")), "a folder beside the lock file is no twin", JSON.stringify(r));
+    ok(![...r.failures, ...r.reports].some((m) => m.includes("stands beside it")), "a folder beside the lock file is no twin, in the shrinkwrap file's own name or in another case (on a case-insensitive file system the two are one name)", JSON.stringify(r));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 

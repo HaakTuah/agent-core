@@ -55,10 +55,11 @@ export function corePath(root = ".") {
 }
 
 /** The manifest's text at `file`, or null where there is none. One that is no regular file, a link to a device say, or
- *  past a mebibyte reads as empty, its "Core:" line then missing, so that it stops no script that reads it. */
-export function manifestText(file) {
+ *  past a mebibyte reads as empty, its "Core:" line then missing, so that it stops no script that reads it. Given
+ *  `{ linked: false }`, a link itself is no regular file, whatever it leads to (SECURITY.md, rule 5). */
+export function manifestText(file, { linked = true } = {}) {
   let stat;
-  try { stat = fs.statSync(file); } catch { return null; }
+  try { stat = linked ? fs.statSync(file) : fs.lstatSync(file); } catch { return null; }
   if (!stat.isFile() || stat.size > 1 << 20) return "";
   try { return fs.readFileSync(file, "utf8"); } catch { return null; }
 }
