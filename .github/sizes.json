@@ -153,8 +153,8 @@
       "why": "Its list of the scripts that write a file and the round trips it runs are two things a reader looks up apart; the split is #1196, and until it lands each writer added takes the file past the mark."
     },
     "tests/pure-sync-test.mjs": {
-      "mark": 42307,
-      "why": "The two programs (sync.mjs and the proof pure-sync.mjs) run end to end on one scratch copy of the core with a short history and a project made from it, the later cases taking the project as the earlier left it; split, each file would build them again, adding to the suite's time (tasks/tests.md); the cases of the core's own files and parts the proof admits (#1083) take the same project (#1008)."
+      "mark": 54771,
+      "why": "The two programs (sync.mjs and the proof pure-sync.mjs) run end to end on one scratch copy of the core with a short history and a project made from it, the later cases taking the project as the earlier left it; split, each file would build them again, adding to the suite's time (tasks/tests.md); the cases of the core's own files and parts the proof admits (#1083) take the same project (#1008); the case of a sync pull request synced again (#1361, point 24) builds a scratch core of its own, a few lines, and stands with the sync's other cases, where a reader of them looks."
     },
     "tests/work-saved-test.mjs": {
       "mark": 26522,
