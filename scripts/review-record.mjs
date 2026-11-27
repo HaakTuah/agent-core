@@ -40,7 +40,7 @@ import { broughtBy, perPull, reviewEvents, ruleOf, rulesNamed } from "./review-c
 import { checksLines, checksRead, runsReader } from "./review-checks.mjs";
 import { roundsLines, roundsOf, wanted } from "./review-rounds.mjs";
 import { started } from "./started.mjs";
-import { HERE } from "./reading.mjs";
+import { HERE, realFiles, regular } from "./reading.mjs";
 import { ROOT, rules, rulesOf } from "./rules.mjs";
 import { pages } from "./stand-in-record.mjs";
 
@@ -68,13 +68,13 @@ export function foundTwice(pulls, since = null) {
 
 // The rules that stand, keyed as ruleOf keys a finding's line: those of the floor, the roles and the modules of the core
 // at `core` (rules.mjs), and those of the AGENTS.md and SECURITY.md at the root of the project at `project`, its own,
-// with, in the core's own repository, the files of core-changes/ beside its AGENTS.md (#1202); null where they cannot
-// be read.
+// with, in the core's own repository, the files of core-changes/ beside its AGENTS.md (#1202), read as rules.mjs reads
+// them; null where they cannot be read.
 export function standing(core = ROOT, project = process.cwd()) {
   try {
-    const here = fs.existsSync(path.join(project, HERE)) ? fs.readdirSync(path.join(project, HERE)).filter(f => f.endsWith(".md")).sort().map(f => `${HERE}/${f}`) : [];
-    const own = ["AGENTS.md", ...here, "SECURITY.md"].filter(f => fs.existsSync(path.join(project, f)))
-      .flatMap(f => rulesOf(f, fs.readFileSync(path.join(project, f), "utf8")));
+    const own = ["AGENTS.md", "SECURITY.md"].filter(f => fs.existsSync(path.join(project, f)))
+      .flatMap(f => rulesOf(f, fs.readFileSync(path.join(project, f), "utf8")))
+      .concat(realFiles(project, HERE, new Set()).flatMap(f => rulesOf(`${HERE}/${f}`, regular(project, `${HERE}/${f}`) ?? "")));
     return new Set([...rules(core), ...own].map(r => ruleOf(r.key)));
   } catch { return null; }
 }

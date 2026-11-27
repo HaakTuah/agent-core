@@ -173,6 +173,10 @@ ok(r.status === 1 && mended(r.out) && /is no role the core has a file for/.test(
 r = run(root, "builder", "--kind", "rule", "--path", "scripts/release-due.mjs");
 ok(r.status === 0 && /  core-changes\/rules\.md +the kind rule\n/.test(r.out) && /  core-changes\/releases\.md +the path scripts\/release-due\.mjs\n/.test(r.out) && /  core-changes\/projects\.md +the path scripts\/release-due\.mjs\n/.test(r.out),
   "in the core, the files of core-changes/ are called for by the kinds and paths their openings name (#1202)", r.out);
+r = run(root, "builder", "--kind", "audit", "--kind", "bug", "--path", "reports/release-trial.json", "--path", "reports/pruning.json", "--path", "reports/unheld.json");
+ok(r.status === 0 && /  core-changes\/holders\.md +the kind audit\n/.test(r.out) && /  core-changes\/releases\.md +the kind audit\n/.test(r.out) && /  core-changes\/parts\.md +the kind bug\n/.test(r.out)
+  && ["release-trial.json", "pruning.json", "unheld.json"].every(f => run(root, "builder", "--path", `reports/${f}`).out.includes(`  core-changes/${f === "release-trial.json" ? "releases" : "holders"}.md`)),
+  "in the core, the state report and the review of the core, a bug, the trial's record and the pruning's are each called to the files of core-changes/ whose rules bind them (#1202)", r.out);
 ok(run(root, "--kinds").status === 0 && /^screen +tasks\/game-design\.md, tasks\/screens\.md$/m.test(run(root, "--kinds").out) && /^workflow +tasks\/tests\.md, floor\/topics\/workflows\.md$/m.test(run(root, "--kinds").out), "--kinds lists each kind with its files");
 
 // a scratch project that holds the core's copy

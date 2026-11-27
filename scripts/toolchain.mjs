@@ -1,20 +1,19 @@
 #!/usr/bin/env node
-// The toolchain a project pins, fetched for a release's trial at set-up (#1361, point 21; AGENTS.md, "The trial's machine
-// fetches what a project pins"), as scripts/node.sh fetches Node: one exact version, taken only where the list SDKS
-// below holds its checksum for this machine, and checked against it before anything of it runs. The one pin it reads
-// is the .NET SDK a project's global.json names ("sdk": { "version" }), at that exact version, which meets any
-// "rollForward" the file sets. It reads the global.json at the project's root alone, not one a subfolder's jobs run
-// under. Every dotnet it runs runs from the file system's root, so no global.json of the project's, or of the folder it
-// was started in, chooses what runs. A version out of form is named by its JSON type alone, nothing of it printed. It
-// goes to a folder of its own under the home folder, which it holds outside the project (the trial's builder keeps the
-// home outside every repository), never over the machine's own; the line it prints says what to set for the trial's
-// runs. Where the machine's own dotnet already lists that SDK, it fetches nothing. A version or a machine the list holds
-// no sum for, a host that does not give the file (any status but 200), a sum that differs, or a binary that does not
-// give its version, and nothing is installed:
-// it says so with its mend. It widens no network (only the owner does that) and changes nothing of the project. Safe to
-// run twice; it always exits 0 when it fetches, since it decides nothing: a job wanting what it could not fetch reads
-// alike before and after the update, so it stops no cut (scripts/release-trial.mjs). Node's own modules and the
-// machine's curl and tar.
+// The toolchain a project pins, fetched for a release's trial at set-up (#1361, point 21; core-changes/releases.md,
+// "The trial's machine fetches what a project pins"), as scripts/node.sh fetches Node: one exact version, taken only
+// where the list SDKS below holds its checksum for this machine, and checked against it before anything of it runs. The
+// one pin it reads is the .NET SDK a project's global.json names ("sdk": { "version" }), at that exact version, which
+// meets any "rollForward" the file sets. It reads the global.json at the project's root alone, not one a subfolder's
+// jobs run under. Every dotnet it runs runs from the file system's root, so no global.json of the project's, or of the
+// folder it was started in, chooses what runs. A version out of form is named by its JSON type alone, nothing of it
+// printed. It goes to a folder of its own under the home folder, which it holds outside the project (the trial's
+// builder keeps the home outside every repository), never over the machine's own; the line it prints says what to set
+// for the trial's runs. Where the machine's own dotnet already lists that SDK, it fetches nothing. A version or a
+// machine the list holds no sum for, a host that does not give the file (any status but 200), a sum that differs, or a
+// binary that does not give its version, and nothing is installed: it says so with its mend. It widens no network (only
+// the owner does that) and changes nothing of the project. Safe to run twice; it always exits 0 when it fetches, since
+// it decides nothing: a job wanting what it could not fetch reads alike before and after the update, so it stops no cut
+// (scripts/release-trial.mjs). Node's own modules and the machine's curl and tar.
 //
 //   node <core>/scripts/toolchain.mjs [<project folder>]   fetch what the project pins (default: the current folder)
 //   node <core>/scripts/toolchain.mjs --entry <version>    print the list's entries for that SDK from the publisher's

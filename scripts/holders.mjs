@@ -124,7 +124,7 @@ function behindWrong(root, behind) {
 }
 
 // What is wrong with the number each rule names ("numbers"), each a line with its mend: keyed as "behind" is, by a
-// rule of the floor, the modules or AGENTS.md.
+// rule of the floor, the modules, AGENTS.md or HERE.
 function numbersWrong(root, numbers) {
   const keys = new Set(rules(root, { agents: true }).map(r => r.key)), wrong = [];
   for (const [key, n] of Object.entries(numbers)) {

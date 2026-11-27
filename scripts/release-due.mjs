@@ -131,7 +131,7 @@ export function dueIssue({ manifest, at, repo }, read = () => readGit(gitIn(ROOT
     body: [
       `A release's trial is due (\`node scripts/release-due.mjs\`; AGENTS.md, "One batch, then one release"). ${d.said}`,
       "",
-      "A task the orchestrator gives a lane: a builder at the strongest tier tries the release on main's newest commit whose checks all passed, from the brief `node scripts/trial-brief.mjs <that commit>` prints, and records it with `node scripts/release.mjs --trial` in a pull request of its own (AGENTS.md, \"Each release is tried on a real project first\"); once that record merges holding no cut, this issue closes and the release workflow is started on the owner's standing word. The lines that merge after the commit tried go to the next batch.",
+      "A task the orchestrator gives a lane: a builder at the strongest tier tries the release on main's newest commit whose checks all passed, from the brief `node scripts/trial-brief.mjs <that commit>` prints, and records it with `node scripts/release.mjs --trial` in a pull request of its own (core-changes/releases.md, \"Each release is tried on a real project first\"); once that record merges holding no cut, this issue closes and the release workflow is started on the owner's standing word. The lines that merge after the commit tried go to the next batch.",
     ].join("\n"),
   };
 }

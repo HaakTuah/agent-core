@@ -1,6 +1,7 @@
 # Writing a rule
 
-Read in the core by whoever writes or changes a rule, or a size cap: the kind `rule`, the paths `floor/`, `roles/`, `tasks/`, `tools/`, `AGENTS.md`, `core-changes/`, `size.mjs` and `general.json`.
+Read in the core by whoever writes or changes a rule, or a size cap: the kind `rule`, the paths `floor/`, `roles/`,
+`tasks/`, `tools/`, `AGENTS.md`, `core-changes/`, `size.mjs` and `general.json`.
 
 - **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`).
   By default what a role reads at its start, as its file under `roles/` names it, with the core's own `AGENTS.md`,
@@ -45,38 +46,37 @@ Read in the core by whoever writes or changes a rule, or a size cap: the kind `r
   keeping the thing does. Nothing changes it. It does not mean a rule names no number: its line costs a line and is asked all
   the same ("Every rule says what holds it"); what is sized is the work of proving. Reason: proof that costs more than
   what it guards against is the overhead it was meant to cut. Held by the review guidelines ("A rule file changed").
-- **A rule is written in the form a check can hold** (#887). By default a rule of the floor, the modules or this file
-  takes a form whose breach a check reads without guessing: whoever writes or changes one looks first for such a form,
-  the rule as asked or one slightly different, writes it, and names the check under "What holds it". The one condition that
-  changes it: the checkable form would change what the rule asks or protects in a way that matters a great deal; then
-  the form only a reading holds is kept, and the pull request says why. The trigger is a rule written or changed: the
-  design check reads each for it, and blocks one held by reading alone where a checkable form exists and the pull
-  request gives no such reason (`roles/shared/review-guidelines.md`, "A rule file changed"); and at each pruning ("Rules
-  are pruned by their numbers") the session that takes it proposes, for each rule with no holder, beside its other
-  proposal, a slightly different form a check could hold, or why none exists (`form` or `noForm` in
+- **A rule is written in the form a check can hold** (#887). By default a rule of the floor, the modules, `AGENTS.md` or
+  `core-changes/` takes a form whose breach a check reads without guessing: whoever writes or changes one looks first
+  for such a form, the rule as asked or one slightly different, writes it, and names the check under "What holds it".
+  The one condition that changes it: the checkable form would change what the rule asks or protects in a way that
+  matters a great deal; then the form only a reading holds is kept, and the pull request says why. The trigger is a rule
+  written or changed: the design check reads each for it, and blocks one held by reading alone where a checkable form
+  exists and the pull request gives no such reason (`roles/shared/review-guidelines.md`, "A rule file changed"); and at
+  each pruning ("Rules are pruned by their numbers") the session that takes it proposes, for each rule with no holder,
+  beside its other proposal, a slightly different form a check could hold, or why none exists (`form` or `noForm` in
   `reports/unheld.json`; a proposal of a check, which holds the rule as worded, or that the rule describes needs
-  neither). A project's design checks read its own rules the same way, from the release that brings it. It does not
-  mean that a rule's purpose is bent to fit a check, that a rule is turned into a line a pull request declares where
-  what it asks is what the work does, that a check that guesses is written, nor that a rule that stands and no change
-  touches is rewritten for it outside a pruning's proposal. Reason: a
-  rule a check holds need not be given to a session ahead of its work once release 7 (#692) begins, and is kept whether
-  or not it is read, while one held by reading costs every session that reads it. Held, for the pruning, by
-  `scripts/pruning.mjs`, whose test reads that the list gives each rule with no holder its checkable form or the reason
-  it has none, or says it has neither yet; for the design check, by no check, since none can tell without guessing
-  whether a form exists.
-- **A rule is written to one pattern.** Whoever writes or changes a rule of the floor, the modules or
-  this file writes it in six parts: the default first, then the one condition that changes it; a trigger someone can
-  observe ("a trial shows the stack misses a need stated in numbers", never `when performance matters`); one actor and
-  one action, who does what; what it does not mean, where a reader could overreach; its reason, in one line; and what
-  holds it (a check, in the form one can hold where there is one, as the rule before says; a staged case or the
-  audit), named under "What holds it" as "Every rule says what holds it" says.
-  Kept out: adjectives that measure nothing (`clean`, `performant`), `should consider`, which binds no one, lists of
-  preferred technologies, which date within months, and whatever a check's failure can say at the moment it matters
-  (#254). A rule that stands and no change touches is the one exception: the audit of the core against itself (#259)
-  brings it to the pattern instead. It does not mean a project's own rules are asked to take this pattern; they may be
-  written the same way, and what holds them is listed as "A project's own rules name what holds them" says. Reason: in one evening three rules were read against what the owner meant, each for want of an observable
-  trigger or a reason. Held by `scripts/general.mjs` with its list "phrases" (`scripts/general.json`), and by the review
-  guidelines ("A rule file changed").
+  neither). A project's design checks read its own rules the same way, from the release that brings it. It does not mean
+  that a rule's purpose is bent to fit a check, that a rule is turned into a line a pull request declares where what it
+  asks is what the work does, that a check that guesses is written, nor that a rule that stands and no change touches is
+  rewritten for it outside a pruning's proposal. Reason: a rule a check holds need not be given to a session ahead of
+  its work once release 7 (#692) begins, and is kept whether or not it is read, while one held by reading costs every
+  session that reads it. Held, for the pruning, by `scripts/pruning.mjs`, whose test reads that the list gives each rule
+  with no holder its checkable form or the reason it has none, or says it has neither yet; for the design check, by no
+  check, since none can tell without guessing whether a form exists.
+- **A rule is written to one pattern.** Whoever writes or changes a rule of the floor, the modules, `AGENTS.md` or
+  `core-changes/` writes it in six parts: the default first, then the one condition that changes it; a trigger someone
+  can observe ("a trial shows the stack misses a need stated in numbers", never `when performance matters`); one actor
+  and one action, who does what; what it does not mean, where a reader could overreach; its reason, in one line; and
+  what holds it (a check, in the form one can hold where there is one, as the rule before says; a staged case or the
+  audit), named under "What holds it" as "Every rule says what holds it" says. Kept out: adjectives that measure nothing
+  (`clean`, `performant`), `should consider`, which binds no one, lists of preferred technologies, which date within
+  months, and whatever a check's failure can say at the moment it matters (#254). A rule that stands and no change
+  touches is the one exception: the audit of the core against itself (#259) brings it to the pattern instead. It does
+  not mean a project's own rules are asked to take this pattern; they may be written the same way, and what holds them
+  is listed as "A project's own rules name what holds them" says. Reason: in one evening three rules were read against
+  what the owner meant, each for want of an observable trigger or a reason. Held by `scripts/general.mjs` with its list
+  "phrases" (`scripts/general.json`), and by the review guidelines ("A rule file changed").
 - **What can be read is never asked or declared** (#481). By default a fact about a project's set-up
   that can be read exactly, from its repository, its host, the tools at hand or the record of its past work, is read by
   a script, and a row of its manifest, or the owner's word, only overrides what was read; what the owner wants (a pace,

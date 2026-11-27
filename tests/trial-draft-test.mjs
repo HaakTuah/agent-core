@@ -1,8 +1,9 @@
-// Tests of the draft in a release's trial (#1334; AGENTS.md, "A release's trial opens its update as a draft in the
-// owner's own projects"): the draft's checks read beside main's on a stand-in for the host, each in its class; no answer
-// for a draft of another owner's, behind a stop switch or one not read, no draft, pinned elsewhere, with no check or one
-// not finished, or a list not read whole; and why none was opened, read. The record the readings make and the cut it
-// holds: tests/trial-draft-record-test.mjs. No call reaches the network, and no process is started. Node's own modules.
+// Tests of the draft in a release's trial (#1334; core-changes/releases.md, "A release's trial opens its update as a
+// draft in the owner's own projects"): the draft's checks read beside main's on a stand-in for the host, each in its
+// class; no answer for a draft of another owner's, behind a stop switch or one not read, no draft, pinned elsewhere,
+// with no check or one not finished, or a list not read whole; and why none was opened, read. The record the readings
+// make and the cut it holds: tests/trial-draft-record-test.mjs. No call reaches the network, and no process is started.
+// Node's own modules.
 //
 //   node tests/trial-draft-test.mjs
 import { OWNER } from "../scripts/core-address.mjs";

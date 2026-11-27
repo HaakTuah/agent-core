@@ -1,12 +1,13 @@
 #!/usr/bin/env node
-// The brief of a release's trial (#1413, point 1; AGENTS.md, "A trial's brief is written by a tested script"): what the
-// orchestrator gives the builder that tries the commit under trial on real projects, step by step, as the trial's rules
-// set it (AGENTS.md, "Each release is tried on a real project first", #1084; "A release's trial opens its update as a
-// draft in the owner's own projects", #1334; "The trial's machine fetches what a project pins", #1361), each step's
-// command one the script it names takes. It finds the owner's own projects as scripts/state-report.mjs --projects finds
-// them; a project of another owner's it takes only by --other, from the orchestrator in private, never found, kept or
-// written anywhere but in what it prints. It prints the brief and writes nothing; where gh gives no answer it prints no
-// brief, since nothing read is not none found (#1112). gh and Node's own modules.
+// The brief of a release's trial (#1413, point 1; core-changes/releases.md, "A trial's brief is written by a tested
+// script"): what the orchestrator gives the builder that tries the commit under trial on real projects, step by step,
+// as the trial's rules set it (core-changes/releases.md, "Each release is tried on a real project first", #1084; "A
+// release's trial opens its update as a draft in the owner's own projects", #1334; "The trial's machine fetches what a
+// project pins", #1361), each step's command one the script it names takes. It finds the owner's own projects as
+// scripts/state-report.mjs --projects finds them; a project of another owner's it takes only by --other, from the
+// orchestrator in private, never found, kept or written anywhere but in what it prints. It prints the brief and writes
+// nothing; where gh gives no answer it prints no brief, since nothing read is not none found (#1112). gh and Node's own
+// modules.
 //
 //   node scripts/trial-brief.mjs <the commit tried, a full SHA> [--other <owner>/<name>]... [--repo <owner>/<name>]...
 //         --repo names the repositories to read in place of the account's, where gh lists none (as state-report.mjs)
@@ -42,7 +43,7 @@ export function brief(sha, own, other = []) {
   return [
     `# The trial of the release at ${s}`,
     "",
-    `You build the trial of the core's release at the commit ${c} (AGENTS.md of the core, "Each release is tried on a real project first"; "A release's trial opens its update as a draft in the owner's own projects"; "The trial's machine fetches what a project pins"). This brief was printed by \`node scripts/trial-brief.mjs\`; it names projects, so it is given in private and copied into no public text. Read the core's stop switch (\`git ls-remote https://github.com/${CORE} refs/heads/agents-stop\`) at your start; where it stands, stop.`,
+    `You build the trial of the core's release at the commit ${c} (core-changes/releases.md of the core, "Each release is tried on a real project first"; "A release's trial opens its update as a draft in the owner's own projects"; "The trial's machine fetches what a project pins"). This brief was printed by \`node scripts/trial-brief.mjs\`; it names projects, so it is given in private and copied into no public text. Read the core's stop switch (\`git ls-remote https://github.com/${CORE} refs/heads/agents-stop\`) at your start; where it stands, stop.`,
     "",
     "The projects:",
     ...projectLines(own, other),

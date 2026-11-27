@@ -1,6 +1,8 @@
 # A part of the core and what is maintained
 
-Read in the core by whoever replaces a part of the core, weighs one, or fetches a tool: the kinds `update` and `choice`, the paths `INVENTORY.md`, `QUEUE.md`, `CHOICES.md`, `choices/`, `node.sh`, `install.mjs` and `.packages/`.
+Read in the core by whoever replaces a part of the core, weighs one, fixes a bug, or fetches a tool: the kinds `update`,
+`choice` and `bug`, the paths `INVENTORY.md`, `QUEUE.md`, `CHOICES.md`, `choices/`, `node.sh`, `install.mjs` and
+`.packages/`.
 
 - **A part of the core gives way to what is maintained** (#534). By default the core keeps the parts it has. The one
   condition that changes it: a maintained tool, package or standard, free to use, does a part's job at the same level or

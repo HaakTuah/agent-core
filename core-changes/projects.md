@@ -1,6 +1,7 @@
 # What a change of the core asks of a project
 
-Read in the core by whoever builds a check, a writer, a sync note or a step, or anything a project's copy runs: the paths `scripts/`, `setup/` and `.github/workflows/`.
+Read in the core by whoever builds what a project's copy runs, a sync note or a step: the paths `scripts/`, `setup/` and
+`.github/workflows/`.
 
 - **Nothing locks a project,** in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
@@ -28,8 +29,8 @@ Read in the core by whoever builds a check, a writer, a sync note or a step, or 
   the .NET one as Windows holds it, its commits made under a listed name), holding old content of each kind a check
   reads and synced to the commit under test, passes every check of the core unchanged, that mend made, starts no job
   it did not start before, and fails a pull request that adds a copy until the mend its failure words is made; by the
-  heading "What it asks of a project" below; and, for the dose, by the scheduled look (`scripts/look.mjs`), which
-  reads it from the shape check's baseline (`scripts/dose.mjs`).
+  heading "What it asks of a project" (`AGENTS.md`); and, for the dose, by the scheduled look (`scripts/look.mjs`),
+  which reads it from the shape check's baseline (`scripts/dose.mjs`).
 - **One process takes the core in** (#1083). By default the starter kit (`scripts/init.mjs`) and every sync
   (`scripts/sync.mjs`) take the core into a repository, a new one or one at any earlier copy, by one process,
   `scripts/converge.mjs` (the kit by the same `converged` of `scripts/core-owned.mjs`), which writes what the core owns

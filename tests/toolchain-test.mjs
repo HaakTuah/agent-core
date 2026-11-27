@@ -1,12 +1,12 @@
 // Tests of the toolchain a release's trial fetches for a project that pins it (scripts/toolchain.mjs; #1361, point 21;
-// AGENTS.md, "The trial's machine fetches what a project pins"): the core's list read in its one form, and each case of
-// a fetch, on a stand-in curl that hands over an archive made here and a stand-in dotnet, so no call reaches the network:
-// a project that pins none, a pin the list holds no sum for (its folder never run, even where one stands), one fetched
-// and checked by its sum, then present, a sum that differs (never opened), a host that does not answer or answers
-// another status, a binary that gives another version, the machine's own SDK kept, a machine the list holds none for, a
-// folder that would stand in the project, and each dotnet run from the file system's root, a global.json where it was
-// started in chosen by none; and a hostile global.json, read bounded, nothing of a version out of form printed. (Not on
-// Windows, where no trial machine runs the fetches.)
+// core-changes/releases.md, "The trial's machine fetches what a project pins"): the core's list read in its one form,
+// and each case of a fetch, on a stand-in curl that hands over an archive made here and a stand-in dotnet, so no call
+// reaches the network: a project that pins none, a pin the list holds no sum for (its folder never run, even where one
+// stands), one fetched and checked by its sum, then present, a sum that differs (never opened), a host that does not
+// answer or answers another status, a binary that gives another version, the machine's own SDK kept, a machine the list
+// holds none for, a folder that would stand in the project, and each dotnet run from the file system's root, a
+// global.json where it was started in chosen by none; and a hostile global.json, read bounded, nothing of a version out
+// of form printed. (Not on Windows, where no trial machine runs the fetches.)
 //
 //   node tests/toolchain-test.mjs
 import crypto from "node:crypto";

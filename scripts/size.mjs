@@ -1,28 +1,29 @@
-// The caps on the core's rules (README.md, "Two layers"): what a role reads at its start stays under that role's cap, so
-// a new rule there replaces text rather than adding to it (core archive 134 and 234; #304). A role's start is what the
-// reading script gives for it (reading.mjs, beside this file): the floor's security.md, the role's own file under
+// The caps on the core's rules (README.md, "Two layers"): what a role reads at its start stays under that role's cap,
+// so a new rule there replaces text rather than adding to it (core archive 134 and 234; #304). A role's start is what
+// the reading script gives for it (reading.mjs, beside this file): the floor's security.md, the role's own file under
 // roles/ and the files that names, with every module a tool's session reads at its start (a builder's own part), and
-// here the core's own AGENTS.md, which CLAUDE.md imports, so that every session reads it at its start (#1202); a
-// file read only when a task calls for it is held instead by the reviews' "content put where its readers must read
-// past it" (roles/shared/review-guidelines.md; core archive 201). A cap keeps the rules lean and decides nothing else: no
-// rule is moved, cut short or left out to fit, and a change that honest trimming gives no room for raises that role's
-// cap in the same pull request, saying why, once a fresh session has read all the rules for room and found too little
-// (AGENTS.md, "How changes are made here"; core archive 179 and 181). That session's answer stands in the pull
-// request as a comment that opens "Leanness check:" (roles/shared/review-guidelines.md, "A mark on what every session
-// reads"), and with --raise this script fails a pull request that raises a role's cap and has no such comment from an
-// account the security-review check counts (security-review.mjs's counted: the repository's owner, or a person whose
-// rights the host gives as letting them write, read by the size workflow for those who posted one), and one that raises
-// it by more than one step. It holds that the comment is there, not what it says, when it was written or that a fresh session
-// wrote it: whether the session found too little room stays with the reviews, as does any change to this check itself
-// and the first cap of a role that had none. A start or the queue past its cap fails a pull request only where its own
-// change grows it there, against the base; where the default branch itself stands past one, since pull requests that
-// each fitted merged together, it is a task, never a red: a warning here, and an issue the scheduled look keeps (`due`,
-// which look.mjs reads; #750, point 6). The size workflow (.github/workflows/size.yml) runs the raise twice: the
-// default branch's version, from the base's own copy before any of the pull request's code runs, reads the head's file
-// as text alone, so that no change to this file decides whether the raise its text sets has its answer; and the pull
-// request's version, as itself, which holds that the caps its text sets are those it runs with. What caps the head's
-// code really holds the rules to, and its count of each role's start, stay its own and its reviews'. Run from this
-// repository's root by the size workflow; git and Node's own modules only.
+// here the core's own AGENTS.md, which CLAUDE.md imports, so that every session reads it at its start (#1202); a file
+// read only when a task calls for it is held instead by the reviews' "content put where its readers must read past it"
+// (roles/shared/review-guidelines.md; core archive 201). A cap keeps the rules lean and decides nothing else: no rule
+// is moved, cut short or left out to fit, and a change that honest trimming gives no room for raises that role's cap in
+// the same pull request, saying why, once a fresh session has read all the rules for room and found too little
+// (core-changes/rules.md, "The size caps keep the rules lean and decide nothing else"; core archive 179 and 181). That
+// session's answer stands in the pull request as a comment that opens "Leanness check:"
+// (roles/shared/review-guidelines.md, "A mark on what every session reads"), and with --raise this script fails a pull
+// request that raises a role's cap and has no such comment from an account the security-review check counts
+// (security-review.mjs's counted: the repository's owner, or a person whose rights the host gives as letting them
+// write, read by the size workflow for those who posted one), and one that raises it by more than one step. It holds
+// that the comment is there, not what it says, when it was written or that a fresh session wrote it: whether the
+// session found too little room stays with the reviews, as does any change to this check itself and the first cap of a
+// role that had none. A start or the queue past its cap fails a pull request only where its own change grows it there,
+// against the base; where the default branch itself stands past one, since pull requests that each fitted merged
+// together, it is a task, never a red: a warning here, and an issue the scheduled look keeps (`due`, which look.mjs
+// reads; #750, point 6). The size workflow (.github/workflows/size.yml) runs the raise twice: the default branch's
+// version, from the base's own copy before any of the pull request's code runs, reads the head's file as text alone, so
+// that no change to this file decides whether the raise its text sets has its answer; and the pull request's version,
+// as itself, which holds that the caps its text sets are those it runs with. What caps the head's code really holds the
+// rules to, and its count of each role's start, stay its own and its reviews'. Run from this repository's root by the
+// size workflow; git and Node's own modules only.
 //
 //   node scripts/size.mjs [--base <revision>]              what each role reads at its start, against its cap, and
 //                                                          the queue against its own mark; with --base, the pull

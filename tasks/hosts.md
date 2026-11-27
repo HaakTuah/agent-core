@@ -49,18 +49,18 @@ harm (floor rule 14): the session that reads it so, a builder before its merge o
 auto-merge off on every other open pull request (`tasks/github-calls.md`) and gives the fix the first lane, or takes it
 as a bug ("Bugs don't wait") where no open pull request says it fixes it. A release is cut, and a build published, only
 where every check on the default branch's newest commit passed, or, for the core's own release, on the commit of it its
-trial tried (`AGENTS.md` of the core, "A release is cut from the commit its trial tried"). Where the host still asks an up-to-date branch and the
-project no longer publishes on each merge, a setting only the owner changes, each pull request is brought up to date in
-its turn, as the merge line says, and the owner is advised to switch it off as a queue offered is, by one issue (the
-same script prints the advice); nothing waits on it ("Nothing locks a project"). It does not mean a pull request merges
-with a failing check or an open finding, nor that a conflict git reports is merged unresolved, nor that users wait for a
-batch: a site is published within one run of the merge. Reason: publishing on each merge forced every pull request
-through a line one at a time, where publishing from a green branch costs the users one run's wait. Held by the release
-workflow, which cuts none from a default branch with a failed check (the core's `release.yml`); by
-`tests/merge-line-test.mjs`, for what `core/scripts/merge-line.mjs` reads and prints of it; by the step of the sync
-notes, for a project's publishing; by the host's ruleset, as its owner sets it; a red default branch fixed first, by
-nothing yet: a check that failed each pull request while it is red would fail its fix too, and auto-merge already on
-merges a pull request that went green before the default branch went red.
+trial tried (`core-changes/releases.md` of the core, "A release is cut from the commit its trial tried"). Where the host
+still asks an up-to-date branch and the project no longer publishes on each merge, a setting only the owner changes,
+each pull request is brought up to date in its turn, as the merge line says, and the owner is advised to switch it off
+as a queue offered is, by one issue (the same script prints the advice); nothing waits on it ("Nothing locks a
+project"). It does not mean a pull request merges with a failing check or an open finding, nor that a conflict git
+reports is merged unresolved, nor that users wait for a batch: a site is published within one run of the merge. Reason:
+publishing on each merge forced every pull request through a line one at a time, where publishing from a green branch
+costs the users one run's wait. Held by the release workflow, which cuts none from a default branch with a failed check
+(the core's `release.yml`); by `tests/merge-line-test.mjs`, for what `core/scripts/merge-line.mjs` reads and prints of
+it; by the step of the sync notes, for a project's publishing; by the host's ruleset, as its owner sets it; a red
+default branch fixed first, by nothing yet: a check that failed each pull request while it is red would fail its fix
+too, and auto-merge already on merges a pull request that went green before the default branch went red.
 
 **The merge line follows the host** (#702). By default the line of ready pull requests that `roles/shared/work-flow.md`
 sets is kept by hand. Where the host offers a merge queue for the repository and it is on, the queue takes the line, and

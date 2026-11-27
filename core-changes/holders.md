@@ -1,6 +1,10 @@
 # What holds a rule, and the records
 
-Read in the core by whoever writes or changes a rule or what holds one, writes an archive item or an entry of a record pull requests add to, or takes a state report or a pruning: the kind `rule`, the paths `floor/`, `roles/`, `tasks/`, `tools/`, `AGENTS.md`, `core-changes/`, `scripts/holders/`, `holders.mjs`, `scripts/staged/`, `staged.mjs`, `pruning.mjs`, `archive/`, `words/`, `INVENTORY.md`, `inventory/`, `setup/sync-notes.md`, `setup/sync-notes/`, `scripts/steps/`, `scripts/stages/`, `CHOICES.md`, `choices/`, `core-address.mjs` and `.github/workflows/core.yml`.
+Read in the core by whoever writes or changes a rule, what holds one, an archive item or a record's entry, or takes a
+state report or a pruning: the kinds `rule` and `audit`, the paths `floor/`, `roles/`, `tasks/`, `tools/`, `AGENTS.md`,
+`core-changes/`, `scripts/holders/`, `holders.mjs`, `scripts/staged/`, `staged.mjs`, `pruning.*`, `unheld.json`,
+`archive/`, `words/`, `INVENTORY.md`, `inventory/`, `sync-notes.md`, `setup/sync-notes/`, `scripts/steps/`,
+`scripts/stages/`, `CHOICES.md`, `choices/`, `core-address.mjs` and `core.yml`.
 
 - **Every rule says what holds it.** By default a rule of the floor or the modules is held by
   a check that fails where it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no
@@ -46,11 +50,11 @@ Read in the core by whoever writes or changes a rule or what holds one, writes a
   rules by what holds them. The session that takes it gives, on its line "rules held by a check", how many of the
   project's own rules a check holds whole and how many of the core's it takes, as the core's list maps them, counting
   none whose every check read nothing there ("A check that read nothing says so"); the core's report of the projects
-  carries it as numbers alone, and the core's own report gives the same of the core's own rules, those of this file,
-  beside the floor's and the modules'. Nothing changes it. It does not mean the share is a target, nor that a check the
-  core's list names (a ruleset of the host's) is read as set up in the project. Reason: the owner sees how much of what
-  binds a project a check holds there, which a count of the core alone hides. Held by `tests/look-test.mjs` and
-  `tests/holders-test.mjs`, the core's own count included (#925).
+  carries it as numbers alone, and the core's own report gives the same of the core's own rules, those of `AGENTS.md`
+  and `core-changes/`, beside the floor's and the modules'. Nothing changes it. It does not mean the share is a target,
+  nor that a check the core's list names (a ruleset of the host's) is read as set up in the project. Reason: the owner
+  sees how much of what binds a project a check holds there, which a count of the core alone hides. Held by
+  `tests/look-test.mjs` and `tests/holders-test.mjs`, the core's own count included (#925).
 - **Staged cases hold what no check reads** (#235). By default a rule is held by a check; where none
   can read its breach exactly, since the breach lies in what a session does, a staged case holds it: a scratch project
   (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by
@@ -72,27 +76,27 @@ Read in the core by whoever writes or changes a rule or what holds one, writes a
   report a session of a newer generation of model takes than the last pruning's (`node scripts/pruning.mjs --due --model
   <its id>`), the session that takes the report runs each staged case with the rules it holds taken out
   (`scripts/pruning.mjs --set`, then `--read`), records the counts (`--record`) and adds as a note the list `node
-  scripts/pruning.mjs` prints, the record in a pull request of its own: the rules of the floor, the modules and this
-  file whose number did not move since the last pruning, whose check no failed step of a pull request's run shows
-  firing, whose case passed without them, or whose number, a stand-in, moved at two prunings while its outcome's direct
-  measures did not. A rule fewer than twenty merged pull requests have come under since it joined is "too early" and not
-  judged, and one that guards against rare and severe harm, the floor's and any whose number says so, is judged by its
-  staged case alone, never listed for a check that did not fire. Ahead of all these, the list leads with the rules
-  `scripts/holders.mjs` counts as having no holder, worst first, a rule read at a role's or a tool's start before one
-  read on need, each with its proposal in `reports/unheld.json` (#545): a check or staged case that could hold it, filed
-  as a task; a move to a module read on need; that it goes; or, where it binds no one, that it describes. The session
-  gives one to each that has none, a check only where it never guesses and its upkeep pays, a maintained tool where one
-  reads the breach (#534) and a maintained linter's rule that can be switched on before a check written by hand, takes
-  out those whose rule gained a holder, and files each check as an issue, which joins the queue as any check for a rule
-  that stands does, worst first; a rule that guards against rare and severe harm is proposed a holder, never to go.
-  Nothing changes it. The owner decides which move or go, a few at a time, the numbers read again before more go; the
-  list gives each rule its step: a rule read at a role's start is at step 1, to move to a module read on need, and one
-  read on need at step 2, to go where nothing changed after its move, kept in the archive with its reason and its last
-  number, and free to return. It does not mean that a session removes or moves a rule by its own choice, that a listed
-  rule goes, or that a new rule waits for a holder. Reason: the core tested that a rule holds and never whether it is
-  still needed, and an unneeded one costs every session that reads it; on 17 November 2026, 189 of its 310 rules were
-  held by being read alone. Held by `scripts/pruning.mjs`, which makes the list, its test reading that the rules with no
-  holder lead it, and by the state report, which says when a pruning is due.
+  scripts/pruning.mjs` prints, the record in a pull request of its own: the rules of the floor, the modules, `AGENTS.md`
+  and `core-changes/` whose number did not move since the last pruning, whose check no failed step of a pull request's
+  run shows firing, whose case passed without them, or whose number, a stand-in, moved at two prunings while its
+  outcome's direct measures did not. A rule fewer than twenty merged pull requests have come under since it joined is
+  "too early" and not judged, and one that guards against rare and severe harm, the floor's and any whose number says
+  so, is judged by its staged case alone, never listed for a check that did not fire. Ahead of all these, the list leads
+  with the rules `scripts/holders.mjs` counts as having no holder, worst first, a rule read at a role's or a tool's
+  start before one read on need, each with its proposal in `reports/unheld.json` (#545): a check or staged case that
+  could hold it, filed as a task; a move to a module read on need; that it goes; or, where it binds no one, that it
+  describes. The session gives one to each that has none, a check only where it never guesses and its upkeep pays, a
+  maintained tool where one reads the breach (#534) and a maintained linter's rule that can be switched on before a
+  check written by hand, takes out those whose rule gained a holder, and files each check as an issue, which joins the
+  queue as any check for a rule that stands does, worst first; a rule that guards against rare and severe harm is
+  proposed a holder, never to go. Nothing changes it. The owner decides which move or go, a few at a time, the numbers
+  read again before more go; the list gives each rule its step: a rule read at a role's start is at step 1, to move to a
+  module read on need, and one read on need at step 2, to go where nothing changed after its move, kept in the archive
+  with its reason and its last number, and free to return. It does not mean that a session removes or moves a rule by
+  its own choice, that a listed rule goes, or that a new rule waits for a holder. Reason: the core tested that a rule
+  holds and never whether it is still needed, and an unneeded one costs every session that reads it; on 17 November
+  2026, 189 of its 310 rules were held by being read alone. Held by `scripts/pruning.mjs`, which makes the list, its
+  test reading that the rules with no holder lead it, and by the state report, which says when a pruning is due.
 - **The archive keeps the reasoning; the owner's words stay here** (#252). By default each item of the core's archive
   stands in the core's own words (`archive/instructions/`: its date and source, what was asked, what was decided and
   what it stands behind), and that is what a project's copy carries and "core archive N" leads to; the record of the
@@ -106,14 +110,14 @@ Read in the core by whoever writes or changes a rule or what holds one, writes a
   Held, in part, by `scripts/holders.mjs`, which fails the two forms out of step (`scripts/archive.mjs`), and by
   `.github/workflows/core.yml`, which fails a copy that holds what `.gitattributes` keeps here; what is quoted, by what
   holds floor rule 4's "The owner's word".
-- **The archive is pointed to from the list,** not from the rule (#252). By default a rule file here (this file, the
-  floor's, the roles' and the modules') holds no "core archive N": `scripts/holders/` names under "behind" the
-  items behind each rule, and a session that needs a rule's reason looks them up there. Whoever writes or changes a
-  rule adds its items to that list in the same pull request. Nothing changes it. It does not mean a rule loses its
-  one-line reason, which stays in it ("A rule is written to one pattern"), nor that a project's own rule files are
+- **The archive is pointed to from the list,** not from the rule (#252). By default a rule file here (`AGENTS.md`,
+  `core-changes/`, the floor's, the roles' and the modules') holds no "core archive N": `scripts/holders/` names under
+  "behind" the items behind each rule, and a session that needs a rule's reason looks them up there. Whoever writes or
+  changes a rule adds its items to that list in the same pull request. Nothing changes it. It does not mean a rule loses
+  its one-line reason, which stays in it ("A rule is written to one pattern"), nor that a project's own rule files are
   asked anything. Reason: about 60 such pointers stood in what every session reads at its start, and a builder on an
-  ordinary task never opens the archive. Held by `scripts/holders.mjs`, which fails a pointer in a rule file and an item the list names
-  that is not in the archive.
+  ordinary task never opens the archive. Held by `scripts/holders.mjs`, which fails a pointer in a rule file and an item
+  the list names that is not in the archive.
 - **A new archive item is named by its issue** (#744). By default an item added to the archive is keyed by the issue
   that carries the owner's word and, where it records one point of several, by that point, as `#733.1`, and stands in
   a file of its own named by its key (`archive/instructions/issue-733.1.md`; #750, point 1); `scripts/holders/`
