@@ -86,7 +86,6 @@ export function verdict(head, base = null) {
   return { fails, notes };
 }
 
-
 if (guard(import.meta.url)) {
   const core = process.argv.includes("--core"), base = core ? "" : process.env.ENTRY_BASE ?? "";
   // (the work tree's files as ownText reads them, a link inside the project followed, and the base's as readAt reads
