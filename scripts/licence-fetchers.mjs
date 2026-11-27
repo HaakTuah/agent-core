@@ -51,7 +51,7 @@ export const WINDOWS_FETCHER = (() => {
 // connection and downloads nothing (#1437): its arguments all strings, but an option's value and, after "--", the folder
 // it clones to; its options among those below, none that reaches past the source (submodules, a config that rewrites an
 // address); its source a file:// address, or a path with no ":" (no scheme, no host:path, no transport::), or one that
-// starts with "/", "./" or "../" before anything held in a variable; and its call one of Node's that runs a program
+// starts with "/", "./" or "../" before a value held in a name; its program "git" by that name alone; and its call one of Node's that runs a program
 // through no shell, by the name the file imports it by, closed after the array or after an object of options among a
 // few, none a shell or an environment. Anything else the scan cannot read exactly, and stays a fetch.
 const CLONE_FLAGS = new Set(["-q", "--quiet", "-v", "--verbose", "--progress", "-n", "--no-checkout", "--bare", "--mirror", "--single-branch", "--no-single-branch", "--no-tags", "-l", "--local", "--no-local", "--no-hardlinks", "-s", "--shared"]);
@@ -80,14 +80,21 @@ function exprEnd(text, i) {
   }
   return -1;
 }
+// A value whose reading changes nothing: a name, or names joined by ".", String() of a name, a number, true or false.
+const NAME = "[A-Za-z_$][\\w$]*", SIMPLE = new RegExp(`^(?:${NAME}(?:\\.${NAME})*|String\\(${NAME}\\)|\\d[\\d_]*|true|false)$`, "u");
 // What an argument written as `source` is: a string ("text", its value), a template ("template", its text before any
-// ${}; "text" where it holds none), a spread, or anything else; a backslash leaves it unread, so "other".
+// ${}, each ${} a value above; "text" where it holds none), a spread, or anything else ("other", its text); a backslash
+// leaves it unread, so "other".
 function argument(source) {
   const string = /^(?:"([^"\\\n]*)"|'([^'\\\n]*)')$/u.exec(source), template = /^`([^`\\]*)`$/u.exec(source);
   if (string) return { kind: "text", value: string[1] ?? string[2] };
-  if (template) return template[1].includes("${") ? { kind: "template", head: template[1].slice(0, template[1].indexOf("${")) } : { kind: "text", value: template[1] };
-  return { kind: source.startsWith("...") ? "spread" : "other" };
+  const parts = template && [...template[1].matchAll(/\$\{([^}]*)\}/gu)];
+  if (parts?.length && parts.every((p) => SIMPLE.test(p[1].trim())) && !template[1].replace(/\$\{[^}]*\}/gu, "").includes("${")) return { kind: "template", head: template[1].slice(0, template[1].indexOf("${")) };
+  if (template && !template[1].includes("${")) return { kind: "text", value: template[1] };
+  return { kind: source.startsWith("...") ? "spread" : "other", raw: source };
 }
+// Whether the argument a, an option's value or a folder, reads as a string, a template or a value above.
+const readable = (a) => a.kind === "text" || a.kind === "template" || (a.kind === "other" && SIMPLE.test(a.raw));
 // The arguments of an array that opens at text[i], and the place after its "]", or null where one cannot be read.
 function arrayAt(text, i) {
   const out = [];
@@ -100,17 +107,19 @@ function arrayAt(text, i) {
     i = text[end] === "," ? end + 1 : end;
   }
 }
-const localSource = (a) => (a.kind === "text" && !a.value.includes("\n") && (a.value.startsWith("file://") || (a.value !== "" && !a.value.includes(":") && !/^(?:-|\/\/|\\\\)/u.test(a.value)))) ||
+// A source read as local: a file:// address of no host ("file:///" or a drive's "file://C:/"), no second separator and no
+// "%" after; a plain path of no ":", not "-", "//" or "\\\\" first; or a template that starts with one before its ${}.
+const localSource = (a) => (a.kind === "text" && (/^file:\/\/(?:\/|[A-Za-z]:\/)(?![/\\])[^%\n]*$/u.test(a.value) || (a.value !== "" && !/[:\n]/u.test(a.value) && !/^(?:-|\/\/|\\\\)/u.test(a.value)))) ||
   (a.kind === "template" && (a.head.startsWith("file://") || /^(?:\/(?!\/)|\.\.?\/)/u.test(a.head)));
 // How many arguments the option args[k] takes, itself and its value, or 0 where it is none of those above.
 function optionAt(args, k) {
   const { value } = args[k];
   if (CLONE_FLAGS.has(value) || (value.startsWith("--") && value.includes("=") && CLONE_VALUED.has(value.split("=")[0]))) return 1;
-  return CLONE_VALUED.has(value) && args[k + 1] && args[k + 1].kind !== "spread" ? 2 : 0;
+  return CLONE_VALUED.has(value) && args[k + 1] && readable(args[k + 1]) ? 2 : 0;
 }
-// Whether a, the folder a clone writes to, cannot be read as an option: anything after "--"; before it, a string or a
-// template that does not start with "-".
-const notOption = (a, ended) => ended || (a.kind === "text" ? a.value !== "" : a.kind === "template" && /^[^-]/u.test(a.head));
+// Whether a, the folder a clone writes to, cannot be read as an option: anything readable after "--"; before it, a string
+// or a template that does not start with "-".
+const notOption = (a, ended) => (ended && readable(a)) || (a.kind === "text" ? a.value !== "" : a.kind === "template" && /^[^-]/u.test(a.head));
 // Whether the arguments of a clone, after "clone", read exactly as one of a local source (above).
 function localArguments(args) {
   let source = null, folder = false, ended = false;
@@ -127,6 +136,13 @@ function localArguments(args) {
 }
 // The options a call may give a local clone: none of them runs it through a shell or sets its environment.
 const CALL_OPTIONS = new Set(["cwd", "stdio", "encoding", "timeout", "maxBuffer", "windowsHide"]);
+// Whether the value of a call's option reads as one above, or as an array of plain strings.
+const optionValue = (raw) => readable(argument(raw)) || /^\[\s*(?:(?:"[\w-]*"|'[\w-]*')\s*,?\s*)*\]$/u.test(raw);
+// The place where the value of a call's option at text[i] ends, or -1 where it does not read as one above.
+function valueEnd(text, i) {
+  const end = exprEnd(text, i);
+  return end >= 0 && optionValue(text.slice(i, end).trim()) ? end : -1;
+}
 // The place after the "}" of an object of options that opens at text[i], each of its keys among those above, written
 // plainly, alone or with a value that can be read, or -1.
 function optionsEnd(text, i) {
@@ -136,7 +152,7 @@ function optionsEnd(text, i) {
     if (key[0].trim() === "}") return i + key[0].length;
     if (!CALL_OPTIONS.has(key[1] ?? key[2] ?? key[3]) || (!key[4] && !key[1])) return -1;
     i += key[0].length;
-    if (key[4]) i = exprEnd(text, i);
+    if (key[4]) i = valueEnd(text, i);
     else while (/\s/u.test(text[i] ?? "")) i++;
     if (text[i] !== "," && text[i] !== "}") return -1;
     if (text[i] === ",") i++;
@@ -151,16 +167,19 @@ function callCloses(text, end) {
 }
 // The functions of Node's that run a program with its arguments as given, through no shell unless an option says so.
 const DIRECT_CALLS = new Set(["execFileSync", "execFile", "spawnSync", "spawn"]);
-// Whether the call whose first argument opens at text[i] is of one of those functions by its own name, which the file
-// imports by that name from node:child_process.
+const IMPORTS = /^import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["'];?$/gmu;
+// Whether the call whose first argument opens at text[i] is of one of those functions by its own name, called alone (no
+// ".", "?." or "#" before it), which the file imports by that name from node:child_process and uses nowhere but in calls.
 function directCall(text, i) {
-  const name = /(?:^|[^\w$.])([A-Za-z]+)\s*\(\s*$/u.exec(text.slice(Math.max(0, i - 40), i))?.[1];
-  return DIRECT_CALLS.has(name) && [...text.matchAll(/^import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["'];?$/gmu)]
-    .some((m) => m[1].split(",").some((entry) => entry.trim() === name));
+  const call = /([\w$]+)\s*\(\s*$/u.exec(text.slice(0, i)), name = call?.[1];
+  if (!DIRECT_CALLS.has(name) || /[.#]$/u.test(text.slice(0, call.index).trimEnd())) return false;
+  const rest = text.replace(IMPORTS, (line, names) => (names.split(",").some((entry) => entry.trim() === name) ? "\0" : line));
+  return rest.includes("\0") && [...rest.matchAll(new RegExp(`(?<![\\w$#])${name}(?![\\w$])`, "gu"))]
+    .every((m) => /^\s*\(/u.test(rest.slice(m.index + name.length)) && !/(?:\bfunction\s*|\*|[.#])\s*$/u.test(rest.slice(0, m.index)));
 }
 // Whether the match m of OTHER_FETCHER is a clone by git, written as an array, whose source reads exactly as local (above).
 function localClone(text, m) {
-  if (!/^['"`](?:[^'"`\s]*[/\\])?git['"`]\s*,\s*\[\s*['"`]clone$/u.test(m[0])) return false;
+  if (!/^['"`]git['"`]\s*,\s*\[\s*['"`]clone$/u.test(m[0])) return false;
   const array = arrayAt(text, m.index + m[0].lastIndexOf("["));
   return Boolean(array) && array.args[0]?.value === "clone" && localArguments(array.args) && callCloses(text, array.end) && directCall(text, m.index);
 }
