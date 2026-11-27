@@ -75,8 +75,8 @@ export function regularText(file, { linked = true, bound = 1 << 20 } = {}) {
   const { O_RDONLY, O_NOFOLLOW, O_NONBLOCK } = fs.constants;
   // (where the platform gives no flag that refuses a link as it opens, as Windows, the link is refused before it)
   if (!linked && O_NOFOLLOW === undefined && isLink(file)) return null;
-  // (where it follows a link, what the link leads to is looked at first, and only a regular file opened: a device or a
-  // pipe is never opened; the file opened must then be the one looked at)
+  // (where it follows a link, what the link leads to is looked at first, and opened only where it is a regular file; the
+  // file opened must then be the one looked at, else nothing of it is read)
   const seen = linked ? lookedAt(file, bound) : undefined;
   if (seen === null) return null;
   let fd;

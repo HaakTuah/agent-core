@@ -35,17 +35,28 @@ const { ok, done } = tally();
   }
 }
 
-// (where the reader follows a link, what it leads to is looked at before it is opened: a device, or a link to one, is never
+// (where the reader follows a link, what it leads to is looked at before it is opened: a device, or a link to one, is not
 // opened, and reads as no regular file; /dev/null stands for any device, whose opening does nothing)
 if (process.platform !== "win32") { // (a device at that path and a link need what Windows may not give)
-  const dir = scratchDir("core-path-read-device-"), pipe = "/dev/null", linked = path.join(dir, "core-manifest.md");
-  fs.symlinkSync(pipe, linked);
+  const dir = scratchDir("core-path-read-device-"), device = "/dev/null", linked = path.join(dir, "core-manifest.md");
+  fs.symlinkSync(device, linked);
   const opened = [], { openSync } = fs;
   fs.openSync = (file, ...rest) => { opened.push(file); return openSync(file, ...rest); };
   let texts;
-  try { texts = [manifestText(linked), manifestText(pipe), regularText(linked)]; } finally { fs.openSync = openSync; }
+  try { texts = [manifestText(linked), manifestText(device), regularText(linked)]; } finally { fs.openSync = openSync; }
   ok(texts[0] === "" && texts[1] === "" && texts[2] === null && opened.length === 0,
-    "a device, or a link that leads to one, is never opened where the reader follows a link, and reads as no regular file", JSON.stringify({ texts, opened }));
+    "a device, or a link that leads to one, is not opened where the reader follows a link, and reads as no regular file", JSON.stringify({ texts, opened }));
+}
+
+// (where the reader follows a link, the file opened must be the file looked at: one that is another is not read)
+{
+  const at = path.join(scratchDir("core-path-read-other-"), "core-manifest.md");
+  fs.writeFileSync(at, copied("vendor/core/"));
+  const { statSync } = fs;
+  fs.statSync = (file, ...rest) => { const seen = statSync(file, ...rest); return file === at ? Object.assign(seen, { ino: seen.ino + 1 }) : seen; };
+  let text;
+  try { text = regularText(at); } finally { fs.statSync = statSync; }
+  ok(text === null, "a file opened that is not the one looked at is not read", JSON.stringify(text));
 }
 
 done("how the manifest's reader reads a file");
