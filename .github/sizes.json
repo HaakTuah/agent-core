@@ -37,6 +37,8 @@
     "scripts/staged.mjs": { "mark": 30534, "why": "the question of a split is asked in #1157" },
     "scripts/init.mjs": { "mark": 30906, "why": "the question of a split is asked in #1098" },
     "tests/checks-test.mjs": { "mark": 22508, "why": "the question of a split is asked in #1391" },
+    "scripts/lookup-pypi.mjs": { "mark": 23147, "why": "the question of a split is asked in #1431" },
+    "tests/lookup-pypi-test.mjs": { "mark": 22191, "why": "the question of a split is asked in #1431" },
     "tests/trial-test.mjs": { "mark": 21844, "why": "the question of a split is asked in #1391" },
     "tests/check-test.mjs": { "mark": 31544, "why": "#1073: npm stand-in's test split off; the rest is one scratch project's cases, written again by a split" },
     "scripts/check.mjs": { "mark": 33867, "why": "the question of a split is asked in #1064" },
