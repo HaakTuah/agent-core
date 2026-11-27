@@ -46,6 +46,10 @@ import { keysOf, shapeFaults } from "./schemas.mjs";
 import { didNotRun } from "./packages.mjs";
 import { uncommented } from "./yaml-keys.mjs";
 import { listForm, listNow, valuesTwice } from "./copies-values.mjs";
+import { guard } from "./mend.mjs";
+
+guard(import.meta.url); // (an error it does not catch fails with its mend: mend.mjs)
+
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
 // core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
 // (git says it, as the path from the root to this folder, so no spelling of a path, such as Windows' short names,

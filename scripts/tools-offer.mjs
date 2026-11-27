@@ -22,9 +22,9 @@ import { fileURLToPath } from "node:url";
 import { HOOKS } from "./holders.mjs";
 import { FILES, TEMPLATES } from "./init.mjs";
 import { ENTRY_FILES } from "./rule-files.mjs";
-import { started } from "./started.mjs";
 import { MODULE as WAYS_MODULE, readWays } from "./ways.mjs";
 import { asText, parseBounded } from "./guards.mjs";
+import { guard } from "./mend.mjs";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const TABLE = "tasks/tools.md";
@@ -136,7 +136,7 @@ const gitFiles = root => execFileSync("git", ["-C", root, "ls-files", "-z"], { e
 export const openFrom = answer => { const a = typeof answer === "string" && answer.length <= 20 ? answer.trim() : null; return a === "open" ? true : a === "closed" ? false : null; };
 const ghOpen = n => { try { return openFrom(execFileSync("gh", ["api", `repos/{owner}/{repo}/issues/${n}`, "--jq", ".state"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 20000 })); } catch { return null; } };
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const tools = parseBounded(fs.readFileSync(path.join(ROOT, "scripts/staged-tools.json"), "utf8")).tools;
   const r = wrong({ tools, tracked: gitFiles(ROOT), isOpen: process.argv.includes("--open") ? ghOpen : () => null });
   console.log(`The table of what the core offers each tool: ${tools.length} tools, ${r.wrong.length} wrong${r.unread.length && process.argv.includes("--open") ? `; gh could not say whether ${r.unread.map(n => `#${n}`).join(", ")} ${r.unread.length > 1 ? "are" : "is"} open, so nothing fails for ${r.unread.length > 1 ? "them" : "it"}` : ""}.`);

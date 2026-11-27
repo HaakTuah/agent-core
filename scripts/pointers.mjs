@@ -46,6 +46,9 @@ import { markdownReader } from "./markdown.mjs";
 import { DEEPEST, LIST, SEARCHED, brokenNames, listOf, nameKey } from "./names.mjs";
 import { didNotRun, installed } from "./packages.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
+import { guard } from "./mend.mjs";
+
+guard(import.meta.url); // (an error it does not catch fails with its mend: mend.mjs)
 
 // (a listing of the project's tracked paths grows with it, so git's output is read into a buffer of 256 MB, the bound the
 // core's other checks of a project's listing keep, and not Node's default 1 MB, which a project of about 20,000 files

@@ -27,7 +27,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      line, `tests/tools-read-test.mjs`; and for the order's own reading of names and asks, `tests/stage-order-test.mjs`.
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
-     the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
+     the selection of tests (`scripts/select.mjs`, its reader of the folders a file lists `scripts/select-folders.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
      a pull request adds under its manifest's "Differences" (`scripts/pr-reasons.mjs`), the numbers of the entries of
      `scripts/holders/` it adds or changes (`scripts/pr-number.mjs`, which reads a tree's regular files alone in four
      calls of git whatever their count, a link or a submodule refused with its mend), the rule files a checkout
@@ -52,7 +52,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      (`scripts/tree-walk.mjs`), while of JavaScript and TypeScript it gives the parser nothing, reading their imports
      without it; and of all the files a pull request changes together, 4,000,000 characters and 1.5 s of reading, of any
      one file of JavaScript, TypeScript or Python it leaves as it was, 4,000,000 characters, 1.5 s to link the files and follow
-     the links from each test, and 3 s for the whole of it, the project's own files read too, past which the selection
+     the links from each test, a string a file that lists a folder holds past twice the longest path and 64 more read as naming none, and 3 s for the whole of it, the project's own files read too, past which the selection
      reads no more and runs the whole suite (`scripts/hurry.mjs`); hostile tests: `tests/hostile-pr-changes-test.mjs`, and for the entries' numbers,
      `tests/pr-description-entries-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
@@ -97,7 +97,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository (the
      workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`, `scripts/releases.mjs`,
      `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`, `scripts/clean-merges.mjs`,
-     `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs`, `scripts/stage-order.mjs`,
+     `scripts/security-review.mjs`, `scripts/merge-line.mjs` with `scripts/merge-line-measure.mjs`, `scripts/runners.mjs`, `scripts/stage-order.mjs`,
      `scripts/tools-offer.mjs`, the owner's settings (`scripts/owner-settings.mjs`: a repository's settings, its default
      branch's rules and its secrets' names, never a value) and the scheduled look's reader of the default branch's newest commit, read as a time
      alone (`scripts/look.mjs`, in `scripts/look-pulls.mjs`), and
@@ -200,6 +200,17 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      the list holds or refuses; limits: 64 KB of the file, nested no deeper than JSON's bounded reader allows (200), 80
      characters of the SDK it names, 900 s for the download and for each run, 256 MB of a run's output; hostile tests:
      `tests/toolchain-test.mjs`.
+   - what the daily try of the core reads of the owner's own projects (`scripts/daily-try.mjs`): GitHub's list of the
+     owner's repositories and their manifests, the verdicts the projects' checks write before and after the sync, and
+     the counts line ending each runner's log; a repository is kept only where its owner's login is the owner's, a
+     manifest as text, the verdicts only through the trial's reader (`release-trial.mjs`), a runner's line only as whole
+     numbers, the commit and what its project came to, and only where it gives that runner's own number, `--local` too;
+     the issue filed is built from those numbers alone and names no project; each project runs alone on a fresh runner,
+     its code as a user outside sudo with no environment, key, token or runner's file; limits: 500 pages of 100
+     repositories, 256 MB of an answer, 1 MB of a manifest (past it, no project), 16 MB of verdicts (past it, none
+     written), 16 MB of a runner's log, 4 KB of its line and 10,000 of each count (past them, it said nothing), 256
+     runners, 25 minutes a run of a project's checks or sync, 10 a clone, 120 a runner's job, 10 the list's and
+     filing's; hostile tests: `tests/daily-try-test.mjs`, `tests/daily-try-file-test.mjs`.
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
    (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are
    tools that only run, each with its licence in its audit (`.github/licences-audit.json`). Among them is Node

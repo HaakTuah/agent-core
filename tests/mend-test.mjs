@@ -15,6 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { failures, mended, unmended } from "../scripts/mend.mjs";
+import { ANSWERS } from "../scripts/check-runs-read.mjs";
 import { folders, partsIn, whole } from "../scripts/inventory.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -87,6 +88,7 @@ const CHECKS = {
 const NOT_CHECKS = {
   "scripts/core-moved.mjs": "runs on a schedule, and tells a project the core has moved",
   "scripts/look.mjs": "runs on a schedule, and opens issues",
+  "scripts/daily-try.mjs": "runs on a schedule, tries the core on the owner's own projects and files a bug from its counts, and fails no pull request",
   "scripts/issue-terms.mjs": "runs on a schedule, takes the personal terms out of issues and comments, and fails nothing",
   "scripts/lychee.sh": "fetches the link checker the pointer check runs, at set-up, and always exits 0; the check (pointers.mjs) says where it was not fetched",
   "scripts/test-downloads.sh": "fetches, at set-up, what the tests that run with the network cut off need, and always exits 0; the tests that need it fail saying their own mend where it was not fetched",
@@ -249,6 +251,28 @@ for (const [check, test] of Object.entries(CHECKS)) {
   ok(fs.existsSync(path.join(root, check)) && reads, `${check}: its test, ${test}, reads its failures for their mend${reads ? ""
     : `${text ? "" : " (no such test)"}. Mend: in ${test}, run the check where it fails and ask mended() of scripts/mend.mjs of its output`}`);
 }
+
+// each check of Node's whose entry runs through guard() (#1140, point 1): its import from mend.mjs and its call
+for (const check of Object.keys(CHECKS).filter(c => c.endsWith(".mjs"))) {
+  let text = "";
+  try { text = fs.readFileSync(path.join(root, check), "utf8"); } catch { /* read as missing below */ }
+  // (or, in a script that stands alone, as the start hook runs reading.mjs from stdin, mend.mjs imported late)
+  const through = (/^import \{[^}]*\bguard\b[^}]*\} from "\.\/mend\.mjs";$/mu.test(text) || /\(await import\("\.\/mend\.mjs"\)\)\.guard\(import\.meta\.url\)/u.test(text))
+    && /\bguard\(import\.meta\.url\)/u.test(text);
+  ok(through, `${check}: its entry runs through guard(), so an error it does not catch fails with its mend${through ? ""
+    : `. Mend: start the script through \`guard()\` from \`scripts/mend.mjs\`: import { guard } from "./mend.mjs", and write its entry as if (guard(import.meta.url)) { ... } in place of started(), or call guard(import.meta.url) before its first statement`}`);
+}
+// each hostile test runs the core's scripts through check-runs.mjs, which reads each run that fails (#1140, point 2)
+const hostile = fs.readdirSync(path.join(root, "tests")).filter(f => /^hostile-.+-test\.mjs$/u.test(f));
+ok(hostile.length > 0, `the hostile tests are found${hostile.length ? "" : ". Mend: run the test from the core's clone, where tests/hostile-*-test.mjs stand"}`);
+for (const f of hostile) {
+  const text = fs.readFileSync(path.join(root, "tests", f), "utf8");
+  const watched = !/["'`](?:node:)?child_process["'`]/u.test(text);
+  ok(watched, `tests/${f} runs what it starts through scripts/check-runs.mjs${watched ? ""
+    : `. Mend: in tests/${f}, import spawnSync and execFileSync from "../scripts/check-runs.mjs" in place of "node:child_process"`}`);
+}
+const answerFaults = [...ANSWERS].filter(a => a in CHECKS || !fs.existsSync(path.join(root, a)));
+ok(answerFaults.length === 0, `each proof whose exit code is its answer is there and no check${answerFaults.length ? `: not so for ${answerFaults.join(", ")}. Mend: take it out of ANSWERS in scripts/check-runs-read.mjs` : ""}`);
 
 console.log(`${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

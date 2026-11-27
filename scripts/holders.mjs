@@ -41,9 +41,9 @@ import { NUMBER } from "./outcomes.mjs";
 import { didNotRun, installed } from "./packages.mjs";
 import { FOLDERS, ROOT, rules } from "./rules.mjs";
 import { shapeFaults } from "./schemas.mjs";
-import { started } from "./started.mjs";
 import { CASES } from "./staged.mjs";
 import { asText, parseBounded } from "./guards.mjs";
+import { guard } from "./mend.mjs";
 
 // (what a project's own list reads, and the shared pieces, stay importable from here, as they were before the split)
 export { FILE, HOOKS, OWN, counts, ownHolders, ownReport, writeOwn };
@@ -204,9 +204,9 @@ function unchecked() {
   if (!installed("ajv")) console.log(didNotRun(`The form of ${FILE}/ was not checked`, "ajv"));
 }
 
-if (started(import.meta.url) && process.argv.includes("--own")) {
+if (guard(import.meta.url) && process.argv.includes("--own")) {
   ownMain();
-} else if (started(import.meta.url)) {
+} else if (guard(import.meta.url)) {
   unchecked();
   const h = holders();
   const lines = report().map(l => l.slice(2));

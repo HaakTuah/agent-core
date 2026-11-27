@@ -8,7 +8,7 @@
   `scripts/own-files.mjs`, `scripts/runners.mjs`, `scripts/read-nothing.mjs`, `scripts/core-reading.mjs`, `scripts/attached.mjs`,
   `scripts/owner-settings.mjs`, `scripts/owner-settings.json`, `tests/owner-settings-test.mjs`, `scripts/review-caller.mjs`, `tests/review-caller-test.mjs`,
   `setup/sync-notes.md`, `setup/sync-notes/`, `tests/init-dotnet-test.mjs`, `scripts/steps-kit.mjs`,
-  `tests/steps-checks-run-test.mjs`, `tests/steps-files-test.mjs`, `tests/steps-tool-files-test.mjs`, `tests/steps-fetched-test.mjs`,
+  `tests/steps-checks-run-test.mjs`, `tests/steps-select-jobs-test.mjs`, `tests/steps-files-test.mjs`, `tests/steps-tool-files-test.mjs`, `tests/steps-fetched-test.mjs`,
   `tests/steps-slots-test.mjs`, `tests/steps-fresh-test.mjs`, `tests/fresh-config-paths-test.mjs`, `tests/steps-vendored-test.mjs`,
   `tests/steps-own-configs-test.mjs`, `tests/steps-run-configs-test.mjs`, `tests/steps-run-wrappers-test.mjs`,
   `tests/steps-run-words-test.mjs`, `tests/steps-write-test.mjs`, `tests/steps-write-tools-test.mjs`, `tests/step-writers-crlf-test.mjs`, `tests/steps-run-hostile-test.mjs`: the starter kit

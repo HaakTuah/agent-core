@@ -269,10 +269,16 @@ export function forRelease(record, { boundBefore = false, cut = [], since = null
 // its output, throwing where git fails) from that commit's record, never the working folder's, and from the record of
 // the release before (`before`, or null): a record not in the commit is none yet; one there that cannot be read holds
 // the release; and the record only grows, so the release before's whole is in this one, its binding carried on and
-// none of its verdicts lost. `before` is the release before ({ sha }), or none.
-export function atRelease(sha, before, git) {
+// none of its verdicts lost. `before` is the release before ({ sha }), or none. Read from a later commit `from` (main's
+// newest, where the runs at the release are recorded: #1413, point 3), the record counts, of the runs added after the
+// one `sha` holds, only those on `sha` or a commit before it, so a verdict on a later commit, a fix `sha` lacks, never
+// stands for it.
+export function atRelease(sha, before, git, from = sha) {
   const at = rev => { try { git(["cat-file", "-e", `${rev}:${RECORD}`]); } catch { return undefined; } try { const r = JSON.parse(git(["show", `${rev}:${RECORD}`])); return Array.isArray(r?.runs) ? r : null; } catch { return null; } };
-  const there = at(sha), record = there === undefined ? { runs: [] } : there;
+  const ofSha = run => { try { git(["merge-base", "--is-ancestor", String(run?.commit), sha]); return true; } catch { return false; } };
+  const there = at(from), own = from === sha ? null : at(sha), kept = Array.isArray(own?.runs) ? own.runs.length : 0;
+  const read = there && from !== sha ? { ...there, runs: there.runs.filter((run, i) => i < kept || ofSha(run)) } : there;
+  const record = read === undefined ? { runs: [] } : read;
   const prior = before ? at(before.sha) : undefined;
   const ok = prior && wellFormed(prior);
   let since = null;

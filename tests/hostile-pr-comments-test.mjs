@@ -8,7 +8,7 @@
 // refused: nothing of it is taken as a review, an answer, a commit or a pass, nor a tool's name past the line it stands on. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/hostile-pr-comments-test.mjs
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "../scripts/check-runs.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

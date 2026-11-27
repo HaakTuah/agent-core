@@ -11,7 +11,7 @@
 // data is made up. Run by the core's tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
 //
 //   node tests/hostile-configs-test.mjs
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "../scripts/check-runs.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { BEGIN, END, converged, stubOf } from "../scripts/core-owned.mjs";

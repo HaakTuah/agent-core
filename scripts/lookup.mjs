@@ -36,7 +36,7 @@ import { lockPackages, nugetConfig } from "./nuget.mjs";
 import { pypiGraphed, pypiHashes, pypiPackages, pypiRegistry, pypiRequires } from "./lookup-pypi.mjs";
 import { reach } from "./reach.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
 
 export const YOUNG = 90;
 export const GITHUB_MOST = 20;
@@ -515,7 +515,7 @@ export function namedBase(root) {
   try { if (name === "HEAD^1") commit("HEAD^2"); return commit(name) || null; } catch { return null; }
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const configPath = process.argv.slice(2).find((a) => !a.startsWith("--"));
   if (!configPath) { console.error("FAIL: no config was named. Mend: name it: node core/scripts/lookup.mjs <the licence check's config> [--nuget]"); process.exit(1); }
   let root;

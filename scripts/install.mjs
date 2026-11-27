@@ -22,6 +22,9 @@ import { fileURLToPath } from "node:url";
 import { npmIgnores, npmReadsAll, npmVersion } from "./npm-reads.mjs";
 import { noSignInWhole, parseBounded } from "./guards.mjs";
 import { INSTALLS, lockFaults, npmrcOthers } from "./packages.mjs";
+import { guard } from "./mend.mjs";
+
+guard(import.meta.url); // (an error it does not catch fails with its mend: mend.mjs)
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 // (the folder of the core's own package list, lock file and .npmrc, where npm runs and so reads that .npmrc alone)
