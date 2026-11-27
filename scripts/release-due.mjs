@@ -101,7 +101,7 @@ export function closedSince(repo, since, ask = ghApi) {
 // Who made each close of `numbers` (issues of `repo` closed as completed), read from GitHub: { counted, unread, other }.
 // Counted, a Set, where the issue itself names as its closer an account whose right on the repository is write,
 // maintain or admin (writersOf), or where its close, found in its events from the newest page back, names a commit that
-// a merged pull request brought in; other, the numbers whose close was made by neither; unread, [{ number, why }], those
+// a pull request merged into the repository's default branch brought in; other, the numbers whose close was made by neither; unread, [{ number, why }], those
 // whose issue, closer, right or events gave no answer in its form, or past the bounds: counted neither way, never
 // guessed. A close made by a merge is read so twice, since GitHub names the merger as its closer and the commit, where a
 // pull request's "Fixes #n" closed it, is null. An answer read is held to its form, the events to EVENT_PAGES pages
@@ -148,15 +148,20 @@ function closeAt(repo, number, at, read) {
   return undefined;
 }
 
-// Whether issue `number`'s close at `at` was made by a merged pull request's commit: true, false, or undefined unread.
+// Whether issue `number`'s close at `at` was made by the commit of a pull request merged into the repository's default
+// branch: true, false, or undefined unread.
 function mergedClose(repo, number, at, read) {
   const close = closeAt(repo, number, at, read);
   if (close === undefined) return undefined;
   if (close.commit === null) return false;
   const pulls = read(`repos/${repo}/commits/${close.commit}/pulls`);
   if (!Array.isArray(pulls)) return undefined;
-  return pulls.some(p => typeof p?.merged_at === "string" && !Number.isNaN(Date.parse(p.merged_at)));
+  return pulls.some(p => typeof p?.merged_at === "string" && !Number.isNaN(Date.parse(p.merged_at)) && intoDefault(p, repo));
 }
+
+// Whether a pull request was made into `repo`'s default branch, as its own base says.
+const intoDefault = (pull, repo) => typeof pull.base?.ref === "string" && pull.base.ref === pull.base.repo?.default_branch
+  && typeof pull.base.repo.full_name === "string" && pull.base.repo.full_name.toLowerCase() === repo.toLowerCase();
 
 // How issue `number` was closed: true by a writer or a merge, false by neither, else why it could not be read. An
 // app's account (a login with "[bot]") is no writer, so its right is not asked.
