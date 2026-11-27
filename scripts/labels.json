@@ -18,7 +18,8 @@
   },
   "mark": {
     "stand-in-yes": { "color": "e99695", "description": "Queued on the stand-in's sure yes, a guess: off once the owner confirms or corrects it." },
-    "correction": { "color": "b60205", "description": "Corrects merged work: names it, Brought in by: #N, and its kind, Correction: <kind>." }
+    "correction": { "color": "b60205", "description": "Corrects merged work: names it, Brought in by: #N, and its kind, Correction: <kind>." },
+    "hardening": { "color": "0e8a8a", "description": "Fixes a weakness: its description names the kind, Hardens against: <kind>." }
   },
   "openers": [
     "From the owner's design session",
