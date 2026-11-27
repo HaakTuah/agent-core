@@ -76,6 +76,8 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
   const timed = engineAnswer("engine", ".", ["a.js", "b.js"], new Set(["a.js", "b.js"]), slow, Date.now() - 1);
   const overTime = scan(nothing, { base: "HEAD~1", dir: path.join(tmp, "no-engine-here"), most: { files: 10, time: -1 } });
   ok(overTime.failed && /ran past the \d+ s its runs have together/u.test(overTime.lines.join("\n")) && mended(overTime.lines.join("\n")), "a scan past its time fails closed, with its mend", overTime.lines.join("\n"));
+  const noBase = scan(nothing, { dir: path.join(tmp, "no-engine-here"), most: { files: 1, time: -1 } }).lines.join("\n");
+  ok(!/ran past|past the 1 one scan reads/u.test(noBase), "with no base, as on a push to main, neither bound holds the scan", noBase);
   ok(late.late === true && timed.got.late === true && timed.held.length === 0 && calls.length === 1, "a run past the scan's time is late, and holds no listed file back: the scan fails on it", JSON.stringify({ late, timed, calls }));
 }
 

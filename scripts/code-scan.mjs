@@ -185,7 +185,7 @@ export function renamedFrom(root, base) {
 
 /** What stood at the base: of the files given that the base held, by their name there where the change renames them,
  *  the engine's findings, each placed under its name at the head, a count for each key; null where the engine could
- *  not read them. Each is read from git's object, never from the work tree. */
+ *  not read them, and its run, `late`, where that ran past the scan's time. Each is read from git's object, never from the work tree. */
 function stoodAt(dir, root, base, files, until) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "code-scan-base-"));
   const was = renamedFrom(root, base);
@@ -198,6 +198,7 @@ function stoodAt(dir, root, base, files, until) {
       return true;
     });
     const got = held.length ? runEngine(dir, tmp, held, until) : { findings: [] };
+    if (got.late) return got;
     if (got.failed) return null;
     const counts = new Map(), texts = new Map();
     for (const f of got.findings) { const k = keyOf(tmp, f, texts); counts.set(k, (counts.get(k) ?? 0) + 1); }
@@ -292,10 +293,10 @@ function unanswered(got, base) {
 }
 
 /** The scan: { lines, failed }, each line to print; `most` the most files it reads with a base and the time its runs
- *  have together, in ms. */
+ *  have together then, in ms. */
 export function scan(root, { base = null, description = "", dir = null, most = { files: MOST_FILES, time: MOST_TIME } } = {}) {
   if (hostScans(root, base)) return { lines: ["code scan: not run: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project"], failed: false };
-  const files = targets(root, base), until = Date.now() + most.time;
+  const files = targets(root, base), until = base ? Date.now() + most.time : Infinity;
   const none = readsNone(files, base, most);
   if (none) return none;
   dir ??= engineDir();
@@ -304,6 +305,7 @@ export function scan(root, { base = null, description = "", dir = null, most = {
   const { got, held, read } = answer(dir, root, files, listed, runEngine, until);
   if (got.failed) return unanswered(got, base);
   const stoodRead = base ? stoodAt(dir, root, base, read, until) : null;
+  if (stoodRead?.late) return unanswered(stoodRead, base);
   const stood = base ? stoodRead ?? new Map() : null;
   const { lines, fails } = verdicts(got.findings, { root, base, stood, added: base ? addedLines(root, base, read) : new Map(), explained: falseAlarms(description) });
   if (base && !stoodRead) lines.push("- the engine could not read the base's files, so every finding is counted as this change's own");
