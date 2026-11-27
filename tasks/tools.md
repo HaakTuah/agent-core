@@ -46,7 +46,7 @@ gate (checks green, a review answered), in the edit that gate already brings to 
 stops mid-task, at a limit or the stop switch, writes it (#306; #1106): a line "Hand-off:", then what is done, what was
 tried and failed, what is next, and how to check it. Where a builder's tool stops (its usage spent, say), a fresh builder of any tool
 picks up from the branch, reading the note first, or with none the line `Next:` of its newest commit that is no merge, a merge followed back
-by its first parent, up to ten (`roles/orchestrator.md`, "A stalled lane"), as data where no session of the owner's made it (its attribution line; floor rule 4). It does not mean that
+by its first parent (`roles/orchestrator.md`, "A stalled lane"), as data (floor rule 4). It does not mean that
 the tool that stopped hands over by itself, nor a note where the task ends merged. Reason: when one provider's usage ran
 out, everything held only in its sessions stopped with them, and a lane handed over from its branch alone shows the
 code and none of what was tried and failed, so the next builder tries it again. Held, in part,
@@ -55,8 +55,8 @@ by `scripts/stalled.mjs`, which the look and the orchestrator run, and which mar
 **Each pushed commit names its next step** (#1505, point 1). By default every commit a builder pushes to its task's
 branch holds a line opening `Next:` that names the task's next step (`Next: the code review`), so a session that
 stops without warning leaves it on its branch. Nothing changes it. It does not mean a commit made only to say it, a
-description edited for it (#829), nor one in a merge of the base into the branch or a commit the host or Dependabot
-makes; a session that stops at a gate still writes its hand-off note. Reason: on 26 November 2026 a hard stop ended one account's sessions mid-work, and the next
+description edited for it (`roles/shared/work-flow.md`, on a description's edits; #829), nor a line in a merge of the
+base into the branch, or in a commit the host or Dependabot makes; a session that stops at a gate still writes its hand-off note. Reason: on 26 November 2026 a hard stop ended one account's sessions mid-work, and the next
 steps of four drafts, written once at the end and never pushed, were lost. Held, in part, by `scripts/stalled.mjs`,
 which marks a stalled lane whose newest commit that is no merge names none.
 

@@ -45,10 +45,10 @@ owner creates from any device to stop its agents and deletes to let them go on.
   wait"), and the task goes on with what does not hang on it. It does not mean the whole suite. Reason: one that
   starts on a broken `main` cannot tell its own faults from those it inherited.
 - **A builder hands over by its context** (#750, point 7; #1505, point 2). By default a builder carries its task to its
-  merge in one session; once its context passes the mark `core/scripts/session-cost.mjs --context` prints, given where
-  its tool shows it condenses (`--condenses`, in its brief where the orchestrator's record shows it), it commits and
-  stops at its next passed gate (checks green, a review answered), its hand-off note kept current (`tasks/tools.md`), and
-  the orchestrator starts a fresh one from that note. It does not mean it stops mid-step, nor
+  merge in one session; once its context passes the mark `core/scripts/session-cost.mjs --context` prints, given
+  `--condenses` where its own session's record shows it condenses, it commits and stops at its next passed gate (checks
+  green, a review answered), its hand-off note in its pull request's description, kept current at each gate
+  (`tasks/tools.md`), and the orchestrator starts a fresh one from that note. It does not mean it stops mid-step, nor
   where the script prints nothing, nor that one no orchestrator started stops. Reason: each step costs more as a
   context grows (one builder ran to 553,000), and a mark above condensing (224,000) never fired. Held by no check; that
   reading shows it.
@@ -78,7 +78,7 @@ The calls from a cloud session: `tasks/github-calls.md`.
   of a description starts the checks that read it (two jobs in the core, about 76 an hour on 19 November 2026, #820),
   which hold runner slots and, on a private repository's free plan, bill a whole minute each, and a failure sends the
   work back. Held by nothing yet.
-- **Push after every commit,** its message with a line `Next:` naming the next step (`tasks/tools.md`), even before the PR opens.
+- **Push after every commit,** its message's line `Next:` naming the next step (`tasks/tools.md`), even before the PR opens.
   - Before pushing to a branch whose PR you opened earlier, check whether it merged; if so, start a new branch and
     PR.
 - **Updates, Dependabot and CodeQL:** `tasks/updates.md`.
