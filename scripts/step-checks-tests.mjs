@@ -25,17 +25,21 @@ function testsStand(p) {
 }
 
 // Whether a workflow that runs on pull requests has a step that runs the strength check, with STRENGTH_BASE set on the
-// step, its job or the workflow: a mention in a comment, or a step with no base, which measures nothing, is none.
+// step, its job or the workflow, or inline in its script: a mention in a comment, or a step with no base, which measures nothing, is none.
 // (at the copy's own path, which the manifest names: #628)
 const strengthRunOf = copy => new RegExp(`(^|[\\s;&|])node\\s+${inCopy(copy)}scripts/strength\\.mjs(?=\\s*($|[;&|]))`, "mu");
 
 const based = (...envs) => envs.some(e => typeof e?.STRENGTH_BASE === "string" && e.STRENGTH_BASE.trim() !== "");
 
+// (a base set in the step's own script, `STRENGTH_BASE=origin/main node …` or `export STRENGTH_BASE=…`, on a line that is
+// no comment, is as good as one under `env:`)
+const inlineBase = run => run.split(/\r?\n/u).some(line => !/^\s*#/u.test(line) && /(^|[\s;&|])STRENGTH_BASE=(?!""|''|["']?(\s|$|[;&|]))/u.test(line));
+
 function strengthRuns(p) {
   readable(p, text => text.includes("strength.mjs"));
   const STRENGTH_RUN = strengthRunOf(copyAt(p));
   return Object.values(p.workflows).some(({ yaml }) => onPullRequests(yaml?.on) && Object.values(yaml.jobs ?? {})
-    .some(job => (job?.steps ?? []).some(step => typeof step?.run === "string" && STRENGTH_RUN.test(step.run) && based(step.env, job.env, yaml.env))));
+    .some(job => (job?.steps ?? []).some(step => typeof step?.run === "string" && STRENGTH_RUN.test(step.run) && (based(step.env, job.env, yaml.env) || inlineBase(step.run)))));
 }
 
 // Whether the project names its mutation tool, or none with its reason, and where it names one, a workflow runs the

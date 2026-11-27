@@ -8,17 +8,29 @@ import { KINDS, NUMBER } from "./outcomes.mjs";
 import { DIRECT } from "./pruning-record.mjs";
 import { ROOT } from "./rules.mjs";
 import { parseBounded } from "./guards.mjs";
+import { dayOf, shallowGap } from "./shallow.mjs";
 
 export const git = (args, cwd = ROOT) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 });
 
 // How many merged pull requests came under the rule `r` since it joined, read from git at `root`; null where the
-// commit that first wrote its lead in bold cannot be found.
+// commit that first wrote its lead in bold cannot be found. It throws, with the mend, where the clone is shallow and
+// the commit found is no later than its boundary: that commit is then the boundary's own, which holds every line the
+// history behind it wrote, so every rule would seem to join there (#1422).
 export function joinedIn(r, root = ROOT) {
+  let first;
   try {
-    const first = git(["log", "--reverse", "--format=%cI", "-S", `**${r.lead}`, "HEAD"], root).split("\n").find(Boolean);
+    first = git(["log", "--reverse", "--format=%cI", "-S", `**${r.lead}`, "HEAD"], root).split("\n").find(Boolean);
     if (!first) return null;
-    return git(["log", "--first-parent", "--format=%s", `--since=${first}`, "HEAD"], root).split("\n").filter(s => /^Merge pull request #\d+|\(#\d+\)$/u.test(s)).length;
   } catch { return null; }
+  const gap = shallowGap(dayOf(first), root, `the day the rule joined (${dayOf(first)})`);
+  if (gap) throw new Error(gap);
+  try { return git(["log", "--first-parent", "--format=%s", `--since=${first}`, "HEAD"], root).split("\n").filter(s => /^Merge pull request #\d+|\(#\d+\)$/u.test(s)).length; } catch { return null; }
+}
+
+// `joinedIn` for a whole list of rules: { joined: (r) => count or null, gap: () => the first reason a count was refused, or null }.
+export function joinedCounter(root = ROOT) {
+  let gap = null;
+  return { joined: r => { try { return joinedIn(r, root); } catch (e) { gap ??= e.message; return null; } }, gap: () => gap };
 }
 
 // The workflows' named steps at `root`: { path: [{ name, run }] }, read by the core's reader of YAML (parse-yaml.mjs);

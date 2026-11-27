@@ -4,15 +4,17 @@
 // check's config under "pypi" is read so: a line in any other form (a range, an address, a package with no hash, an
 // include, an index that is not PyPI's) fails it whole, since pip or uv would install what the lookup did not read.
 // Which package another brings, and which the project names, is read from the "# via" lines those tools write; a file
-// with none names every package itself, and says nothing of what each brings. Each hash the line of a package new to
-// the project names is one PyPI lists for a file of that version, or the package fails the lookup (#1368, point 1),
-// since pip, given an index outside the file, would install a file the lookup never read. Names are compared as pip compares them
+// with none names every package itself, and says nothing of what each brings; a parent such a line names brings a new
+// package only where PyPI lists it as requiring it (#1388, point 2). Each hash the line of a package new to the project
+// names, and each a line the pull request adds or changes names (#1388, point 1), is one PyPI lists for a file of that
+// version, or the line fails the lookup (#1368, point 1), since pip, given an index outside the file, would install a
+// file the lookup never read. Names are compared as pip compares them
 // (PEP 503: in lower case, each run of "-", "_" and "." one "-"). What PyPI answers is a publisher's text: it is said
 // on one line by the lookup's report, and an answer of another shape is a lookup that failed. The reader of a
 // repository's address is the lookup's own, passed in (`readRepo`), so neither file imports the other.
 
 import { normal } from "./pypi-name.mjs";
-import { reach } from "./reach.mjs";
+import { closure, reach } from "./reach.mjs";
 
 const PYPI = "https://pypi.org/";
 // (a name as PyPI gives one, PEP 508's, and a version as PEP 440 writes one exactly: never a wildcard or a range)
@@ -45,7 +47,7 @@ export function pypiPackages(text, lockPath) {
     const entry = lineOf(uncommented(line), refuse);
     if (entry) entries.push(entry);
   }
-  return graphed(entries);
+  return pypiGraphed(entries);
 }
 
 // pip reads a file in the encoding a byte-order mark or its first two lines declare ("# coding: …", PEP 263's form),
@@ -134,26 +136,29 @@ function entryOf(args, options, refuse) {
 // (the project's own file, "-r requirements.in", "(pyproject.toml)"), is named by the project; the packages a line
 // names bring it. One that nothing so named brings, by any path, is named by the project too: a package "# via" itself,
 // or one of a cycle that no named package leads into (#1368, point 2), since the lines are the pull request's own text,
-// and GitHub's check is asked only of a package the project names. A file with no "# via" line at all says nothing of
-// what each brings.
-function graphed(entries) {
+// and GitHub's check is asked only of a package the project names. Where `keep` (a parent, the package) says a parent the
+// line names does not bring it, as the lookup reads from what PyPI lists that parent as requiring (#1388, point 2), that
+// parent brings nothing, and the package, where none of its parents is kept, is named by the project, the parents left
+// out given as `unborne`. A file with no "# via" line at all says nothing of what each brings. What each brings and what
+// brings it are read for every package in one pass, the first time one is asked (#1388, point 3).
+export function pypiGraphed(entries, keep = () => true) {
   const any = entries.some((e) => e.via.length), names = new Set(entries.map((e) => e.name));
-  const parents = (e) => e.via.map((v) => normal(v.replace(/\[.*$/u, ""))).filter((v) => names.has(v));
-  const named = (e) => !any || parents(e).length < e.via.length || !e.via.length;
+  const parents = entries.map((e) => e.via.map((v) => normal(v.replace(/\[.*$/u, ""))).filter((v) => names.has(v)));
+  const kept = entries.map((e, i) => parents[i].filter((p) => keep(p, e.name))), held = kept.map((k) => new Set(k));
+  const named = (e, i) => !any || parents[i].length < e.via.length || !e.via.length || !kept[i].length;
   // (a name given twice is brought by what either of its lines names)
-  const children = new Map(), brought = new Map();
-  for (const e of entries) for (const p of parents(e)) {
-    children.set(p, (children.get(p) ?? new Set()).add(e.name));
-    brought.set(e.name, (brought.get(e.name) ?? new Set()).add(p));
-  }
+  const children = new Map();
+  entries.forEach((e, i) => { for (const p of kept[i]) children.set(p, (children.get(p) ?? new Set()).add(e.name)); });
   // (what a named package leads to, in one pass from all of them: each such package that is not named itself is brought)
   const roots = entries.filter(named).map((e) => e.name), fed = reach("", (x) => (x === "" ? roots : children.get(x) ?? []));
   // (each entry its own: a name the file gives twice, behind two markers, is named where either line names it)
-  const direct = entries.map((e) => named(e) || !fed.has(e.name)), shown = new Set(entries.filter((e, i) => direct[i]).map((e) => e.name));
-  const ancestors = (e) => [...reach(e.name, (x) => brought.get(x) ?? [])];
-  return entries.map((e, i) => ({ name: e.name, version: e.version, path: e.name, direct: direct[i], pypi: true, hashes: e.hashes,
-    get brings() { return any ? reach(e.name, (x) => children.get(x) ?? []).size : null; },
-    get by() { return direct[i] ? [] : ancestors(e).filter((x) => shown.has(x)); } }));
+  const direct = entries.map((e, i) => named(e, i) || !fed.has(e.name)), shown = entries.filter((e, i) => direct[i]).map((e) => e.name);
+  let closed = null;
+  const close = () => (closed ??= closure([...names], children, shown));
+  return entries.map((e, i) => ({ name: e.name, version: e.version, path: e.name, direct: direct[i], pypi: true, hashes: e.hashes, via: e.via, parents: parents[i],
+    unborne: [...new Set(parents[i])].filter((p) => !held[i].has(p)),
+    get brings() { return any ? close().brings(e.name) : null; },
+    get by() { return direct[i] ? [] : close().by(e.name); } }));
 }
 
 /** What PyPI says of the package `p` ({ name, version }), asked with `get(url)` ({ status, json }): its facts, or
@@ -189,22 +194,53 @@ export function pep440(version) {
  *  publisher, note, file, failures } or { missing }, `failures` each { lockPath, version, text }. */
 export function pypiFacts(doc, version, readRepo, lines = []) {
   if (!object(doc) || !object(doc.releases)) throw new Error("its answer is no JSON object that lists releases");
-  const releases = doc.releases;
-  const files = (v) => (Array.isArray(releases[v]) ? releases[v].filter(object) : []);
-  const all = Object.keys(releases).flatMap((v) => files(v).map((f) => ({ at: when(f.upload_time_iso_8601), yanked: f.yanked === true }))).filter((f) => !Number.isNaN(f.at));
+  const releases = doc.releases, keyOf = keyer(releases);
+  const all = Object.keys(releases).flatMap((v) => files(releases, v).map((f) => ({ at: when(f.upload_time_iso_8601), yanked: f.yanked === true }))).filter((f) => !Number.isNaN(f.at));
   if (!all.length) return { missing: "the registry knows the name, and holds no file of it" };
-  // (a version as written in the lock file, else the one PyPI keys that PEP 440 holds equal to it; each found, and its
-  // files' digests gathered, once however many lines name it)
-  const once = (f, m = new Map()) => (v) => (m.has(v) ? m.get(v) : m.set(v, f(v)).get(v));
-  const keyOf = once((v) => { const asked = pep440(v); return Object.hasOwn(releases, v) ? v : Object.keys(releases).find((k) => (asked ? pep440(k) === asked : k.toLowerCase() === v.toLowerCase())); });
-  const listedOf = once((k) => new Set((k ? files(k) : []).map((f) => f.digests?.sha256).filter((d) => typeof d === "string" && /^[0-9a-f]{64}$/u.test(d)).map((d) => `sha256:${d}`)));
-  const key = keyOf(version), own = key ? files(key) : [];
+  const key = keyOf(version), own = key ? files(releases, key) : [];
   if (!own.length) return { missing: `the registry knows the name, and no file of version ${version.slice(0, 64)} of it` };
   const kept = all.filter((f) => !f.yanked), info = object(doc.info) ? doc.info : {};
   return { first: Math.min(...all.map((f) => f.at)), last: Math.max(...(kept.length ? kept : all).map((f) => f.at)), repo: repoOf(info, readRepo),
     publisher: publisher(doc.ownership, info), note: own.every((f) => f.yanked === true) ? "this version is yanked: PyPI asks that it not be installed" : "", version: key, file: fileOf(own),
-    // (each file's line held to the files of its own version: two files of the pull request may name it at two)
-    failures: lines.flatMap((l) => { const text = unlisted(l.hashes, listedOf(keyOf(l.version)), l.version); return text ? [{ lockPath: l.lockPath, version: l.version, text }] : []; }) };
+    failures: hashFailures(releases, keyOf, lines) };
+}
+
+/** Each of `p.lines` ({ lockPath, version, hashes }) that names a hash PyPI lists for no file of its version: each
+ *  { lockPath, version, text }, as PyPI answers `get(url)` of the package `p.name`; a name PyPI does not know lists no
+ *  file. For a line a pull request adds or changes of a package its base held (#1388, point 1), whose other facts are
+ *  asked only of a new name. */
+export async function pypiHashes(p, get) {
+  if (!NAME.test(p.name)) throw new Error("its name is not one PyPI gives");
+  const r = await get(`${PYPI}pypi/${normal(p.name)}/json`);
+  if (r.status === 404) return hashFailures({}, () => undefined, p.lines);
+  if (r.status !== 200) throw new Error(`it answered ${r.status}`);
+  if (!object(r.json) || !object(r.json.releases)) throw new Error("its answer is no JSON object that lists releases");
+  return hashFailures(r.json.releases, keyer(r.json.releases), p.lines);
+}
+
+/** The names PyPI lists as what the package `name` requires at `version` (its "requires_dist", an extra's too), as it
+ *  answers `get(url)`: a Set, empty where PyPI lists none, does not know the version or does not answer, so that a
+ *  "# via" line it does not bear out brings nothing (#1388, point 2). */
+export async function pypiRequires(name, version, get) {
+  if (!NAME.test(name) || !VERSION.test(version)) return new Set();
+  const r = await get(`${PYPI}pypi/${normal(name)}/${encodeURIComponent(version)}/json`).catch(() => ({ status: 0 }));
+  const listed = r.status === 200 && object(r.json?.info) && Array.isArray(r.json.info.requires_dist) ? r.json.info.requires_dist : [];
+  return new Set(listed.map((d) => (typeof d === "string" ? /^\s*([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)/u.exec(d)?.[1] : null)).filter(Boolean).map(normal));
+}
+
+// The files PyPI lists for the version `v` of a project's releases.
+const files = (releases, v) => (Array.isArray(releases[v]) ? releases[v].filter(object) : []);
+
+// A version as written in the lock file, else the one PyPI keys that PEP 440 holds equal to it, found once however many
+// lines name it.
+const once = (f, m = new Map()) => (v) => (m.has(v) ? m.get(v) : m.set(v, f(v)).get(v));
+const keyer = (releases) => once((v) => { const asked = pep440(v); return Object.hasOwn(releases, v) ? v : Object.keys(releases).find((k) => (asked ? pep440(k) === asked : k.toLowerCase() === v.toLowerCase())); });
+
+// Each line held to the files of its own version (two files of the pull request may name a package at two), each
+// version's digests gathered once.
+function hashFailures(releases, keyOf, lines) {
+  const listedOf = once((k) => new Set((k ? files(releases, k) : []).map((f) => f.digests?.sha256).filter((d) => typeof d === "string" && /^[0-9a-f]{64}$/u.test(d)).map((d) => `sha256:${d}`)));
+  return lines.flatMap((l) => { const text = unlisted(l.hashes, listedOf(keyOf(l.version)), l.version); return text ? [{ lockPath: l.lockPath, version: l.version, text }] : []; });
 }
 
 // Where the lock line names a hash not `listed` for a file of the version (each file's sha256 as PyPI gives it; a

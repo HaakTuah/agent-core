@@ -30,7 +30,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
-import { recordModes } from "./copy-tree.mjs";
+import { copyTree, recordModes } from "./copy-tree.mjs";
 import { readCore } from "./core-path.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { everyInstall } from "./packages.mjs";
@@ -125,9 +125,11 @@ export function moveCalls(pin, tmp, own) {
   return { moved, unread };
 }
 
-// What the sync moved (the copy, the manifest's line and the workflow calls).
+// What the sync moved (the copy, the manifest's line and the workflow calls): the files counted are the copy's, the
+// core's trees at the two pins without the folders each keeps to itself (copy-tree.mjs: tests/, reports/, words/), which
+// the sync never writes (#1361, point 7).
 function sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp) {
-  const changed = git(["diff", "--stat", "--format=", old, pin], tmp).split("\n").pop() || "no files";
+  const changed = git(["diff", "--stat", "--format=", copyTree(old, tmp), copyTree(pin, tmp)], tmp).split("\n").pop() || "no files";
   console.log(`${at} ${old.slice(0, 7)} -> ${pin.slice(0, 7)}${release} (${changed.trim()}); ${manifest} moved.`);
   console.log(moved.length
     ? `Workflow calls moved:\n  ${moved.join("\n  ")}`

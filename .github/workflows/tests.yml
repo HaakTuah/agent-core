@@ -615,6 +615,9 @@ jobs:
       - name: The draft of the sync in a release's trial, read beside main's checks
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-draft-test.mjs ')) }}
         run: node tests/trial-draft-test.mjs
+      - name: The toolchain a release's trial fetches for a project that pins it
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/toolchain-test.mjs ')) }}
+        run: node tests/toolchain-test.mjs
       - name: The stand-in for the host in the tests of the draft in a release's trial
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-draft-host-test.mjs ')) }}
         run: node tests/trial-draft-host-test.mjs
