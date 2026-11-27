@@ -144,7 +144,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **One batch, then one release** (#1413, point 4). By default a batch is the lines of the file merged since the
   commit the newest release stands on, and the release after it is the owner's ("A release is cut on the owner's
   word"), that word given for every batch. Its trial is due once ten lines have merged since that commit, or seven
-  days have passed since it with at least one merged, as `node scripts/release-due.mjs` counts them. The one condition
+  days have passed since it with at least one merged, as `node scripts/release-due.mjs` counts them, a line merged
+  where its issue's close was made by a merged pull request or an account that can write, a close it cannot read so
+  is not counted and is named. The one condition
   that changes it: the file holds no line a session can take, no PR of a session's is open, every check on `main`'s
   newest commit has passed and no open issue is left that is to be queued; then the trial is due whatever the count.
   The trigger is the scheduled look's issue "A release's trial is due", or the orchestrator finding the queue worked

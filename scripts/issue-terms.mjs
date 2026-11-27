@@ -35,6 +35,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { aLogin } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
 import { writersOf } from "./security-review.mjs";
@@ -89,7 +90,6 @@ const aText = v => v === null || (typeof v === "string" && v.length <= 1 << 20);
 // author association (MEMBER, COLLABORATOR) proves no right to write, and no app is one: what an app writes can carry
 // an outsider's words, Dependabot's the release notes of another publisher, Codex's a fork's pull request it reviews,
 // and GitHub's own job those of an issue or comment that started a project's workflow.
-const aLogin = v => typeof v === "string" && /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u.test(v);
 export function writersAmong(repo, logins, gh = ghApi) {
   const rights = [];
   for (const login of new Set(logins.filter(aLogin))) { try { rights.push(JSON.parse(gh(`repos/${repo}/collaborators/${login}/permission`))); } catch {} }
