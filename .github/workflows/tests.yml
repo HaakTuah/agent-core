@@ -264,6 +264,9 @@ jobs:
       - name: The licence scan on the programs a file downloads, pinned by version and checksum
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-pins-test.mjs ')) }}
         run: node tests/licence-scan-pins-test.mjs
+      - name: The licence scan on a package of the machine's distribution, asked no version
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-distribution-test.mjs ')) }}
+        run: node tests/licence-distribution-test.mjs
       - name: The licence scan on the forms of an npm command
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-test.mjs ')) }}
         run: node tests/licence-fetch-test.mjs
@@ -273,6 +276,9 @@ jobs:
       - name: The licence scan on the fetchers it cannot read
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-other-test.mjs ')) }}
         run: node tests/licence-fetch-other-test.mjs
+      - name: The licence scan on more of the forms a repository fetch takes
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-wrapper-test.mjs ')) }}
+        run: node tests/licence-fetch-wrapper-test.mjs
       - name: The licence scan on pages and components
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-pages-test.mjs ')) }}
         run: node tests/licence-fetch-pages-test.mjs
@@ -405,6 +411,9 @@ jobs:
       - name: The pathspecs the selection matches a path against
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-matcher-test.mjs ')) }}
         run: node tests/select-matcher-test.mjs
+      - name: The files a test reaches by listing a folder, for the selection
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-folders-test.mjs ')) }}
+        run: node tests/select-folders-test.mjs
       - name: A tree that passed is not run again
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-passed-test.mjs ')) }}
         run: node tests/select-passed-test.mjs
@@ -456,6 +465,12 @@ jobs:
       - name: The scheduled look and its state report
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/look-test.mjs ')) }}
         run: node tests/look-test.mjs
+      - name: The scheduled look's reader of the files past the split mark
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/look-split-test.mjs ')) }}
+        run: node tests/look-split-test.mjs
+      - name: The description and size checks a builder runs before ready
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/before-ready-test.mjs ')) }}
+        run: node tests/before-ready-test.mjs
       - name: The personal terms taken out of issues and comments
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/issue-terms-test.mjs ')) }}
         run: node tests/issue-terms-test.mjs
@@ -626,12 +641,21 @@ jobs:
       - name: The trial of a release on a real project
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/release-trial-test.mjs ')) }}
         run: node tests/release-trial-test.mjs
+      - name: The brief of a release's trial, read for each step its rules ask
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-brief-test.mjs ')) }}
+        run: node tests/trial-brief-test.mjs
       - name: check.mjs as a release's trial runs it, and the trial's record
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-test.mjs ')) }}
         run: node tests/trial-test.mjs
       - name: The draft of the sync in a release's trial, read beside main's checks
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-draft-test.mjs ')) }}
         run: node tests/trial-draft-test.mjs
+      - name: The daily try of the core on the owner's own projects, read-only, each on a runner of its own
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/daily-try-test.mjs ')) }}
+        run: node tests/daily-try-test.mjs
+      - name: The daily try's counts, each runner's read from its own log, and what is filed from them alone
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/daily-try-file-test.mjs ')) }}
+        run: node tests/daily-try-file-test.mjs
       - name: The toolchain a release's trial fetches for a project that pins it
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/toolchain-test.mjs ')) }}
         run: node tests/toolchain-test.mjs
@@ -769,6 +793,9 @@ jobs:
       - name: The steps' writers, each step a script does whole written and read done after it, the rule files' words kept
         if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-write-test.mjs ')) }}
         run: node tests/steps-write-test.mjs
+      - name: The writer of an agent's own tools, listing only what the project commits as its own
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-write-tools-test.mjs ')) }}
+        run: node tests/steps-write-tools-test.mjs
       - name: The steps' writers keep a file's Windows line ends
         if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/step-writers-crlf-test.mjs ')) }}
         run: node tests/step-writers-crlf-test.mjs
@@ -787,6 +814,9 @@ jobs:
       - name: The readers of when and how the checks run, which the steps read
         if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-checks-run-test.mjs ')) }}
         run: node tests/steps-checks-run-test.mjs
+      - name: The step of the tests a change can reach, where a project's tests run in several jobs
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-select-jobs-test.mjs ')) }}
+        run: node tests/steps-select-jobs-test.mjs
       - name: The readers of what the project's files name, which the steps read
         if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-files-test.mjs ')) }}
         run: node tests/steps-files-test.mjs

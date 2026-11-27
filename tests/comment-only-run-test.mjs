@@ -39,7 +39,7 @@ const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encodin
 const write = (dir, f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
 const origin = path.join(tmp, "origin.git"), work = path.join(tmp, "work");
 git(tmp, "init", "-q", "--bare", "-b", "main", origin);
-git(tmp, "clone", "-q", origin, work);
+execFileSync("git", ["clone", "-q", "--", ".", work], { cwd: origin, stdio: ["ignore", "pipe", "pipe"] });
 const WF = ".github/workflows/t.yml";
 write(work, WF, BASE);
 write(work, ".claude/settings.json", "{}\n");

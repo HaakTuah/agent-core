@@ -46,3 +46,7 @@ alone where a form a check can hold exists: an eleventh fresh leanness check rea
 found 8 bytes of valid trim, in the point itself, which was made, for 312 over once the point read a project's own
 rules too. The auditor's first, on 20 November 2026 for #464, the whole KB above its start's 19,352 bytes, and the
 smallest the base holds.
+The design session's, raised one step on 27 November 2026 for #1413, point 6, a builder running the description and size
+checks before ready: a fresh leanness check read the design role's start whole and found 72 bytes of valid trim, 25 of
+them a second pointer to `tasks/github-calls.md` in `roles/shared/work-flow.md`, which was made, and 47 in the point's
+own words describing what its script checks, which it called borderline and so stayed, for 168 over.
