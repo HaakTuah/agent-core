@@ -25,7 +25,7 @@ const { ok, done } = tally();
   const opens = seen.filter(([kind, file]) => kind === "open" && file === at), noFollow = fs.constants.O_NOFOLLOW ?? 0;
   ok(text === copied("vendor/core/") && opens.length === 1 && (opens[0][2] & noFollow) === noFollow && !seen.some(([kind]) => kind === "read"),
     "the manifest is opened once, refusing a link as it opens where the platform can, and read through that one descriptor", JSON.stringify(seen));
-  ok(regularText(at, { bound: copied("vendor/core/").length }) === copied("vendor/core/") && regularText(at, { bound: copied("vendor/core/").length - 1 }) === null,
+  ok(regularText(at, { bound: Buffer.byteLength(copied("vendor/core/")) }) === copied("vendor/core/") && regularText(at, { bound: Buffer.byteLength(copied("vendor/core/")) - 1 }) === null,
     "a file of the bound exactly is read whole, and one a byte past it is not read");
   if (process.platform !== "win32") { // (a link needs a right Windows may not give)
     fs.symlinkSync("core-manifest.md", path.join(one, "linked.md")); fs.symlinkSync("nowhere.md", path.join(one, "dangling.md"));

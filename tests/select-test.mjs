@@ -263,7 +263,7 @@ ok(r.status === 0 && /test\/rules\.test\.js: failed last time/.test(r.out), "the
 fs.renameSync(path.join(dir, "checks/shape.json"), path.join(dir, "checks/other.json"));
 r = run([], { SELECT_BASE: "HEAD^1" });
 ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/shape\.json\) cannot be read/.test(r.out), "where the shape check's config cannot be read, the whole suite runs", r.out);
-// (its rules file is read within a bound, as the manifest's reader reads it: past a mebibyte, or a link, it is none)
+// (its rules file is read within a bound, through no link: past a mebibyte, or a link, it is none)
 const row = "| the *shape check* | `checks/other.json` |\n", rulesFile = path.join(dir, "AGENTS.md");
 put("AGENTS.md", row);
 r = run([], { SELECT_BASE: "HEAD^1" });
@@ -310,6 +310,15 @@ if (process.platform !== "win32") {
   r = run([], { SELECT_BASE: "HEAD^1" }, 20000);
   ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/other\.json\) cannot be read/.test(r.out), "a config that is a pipe is read as none, without waiting on it, and the whole suite runs", r.out);
   fs.rmSync(otherConfig);
+  // (a config that is a link, or one reached through a linked folder, is not read)
+  fs.writeFileSync(path.join(dir, "real.json"), configText); fs.symlinkSync("../real.json", otherConfig);
+  r = run([], { SELECT_BASE: "HEAD^1" });
+  ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/other\.json\) cannot be read/.test(r.out), "a config that is a link is read as none, and the whole suite runs", r.out);
+  fs.rmSync(otherConfig); fs.mkdirSync(path.join(dir, "real")); fs.renameSync(path.join(dir, "real.json"), path.join(dir, "real/other.json"));
+  put("AGENTS.md", "| the *shape check* | `linked/other.json` |\n"); fs.symlinkSync("real", path.join(dir, "linked"));
+  r = run([], { SELECT_BASE: "HEAD^1" });
+  ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(linked\/other\.json\) cannot be read/.test(r.out), "a config reached through a linked folder is read as none, and the whole suite runs", r.out);
+  fs.rmSync(path.join(dir, "linked")); fs.rmSync(path.join(dir, "real"), { recursive: true }); put("AGENTS.md", row);
 }
 fs.writeFileSync(otherConfig, configText);
 fs.rmSync(rulesFile);

@@ -56,7 +56,7 @@ export function corePath(root = ".") {
 }
 
 /** The manifest's text at `file`, or null where there is none. One that is no regular file, a link to a device say, or
- *  past a mebibyte reads as empty, its "Core:" line then missing, so that it stops no script that reads it. Given
+ *  past a mebibyte, or that stands there but cannot be read, reads as empty, its "Core:" line then missing, so that it stops no script that reads it. Given
  *  `{ linked: false }`, as the suites' selection reads its rules file, a link itself is no regular file, whatever it
  *  leads to; the manifest's other readers follow one (SECURITY.md, rule 5). */
 export function manifestText(file, { linked = true } = {}) {
