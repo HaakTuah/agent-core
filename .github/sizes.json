@@ -72,6 +72,10 @@
       "mark": 67924,
       "why": "Its rules that only some tasks break move to modules read on need in #845."
     },
+    "tests/licence-scan-pins-test.mjs": {
+      "mark": 23199,
+      "why": "The scan's tests of download pins alone, split from licence-scan-test.mjs already; its blocks read one reader, the pin of a download and what stood at the base, so a split would have a reader open two files for one check."
+    },
     "scripts/licence-scan.mjs": {
       "mark": 23622,
       "why": "#946: its reading of pages and components is split off; what stands is the scan of a project's files, its download pins and their base, which call each other's readers (readAs, codeOf, covers), so a split would make a cycle of imports."

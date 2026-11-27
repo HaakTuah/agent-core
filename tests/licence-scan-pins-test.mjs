@@ -12,6 +12,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { check as licenceCheck } from "../scripts/licences.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
+import { pinFault, readsData } from "../scripts/licence-scan.mjs";
 
 // A program a file downloads by its address is pinned by version and checksum (#488, point 5): read against the pull
 // request's base, a file that stood unpinned is reported, and one a pull request adds or unpins fails, saying the mend.
@@ -220,5 +221,22 @@ const scratchRepo = (prefix) => {
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+}
+// A read of a version index is no download of a program, and a package of the machine's distribution, kind
+// "distribution", is asked no version, its download by address still asked a checksum (#1361, point 11).
+{
+  const SH = "scripts/setup.sh", sdk = { name: "dotnet-sdk-8.0", licence: "MIT", files: [SH] }, moss = { name: "mosstool", licence: "MIT", version: "1.2.0", files: [SH] };
+  const INDEX = "V=$(curl -fsS https://dotnet.example/release-metadata/releases-index.json | jq -r '.[0].sdk')\n", APT = "apt-get install -y dotnet-sdk-8.0\n";
+  const GET = "curl -fsSLo moss.tgz https://mossgrip.example/moss-1.2.0.tgz\n", CHECKED = `echo "${"0a1b2c3d".repeat(8)}  moss.tgz" | sha256sum -c -\n`;
+  ok(pinFault([sdk], "audit.json", SH, `${APT}${INDEX}`) === null, "a file that reads a version index and downloads no program asks no pin of the distribution's package that covers it");
+  ok(pinFault([moss], "audit.json", SH, `${INDEX}${GET}${CHECKED}`) === null, "a version index read beside a program's download asks no checksum of its own");
+  ok(/names no version/u.test(pinFault([sdk, moss], "audit.json", SH, `${APT}${GET}${CHECKED}`)?.what ?? "") && /"kind": "distribution"/u.test(pinFault([sdk, moss], "audit.json", SH, `${APT}${GET}${CHECKED}`).mend), "an entry with no version beside a program's download is asked one, its mend naming the distribution's kind");
+  ok(pinFault([{ ...sdk, kind: "distribution" }, moss], "audit.json", SH, `${APT}${GET}${CHECKED}`) === null, "and one of kind distribution is not");
+  ok(/holds no checksum/u.test(pinFault([{ ...sdk, kind: "distribution" }], "audit.json", SH, `${APT}${GET}`)?.what ?? ""), "a download covered by a distribution's package alone is still asked its checksum");
+  ok(readsData("curl -s https://dl.example/release/stable.txt") && readsData("Invoke-RestMethod https://dotnet.example/index.json?x=1"), "a text or JSON file read by address, by curl or PowerShell, is a read of data");
+  const progs = ["curl -fsSL https://mossgrip.example/get.sh | bash", "curl -s https://mossgrip.example/index.json | sh", "curl -fsSLo moss.tgz https://mossgrip.example/$(curl -s https://mossgrip.example/index.json | jq -r .v)/moss.tgz", "curl -fsSLO \"$URL\""];
+  ok(progs.every((d) => !readsData(d)), "a program's address, data piped into a shell, a download whose address another read makes and one with no address written are each no read of data", progs.filter(readsData).join(" | "));
+  const twice = "curl -s https://mossgrip.example/index.json | jq -r .url | xargs curl -fsSLO";
+  ok(!readsData(twice, [twice, twice]), "a second download in the same words, as on one line, is no read of data");
 }
 done();
