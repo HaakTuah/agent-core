@@ -24,6 +24,7 @@
 import { createHash } from "node:crypto";
 import { aCommit, aRepository, asText } from "./guards.mjs";
 import { OWNER } from "./core-address.mjs";
+import { ownWhole } from "./own-repo.mjs";
 import { readCore } from "./core-path.mjs";
 import { ghAsk } from "./owner-settings.mjs";
 import { started } from "./started.mjs";
@@ -74,7 +75,9 @@ function notPlaced(pr, pull, ours) {
 function notDraft(repo, pr, pull, ask) {
   if (!pull || typeof pull !== "object") return `pull request ${pr} could not be read. Mend: run it where gh answers for the owner's account, with the draft's number`;
   const ours = login => String(login ?? "").toLowerCase() === OWNER.toLowerCase();
-  if (!ours(pull.base?.repo?.owner?.login)) return `the repository is not owned by the core's owner's account, ${OWNER}, where a trial opens no draft. Mend: write nothing more there, tell the owner at once that a pull request stands there, and ${NONE_MEND}`;
+  const own = ownWhole(OWNER, pull.base?.repo, name => ask(`repos/${name}`).body ?? null);
+  if (own === null) return `the repository could not be read to say whose it is. Mend: run it again where gh answers for the owner's account`;
+  if (!own) return `the repository is not owned by the core's owner's account, ${OWNER}, or is a fork of a repository another account owns, where a trial opens no draft. Mend: write nothing more there, tell the owner at once that a pull request stands there, and ${NONE_MEND}`;
   const stop = stopOf(repo, ask);
   if (stop.why) return stop.why;
   if (stop) return `the project's stop switch stands (the branch agents-stop), where a trial opens no draft. Mend: write nothing more there, tell the owner that a draft stands there, and ${NONE_MEND}`;
@@ -139,7 +142,9 @@ export function readNone(repo, sha, ask = ghAsk) {
   const taking = notTaking(repo, ask);
   if (taking) return { why: taking };
   const answer = none => ({ answer: { commit: sha, repo: repoHash(id), none } });
-  if (owner.toLowerCase() !== OWNER.toLowerCase()) return answer("another-owner");
+  const own = ownWhole(OWNER, got.body, name => ask(`repos/${name}`).body ?? null);
+  if (own === null) return { why: "the repository could not be read to say whose it is. Mend: run it again where gh answers for the owner's account" };
+  if (!own) return answer("another-owner");
   const stop = stopOf(repo, ask);
   if (stop.why) return stop;
   return stop ? answer("stop-switch") : { why: "the project is the owner's own and its stop switch does not stand, so the trial opens a draft there. Mend: open its sync as a draft pull request pinned to the commit tried, and read it by its number" };

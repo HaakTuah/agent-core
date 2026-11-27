@@ -15,11 +15,14 @@ const page = (route, key, all) => {
   const n = Number(/[?&]page=(\d+)/.exec(route)?.[1] ?? 0);
   return n ? { body: { [key]: all.slice((n - 1) * 100, n * 100), total_count: all.length } } : { why: "no page asked" };
 };
+// (`fork`: "own" or "theirs", the project a fork of a repository of its own account's or of another's, its parent and
+// source given only in the repository's own answer, as GitHub's pull request gives none; "unread", that answer refused)
 export const host = (over = {}) => route => {
-  const pulls = { state: "open", draft: true, user: { login: OWNER }, head: { sha: HEAD, repo: { id: 41 } }, base: { ref: "main", repo: { id: 41, owner: { login: OWNER }, default_branch: "main" } }, ...over.pull };
+  const forked = over.fork ? { fork: true, parent: { owner: { login: over.fork === "own" ? OWNER : "someone-else" } }, source: { owner: { login: over.fork === "own" ? OWNER : "someone-else" } } } : { fork: false };
+  const pulls = { state: "open", draft: true, user: { login: OWNER }, head: { sha: HEAD, repo: { id: 41 } }, base: { ref: "main", repo: { id: 41, full_name: "o/p", fork: Boolean(over.fork), owner: { login: OWNER }, default_branch: "main" } }, ...over.pull };
   const draftRuns = over.empty ? (over.empty === "skipped" ? [{ name: "tests", status: "completed", conclusion: "skipped" }] : []) : [{ name: "tests", status: "completed", conclusion: "success" }, ...(over.deployRun ? [{ name: "deploy", status: "completed", conclusion: "skipped" }] : []), ...(over.draftRuns ?? []), { name: "dependency review", status: over.late ? "queued" : "completed", conclusion: over.late ? null : over.skipReview ? "skipped" : "failure" }, ...(over.many ? Array.from({ length: 150 }, (_, i) => ({ name: `job ${i}`, status: "completed", conclusion: "success" })) : [])];
   if (route === "repos/o/p/pulls/7") return { body: pulls };
-  if (route === "repos/o/p") return { body: { id: 41, owner: { login: over.owner ?? OWNER } } };
+  if (route === "repos/o/p") return over.fork === "unread" ? { why: "GitHub answered 502 (Bad Gateway)" } : { body: { id: 41, full_name: "o/p", owner: { login: over.owner ?? OWNER }, ...forked } };
   if (route === "repos/o/p/contents/core-manifest.md") return over.manifest === "unread" ? { why: "GitHub answered 502 (Bad Gateway)" } : over.noCore ? { why: "GitHub answered 404 (Not Found)" } : { body: { content: Buffer.from(over.carried ? `Core: ${CORE}, carried by lib/ under lib/core/\n` : `Core: ${CORE} at ${MAIN}, copied whole under core/\n`).toString("base64") } };
   if (route === "repos/o/p/branches/agents-stop") return over.stop === "unread" ? { why: "GitHub answered 403 (forbidden)" } : over.stop ? { body: { name: "agents-stop" } } : { why: "GitHub answered 404 (Not Found)" };
   if (route === `repos/o/p/contents/core-manifest.md?ref=${HEAD}`) return { body: { content: Buffer.from(`Core: ${CORE} at ${over.pin ?? TRIED}, copied whole under core/\n`).toString("base64") } };

@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 import { brief, briefFor, run } from "../scripts/trial-brief.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { ownCount } from "../scripts/release-trial.mjs";
+import { projects } from "../scripts/state-report.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -72,8 +74,9 @@ ok(!missing.length, "each option the brief gives a script is one that script rea
   const manifest = Buffer.from(`# Core manifest\n\nCore: ${CORE} at ${SHA}, copied whole under core/ (never edited here).\n`).toString("base64");
   const own = { login: "example-owner" }, theirs = { login: "friend" };
   // (forks as a list gives them, with no parent: one of the owner's own repository, one of another's)
-  const repos = [{ full_name: "example-owner/game-one", private: true, fork: false, owner: own }, { full_name: "example-owner/notes", private: false, fork: false, owner: own }, { full_name: "friend/shared", private: true, fork: false, owner: theirs }, { full_name: CORE, private: false, fork: false, owner: own }, { full_name: "example-owner/game-copy", private: true, fork: true, owner: own }, { full_name: "example-owner/shared", private: true, fork: true, owner: own }];
-  const whole = { "repos/example-owner/game-copy": { full_name: "example-owner/game-copy", fork: true, owner: own, parent: { owner: own }, source: { owner: own } }, "repos/example-owner/shared": { full_name: "example-owner/shared", fork: true, owner: own, parent: { owner: theirs }, source: { owner: theirs } } };
+  const repos = [{ full_name: "example-owner/game-one", private: true, fork: false, owner: own }, { full_name: "example-owner/notes", private: false, fork: false, owner: own }, { full_name: "friend/shared", private: true, fork: false, owner: theirs }, { full_name: CORE, private: false, fork: false, owner: own }, { full_name: "example-owner/game-copy", private: true, fork: true, owner: own }, { full_name: "example-owner/shared", private: true, fork: true, owner: own }, { full_name: "example-owner/no-field", private: true, owner: own }, { full_name: "example-owner/half", private: true, fork: true, owner: own }];
+  const whole = { "repos/example-owner/game-copy": { full_name: "example-owner/game-copy", fork: true, owner: own, parent: { owner: own }, source: { owner: own } }, "repos/example-owner/shared": { full_name: "example-owner/shared", fork: true, owner: own, parent: { owner: theirs }, source: { owner: theirs } },
+    "repos/example-owner/no-field": { full_name: "example-owner/no-field", fork: false, owner: own }, "repos/example-owner/half": { full_name: "example-owner/half", fork: true, owner: own, parent: { owner: own }, source: { owner: theirs } } };
   const gh = (...a) => {
     if (a[0] === "user") return "example-owner\n";
     if (a[0].startsWith("user/repos")) return JSON.stringify(a[0].includes("page=1") ? repos : []);
@@ -84,7 +87,14 @@ ok(!missing.length, "each option the brief gives a script is one that script rea
   };
   const got = briefFor(SHA, [OTHER], gh);
   ok(got.text?.includes("`example-owner/game-one`, the owner's own") && !/example-owner\/notes|friend\/shared/.test(got.text) && !got.text.includes(`\`${CORE}\`, the owner's`), "of what gh lists, only the account's own repositories whose manifest pins a copy are the owner's projects", got.why ?? "");
-  ok(got.text?.includes("`example-owner/game-copy`, the owner's own") && !got.text.includes("example-owner/shared"), "a fork is the owner's own only where its parent and source are the account's too: a fork of another's repository, under the account's name, is not", got.why ?? "");
+  ok(got.text?.includes("`example-owner/game-copy`, the owner's own") && !got.text.includes("example-owner/shared") && !got.text.includes("example-owner/half"), "a fork is the owner's own only where its parent and source are the account's too: a fork of another's repository, under the account's name, is not, nor one whose source is another's", got.why ?? "");
+  ok(got.text?.includes("`example-owner/no-field`, the owner's own"), "a list's answer that does not say whether it is a fork is read from the repository's own answer", got.why ?? "");
+  // (the state report reads them the same way, and the trial's record counts the owner's own from what it prints)
+  const printed = [], log = console.log;
+  console.log = l => printed.push(l);
+  try { projects([], gh); } finally { console.log = log; }
+  const rows = printed.join("\n");
+  ok(ownCount(rows) === 3 && (rows.match(/^- a project of another owner: /gm) ?? []).length === 3, "--projects names as the owner's own the same three, and the forks of another's beside another owner's project as another owner's", rows);
   const unread = briefFor(SHA, [], (...a) => { if (a[0] === "repos/example-owner/shared") throw new Error("gh: HTTP 502 Bad Gateway"); return gh(...a); });
   ok(!unread.text && /Mend: run it again where gh answers/.test(unread.why ?? ""), "where a fork's own answer cannot be read, no brief, never the fork read as the owner's own or not", unread.why ?? "");
   const down = briefFor(SHA, [], () => { throw new Error("gh: connection refused"); });

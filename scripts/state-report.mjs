@@ -38,6 +38,7 @@ import { ROOT, rules } from "./rules.mjs";
 import { started } from "./started.mjs";
 import { billedLine, line as waitLine, measure as measureWait, selfHosted } from "./wait.mjs";
 import { parseBounded } from "./guards.mjs";
+import { ownWhole } from "./own-repo.mjs";
 
 export const TITLE = "State report";
 export const COUNTS = "Counts for the core";
@@ -250,29 +251,25 @@ export const reportOf = (issues, owner) => [...issues].filter(i => /^State repor
 // Whether the account is a collaborator of a repository.
 const collaboratorOf = (gh, account, name) => { try { gh(`repos/${name}/collaborators/${account}`); return true; } catch { return false; } };
 
-// Whether a repository, as GitHub answers for it (`r`), is the account's own all the way back: the account owns it, and
-// it is no fork, or a fork whose parent and source the account owns too. A fork of another's, or one whose answer says
-// nothing of either, is not. Where the answer is a list's, which gives no
-// parent, the repository's own answer is read; a failure throws, never read as not own.
-export function ownWhole(gh, account, r) {
-  const is = x => String(x?.owner?.login ?? "").toLowerCase() === account.toLowerCase();
-  if (!is(r)) return false;
-  if (r.fork === false) return true;
-  const whole = r.parent || r.source ? r : parseBounded(gh(`repos/${r.full_name}`));
-  return whole?.fork === false || (whole?.fork === true && is(whole.parent) && is(whole.source));
+// Whether the account owns `r` all the way back (scripts/own-repo.mjs), its own answer read through gh where a list's
+// says too little; a failure to read throws, never read as own or not.
+function ownedWhole(gh, account, r) {
+  const own = ownWhole(account, r, name => parseBounded(gh(`repos/${name}`)));
+  if (own === null) throw new Error(`gh gave no answer for ${r.full_name} that says whose it is`);
+  return own;
 }
 
 // The repositories to read, as { private, owner, own, shared } by full name: the ones named, or all the account
-// reaches; `own` where the account owns it all the way back (ownWhole).
+// reaches; `own` where the account owns it all the way back (ownedWhole).
 function reached(gh, account, named) {
   const found = new Map();
   // (a named repository counts as given access where it is private and readable, or the account is its collaborator,
   // read-only too, as GitHub answers; else, a public one of another owner, only by its row)
   if (named.length) for (const name of named) {
     const r = parseBounded(gh(`repos/${name}`)), theirs = String(r.owner?.login).toLowerCase() !== account.toLowerCase();
-    found.set(r.full_name, { private: r.private, owner: r.owner?.login, own: ownWhole(gh, account, r), shared: theirs && !r.private && !r.permissions?.push && !collaboratorOf(gh, account, r.full_name) });
+    found.set(r.full_name, { private: r.private, owner: r.owner?.login, own: ownedWhole(gh, account, r), shared: theirs && !r.private && !r.permissions?.push && !collaboratorOf(gh, account, r.full_name) });
   }
-  else for (const r of pagesOf("user/repos?affiliation=owner,collaborator", gh)) found.set(r.full_name, { private: r.private, owner: r.owner?.login, own: ownWhole(gh, account, r), shared: false });
+  else for (const r of pagesOf("user/repos?affiliation=owner,collaborator", gh)) found.set(r.full_name, { private: r.private, owner: r.owner?.login, own: ownedWhole(gh, account, r), shared: false });
   return found;
 }
 
@@ -316,7 +313,7 @@ function takesCore(gh, name, r) {
 }
 
 // The owner's own projects, by full name, as --projects finds them: of the repositories named, or else all the account
-// reaches, those it owns all the way back (ownWhole) whose manifest pins a copy of the core (scripts/trial-brief.mjs; #1413, point 1). A failure
+// reaches, those it owns all the way back (ownedWhole) whose manifest pins a copy of the core (scripts/trial-brief.mjs; #1413, point 1). A failure
 // of gh throws, never read as none.
 export function ownTakers(named = [], gh = ghApi) {
   const account = gh("user", "--jq", ".login").trim();

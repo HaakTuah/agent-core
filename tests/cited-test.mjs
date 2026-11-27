@@ -111,7 +111,7 @@ ok(run.status === 1 && mended(run.stdout + run.stderr), "a month or repository i
 
 // ---- --projects reads nothing as nothing read (#1112) ----
 {
-  const mine = { private: false, owner: "o", shared: false };
+  const mine = { private: false, owner: "o", own: true, shared: false };
   const outage = new Error("gh: HTTP 502 Bad Gateway"), absent = new Error("gh: Not Found (HTTP 404)");
   let threw = false;
   try { rowOf(() => { throw outage; }, "o", "o/a", mine); } catch (e) { threw = e === outage; }
