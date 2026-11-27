@@ -198,6 +198,20 @@ try {
   readProject(dir, "");
   ok(!fs.existsSync(marker), "the reader lists the project's files with its fsmonitor off, so the command its config names does not run");
   sh("config", "--unset", "core.fsmonitor");
+  // (what the row is read from not readable yet: advice, its mend said, nothing written, nothing failed; #1361, point 6)
+  const before = read("core-manifest.md");
+  put("checks/shape.json", "{ not json");
+  r = run("--write");
+  ok(r.status === 0 && /^Not read, so no row is given and nothing written: the shape check's config .*Mend: /m.test(r.stdout) && !/FAIL/.test(r.stdout + r.stderr) && read("core-manifest.md") === before,
+    "a shape check's config that cannot be read is advice: the mend said, nothing written, exit 0", r.stdout + r.stderr);
+  fs.rmSync(path.join(dir, "checks/shape.json"));
+  fs.rmSync(path.join(dir, "core-manifest.md"));
+  fs.mkdirSync(path.join(dir, "core-manifest.md"));
+  r = run("--write");
+  ok(r.status === 0 && /^Not read, so no row is given and nothing written: core-manifest\.md cannot be read as a file of the project's own.*Mend: /m.test(r.stdout),
+    "a manifest that is no regular file is advice too: the mend said, exit 0", r.stdout + r.stderr);
+  fs.rmSync(path.join(dir, "core-manifest.md"), { recursive: true });
+  put("core-manifest.md", before);
   r = run("--wrte");
   ok(r.status === 1 && /Mend: /.test(r.stderr), "an unknown argument fails with its mend", r.stderr);
 } finally {
