@@ -15,26 +15,29 @@ const GIT_CALL = new RegExp(String.raw`(?<![\w$#])(?:execFileSync|execFile|spawn
 // What changes a parameter's arguments before they reach git.
 const changes = (p, body) => new RegExp(String.raw`(?<![\w$.])${esc(p)}\s*(?:(?:[-+*]|\?\?|\|\||&&)?=(?!=)|\+\+|--|\[[^\]]*\]\s*=(?!=)|\.\s*(?:unshift|splice|shift|reverse|sort|fill|copyWithin)\b)`, "u").test(body);
 
-// The words after which a "/" opens a regular expression, not a division, and what may stand before such a word.
-const BEFORE_REGEX = /(?<![\p{ID_Continue}$#])(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/u;
+// The words after which a "/" opens a regular expression, not a division; the words that may also be names, after which
+// it cannot be told; and what may stand before such a word.
+const BEFORE_REGEX = new Set(["return", "typeof", "instanceof", "in", "new", "delete", "void", "throw", "case", "do", "else", "extends", "default"]);
+const NAME_OR_WORD = new Set(["of", "await", "yield"]);
 const BEFORE_WORD = /[;{}()[\],=:?!&|+\-*%<>~^]/u;
+const NAME_CHAR = /[\p{ID_Continue}$]/u;
 // The place of the last character before text[i] that is not a space.
 const lastCode = (text, i) => i - 1 - /\s*$/u.exec(text.slice(Math.max(0, i - 200), i))[0].length;
-// Whether a "/" after the code that ends at text[last] (comments read past) divides: after a name, a number, a "]" or a
-// string, but one of the words above where code of the kinds above, or nothing, stands before it; or null where it
-// cannot be told: after ")", "}", "/", "++" or "--", or after such a word with anything else before it.
-function divides(text, last) {
-  const before = text.slice(Math.max(0, last - 19), last + 1), word = BEFORE_REGEX.exec(before);
-  if (/(?:[)}/]|\+\+|--)$/u.test(before)) return null;
-  if (!word) return /[\p{ID_Continue}$\]'"\x60]$/u.test(before);
-  const at = lastCode(text, last + 1 - word[0].length);
-  return at < 0 || BEFORE_WORD.test(text[at]) ? false : null;
+// Whether a "/" after the code that ends at text[last] divides, where text[prev] is the code before the name that ends
+// there (comments read past): after a name, a number, a "]" or a string, but one of the words above where code of the
+// kinds above, or nothing, stands before it; or null where it cannot be told: after ")", "}", "/", ".", "++" or "--",
+// after a word that may also be a name, or after such a word with anything else before it.
+function divides(text, last, prev) {
+  const before = text.slice(Math.max(0, last - 19), last + 1), word = /[\p{ID_Continue}$]*$/u.exec(before)[0];
+  if (/(?:[)}/.]|\+\+|--)$/u.test(before) || NAME_OR_WORD.has(word)) return null;
+  if (!BEFORE_REGEX.has(word)) return /[\p{ID_Continue}$\]'"\x60]$/u.test(before);
+  return prev < 0 || BEFORE_WORD.test(text[prev] ?? "") ? false : null;
 }
-// The place of the last character of what opens at the "/" text[i], after the code that ends at text[last]: the "/"
-// itself where it divides, else the "/" that closes its regular expression on that line, or -1 where none does or
-// `divides` cannot tell.
-function slashEnd(text, i, last) {
-  const div = divides(text, last);
+// The place of the last character of what opens at the "/" text[i], after the code that ends at text[last] (text[prev]
+// as `divides` reads it): the "/" itself where it divides, else the "/" that closes its regular expression on that
+// line, or -1 where none does or `divides` cannot tell.
+function slashEnd(text, i, last, prev) {
+  const div = divides(text, last, prev);
   if (div !== false) return div ? i : -1;
   for (let j = i + 1, inClass = false; j < text.length && text[j] !== "\n"; j++) {
     if (text[j] === "\\") j++;
@@ -45,24 +48,30 @@ function slashEnd(text, i, last) {
   return -1;
 }
 // The place of the last character of the string, template, comment or regular expression that opens at text[i], after
-// the code that ends at text[last], or -1 where it cannot be read exactly.
-function skipped(text, i, last) {
+// the code that ends at text[last] (text[prev] as `divides` reads it), or -1 where it cannot be read exactly.
+function skipped(text, i, last, prev) {
   if (text.startsWith("//", i)) return text.indexOf("\n", i) - 1;
   if (text.startsWith("/*", i)) { const end = text.indexOf("*/", i + 2); return end < 0 ? -1 : end + 1; }
-  return text[i] === "/" ? slashEnd(text, i, last) : stringEnd(text, i, (t, j) => codeEnd(t, j, false));
+  return text[i] === "/" ? slashEnd(text, i, last, prev) : stringEnd(text, i, (t, j) => codeEnd(t, j, false));
 }
+// Where code may stand that is read otherwise in some files, or not at all: an escape in a name, or an HTML-like comment.
+const unsure = (text, i) => text[i] === "\\" || text.startsWith("<!--", i) || text.startsWith("-->", i);
+// The code before the name that starts at text[i], where one starts there after the code that ends at text[last]; else
+// `prev`, the code before the name that holds it (NaN where that name started before the reading did).
+const wordFrom = (text, i, last, prev) => (NAME_CHAR.test(text[i]) && !(last === i - 1 && NAME_CHAR.test(text[last])) ? last : prev);
 // The place where code that starts at text[i] ends, its strings, comments and regular expressions read past: after
 // the "}" of the block that opens there where `block`, else at the first ",", ";" or closing bracket at its own depth;
 // or -1 where it cannot be read exactly.
 function codeEnd(text, i, block) {
-  for (let depth = 0, last = lastCode(text, i); i < text.length; i++) {
+  for (let depth = 0, last = lastCode(text, i), prev = NaN; i < text.length; i++) {
     const ch = text[i], note = ch === "/" && "/*".includes(text[i + 1]);
     if (!block && !depth && ",;)]}".includes(ch)) return i;
-    if ("'\"`/".includes(ch)) { i = skipped(text, i, last); if (i < 0) return -1; }
+    if (unsure(text, i)) return -1;
+    if ("'\"`/".includes(ch)) { i = skipped(text, i, last, prev); if (i < 0) return -1; }
     else if ("([{".includes(ch)) depth++;
     else if (")]}".includes(ch) && --depth === 0 && block) return i + 1;
     else if (depth < 0) return -1;
-    if (!note && !/\s/u.test(ch)) last = i;
+    if (!note && !/\s/u.test(ch)) [prev, last] = [wordFrom(text, i, last, prev), i];
   }
   return -1;
 }
