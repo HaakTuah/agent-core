@@ -30,7 +30,7 @@
         "type": "object",
         "mend": "write the label as { \"color\": six lower-case hex digits, \"description\": at most 100 characters }, as GitHub takes one",
         "mendFor": {
-          "additionalProperties": "take it out; a label holds \"color\" and \"description\" alone"
+          "additionalProperties": "take it out; a label holds \"color\" and \"description\" alone, and the lease's state \"lease\""
         },
         "required": [
           "color",
@@ -48,6 +48,10 @@
             "minLength": 1,
             "maxLength": 100,
             "mend": "write a description of 1 to 100 characters, as GitHub takes it"
+          },
+          "lease": {
+            "const": true,
+            "mend": "write it as true, on the one state that marks the orchestrator's lease (scripts/lease.mjs), or take it out"
           }
         }
       }

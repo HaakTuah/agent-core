@@ -85,6 +85,7 @@ The index, and how an item is written: `archive/instructions.md`.
      owner asked which. Behind: the orchestrator's row in `modules/claude.md` and its line in `setup/server.md`; and, in
      `modules/orchestrating.md`, the hourly wake set once as a repeat, its clone on `main`, and "A stalled lane" found
      by `scripts/stalled.mjs` and handed over once.
+     Changed by: #1106.
 
 201. **13 November 2026** (the core, handed to its design session in a message: the brief of an outside session that had
      audited the core at release-2 that day, which the owner had gone through point by point). Asked: the owner answered

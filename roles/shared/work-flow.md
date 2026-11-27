@@ -46,9 +46,9 @@ owner creates from any device to stop its agents and deletes to let them go on.
   starts on a broken `main` cannot tell its own faults from those it inherited.
 - **A builder hands over by its context** (#750, point 7; #1505, point 2). By default a builder carries its task to its
   merge in one session; once its context passes the mark `core/scripts/session-cost.mjs --context` prints, given where
-  its tool shows it condenses (`--condenses`), it stops at its next passed gate (checks green, a review answered) with
-  its hand-off note in its pull request's description, as any session that stops mid-task commits and writes it
-  (`tasks/tools.md`), and the orchestrator starts a fresh one from that note. It does not mean it stops mid-step, nor
+  its tool shows it condenses (`--condenses`), it commits and stops at its next passed gate (checks green, a review
+  answered), its hand-off note in its pull request's description, kept current at each gate (`tasks/tools.md`), and
+  the orchestrator starts a fresh one from that note. It does not mean it stops mid-step, nor
   where the script prints nothing, nor that one no orchestrator started stops. Reason: each step costs more as a
   context grows (one builder ran to 553,000), and a mark above condensing (224,000) never fired. Held by no check; that
   reading shows it.

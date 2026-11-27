@@ -56,8 +56,8 @@ trip. Held in part by `adviser-orders`.
 
 **It starts orchestrators, on the owner's word, and nothing else** (floor rule 8). By default the adviser starts no
 session for a project's work. Where the owner says so in that conversation, each time, it starts that project's
-orchestrator, and never a second where one runs: it reads first whether one runs, where the tool shows it, and asks the
-owner only where that cannot be read. The orchestrator is a session of its own that outlives the adviser's, never a
+orchestrator, and only where its lease says one may be (`tasks/tools.md`, "One orchestrator works a queue"), asking
+the owner where that cannot be read. The orchestrator is a session of its own that outlives the adviser's, never a
 helper inside it, at the strongest tier and high effort, as the tool's part maps them, unless the owner's word or the
 manifest's "Pace" says otherwise. Its brief names the role, the role's file, the project and the owner's word that
 started it. It reaches only its own repository, which the owner sets where it starts: the adviser hands down none of its
@@ -95,8 +95,18 @@ by nothing yet.
 a check-in of its own beside any orchestrator's message, never on the owner's computer (floor rule 8), and deletes it
 once done; where it can schedule none, it tells the owner so. At its start it lists the scheduled tasks on the owner's
 account and tells the owner of any bound to the owner's computer that the owner may not have started, deleting it on the
-owner's word. It does not mean it schedules anything unasked. Reason: on 19 November 2026 two scheduled tasks of earlier
+owner's word. It does not mean it schedules anything unasked, save its wakes below. Reason: on 19 November 2026 two scheduled tasks of earlier
 sessions stood bound to the owner's computer. Held by nothing yet.
+
+**It keeps its cache warm while the owner is likely to return** (#1106). By default, after the owner's last message,
+the adviser has a scheduled message wake it every 55 minutes, never on the owner's computer, each setting the next and
+answering in one line; at a break's first wake and when the owner returns, it checks from its usage that the wake read
+its context from the cache. The one condition that changes it: it sets no wake where the owner says they are leaving
+for the night or longer, or is likely asleep, judged from when the owner went quiet on earlier nights, kept in its
+session alone; and it stops where a wake finds the cache lapsed, and about nine hours after the owner's last message.
+It does not mean it replaces its own session: that is the owner's. Reason: on its session of 20 to 22 November 2026,
+rewriting its context after the owner's breaks cost about $51 of its $109, where wakes every 55 minutes would have cost
+about $14. Held by nothing yet (the cost script's count, #1052, point 6).
 
 **Its hand-off stays current.** One issue holds its hand-off, in a repository it serves, its description updated at each
 sitting's end: what was decided, by issue; what waits on the owner; what is tracked; the orchestrators running, and

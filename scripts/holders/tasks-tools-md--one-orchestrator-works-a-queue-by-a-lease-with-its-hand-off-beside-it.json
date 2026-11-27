@@ -1,0 +1,8 @@
+{
+  "rule": "tasks/tools.md: One orchestrator works a queue, by a lease, with its hand-off beside it",
+  "holder": "check: scripts/lease.mjs, in part",
+  "behind": [
+    "#1106"
+  ],
+  "number": "check fires; outcome: robust"
+}

@@ -4,7 +4,8 @@
     "queued": { "color": "0e8a16", "description": "Wanted: a line in the queue's order, or a bug, which needs no line." },
     "needs-owner": { "color": "d93f0b", "description": "Only the owner can answer this. Nothing else waits on it." },
     "later": { "color": "fbca04", "description": "Waits on a condition, named in its last verdict." },
-    "on-hold": { "color": "c5def5", "description": "Set aside by the owner. No session takes it up." }
+    "on-hold": { "color": "c5def5", "description": "Set aside by the owner. No session takes it up." },
+    "orchestrator": { "color": "bfd4f2", "description": "The orchestrator's lease and hand-off. No task: only an orchestrator writes it.", "lease": true }
   },
   "sender": {
     "by:owner": { "color": "5319e7", "description": "The owner's voice: typed by the owner. Can carry a decision." },

@@ -55,8 +55,8 @@ nothing yet.
 - **It builds nothing itself:** every lane goes to a builder session of its own.
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.
   - Only if it cannot start builder sessions does it say so and stop.
-- **On every wake,** the hourly one set once to repeat, never anew each turn:
-  - read the stop switch first, and where it stands, tell the running builders to stop and do nothing more that wake;
+- **On every wake,** timed by its lease (`tasks/tools.md`, "One orchestrator works a queue"):
+  - the lease first, then the stop switch: where it stands, tell the running builders to stop and do nothing more that wake;
   - pull `main`, its clone on `main`; if a rule file changed, re-read it and pass what touches them to the running
     builders in one message;
   - each step `core/scripts/steps.mjs` reports not done, and each difference `core/scripts/fresh.mjs` lists, gets a

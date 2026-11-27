@@ -2,7 +2,7 @@
 
 Read when a project sets up an agent tool, hands a role to one or changes its tool mid-task, and when a tool's staged
 run is due: the kind `tool`; by a session that stops a task before its end, for its hand-off note: the kind
-`hand-off`; the paths `CLAUDE.md`, `.claude/`, `.kiro/`, `.agents/` and `.codex/`. Which tool takes
+`hand-off`; by an orchestrator and whoever starts one, for its lease: the kind `orchestrator`; the paths `CLAUDE.md`, `.claude/`, `.kiro/`, `.agents/` and `.codex/`. Which tool takes
 which role: `tasks/roles.md`, "Tools are preferences". What lies around a tool's session, the cloud, a tool that runs
 the agents side by side or a plain terminal, is a way, no tool, with no column below: `tasks/ways.md`.
 
@@ -41,9 +41,10 @@ same rules.
 
 **A change of tool loses nothing.** The state of a task is in the repository and never only in a
 session: its branch, pushed after every commit, each naming the next step, its pull request's description with its hand-off note, its line in the
-*progress file* and what it waits on (`roles/shared/work-flow.md`). A session that stops mid-task, at a passed gate, a
-limit or the stop switch, writes the note (#306): a line "Hand-off:", then what is done, what was tried and failed,
-what is next, and how to check it. Where a builder's tool stops (its usage spent, say), a fresh builder of any tool
+*progress file* and what it waits on (`roles/shared/work-flow.md`). A builder keeps the note current at each passed
+gate (checks green, a review answered), in the edit that gate already brings to its description, and a session that
+stops mid-task, at a limit or the stop switch, writes it (#306; #1106): a line "Hand-off:", then what is done, what was
+tried and failed, what is next, and how to check it. Where a builder's tool stops (its usage spent, say), a fresh builder of any tool
 picks up from the branch, reading the note first, or with none its newest commit's next step (`roles/orchestrator.md`, "A stalled lane"). It does not mean that
 the tool that stopped hands over by itself, nor a note where the task ends merged. Reason: when one provider's usage ran
 out, everything held only in its sessions stopped with them, and a lane handed over from its branch alone shows the
@@ -59,6 +60,46 @@ commit the host or Dependabot makes, carries one; a session that stops at a gate
 writes its hand-off note. Reason: on 26 November 2026 a hard stop ended one account's sessions mid-work, and the next
 steps of four drafts, written once at the end and never pushed, were lost. Held, in part, by `scripts/stalled.mjs`,
 which marks a stalled lane whose newest commit names no next step.
+
+**One orchestrator works a queue, by a lease, with its hand-off beside it** (#1106). By default a project's queue has
+one orchestrator, which holds its lease: one issue of the project's, labelled `orchestrator`, whose newest lease comment
+from the *owner's account* names the session that holds the queue, its tool and its builders running, its time the
+host's (`core/scripts/lease.mjs` writes and reads it). Nothing changes it.
+- At every wake, before anything else, the orchestrator runs `core/scripts/lease.mjs --session <its own> --tool
+  <its tool> --builders <how many run>`: where it prints "Stop:" (another session woke within the lease's term, three
+  hours, a first guess, or a hand-over note there names another or replaced its own lease), it deletes every wake of
+  its own and stops; else the script renews or claims the lease. It reads the *owner's account*'s issue and comments
+  alone; where gh acts as another account, it writes nothing, so the wake goes on without the lease, save where
+  another's is fresh. Where no lease can stand (issues switched off, no repository on github.com, no gh, or gh refused by
+  its sign-in), it says so and the wake goes on without one; where it fails otherwise, that wake works no lane and
+  keeps its next only while work is in flight.
+- The issue's current text is its hand-off, which it keeps current at each change (a builder started or stopped, a
+  merge, an order given): the lanes and their pull requests, what each waits on, the orders for now in force (a pace,
+  an order of work, a hold), one given only by message among them, and what comes next.
+- A new orchestrator, of any tool or account, is started only where the script, read alone, says one may be: no
+  lease is fresh, or its holder handed over by a note there. Whoever starts one (the owner, the adviser) runs it first,
+  and the new one takes up from the hand-off alone.
+- A cold orchestrator is not woken: where the script says the holder's last wake is over an hour old and it had no
+  builder running, so that its cache has lapsed, whoever resumes the work writes the hand-over note (`--hand-over any`,
+  or the fresh session's name where it is known), which stops the old one whatever it names, and starts a fresh one
+  from the hand-off, as "Hand over at once" (`roles/orchestrator.md`) does for a builder; one with builders running is never replaced, since they report to the session that started them.
+- Its wake follows the cache: while a builder of its runs, or a review or check it waits on is due, its next wake
+  comes within the cache's hour (55 minutes, a first guess), set again at each wake, which the lease makes safe; with
+  nothing in flight (a pause, or no line a session can take) it keeps no wake, its hand-off ready, and the work resumes
+  in a fresh one.
+- Ready at any moment: since a session's usage can end mid-step with no chance to write a note, the hand-offs are
+  kept current, never written only at a stop: the orchestrator's at each change, each builder's at each passed gate
+  ("A change of tool loses nothing").
+
+It does not mean that a session's word is trusted for who holds the lease beyond what the issue shows, that a builder
+needs a lease, nor that a wake runs on the owner's computer (floor rule 8). Reason: on 22 November 2026 an
+orchestrator's scheduled wake would have revived it while another account's orchestrator worked the same queue, and a
+wake after its cache lapsed wrote its 440,000 tokens anew ($3.76 for one short turn, against $0.33 warm), where a fresh
+one writes only what it needs. Held by `scripts/lease.mjs` and its test (a fresh lease of another session stops the
+wake, a stale one is claimed, a hand-over note stops the old holder, a session signed in as another account writes
+nothing and goes on, a project whose issues cannot be read keeps its orchestrator, and read alone it says whether the holder's last
+wake is over an hour old), and by the scheduled look, which reports a lease renewed by two sessions and wakes more than
+an hour apart while builders ran; that the hand-offs are kept current, by nothing yet.
 
 **Proven by the staged cases, tool by tool** (`core-changes/holders.md`, "Staged cases hold what no check
 reads"). A tool works with the core once a session of it has passed every staged case (`node scripts/staged.mjs

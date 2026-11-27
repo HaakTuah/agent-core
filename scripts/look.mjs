@@ -34,6 +34,8 @@
 //     (release-due.mjs; #1413, point 4); and of the
 //     choices that are hard to undo (choices.mjs), the pass over them twice a year, and a sign written in a measure the
 //     shape check keeps, while it holds.
+//   - The orchestrator's lease (lease.mjs; #1106), where one stands: renewed by two sessions, or its holder's wakes more
+//     than an hour apart while builders ran.
 //   - Once a month, the state report (state-report.mjs, beside this file), opened once and not touched again; and, in a
 //     project, the packages it holds that have gone stale (held.mjs, beside this file, run as a process of its own, since
 //     it asks the registries over the network): no release within the year, gone from their registry, or their
@@ -71,6 +73,7 @@ import { started } from "./started.mjs";
 import { due as capPassed } from "./size.mjs";
 import { splitAsked } from "./look-split.mjs";
 import { dueIssue as trialDue } from "./release-due.mjs";
+import { dueIssue as leaseDue } from "./lease.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
 import { line as blindLine, reader as blindSample, shareNow, TITLE as BLIND } from "./blind-sample.mjs";
 import { ownReport } from "./holders.mjs";
@@ -100,14 +103,17 @@ const ownHeld = scripts => { try { return ownReport(process.cwd(), scripts); } c
 
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
 // issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), a cap passed (size.mjs) and a
-// release's trial due (release-due.mjs), in the core alone; a file past the split mark whose question stands
+// release's trial due (release-due.mjs), in the core alone; the orchestrator's lease (lease.mjs), where one stands; a file past the split mark whose question stands
 // (look-split.mjs); the pass over
 // the choices that are hard to undo and a sign of theirs that has tripped (choices.mjs); and the cleaning and the audit
 // the dose makes due (dose.mjs); and the blind sample (blind-sample.mjs), whose draw is laid out on the first run of
 // each month. One that says `owner`, true or false, has its issue's state label kept to it:
 // needs-owner where true, else queued; one that gives `requeue`, the key of a line of its lists, has it put back to
 // queued where an update brings a key the issue did not hold (`updating`).
-export const DUE = [stagedCases, capPassed, trialDue, splitAsked, choicesDue, signs, cleaningDue, auditIsDue, blindSample];
+export const DUE = [stagedCases, capPassed, trialDue, leaseDue, splitAsked, choicesDue, signs, cleaningDue, auditIsDue, blindSample];
+
+// What the look gives each reader of what is due: its repository, manifest, time and the owner's account.
+export const dueContext = ({ repo, manifest, at, owner }) => ({ repo, manifest, at, owner });
 
 export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner, ...(typeof d.requeue === "function" ? { requeue: d.requeue } : {}) }));
 
@@ -191,7 +197,7 @@ function findingsOf(ctx, reach, last) {
   // a missed run
   if (last && hoursBetween(last, at) > MISSED) add(TITLES.missed, `The look before this one ran at ${last}, ${hoursBetween(last, at)} h before this run at ${at}: over ${MISSED} h. Find why and mend it, then close this issue: GitHub switches a scheduled workflow off after 60 days with no activity in the repository (\`gh workflow enable\` turns it back on, as an orchestrator's wake does), a run can fail, and an orchestrator that carries the look may not have woken.`);
   // what else is due, as each rule that sets it comes
-  findings.push(...dueNow({ repo, manifest, at }));
+  findings.push(...dueNow(dueContext(ctx)));
   return { findings, stepsLeft };
 }
 
