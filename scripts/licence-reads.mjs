@@ -29,11 +29,11 @@ const use = (name) => new RegExp(`^curl(?:[ \\t]+-[fsSL]+)*(?:[ \\t]+-[fsSL]*o[ 
 const REACHES_ANY = /\$\{!|<<|(?<![\w-])(?:eval|export|declare|typeset|env|printenv|compgen|Invoke-Expression|iex)(?![\w-])|(?<![\w-])set[ \t]+(?:-[A-Za-z]*a|-o[ \t]+allexport)|(?<![\w-])set[ \t]*(?:$|[;|&)>])|\$_(?!\w)|\$\{_\}|(?<![\w-])(?:function[ \t]+(?:curl|jq|grep)|alias[ \t]+(?:curl|jq|grep)|(?:curl|jq|grep)[ \t]*\(\))(?![\w-])/imu;
 
 /** The downloads of `code` that may fetch a program: all but its reads of data. A read of data is a download of the
- *  form READ, its output held to versions by its grep, once in the file, whose variable's name is none a shell or program reads by itself (SHELL_OWN), and
- *  which is used only on lines of the one form `use`, a download of a double-quoted address that holds no other
- *  expansion, so that what the read printed is only ever part of an address (that download, a program's, asked its
- *  checksum), each of these lines standing outside any quote and no continuation of the line before (`plain`), in a
- *  file where nothing could reach the variable otherwise (REACHES_ANY). */
+ *  form READ, its output held to versions by its grep, once in the file, whose variable's name is none a shell or
+ *  program reads by itself (SHELL_OWN), and which is used only on lines of the one form `use`, a download of a
+ *  double-quoted address that holds no other expansion (that download, a program's, asked its checksum), each of these
+ *  lines standing outside any quote and no continuation of the line before (`plain`), in a file where nothing could
+ *  reach the variable otherwise (REACHES_ANY). */
 export function programDownloads(code) {
   const all = downloads(code);
   if (REACHES_ANY.test(code)) return all;
