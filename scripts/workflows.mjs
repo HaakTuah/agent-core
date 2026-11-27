@@ -58,7 +58,7 @@ import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
 import { DEEPEST, LONGEST, pruned, twice } from "./yaml-keys.mjs";
 import { didNotRun, installed, loadSync, unreached } from "./packages.mjs";
-import { copyOf, projectAt } from "./core-path.mjs";
+import { copyAside, projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { compared, run } from "./workflow-tools.mjs";
@@ -222,8 +222,8 @@ export function foreignBroken(files, before) {
 }
 
 // The files the check reads, of those git tracks: the project's own, the copy of the core aside, where its manifest names
-// it (`copy`, core-path.mjs's copyOf; core/ where it names none).
-export const reads = (files, copy = "core/") => files.filter(f => !f.startsWith(copy) && !f.split("/").includes("node_modules") &&
+// it (`copy`, core-path.mjs's copyAside; core/ where it names none, null in the core's own repository).
+export const reads = (files, copy = "core/") => files.filter(f => !(copy && f.startsWith(copy)) && !f.split("/").includes("node_modules") &&
   (/^\.github\/(workflows\/[^/]+|actions\/.+)\.ya?ml$/iu.test(f) || /(^|\/)action\.ya?ml$/iu.test(f)));
 // What may be no link, of those git tracks: what the check reads, and .github itself with everything in it.
 export const unlinked = (files, copy) => { const read = new Set(reads(files, copy)); return files.filter(f => read.has(f) || /^\.github(\/|$)/iu.test(f)); };
@@ -381,7 +381,7 @@ if (started(import.meta.url)) {
   const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
   process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
-  const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean), copy = copyOf("."), files = reads(tracked, copy);
+  const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean), copy = copyAside("."), files = reads(tracked, copy);
   const core = process.argv.includes("--core"), base = core ? "" : process.env.WORKFLOWS_BASE ?? "";
   // (both texts with their line ends as "\n": git may convert them on checkout, so the working tree's file and the base's
   // blob of one text must read as equal and as one length, #752)

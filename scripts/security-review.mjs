@@ -77,8 +77,8 @@
 //         their rights (collaborators/<login>/permission, as a JSON list); PURE for the head pure-sync.mjs proved;
 //         QUEUE for the head the caller's queue-only.mjs proved (#750); CODE for the file scripts/code-review-wait.mjs
 //         printed into for the same head, whose waiting this status waits for too (withCode; #1339).
-import { existsSync, readFileSync } from "node:fs";
-import { copyOf } from "./core-path.mjs";
+import { readFileSync } from "node:fs";
+import { copyHeld } from "./core-path.mjs";
 import { RUNS } from "./comment-only.mjs";
 import { mayRun } from "./power.mjs";
 import { blockingOf } from "./review-lines.mjs";
@@ -322,7 +322,7 @@ export const queueOnly = (pull, files, copy) => files !== undefined && whole(pul
 export const whole = (pull, files) => Number.isInteger(pull.changed_files) && pull.changed_files >= 0 && flat(files).length >= pull.changed_files;
 // what runs by itself, as comment-only.mjs reads it, the copy of the core aside (only a sync changes it, and its code
 // passed its reviews in the core's own pull request: floor rule 8), under core/ or the path the default branch's manifest
-// names (`copy`, core-path.mjs's copyOf, given by the script's caller); a file moved counts on either side
+// names (`copy`, core-path.mjs's copyHeld, given by the script's caller); a file moved counts on either side
 const runs = (file, copy = "core/") => [file.filename, file.previous_filename].some((name) => typeof name === "string" && !name.startsWith(copy) && RUNS.test(name));
 // a `uses:` line pinned to a whole SHA, with the note after it if any: [the line with the pin and note set aside]
 const USES = /^(\s*(?:-\s+)?["']?uses["']?\s*:\s*["']?[^\s"'@#]+@)[0-9a-f]{40}(["']?)(?:\s+#\s*[\w.+-]*)?$/u;
@@ -494,7 +494,7 @@ if (started(import.meta.url)) {
       queue: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.QUEUE === pull.head.sha,
       merges: mergesFile ? read(mergesFile) : undefined,
       light: lightOf(process.env.POWER, read), power: powerFilesOf(process.env.POWER, read),
-      copy: existsSync("core-manifest.md") ? copyOf(".") : undefined }); // (the copy at the path the default branch's manifest names, checked out here, as code-review-wait.mjs reads it)
+      copy: copyHeld(".") ?? undefined }); // (the copy at the path the default branch's manifest names, checked out here, none in the core's own repository, as code-review-wait.mjs reads it)
   // (CODE: the file code-review-wait.mjs printed into, where the workflow ran it; missing, empty or not JSON, it is
   // read as not worked out, which waits)
   const code = (() => {

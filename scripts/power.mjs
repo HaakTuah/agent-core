@@ -198,7 +198,7 @@ if (started(import.meta.url)) {
   if (args[0] === "--list") {
     const root = args[1] ?? ".";
     if (!existsSync(root)) fail(`found no folder ${root}`, "give the folder of a repository's checkout, or none for the one you stand in");
-    const copy = existsSync(path.join(root, "core-manifest.md")) ? (await import("./core-path.mjs")).copyOf(root) : undefined;
+    const copy = (await import("./core-path.mjs")).copyHeld(root) ?? undefined; // (none in the core's own repository: core-path.mjs)
     const why = new Map();
     for (const name of [...setOf({ ...diskTree(root), copy }, why)].sort()) console.log(`${name}\t${why.get(name)}`);
     process.exit(0);
@@ -215,7 +215,7 @@ if (started(import.meta.url)) {
   const pull = read(pullFile), commits = read(commitsFile), files = read(filesFile);
   const head = pull?.head?.sha;
   if (typeof head !== "string" || !SHA.test(head)) fail("was given a pull request with no head commit", "give it the pull request as GitHub's API gives it");
-  const copy = existsSync(path.join(baseDir, "core-manifest.md")) ? (await import("./core-path.mjs")).copyOf(baseDir) : undefined;
+  const copy = (await import("./core-path.mjs")).copyHeld(baseDir) ?? undefined;
   const sets = new Map();
   const setAt = (commit) => { if (!sets.has(commit)) sets.set(commit, setOf({ ...gitTree(commit, "."), copy })); return sets.get(commit); };
   const changed = (parent, commit) => git(["diff-tree", "-r", "-z", "--no-renames", "--name-only", parent, commit], ".").split("\0").filter(Boolean);
