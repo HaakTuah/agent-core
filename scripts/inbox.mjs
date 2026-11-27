@@ -24,9 +24,10 @@ import { started } from "./started.mjs";
 
 export const FOLDER = "inbox";
 // The two lines above an item's headings, in place of labels: its state and its sender, by the names of the labels'
-// list (labels.json, beside this file; core archive 217), a sender without its "by:".
+// list (labels.json, beside this file; core archive 217), a sender without its "by:". The state `orchestrator` marks
+// the lease's issue (lease.mjs, LABEL), no item: the lease is read from issues alone, so no item of the folder takes it.
 const LIST = parseBounded(fs.readFileSync(new URL("./labels.json", import.meta.url), "utf8"));
-export const STATES = Object.keys(LIST.state);
+export const STATES = Object.keys(LIST.state).filter(s => s !== "orchestrator");
 export const SENDERS = Object.keys(LIST.sender).map(s => s.replace(/^by:/, ""));
 
 // Whether an origin's address names no host: none, or a folder on this machine (a path, or `file:`), as a release's trial
