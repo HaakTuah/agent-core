@@ -39,7 +39,7 @@ const WINDOWS = ["commandWindows", "command_windows"];
 function commandsOf(hook) {
   const runs = hook?.type === "command" && typeof hook.command === "string";
   const windows = WINDOWS.filter(k => hook && typeof hook === "object" && Object.hasOwn(hook, k)).map(k => hook[k]);
-  if (!runs) return { runs, text: JSON.stringify(hook), commands: [NO_KIT, ...windows] };
+  if (!runs) return { runs, text: JSON.stringify(hook), commands: [...windows, NO_KIT] };
   return { runs, text: `${hook.command}${windows.length ? ` (Windows: ${windows.map(String).join(", ")})` : ""}`, commands: [hook.command, ...windows] };
 }
 // The hooks one settings file configures, into configured()'s `state`: Claude Code's, or, with `tool`, another tool's
