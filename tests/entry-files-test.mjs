@@ -92,8 +92,20 @@ try {
   const away = path.join(path.dirname(dir), `${path.basename(dir)}-away.md`);
   fs.writeFileSync(away, "@elsewhere.md\n");
   try {
-    fs.rmSync(path.join(dir, "CLAUDE.md")); fs.symlinkSync(away, path.join(dir, "CLAUDE.md"));
-    ok(run({ ENTRY_BASE: "HEAD" }).status === 0, "an entry file that is a link leading out of the project is unread, as one not there");
+    const swap = (f, make) => { fs.rmSync(path.join(dir, f), { force: true }); make(path.join(dir, f)); };
+    const refused = what => { const res = run({ ENTRY_BASE: "HEAD" }); ok(res.status === 1 && mended(res.out) && res.out.includes("stands here but is not read"), what); };
+    swap("CLAUDE.md", f => fs.symlinkSync(away, f));
+    refused("against a base that read it, an entry file that is a link leading out of the project fails, saying its mend");
+    r = run();
+    ok(r.status === 0 && r.out.includes("note") && r.out.includes("stands here but is not read"), "with no base, the same is noted and fails nothing");
+    swap("CLAUDE.md", f => fs.symlinkSync("nowhere.md", f));
+    refused("so does one that is a link leading nowhere");
+    swap("CLAUDE.md", f => fs.writeFileSync(f, `@AGENTS.md\n${"x".repeat(1 << 20)}\n`));
+    refused("and one past the bound");
+    swap("CLAUDE.md", f => fs.symlinkSync("AGENTS.md", f));
+    ok(run({ ENTRY_BASE: "HEAD" }).status === 0, "once it is again what the base held, it passes");
+    swap("AGENTS.md", f => fs.symlinkSync(away, f));
+    refused("and AGENTS.md as a link leading out of the project fails too");
   } finally { fs.rmSync(away, { force: true }); }
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 

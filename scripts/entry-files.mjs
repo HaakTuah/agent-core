@@ -17,6 +17,7 @@
 //
 //   node core/scripts/entry-files.mjs           from a project's root, as the copies workflow runs it
 //   node scripts/entry-files.mjs --core         in the core's own repository
+import fs from "node:fs";
 import path from "node:path";
 import { ownText } from "./core-path.mjs";
 import { ENTRY_FILES, readAt } from "./rule-files.mjs";
@@ -42,6 +43,9 @@ export const ENTRY = [
     pulls: text => [...live(text).matchAll(/@\[[^\]\n]*\]\(([^)\s]+)\)/gu)].map(m => path.posix.join(path.posix.dirname(ENTRY_FILES.antigravity), m[1])),
     off: text => (front(text).trigger === "always_on" ? null : `its front matter has no "trigger: always_on". Mend: open the file with the front matter ---, trigger: always_on, --- on three lines`) },
 ];
+
+// Whether anything stands at the path, a link that leads nowhere included.
+const standsHere = file => { try { fs.lstatSync(file); return true; } catch { return false; } };
 
 const clean = p => path.posix.normalize(String(p).replace(/\\/gu, "/")).replace(/^\.\//u, "");
 
@@ -87,7 +91,15 @@ if (guard(import.meta.url)) {
   const core = process.argv.includes("--core"), base = core ? "" : process.env.ENTRY_BASE ?? "";
   // (the work tree's files as ownText reads them, a link inside the project followed, and the base's as readAt reads
   // its tree, each link inside it followed the same way, so that a file the base held as a link reads as its target)
-  const read = verdict(file => ownText(file), base ? readAt(base) : null);
+  // (a file that stands here but that ownText refuses is one no check can read: it fails where the base read it, as
+  // the pull request's own doing, and is noted where it stood so or was not there)
+  const unread = new Set(), was = base ? readAt(base) : null;
+  const here = file => { const text = ownText(file); if (text === null && standsHere(file)) unread.add(file); return text; };
+  const read = verdict(here, was);
+  for (const f of unread) {
+    const said = `${f} stands here but is not read: it is no regular file of the project's own of at most 1 MB, so what it pulls in cannot be checked. Mend: make ${f} a regular file of the project's own, of at most 1 MB`;
+    (core || (was && was(f) !== null) ? read.fails : read.notes).push(said);
+  }
   // (in a project with no base to read against, nothing is new: each is a note)
   const { fails, notes } = core || base ? read : { fails: [], notes: [...read.notes, ...read.fails] };
   for (const n of notes) console.log(asText(`note (it stood so before this pull request, so it fails nothing): ${n}`));
