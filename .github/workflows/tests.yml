@@ -465,6 +465,12 @@ jobs:
       - name: The scheduled look and its state report
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/look-test.mjs ')) }}
         run: node tests/look-test.mjs
+      - name: The scheduled look's reader of the files past the split mark
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/look-split-test.mjs ')) }}
+        run: node tests/look-split-test.mjs
+      - name: The description and size checks a builder runs before ready
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/before-ready-test.mjs ')) }}
+        run: node tests/before-ready-test.mjs
       - name: The personal terms taken out of issues and comments
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/issue-terms-test.mjs ')) }}
         run: node tests/issue-terms-test.mjs

@@ -1,6 +1,6 @@
 {
   "rule": "tasks/cleaning.md: Size asks; a reader who reads less answers",
-  "holder": "check: scripts/reading-size.mjs, in part",
-  "behind": ["#469"],
+  "holder": ["check: scripts/reading-size.mjs, in part", "check: tests/size-test.mjs, in part", "check: scripts/look-split.mjs, in part"],
+  "behind": ["#469", "#1413.6"],
   "number": "check fires; outcome: readable"
 }
