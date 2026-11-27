@@ -34,20 +34,25 @@ export function readAt(commit, place = placeAt(commit), { bound } = {}) {
 }
 // (a link's text that leads out of any tree: none read, or one written from a root)
 const outward = to => to === null || /^([\\/]|[A-Za-z]:)/u.test(to);
-// Where a path leads, from the root: every link on its way followed, the first a part of it, its own end included, that
-// `isLink` says is one, its text (`text`, null where none is read) put in its place from the link's own folder, while
-// it leads inside the tree, at most 40; the path it ends at, or null where a link leads out or the links run past 40.
-// placeAt reads a commit's tree through it and entry-files.mjs the work tree, so the two read a link alike.
+// Where a path leads, from the root, read part by part as a system reads it: each part that `isLink` says is a link
+// has its text (`text`, null where none is read) put in its place, read from the link's own folder, and a `..` steps
+// back from the folder reached, while it leads inside the tree, at most 40 links; the path it ends at, or null where a
+// link leads out or the links run past 40. placeAt reads a commit's tree through it and entry-files.mjs the work tree,
+// so the two read a link alike.
 export function followLinks(f, isLink, text) {
-  for (let at = path.posix.normalize(f), hops = 0; hops <= 40; hops++) {
-    if (at === ".." || at.startsWith("../") || at.startsWith("/")) return null;
-    const parts = at.split("/"), k = parts.findIndex((_, i) => isLink(parts.slice(0, i + 1).join("/")));
-    if (k < 0) return at;
-    const link = parts.slice(0, k + 1).join("/"), to = text(link);
+  if (String(f).startsWith("/")) return null;
+  const todo = String(f).split("/"), cur = [];
+  for (let hops = 0; todo.length;) {
+    const p = todo.shift();
+    if (p === "" || p === ".") continue;
+    if (p === "..") { if (!cur.length) return null; cur.pop(); continue; }
+    const next = [...cur, p].join("/");
+    if (!isLink(next)) { cur.push(p); continue; }
+    const to = ++hops > 40 ? null : text(next);
     if (outward(to)) return null;
-    at = path.posix.normalize(path.posix.join(path.posix.dirname(link), to.replace(/\\/gu, "/"), ...parts.slice(k + 1)));
+    todo.unshift(...to.replace(/\\/gu, "/").split("/"));
   }
-  return null;
+  return cur.join("/");
 }
 // Where readAt(commit) reads a path from: the path, from the root, of the file it leads to, every link on its way
 // followed as readAt follows it, or null where readAt reads nothing there; `show` reads a file of the tree by its path,

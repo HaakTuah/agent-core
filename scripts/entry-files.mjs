@@ -102,13 +102,14 @@ if (guard(import.meta.url)) {
   const core = process.argv.includes("--core"), base = core ? "" : process.env.ENTRY_BASE ?? "";
   // (the work tree's files as ownText reads them, a link inside the project followed, and the base's as readAt reads
   // its tree, each link inside it followed the same way, so that a file the base held as a link reads as its target)
-  // (a file that stands here but that ownText refuses is one no check can read: it fails where the base read it or
-  // held nothing there, as the pull request's own doing, and is noted where the base held it unread too)
+  // (a file that stands here but that ownText refuses, or that a link on its way written from a root or climbing above
+  // the project's root reaches, is one no check can read: it fails where the base read it or held nothing there, as
+  // the pull request's own doing, and is noted where the base held it unread too)
   const unread = new Set(), place = base ? placeAt(base) : null, was = place ? readAt(base, place, { bound: BOUND }) : null;
   const here = file => { const text = asTheBaseReads(file) ? ownText(file, { bound: BOUND }) : null; if (text === null && standsHere(file)) unread.add(file); return text; };
   const read = verdict(here, was);
   for (const f of unread) {
-    const said = `${f} stands here but is not read: it is no regular file of the project's own of at most 1 MB, so what it pulls in cannot be checked. Mend: make ${f} a regular file of the project's own, of at most 1 MB`;
+    const said = `${f} stands here but is not read: it is no regular file of the project's own of at most 1 MB, reached by no link written from a root or climbing above the project's root, so what it pulls in cannot be checked. Mend: make ${f} a regular file of the project's own, of at most 1 MB, with no such link on its way`;
     (core || (was && (was(f) !== null || !place.held(f))) ? read.fails : read.notes).push(said);
   }
   // (in a project with no base to read against, nothing is new: each is a note)

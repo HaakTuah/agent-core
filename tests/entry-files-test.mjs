@@ -29,8 +29,8 @@ ok(lacking(reader({ "AGENTS.md": AGENTS })).length === 0 && lacking(reader({ "CL
   "an entry file the project does not hold, or a project with no AGENTS.md, is not looked for");
 // (the one walk the base and the work tree read a link by, on a tree of links given as { path: text })
 const walk = (links, f) => followLinks(f, p => p in links, p => links[p] ?? null);
-ok(walk({ "a": "b/c", "b": "d" }, "a/e") === "d/c/e" && walk({ "a": "/etc" }, "a") === null && walk({ "a": "a" }, "a") === null && walk({ "a": "../x" }, "a") === null,
-  "one walk follows each link from its own folder, and refuses one written from a root, one that climbs out and a loop past 40");
+ok(walk({ "a": "b/c", "b": "d" }, "a/e") === "d/c/e" && walk({ "a": "/etc" }, "a") === null && walk({ "a": "a" }, "a") === null && walk({ "a": "../x" }, "a") === null
+  && walk({ "x": "d/e" }, "x/../y") === "d/y", "one walk follows each link from its own folder, steps back by a `..` from the folder a link reached, and refuses one written from a root, one that climbs out and a loop past 40");
 let l = lacking(reader({ "AGENTS.md": AGENTS, "CLAUDE.md": "@core-manifest.md\n" }));
 ok(l.length === 1 && l[0].file === "CLAUDE.md" && l[0].missing.join() === "core/floor/security.md",
   "a CLAUDE.md that imports neither AGENTS.md nor each of its files lacks the one it leaves out");
@@ -143,6 +143,7 @@ try {
       ["CLAUDE.md led through a second link to a folder lacking the file", () => { swap("CLAUDE.md", f => fs.symlinkSync("x/c.md", f)); fs.symlinkSync("z", path.join(dir, "x")); }],
       [".agents led through a second link to a folder lacking the rest", () => { swap(".agents", f => fs.symlinkSync("x/y", f)); fs.symlinkSync("z", path.join(dir, "x")); }],
       [".agents led up out of a folder that is not there", () => swap(".agents", f => fs.symlinkSync("w/..", f))],
+      ["CLAUDE.md led through a link and back up from the folder it reached, which lacks the file", () => { swap("CLAUDE.md", f => fs.symlinkSync("x/../AGENTS.md", f)); write("docs/d/.keep", ""); fs.symlinkSync("docs/d", path.join(dir, "x")); }],
     ]) {
       made(); commit(what);
       r = run({ ENTRY_BASE: "HEAD" });
