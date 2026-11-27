@@ -23,7 +23,7 @@ export function inProject(p) {
  *  caller's own choice, and reads as it is. */
 export const linkedOut = at => {
   const rel = path.relative(process.cwd(), path.resolve(at));
-  return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel) && leadsOut(".", at);
+  return rel !== "" && rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel) && leadsOut(".", at);
 };
 
 /** Whether the file or folder at `at`, every link on its way followed, lies outside the folder `root` (its own real

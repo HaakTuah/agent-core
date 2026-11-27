@@ -7,7 +7,7 @@
 //   node tests/guards-test.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { DEEPEST, aCommit, aLogin, aRepository, inProject, asText, leadsOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
+import { DEEPEST, aCommit, aLogin, aRepository, inProject, asText, leadsOut, linkedOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -37,6 +37,13 @@ try {
   if (fileLink) {
     fs.symlinkSync(path.join(elsewhere, "gone.json"), path.join(project, "dangling.json"));
     ok(leadsOut(project, path.join(project, "dangling.json")), "a link that leads nowhere leads out");
+    fs.symlinkSync(path.join(elsewhere, "other.json"), path.join(project, "..x.json"));
+    const was = process.cwd();
+    try {
+      process.chdir(project);
+      ok(linkedOut("out.json") && linkedOut("..x.json") && linkedOut(path.join(project, "..x.json")), "a path named inside the folder run from, a name that opens with two dots included, leads out through a link");
+      ok(!linkedOut("inner/own.json") && !linkedOut(path.join(elsewhere, "other.json")) && !linkedOut("../elsewhere/other.json"), "one that stays inside, or one named outside the folder, does not");
+    } finally { process.chdir(was); }
   }
   ok(unrooted(`ENOENT: open '${path.join(project, "core-manifest.md")}'`, project) === `ENOENT: open '.${path.sep}core-manifest.md'`, "a message names the project's place as \".\"", unrooted(path.join(project, "core-manifest.md"), project));
   ok(!unrooted(`at '${project.replace(/\\/gu, "/")}' and ${project}`, project).includes(tmp), "in each spelling of the place", unrooted(`at '${project.replace(/\\/gu, "/")}' and ${project}`, project));

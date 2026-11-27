@@ -48,13 +48,14 @@ export function placeAt(commit) {
     return modes.get(f);
   };
   const show = at => { try { return run(["show", `${commit}:${at}`]); } catch { return null; } };
-  // (where a path leads: { at } the file read there, or null with `held` whether anything stands on its way)
+  // (where a path leads: { at } the file read there, or null with `held` whether anything stands on its way, a link
+  // followed to nowhere included)
   const walk = f => {
     for (let at = path.posix.normalize(f), hops = 0; hops <= 40; hops++) {
       if (at === ".." || at.startsWith("../") || at.startsWith("/")) return { at: null, held: true };
       // (the first part of the path, its own end included, that is a link: what stands there is read through it)
       const parts = at.split("/"), k = parts.findIndex((_, i) => mode(parts.slice(0, i + 1).join("/")) === "120000");
-      if (k < 0) { const m = mode(at); return { at: /^100/u.test(m ?? "") ? at : null, held: m !== undefined || [...modes.keys()].some(p => p.startsWith(`${at}/`)) }; }
+      if (k < 0) { const m = mode(at); return { at: /^100/u.test(m ?? "") ? at : null, held: hops > 0 || m !== undefined || [...modes.keys()].some(p => p.startsWith(`${at}/`)) }; }
       const link = parts.slice(0, k + 1).join("/"), to = show(link);
       if (to === null || /^([\\/]|[A-Za-z]:)/u.test(to)) return { at: null, held: true };
       at = path.posix.normalize(path.posix.join(path.posix.dirname(link), to.replace(/\\/gu, "/"), ...parts.slice(k + 1)));

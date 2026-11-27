@@ -112,6 +112,9 @@ try {
     swap("CLAUDE.md", f => fs.writeFileSync(f, `@AGENTS.md\n${"x".repeat(1 << 20)}\n`)); commit("past the bound");
     r = run({ ENTRY_BASE: "HEAD" });
     ok(r.status === 0 && r.out.includes("note") && r.out.includes("stands here but is not read"), "against a base that held it past the bound too, an entry file past the bound is noted and fails nothing");
+    swap("CLAUDE.md", f => fs.symlinkSync("nowhere.md", f)); commit("a link that leads nowhere");
+    r = run({ ENTRY_BASE: "HEAD" });
+    ok(r.status === 0 && r.out.includes("note") && r.out.includes("stands here but is not read"), "against a base that held the same link leading nowhere, it is noted and fails nothing");
     swap("CLAUDE.md", f => fs.writeFileSync(f, "@AGENTS.md\n")); commit("within the bound");
     write(".agents/rules/.keep", ""); swap(".agents/rules/core.md", f => fs.symlinkSync("nowhere.md", f));
     refused("against a base that held nothing there, an entry file the pull request adds as a link leading nowhere fails, saying its mend");
