@@ -76,8 +76,9 @@
 //   node core/scripts/nuget.mjs --projects     the project files git knows, a line each: what the workflow restores
 //   node core/scripts/nuget.mjs --imports      the files of another name than a build file's that an Import, or a
 //                                               property MSBuild's own targets import a file by, brings in, and
-//                                               every file of the project's whose root element is a Project,
-//                                               a line each: what the workflow's first look adds to what it diffs
+//                                               every file of the project's whose root element is a Project, or
+//                                               that begins as XML past the bound this check reads to, a line
+//                                               each: what the workflow's first look adds to what it diffs
 //   node core/scripts/nuget.mjs <config> --sources   where the workflow's restore takes packages from, a line each,
 //                                                    a folder by its whole path
 //
@@ -379,6 +380,14 @@ export function projectFilesByContent(root, own, past = []) {
     } catch { /* (a file that cannot be read is no project) */ } finally { if (fd !== null) closeSync(fd); }
   }
   return out;
+}
+// (a file past BOUND stands as the base held it where git holds the same entry at it as the base did and, for a file
+// of bytes, the checkout's file hashes to the base's blob as git would store it: hashed, never read into memory)
+function heldPast(c, f) {
+  if (!sameEntryAsBase(c, f)) return false;
+  const was = baseTree(c).get(f);
+  if (was.mode === "120000") return true;
+  try { return execFileSync("git", ["--literal-pathspecs", "hash-object", "--", f], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 60000 }).trim() === was.id; } catch { return false; }
 }
 // what a reader gives for a path git knows that leads to no file of bytes of the project's own (NOT_A_FILE_IS), which is
 // never read: a device can be endless, a pipe never ends, and a file outside the project is none of its own (#446)
@@ -812,7 +821,11 @@ function buildFileFaults(c, own) {
   c.bytesNow = new Map();
   const past = [];
   c.byContent = new Set(projectFilesByContent(c.root, own, past));
-  for (const f of past) c.reports.push(`${f} begins as XML and is past ${BOUND} bytes, so this check does not read whether its root element is a Project: what it names, where MSBuild imports it by a property, goes unseen (reported, and passes)`);
+  for (const f of past) {
+    const what = `${f} begins as XML and is past ${BOUND} bytes, so this check does not read whether its root element is a Project: what it names, where MSBuild imports it by a property, goes unseen`;
+    if (!c.base || heldPast(c, f)) c.reports.push(`${what} ${heldBefore}`);
+    else c.failures.push(`${what}. Mend: keep it within that bound, or split it`);
+  }
   c.now = importsOf(own, (f) => readNow(c, f), [...c.byContent]);
   for (const [f, text] of c.now.files) {
     const found = buildFileFindings(c.now, f, text);
@@ -1090,8 +1103,9 @@ if (guard(import.meta.url)) {
   if (args.includes("--imports")) {
     let files;
     try {
-      const { root, tracked } = project(), copy = copyAside(root), own = tracked.filter((f) => !under(f, copy)), byContent = projectFilesByContent(root, own);
-      files = [...new Set([...byContent, ...importsOf(own, (f) => readProject(root, f), byContent).brought.keys()])];
+      const { root, tracked } = project(), copy = copyAside(root), own = tracked.filter((f) => !under(f, copy)), past = [], byContent = projectFilesByContent(root, own, past);
+      // (one past the bound too, unread: whether MSBuild imports it is unseen, so a change to it alone is one to check)
+      files = [...new Set([...byContent, ...past, ...importsOf(own, (f) => readProject(root, f), byContent).brought.keys()])];
     } catch (e) { fail(e.message); }
     const odd = files.filter((f) => oneLine(f) !== f);
     if (odd.length) fail(`a file an Import brings in whose name holds a line break or a control character: ${odd.join(", ")}. Mend: rename it`);
