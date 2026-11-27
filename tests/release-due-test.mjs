@@ -38,6 +38,10 @@ try {
   ok(readGit(git).trialed === tried, "a trial's record past the release is read as a trial that has run");
   commit("reports/release-trial.json", JSON.stringify({ commit: r2 }), "2026-11-13T12:00:00Z");
   ok(readGit(git).trialed === null, "a record of the release's own commit is the trial of the release already cut, not a new one");
+  commit("QUEUE.md", `| #7 | any builder | ${"x".repeat(1 << 20)} |\n`, "2026-11-14T10:00:00Z");
+  let refused = null;
+  try { readGit(git); } catch (e) { refused = e.message; }
+  ok(/is past the 1048576 bytes the reader takes/.test(refused ?? ""), "a version of QUEUE.md past the reader's bound is refused, never read", refused);
   git(["tag", "-d", "release-1"]); git(["tag", "-d", "release-2"]);
   ok(readGit(git) === null, "with no release cut, there is nothing to count from");
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }

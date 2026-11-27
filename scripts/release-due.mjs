@@ -6,8 +6,8 @@
 // next batch's. A trial whose record on main names a commit past the newest release has run, and no second one is due
 // until that release is cut. The scheduled look keeps the issue TITLE while one is due (look.mjs, `dueIssue`), a task
 // the orchestrator gives a lane like any other. In the core alone: a project cuts no release. QUEUE.md's text and
-// GitHub's answers are untrusted (SECURITY.md, rule 5): each is checked against its form, and only the repository's
-// name and a date reach gh's route. Git and Node's own modules, and gh.
+// GitHub's answers are untrusted (SECURITY.md, rule 5): each is checked against its form, a version of the file past
+// LARGEST bytes is refused unread, and only the repository's name and a date reach gh's route. Git and Node's own modules, and gh.
 //
 //   node scripts/release-due.mjs      whether a trial is due, and what the count rests on; it writes nothing
 import { execFileSync, spawnSync } from "node:child_process";
@@ -16,7 +16,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { aRepository, parseBounded } from "./guards.mjs";
-import { linesOf } from "./queue.mjs";
+import { LARGEST, linesOf } from "./queue.mjs";
 import { TRIAL } from "./release-trial.mjs";
 import { RELEASE } from "./releases.mjs";
 import { started } from "./started.mjs";
@@ -47,9 +47,12 @@ export function readGit(git, head = "HEAD") {
   const versions = [sha, ...git(["log", "--format=%H", `${sha}..${head}`, "--", "QUEUE.md"]).split("\n").filter(s => SHA.test(s))];
   const lines = new Set();
   for (const v of versions) {
-    let text = null;
-    try { text = git(["show", `${v}:QUEUE.md`]); } catch { /* (no QUEUE.md in that version) */ }
-    for (const line of linesOf(text ?? "")) for (const n of line.issues) lines.add(n);
+    let size = null;
+    try { size = Number(git(["cat-file", "-s", `${v}:QUEUE.md`])); } catch { /* (no QUEUE.md in that version) */ }
+    if (size === null) continue;
+    if (!(size <= LARGEST)) throw new Error(`QUEUE.md at ${v.slice(0, 7)} is past the ${LARGEST} bytes the reader takes`);
+    const text = git(["show", `${v}:QUEUE.md`]);
+    for (const line of linesOf(text)) for (const n of line.issues) lines.add(n);
   }
   let trialed = null;
   try {
