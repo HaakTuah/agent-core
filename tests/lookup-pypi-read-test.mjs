@@ -61,6 +61,22 @@ for (const links of [3000, 20000]) {
   ok(quick(() => { for (const p of pypiPackages(chain, "requirements.txt")) total += p.brings + p.by.length; return true; }) && total === (links * (links + 1)) / 2 + links, `every package of a "# via" chain of ${links} links is read, what it brings and what brings it, quickly (${total})`);
 }
 
+// (the graphs whose every node an earlier closure held a set of bits for, as wide as the graph: none is held where
+// nothing leads anywhere, and a set many share is put in order once)
+const via = (name, ...parents) => [`${name}-moss==1.0.0 ${H()}`, "    # via", ...parents.map((p) => `    #   ${p}`)];
+const reads = (what, lines, sum) => {
+  let total = 0;
+  ok(quick(() => { for (const p of pypiPackages(lines.join("\n"), "requirements.txt")) total += p.brings + p.by.length; return true; }) && total === sum, `${what} is read, what each brings and what brings it, quickly (${total})`);
+};
+reads("a file of 100,000 packages that each name alone", Array.from({ length: 100000 }, (_, i) => via(`i${i}`, "-r requirements.in")).flat(), 0);
+reads("a file of 40,000 cycles of two", Array.from({ length: 40000 }, (_, i) => [...via(`a${i}`, `b${i}-moss`), ...via(`b${i}`, `a${i}-moss`)]).flat(), 80000);
+reads("a chain of 50,000 under 50,000 packages the project names", [...Array.from({ length: 50000 }, (_, i) => via(`n${i}`, "-r requirements.in")).flat(), ...via("h", ...Array.from({ length: 50000 }, (_, i) => `n${i}-moss`)), ...Array.from({ length: 50000 }, (_, i) => via(`c${i}`, i ? `c${i - 1}-moss` : "h-moss")).flat()], 50000 * 50001 + 50000 * 50001 + 1250025000);
+const ladder = Array.from({ length: 40000 }, (_, i) => via(`l${i}`, ...(i ? [`l${i - 1}-moss`] : ["-r requirements.in"]), ...(i > 1 ? [`l${i - 2}-moss`] : []))).flat();
+let top;
+ok(quick(() => (top = pypiPackages(ladder.join("\n"), "requirements.txt")).length === 40000) && top[0].brings === undefined, `a graph whose paths are past what the closure counts is given up within its bound, what each brings left unsaid (${top?.[0]?.brings})`);
+const many = Array.from({ length: 100000 }, (_, i) => ({ name: `m${i}-moss`, version: "1.0.0", hashes: [], via: ["-r requirements.in"] }));
+let lone;
+ok(quick(() => (lone = pypiGraphed([...many, { name: "lone-moss", version: "1.0.0", hashes: [], via: many.map((m) => m.name) }], () => false).at(-1)).unborne.length === 100000) && lone.direct, `a package whose "# via" names 100,000 packages, none of which PyPI bears out, gives each once, quickly (${lone?.unborne.length})`);
 // (#1368, point 4: a long run of spaces is read in one pass, never by trying each split of it)
 for (const [what, line] of [["a comment's strip", `plain-moss==1.0.0${" ".repeat(200000)}x`], ["a requirement", `plain-moss${" ".repeat(200000)}x ${H()}`], ["a requirement's version", `plain-moss ==${" ".repeat(200000)}; ${H()}`]]) {
   ok(quick(() => throws(() => pypiPackages(`${line}\n`, "requirements.txt"))), `${what} on a run of 200,000 spaces is refused, quickly, not after one try for each split of it`);

@@ -93,6 +93,7 @@ try {
     "https://pypi.org/pypi/tidy-moss-format/json": { status: 200, json: { info: {}, releases: { "1.1.0": release("1.1.0", "a"), "2.0.0": release("2.0.0", "b") } } },
     "https://pypi.org/pypi/tidy-moss-format/1.1.0/json": { status: 200, json: { info: { requires_dist: ["brought-moss>=1; extra == 'fast'"] } } },
   };
+  for (const name of ["brought-moss", "unrequired-moss"]) pypiAnswers[`https://pypi.org/pypi/${name}/json`] = { status: 200, json: { info: {}, releases: { "1.0.0": release("1.0.0", "a") } } };
   const npmGet = async (url) => { if (url.startsWith("https://pypi.org/")) pypiAsked.push(url); return url.startsWith("https://registry.npmjs.org/") ? { status: 404 } : pypiAnswers[url] ?? get(url); };
   const pgit = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: ptmp, encoding: "utf8" }).trim();
   try {
@@ -135,8 +136,8 @@ try {
       settings(["requirements.txt"]);
       r = await run(config, { root: ptmp, base, get: npmGet, now: NOW });
       out = r.lines.join("\n");
-      const reported = named ? /^FAIL: requirements\.txt: unrequired-moss@1\.0\.0: PyPI has no such package/mu.test(out) : /^FAIL: requirements\.txt: brought-moss@1\.0\.0: PyPI has no such package/mu.test(out);
-      ok(reported && pypiAsked.includes("https://pypi.org/pypi/tidy-moss-format/1.1.0/json"), `${what}: its parent's requirements are asked of PyPI at the version the file holds (${r.lines})`);
+      const said = named ? /^REPORT: requirements\.txt: unrequired-moss@1\.0\.0: named by the project \(its "# via" names tidy-moss-format, which PyPI does not list/mu : /^REPORT: requirements\.txt: brought-moss@1\.0\.0: brought by tidy-moss-format;/mu;
+      ok(said.test(out) && pypiAsked.includes("https://pypi.org/pypi/tidy-moss-format/1.1.0/json"), `${what}: its parent's requirements are asked of PyPI at the version the file holds, and the report says what brings it (${r.lines})`);
     }
     rmSync(join(ptmp, "more.txt"));
     writeFileSync(join(ptmp, "requirements.txt"), `tidy-moss-format==1.1.0 ${H()}\n`);

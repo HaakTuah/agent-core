@@ -301,7 +301,8 @@ async function described(p, facts, now, { get, nuget, github }) {
   const age = Math.floor((now - facts.first) / DAY);
   let repo = facts.repo ? said(facts.repo.url) : "not named";
   if (p.direct && facts.repo?.owner) repo += github.asked++ < GITHUB_MOST ? await onGitHub(facts.repo, p.name, get, nuget || p.pypi) : `, GitHub not asked: past the ${GITHUB_MOST} packages a lookup asks of it`;
-  const brings = p.brings === null ? "what it brings, its lock file does not say" : `brings ${p.brings} package${p.brings === 1 ? "" : "s"} with it`;
+  const brings = p.brings === null ? "what it brings, its lock file does not say" : p.brings === undefined ? "what it brings, too many paths to count"
+    : `brings ${p.brings} package${p.brings === 1 ? "" : "s"} with it`;
   const unborne = p.unborne?.length ? ` (its "# via" names ${p.unborne.slice(0, 3).map(said).join(", ")}${p.unborne.length > 3 ? " and more" : ""}, which PyPI does not list as requiring it at the version the file holds)` : "";
   return `${p.direct ? `named by the project${unborne}` : `brought by ${brought(p) || "another"}`}; first published ${day(facts.first)} (${age} days ago); last release ${day(facts.last)}; repository ${repo}; published by ${said(facts.publisher)}; ${brings}; provenance: ${said(facts.provenance)}${facts.note ? `; ${said(facts.note)}` : ""}`;
 }
@@ -420,8 +421,8 @@ export async function run(configPath, { root, base, nuget = false, get = fetched
     ...(off ? [`${off} lock entr${off === 1 ? "y" : "ies"} the pull request brings not from npm's registry with an integrity value (floor rule 7)`] : [])], code: failures.length || off || pypi.failures.length ? 1 : 0 };
 }
 
-// PyPI's part of the run, from its `lists`: the new packages looked up, and the hashes of the lines changed of those the
-// base held compared, as { failures, reports, sums }, `sums` the line that sums up each.
+// PyPI's part of the run, from its `lists`: the new packages looked up, and the hashes of the changed lines of held
+// ones compared, as { failures, reports, sums }, `sums` the line summing up each.
 async function pypiLooked(lists, { get, now }) {
   const py = await pypiNew(lists, get), looked = await lookUp(py.fresh, { get, now }), hashed = await hashesHeld(py.changed, get);
   return { failures: [...looked.failures, ...hashed], reports: looked.reports, sums: [summed(looked.failures.length, py.fresh.length, "PyPI"), hashesSummed(hashed.length, py.changed)] };
@@ -453,7 +454,7 @@ async function pypiNew(lists, get) {
   return { fresh: newPackages(head, lists.base), changed: changedLines(head, lists.held, names) };
 }
 
-// Each name of a file's packages, and the versions the file holds it at.
+// Each name of a file's packages, and the versions it holds it at.
 function versionsOf(packages) {
   const out = new Map();
   for (const p of packages) out.set(p.name, [...new Set([...(out.get(p.name) ?? []), p.version])]);

@@ -7,42 +7,126 @@ export function reach(start, next) {
   return seen;
 }
 
+// What `closure` holds at once and does in all, in words of 32 bits (about 128 MB, and about a second here), past which
+// it gives no answer: some graphs hold more to say of each node than a pass can carry, and the lookup says so.
+const ROOM = 1 << 25, WORK = 1 << 26;
+const OVER = new Error("past what the closure holds or does");
+
 /** What each of `nodes` brings and which of the `shown` ones bring it, for all of them in one pass (#1388, point 3),
  *  where `reach` asked of each walks the graph again, quadratic over a chain: { brings(node), by(node) }, `children`
  *  a Map of each node to what it leads to. The graph is cut into its cycles (Tarjan's strongly connected components,
- *  walked without recursion, so a chain of any length is read), and each cycle's descendants, then the shown nodes that
- *  lead to it, gathered as bits from the cycles it leads to, then from those that lead to it. `brings` counts what
- *  `reach` would, the node itself left out; `by` gives the shown nodes among what leads to it, in the order of `shown`. */
+ *  walked without recursion, so a chain of any length is read); what each cycle leads to is gathered from the sinks up,
+ *  and the shown nodes that lead to it from the sources down, each set listed while it is short and held as bits once
+ *  longer. `brings` counts what `reach` would, the node itself left out; `by` gives the shown nodes among what leads to
+ *  it, in the order of `shown`; each gives undefined where the graph took the pass past ROOM or WORK. */
 export function closure(nodes, children, shown) {
   const at = new Map(nodes.map((n, i) => [n, i])), adj = nodes.map((n) => [...(children.get(n) ?? [])].map((c) => at.get(c)).filter((c) => c !== undefined));
   const { comp, comps } = components(adj);
-  const W = (comps.length + 31) >>> 5, desc = comps.map(() => new Uint32Array(W)), counts = new Array(comps.length);
-  // (a cycle's descendants, the cycles found first being those it leads to; each counted by its members, past the one bit)
-  const big = comps.map((m, c) => [c, m.length - 1]).filter(([, extra]) => extra > 0);
+  // (each cycle's cycles below and above, each once)
+  const kids = comps.map(() => []), ups = comps.map(() => []);
   comps.forEach((members, c) => {
-    for (const u of members) for (const w of adj[u]) if (comp[w] !== c) { const d = comp[w]; desc[c][d >>> 5] |= 1 << (d & 31); or(desc[c], desc[d]); }
-    counts[c] = members.length - 1 + bits(desc[c]) + big.reduce((sum, [b, extra]) => sum + (desc[c][b >>> 5] >>> (b & 31) & 1) * extra, 0);
+    const seen = new Set();
+    for (const u of members) for (const w of adj[u]) { const d = comp[w]; if (d !== c && !seen.has(d)) { seen.add(d); kids[c].push(d); ups[d].push(c); } }
   });
-  // (the shown nodes that lead to each cycle, passed on from each cycle to those it leads to, the last found first)
-  const marks = [...new Set(shown)].filter((n) => at.has(n)), S = (marks.length + 31) >>> 5, anc = comps.map(() => new Uint32Array(S)), own = comps.map(() => []);
+  const marks = [...new Set(shown)].filter((n) => at.has(n)), own = comps.map(() => []);
   marks.forEach((n, k) => own[comp[at.get(n)]].push(k));
-  for (let c = comps.length - 1; c >= 0; c--) {
-    const passed = Uint32Array.from(anc[c]);
-    for (const k of own[c]) passed[k >>> 5] |= 1 << (k & 31);
-    for (const u of comps[c]) for (const w of adj[u]) if (comp[w] !== c) or(anc[comp[w]], passed);
-  }
+  const counts = bounded(() => counted(comps, kids, ups)), anc = bounded(() => above(ups, own, marks.length));
+  // (a set many cycles share is put in order once, so a long chain under many shown nodes is answered in one pass too)
+  const sorted = new Map(), inOrder = (set) => {
+    if (!sorted.has(set)) { const ks = []; if (set) each(set, (k) => ks.push(k)); sorted.set(set, Object.freeze(ks.sort((a, b) => a - b).map((k) => marks[k]))); }
+    return sorted.get(set);
+  };
   return {
-    brings: (n) => (at.has(n) ? counts[comp[at.get(n)]] : 0),
+    brings: (n) => (at.has(n) ? counts?.[comp[at.get(n)]] : 0),
     by: (n) => {
       if (!at.has(n)) return [];
-      const c = comp[at.get(n)];
-      return marks.filter((m, k) => (anc[c][k >>> 5] >>> (k & 31) & 1) === 1 || (m !== n && comp[at.get(m)] === c));
+      if (!anc) return undefined;
+      const c = comp[at.get(n)], ks = own[c].filter((k) => marks[k] !== n);
+      if (!ks.length) return inOrder(anc[c]);
+      if (anc[c]) each(anc[c], (k) => ks.push(k));
+      return ks.sort((a, b) => a - b).map((k) => marks[k]);
     },
   };
 }
 
-const or = (into, from) => { for (let i = 0; i < from.length; i++) into[i] |= from[i]; };
-const bits = (set) => { let n = 0; for (let x of set) { x -= (x >>> 1) & 0x55555555; x = (x & 0x33333333) + ((x >>> 2) & 0x33333333); n += (((x + (x >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24; } return n; };
+// What each cycle brings: its other members and each node of the cycles it leads to, gathered from the sinks up. A
+// cycle with one cycle below takes over that one's set where nothing else reads it, and a set is let go once every
+// cycle above has read it, so a chain holds one set at a time; one that nothing leads to keeps only its count.
+function counted(comps, kids, ups) {
+  const C = comps.length, at = new Int32Array(C).fill(-1), weight = [];
+  for (let c = 0; c < C; c++) if (ups[c].length) { at[c] = weight.length; weight.push(comps[c].length); }
+  const S = sets(weight.length), desc = new Array(C).fill(null), left = ups.map((u) => u.length), counts = new Array(C);
+  const read = (d) => { if (--left[d] === 0 && desc[d]) { S.drop(desc[d]); desc[d] = null; } };
+  for (let c = 0; c < C; c++) {
+    const ks = kids[c], keep = ups[c].length > 0;
+    let below = 0;
+    if (ks.length === 1) {
+      const d = ks[0];
+      below = counts[d] + 1;
+      if (keep && left[d] === 1) { desc[c] = desc[d] ?? S.make(); desc[d] = null; S.add(desc[c], at[d]); }
+      else if (keep) desc[c] = S.union([desc[d]], [at[d]], () => 0).set;
+      read(d);
+    } else if (ks.length) {
+      const { set, grew } = S.union(ks.map((d) => desc[d]), ks.map((d) => at[d]), (i) => weight[i]);
+      below = grew;
+      if (keep) desc[c] = set; else S.drop(set);
+      for (const d of ks) read(d);
+    }
+    counts[c] = comps[c].length - 1 + below;
+  }
+  return counts;
+}
+
+// The shown nodes that lead to each cycle, passed down from the sources: a cycle whose one cycle above holds no shown
+// node shares that one's set, unchanged; any other gathers its own.
+function above(ups, own, n) {
+  const S = sets(n), anc = new Array(ups.length).fill(null);
+  for (let c = ups.length - 1; c >= 0; c--) {
+    const ps = ups[c];
+    if (ps.length === 1 && !own[ps[0]].length) anc[c] = anc[ps[0]];
+    else if (ps.length) anc[c] = S.union(ps.map((p) => anc[p]), ps.flatMap((p) => own[p]), () => 0).set;
+  }
+  return anc;
+}
+
+// Sets of numbers below `size`, each listed while short, as bits once its list would outgrow them, every word read or
+// written spent from WORK and every word kept held against ROOM; `union` gives a new set and the weight it gathered.
+function sets(size) {
+  const W = (size + 31) >>> 5, stamp = new Int32Array(size);
+  let room = ROOM, work = WORK, gen = 0;
+  const spend = (n) => { if ((work -= n) < 0) throw OVER; };
+  const hold = (n) => { spend(n); if ((room -= n) < 0) throw OVER; };
+  const make = () => ({ list: [], bits: null });
+  // (`add` is given a number the set lacks: by its caller's word, or by the stamp `union` keeps)
+  const add = (s, i) => {
+    if (s.bits) { spend(1); s.bits[i >>> 5] |= 1 << (i & 31); return; }
+    hold(1); s.list.push(i);
+    if (s.list.length <= W) return;
+    hold(W); s.bits = new Uint32Array(W);
+    for (const j of s.list) s.bits[j >>> 5] |= 1 << (j & 31);
+    room += s.list.length; s.list = null;
+  };
+  return {
+    make, add,
+    drop: (s) => { if (s) room += s.bits ? W : s.list.length; },
+    union(sources, extra, weigh) {
+      let grew = 0;
+      gen++;
+      const set = make(), put = (i) => { if (stamp[i] === gen) return; stamp[i] = gen; add(set, i); grew += weigh(i); };
+      for (const s of sources) if (s) { spend(s.bits ? W : s.list.length); each(s, put); }
+      for (const i of extra) put(i);
+      return { set, grew };
+    },
+  };
+}
+
+// Each number of the set `s`, in no set order.
+function each(s, fn) {
+  if (!s.bits) { for (const i of s.list) fn(i); return; }
+  for (let w = 0; w < s.bits.length; w++) for (let x = s.bits[w]; x; x &= x - 1) fn(w * 32 + 31 - Math.clz32(x & -x));
+}
+
+const bounded = (f) => { try { return f(); } catch (e) { if (e === OVER) return undefined; throw e; } };
 
 // The cycles of the graph `adj` (each node's list of the nodes it leads to): { comp, comps }, each node's cycle and each
 // cycle's members, a cycle found only after every cycle it leads to (Tarjan's order), with no recursion.

@@ -144,7 +144,7 @@ function entryOf(args, options, refuse) {
 export function pypiGraphed(entries, keep = () => true) {
   const any = entries.some((e) => e.via.length), names = new Set(entries.map((e) => e.name));
   const parents = entries.map((e) => e.via.map((v) => normal(v.replace(/\[.*$/u, ""))).filter((v) => names.has(v)));
-  const kept = entries.map((e, i) => parents[i].filter((p) => keep(p, e.name)));
+  const kept = entries.map((e, i) => parents[i].filter((p) => keep(p, e.name))), held = kept.map((k) => new Set(k));
   const named = (e, i) => !any || parents[i].length < e.via.length || !e.via.length || !kept[i].length;
   // (a name given twice is brought by what either of its lines names)
   const children = new Map();
@@ -156,7 +156,7 @@ export function pypiGraphed(entries, keep = () => true) {
   let closed = null;
   const close = () => (closed ??= closure([...names], children, shown));
   return entries.map((e, i) => ({ name: e.name, version: e.version, path: e.name, direct: direct[i], pypi: true, hashes: e.hashes, via: e.via, parents: parents[i],
-    unborne: [...new Set(parents[i].filter((p) => !kept[i].includes(p)))],
+    unborne: [...new Set(parents[i])].filter((p) => !held[i].has(p)),
     get brings() { return any ? close().brings(e.name) : null; },
     get by() { return direct[i] ? [] : close().by(e.name); } }));
 }

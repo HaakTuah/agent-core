@@ -191,6 +191,8 @@ for (const name of ["flaky-moss", "listless-moss"]) ok(/answered 503|lists relea
 // (#1388, point 2: the report says which "# via" parent PyPI does not bear out)
 r = await one(pkg("tidy-moss-format", { unborne: ["root-moss"] }));
 ok(/^requirements\.txt: tidy-moss-format@1\.1\.0: named by the project \(its "# via" names root-moss, which PyPI does not list as requiring it at the version the file holds\); first published/u.test(r.reports[0] ?? ""), `a package whose "# via" parents PyPI does not bear out is named by the project, and the report says so (${r.reports})`);
+r = await one(pkg("tidy-moss-format", { brings: undefined }));
+ok(/; what it brings, too many paths to count;/u.test(r.reports[0] ?? ""), `a file whose paths are past what the closure counts says so, never "brings undefined packages" (${r.reports})`);
 
 asked.length = 0;
 r = await one(pkg("bad/../name"));
