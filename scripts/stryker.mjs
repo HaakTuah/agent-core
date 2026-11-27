@@ -8,7 +8,8 @@
 //   each is run once as it stands before a fault first reaches it (with no fault switched on), one that fails there
 //   or takes longer than LONGEST left out, and the run says so, and with a fault in it is held to mutate.mjs's limit,
 //   past which it is stopped and the fault counts as caught; Stryker's own first run, which only times the tests, runs
-//   none;
+//   none; a test node runs is given a preload (stryker-vm.mjs, beside this file) that hands the fault to the code it
+//   runs in a `vm` context, which holds no `process` to read it from (#1361, point 26);
 // - a working copy of the project's own (mutate.mjs's copyOf: a git worktree of HEAD with the files that differ from
 //   it), in which Stryker changes the files in place, so the project's own files are never changed and its tests find
 //   git as they do in the project;
@@ -31,13 +32,13 @@ import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { LONGEST, Refused, copyOf, limitOf, projectOf, refuse, run, stopAll, takeAway, testsOf, wantedOf } from "./mutate.mjs";
 import { started } from "./started.mjs";
 import { parseBounded } from "./guards.mjs";
+import { ACTIVE } from "./stryker-vm.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ACTIVE = "__STRYKER_ACTIVE_MUTANT__"; // (the variable Stryker's command runner names the fault to switch on by)
 // A path as one word of the shell the command runner starts, read as it is written: in single quotes off Windows, each
 // of its own written as '\'', so no $, ` or \ is expanded; in double quotes on Windows, where a path that holds one, or
 // a %, is refused, as is one that holds a line break anywhere.
@@ -58,8 +59,11 @@ export function testsFor(map, active, readPlan = p => parseBounded(fs.readFileSy
 // the project's vitest and run); both set from the map by dispatch.
 let groups = null, runner = [];
 
-// The words node is given to run one test: its file alone, or after the runner's (`prefix`), as vitest is given it.
-export const argsOf = (prefix, test) => [...prefix, test];
+// The words node is given to run one test: its file, after the preload that hands the fault switched on to the code
+// the test runs in a `vm` context (stryker-vm.mjs, beside this file; #1361, point 26), or after the runner's
+// (`prefix`), as vitest is given it, which runs its tests in processes of its own.
+const VM = ["--import", pathToFileURL(path.join(HERE, "stryker-vm.mjs")).href];
+export const argsOf = (prefix, test) => prefix.length ? [...prefix, test] : [...VM, test];
 
 // The program of the vitest installed at the project's root (`root`), as its package.json names it: its path from the
 // root, or null where none is installed, it names none, or the one it names, its links followed, is no file inside
