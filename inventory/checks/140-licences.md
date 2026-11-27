@@ -1,8 +1,8 @@
 - `scripts/licences.mjs`, `scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`, `scripts/licence-yes.mjs`,
   `.github/workflows/licences.yml`, `scripts/licence-commands.mjs`, `scripts/licence-npm.mjs`, `scripts/licence-fetchers.mjs`,
-  `scripts/licence-wrappers.mjs`, `scripts/licence-pages.mjs`, `scripts/licence-scan-stage.mjs`, `scripts/licence-locks.mjs`, `tests/licence-locks-test.mjs`,
+  `scripts/licence-wrappers.mjs`, `scripts/licence-audit-fetches.mjs`, `scripts/licence-pages.mjs`, `scripts/licence-scan-stage.mjs`, `scripts/licence-locks.mjs`, `tests/licence-locks-test.mjs`,
   `scripts/licences.d.mts`, `.github/licences.json`, `.github/licences-audit.json`, `tests/licence-fetch-test.mjs`, `tests/licence-fetch-places-test.mjs`,
-  `tests/licence-fetch-other-test.mjs`, `tests/licence-fetch-wrapper-test.mjs`, `tests/licence-fetch-pages-test.mjs`, `tests/licence-scan-limits-test.mjs`,
+  `tests/licence-fetch-other-test.mjs`, `tests/licence-fetch-wrapper-test.mjs`, `tests/licence-audit-fetches-test.mjs`, `tests/licence-fetch-pages-test.mjs`, `tests/licence-scan-limits-test.mjs`,
   `tests/licence-scan-pins-test.mjs`, `tests/licence-distribution-test.mjs`: hold
   every package the lock files install, and every entry of the audit, to floor rule 10's list, with the owner's yes for
   what is off it. *Runs:* any session and the runners. *Else:* npm's own `npm sbom` (each installed package's licence,
@@ -27,4 +27,7 @@
   lie in the lock file, which npm's reading of what is installed never opens); #339, #364, #366, #386 and #447 not run
   (their cases lie in where the config stands, the steps and the scan, which no tool tried here takes over). The
   config's form is held by a schema and ajv where the core's packages are installed, and by the check's own checks of
-  it where they are not (`scripts/schemas/licences.json`; #530, item 7).
+  it where they are not (`scripts/schemas/licences.json`; #530, item 7). *Limits:* the scan reads the forms in which a
+  project writes its fetches, commands and packages in the ordinary way; a form written on purpose to hide a fetch or a
+  package from it is beyond what it reads. Input it cannot read whole fails, but in a file an entry audits by hand, and
+  what stood so at the pull request's base, which is reported; none passes with neither an entry nor a report.
