@@ -3,6 +3,8 @@
 import { coreOf, kitHooks, check as toolsCheck } from "../agent-tools.mjs";
 import { listed, markOf, show } from "../agent-tools-entries.mjs";
 import { NOT_KIT_WHY } from "../agent-tools-read.mjs";
+import { listing } from "../agent-tools-listing.mjs";
+import { fetchedBy, libraryOf } from "../hook-source.mjs";
 import { readProject } from "../agent-tools-project.mjs";
 import { installed } from "../packages.mjs";
 import { calls, copyAt } from "../workflow-calls.mjs";
@@ -32,9 +34,20 @@ function reading(p) {
 
 // What a script lists exactly (#1361, point 2): each skill and hook the project's own files configure that the list
 // lacks, a file of the project's own ("this project", as the list's mend says of one), that stood before the step came,
-// as a baseline does. Never a plug-in or a tool server, whose publisher and version are no file's to read, nor a tool
-// whose source the check questions: a hook whose command is not the kit's form is a security judgement, never a mend.
-const exactly = r => r.missing.map(([k]) => k).filter(k => /^(?:skill|hook) /u.test(k) && !r.sources.some(([s]) => s === k));
+// as a baseline does. Only where both what configures it and what it runs are plain files committed at HEAD, outside the
+// copy of the core and any submodule: a skill whose SKILL.md is one, and a hook every one of whose commands is in the
+// starter kit's form and fetches one from main, no library's. Never a plug-in or a tool server, whose publisher and
+// version are no file's to read; a hook of any other kind, which a session weighs; nor a tool whose source
+// the check questions: each is a security judgement, never a mend, and left to the step's.
+function exactly(r, p) {
+  const { blobs } = listing(p.root, "HEAD"), copy = copyAt(p);
+  const own = at => typeof at === "string" && blobs.has(at) && !at.startsWith(copy);
+  // (an entry the list holds for the tool already, in a form the check refuses, is the check's to name, never written twice)
+  const stands = k => (Array.isArray(r.config?.agentTools) ? r.config.agentTools : []).some(e => e && `${e.kind} ${e.name}` === k);
+  const ran = k => { const hook = r.head.runs.get(k); return hook?.runs && hook.commands.length && hook.commands.every(c => !libraryOf(c) && own(fetchedBy(c))); };
+  return r.missing.map(([k]) => k).filter(k => /^(?:skill|hook) /u.test(k) && !r.sources.some(([s]) => s === k) && own(r.head.tools.get(k))
+    && (k.startsWith("skill ") || ran(k)) && !stands(k));
+}
 
 export default { lead: "16 November 2026, an agent's own tools listed", cost: COST.line,
   check: p => {
@@ -55,7 +68,7 @@ export default { lead: "16 November 2026, an agent's own tools listed", cost: CO
   write: (p, busy) => {
     const r = reading(p);
     if (r.unread) throw new Unwritten("the core's packages are not installed, so the Codex config could not be read");
-    const add = exactly(r), { file, config } = r;
+    const add = exactly(r, p), { file, config } = r;
     if (!config || typeof config !== "object" || Array.isArray(config)) throw new Unwritten(`the licence check's config \`${file}\` is not there or is no JSON object`);
     if (Object.hasOwn(config, "agentTools") && !Array.isArray(config.agentTools)) throw new Unwritten(`"agentTools" in \`${file}\` is no list`);
     // (what is left, a plug-in or a tool server whose publisher and version a session gives, or a tool whose source is to

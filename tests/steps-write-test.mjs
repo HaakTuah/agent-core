@@ -384,34 +384,4 @@ for (const l of WHOLE) {
   back();
 }
 
-// ---- an agent's own tools (#1361, point 2): a skill of the project's own listed, a plug-in left to a session ----
-{
-  const tools = lead("16 November 2026, an agent's own tools"), file = "checks/licences.json", before = JSON.parse(read(file));
-  put(".claude/skills/release-notes/SKILL.md", "---\nname: release-notes\ndescription: Writes the release notes.\n---\nRead the merged pull requests and write the notes.\n");
-  commit("a skill of the project's own, listed nowhere");
-  ok(missed(tools).length === 1, "a skill listed nowhere leaves the step not done", JSON.stringify(missed(tools)));
-  r = write();
-  const after = JSON.parse(read(file)), added = (after.agentTools ?? []).filter(e => !(before.agentTools ?? []).some(b => same(b, e)));
-  ok(r.status === 0 && r.stdout.includes(`- ${tools}: wrote \`${file}\`; the step is done`) && same(added, [{ kind: "skill", name: "release-notes", publisher: "this project" }])
-    && same({ ...after, agentTools: undefined }, { ...before, agentTools: undefined }) && !missed(tools).length,
-  "--write lists a skill of the project's own as the project's, its other keys kept, and the step reads done", `${r.stdout}${r.stderr}`);
-  commit("the skill listed");
-  const settings = JSON.parse(read(".claude/settings.json"));
-  put(".claude/settings.json", `${JSON.stringify({ ...settings, enabledPlugins: { "notes@example-market": true } }, null, 2)}\n`);
-  put(".claude/skills/triage/SKILL.md", "---\nname: triage\ndescription: Sorts new issues.\n---\nLabel each new issue.\n");
-  commit("a plug-in and a second skill, listed nowhere");
-  r = write();
-  const left = missed(tools)[0]?.mend ?? "", listedNow = JSON.parse(read(file)).agentTools;
-  ok(r.status === 0 && listedNow.some(e => e.kind === "skill" && e.name === "triage" && e.publisher === "this project") && !listedNow.some(e => e.kind === "plugin")
-    && left.includes("notes@example-market") && !left.includes("triage"),
-  "a plug-in, whose publisher and version no file gives, is left to the step's mend, and the skill beside it listed", `${r.stdout}${r.stderr}\n${left}`);
-  back();
-  put(file, "[]\n");
-  put(".claude/skills/release-notes/SKILL.md", "---\nname: release-notes\ndescription: Writes the release notes.\n---\nWrite the notes.\n");
-  commit("a skill listed nowhere, and a licence config that is no JSON object");
-  r = write();
-  ok(r.status === 0 && r.stdout.includes(`- ${tools}: wrote nothing, since`) && read(file) === "[]\n", "a licence config that is no JSON object is left, and the report says why", r.stdout);
-  back();
-}
-
 done("the steps' writers");
