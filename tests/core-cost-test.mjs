@@ -106,9 +106,9 @@ ok(!print(rows, false).includes("answers"), "without --cost the table says nothi
       dated("switch", "-q", "-c", `b${n}`); dated("commit", "-q", "--allow-empty", "-m", `work ${n}`); dated("switch", "-q", "main");
       dated("merge", "-q", "--no-ff", `b${n}`, "-m", `Merge pull request #${n} from o/b${n}`);
     }
-    run(dir, "clone", "-q", `file://${src}`, "full");
-    run(dir, "clone", "-q", "--depth", "2", `file://${src}`, "shallow");
+    execFileSync("git", ["clone", "-q", "--", `file://${src}`, "full"], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
     process.chdir(join(dir, "full"));
+    execFileSync("git", ["clone", "-q", "--depth", "2", "--", `file://${src}`, "shallow"], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
     ok(shallowGap() === null && mergedPulls([]).merged.length === 4, "a full clone is read whole, with no word of a gap");
     process.chdir(join(dir, "shallow"));
     const gap = shallowGap(), early = shallowGap("2026-11-02"), late = shallowGap("2026-11-16");

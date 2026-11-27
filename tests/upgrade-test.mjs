@@ -393,7 +393,7 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
   fs.writeFileSync(ghData, JSON.stringify({ "pulls/1$": pull, "issues/1/comments": [summary(sha)], "pulls/1/comments": [], "pulls/1/commits": [{ sha, commit: { author: { name: p.owner } }, author: { login: p.owner } }], "pulls/1/files": [], "/issues\\?": [] }));
   const workspace = () => {
     const ws = path.join(tmp, "ws", String(++runs));
-    git(tmp, "clone", "-q", "--no-checkout", p.dir, ws);
+    execFileSync("git", ["clone", "-q", "--no-checkout", "--", ".", ws], { cwd: p.dir, stdio: ["ignore", "pipe", "pipe"] });
     git(ws, "checkout", "-q", "--detach", sha);
     // (on a pull request, the merge of its head into its base that GitHub checks out, refs/pull/N/merge: HEAD^1 the base,
     // HEAD^2 the head, which the core's workflows read as the base on a pull request: #1231)
@@ -405,7 +405,7 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
       if (w.repository) {
         if (w.repository !== CORE) throw new Error(`a checkout of another repository: ${w.repository}`);
         const to = path.join(ws, w.path || ".");
-        git(tmp, "clone", "-q", "--no-checkout", theCore, to);
+        execFileSync("git", ["clone", "-q", "--no-checkout", "--", ".", to], { cwd: theCore, stdio: ["ignore", "pipe", "pipe"] });
         git(to, "checkout", "-q", "--detach", w.ref || "main");
       } else if (w.ref) git(ws, "checkout", "-q", "--detach", git(ws, "rev-parse", `origin/${w.ref}`));
     },
@@ -544,7 +544,7 @@ function upgrade(p, from, ownChanges, expect) {
   ok(bits(p.dir, syncHead, "core/") === bits(theCore, head, "."), `${p.name}: the sync's copy records the executable bit of each file the core marks so, and of no other${git(p.dir, "config", "--get", "core.fileMode") === "false" ? ", though git here records none" : ""}`, bits(p.dir, syncHead, "core/"));
   if (process.platform !== "win32") {
     const runner = path.join(tmp, `${p.name}-runner`);
-    git(tmp, "clone", "-q", "--no-checkout", p.dir, runner);
+    execFileSync("git", ["clone", "-q", "--no-checkout", "--", ".", runner], { cwd: p.dir, stdio: ["ignore", "pipe", "pipe"] });
     git(runner, "checkout", "-q", syncHead);
     const run = spawnSync(path.join(runner, "core/scripts/work-saved.sh"), ["none"], { cwd: runner, env: { ...env, CLAUDE_PROJECT_DIR: runner }, encoding: "utf8" });
     ok(run.status === 0, `${p.name}: and a job that runs core/scripts/work-saved.sh by its path, in a clone of it, runs it`, `${run.error ?? ""}${run.stdout}${run.stderr}`);
@@ -658,7 +658,8 @@ function upgrade(p, from, ownChanges, expect) {
   const unasked = stepsIn(p.dir);
   ok(!unasked.out.includes("the core's packages installed from its lock file:"), `${p.name}: and the steps the sync prints ask no install step of that workflow`, unasked.out);
   const bare = path.join(tmp, `${p.name}-core-run`);
-  git(tmp, "clone", "-q", "--branch", "own-run", p.dir, bare);
+  execFileSync("git", ["clone", "-q", "--no-checkout", "--branch", "own-run", "--", ".", bare], { cwd: p.dir, stdio: ["ignore", "pipe", "pipe"] });
+  git(bare, "reset", "-q", "--hard");
   // (where its install cannot reach the registry, it says it did not run and why, as a warning, and fails nothing)
   const unreachedRun = spawnSync(process.execPath, ["core/scripts/workflows.mjs"], { cwd: bare, env: { ...base, CORE_PACKAGES_UNREACHED: "1" }, encoding: "utf8" });
   ok(unreachedRun.status === 0 && /::warning::[^\n]*did not run[^\n]*could not be installed[^\n]*Mend:/u.test(`${unreachedRun.stdout}${unreachedRun.stderr}`), `${p.name}: where the install cannot reach the registry, the check says it did not run and why, failing nothing`, `${unreachedRun.status}: ${unreachedRun.stdout}${unreachedRun.stderr}`);
@@ -1014,7 +1015,9 @@ const within = (top, to) => { const rel = path.relative(top, to); return !rel ||
 function readersAgainstTools(p) {
   const held = key => { try { return git(p.dir, "config", "--get", key); } catch { return ""; } };
   const dir = path.join(tmp, `${p.name}-kinds`);
-  git(tmp, "clone", "-q", ...["core.autocrlf", "core.fileMode"].flatMap(k => held(k) ? ["-c", `${k}=${held(k)}`] : []), "--branch", "main", p.dir, dir);
+  execFileSync("git", ["clone", "-q", "--no-checkout", "--branch", "main", "--", ".", dir], { cwd: p.dir, stdio: ["ignore", "pipe", "pipe"] });
+  for (const k of ["core.autocrlf", "core.fileMode"]) if (held(k)) git(dir, "config", k, held(k));
+  git(dir, "reset", "-q", "--hard");
   const dotnet = fs.existsSync(path.join(dir, "src/App/App.csproj"));
   kinds(dir);
   ownWorkflow(dir);
@@ -1189,7 +1192,7 @@ for (const tag of [...starts, ...(cut.includes(FIXED) && !starts.includes(FIXED)
   const fixed = !starts.includes(tag), release = tag === starts.at(-1) ? "newer" : "older";
   if (fixed ? !inPart(release, KIND_PRE) : !inPart(release, KIND_JS) && !inPart(release, KIND_NET)) continue;
   const from = { tag, sha: git(theCore, "rev-parse", `${tag}^{commit}`), dir: path.join(tmp, `core-at-${tag}`) };
-  git(tmp, "clone", "-q", theCore, from.dir);
+  execFileSync("git", ["clone", "-q", "--no-checkout", "--", ".", from.dir], { cwd: theCore, stdio: ["ignore", "pipe", "pipe"] });
   git(from.dir, "checkout", "-q", from.sha);
 
   // the npm project, public
