@@ -90,6 +90,8 @@ for (const [what, files, opts] of [
   ["one that changes only a file an Import brings in", { "build/deps.xml": "<Project>\n  <!-- a note -->\n</Project>\n" }],
   ["one that changes only a file an imported file brings in, written with a tab and a reference", { "build/deeper .xml": "<Project>\n  <!-- a note -->\n</Project>\n" }, { start: { "build/deps.xml": '<Project>\n  <Import Project="deeper\t&#46;xml" />\n</Project>\n', "build/deeper .xml": EMPTY } }],
   ["one that changes only a file a property MSBuild's targets import names", { "build/after.xml": "<Project>\n  <!-- a note -->\n</Project>\n" }, { start: { "Directory.Build.props": "<Project>\n  <PropertyGroup>\n    <CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)build/after.xml</CustomAfterMicrosoftCommonTargets>\n  </PropertyGroup>\n</Project>\n", "build/after.xml": EMPTY } }],
+  ["one that changes only the attributes git writes the checkout by, at the root", { ".gitattributes": "*.xml text\n" }],
+  ["one that changes only the attributes git writes the checkout by, in a folder", { "src/App/.gitattributes": "*.xml text\n" }],
   ["a pull request with no base to read it against", { "README.md": "# More\n" }, { base: false }],
 ]) { const r = restores(what, files, opts); if (what !== "a pull request with no base to read it against") ok(r.out.includes("Changed:"), `${what}: named by the first look`, r.out); }
 

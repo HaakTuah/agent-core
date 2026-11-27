@@ -33,9 +33,9 @@
 # restore a pull request cannot have changed, while the check still reports on every pull request (core archive 201).
 # Two looks: git's own diff against the base, as the signature check looks, for a project file, a lock file, a .props,
 # .targets, Directory.Build or response file, a .user file beside a project file, any file an Import in one, or a
-# property MSBuild's own targets import a file by, brings in, and any file whose root element is a Project
-# (core/scripts/nuget.mjs --imports), packages.config, a NuGet.Config, a global.json, .NET's tools manifest, a package
-# file, the licence check's config and its audit, a folder the config names as a source, the core's Node version and the
+# property MSBuild's own targets import a file by, brings in, and any file whose root element is a Project or that
+# begins as XML past the bound the script reads to (core/scripts/nuget.mjs --imports), packages.config, a NuGet.Config,
+# a global.json, .NET's tools manifest, a package file, a .gitattributes, the licence check's config and its audit, a folder the config names as a source, the core's Node version and the
 # calling workflow; and, where none changed, NuGet's own word that every lock file still holds what its project asks
 # for, however it asks (an import, a property, any file a build reads), from a restore against an empty source that
 # downloads nothing, under a NuGet config of its own, so that a project's mapping of packages to sources has no say

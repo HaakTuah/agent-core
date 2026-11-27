@@ -13,7 +13,7 @@ paths=(':(glob,icase)**/*.csproj' ':(glob,icase)**/*.fsproj' ':(glob,icase)**/*.
   ':(glob,icase)**/*.targets' ':(glob,icase)**/Directory.Build.*' ':(glob,icase)**/*.rsp' ':(glob,icase)**/*.user'
   ':(glob,icase)**/packages.lock.json' ':(glob,icase)**/packages.*.lock.json' ':(glob,icase)**/packages.config'
   ':(glob,icase)**/nuget.config' ':(glob,icase)**/global.json' ':(glob,icase)**/dotnet-tools.json'
-  ':(glob,icase)**/*.nupkg' "${CORE_AT}.node-version" .github/workflows/nuget.yml)
+  ':(glob,icase)**/*.nupkg' ':(glob,icase)**/.gitattributes' "${CORE_AT}.node-version" .github/workflows/nuget.yml)
 # NuGet's own word on whether every lock file still holds what its project asks for, however the project asks
 # (in an import, through a property, from any file a build reads): a restore of each project file from its
 # lock file alone against an empty source, which downloads nothing. It holds only where each restore passed
