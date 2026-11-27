@@ -13,5 +13,14 @@ export function counted(bytes) {
   return n;
 }
 
-// The count of the file at a path; 0 where there is none.
-export const sizeOf = file => fs.existsSync(file) ? counted(fs.readFileSync(file)) : 0;
+// The count of the file at a path; 0 where there is none. What stands there and is no regular file (a device, a pipe, a
+// folder, as a link may lead to) is never read: it throws, with its mend, through one descriptor opened without waiting,
+// so that what is checked is what is read.
+export function sizeOf(file) {
+  let fd;
+  try { fd = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NONBLOCK ?? 0)); } catch (e) { if (e.code === "ENOENT") return 0; throw e; }
+  try {
+    if (!fs.fstatSync(fd).isFile()) throw new Error(`FAIL: ${JSON.stringify(String(file))} is no regular file, and is not counted. Mend: put the file itself in its place, and run the check again`);
+    return counted(fs.readFileSync(fd));
+  } finally { fs.closeSync(fd); }
+}

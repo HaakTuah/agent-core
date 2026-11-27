@@ -23,8 +23,10 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { OWNER } from "./core-address.mjs";
+import { regularText } from "./core-path.mjs";
 import { asText, parseBounded } from "./guards.mjs";
 import { guard } from "./mend.mjs";
+import { real, regular } from "./reading.mjs";
 
 guard(import.meta.url); // (an error it does not catch fails with its mend: mend.mjs)
 
@@ -33,13 +35,22 @@ const at = args.indexOf("--base");
 const baseRev = at >= 0 ? args[at + 1] : null;
 // (a commit, never an option: git is asked whether it is one, and it stands after --end-of-options)
 if (at >= 0 && (!/^[\w^~./][\w^~./-]*$/.test(baseRev ?? "") || (() => { try { execFileSync("git", ["rev-parse", "--verify", "--quiet", "--end-of-options", `${baseRev}^{commit}`], { stdio: "ignore" }); return false; } catch { return true; } })())) { console.log(`FAIL --base needs a commit of this repository, and "${baseRev ?? ""}" is none. Mend: fetch the base (git fetch origin main) and name its commit after --base`); process.exit(1); }
-const config = parseBounded(fs.readFileSync(args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--base") ?? "scripts/general.json", "utf8"));
+const configFile = args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--base") ?? "scripts/general.json";
+const configText = regularText(configFile, { linked: false });
+if (configText === null) { console.log(asText(`FAIL the config ${configFile} is not here as a regular file. Mend: name the config's own file, scripts/general.json in the core`)); process.exit(1); }
+const config = parseBounded(configText);
+// (each file and folder read only where it is a real one of the checkout's own, no link on its way, and each link met
+// where the rules stand fails: reading.mjs)
+const links = new Set();
+const kindOf = p => { const kind = real(".", p); if (kind === "link") links.add(p); return kind; };
+const filesIn = (dir, kinds) => kindOf(dir) !== "folder" ? [] : fs.readdirSync(dir).filter(f => kinds.test(f)).map(f => path.posix.join(dir, f)).filter(f => kindOf(f) === "file");
+const linesOf = file => (regular(".", file) ?? "").split("\n");
 const account = { pattern: OWNER.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&"), say: "the *owner's account*, or the repository's own address" };
 const words = [...config.words, account].map(w => ({ re: new RegExp(w.pattern, w.case ? "u" : "iu"), say: w.say, outside: w.outside ?? [] }));
 const exempt = new Set(config.exempt);
 if (!config.words.length) { console.log("FAIL the config's list \"words\" is empty, so the check would pass anything. Mend: put its words back in scripts/general.json"); process.exit(1); }
 const files = config.paths
-  .flatMap(dir => fs.readdirSync(dir).filter(f => f.endsWith(".md")).map(f => path.posix.join(dir, f)))
+  .flatMap(dir => filesIn(dir, /\.md$/u))
   .filter(f => !exempt.has(f))
   .sort();
 if (!files.length) { console.log(`FAIL no file of the floor or the modules was read (${config.paths.join(", ")}), so the check would pass anything. Mend: run it from the core's root, or name in the config's "paths" the folders that hold them`); process.exit(1); }
@@ -68,7 +79,7 @@ const quoted = text => /^\s*>/.test(text);
 
 let found = 0;
 for (const file of files) {
-  fs.readFileSync(file, "utf8").split("\n").forEach((line, i) => {
+  linesOf(file).forEach((line, i) => {
     for (const { re, say, outside } of words) {
       if (outside.some(dir => file.startsWith(`${dir}/`))) continue;
       const hit = line.match(re);
@@ -94,9 +105,9 @@ const { paths: phrasePaths = [], list: phraseList = [] } = config.phrases ?? {};
 if (!phraseList.length) { console.log("FAIL the config's list of phrases a rule may not use is empty, so the check would pass anything. Mend: put its phrases back in scripts/general.json"); process.exit(1); }
 const phrases = phraseList.map(p => ({ re: new RegExp(p.pattern, "iu"), say: p.say }));
 const used = text => quoted(text) ? [] : phrases.map(p => ({ ...p, hit: text.replace(/`[^`]*`/gu, "").match(p.re) })).filter(p => p.hit);
-const absent = phrasePaths.filter(p => !fs.existsSync(p));
+const absent = phrasePaths.filter(p => kindOf(p) === null);
 if (absent.length) { console.log(`FAIL the files and folders read for the phrases are not there: ${absent.join(", ")}. Mend: run it from the core's root, or name in the config's "phrases" the files that stand`); process.exit(1); }
-const ruleFiles = phrasePaths.flatMap(p => fs.statSync(p).isDirectory() ? fs.readdirSync(p).filter(f => /\.md(\.tmpl)?$/u.test(f)).map(f => path.posix.join(p, f)) : [p]).sort();
+const ruleFiles = phrasePaths.flatMap(p => kindOf(p) === "file" ? [p] : filesIn(p, /\.md(\.tmpl)?$/u)).sort();
 if (!ruleFiles.length) { console.log("FAIL no rule file was read for the phrases, so the check would pass anything. Mend: run it from the core's root, or name in the config's \"phrases\" the folders that hold the rules"); process.exit(1); }
 const fresh = new Set();
 let failedPhrases = 0, reported = 0;
@@ -110,11 +121,12 @@ if (baseRev) {
   }
 } else console.log("no --base given: the phrases are only reported, none failed");
 for (const file of ruleFiles) {
-  fs.readFileSync(file, "utf8").split("\n").forEach((line, i) => {
+  linesOf(file).forEach((line, i) => {
     if (fresh.has(`${file}:${i + 1}`)) return;
     for (const { hit, say } of used(line)) { reported++; console.log(asText(`${file}:${i + 1}: "${hit[0]}" reported, standing before this change; ${say} (the audit brings it to the pattern, #259)`)); }
   });
 }
 console.log(`${ruleFiles.length} rule and brief files read for ${phrases.length} phrases neither may use: ${failedPhrases} in what this change writes, ${reported} standing`);
 found += failedPhrases;
+for (const l of [...links].sort()) { found++; console.log(asText(`FAIL ${l} is a symbolic link where the rules stand, and is read as nothing. Mend: put the file or folder itself in its place, or take the link out`)); }
 process.exit(found ? 1 : 0);

@@ -387,10 +387,12 @@ if (guard(import.meta.url)) {
   // blob of one text must read as equal and as one length, #752)
   const plain = text => text.replace(/\r\n?/gu, "\n");
   const show = file => { try { return plain(git(["show", `${base}:${file}`])); } catch { return null; } };
-  const links = new Set(unlinked(tracked, copy).filter(f => fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()));
+  // (each that stands as no regular file, a link or a folder as a submodule's is, read as none and failed)
+  const kinds = new Map(unlinked(tracked, copy).map(f => [f, fs.lstatSync(f, { throwIfNoEntry: false })]).filter(([, s]) => s && !s.isFile()));
+  const links = new Set(kinds.keys());
   let failed = links.size;
   const texts = [];
-  for (const file of links) console.log(`FAIL ${logged(file)}: a link, not a file, and the check reads the project's own text only. Mend: put the file itself there in place of the link`);
+  for (const [file, s] of kinds) console.log(`FAIL ${logged(file)}: ${s.isSymbolicLink() ? "a link" : "a folder or submodule"}, not a file, and the check reads the project's own text only. Mend: put the file itself there in its place`);
   for (const file of files) {
     if (links.has(file)) continue;
     const raw = fs.readFileSync(file, "utf8"), found = lines(raw);

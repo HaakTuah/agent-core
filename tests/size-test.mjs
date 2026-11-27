@@ -11,6 +11,7 @@ import { mended } from "../scripts/mend.mjs";
 import { ghStandIn, scratchDir } from "../scripts/scratch-core.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
 import { onPath } from "../scripts/workflow-run.mjs";
+import { sizeOf } from "../scripts/file-size.mjs";
 import { AGENTS, CAPS, DUE_TITLE, QUEUE, answered, capsAt, capsOf, counted, due, judged, raised as raisedWith, rolesAt, whoseOf } from "../scripts/size.mjs";
 
 let failed = 0, count = 0;
@@ -129,6 +130,20 @@ fs.copyFileSync(path.join(root, AGENTS.file), path.join(tmp, AGENTS.file));
 const standInCap = CAPS["stand-in"] + AGENTS.mark;
 const copy = path.join(tmp, "scripts", "size.mjs"), at2 = (...args) => { const r = spawnSync(process.execPath, [copy, ...args], { cwd: tmp, encoding: "utf8", env: { ...process.env, OWNER: "someone" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 ok(at2().status === 0, "a copy of the core counts as the core does", at2().out);
+// (a file it counts, at its start or the queue, as a tracked link: refused, with its mend, and counted as nothing)
+if (process.platform !== "win32") {
+  let device = null;
+  try { sizeOf("/dev/zero"); } catch (e) { device = e; }
+  ok(device !== null && mended(device.message) && sizeOf(path.join(tmp, "no-such-file")) === 0, "a size is never read of what is no regular file: it fails with its mend; a file not there counts 0", device?.message);
+  for (const [name, to] of [[AGENTS.file, "/dev/null"], [QUEUE.file, "/dev/zero"]]) {
+    const at = path.join(tmp, name), text = fs.readFileSync(at);
+    fs.rmSync(at); fs.symlinkSync(to, at);
+    try {
+      const linked = at2();
+      ok(linked.status === 1 && linked.out.includes(`${name} is no regular file`) && mended(linked.out), `a tracked link in the place of ${name} is refused, with its mend`, linked.out);
+    } finally { fs.rmSync(at); fs.writeFileSync(at, text); }
+  }
+}
 const git = (...args) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: tmp, encoding: "utf8" });
 git("init", "-q"); git("add", "-A"); git("commit", "-qm", "base");
 const standIn = Number(new RegExp(`the role stand-in reads at its start \\(.*\\): (\\d+) bytes of`).exec(at2().out)?.[1]);

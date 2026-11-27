@@ -9,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { FLOOR, FLOOR_WHEN, KINDS_BY_PATH, MAKE, PAST, READ_LINE, START, TRY, asked, budget, calledByPaths, coreAt, faults, gather, hookLine, kindsOf, leftOut, library, lineMend, listed, matches as matchesIn, opening, ownOf, ownPaths, reading, readsOf, taken, whenOf } from "../scripts/reading.mjs";
+import { FLOOR, FLOOR_WHEN, KINDS_BY_PATH, MAKE, PAST, READ_LINE, START, TRY, asked, budget, calledByPaths, coreAt, faults, gather, hookLine, kindsOf, leftOut, library, lineMend, listed, matches as matchesIn, opening, ownOf, ownPaths, reading, readsOf, taken, whenOf, whole } from "../scripts/reading.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 // (each case its own reading, with a budget of its own, where it gives none)
 const matches = (pattern, file, within = budget()) => matchesIn(pattern, file, within);
@@ -253,6 +253,16 @@ let handMade = null;
 try { matchesIn("*.md", "a.md"); } catch (e) { unbudgeted = e; }
 try { matchesIn("*.md", "a.md", { left: 5 }); } catch (e) { handMade = e; }
 ok(unbudgeted instanceof TypeError && /Mend:/u.test(unbudgeted.message) && handMade instanceof TypeError && /Mend:/u.test(handMade.message), "matches() given no reading's budget is refused, with its mend, so no try runs outside a reading's bound");
+
+// a git read: its output, none where git ends saying it holds no such thing, and a read that did not finish a failure
+{
+  let unfinished = [];
+  for (const r of [{ error: Object.assign(new Error("x"), { code: "ENOBUFS" }), status: null, stdout: "part" }, { error: undefined, status: null, signal: "SIGTERM" }]) {
+    try { whole(r); } catch (e) { unfinished.push(e.message); }
+  }
+  ok(whole({ status: 0, stdout: "text" }) === "text" && whole({ status: 128, stdout: "" }) === null && unfinished.length === 2 && unfinished.every(m => mended(m)),
+    "a git read is its output, or none where git ends saying so; one past its bound or stopped is unread, and fails with its mend", unfinished.join(" | "));
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the reading script`);
 process.exit(failed ? 1 : 0);

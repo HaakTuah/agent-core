@@ -60,12 +60,12 @@ import { isPart, milestoneMends } from "./milestones.mjs";
 import { asking, coreAtBase, issuesOf, textsOf, yesOf } from "./owner-yes.mjs";
 import { numberOf, statedOf } from "./meaning-kept.mjs";
 import { proven } from "./path-only.mjs";
-import { coreAt, lineMend, pathIn, textOf } from "./reading.mjs";
+import { lineMend, pathIn, textOf, whole } from "./reading.mjs";
 import { changedMend, plain, testsChanged } from "./weakened.mjs";
 import { NO_COST, costMend } from "./pr-cost.mjs";
 import { headMends, headOf } from "./pr-head.mjs";
 import { HOLDS, entriesChanged, entriesMend, numberMend } from "./pr-number.mjs";
-import { calledFor } from "./pr-reads.mjs";
+import { calledFor, coreHere } from "./pr-reads.mjs";
 import { MANIFEST_MAX, REASONS, UNREADABLE, differencesAdded, reasonsMend } from "./pr-reasons.mjs";
 import { WAITS, heldAt, waitsMend, waitsOn } from "./pr-waits.mjs";
 import { asText, parseBounded } from "./guards.mjs";
@@ -158,18 +158,22 @@ if (guard(import.meta.url)) {
       heldAt(commits, created, sha => { then = Buffer.from(parseBounded(gh(`repos/${repo}/contents/${file}?ref=${sha}`)).content ?? "", "base64").toString("utf8"); return true; });
     } catch { then = null; }
     const why = then === null ? "whether the copy on its base held it could not be read" : "the copy on its base did not hold it when the pull request opened";
+    // (where the core lies at the head, read once; where it cannot be read there, a failure, so that no line below that
+    // reads it passes as not asked: pr-reads.mjs)
+    const here = coreHere(process.cwd());
+    if (here.mend) mends.push(here.mend);
     if (then?.includes("export const WAITS_SINCE")) { const mend = waitsMend(process.env.PR_BODY); if (mend) mends.push(mend); }
     else console.log(`ok   the line "${WAITS}" is not asked here: ${why}`);
     if (created >= READS_SINCE && then?.includes("export const READS_SINCE")) {
       const called = calledFor(process.cwd());
       if (called === null) console.log("ok   the line that lists what the changed paths call for is not asked here: the change could not be read against its base");
       else {
-        const mend = lineMend(process.env.PR_BODY, called, `node ${coreAt(process.cwd())}scripts/reading.mjs builder --changed --line`);
+        const mend = lineMend(process.env.PR_BODY, called, `node ${here.at ?? ""}scripts/reading.mjs builder --changed --line`);
         if (mend) mends.push(mend);
         else console.log(`ok   the description lists what its changed paths call for (${called.length} file${called.length === 1 ? "" : "s"})`);
       }
     } else console.log(`ok   the line that lists what the changed paths call for is not asked here: ${why}`);
-    const at = coreAt(process.cwd()) ?? "", queue = doneAsked(created, then) || planAsked(created, then) ? queueAt(process.cwd(), at) : null;
+    const at = here.at ?? "", queue = doneAsked(created, then) || planAsked(created, then) ? queueAt(process.cwd(), at) : null;
     // (one read of each item for both checks, so that a run reads a dozen at most between them)
     const owner = queue ? ownerAt(queue.manifest, at, repo) : null, seen = new Map();
     const read = item => { if (!seen.has(item)) seen.set(item, readItem(repo, item, ".", owner)); return seen.get(item); };
@@ -197,7 +201,7 @@ if (guard(import.meta.url)) {
       else {
         // (each file whose assertions are only changed is listed for the reviewer, and asks nothing: one made stricter is no worse)
         for (const f of found.filter(f => !f.weaker)) console.log(`ok   for the reviewer: ${plain(f.file)} has ${f.asserts.length} line${f.asserts.length === 1 ? "" : "s"} that assert changed, none fewer`);
-        const mend = changedMend(process.env.PR_BODY, found, `node ${coreAt(process.cwd()) ?? ""}scripts/weakened.mjs`);
+        const mend = changedMend(process.env.PR_BODY, found, `node ${here.at ?? ""}scripts/weakened.mjs`);
         if (mend) mends.push(mend); else console.log(`ok   the description names each test file this pull request leaves with fewer lines that assert, or in which it skips a case (${found.filter(f => f.weaker).length})`);
       }
     } else console.log(`ok   the tests this pull request edits are not asked here: ${why}`);
@@ -211,16 +215,16 @@ if (guard(import.meta.url)) {
       else console.log(entries ? `ok   the lines "Number:" under "${HOLDS}" are in step with the ${entries.changed.length} entr${entries.changed.length === 1 ? "y" : "ies"} whose number this pull request adds or changes` : `ok   the lines "Number:" are not held to the entries here: this is no core's own repository, or the change could not be read against its base`);
     } else if (parts.includes(HOLDS)) console.log(`ok   the lines "Number:" are not held to the entries here: ${why}`);
     if (created >= REASONS_SINCE && then?.includes("export const REASONS_SINCE")) {
-      const added = differencesAdded(process.cwd()), mend = added === null ? null : reasonsMend(process.env.PR_BODY, added, coreAt(process.cwd()) ?? "core/");
+      const added = differencesAdded(process.cwd()), mend = added === null ? null : reasonsMend(process.env.PR_BODY, added, here.at ?? "core/");
       if (mend) mends.push(mend);
       else console.log(added === null ? `ok   the line "${REASONS}" is not asked here: the change could not be read against its base` : added.length ? `ok   the description says the reasons read for the difference it adds` : `ok   the line "${REASONS}" is not asked here: no line is added under the manifest's "Differences"`);
     } else console.log(`ok   the line "${REASONS}" is not asked here: ${why}`);
-    if (headAsked(created, then)) { const head = headOf(process.env.PR_BODY, coreAt(process.cwd())); for (const line of head.oks) console.log(`ok   ${line}`); mends.push(...head.mends); }
+    if (headAsked(created, then)) { const head = headOf(process.env.PR_BODY, here.at); for (const line of head.oks) console.log(`ok   ${line}`); mends.push(...head.mends); }
     else console.log(`ok   the archive keys and placeholders of the description are not asked here: ${why}`);
     if (created >= YES_SINCE && then?.includes("export const YES_SINCE")) {
-      const diff = spawnSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
+      const diff = whole(spawnSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 }));
       // (where the core lies is read from the base's manifest, never the head's, which the pull request could bring)
-      const at = coreAtBase(process.cwd()), paths = diff.status === 0 && at !== null ? asking(diff.stdout.split("\0").filter(Boolean), at) : null;
+      const at = coreAtBase(process.cwd()), paths = diff !== null && at !== null ? asking(diff.split("\0").filter(Boolean), at) : null;
       if (paths === null) console.log("ok   the owner's yes is not asked here: the change could not be read against its base");
       else {
         // (a file whose change only follows files the pull request moves asks no yes: path-only.mjs; #886, point 1)
