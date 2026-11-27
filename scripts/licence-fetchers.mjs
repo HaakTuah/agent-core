@@ -51,8 +51,9 @@ export const WINDOWS_FETCHER = (() => {
 // connection and downloads nothing (#1437): its arguments all strings, but an option's value and, after "--", the folder
 // it clones to; its options among those below, none that reaches past the source (submodules, a config that rewrites an
 // address); its source a file:// address, or a path with no ":" (no scheme, no host:path, no transport::), or one that
-// starts with "/", "./" or "../" before anything held in a variable; and its call closed after the array, or after an
-// object of options that sets no environment. Anything else the scan cannot read exactly, and stays a fetch.
+// starts with "/", "./" or "../" before anything held in a variable; and its call one of Node's that runs a program
+// through no shell, by the name the file imports it by, closed after the array or after an object of options among a
+// few, none a shell or an environment. Anything else the scan cannot read exactly, and stays a fetch.
 const CLONE_FLAGS = new Set(["-q", "--quiet", "-v", "--verbose", "--progress", "-n", "--no-checkout", "--bare", "--mirror", "--single-branch", "--no-single-branch", "--no-tags", "-l", "--local", "--no-local", "--no-hardlinks", "-s", "--shared"]);
 const CLONE_VALUED = new Set(["--depth", "--shallow-since", "--shallow-exclude", "-b", "--branch", "-o", "--origin"]);
 // The place of the quote that closes the string or template opening at text[i] (its escapes and ${} read past), or -1.
@@ -148,11 +149,20 @@ function callCloses(text, end) {
   const at = end + after[0].length, close = text[at] === "{" ? optionsEnd(text, at) : -1;
   return close > 0 && /^\s*,?\s*\)/u.test(text.slice(close));
 }
+// The functions of Node's that run a program with its arguments as given, through no shell unless an option says so.
+const DIRECT_CALLS = new Set(["execFileSync", "execFile", "spawnSync", "spawn"]);
+// Whether the call whose first argument opens at text[i] is of one of those functions by its own name, which the file
+// imports by that name from node:child_process.
+function directCall(text, i) {
+  const name = /(?:^|[^\w$.])([A-Za-z]+)\s*\(\s*$/u.exec(text.slice(Math.max(0, i - 40), i))?.[1];
+  return DIRECT_CALLS.has(name) && [...text.matchAll(/^import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["'];?$/gmu)]
+    .some((m) => m[1].split(",").some((entry) => entry.trim() === name));
+}
 // Whether the match m of OTHER_FETCHER is a clone by git, written as an array, whose source reads exactly as local (above).
 function localClone(text, m) {
   if (!/^['"`](?:[^'"`\s]*[/\\])?git['"`]\s*,\s*\[\s*['"`]clone$/u.test(m[0])) return false;
   const array = arrayAt(text, m.index + m[0].lastIndexOf("["));
-  return Boolean(array) && array.args[0]?.value === "clone" && localArguments(array.args) && callCloses(text, array.end);
+  return Boolean(array) && array.args[0]?.value === "clone" && localArguments(array.args) && callCloses(text, array.end) && directCall(text, m.index);
 }
 // Each fetch in text by a fetcher the scan cannot read, as the two readers above find them: their matches, each place
 // once, in the order they stand, but a git clone of a local source (localClone).
