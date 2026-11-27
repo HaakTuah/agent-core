@@ -55,8 +55,8 @@ import { copyHeld } from "./core-path.mjs";
 import { blockingOf, codexFind } from "./review-comments.mjs";
 import { formOf, marksWait } from "./review-marks.mjs";
 import { RULES, ruleFiles } from "./rule-files.mjs";
-import { started } from "./started.mjs";
 import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, counted, pinsAlone, queueOnly, reviewersOf, standsFrom, status, unproved, whole, writersOf } from "./security-review.mjs";
+import { guard } from "./mend.mjs";
 
 export const CONTEXT = "code-review";
 const SHA = /^[0-9a-f]{40}$/u;
@@ -195,7 +195,7 @@ function needs(pull, files, rules, copy) {
     || (/^\.github\/workflows\/[^/]+\.ya?ml$/u.test(file.filename) && pinsAlone(file)));
   return !(sync && files.some((file) => file.filename === "core-manifest.md"));
 }
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const [pullFile, commentsFile, commitsFile, filesFile, mergesFile] = process.argv.slice(2);
   if (!pullFile || !commentsFile) {
     console.error("usage: node scripts/code-review-wait.mjs <the pull request, as JSON> <its comments, as JSON> [<its commits, as JSON> <its files, as JSON> [<the merges clean-merges.mjs proved, as JSON>]]");

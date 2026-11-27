@@ -21,7 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ENTRY_FILES } from "./rule-files.mjs";
 import { asText } from "./guards.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
 
 export const AGENTS = "AGENTS.md";
 // A file's front matter (the lines between a first line "---" and the next "---"), as { key: value }, or {} where none.
@@ -85,7 +85,7 @@ export function verdict(head, base = null) {
 const fileAt = file => (fs.existsSync(file) && fs.statSync(file).isFile() ? fs.readFileSync(file, "utf8") : null);
 const gitAt = rev => file => { try { return execFileSync("git", ["show", `${rev}:${file}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; } };
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const core = process.argv.includes("--core"), base = core ? "" : process.env.ENTRY_BASE ?? "";
   const read = verdict(fileAt, base ? gitAt(base) : null);
   // (in a project with no base to read against, nothing is new: each is a note)

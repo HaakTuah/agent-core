@@ -84,8 +84,8 @@ import { inProject, logged, loggedAlone } from "./guards.mjs";
 import { didNotRun, installStep, installed, notInstalled } from "./packages.mjs";
 import { shapeFaults } from "./schemas.mjs";
 import { CHANGE_MARKS, FIRST_READS, PACKAGE_FILES, REACH, READERS, WHOLE_ON_PARSER, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unreachedReaders } from "./shape-readers.mjs";
-import { started } from "./started.mjs";
 import { LARGEST, MOST_NODES } from "./tree-walk.mjs";
+import { guard } from "./mend.mjs";
 
 export const KIT = "checks/shape.json";
 const TEMPLATE = fileURLToPath(new URL("../setup/template/shape.json.tmpl", import.meta.url));
@@ -1082,7 +1082,7 @@ function main(argv) {
   return command(config, at, self, new Map([...found.entries].map(([id, e]) => [id, numbersOf(e.n)])), base, found, named);
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   try { process.exitCode = main(process.argv.slice(2)); }
   // (a reader's own failure that says its mend, as the parser's that cannot be loaded, is told as the check's own)
   catch (e) { if (!(e instanceof Refused) && !/\. Mend: /u.test(String(e?.message))) throw e; console.error(`FAIL: ${loggedAlone(e.message)}`); process.exitCode = 1; }

@@ -55,13 +55,13 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logged } from "./guards.mjs";
-import { started } from "./started.mjs";
 import { DEEPEST, LONGEST, pruned, twice } from "./yaml-keys.mjs";
 import { didNotRun, installed, loadSync, unreached } from "./packages.mjs";
 import { copyAside, projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { compared, run } from "./workflow-tools.mjs";
+import { guard } from "./mend.mjs";
 
 const WORD = "pull_request_target";
 const BREAK = "\\r\\n|[\\r\\n\\u0085\\u2028\\u2029]"; // every line break YAML 1.1 or 1.2 knows
@@ -377,7 +377,7 @@ export function baseFolder(under) {
   return dir;
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
   process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)

@@ -25,9 +25,8 @@
     "tests/converge-test.mjs": { "mark": 22202, "why": "the question of a split is asked in #1283" },
     "scripts/labels.mjs": { "mark": 22008, "why": "the question of a split is asked in #1186" },
     "scripts/sync.mjs": { "mark": 22147, "why": "the question of a split is asked in #1250" },
-    "scripts/pure-sync.mjs": { "mark": 22852, "why": "the question of a split is asked in #1385" },
-    "scripts/comment-only.mjs": { "mark": 28954, "why": "the question of a split is asked in #1341" },
-    "SECURITY.md": { "mark": 21346, "why": "the question of a split is asked in #1255" },
+    "scripts/pure-sync.mjs": { "mark": 22905, "why": "#1385: floor rule 8's proof is one run on one state: the opening reads the main it is checked against, the pins and the diff, and sets aside each file outside the copy (later, gone) for the proof of the core's own files and parts (provedOwned, provedGone), which reads that state and is what lets those files pass, and done gives the one verdict; a reader of the proof needs the opening every time, a reviewer of the gate reads it whole each time, and the file is 12% past the mark." },
+    "SECURITY.md": { "mark": 26852, "why": "the question of a split is asked in #1255" },
     "scripts/licences.mjs": { "mark": 52937, "why": "the question of a split is asked in #1151" },
     "scripts/packages.mjs": { "mark": 25772, "why": "the question of a split is asked in #1151" },
     "tests/exact-versions-test.mjs": { "mark": 20990, "why": "the question of a split is asked in #1151" },
@@ -239,10 +238,6 @@
       "mark": 33252,
       "why": "#1008: one step's cases (the sync step that asks a lookup beside each exact-versions check) on the workflows each writes into the one scratch project; split along its sections, each file would build the project again, adding to the suite's time (tasks/tests.md), and a session changing the step reads every case."
     },
-    "tests/merge-line-test.mjs": {
-      "mark": 23054,
-      "why": "One script's cases (merge-line.mjs: the facts read from the host for each kind of repository, where users get a release, the measure, the cancelling) through the stand-in for gh they share; split along the script's parts, each file would write it again, and the file is 13% past the mark (#1008)."
-    },
     "tests/size-test.mjs": {
       "mark": 28199,
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
@@ -251,14 +246,13 @@
       "mark": 25951,
       "why": "#943: the selection's rules apart from those of the suites' time and of the run of a tree that passed."
     },
-    "scripts/select.mjs": { "mark": 23161, "why": "the question of a split is asked in #1380" },
-    "tests/select-csharp-compile-test.mjs": { "mark": 25580, "why": "the question of a split is asked in #1380: the cases of what git holds beside the texts (heldBeside, the solutions) can go to a file of their own" },
+    "tests/select-csharp-compile-test.mjs": { "mark": 28239, "why": "#1401 added the cases of a target of messages; the question of a split is asked in #1472: the cases of what git holds beside the texts (heldBeside, the solutions) can go to a file of their own" },
     "tests/select-test.mjs": {
-      "mark": 41948,
-      "why": "#1380: the timed C# cases, which read none of the fixture, are to move beside the other select-csharp tests. #943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
+      "mark": 34755,
+      "why": "#943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
     },
     ".github/shape-baseline.json": {
-      "mark": 27000,
+      "mark": 33900,
       "why": "A baseline the shape check reads and writes whole (--write), in the form every project's baseline takes; 'grown' gives the reason for some of the keys 'listed' holds, so a split along the two parts would make two files to keep in step, and none along who reads it was found."
     },
     "tests/staged-test.mjs": {
@@ -277,13 +271,9 @@
       "mark": 27539,
       "why": "One feature's cases (the fetch before the NuGet check's restore) on the scratch project and the package files they share, each case reading what the one before committed; split, each file would write that project again and add to the suite's time"
     },
-    "scripts/merge-line.mjs": {
-      "mark": 20602,
-      "why": "the question of a split is asked in #1345"
-    },
     "scripts/screens.mjs": {
-      "mark": 23155,
-      "why": "the question of a split is asked in #1345"
+      "mark": 20920,
+      "why": "#1345: the list of its checks and their mends, which a session adding a check or rewording a mend reads alone, stands in screens-checks.mjs; what is left is one body: the config and the findings read, the verdict, which lowers the baseline as --write does, and the run that sets them in order, each part reading what the others give, so whoever changes one reads them all, and the file is 2% past the mark."
     }
   }
 }

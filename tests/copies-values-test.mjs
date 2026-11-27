@@ -57,7 +57,7 @@ try {
   const g = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   const commit = what => { g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", what); return g("rev-parse", "HEAD").trim(); };
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of ["copies.mjs", "copies-values.mjs", "code-shape-lexer.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "schemas.mjs", "core-owned.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
+  for (const f of ["copies.mjs", "copies-values.mjs", "code-shape-lexer.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "mend.mjs", "yaml-keys.mjs", "packages.mjs", "schemas.mjs", "core-owned.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
   fs.cpSync(path.join(here, "schemas"), path.join(dir, "core/scripts/schemas"), { recursive: true });
   fs.cpSync(path.join(here, "..", ".packages"), path.join(dir, "core/.packages"), { recursive: true, filter: parserLeftOut });
   fs.copyFileSync(path.join(here, "..", ".gitignore"), path.join(dir, "core/.gitignore"));

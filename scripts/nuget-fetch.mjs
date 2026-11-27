@@ -28,8 +28,8 @@ import { fileURLToPath } from "node:url";
 import { baseOf, configAt, loadConfig, textAt } from "./licences.mjs";
 import { NOT_A_FILE, NOT_A_FILE_IS, REGISTRY, heldBefore, lockPackages, nugetConfig, readProject, sourcesOf, twoHashes, unmarked } from "./nuget.mjs";
 import { asText } from "./guards.mjs";
-import { started } from "./started.mjs";
-import { copyOf, projectAt } from "./core-path.mjs";
+import { copyAside, projectAt } from "./core-path.mjs";
+import { guard } from "./mend.mjs";
 
 const FLAT = "https://api.nuget.org/v3-flatcontainer/"; // the registry's own address for package files
 const TOOLS = "dotnet-tools.json"; // its name, in any case, in .config/ or in any folder, as dotnet reads it
@@ -261,11 +261,11 @@ function readLocks(locks, { tracked, textOf, asBase, failures, reports, wanted }
     }
   }
 }
-// The tools each tracked manifest of dotnet's names, outside the core's copy, into `wanted`, its failures and reports
-// said.
+// The tools each tracked manifest of dotnet's names, outside the core's copy (core-path.mjs's copyAside: none in the
+// core's own repository), into `wanted`, its failures and reports said.
 function readTools(ctx) {
-  const { root, base, tracked, sameSources, textOf, failures, reports } = ctx;
-  for (const f of tracked.filter((t) => !t.startsWith(copyOf(root)) && isTools(t))) {
+  const { root, copy, base, tracked, sameSources, textOf, failures, reports } = ctx;
+  for (const f of tracked.filter((t) => !(copy !== null && t.startsWith(copy)) && isTools(t))) {
     const text = textOf(f);
     if (text === null) continue;
     const read = toolsOf(text, f), before = toolsAt(root, base, f);
@@ -358,13 +358,13 @@ async function eightAtATime(list, work) {
  * { failures, notes, reports, summary }.
  */
 export async function fetchAll(config, root, tracked, into, sources = sourcesOf(config, root), { base = null, baseConfig = null } = {}) {
-  const copy = copyOf(root), { ships, tools: toolLocks } = nugetConfig(config, copy);
+  const copy = copyAside(root), { ships, tools: toolLocks } = nugetConfig(config, copy);
   const sameSources = sameSourcesOf(config, base, baseConfig, copy);
   const failures = [], notes = [], reports = [], wanted = new Map();
   const listedThen = listedBy(baseConfig, copy);
   const textOf = reader(root, failures);
   const asBase = (f) => base === null || (listedThen.includes(f) && textAt(root, base, f) === textOf(f));
-  const ctx = { root, base, tracked, sameSources, textOf, asBase, failures, reports, wanted };
+  const ctx = { root, copy, base, tracked, sameSources, textOf, asBase, failures, reports, wanted };
   readLocks([...ships, ...toolLocks], ctx);
   readTools(ctx);
   const results = await eightAtATime([...wanted.values()], (p) => fetchOne(p, sources, into));
@@ -381,7 +381,7 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
 export const printed = ({ notes, reports, failures }) => ({
   out: [...notes.map(n => `note ${shown(n)}`), ...reports.map(r => `REPORT: ${shown(r)}`)], err: failures.map(f => `FAIL: ${shown(f)}`) });
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const args = process.argv.slice(2), at = args.indexOf("--into");
   const fail = (msg) => { console.error(`FAIL: ${shown(msg)}`); process.exit(1); };
   const configPath = args.find((a, i) => !a.startsWith("--") && i !== at + 1), into = at >= 0 ? args[at + 1] : undefined;

@@ -22,9 +22,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logged, unrooted } from "./guards.mjs";
 import { MODULES } from "./reading.mjs";
-import { started } from "./started.mjs";
 import { copyOf, projectAt, readCore } from "./core-path.mjs";
 import { movedModules } from "./step-checks-moved.mjs";
+import { guard } from "./mend.mjs";
 
 const plain = s => s.toLowerCase().replace(/[‘’]/gu, "'").replace(/\s+/gu, " ").trim();
 // (a phrase in italics may run over one line break, as a module's text wraps it: "*where the numbers\n  go*"; the
@@ -253,4 +253,4 @@ function main() {
   return 0;
 }
 
-if (started(import.meta.url)) process.exitCode = main();
+if (guard(import.meta.url)) process.exitCode = main();

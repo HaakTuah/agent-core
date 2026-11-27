@@ -27,7 +27,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { tokens } from "./code-shape.mjs";
-import { links, reached } from "./select.mjs";
+import { links, reached } from "./select-reach.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
@@ -116,7 +116,7 @@ export function testsOf(file, tests) {
 }
 
 // For --every: each file's tests that reach it, through a barrel or a wrapper too, as the selection maps them
-// (select.mjs), so that every test that would catch a fault runs against it.
+// (select-reach.mjs), so that every test that would catch a fault runs against it.
 function reachersOf(texts, tests, config) {
   const out = new Map();
   for (const [t, files] of reached(tests, links(texts, tests, survey(texts, config, tests).reach))) for (const f of files) if (f !== t) out.set(f, [...(out.get(f) ?? []), t]);

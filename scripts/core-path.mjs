@@ -117,12 +117,16 @@ export function trackedOf(root = ".") {
     return execFileSync("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "ls-files", "-z", "--", MANIFEST, OWN], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean);
   } catch { return [MANIFEST, OWN].filter(f => fs.existsSync(path.join(root, f))); }
 }
-/** The copy's folder, or null, for the scripts that read what runs with power or gate a merge from the default branch's
- *  checkout at `root`: copyAmong on what trackedOf finds there, so the core's own repository holds no copy. */
+/** The copy's folder, or null, at the checkout `root`, for the scripts that read what runs with power or gate a merge
+ *  (from the default branch's checkout) and for the suites' selection (from a pull request's own): copyAmong on what
+ *  trackedOf finds there, so the core's own repository holds no copy. */
 export const copyHeld = (root = ".") => copyAmong(trackedOf(root), root);
+/** Whether the checkout at `root` is the core's own repository, as trackedOf finds it, whatever manifest stands at its
+ *  root: the one that reads its rules from AGENTS.md, never from a core-manifest.md. */
+export const coreItself = (root = ".") => trackedOf(root).includes(OWN);
 /** The same for a check that leaves a copy out of a project's own files even where no manifest names it: null in the
  *  core's own repository, which leaves nothing out; else copyOf(root), core/ where no manifest names a path. */
-export const copyAside = (root = ".") => trackedOf(root).includes(OWN) ? null : copyOf(root);
+export const copyAside = (root = ".") => coreItself(root) ? null : copyOf(root);
 
 /** The folder of the floor's own copy the manifest names on its line "Floor copy: <folder>/", which a repository whose
  *  core a library carries keeps until every agent tool has passed the staged cases carried and no-floor; null where it

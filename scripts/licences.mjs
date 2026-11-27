@@ -45,8 +45,8 @@ import { blobAt, scan } from "./licence-scan.mjs";
 import { stoodAt, trackedIn, unnamedLocks } from "./licence-locks.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { shapeFaults } from "./schemas.mjs";
-import { started } from "./started.mjs";
 import { projectAt } from "./core-path.mjs";
+import { guard } from "./mend.mjs";
 
 // Every licence the Open Source Initiative approves, as the SPDX licence list marks them (isOsiApproved, deprecated ids
 // left out; the list of 28 October 2026). Left out: BSD-ask-to-endorse, newer than the SPDX list the pinned dependency
@@ -742,7 +742,7 @@ export function coreConfig(at = fileURLToPath(new URL("../.github/licences.json"
   return core;
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const fail = (msg) => { console.error(`FAIL: ${logged(msg)}`); process.exit(1); };
   const configPath = process.argv.slice(2).find((a) => !a.startsWith("--"));
   if (!configPath) fail("no config was named. Mend: name it: node core/scripts/licences.mjs <config> [--action]");
