@@ -128,14 +128,21 @@ function audited(entries, f, found) {
 function entryFaults(c, e) {
   const { auditPath, fail } = c;
   if (badFiles(e)) { fail(`${auditPath}: ${e.name}: "files" is not a list of paths. Mend: write it as a list of paths from the project's root`); return; }
-  if (badFetches(e)) { fail(`${auditPath}: ${e.name}: "fetches" is not a map of paths to the fetches it audits there. Mend: write it as { "<a file's path>": ["<a fetch's line, as the scan prints it>"] }`); return; }
-  if (e.fetches && e.kind === "own") fail(`${auditPath}: ${e.name}: the owner's own work audits no fetch. Mend: take "fetches" out, and audit what it fetches in an entry of its own`);
-  for (const p of Object.keys(e.fetches ?? {})) if (!c.tracked.includes(p)) fail(`${auditPath}: ${e.name}: "fetches" names ${p}, no tracked file. Mend: correct the path, or take it out`);
+  if (!fetchesHeld(c, e)) return;
   if (e.version !== undefined && typeof e.version !== "string") fail(`${auditPath}: ${e.name}: "version" is not text. Mend: write the version in quotes`);
   if (e.kind === "own" && (e.version !== undefined || (e.files ?? []).some((p) => p.endsWith("/")))) fail(`${auditPath}: ${e.name}: the owner's own work names its files one by one, with no version. Mend: list each file, no folder, and take "version" out`);
   for (const p of e.files ?? []) if (!c.tracked.some((f) => holds(p, f))) fail(`${auditPath}: ${e.name}: ${p} names no tracked file. Mend: correct the path, or take it out`);
   const shipped = c.files.find((f) => served(c, f) && covers(e, f));
   if (shipped && e.ships !== true) fail(`${auditPath}: ${e.name}: it covers ${shipped}, which reaches users, so it ships. Mend: set "ships": true on it`);
+}
+
+/** What fails in an audit entry `e`'s "fetches" (entryFaults, above); false where it cannot be read at all. */
+function fetchesHeld(c, e) {
+  const { auditPath, fail } = c;
+  if (badFetches(e)) { fail(`${auditPath}: ${e.name}: "fetches" is not a map of paths to the fetches it audits there. Mend: write it as { "<a file's path>": ["<a fetch's line, as the scan prints it>"] }`); return false; }
+  if (e.fetches && e.kind === "own") fail(`${auditPath}: ${e.name}: the owner's own work audits no fetch. Mend: take "fetches" out, and audit what it fetches in an entry of its own`);
+  for (const p of Object.keys(e.fetches ?? {})) if (!c.tracked.includes(p)) fail(`${auditPath}: ${e.name}: "fetches" names ${p}, no tracked file. Mend: correct the path, or take it out`);
+  return true;
 }
 
 /** That the package `name` (used in `where`) has an entry, at `version` where one is given (scan, above). */
@@ -204,13 +211,15 @@ const installs = (code, name) => typeof name === "string" && /^[\w.+-]+$/u.test(
 const CHECKSUM = /(?<![0-9a-f])(?:[0-9a-f]{64}){1,2}(?![0-9a-f])|sha(?:256|384|512)-[A-Za-z0-9+/]{43,}={0,2}/iu;
 const VERIFIER = /(?<![\w-])(?:sha(?:256|512)sum|shasum|Get-FileHash|certutil(?:\.exe)?\s+-hashfile|createHash)(?![\w-])/giu;
 
+// Whether the entry `e` audits what may be a program in the file `f`, by its "files" or by a fetch its "fetches" names there.
+const mayBeProgram = (e, f) => e && typeof e === "object" && (covers(e, f) || fetchesIn(e, f).length > 0) && !NO_PROGRAM.has(e.kind);
 /** What the code `code` of the file `f` (codeOf) lacks for the programs it downloads by address to be pinned, or
  *  null: of the audit's `entries` covering `f` that audit what may be a program, each names its version (`bare`, those
  *  that do not), but one of kind "distribution" whose package a line of `f` installs (installs), and for each download
  *  the file holds a checksum of its own and a check by a
  *  command of VERIFIER (`deficit`, the downloads short of one). The scan and the sync's step (steps.mjs) read it alike. */
 export function pinFault(entries, auditPath, f, code) {
-  const tools = entries.filter((e) => e && typeof e === "object" && (covers(e, f) || fetchesIn(e, f).length) && !NO_PROGRAM.has(e.kind)), count = downloads(code).length;
+  const tools = entries.filter((e) => mayBeProgram(e, f)), count = downloads(code).length;
   if (!tools.length || !count) return null;
   const bare = tools.filter((e) => !(e.kind === DISTRIBUTION && installs(code, e.name)) && (typeof e.version !== "string" || !e.version.trim())).map((e) => e.name);
   // (which check a download meets is left to the review, since reading that needs a reader of the shell's data flow)
