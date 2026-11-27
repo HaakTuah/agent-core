@@ -112,7 +112,7 @@ ok(open(r, null, "2026-11-02").at === "2026-11-02" && r.prunings.length === 3, "
   const days = ["2026-11-01", "2026-11-04", "2026-11-08", "2026-11-12", "2026-11-16", "2026-11-20"];
   const steps = days.map((day, i) => ({ day, subject: `A change (#${i + 1})`, files: { "rules.md": `**Early rule** holds, ${i}.\n${i >= 4 ? "**Fresh rule** holds.\n" : ""}` } }));
   const h = scratchHistory("pruning-shallow-", steps), early = { lead: "Early rule" }, fresh = { lead: "Fresh rule" };
-  const whole = h.clone("whole"), cut = h.clone("cut", "--depth", "3");
+  const whole = h.clone("whole"), cut = h.clone("cut", 3);
   ok(joinedIn(early, whole) === 6 && joinedIn(fresh, whole) === 2, "in a whole clone each rule counts the merged pull requests since it joined", `${joinedIn(early, whole)} / ${joinedIn(fresh, whole)}`);
   let thrown = "";
   try { joinedIn(early, cut); } catch (e) { thrown = e.message; }

@@ -47,9 +47,100 @@ export const WINDOWS_FETCHER = (() => {
     "imu",
   );
 })();
+// A git clone written as a program and its array of arguments whose source reads exactly as local, which opens no
+// connection and downloads nothing (#1437): its arguments all strings, but an option's value and, after "--", the folder
+// it clones to; its options among those below, none that reaches past the source (submodules, a config that rewrites an
+// address); its source a file:// address, or a path with no ":" (no scheme, no host:path, no transport::), or one that
+// starts with "/", "./" or "../" before anything held in a variable; and its call closed after the array, or after an
+// object of options that sets no environment. Anything else the scan cannot read exactly, and stays a fetch.
+const CLONE_FLAGS = new Set(["-q", "--quiet", "-v", "--verbose", "--progress", "-n", "--no-checkout", "--bare", "--mirror", "--single-branch", "--no-single-branch", "--no-tags", "-l", "--local", "--no-local", "--no-hardlinks", "-s", "--shared"]);
+const CLONE_VALUED = new Set(["--depth", "--shallow-since", "--shallow-exclude", "-b", "--branch", "-o", "--origin"]);
+// The place of the quote that closes the string or template opening at text[i] (its escapes and ${} read past), or -1.
+function stringEnd(text, i) {
+  const q = text[i];
+  for (i++; text[i] !== q; i++) {
+    if (i >= text.length || (q !== "`" && text[i] === "\n")) return -1;
+    if (text[i] === "\\") i++;
+    else if (q === "`" && text.startsWith("${", i)) { i = exprEnd(text, i + 2); if (i < 0 || text[i] !== "}") return -1; }
+  }
+  return i;
+}
+// The place where the expression at text[i] ends: the "," or closing bracket at its own depth (its strings and
+// templates read past), or -1 where it cannot be read exactly (a comment or a "/" outside a string, no end).
+function exprEnd(text, i) {
+  const depth = [];
+  for (; i >= 0 && i < text.length; i++) {
+    const ch = text[i];
+    if (!depth.length && ",)]}".includes(ch)) return i;
+    if ("'\"`".includes(ch)) i = stringEnd(text, i);
+    else if (ch === "/") return -1;
+    else if ("([{".includes(ch)) depth.push(")]}"["([{".indexOf(ch)]);
+    else if (")]}".includes(ch) && depth.pop() !== ch) return -1;
+  }
+  return -1;
+}
+// What an argument written as `source` is: a string ("text", its value), a template ("template", its text before any
+// ${}; "text" where it holds none), a spread, or anything else; a backslash leaves it unread, so "other".
+function argument(source) {
+  const string = /^(?:"([^"\\\n]*)"|'([^'\\\n]*)')$/u.exec(source), template = /^`([^`\\]*)`$/u.exec(source);
+  if (string) return { kind: "text", value: string[1] ?? string[2] };
+  if (template) return template[1].includes("${") ? { kind: "template", head: template[1].slice(0, template[1].indexOf("${")) } : { kind: "text", value: template[1] };
+  return { kind: source.startsWith("...") ? "spread" : "other" };
+}
+// The arguments of an array that opens at text[i], and the place after its "]", or null where one cannot be read.
+function arrayAt(text, i) {
+  const out = [];
+  for (i++; ; ) {
+    while (/\s/u.test(text[i] ?? "")) i++;
+    if (text[i] === "]") return { args: out, end: i + 1 };
+    const end = exprEnd(text, i);
+    if (end < 0 || !/^[,\]]$/u.test(text[end])) return null;
+    out.push(argument(text.slice(i, end).trim()));
+    i = text[end] === "," ? end + 1 : end;
+  }
+}
+const localSource = (a) => (a.kind === "text" && a.value !== "" && !/[:\n]/u.test(a.value) && !/^(?:-|\/\/|\\\\)/u.test(a.value)) ||
+  (a.kind === "template" && (a.head.startsWith("file://") || /^(?:\/(?!\/)|\.\.?\/)/u.test(a.head)));
+// How many arguments the option args[k] takes, itself and its value, or 0 where it is none of those above.
+function optionAt(args, k) {
+  const { value } = args[k];
+  if (CLONE_FLAGS.has(value) || (value.startsWith("--") && value.includes("=") && CLONE_VALUED.has(value.split("=")[0]))) return 1;
+  return CLONE_VALUED.has(value) && args[k + 1] && args[k + 1].kind !== "spread" ? 2 : 0;
+}
+// Whether a, the folder a clone writes to, cannot be read as an option: anything after "--"; before it, a string or a
+// template that does not start with "-".
+const notOption = (a, ended) => ended || (a.kind === "text" ? a.value !== "" : a.kind === "template" && /^[^-]/u.test(a.head));
+// Whether the arguments of a clone, after "clone", read exactly as one of a local source (above).
+function localArguments(args) {
+  let source = null, folder = false, ended = false;
+  for (let k = 1; k < args.length; k++) {
+    const a = args[k], option = !ended && a.kind === "text" && a.value.startsWith("-");
+    if (a.kind === "spread") return false;
+    if (option && a.value === "--") ended = true;
+    else if (option) { const n = optionAt(args, k); if (!n) return false; k += n - 1; }
+    else if (source === null) { if (!localSource(a)) return false; source = a; }
+    else if (folder || !notOption(a, ended)) return false;
+    else folder = true;
+  }
+  return source !== null;
+}
+// Whether the call whose array of arguments ends at text[end] closes there, or after an object of options that sets no
+// environment.
+function callCloses(text, end) {
+  const after = /^\s*(?:\)|,\s*)/u.exec(text.slice(end));
+  if (!after || after[0].trim() === ")") return Boolean(after);
+  const at = end + after[0].length, close = text[at] === "{" ? exprEnd(text, at) : -1, options = text.slice(at, Math.max(at, close));
+  return close > 0 && options.trim().endsWith("}") && !/\benv\b|\.\.\.|GIT_/u.test(options) && /^\s*,?\s*\)/u.test(text.slice(close));
+}
+// Whether the match m of OTHER_FETCHER is a clone by git, written as an array, whose source reads exactly as local (above).
+function localClone(text, m) {
+  if (!/^['"`](?:[^'"`\s]*[/\\])?git['"`]\s*,\s*\[\s*['"`]clone$/u.test(m[0])) return false;
+  const array = arrayAt(text, m.index + m[0].lastIndexOf("["));
+  return Boolean(array) && array.args[0]?.value === "clone" && localArguments(array.args) && callCloses(text, array.end);
+}
 // Each fetch in text by a fetcher the scan cannot read, as the two readers above find them: their matches, each place
-// once, in the order they stand.
-const matches = (text) => [...new Map([OTHER_FETCHER, WINDOWS_FETCHER].flatMap((re) => [...text.matchAll(new RegExp(re.source, `${re.flags}g`))]).map((m) => [m.index, m])).values()].sort((a, b) => a.index - b.index);
+// once, in the order they stand, but a git clone of a local source (localClone).
+const matches = (text) => [...new Map([OTHER_FETCHER, WINDOWS_FETCHER].flatMap((re) => [...text.matchAll(new RegExp(re.source, `${re.flags}g`))]).map((m) => [m.index, m])).values()].filter((m) => !localClone(text, m)).sort((a, b) => a.index - b.index);
 // The line in text that holds the place i, with the lines that run on to it and those it runs on to (after a "\\" or
 // PowerShell's "`" at a line's end).
 function runOn(text, i) {
