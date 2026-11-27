@@ -11,7 +11,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { RUNS, RUNS_TOO } from "../scripts/comment-only.mjs";
+import { RUNS, RUNS_TOO } from "../scripts/runs-by-itself.mjs";
 import { BASE, edit } from "../scripts/comment-only-stage.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -39,7 +39,7 @@ const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encodin
 const write = (dir, f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
 const origin = path.join(tmp, "origin.git"), work = path.join(tmp, "work");
 git(tmp, "init", "-q", "--bare", "-b", "main", origin);
-git(tmp, "clone", "-q", origin, work);
+execFileSync("git", ["clone", "-q", "--", ".", work], { cwd: origin, stdio: ["ignore", "pipe", "pipe"] });
 const WF = ".github/workflows/t.yml";
 write(work, WF, BASE);
 write(work, ".claude/settings.json", "{}\n");

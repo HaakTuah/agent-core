@@ -1,8 +1,8 @@
 - `scripts/pr-description.mjs`, `scripts/pr-cost.mjs`, `scripts/pr-head.mjs`, `scripts/pr-number.mjs`, `scripts/pr-reads.mjs`, `scripts/pr-reasons.mjs`, `scripts/pr-waits.mjs`, `tests/pr-description-entries-test.mjs`, `tests/pr-description-reads-test.mjs`, `tests/pr-description-reasons-test.mjs`, `tests/pr-description-yes-test.mjs`, `.github/workflows/pr-description.yml`, `.github/workflows/own-description.yml`, `tests/own-description-test.mjs`,
   `scripts/milestones.mjs`, `scripts/done-when.mjs`, `scripts/owner-yes.mjs`, `scripts/path-only.mjs`,
-  `scripts/meaning-kept.mjs`, `scripts/weakened.mjs`, `tests/weakened-test.mjs`, `tests/path-only-test.mjs`: fail a ready pull request whose
+  `scripts/meaning-kept.mjs`, `scripts/weakened.mjs`, `tests/weakened-test.mjs`, `tests/path-only-test.mjs`, `scripts/before-ready.mjs`, `tests/before-ready-test.mjs`: fail a ready pull request whose
   description lacks a heading the project names, and, here, the lines the core asks, a test file weakened among them
-  (#307), and an archive key its head does not hold or a placeholder left in (#1136), saying so of a draft. *Runs:* the
+  (#307), and an archive key its head does not hold or a placeholder left in (#1136), saying so of a draft; a builder runs them, and the size check, on its own machine before ready (`before-ready.mjs`; #1413, point 6). *Runs:* the
   runners, where the description is; any session given it. *Else:* Danger JS (MIT), its rules written in JavaScript and
   run with a token, dropped on a measure: 14.1.0 installs 86 packages (34 MB), and the check's rules, the headings and
   lines the core asks, would be written again in its file, Danger giving only the description the workflow already

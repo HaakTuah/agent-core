@@ -195,13 +195,13 @@ if (p.status === 0) {
   git(p.dir, "rm", "-q", "-f", "--cached", "big.md");
   fs.rmSync(path.join(p.dir, "big.md"));
   fs.writeFileSync(marksAt, marksWas);
-  ok(unlisted.status === 1 && /big\.md is \d+ bytes, past the 51200-byte mark.*Mend: ask in what ways it could be split so that someone reads less/.test(unlisted.stderr) && mended(unlisted.stderr)
-    && bare.status === 1 && /big\.md is listed under "past" .* with no reason it stays whole/.test(bare.stderr) && mended(bare.stderr)
-    && grown.status === 1 && /grown more than a quarter past its mark/.test(grown.stderr) && mended(grown.stderr),
-    "a changed file past the split mark with no line, a line with no why, or one grown a quarter past its mark fails, saying its mend", `${unlisted.stderr}${bare.stderr}${grown.stderr}`);
-  ok(kept.status === 0 && within.status === 0 && issue.status === 0, "a line that says why the file stays whole, or names the split's issue, passes, its file grown less than a quarter past its mark too", `${kept.stderr}${within.stderr}${issue.stderr}`);
-  ok(stood.status === 0 && /big\.md is listed under "past" .* with a mark alone: when next you change its line/.test(stood.stdout + stood.stderr) && stoodGrown.status === 1 && /big\.md is \d+ bytes, past its mark of \d+/.test(stoodGrown.stderr) && mended(stoodGrown.stderr),
-    "a line of a mark alone that stood on the base passes while its file is within it, noted, and fails, as before, once the file grows past it", `${stood.stdout}${stood.stderr}${stoodGrown.stderr}`);
+  // (each fails nothing: the question is noted, with what answers it, and the scheduled look keeps it; #1413, point 6)
+  const asks = (r, why) => r.status === 0 && !/FAIL/.test(r.stderr) && new RegExp(`big\\.md is \\d+ bytes, past the 51200-byte mark, and this PR changes it, which fails nothing: ${why}\\. Mend: ask in what ways it could be split so that someone reads less`).test(r.stdout);
+  ok(asks(unlisted, 'it has no line under "past"') && asks(bare, 'its line under "past" is a mark alone, with no why') && asks(grown, 'it has grown more than a quarter past its mark of \\d+ under "past"'),
+    "a changed file past the split mark with no line, a line with no why, or one grown a quarter past its mark fails nothing, its question noted with its mend", `${unlisted.stdout}${unlisted.stderr}${bare.stdout}${grown.stdout}`);
+  ok(kept.status === 0 && within.status === 0 && issue.status === 0 && ![kept, within, issue].some(r => /which fails nothing/.test(r.stdout)), "a line that says why the file stays whole, or names the split's issue, passes and asks nothing, its file grown less than a quarter past its mark too", `${kept.stderr}${within.stderr}${issue.stderr}`);
+  ok(stood.status === 0 && /big\.md is listed under "past" .* with a mark alone: when next you change its line/.test(stood.stdout + stood.stderr) && asks(stoodGrown, 'it has grown past its mark alone, \\d+, under "past"'),
+    "a line of a mark alone that stood on the base passes while its file is within it, noted, and once the file grows past it its question is noted, failing nothing", `${stood.stdout}${stood.stderr}${stoodGrown.stdout}${stoodGrown.stderr}`);
   ok(raised.status === 0 && /big\.md: this PR raises its mark under "past" .* from \d+ to \d+, so the question is asked again/.test(raised.stdout + raised.stderr), "a mark this pull request raises on a line that stood is noted, so the reviews read its why again", `${raised.stdout}${raised.stderr}`);
   // (a copy the project adds fails the copies check, and each failure says its mend)
   undo = grow("AGENTS.md", 0);
