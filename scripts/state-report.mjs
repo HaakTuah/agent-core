@@ -287,13 +287,27 @@ function countsOf(gh, name, r, own) {
 // Only GitHub's answer that the manifest is not there (404) reads as "not a project"; any other failure (an outage, no
 // sign-in) throws, so that a reading that could not be taken is never taken for none (#1112).
 export function rowOf(gh, account, name, r) {
-  if (name.toLowerCase() === CORE.toLowerCase()) return null;
-  let manifest;
-  try { manifest = Buffer.from(parseBounded(gh(`repos/${name}/contents/core-manifest.md`)).content ?? "", "base64").toString("utf8"); } catch (e) { if (/\(HTTP 404\)\s*$/.test(String(e?.message).trim())) return null; throw e; }
-  if (!pinOf(manifest) || (r.shared && !SHARES.test(manifest))) return null;
+  if (!takesCore(gh, name, r)) return null;
   const own = String(r.owner).toLowerCase() === account.toLowerCase();
   const shown = shownAs(name, own, r.private);
   return `- ${shown}: ${countsOf(gh, name, r, own)}.`;
+}
+
+// Whether a repository found is a project of the core: not the core, its manifest pins a copy, and, where it was found
+// by its row alone, the row says it shares its counts; a failure but 404 throws (rowOf, above).
+function takesCore(gh, name, r) {
+  if (name.toLowerCase() === CORE.toLowerCase()) return false;
+  let manifest;
+  try { manifest = Buffer.from(parseBounded(gh(`repos/${name}/contents/core-manifest.md`)).content ?? "", "base64").toString("utf8"); } catch (e) { if (/\(HTTP 404\)\s*$/.test(String(e?.message).trim())) return false; throw e; }
+  return Boolean(pinOf(manifest)) && (!r.shared || SHARES.test(manifest));
+}
+
+// The owner's own projects, by full name, as --projects finds them: of the repositories named, or else all the account
+// reaches, those it owns whose manifest pins a copy of the core (scripts/trial-brief.mjs; #1413, point 1). A failure
+// of gh throws, never read as none.
+export function ownTakers(named = [], gh = ghApi) {
+  const account = gh("user", "--jq", ".login").trim();
+  return [...reached(gh, account, named)].filter(([name, r]) => String(r.owner).toLowerCase() === account.toLowerCase() && takesCore(gh, name, r)).map(([name]) => name);
 }
 
 // --projects: each project the account reaches, with its kind and the counts from its own newest state report.
