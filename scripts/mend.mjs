@@ -34,8 +34,8 @@ export function unmended(output) {
 
 // Each script a mend names to run (`node <path>`, the path written out, not a placeholder) whose file is not there from
 // the folder `from`: "<path> (in: <the failure>)" each. A path the same line tests for first (`[ -f <path> ]`) is
-// there or not by design, as the guarded install is, and is not read.
-const RUN = /\bnode\s+((?:\.{1,2}\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:mjs|cjs|js|sh))(?=$|[\s`'"),;:]|\.(?:\s|$))/gu;
+// there or not by design, as the guarded install is, and is not read. A path may be relative, absolute or in quotes (#1488).
+const RUN = /\bnode\s+["'`]?((?:\/|[A-Za-z]:\/|\.{1,2}\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:mjs|cjs|js|sh))(?=$|[\s`'"),;:]|\.(?:\s|$))/gu;
 export function missing(output, from) {
   const gone = [];
   for (const line of failures(output)) {
