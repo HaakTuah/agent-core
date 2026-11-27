@@ -39,7 +39,7 @@ where that tool is not at hand, to the next it names:
   sign as `tasks/reviews.md`, point 2, says. Whoever hands out the role (the orchestrator, or the session that needs
   the review) takes the next.
 - It does not mean that any tool is refused a role: a preference orders and never refuses, and a project with one tool
-  runs every role with it. Nor does it mean that a session judges what it wrote (below).
+  runs every role with it.
 - Reason: where only one tool might take a role, the work stopped when that provider's usage ran out, and an owner
   with another tool alone could fill none.
 - Held by nothing yet: which tool took a role leaves no mark a check reads.
