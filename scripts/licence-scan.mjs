@@ -244,6 +244,17 @@ function pinned(c, f, text) {
   else c.fail(`${said}. Mend: ${fault.mend}`);
 }
 
+/** What the file `f`, holding `text`, fetches, held (scanned, below), and where its readers cannot follow it, a
+ *  failure: strings and templates nested some thousands deep run them out of stack, so the file fails, named, with its
+ *  mend, where the check stopped with the bare error (#1496). */
+function fetchesRead(c, f, text) {
+  try { unaudited(c, f, byKind(c, f, text)); pinnedIfRead(c, f, text); }
+  catch (e) {
+    if (!(e instanceof RangeError && /call stack/u.test(e.message))) throw e;
+    c.fail(`${f} nests its strings, templates or brackets too deep for the scan to read, so what it fetches cannot be read. Mend: write ${f} with them nested less deep, each one it opens closed`);
+  }
+}
+
 /** The scan of one tracked file `f` (scan, above): by what it is, and for a licence notice it carries. */
 function scanned(c, f) {
   if (LOCKFILE.test(f) && !c.lockfiles.includes(f)) {
@@ -253,8 +264,7 @@ function scanned(c, f) {
     else c.fail(said);
   }
   const text = c.binary.has(f) ? "" : trackedText(c.root, f, c.fail);
-  unaudited(c, f, byKind(c, f, text));
-  pinnedIfRead(c, f, text);
+  fetchesRead(c, f, text);
   // (a notice in any file but prose, the notices a project writes itself among them: code copied in, in any language)
   if (!c.binary.has(f) && !PROSE_FILE.test(f) && NOTICE.test(text)) needFile(c, f, "a file carrying a licence notice", { own: false });
   if (ASSET.test(f) || c.binary.has(f)) needFile(c, f, c.binary.has(f) && !ASSET.test(f) ? "a binary file" : "a font, image, sound, video, model or data file");
