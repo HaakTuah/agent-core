@@ -27,7 +27,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      line, `tests/tools-read-test.mjs`; and for the order's own reading of names and asks, `tests/stage-order-test.mjs`.
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
-     the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
+     the selection of tests (`scripts/select.mjs`, its reader of the folders a file lists `scripts/select-folders.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
      a pull request adds under its manifest's "Differences" (`scripts/pr-reasons.mjs`), the numbers of the entries of
      `scripts/holders/` it adds or changes (`scripts/pr-number.mjs`, which reads a tree's regular files alone in four
      calls of git whatever their count, a link or a submodule refused with its mend), the rule files a checkout
@@ -52,7 +52,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      (`scripts/tree-walk.mjs`), while of JavaScript and TypeScript it gives the parser nothing, reading their imports
      without it; and of all the files a pull request changes together, 4,000,000 characters and 1.5 s of reading, of any
      one file of JavaScript, TypeScript or Python it leaves as it was, 4,000,000 characters, 1.5 s to link the files and follow
-     the links from each test, and 3 s for the whole of it, the project's own files read too, past which the selection
+     the links from each test, a string a file that lists a folder holds past twice the longest path and 64 more read as naming none, and 3 s for the whole of it, the project's own files read too, past which the selection
      reads no more and runs the whole suite (`scripts/hurry.mjs`); hostile tests: `tests/hostile-pr-changes-test.mjs`, and for the entries' numbers,
      `tests/pr-description-entries-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and

@@ -43,6 +43,7 @@
 //   node scripts/pruning.mjs --record --repo <owner/name> [--model <id>] [--owner <login>]
 //                                                          the counts of the span since the last pruning, read through
 //                                                          gh and written into the pruning in progress, which ends it
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -77,7 +78,7 @@ async function setCmd(argv) {
   const core = fs.mkdtempSync(path.join(os.tmpdir(), "pruning-core-"));
   try {
     // (with no origin, the kit holds the pin to no main: the commit that takes the rules out stands on none)
-    git(["clone", "--quiet", ROOT, core]);
+    execFileSync("git", ["clone", "--quiet", "--", ".", core], { cwd: ROOT, stdio: ["ignore", "pipe", "ignore"] });
     git(["remote", "remove", "origin"], core);
     const all = rules(core, { agents: true }), cut = without(got.c.holds, all, f => fs.readFileSync(path.join(core, f), "utf8"));
     if (cut.missing.length) return fail(`${got.c.name} holds rules that no longer stand: ${cut.missing.join("; ")}. Mend: bring the case's list of rules up to date in scripts/staged/${got.c.name}.mjs, in a pull request of its own`);

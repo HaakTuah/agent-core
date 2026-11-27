@@ -73,6 +73,9 @@ export function addHook(state, file, { tool, event, matcher, given = matcher, ho
   state.shapes.set(name, kinds);
   state.add(name, id);
   state.tools.set(name, file);
+  // (a name two hooks share keeps both one's commands and whether every one of them is a command)
+  const was = state.runs?.get(name);
+  state.runs?.set(name, { runs: runs && (was?.runs ?? true), commands: [...(was?.commands ?? []), ...commands] });
   // (the starter kit's own hooks too: they are in its form, and what they fetch must be no link, as any hook's)
   readSource(state, name, commands);
 }

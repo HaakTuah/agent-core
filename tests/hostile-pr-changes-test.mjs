@@ -237,6 +237,10 @@ const together = (key, what, files, whole = true) => {
 };
 // (and the linking of each file to the files whose names it holds, which took time in step with the count of files times their
 // text, and the search from each test: the answer is the whole suite where the pace is passed, else the tests it selects)
+// (a test that lists a folder, in a tree of deep paths, holding a string of 300,000 folders in and as many `..` out:
+// the folder reader's work stays in step with the text and the paths, where it took 5 s; #1361, point 25; Windows
+// holds no path 2,000 characters long)
+if (NAMES) together("listing", "a listing test holding a string of 750,000 characters, beside 300 paths 1,000 folders deep", { "test/list.test.mjs": `fs.readdirSync(".");\n"${"a/".repeat(150000)}${"../".repeat(150000)}";\n`, ...Object.fromEntries(Array.from({ length: 300 }, (_, n) => [`${"d/".repeat(1000)}f${n}.js`, "1;\n"])) }, false);
 together("many-mid", "2300 files of 1,500 characters, under the limit in characters", Object.fromEntries(Array.from({ length: 2300 }, (_, n) => [`src/f${n}.js`, `export const v = "${" f1.j".repeat(300)}";\n`])), false);
 together("one-long", "4000 small files and one of 3.8 million characters", { ...Object.fromEntries(Array.from({ length: 4000 }, (_, n) => [`src/g${n}.js`, `export const v = ${n};\n`])), "src/long.js": `export const v = "${"a ".repeat(1_900_000)}";\n` }, false);
 together("tests-naming", "700 test files that each name the 699 others", Object.fromEntries(Array.from({ length: 700 }, (_, n) => [`test/t${n}.js`, `export const v = "${Array.from({ length: 700 }, (_, k) => `t${k}.js`).join(" ")}";\n`])), false);
@@ -263,7 +267,7 @@ const large = (key, what, files, change, said1) => {
   fs.writeFileSync(envFile, "");
   const from = Date.now(), timed = spawnSync(process.execPath, [path.join(root, "scripts", "select.mjs"), "--env", "RUN"], { cwd: p, env: { ...env, SELECT_BASE: base, GITHUB_ENV: envFile }, encoding: "utf8", maxBuffer: 1 << 28, timeout: 5000 });
   console.log(`     ${key}: ${Date.now() - from} ms`);
-  ok(timed.status === 0 && !raw(`${timed.stdout}${timed.stderr}`) && said() === said1, `select: ${what}, within 5 s`, `${timed.signal ?? ""}${timed.stderr}${said()}`);
+  ok(timed.status === 0 && !raw(`${timed.stdout}${timed.stderr}`) && (said1 instanceof RegExp ? said1.test(said()) : said() === said1), `select: ${what}, within 5 s`, `${timed.signal ?? ""}${timed.stderr}${said()}`);
 };
 const jsUnit = (i, j) => `export function f${i}x${j}(a, b) { return a > b ? [a, b].map(x => x * ${j}) : { a, b }; }\n`;
 large("own-js", "a project of 300 files of JavaScript, 6.5 million characters, one changed, selects the test that reaches it",
@@ -273,6 +277,13 @@ const pyUnit = j => `def f${j}(a, b=None):\n    if a > b:\n        return [x * $
 large("own-py", "a project of 600 files of Python, 6.9 million characters, one changed, past what can be read in time, runs the whole suite",
   Object.fromEntries(Array.from({ length: 600 }, (_, i) => [`src/py/m${i}.py`, `import os\n\n${Array.from({ length: 110 }, (_, j) => pyUnit(j)).join("")}`])),
   () => fs.appendFileSync(path.join(p, "src/py/m0.py"), "MORE = 1\n"), "RUN=all\n");
+// (C#, end to end: a .props git holds beside the config, of 150,000 <Using> items, and a file of C# read at the base
+// through git show and changed to 22,000 open aliases, is read in time: it selects the test that reaches the file, or on a
+// slow runner passes the budget and runs the whole suite; select-test.mjs times each against the code before; #675)
+large("own-cs", "a project of C# whose .props holds 150,000 <Using> items, a file changed to 22,000 open aliases, selects its test or runs the whole suite",
+  { "src/App.csproj": "<Project />\n", "Directory.Build.props": `<Project><ItemGroup>${'<Using Include="A" />'.repeat(150_000)}</ItemGroup></Project>\n`,
+    "src/Evil.cs": "namespace App;\nclass Evil {}\n", "test/EvilTest.cs": "namespace App;\nclass EvilTest { Evil e; }\n" },
+  () => write("src/Evil.cs", `${"using A=(".repeat(22_000)};\nnamespace App;\nclass Evil {}\n`), /^RUN=(all|.*EvilTest.*)\n$/u);
 large("own-huge", "a file of JavaScript of 20 million characters the pull request leaves as it was, past what one read may take, runs the whole suite",
   { "src/vendor.js": SLOWEST["src/list.js"](20_000_000) }, () => fs.appendFileSync(path.join(p, "src/a.mjs"), "export const more = 1;\n"), "RUN=all\n");
 branch("sel-after-large", () => {});

@@ -17,7 +17,8 @@ import { readKiro } from "./agent-tools-kiro.mjs";
 import { pinsOf } from "./agent-tools-pins.mjs";
 
 // The tools a project's files configure, as "kind name" keys, each with the file that configures it; the problems met
-// reading them; `sources`, each hook that does not run its copy on main, with why (readSource()). `read(file)` gives a
+// reading them; `sources`, each hook that does not run its copy on main, with why (readSource()); `runs`, each hook's
+// commands, and whether it is a command at all. `read(file)` gives a
 // file's text or null; `skills()` the names of the folders under .claude/skills/ that hold a SKILL.md; `files(dir)` the
 // names in a folder of the project (here .kiro/hooks); `linked(path)` whether the project, or main, holds a path as a
 // link; `inLibrary(library, path)` what the commit that main pins of a library holds at a path of it: "file", "other"
@@ -27,10 +28,10 @@ export function configured(read, skills, files = () => [], linked = () => false,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
   // (`texts`: each problem met reading a file, with that file's text, so one the base held as it stands can be told)
   // (`baselined`: those a project may hold, noted where there is no base to read against, as a pin is)
-  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map(), baselined = new Set(), unread = new Set(), notRead = new Set();
+  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map(), baselined = new Set(), unread = new Set(), notRead = new Set(), runs = new Map();
   const flag = (problem, file, text = read(file)) => { problems.push(problem); texts.set(problem, `${file}\0${text}`); };
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
-  const state = { tools, problems, texts, baselined, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, linked, unread, notRead, inLibrary };
+  const state = { tools, problems, texts, baselined, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, linked, unread, notRead, inLibrary, runs };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -68,7 +69,7 @@ export function configured(read, skills, files = () => [], linked = () => false,
   for (const file of markdown()) { readFrontmatter(state, file, read(file)); if (/^\.claude\/commands\//iu.test(file.normalize("NFC"))) readShell(state, file, read(file)); }
   readKiro(state, json, files);
   readCodex(state, json, read);
-  return { tools, ids, problems, texts, baselined, sources, unread, notRead, pins: pinsOf(plugins, markets, servers) };
+  return { tools, ids, problems, texts, baselined, sources, unread, notRead, runs, pins: pinsOf(plugins, markets, servers) };
 }
 // What a plug-in's marketplace declares of it, for its id: the source, or of a "settings" source its own fields and the
 // entries of this plug-in's name.

