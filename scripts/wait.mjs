@@ -17,6 +17,7 @@ import { timeOf } from "./moment.mjs";
 import { ghApi } from "./labels.mjs";
 import { notLinked, parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
+import { named as asNamed } from "./mend.mjs";
 
 class Refused extends Error {}
 const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
@@ -97,7 +98,7 @@ function main(argv) {
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, rest = named ? argv.slice(1) : argv;
   const opt = k => { const i = rest.indexOf(k); return i >= 0 ? rest[i + 1] : undefined; };
   const repo = opt("--repo"), count = Number(opt("--count") ?? COUNT);
-  if (!aRepository(repo) || !(Number.isInteger(count) && count > 0)) refuse("no repository was named, or the count is no whole number", "run node core/scripts/wait.mjs [<config>] --repo <owner>/<name> [--count <n>]");
+  if (!aRepository(repo) || !(Number.isInteger(count) && count > 0)) refuse("no repository was named, or the count is no whole number", `run node ${asNamed(import.meta.url)} [<config>] --repo <owner>/<name> [--count <n>]`);
   const rules = ["core-manifest.md", "AGENTS.md"].find(f => fs.existsSync(f)), at = named ?? where(rules ? fs.readFileSync(rules, "utf8") : "");
   let mark;
   try { mark = fs.existsSync(notLinked(at)) ? parseConfig(fs.readFileSync(at, "utf8"), at).wait : undefined; } catch { mark = undefined; }

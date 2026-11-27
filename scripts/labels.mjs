@@ -223,8 +223,8 @@ const fail = msg => { console.error(`FAIL: ${msg}`); return 1; };
 
 // The wrong option given, as the words of its failure, or null where the options are right.
 function optionError(args, at, by, since) {
-  if (at >= 0 && !/^\d{4}-\d\d-\d\d(?:T\d\d:\d\d:\d\dZ)?$/.test(since ?? "")) return "--since needs a date after it, as 2026-11-16 or 2026-11-16T00:00:00Z";
-  if (by >= 0 && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(args[by + 1] ?? "")) return "--owner needs the owner's account after it";
+  if (at >= 0 && !/^\d{4}-\d\d-\d\d(?:T\d\d:\d\d:\d\dZ)?$/.test(since ?? "")) return "--since needs a date after it, as 2026-11-16 or 2026-11-16T00:00:00Z. Mend: give the day after --since, as 2026-11-16, or leave --since out";
+  if (by >= 0 && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(args[by + 1] ?? "")) return "--owner needs the owner's account after it. Mend: give the account's login after --owner, letters, digits and hyphens alone, or leave --owner out";
   return null;
 }
 
@@ -259,7 +259,7 @@ function main(args) {
   const bad = optionError(args, at, by, since);
   if (bad) return fail(bad);
   const below = spawnSync("git", ["rev-parse", "--show-prefix"], { encoding: "utf8" });
-  if (below.status !== 0 || below.stdout.trim() !== "") return fail("run it from the root of the project's git repository");
+  if (below.status !== 0 || below.stdout.trim() !== "") return fail("run it from the root of the project's git repository. Mend: change to the folder git rev-parse --show-toplevel prints, and run it there");
   const repo = repoOf(spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout);
   if (!repo) { console.log("The labels and openers were not read: the repository's origin is not on github.com, so it has no labels; the inbox's files carry state and sender as two lines (core/scripts/inbox.mjs)."); return 0; }
   let manifest = "";

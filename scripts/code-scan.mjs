@@ -36,8 +36,7 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { copyAside } from "./core-path.mjs";
 import { leadsOut, logged } from "./guards.mjs";
-import { MEND } from "./mend.mjs";
-import { started } from "./started.mjs";
+import { MEND, guard } from "./mend.mjs";
 import { pypiFile, pypiNotInstalled, pypiUnreached } from "./packages.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 
@@ -283,7 +282,7 @@ export function scan(root, { base = null, description = "", dir = null } = {}) {
   return { lines: [...lines, ...failing], failed: failing.length > 0 };
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const args = process.argv.slice(2);
   const opt = name => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
   const base = opt("--base") || null;

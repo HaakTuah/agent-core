@@ -82,7 +82,7 @@ import { copyHeld } from "./core-path.mjs";
 import { RUNS } from "./comment-only.mjs";
 import { mayRun } from "./power.mjs";
 import { blockingOf } from "./review-lines.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
 
 export const CODEX = "chatgpt-codex-connector[bot]";
 export const DEPENDABOT = "dependabot[bot]";
@@ -479,7 +479,7 @@ export function status(verdict, advisory, url, context = CONTEXT) {
   return { state, description, context, ...(typeof url === "string" && /^https:\/\/[\w./-]{1,200}$/u.test(url) ? { target_url: url } : {}) };
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const [pullFile, commentsFile, reviewCommentsFile, commitsFile, filesFile, mergesFile] = process.argv.slice(2);
   if (!pullFile || !commentsFile) {
     console.error("usage: node scripts/security-review.mjs <the pull request, as JSON> <its comments, as JSON> [<its review comments, as JSON> [<its commits, as JSON> [<its files, as JSON> [<the merges clean-merges.mjs proved, as JSON>]]]]");

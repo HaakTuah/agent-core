@@ -57,7 +57,7 @@ import { csharpReach, undeclared } from "./select-csharp.mjs";
 import { CS, heldBeside, ofNoProject, tooMuch } from "./select-csharp-project.mjs";
 import { git, passedWhole } from "./select-passed.mjs";
 import { isCode } from "./shape-readers.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
 
 class Refused extends Error {}
 const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
@@ -308,7 +308,7 @@ async function main(argv) {
   return 0;
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   try { process.exitCode = await main(process.argv.slice(2)); }
   catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${loggedAlone(e.message)}`); process.exitCode = 1; }
 }

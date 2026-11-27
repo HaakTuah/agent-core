@@ -77,10 +77,10 @@ function ownCopy(text) {
 // sync.
 function targetOf({ manifest, text, old, first, at }, tmp) {
   const arg = process.argv[2];
-  if (arg && !/^[0-9a-f]{40}$/.test(arg)) fail("give the core's commit as a full SHA");
+  if (arg && !/^[0-9a-f]{40}$/.test(arg)) fail("the commit given is no full SHA. Mend: give the core's commit as its 40 hex characters (git rev-parse <it>), or give none to take what the manifest follows");
   const pin = arg ?? (first ? old : null);
   if (pin) return { pin, release: "" };
-  const follows = followsOf(text, hostSaid()) ?? fail(`${manifest} does not say what the project follows: its *follows* row is \`main\` or \`releases\`, once, or left out where the owner's account is read: its one row, or the repository's own account where the host says a person holds it`);
+  const follows = followsOf(text, hostSaid()) ?? fail(`${manifest} does not say what the project follows: its *follows* row is \`main\` or \`releases\`, once, or left out where the owner's account is read: its one row, or the repository's own account where the host says a person holds it. Mend: write the manifest's *follows* row once, as \`main\` or \`releases\`, taking out any other`);
   if (follows === "main") return greenToTake({ old, at }, tmp);
   return releaseToTake({ text, old, at }, tmp);
 }
@@ -193,9 +193,9 @@ function sync(tmp) {
   const manifest = "core-manifest.md";
   // (read as the steps read it: own-files.mjs; one that is no regular file of the project's own is none)
   let own;
-  try { own = ownFiles("."); } catch { fail(`run it from a project's root, a git repository, beside ${manifest}`); }
+  try { own = ownFiles("."); } catch { fail(`it was not run from a project's root, a git repository, beside ${manifest}. Mend: change to the folder of the project's clone that holds ${manifest}, and run it there`); }
   const text = own.read(manifest, true);
-  if (text === null) fail(`run it from a project's root, beside ${manifest}, a regular file of the project's own of at most ${READ_MOST} bytes`);
+  if (text === null) fail(`${manifest} is not read here: it was not run from a project's root beside ${manifest}, a regular file of the project's own of at most ${READ_MOST} bytes. Mend: change to the folder of the project's clone that holds ${manifest}, and run it there`);
   const line = ownCopy(text);
   if (!line) return;
   const at = line.path, dir = at.slice(0, -1), old = line.pin, lineRe = new RegExp(`^Core: ${CORE} at ([0-9a-f]{40}), copied whole under `, "m");
@@ -205,7 +205,7 @@ function sync(tmp) {
   const target = targetOf({ manifest, text, old, first, at }, tmp);
   if (!target) return;
   const { pin, release } = target;
-  if (!past(pin, "refs/heads/main", tmp)) fail(`${pin} is not a commit of the core's main`);
+  if (!past(pin, "refs/heads/main", tmp)) fail(`${pin} is not a commit of the core's main. Mend: give a commit the core's main holds (git log origin/main in a clone of the core), or give none to take what the manifest follows`);
   if (pin === old && !first) { samePin({ at, dir, pin, manifest }, tmp); return; }
 
   fs.rmSync(dir, { recursive: true, force: true });

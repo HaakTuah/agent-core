@@ -30,6 +30,9 @@ import { fileURLToPath } from "node:url";
 import { corePath, floorCopy, projectAt } from "./core-path.mjs";
 import { sizeOf as size } from "./file-size.mjs";
 import { asText, leadsOut, logged, parseBounded } from "./guards.mjs";
+import { guard } from "./mend.mjs";
+
+guard(import.meta.url); // (an error it does not catch fails with its mend: mend.mjs)
 
 // (a listing of the tracked paths grows with the project: 256 MB, not Node's default 1 MB; #1204)
 const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
