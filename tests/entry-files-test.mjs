@@ -9,7 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ENTRY, lacking, verdict } from "../scripts/entry-files.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { ruleFiles } from "../scripts/rule-files.mjs";
+import { followLinks, ruleFiles } from "../scripts/rule-files.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -27,6 +27,10 @@ const ranged = lacking(reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": K
 ok(ranged.length === 1 && ranged[0].missing.join() === "core/floor/security.md", "a Kiro include with a line range pulls in part of a file, so the file is still lacking");
 ok(lacking(reader({ "AGENTS.md": AGENTS })).length === 0 && lacking(reader({ "CLAUDE.md": "x" })).length === 0,
   "an entry file the project does not hold, or a project with no AGENTS.md, is not looked for");
+// (the one walk the base and the work tree read a link by, on a tree of links given as { path: text })
+const walk = (links, f) => followLinks(f, p => p in links, p => links[p] ?? null);
+ok(walk({ "a": "b/c", "b": "d" }, "a/e") === "d/c/e" && walk({ "a": "/etc" }, "a") === null && walk({ "a": "a" }, "a") === null && walk({ "a": "../x" }, "a") === null,
+  "one walk follows each link from its own folder, and refuses one written from a root, one that climbs out and a loop past 40");
 let l = lacking(reader({ "AGENTS.md": AGENTS, "CLAUDE.md": "@core-manifest.md\n" }));
 ok(l.length === 1 && l[0].file === "CLAUDE.md" && l[0].missing.join() === "core/floor/security.md",
   "a CLAUDE.md that imports neither AGENTS.md nor each of its files lacks the one it leaves out");

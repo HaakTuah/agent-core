@@ -20,7 +20,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ownText } from "./core-path.mjs";
-import { ENTRY_FILES, placeAt, readAt } from "./rule-files.mjs";
+import { ENTRY_FILES, followLinks, placeAt, readAt } from "./rule-files.mjs";
 import { asText, leadsOut } from "./guards.mjs";
 import { guard } from "./mend.mjs";
 
@@ -55,21 +55,11 @@ const standsHere = file => {
 };
 
 const clean = p => path.posix.normalize(String(p).replace(/\\/gu, "/")).replace(/^\.\//u, "");
-// Whether each link on the file's way is one rule-files.mjs's placeAt follows at a commit: written relative, and inside
-// the tree as written, every link followed, at most 40; so the work tree and the base read a link alike.
-const asTheBaseReads = file => {
-  for (let at = clean(file), hops = 0; hops <= 40; hops++) {
-    if (at === ".." || at.startsWith("../") || at.startsWith("/")) return false;
-    const parts = at.split("/"), k = parts.findIndex((_, i) => { try { return fs.lstatSync(parts.slice(0, i + 1).join("/")).isSymbolicLink(); } catch { return false; } });
-    if (k < 0) return true;
-    const link = parts.slice(0, k + 1).join("/");
-    let to;
-    try { to = fs.readlinkSync(link); } catch { return false; }
-    if (/^([\\/]|[A-Za-z]:)/u.test(to)) return false;
-    at = path.posix.normalize(path.posix.join(path.posix.dirname(link), to.replace(/\\/gu, "/"), ...parts.slice(k + 1)));
-  }
-  return false;
-};
+// Whether each link on the file's way is one rule-files.mjs's placeAt follows at a commit (followLinks): written
+// relative, and inside the tree as written, every link followed, at most 40; so the work tree and the base read a link alike.
+const isLink = p => { try { return fs.lstatSync(p).isSymbolicLink(); } catch { return false; } };
+const linkText = p => { try { return fs.readlinkSync(p); } catch { return null; } };
+const asTheBaseReads = file => followLinks(clean(file), isLink, linkText) !== null;
 
 // What each entry file the project holds lacks of AGENTS.md's list: [{ file, tool, missing: [path], line, off }], `off`
 // why its tool would not load it at all (every file is then missing), or null.

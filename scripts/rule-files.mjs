@@ -32,6 +32,23 @@ export const TOOL_FILES = Object.freeze(["GEMINI.md", ...Object.values(ENTRY_FIL
 export function readAt(commit, place = placeAt(commit), { bound } = {}) {
   return f => { const at = place(f); return at === null || (bound !== undefined && !(place.size(at) <= bound)) ? null : place.show(at); };
 }
+// (a link's text that leads out of any tree: none read, or one written from a root)
+const outward = to => to === null || /^([\\/]|[A-Za-z]:)/u.test(to);
+// Where a path leads, from the root: every link on its way followed, the first a part of it, its own end included, that
+// `isLink` says is one, its text (`text`, null where none is read) put in its place from the link's own folder, while
+// it leads inside the tree, at most 40; the path it ends at, or null where a link leads out or the links run past 40.
+// placeAt reads a commit's tree through it and entry-files.mjs the work tree, so the two read a link alike.
+export function followLinks(f, isLink, text) {
+  for (let at = path.posix.normalize(f), hops = 0; hops <= 40; hops++) {
+    if (at === ".." || at.startsWith("../") || at.startsWith("/")) return null;
+    const parts = at.split("/"), k = parts.findIndex((_, i) => isLink(parts.slice(0, i + 1).join("/")));
+    if (k < 0) return at;
+    const link = parts.slice(0, k + 1).join("/"), to = text(link);
+    if (outward(to)) return null;
+    at = path.posix.normalize(path.posix.join(path.posix.dirname(link), to.replace(/\\/gu, "/"), ...parts.slice(k + 1)));
+  }
+  return null;
+}
 // Where readAt(commit) reads a path from: the path, from the root, of the file it leads to, every link on its way
 // followed as readAt follows it, or null where readAt reads nothing there; `show` reads a file of the tree by its path,
 // `size` gives its bytes, and `held` says whether the tree holds anything at a path: a link on its way it cannot follow,
@@ -48,18 +65,7 @@ export function placeAt(commit) {
     return modes.get(f);
   };
   const show = at => { try { return run(["show", `${commit}:${at}`]); } catch { return null; } };
-  const place = f => {
-    for (let at = path.posix.normalize(f), hops = 0; hops <= 40; hops++) {
-      if (at === ".." || at.startsWith("../") || at.startsWith("/")) return null;
-      // (the first part of the path, its own end included, that is a link: what stands there is read through it)
-      const parts = at.split("/"), k = parts.findIndex((_, i) => mode(parts.slice(0, i + 1).join("/")) === "120000");
-      if (k < 0) return /^100/u.test(mode(at) ?? "") ? at : null;
-      const link = parts.slice(0, k + 1).join("/"), to = show(link);
-      if (to === null || /^([\\/]|[A-Za-z]:)/u.test(to)) return null;
-      at = path.posix.normalize(path.posix.join(path.posix.dirname(link), to.replace(/\\/gu, "/"), ...parts.slice(k + 1)));
-    }
-    return null;
-  };
+  const place = f => { const at = followLinks(f, p => mode(p) === "120000", show); return at !== null && /^100/u.test(mode(at) ?? "") ? at : null; };
   const size = at => (mode(at) === undefined ? undefined : sizes.get(at));
   let folders = null;
   const isFolder = at => {
@@ -70,7 +76,7 @@ export function placeAt(commit) {
   // place and read from the link's own folder; a part a link's text brings that the tree lacks makes it a link that
   // leads nowhere, held, while a part of the path's own that the tree lacks, past every link, holds nothing; a link
   // that leads out of the tree, one past 4096 bytes, a submodule on the way and more than 40 links are held)
-  const linkText = at => (size(at) <= 4096 ? show(at) : null), outward = to => to === null || /^([\\/]|[A-Za-z]:)/u.test(to);
+  const linkText = at => (size(at) <= 4096 ? show(at) : null);
   const held = f => {
     const todo = path.posix.normalize(f).split("/").map(p => ({ p, linked: false }));
     for (let cur = "", hops = 0; todo.length;) {
