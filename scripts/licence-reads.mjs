@@ -4,39 +4,66 @@
 // asked its checksum. Node's own modules alone, and the fetchers' reader.
 import { downloads } from "./licence-fetchers.mjs";
 
-// The one form a read of data takes, alone on its line: a shell variable set to what curl prints of a file of data
-// (JSON, XML, YAML, TOML or text, by the end of its address's path), curl given no option but -f, -s, -S and -L, and
-// its output piped into jq -r with a filter in single quotes, and nothing else: `V=$(curl -fsS https://… | jq -r '…')`.
-// No redirection, other pipe, file or option stands in it, so it keeps nothing and runs nothing. The form is matched
-// whole, never read in parts: a line that differs from it in any way is a program's download.
-const READ = /^([A-Za-z_][A-Za-z0-9_]*)=\$\(\s*curl(?:[ \t]+-[fsSL]+)*[ \t]+(["']?)https:\/\/[A-Za-z0-9._~/%-]+\.(?:json|xml|ya?ml|toml|txt)\2(?:[ \t]*\|[ \t]*jq[ \t]+-r[ \t]+'[^'$`\\!\n]*')?[ \t]*\)$/u;
-// What could reach a variable by a name the file builds, or hand every variable to what runs, so that a variable's use
-// cannot be read from its name: an indirect expansion, text run as code, and the commands that export or print them all.
-const REACHES_ANY = /\$\{!|(?<![\w-])(?:eval|export|declare|typeset|env|printenv|compgen|Invoke-Expression|iex)(?![\w-])|(?<![\w-])set[ \t]+(?:-[A-Za-z]*a|-o[ \t]+allexport)|(?<![\w-])set[ \t]*(?:$|[;|&)>])/imu;
+// The one form a read of data takes, alone on its line: a variable of a lowercase name set to what curl prints of a
+// file of data (JSON, XML, YAML, TOML or text, by the end of its address's path), curl given no option but -f, -s, -S
+// and -L, and its output piped into jq -r with a filter in single quotes, and nothing else:
+// `v=$(curl -fsS https://… | jq -r '…')`. No redirection, other pipe, file or option stands in it, so it keeps nothing
+// and runs nothing. The form is matched whole, never read in parts: a line that differs from it in any way is a
+// program's download.
+const READ = /^([a-z_][a-z0-9_]*)=\$\(\s*curl(?:[ \t]+-[fsSL]+)*[ \t]+(["']?)https:\/\/[A-Za-z0-9._~/%-]+\.(?:json|xml|ya?ml|toml|txt)\2(?:[ \t]*\|[ \t]*jq[ \t]+-r[ \t]+'[^'$`\\!\n]*')?[ \t]*\)$/u;
+// The lowercase names a shell or a program reads by themselves, so that a value set to one acts with no later mention:
+// a proxy's, and those zsh ties to its PATH and prompt, or bash reads for its history and jobs. The environment's and
+// the shells' own other names are uppercase, which READ takes no part of.
+const SHELL_OWN = /(?:proxy|^(?:path|fpath|cdpath|manpath|module_path|mailpath|prompt|psvar|histchars|auto_resume|fignore|watch))$/u;
+// The one form a line that uses the read's variable takes, alone on its line: curl given no option but -f, -s, -S and
+// -L, and at most -o with a file's plain name, fetching a double-quoted https address in which the variable stands, as
+// `$v` or `${v}`, and nothing else expands: `curl -fsSLo m.tgz "https://…-${v}.tgz"`. That download is a program's,
+// asked its checksum.
+const use = (name) => new RegExp(`^curl(?:[ \\t]+-[fsSL]+)*(?:[ \\t]+-[fsSL]*o[ \\t]*[A-Za-z0-9._-]+)?(?:[ \\t]+-[fsSL]+)*[ \\t]+"https://(?:[^"$\`\\\\\\s]|\\$(?:${name}|\\{${name}\\})(?!\\w))*"$`, "u");
+// What could reach a variable by a name the file builds, hand every variable to what runs, or run a line as other than
+// it reads: an indirect expansion, text run as code, the commands that export or print them all, a here-document (whose
+// text the shell expands before it hands it on), and curl defined anew, as a function or an alias.
+const REACHES_ANY = /\$\{!|<<|(?<![\w-])(?:eval|export|declare|typeset|env|printenv|compgen|Invoke-Expression|iex)(?![\w-])|(?<![\w-])set[ \t]+(?:-[A-Za-z]*a|-o[ \t]+allexport)|(?<![\w-])set[ \t]*(?:$|[;|&)>])|(?<![\w-])(?:function[ \t]+curl|alias[ \t]+curl|curl[ \t]*\(\))(?![\w-])/imu;
 
 /** The downloads of `code` that may fetch a program: all but its reads of data. A read of data is a download of the
- *  form READ, once in the file, whose variable is used only as `$V` or `${V}` inside a double-quoted address of
- *  another download that holds no other expansion, so that what the read printed is only ever part of an address
- *  (that download, a program's, asked its checksum), in a file where nothing could reach the variable otherwise
- *  (REACHES_ANY). */
+ *  form READ, once in the file, whose variable's name is none a shell or program reads by itself (SHELL_OWN), and
+ *  which is used only on lines of the one form `use`, a download of a double-quoted address that holds no other
+ *  expansion, so that what the read printed is only ever part of an address (that download, a program's, asked its
+ *  checksum), each of these lines standing outside any quote and no continuation of the line before (`plain`), in a
+ *  file where nothing could reach the variable otherwise (REACHES_ANY). */
 export function programDownloads(code) {
   const all = downloads(code);
   if (REACHES_ANY.test(code)) return all;
-  const lines = String(code).split(/\r?\n/u).map((l) => l.trim());
-  return all.filter((d) => !readsData(d, all, lines));
+  const raw = String(code).split(/\r?\n/u), lines = raw.map((l) => l.trim()), free = plain(raw);
+  return all.filter((d) => !readsData(d, all, lines, free));
 }
 
-function readsData(d, all, lines) {
+function readsData(d, all, lines, free) {
   const name = READ.exec(d)?.[1];
-  if (!name || all.filter((x) => x === d).length !== 1 || lines.filter((l) => l === d).length !== 1) return false;
-  const named = new RegExp(`(?<!\\w)${name}(?!\\w)`, "u");
-  return lines.every((line) => line === d || !named.test(line) || (all.includes(line) && !READ.test(line) && onlyInAddresses(line, name, named)));
+  if (!name || SHELL_OWN.test(name) || all.filter((x) => x === d).length !== 1 || lines.filter((l) => l === d).length !== 1) return false;
+  const named = new RegExp(`(?<!\\w)${name}(?!\\w)`, "u"), used = use(name);
+  return lines.every((line, i) => !named.test(line) || (free[i] && (line === d || (all.includes(line) && !READ.test(line) && used.test(line)))));
 }
 
-// Whether every mention of `name` on `line` is `$name` or `${name}` inside a double-quoted https address that holds no
-// other expansion, quote, backtick, backslash or space.
-function onlyInAddresses(line, name, named) {
-  const use = `\\$(?:${name}|\\{${name}\\})(?!\\w)`;
-  const address = new RegExp(`"https://(?:[^"$\`\\\\\\s]|${use})*"`, "gu");
-  return !named.test(line.replace(address, ""));
+// For each line of a shell file, whether it starts outside any quote or backtick and does not continue the line before
+// it by a backslash: a line inside a string spanning lines is text another command is handed, never a line of its own.
+function plain(raw) {
+  let quote = "";
+  const out = raw.map((line) => { const before = quote, s = scan(line, quote); quote = s.quote; return { before, continues: s.continues }; });
+  return out.map((s, i) => !s.before && !(i > 0 && out[i - 1].continues));
+}
+
+// The quote open at the end of a line that starts with `quote` open, and whether the line ends in a backslash that
+// continues it, a comment's end aside.
+function scan(line, quote) {
+  let escaped = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (escaped) escaped = false;
+    else if (c === "\\" && quote !== "'") escaped = true;
+    else if (quote) { if (c === quote) quote = ""; }
+    else if (c === "#" && (i === 0 || /\s/u.test(line[i - 1]))) return { quote, continues: false };
+    else if (c === "'" || c === '"' || c === "`") quote = c;
+  }
+  return { quote, continues: escaped };
 }
