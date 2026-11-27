@@ -21,6 +21,8 @@
 //                                                  entries for both and its data packages, any audit the project keeps
 //                                                  of its own lock files, and the job's install and step
 // Run from the project's root. Reads the project; --write writes the row and those two files, each through no link.
+// It fails (exit 1) only on an argument it does not know, away from the project's manifest, or with the manifest reached
+// through a link; a manifest or a shape check's config it cannot read yet it says, with the mend, and exits 0 (#1361, point 6).
 // git and Node's own modules.
 import fs from "node:fs";
 import path from "node:path";
@@ -268,17 +270,18 @@ function manifestAt() {
 }
 
 // The manifest's text, with its line ends, the project's reader, and what the project holds that the row is read from;
-// or the failure, with its mend. The manifest is read through own-files.mjs's reader, as a regular file of the project's
-// own of a bounded size.
+// or the failure, with its mend: `fail` where the command is wrong or the manifest is reached through a link, `advice`
+// where what the row is read from cannot be read yet, which writes nothing and fails nothing (#1361, point 6). The
+// manifest is read through own-files.mjs's reader, as a regular file of the project's own of a bounded size.
 function readHere(argv) {
   if (argv.length > 1 || (argv.length && argv[0] !== "--write")) return { fail: "the script does not know that. Mend: run node core/scripts/mutation-tools.mjs, or with --write" };
   const { at, fail } = manifestAt();
   if (fail) return { fail };
   if (!fs.lstatSync(at, { throwIfNoEntry: false })) return { fail: `there is no ${MANIFEST} here. Mend: run it from the project's root, beside its manifest` };
   const read = ownReader("."), manifest = read(MANIFEST, true);
-  if (manifest === null) return { fail: `${MANIFEST} cannot be read as a file of the project's own: it is no regular file, is past ${READ_MOST} bytes, or git does not list it in this repository. Mend: make it a plain file of the project's own, in the project's git repository, then run this again` };
+  if (manifest === null) return { advice: `${MANIFEST} cannot be read as a file of the project's own: it is no regular file, is past ${READ_MOST} bytes, or git does not list it in this repository. Mend: make it a plain file of the project's own, in the project's git repository, then run this again` };
   const project = readProject(".", manifest, read);
-  if (!project) return { fail: `the shape check's config (${where(manifest)}) cannot be read, and the code and tests are read from it. Mend: mend it as node ${copyOf(".")}scripts/shape.mjs says, then run this again` };
+  if (!project) return { advice: `the shape check's config (${where(manifest)}) cannot be read, and the code and tests are read from it. Mend: mend it as node ${copyOf(".")}scripts/shape.mjs says, then run this again` };
   return { manifest, read, project };
 }
 
@@ -314,8 +317,9 @@ async function writeRow(manifest, row) {
 }
 
 async function main(argv) {
-  const { fail, manifest, project: p } = readHere(argv);
+  const { fail, advice, manifest, project: p } = readHere(argv);
   if (fail) { console.error(`FAIL: ${fail}`); return 1; }
+  if (advice) { console.log(`Not read, so no row is given and nothing written: ${advice}`); return 0; }
   const row = rowFor(p), languages = [...new Set(p.code.map(languageOf))].sort();
   console.log(`Read: ${p.code.length} files of code (${languages.join(", ") || "none"}), ${p.tests ? "tests" : "no tests"}, the tests run by ${p.runner ?? "no script of package.json's"}.`);
   console.log(`The list gives: ${lineOf(row)}`);

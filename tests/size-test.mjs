@@ -204,5 +204,25 @@ ok(run("--raise").status === 1 && run("--raise", same).status === 1 && run("--ra
     "  and puts by the head's script as text and the base's own scripts, for the base's to judge the raise");
 }
 
+// size.yml's step for the split mark, run as it stands on a repository of the core's form (#1413, point 6): a pull
+// request that changes a file past the mark with no line under "past" fails nothing for it, and is told its question;
+// a line under "past" for a file no longer past the mark still fails, with its mend
+{
+  const step = parseYaml(fs.readFileSync(path.join(root, ".github/workflows/size.yml"), "utf8")).jobs.size.steps.find(s => /past the split mark/u.test(s.name ?? ""));
+  const repo = fs.mkdtempSync(path.join(tmp, "split-"));
+  const git = (...args) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], { cwd: repo, encoding: "utf8" });
+  const marks = past => { fs.mkdirSync(path.join(repo, ".github"), { recursive: true }); fs.writeFileSync(path.join(repo, ".github/sizes.json"), JSON.stringify({ each: 1024, read: {}, total: 1024, split: 20480, past })); };
+  // (the core's scripts in the repository, as in the core's own, since the check reads the repository its script stands in)
+  git("init", "-q"); fs.cpSync(path.join(root, "scripts"), path.join(repo, "scripts"), { recursive: true }); marks({}); fs.writeFileSync(path.join(repo, "long.md"), "x\n".repeat(11000)); git("add", "-A"); git("commit", "-q", "-m", "base");
+  fs.appendFileSync(path.join(repo, "long.md"), "one more line\n"); git("commit", "-qam", "head");
+  const run = () => spawnSync(onPath("bash", process.env), ["-ec", step.run], { cwd: repo, encoding: "utf8", env: { ...process.env, ...step.env } });
+  const r = run();
+  ok(/^A file past the split mark/u.test(step.name) && step.env?.SIZES_BASE === "HEAD^1" && r.status === 0 && /long\.md is \d+ bytes, past the 20480-byte mark, and this PR changes it, which fails nothing: it has no line under "past"\. Mend: ask in what ways/u.test(r.stdout + r.stderr),
+    "size.yml: a pull request that changes a file past the split mark with no line under \"past\" fails nothing for it, and is told its question and the line to write", r.stdout + r.stderr);
+  marks({ "long.md": { mark: 22100, why: "#1" }, "short.md": { mark: 30000, why: "#2" } }); fs.writeFileSync(path.join(repo, "short.md"), "short\n"); git("add", "-A"); git("commit", "-q", "-m", "a line for a short file");
+  const stale = run();
+  ok(stale.status === 1 && /short\.md/u.test(stale.stderr) && mended(stale.stderr), "  and a line under \"past\" for a file no longer past the mark still fails, with its mend", stale.stdout + stale.stderr);
+}
+
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the cap's check`);
 process.exit(failed ? 1 : 0);

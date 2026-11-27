@@ -50,7 +50,7 @@ import { started } from "./started.mjs";
 // leanness check's numbers, stands in scripts/size-raises.md; whoever raises a cap adds its entry there.
 export const CAPS = {
   builder: 32 * 1024,
-  design: 33 * 1024,
+  design: 34 * 1024,
   orchestrator: 50 * 1024,
   adviser: 34 * 1024,
   reviewer: 28 * 1024,

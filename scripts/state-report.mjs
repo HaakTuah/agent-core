@@ -38,6 +38,7 @@ import { ROOT, rules } from "./rules.mjs";
 import { started } from "./started.mjs";
 import { billedLine, line as waitLine, measure as measureWait, selfHosted } from "./wait.mjs";
 import { parseBounded } from "./guards.mjs";
+import { ownWhole } from "./own-repo.mjs";
 
 export const TITLE = "State report";
 export const COUNTS = "Counts for the core";
@@ -250,16 +251,25 @@ export const reportOf = (issues, owner) => [...issues].filter(i => /^State repor
 // Whether the account is a collaborator of a repository.
 const collaboratorOf = (gh, account, name) => { try { gh(`repos/${name}/collaborators/${account}`); return true; } catch { return false; } };
 
-// The repositories to read, as { private, owner, shared } by full name: the ones named, or all the account reaches.
+// Whether the account owns `r` all the way back (scripts/own-repo.mjs), its own answer read through gh where a list's
+// says too little; a failure to read throws, never read as own or not.
+function ownedWhole(gh, account, r) {
+  const own = ownWhole(account, r, name => parseBounded(gh(`repos/${name}`)));
+  if (own === null) throw new Error(`gh gave no answer for ${r.full_name} that says whose it is`);
+  return own;
+}
+
+// The repositories to read, as { private, owner, own, shared } by full name: the ones named, or all the account
+// reaches; `own` where the account owns it all the way back (ownedWhole).
 function reached(gh, account, named) {
   const found = new Map();
   // (a named repository counts as given access where it is private and readable, or the account is its collaborator,
   // read-only too, as GitHub answers; else, a public one of another owner, only by its row)
   if (named.length) for (const name of named) {
     const r = parseBounded(gh(`repos/${name}`)), theirs = String(r.owner?.login).toLowerCase() !== account.toLowerCase();
-    found.set(r.full_name, { private: r.private, owner: r.owner?.login, shared: theirs && !r.private && !r.permissions?.push && !collaboratorOf(gh, account, r.full_name) });
+    found.set(r.full_name, { private: r.private, owner: r.owner?.login, own: ownedWhole(gh, account, r), shared: theirs && !r.private && !r.permissions?.push && !collaboratorOf(gh, account, r.full_name) });
   }
-  else for (const r of pagesOf("user/repos?affiliation=owner,collaborator", gh)) found.set(r.full_name, { private: r.private, owner: r.owner?.login, shared: false });
+  else for (const r of pagesOf("user/repos?affiliation=owner,collaborator", gh)) found.set(r.full_name, { private: r.private, owner: r.owner?.login, own: ownedWhole(gh, account, r), shared: false });
   return found;
 }
 
@@ -287,13 +297,29 @@ function countsOf(gh, name, r, own) {
 // Only GitHub's answer that the manifest is not there (404) reads as "not a project"; any other failure (an outage, no
 // sign-in) throws, so that a reading that could not be taken is never taken for none (#1112).
 export function rowOf(gh, account, name, r) {
-  if (name.toLowerCase() === CORE.toLowerCase()) return null;
-  let manifest;
-  try { manifest = Buffer.from(parseBounded(gh(`repos/${name}/contents/core-manifest.md`)).content ?? "", "base64").toString("utf8"); } catch (e) { if (/\(HTTP 404\)\s*$/.test(String(e?.message).trim())) return null; throw e; }
-  if (!pinOf(manifest) || (r.shared && !SHARES.test(manifest))) return null;
-  const own = String(r.owner).toLowerCase() === account.toLowerCase();
+  if (!takesCore(gh, name, r)) return null;
+  const own = r.own === true;
   const shown = shownAs(name, own, r.private);
   return `- ${shown}: ${countsOf(gh, name, r, own)}.`;
+}
+
+// Whether a repository found is a project of the core: not the core, its manifest pins a copy, and, where it was found
+// by its row alone, the row says it shares its counts; a failure but 404 throws (rowOf, above).
+function takesCore(gh, name, r) {
+  if (name.toLowerCase() === CORE.toLowerCase()) return false;
+  let manifest;
+  try { manifest = Buffer.from(parseBounded(gh(`repos/${name}/contents/core-manifest.md`)).content ?? "", "base64").toString("utf8"); } catch (e) { if (/\(HTTP 404\)\s*$/.test(String(e?.message).trim())) return false; throw e; }
+  return Boolean(pinOf(manifest)) && (!r.shared || SHARES.test(manifest));
+}
+
+// The owner's own projects, by full name, as --projects finds them: of the repositories named, or else all the account
+// reaches, those it owns all the way back (ownedWhole) whose manifest pins a copy of the core (scripts/trial-brief.mjs; #1413, point 1). A failure
+// of gh throws, never read as none.
+export function ownTakers(named = [], gh = ghApi) {
+  const account = gh("user", "--jq", ".login").trim();
+  const found = reached(gh, account, named);
+  if (!found.size) throw new Error("GitHub listed no repository");
+  return [...found].filter(([name, r]) => r.own && takesCore(gh, name, r)).map(([name]) => name);
 }
 
 // --projects: each project the account reaches, with its kind and the counts from its own newest state report.

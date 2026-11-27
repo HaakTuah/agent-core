@@ -28,7 +28,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { parseBounded, seen } from "./guards.mjs";
-import { repoOf } from "./inbox.mjs";
+import { namesNoHost, repoOf } from "./inbox.mjs";
 import { KINDS, LABEL, kindOf } from "./outcomes.mjs";
 import { broughtBy } from "./review-record.mjs";
 import { timeOf } from "./moment.mjs";
@@ -260,7 +260,9 @@ function main(args) {
   if (bad) return fail(bad);
   const below = spawnSync("git", ["rev-parse", "--show-prefix"], { encoding: "utf8" });
   if (below.status !== 0 || below.stdout.trim() !== "") return fail("run it from the root of the project's git repository");
-  const repo = repoOf(spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout);
+  const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout, repo = repoOf(origin);
+  // (an origin that is none or a folder names no host, so nothing is said of its labels; #1361, point 17)
+  if (namesNoHost(origin)) { console.log("The labels and openers were not read: the repository's origin names no host, being none or a folder on this machine, so no host is named to read them from. Read them with this session's own GitHub tools as core/scripts/labels.json says, or run `node core/scripts/labels.mjs` where the origin is set."); return 0; }
   if (!repo) { console.log("The labels and openers were not read: the repository's origin is not on github.com, so it has no labels; the inbox's files carry state and sender as two lines (core/scripts/inbox.mjs)."); return 0; }
   let manifest = "";
   try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { /* (the core itself, or no manifest yet) */ }
