@@ -28,6 +28,6 @@ export function shippedPaths(
 ): Set<string>;
 export function registryOverrides(npmrc: string): string[];
 export function scriptsOff(npmrc: string): boolean;
-export function loadConfig(path: string): LicenceConfig;
+export function loadConfig(path: string, root?: string | null): LicenceConfig;
 export function actionLists(config: LicenceConfig): string[];
 export function check(config: LicenceConfig, root: string): { failures: string[]; summary: string };

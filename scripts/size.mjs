@@ -43,7 +43,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { counted as bytesOf, sizeOf } from "./file-size.mjs";
-import { gather, library, reading } from "./reading.mjs";
+import { gather, library, real, reading } from "./reading.mjs";
 import { counted as countedBy, writersOf } from "./security-review.mjs";
 import { asText, logged } from "./guards.mjs";
 import { guard, named } from "./mend.mjs";
@@ -202,10 +202,17 @@ function startOf(role, roles) {
   if (cap === undefined) return { wrong: `the role ${role} has no cap. Mend: give it a line in CAPS of scripts/size.mjs, the whole KB next above what it reads at its start, and say so in the pull request` };
   const missing = files.filter(f => !fs.existsSync(f));
   if (missing.length) return { wrong: `what the role ${role} reads at its start cannot be counted: ${missing.join(", ")}. Mend: put back the file moved or taken out, or name it as it now stands in roles/${role}.md` };
+  // (each counted only as a regular file of the checkout's own, no link on its way: reading.mjs)
+  const odd = files.filter(f => real(".", f) !== "file");
+  if (odd.length) return { wrong: notFile(odd, `what the role ${role} reads at its start`) };
   const total = files.reduce((sum, f) => sum + sizeOf(f), 0);
   console.log(asText(`what the role ${role} reads at its start (${files.join(", ")}): ${total} bytes of ${cap}${files.includes(AGENTS.file) ? ` (${CAPS[role]} its own, ${AGENTS.mark} ${AGENTS.file}'s share)` : ""}`));
   return { total, cap };
 }
+
+// The failure for files that stand as no regular file of the checkout's own (a link, a device, a folder), which are not
+// counted.
+const notFile = (files, what) => `${what} cannot be counted: ${files.join(", ")} ${files.length === 1 ? "is" : "are"} no regular file of the checkout's own. Mend: put the file itself in its place, and run the check again`;
 
 const TRIM = {
   role: "say the rules this\npull request changes in fewer words and trim what is said twice; raise the role's cap by one KB only once a fresh session\n"
@@ -221,6 +228,7 @@ function measured(roles, wrong) {
     if (got.wrong) wrong.push(got.wrong);
     else out.push({ what: role, total: got.total, cap: got.cap, kind: "role", said: `what the role ${role} reads at its start` });
   }
+  if (real(".", QUEUE.file) !== "file") { wrong.push(notFile([QUEUE.file], "the queue")); return out.filter(m => m.total > m.cap); }
   const queue = sizeOf(QUEUE.file);
   console.log(`the queue (${QUEUE.file}): ${queue} bytes of its mark, ${QUEUE.mark}`);
   out.push({ what: QUEUE.file, total: queue, cap: QUEUE.mark, kind: "queue", said: QUEUE.file });

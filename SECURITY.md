@@ -202,7 +202,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      wheel's pinned hash, with no variable that holds a token, fails a file it could not read, and silences no finding a
      comment in the code asks it to; limits: no size of a file, a file the engine did not scan or stopped on failing
      and one it parsed in part passing, said as read in part, 200 files to a run of the engine, 30 s for a rule on a
-     file, 900 s for a run, 256 MB of git's diff of a file, 1 GB of the engine's answer, and the description whole as
+     file, 900 s for a run, 2,000 files a scan with a base reads and 240 s for all its runs together, past either failing,
+     256 MB of git's diff of a file, 1 GB of the engine's answer, and the description whole as
      the host gives it, at most 65,536 characters; hostile tests: `tests/code-scan-test.mjs`.
    - the `global.json` of a project a release's trial runs on, and the .NET SDK it pins: read by `scripts/toolchain.mjs`,
      which reads only the file at the project's root, a plain file not reached through a link out of the project,

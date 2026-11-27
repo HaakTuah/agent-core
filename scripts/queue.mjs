@@ -21,9 +21,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { copyOf, readCore } from "./core-path.mjs";
+import { copyOf, manifestText, readCore } from "./core-path.mjs";
 import { progressOf } from "./done-when.mjs";
-import { aRepository, inProject, parseBounded } from "./guards.mjs";
+import { aRepository, inProject, leadsOut, parseBounded } from "./guards.mjs";
 import { formFails } from "./queue-form.mjs";
 import { repoOf } from "./inbox.mjs";
 import { RULES, ruleFiles } from "./rule-files.mjs";
@@ -229,9 +229,11 @@ export function unplaced(copy, file) {
   return null;
 }
 
-// Where the command runs: { copy, file, repo } or { fail }, the failure with its mend.
-function placed() {
-  const copy = inCopy(), manifest = copy && fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null;
+// Where the command runs: { copy, file, repo } or { fail }, the failure with its mend; `copy`, the copy's path where it
+// runs from one, else "". The manifest is read where it is a file of the project's own (core-path.mjs's manifestText,
+// behind guards.mjs's leadsOut): one a link leads out of the project to reads as empty.
+export function placed(copy = inCopy()) {
+  const manifest = !copy ? null : leadsOut(".", "core-manifest.md") ? "" : manifestText("core-manifest.md");
   // (never inside the copy, nor inside the library that carries it, whose files are its own repository's)
   const file = copy ? fileAt(manifest ?? "", ownRules(), readCore(manifest ?? "").library ?? copy) : FILE, fail = unplaced(copy, file);
   if (fail) return { fail };

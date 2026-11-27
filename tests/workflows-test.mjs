@@ -239,6 +239,12 @@ try {
   const out = r.stdout + r.stderr;
   const good = r.status === 1 && /a\.yml:2: pull_request_target .*\. Mend: take the word out/.test(out) && /and on 2 more lines\. Mend:/.test(out) && /b\.yml: not UTF-8 text.*Mend: save it as UTF-8/.test(out) && mended(out);
   ok(good, `run, it fails each, by file and line, and each failure says its mend${good ? "" : `:\n${out}`}`);
+  // (a submodule tracked at a workflow's path, a folder in the work tree, is no file: failed, with its mend)
+  fs.mkdirSync(path.join(tmp, ".github/workflows/sub.yml"));
+  execFileSync("git", ["update-index", "--add", "--cacheinfo", `160000,${"1".repeat(40)},.github/workflows/sub.yml`], { cwd: tmp, stdio: "ignore" });
+  const sub = spawnSync(process.execPath, [path.join(tmp, "core/scripts/workflows.mjs")], { cwd: tmp, encoding: "utf8" }), subOut = sub.stdout + sub.stderr;
+  ok(sub.status === 1 && /^FAIL \.github\/workflows\/sub\.yml: a folder or submodule, not a file/mu.test(subOut) && !/EISDIR/u.test(subOut) && mended(subOut), "a tracked submodule at a workflow's path is no file: failed, with its mend", subOut);
+  execFileSync("git", ["rm", "-q", "--cached", ".github/workflows/sub.yml"], { cwd: tmp, stdio: "ignore" }); fs.rmdirSync(path.join(tmp, ".github/workflows/sub.yml"));
   // (the two tools, where the job's set-up fetched them, as on the runners, never in a session (#580): a key given twice
   // the base held is noted and a new one fails, an action zizmor cannot read fails, and in the core's own repository
   // each fails; with no tool fetched, the check says it did not run them and decides nothing by them)

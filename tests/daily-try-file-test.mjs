@@ -5,7 +5,11 @@
 // tests/daily-try-test.mjs.
 //
 //   node tests/daily-try-file-test.mjs
+import fs from "node:fs";
+import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
+import { COUNTS } from "../scripts/release-trial.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 import { LINE, OWNER, SIGNIN, TITLE, bugText, file, formed, gather, legLines } from "../scripts/daily-try-file.mjs";
 
 let failed = 0, count = 0;
@@ -71,6 +75,53 @@ const SHA = "2".repeat(40);
   let refusedJobs = null;
   try { legLines(8, 1, { gh: ghLogs, repo: CORE }); } catch (e) { refusedJobs = e; }
   ok(refusedJobs instanceof Error, "GitHub refusing the list of jobs throws, never read as runners that said nothing");
+  let refusedLog = null;
+  const flaky = (route, ...a) => {
+    if (/\/jobs\?/u.test(route)) return JSON.stringify({ jobs: [{ id: 11, name: "try 1" }] });
+    if (a.length) throw new Error("gh: Server Error (HTTP 502)");
+    return logs[11];
+  };
+  try { legLines(7, 2, { gh: flaky, repo: CORE }); } catch (e) { refusedLog = e; }
+  ok(/HTTP 502/u.test(refusedLog?.message), "GitHub refusing a log throws; only gh's refusal of the flag itself is asked again without it (#1549)", String(refusedLog));
+}
+
+// --file's reading through the gh on the path (#1549), by the script's own call (ghApi): a job's log holds the runner's
+// colour codes, which a gh from 2.97.0 on refuses to print without its flag and an older one takes no such flag; each
+// still gives the runner's counts. The stand-in answers as each gh does, its words those of gh 2.97.0 and 2.89.0.
+{
+  const dir = scratchDir("daily-try-file-"), bin = path.join(dir, "bin");
+  fs.mkdirSync(bin);
+  const counts = { leg: 1, commit: SHA, came: "held", ...Object.fromEntries(COUNTS.map(k => [k, 0])), failedAfter: 1 };
+  fs.writeFileSync(path.join(dir, "log"), `2026-11-27T06:00:00.0000000Z \u001b[36;1mnode scripts/daily-try.mjs --run\u001b[0m\n2026-11-27T06:00:01.0000000Z ${LINE}${JSON.stringify(counts)}\r\n2026-11-27T06:00:02.0000000Z \u001b[0;32mdone\u001b[0m\n`);
+  fs.writeFileSync(path.join(dir, "jobs"), JSON.stringify({ jobs: [{ id: 11, name: "try 1" }, { id: 12, name: "try-file" }] }));
+  fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh
+case " $* " in *" --allow-escape-sequences "*) flag=1;; *) flag=;; esac
+if [ -n "$flag" ] && [ "$GH_KIND" = old ]; then echo 'unknown flag: --allow-escape-sequences' >&2; exit 1; fi
+case "$2" in
+  */attempts/1/jobs*) cat "${path.join(dir, "jobs")}";;
+  */jobs/11/logs) if [ -z "$flag" ] && [ "$GH_KIND" = new ]; then echo 'the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway' >&2; exit 1; fi; cat "${path.join(dir, "log")}";;
+  *issues*) echo '[]';;
+  *) echo 'gh: Not Found (HTTP 404)' >&2; exit 1;;
+esac
+`, { mode: 0o755 });
+  // (the stand-in for gh is a shell script, which Windows cannot run)
+  if (process.platform === "win32") console.log("skip --file's reading through the gh on the path: its stand-in for gh is a shell script");
+  else {
+    const was = { PATH: process.env.PATH, GH_KIND: process.env.GH_KIND };
+    process.env.PATH = `${bin}${path.delimiter}${was.PATH}`;
+    try {
+      for (const kind of ["new", "old"]) {
+        process.env.GH_KIND = kind;
+        const wrote = [];
+        let err = "";
+        try { file(gather(legLines(7, 1), { sha: SHA, day: "2026-11-27", signedIn: true, found: 1, privates: 0 }), { write: (m, r, b) => wrote.push(b), say: () => {} }); } catch (e) { err = e.message; }
+        const body = wrote.find(b => b.title === TITLE)?.body ?? "";
+        ok(/1 project whose checks the trial's reading holds \(1 passed before the sync and failed after/u.test(body) && !body.includes("\u001b"), `--file reads the counts of a log that holds escape sequences, with a gh ${kind === "new" ? "from 2.97.0 on, given its flag" : "older than 2.97.0, which takes no such flag"}`, err.slice(0, 300) || body.slice(0, 300));
+      }
+    } finally {
+      for (const [k, v] of Object.entries(was)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
 }
 
 console.log(`${count - failed} of ${count} assertions on the daily try's counts`);

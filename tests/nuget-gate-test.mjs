@@ -90,8 +90,23 @@ for (const [what, files, opts] of [
   ["one that changes only a file an Import brings in", { "build/deps.xml": "<Project>\n  <!-- a note -->\n</Project>\n" }],
   ["one that changes only a file an imported file brings in, written with a tab and a reference", { "build/deeper .xml": "<Project>\n  <!-- a note -->\n</Project>\n" }, { start: { "build/deps.xml": '<Project>\n  <Import Project="deeper\t&#46;xml" />\n</Project>\n', "build/deeper .xml": EMPTY } }],
   ["one that changes only a file a property MSBuild's targets import names", { "build/after.xml": "<Project>\n  <!-- a note -->\n</Project>\n" }, { start: { "Directory.Build.props": "<Project>\n  <PropertyGroup>\n    <CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)build/after.xml</CustomAfterMicrosoftCommonTargets>\n  </PropertyGroup>\n</Project>\n", "build/after.xml": EMPTY } }],
+  ["one that changes only the attributes git writes the checkout by, at the root", { ".gitattributes": "*.xml text\n" }],
+  ["one that changes only the attributes git writes the checkout by, in a folder", { "src/App/.gitattributes": "*.xml text\n" }],
   ["a pull request with no base to read it against", { "README.md": "# More\n" }, { base: false }],
 ]) { const r = restores(what, files, opts); if (what !== "a pull request with no base to read it against") ok(r.out.includes("Changed:"), `${what}: named by the first look`, r.out); }
+
+// the config is read only as a file of the project's own: a tracked link in its place is refused, with its mend
+let canLink = true;
+try { fs.symlinkSync("nowhere", path.join(tmp, "probe")); } catch { canLink = false; }
+if (canLink) {
+  const r = gate(dir => { const at = path.join(dir, "checks/licences.json"); fs.writeFileSync(path.join(dir, "checks/real.json"), fs.readFileSync(at)); fs.rmSync(at); fs.symlinkSync("real.json", at); });
+  ok(r.run === undefined && r.out.includes("checks/licences.json, the licence check's config, is a link") && mended(r.out), "a tracked link in the config's place is refused, with its mend", r.out);
+  const away = path.join(tmp, "away");
+  const folder = gate(dir => { fs.cpSync(path.join(dir, "checks"), away, { recursive: true }); fs.rmSync(path.join(dir, "checks"), { recursive: true }); fs.symlinkSync(away, path.join(dir, "checks")); });
+  ok(folder.run === undefined && folder.out.includes("checks/licences.json, the licence check's config, stands in a folder outside the project") && mended(folder.out), "a config whose folder a tracked link leads out of the project is refused, with its mend", folder.out);
+  const dirAt = gate(dir => { const at = path.join(dir, "checks/licences.json"); fs.rmSync(at); fs.mkdirSync(at); fs.writeFileSync(path.join(at, "x"), "x"); });
+  ok(dirAt.run === undefined && dirAt.out.includes("is no regular file (a folder, a device or a pipe)") && mended(dirAt.out), "a folder in the config's place is refused, with its mend", dirAt.out);
+}
 
 // the second look, NuGet's own word, where no file the first names changed
 if (!sdk) console.log("skip NuGet's own word: no .NET SDK here");

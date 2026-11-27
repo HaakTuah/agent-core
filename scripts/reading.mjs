@@ -212,6 +212,14 @@ export const real = (dir, rel) => walk(dir, rel).kind;
 // an endless device or to a file outside the checkout), at its own place or on the way to it, a device, a pipe or a
 // folder reads as no file (#848).
 export const regular = (dir, rel) => { try { const w = walk(dir, rel); return w.kind === "file" ? fs.readFileSync(w.at, "utf8") : null; } catch { return null; } };
+// git's answer to a read, `r` as spawnSync gives it: its output where git ended well, null where git ended saying it
+// holds no such thing. A read that did not finish (past its buffer, past its time, stopped by a signal, never started)
+// is neither, and is thrown as a failure with its mend, which a check's guard (mend.mjs) prints as it stands, so that
+// no check takes it for nothing to ask.
+export function whole(r, what = "git's answer") {
+  if (r.error || r.status === null) throw new Error(`FAIL: ${what} could not be read whole (${r.error?.code ?? r.signal ?? "unfinished"}), so it is read neither as there nor as not. Mend: make what it reads smaller (split the pull request, or take out a file past its bound), and run the check again`);
+  return r.status === 0 ? r.stdout : null;
+}
 // The Markdown files of a real folder of the checkout, by their paths under `dir`; each link met, in the folder or on the
 // way to it, goes into `links` and is listed as no file.
 export function realFiles(dir, folder, links) {

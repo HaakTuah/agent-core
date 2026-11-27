@@ -37,11 +37,10 @@ export function unmended(output) {
 // the folder `from`: "<path> (in: <the failure>)" each. A path the same line tests for first (`[ -f <path> ]`) is
 // there or not by design, as the guarded install is, and is not read. A path may be relative, absolute or in quotes (#1488).
 const RUN = /\bnode\s+["'`]?((?:\/|[A-Za-z]:\/|\.{1,2}\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:mjs|cjs|js|sh))(?=$|[\s`'"),;:]|\.(?:\s|$))/gu;
+const mends = output => failures(output).filter(line => line.includes(MEND)).map(line => [line, line.slice(line.indexOf(MEND) + MEND.length)]);
 export function missing(output, from) {
   const gone = [];
-  for (const line of failures(output)) {
-    if (!line.includes(MEND)) continue;
-    const mend = line.slice(line.indexOf(MEND) + MEND.length);
+  for (const [line, mend] of mends(output)) {
     for (const run of mend.matchAll(RUN)) {
       const file = run[1];
       if (mend.slice(0, run.index).includes(`-f ${file}`) || fs.existsSync(path.resolve(from, file))) continue;
@@ -53,13 +52,14 @@ export function missing(output, from) {
 
 // Whether a check's output holds a failure and every failure in it says its mend: what a check's test asks of a run
 // that fails. Each script its mends name to run is there from the folder the check ran in (`from`, the process's own
-// where none is given).
+// where none is given, read only where a mend names one).
 export function mended(output, { from } = {}) {
   if (failures(output).length === 0 || unmended(output).length > 0) return false;
-  // the process's own folder is read only once the failure is found mended, and where it cannot be read (it was
-  // removed: process.cwd() throws) the output is not mended (#1538)
+  // the process's own folder is read only once the failure is found mended and a mend names a script to run, and where
+  // it cannot be read (it was removed: process.cwd() throws) the output is not mended (#1538; #1546)
   let folder = from;
   if (folder === undefined) {
+    if (!mends(output).some(([, mend]) => [...mend.matchAll(RUN)].length)) return true;
     try { folder = process.cwd(); } catch { return false; }
   }
   return missing(output, folder).length === 0;
@@ -68,8 +68,8 @@ export function mended(output, { from } = {}) {
 // The failure a check gives for an error it did not catch: a parser's abort, a raw error of git's, a RangeError.
 // An error whose message is a failure that says its mend already is printed as it stands, on its one line, once
 // mended() finds it so: that reads the process's own folder (#1488), in a project the project's, where the mends it
-// prints stand, so one naming a script that is not there, or read where the folder cannot be, is worded as an unknown
-// error. Its words may come from a project's file (a parse error's excerpt), so each
+// prints stand, so one naming a script that is not there, or one naming a script where the folder cannot be read, is
+// worded as an unknown error. Its words may come from a project's file (a parse error's excerpt), so each
 // is printed as the log reads text alone, any address's sign-in cut out (guards.mjs: loggedAlone, loggedCause, logged;
 // floor rule 1).
 export function unknown(script, error) {

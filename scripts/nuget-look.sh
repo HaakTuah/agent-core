@@ -13,7 +13,7 @@ paths=(':(glob,icase)**/*.csproj' ':(glob,icase)**/*.fsproj' ':(glob,icase)**/*.
   ':(glob,icase)**/*.targets' ':(glob,icase)**/Directory.Build.*' ':(glob,icase)**/*.rsp' ':(glob,icase)**/*.user'
   ':(glob,icase)**/packages.lock.json' ':(glob,icase)**/packages.*.lock.json' ':(glob,icase)**/packages.config'
   ':(glob,icase)**/nuget.config' ':(glob,icase)**/global.json' ':(glob,icase)**/dotnet-tools.json'
-  ':(glob,icase)**/*.nupkg' "${CORE_AT}.node-version" .github/workflows/nuget.yml)
+  ':(glob,icase)**/*.nupkg' ':(glob,icase)**/.gitattributes' "${CORE_AT}.node-version" .github/workflows/nuget.yml)
 # NuGet's own word on whether every lock file still holds what its project asks for, however the project asks
 # (in an import, through a property, from any file a build reads): a restore of each project file from its
 # lock file alone against an empty source, which downloads nothing. It holds only where each restore passed
@@ -77,6 +77,17 @@ holds() {
   done < <(find . -path "./${CORE_AT%/}" -prune -o -name project.assets.json -newer "$stamp" -print0)
 }
 run=true
+# (the config is read only where it is a regular file, no link, in a folder that resolves, each of its parts followed,
+# inside the project: nuget.mjs reads it after)
+folder=$(cd -- "$(dirname -- "$CONFIG")" 2> /dev/null && pwd -P) || folder=
+here=$(pwd -P)
+if [ -n "$folder" ] && [ "$folder" != "$here" ] && [ "${folder#"$here"/}" = "$folder" ]; then
+  echo "FAIL $(named "$CONFIG"), the licence check's config, stands in a folder outside the project (reached through a link on its way, or named so), so it is not read. Mend: keep the config in a folder of the project's own, in place of the link"; exit 1
+elif [ -L "$CONFIG" ]; then
+  echo "FAIL $(named "$CONFIG"), the licence check's config, is a link, so it is not read. Mend: make it a file of the project's own, in place of the link"; exit 1
+elif [ -e "$CONFIG" ] && [ ! -f "$CONFIG" ]; then
+  echo "FAIL $(named "$CONFIG"), the licence check's config, is no regular file (a folder, a device or a pipe), so it is not read. Mend: make it a file of the project's own, there"; exit 1
+fi
 # (the config, its audit and each folder it names as a source, each by its exact name, and the caller)
 if [ -n "$BASE" ] && extra=$(jq -r '[.audit, (.nuget.sources // [])[]] | .[] | strings | select(startswith("https://") | not)' "$CONFIG"); then
   paths+=(":(literal)$CONFIG")
@@ -84,8 +95,8 @@ if [ -n "$BASE" ] && extra=$(jq -r '[.audit, (.nuget.sources // [])[]] | .[] | s
   caller=${CALLER#"$GITHUB_REPOSITORY"/}; caller=${caller%%@*}
   [ -n "$caller" ] && [ "$caller" != "$CALLER" ] && paths+=(":(literal)$caller")
   # (each file an Import, or a property MSBuild's own targets import a file by, brings in under another name
-  # than a build file's, and each whose root element is a Project, which the script reads as one: a change to
-  # it alone is one NuGet reads)
+  # than a build file's, each whose root element is a Project, which the script reads as one, and each that
+  # begins as XML past the bound the script reads to: a change to it alone is one NuGet reads)
   imports=ok
   brought=$(node "$CORE_AT"scripts/nuget.mjs --imports) || imports=
   while IFS= read -r p; do p=${p%$'\r'}; [ -n "$p" ] && paths+=(":(literal)$p"); done <<< "$brought"

@@ -126,7 +126,7 @@ for (const [what, change, why] of [
   ["notices that are no path", json("licences.json", (j) => { j.notices = 7; }), /"notices".*Mend: name the notices file by its path/],
   ["notices without an audit", (dir) => { LOCK("MIT")(dir); json("licences.json", (j) => { delete j.audit; delete j.scan; j.notices = "site/NOTICES.txt"; })(dir); }, /notices.*Mend: name the (?:notices file by its path, beside an "audit"|audit's file in "audit", which holds what "notices")/],
   ["notices naming no file", json("licences.json", (j) => { j.notices = "site/NOTICES.txt"; }), /"notices", site\/NOTICES\.txt, names no file/],
-  ["notices naming a folder", json("licences.json", (j) => { j.notices = "site/audio"; }), /"notices", site\/audio, names no file/],
+  ["notices naming a folder", json("licences.json", (j) => { j.notices = "site/audio"; }), /"notices": site\/audio is no regular file/],
 ]) { const f = run(change); ok(f.some((m) => why.test(m)) && mended(asOutput(f)), `fails on ${what}, each failure saying its mend`, f.join("\n") || "(it passed)"); }
 
 done();

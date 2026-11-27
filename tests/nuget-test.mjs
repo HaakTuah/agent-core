@@ -155,6 +155,15 @@ const bad = project(direct(["Copy.Left", "4.0.0"], ["Test.Tool", "9.0.0"], ["By.
 ok(bad.failures.length === 3 && /Copy\.Left@4\.0\.0 .*GPL-3\.0-only is off the list for what ships.*nuget\.accepted/.test(said(bad)) && /Test\.Tool@9\.0\.0 .*EPL-2\.0 is off the list for what ships/.test(said(bad)) && /By\.File@1\.0\.0 .*it ships, and its manifest names a licence file.*waits for the owner's yes \(floor rule 10\)\. Mend: .*the config's "nuget\.accepted"/.test(said(bad)),
   "copyleft in what ships fails, a licence good enough for a tool is not good enough for what ships, and what ships under a licence in a file waits for the owner's yes", said(bad));
 
+// (a package's manifest the restore left is read to a bound, core-path.mjs's regularText: past it, unread)
+{
+  const dir = restore("Newtonsoft.Json@13.0.3");
+  fs.appendFileSync(path.join(dir, "newtonsoft.json/13.0.3/newtonsoft.json.nuspec"), " ".repeat(1 << 24));
+  put(L, lock(direct(["Newtonsoft.Json", "13.0.3"]))); put(T, lock({})); put("checks/audit.json", JSON.stringify({ entries: [] }));
+  const r = check({ ships: [], audit: "checks/audit.json", nuget: { ships: [L], tools: [T] } }, tmp, dir, TRACKED);
+  ok(/Newtonsoft\.Json@13\.0\.3 .*its manifest in the restore's folder is no file of bytes, or is past \d+ bytes.*Mend: /.test(said(r)), "a package's manifest past the bound is unread, and fails with its mend", said(r));
+}
+
 // read by hand: a tool's entry in the audit, and the owner's yes for what ships
 const hand = { name: "by.file@1.0.0", kind: "nuget", licence: "MIT" };
 const tool = (entries, nuget = {}) => project({}, direct(["By.File", "1.0.0"]), { entries, nuget });
@@ -311,6 +320,10 @@ put("build/odd3.xml", "\uFEFF\uFEFF<Project><NuGetLockFilePath>x</NuGetLockFileP
 const odd = reported(["build/odd1.xml", "build/odd2.xml", "build/odd3.xml", "build/odd4.xml"]);
 ok(odd.reports.some(x => x.startsWith("build/odd1.xml is not plain UTF-8")) && odd.reports.some(x => x.startsWith("build/odd2.xml is not plain UTF-8")) && odd.reports.some(x => x.startsWith("build/odd3.xml names NuGetLockFilePath")) && odd.reports.some(x => x.startsWith("build/odd4.xml names RestorePackagesPath")),
   "a project with a byte UTF-8 does not allow, in UTF-32, with two marks, or past many blanks is read for what it is", JSON.stringify(odd));
+put("build/big.xml", `<Project><NuGetLockFilePath>x</NuGetLockFilePath></Project>${" ".repeat(1 << 24)}`);
+const big = reported(["build/big.xml"]);
+ok(readProject(tmp, "build/big.xml") === NOT_A_FILE && !big.reports.some(x => x.startsWith("build/big.xml names")) && big.reports.some(x => x.startsWith("build/big.xml begins as XML and is past")), "a file past the bound is unread, by name or by its content, and is named so", JSON.stringify(big.reports));
+fs.rmSync(path.join(tmp, "build/big.xml"));
 if (process.platform !== "win32") {
   fs.symlinkSync("/dev/null", path.join(tmp, "build/device.xml"));
   ok(readProject(tmp, "build/device.xml") === NOT_A_FILE && readProject(tmp, "build") === NOT_A_FILE && readProject(tmp, "build/none.xml") === null && Buffer.isBuffer(readProject(tmp, "build/after.xml")), "a path that leads to a device or a folder is no file, and is never read");
@@ -599,6 +612,26 @@ git("add", "-A"); git("commit", "-q", "-m", "a publish profile");
 ok(!pubCheck().failures.some(x => x.includes(PUB)) && pubCheck().reports.some(x => x.startsWith(`${PUB} names NuGetLockFilePath`) && x.includes("held before this check read it")), "the same project as the base held it: reported, and passes");
 ok(run("--imports").stdout.includes(`${PUB}\n`), "and the workflow's first look is told of it, so a change to it alone is checked");
 fs.rmSync(path.join(repo, "src/App/Properties"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no publish profile");
+// a file that begins as XML past the bound, unread: one the pull request adds or changes fails, and the first look is
+// told of it; as the base held it, reported
+{
+  const BIG = "build/big.xml", bigText = `<Project><NuGetLockFilePath>x</NuGetLockFilePath></Project>${" ".repeat(1 << 24)}`;
+  const bigCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, BIG], process.env, { base: "HEAD", baseConfig: null });
+  inRepo(BIG, bigText); git("add", "-A");
+  const added = bigCheck();
+  ok(added.failures.some(x => x.startsWith(`${BIG} begins as XML and is past`) && /Mend: /.test(x)) && run("--imports").stdout.includes(`${BIG}\n`), "one past the bound the pull request adds fails with its mend, and the workflow's first look is told of it", JSON.stringify(added));
+  git("commit", "-q", "-m", "a big file");
+  const held = bigCheck();
+  ok(!held.failures.some(x => x.includes(BIG)) && held.reports.some(x => x.startsWith(`${BIG} begins as XML and is past`) && x.includes("held before this check read it")), "the same as the base held it: reported, and passes", JSON.stringify(held));
+  inRepo(BIG, `${bigText} `);
+  ok(bigCheck().failures.some(x => x.startsWith(`${BIG} begins as XML and is past`)), "one changed in the checkout from what the base and git's index hold fails");
+  // (an attribute of the checkout's own that would hash other bytes to the base's blob is not the base's: it fails)
+  inRepo(BIG, bigText.replace("<Project>", "<Project>$Id$")); git("add", "-A"); git("commit", "-q", "-m", "a big file with an ident");
+  inRepo(".gitattributes", "*.xml ident\n"); inRepo(BIG, bigText.replace("<Project>", `<Project>$Id: <Import Project="x.props" /> $`));
+  ok(bigCheck().failures.some(x => x.startsWith(`${BIG} begins as XML and is past`)), "one whose bytes differ from the base's, under an attribute the base did not give it, fails", JSON.stringify(bigCheck().reports.filter(x => x.startsWith(BIG))));
+  fs.rmSync(path.join(repo, ".gitattributes"));
+  fs.rmSync(path.join(repo, BIG)); git("add", "-A"); git("commit", "-q", "-m", "no big file");
+}
 // a file a project read by what it is imports, as the base held both: reported, so that a sync fails no project that
 // changed nothing (#283's security review)
 const FIX = "tests/fixtures/a.xml", FIXED = "tests/fixtures/b.xml";
