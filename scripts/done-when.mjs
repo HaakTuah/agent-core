@@ -214,16 +214,22 @@ function readNotes(gh, repo, n, got, owner) {
 // and, of an issue, the login that opened it and whether it is a pull request: an issue
 // by gh from `repo`, an inbox file, "open" while it stands, as the head's commit holds it in the checkout at `dir` (from
 // git, so that a link is read as its own text and never followed out of the checkout); { limited: true } where
-// GitHub's rate limit refused it; null where it cannot be read.
+// GitHub's rate limit refused it; null where it cannot be read; an answer that did not finish thrown, with its mend.
 export function readItem(repo, item, dir = ".", owner = String(repo).split("/")[0]) {
   if (item.startsWith("inbox/")) {
     const body = whole(spawnSync("git", ["show", `HEAD:${item}`], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 24 }));
     return body === null ? null : { labels: [], body, state: "open" };
   }
+  // (GitHub's answer, or null where gh is not there or ends saying it cannot give it; an answer that did not finish is
+  // thrown past the catch below, with its mend: whole(), reading.mjs)
+  let unfinished = null;
   const gh = route => {
     const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 24 });
+    if (r.error?.code === "ENOENT") return null;
     if (r.status !== 0 && /rate limit/iu.test(String(r.stderr))) throw LIMITED;
-    return r.status === 0 ? parseBounded(r.stdout) : null;
+    let out;
+    try { out = whole(r, "GitHub's answer"); } catch (e) { unfinished = e; throw e; }
+    return out === null ? null : parseBounded(out);
   };
   try {
     const n = item.slice(1), got = gh(`repos/${repo}/issues/${n}`);
@@ -232,5 +238,8 @@ export function readItem(repo, item, dir = ".", owner = String(repo).split("/")[
     if (notes === null) return null;
     return { labels: (got.labels ?? []).map(l => String(l?.name ?? "")), body: currentText(got.body, notes, owner), state: got.state,
       author: String(got.user?.login ?? ""), pull: got.pull_request !== undefined };
-  } catch (e) { return e === LIMITED ? { limited: true } : null; }
+  } catch (e) {
+    if (unfinished) throw unfinished;
+    return e === LIMITED ? { limited: true } : null;
+  }
 }
