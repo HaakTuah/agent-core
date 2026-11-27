@@ -100,6 +100,12 @@ export const copyOf = (root = ".") => {
   return copies.get(root);
 };
 
+/** The folder of the core's copy a check leaves out of a project's own files, given the tracked files of the repository at
+ *  `root`: null in the core's own repository, which holds no copy whatever a core-manifest.md at its root says (its
+ *  scripts/core-path.mjs is tracked at the root), and in a repository with no manifest; else copyOf(root) (#1350). */
+export const copyAmong = (tracked, root = ".") =>
+  tracked.includes(MANIFEST) && !tracked.includes("scripts/core-path.mjs") ? copyOf(root) : null;
+
 /** The folder of the floor's own copy the manifest names on its line "Floor copy: <folder>/", which a repository whose
  *  core a library carries keeps until every agent tool has passed the staged cases carried and no-floor; null where it
  *  names none. Given the manifest's text, or with `root` read from there. */

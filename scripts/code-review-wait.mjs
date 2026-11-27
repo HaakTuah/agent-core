@@ -36,7 +36,9 @@
 // beside this file; #551): the newest posted review of each kind declaring its lines and its score (#710), and, in the core's own
 // repository, a design-checked pull request's design check of its head; a review counts for these only as the
 // security-review status counts one (REVIEWERS, RIGHTS). It prints, as JSON, the commit to
-// mark and the status to give it, named "code-review", or {} for a pull request that is closed or a draft. While
+// mark, the status to give it, named "code-review", and the verdict (done, why), which the security-review status,
+// required where this one is not, waits on too (security-review.mjs, withCode; #1339), or {} for a pull request that
+// is closed or a draft. While
 // "advisory" (the workflow's input, on unless turned off) the status is always a pass that says what the check would
 // have done, as the security-review status's.
 //
@@ -213,5 +215,6 @@ if (started(import.meta.url)) {
   const more = { reviewers: reviewersOf(process.env.REVIEWERS), rights: process.env.RIGHTS ? read(process.env.RIGHTS) : undefined, findings: process.env.FINDINGS ? read(process.env.FINDINGS) : undefined,
     queue: typeof pull?.head?.sha === "string" && /^[0-9a-f]{40}$/u.test(pull.head.sha) && process.env.QUEUE === pull.head.sha };
   const verdict = judge(pull, read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, boundOf(process.env.BOUND, pull, process.env.SINCE), mergesFile ? read(mergesFile) : undefined, copy, more);
-  console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL, CONTEXT), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
+  // (done and why, the verdict itself, which security-review.mjs folds into its own status: #1339)
+  console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, done: verdict.done, why: verdict.why, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL, CONTEXT), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }

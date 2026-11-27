@@ -9,7 +9,7 @@
 //     text alone (no ., [, *, +, ?, {, | or class escape such as \d), since that is a script's printed wording read, which
 //     the reviews judge.
 // A value counts where it stands in two files or more. Not read: lock files, the dated records (archive/, reports/,
-// words/, at the root and in the core's copy), what the config's ":!" specs leave out, and the files its "tests" lists,
+// words/, at the root and in the core's copy), the licence audit's config, by the kit's file name (its "version" of a tool fetched by checksum is the pin a file writes), what the config's ":!" specs leave out, and the files its "tests" lists,
 // whose copies of the code are another check's (#460, point 3); a value the config's "twice" names, with why both files
 // must hold it, is taken as said.
 // Nothing locks a project (AGENTS.md of the core): what the pull request's base held is the baseline. A value fails only
@@ -27,6 +27,9 @@ export const PATTERN_LEAST = 30;
 const PIN = /(?<![0-9A-Za-z_])(?:[0-9a-fA-F]{64}|[0-9a-fA-F]{40})(?![0-9A-Za-z_])/gu;
 const USES = /uses:[ \t]*["']?[^\s"'@]+@(?:sha256:)?$/u;
 const LOCKS = ["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lock", "packages.lock.json", "Cargo.lock", "poetry.lock", "Pipfile.lock", "uv.lock", "Gemfile.lock", "composer.lock", "go.sum"];
+// (the licence audit's config, by the kit's file name: the "version" of a tool fetched by its checksum is that pin,
+// written there and in the file that fetches it, so it stands in both by design)
+const AUDITS = ["licences-audit.json"];
 const RECORDS = ["archive/", "reports/", "words/"];
 const SCRIPT = /\.(?:[cm]?js|jsx|[cm]?ts|tsx)$/u;
 const READ_MOST = 1 << 20;
@@ -90,7 +93,7 @@ const excluded = s => {
 function scope(config, core, configAt) {
   const out = list(config.code).concat(list(config.prose)).filter(excludes);
   const leftOut = [...out, ...list(config.tests).filter(s => !excludes(s)).map(excluded),
-    ...(configAt ? [`:(exclude,literal)${configAt}`] : []), ...LOCKS.map(f => `:(exclude,glob)**/${f}`), ...RECORDS.flatMap(r => [`:(exclude)${r}`, ...(core ? [`:(exclude)${core}${r}`] : [])])];
+    ...(configAt ? [`:(exclude,literal)${configAt}`] : []), ...LOCKS.map(f => `:(exclude,glob)**/${f}`), ...AUDITS.map(f => `:(exclude,glob)**/${f}`), ...RECORDS.flatMap(r => [`:(exclude)${r}`, ...(core ? [`:(exclude)${core}${r}`] : [])])];
   const code = list(config.code).filter(s => !excludes(s));
   return { specs: [".", ...leftOut], code, codeSpecs: [...code, ...leftOut] };
 }

@@ -12,7 +12,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { HOST_OWN } from "../scripts/check.mjs";
+import { HOST_OWN, STAND_IN } from "../scripts/check.mjs";
 import { onPath } from "../scripts/workflow-run.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
@@ -311,6 +311,12 @@ ok(r.status === 1 && r.out.includes("does not merge into its base without a conf
   commit(one.dir, "the starter kit");
   r = check(one.dir, "--base", "HEAD", "--own");
   ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && /ok {3}parents\.yml\/parents/.test(r.out), "and in a repository of one commit, a head that is its base passes the copies checks, its base read, the commit a merge of two parents that adds nothing to it", r.out);
+}
+
+{
+  // (the form of an address that personal-terms.yml accepts: its step "form=")
+  const form = new RegExp(fs.readFileSync(path.join(root, ".github", "workflows", "personal-terms.yml"), "utf8").match(/form='([^']+)'/)[1], "i");
+  ok(form.test(STAND_IN.email), "the commits it makes for a pull request are written under an address the personal-terms check accepts (a no-reply one)", STAND_IN.email);
 }
 
 // another host: no .github/workflows, so the kit's calls are run, read from the core itself

@@ -12,8 +12,10 @@
 # its SHA-256, then run once to show its version, before it replaces anything; a version with no checksum here is never
 # installed, whatever `.node-version` says. The sums are the SHA-256 of `bin/node` in that version's node-linux-<arch>
 # packages, published by the Node.js project, recomputed in the PR that sets the pin.
-# Safe to run twice; always exits 0 and says what it could not do.
+# Safe to run twice; always exits 0 and says what it could not do, and, where the machine has no npm, that this brings
+# Node alone and what to do about it.
 have() { command -v "$1" >/dev/null 2>&1; }
+trap 'have npm || echo "note: npm is not here, and this script brings Node alone. Mend: install npm beside Node (the system package for it, or the Node distribution'"'"'s own), which each check that installs the core'"'"'s packages needs"' EXIT
 digits() { case "$1" in ''|*[!0-9]*) return 1 ;; esac; }
 want=$(tr -d '[:space:]' 2>/dev/null <core/.node-version)
 least=$(tr -d '[:space:]' 2>/dev/null <core/.node-least)
