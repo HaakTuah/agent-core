@@ -41,12 +41,12 @@ const ok = (cond, what, got = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${
     ok(linked.at === null && mended(`FAIL ${linked.mend}`), "a tracked link in the manifest's place is refused, with its mend", JSON.stringify(linked));
     fs.rmSync(path.join(project, "core-manifest.md")); put("core-manifest.md", text); git("add", "-A"); git("commit", "-q", "-m", "the file back");
   }
-  // (a head that moves where the core lies, its manifest naming another copy it brings: refused, with its mend)
+  // (a project's head that moves its copy, its manifest naming the new place: read there, as core.yml holds that copy
+  // to its pin)
   const manifestText = fs.readFileSync(path.join(project, "core-manifest.md"), "utf8");
   put("core-manifest.md", `Core: someone/core at ${"0".repeat(40)}, copied whole under x/\n`); put("x/roles/a.md", "a\n"); put("x/floor/security.md", "f\n");
   git("add", "-A"); git("commit", "-q", "-m", "another place");
-  const moved = coreHere(project);
-  ok(moved.at === null && mended(`FAIL ${moved.mend}`) && /under x\/, where its base held it under core\//.test(moved.mend), "a head that holds the core elsewhere than its base is refused, with its mend", JSON.stringify(moved));
+  ok(JSON.stringify(coreHere(project)) === JSON.stringify({ at: "x/", mend: null }), "a project's head that moves its copy is read where its manifest puts it, with nothing to mend");
   put("core-manifest.md", manifestText); fs.rmSync(path.join(project, "x"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "the place back");
   if (process.platform !== "win32") {
     fs.renameSync(path.join(project, "core", "tasks"), path.join(project, "core", "t")); fs.symlinkSync("t", path.join(project, "core", "tasks"));
@@ -67,5 +67,21 @@ const ok = (cond, what, got = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${
   ok(gone.at === null && mended(`FAIL ${gone.mend}`), "a head that holds the core nowhere its base held it fails, with its mend", JSON.stringify(gone));
   git("checkout", "-q", "--orphan", "alone"); git("commit", "-q", "-m", "no parent");
   ok(calledFor(project) === null, "with no base to read against, nothing is asked");
+}
+// (a head of the core's own repository that puts its rules elsewhere, its added manifest naming a copy it brings:
+// refused, with its mend)
+{
+  const tmp = scratchDir("pr-description-test-"), own = path.join(tmp, "own");
+  const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
+  const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
+  const git = (...args) => execFileSync("git", args, { cwd: own, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(own, f)), { recursive: true }); fs.writeFileSync(path.join(own, f), text); };
+  put("roles/a.md", "a\n"); put("floor/security.md", "f\n");
+  git("init", "-q", "-b", "main"); git("add", "-A"); git("commit", "-q", "-m", "the base");
+  ok(JSON.stringify(coreHere(own)) === JSON.stringify({ at: "", mend: null }), "the core's own repository is read at its root, with nothing to mend");
+  put("core-manifest.md", `Core: someone/core at ${"0".repeat(40)}, copied whole under x/\n`); put("x/roles/a.md", "a\n"); put("x/floor/security.md", "f\n");
+  git("add", "-A"); git("commit", "-q", "-m", "another place");
+  const moved = coreHere(own);
+  ok(moved.at === null && mended(`FAIL ${moved.mend}`) && /under x\/, where its base, the core's own repository, held them at its root/.test(moved.mend), "a head of the core's own repository that reads its rules elsewhere is refused, with its mend", JSON.stringify(moved));
 }
 process.exit(failed ? 1 : 0);
