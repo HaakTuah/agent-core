@@ -1,0 +1,265 @@
+// The orchestrator's lease (core/tasks/tools.md, "One orchestrator works a queue"; #1106): one issue of the project's,
+// labelled `orchestrator`, whose newest lease comment names the session that holds the queue, its tool and how many
+// builders it had running, its time the host's own (the comment's creation), and whose current text is the
+// orchestrator's hand-off. Only comments the *owner's account* wrote are read: any other account's, and a session's word
+// beyond what the issue shows, decide nothing (floor rule 4). GitHub's answers are untrusted (floor rule 4): each comment
+// is read by its lines' form, a session's name and a tool's in a form of their own, and only the repository's name, an
+// issue's number and a time in its form reach gh's route.
+//   - At a wake (--session): where another session's lease is fresh (younger than TERM_HOURS), or a hand-over note newer
+//     than the newest lease names another, it prints "Stop:" and ends with 2, so the orchestrator deletes every wake of
+//     its own and stops; else it writes its lease comment (renewing its own, or claiming a stale one, or one handed to it
+//     or to any) and ends with 0. Where no lease issue stands, it opens one first, its text the hand-off's frame.
+//   - Read alone (no --session): who holds the lease, its tool, its last wake and how long ago, whether that is over
+//     COLD_MINUTES old (the holder's cache lapsed) and whether it had builders running, and so whether a new orchestrator
+//     may be started; it writes nothing. Whoever starts one (the owner, the adviser) reads it first.
+//   - --hand-over <session or "any">: the hand-over note, written by whoever starts a fresh orchestrator in place of a
+//     cold one, or by an orchestrator that stops keeping no wake; the session it names, or with "any" the next that
+//     wakes, takes the lease.
+//   - For the scheduled look (`dueIssue`, look.mjs): over the last LOOK_HOURS, a lease renewed by two sessions (a lease
+//     of one session while another's was fresh, with no hand-over note between that names it or any), and a holder's
+//     wakes more than COLD_MINUTES apart while it had builders running.
+// It writes on the host only the lease comment, the hand-over note and the lease issue, and only where it is run with
+// --session or --hand-over. Node's own modules and gh.
+//
+//   node core/scripts/lease.mjs                                  who holds the lease, and whether one may be started
+//   node core/scripts/lease.mjs --session <id> --tool <t> [--builders <n>]   at a wake: renew, claim, or Stop
+//   node core/scripts/lease.mjs --hand-over <id or any>          hand the lease over
+//   ... [--repo <owner>/<name>] [--owner <login>]               the repository and the owner's account, where not read
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import { aLogin, aRepository, oneLine } from "./guards.mjs";
+import { repoOf } from "./inbox.mjs";
+import { timeOf } from "./moment.mjs";
+import { ownerOf, plainEnv } from "./releases.mjs";
+import { started } from "./started.mjs";
+
+export const LABEL = "orchestrator";
+export const ISSUE_TITLE = "The orchestrator's lease and hand-off";
+export const TITLE = "The orchestrator's lease shows two holders or a late wake";
+// A lease is fresh this long after its holder's last wake (a few hours, a first guess); a holder's cache lapses an
+// hour after its last step; the look reads this far back; the most comments read.
+export const TERM_HOURS = 3, COLD_MINUTES = 60, LOOK_HOURS = 26, PAGES = 10;
+const HOUR = 3600000, MINUTE = 60000;
+const SESSION = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/u, TOOL = /^[a-z][a-z0-9-]{0,39}$/u;
+export const OPENER = "From the orchestrator, on its lease:";
+
+// The lease comment and the hand-over note as the script writes them, and as `entryOf` reads them back.
+export const leaseText = ({ session, tool, builders }) => [OPENER, `Lease: ${session}`, `Tool: ${tool}`, `Builders: ${builders}`].join("\n");
+export const handOverText = (to, opener = OPENER) => [opener, `Hand-over: ${to}`].join("\n");
+
+const valueOf = (lines, key) => {
+  const found = lines.filter(l => l.startsWith(`${key}: `));
+  return found.length === 1 ? found[0].slice(key.length + 2).trim() : null;
+};
+
+// A comment read as { kind: "lease", session, tool, builders, at } or { kind: "hand-over", to, at }, or null: one the
+// owner's account did not write, one with no time of the host's, and one whose lines are of neither form (both, or a
+// key twice, is neither).
+export function entryOf(comment, owner) {
+  if (!comment || typeof comment !== "object") return null;
+  if (String(comment.user?.login ?? "").toLowerCase() !== String(owner).toLowerCase() || !owner) return null;
+  const at = timeOf(comment.created_at);
+  if (at === null || typeof comment.body !== "string" || comment.body.length > 4000) return null;
+  const lines = comment.body.split(/\r?\n/u).map(l => l.trim());
+  const session = valueOf(lines, "Lease"), to = valueOf(lines, "Hand-over");
+  if (session !== null && to === null) {
+    const tool = valueOf(lines, "Tool"), builders = Number(valueOf(lines, "Builders"));
+    if (!SESSION.test(session) || !TOOL.test(tool ?? "") || !Number.isInteger(builders) || builders < 0 || builders > 999) return null;
+    return { kind: "lease", session, tool, builders, at };
+  }
+  if (to !== null && session === null && (to === "any" || SESSION.test(to))) return { kind: "hand-over", to, at };
+  return null;
+}
+
+export const entriesOf = (comments, owner) => (Array.isArray(comments) ? comments : []).map(c => entryOf(c, owner)).filter(Boolean).sort((a, b) => a.at - b.at);
+
+const ago = (at, now) => Math.max(0, Math.round((now - at) / MINUTE));
+
+// Who holds the lease at `now`, from the entries (entriesOf): { holder, tool, builders, at, minutes, fresh, cold,
+// handedTo } where a lease stands (handedTo: the session or "any" a hand-over note newer than it names), else null.
+export function holding(entries, now) {
+  const lease = [...entries].reverse().find(e => e.kind === "lease") ?? null;
+  const note = [...entries].reverse().find(e => e.kind === "hand-over" && (!lease || e.at > lease.at)) ?? null;
+  if (!lease && !note) return null;
+  const base = lease ? { holder: lease.session, tool: lease.tool, builders: lease.builders, at: lease.at, minutes: ago(lease.at, now) } : { holder: null, tool: null, builders: 0, at: note.at, minutes: ago(note.at, now) };
+  return { ...base, fresh: now - base.at < TERM_HOURS * HOUR, cold: now - base.at > COLD_MINUTES * MINUTE, handedTo: note?.to ?? null, noteAt: note?.at ?? null };
+}
+
+// What a wake of session `me` does: { act: "renew" | "claim" | "stop", why }.
+export function decide(entries, me, now) {
+  const h = holding(entries, now);
+  if (!h) return { act: "claim", why: "no lease stands" };
+  if (h.handedTo !== null) {
+    if (h.handedTo === me || h.handedTo === "any") return { act: "claim", why: `the lease was handed over to ${h.handedTo === "any" ? "the next that wakes" : "this session"}` };
+    if (now - h.noteAt < TERM_HOURS * HOUR) return { act: "stop", why: `a hand-over note names ${h.handedTo}` };
+    return { act: "claim", why: `the hand-over note to ${h.handedTo} is over ${TERM_HOURS} hours old and it never took the lease` };
+  }
+  if (h.holder === me) return { act: "renew", why: "this session holds the lease" };
+  if (h.fresh) return { act: "stop", why: `${h.holder} (${h.tool}) holds the lease, its last wake ${h.minutes} minutes ago` };
+  return { act: "claim", why: `the lease of ${h.holder} is stale, its last wake ${h.minutes} minutes ago` };
+}
+
+// The lines read alone print: who holds it and whether a new orchestrator may be started.
+export function said(h) {
+  if (!h) return ["No lease stands: a new orchestrator may be started."];
+  const when = new Date(h.at).toISOString().replace(/\.\d{3}Z$/u, "Z");
+  const out = h.holder ? [`Held by ${h.holder} (${h.tool}), its last wake ${when}, ${h.minutes} minutes ago, with ${h.builders} builder${h.builders === 1 ? "" : "s"} running.`] : [];
+  if (h.handedTo) out.push(`Handed over to ${h.handedTo === "any" ? "the next that wakes" : h.handedTo}: ${h.handedTo === "any" ? "a new orchestrator may be started" : "only that session takes it"}.`);
+  else if (!h.fresh) out.push(`The lease is stale (over ${TERM_HOURS} hours): a new orchestrator may be started.`);
+  else if (h.cold && h.builders === 0) out.push(`Its last wake is over an hour old and it had no builder running, so its cache has lapsed: whoever resumes the work starts a fresh orchestrator from the hand-off with \`--hand-over <its session>\`, never waking the old one.`);
+  else if (h.cold) out.push(`Its last wake is over an hour old, but it had builders running, which report to it: do not replace it; wake it.`);
+  else out.push("Its last wake is within the hour: do not start another.");
+  return out;
+}
+
+// What the look reports over the entries since `from`: the leases taken while another's was fresh with no note that
+// named the new holder or any, and a holder's wakes more than COLD_MINUTES apart while it had builders running.
+export function faults(entries, from) {
+  const out = [];
+  let held = null, note = null;
+  for (const e of entries) {
+    if (e.kind === "hand-over") { note = e; continue; }
+    if (held && e.at >= from) {
+      const handed = note && note.at > held.at && (note.to === e.session || note.to === "any");
+      if (held.session !== e.session && e.at - held.at < TERM_HOURS * HOUR && !handed) out.push(`renewed by two sessions: ${e.session} took the lease ${ago(held.at, e.at)} minutes after ${held.session}'s wake, with no hand-over note between`);
+      if (held.session === e.session && held.builders > 0 && e.at - held.at > COLD_MINUTES * MINUTE) out.push(`${e.session}'s wakes ${ago(held.at, e.at)} minutes apart while ${held.builders} builder${held.builders === 1 ? "" : "s"} ran`);
+    }
+    held = e;
+    note = null;
+  }
+  return out;
+}
+
+const plain = route => route.split("?")[0];
+const ghRead = route => {
+  const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 24, timeout: 60000, env: plainEnv() });
+  if (r.status !== 0) throw new Error(`gh could not read ${plain(route)}: ${oneLine(String(r.stderr || r.error || "")).trim().slice(0, 200)}`);
+  return JSON.parse(r.stdout);
+};
+const ghWrite = (route, payload) => {
+  const r = spawnSync("gh", ["api", "-X", "POST", route, "--input", "-"], { input: JSON.stringify(payload), encoding: "utf8", maxBuffer: 1 << 24, timeout: 60000, env: plainEnv() });
+  if (r.status !== 0) throw new Error(`gh could not write ${plain(route)}: ${oneLine(String(r.stderr || r.error || "")).trim().slice(0, 200)}`);
+  return JSON.parse(r.stdout);
+};
+
+// The host as the script reads and writes it: the open lease issues the owner's account opened, lowest number first,
+// and an issue's comments updated since `since` (an ISO time), at most PAGES pages.
+export function hostOf(repo, read = ghRead, write = ghWrite) {
+  if (!aRepository(repo)) throw new Error("no repository in the form owner/name");
+  return {
+    issues: owner => (aLogin(owner) ? read(`repos/${repo}/issues?labels=${LABEL}&state=open&creator=${owner}&per_page=100`) : []).filter(i => i && !i.pull_request && Number.isInteger(i.number)).sort((a, b) => a.number - b.number),
+    comments: (number, since) => {
+      const rows = [];
+      for (let page = 1; page <= PAGES; page++) {
+        const got = read(`repos/${repo}/issues/${number}/comments?since=${since}&per_page=100&page=${page}`);
+        if (!Array.isArray(got)) throw new Error("GitHub gave no list of comments");
+        rows.push(...got);
+        if (got.length < 100) return rows;
+      }
+      throw new Error(`the lease's comments run past ${PAGES * 100}`);
+    },
+    open: () => write(`repos/${repo}/issues`, { title: ISSUE_TITLE, labels: [LABEL], body: frame() }),
+    comment: (number, body) => write(`repos/${repo}/issues/${number}/comments`, { body }),
+  };
+}
+
+// The hand-off's frame, the lease issue's first text, which the orchestrator keeps current at each change.
+export const frame = () => [
+  "This is the issue's current text.",
+  "",
+  "The orchestrator's lease and hand-off (core/tasks/tools.md, \"One orchestrator works a queue\"): its newest lease comment names the session that holds the queue; this text is the hand-off, kept current at each change, from which a new orchestrator takes up alone.",
+  "",
+  "**Lanes and their pull requests, and what each waits on:** none yet.",
+  "**Orders for now in force:** none.",
+  "**Next:** the first wake's work.",
+  "",
+  "Found while: an orchestrator's first wake, taking the lease.",
+].join("\n");
+
+const iso = t => new Date(t).toISOString().replace(/\.\d{3}Z$/u, "Z");
+
+// The scheduled look's reader (look.mjs, DUE): its issue while a fault of the last LOOK_HOURS stands, closed once none
+// does; none at all where no lease issue stands.
+export function dueIssue({ repo, owner, at }, host = () => hostOf(repo)) {
+  try {
+    const now = timeOf(at) ?? Date.now();
+    const h = host();
+    const issue = h.issues(owner)[0];
+    if (!issue) return null;
+    const from = now - LOOK_HOURS * HOUR;
+    const found = faults(entriesOf(h.comments(issue.number, iso(from - TERM_HOURS * HOUR)), owner), from);
+    if (!found.length) return { title: TITLE, body: null };
+    return {
+      title: TITLE, owner: false,
+      body: [
+        `The orchestrator's lease (#${issue.number}; \`node core/scripts/lease.mjs\`; core/tasks/tools.md, "One orchestrator works a queue") shows, over the last ${LOOK_HOURS} hours:`,
+        "",
+        ...found.map(f => `- ${f}`),
+        "",
+        "A task the orchestrator takes: find why from its wakes and the sessions running (two orchestrators on one queue: the one that does not hold the lease deletes its wakes and stops; a late wake: its wake comes within the cache's hour while a builder runs), and close this issue once it is mended.",
+      ].join("\n"),
+    };
+  } catch (e) { return { title: TITLE, body: null, unread: `the orchestrator's lease could not be read: ${oneLine(String(e.message)).slice(0, 200)}` }; }
+}
+
+// The options, or { fail }.
+export function optionsOf(argv) {
+  const o = { session: null, tool: null, builders: 0, handOver: null, repo: null, owner: null };
+  const keys = { "--session": "session", "--tool": "tool", "--builders": "builders", "--hand-over": "handOver", "--repo": "repo", "--owner": "owner" };
+  for (let i = 0; i < argv.length; i += 2) {
+    const key = keys[argv[i]], value = argv[i + 1];
+    if (!key) return { fail: `${oneLine(argv[i])} is no option of this script (${Object.keys(keys).join(", ")})` };
+    if (value === undefined || value.startsWith("--")) return { fail: `${argv[i]} needs a value` };
+    o[key] = key === "builders" ? Number(value) : value;
+  }
+  if (o.session !== null && !SESSION.test(o.session)) return { fail: "--session is no session's name: letters, digits and _ . : - alone, at most 100" };
+  if (o.session !== null && !TOOL.test(o.tool ?? "")) return { fail: "--session needs --tool, the tool's name in lower case (claude, codex)" };
+  if (!Number.isInteger(o.builders) || o.builders < 0 || o.builders > 999) return { fail: "--builders is a whole number of builders running" };
+  if (o.handOver !== null && o.handOver !== "any" && !SESSION.test(o.handOver)) return { fail: "--hand-over names a session, or any" };
+  if (o.handOver !== null && o.session !== null) return { fail: "--hand-over and --session go apart" };
+  if (o.repo !== null && !aRepository(o.repo)) return { fail: "--repo is owner/name" };
+  if (o.owner !== null && !aLogin(o.owner)) return { fail: "--owner is an account's login" };
+  return o;
+}
+
+function repoHere() {
+  if (process.env.GITHUB_ACTIONS === "true" && aRepository(process.env.GITHUB_REPOSITORY ?? "")) return process.env.GITHUB_REPOSITORY;
+  return repoOf(spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8", env: plainEnv() }).stdout);
+}
+const manifestOwner = () => { try { return ownerOf(fs.readFileSync("core-manifest.md", "utf8")); } catch { return null; } };
+
+export function main(argv, { host = hostOf, now = Date.now(), print = console.log, repo = null, owner = null } = {}) {
+  const o = optionsOf(argv);
+  if (o.fail) { console.error(`FAIL: ${o.fail}. Mend: run it as its header shows`); return 1; }
+  const where = o.repo ?? repo ?? repoHere();
+  if (!where) { console.error("FAIL: no repository on github.com could be read from origin. Mend: give --repo <owner>/<name>"); return 1; }
+  const who = o.owner ?? owner ?? manifestOwner() ?? where.split("/")[0];
+  let h;
+  try {
+    h = host(where);
+    let issue = h.issues(who)[0];
+    if (!issue && (o.session === null || o.handOver !== null)) {
+      if (o.handOver === null) { print(said(null).join("\n")); return 0; }
+      console.error("FAIL: no lease issue stands to hand over. Mend: nothing to hand over; the next orchestrator's wake opens it");
+      return 1;
+    }
+    if (!issue) { issue = h.open(); print(`Opened the lease issue #${issue.number}.`); }
+    const entries = entriesOf(h.comments(issue.number, iso(now - 24 * HOUR)), who);
+    if (o.handOver !== null) {
+      h.comment(issue.number, handOverText(o.handOver));
+      print(`Handed the lease (#${issue.number}) over to ${o.handOver === "any" ? "the next that wakes" : o.handOver}.`);
+      return 0;
+    }
+    if (o.session === null) { print([`The lease: #${issue.number}.`, ...said(holding(entries, now))].join("\n")); return 0; }
+    const d = decide(entries, o.session, now);
+    if (d.act === "stop") { print(`Stop: ${d.why} (#${issue.number}). Delete every wake of your own and stop; keep no wake.`); return 2; }
+    h.comment(issue.number, leaseText(o));
+    print(`${d.act === "renew" ? "Renewed" : "Claimed"} the lease (#${issue.number}): ${d.why}. Set your next wake within the cache's hour (55 minutes) while a builder runs or a review or check is due; with nothing in flight keep none, hand over with --hand-over any, and stop.`);
+    return 0;
+  } catch (e) {
+    console.error(`FAIL: ${oneLine(String(e.message)).slice(0, 300)}. Mend: run it again where gh answers for the owner's account; where it still cannot read the lease, stop the wake and say so`);
+    return 1;
+  }
+}
+
+if (started(import.meta.url)) process.exitCode = main(process.argv.slice(2));
