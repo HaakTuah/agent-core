@@ -34,7 +34,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { copyOf } from "./core-path.mjs";
+import { copyAside } from "./core-path.mjs";
 import { leadsOut, logged } from "./guards.mjs";
 import { MEND } from "./mend.mjs";
 import { started } from "./started.mjs";
@@ -84,8 +84,8 @@ export function hostScans(root, base = null) {
 export function targets(root, base) {
   const git = (...a) => execFileSync("git", a, { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
   const listed = base ? git("diff", "--name-only", "-z", "--no-renames", "--diff-filter=AMT", base, "HEAD") : git("ls-files", "-z");
-  const copy = copyOf(root);
-  return listed.filter(f => KINDS.test(f) && !f.startsWith(copy) && !leadsOut(root, path.join(root, f)) && fs.lstatSync(path.join(root, f), { throwIfNoEntry: false })?.isFile());
+  const copy = copyAside(root); // (none in the core's own repository: core-path.mjs)
+  return listed.filter(f => KINDS.test(f) && !(copy && f.startsWith(copy)) && !leadsOut(root, path.join(root, f)) && fs.lstatSync(path.join(root, f), { throwIfNoEntry: false })?.isFile());
 }
 
 /** The lines the change adds to each file, from git's diff of that file alone with no context, its name taken

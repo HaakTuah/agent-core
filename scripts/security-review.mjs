@@ -31,7 +31,8 @@
 // where none is found, waits, as before.
 // Dependabot's own pull request (opened by it from a branch of the repository, every commit of it written by Dependabot
 // and signed by GitHub, so that one somebody else has pushed to, or brought up to date by a merge, is its own no
-// longer) passes where no review of Codex's has begun on it: floor rule 17 holds it (with a branch of the repository,
+// longer) passes where no review of Codex's has begun on it, save while the code-review verdict waits (withCode, below;
+// #1339): floor rule 17 holds it (with a branch of the repository,
 // its status is written when the first comment that counts arrives, which is Codex's summary once the code review rule
 // 17 asks for is asked). A pull request that needs no security review and gets none by itself says so in a comment of
 // that kind, which its code reviewer checks (tasks/reviews.md, point 3); the status then says a review is posted, and
@@ -63,7 +64,10 @@
 // input, on unless turned off) the status is always a pass that says what the check would have done, until the
 // project's owner turns that off (#99). What the status proves where every review is posted (none starts by itself, as
 // through a plug-in): that a review was posted for the head, not who made it, since builder and reviewer may post under
-// one login, which no check here tells apart (#187).
+// one login, which no check here tells apart (#187). Given the verdict scripts/code-review-wait.mjs printed for the
+// same head (CODE), it waits, too, while the code-review status waits, saying why, so that the one status a ruleset
+// requires holds a pull request that needs a code review until one is posted in its form (#1339); one it cannot read
+// waits too; a head proved a pure sync (PURE) needs no review, and waits on none.
 //
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its review comments, the same> [<its commits, the same> [<its files, the same> [<the merges proved>]]]]
@@ -71,9 +75,10 @@
 //         the host's time the script first came to the default branch, which it was opened before (boundOf); RUN_URL for
 //         the link the status carries; REVIEWERS for the accounts named; RIGHTS for a file of GitHub's answers on
 //         their rights (collaborators/<login>/permission, as a JSON list); PURE for the head pure-sync.mjs proved;
-//         QUEUE for the head the caller's queue-only.mjs proved (#750).
-import { existsSync, readFileSync } from "node:fs";
-import { copyOf } from "./core-path.mjs";
+//         QUEUE for the head the caller's queue-only.mjs proved (#750); CODE for the file scripts/code-review-wait.mjs
+//         printed into for the same head, whose waiting this status waits for too (withCode; #1339).
+import { readFileSync } from "node:fs";
+import { copyHeld } from "./core-path.mjs";
 import { RUNS } from "./comment-only.mjs";
 import { mayRun } from "./power.mjs";
 import { blockingOf } from "./review-lines.mjs";
@@ -242,7 +247,7 @@ function begunAfter(verdict, { sha, running, all, posted, bound }) {
 // runs by itself beyond .github/ (an agent tool's folder, the install and build files), as power.mjs's mayRun reads them; where it did not run (a
 // default branch whose core is older), what runs by itself alone, as that core reads it
 const withPower = (file, copy, power) => (power instanceof Set ? [file.filename, file.previous_filename].some((name) => typeof name === "string" && power.has(name))
-  : runs(file, copy) || (power === null && [file.filename, file.previous_filename].some((name) => typeof name === "string" && !name.startsWith(copy ?? "core/") && mayRun(name))));
+  : runs(file, copy) || (power === null && [file.filename, file.previous_filename].some((name) => typeof name === "string" && !aside(name, copy) && mayRun(name))));
 function floorTwo(verdict, { sha, pull, files, posted, review, bound, pure, copy, power }) {
   if (!(verdict.done && pure !== true && files !== undefined && (!whole(pull, files) || flat(files).some((file) => withPower(file, copy, power) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha)))) return verdict;
   const codexDone = review !== null && typeof review === "object" && review.status === "completed";
@@ -317,8 +322,11 @@ export const queueOnly = (pull, files, copy) => files !== undefined && whole(pul
 export const whole = (pull, files) => Number.isInteger(pull.changed_files) && pull.changed_files >= 0 && flat(files).length >= pull.changed_files;
 // what runs by itself, as comment-only.mjs reads it, the copy of the core aside (only a sync changes it, and its code
 // passed its reviews in the core's own pull request: floor rule 8), under core/ or the path the default branch's manifest
-// names (`copy`, core-path.mjs's copyOf, given by the script's caller); a file moved counts on either side
-const runs = (file, copy = "core/") => [file.filename, file.previous_filename].some((name) => typeof name === "string" && !name.startsWith(copy) && RUNS.test(name));
+// names (`copy`, core-path.mjs's copyHeld, given by the script's caller); a file moved counts on either side
+const runs = (file, copy) => [file.filename, file.previous_filename].some((name) => typeof name === "string" && !aside(name, copy) && RUNS.test(name));
+// (a name under the copy: none where the caller found no copy, null, as in the core's own repository; core/ where a caller
+// gives none, undefined, as an older default branch's does)
+const aside = (name, copy) => copy !== null && name.startsWith(copy ?? "core/");
 // a `uses:` line pinned to a whole SHA, with the note after it if any: [the line with the pin and note set aside]
 const USES = /^(\s*(?:-\s+)?["']?uses["']?\s*:\s*["']?[^\s"'@#]+@)[0-9a-f]{40}(["']?)(?:\s+#\s*[\w.+-]*)?$/u;
 // whether a file, as GitHub's API gives it among a pull request's files, only moves pins: changed in place, and in
@@ -438,6 +446,29 @@ export function powerFilesOf(file, read) {
   return Array.isArray(power) && power.every((name) => typeof name === "string") ? new Set(power) : null;
 }
 
+// the code-review status's verdict folded in (#1339): the security-review status, which a ruleset requires (the core's; a
+// project's where its owner makes it so), also waits while the code-review status waits, which none requires,
+// so that a pull request that needs a code review merges only after one is posted, in its form. `code` is
+// what scripts/code-review-wait.mjs printed for the same head ({ sha, done, why }), or undefined where the workflow ran
+// none (a default branch whose core is older); one it ran that cannot be read is read as waiting, never as a pass;
+// `pure`, where pure-sync.mjs proved the head a pure sync, which needs no review at all (floor rule 8), whatever the
+// code-review status reads of a shape it does not prove (a workflow the kit renders anew, beyond its pins), so that the
+// sync, merged by hand, is held by no wait of a review
+// (its why carried whole where it fits, with room for "Advisory: " and "; summary unreadable" in GitHub's 140
+// characters; else what it waits for with a mend that points to that status's own, which GitHub shows beside this
+// one; else that pointer alone)
+export const CODE_UNREAD = "code-review not worked out. Mend: run this job again; failing again, mend scripts/code-review-wait.mjs";
+export const CODE_WAITS = "code-review waits. Mend: do what the code-review status's own mend says; this status then follows it";
+const POINTS = "Mend: do what the code-review status's own mend says";
+export function withCode(verdict, code, pure = false) {
+  if (verdict === undefined || code === undefined || !verdict.done || pure) return verdict;
+  const read = code !== null && typeof code === "object" && code.sha === verdict.sha && typeof code.done === "boolean" && typeof code.why === "string";
+  if (read && code.done) return verdict;
+  if (!read) return { ...verdict, done: false, why: CODE_UNREAD };
+  const whole = `code-review waits: ${code.why}`, short = `code-review waits: ${code.why.split(/\. Mend: /u)[0]}. ${POINTS}`;
+  return { ...verdict, done: false, why: [whole, short].find((why) => why.length <= 110) ?? CODE_WAITS };
+}
+
 // the commit status GitHub is given: while advisory always a pass, saying what the check would have done (context: the
 // status's name, this check's unless scripts/code-review-wait.mjs gives its own)
 export function status(verdict, advisory, url, context = CONTEXT) {
@@ -466,6 +497,13 @@ if (started(import.meta.url)) {
       queue: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.QUEUE === pull.head.sha,
       merges: mergesFile ? read(mergesFile) : undefined,
       light: lightOf(process.env.POWER, read), power: powerFilesOf(process.env.POWER, read),
-      copy: existsSync("core-manifest.md") ? copyOf(".") : undefined }); // (the copy at the path the default branch's manifest names, checked out here, as code-review-wait.mjs reads it)
-  console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
+      copy: copyHeld(".") }); // (the copy at the path the default branch's manifest names, checked out here, none in the core's own repository, as code-review-wait.mjs reads it)
+  // (CODE: the file code-review-wait.mjs printed into, where the workflow ran it; missing, empty or not JSON, it is
+  // read as not worked out, which waits)
+  const code = (() => {
+    if (!process.env.CODE) return undefined;
+    try { return JSON.parse(readFileSync(process.env.CODE, "utf8")); } catch { return null; }
+  })();
+  const folded = withCode(verdict, code, typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.PURE === pull.head.sha);
+  console.log(JSON.stringify(folded === undefined ? {} : { sha: folded.sha, status: status(folded, process.env.ADVISORY !== "false", process.env.RUN_URL), ...(folded.warning ? { warning: folded.warning } : {}) }));
 }

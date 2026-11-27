@@ -10,8 +10,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { checkout, copied, OWN_SCRIPT } from "../scripts/core-path-scratch.mjs";
 import { CORE } from "../scripts/core-address.mjs";
-import { falseAlarms, hostScans, installNot, scan, answer as engineAnswer, verdicts, unreadLines, unreadListed, unreadOf } from "../scripts/code-scan.mjs";
+import { falseAlarms, hostScans, installNot, scan, answer as engineAnswer, targets, verdicts, unreadLines, unreadListed, unreadOf } from "../scripts/code-scan.mjs";
 
 const { ok, done } = tally();
 const tmp = scratchDir("code-scan-logic-test-");
@@ -65,6 +66,16 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
   ok(installNot(nothing, "HEAD~1") === "the change adds or alters no file of the kinds the scan reads" && installNot(nothing) === null, "a change of no file the scan reads installs no engine; with no base, as on a push to main, the engine is installed");
   ok(scan(nothing, { base: "HEAD~1", dir: path.join(tmp, "no-engine-here") }).lines.join("").includes("no file of the kinds it reads changed"), "and its scan says so, with no engine to ask");
   ok(/a workflow calls the core's codeql\.yml/u.test(installNot(p) ?? ""), "where the host's CodeQL scans the project, no engine is installed");
+}
+
+// The copy told apart from the core's own repository, as core-path.mjs's copyAside does (#1350): where
+// scripts/core-path.mjs is tracked at the root, a core-manifest.md beside it names no copy, and the folder it names is
+// scanned; in a project, which tracks no such script there, the copy is left out
+{
+  const both = { "core-manifest.md": copied("lib/"), "lib/a.js": "x();\n", "src/b.js": "y();\n" };
+  const own = targets(checkout(tmp, "targets-own", { ...both, ...OWN_SCRIPT })), copy = targets(checkout(tmp, "targets-copy", both));
+  ok(own.includes("lib/a.js") && own.includes("scripts/core-path.mjs") && !copy.includes("lib/a.js") && copy.includes("src/b.js"),
+    "in the core's own repository a manifest at its root leaves no folder out of the scan; in a project its copy is left out", JSON.stringify([own, copy]));
 }
 
 done("the code scan's own logic");

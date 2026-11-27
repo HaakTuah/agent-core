@@ -8,7 +8,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { checksOf, list, rare, stepsOf, without } from "../scripts/pruning-list.mjs";
-import { firedOf, stepsAt } from "../scripts/pruning-read.mjs";
+import { firedOf, joinedCounter, joinedIn, stepsAt } from "../scripts/pruning-read.mjs";
+import { scratchHistory } from "../scripts/scratch-shallow.mjs";
 import { DIRECT, due, generation, open, said } from "../scripts/pruning-record.mjs";
 import { rulesOf } from "../scripts/rules.mjs";
 import * as facade from "../scripts/pruning.mjs";
@@ -105,6 +106,22 @@ const first = open(r, "claude-opus-5-5", "2026-11-01"), again = open(r, null, "2
 ok(first === again && first.at === "2026-11-01" && r.prunings.length === 2 && first.model === "claude-opus-5-5", "the cases read on the next day go into the pruning in progress, not a new one");
 first.recorded = true;
 ok(open(r, null, "2026-11-02").at === "2026-11-02" && r.prunings.length === 3, "once its counts are recorded the pruning ends, and the next read begins another");
+
+// ---- a shallow clone is no whole history (#1422): the count of merges since a rule joined is refused, with its mend ----
+{
+  const days = ["2026-11-01", "2026-11-04", "2026-11-08", "2026-11-12", "2026-11-16", "2026-11-20"];
+  const steps = days.map((day, i) => ({ day, subject: `A change (#${i + 1})`, files: { "rules.md": `**Early rule** holds, ${i}.\n${i >= 4 ? "**Fresh rule** holds.\n" : ""}` } }));
+  const h = scratchHistory("pruning-shallow-", steps), early = { lead: "Early rule" }, fresh = { lead: "Fresh rule" };
+  const whole = h.clone("whole"), cut = h.clone("cut", 3);
+  ok(joinedIn(early, whole) === 6 && joinedIn(fresh, whole) === 2, "in a whole clone each rule counts the merged pull requests since it joined", `${joinedIn(early, whole)} / ${joinedIn(fresh, whole)}`);
+  let thrown = "";
+  try { joinedIn(early, cut); } catch (e) { thrown = e.message; }
+  ok(/shallow/.test(thrown) && /git fetch --unshallow/.test(thrown) && mended(`FAIL: ${thrown}`), "in a shallow clone a rule that seems to join at its boundary is not counted from there: it says so, with its mend", thrown);
+  ok(joinedIn(fresh, cut) === 2, "a rule that joined after the boundary is counted, the clone holding all of its span", String(joinedIn(fresh, cut)));
+  const counter = joinedCounter(cut);
+  ok(counter.joined(early) === null && counter.joined(fresh) === 2 && /git fetch --unshallow/.test(counter.gap() ?? "") && joinedCounter(whole).gap() === null,
+    "a list of rules keeps the first refusal, for the command to fail with, and no rule's count stands for another's", String(counter.gap()));
+}
 
 // ---- run, a failure says its mend ----
 const run = (...a) => spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/pruning.mjs", import.meta.url)), ...a], { encoding: "utf8" });

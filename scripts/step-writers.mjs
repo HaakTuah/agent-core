@@ -10,6 +10,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { leadsOut } from "./guards.mjs";
+import { leadsAlone } from "./leads-alone.mjs";
 import { OWN as OWN_HOLDERS } from "./holders-own.mjs";
 import { READ_MOST } from "./own-files.mjs";
 import { parseConfig, where as shapeAt } from "./shape.mjs";
@@ -210,12 +211,12 @@ export function writeBreaks(p, busy) {
 }
 
 // 16 November 2026: each path of a file the rules left (core/modules/, floor/topics.md) in the project's own files the
-// step reads, as the step's check finds it there, written as the file it now is; a copies config that reads the old
-// folder alone given the new folders' patterns beside it; the size marks' "read" (marksMoved); and the manifest's
-// "Paths:" line, where it is word for word the one the starter kit of releases 1 to 5 wrote, written as the kit writes
-// it now. Each path is written on its own (#1248, point 5): one whose move is no exact one (it leads to a folder, or a
-// rule of its file stands elsewhere since and the line does not name that rule by its lead) is left as it stands for
-// the step's mend, and so is a "Paths:" line of the project's own words. Never written: the core's part, the one
+// step reads, as the step's check finds it there, written as the file it now is (or its folder: leadsAlone); a copies
+// config that reads the old folder alone given the new folders' patterns beside it; the size marks' "read"
+// (marksMoved); and the manifest's "Paths:" line, where it is word for word the one the starter kit of releases 1 to 5
+// wrote, written as the kit writes it now. Each path is written on its own (#1248, point 5): one whose move is no exact
+// one (a rule of its file stands elsewhere since and the line does not name that rule by its lead) is left as it stands
+// for the step's mend, and so is a "Paths:" line of the project's own words. Never written: the core's part, the one
 // process's, or a file whose part cannot be told apart; nor a file the writer cannot tell is the project's own (sure).
 export const OLD_PATHS = "Paths: in the core's files, one into floor/, modules/, scripts/, setup/ or archive/ is under core/; any other is ours.";
 const quoted = f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
@@ -227,7 +228,7 @@ export function writeMoved(p, busy) {
   let marks = null;
   try { marks = marksConfig(p); } catch { /* (marks whose path cannot be read are read as any other file) */ }
   for (const f of sure(p, namers(p))) {
-    const text = p.read(f) ?? "", c = partCut(f, text), own = t => movedIn(f === marks ? marksMoved(t, map) : t, map, oldPath, c?.[1]?.split("\n").map(l => l.replace(/\r$/u, "")));
+    const text = p.read(f) ?? "", c = partCut(f, text), own = t => movedIn(f === marks ? marksMoved(t, map) : t, map, oldPath, c?.[1]?.split("\n").map(l => l.replace(/\r$/u, "")), f);
     if (!c) continue;
     let next = c.length === 3 ? `${own(c[0])}${c[1]}${own(c[2])}` : own(text);
     if (oldPath && readsOldAlone(p, f, copy)) next = next.split(atCopy(MOVED_GLOB, copy)).join(atCopy(`${MOVED_GLOB}, ${MOVED_GLOBS}`, copy));
@@ -239,15 +240,15 @@ export function writeMoved(p, busy) {
   return writes.map(([f]) => f);
 }
 
-// A file's text with each old path it names written as the file it now is, where its move is an exact one; a rule that
-// left its file named with its lead, `core/<old>`, "<lead>", as the step words it, named where it stands now; and a
-// pull-in (an import, Kiro's `#[[file:`) this writes into one that a line above, or the core's part (`part`, its lines),
-// already makes left out.
-function movedIn(text, map, oldPath, part = []) {
+// A file's text with each old path it names written as the file it now is (or its folder), where its move is an exact
+// one; a rule that left its file named with its lead, `core/<old>`, "<lead>", as the step words it, named where it
+// stands now; and a pull-in (an import, Kiro's `#[[file:`) this writes into one that a line above, or the core's part
+// (`part`, its lines), already makes left out.
+function movedIn(text, map, oldPath, part = [], f = "") {
   if (!oldPath) return text;
-  const apart = moved.apart(), exact = old => !map[old].endsWith("/") && !(apart[old]?.length);
+  const apart = moved.apart(), exact = old => !(apart[old]?.length);
   const led = Object.entries(apart).reduce((t, [old, parts]) => parts.reduce((u, a) => u.split(`\`core/${old}\`, "${a.lead}"`).join(`\`core/${a.to}\`, "${a.lead}"`), t), text);
-  const next = led.replace(oldPath, (all, old) => exact(old) ? `core/${map[old]}` : all);
+  const next = led.replace(oldPath, (all, old, at, whole) => exact(old) && (!map[old].endsWith("/") || leadsAlone(f, whole, at, all.length)) ? `core/${map[old]}` : all);
   if (next === text) return text;
   const was = text.split("\n"), now = next.split("\n");
   const twice = (l, i) => (now.indexOf(l) < i && !(was[i] === l && was.indexOf(l) < i)) || (was[i] !== l && part.includes(l.replace(/\r$/u, "")));

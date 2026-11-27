@@ -10,7 +10,7 @@
 // agent-tools-codex.mjs, any other of which may change how the programs a hook runs start, save one the base held while
 // its entry stands.
 import path from "node:path";
-import { corePath } from "./core-path.mjs";
+import { copyHeld } from "./core-path.mjs";
 import { fold, show } from "./agent-tools-entries.mjs";
 import { listing, commitReader } from "./agent-tools-listing.mjs";
 
@@ -49,9 +49,10 @@ function submodules(root, rev) {
 // this check reads only the root's, so one the base held is noted while all it holds stands, each entry the commit lists
 // there by its object.
 // The core's copy, where the manifest names one, is left out: core.yml holds it to the core's own commit, whose .claude is
-// the core's. With no manifest, as in the core's own repository, nothing is left out.
+// the core's. In the core's own repository, which holds no copy whatever a manifest at its root says (core-path.mjs's
+// copyHeld), and with no manifest, nothing is left out.
 function nestedClaude(root, rev) {
-  const l = listing(root, rev), found = new Set(), copy = corePath(root);
+  const l = listing(root, rev), found = new Set(), copy = copyHeld(root);
   for (const at of l.ids.keys()) {
     if (copy && at.startsWith(copy)) continue;
     // (found a name at a time, so a name in any normal form is cut where it stands)

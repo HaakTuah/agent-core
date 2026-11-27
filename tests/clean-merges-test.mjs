@@ -148,10 +148,12 @@ ok(own.passed && own.out.includes("Merges from main that are the ones git makes:
 // a member's review of the head, which the job reads the member's rights for (#412)
 const member = { user: { login: "a-member", type: "User" }, author_association: "MEMBER", created_at: "2026-11-15T11:00:00Z", updated_at: "2026-11-15T11:00:00Z", body: `Security review: ${OWN}\nNo blocking finding.\nNo other finding.` };
 const rightOf = (role_name, permission) => ({ "collaborators/a-member/permission$": { permission, role_name, user: { login: "a-member", type: "User" } } });
-const writer = check(2, OWN, [member], rightOf("write", "write"));
-ok(writer.passed && writer.security.state === "success" && writer.security.description.includes("a security review is posted"), "the workflow: a member the host lets write counts with nothing named", writer.out + JSON.stringify(writer.security));
-const reader = check(2, OWN, [member], rightOf("triage", "read")), unread = check(2, OWN, [member]);
-ok(reader.passed && reader.security.state === "pending" && unread.passed && unread.security.state === "pending" && unread.out.includes("The host's rights of a-member could not be read"),
+// (with the member's code review of the head beside it, which the security-review status waits for too: #1339)
+const memberCode = { ...member, body: `Code review: ${OWN}\nNo blocking finding.\nNo other finding.` };
+const writer = check(2, OWN, [member, memberCode], rightOf("write", "write"));
+ok(writer.passed && writer.security.state === "success" && writer.security.description.includes("a security review is posted") && writer.code.state === "success", "the workflow: a member the host lets write counts with nothing named", writer.out + JSON.stringify(writer.security));
+const reader = check(2, OWN, [member, memberCode], rightOf("triage", "read")), unread = check(2, OWN, [member, memberCode]);
+ok([reader, unread].every((r) => r.passed && r.security.state === "pending" && !r.security.description.includes("code-review waits")) && unread.out.includes("The host's rights of a-member could not be read"),
   "  and one it lets only triage, or whose rights cannot be read, does not, the run saying the second", reader.out + unread.out + JSON.stringify([reader.security, unread.security]));
 
 // a pull request that leaves the check's scripts alone, whose head holds none: from before the check only where it was

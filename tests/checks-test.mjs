@@ -216,6 +216,14 @@ if (process.platform !== "win32") {
     if (v === "10.9.9") ok(/^it needs npm 11\.15\.0 or later, .*\.node-version.*, which this machine lacks$/u.test(unrunWhy(jobOf(old.out)) ?? "") && unrunWhy(jobOf(old.out, "a real fault\n")) === null && unrunWhy(jobOf("a real fault\n")) === null && unrunWhy({ ...jobOf(old.out), passed: true }) === null && [`${old.out}FAIL a real fault\n`, `FAIL: a real fault\n${old.out}`, `assertion failed\n${old.out}`, old.out.replace(/^FAIL npm/mu, "a real fault\rFAIL npm")].every(o => npmRefused(o) === null) && unrunWhy({ ...jobOf(old.out), steps: [{ name: "A step of the change", passed: false, ran: true, out: old.out }] }) === null,
       "  and check.mjs writes a job failed by it alone unrun on this machine, naming the least version of npm; one with another failure beside it, in its step or another, or such words printed by another step, stays failed", unrunWhy(jobOf(old.out)));
   }
+  // (#1361, point 9: with no npm on this machine at all, the check did not run, saying to install npm beside Node, and
+  // never the refusal, whose mend runs npm)
+  const nonpm = path.join(tmp, "no-npm-bin");
+  fs.mkdirSync(nonpm, { recursive: true });
+  for (const p of ["bash", "git"]) fs.symlinkSync(execFileSync("bash", ["-c", `command -v ${p}`], { encoding: "utf8" }).trim(), path.join(nonpm, p));
+  const none = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base, PATH: nonpm });
+  ok(none.status === 127 && /^The package manager could not be started \(spawnSync npm ENOENT\)\. Mend: install npm beside Node/m.test(none.out) && /could not run here, since this machine lacks npm/.test(none.out)
+    && !/--allow-remote/.test(none.out) && !/checks failed/.test(none.out) && mended(none.out), "signatures: with no npm on this machine, it did not run, saying to install npm beside Node, and gives no refusal", none.out);
   const now = under("11.15.0");
   ok(now.status === 0 && /^ran npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none$/m.test(now.out) && /^ran npm audit signatures$/m.test(now.out), "and under npm 11.15.0, which reads them all, it installs and checks the signatures", now.out);
 }

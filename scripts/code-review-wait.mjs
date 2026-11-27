@@ -36,7 +36,9 @@
 // beside this file; #551): the newest posted review of each kind declaring its lines and its score (#710), and, in the core's own
 // repository, a design-checked pull request's design check of its head; a review counts for these only as the
 // security-review status counts one (REVIEWERS, RIGHTS). It prints, as JSON, the commit to
-// mark and the status to give it, named "code-review", or {} for a pull request that is closed or a draft. While
+// mark, the status to give it, named "code-review", and the verdict (done, why), which the security-review status,
+// required where this one is not, waits on too (security-review.mjs, withCode; #1339), or {} for a pull request that
+// is closed or a draft. While
 // "advisory" (the workflow's input, on unless turned off) the status is always a pass that says what the check would
 // have done, as the security-review status's.
 //
@@ -47,9 +49,9 @@
 //         those who posted a review (a JSON list), as security-review.mjs reads them; QUEUE for the head the
 //         caller's queue-only.mjs proved; FINDINGS, the pull request's review comments (a JSON list), for whether
 //         Codex's code review found anything blocking.
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
-import { copyOf } from "./core-path.mjs";
+import { copyHeld } from "./core-path.mjs";
 import { blockingOf, codexFind } from "./review-comments.mjs";
 import { formOf, marksWait } from "./review-marks.mjs";
 import { RULES, ruleFiles } from "./rule-files.mjs";
@@ -141,7 +143,7 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
   }
   if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules, copy))) return { sha, done: true, why: "no code review is running" };
   // (one its caller proved queue-only, its files as queueOnly reads them, needs none: floor rule 8, #750)
-  if (more?.queue === true && queueOnly(pull, files, copy ?? undefined)) return { sha, done: true, why: "queue-only, as queue-only.mjs proves: no code review needed" };
+  if (more?.queue === true && queueOnly(pull, files, copy)) return { sha, done: true, why: "queue-only, as queue-only.mjs proves: no code review needed" };
   return reviewRan(sha, posted, review, pull, commits, bound, merges, clearOf(list, review, pull, bound, more), checked);
 }
 // the commits a code review that found nothing blocking ran on: posted with no blocking finding, or Codex's completed
@@ -207,11 +209,13 @@ if (started(import.meta.url)) {
   // (the project's own rule files, where its SECURITY.md names them; none read, where it names none)
   let rules = [];
   try { rules = ruleFiles(undefined, undefined, { tools: true }); } catch { rules = []; }
-  // (and the core's copy, at the path the default branch's manifest names, checked out here: core-path.mjs)
-  const copy = existsSync("core-manifest.md") ? copyOf(".") : null;
+  // (and the core's copy, at the path the default branch's manifest names, checked out here, none in the core's own
+  // repository: core-path.mjs)
+  const copy = copyHeld(".");
   const pull = read(pullFile);
   const more = { reviewers: reviewersOf(process.env.REVIEWERS), rights: process.env.RIGHTS ? read(process.env.RIGHTS) : undefined, findings: process.env.FINDINGS ? read(process.env.FINDINGS) : undefined,
     queue: typeof pull?.head?.sha === "string" && /^[0-9a-f]{40}$/u.test(pull.head.sha) && process.env.QUEUE === pull.head.sha };
   const verdict = judge(pull, read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, boundOf(process.env.BOUND, pull, process.env.SINCE), mergesFile ? read(mergesFile) : undefined, copy, more);
-  console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL, CONTEXT), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
+  // (done and why, the verdict itself, which security-review.mjs folds into its own status: #1339)
+  console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, done: verdict.done, why: verdict.why, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL, CONTEXT), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }

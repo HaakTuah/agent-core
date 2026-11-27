@@ -51,4 +51,48 @@ for (const [what, change, why] of [
   ["another fetcher handed to a shell as one argument", write(".vscode/tasks.json", JSON.stringify({ type: "process", command: "bash", args: ["-c", "pip install mosspy"] })), /fetches what no entry/],
 ]) { const f = run(change); ok(f.some((m) => why.test(m)), `fails on ${what}`, f.join("\n") || "(it passed)"); }
 
+// A git clone written as an array whose source reads exactly as local opens no connection, so it fetches nothing
+// (#1437); one from an address, or from a source or with options the scan cannot read exactly, is still a fetch.
+for (const code of ["execFileSync(\"git\", [\"clone\", \"-q\", \"--depth\", String(depth), \"--\", `file://${src}`, to]);",
+  "execFileSync('git', ['clone', '--quiet', `file://${src}`, 'copy'], { cwd: dir, stdio: 'ignore' });", 'spawnSync("git", ["clone", "--bare", "/tmp/moss", "moss.git"]);',
+  "execFileSync(`git`, [`clone`, `./${name}`]);", 'execFileSync("git", [\n  "clone",\n  "--shallow-since=2026-11-01",\n  "../moss",\n]);',
+  'execFileSync("git", ["clone", "file:///tmp/moss", "copy"], { cwd, "windowsHide": true, timeout: 60_000 });',
+  'function copy() { return execFileSync("git", ["clone", "/tmp/moss"]); }', 'if (done) copy(); else spawnSync("git", ["clone", "/tmp/moss"]);']) {
+  const f = run(write("scripts/copy.mjs", `/* Moss, a header\n * of two lines. */\nimport { execFileSync, spawnSync } from "node:child_process";\n${code}\n`));
+  ok(!f.some((m) => /fetches what no entry/u.test(m)), `passes a git clone of a local source: ${JSON.stringify(code)}`, f.join("\n"));
+}
+for (const code of ['execFileSync("git", ["clone", "https://mossgrip.example/moss.git"]);', 'execFileSync("git", ["clone", "ssh://git@mossgrip.example/moss.git"]);',
+  'execFileSync("git", ["clone", "git@mossgrip.example:moss.git"]);', 'execFileSync("git", ["clone", "git://mossgrip.example/moss.git"]);',
+  'execFileSync("git", ["clone", "ext::sh -c moss"]);', 'execFileSync("git", ["clone", url]);', "execFileSync(\"git\", [\"clone\", `${base}/moss.git`]);",
+  'execFileSync("git", ["clone", ...options, "file:///tmp/moss"]);', 'execFileSync("git", ["clone", "--recurse-submodules", "file:///tmp/moss"]);',
+  'execFileSync("git", ["clone", "-c", "url.https://mossgrip.example/.insteadOf=/tmp/", "/tmp/moss"]);', 'execFileSync("git", ["clone", "file:///tmp/moss", to]);',
+  'execFileSync("git", ["clone", "file:///tmp/moss"], { env: { ...process.env, ...moss } });', 'execFileSync("git", ["clone", "file:///tmp/moss"], options);',
+  'execFileSync("git", ["clone", "file:///tmp/moss" /* or https */]);', 'execFileSync("git", ["clone", "c:\\\\moss"]);',
+  'spawnSync("git", ["clone", `./${name}`], { shell: true });', 'spawnSync("git", ["clone", "/tmp/moss"], { cwd: dir, "shell": "/bin/sh" });',
+  'spawnSync("git", ["clone", "/tmp/moss"], { cwd, ...rest });', 'execFileSync("git", ["clone", `./${name.replace(/x/, "y")}`]);',
+  'run("git", ["clone", "/tmp/moss"]);', 'shell.spawnSync("git", ["clone", "/tmp/moss"]);', 'spawn("git", ["clone", "/tmp/moss"]);',
+  'shell . spawnSync("git", ["clone", "/tmp/moss"]);', 'this.#execFileSync("git", ["clone", "/tmp/moss"]);', `xspawnSync(${" ".repeat(30)}"git", ["clone", "/tmp/moss"]);`,
+  'const execFileSync = run; execFileSync("git", ["clone", "/tmp/moss"]);', 'execFileSync("git", ["clone", "file://mossgrip.example/share"]);',
+  'execFileSync("git", ["clone", "file:////mossgrip.example/share"]);', 'execFileSync("git", ["clone", "file:///tmp/%6Doss"]);',
+  'execFileSync("/usr/bin/git", ["clone", "/tmp/moss"]);', 'execFileSync("git", ["clone", "/tmp/moss", "--", (process.env.A = "b")]);',
+  'execFileSync("git", ["clone", "--depth", (process.env.A = "1"), "/tmp/moss"]);', 'execFileSync("git", ["clone", "/tmp/moss"], { cwd: (process.env.A = "b") });',
+  "execFileSync(\"git\", [\"clone\", `./${(process.env.A = name)}`]);", 'shell. /* moss */ spawnSync("git", ["clone", "/tmp/moss"]);',
+  'shell.\n// moss;\nspawnSync("git", ["clone", "/tmp/moss"]);', 'éspawnSync("git", ["clone", "/tmp/moss"]);',
+  'function /* moss */ spawnSync() {}\nspawnSync("git", ["clone", "/tmp/moss"]);']) {
+  const f = run(write("scripts/copy.mjs", `import { execFileSync, spawnSync } from "node:child_process";\n${code}\n`));
+  ok(f.some((m) => /fetches what no entry/u.test(m)), `fails a git clone from an address, or one the scan cannot read exactly: ${JSON.stringify(code)}`, f.join("\n") || "(it passed)");
+}
+{
+  const f = run(write("scripts/copy.mjs", 'import { execSync as execFileSync } from "node:child_process";\nexecFileSync("git", ["clone", "/tmp/moss"]);\n'));
+  ok(f.some((m) => /fetches what no entry/u.test(m)), "fails a local clone by a function that the file imports by another name", f.join("\n") || "(it passed)");
+}
+{
+  const f = run(write("scripts/copy.mjs", 'const note = `\nimport { execFileSync } from "node:child_process";\n`;\nexecFileSync("git", ["clone", "/tmp/moss"]);\n'));
+  ok(f.some((m) => /fetches what no entry/u.test(m)), "fails a local clone by a function whose import stands only in a string, past the file's opening", f.join("\n") || "(it passed)");
+  const g = run(write("scripts/copy.mjs", 'import fs /*\nimport { execFileSync } from "node:child_process";\n*/ from "node:fs";\nexecFileSync("git", ["clone", "/tmp/moss"]);\n'));
+  ok(g.some((m) => /fetches what no entry/u.test(m)), "fails a local clone by a function whose import stands only in a comment", g.join("\n") || "(it passed)");
+  const h = run(write("scripts/copy.mjs", '/* A header\nimport { execFileSync } from "node:child_process";\n*/\nconst moss = 1;\nexecFileSync("git", ["clone", "/tmp/moss"]);\n'));
+  ok(h.some((m) => /fetches what no entry/u.test(m)), "fails a local clone by a function whose import stands only in the opening's comment", h.join("\n") || "(it passed)");
+}
+
 done();

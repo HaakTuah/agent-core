@@ -50,7 +50,7 @@ const WRITERS = {
 // The scripts that write a file no reader of the core reads in a project, each with why.
 const ELSEWHERE = {
   "agent-tools-scratch.mjs": "a scratch project for a test", "releases-scratch.mjs": "a test's scratch core", "stage-helpers.mjs": "a test's stage", "steps-kit.mjs": "a test's kit project",
-  "licence-scan-stage.mjs": "a test's stage", "nuget-gate-scratch.mjs": "a test's scratch project", "scratch-core.mjs": "a test's scratch folders", "twice-scratch.mjs": "a test's scratch project",
+  "licence-scan-stage.mjs": "a test's stage", "nuget-gate-scratch.mjs": "a test's scratch project", "scratch-core.mjs": "a test's scratch folders", "scratch-shallow.mjs": "a test's scratch history", "twice-scratch.mjs": "a test's scratch project", "core-path-scratch.mjs": "a test's scratch checkouts",
   "check.mjs": "the verdicts, to a file outside every repository, read by release-trial.mjs in the core",
   "checks.mjs": "a job's output (GITHUB_OUTPUT)", "install.mjs": "a job's environment (GITHUB_ENV)", "select.mjs": "a job's output",
   "tests-parts.mjs": "a job's output", "lookup.mjs": "a job's summary", "look.mjs": "a job's output and summary",

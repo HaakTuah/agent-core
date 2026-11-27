@@ -118,6 +118,8 @@ export const UNPLANTED = {
   "23 November 2026, the host read and written by the daily look": "its outcome is the daily look's run in GitHub's job, which reads the host with the job's own token and writes its record, and this case's scratch project has no runner",
   "20 November 2026, the workflow check runs zizmor and actionlint": "what it asks, a task filed from the notes of the sync pull request's own run, needs that run of the workflow check on the host's runners, where the two tools alone run, and this case's scratch project has no runner",
   "20 November 2026, the pointer check reads Markdown's links with lychee": "what it asks, a task filed from the notes of the sync pull request's own run, needs that run of the pointer check on the host's runners, where lychee alone runs, and this case's scratch project has no runner",
+  // (a step the sync does itself: #1426)
+  "26 November 2026, the daily look reads the whole history": none("the sync moves each call of the core's `look.yml` to the copy's commit, whose checkout takes the whole history"),
   // (five steps the core now does itself, which ask a session nothing: #1093, point 2)
   "12 November 2026, exact versions": none("the licence check runs the exact-versions check itself"),
   "16 November 2026, the NuGet check where it can matter": none("the NuGet check runs in core.yml's one job and the sync takes out nuget.yml"),

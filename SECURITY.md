@@ -176,8 +176,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
      lookup (`scripts/lookup.mjs`, with `scripts/lookup-pypi.mjs` for a requirements file in PyPI's lock form, which it
-     fails whole where pip or uv could read it otherwise, and fails a hash a line names that PyPI lists for none of that
-     release's files) and its lookup again of what a project holds (`scripts/held.mjs`, through the
+     fails whole where pip or uv could read it otherwise, and fails a hash a line names, of a new package or on a line the
+     pull request adds or changes, that PyPI lists for none of that release's files) and its lookup again of what a project holds (`scripts/held.mjs`, through the
      lookup's readers of npm's and NuGet's lock files); Node itself is checked against its SHA-256 by `scripts/node.sh`, and the code scan's wheel by
      its own, which pip checks against `.packages/requirements.txt` (`scripts/install.mjs pypi`); limits: 16 MB of a
      NuGet package's manifest, 100 pages of NuGet's registry, 20 lookups on GitHub in a run, 30 s for an answer (60 s
@@ -190,6 +190,16 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      and one it parsed in part passing, said as read in part, 200 files to a run of the engine, 30 s for a rule on a
      file, 900 s for a run, 256 MB of git's diff of a file, 1 GB of the engine's answer, and the description whole as
      the host gives it, at most 65,536 characters; hostile tests: `tests/code-scan-test.mjs`.
+   - the `global.json` of a project a release's trial runs on, and the .NET SDK it pins: read by `scripts/toolchain.mjs`,
+     which reads only the file at the project's root, a plain file not reached through a link out of the project,
+     fetches only a build its own list holds the SHA-512 of, checked before the archive is opened, and runs every
+     `dotnet` from the file system's root, so no `global.json` of the project's or of the folder it was started in
+     chooses what runs, and names an `sdk.version` out of form by its JSON type alone, nothing of it printed; a folder
+     it fetched before is trusted as the machine's own SDK is, and run only for a build and machine its list holds; the
+     file carries no version number of its own form, the SDK it names being a build the machine holds already, or one
+     the list holds or refuses; limits: 64 KB of the file, nested no deeper than JSON's bounded reader allows (200), 80
+     characters of the SDK it names, 900 s for the download and for each run, 256 MB of a run's output; hostile tests:
+     `tests/toolchain-test.mjs`.
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
    (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are
    tools that only run, each with its licence in its audit (`.github/licences-audit.json`). Among them is Node
@@ -199,7 +209,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    and checks against its SHA-256 before it runs; and Semgrep's engine (`semgrep-core` from the `semgrep` wheel on PyPI
    at the version and hashes in `.packages/requirements.txt`), which `scripts/install.mjs pypi` installs with pip in the code
    scan's own step for a project the host's CodeQL does not scan, the wheel checked by its SHA-256, no dependency
-   taken and none of its code run, and which the scan runs with no Python.
+   taken and none of its code run, and which the scan runs with no Python; and, for a release's trial alone, the .NET
+   SDK a project's `global.json` pins, which `scripts/toolchain.mjs` fetches by curl from the publisher's own host over
+   HTTPS where its own list holds the SHA-512 of that build for that machine, checked before the archive
+   is opened, to a folder outside every repository (#1361, point 21).
 17. **Dependabot** updates the workflows' GitHub actions and the packages of the core's lock files, `package-lock.json`
     and `.packages/requirements.txt` (`.github/dependabot.yml`), each a week after its release.
 
