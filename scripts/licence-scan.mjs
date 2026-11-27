@@ -18,8 +18,8 @@
 //     only in a file an entry's "files" names, that entry its hand audit, each fetch that stood at the base reported; and where such a file downloads by address
 //     (curl, wget, PowerShell's) and an entry covering it audits what may be a program (no data, asset, font, service
 //     of GitHub's or the owner's own work), each such entry names its version, but a package of the machine's
-//     distribution that the file installs (kind "distribution"), whose version is the distribution's, and the file holds, for each download
-//     but a read of data (a version index: licence-reads.mjs), a checksum of its own and a command that checks by
+//     distribution that the file installs (kind "distribution"), whose version is the distribution's, and the file holds, for each download,
+//     a checksum of its own and a command that checks by
 //     one (sha256sum, shasum, Get-FileHash and the like) (floor rule 7), a file that stood unpinned at the pull
 //     request's base reported;
 //   - an entry covering each script in a language it cannot read (Python, Ruby, PowerShell and the like): the entries
@@ -40,8 +40,7 @@ import { join, posix } from "node:path";
 import { OWNER } from "./core-address.mjs";
 import { DEEPEST, leadsOut, parseBounded, tooDeep } from "./guards.mjs";
 import { commandLines, commands } from "./licence-commands.mjs";
-import { otherFetches } from "./licence-fetchers.mjs";
-import { programDownloads } from "./licence-reads.mjs";
+import { downloads, otherFetches } from "./licence-fetchers.mjs";
 import { fetched } from "./licence-npm.mjs";
 import { executable } from "./licence-pages.mjs";
 import { copyAmong } from "./core-path.mjs";
@@ -186,10 +185,10 @@ const VERIFIER = /(?<![\w-])(?:sha(?:256|512)sum|shasum|Get-FileHash|certutil(?:
 /** What the code `code` of the file `f` (codeOf) lacks for the programs it downloads by address to be pinned, or
  *  null: of the audit's `entries` covering `f` that audit what may be a program, each names its version (`bare`, those
  *  that do not), but one of kind "distribution" whose package a line of `f` installs (installs), and for each download
- *  but a read of data (licence-reads.mjs's programDownloads) the file holds a checksum of its own and a check by a
+ *  the file holds a checksum of its own and a check by a
  *  command of VERIFIER (`deficit`, the downloads short of one). The scan and the sync's step (steps.mjs) read it alike. */
 export function pinFault(entries, auditPath, f, code) {
-  const tools = entries.filter((e) => e && typeof e === "object" && covers(e, f) && !NO_PROGRAM.has(e.kind)), count = programDownloads(code).length;
+  const tools = entries.filter((e) => e && typeof e === "object" && covers(e, f) && !NO_PROGRAM.has(e.kind)), count = downloads(code).length;
   if (!tools.length || !count) return null;
   const bare = tools.filter((e) => !(e.kind === DISTRIBUTION && installs(code, e.name)) && (typeof e.version !== "string" || !e.version.trim())).map((e) => e.name);
   // (which check a download meets is left to the review, since reading that needs a reader of the shell's data flow)
@@ -230,14 +229,14 @@ function baseEntries(c) {
 function heldAtBase(c, f, text, fault) {
   const was = atBase(c, f);
   const then = was === null ? null : pinFault(baseEntries(c), c.auditPath, f, codeOf(f, was));
-  return then !== null && programDownloads(text).length <= programDownloads(codeOf(f, was)).length && fault.deficit <= then.deficit && fault.bare.every((n) => then.bare.includes(n));
+  return then !== null && downloads(text).length <= downloads(codeOf(f, was)).length && fault.deficit <= then.deficit && fault.bare.every((n) => then.bare.includes(n));
 }
 
 function pinned(c, f, text) {
   const fault = pinFault(c.entries, c.auditPath, f, text);
   if (!fault) return;
   const held = !c.base || heldAtBase(c, f, text, fault);
-  const said = `${f}: it downloads what may be a program (${programDownloads(text)[0].replace(/\s+/gu, " ").slice(0, 120)}), and ${fault.what}, so what runs is not pinned by version and checksum (floor rule 7)`;
+  const said = `${f}: it downloads what may be a program (${downloads(text)[0].replace(/\s+/gu, " ").slice(0, 120)}), and ${fault.what}, so what runs is not pinned by version and checksum (floor rule 7)`;
   if (held) c.reports.push(`${said}; it stood so ${c.base ? "at the pull request's base" : "with no base to read it against"}, so it passes: ${fault.mend}, as the sync's step asks`);
   else c.fail(`${said}. Mend: ${fault.mend}`);
 }

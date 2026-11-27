@@ -17,7 +17,7 @@
       "tests/licence-yes-test.mjs",
       "tests/licence-scan-limits-test.mjs",
       "tests/licence-scan-pins-test.mjs",
-      "tests/licence-reads-test.mjs",
+      "tests/licence-distribution-test.mjs",
       "tests/licence-fetch-test.mjs",
       "tests/licence-fetch-places-test.mjs",
       "tests/licence-fetch-other-test.mjs",
