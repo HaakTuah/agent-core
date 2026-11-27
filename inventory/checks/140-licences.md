@@ -27,4 +27,7 @@
   lie in the lock file, which npm's reading of what is installed never opens); #339, #364, #366, #386 and #447 not run
   (their cases lie in where the config stands, the steps and the scan, which no tool tried here takes over). The
   config's form is held by a schema and ajv where the core's packages are installed, and by the check's own checks of
-  it where they are not (`scripts/schemas/licences.json`; #530, item 7).
+  it where they are not (`scripts/schemas/licences.json`; #530, item 7). *Limits:* the scan reads the forms in which a
+  project writes its fetches, commands and packages in the ordinary way; a form written on purpose to hide a fetch or a
+  package from it is beyond what it reads. Input it cannot read whole fails, but in a file an entry audits by hand, and
+  what stood so at the pull request's base, which is reported; none passes with neither an entry nor a report.
