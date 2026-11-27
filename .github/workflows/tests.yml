@@ -408,6 +408,9 @@ jobs:
       - name: Where a <Compile> item decides what a file of C# reaches, for the selection
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-csharp-compile-test.mjs ')) }}
         run: node tests/select-csharp-compile-test.mjs
+      - name: The time a file of C# a change holds is read in, for the selection
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-csharp-slow-test.mjs ')) }}
+        run: node tests/select-csharp-slow-test.mjs
       - name: The pathspecs the selection matches a path against
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-matcher-test.mjs ')) }}
         run: node tests/select-matcher-test.mjs
@@ -423,9 +426,12 @@ jobs:
       - name: What a push waits on, against its mark
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/wait-test.mjs ')) }}
         run: node tests/wait-test.mjs
-      - name: The merge line read from the host, its measure and the runs it cancels
+      - name: The merge line read from the host and the runs it cancels
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/merge-line-test.mjs ')) }}
         run: node tests/merge-line-test.mjs
+      - name: The merge line's measure
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/merge-line-measure-test.mjs ')) }}
+        run: node tests/merge-line-measure-test.mjs
       - name: Where a project's tests run and who pays, read from its workflows and its host
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/runners-test.mjs ')) }}
         run: node tests/runners-test.mjs
