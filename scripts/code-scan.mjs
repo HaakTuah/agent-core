@@ -275,20 +275,34 @@ function engineDir() {
   return pypiUnreached(engine()) ? null : path.dirname(pypiFile(engine()));
 }
 
+/** What the scan says where it reads none of the files it found (none there, or with a base past the most it reads),
+ *  { lines, failed }; null where it reads them. */
+function readsNone(files, base, most) {
+  if (!files.length) return { lines: [`code scan: no file of the kinds it reads ${base ? "changed" : "tracked"}`], failed: false };
+  if (base && files.length > most.files) return { lines: [`FAIL: code scan: the change adds or alters ${files.length} files of the kinds it reads, past the ${most.files} one scan reads, so it read none of them. ${MEND}split the pull request so that each adds or alters at most ${most.files} such files, and run it again`], failed: true };
+  return null;
+}
+
+/** What the scan says where the engine gave no answer it could read: with a base, a failure with its mend (past the
+ *  scan's time, or on a file it stops on); with none, a line that decides nothing. */
+function unanswered(got, base) {
+  if (!base) return { lines: [`code scan: did not run: ${got.failed}; it decides nothing`], failed: false };
+  const mend = got.late ? `${MEND}split the pull request so that each scan reads fewer files, or split the files it stops on, and run it again` : `${UNREAD_MEND("<path>")}, naming the file it stops on (run the scan on each)`;
+  return { lines: [`FAIL: code scan: ${got.failed}, on the files this change adds or alters. ${mend}`], failed: true };
+}
+
 /** The scan: { lines, failed }, each line to print; `most` the most files it reads with a base and the time its runs
  *  have together, in ms. */
 export function scan(root, { base = null, description = "", dir = null, most = { files: MOST_FILES, time: MOST_TIME } } = {}) {
   if (hostScans(root, base)) return { lines: ["code scan: not run: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project"], failed: false };
   const files = targets(root, base), until = Date.now() + most.time;
-  if (!files.length) return { lines: [`code scan: no file of the kinds it reads ${base ? "changed" : "tracked"}`], failed: false };
-  if (base && files.length > most.files) return { lines: [`FAIL: code scan: the change adds or alters ${files.length} files of the kinds it reads, past the ${most.files} one scan reads, so it read none of them. ${MEND}split the pull request so that each adds or alters at most ${most.files} such files, and run it again`], failed: true };
+  const none = readsNone(files, base, most);
+  if (none) return none;
   dir ??= engineDir();
   if (!dir) return { lines: [`::warning::The code scan did not run: ${pypiNotInstalled(engine())}`], failed: false };
   const listed = base ? unreadListed(description) : new Set();
   const { got, held, read } = answer(dir, root, files, listed, runEngine, until);
-  if (got.failed) return base
-    ? { lines: [`FAIL: code scan: ${got.failed}, on the files this change adds or alters. ${got.late ? `${MEND}split the pull request so that each scan reads fewer files, or split the files it stops on, and run it again` : `${UNREAD_MEND("<path>")}, naming the file it stops on (run the scan on each)`}`], failed: true }
-    : { lines: [`code scan: did not run: ${got.failed}; it decides nothing`], failed: false };
+  if (got.failed) return unanswered(got, base);
   const stoodRead = base ? stoodAt(dir, root, base, read, until) : null;
   const stood = base ? stoodRead ?? new Map() : null;
   const { lines, fails } = verdicts(got.findings, { root, base, stood, added: base ? addedLines(root, base, read) : new Map(), explained: falseAlarms(description) });
