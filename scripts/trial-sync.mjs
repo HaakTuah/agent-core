@@ -87,6 +87,6 @@ export function syncFormed(r) {
 // What a record says of them.
 export function syncSaid(r) {
   const from = Object.entries(r.copiesFrom ?? {}).map(([k, n]) => `${n} from ${k === "main" ? "a commit of the core's main that is no release" : k === "unknown" ? "a copy not read" : k}`);
-  const main = Object.entries(r.mainsRead ?? {}).map(([k, n]) => `${n} against ${k === "origin" ? "the project's main fetched from its origin" : k === "clone" ? "a clone's own branch main, the clone having no origin" : "a main their reading does not name"}`);
+  const main = Object.entries(r.mainsRead ?? {}).map(([k, n]) => `${n} against ${k === "origin" ? "the project's main fetched from the clone's origin" : k === "clone" ? "a clone's own branch main, the clone having no origin" : "a main their reading does not name"}`);
   return `Against the commit tried, as pure-sync.mjs --trial reads it, holding no cut: ${r.syncPure} of the syncs pure, ${r.syncNotPure} not${r.syncUnproved ? `, ${r.syncUnproved} of them not proved, their reading holding no answer` : ""}${from.length ? `; the runs before the update started from the copies their main held, ${from.join(", ")}` : ""}${main.length ? `; the syncs read ${main.join(", ")}` : ""}.`;
 }
