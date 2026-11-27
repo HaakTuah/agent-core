@@ -11,7 +11,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { RUNS, RUNS_TOO } from "../scripts/comment-only.mjs";
+import { RUNS, RUNS_TOO } from "../scripts/runs-by-itself.mjs";
 import { BASE, edit } from "../scripts/comment-only-stage.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 

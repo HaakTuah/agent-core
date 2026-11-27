@@ -11,7 +11,8 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { proof, readYaml } from "../scripts/comment-only.mjs";
+import { proof } from "../scripts/comment-only.mjs";
+import { readYaml } from "../scripts/comment-only-yaml.mjs";
 import { BASE, edit } from "../scripts/comment-only-stage.mjs";
 
 let failed = 0, count = 0;
