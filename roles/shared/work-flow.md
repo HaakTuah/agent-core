@@ -44,13 +44,14 @@ owner creates from any device to stop its agents and deletes to let them go on.
 - A session runs the *quick check* before its first change; a failure there is a bug outside its task ("Bugs don't
   wait"), and the task goes on with what does not hang on it. It does not mean the whole suite. Reason: one that
   starts on a broken `main` cannot tell its own faults from those it inherited.
-- **A builder hands over by its context** (#750, point 7). By default a builder carries its task to its merge in one
-  session; once its context passes about 250,000 tokens (a first guess), as `core/scripts/session-cost.mjs --context`
-  prints it, it stops at its next passed gate (checks green, a review answered) with its hand-off note in its pull
-  request's description, as any session that stops mid-task commits and writes it (`tasks/tools.md`), and the
-  orchestrator starts a fresh one from that note. It does not mean it stops mid-step, nor where the script prints
-  nothing, nor that one no orchestrator started stops. Reason: each step costs more as a context grows; one builder
-  ran to 553,000. Held by no check; that reading shows it.
+- **A builder hands over by its context** (#750, point 7; #1505, point 2). By default a builder carries its task to its
+  merge in one session; once its context passes the mark `core/scripts/session-cost.mjs --context` prints, given where
+  its tool shows it condenses (`--condenses`), it stops at its next passed gate (checks green, a review answered) with
+  its hand-off note in its pull request's description, as any session that stops mid-task commits and writes it
+  (`tasks/tools.md`), and the orchestrator starts a fresh one from that note. It does not mean it stops mid-step, nor
+  where the script prints nothing, nor that one no orchestrator started stops. Reason: each step costs more as a
+  context grows (one builder ran to 553,000), and a mark above condensing (224,000) never fired. Held by no check; that
+  reading shows it.
 - A builder session that no orchestrator started, and the orchestrator on every wake, first checks whether the core
   has moved (`core/scripts/core-moved.mjs --dry`) and syncs it if so (`core/scripts/sync.mjs`, then each step and
   difference it reports), between tasks, a floor change at once (`tasks/planning.md`); where checks cost money, not on a day a sync PR was already opened. Then both read what reviews left after a merge (`tasks/reviews.md`, point 2), and take up a check failed on `main`'s newest commit that no running session owns (`tasks/tests.md`).
@@ -77,7 +78,7 @@ The calls from a cloud session: `tasks/github-calls.md`.
   of a description starts the checks that read it (two jobs in the core, about 76 an hour on 19 November 2026, #820),
   which hold runner slots and, on a private repository's free plan, bill a whole minute each, and a failure sends the
   work back. Held by nothing yet.
-- **Push after every commit,** even before the PR opens (a draft if not ready).
+- **Push after every commit,** its message naming the next step (`tasks/tools.md`), even before the PR opens (a draft if not ready).
   - Before pushing to a branch whose PR you opened earlier, check whether it merged; if it did, start a new branch and
     PR.
 - **Updates, Dependabot and CodeQL:** `tasks/updates.md`.

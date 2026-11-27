@@ -3,7 +3,8 @@
 // newest commit, and prints those whose branch has had no push for longer than the given hours (HOURS unless --hours
 // says otherwise), oldest first, so that no session's word that a lane is "running" stands in for the clock, each
 // marked where its description holds no hand-off note (tasks/tools.md, "A change of tool loses nothing"; #306), the
-// line "Hand-off:" the fresh builder reads first. Pull requests from a fork and Dependabot's own are no lanes and are
+// line "Hand-off:" the fresh builder reads first, and where its newest commit names no next step (tasks/tools.md, "Each
+// pushed commit names its next step"; #1505, point 1), the line "Next:" of that commit's message. Pull requests from a fork and Dependabot's own are no lanes and are
 // left out. Where the way the sessions run through reports their states (tasks/ways.md, "A session's state is read
 // where the way gives it"; #397), --states names a JSON file of each lane's pull request number or branch to its state,
 // one of STATES: a lane given there is printed by that state and never judged by the clock. It prints one line when
@@ -22,6 +23,10 @@ import { started } from "./started.mjs";
 // A description's hand-off note: a line that opens "Hand-off:", bare, bold, a heading or an item of a list.
 export const HAND_OFF = /^(?:[-*] |#{1,6} )?(?:\*\*)?Hand-off:/mu;
 export const handedOff = body => HAND_OFF.test(typeof body === "string" ? body : "");
+
+// A commit message's next step: a line that opens "Next:" and names something.
+export const NEXT = /^Next: *\S/mu;
+export const namesNext = message => NEXT.test(typeof message === "string" ? message : "");
 
 // How long a lane may go without a push before it counts as stalled, unless --hours says otherwise.
 export const HOURS = 3;
@@ -81,7 +86,7 @@ export function print(lanes, open, hours, given = []) {
   const said = given.length ? [`As the way reports, not judged by the clock: ${given.length} of ${open} open`, ...given.map(l => `  #${l.number} ${plain(l.ref)}: ${l.state} (${plain(l.title)})`)] : [];
   if (!lanes.length) return [`No lane stalled: ${open} open, none ${given.length ? "of the rest " : ""}without a push for over ${hours} h.`, ...said].join("\n");
   return [`Stalled, no push for over ${hours} h: ${lanes.length} of ${open} open`,
-    ...lanes.map(l => `  #${l.number} ${plain(l.ref)}: ${l.waited.toFixed(1)} h since ${l.at} (${plain(l.title)})${handedOff(l.body) ? "" : "; no hand-off note"}`), ...said].join("\n");
+    ...lanes.map(l => `  #${l.number} ${plain(l.ref)}: ${l.waited.toFixed(1)} h since ${l.at} (${plain(l.title)})${handedOff(l.body) ? "" : "; no hand-off note"}${namesNext(l.message) ? "" : "; its newest commit names no next step"}`), ...said].join("\n");
 }
 
 // Whether work went on in the last `hours` (a day by default) at `now`: a push to a pull request of the repository's
@@ -102,8 +107,9 @@ export function standingStill({ queue, closed, pulls, notices, now, latest = nul
 }
 
 // The open pull requests of `repo`, through `api` (gh api's route and --jq, as main gives it), page by page, since a
-// cloud session's gh cannot follow pages by itself: each { number, title, ref, sha, own, draft, body, labels, at }, `at`
-// the time of its newest commit where its branch is in this repository. Also read by the scheduled look (look.mjs).
+// cloud session's gh cannot follow pages by itself: each { number, title, ref, sha, own, draft, body, labels, at,
+// message }, `at` the time of its newest commit and `message` that commit's message, where its branch is in this
+// repository. Also read by the scheduled look (look.mjs).
 export function openPulls(repo, api) {
   const pulls = [];
   for (let page = 1; page <= 50; page++) {
@@ -113,7 +119,12 @@ export function openPulls(repo, api) {
     for (const [number, title, ref, sha, from, draft, body, labels] of rows) pulls.push({ number, title, ref, sha, own: from === repo.toLowerCase(), draft, body, labels });
     if (rows.length < 100) break;
   }
-  for (const p of pulls) if (p.own && /^[0-9a-f]{40}$/.test(p.sha)) p.at = api(`repos/${repo}/commits/${p.sha}`, ".commit.committer.date").trim();
+  for (const p of pulls) {
+    if (!p.own || !/^[0-9a-f]{40}$/.test(p.sha)) continue;
+    const [at, ...message] = api(`repos/${repo}/commits/${p.sha}`, '(.commit.committer.date // "") + "\\n" + (.commit.message // "")').split("\n");
+    p.at = at.trim();
+    p.message = message.join("\n");
+  }
   return pulls;
 }
 
