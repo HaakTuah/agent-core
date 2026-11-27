@@ -27,7 +27,6 @@
     "scripts/pure-sync.mjs": { "mark": 22852, "why": "the question of a split is asked in #1385" },
     "scripts/comment-only.mjs": { "mark": 28954, "why": "the question of a split is asked in #1341" },
     "SECURITY.md": { "mark": 21346, "why": "the question of a split is asked in #1255" },
-    ".github/sizes.json": { "mark": 20901, "why": "a list a script reads, each entry looked up by its path; no split lets anyone read less" },
     "scripts/licences.mjs": { "mark": 52937, "why": "the question of a split is asked in #1151" },
     "scripts/packages.mjs": { "mark": 25772, "why": "the question of a split is asked in #1151" },
     "tests/exact-versions-test.mjs": { "mark": 20990, "why": "the question of a split is asked in #1151" },
@@ -62,10 +61,6 @@
     "tests/personal-terms-test.mjs": {
       "mark": 49085,
       "why": "#929: the cases of how Betterleaks reads apart from what the check reads."
-    },
-    ".github/shape-baseline.json": {
-      "mark": 20951,
-      "why": "The shape check's one baseline (scripts/shape.mjs), which it reads whole and a session reads by the id of the one entry it adds or takes out, found by its name; main stood past the mark at 20,580 bytes with no entry here when #582 added its test's."
     },
     ".github/workflows/tests.yml": {
       "mark": 94371,
