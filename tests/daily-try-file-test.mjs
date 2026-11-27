@@ -16,9 +16,10 @@ const SHA = "2".repeat(40);
 {
   const t = { commit: SHA, day: "2026-11-27", signedIn: false, found: 3, private: 1, tried: 2, atPin: 0, untried: 0, syncFailed: 1, afterUnread: 0, held: 1, ...Object.fromEntries(["passedBoth", "fixedAfter", "failedBoth", "failedAfter", "failedAfterAlone", "stoppedAfter", "stoppedNeither", "ranAfterAlone", "ranBeforeAlone", "failedBeforeAlone", "unrunAfter", "unrunAfterRan", "unreadAfter", "unreadBefore", "unreadNeither"].map(k => [k, 0])), failedAfter: 1, name: `${OWNER}/game-one` };
   ok(formed(t) && !formed({ ...t, held: "1" }) && !formed({ ...t, commit: "main" }) && !formed({ ...t, tried: 9 }), "only counts in the form the run writes are filed");
-  const issues = (open = []) => route => {
+  const issues = (open = [], shut = []) => route => {
     if (/\/comments/u.test(route)) return JSON.stringify(open.flatMap(i => i.comments ?? []));
     if (/issues\?state=open/u.test(route)) return JSON.stringify(open);
+    if (/issues\?state=closed/u.test(route)) return JSON.stringify(shut);
     throw new Error("gh: Not Found (HTTP 404)");
   };
   const wrote = [], write = (m, r, b) => wrote.push({ m, r, b });
@@ -27,6 +28,10 @@ const SHA = "2".repeat(40);
   ok(bug && bug.m === "POST" && bug.b.labels.join() === "bug,queued,by:look" && bug.b.assignees.join() === OWNER && bug.b.body.includes(SHA) && /1 project whose checks the trial's reading holds \(1 passed before the sync and failed after/u.test(bug.b.body) && /1 project whose sync to the commit failed/u.test(bug.b.body), "a held try files one bug, labelled and assigned, saying the commit and the counts", bug?.b.body);
   ok(!wrote.some(w => JSON.stringify(w.b).includes("game-one")) && /--local/u.test(bug.b.body) && /Mend:/u.test(bug.b.body), "it names no project, even one smuggled into the counts, and says how a session finds which", bugText(t));
   ok(signin && signin.b.labels.join() === "needs-owner,by:look" && /PROJECTS_READ/u.test(signin.b.body), "without the sign-in, one issue asks it of the owner, labelled needs-owner", signin?.b.labels);
+  ok(/today it found 3 projects\./u.test(signin.b.body) && /matters only where a private project of the owner's takes the core/u.test(signin.b.body) && /Where none does, the owner may close this issue, and the try does not file it again\./u.test(signin.b.body), "the ask says the sign-in matters only where a private project takes the core, the count found, and that the owner may close it otherwise", signin?.b.body);
+  wrote.length = 0;
+  file({ ...t, held: 0, syncFailed: 0, tried: 3, failedAfter: 0 }, { gh: issues([], [{ number: 9, title: SIGNIN, body: "" }]), write, say: () => {} });
+  ok(wrote.length === 0, "a sign-in's issue the owner closed is never filed again", JSON.stringify(wrote));
   wrote.length = 0;
   const standing = [{ number: 7, title: TITLE, body: "of an earlier commit", comments: [] }, { number: 8, title: SIGNIN, body: "" }];
   file(t, { gh: issues(standing), write, say: () => {} });
