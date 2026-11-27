@@ -3,7 +3,7 @@
 // newest commit, and prints those whose branch has had no push for longer than the given hours (HOURS unless --hours
 // says otherwise), oldest first, so that no session's word that a lane is "running" stands in for the clock, each
 // marked where its description holds no hand-off note (tasks/tools.md, "A change of tool loses nothing"; #306), the
-// line "Hand-off:" the fresh builder reads first, and where its newest commit names no next step (tasks/tools.md, "Each
+// line "Hand-off:" the fresh builder reads first, and where its newest commit that is no merge names no next step (tasks/tools.md, "Each
 // pushed commit names its next step"; #1505, point 1), the line "Next:" of that commit's message. Pull requests from a fork and Dependabot's own are no lanes and are
 // left out. Where the way the sessions run through reports their states (tasks/ways.md, "A session's state is read
 // where the way gives it"; #397), --states names a JSON file of each lane's pull request number or branch to its state,
@@ -106,10 +106,14 @@ export function standingStill({ queue, closed, pulls, notices, now, latest = nul
   return read(String(queue ?? ""), closed).next?.issues ?? null;
 }
 
+// How many merge commits at a branch's head openPulls steps back over to find a commit's message that is no merge's.
+export const MERGES_SKIPPED = 10;
+
 // The open pull requests of `repo`, through `api` (gh api's route and --jq, as main gives it), page by page, since a
 // cloud session's gh cannot follow pages by itself: each { number, title, ref, sha, own, draft, body, labels, at,
-// message }, `at` the time of its newest commit and `message` that commit's message, where its branch is in this
-// repository. Also read by the scheduled look (look.mjs).
+// message }, `at` the time of its newest commit and `message` the message of its newest commit that is no merge (a merge of
+// the base into the branch carries no next step; the first parent is followed, up to MERGES_SKIPPED merges back), where
+// its branch is in this repository. Also read by the scheduled look (look.mjs).
 export function openPulls(repo, api) {
   const pulls = [];
   for (let page = 1; page <= 50; page++) {
@@ -121,9 +125,15 @@ export function openPulls(repo, api) {
   }
   for (const p of pulls) {
     if (!p.own || !/^[0-9a-f]{40}$/.test(p.sha)) continue;
-    const [at, ...message] = api(`repos/${repo}/commits/${p.sha}`, '(.commit.committer.date // "") + "\\n" + (.commit.message // "")').split("\n");
-    p.at = at.trim();
-    p.message = message.join("\n");
+    let sha = p.sha;
+    for (let step = 0; step < MERGES_SKIPPED + 1; step++) {
+      const [head, ...message] = api(`repos/${repo}/commits/${sha}`, '(.commit.committer.date // "") + " " + ((.parents | length) | tostring) + " " + (.parents[0].sha // "") + "\\n" + (.commit.message // "")').split("\n");
+      const [at, parents = "1", first = ""] = head.trim().split(" ");
+      if (step === 0) p.at = at;
+      p.message = message.join("\n");
+      if (Number(parents) < 2 || !/^[0-9a-f]{40}$/.test(first)) break;
+      sha = first;
+    }
   }
   return pulls;
 }

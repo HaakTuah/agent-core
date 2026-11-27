@@ -3,7 +3,7 @@
 // program's own and are not made here.
 //
 //   node tests/stalled-test.mjs
-import { goesOn, handedOff, namesNext, NOTICE, print, readStates, reported, stalled, standingStill, statesIn } from "../scripts/stalled.mjs";
+import { goesOn, handedOff, MERGES_SKIPPED, namesNext, NOTICE, openPulls, print, readStates, reported, stalled, standingStill, statesIn } from "../scripts/stalled.mjs";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 
@@ -67,6 +67,19 @@ ok(standingStill({ queue: "| #13 | builder | #12 |\n| #14 | the owner | |\n| #11
 ok(JSON.stringify(standingStill({ queue: "| #13 | builder | #11 |\n", closed, pulls: [], notices: [], now })) === "[13]", "a line whose wait has closed can be taken");
 
 ok(standingStill({ queue, closed, pulls: [old], notices: [], now, latest: "2026-11-13T12:00:00Z" }) === null && goesOn({ pulls: [], latest: "2026-11-13T12:00:00Z", now }) && !goesOn({ pulls: [fork], latest: "2026-11-12T08:00:00Z", now }) && !goesOn({ pulls: [{ own: true, at: "not a time" }], now }), "a commit on the default branch in the last day is work going on; a fork's push, an older commit and a time that is no time are not");
+
+// The open pull requests as `openPulls` reads them, through a fake `api` that answers a route as the host does.
+{
+  const repo = "o/r", sha = n => String(n).padStart(40, "0"), row = `[7,"t","lane/x","${sha(1)}","o/r",false,"",[]]`;
+  const pullsOf = commits => openPulls(repo, route => route.includes("/pulls?") ? row : commits[route.split("/commits/")[1]] ?? "");
+  let got = pullsOf({ [sha(1)]: "2026-11-27T10:00:00Z\nWrite x\n\nNext: y\n" })[0];
+  ok(got.at === "2026-11-27T10:00:00Z" && got.message === "Write x\n\nNext: y\n" && namesNext(got.message), "a pull request's newest commit: its time, and its whole message, not its first line");
+  got = pullsOf({ [sha(1)]: "2026-11-27T12:00:00Z 2 " + sha(2) + "\nMerge main into lane", [sha(2)]: "2026-11-27T10:00:00Z 1 " + sha(3) + "\nWrite x\n\nNext: y" })[0];
+  ok(got.at === "2026-11-27T12:00:00Z" && namesNext(got.message) && got.message.startsWith("Write x"), "a merge of the base as the newest commit: its time stands, the message is the newest commit's that is no merge", JSON.stringify(got));
+  const chain = { [sha(1)]: "2026-11-27T12:00:00Z 2 " + sha(2) + "\nMerge" };
+  for (let i = 2; i <= MERGES_SKIPPED + 2; i++) chain[sha(i)] = `2026-11-27T12:00:00Z 2 ${sha(i + 1)}\nMerge`;
+  ok(!namesNext(pullsOf(chain)[0].message), "a long run of merges is stepped back over only so far, and names no step");
+}
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);
