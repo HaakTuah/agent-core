@@ -638,6 +638,9 @@ jobs:
       - name: The brief of a release's trial, read for each step its rules ask
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-brief-test.mjs ')) }}
         run: node tests/trial-brief-test.mjs
+      - name: Whether a release's trial is due, and the look's issue for it
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/release-due-test.mjs ')) }}
+        run: node tests/release-due-test.mjs
       - name: check.mjs as a release's trial runs it, and the trial's record
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-test.mjs ')) }}
         run: node tests/trial-test.mjs
