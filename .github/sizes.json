@@ -21,12 +21,12 @@
     "tests/mutation-tools-test.mjs": { "mark": 20863, "why": "the question of a split is asked in #1253" },
     "tests/nuget-gate-test.mjs": { "mark": 21798, "why": "the question of a split is asked in #1326" },
     "tests/steps-write-test.mjs": { "mark": 27675, "why": "the question of a split is asked in #1253" },
+    "tests/stryker-test.mjs": { "mark": 24074, "why": "One script's tests, read by their headings (---- … ----) and found by searching; the runs with Stryker itself share the scratch repository the cases beside them build, so a split would have a reader open two files where one does now" },
     "tests/converge-test.mjs": { "mark": 22202, "why": "the question of a split is asked in #1283" },
     "scripts/labels.mjs": { "mark": 22008, "why": "the question of a split is asked in #1186" },
     "scripts/sync.mjs": { "mark": 22147, "why": "the question of a split is asked in #1250" },
     "scripts/pure-sync.mjs": { "mark": 22905, "why": "#1385: floor rule 8's proof is one run on one state: the opening reads the main it is checked against, the pins and the diff, and sets aside each file outside the copy (later, gone) for the proof of the core's own files and parts (provedOwned, provedGone), which reads that state and is what lets those files pass, and done gives the one verdict; a reader of the proof needs the opening every time, a reviewer of the gate reads it whole each time, and the file is 12% past the mark." },
-    "scripts/comment-only.mjs": { "mark": 28954, "why": "the question of a split is asked in #1341" },
-    "SECURITY.md": { "mark": 21346, "why": "the question of a split is asked in #1255" },
+    "SECURITY.md": { "mark": 26852, "why": "the question of a split is asked in #1255" },
     "scripts/licences.mjs": { "mark": 52937, "why": "the question of a split is asked in #1151" },
     "scripts/packages.mjs": { "mark": 25772, "why": "the question of a split is asked in #1151" },
     "tests/exact-versions-test.mjs": { "mark": 20990, "why": "the question of a split is asked in #1151" },
@@ -153,8 +153,8 @@
       "why": "Its list of the scripts that write a file and the round trips it runs are two things a reader looks up apart; the split is #1196, and until it lands each writer added takes the file past the mark."
     },
     "tests/pure-sync-test.mjs": {
-      "mark": 42307,
-      "why": "The two programs (sync.mjs and the proof pure-sync.mjs) run end to end on one scratch copy of the core with a short history and a project made from it, the later cases taking the project as the earlier left it; split, each file would build them again, adding to the suite's time (tasks/tests.md); the cases of the core's own files and parts the proof admits (#1083) take the same project (#1008)."
+      "mark": 54771,
+      "why": "The two programs (sync.mjs and the proof pure-sync.mjs) run end to end on one scratch copy of the core with a short history and a project made from it, the later cases taking the project as the earlier left it; split, each file would build them again, adding to the suite's time (tasks/tests.md); the cases of the core's own files and parts the proof admits (#1083) take the same project (#1008); the case of a sync pull request synced again (#1361, point 24) builds a scratch core of its own, a few lines, and stands with the sync's other cases, where a reader of them looks."
     },
     "tests/work-saved-test.mjs": {
       "mark": 26522,
@@ -257,7 +257,7 @@
       "why": "#1380: the timed C# cases, which read none of the fixture, are to move beside the other select-csharp tests. #943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
     },
     ".github/shape-baseline.json": {
-      "mark": 27000,
+      "mark": 33900,
       "why": "A baseline the shape check reads and writes whole (--write), in the form every project's baseline takes; 'grown' gives the reason for some of the keys 'listed' holds, so a split along the two parts would make two files to keep in step, and none along who reads it was found."
     },
     "tests/staged-test.mjs": {

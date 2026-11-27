@@ -1,0 +1,5 @@
+{
+  "rule": "AGENTS.md: A bug a release's trial finds is built at once",
+  "behind": ["#1413.7"],
+  "number": "correction: misread; outcome: fast"
+}

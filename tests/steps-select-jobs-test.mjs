@@ -1,0 +1,125 @@
+// Tests the step of the tests a change can reach where a project's tests run in several jobs (#1361, point 4): each job
+// on pull requests that names a test of the project's own must select in that job, since the RUN its step writes holds
+// in its own job alone, or run only where the change touched its paths (#1361, point 25); where no job names one, a
+// job that selects is enough, as before. On the project the starter kit
+// of this commit writes in a scratch folder. Node's own modules and git.
+//
+//   node tests/steps-select-jobs-test.mjs
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { STEPS, project } from "../scripts/steps.mjs";
+import { kitIn } from "../scripts/steps-kit.mjs";
+import { scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { Unread } from "../scripts/workflow-calls.mjs";
+
+const { ok, done } = tally();
+const dir = kitIn(scratchDir("steps-select-jobs-"))("an-npm-project", { packages: "." });
+const step = STEPS.find(s => s.lead === "16 November 2026, the tests a change can reach");
+const flows = path.join(dir, ".github/workflows");
+
+for (const f of ["tools/rules-test.js", "tools/ui-test.js", "core/tests/kept-test.mjs"]) {
+  fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true });
+  fs.writeFileSync(path.join(dir, f), "export {};\n");
+}
+execFileSync("git", ["add", "-A"], { cwd: dir });
+
+const SELECT = "      - run: node core/scripts/select.mjs --env RUN\n        env:\n          SELECT_BASE: HEAD^1\n";
+const job = (name, steps) => `  ${name}:\n    runs-on: ubuntu-latest\n    steps:\n${steps}`;
+const gated = file => `      - if: env.RUN == 'all' || contains(env.RUN, ' ${file} ')\n        run: node ${file}\n`;
+// (the reading of the step with one workflow written, every other workflow of the project's taken out first)
+const kept = fs.readdirSync(flows).map(f => [f, fs.readFileSync(path.join(flows, f), "utf8")]);
+const said = (jobs, on = "pull_request:") => {
+  for (const f of fs.readdirSync(flows)) fs.rmSync(path.join(flows, f));
+  fs.writeFileSync(path.join(flows, "tests.yml"), `name: tests\non:\n  ${on}\njobs:\n${jobs.join("")}`);
+  return step.check(project(dir));
+};
+
+const both = said([job("node", SELECT + gated("tools/rules-test.js")), job("ui", SELECT + gated("tools/ui-test.js"))]);
+ok(both === null, "each job that names a test selects in it: done", both);
+
+const oneOfTwo = said([job("node", SELECT + gated("tools/rules-test.js")), job("ui", "      - run: node tools/ui-test.js\n")]);
+ok(oneOfTwo !== null && oneOfTwo.includes("`.github/workflows/tests.yml`, its job `ui`") && !oneOfTwo.includes("its job `node`") && oneOfTwo.includes("<its condition> && (env.RUN == 'all' || contains(env.RUN, ' <file> '))"),
+  "a job that names a test and selects nothing is named, with the gate of a test a step each, though another job selects", oneOfTwo);
+
+const dotted = said([job("node", SELECT + gated("tools/rules-test.js")), job("ui", "      - run: |\n          npm ci\n          node ./tools/ui-test.js --fast\n")]);
+ok(dotted?.includes("its job `ui`"), "a test named with ./ before it, in a script of several lines, is a test the job runs", dotted);
+
+const noneSelects = said([job("node", "      - run: node tools/rules-test.js\n"), job("ui", "      - run: node tools/ui-test.js\n")]);
+ok(noneSelects?.includes("its job `node`") && noneSelects.includes("its job `ui`"), "where no job selects, each job that names a test is named", noneSelects);
+
+const runner = said([job("tests", SELECT + "      - run: if [ \"$RUN\" = all ]; then node --test; else node --test $RUN; fi\n"), job("lint", "      - run: node tools/lint.mjs .\n")]);
+ok(runner === null, "where no job names a test, one job that selects, handing its runner the files, is done as before", runner);
+
+const nothing = said([job("tests", "      - run: node --test\n")]);
+ok(nothing !== null && nothing.includes("add a step before them"), "where no job selects and none names a test, the mend asks the selection, as before", nothing);
+
+const others = said([job("node", SELECT + gated("tools/rules-test.js")), job("kept", "      - run: node core/tests/kept-test.mjs\n"), job("near", "      - run: node tools/rules-test.json; cat tools/ui-test.js.bak\n")]);
+ok(others === null, "a test of the copy of the core, and a file whose name only begins with a test's, name no test of the project's", others);
+
+const pushOnly = said([job("ui", "      - run: node tools/ui-test.js\n")], "push:");
+ok(pushOnly !== null && !pushOnly.includes("its job `ui`"), "a job of a workflow pull requests do not run is not read as one that runs tests", pushOnly);
+
+// (#1361, point 25: a job that runs only where the change touched its paths selects by them already)
+const CHANGES = "  changes:\n    runs-on: ubuntu-latest\n    outputs:\n      code: ${{ steps.what.outputs.code }}\n      copy: ${{ steps.what.outputs.copy }}\n    steps:\n      - id: what\n        run: |\n          files=$(git diff --no-renames --name-only \"$BASE\" HEAD)\n          echo \"code=true\" >> \"$GITHUB_OUTPUT\"\n";
+const needing = (name, cond, steps, needs = "changes") => `  ${name}:\n    needs: ${needs}\n    if: ${cond}\n    runs-on: ubuntu-latest\n    steps:\n${steps}`;
+const RULES = "      - run: node tools/rules-test.js\n", UI = "      - run: node tools/ui-test.js\n";
+
+const byChange = said([CHANGES, needing("node", "needs.changes.outputs.code == 'true' || needs.changes.outputs.copy == 'true'", RULES), needing("ui", "${{ needs.changes.outputs.code == 'true' && github.event_name == 'pull_request' }}", UI)]);
+ok(byChange === null, "jobs whose if: reads, every way it is true, an output of a job they need that lists the change's files select by path: done", byChange);
+
+const always = said([CHANGES, needing("node", "always() || needs.changes.outputs.code == 'true'", RULES)]);
+ok(always?.includes("its job `node`"), "an if: true by a way that reads no such output runs whatever changed: named", always);
+
+const BUILD = "  build:\n    runs-on: ubuntu-latest\n    outputs:\n      code: ${{ steps.what.outputs.code }}\n    steps:\n      - id: what\n        run: echo \"code=true\" >> \"$GITHUB_OUTPUT\"\n";
+const notChange = said([BUILD, needing("node", "needs.build.outputs.code == 'true'", RULES, "build")]);
+ok(notChange?.includes("its job `node`"), "an output of a job that lists no change's files gates nothing by path: named", notChange);
+
+const unneeded = said([CHANGES, needing("node", "needs.changes.outputs.code == 'true'", RULES, "[]")]);
+ok(unneeded?.includes("its job `node`"), "an output of a job the job does not need is none: named", unneeded);
+
+const FILTER = "  changes:\n    runs-on: ubuntu-latest\n    outputs:\n      code: ${{ steps.f.outputs.code }}\n    steps:\n      - id: f\n        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36\n";
+const filtered = said([FILTER, `  node:\n    needs: [changes]\n    runs-on: ubuntu-latest\n    steps:\n      - if: needs.changes.outputs.code == 'true'\n        run: node tools/rules-test.js\n      - run: node tools/lint.mjs .\n`]);
+ok(filtered === null, "each step that names a test gated on a paths filter's output: done", filtered);
+
+const halfGated = said([FILTER, `  node:\n    needs: [changes]\n    runs-on: ubuntu-latest\n    steps:\n      - if: needs.changes.outputs.code == 'true'\n        run: node tools/rules-test.js\n      - run: node tools/ui-test.js\n`]);
+ok(halfGated?.includes("its job `node`"), "a step that names a test, ungated beside one gated: named", halfGated);
+
+const paths = said([job("node", RULES), job("ui", UI)], "pull_request:\n    paths: ['tools/**', 'src/**']");
+ok(paths === null, "a workflow that pull requests run only where they touch its paths: done", paths);
+
+const branches = said([job("node", RULES)], "pull_request:\n    branches: [main]\n    paths-ignore: []");
+ok(branches?.includes("its job `node`"), "a workflow whose pull_request names branches and no path: named", branches);
+
+// (the review of #1500: each way an if: can be true without such an output, and the other forms that read the change)
+for (const [cond, what] of [
+  ["(needs.changes.outputs.code == 'true' || github.event_name == 'pull_request') && success()", "an || inside parentheses with a way that reads no output"],
+  ["${{ !(needs.changes.outputs.code == 'true' && false) }}", "a negation"],
+  ["\"'needs.changes.outputs.code' != ''\"", "the output's name inside a quoted text"],
+  ["${{ needs.changes.outputs.code == 'true' }} && ${{ needs.changes.outputs.copy == 'true' }}", "two expressions, which GitHub reads as one text"],
+  ["needs.changes.outputs.code != ''", "a comparison that holds where the output is any text"],
+  ["needs.changes.outputs.node == 'true'", "an output the job does not take from the step that lists the files"]]) {
+  const read = said([CHANGES, needing("node", cond, RULES)]);
+  ok(read?.includes("its job `node`"), `an if: with ${what} runs whatever changed: named`, read);
+}
+const nested = said([CHANGES, needing("node", "(needs.changes.outputs.code == 'true' || needs.changes.outputs.copy == 'true') && success()", RULES, "[changes]")]);
+ok(nested === null, "an if: whose parenthesised || reads such an output every way, beside success(), with needs as a list: done", nested);
+const STATUS = CHANGES.replace("--name-only", "--name-status");
+ok(said([STATUS, needing("node", "contains(needs.changes.outputs.code, 'true')", RULES)]) === null, "a git diff with --name-status and contains() on its output: done");
+const commented = CHANGES.replace("files=$(git diff --no-renames --name-only \"$BASE\" HEAD)", "# git diff --name-only");
+ok(said([commented, needing("node", "needs.changes.outputs.code == 'true'", RULES)])?.includes("its job `node`"), "a git diff only in a comment lists no files: named");
+const CHANGED = FILTER.replace("dorny/paths-filter@", "tj-actions/changed-files@");
+ok(said([CHANGED, needing("node", "needs.changes.outputs.code == 'true'", RULES)]) === null, "a changed-files action's output: done");
+ok(said([job("node", RULES)], "pull_request:\n    paths-ignore: ['docs/**']") === null, "a workflow whose pull_request ignores some paths: done");
+const LONG = `  changes:\n    runs-on: ubuntu-latest\n    outputs:\n      code: \${{ steps.what.outputs.code }}\n    steps:\n      - id: what\n        run: git diff ${"x ".repeat(20000)}--name-only\n`;
+ok(said([LONG, needing("node", "needs.changes.outputs.code == 'true'", RULES)]) === null, "a git diff whose --name-only stands at the end of a long line: done");
+
+said([job("node", SELECT + gated("tools/rules-test.js"))]);
+fs.writeFileSync(path.join(flows, "ui.yml"), "name: ui\non: pull_request\njobs:\n  ui: {steps: [\n      - run: node tools/ui-test.js\n");
+let unread;
+try { unread = step.check(project(dir)); } catch (e) { unread = e; }
+ok(unread instanceof Unread && unread.message.includes(".github/workflows/ui.yml"), "a workflow the reader cannot read that names a test is said not read, never read as done", unread);
+
+for (const f of fs.readdirSync(flows)) fs.rmSync(path.join(flows, f));
+for (const [f, text] of kept) fs.writeFileSync(path.join(flows, f), text);
+done("the tests a change can reach, in several jobs");
