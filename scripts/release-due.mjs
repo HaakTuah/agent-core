@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { aCommit, aRepository, parseBounded } from "./guards.mjs";
+import { aCommit, aLogin, aRepository, parseBounded } from "./guards.mjs";
 import { LARGEST, linesOf } from "./queue.mjs";
 import { TRIAL, trialAt } from "./release-trial.mjs";
 import { RELEASE } from "./releases.mjs";
@@ -28,7 +28,7 @@ import { started } from "./started.mjs";
 export const LINES = 10, DAYS = 7, PAGES = 30, EVENT_PAGES = 10;
 export const TITLE = "A release's trial is due";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SHA = /^[0-9a-f]{40}$/u, DAY = 86400000, LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u;
+const SHA = /^[0-9a-f]{40}$/u, DAY = 86400000;
 
 const gitIn = dir => args => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }).trim();
 const ghApi = route => {
@@ -139,7 +139,7 @@ function closer(repo, number, read) {
   if (!close) return "its events hold no close that could be read";
   if (merged(repo, close.commit_id, read)) return true;
   const login = close.actor?.login;
-  if (typeof login !== "string" || !LOGIN.test(login)) return "who closed it could not be read";
+  if (!aLogin(login)) return "who closed it could not be read";
   const right = read(`repos/${repo}/collaborators/${login}/permission`);
   if (typeof right?.permission !== "string") return "the right of the account that closed it could not be read";
   return writersOf([right]).has(login.toLowerCase());
