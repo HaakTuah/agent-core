@@ -10,7 +10,7 @@
 //
 //   node core/scripts/host.mjs     from a project's root: the steps read on the host that are not done, and those not read
 import { spawnSync } from "node:child_process";
-import { asked, repoOf } from "./inbox.mjs";
+import { asked, namesNoHost, repoOf } from "./inbox.mjs";
 import { RECORD, mine } from "./look-keep.mjs";
 import { SETTINGS, ghAsk, readHost as ownerRead, shown, statesOf } from "./owner-settings.mjs";
 import { ownerOf } from "./releases.mjs";
@@ -109,7 +109,8 @@ export const refusal = (what, e, right) => {
 function main() {
   const below = spawnSync("git", ["rev-parse", "--show-prefix"], { encoding: "utf8" });
   if (below.status !== 0 || below.stdout.trim() !== "") { console.error("FAIL: run it from the root of the project's git repository. Mend: cd to the project's root and run node core/scripts/host.mjs again"); return 1; }
-  const repo = repoOf(spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout);
+  const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout, repo = repoOf(origin);
+  if (namesNoHost(origin)) { console.log("The host was not read: the origin names no host, being none or a folder on this machine, so the steps read on it are not read here; read them where the origin is set, or with this session's own GitHub tools."); return 0; }
   if (!repo) { console.log("The host was not read: the origin is on no github.com, so the steps read on it are left to the project's own host (core/tasks/hosts.md)."); return 0; }
   const root = process.cwd();
   // (a sync's run reads only: whether issues can be written is learnt by GETs alone, #1363)
