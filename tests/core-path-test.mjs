@@ -8,11 +8,13 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
 import path from "node:path";
-import { readCore, floorCopyIn, carriedAt, corePath, manifestText, floorCopy, atCopy, mendAt, trackedOf, copyHeld, copyAside } from "../scripts/core-path.mjs";
+import { readCore, floorCopyIn, carriedAt, corePath, manifestText, floorCopy, atCopy, mendAt, trackedOf, copyHeld, copyAside, coreItself } from "../scripts/core-path.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { pathIn } from "../scripts/reading.mjs";
-import { copied, A, carried, CALLED, tmp } from "../scripts/core-path-scratch.mjs";
+import { copied, A, carried, CALLED, tmp, checkout, OWN_SCRIPT } from "../scripts/core-path-scratch.mjs";
+import { check as nugetCheck, sourcesOf } from "../scripts/nuget.mjs";
+import { fetchAll } from "../scripts/nuget-fetch.mjs";
 import { root, scratchEnv, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -171,6 +173,25 @@ ok(atCopy("refs/remotes/origin/main:vendor/core/a core/b", "vendor/core/") === "
     "power.mjs --list leaves nothing out in the core's own repository, and a project's copy out of its set", ownList.stdout + ownList.stderr + projectList.stdout + projectList.stderr);
   ok(powered(ownRun)?.includes("scripts/run.mjs") && Array.isArray(powered(projectRun)) && !powered(projectRun).includes("scripts/run.mjs"),
     "  and so, as the default branch's checkout, of what runs with power", ownRun.stdout + ownRun.stderr + projectRun.stdout + projectRun.stderr);
+}
+
+// The NuGet check and the suites' selection read the core's own repository as the core, whatever core-manifest.md
+// stands at its root, as core-path.mjs's coreItself and copyAside tell it; in a project the copy stays aside
+{
+  const lib = { "core-manifest.md": `${copied("lib/")}\n| *shape check* | \`checks/other.json\` |\n`, "lib/A/A.csproj": "<Project />\n",
+    "lib/.config/dotnet-tools.json": "{", "AGENTS.md": "the *shape check*: `scripts/shape.mjs` with `.github/shape.json`\n" };
+  const own = checkout(tmp, "itself-own", { ...lib, ...OWN_SCRIPT }), project = checkout(tmp, "itself-copy", lib);
+  ok(coreItself(own) && !coreItself(project), "coreItself tells the core's own repository from a project's by the script it tracks at its root");
+  const tracked = dir => execFileSync("git", ["ls-files", "-z"], { cwd: dir, encoding: "utf8" }).split("\0").filter(Boolean);
+  const unlocked = dir => nugetCheck({ ships: [], nuget: {} }, dir, undefined, tracked(dir)).failures.some(f => f.startsWith("lib/A/A.csproj has no"));
+  ok(unlocked(own) && !unlocked(project), "the NuGet check reads a project file in the folder a manifest at the core's own root names, and leaves a project's copy aside");
+  const folder = { nuget: { sources: ["lib/feed/"] } }, takes = dir => { try { return sourcesOf(folder, dir).length === 2; } catch { return false; } };
+  ok(takes(own) && !takes(project), "  and takes a source folder there as the core's own, where a project may name none in its copy");
+  const tools = async dir => (await fetchAll({ ships: [], nuget: {} }, dir, tracked(dir), path.join(tmp, "itself-fetched"))).reports.join("\n").includes("lib/.config/dotnet-tools.json");
+  ok(await tools(own) && !(await tools(project)), "  and its fetch reads a tools manifest there, leaving a project's copy aside");
+  const config = dir => spawnSync(process.execPath, [path.join(root, "scripts/select.mjs")], { cwd: dir, encoding: "utf8", env: { ...process.env, SELECT_BASE: "" } }).stdout;
+  ok(/\.github\/shape\.json/u.test(config(own)) && !/checks\/other/u.test(config(own)) && /checks\/other\.json/u.test(config(project)),
+    "the suites' selection reads the core's own config from AGENTS.md, whatever manifest stands at its root, and a project's from its manifest", config(own) + config(project));
 }
 
 done("where the core's copy stands");

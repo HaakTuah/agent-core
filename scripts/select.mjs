@@ -47,7 +47,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE } from "./code-shape.mjs";
 import { CORE } from "./core-address.mjs";
-import { corePath } from "./core-path.mjs";
+import { copyHeld, coreItself } from "./core-path.mjs";
 import { asText, loggedAlone } from "./guards.mjs";
 import { WORDS, mentioned, nameTrie } from "./name-trie.mjs";
 import { CHARACTERS, Late, hurry } from "./hurry.mjs";
@@ -215,8 +215,9 @@ function pinsOnly(base, changed) {
   }));
 }
 
-// The path of the project's copy of the core, or null in the core's own repository, where its files are the code.
-const copyOf = () => { try { return corePath(".") || null; } catch { return null; } };
+// The path of the project's copy of the core, or null in the core's own repository, where its files are the code,
+// whatever manifest stands at its root (core-path.mjs's copyHeld).
+const copyOf = () => { try { return copyHeld("."); } catch { return null; } };
 
 const pick = ({ reach, scripts, unsure }) => ({ reach, scripts, unsure });
 // The conftest.py files git holds that the config's pathspecs leave out: pytest runs them all the same.
@@ -293,7 +294,8 @@ async function chosen({ config, at, base, passed, select }) {
 async function main(argv) {
   const self = path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/");
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, opts = options(named ? argv.slice(1) : argv, self);
-  const rules = ["core-manifest.md", "AGENTS.md"].find(f => fs.existsSync(f));
+  // (the core's own repository reads its slots from AGENTS.md, whatever manifest stands at its root: core-path.mjs)
+  const rules = (coreItself(".") ? ["AGENTS.md"] : ["core-manifest.md", "AGENTS.md"]).find(f => fs.existsSync(f));
   const at = named ?? where(rules ? fs.readFileSync(rules, "utf8") : ""), base = baseOf(), config = configOf(at);
   const now = config ? standing(config) : null, failed = readFailed(opts["--failed"]);
   const s = await chosen({ config, at, base, passed: opts["--passed"], select: from => selectedFrom(from, { now, config, failed }) });
