@@ -35,22 +35,25 @@ export function readAt(commit, place = placeAt(commit), { bound } = {}) {
 // (a link's text that leads out of any tree: none read, or one written from a root)
 const outward = to => to === null || /^([\\/]|[A-Za-z]:)/u.test(to);
 // Where a path leads, from the root, read part by part as a system reads it: each part that `isLink` says is a link
-// has its text (`text`, null where none is read) put in its place, read from the link's own folder, and a `..` steps
-// back from the folder reached, while it leads inside the tree, at most 40 links; the path it ends at, or null where a
-// link leads out or the links run past 40. placeAt reads a commit's tree through it and entry-files.mjs the work tree,
-// so the two read a link alike.
-export function followLinks(f, isLink, text) {
+// has its text (`text`, null where none is read) put in its place, read from the link's own folder, a `..` steps back
+// from the folder reached, and a part with more after it must be a folder (`isFolder`), while it leads inside the
+// tree, at most 40 links; the path it ends at, or null where a link leads out, the links run past 40 or a part with
+// more after it is no folder. placeAt reads a commit's tree through it and entry-files.mjs the work tree, so the two
+// read a link alike.
+export function followLinks(f, isLink, text, isFolder) {
   if (String(f).startsWith("/")) return null;
-  const todo = String(f).split("/"), cur = [];
+  let todo = String(f).split("/");
+  const cur = [];
   for (let hops = 0; todo.length;) {
     const p = todo.shift();
+    if (cur.length && !isFolder(cur.join("/"))) return null;
     if (p === "" || p === ".") continue;
     if (p === "..") { if (!cur.length) return null; cur.pop(); continue; }
     const next = [...cur, p].join("/");
     if (!isLink(next)) { cur.push(p); continue; }
     const to = ++hops > 40 ? null : text(next);
     if (outward(to)) return null;
-    todo.unshift(...to.replace(/\\/gu, "/").split("/"));
+    todo = to.replace(/\\/gu, "/").split("/").concat(todo);
   }
   return cur.join("/");
 }
@@ -70,18 +73,19 @@ export function placeAt(commit) {
     return modes.get(f);
   };
   const show = at => { try { return run(["show", `${commit}:${at}`]); } catch { return null; } };
-  const place = f => { const at = followLinks(f, p => mode(p) === "120000", show); return at !== null && /^100/u.test(mode(at) ?? "") ? at : null; };
   const size = at => (mode(at) === undefined ? undefined : sizes.get(at));
   let folders = null;
   const isFolder = at => {
     if (!folders) { mode(""); folders = new Set([...modes.keys()].flatMap(k => k.split("/").slice(0, -1).map((_, i, a) => a.slice(0, i + 1).join("/")))); }
     return folders.has(at);
   };
+  // (a link's text, read only where it is at most 4096 bytes, as a system's paths are; a longer one is none)
+  const linkText = at => (size(at) <= 4096 ? show(at) : null);
+  const place = f => { const at = followLinks(f, p => mode(p) === "120000", linkText, isFolder); return at !== null && /^100/u.test(mode(at) ?? "") ? at : null; };
   // (whether the tree holds anything at a path, read part by part as a system reads it: each link's text put in its
   // place and read from the link's own folder; a part a link's text brings that the tree lacks makes it a link that
   // leads nowhere, held, while a part of the path's own that the tree lacks, past every link, holds nothing; a link
   // that leads out of the tree, one past 4096 bytes, a submodule on the way and more than 40 links are held)
-  const linkText = at => (size(at) <= 4096 ? show(at) : null);
   const held = f => {
     const todo = path.posix.normalize(f).split("/").map(p => ({ p, linked: false }));
     for (let cur = "", hops = 0; todo.length;) {

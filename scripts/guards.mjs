@@ -31,10 +31,11 @@ export const linkedOut = at => {
  *  under a linked folder leads out too; a link that leads nowhere counts as leading out. */
 export function leadsOut(root, at) {
   let top;
-  try { top = fs.realpathSync(root); } catch { return true; }
+  // (the system's own realpath, which reads a `..` after a link from the folder the link reached, as a read does)
+  try { top = fs.realpathSync.native(root); } catch { return true; }
   for (let p = path.resolve(at); ;) {
     let real;
-    try { real = fs.realpathSync(p); } catch {
+    try { real = fs.realpathSync.native(p); } catch {
       let found;
       try { found = fs.lstatSync(p, { throwIfNoEntry: false }); } catch { found = undefined; }
       if (found?.isSymbolicLink()) return true;

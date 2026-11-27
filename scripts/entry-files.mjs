@@ -59,7 +59,8 @@ const clean = p => path.posix.normalize(String(p).replace(/\\/gu, "/")).replace(
 // relative, and inside the tree as written, every link followed, at most 40; so the work tree and the base read a link alike.
 const isLink = p => { try { return fs.lstatSync(p).isSymbolicLink(); } catch { return false; } };
 const linkText = p => { try { return fs.readlinkSync(p); } catch { return null; } };
-const asTheBaseReads = file => followLinks(clean(file), isLink, linkText) !== null;
+const isFolder = p => { try { return fs.lstatSync(p).isDirectory(); } catch { return false; } };
+const asTheBaseReads = file => followLinks(clean(file), isLink, linkText, isFolder) !== null;
 
 // What each entry file the project holds lacks of AGENTS.md's list: [{ file, tool, missing: [path], line, off }], `off`
 // why its tool would not load it at all (every file is then missing), or null.

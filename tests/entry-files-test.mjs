@@ -28,9 +28,10 @@ ok(ranged.length === 1 && ranged[0].missing.join() === "core/floor/security.md",
 ok(lacking(reader({ "AGENTS.md": AGENTS })).length === 0 && lacking(reader({ "CLAUDE.md": "x" })).length === 0,
   "an entry file the project does not hold, or a project with no AGENTS.md, is not looked for");
 // (the one walk the base and the work tree read a link by, on a tree of links given as { path: text })
-const walk = (links, f) => followLinks(f, p => p in links, p => links[p] ?? null);
+const walk = (links, f, folder = () => true) => followLinks(f, p => p in links, p => links[p] ?? null, folder);
 ok(walk({ "a": "b/c", "b": "d" }, "a/e") === "d/c/e" && walk({ "a": "/etc" }, "a") === null && walk({ "a": "a" }, "a") === null && walk({ "a": "../x" }, "a") === null
-  && walk({ "x": "d/e" }, "x/../y") === "d/y", "one walk follows each link from its own folder, steps back by a `..` from the folder a link reached, and refuses one written from a root, one that climbs out and a loop past 40");
+  && walk({ "x": "d/e" }, "x/../y") === "d/y" && walk({}, "f/../y", p => p !== "f") === null && walk({}, "f/", p => p !== "f") === null,
+  "one walk follows each link from its own folder, steps back by a `..` from the folder a link reached, refuses to step through a part that is no folder, and refuses one written from a root, one that climbs out and a loop past 40");
 let l = lacking(reader({ "AGENTS.md": AGENTS, "CLAUDE.md": "@core-manifest.md\n" }));
 ok(l.length === 1 && l[0].file === "CLAUDE.md" && l[0].missing.join() === "core/floor/security.md",
   "a CLAUDE.md that imports neither AGENTS.md nor each of its files lacks the one it leaves out");
@@ -143,6 +144,7 @@ try {
       ["CLAUDE.md led through a second link to a folder lacking the file", () => { swap("CLAUDE.md", f => fs.symlinkSync("x/c.md", f)); fs.symlinkSync("z", path.join(dir, "x")); }],
       [".agents led through a second link to a folder lacking the rest", () => { swap(".agents", f => fs.symlinkSync("x/y", f)); fs.symlinkSync("z", path.join(dir, "x")); }],
       [".agents led up out of a folder that is not there", () => swap(".agents", f => fs.symlinkSync("w/..", f))],
+      ...["AGENTS.md/", "AGENTS.md/.", "README.md/../AGENTS.md", "nothere/../AGENTS.md"].map(to => [`CLAUDE.md led through a part that is no folder (${to})`, () => { write("README.md", "x\n"); swap("CLAUDE.md", f => fs.symlinkSync(to, f)); }]),
       ["CLAUDE.md led through a link and back up from the folder it reached, which lacks the file", () => { swap("CLAUDE.md", f => fs.symlinkSync("x/../AGENTS.md", f)); write("docs/d/.keep", ""); fs.symlinkSync("docs/d", path.join(dir, "x")); }],
     ]) {
       made(); commit(what);
@@ -150,6 +152,10 @@ try {
       ok(r.status === 0 && r.out.includes("note") && r.out.includes("stands here but is not read"), `against a base where ${what}, left so, it is noted and fails nothing`);
       fs.rmSync(path.join(dir, "x"), { force: true }); swap("CLAUDE.md", f => fs.writeFileSync(f, "@AGENTS.md\n")); swap(".agents", () => write(".agents/rules/core.md", AG)); commit(`${what}, undone`);
     }
+    // (a link through a folder link, then back up from the folder it reached, to a file there: read as the system reads it)
+    write("docs/d/.keep", ""); write("docs/A2.md", "@AGENTS.md\n"); fs.symlinkSync("docs/d", path.join(dir, "x")); swap("CLAUDE.md", f => fs.symlinkSync("x/../A2.md", f)); commit("CLAUDE.md through a folder link and up");
+    ok(run({ ENTRY_BASE: "HEAD" }).status === 0, "against a base that held an entry file as a link through a folder link and back up from the folder it reached, left so, it is read and passes");
+    fs.rmSync(path.join(dir, "x")); swap("CLAUDE.md", f => fs.writeFileSync(f, "@AGENTS.md\n")); commit("CLAUDE.md through a folder link and up, undone");
     const awayDir = `${away}.d`;
     fs.mkdirSync(path.join(awayDir, "rules"), { recursive: true }); fs.writeFileSync(path.join(awayDir, "rules/core.md"), AG);
     swap(".agents", f => fs.symlinkSync(awayDir, f)); commit("antigravity's folder elsewhere");

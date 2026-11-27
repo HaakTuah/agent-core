@@ -34,6 +34,12 @@ try {
   ok((!fileLink || leadsOut(project, path.join(project, "out.json"))) && leadsOut(project, path.join(project, "away", "other.json")), "a file reached through a link out of the project, at the file or a folder on its way, leads out");
   ok(!leadsOut(project, path.join(project, "none.json")) && !leadsOut(project, path.join(project, "inner", "new", "x.json")), "a path that does not stand yet, under a folder of the project's, does not lead out");
   ok(leadsOut(project, path.join(project, "away", "new.json")) && leadsOut(project, path.join(project, "away", "deeper", "new.json")), "a path that does not stand yet, under a folder linked out of the project, leads out");
+  fs.mkdirSync(path.join(elsewhere, "deep")); fs.writeFileSync(path.join(project, "other.json"), "{}");
+  fs.symlinkSync(path.join(elsewhere, "deep"), path.join(project, "far"), "junction");
+  // (a link whose text, written as is, steps back by a `..` from the folder a folder link reached: the system reads it there)
+  let upLink = true;
+  try { fs.symlinkSync(["far", "..", "other.json"].join(path.sep), path.join(project, "up.json")); } catch { upLink = false; }
+  ok(!upLink || leadsOut(project, path.join(project, "up.json")), "a link whose text steps back from a folder link out of the project leads out, though its spelling stays inside");
   if (fileLink) {
     fs.symlinkSync(path.join(elsewhere, "gone.json"), path.join(project, "dangling.json"));
     ok(leadsOut(project, path.join(project, "dangling.json")), "a link that leads nowhere leads out");

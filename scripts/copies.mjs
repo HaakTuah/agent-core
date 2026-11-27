@@ -217,10 +217,10 @@ const placeHere = bound => {
     let at = null;
     try {
       if (!leadsOut(ROOT, f)) {
-        const real = fs.realpathSync(f), st = fs.statSync(real);
+        const real = fs.realpathSync.native(f), st = fs.statSync(real);
         if (st.isFile() && st.size <= bound && (counted.has(real) || readSoFar + st.size <= TOTAL)) {
           if (!counted.has(real)) { counted.add(real); readSoFar += st.size; }
-          at = path.relative(fs.realpathSync("."), real).split(path.sep).join("/");
+          at = path.relative(fs.realpathSync.native("."), real).split(path.sep).join("/");
         }
       }
     } catch { at = null; }

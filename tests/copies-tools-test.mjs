@@ -181,6 +181,8 @@ try {
       put("notes/a.md", `# Notes\n\n${OTHER}.\n`);
       for (const [to, f] of [["/dev/zero", "src/zero.js"], ["/proc/self/fd/1", "src/out.js"], ["../notes", "src/dir"], ["gone.js", "src/gone.js"], [path.join(away0, "out.md"), "notes/out.md"], ["a.md", "notes/link.md"], ["../src/a.js", "notes/code.md"]]) fs.symlinkSync(to, path.join(dir, f));
       fs.symlinkSync("a.js", path.join(dir, "src/b.js"));
+      // (and one through a folder link, then back up from the folder it reached, is read where the system reads it)
+      put("notes/sub/s.md", "# Sub\n"); put("notes/a3.md", "# Three\n"); fs.symlinkSync("notes/sub", path.join(dir, "xl")); fs.symlinkSync("../xl/../a3.md", path.join(dir, "notes/up.md"));
       put("notes/big.md", `${OTHER}.\n`.repeat(100000));
       put("checks/odd.json", `${JSON.stringify({ baseline: "checks/odd-baseline.json", code: ["src"], prose: ["notes"], proseFromSecurity: false })}\n`);
       put("checks/odd-baseline.json", `${JSON.stringify({ windows: {}, values: {} })}\n`);
@@ -188,7 +190,7 @@ try {
       const odd = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/odd.json"], { cwd: dir, encoding: "utf8", timeout: 60000, env: { ...process.env, COPIES_BASE: "" } });
       const said = `${odd.stdout}${odd.stderr}`;
       ok(odd.status === 0 && /^note 6 of the files the config names are not read: /mu.test(said) && !said.includes("outside the project") && !/new copy/u.test(said),
-        "a tracked link that leads out of the project, to a device, a folder or nowhere, and a file past the bound are unread and counted, and a link inside the project is read once, as the file it leads to", said);
+        "a tracked link that leads out of the project, to a device, a folder or nowhere, and a file past the bound are unread and counted, and a link inside the project is read once, as the file it leads to, through a folder link and back up too", said);
       // (many links to one file count it once, and each run has its own total, so the code's links leave the prose read)
       put("src/many.js", Array.from({ length: 70000 }, (_, i) => `const v${i} = ${i};`).join("\n"));
       for (let i = 0; i < 300; i += 1) fs.symlinkSync("many.js", path.join(dir, `src/many${i}.js`));
