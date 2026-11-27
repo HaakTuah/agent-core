@@ -126,6 +126,9 @@ const around = {
   "a dot continued before its space": `.\\\n ./lib.sh\n${READ}\n${GET}\n`,
   "hash continued in mid-word": `ha\\\nsh -p ./tools/grep grep\n${READ}\n${GET}\n`,
   "grep defined, continued in mid-word": `gr\\\nep() { sh; }\n${READ}\n${GET}\n`,
+  // (a line that ends in an escaped backslash, which continues nothing, #1455's eighth review)
+  "a dot after a line that ends in an escaped backslash": `echo foo\\\\\n. ./lib.sh\n${READ}\n${GET}\n`,
+  "grep defined after a line that ends in an escaped backslash": `echo x\\\\\ngrep() { sh; }\n${READ}\n${GET}\n`,
 };
 const through = Object.entries(around).filter(([, code]) => programs(code) < 2).map(([what]) => what);
 ok(!through.length, "a read whose variable a shell reads by itself, or that stands other than it reads, is a program's download", through.join(" | "));
