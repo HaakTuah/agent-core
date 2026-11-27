@@ -311,6 +311,21 @@ try {
   ok(inCopy.status === 0 && !/vendor\/core/u.test(inCopy.stdout + inCopy.stderr) && own.status === 1 && /^FAIL core\/tools\/action\.yml:2: pull_request_target/m.test(own.stdout) && !/vendor\/core\/tools/u.test(own.stdout),
     "run in a project whose manifest names the copy at another path, an action.yml in the copy is left out and the project's own core/ is read", `${inCopy.stdout}${inCopy.stderr}\n${own.stdout}${own.stderr}`);
 } finally { fs.rmSync(vend, { recursive: true, force: true }); }
+
+// ---- the copy told apart from the core's own repository, as core-path.mjs's copyAside does (#1350): where the check's
+// own scripts/core-path.mjs is tracked at the root, a core-manifest.md beside it names no copy, and nothing is left out ----
+const ownCore = scratchDir("workflows-own-");
+try {
+  const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(ownCore, f)), { recursive: true }); fs.writeFileSync(path.join(ownCore, f), text); };
+  for (const f of CHECK_FILES) put(`scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url)))));
+  fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(ownCore, ".packages"), { recursive: true });
+  put("core-manifest.md", `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under tools/ (never edited here).\n`);
+  put("tools/action.yml", "on:\n  pull_request_target:\n");
+  put(".github/workflows/own.yml", "on: push\n");
+  for (const args of [["init", "-q"], ["add", "-A", "-f"]]) execFileSync("git", args, { cwd: ownCore, stdio: "ignore" });
+  const r = spawnSync(process.execPath, [path.join(ownCore, "scripts/workflows.mjs")], { cwd: ownCore, encoding: "utf8", env: { ...process.env, WORKFLOWS_BASE: "" } });
+  ok(r.status === 1 && /^FAIL tools\/action\.yml:2: pull_request_target/m.test(r.stdout), "run in the core's own repository with a core-manifest.md at its root, the path that manifest names is read as its own", r.stdout + r.stderr);
+} finally { fs.rmSync(ownCore, { recursive: true, force: true }); }
 // ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
 // Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and
 // the pull request, cancelled once a newer run starts for it; a run on main, a schedule or a start by hand is a group of
@@ -424,6 +439,17 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     && suites[2].length === suites[0].length + suites[1].length && [".node-version", ".node-least"].every(n => suites[2].filter(x => x.node === n).length === suites[2].length / 2)
     && upgrades && only(upgrades[0], "ubuntu-latest") && only(upgrades[1], "windows-latest") && upgrades[2].length === upgrades[0].length + upgrades[1].length,
     "a pull request's run and a push's are on Linux alone, the hourly run on Windows but for the network's jobs, every job named whole, and a start by hand runs them all, on both Nodes (points 3, 4 and 6)", String(tests.jobs.suites.strategy.matrix.include).slice(0, 300));
+  // (#1446: on Linux, a pull request's run and a push's take each part once on each Node, the two longest of the steps'
+  // parts, steps and writes, in jobs apart, since together with the rest they ran past the job's limit; and each job's
+  // suite has its time mark on its system)
+  const linuxParts = suites ? [".node-version", ".node-least"].map(n => suites[0].filter(x => x.node === n).flatMap(x => x.parts.split(" ")).sort().join()) : [];
+  const jobOf = part => suites[0].filter(x => x.node === ".node-version" && x.parts.split(" ").includes(part)).map(x => x.suite);
+  const shapeMarks = JSON.parse(fs.readFileSync(path.join(wfDir, "..", "shape.json"), "utf8")).suites;
+  ok(suites && linuxParts.length === 2 && linuxParts[0] === linuxParts[1] && new Set(linuxParts[0].split(",")).size === linuxParts[0].split(",").length
+    && jobOf("steps").length === 1 && jobOf("writes").length === 1 && jobOf("steps")[0] !== jobOf("writes")[0]
+    && suites.flat().every(x => shapeMarks[x.suite]?.[x.os === "windows-latest" ? "win32" : "linux"] > 0),
+    "on Linux each part runs once on each Node, the steps' and the writers' parts in jobs apart, so that neither job runs past its limit, and each job's suite has a time mark on its system (#1446)",
+    JSON.stringify({ linuxParts, steps: suites && jobOf("steps"), writes: suites && jobOf("writes") }));
   // (the tests that reach the network, in the part of that name: in no pull request's run nor a push's, and once an hour
   // and by hand on both systems and both Nodes; #733, point 9)
   const steps = tests.jobs.suites.steps.filter(s => /contains\(matrix\.parts, 'network'\)/.test(String(s.if))).map(s => s.run).sort();
@@ -632,6 +658,16 @@ exit 1
   const job = parseYaml(fs.readFileSync(path.join(wfDir, "look.yml"), "utf8")).jobs.look, steps = job.steps ?? [];
   const without = steps.filter(s => !(s["timeout-minutes"] > 0 && s["timeout-minutes"] < job["timeout-minutes"])).map(s => s.name ?? s.uses ?? s.run);
   ok(steps.length > 0 && without.length === 0, "each step of the daily look's job has a time limit of its own, shorter than the job's (#1346)", without.join("; "));
+}
+
+// (#1426: the look's readers count history, the dose's cleaning share and the day the labels' check came, and refuse a
+// shallow clone; a fetch after a checkout that keeps no token has no sign-in in a private repository, so the job's
+// checkout takes the whole history itself)
+{
+  const steps = parseYaml(fs.readFileSync(path.join(wfDir, "look.yml"), "utf8")).jobs.look.steps ?? [];
+  const checkouts = steps.filter(s => /^actions\/checkout@/.test(String(s.uses ?? "")));
+  ok(checkouts.length === 1 && String(checkouts[0].with?.["fetch-depth"]) === "0" && String(checkouts[0].with?.["persist-credentials"]) === "false",
+    "the daily look's checkout holds the whole history its readers count, keeping no token (#1426)", JSON.stringify(checkouts.map(s => s.with)));
 }
 
 process.exit(failed ? 1 : 0);

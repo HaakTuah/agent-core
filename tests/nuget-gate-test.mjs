@@ -9,7 +9,8 @@
 // NuGet.Config that maps its packages to their sources included. No package is
 // downloaded: the step restores against an empty source. The whole job, on a project with no package: its restore and
 // its check pass, and a lock file that no longer holds what its project asks for fails the restore. Where there is no
-// .NET SDK (never on GitHub's runners) only the first look is tried. The one case where the restore must succeed, which
+// .NET SDK (never on GitHub's runners) only the first look is tried, and the whole job on a stand-in for dotnet that
+// says the machine lacks the SDK band global.json pins, whose restore reads as not run (#1361, point 10). The one case where the restore must succeed, which
 // asks NuGet's own registry, is nuget-gate-network-test.mjs's, in the part network (#772). The whole job installs the core's packages from a
 // copy of the machine's npm cache, made as the test starts, so it reaches no registry (#772). On Linux and on Windows.
 // Git, bash, jq, the .NET SDK, npm and Node's own modules.
@@ -152,6 +153,21 @@ if (sdk) {
   ok(!stale.passed && /NU1004/.test(stale.out) && /A restore from a lock file failed .*\. Mend: /.test(stale.out) && mended(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
 }
 
+// the whole job on a machine without the SDK band the project's global.json pins (a stand-in for dotnet that says so): the
+// restore is not run, the machine's fault, and the job says what it lacks with its mend, not that a lock file failed
+if (process.platform === "win32") console.log("skip the job without the SDK band: the stand-in for dotnet is a shell script");
+else {
+  const bin = path.join(tmp, "no-band");
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, "dotnet"), '#!/bin/sh\necho "A compatible .NET SDK was not found." >&2\necho "Requested SDK version: 1.0.100"\nexit 1\n', { mode: 0o755 });
+  const kept = env.PATH;
+  env.PATH = `${bin}${path.delimiter}${kept}`;
+  const lacked = whole({ "README.md": "# More\n" });
+  env.PATH = kept;
+  ok(!lacked.passed && lacked.out.includes("The restores could not run: this machine has no .NET SDK that the global.json here accepts") && /could not run here, since this machine lacks the \.NET SDK band the global\.json names: Restore each project file from its lock file alone\. Mend: /.test(lacked.out) && mended(lacked.out) && !lacked.out.includes("A restore from a lock file failed"),
+    "a machine without the SDK band global.json pins leaves the restore not run, saying what it lacks with its mend, and no lock file is said to have failed", lacked.out.slice(-1500));
+}
+
 // a changed file whose name holds "##[" is listed broken, behind its dash
 {
   const r = gate({ "src/##[group]x/App.csproj": project() });
@@ -202,6 +218,10 @@ printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":
   const unnamed = atCopy("core/", "core/", failing(""), { "::error::x/App.csproj": project() }).out, coded = atCopy("core/", "core/", failing('echo "error NU1004: the lock file"'), { "src/##[group]x/App.csproj": project() }).out;
   ok(unnamed.includes(": :error: :x/App.csproj: the restore failed with no error NuGet names") && !/^\s*::/m.test(unnamed), "a project file's path that starts with \"::\" is broken where the restore fails with no error named", unnamed);
   ok(coded.includes("src/# #[group]x/App.csproj: error NU1004") && !coded.includes("##["), "and one that holds \"##[\" is broken where it fails with an error NuGet names", coded);
+  // (a machine without the SDK band the project's global.json pins: the failure says it is the machine's, with its mend, not
+  // that the restore failed with no error named)
+  const noBand = atCopy("core/", "core/", failing('echo "A compatible .NET SDK was not found." >&2; echo "Requested SDK version: 8.0.100"'), { "App.csproj": project() }).out;
+  ok(/App\.csproj: no restore ran, since this machine has no \.NET SDK that the project's global\.json accepts: the machine's fault, not the change's\. Mend: install the SDK band/.test(noBand) && !noBand.includes("the restore failed with no error"), "a restore that fails for want of the SDK band global.json pins says it is the machine's fault, with its mend", noBand);
   // (and where only letters beyond ASCII stand between a pair's marks: in the project's path and in what dotnet printed;
   // #1348)
   const pair = /:[^\u0000-\u007f]*:|#[^\u0000-\u007f]*#[^\u0000-\u007f]*\[/u;

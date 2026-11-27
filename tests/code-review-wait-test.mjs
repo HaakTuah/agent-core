@@ -10,6 +10,7 @@ import { mended } from "../scripts/mend.mjs";
 import { UNREAD, status } from "../scripts/security-review.mjs";
 import { CONTEXT, judge } from "../scripts/code-review-wait.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
+import { checkout, copied, OWN_SCRIPT } from "../scripts/core-path-scratch.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -234,12 +235,12 @@ ok(is(queued([summary(running)], [lineOf]), false, "still running"), "a code rev
 const dir = scratchDir("code-review-wait-");
 try {
   const script = fileURLToPath(new URL("../scripts/code-review-wait.mjs", import.meta.url));
-  const run = (p, c, env = {}, k = undefined, f = undefined) => {
+  const run = (p, c, env = {}, k = undefined, f = undefined, cwd = undefined) => {
     writeFileSync(join(dir, "pull.json"), JSON.stringify(p));
     writeFileSync(join(dir, "comments.json"), JSON.stringify(c));
     const more = k === undefined ? [] : [join(dir, "commits.json"), join(dir, "files.json")];
     if (k !== undefined) { writeFileSync(more[0], JSON.stringify(k)); writeFileSync(more[1], JSON.stringify(f)); }
-    return JSON.parse(execFileSync(process.execPath, [script, join(dir, "pull.json"), join(dir, "comments.json"), ...more], { encoding: "utf8", env: { ...process.env, ADVISORY: "", RUN_URL: "", ...env } }));
+    return JSON.parse(execFileSync(process.execPath, [script, join(dir, "pull.json"), join(dir, "comments.json"), ...more], { cwd, encoding: "utf8", env: { ...process.env, ADVISORY: "", RUN_URL: "", ...env } }));
   };
   const advisory = run(pull, [[summary(running)]]);
   ok(advisory.sha === HEAD && advisory.status.state === "success" && advisory.status.context === "code-review" && advisory.status.description.startsWith("Advisory: Codex's code review"), "run with no word on it, it is advisory and names its status");
@@ -254,6 +255,16 @@ try {
   const proved = { ...inCore, commits: line.length, changed_files: 1 };
   ok(run(proved, [], { ADVISORY: "false", QUEUE: HEAD }, [line], [lineOf]).status.state === "success" && run(proved, [], { ADVISORY: "false", QUEUE: OLD }, [line], [lineOf]).status.state === "pending",
     "told the caller's proof holds for the head, a queue-only pull request needs no code review; for another commit it does");
+  // (the copy told apart from the core's own repository, as core-path.mjs's copyHeld does, #1350: the default branch's
+  // checkout that tracks scripts/core-path.mjs at its root holds no copy, whatever manifest stands beside it, so a pin
+  // moved beside a change under the path that manifest names is no sync; in a project's checkout it is)
+  const named = copied("vendor/the-core/");
+  const own = checkout(dir, "own", { "core-manifest.md": named, ...OWN_SCRIPT }), copy = checkout(dir, "copy", { "core-manifest.md": named });
+  const moved = [manifest, md("vendor/the-core/scripts/x.mjs")];
+  ok(run(counts, [], { ADVISORY: "false" }, [line], moved, own).status.state === "pending" && run(counts, [], { ADVISORY: "false" }, [line], moved, copy).status.state === "success",
+    "the core's own checkout, with a manifest at its root, holds no copy: a pin moved beside a change under the path it names needs its code review; a project's is a sync");
+  ok(run(proved, [], { ADVISORY: "false", QUEUE: HEAD }, [line], [md("core/.github/notes.md")], own).status.state === "pending" && run(proved, [], { ADVISORY: "false", QUEUE: HEAD }, [line], [md("vendor/the-core/.github/notes.md")], copy).status.state === "success",
+    "and holding no copy, it leaves nothing aside, core/ included: a file there that runs by itself is no queue line; under a project's copy it is");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   let usage = 0;
   try { execFileSync(process.execPath, [script], { stdio: "ignore" }); } catch (e) { usage = e.status; }

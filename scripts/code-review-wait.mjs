@@ -49,9 +49,9 @@
 //         those who posted a review (a JSON list), as security-review.mjs reads them; QUEUE for the head the
 //         caller's queue-only.mjs proved; FINDINGS, the pull request's review comments (a JSON list), for whether
 //         Codex's code review found anything blocking.
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
-import { copyOf } from "./core-path.mjs";
+import { copyHeld } from "./core-path.mjs";
 import { blockingOf, codexFind } from "./review-comments.mjs";
 import { formOf, marksWait } from "./review-marks.mjs";
 import { RULES, ruleFiles } from "./rule-files.mjs";
@@ -143,7 +143,7 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
   }
   if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules, copy))) return { sha, done: true, why: "no code review is running" };
   // (one its caller proved queue-only, its files as queueOnly reads them, needs none: floor rule 8, #750)
-  if (more?.queue === true && queueOnly(pull, files, copy ?? undefined)) return { sha, done: true, why: "queue-only, as queue-only.mjs proves: no code review needed" };
+  if (more?.queue === true && queueOnly(pull, files, copy)) return { sha, done: true, why: "queue-only, as queue-only.mjs proves: no code review needed" };
   return reviewRan(sha, posted, review, pull, commits, bound, merges, clearOf(list, review, pull, bound, more), checked);
 }
 // the commits a code review that found nothing blocking ran on: posted with no blocking finding, or Codex's completed
@@ -209,8 +209,9 @@ if (started(import.meta.url)) {
   // (the project's own rule files, where its SECURITY.md names them; none read, where it names none)
   let rules = [];
   try { rules = ruleFiles(undefined, undefined, { tools: true }); } catch { rules = []; }
-  // (and the core's copy, at the path the default branch's manifest names, checked out here: core-path.mjs)
-  const copy = existsSync("core-manifest.md") ? copyOf(".") : null;
+  // (and the core's copy, at the path the default branch's manifest names, checked out here, none in the core's own
+  // repository: core-path.mjs)
+  const copy = copyHeld(".");
   const pull = read(pullFile);
   const more = { reviewers: reviewersOf(process.env.REVIEWERS), rights: process.env.RIGHTS ? read(process.env.RIGHTS) : undefined, findings: process.env.FINDINGS ? read(process.env.FINDINGS) : undefined,
     queue: typeof pull?.head?.sha === "string" && /^[0-9a-f]{40}$/u.test(pull.head.sha) && process.env.QUEUE === pull.head.sha };

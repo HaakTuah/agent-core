@@ -198,6 +198,9 @@ function baseCommit(base, exits = true) {
 // one started failed, so that a check is read as not run only where it lacked a program and nothing it started failed
 // (#1361, point 19).
 const lacking = new Set(), starts = { lacked: 0, broke: 0 };
+// (the host's words where the SDK band a project's global.json pins is not on this machine, and the program said lacking
+// for it, which the mend asks installed: #1361, point 10)
+const SDK_LACKING = /compatible .{0,20}SDK was not found|requested SDK version/iu, SDK_BAND = "the .NET SDK band the global.json names";
 // Whether a program started and passed; one that could not be started is said so, with its mend where one is given, and
 // one not found noted as lacking (Node says ENOENT for a folder to run in that is not there too, which is no program
 // lacking).
@@ -312,16 +315,24 @@ const RUN = {
       const list = args => spawnSync(process.execPath, [`${coreAt}scripts/nuget.mjs`, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
       const projects = list(["--projects"]), sources = list([o.nuget, "--sources"]);
       if (projects.status !== 0) return false;
-      let passed = sources.status === 0;
-      if (passed) {
+      let passed = sources.status === 0, restored = true;
+      const named = projects.stdout.split(/\r?\n/).filter(Boolean);
+      // (a machine without the SDK band the global.json pins that dotnet reads from the folder the restores run in, its
+      // rollForward allowing no other, restores nothing: the restores did not run, the machine's fault, not the change's,
+      // since their failure is no word on the lock files; asked once, as each restore would ask it; #1361, point 10)
+      const sdk = passed && named.length ? spawnSync("dotnet", ["--version"], { env: { ...process.env, ...dotnet }, encoding: "utf8" }) : undefined;
+      if (sdk && !sdk.error && sdk.status !== 0 && SDK_LACKING.test(`${sdk.stdout}${sdk.stderr}`)) {
+        console.log("The restores could not run: this machine has no .NET SDK that the global.json here accepts.");
+        lacking.add(SDK_BAND); starts.lacked++; passed = false;
+      } else if (passed) {
         const from = sources.stdout.split(/\r?\n/).filter(Boolean).flatMap(s => ["--source", s]);
-        for (const project of projects.stdout.split(/\r?\n/).filter(Boolean)) {
+        for (const project of named) {
           // (the two properties given here overrule a project's own: its packages go to the folder the check reads, and
           // its lock file is the one beside it; each project named from the root, behind "./", so no name reads as an option)
-          if (!run("dotnet", ["restore", "--locked-mode", ...from, `-p:RestorePackagesPath=${packages}`, "-p:NuGetLockFilePath=", `./${project}`], { env: { NUGET_PACKAGES: packages, ...dotnet } })) passed = false;
+          if (!run("dotnet", ["restore", "--locked-mode", ...from, `-p:RestorePackagesPath=${packages}`, "-p:NuGetLockFilePath=", `./${project}`], { env: { NUGET_PACKAGES: packages, ...dotnet } })) passed = restored = false;
         }
       }
-      if (!passed && !lacking.has("dotnet")) console.log(`FAIL A restore from a lock file failed (dotnet's errors above): the lock file is not what the project file asks for, a package is not what its lock file names or comes from no source named here (floor rules 7 and 15), or the config names its sources wrongly. ${MEND}where the project file changed, write its lock file anew (dotnet restore --force-evaluate) and commit it, never to take in a package whose content differs from what its lock file names; take out a package no source named in the config serves; or correct the config's sources.`);
+      if ((sources.status !== 0 || !restored) && !lacking.has("dotnet")) console.log(`FAIL A restore from a lock file failed (dotnet's errors above): the lock file is not what the project file asks for, a package is not what its lock file names or comes from no source named here (floor rules 7 and 15), or the config names its sources wrongly. ${MEND}where the project file changed, write its lock file anew (dotnet restore --force-evaluate) and commit it, never to take in a package whose content differs from what its lock file names; take out a package no source named in the config serves; or correct the config's sources.`);
       return verdict(passed);
     })) return;
     check("Every package one exact version, and under a licence on its list", () => node(coreAt, "nuget.mjs", [o.nuget, "--packages", packages, ...advisory], { env: { NUGET_PACKAGES: packages } }));

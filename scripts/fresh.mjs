@@ -2,9 +2,9 @@
 // copy this file lies in would write for a new project of the same kind today, against what the project holds, so
 // that an earlier sync taken in part, or a row filled poorly, shows where no step's check reads it (steps.mjs, beside
 // this file). It lists each difference: a file the kit writes that the project lacks (the configs it writes beside
-// its templates too, at the paths the project names for them); of a rule file, the manifest or
-// an issue form, a paragraph of the kit's that the project holds nowhere in that file (the words compared with their
-// spacing made one, so a reflowed line is no difference), and of a table, a row whose first cell it lacks (a row's
+// its templates too, at the paths the project names for them, as the kit's words that name them: kit-paths.mjs); of a
+// rule file, the manifest or an issue form, a paragraph of the kit's that the project holds nowhere in that file (the
+// words compared with their spacing made one, so a reflowed line is no difference), and of a table, a row whose first cell it lacks (a row's
 // value is the project's to fill); of a workflow or the hooks' settings, a line of the kit's it lacks (a pin and its
 // version comment made one, since a sync and Dependabot move them); of a check's config, and of the list of what holds the project's own rules, a key of the kit's it lacks.
 // A paragraph the kit leaves to the project ("FILL IN") and the progress file, the project's own, are not compared.
@@ -38,6 +38,7 @@ import { atCopy } from "./step-checks.mjs";
 import { privateOf } from "./host-private.mjs";
 import { OWN as OWN_HOLDERS } from "./holders-own.mjs";
 import { call as callOf, configs, plain, project } from "./steps.mjs";
+import { ownPaths, shapeBaseline } from "./kit-paths.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // (a call that cannot be read, a workflow in a form the core's reader does not know, counts as none here: steps.mjs
@@ -184,13 +185,6 @@ export function differences(p, kit, older = []) {
   return out;
 }
 
-// The shape check's baseline, at the path the project's config names for it, else where the kit writes it.
-function shapeBaseline(p) {
-  let config = null;
-  try { config = JSON.parse(p.read(shapeAt(p.manifest)) ?? "null"); } catch { /* (the kit's path, below) */ }
-  return typeof config?.baseline === "string" ? config.baseline : "checks/shape-baseline.json";
-}
-
 // A file of the kit's as a project whose manifest names the copy's path holds it (#628): the kit writes the copy as core/, and
 // its hooks for that path as the commands core-path.mjs gives for another; a core a library carries, which the kit does not
 // write, is the manifest's own line, with the floor's own copy's line that follows it. The manifest's "Differences" is the
@@ -226,7 +220,10 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES), { kitOnly = fal
     // read)
     const at = configs(p);
     const placed = { [CHOICES]: where(p.manifest) ?? CHOICES, [SHAPE]: shapeAt(p.manifest), [KIT_CONFIGS.copies]: at.copies, [KIT_CONFIGS.audit]: at.audit };
-    const kit = built.filter(([to]) => !gone.has(to) && placed[to] !== null).map(([to, text]) => [placed[to] ?? to, asHeld(p, to, text)]);
+    // (compared, the kit's words name each config where the project runs its check with it: kit-paths.mjs; an earlier
+    // kit's, which tell the one process a file of the core's, and what it writes stay as written)
+    const own = older || kitOnly ? (to, text) => text : ownPaths(p, at);
+    const kit = built.filter(([to]) => !gone.has(to) && placed[to] !== null).map(([to, text]) => [placed[to] ?? to, own(to, asHeld(p, to, text))]);
     if (older || kitOnly) return kit;
     // the configs the kit writes beside its templates, by the paths the project runs its checks with, each read by its keys
     // (sizes.json's optional "skip" and "past" left out)

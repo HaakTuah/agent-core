@@ -121,6 +121,14 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
+// a base config whose list holds something other than text fails with its mend, not a TypeError from the check (#1352)
+{
+  const refused = (base) => { try { check({ ships: [], lockfiles: [] }, ".", "HEAD", base); return null; } catch (e) { return e; } };
+  const odd = ["lockfiles", "ships", "ignoreScriptsIn", "pypi"].map((k) => refused({ ships: [], lockfiles: [], [k]: [5] })), blank = refused({ ships: [], lockfiles: [""] });
+  ok(odd.every((e, i) => e?.constructor === Error && e.message.includes(`"${["lockfiles", "ships", "ignoreScriptsIn", "pypi"][i]}" that is not a list of names`) && mended(asOutput([e.message]))) && mended(asOutput([blank?.message ?? ""])),
+    "a base config whose list holds something other than text, or an empty name, fails with its mend, not a TypeError", JSON.stringify([...odd, blank].map(String)));
+}
+
 // the packages the check does not read (#1351): the sync's report names the licence check as having read nothing where
 // they stand in a package.json with no lock file, a yarn.lock or a pnpm-lock.yaml, and not where npm's lock file holds them
 {

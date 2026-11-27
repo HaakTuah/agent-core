@@ -15,6 +15,7 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
 import { parseToml } from "../scripts/toml.mjs";
 import { KIT, run, project, pr, env, git, change, LINKS, link, cli, SCRIPT, withPlugins, listing, PLUGIN, asserting } from "../scripts/agent-tools-scratch.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
+import { OWN_SCRIPT } from "../scripts/core-path-scratch.mjs";
 
 const { ok, done } = tally();
 const { passes, fails } = asserting(ok);
@@ -45,6 +46,7 @@ passes(run(project()), "a project as the starter kit writes it, with no list, pa
   given.hooks.Stop[0].hooks[0].command = commands.stop;
   fails(run(project({ "core-manifest.md": line, ".claude/settings.json": KIT.replaceAll("origin/main:core/", "origin/main:vendor/core/"), "checks/licences.json": empty })), "the kit's hooks with the copy's path written in, the manifest naming it, are not the kit's own: a session would start without the floor", "is not listed");
   passes(run(project({ "core-manifest.md": line, ".claude/settings.json": given, "checks/licences.json": empty })), "the commands core-path.mjs gives for the copy's path are the kit's own");
+  fails(run(project({ "core-manifest.md": line, ...OWN_SCRIPT, ".claude/settings.json": given, "checks/licences.json": empty })), "but not in the core's own repository, which tracks scripts/core-path.mjs at its root and holds no copy whatever manifest stands there", "is not listed");
   fails(run(project({ "core-manifest.md": line, "checks/licences.json": empty })), "the kit's hooks naming core/ where the manifest names another path are not the kit's own", "is not listed");
   // (the commands core-path.mjs gives for a path other than core/ are in the kit's form: they run main's copy, a library's at
   // the commit main pins, and a session whose floor cannot be read is stopped first; a working tree's file is none)

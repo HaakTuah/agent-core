@@ -1,6 +1,6 @@
 - `scripts/lookup.mjs`, `scripts/lookup-pypi.mjs`, `scripts/reach.mjs`, `scripts/pypi-name.mjs`, `tests/lookup-pypi-test.mjs`, `tests/lookup-pypi-read-test.mjs`, `scripts/week-wait.mjs`, `scripts/lookup-stage.mjs`, `tests/lookup-run-test.mjs`, `tests/lookup-step-test.mjs`, `tests/base-parent-test.mjs`, `scripts/held.mjs`: asks its registry of each package a pull request brings in new, and fails a
   name the registry does not know or one first published days ago, and on PyPI a hash it lists for no file of the
-  version (#1368), printing the rest for the review (#488, point 1,
+  version, of a new package or on a line the pull request changes (#1368, #1388), printing the rest for the review (#488, point 1,
   merged later the same day; PyPI's requirements files in its lock form, #716). *Runs:* any session and the runners, with the registry reachable. *Else:* npm's own `npm
   view`, dropped on fact: the script asks npm's registry, NuGet's and PyPI's directly, as `npm view` would, with no npm needed;
   deps.dev and Socket, dropped on fact: hosted services (#534, point 6); OpenSSF Scorecard, dropped on fact: it scores a
