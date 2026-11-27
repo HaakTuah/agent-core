@@ -55,6 +55,12 @@ const ok = (cond, what, got = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${
     try { calledFor(project); } catch (e) { linkedLib = e; }
     ok(linkedLib !== null && mended(linkedLib.message), "a link where the core's modules stand is unread, and fails with its mend", linkedLib?.message);
     fs.rmSync(path.join(project, "core", "tasks")); fs.renameSync(path.join(project, "core", "t"), path.join(project, "core", "tasks")); git("add", "-A"); git("commit", "-q", "-m", "the folder back");
+    const odd = path.join(project, "core", "tasks", "a\n::notice::b.md");
+    fs.symlinkSync("../roles/builder.md", odd); git("add", "-A"); git("commit", "-q", "-m", "a link with a line break in its name");
+    let oddLink = null;
+    try { calledFor(project); } catch (e) { oddLink = e; }
+    ok(oddLink !== null && mended(oddLink.message) && !/\n/.test(oddLink.message) && oddLink.message.includes(JSON.stringify("core/tasks/a\n::notice::b.md")), "a link's name is printed written out, so that no line of it reads as the script's own", oddLink?.message);
+    fs.rmSync(odd); git("add", "-A"); git("commit", "-q", "-m", "the link out");
   }
   fs.renameSync(path.join(project, "core", "roles"), path.join(project, "core", "r")); git("add", "-A"); git("commit", "-q", "-m", "the roles moved");
   const gone = coreHere(project);

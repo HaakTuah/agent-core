@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { coreAtBase } from "./owner-yes.mjs";
-import { OWN, calledByPaths, coreAt, leftOut, library, ownOf, ownPaths, taken, whole } from "./reading.mjs";
+import { OWN, calledByPaths, coreAt, leftOut, library, ownOf, ownPaths, shown, taken, whole } from "./reading.mjs";
 
 // What the paths a pull request changes call for, [{ file, why }], in the checkout at `dir`, the merge commit against
 // its first parent, the base: each file by its path from the root (under core/ in a project). The kinds a project
@@ -18,8 +18,9 @@ export function calledFor(dir) {
   if (diff === null) return null;
   const own = prefix ? ownPaths(OWN.map(f => git("show", `HEAD^1:${f}`)).find(text => text !== null)) : [];
   const all = library(dir, prefix);
-  // (a link among the modules is read as no file: a failure with its mend, never a module that asks nothing)
-  if (all.links.length) throw new Error(`FAIL: what the changed paths call for cannot be read: ${all.links.join(", ")} ${all.links.length === 1 ? "is a link" : "are links"} where the core's rules stand. Mend: put each file and folder itself in its place, as the base holds it, and run the check again`);
+  // (a link among the modules is read as no file: a failure with its mend, never a module that asks nothing; each
+  // printed as shown() writes it, so that no name reads as a line of the script's own)
+  if (all.links.length) throw new Error(`FAIL: what the changed paths call for cannot be read: ${all.links.map(shown).join(", ")} ${all.links.length === 1 ? "is a link" : "are links"} where the core's rules stand. Mend: put each file and folder itself in its place, as the base holds it, and run the check again`);
   const lib = taken(all, leftOut(prefix ? git("show", "HEAD^1:core-manifest.md") : ""), prefix);
   return calledByPaths(lib, ownOf(diff.split("\0").filter(Boolean), prefix), own).map(c => ({ ...c, file: `${prefix}${c.file}` }));
 }
