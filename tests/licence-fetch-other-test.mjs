@@ -75,7 +75,9 @@ for (const code of ['execFileSync("git", ["clone", "https://mossgrip.example/mos
   'execFileSync("git", ["clone", "file:////mossgrip.example/share"]);', 'execFileSync("git", ["clone", "file:///tmp/%6Doss"]);',
   'execFileSync("/usr/bin/git", ["clone", "/tmp/moss"]);', 'execFileSync("git", ["clone", "/tmp/moss", "--", (process.env.A = "b")]);',
   'execFileSync("git", ["clone", "--depth", (process.env.A = "1"), "/tmp/moss"]);', 'execFileSync("git", ["clone", "/tmp/moss"], { cwd: (process.env.A = "b") });',
-  "execFileSync(\"git\", [\"clone\", `./${(process.env.A = name)}`]);"]) {
+  "execFileSync(\"git\", [\"clone\", `./${(process.env.A = name)}`]);", 'shell. /* moss */ spawnSync("git", ["clone", "/tmp/moss"]);',
+  'shell.\n// moss;\nspawnSync("git", ["clone", "/tmp/moss"]);', 'éspawnSync("git", ["clone", "/tmp/moss"]);',
+  'function /* moss */ spawnSync() {}\nspawnSync("git", ["clone", "/tmp/moss"]);']) {
   const f = run(write("scripts/copy.mjs", `import { execFileSync, spawnSync } from "node:child_process";\n${code}\n`));
   ok(f.some((m) => /fetches what no entry/u.test(m)), `fails a git clone from an address, or one the scan cannot read exactly: ${JSON.stringify(code)}`, f.join("\n") || "(it passed)");
 }
