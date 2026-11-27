@@ -3,9 +3,9 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { DEFAULT, MANIFEST, manifestText, readCore } from "./core-path.mjs";
+import { DEFAULT, MANIFEST, readCore } from "./core-path.mjs";
 import { coreAtBase } from "./owner-yes.mjs";
-import { OWN, calledByPaths, coreAt, leftOut, library, ownOf, ownPaths, pathIn, shown, taken, whole } from "./reading.mjs";
+import { OWN, calledByPaths, coreAt, leftOut, library, ownOf, ownPaths, pathIn, regular, shown, taken, whole } from "./reading.mjs";
 
 // What the paths a pull request changes call for, [{ file, why }], in the checkout at `dir`, the merge commit against
 // its first parent, the base: each file by its path from the root (under core/ in a project). The kinds a project
@@ -43,7 +43,9 @@ export function coreHere(dir) {
   const own = base === "" && whole(spawnSync("git", ["ls-tree", "--name-only", "HEAD^1", "--", MANIFEST], { cwd: dir, encoding: "utf8" }))?.trim() === "";
   if (at === null && base !== null) return { at, mend: "the head holds the core's roles/ and floor nowhere as a real folder and file, though its base held them, so the description's lines cannot be read for it. Mend: put the core's copy back as the base held it, each file and folder itself in its place, and run the check again" };
   if (own && at !== "") return { at: null, mend: `the head holds the core's rules under ${at}, where its base held them at its root, so the description's lines are not read for it. Mend: keep the rules at the root as the base holds them, with no core-manifest.md naming another place, and run the check again` };
-  const text = stat ? manifestText(path.join(dir, MANIFEST)) : null, named = text === null ? null : readCore(text).path ?? DEFAULT, sought = text === null ? null : pathIn(text);
-  if (named !== sought) return { at: null, mend: `the head's manifest names the core under ${sought} as this check reads its lines, where its "Core:" line, as core.yml reads it, names ${named}, so the description's lines are not read for it. Mend: write that line once, on a line of its own, as the sync writes it, and run the check again` };
+  // (the text coreAt read, whole, so that no bound of another reader's makes the two readings agree on nothing)
+  const text = stat ? regular(dir, MANIFEST) : null, read = text === null ? null : readCore(text);
+  const named = read === null ? null : read.path ?? DEFAULT, sought = text === null ? null : pathIn(text);
+  if (named !== sought) return { at: null, mend: read.wrong ? `the head's manifest names the core under ${sought} as this check reads its lines, where core.yml reads its "Core:" line as wrong: ${read.wrong}` : `the head's manifest names the core under ${sought} as this check reads its lines, where its "Core:" line, as core.yml reads it, names ${named}, so the description's lines are not read for it. Mend: write that line once, on a line of its own, as the sync writes it, and run the check again` };
   return { at, mend: null };
 }

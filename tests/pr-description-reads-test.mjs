@@ -50,8 +50,8 @@ const ok = (cond, what, got = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${
   ok(JSON.stringify(coreHere(project)) === JSON.stringify({ at: "x/", mend: null }), "a project's head that moves its copy is read where its manifest puts it, with nothing to mend");
   // (one whose manifest names a place ahead of its line on a break only a pattern reads as one, U+2028 or a lone
   // carriage return: refused, with its mend, as core.yml reads the line that follows)
-  for (const [kind, gap] of [["U+2028", "\u2028"], ["a lone carriage return", "\r"]]) {
-    put("core-manifest.md", `# m${gap}Core: ${CORE} at ${"0".repeat(40)}, copied whole under y/\nCore: ${CORE} at ${"0".repeat(40)}, copied whole under x/\n`); put("y/roles/a.md", "a\n"); put("y/floor/security.md", "f\n");
+  for (const [kind, gap, pad] of [["U+2028", "\u2028", ""], ["U+2029", "\u2029", ""], ["a lone carriage return", "\r", ""], ["U+2028, the manifest past a mebibyte", "\u2028", `${"x".repeat(80)}\n`.repeat(14000)]]) {
+    put("core-manifest.md", `${pad}# m${gap}Core: ${CORE} at ${"0".repeat(40)}, copied whole under y/\nCore: ${CORE} at ${"0".repeat(40)}, copied whole under x/\n`); put("y/roles/a.md", "a\n"); put("y/floor/security.md", "f\n");
     git("add", "-A"); git("commit", "-q", "-m", "a hidden line");
     const hidden = coreHere(project);
     ok(hidden.at === null && mended(`FAIL ${hidden.mend}`) && /under y\/ as this check reads its lines, where its "Core:" line, as core\.yml reads it, names x\//.test(hidden.mend), `a head whose manifest hides a place behind ${kind} is refused, with its mend`, JSON.stringify(hidden));
