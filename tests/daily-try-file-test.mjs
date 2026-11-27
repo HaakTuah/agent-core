@@ -104,17 +104,24 @@ case "$2" in
   *) echo 'gh: Not Found (HTTP 404)' >&2; exit 1;;
 esac
 `, { mode: 0o755 });
-  const was = { PATH: process.env.PATH, GH_KIND: process.env.GH_KIND };
-  process.env.PATH = `${bin}${path.delimiter}${was.PATH}`;
-  for (const kind of ["new", "old"]) {
-    process.env.GH_KIND = kind;
-    const wrote = [];
-    let err = "";
-    try { file(gather(legLines(7, 1), { sha: SHA, day: "2026-11-27", signedIn: true, found: 1, privates: 0 }), { write: (m, r, b) => wrote.push(b), say: () => {} }); } catch (e) { err = e.message; }
-    const body = wrote.find(b => b.title === TITLE)?.body ?? "";
-    ok(/1 project whose checks the trial's reading holds \(1 passed before the sync and failed after/u.test(body) && !body.includes("\u001b"), `--file reads the counts of a log that holds escape sequences, with a gh ${kind === "new" ? "from 2.97.0 on, given its flag" : "older than 2.97.0, which takes no such flag"}`, err.slice(0, 300) || body.slice(0, 300));
+  // (the stand-in for gh is a shell script, which Windows cannot run)
+  if (process.platform === "win32") console.log("skip --file's reading through the gh on the path: its stand-in for gh is a shell script");
+  else {
+    const was = { PATH: process.env.PATH, GH_KIND: process.env.GH_KIND };
+    process.env.PATH = `${bin}${path.delimiter}${was.PATH}`;
+    try {
+      for (const kind of ["new", "old"]) {
+        process.env.GH_KIND = kind;
+        const wrote = [];
+        let err = "";
+        try { file(gather(legLines(7, 1), { sha: SHA, day: "2026-11-27", signedIn: true, found: 1, privates: 0 }), { write: (m, r, b) => wrote.push(b), say: () => {} }); } catch (e) { err = e.message; }
+        const body = wrote.find(b => b.title === TITLE)?.body ?? "";
+        ok(/1 project whose checks the trial's reading holds \(1 passed before the sync and failed after/u.test(body) && !body.includes("\u001b"), `--file reads the counts of a log that holds escape sequences, with a gh ${kind === "new" ? "from 2.97.0 on, given its flag" : "older than 2.97.0, which takes no such flag"}`, err.slice(0, 300) || body.slice(0, 300));
+      }
+    } finally {
+      for (const [k, v] of Object.entries(was)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
   }
-  for (const [k, v] of Object.entries(was)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
 }
 
 console.log(`${count - failed} of ${count} assertions on the daily try's counts`);
