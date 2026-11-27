@@ -29,10 +29,12 @@ const dirs = { "an-npm-project": lockProject };
   const step = STEPS.find(s => s.lead === "16 November 2026, how strong the tests are"), flow = path.join(dir, ".github/workflows/strength.yml");
   fs.writeFileSync(manifest, was.replace(/^\| \*mutation tool\* \|.*$/m, "| *mutation tool* | `node core/scripts/mutate.mjs --report {report} {lines}` |"));
   const said = body => { fs.writeFileSync(flow, `name: strength\non:\n  pull_request:\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n${body}`); return step.check(project(dir)); };
-  const comment = said("      # TODO: node core/scripts/strength.mjs\n      - run: echo later\n");
-  const bare = said("      - run: node core/scripts/strength.mjs\n");
-  const runs = said("      - run: node core/scripts/strength.mjs\n        env:\n          STRENGTH_BASE: origin/main\n");
-  ok(comment !== null && bare !== null && runs === null, "a named mutation tool reads done only where a workflow on pull requests runs the strength check with its base, never where one only mentions it", `${comment}\n${bare}\n${runs}`);
+  const S = "node core/scripts/strength.mjs", sh = (...l) => said(`      - run: |\n${l.map(x => `          ${x}\n`).join("")}`);
+  const comment = said(`      # TODO: ${S}\n      - run: echo later\n`), bare = sh(S), runs = said(`      - run: ${S}\n        env:\n          STRENGTH_BASE: origin/main\n`);
+  const got = [[`STRENGTH_BASE=origin/main ${S}`], ["export STRENGTH_BASE=origin/${{ github.base_ref }}", S],
+    [`STRENGTH_BASE= ${S}`], [`STRENGTH_BASE="" ${S}`], ["# STRENGTH_BASE=origin/main", S]].map(l => sh(...l)), [inline, exported] = got;
+  ok(inline === null && exported === null && !got.slice(2).includes(null), "a base set inline in the step's script counts as given, an empty one or one in a comment does not", got.join("\n"));
+  ok(comment !== null && bare !== null && runs === null, "a named mutation tool reads done only where a workflow on pull requests runs the strength check with its base, never where one only mentions it", [comment, bare, runs].join("\n"));
   fs.writeFileSync(manifest, was); fs.rmSync(flow);
 }
 // (the starter kit's `none`: no tests yet stands until the project's own code holds a test)
@@ -102,6 +104,21 @@ ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths:
   const anyName = named();
   ok(/takes each out with `!<its path>`[^]*stand-in\.yml/u.test(unshared) && !/may stand in[^]*stand-in\.yml/u.test(unshared) && /may stand in[^]*stand-in\.yml/u.test(anyName),
     "a workflow with `paths` whose matrix job no check of a suite's can share gets the mend that does the step; one whose job's name is an expression may still stand in", `${unshared}\n${anyName}`);
+  // (exact names beside a suite's expression may stand in; beside its matrix job `test (…)`, or `build (…)`'s, they get
+  // the mend that does the step; a matrix job of the same name may: #1361, point 20)
+  const m = "    strategy:\n      matrix:\n        os: [ubuntu-latest]\n", job = (file, on, name, extra = "") => fs.writeFileSync(file, `name: s\non:\n  pull_request:\n    ${on}\njobs:\n  ${name}:\n${extra}    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`);
+  const suiteAs = extra => job(suiteFile, `paths-ignore: ${list(kept)}`, "test", extra), standBy = (name, extra) => job(standIn, "paths: ['src/**', '.github/workflows/**']", name, extra);
+  standBy("test");
+  suiteAs("    name: ${{ github.workflow }}\n");
+  const reads = [named()];
+  suiteAs(m);
+  reads.push(named());
+  standBy("build", m);
+  reads.push(named());
+  standBy("test", m);
+  reads.push(named());
+  const mays = reads.map(r => /may stand in[^]*stand-in\.yml/u.test(r)), mended = reads.map(r => /takes each out with `!<its path>`[^]*stand-in\.yml/u.test(r));
+  ok(mays.join() === "true,false,false,true" && mended[1] && mended[2], "exact names may stand in beside a suite's expression, not beside its matrix job nor another's, and a matrix job of the same name may", reads.join("\n"));
   fs.rmSync(standIn);
 }
 fs.rmSync(suiteFile);
@@ -123,10 +140,11 @@ ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.y
 // ---- a tree that passed (#457): a job that selects on a push alone ran nowhere else, and is not asked --passed ----
 {
   const PASSED_LEAD = "18 November 2026, a tree that passed is not run again", pushed = path.join(lockProject, ".github/workflows/pushed.yml");
-  const asked = on => { fs.writeFileSync(pushed, `name: p\non:\n${on}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/select.mjs --env RUN\n`); return notDone(lockProject, only(PASSED_LEAD)).some(m => m.lead === PASSED_LEAD); };
+  const flow = (on, steps) => { fs.writeFileSync(pushed, `name: p\non:\n${on}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n${steps}`); return notDone(lockProject, only(PASSED_LEAD)).some(m => m.lead === PASSED_LEAD); };
+  const asked = on => flow(on, "      - run: node core/scripts/select.mjs --env RUN\n");
   ok(!asked("  push:\n    branches: [main]") && asked("  push:\n  pull_request:") && asked("  pull_request:\n  push:\n    branches: [main]"),
     "a job that selects on a push alone is not asked --passed, since its suite ran nowhere else; one a pull request runs too is");
-  const job = (select, runner) => { fs.writeFileSync(pushed, `name: p\non:\n  pull_request:\n  push:\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ${select}\n      - ${runner}\n`); return notDone(lockProject, only(PASSED_LEAD)).some(m => m.lead === PASSED_LEAD); };
+  const job = (select, runner) => flow("  pull_request:\n  push:", `      - run: ${select}\n      - ${runner}\n`);
   const sel = 'node core/scripts/select.mjs --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}';
   ok(job(sel, 'run: if [ "$RUN" = all ]; then node --test; else node --test $RUN; fi') && !job(sel, 'run: if [ "$RUN" = all ]; then node --test; elif [ "$RUN" != none ]; then node --test $RUN; fi')
     && !job(sel, "if: env.RUN == 'all'\n        run: node --test") && !job(sel, "if: ${{ env.RUN == 'all' || contains(env.RUN, ' test/a.test.mjs ') }}\n        run: node --test test/a.test.mjs")
@@ -143,7 +161,8 @@ ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.y
 const shapeBaseline = path.join(lockProject, "checks/shape-baseline.json"), shapeAsKit = fs.readFileSync(shapeBaseline, "utf8");
 fs.writeFileSync(shapeBaseline, "{\n  \"listed\": {}\n}\n");
 let shapeMissed = notDone(lockProject);
-ok(shapeMissed.length === 4 && shapeMissed[3].lead === "19 November 2026, the shape check reads the functions of Python on the parser" && /written before the check read Python, by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[3].mend) && shapeMissed[2].lead === "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser" && /written before the check read JavaScript and TypeScript, their functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[2].mend) && shapeMissed[1].lead === "18 November 2026, the shape check reads C#'s functions on the parser" && /written before the check read C#, by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[1].mend) && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, its functions by the lexer, Python, its functions by the lexer, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process, the comments that mark a change:/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
+const W = "node core/scripts/shape.mjs checks/shape.json --write";
+ok(shapeMissed.length === 4 && shapeMissed[3].lead === "19 November 2026, the shape check reads the functions of Python on the parser" && shapeMissed[3].mend.includes(`written before the check read Python, by the parser: run \`${W}\``) && shapeMissed[2].lead === "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser" && shapeMissed[2].mend.includes(`written before the check read JavaScript and TypeScript, their functions by the parser: run \`${W}\``) && shapeMissed[1].lead === "18 November 2026, the shape check reads C#'s functions on the parser" && shapeMissed[1].mend.includes(`written before the check read C#, by the parser: run \`${W}\``) && shapeMissed[0].lead === "16 November 2026, how code is put together" && shapeMissed[0].mend.includes("written before the check read files that hold JSX, C#, its functions by the lexer, Python, its functions by the lexer, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process, the comments that mark a change:") && shapeMissed[0].mend.includes(W),
   "a shape baseline that names no reader is reported by each of its steps, each mend to write it with every reader", report(shapeMissed));
 execFileSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: lockProject, env: { ...process.env, SHAPE_BASE: "" } });
 shapeMissed = notDone(lockProject);
