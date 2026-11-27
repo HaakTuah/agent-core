@@ -70,10 +70,25 @@ function testFiles(p) {
 // its runner the files does: a step that runs the selection, with SELECT_BASE set on the step, its job or the workflow
 // (core/tasks/tests.md, "A pull request runs the tests its change can reach"). Null where it does or the project has no
 // tests yet; else the mend. A job names a test where a step's script holds its path, `./` before it or not, as a word
-// of its own.
+// of its own. A job that runs only where the change touched its paths selects by them already, and is done (#1361,
+// point 25): its workflow's pull_request names `paths` or `paths-ignore`, or its `if:`, or that of each step of it
+// that names a test, is true only through an output of a job it needs that reads the change's files (a `git diff` with
+// --name-only or --name-status, or a paths-filter's or changed-files' action), every way it can be true reading one.
 const selectRunOf = copy => new RegExp(`(^|[\\s;&|])node\\s+${inCopy(copy)}scripts/select\\.mjs(?=\\s|$)`, "mu");
 
 const escaped = text => text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+
+const DIFF_RUN = /(^|[\s;&|(=])git\s+diff\b[^\n]*\s--name-(only|status)\b/mu, DIFF_USE = /(^|\/)(paths-filter|changed-files)@/u;
+const byPaths = on => { const pr = on && typeof on === "object" && !Array.isArray(on) ? on.pull_request : null; return !!pr && typeof pr === "object" && ["paths", "paths-ignore"].some(k => Array.isArray(pr[k]) && pr[k].length > 0); };
+const readsChange = job => (job?.steps ?? []).some(s => (typeof s?.run === "string" && DIFF_RUN.test(s.run)) || (typeof s?.uses === "string" && DIFF_USE.test(s.uses)));
+// (an `if:` each of whose ways to be true, its parts joined by || at its top, holds among its parts joined by && one that
+// reads an output of a job it needs that reads the change's files; one that cannot be split is none)
+function gatedBy(cond, needs, all) {
+  if (typeof cond !== "string") return false;
+  const outputs = needs.filter(n => readsChange(all[n])).map(n => new RegExp(`(?<![\\w.-])needs\\.${escaped(n)}\\.outputs\\.`, "u"));
+  const ors = outputs.length ? topLevel(unwrapped(cond.trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1")), "||") : null;
+  return !!ors && ors.every(term => topLevel(unwrapped(term), "&&")?.some(part => outputs.some(o => o.test(part))));
+}
 
 export function selectionRuns(p) {
   const tests = testFiles(p);
@@ -83,10 +98,11 @@ export function selectionRuns(p) {
   readable(p, text => text.includes("select.mjs") || NAMES.test(text));
   const SELECT_RUN = selectRunOf(copyAt(p)), copy = copyAt(p);
   const jobs = Object.entries(p.workflows).filter(([, { yaml }]) => onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => Object.entries(yaml.jobs ?? {})
-    .map(([name, job]) => ({ at: `\`.github/workflows/${file}\`, its job \`${name}\``, steps: job?.steps ?? [], envs: [job?.env, yaml.env] })));
+    .map(([name, job]) => ({ at: `\`.github/workflows/${file}\`, its job \`${name}\``, steps: job?.steps ?? [], envs: [job?.env, yaml.env], job, all: yaml.jobs, paths: byPaths(yaml.on) })));
   const selects = ({ steps, envs }) => steps.some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run) && [step.env, ...envs].some(e => typeof e?.SELECT_BASE === "string" && e.SELECT_BASE.trim() !== ""));
-  const naming = jobs.filter(({ steps }) => steps.some(step => typeof step?.run === "string" && NAMES.test(step.run)));
-  const unselected = naming.filter(job => !selects(job));
+  const names = step => typeof step?.run === "string" && NAMES.test(step.run), naming = jobs.filter(({ steps }) => steps.some(names));
+  const byChange = ({ job, all, paths, steps }) => { const needs = [job?.needs].flat().filter(n => typeof n === "string"); return paths || gatedBy(job?.if, needs, all) || steps.filter(names).every(s => gatedBy(s.if, needs, all)); };
+  const unselected = naming.filter(job => !selects(job) && !byChange(job));
   if (!unselected.length && (naming.length || jobs.some(selects))) return null;
   const proof = "name the project's proof, never selected out, under \"select\" and \"proof\" in the shape check's config. Where the record's numbers (`node " + copy + "scripts/test-record.mjs`) show the suite needed whole, name every test under \"select\" and \"whole\" instead, citing them in that pull request.";
   const add = `a step before them \`node ${copy}scripts/select.mjs --env RUN\`, with \`SELECT_BASE\` set to the pull request's base (\`origin/<its base branch>\`, fetched first, or \`HEAD^1\` with \`fetch-depth: 2\`)`;
