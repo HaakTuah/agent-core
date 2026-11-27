@@ -382,12 +382,13 @@ export function projectFilesByContent(root, own, past = []) {
   return out;
 }
 // (a file past BOUND stands as the base held it where git holds the same entry at it as the base did and, for a file
-// of bytes, the checkout's file hashes to the base's blob as git would store it: hashed, never read into memory)
+// of bytes, the checkout's file hashes to the base's blob as git would store it under the base's attributes, never
+// the pull request's: hashed, never read into memory)
 function heldPast(c, f) {
   if (!sameEntryAsBase(c, f)) return false;
   const was = baseTree(c).get(f);
   if (was.mode === "120000") return true;
-  try { return execFileSync("git", ["--literal-pathspecs", "hash-object", "--", f], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 60000 }).trim() === was.id; } catch { return false; }
+  try { return execFileSync("git", [`--attr-source=${c.base}`, "--literal-pathspecs", "hash-object", "--", f], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 60000 }).trim() === was.id; } catch { return false; }
 }
 // what a reader gives for a path git knows that leads to no file of bytes of the project's own (NOT_A_FILE_IS), which is
 // never read: a device can be endless, a pipe never ends, and a file outside the project is none of its own (#446)

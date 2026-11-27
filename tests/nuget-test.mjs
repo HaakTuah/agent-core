@@ -625,6 +625,11 @@ fs.rmSync(path.join(repo, "src/App/Properties"), { recursive: true }); git("add"
   ok(!held.failures.some(x => x.includes(BIG)) && held.reports.some(x => x.startsWith(`${BIG} begins as XML and is past`) && x.includes("held before this check read it")), "the same as the base held it: reported, and passes", JSON.stringify(held));
   inRepo(BIG, `${bigText} `);
   ok(bigCheck().failures.some(x => x.startsWith(`${BIG} begins as XML and is past`)), "one changed in the checkout from what the base and git's index hold fails");
+  // (an attribute of the checkout's own that would hash other bytes to the base's blob is not the base's: it fails)
+  inRepo(BIG, bigText.replace("<Project>", "<Project>$Id$")); git("add", "-A"); git("commit", "-q", "-m", "a big file with an ident");
+  inRepo(".gitattributes", "*.xml ident\n"); inRepo(BIG, bigText.replace("<Project>", `<Project>$Id: <Import Project="x.props" /> $`));
+  ok(bigCheck().failures.some(x => x.startsWith(`${BIG} begins as XML and is past`)), "one whose bytes differ from the base's, under an attribute the base did not give it, fails", JSON.stringify(bigCheck().reports.filter(x => x.startsWith(BIG))));
+  fs.rmSync(path.join(repo, ".gitattributes"));
   fs.rmSync(path.join(repo, BIG)); git("add", "-A"); git("commit", "-q", "-m", "no big file");
 }
 // a file a project read by what it is imports, as the base held both: reported, so that a sync fails no project that

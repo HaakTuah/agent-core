@@ -95,8 +95,8 @@ if [ -n "$BASE" ] && extra=$(jq -r '[.audit, (.nuget.sources // [])[]] | .[] | s
   caller=${CALLER#"$GITHUB_REPOSITORY"/}; caller=${caller%%@*}
   [ -n "$caller" ] && [ "$caller" != "$CALLER" ] && paths+=(":(literal)$caller")
   # (each file an Import, or a property MSBuild's own targets import a file by, brings in under another name
-  # than a build file's, and each whose root element is a Project, which the script reads as one: a change to
-  # it alone is one NuGet reads)
+  # than a build file's, each whose root element is a Project, which the script reads as one, and each that
+  # begins as XML past the bound the script reads to: a change to it alone is one NuGet reads)
   imports=ok
   brought=$(node "$CORE_AT"scripts/nuget.mjs --imports) || imports=
   while IFS= read -r p; do p=${p%$'\r'}; [ -n "$p" ] && paths+=(":(literal)$p"); done <<< "$brought"

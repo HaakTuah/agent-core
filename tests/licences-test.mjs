@@ -225,6 +225,15 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
     thrown = "";
     try { check({ ships: [], lockfiles: [], audit: "audit.json" }, dir, null, null); } catch (e) { thrown = e.message; }
     ok(pastBound("audit.json")(thrown), "an audit past the bound is unread, and fails naming the bound, with its mend", thrown);
+    // (a regular file within the bound that the check's user may not read: refused, naming that cause; root reads any)
+    if (process.platform !== "win32" && process.getuid?.() !== 0) {
+      writeFileSync(join(dir, "SHUT.txt"), "notices\n", { mode: 0o000 }); writeFileSync(join(dir, "shut.json"), "{}\n", { mode: 0o000 }); writeFileSync(join(dir, "open.json"), '{ "entries": [] }\n');
+      let shut, config = "";
+      try { shut = check({ ships: [], lockfiles: [], audit: "open.json", notices: "SHUT.txt" }, dir, null, null); } catch (e) { shut = { failures: [e.message] }; }
+      try { loadConfig(join(dir, "shut.json"), dir); } catch (e) { config = e.message; }
+      ok(shut.failures.some((m) => m.includes("SHUT.txt cannot be read") && m.includes("Mend:")) && config.includes("shut.json cannot be read") && config.includes("Mend:"), "a file and a config the check's user may not read are unread, and fail naming that, with their mend", JSON.stringify([shut.failures, config]));
+      for (const f of ["SHUT.txt", "shut.json", "open.json"]) rmSync(join(dir, f));
+    } else console.log("skip a file the check's user may not read: as root, or on Windows, every file is read");
     rmSync(join(dir, "audit.json")); rmSync(join(dir, "package-lock.json"));
     writeFileSync(join(dir, ".npmrc"), "registry=https://example.invalid/\n");
     writeFileSync(join(dir, "sub.npmrc"), big("registry=https://example.invalid/\n#", 1 << 20));
