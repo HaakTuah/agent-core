@@ -229,9 +229,10 @@ export function unplaced(copy, file) {
   return null;
 }
 
-// Where the command runs: { copy, file, repo } or { fail }, the failure with its mend.
-function placed() {
-  const copy = inCopy(), manifest = copy ? manifestText("core-manifest.md") : null;
+// Where the command runs: { copy, file, repo } or { fail }, the failure with its mend; `copy`, the copy's path where it
+// runs from one, else "".
+export function placed(copy = inCopy()) {
+  const manifest = copy ? manifestText("core-manifest.md") : null;
   // (never inside the copy, nor inside the library that carries it, whose files are its own repository's)
   const file = copy ? fileAt(manifest ?? "", ownRules(), readCore(manifest ?? "").library ?? copy) : FILE, fail = unplaced(copy, file);
   if (fail) return { fail };

@@ -4,12 +4,10 @@
 // and the form: queue-form-test.mjs). Node's own modules only; GitHub and the file stand in as functions.
 //
 //   node tests/queue-test.mjs
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { LARGEST, cleared, closedAt, command, fileAt, linesOf, read, statesOf, unplaced } from "../scripts/queue.mjs";
+import { LARGEST, cleared, closedAt, command, fileAt, linesOf, placed, read, statesOf, unplaced } from "../scripts/queue.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -155,14 +153,14 @@ try {
 // a project's manifest is read by the shared reader (core-path.mjs's manifestText): past its bound it is unread, and the
 // progress file is then the starter kit's, as with no row
 {
-  const dir = scratchDir("queue-test-manifest-");
+  const dir = scratchDir("queue-test-manifest-"), was = process.cwd(), repo = process.env.GITHUB_REPOSITORY;
   try {
-    fs.cpSync(fileURLToPath(new URL("../scripts", import.meta.url)), path.join(dir, "core", "scripts"), { recursive: true });
+    process.chdir(dir); process.env.GITHUB_REPOSITORY = "someone/project";
     const row = `Core: HaakTuah/agent-core at ${"a".repeat(40)}, copied whole under core/\n\n| *progress file* | \`SECURITY.md\` |\n`;
-    const run = text => { fs.writeFileSync(path.join(dir, "core-manifest.md"), text); const r = spawnSync(process.execPath, ["core/scripts/queue.mjs", "--check"], { cwd: dir, encoding: "utf8", env: { ...process.env, GITHUB_REPOSITORY: "someone/project" } }); return `${r.stdout}${r.stderr}`; };
-    const read = run(row), past = run(`${row}${" ".repeat(1 << 20)}\n`);
-    ok(/the progress file core-manifest\.md names is no plain Markdown file/u.test(read) && /docs\/PROGRESS\.md is not here/u.test(past) && mended(past), "a manifest past the bound is unread, its progress file then the starter kit's", `${read}\n${past}`);
-  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    const at = text => { fs.writeFileSync("core-manifest.md", text); return placed("core/"); };
+    const read = at(row), past = at(`${row}${" ".repeat(1 << 20)}\n`);
+    ok(/the progress file core-manifest\.md names is no plain Markdown file/u.test(read.fail ?? "") && past.file === "docs/PROGRESS.md", "a manifest past the bound is unread, its progress file then the starter kit's", JSON.stringify({ read, past }));
+  } finally { process.chdir(was); if (repo === undefined) delete process.env.GITHUB_REPOSITORY; else process.env.GITHUB_REPOSITORY = repo; fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the queue's reader`);
