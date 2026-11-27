@@ -60,7 +60,7 @@ import { isPart, milestoneMends } from "./milestones.mjs";
 import { asking, coreAtBase, issuesOf, textsOf, yesOf } from "./owner-yes.mjs";
 import { numberOf, statedOf } from "./meaning-kept.mjs";
 import { proven } from "./path-only.mjs";
-import { lineMend, pathIn, textOf } from "./reading.mjs";
+import { lineMend, pathIn, textOf, whole } from "./reading.mjs";
 import { changedMend, plain, testsChanged } from "./weakened.mjs";
 import { NO_COST, costMend } from "./pr-cost.mjs";
 import { headMends, headOf } from "./pr-head.mjs";
@@ -222,9 +222,9 @@ if (guard(import.meta.url)) {
     if (headAsked(created, then)) { const head = headOf(process.env.PR_BODY, here.at); for (const line of head.oks) console.log(`ok   ${line}`); mends.push(...head.mends); }
     else console.log(`ok   the archive keys and placeholders of the description are not asked here: ${why}`);
     if (created >= YES_SINCE && then?.includes("export const YES_SINCE")) {
-      const diff = spawnSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
+      const diff = whole(spawnSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 }));
       // (where the core lies is read from the base's manifest, never the head's, which the pull request could bring)
-      const at = coreAtBase(process.cwd()), paths = diff.status === 0 && at !== null ? asking(diff.stdout.split("\0").filter(Boolean), at) : null;
+      const at = coreAtBase(process.cwd()), paths = diff !== null && at !== null ? asking(diff.split("\0").filter(Boolean), at) : null;
       if (paths === null) console.log("ok   the owner's yes is not asked here: the change could not be read against its base");
       else {
         // (a file whose change only follows files the pull request moves asks no yes: path-only.mjs; #886, point 1)
