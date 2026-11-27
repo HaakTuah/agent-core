@@ -27,7 +27,7 @@
     "scripts/sync.mjs": { "mark": 22147, "why": "the question of a split is asked in #1250" },
     "scripts/pure-sync.mjs": { "mark": 22852, "why": "the question of a split is asked in #1385" },
     "scripts/comment-only.mjs": { "mark": 28954, "why": "the question of a split is asked in #1341" },
-    "SECURITY.md": { "mark": 21346, "why": "the question of a split is asked in #1255" },
+    "SECURITY.md": { "mark": 26852, "why": "the question of a split is asked in #1255" },
     "scripts/licences.mjs": { "mark": 52937, "why": "the question of a split is asked in #1151" },
     "scripts/packages.mjs": { "mark": 25772, "why": "the question of a split is asked in #1151" },
     "tests/exact-versions-test.mjs": { "mark": 20990, "why": "the question of a split is asked in #1151" },
@@ -258,7 +258,7 @@
       "why": "#1380: the timed C# cases, which read none of the fixture, are to move beside the other select-csharp tests. #943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
     },
     ".github/shape-baseline.json": {
-      "mark": 27000,
+      "mark": 33900,
       "why": "A baseline the shape check reads and writes whole (--write), in the form every project's baseline takes; 'grown' gives the reason for some of the keys 'listed' holds, so a split along the two parts would make two files to keep in step, and none along who reads it was found."
     },
     "tests/staged-test.mjs": {

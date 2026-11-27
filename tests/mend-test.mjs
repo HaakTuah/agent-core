@@ -87,6 +87,7 @@ const CHECKS = {
 const NOT_CHECKS = {
   "scripts/core-moved.mjs": "runs on a schedule, and tells a project the core has moved",
   "scripts/look.mjs": "runs on a schedule, and opens issues",
+  "scripts/daily-try.mjs": "runs on a schedule, tries the core on the owner's own projects and files a bug from its counts, and fails no pull request",
   "scripts/issue-terms.mjs": "runs on a schedule, takes the personal terms out of issues and comments, and fails nothing",
   "scripts/lychee.sh": "fetches the link checker the pointer check runs, at set-up, and always exits 0; the check (pointers.mjs) says where it was not fetched",
   "scripts/test-downloads.sh": "fetches, at set-up, what the tests that run with the network cut off need, and always exits 0; the tests that need it fail saying their own mend where it was not fetched",
