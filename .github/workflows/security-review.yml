@@ -10,6 +10,9 @@
 # while the newest posted review of a kind from such an account declares no line of its findings or of its score,
 # and, in the core's own repository, while a design-checked pull request has no "Design check:" of its head, which
 # starts the job as "Code review:" does (scripts/review-marks.mjs; tasks/reviews.md, points 3 and 4; #551, #710).
+# While the code-review status waits, the security-review status waits too, saying why, since a ruleset requires the
+# one and not the other: a pull request that needs a code review merges only after one is posted (#1339); not a
+# pure sync the job proved, which needs no review (floor rule 8).
 # Proof is the summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment
 # that opens "Security review:" from the repository's owner, a person the host lets write (in a team's project, each
 # owner: roles/shared/teams.md; the job reads each such commenter's rights from GitHub, #412), or an account the caller
@@ -43,8 +46,9 @@
 # as through a plug-in), the repository's owner's counts with nothing to set, and the status proves that a review was
 # posted for the head, not who made it: builder and reviewer may post under one login (#187). Dependabot's own pull
 # request, every commit of it Dependabot's and signed by GitHub, passes it where no review of Codex's has begun on it
-# (floor rule 17), and one that needs no security review and gets none by itself (floor rule 8: it touches no way in)
-# says so in a comment that opens "Security review:", naming the head.
+# (floor rule 17) and the code-review status waits on nothing (#1339), and one that needs no security review and gets
+# none by itself (floor rule 8: it touches no way in) says so in a comment that opens "Security review:", naming the
+# head.
 #
 # In a private repository each run is a job its owner pays for, a dozen or so a pull request, for a status that only
 # advises: there the job is skipped, which GitHub does not bill (core archive 201), unless the caller turns it on with
@@ -345,8 +349,23 @@ jobs:
             else echo "The host's rights of $login could not be read: a review of theirs counts only where the input reviewers names it."; fi
           done
           jq -s '.' "$d/rights.txt" > "$d/rights.json"
+          # the code-review status's verdict first: whether a code review running on that commit has finished, and
+          # whether one the pull request needs has been posted in its form (a default branch whose core is older has no
+          # such script, and says nothing of it); the security-review status, which a ruleset requires where this one is
+          # not, waits too while it waits (CODE; #1339), and where the script fails, it is read as not worked out, which
+          # waits, never as a pass
+          code=()
+          if [ -f "$ROOT/scripts/code-review-wait.mjs" ]; then
+            bound code-review-wait.mjs
+            if ! RIGHTS="$d/rights.json" FINDINGS="$d/findings.json" node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
+              "$d/comments.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/code.json"; then
+              rm -f "$d/code.json"
+              echo "::warning::the code-review status could not be worked out: scripts/code-review-wait.mjs failed, so the security-review status waits and the code-review status is not posted"
+            fi
+            code=("CODE=$d/code.json")
+          fi
           bound security-review.mjs
-          env "${power[@]}" PURE="$pure" RIGHTS="$d/rights.json" node "$ROOT/scripts/security-review.mjs" "$d/pull.json" \
+          env "${power[@]}" "${code[@]}" PURE="$pure" RIGHTS="$d/rights.json" node "$ROOT/scripts/security-review.mjs" "$d/pull.json" \
             "$d/comments.json" "$d/findings.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/out.json"
           sha=$(jq -r '.sha // empty' "$d/out.json")
           if [ -z "$sha" ]; then
@@ -360,14 +379,10 @@ jobs:
             echo "::error::FAIL the security-review status of $sha could not be posted: the host refused it or gave no answer within 20 seconds (its error, if any, is above), so the code-review status was not posted either. Mend: where no error shows above (the 20 seconds ran out), or it is a lost connection, a 5xx or a rate limit, run this job again from the pull request's checks; otherwise mend what it names, then run it again."
             false
           fi
-          # the second status, code-review: whether a code review running on that commit has finished (a default branch
-          # whose core is older has no such script, and says nothing of it)
-          # (a fault in it warns and leaves the job as green as the security-review status left it)
-          if [ -f "$ROOT/scripts/code-review-wait.mjs" ]; then
-            bound code-review-wait.mjs
-            if RIGHTS="$d/rights.json" FINDINGS="$d/findings.json" node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
-              "$d/comments.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/code.json" \
-              && jq -r '.status | "\(.state): \(.description)"' "$d/code.json" \
+          # the second status, code-review, as worked out above
+          # (a fault in posting it warns and leaves the job as green as the security-review status left it)
+          if [ -f "$d/code.json" ]; then
+            if jq -r '.status | "\(.state): \(.description)"' "$d/code.json" \
               && jq '.status' "$d/code.json" | timeout 20 gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then :
-            else echo "::warning::the code-review status could not be written: scripts/code-review-wait.mjs or its post failed"; fi
+            else echo "::warning::the code-review status could not be written: its post failed"; fi
           fi

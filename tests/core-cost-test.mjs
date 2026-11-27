@@ -7,7 +7,8 @@ import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { CAP_DAYS, mergedPulls, shallowGap, EVERY, REPO, cap, classify, pullsOf, sumOf, summed, sums, rulesFor, dayOf, defaultRef, median, priced, print, reading, readings, sessionOf, table, weekOf } from "../scripts/core-cost.mjs";
+import { CAP_DAYS, mergedPulls, EVERY, REPO, cap, classify, pullsOf, sumOf, summed, sums, rulesFor, defaultRef, median, priced, print, reading, readings, sessionOf, table, weekOf } from "../scripts/core-cost.mjs";
+import { dayOf, shallowGap } from "../scripts/shallow.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { line } from "../scripts/session-cost.mjs";
 

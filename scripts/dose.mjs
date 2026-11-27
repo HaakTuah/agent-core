@@ -13,7 +13,9 @@
 //     moved by MOVED since. Where, in debt, an audit comes due by its days and the baseline is no smaller than at
 //     the last, the issue is the owner's to see (`owner`), and nothing fails.
 // The numbers are first guesses, which use tunes. It reads, and with --audited writes the day and the counts of an
-// audit into the baseline; it fails nothing but a run it cannot make. git and Node's own modules.
+// audit into the baseline; it fails nothing but a run it cannot make, a shallow clone that cannot hold the history the
+// cleaning's counts read among them (shallow.mjs; #1422: the look leaves that task as it stands, unread, with the mend).
+// git and Node's own modules.
 //
 //   node core/scripts/dose.mjs             from a project's root: the state, the shares, what to clean first, and
 //                                          whether an audit is due (in the core: node scripts/dose.mjs)
@@ -25,6 +27,7 @@ import path from "node:path";
 import { fileOf, notLinked, parseBaseline, parseConfig, standing, survey, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 import { parseBounded } from "./guards.mjs";
+import { dayOf, shallowGap } from "./shallow.mjs";
 
 export const STATES = ["in debt", "paying down", "in standard"];
 export const DEBT = 0.05, STANDARD = 0.005, DAYS = 30, BATCH = 0.1, MOVED = 0.25;
@@ -83,10 +86,14 @@ const tolerant = (read, otherwise) => { try { return read(); } catch { return ot
 
 // How often each file changed in the newest commits git holds here (a merge is none), and how many it read.
 function changesOf(config, root) {
-  const log = tolerant(() => git(["log", "--no-merges", "-n", String(HISTORY), "--format=%x00", "--name-only", "--", ...config.code], root), "");
+  const log = tolerant(() => git(["log", "--no-merges", "-n", String(HISTORY), "--format=%x00%cI", "--name-only", "--", ...config.code], root), null);
+  if (log === null) return { changes: new Map(), commits: 0, gap: null };
   const commits = log.split("\0").slice(1), changes = new Map();
-  for (const c of commits) for (const f of new Set(c.split("\n").map(s => s.trim()).filter(Boolean))) changes.set(f, (changes.get(f) ?? 0) + 1);
-  return { changes, commits: commits.length };
+  for (const c of commits) for (const f of new Set(c.split("\n").slice(1).map(s => s.trim()).filter(Boolean))) changes.set(f, (changes.get(f) ?? 0) + 1);
+  // (a shallow clone's oldest commit lists every file it holds as changed, and a count from it would pass a part for the
+  // whole: the span read is the newest HISTORY commits, so the clone must hold them, or all the history where fewer came)
+  const oldest = commits.length >= HISTORY ? dayOf(commits.at(-1).split("\n")[0]) : null;
+  return { changes, commits: commits.length, gap: tolerant(() => shallowGap(oldest, root, `the oldest of the ${HISTORY} commits read (${oldest})`), null) };
 }
 
 // The debt a baseline's text lists: how many entries, and the sum of their numbers; null where it cannot be read.
@@ -102,14 +109,16 @@ function debtOf(text) {
 // with smaller numbers. One that only records an audit, or moves an entry, lowered nothing.
 function shareGot(config, at, root) {
   const since = new Date(Date.parse(at) - DAYS * 86400000).toISOString();
+  const gap = tolerant(() => shallowGap(dayOf(since), root, `the last ${DAYS} days (from ${dayOf(since)})`), null);
+  if (gap) return { all: null, cleaning: null, gap };
   const commits = paths => tolerant(() => git(["log", "--first-parent", `--since=${since}`, "--format=%H", "--", ...paths], root).split("\n").filter(Boolean), null);
   const all = commits(["."]), touched = commits([config.baseline]);
-  if (!all || !touched) return { all: null, cleaning: null };
+  if (!all || !touched) return { all: null, cleaning: null, gap: null };
   const lowered = commit => {
     const [now, was] = [commit, `${commit}^`].map(c => debtOf(tolerant(() => git(["show", `${c}:${config.baseline}`], root), "")));
     return !!now && !!was && (now.entries < was.entries || (now.entries === was.entries && now.sum < was.sum));
   };
-  return { all: all.length, cleaning: touched.filter(lowered).length };
+  return { all: all.length, cleaning: touched.filter(lowered).length, gap: null };
 }
 
 // The project at `root` as the dose reads it: null where it has no config of the shape check yet; else its config,
@@ -129,9 +138,12 @@ export function reading(rules, root = ".") {
 const percent = (n, of) => `${of > 0 ? Math.round(1000 * n / of) / 10 : 0}%`;
 const stateLine = r => `The codebase is **${r.state}**${r.named ? " (named so in the project's rules)" : ""}: \`${r.config.baseline}\` lists ${r.listed} old breaches of how the code is put together, of ${r.read} functions and imports the shape check reads (${percent(r.listed, r.read)}).`;
 
+// Whether the state asks for a cleaning task: the one reading of history it makes is made only then.
+export const cleaningWanted = r => r.state !== "in standard" && r.listed !== 0;
+
 // The cleaning task's text, or null where the state asks for none.
 export function cleaningBody(r, { changes, commits }, got, home) {
-  if (r.state === "in standard" || r.listed === 0) return null;
+  if (!cleaningWanted(r)) return null;
   const first = worstFirst([...r.baseline.listed.keys()], changes).slice(0, FIRST);
   const share = got.all === null ? "could not be read from git here" : `${got.cleaning} of the ${got.all} changes that reached this branch in the last ${DAYS} days lowered the baseline`;
   return [stateLine(r), "",
@@ -165,7 +177,17 @@ const reader = (title, body) => ({ manifest, at, root = "." }) => {
   try { r = reading(rules, root); } catch (e) { return { title, body: null, unread: String(e.message).split(". Mend: ")[0] }; }
   return { title, ...(r ? body(r, at, home, root) : { body: null }) };
 };
-export const cleaningDue = reader(TITLES.cleaning, (r, at, home, root) => ({ body: cleaningBody(r, changesOf(r.config, root), shareGot(r.config, at, root), home) }));
+// The cleaning's reading of history, or its gap: where the clone is shallow and cannot hold what the count reads, the
+// task is left as it stands, unread, with the mend (#1422), never counted from a part.
+function historyOf(r, at, root) {
+  if (!cleaningWanted(r)) return { changes: { changes: new Map(), commits: 0 }, got: { all: null, cleaning: null }, gap: null };
+  const changes = changesOf(r.config, root), got = shareGot(r.config, at, root);
+  return { changes, got, gap: changes.gap ?? got.gap ?? null };
+}
+export const cleaningDue = reader(TITLES.cleaning, (r, at, home, root) => {
+  const h = historyOf(r, at, root);
+  return h.gap ? { body: null, unread: h.gap.split(". Mend: ")[0] } : { body: cleaningBody(r, h.changes, h.got, home) };
+});
 export const auditIsDue = reader(TITLES.audit, (r, at, home) => auditBody(r, at, home) ?? { body: null });
 
 // The audit recorded in the baseline: its day and the counts it stood at.
@@ -182,8 +204,9 @@ function main(args) {
   const r = reading(rules);
   if (!r) return `No config of the shape check at \`${where(rules)}\` yet, so no dose is read (${home}setup/sync-notes/, "how code is put together").`;
   if (args[0] === "--audited") return audited(r, at);
-  const audit = auditBody(r, at, home);
-  return [cleaningBody(r, changesOf(r.config, "."), shareGot(r.config, at, "."), home) ?? `${stateLine(r)}\n\nNo cleaning beyond what the shape check holds.`, "", audit ? audit.body : "No audit by a reader is due."].join("\n");
+  const audit = auditBody(r, at, home), h = historyOf(r, at, ".");
+  if (h.gap) throw new Error(h.gap);
+  return [cleaningBody(r, h.changes, h.got, home) ?? `${stateLine(r)}\n\nNo cleaning beyond what the shape check holds.`, "", audit ? audit.body : "No audit by a reader is due."].join("\n");
 }
 
 if (started(import.meta.url)) {

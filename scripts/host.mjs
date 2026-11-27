@@ -38,14 +38,14 @@ const named = p => { try { return [...new Set(reviewersNamed(p).map(n => n.toLow
 
 // What GitHub answers for `repo` ("owner/name"), for the project `p` (steps.mjs's project), asked by `ask` (ghAsk, or a
 // stand-in): owner-settings.mjs's reads, and the repository's labels, whether issues can be read and written (`reach`,
-// inbox.mjs's answer, given by a caller that has it; `post`, its empty write, sends none unless a caller gives one), the look's record (given, or read from its
-// issues), the rights of each account `reviewers` names, the time (`at`), whether the look itself is reading it
-// (`looking`), and whether the secret PERSONAL_TERMS is given, as the look's workflow says it (`env.TERMS_GIVEN`, never
-// its value).
-export function readHost(p, repo, { ask = ghAsk, post = () => ({ status: null, err: "" }), reach, record, at = new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), looking = false, env = process.env } = {}) {
+// inbox.mjs's answer, given by a caller that has it, else asked by reads alone, `GET user` through `ask`, an app's
+// token read as no answer), the look's record (given, or read from its issues), the rights of each account `reviewers`
+// names, the time (`at`), whether the look itself is reading it (`looking`), and whether the secret PERSONAL_TERMS is
+// given, as the look's workflow says it (`env.TERMS_GIVEN`, never its value).
+export function readHost(p, repo, { ask = ghAsk, reach, record, at = new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), looking = false, env = process.env } = {}) {
   const h = { ...ownerRead(repo, ask), name: repo, at, looking };
   h.labels = listOf(`repos/${repo}/labels`, ask);
-  h.reach = reach !== undefined ? reach : h.repo.body ? asked(repo, h.repo.body, post) : null;
+  h.reach = reach !== undefined ? reach : h.repo.body ? asked(h.repo.body, { who: () => ask("user").body ? "user" : null }) : null;
   if (record) h.record = record;
   else {
     const kept = listOf(`repos/${repo}/issues?state=all&labels=by%3Alook`, ask);
@@ -112,7 +112,7 @@ function main() {
   const repo = repoOf(spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout);
   if (!repo) { console.log("The host was not read: the origin is on no github.com, so the steps read on it are left to the project's own host (core/tasks/hosts.md)."); return 0; }
   const root = process.cwd();
-  // (a sync's run reads only: no empty write is sent to learn whether issues can be written, readHost's default)
+  // (a sync's run reads only: whether issues can be written is learnt by GETs alone, #1363)
   console.log(hostReport(hostSteps(root, readHost(project(root), repo))));
   return 0;
 }

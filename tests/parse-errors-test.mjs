@@ -4,10 +4,13 @@
 // every JSON.parse of scripts/ (read on the parser the core installs, scripts/parser.mjs, so a call is told from text
 // that names one) stands where its error is never printed: in a try whose catch reads nothing of the error but its kind
 // (instanceof, .code, .name), else it is parseBounded, which words it so. On Linux and on Windows. Node's own modules,
-// the parser, and the YAML and TOML packages the core installs.
+// the parser, and the YAML and TOML packages the core installs. It holds too that the JSON the core reads has no key
+// twice in one object (scripts/json-keys.mjs; #1367), which JSON.parse would read as the last alone: the check's cases, and
+// each JSON file git tracks here.
 //
 //   node tests/parse-errors-test.mjs
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SEEK, parseBounded } from "../scripts/guards.mjs";
@@ -15,6 +18,9 @@ import { load } from "../scripts/parser.mjs";
 import { LARGEST, budgetOf, parseWithin } from "../scripts/tree-walk.mjs";
 import { parseToml } from "../scripts/toml.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
+import { check, duplicateKeys, failuresOf, outside, repoRoot, toRead, trackedJson } from "../scripts/json-keys.mjs";
+import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 600).replace(/\n/g, "\n     ")}`}`); } };
@@ -183,6 +189,54 @@ ok(found.length === 0, "no JSON.parse of scripts/ has its error printed: each st
     if (got !== want) wrong.push(`${src}: ${got}, not ${want}`);
   }
   ok(!wrong.length, "the reader tells each way a JSON.parse's error may be printed from a catch that reads only its kind", wrong.join("\n"));
+}
+
+// A key that stands twice in one object of a JSON file (#1367): each case is the text and the lines of the key's two places, or null
+for (const [text, lines, what] of [
+  ['{\n  "a": 1,\n  "b": 2,\n  "a": 3\n}\n', [2, 4], "a key twice, the lines of both"],
+  ['{ "past": {\n"x": { "mark": 1 },\n"y": 1,\n"x": { "mark": 2 }\n} }', [2, 4], "a key twice inside a nested object"],
+  ['{"a": 1, "\\u0061": 2}', [1, 1], "a key and the same key written with an escape"],
+  ['{"a": {"k": 1}, "b": {"k": 2}}', null, "the same key in two objects"],
+  ['[{"k": 1}, {"k": 2}]', null, "the same key in the objects of an array"],
+  ['{"a": "a", "b": ["a", "b", "a"]}', null, "the same text as values"],
+  ['{"a": "x\\"a\\": 1, \\"a\\"", "b": 1}', null, "a key written inside a value"],
+  ['{"a": 1, "a": ', null, "a text that is no JSON, left to its readers"],
+  ['{"k": {"a": 1, "a": 2}, "k2": 1}', [1, 1], "a key twice in an object that is a value"],
+]) {
+  const found = duplicateKeys(text);
+  ok(lines === null ? found.length === 0 : found.length === 1 && found[0].first === lines[0] && found[0].again === lines[1], what, JSON.stringify(found));
+}
+{
+  const says = failuresOf("twice.json", '{\n  "mark": 1,\n  "mark": 2\n}\n').join("\n");
+  ok(says.includes('twice.json holds the key "mark" twice') && says.includes("lines 2 and 3") && mended(says), "a key twice is failed with its file, key, lines and mend", says);
+  ok(!failuresOf("x\u001b[31m.json", '{"a": 1, "a": 2}').join("\n").includes("\u001b"), "a file's name is said with its control characters written out");
+  ok(failuresOf("long.json", `{"${"k".repeat(200)}": 1, "${"k".repeat(200)}": 2}`).join("\n").length < 700, "a long key is cut in what is said");
+}
+{
+  // A link is not read, so a key of a file outside the repository is never said; nor a dated record or a lock file.
+  const dir = scratchDir("json-keys-");
+  {
+    fs.mkdirSync(path.join(dir, "repo", "sub"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "outside.json"), '{"a": 1, "a": 2}');
+    fs.writeFileSync(path.join(dir, "repo", "sub", "kept.json"), '{"a": 1}');
+    let linked = true;
+    try { fs.symlinkSync(path.join(dir, "outside.json"), path.join(dir, "repo", "link.json")); } catch { linked = false; }
+    const read = toRead(path.join(dir, "repo"), ["sub/kept.json", "link.json", "archive/x.json", "words/y.json", "a/package-lock.json", ""]);
+    ok(read.join() === "sub/kept.json", `a link, a dated record and a lock file are not read${linked ? "" : " (no link could be made here)"}`, read.join());
+    // a file named by its absolute path is read as itself, from whatever root, and named from the root, never by the
+    // folders above it; only the files read are counted, and a folder named is told with its mend
+    fs.writeFileSync(path.join(dir, "twice.json"), '{"a": 1, "a": 2}');
+    const named = check(path.join(dir, "repo"), [path.join(dir, "twice.json"), "sub/kept.json", "gone.json", "sub"]);
+    ok(named.read === 2 && named.failures.length === 2 && named.failures[0].includes("FAIL twice.json ") && !named.failures.join().includes(dir) && mended(named.failures[1]) && named.failures[1].includes("FAIL sub is a folder"),
+      "a file named by its absolute path is read and named from the root, or by its own name outside it, a file not there is not counted, and a folder named is told with its mend", JSON.stringify(named));
+    // outside a repository the check fails with its mend, having read nothing
+    const top = repoRoot(dir);
+    ok(top === null ? mended(outside(dir)) && outside(dir).includes("no git repository") && !outside(dir).includes(os.tmpdir()) : top !== path.join(dir, "repo"), "a folder in no git repository is told, and its failure says the mend", String(top));
+  }
+}
+{
+  const said = trackedJson(root).flatMap(f => failuresOf(f, fs.readFileSync(path.join(root, f), "utf8")));
+  ok(said.length === 0, "no JSON file this repository tracks holds a key twice in one object", said.join("\n"));
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on how a parse error is worded`);

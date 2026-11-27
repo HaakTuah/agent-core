@@ -3,7 +3,9 @@
 // the calls to git and gh are the program's own and are not made here, save that it refuses a day that is none.
 //
 //   node tests/fixes-test.mjs
-import { changedLines, fixedBy, fixesOf, NO_DAY, parentsOf, scriptOf, sinceOf } from "../scripts/fixes.mjs";
+import { mended } from "../scripts/mend.mjs";
+import { scratchHistory } from "../scripts/scratch-shallow.mjs";
+import { changedLines, cutShort, fixedBy, fixesOf, NO_DAY, parentsOf, scriptOf, sinceOf } from "../scripts/fixes.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -37,6 +39,17 @@ ok(sinceOf(["--since", "2026-11-01"]) === "2026-11-01" && sinceOf(["x", "--since
 ok(sinceOf(["--since", "soon"]) === null && sinceOf(["--since"]) === null && sinceOf([]) === null && sinceOf(["2026-11-01"]) === null && sinceOf(["--since", "2026-11-01\nx"]) === null,
   "a day that is none, none given, or a day without the word that asks it is refused");
 ok(/^--since takes a day/.test(NO_DAY), "and the refusal says what it takes");
+
+// A shallow clone holds no fix older than its boundary: the lister refuses it, with the mend, before it counts a part as the whole (#1422).
+{
+  const steps = ["2026-11-01", "2026-11-05", "2026-11-10", "2026-11-15"].map((day, i) => ({ day, subject: `Change ${i + 1} (#${i + 1})`, files: { "scripts/a.mjs": `export const n = ${i};\n` } }));
+  const h = scratchHistory("fixes-shallow-", steps), cut = h.clone("cut", "--depth", "2"), whole = h.clone("whole");
+  const early = cutShort("2026-11-02", [], cut), late = cutShort("2026-11-20", [], cut), behind = [{ sha: a, parent: b, second: c, brought: [{ sha: c, parent: null }] }];
+  ok(typeof early === "string" && /shallow/.test(early) && /--since 2026-11-02 reaches before it/.test(early) && mended(`FAIL: ${early}`), "in a shallow clone a day before its boundary is refused: it says the clone could not hold the span, and its mend", String(early));
+  ok(late === null && cutShort("2026-11-02", [], whole) === null, "a day after the boundary is read, and a whole clone is read from any day", String(late));
+  const brought = cutShort("2026-11-20", behind, cut);
+  ok(/brought commits from behind the clone's boundary/.test(brought) && mended(`FAIL: ${brought}`) && cutShort("2026-11-02", behind, whole) === null, "in a shallow clone a merge that brought commits from behind its boundary is refused too, with its mend", String(brought));
+}
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

@@ -21,7 +21,8 @@
 // Each listed with its step of the pruning: a rule read at a role's start (an AGENTS.md rule is, here) is at step 1, to
 // move to a module read on need; one read on need is at step 2, to go where nothing changed since it moved. A rule
 // fewer than EARLY merged pull requests came under since it joined (read from git: the first commit that wrote its lead
-// in bold, and the merges on the first-parent line since) is "too early" and not judged; one that guards against rare
+// in bold, and the merges on the first-parent line since; a shallow clone that cannot hold that span fails the list, with its
+// mend, #1422) is "too early" and not judged; one that guards against rare
 // and severe harm, of the floor or with a number marked "; rare harm", is never listed for its check alone. Beside the list, under "in use", the citations of each rule in the span
 // (cited.mjs, beside this file), which say a rule is applied and never that it helps. It removes nothing: the owner
 // decides which go. The record is RECORD, written by --read and --record into the pruning in progress (open()), which
@@ -45,7 +46,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { git, holdersAt, joinedIn, stepsAt, counts } from "./pruning-read.mjs";
+import { git, holdersAt, joinedCounter, joinedIn, stepsAt, counts } from "./pruning-read.mjs";
 import { checksOf, list, readUnheld, stepsOf, without } from "./pruning-list.mjs";
 import { EVERY, RECORD, due, open, ordered, readRecord, writeRecord } from "./pruning-record.mjs";
 import { ROOT, rules } from "./rules.mjs";
@@ -131,7 +132,10 @@ async function main(argv) {
   // (the core's AGENTS.md, which every builder here reads at its start, with the floor and the modules)
   const all = rules(ROOT, { agents: true }), h = await holdersAt(ROOT), starts = new Set([...all.filter(r => r.file === "AGENTS.md").map(r => r.key), ...[...startRules(all).values()].flatMap(x => [...x])]);
   const { counts: heldCounts, holders } = await import("./holders.mjs");
-  console.log(list({ all, named: h.holders ?? {}, numbers: h.numbers ?? {}, record: readRecord(), cases: CASES, steps: await stepsAt(ROOT), starts, toolStarts: new Set(all.filter(r => r.file.startsWith("tools/")).map(r => r.key)), joined: r => joinedIn(r), none: heldCounts(holders()).none, ...readUnheld() }).join("\n"));
+  const counter = joinedCounter(), lines = list({ all, named: h.holders ?? {}, numbers: h.numbers ?? {}, record: readRecord(), cases: CASES, steps: await stepsAt(ROOT), starts, toolStarts: new Set(all.filter(r => r.file.startsWith("tools/")).map(r => r.key)), joined: counter.joined, none: heldCounts(holders()).none, ...readUnheld() });
+  // (a count refused for a shallow clone is no "too early" and no unread rule: the list is not printed, and the failure says why)
+  if (counter.gap()) return fail(`the list could not be made: ${counter.gap()}`);
+  console.log(lines.join("\n"));
 }
 
 if (started(import.meta.url)) await main(process.argv.slice(2));
