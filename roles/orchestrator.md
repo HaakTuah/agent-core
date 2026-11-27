@@ -93,6 +93,10 @@ nothing yet.
   for waits for cleaning's share, a target the look shows. Reason: a PR opened behind a day of line cannot merge for a
   day, goes stale and starts runs that hold the front back; a share nobody hands out is never got. Held, in part, by
   that measure.
+- **One queue-only pull request at a time** (#1413, point 7). By default the orchestrator keeps open at most one pull
+  request that changes the *progress file* alone, adding each new line to it. Nothing changes it. It does not mean a
+  line waits to gather others. Reason: 47 of the core's 392 pull requests merged from 19 to 26 November 2026 were such,
+  each running the checks. Held by nothing yet.
 - **A stalled lane,** found on every wake by `scripts/stalled.mjs`, given the states its way reports where it reports
   them (`tasks/ways.md`), never by a session's word that it runs: an open PR with no push to its branch for a few hours, whose session has ended, cannot be reached
   (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, which reads its
