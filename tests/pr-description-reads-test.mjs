@@ -54,7 +54,7 @@ const ok = (cond, what, got = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${
     put("core-manifest.md", `# m${gap}Core: ${CORE} at ${"0".repeat(40)}, copied whole under y/\nCore: ${CORE} at ${"0".repeat(40)}, copied whole under x/\n`); put("y/roles/a.md", "a\n"); put("y/floor/security.md", "f\n");
     git("add", "-A"); git("commit", "-q", "-m", "a hidden line");
     const hidden = coreHere(project);
-    ok(hidden.at === null && mended(`FAIL ${hidden.mend}`) && /under y\/, where its manifest's "Core:" line, as core\.yml reads it, names x\//.test(hidden.mend), `a head whose manifest hides a place behind ${kind} is refused, with its mend`, JSON.stringify(hidden));
+    ok(hidden.at === null && mended(`FAIL ${hidden.mend}`) && /under y\/ as this check reads its lines, where its "Core:" line, as core\.yml reads it, names x\//.test(hidden.mend), `a head whose manifest hides a place behind ${kind} is refused, with its mend`, JSON.stringify(hidden));
     fs.rmSync(path.join(project, "y"), { recursive: true });
   }
   put("core-manifest.md", manifestText); fs.rmSync(path.join(project, "x"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "the place back");
@@ -88,10 +88,25 @@ const ok = (cond, what, got = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${
   const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(own, f)), { recursive: true }); fs.writeFileSync(path.join(own, f), text); };
   put("roles/a.md", "a\n"); put("floor/security.md", "f\n");
   git("init", "-q", "-b", "main"); git("add", "-A"); git("commit", "-q", "-m", "the base");
-  ok(JSON.stringify(coreHere(own)) === JSON.stringify({ at: "", mend: null }), "the core's own repository is read at its root, with nothing to mend");
+  put("roles/b.md", "b\n"); git("add", "-A"); git("commit", "-q", "-m", "a change at the root");
+  ok(JSON.stringify(coreHere(own)) === JSON.stringify({ at: "", mend: null }), "a change in the core's own repository is read at its root, with nothing to mend");
   put("core-manifest.md", `Core: ${CORE} at ${"0".repeat(40)}, copied whole under x/\n`); put("x/roles/a.md", "a\n"); put("x/floor/security.md", "f\n");
   git("add", "-A"); git("commit", "-q", "-m", "another place");
   const moved = coreHere(own);
   ok(moved.at === null && mended(`FAIL ${moved.mend}`) && /under x\/, where its base held them at its root/.test(moved.mend), "a head of the core's own repository that reads its rules elsewhere is refused, with its mend", JSON.stringify(moved));
+}
+// (a project whose base holds rules at its root beside its manifest, its core carried in a library its commits do not
+// hold: read where the manifest names it, never as the core's own repository)
+{
+  const tmp = scratchDir("pr-description-test-"), carried = path.join(tmp, "carried");
+  const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
+  const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
+  const git = (...args) => execFileSync("git", args, { cwd: carried, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(carried, f)), { recursive: true }); fs.writeFileSync(path.join(carried, f), text); };
+  put("core-manifest.md", `Core: ${CORE}, carried by lib/ under lib/core/\n`); put("roles/a.md", "a\n"); put("floor/security.md", "f\n");
+  git("init", "-q", "-b", "main"); git("add", "-A"); git("commit", "-q", "-m", "the base");
+  put("src/a.js", "1\n"); git("add", "-A"); git("commit", "-q", "-m", "a change");
+  put("lib/core/roles/a.md", "a\n"); put("lib/core/floor/security.md", "f\n"); // (filled as a library's checkout fills it, in no commit)
+  ok(JSON.stringify(coreHere(carried)) === JSON.stringify({ at: "lib/core/", mend: null }), "a project whose base holds rules at its root beside its manifest is not read as the core's own repository", JSON.stringify(coreHere(carried)));
 }
 process.exit(failed ? 1 : 0);
