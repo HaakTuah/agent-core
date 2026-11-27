@@ -1,6 +1,11 @@
 {
   "rule": "tasks/tools.md: A change of tool loses nothing",
   "holder": "check: scripts/stalled.mjs, in part",
-  "behind": [232, "#306", "#1505"],
+  "behind": [
+    232,
+    "#306",
+    "#1505",
+    "#1106"
+  ],
   "number": "correction: does not work; outcome: fast"
 }

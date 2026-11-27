@@ -1,0 +1,7 @@
+{
+  "rule": "roles/adviser.md: It keeps its cache warm while the owner is likely to return",
+  "behind": [
+    "#1106"
+  ],
+  "number": "correction: does not work; outcome: fast"
+}
