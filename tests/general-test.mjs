@@ -112,5 +112,19 @@ ok(r.status === 1 && r.out.includes("AGENTS.md.tmpl:3:") && r.out.includes("AGEN
 r = words({ "setup/template/AGENTS.md.tmpl": "# {{project}}\n" }, { "tasks/b.md": "# A module\n\n- You built none of this; find what is wrong with it, as a demanding expert would. Its lower stakes stay low.\n" }, true, primed);
 ok(r.status === 0, "a role named by what it does, an expert named as a standard and stakes as a measure pass", r.out);
 
+// (only real files of the checkout's own are read: a tracked link is refused, with its mend, and nothing it leads to is
+// read; a folder of a file's name is no file)
+if (process.platform !== "win32") {
+  const dir = path.join(tmp, "links"), outside = path.join(tmp, "outside.md");
+  fs.mkdirSync(path.join(dir, "tasks", "d.md"), { recursive: true }); fs.mkdirSync(path.join(dir, "floor"));
+  fs.writeFileSync(outside, "For every game.\n"); fs.writeFileSync(path.join(dir, "floor", "a.md"), "# The floor\n"); fs.writeFileSync(path.join(dir, "AGENTS.md"), "# Here\n");
+  fs.writeFileSync(path.join(dir, "general.json"), JSON.stringify(config));
+  fs.symlinkSync(outside, path.join(dir, "tasks", "c.md")); fs.symlinkSync("/dev/zero", path.join(dir, "tasks", "e.md"));
+  git(dir, "init", "-q", "-b", "main"); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "links");
+  const got = spawnSync(process.execPath, [script, "general.json"], { cwd: dir, env, encoding: "utf8", timeout: 60000 }), out = `${got.stdout}${got.stderr}`;
+  ok(got.status === 1 && /tasks\/c\.md is a symbolic link/u.test(out) && /tasks\/e\.md is a symbolic link/u.test(out) && !/tasks\/c\.md:1/u.test(out) && !/EISDIR/u.test(out) && mended(out),
+    "a tracked link where the rules stand is refused, with its mend, and nothing it leads to is read; a folder of a file's name is none", out);
+}
+
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the words check`);
 process.exitCode = failed ? 1 : 0;

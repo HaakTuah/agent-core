@@ -12,7 +12,7 @@ import { mended } from "../scripts/mend.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 import { checkout, copied, OWN_SCRIPT } from "../scripts/core-path-scratch.mjs";
 import { CORE } from "../scripts/core-address.mjs";
-import { falseAlarms, hostScans, installNot, scan, answer as engineAnswer, targets, verdicts, unreadLines, unreadListed, unreadOf } from "../scripts/code-scan.mjs";
+import { falseAlarms, hostScans, installNot, runEngine, scan, answer as engineAnswer, targets, verdicts, unreadLines, unreadListed, unreadOf } from "../scripts/code-scan.mjs";
 
 const { ok, done } = tally();
 const tmp = scratchDir("code-scan-logic-test-");
@@ -66,6 +66,17 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
   ok(installNot(nothing, "HEAD~1") === "the change adds or alters no file of the kinds the scan reads" && installNot(nothing) === null, "a change of no file the scan reads installs no engine; with no base, as on a push to main, the engine is installed");
   ok(scan(nothing, { base: "HEAD~1", dir: path.join(tmp, "no-engine-here") }).lines.join("").includes("no file of the kinds it reads changed"), "and its scan says so, with no engine to ask");
   ok(/a workflow calls the core's codeql\.yml/u.test(installNot(p) ?? ""), "where the host's CodeQL scans the project, no engine is installed");
+  // (a scan's bounds: past its files or its time it fails closed, with its mend, and holds no listed file back)
+  for (const f of ["a.js", "b.js", "c.js"]) fs.writeFileSync(path.join(nothing, f), "x();\n");
+  g("add", "-A"); g("commit", "-q", "-m", "code");
+  const many = scan(nothing, { base: "HEAD~1", dir: path.join(tmp, "no-engine-here"), most: { files: 2, time: 60000 } });
+  ok(many.failed && /past the 2 one scan reads/u.test(many.lines.join("\n")) && mended(many.lines.join("\n")), "a change past the files one scan reads fails, with its mend", many.lines.join("\n"));
+  const late = runEngine(path.join(tmp, "no-engine-here"), nothing, ["a.js"], Date.now() - 1);
+  const calls = [], slow = (dir, root, files, until) => { calls.push(files.join(" ")); return Date.now() >= until ? { failed: "late", late: true } : { failed: "no answer" }; };
+  const timed = engineAnswer("engine", ".", ["a.js", "b.js"], new Set(["a.js", "b.js"]), slow, Date.now() - 1);
+  const overTime = scan(nothing, { base: "HEAD~1", dir: path.join(tmp, "no-engine-here"), most: { files: 10, time: -1 } });
+  ok(overTime.failed && /ran past the \d+ s its runs have together/u.test(overTime.lines.join("\n")) && mended(overTime.lines.join("\n")), "a scan past its time fails closed, with its mend", overTime.lines.join("\n"));
+  ok(late.late === true && timed.got.late === true && timed.held.length === 0 && calls.length === 1, "a run past the scan's time is late, and holds no listed file back: the scan fails on it", JSON.stringify({ late, timed, calls }));
 }
 
 // The copy told apart from the core's own repository, as core-path.mjs's copyAside does (#1350): where
