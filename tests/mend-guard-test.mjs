@@ -6,6 +6,7 @@
 //
 //   node tests/mend-guard-test.mjs
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { guard, missing, mended, unknown } from "../scripts/mend.mjs";
@@ -43,6 +44,23 @@ const ok = (cond, what) => { count++; if (cond) console.log(`ok   ${what}`); els
     && mended(unknown("scripts/a.mjs", "a string thrown\nits second line")) && mended(unknown("scripts/a.mjs", new Error(""))),
     "an error not caught is worded as a failure with its mend, of any kind and with any message");
   ok(unknown("scripts/a.mjs", new Error("FAIL: b. Mend: do this here.")) === "FAIL: b. Mend: do this here.", "an error whose message is a mended failure is said as it stands");
+  // (an error naming a script that is not there is worded as an unknown error, its mend read as any is, #1538)
+  const gone = unknown("scripts/a.mjs", new Error("FAIL: b. Mend: run node core/scripts/gone.mjs."));
+  ok(/^FAIL: scripts\/a\.mjs stopped on an error it does not know: FAIL: b\./mu.test(gone), "an error whose message is a mended failure naming a script not there is worded as an unknown error");
+  // (where the process's folder cannot be read, mended() says not mended and unknown() still words the failure)
+  // (a folder in use cannot be removed on Windows, so the case is for the others)
+  if (process.platform !== "win32") {
+    const at = scratchDir("mend-unknown-"), was = process.cwd();
+    let line = "", fallback = false;
+    try {
+      process.chdir(at);
+      fs.rmSync(at, { recursive: true, force: true });
+      line = unknown("scripts/a.mjs", new Error("FAIL: b. Mend: do this here."));
+      fallback = !mended("FAIL: b. Mend: do this here.") && mended("FAIL: b. Mend: do this here.", { from: os.tmpdir() });
+    } finally { process.chdir(was); }
+    ok(fallback && /^FAIL: scripts\/a\.mjs stopped on an error it does not know: /u.test(line),
+      "where the process's folder cannot be read, a mend is not read as mended and unknown() still words the failure");
+  }
   const hostile = unknown("scripts/a.mjs", new Error("bad https://u:p@h.invalid/x\n::warning::x")), passed = unknown("scripts/a.mjs", new Error("FAIL: c. Mend: do it now.\n::error::y"));
   ok(mended(hostile) && mended(passed) && !/u:p@/u.test(hostile) && !/^\s*::/mu.test(hostile) && !/^\s*::/mu.test(passed),
     "an error's words are printed as the log reads text alone: no address's sign-in, and no workflow command at a line's start");
