@@ -149,6 +149,10 @@ if (process.platform !== "win32") {
     ok(r.status === 0 && /could not be read here/.test(r.stdout) && !/a-person|config\.yml/.test(`${r.stdout}${r.stderr}`), "where gh gives no answer, it says so and fails nothing, and prints none of gh's words, which may name a path of the machine", `${r.stdout}${r.stderr}`);
     const m = spawnSync(process.execPath, [script, "--make"], { cwd: repo, env, encoding: "utf8" });
     ok(m.status === 0 && /could not be read here/.test(m.stdout), "--make where gh gives no answer makes nothing and fails nothing", `${m.stdout}${m.stderr}`);
+    spawnSync("git", ["remote", "remove", "origin"], { cwd: repo });
+    const none = spawnSync(process.execPath, [script], { cwd: repo, env, encoding: "utf8" });
+    ok(none.status === 0 && /were not read: the repository has no origin, so no host is named/.test(none.stdout) && !/has no labels/.test(none.stdout), "with no origin, the labels are said not read, never said not to exist (#1361, point 17)", `${none.stdout}${none.stderr}`);
+    spawnSync("git", ["remote", "add", "origin", "https://github.com/someone/a-game"], { cwd: repo });
     const bad = spawnSync(process.execPath, [script, "--since", "soon"], { cwd: repo, env, encoding: "utf8" });
     ok(bad.status === 1 && /--since needs a date/.test(bad.stderr), "a wrong option fails, saying what it takes");
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }

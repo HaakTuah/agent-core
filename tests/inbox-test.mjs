@@ -121,7 +121,13 @@ if (process.platform !== "win32") {
 printf '%s\\037' "$@" >> "$CALLS"; echo >> "$CALLS"
 ${gh}
 `, { mode: 0o755 }); const r = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/inbox.mjs", import.meta.url))], { cwd: repo, env: { ...env, ...more }, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
-    let r = run("echo 'gh: Not Found (HTTP 404)' >&2; exit 1");
+    let r;
+    // no origin, as a release's trial clones a project: not read, no folder asked, gh not called (#1361, point 17)
+    git("remote", "remove", "origin");
+    r = run("exit 1");
+    ok(r.status === 0 && /could not be asked here \(it has no origin, so no host is named to ask\): nothing moves/.test(r.out) && !/^Issues cannot be read/.test(r.out) && !fs.existsSync(log), "a repository with no origin is not read as one with no issues: nothing is asked, no folder made, nothing moves", r.out);
+    git("remote", "add", "origin", "https://github.com/someone/a-game");
+    r = run("echo 'gh: Not Found (HTTP 404)' >&2; exit 1");
     ok(r.status === 0 && /^Issues cannot be read and written here \(GitHub finds no repository someone\/a-game/.test(r.out), "GitHub's Not Found is an answer: the repository cannot be reached for this account, so the folder", r.out);
     for (const [how, said] of [["echo 'gh: API rate limit exceeded (HTTP 403)' >&2; exit 1", "a rate limit"], ["echo 'gh: Bad Gateway (HTTP 502)' >&2; exit 1", "a fault of GitHub's"], ["echo 'error connecting to api.github.com' >&2; exit 1", "no network"], ["echo '{\"has_issues\": true}'", "an answer for no account"]]) {
       r = run(how);

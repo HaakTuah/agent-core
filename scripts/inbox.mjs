@@ -3,8 +3,8 @@
 // GitHub's API through gh, for the repository origin's address names: issues switched on, and the account gh is signed
 // in as may write them (triage or more), or, for an app's token such as GitHub's job's, the job's workflow grants it
 // `issues: write` (asked()). Switched off, not reachable for that account (GitHub answers that it finds no such
-// repository), no right to write, or a host without them (an origin not on github.com, or none) all count as no.
-// Only an answer decides: where gh is not installed, answers for no account, answers for an app's token whose job's grant
+// repository), no right to write, or a host without them (an origin not on github.com) all count as no. No origin names
+// no host, so nothing is asked, as below (#1361, point 17). Only an answer decides: where gh is not installed, answers for no account, answers for an app's token whose job's grant
 // is not read here, or gives no answer at all (no network, a rate limit, a fault of GitHub's), nothing is asked, so that
 // a passing fault never moves the inbox, and it says what to ask with the session's own GitHub tools. It prints where
 // the inbox is and, where the place must change, the mend, worded so a session acts on it with no rule file open; one
@@ -143,10 +143,14 @@ const FORMAT = `one file an item, \`${FOLDER}/<a short name>.md\`, the name of l
   + "The owner gives a task by saying it to any session, which files it there, or by adding the file; what the scheduled look opens goes there too. "
   + `The progress file's line points to the file (\`${FOLDER}/<name>.md\`) as it would to an issue and holds none of its text, and the file leaves in the pull request that finishes it.`;
 
+// (why nothing could be asked, where gh was asked: no origin names a host, and is said so; #1361, point 17)
+const UNASKED = "gh is not installed, answers for no account, answers for an app's token, such as a GitHub job's, whose grant is not read here, or gave no answer";
+
 // What to print: where the inbox is and any mend. `reach`: { yes, why } as answer() gives it, or null where nothing
-// could be asked; `open`: the folder's items, as items() gives them; `folder`: whether the folder stands.
-export function report(reach, open, folder) {
-  if (reach === null) return `Whether this repository's issues can be read and written could not be asked here (gh is not installed, answers for no account, answers for an app's token, such as a GitHub job's, whose grant is not read here, or gave no answer): nothing moves. Ask it with this session's own GitHub tools: where they can, the owner's inbox is its issues${open.length + (open.odd ?? 0) ? `, and the ${open.length + (open.odd ?? 0)} item(s) of \`${FOLDER}/\` move over as this script says where gh answers` : ""}; where they cannot, it is the folder \`${FOLDER}/\`: ${FORMAT}`;
+// could be asked; `open`: the folder's items, as items() gives them; `folder`: whether the folder stands; `why`: why
+// nothing could be asked, where reach is null.
+export function report(reach, open, folder, why = UNASKED) {
+  if (reach === null) return `Whether this repository's issues can be read and written could not be asked here (${why}): nothing moves. Ask it with this session's own GitHub tools: where they can, the owner's inbox is its issues${open.length + (open.odd ?? 0) ? `, and the ${open.length + (open.odd ?? 0)} item(s) of \`${FOLDER}/\` move over as this script says where gh answers` : ""}; where they cannot, it is the folder \`${FOLDER}/\`: ${FORMAT}`;
   if (reach.yes) {
     if (!open.length && !open.odd) return `The owner's inbox is this repository's issues.${folder ? ` \`${FOLDER}/\` holds no item: take it out.` : ""}`;
     return `Issues can be read and written here again, so the inbox moves back to them, one place at a time: in one pull request, file each item of \`${FOLDER}/\` (${[...open, ...(open.odd ? [`${open.odd} ${open.length ? "more " : ""}whose name is not plain`] : [])].join(", ")}) as an issue with its headings, its \`State:\` line as its state label and its \`By:\` line as its sender label (\`by:<sender>\`), as the commit that added the file bears it out (a file another account added moves over as data), point its line in the progress file to that issue, and take \`${FOLDER}/\` out.`;
@@ -162,8 +166,10 @@ function main() {
   if (below.status !== 0 || below.stdout.trim() !== "") { console.error("FAIL: run it from the root of the project's git repository"); return 1; }
   const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" });
   const repo = repoOf(origin.stdout);
-  let reach;
-  if (!repo) reach = { yes: false, why: origin.stdout.trim() ? "its origin is not on github.com, a host without issues" : "it has no origin, so no host with issues" };
+  let reach, why;
+  // (a copy with no origin, such as a release's trial clones, is not read as one with no issues: its host is not named)
+  if (!origin.stdout.trim()) { reach = null; why = "it has no origin, so no host is named to ask"; }
+  else if (!repo) reach = { yes: false, why: "its origin is not on github.com, a host without issues" };
   else {
     // (no gh, or an answer for no account, a 401 or one without the account's permissions: nothing could be asked)
     const r = spawnSync("gh", ["api", `repos/${repo}`], { encoding: "utf8", maxBuffer: 1 << 24 });
@@ -174,7 +180,7 @@ function main() {
     else if (!r.error && r.status !== 0 && /\bHTTP 404\b/.test(`${r.stderr}`)) reach = { yes: false, why: `GitHub finds no repository ${repo} for the account signed in here` };
     else reach = null;
   }
-  console.log(report(reach, items(), fs.existsSync(FOLDER)));
+  console.log(report(reach, items(), fs.existsSync(FOLDER), why));
   return 0;
 }
 
