@@ -16,7 +16,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1123 | rule builder; release 8 | #974, #1060 (`roles/adviser.md`) |
 | #1098, #1133, #1356 | builder; release 8, one PR each | |
 | #1488 | builder; release 8 | |
-| #1510 | builder; release 8 | #1508 (`scripts/select.mjs`) |
+| #1510 | builder; release 8 | #1508, on the same files |
 | #1472 | builder; release 8 | #1510, on the same files |
 | #1475, #1476 | builder; release 8, one PR each | #1472, on the same files |
 | #1180, #1181 | rule builder; release 8, one PR each | |
