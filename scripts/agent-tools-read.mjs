@@ -34,38 +34,45 @@ export function addServers(state, file, servers, tool) {
 // it may run }, the command Codex runs on Windows in its place among them ("commandWindows", or "command_windows" in
 // TOML), whatever the hook's type, each held to the kit's form and named, so its entry in the list reads otherwise than
 // the kit's. A hook of any other type (a prompt, an agent, a web address) runs no command the kit's form can be read in,
-// and is weighed as such (NO_COMMAND); a Windows command that is no text is refused as the wrong shape.
+// and is weighed as such (NO_COMMAND); a command or a Windows command given that is no text is refused as the wrong shape.
 const WINDOWS = ["commandWindows", "command_windows"];
 function commandsOf(hook) {
   const runs = hook?.type === "command" && typeof hook.command === "string";
-  const windows = WINDOWS.filter(k => hook && typeof hook === "object" && Object.hasOwn(hook, k)).map(k => hook[k]);
-  const bad = WINDOWS.filter(k => hook && typeof hook === "object" && Object.hasOwn(hook, k) && typeof hook[k] !== "string");
+  const has = k => hook && typeof hook === "object" && Object.hasOwn(hook, k);
+  const windows = WINDOWS.filter(has).map(k => hook[k]);
+  const bad = [...(hook?.type === "command" && given(hook.command) && !runs ? ["command"] : []), ...WINDOWS.filter(k => has(k) && typeof hook[k] !== "string")];
   if (!runs) return { runs, bad, text: JSON.stringify(hook), commands: [...windows, NO_COMMAND] };
   return { runs, bad, text: `${hook.command}${windows.length ? ` (Windows: ${windows.map(String).join(", ")})` : ""}`, commands: [hook.command, ...windows] };
+}
+// A value in a shape its tool does not take, refused as a problem with that value's own text and where it stands, so one
+// the base held is noted while it stands, whatever else of the file changes, as readEnv's are.
+export function flagShape(state, file, what, form, value, mend = "write it as one, as the tool that reads it takes it") {
+  const problem = `${file}: ${what} is not ${form}. Mend: ${mend}`;
+  state.problems.push(problem);
+  state.texts.set(problem, `${file}\0${what}\0${JSON.stringify(value) ?? "undefined"}`);
+  state.baselined.add(problem);
 }
 // The hooks one settings file configures, into configured()'s `state`: Claude Code's, or, with `tool`, another tool's
 // written the same way (Codex's). A value in a shape the tool's hooks are not written in (an event's that is no list, a
 // group that is no object, a group's "hooks" that is no list) is refused, never passed over unread; so is a "hooks" that
 // is no object in Claude Code's files (Codex's, `state.entries` refuses).
 const given = v => v !== undefined && v !== null, object = v => v && typeof v === "object" && !Array.isArray(v);
-const wrongShape = (state, file) => (what, form) => state.flag(`${file}: ${what} is not ${form}. Mend: write it as one, as the tool that reads it takes its hooks`, file);
 export function readHooks(state, file, settings, tool = "") {
-  const all = settings?.hooks, wrong = wrongShape(state, file);
-  if (!tool && given(all) && !object(all)) wrong(`"hooks"`, "a JSON object, of each event to its hooks");
+  const all = settings?.hooks;
+  if (!tool && given(all) && !object(all)) flagShape(state, file, `"hooks"`, "a JSON object, of each event to its hooks", all);
   for (const [event, groups] of Object.entries(object(all) ? all : {})) {
-    if (given(groups) && !Array.isArray(groups)) wrong(`"hooks.${event}"`, "a list of hook groups");
+    if (given(groups) && !Array.isArray(groups)) flagShape(state, file, `"hooks.${event}"`, "a list of hook groups", groups);
     for (const group of Array.isArray(groups) ? groups : []) readGroup(state, file, tool, event, group);
   }
 }
 // One group of an event's hooks, its matcher and each hook, into configured()'s `state`, a part in the wrong shape refused.
 function readGroup(state, file, tool, event, group) {
-  const wrong = wrongShape(state, file);
-  if (!object(group)) return void wrong(`a group of "hooks.${event}"`, "an object of a matcher and its hooks");
-  if (given(group.hooks) && !Array.isArray(group.hooks)) wrong(`the "hooks" of a group of "hooks.${event}"`, "a list of hooks");
+  if (!object(group)) return void flagShape(state, file, `a group of "hooks.${event}"`, "an object of a matcher and its hooks", group);
+  if (given(group.hooks) && !Array.isArray(group.hooks)) flagShape(state, file, `the "hooks" of a group of "hooks.${event}"`, "a list of hooks", group.hooks);
   const matcher = typeof group.matcher === "string" && group.matcher ? group.matcher : "";
   for (const hook of Array.isArray(group.hooks) ? group.hooks : []) {
     const { bad, ...read } = commandsOf(hook);
-    for (const k of bad) wrong(`the "${k}" of a hook of "hooks.${event}"`, "a text, the one command Codex runs on Windows");
+    for (const k of bad) flagShape(state, file, `the "${k}" of a hook of "hooks.${event}"`, "a text, the one command it runs", hook[k]);
     addHook(state, file, { tool, event, matcher, given: group.matcher, hook, ...read });
   }
 }

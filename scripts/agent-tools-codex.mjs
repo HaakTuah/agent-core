@@ -2,7 +2,7 @@
 // config.toml's "notify" starts, its tool servers there, and the variables its shell environment policy sets (the KEPT
 // lists below), each named with "Codex" first; toml.mjs reads the TOML.
 import { parseToml, TomlUnreached } from "./toml.mjs";
-import { readHooks, addHook, NO_KIT, addServers, SERVERS } from "./agent-tools-read.mjs";
+import { readHooks, addHook, NO_KIT, addServers, SERVERS, flagShape } from "./agent-tools-read.mjs";
 
 // What Codex configures in the project (tools/codex.md; its pages on hooks and on its config, read on 16 November
 // 2026): the hooks of .codex/hooks.json, and those written inline in .codex/config.toml under "hooks", both as Claude
@@ -30,7 +30,7 @@ export function readCodex(state, json, read) {
   readHooks(state, ".codex/config.toml", config, "Codex");
   const notify = config.notify;
   // (a "notify" given in any other shape than a list of texts is refused, never passed over unread)
-  if (notify !== undefined && notify !== null && !(Array.isArray(notify) && notify.every(w => typeof w === "string"))) state.flag(`.codex/config.toml: "notify" is not a list of texts. Mend: write it as one, the program and each of its arguments, as Codex reads it`, ".codex/config.toml");
+  if (notify !== undefined && notify !== null && !(Array.isArray(notify) && notify.every(w => typeof w === "string"))) flagShape(state, ".codex/config.toml", `"notify"`, "a list of texts", notify, "write it as one, the program and each of its arguments, as Codex reads it");
   else if (Array.isArray(notify) && notify.length) {
     // (its words are a program and its arguments, each one whole, read as shellWords reads them)
     addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [shellWords(notify)] });
