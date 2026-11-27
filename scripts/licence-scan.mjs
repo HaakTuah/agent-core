@@ -253,8 +253,14 @@ function scanned(c, f) {
     else c.fail(said);
   }
   const text = c.binary.has(f) ? "" : trackedText(c.root, f, c.fail);
-  unaudited(c, f, byKind(c, f, text));
-  pinnedIfRead(c, f, text);
+  // (strings and templates nested some thousands deep run the readers out of stack: the file fails, named, with its
+  // mend, where the check stopped with the bare error; #1496)
+  try { unaudited(c, f, byKind(c, f, text)); pinnedIfRead(c, f, text); }
+  catch (e) {
+    if (!(e instanceof RangeError && /call stack/u.test(e.message))) throw e;
+    c.fail(`${f} nests its strings, templates or brackets too deep for the scan to read, so what it fetches cannot be read. Mend: write ${f} with them nested less deep, each one it opens closed`);
+    return;
+  }
   // (a notice in any file but prose, the notices a project writes itself among them: code copied in, in any language)
   if (!c.binary.has(f) && !PROSE_FILE.test(f) && NOTICE.test(text)) needFile(c, f, "a file carrying a licence notice", { own: false });
   if (ASSET.test(f) || c.binary.has(f)) needFile(c, f, c.binary.has(f) && !ASSET.test(f) ? "a binary file" : "a font, image, sound, video, model or data file");
