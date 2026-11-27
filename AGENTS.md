@@ -249,9 +249,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   projects as `scripts/state-report.mjs --projects` finds them, and sets out each step these rules ask: the clone kept
   read-only, its pushes blocked and the block checked by reading it, never by a push expected to fail; the toolchain;
   the run before the sync and the run after it; the pure-sync reading; the drafts in the owner's own projects; and the
-  record. The one condition that changes it: gh gives no answer for the owner's projects; then it prints no brief, and
-  its failure says the mend. The trigger is each release's trial. It does not mean that a project of another owner's
-  is found, kept or written anywhere but in the brief the orchestrator gives in private, nor that a step of the brief
+  record. The one condition that changes it: gh gives no answer for the owner's projects; then it prints no brief, its
+  failure says the mend, and the trial starts once gh answers. Each release's trial triggers it. Nor does it mean that a
+  project of another owner's is found, kept or written anywhere but in the brief the orchestrator gives in private, nor that a step of the brief
   stands in for the rule it carries out. Reason: release 6's trial took four rounds, and at least one fault lay in a
   hand-written brief, which asked for a test that could never pass on a project the account can write. Held by
   `tests/trial-brief-test.mjs`, which reads the brief for each of those steps and each command as one its script takes;

@@ -19,11 +19,14 @@ import { started } from "./started.mjs";
 // the commit tried, as the brief names them.
 const SCRATCH = "<scratch>", AT = `${SCRATCH}/core`;
 const NOWHERE = "no-push://the-trial";
+// The draft's branch, one name whatever the commit, so a trial moved to a newer commit moves the same draft (#1334);
+// the steps' writes are committed on a branch of their own, never pushed, so the draft holds the pure sync alone.
+const BRANCH = "core-trial", AFTER = "core-trial-after";
 const short = sha => sha.slice(0, 7);
 const folder = name => `${SCRATCH}/${name.replace("/", "--")}`;
 
 // What the brief says of each project: the owner's own are tried and get a draft; another owner's is tried alone, its
-// code run only through the release's check.mjs, where no sign-in of the owner's answers (floor rule 18).
+// code run only through the release's check.mjs, on a machine shown to hold no sign-in of the owner's (floor rule 18).
 function projectLines(own, other) {
   if (!own.length && !other.length) return ["- None: no project of the owner's takes the core, and none of another owner's was given. Step 8 records a trial of none."];
   return [
@@ -56,26 +59,27 @@ export function brief(sha, own, other = []) {
       `\`git clone https://github.com/<owner>/<name> <n>\`, keeping its remote \`origin\`: the sync's reading and the privacy reader read it, and a clone with no remote crashed both (release 7's trial).`,
       `Block its pushes: \`git -C <n> remote set-url --push origin ${NOWHERE}\`. Check the block by reading it: \`git -C <n> remote get-url --push origin\` prints \`${NOWHERE}\`. Never check it by trying a push and waiting for a refusal: on a project the account can write, the push goes through.`,
       "Nothing is written to the project's repository but the draft step 6 opens in a project of the owner's own: no other branch, no issue, comment, label or setting.",
-      `Of a project of another owner, its own code runs only where no sign-in or key of the owner's is held (floor rule 18): first check that none answers (\`gh auth status\` fails, and \`printf 'protocol=https\\nhost=github.com\\n\\n' | git credential fill\` gives no password); where one does, run nothing of it, give it no pair in step 8, and say why in the record's pull request. Then run its checks only through \`${AT}/scripts/check.mjs\`, whose steps get an environment of their own, never through the scripts of its copy, which its owner can change.`,
+      `Of a project of another owner, its own code runs only on a machine shown to hold no sign-in or key of the owner's by any route (floor rule 18): none in its tools (\`gh auth status\` fails, and \`printf 'protocol=https\\nhost=github.com\\n\\n' | git credential fill\` gives no password), none in its files, and none its network adds to a request on the way out. Where that is not shown, as on a machine whose network may add one, run nothing of it, give it no pair in step 8, and say in the record's pull request that its checks were not run, and why. Where it is, run its checks only through \`${AT}/scripts/check.mjs\`, whose steps get an environment of their own, never through the scripts of its copy, which its owner can change.`,
     ]),
     "2. **The toolchain the project pins.** Before the first run, from `<n>`: `node " + AT + "/scripts/toolchain.mjs .`, and set what its line prints for both runs. Where it fetches nothing, its line says why: go on.",
     "3. **The run before the sync, the baseline.** From `<n>`, on its default branch: `node core/scripts/check.mjs --base \"$(git rev-parse origin/HEAD)\" --own --verdicts " + SCRATCH + "/<name>-before.json`.",
     ...each([
       `Where the copy holds no check.mjs, or one without \`--verdicts\`, and for every project of another owner, run \`node ${AT}/scripts/check.mjs\` with the same options from \`<n>\` instead, the verdicts still under \`${SCRATCH}\`. Note which way each baseline was taken, for step 8.`,
     ]),
-    "4. **The sync.** In `<n>`: `git switch -c core-trial-" + s + "`, then `node " + AT + "/scripts/sync.mjs " + sha + "`, then commit what it wrote (`git add -A && git commit -m \"Sync the core to " + s + " for the release's trial\"`). The steps' writes it sets aside stay in their stash until step 7.",
+    "4. **The sync.** In `<n>`: `git switch -c " + BRANCH + "`, then `node " + AT + "/scripts/sync.mjs " + sha + "`, then commit what it wrote (`git add -A && git commit -m \"Sync the core to " + s + " for the release's trial\"`). The steps' writes it sets aside stay in their stash until step 7.",
     "5. **The pure-sync reading.** With that branch checked out and committed: `node " + AT + "/scripts/pure-sync.mjs --trial " + sha + " > " + SCRATCH + "/<name>-sync.txt`. Its answer stops no cut; a trial recorded without it for a project does.",
     "6. **The draft, in each project of the owner's own.**",
     ...each([
       "Read the project's stop switch: `git -C <n> ls-remote origin refs/heads/agents-stop`. Where it stands, open no draft, and take the reading as for another owner's below.",
-      `Else push the sync's branch alone, by its fetch address named outright, the push address staying blocked: \`git -C <n> push "$(git -C <n> remote get-url origin)" HEAD:refs/heads/core-trial-${s}\`. Open it as a draft pull request against the default branch (\`gh api repos/<owner>/<name>/pulls -f head=core-trial-${s} -f base=<its default branch> -F draft=true -f title=... -f body=...\`), its description saying it is the release's trial, pinned to ${s}, and that the session that syncs the project takes it once the release is cut. It holds the pure sync alone: never the steps' writes, never marked ready, never merged before the cut.`,
+      `Else push the sync's branch alone, by its fetch address named outright, the push address staying blocked: \`git -C <n> push "$(git -C <n> remote get-url origin)" --force HEAD:refs/heads/${BRANCH}\`, the branch the trial's own. Where no draft of an earlier commit's trial is open from it, open it as a draft pull request against the default branch (\`gh api repos/<owner>/<name>/pulls -f head=${BRANCH} -f base=<its default branch> -F draft=true -f title=... -f body=...\`), its description saying it is the release's trial, pinned to ${s}, and that the session that syncs the project takes it once the release is cut. It holds the pure sync alone: never the steps' writes, never marked ready, never merged before the cut.`,
       `Once its checks finish: \`node ${AT}/scripts/trial-draft.mjs <owner>/<name> <its number> ${sha} > ${SCRATCH}/<name>-draft.txt\`, with \`--gate <the check>\` only for a check that fails, or skips after passing on main, for being a draft alone (setup/sync-notes/680), each named in the record's pull request.`,
       `A project of another owner's, or one whose stop switch stands, gets no draft: \`node ${AT}/scripts/trial-draft.mjs <owner>/<name> none ${sha} > ${SCRATCH}/<name>-draft.txt\`.`,
-      "Where a fix of the release moves the trial to a newer commit, move the same draft forward to it: sync again on its branch and push.",
+      `Where a fix of the release moves the trial to a newer commit, the same draft moves forward to it: the trial starts again from step 0 in a fresh scratch folder, and step 6's push to \`${BRANCH}\`, the same name whatever the commit, replaces the draft's sync with the new one; open no second draft, and say the new pin in its description.`,
     ]),
-    "7. **The run after the sync.** In `<n>`, on the sync's branch: take the steps' writes the sync set aside (`git stash pop`, where it set them aside) and commit them on top, never pushed, as the session that syncs commits them after the merge. Then: `node core/scripts/check.mjs --base \"$(git rev-parse origin/HEAD)\" --own --verdicts " + SCRATCH + "/<name>-after.json`.",
+    "7. **The run after the sync.** In `<n>`, on a branch of its own off the sync's (`git switch -c " + AFTER + "`), so the draft's stays the pure sync: take the steps' writes the sync set aside (`git stash pop`, where it set them aside) and commit them there, never pushed, as the session that syncs commits them after the merge. Then: `node core/scripts/check.mjs --base \"$(git rev-parse origin/HEAD)\" --own --verdicts " + SCRATCH + "/<name>-after.json`.",
     ...each([
-      "A check that passed before and failed after, or failed after alone, is the release's, and so is one that ran before and was stopped, not run or not read after: find its fault in the core, mend it there in a pull request of its own, and try again at the new commit, from step 0, the drafts moved forward.",
+      `For every project of another owner, run \`node ${AT}/scripts/check.mjs\` with the same options instead, as in step 3, never the copy's.`,
+      "A check that passed before and failed after, or failed after alone, is the release's, and so is one that ran before and was stopped, not run or not read after: find its fault in the core, mend it there in a pull request of its own, and try again at the new commit, as step 6 says.",
     ]),
     "8. **The record,** in a pull request of the core's own, branched from its main, that changes `reports/release-trial.json` alone:",
     ...each([
@@ -98,11 +102,16 @@ export function briefFor(sha, other, gh, named = []) {
   return { text: brief(sha, own, other) };
 }
 
-if (started(import.meta.url)) {
-  const [sha, ...rest] = process.argv.slice(2);
+// The brief for the command line `args` (the commit, then --other and --repo, each with its name), or { why } not.
+export function run(args, gh) {
+  const [sha, ...rest] = args;
   const flag = a => a === "--other" || a === "--repo";
   const loose = rest.some((a, i) => !flag(a) && !flag(rest[i - 1])) || rest.some((a, i) => flag(a) && (i === rest.length - 1 || flag(rest[i + 1])));
   const of = f => rest.filter((a, i) => rest[i - 1] === f);
-  const got = loose ? { why: "it takes the commit tried, then --other <owner>/<name> for each project of another owner, and --repo <owner>/<name> for each repository to read in place of the account's. Mend: run `node scripts/trial-brief.mjs <the full SHA> [--other <owner>/<name>]... [--repo <owner>/<name>]...`" } : briefFor(sha, of("--other"), undefined, of("--repo"));
+  return loose ? { why: "it takes the commit tried, then --other <owner>/<name> for each project of another owner, and --repo <owner>/<name> for each repository to read in place of the account's. Mend: run `node scripts/trial-brief.mjs <the full SHA> [--other <owner>/<name>]... [--repo <owner>/<name>]...`" } : briefFor(sha, of("--other"), gh, of("--repo"));
+}
+
+if (started(import.meta.url)) {
+  const got = run(process.argv.slice(2));
   if (got.why) { console.error(`FAIL: ${got.why}`); process.exitCode = 1; } else console.log(got.text);
 }

@@ -307,7 +307,9 @@ function takesCore(gh, name, r) {
 // of gh throws, never read as none.
 export function ownTakers(named = [], gh = ghApi) {
   const account = gh("user", "--jq", ".login").trim();
-  return [...reached(gh, account, named)].filter(([name, r]) => String(r.owner).toLowerCase() === account.toLowerCase() && takesCore(gh, name, r)).map(([name]) => name);
+  const found = reached(gh, account, named);
+  if (!found.size) throw new Error("GitHub listed no repository");
+  return [...found].filter(([name, r]) => String(r.owner).toLowerCase() === account.toLowerCase() && takesCore(gh, name, r)).map(([name]) => name);
 }
 
 // --projects: each project the account reaches, with its kind and the counts from its own newest state report.

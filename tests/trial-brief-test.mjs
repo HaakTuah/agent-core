@@ -4,11 +4,11 @@
 // found through a stand-in for gh, and no brief where gh gives no answer. Every name is invented. Node's own modules.
 //
 //   node tests/trial-brief-test.mjs
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { brief, briefFor } from "../scripts/trial-brief.mjs";
+import { brief, briefFor, run } from "../scripts/trial-brief.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0, count = 0;
@@ -36,7 +36,7 @@ const one = step(1);
 ok(/keeping its remote `origin`/.test(one) && /remote set-url --push origin no-push:\/\/the-trial/.test(one) && /remote get-url --push origin` prints `no-push:\/\/the-trial`/.test(one), "the clone keeps its remote, its push address is blocked, and the block is checked by reading it", one);
 ok(/Never check it by trying a push/.test(one) && !/(try|attempt)[a-z]* (a|to) push(?! and waiting)/i.test(text.replace("Never check it by trying a push and waiting for a refusal", "")), "no step asks for a push expected to be refused, which on a project the account can write goes through (release 6's fault)");
 ok(/Nothing is written to the project's repository but the draft step 6 opens/.test(one), "nothing is written to a project but the draft in the owner's own");
-ok(/floor rule 18/.test(one) && /`gh auth status` fails/.test(one) && /git credential fill/.test(one) && /run nothing of it/.test(one) && /only through `<scratch>\/core\/scripts\/check\.mjs`/.test(one), "another owner's code runs only where no sign-in answers, and only through the release's check.mjs");
+ok(/floor rule 18/.test(one) && /`gh auth status` fails/.test(one) && /git credential fill/.test(one) && /none in its files, and none its network adds/.test(one) && /Where that is not shown[^.]*run nothing of it/.test(one) && /only through `<scratch>\/core\/scripts\/check\.mjs`/.test(one), "another owner's code runs only where no sign-in answers, and only through the release's check.mjs");
 ok(/outside every repository/.test(step(0)) && new RegExp(`checkout --detach ${SHA}`).test(step(0)), "the scratch folder lies outside every repository, and the core is cloned at the commit tried");
 
 // the toolchain, the run before the sync and the run after it, in that order
@@ -49,7 +49,12 @@ ok(/git stash pop/.test(step(7)) && /never pushed/.test(step(7)) && /--own --ver
 ok(/pure-sync\.mjs --trial [0-9a-f]{40} > <scratch>\/<name>-sync\.txt/.test(step(5)) && /stops no cut; a trial recorded without it for a project does/.test(step(5)), "the sync's reading is taken against the commit tried, to a file outside every repository");
 const six = step(6);
 ok(/agents-stop/.test(six) && /draft=true/.test(six) && /pinned to 0123456/.test(six) && /takes it once the release is cut/.test(six) && /never the steps' writes, never marked ready, never merged before the cut/.test(six), "the draft is opened only where the stop switch does not stand, pinned, the pure sync alone, never ready or merged before the cut", six);
-ok(new RegExp(`trial-draft\\.mjs <owner>/<name> none ${SHA}`).test(six) && /move the same draft forward/.test(six), "another owner's project, or one behind its stop switch, takes the reading of none, and a new commit moves the same draft");
+ok(new RegExp(`trial-draft\\.mjs <owner>/<name> none ${SHA}`).test(six), "another owner's project, or one behind its stop switch, takes the reading of none");
+const later = brief("fedcba9876543210fedcba9876543210fedcba98", OWN);
+const branches = t => [...t.matchAll(/(?:switch -c|refs\/heads\/|head=)([\w-]+)/g)].map(m => m[1]);
+ok(branches(text).join() === branches(later).join() && branches(text).includes("core-trial") && /--force HEAD:refs\/heads\/core-trial`/.test(six) && /open no second draft/.test(six) && /fresh scratch folder/.test(six), "a trial moved to a newer commit pushes to the same branch, so the same draft moves forward, from a fresh scratch folder, and no second draft is opened (#1334)", branches(text).join());
+ok(/switch -c core-trial-after/.test(step(7)) && /stays the pure sync/.test(step(7)) && !/core-trial-after/.test(six), "the steps' writes are committed on a branch of their own, never the draft's, so a retry pushes the pure sync alone");
+ok(/another owner, run `node <scratch>\/core\/scripts\/check\.mjs` with the same options instead, as in step 3, never the copy's/.test(step(7)), "the run after runs another owner's project through the release's check.mjs, as the run before does");
 
 // the record
 const eight = step(8);
@@ -64,8 +69,8 @@ ok(!missing.length, "each option the brief gives a script is one that script rea
 
 // the projects found through gh: the account's own that pin a copy, not the core, not another's
 {
-  const manifest = Buffer.from(`# Core manifest\n\nCore: HaakTuah/agent-core at ${SHA}, copied whole under core/ (never edited here).\n`).toString("base64");
-  const repos = [{ full_name: "example-owner/game-one", private: true, owner: { login: "example-owner" } }, { full_name: "example-owner/notes", private: false, owner: { login: "example-owner" } }, { full_name: "friend/shared", private: true, owner: { login: "friend" } }, { full_name: "HaakTuah/agent-core", private: false, owner: { login: "example-owner" } }];
+  const manifest = Buffer.from(`# Core manifest\n\nCore: ${CORE} at ${SHA}, copied whole under core/ (never edited here).\n`).toString("base64");
+  const repos = [{ full_name: "example-owner/game-one", private: true, owner: { login: "example-owner" } }, { full_name: "example-owner/notes", private: false, owner: { login: "example-owner" } }, { full_name: "friend/shared", private: true, owner: { login: "friend" } }, { full_name: CORE, private: false, owner: { login: "example-owner" } }];
   const gh = (...a) => {
     if (a[0] === "user") return "example-owner\n";
     if (a[0].startsWith("user/repos")) return JSON.stringify(a[0].includes("page=1") ? repos : []);
@@ -74,19 +79,22 @@ ok(!missing.length, "each option the brief gives a script is one that script rea
     throw new Error("gh: Not Found (HTTP 404)");
   };
   const got = briefFor(SHA, [OTHER], gh);
-  ok(got.text?.includes("`example-owner/game-one`, the owner's own") && !/example-owner\/notes|friend\/shared|`HaakTuah\/agent-core`, the owner's/.test(got.text), "of what gh lists, only the account's own repositories whose manifest pins a copy are the owner's projects", got.why ?? "");
+  ok(got.text?.includes("`example-owner/game-one`, the owner's own") && !/example-owner\/notes|friend\/shared/.test(got.text) && !got.text.includes(`\`${CORE}\`, the owner's`), "of what gh lists, only the account's own repositories whose manifest pins a copy are the owner's projects", got.why ?? "");
   const down = briefFor(SHA, [], () => { throw new Error("gh: connection refused"); });
   ok(!down.text && /nothing read is not none found\. Mend: run it again where gh answers/.test(down.why ?? ""), "where gh gives no answer, no brief, and the mend says why");
+  const empty = briefFor(SHA, [], (...a) => a[0] === "user" ? "example-owner\n" : a[0].startsWith("user/repos") ? "[]" : gh(...a));
+  ok(!empty.text && /Mend: run it again where gh answers/.test(empty.why ?? ""), "where gh lists no repository at all, no brief, never one that records a trial of none");
   ok(/Mend: give --other only for a project of another owner/.test(briefFor(SHA, ["Example-Owner/game-one"], gh).why ?? ""), "an --other that names one of the owner's own projects is refused");
   const asked = [];
   const named = briefFor(SHA, [], (...a) => { asked.push(a[0]); if (a[0].startsWith("user/repos")) throw new Error("gh: listing refused (HTTP 403)"); if (a[0] === "repos/example-owner/game-two") return JSON.stringify({ full_name: "example-owner/game-two", private: false, owner: { login: "example-owner" }, permissions: { push: true } }); return gh(...a); }, ["example-owner/game-two"]);
   ok(named.text?.includes("`example-owner/game-two`, the owner's own") && !named.text.includes("game-one") && !asked.some(r => r.startsWith("user/repos")), "with --repo, the repositories named are read in place of the account's list", named.why ?? asked.join(" "));
 }
 
-// the script itself: each refusal says its mend, and nothing is written
+// the command line: each refusal says its mend, and gives no brief
+const never = () => { throw new Error("gh is not asked for a command line it refuses"); };
 for (const [args, what] of [[["abc"], "a commit that is no full SHA"], [[SHA, "--other"], "an --other with no name"], [[SHA, "--other", "no-slash"], "an --other that is no repository"], [[SHA, "--repo", "--other", "a/b"], "a --repo with no name"], [[SHA, "--loose"], "an option it does not take"]]) {
-  const r = spawnSync(process.execPath, [path.join(ROOT, "scripts", "trial-brief.mjs"), ...args], { encoding: "utf8", env: { ...process.env, GH_TOKEN: "" } });
-  ok(r.status === 1 && mended(r.stdout + r.stderr) && !r.stdout.trim(), `${what} is refused, its failure saying the mend, and no brief printed`, r.stderr);
+  const r = run(args, never);
+  ok(!r.text && mended(`FAIL: ${r.why}`), `${what} is refused, its failure saying the mend, and no brief given`, r.why ?? r.text);
 }
 
 console.log(`${count} assertions on the trial's brief${failed ? `, ${failed} failed` : ""}`);
