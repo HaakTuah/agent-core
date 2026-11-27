@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
-import { FOLDER, answer, asked, granted, items, repoOf, report, whoOf } from "../scripts/inbox.mjs";
+import { FOLDER, answer, asked, granted, items, namesNoHost, repoOf, report, whoOf } from "../scripts/inbox.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -23,6 +23,10 @@ ok(repoOf("https://github.com/someone/a-game") === "someone/a-game" && repoOf("h
 "origin's address on github.com names the repository, in each form git writes it");
 ok([null, "", "https://gitlab.com/someone/x", "/tmp/x.git", "https://github.com.evil.example/someone/x", "https://github.com/someone", "https://github.com/../user", "https://github.com/someone/.."].every(u => repoOf(u) === null),
   "another host, a path, a look-alike host, an address with no repository or a part that is only dots names none");
+ok(["https://github.com/a/b", "https://u@github.com/a/b.git", "git@github.com:a/b.git", "ssh://git@github.com/a/b", "https://gitlab.com/a/b"].every(u => !namesNoHost(u, false) && !namesNoHost(u, true))
+  && ["", "  ", "/tmp/x", "../x", "a-game", "file:///x", "FILE:/x"].every(u => namesNoHost(u, false) && namesNoHost(u, true))
+  && !namesNoHost("g:/x", false) && namesNoHost("g:/x", true) && namesNoHost("c:\\x", true),
+  "an origin that names a host is read so on any system; one that is none or a folder names none; a drive's letter is a folder on Windows alone");
 
 const on = { has_issues: true, permissions: { pull: true, triage: true } };
 ok(answer(on).yes && answer({ ...on, permissions: { push: true } }).yes, "issues on and the right to triage or more: yes");

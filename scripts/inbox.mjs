@@ -29,14 +29,15 @@ const LIST = parseBounded(fs.readFileSync(new URL("./labels.json", import.meta.u
 export const STATES = Object.keys(LIST.state);
 export const SENDERS = Object.keys(LIST.sender).map(s => s.replace(/^by:/, ""));
 
+// Whether an origin's address names no host: none, or a folder on this machine (a path, or `file:`), as a release's trial
+// clones a project from a folder; git reads an address with no scheme and no `host:` before its first "/" as a path,
+// and on Windows one that starts with a drive's letter too.
+export const namesNoHost = (url, windows = process.platform === "win32") => {
+  const u = String(url ?? "").trim();
+  return !u || /^file:/iu.test(u) || (!/^[a-z][a-z0-9+.-]*:\/\//iu.test(u) && ((windows && /^[a-z]:[\\/]/iu.test(u)) || !/^[^/]*:/u.test(u)));
+};
 // The repository origin's address names on github.com ("owner/name"), or null: another host, or no origin.
 // (each part a name, never "." or "..", so the call goes to that repository's route alone)
-// Whether an origin's address names no host: none, or a folder on this machine (a path, or `file:`), as a release's trial
-// clones a project from a folder; git reads an address with no scheme and no `host:` before its first "/" as a path.
-export const namesNoHost = url => {
-  const u = String(url ?? "").trim();
-  return !u || /^file:/iu.test(u) || (!/^[a-z][a-z0-9+.-]*:\/\//iu.test(u) && (/^[a-z]:[\\/]/iu.test(u) || !/^[^/]*:/u.test(u)));
-};
 export const repoOf = url => {
   const repo = /^(?:https:\/\/(?:[^@/]+@)?github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(String(url ?? "").trim())?.[1] ?? null;
   return aRepository(repo) ? repo : null;
