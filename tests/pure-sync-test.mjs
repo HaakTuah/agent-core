@@ -68,6 +68,7 @@ write(theCore, "scripts/steps/997-a-partly-note.mjs", 'import { COST } from "../
 // (and one the manifest's "Differences" leaves undone on purpose, which no check reads done, so it stays in full)
 write(theCore, "setup/sync-notes/996-a-declared-note.md", "- **13 November 2026, a declared note.** Asked of every project; this one leaves it undone on purpose.\n");
 write(theCore, "scripts/steps/996-a-declared-note.mjs", 'import { COST } from "../step-checks.mjs";\n\nexport default { lead: "13 November 2026, a declared note", cost: COST.line, check: () => "the declared note is not done. Mend: do it" };\n');
+write(theCore, "tests/only-in-b-test.mjs", "// a test B gains, which the copy never holds\n"); // (#1361, point 7)
 const B = commit("B");
 const SIDE = git(theCore, "commit-tree", `${B}^{tree}`, "-p", B, "-m", "off main");
 // (packed once: every later fetch, clone and archive of the core reuses the pack, where the loose objects each time are compressed again, which was about half of a run's time in them; #812)
@@ -112,6 +113,8 @@ git(p, "checkout", "-q", "-b", "sync");
 const s = (r => ({ status: r.status, out: `${r.stdout}${r.stderr}` }))(spawnSync(process.execPath, ["core/scripts/sync.mjs", ...process.platform === "win32" ? [B] : []], { cwd: p, env: greenEnv, encoding: "utf8" }));
 const calls = read(p, ".github/workflows/core.yml");
 ok(s.status === 0 && s.out.includes(`${SHA(A)} -> ${SHA(B)}`) && read(p, "core-manifest.md") === manifest(OWNER, B), "the sync takes a project that follows main to the core's newest commit, and moves the manifest's pin", s.out);
+const copied = git(theCore, "diff", "--name-only", copyTree(A, coreRepo), copyTree(B, coreRepo)).split("\n").filter(Boolean).length;
+ok(new RegExp(`${SHA(A)} -> ${SHA(B)} \\(${copied} files? changed`).test(s.out) && copied > 0, "  it counts the files of the copy alone, never one of the tests the core keeps to itself (#1361, point 7)", s.out);
 ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) && s.out.includes("personal-terms.yml"), "  it moves a call whose workflow changed, and leaves one whose workflow did not", calls);
 ok(s.out.includes("Done when nothing: an entry that B gains over A."), "  and prints the sync notes the core gained between the two pins", s.out);
 ok(s.out.includes("- 13 November 2026, a done note: done here, as its step reads.") && !s.out.includes("as it always does"), "  each whose step the new copy reads done here by its lead alone (#1264)", s.out);
