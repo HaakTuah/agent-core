@@ -15,7 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { failures, mended, unmended } from "../scripts/mend.mjs";
-import { ANSWERS } from "../scripts/check-runs.mjs";
+import { ANSWERS } from "../scripts/check-runs-read.mjs";
 import { folders, partsIn, whole } from "../scripts/inventory.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -266,12 +266,12 @@ const hostile = fs.readdirSync(path.join(root, "tests")).filter(f => /^hostile-.
 ok(hostile.length > 0, `the hostile tests are found${hostile.length ? "" : ". Mend: run the test from the core's clone, where tests/hostile-*-test.mjs stand"}`);
 for (const f of hostile) {
   const text = fs.readFileSync(path.join(root, "tests", f), "utf8");
-  const watched = !/from "node:child_process"/u.test(text);
+  const watched = !/["'`](?:node:)?child_process["'`]/u.test(text);
   ok(watched, `tests/${f} runs what it starts through scripts/check-runs.mjs${watched ? ""
     : `. Mend: in tests/${f}, import spawnSync and execFileSync from "../scripts/check-runs.mjs" in place of "node:child_process"`}`);
 }
 const answerFaults = [...ANSWERS].filter(a => a in CHECKS || !fs.existsSync(path.join(root, a)));
-ok(answerFaults.length === 0, `each proof whose exit code is its answer is there and no check${answerFaults.length ? `: not so for ${answerFaults.join(", ")}. Mend: take it out of ANSWERS in scripts/check-runs.mjs` : ""}`);
+ok(answerFaults.length === 0, `each proof whose exit code is its answer is there and no check${answerFaults.length ? `: not so for ${answerFaults.join(", ")}. Mend: take it out of ANSWERS in scripts/check-runs-read.mjs` : ""}`);
 
 console.log(`${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

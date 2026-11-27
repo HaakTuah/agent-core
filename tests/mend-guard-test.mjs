@@ -1,25 +1,19 @@
 // Tests the guard each check's entry runs through and the watch on the hostile tests' runs (scripts/mend.mjs,
-// scripts/check-runs.mjs; AGENTS.md, "A check that fails says the mend"; #1140): an error a check did not catch fails
+// scripts/check-runs.mjs, scripts/check-runs-read.mjs; AGENTS.md, "A check that fails says the mend"; #1140): an error a check did not catch fails
 // with its mend, a mend that names a script to run names one there from the folder the check ran in, and a run that
 // fails with no failure line, or one that says no mend, is a fault. tests/mend-test.mjs holds that each check starts
 // through the guard and each hostile test through the watch. Node's own modules.
 //
 //   node tests/mend-guard-test.mjs
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { missing, mended, unknown } from "../scripts/mend.mjs";
-import { faultsOf, scriptOf, spawnSync } from "../scripts/check-runs.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { guard, missing, mended, unknown } from "../scripts/mend.mjs";
+import { faultsOf, optionsOf, scriptOf } from "../scripts/check-runs-read.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what) => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}`); } };
-// Node run in a folder, on its scripts/c.mjs where no arguments are given: its exit code and its output as one text
-const execFileSyncOr = (at, args = ["scripts/c.mjs"]) => {
-  try { return { status: 0, out: execFileSync(process.execPath, args, { cwd: at, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) }; }
-  catch (e) { return { status: e.status, out: `${e.stdout ?? ""}${e.stderr ?? ""}` }; }
-};
-
 // a mend that names a script to run names one that is there from the folder the check ran in (#1140, point 3)
 {
   const at = scratchDir("mend-paths-");
@@ -41,20 +35,29 @@ const execFileSyncOr = (at, args = ["scripts/c.mjs"]) => {
     && mended(unknown("scripts/a.mjs", "a string thrown\nits second line")) && mended(unknown("scripts/a.mjs", new Error(""))),
     "an error not caught is worded as a failure with its mend, of any kind and with any message");
   ok(unknown("scripts/a.mjs", new Error("FAIL: b. Mend: do this here.")) === "FAIL: b. Mend: do this here.", "an error whose message is a mended failure is said as it stands");
-  const at = scratchDir("mend-guard-");
-  fs.mkdirSync(path.join(at, "scripts"), { recursive: true });
-  const mendUrl = new URL("../scripts/mend.mjs", import.meta.url).href;
-  const ways = { thrown: 'throw new RangeError("Maximum call stack size exceeded");', rejected: 'await Promise.reject(new Error("fatal: pathspec \':(top)../x\' is outside repository"));', later: 'setTimeout(() => { JSON.parse("{"); });' };
-  for (const [way, body] of Object.entries(ways)) {
-    fs.writeFileSync(path.join(at, "scripts/c.mjs"), `import { guard } from ${JSON.stringify(mendUrl)};\nif (guard(import.meta.url)) { ${body} }\n`);
-    const r = execFileSyncOr(at);
-    ok(r.status === 1 && mended(r.out) && /FAIL: scripts\/c\.mjs stopped on an error it does not know: /u.test(r.out) && !/^\S.*\n\s*\^\s*$/mu.test(r.out),
-      `a check whose entry runs through guard() fails with its mend on an error ${way} it did not catch, not Node's own trace`);
+  const hostile = unknown("scripts/a.mjs", new Error("bad https://u:p@h.invalid/x\n::warning::x")), passed = unknown("scripts/a.mjs", new Error("FAIL: c. Mend: do it now.\n::error::y"));
+  ok(mended(hostile) && mended(passed) && !/u:p@/u.test(hostile) && !/^\s*::/mu.test(hostile) && !/^\s*::/mu.test(passed),
+    "an error's words are printed as the log reads text alone: no address's sign-in, and no workflow command at a line's start");
+  // (the events Node raises for an error nothing caught, raised here, the process's exit and its stderr stood in for)
+  const events = ["uncaughtException", "unhandledRejection"], before = events.map(e => process.listeners(e));
+  ok(guard(new URL("../scripts/not-started.mjs", import.meta.url).href) === false && events.every((e, i) => process.listenerCount(e) === before[i].length),
+    "a check imported by another, not started, runs no entry and installs no guard");
+  const file = fileURLToPath(new URL("../scripts/c.mjs", import.meta.url)), [argv, exit, write] = [process.argv[1], process.exit, process.stderr.write];
+  const said = [], codes = [];
+  let installed = false;
+  try {
+    process.argv[1] = file;
+    installed = guard(pathToFileURL(file).href);
+    process.exit = code => { codes.push(code); };
+    process.stderr.write = text => { said.push(String(text)); return true; };
+    process.emit("uncaughtException", new RangeError("Maximum call stack size exceeded"));
+    process.emit("unhandledRejection", new Error("fatal: pathspec ':(top)../x' is outside repository"), Promise.resolve());
+  } finally {
+    [process.argv[1], process.exit, process.stderr.write] = [argv, exit, write];
+    events.forEach((e, i) => process.listeners(e).filter(l => !before[i].includes(l)).forEach(l => process.off(e, l)));
   }
-  fs.writeFileSync(path.join(at, "scripts/c.mjs"), `import { guard } from ${JSON.stringify(mendUrl)};\nif (guard(import.meta.url)) { throw new RangeError("x"); }\n`);
-  const bare = execFileSyncOr(at, ["--input-type=module", "-e", `import ${JSON.stringify(new URL("scripts/c.mjs", `file://${at}/`).href)}; console.log("imported");`]);
-  ok(bare.status === 0 && /imported/u.test(bare.out), "a check imported by another, not started, runs no entry and installs no guard");
-  fs.rmSync(at, { recursive: true, force: true });
+  ok(installed && codes.join() === "1,1" && said.length === 2 && said.every(t => mended(t) && /^FAIL: (?:.*\/)?scripts\/c\.mjs stopped on an error it does not know: /u.test(t)),
+    "a check whose entry runs through guard() fails with its mend and exit code 1 on an error thrown or rejected that it did not catch, not Node's own trace");
 }
 
 // the runs the hostile tests make, read (#1140, point 2)
@@ -72,10 +75,10 @@ ok(scriptOf(process.execPath, ["core/scripts/a.mjs", "--x"]) === "core/scripts/a
 }
 {
   let refused = "";
-  try { spawnSync(process.execPath, ["-e", "1"], { shell: true }); } catch (e) { refused = e.message; }
-  const r = spawnSync(process.execPath, ["-e", "process.stdout.write(process.argv[1])", "a; echo b"], { encoding: "utf8" });
-  ok(/no option shell/u.test(refused) && r.stdout === "a; echo b",
-    "a run asks no shell: an option the watch does not name is refused, and what it starts is the program and its arguments alone");
+  try { optionsOf({ shell: true }); } catch (e) { refused = e.message; }
+  const picked = optionsOf({ cwd: "x", encoding: "utf8" });
+  ok(/no option shell/u.test(refused) && picked.shell === false && picked.cwd === "x" && Object.keys(picked).length === 3,
+    "a run asks no shell: an option the watch does not name is refused, and the options it takes are those it names, with no shell");
 }
 
 console.log(`${count - failed} of ${count} passed`);

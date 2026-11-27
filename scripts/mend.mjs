@@ -6,7 +6,7 @@
 // files, the lines), read with it. Each check's own test reads its failures here (tests/mend-test.mjs holds that it
 // does). A check's entry runs through guard(), so that an error it did not catch fails with its mend too (#1140, point
 // 1); and a mend that names a script to run (`node <path>`) names one that is there from the folder the check ran in,
-// where the caller gives that folder (point 3). Node's own modules only.
+// where the caller gives that folder (point 3). Node's own modules, guards.mjs and started.mjs beside it.
 //
 //   import { guard, mended, unmended } from "./mend.mjs";
 //   if (guard(import.meta.url)) { ... }      (a check's entry, in place of started())
@@ -14,6 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { logged, loggedAlone, loggedCause } from "./guards.mjs";
 import { started } from "./started.mjs";
 
 export const MEND = "Mend: ";
@@ -38,10 +39,11 @@ const RUN = /\bnode\s+((?:\.{1,2}\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:mjs|cjs|js|sh))(?
 export function missing(output, from) {
   const gone = [];
   for (const line of failures(output)) {
-    const mend = line.slice(line.indexOf(MEND) + MEND.length);
     if (!line.includes(MEND)) continue;
-    for (const [, file] of mend.matchAll(RUN)) {
-      if (mend.includes(`-f ${file}`) || fs.existsSync(path.resolve(from, file))) continue;
+    const mend = line.slice(line.indexOf(MEND) + MEND.length);
+    for (const run of mend.matchAll(RUN)) {
+      const file = run[1];
+      if (mend.slice(0, run.index).includes(`-f ${file}`) || fs.existsSync(path.resolve(from, file))) continue;
       gone.push(`${file} (in: ${line.slice(0, 200)})`);
     }
   }
@@ -55,14 +57,16 @@ export function mended(output, { from } = {}) {
 }
 
 // The failure a check gives for an error it did not catch: a parser's abort, a raw error of git's, a RangeError.
-// An error whose message is a failure that says its mend already is printed as it stands.
+// An error whose message is a failure that says its mend already is printed as it stands, on its one line. Its words
+// may come from a project's file (a parse error's excerpt), so each is printed as the log reads text alone, any
+// address's sign-in cut out (guards.mjs: loggedAlone, loggedCause, logged; floor rule 1).
 export function unknown(script, error) {
-  const said = error instanceof Error ? error.message || error.name : String(error);
-  if (mended(said)) return String(said);
-  const [first, ...rest] = String(said).split(/\r?\n/u);
+  const said = String(error instanceof Error ? error.message || error.name : error);
+  if (mended(said)) return loggedAlone(said);
+  const [first, ...rest] = said.split(/\r?\n/u);
   const stack = error instanceof Error && typeof error.stack === "string" ? error.stack.split(/\r?\n/u).filter(l => /^\s+at /u.test(l)).slice(0, 5) : [];
-  return [`FAIL: ${script} stopped on an error it does not know: ${first.trim() || "(no message)"}. ${MEND}run it again; if it fails the same way, file a bug with this line.`,
-    ...rest.map(l => `  ${l}`), ...stack.map(l => `  ${l.trim()}`)].join("\n");
+  return [`FAIL: ${script} stopped on an error it does not know: ${loggedCause(first.trim()) || "(no message)"}. ${MEND}run it again; if it fails the same way, file a bug with this line.`,
+    ...rest.map(l => `  ${logged(l)}`), ...stack.map(l => `  ${logged(l.trim())}`)].join("\n");
 }
 
 // A script as a mend names it: its path from the folder it runs in ("core/scripts/x.mjs" in a project, "scripts/x.mjs"

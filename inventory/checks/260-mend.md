@@ -1,4 +1,4 @@
-- `scripts/mend.mjs`, `scripts/inventory.mjs`, `scripts/check-runs.mjs`, `tests/mend-guard-test.mjs`: the form of a check's failure, a line that opens
+- `scripts/mend.mjs`, `scripts/inventory.mjs`, `scripts/check-runs.mjs`, `scripts/check-runs-read.mjs`, `tests/mend-guard-test.mjs`: the form of a check's failure, a line that opens
   `FAIL` and says the mend, which every check's test reads, the guard each check's entry runs through for an error it
   did not catch, and the watch on each run the hostile tests make, the last file testing those two (#1140); its test holds each check of the core to a test that reads its mends, each
   tracked file to a line of this inventory or a path it leaves out, and this inventory to its challenge, reading it
