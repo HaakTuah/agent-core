@@ -170,6 +170,7 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
   fs.writeFileSync(path.join(linkedIn, "manifest.md"), copied()); relinked(linkedIn, "manifest.md");
   relinked(linkedOut, path.join(tmp, "outside-manifest.md"));
   const device = process.platform === "win32" ? null : relinked(projectWith(copied()), "/dev/zero");
+  const none = projectWith(copied()); fs.rmSync(path.join(none, "core-manifest.md")); git(none, "add", "-A"); git(none, "commit", "-q", "-m", "no manifest");
   // (one step, the same in core.yml and each workflow a project calls)
   const stepOf = text => /^ {6}- name: The manifest is a file of the checkout's own, where one stands\n(?: {8}.*\n|\n)*?(?= {6}- )/mu.exec(text)?.[0] ?? null;
   const guards = ["core.yml", ...CALLED].map(f => stepOf(fs.readFileSync(fileURLToPath(new URL(`../.github/workflows/${f}`, import.meta.url)), "utf8")));
@@ -187,6 +188,7 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
     // (the manifest is read only as a regular file of the checkout's own within a mebibyte, a link to one there too)
     const guard = r => r.steps.find(x => x.name === GUARD) ?? { passed: false, out: "no such step" };
     ok(guard(job(usual)).passed && guard(job(linkedIn)).passed, `${f}: a manifest that is a file of the project's own, or a link to one, is read`, guard(job(linkedIn)).out);
+    ok(guard(job(none)).passed, `${f}: a checkout with no manifest, as the core's own, passes the guard`, guard(job(none)).out);
     for (const [what, dir] of [["a tracked link leading out of the checkout", linkedOut], ["a file past the bound", big], ...(device ? [["a tracked link to a device", device]] : [])]) {
       const r = job(dir), g = guard(r);
       ok(!g.passed && mended(g.out) && /core-manifest\.md is no regular file of this repository's own/.test(g.out) && !r.steps.some(x => x.ran && /Where the core's copy stands/.test(x.name)), `${f}: a manifest that is ${what} fails before it is read, saying the mend`, g.out);

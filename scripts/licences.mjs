@@ -331,9 +331,9 @@ function ownRead(root, f) {
   if (text !== null) return { text };
   let st;
   try { st = statSync(at); } catch { return { text: null }; }
-  return { unread: st.isFile()
-    ? `${f} is past ${BOUND} bytes, the most this check reads, so it is not read. Mend: keep it within ${BOUND} bytes`
-    : `${f} is no regular file (a folder, a device or a pipe), so it is not read. Mend: make it a file of the project's own, there` };
+  return { unread: !st.isFile() ? `${f} is no regular file (a folder, a device or a pipe), so it is not read. Mend: make it a file of the project's own, there`
+    : st.size > BOUND ? `${f} is past ${BOUND} bytes, the most this check reads, so it is not read. Mend: keep it within ${BOUND} bytes`
+    : `${f} cannot be read. Mend: make it a file the check's user may read, then run the check again` };
 }
 /** The text of the project's own file at `f`, "" where nothing stands there; one ownRead does not read is refused. */
 function ownText(root, f) {
@@ -395,7 +395,7 @@ export function loadConfig(path, root = null) {
 function configRead(path, root) {
   if (root !== null && leadsOut(root, resolve(path))) throw new Error(`the config ${path} is reached through a link that leads out of the project, so it is not read. Mend: make it a file of the project's own, in place of the link`);
   const text = regularText(path, { bound: BOUND });
-  if (text === null && isFile(path)) throw new Error(`the config ${path} is past ${BOUND} bytes, the most this check reads, so it is not read. Mend: keep it within ${BOUND} bytes`);
+  if (text === null && isFile(path) && statSync(path).size > BOUND) throw new Error(`the config ${path} is past ${BOUND} bytes, the most this check reads, so it is not read. Mend: keep it within ${BOUND} bytes`);
   let config;
   try { config = JSON.parse(text ?? ""); } catch { throw new Error(`cannot read the config ${path} as JSON. Mend: name the config the licence workflow is given, and write it as JSON`); }
   if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("the config is not a JSON object. Mend: write it as one, as the starter kit writes it");
