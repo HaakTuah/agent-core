@@ -218,12 +218,17 @@ const node = (coreAt, script, args, opts) => run(process.execPath, [`${coreAt}sc
 const shown = { stdio: ["ignore", "inherit", "inherit"] };
 // (Windows' shell, by the path the system names, never a cmd.exe the checked-out folder holds)
 const COMSPEC = process.env.ComSpec || "cmd.exe";
-const passed = (r, cwd) => begun(r, "The package manager", cwd, "install npm beside Node (the script that fetches Node brings Node alone), then run this check again.");
+// (the mend only where npm itself is not on this machine; on Windows what fails to start is the shell: #1361, point 9)
+const passed = (r, cwd) => begun(r, "The package manager", cwd, process.platform !== "win32" && r.error?.code === "ENOENT"
+  ? "install npm beside Node (the script that fetches Node brings Node alone), then run this check again." : "");
 // (only under an npm that reads each setting that keeps the install to the registry: an older one, npm 10 that Node 22
 // brings among them, ignores them without a word and would fetch any git, web or file source the lock file names; #704)
 const ALLOWS = ["allow-git", "allow-remote", "allow-file"];
 function unread(cwd) {
-  const version = npmVersion(cwd), ignored = npmIgnores(version, ALLOWS);
+  const version = npmVersion(cwd);
+  // (a version not read where npm cannot be started at all is a machine that lacks npm, not one too old: #1361, point 9)
+  if (!version && process.platform !== "win32") { const at = spawnSync("npm", ["--version"], { cwd }); if (at.error) return !passed(at, cwd); }
+  const ignored = npmIgnores(version, ALLOWS);
   if (!ignored.length) return false;
   // (the mend's command names the least npm written out, so the licence scan reads it; checks-test.mjs holds it to `least`)
   const least = npmReadsAll(ALLOWS);
