@@ -144,7 +144,7 @@ function main(argv) {
     console.log(dueness(r, closedSince(CORE, r.release.at), new Date().toISOString()).said);
     return 0;
   } catch (e) {
-    console.error(`FAIL: whether a release's trial is due could not be read: ${String(e.message).slice(0, 300)}. Mend: run it from a clone of the core with its whole history and tags (git fetch --unshallow --tags), and with gh signed in`);
+    console.error(`FAIL: whether a release's trial is due could not be read: ${String(e.message).slice(0, 300)}. Mend: run it from a clone of the core with its whole history and tags (git fetch --tags, with --unshallow where the clone is shallow), and with gh signed in`);
     return 1;
   }
 }
