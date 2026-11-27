@@ -1,6 +1,7 @@
 // Tests of the orchestrator's lease (scripts/lease.mjs; core/tasks/tools.md, "One orchestrator works a queue";
 // #1106): a fresh lease of another session stops the wake, a stale one is claimed, a hand-over note stops the old
-// holder whatever it names and lets the session it names take it, what is read alone says whether the holder's last wake is over an hour
+// holder whatever it names and lets the session it names take it, a lasting refusal of gh's sign-in lets the wake go
+// on, comments the bound or gh's buffer cuts short read the lease as unread, an edited comment reads as none, what is read alone says whether the holder's last wake is over an hour
 // old, only the owner's account's comments and the lease issue it opened under the lease's title count, a session
 // gh signs in as another account writes nothing, where no lease can stand the wake goes on, the issue is locked as it
 // opens, the newest comments are read however many stand, the lease comment and the note it writes read back as written, and the
@@ -9,7 +10,7 @@
 //
 //   node tests/lease-test.mjs
 import { toolOf } from "../scripts/stand-in-record.mjs";
-import { COLD_MINUTES, ISSUE_TITLE, LABEL, OPENER, TERM_HOURS, TITLE, decide, dueIssue, entriesOf, entryOf, faults, frame, handOverText, holding, hostOf, leaseIssues, leaseText, main, optionsOf, said } from "../scripts/lease.mjs";
+import { COLD_MINUTES, ISSUE_TITLE, LABEL, OPENER, PAGES, PER_PAGE, SENDER, TERM_HOURS, TITLE, chosenIssue, decide, dueIssue, entriesOf, entryOf, faults, frame, handOverText, holding, hostOf, leaseIssues, leaseText, main, optionsOf, refusalOf, said } from "../scripts/lease.mjs";
 import { DUE, dueContext } from "../scripts/look.mjs";
 import { LIST, STATES } from "../scripts/labels.mjs";
 import { STATES as ITEM_STATES } from "../scripts/inbox.mjs";
@@ -96,15 +97,16 @@ const entries = (...cs) => entriesOf(cs, OWNER);
 }
 
 // ---- main against a stand-in host ----
-function standIn(comments = [], issues = [{ number: 7 }], { login = OWNER, repository = { has_issues: true } } = {}) {
-  const written = [], opened = [];
+function standIn(comments = [], issues = [{ number: 7 }], { login = OWNER, repository = { has_issues: true }, lockable = true } = {}) {
+  const written = [], opened = [], locks = [];
   return {
-    written, opened,
+    written, opened, locks,
     host: repo => ({
       repository: () => repository,
       login: () => login,
       issues: owner => (repo === REPO && owner === OWNER ? issues : []),
       comments: () => comments,
+      lock: n => { locks.push(n); return { locked: lockable, why: lockable ? "" : "HTTP 403" }; },
       open: tool => { opened.push(tool); issues.push({ number: 8 }); return { number: 8, comments: 0, locked: true, why: "" }; },
       comment: (n, body) => { written.push({ n, body }); comments.push(comment(body, T0)); return {}; },
     }),
@@ -148,8 +150,33 @@ const run = (argv, s) => { const out = []; const code = main(argv, { host: s.hos
   const off = standIn([], [], { repository: { has_issues: false } });
   const r8 = run(["--session", "session_a", "--tool", "claude"], off);
   ok(r8.code === 0 && r8.out.startsWith("No lease can stand here") && r8.out.includes("goes on") && off.opened.length === 0, "a project whose issues are switched off keeps its orchestrator: the wake goes on", r8.out);
-  const absent = { host: () => ({ repository: () => { throw Object.assign(new Error("gh could not read repos/x"), { absent: true }); } }) };
+  const absent = { host: () => ({ repository: () => { throw Object.assign(new Error("gh could not read repos/x"), { refused: refusalOf({ error: { code: "ENOENT" } }, "repos/x/y") }); } }) };
   ok(run(["--session", "session_a", "--tool", "claude"], absent).code === 0, "where gh is not here at all, the wake goes on too");
+  // gh refused by its sign-in, which only the owner mends, lets the wake go on; a passing fault fails it
+  const refusals = [[{ status: 4, stderr: "To get started with GitHub CLI, please run:  gh auth login" }, "user"], [{ status: 1, stderr: "HTTP 401: Bad credentials" }, "user"], [{ status: 1, stderr: "HTTP 403: Resource not accessible by integration" }, "user"], [{ status: 1, stderr: "HTTP 404: Not Found" }, `repos/${REPO}`]];
+  for (const [r, route] of refusals) {
+    const got = run(["--session", "session_a", "--tool", "claude"], { host: () => ({ repository: () => { throw Object.assign(new Error("gh could not"), { refused: refusalOf(r, route) }); } }) });
+    ok(got.code === 0 && got.out.startsWith("No lease can stand here: gh"), `gh refused (${r.stderr.slice(0, 24)}) lets the wake go on without the lease`, got.out);
+  }
+  ok(refusalOf({ status: 1, stderr: "HTTP 502: Bad Gateway" }, "user") === null && refusalOf({ status: 1, stderr: "HTTP 404: Not Found" }, `repos/${REPO}/issues/7/comments`) === null && refusalOf({ status: null, error: { code: "ETIMEDOUT" } }, "user") === null, "a passing fault, and a 404 past the repository, are no refusal");
+  const errs = [];
+  const err0 = console.error; console.error = l => errs.push(l);
+  const r502 = main(["--session", "session_a", "--tool", "claude"], { host: () => ({ repository: () => { throw Object.assign(new Error("gh could not read repos/x: HTTP 502"), { refused: null }); } }), now: T0, print: () => {}, repo: REPO, owner: OWNER });
+  console.error = err0;
+  ok(r502 === 1 && errs.join(" ").includes("keeps its next only while"), "a passing fault fails the wake, which keeps its next only while work is in flight", errs.join(" "));
+  // an unlocked lease issue is locked again at each wake, and a refusal is said at each
+  const relock = standIn([lease("session_a", T0 - 50 * MIN)], [{ number: 7, locked: false }], { lockable: false });
+  const r11 = run(["--session", "session_a", "--tool", "claude"], relock), r12 = run(["--session", "session_a", "--tool", "claude"], relock);
+  ok(relock.locks.join() === "7,7" && r11.out.includes("could not be locked") && r12.out.includes("could not be locked") && r12.code === 0, "an unlocked lease issue is locked again at each wake, a refusal said at each", r12.out);
+  ok(standIn([], [{ number: 7, locked: true }]).locks.length === 0 && (s => (run(["--session", "session_a", "--tool", "claude"], s), s.locks.length === 0))(standIn([], [{ number: 7, locked: true }])), "a locked one is left as it is");
+  // more than one lease issue: said, and a locked one holding the owner's leases read first
+  const two = standIn([lease("session_b", T0 - 10 * MIN)], [{ number: 3, locked: false }, { number: 5, locked: true }]);
+  const r13 = run(["--session", "session_a", "--tool", "claude"], two);
+  ok(r13.out.includes("2 lease issues stand (#3, #5): it reads #5") && r13.code === 2, "more than one lease issue is said, and the locked one read", r13.out);
+  ok(chosenIssue([{ number: 3, locked: true }, { number: 4, locked: true }], i => i.number === 4).number === 4 && chosenIssue([{ number: 3 }, { number: 4 }]).number === 3, "among locked ones, the one holding the owner's leases; else the lowest");
+  // an edited comment reads as none, since the script never edits its own
+  const edited = { ...lease("session_b", T0 - 10 * MIN), updated_at: iso(T0 - 5 * MIN) };
+  ok(entryOf(edited, OWNER) === null && entryOf({ ...edited, updated_at: edited.created_at }, OWNER) !== null, "a comment edited since it was written reads as none");
   const out9 = [];
   ok(main(["--session", "session_a", "--tool", "claude"], { host: () => { throw new Error("never asked"); }, now: T0, print: l => out9.push(l), repo: null, owner: OWNER, here: () => null }) === 0 && out9.join(" ").startsWith("No lease can stand here"), "and where no repository on github.com stands", out9.join(" "));
   // the issue is locked as it opens, and a lock refused is said, the wake going on
@@ -174,11 +201,27 @@ const run = (argv, s) => { const out = []; const code = main(argv, { host: s.hos
   const flood = Array.from({ length: 1500 }, (_, i) => comment("a remark", T0 - 2 * HOUR + i));
   flood.push(lease("session_b", T0 - 10 * MIN));
   const pages = [];
-  const read = route => { const page = Number(/[?&]page=(\d+)/.exec(route)[1]); pages.push(page); return flood.slice((page - 1) * 100, page * 100); };
+  const read = route => { const page = Number(/[?&]page=(\d+)/.exec(route)[1]); pages.push(page); return flood.slice((page - 1) * PER_PAGE, page * PER_PAGE); };
   const got = hostOf(REPO, read).comments({ number: 7, comments: flood.length }, iso(T0 - 24 * HOUR));
-  ok(pages[0] === 16 && pages.length <= 10 && decide(entriesOf(got, OWNER), "session_a", T0).act === "stop", "past the bound of pages, the newest comments are still read and the lease still found", JSON.stringify(pages));
-  const old = hostOf(REPO, route => (/[?&]page=3\b/.test(route) ? [lease("session_b", T0 - 10 * MIN)] : [comment("old", T0 - 30 * HOUR)])).comments({ number: 7, comments: 201 }, iso(T0 - 24 * HOUR));
+  ok(pages[0] === Math.ceil(flood.length / PER_PAGE) && pages.length <= PAGES && PER_PAGE * 65536 * 4 < 1 << 24 && decide(entriesOf(got, OWNER), "session_a", T0).act === "stop", "past the bound of pages, the newest comments are still read and the lease still found", JSON.stringify(pages));
+  const old = hostOf(REPO, route => (/[?&]page=7\b/.test(route) ? [lease("session_b", T0 - 10 * MIN)] : [comment("old", T0 - 30 * HOUR)])).comments({ number: 7, comments: 7 * PER_PAGE - 9 }, iso(T0 - 24 * HOUR));
   ok(old.length === 2, "it reads back no further than the first comment older than its reach", String(old.length));
+  // an unlocked issue with 1,100 outsiders' comments newer than the lease: the lease is unread, never claimed
+  const crowd = [lease("session_b", T0 - 2 * HOUR), ...Array.from({ length: 1100 }, (_, i) => comment("a remark", T0 - HOUR + i, "an-outsider"))];
+  const writes = [];
+  const crowdRead = route => (route === `repos/${REPO}` ? { has_issues: true } : route === "user" ? { login: OWNER } : route.includes("/issues?") ? [{ number: 7, title: ISSUE_TITLE, user: { login: OWNER }, locked: false, comments: crowd.length }] : (p => crowd.slice((p - 1) * PER_PAGE, p * PER_PAGE))(Number(/[?&]page=(\d+)/.exec(route)[1])));
+  const crowdOut = [];
+  const rc = main(["--session", "session_a", "--tool", "claude"], { host: repo => hostOf(repo, crowdRead, (route, p, m = "POST") => { writes.push(`${m} ${route}`); return null; }), now: T0, print: l => crowdOut.push(l), repo: REPO, owner: OWNER });
+  ok(rc === 0 && !writes.some(w => w.endsWith("/comments")) && writes.includes(`PUT repos/${REPO}/issues/7/lock`) && crowdOut.join(" ").includes("the lease is unread"), "an unlocked issue with 1,100 outsiders' comments newer than the lease claims nothing", `${writes.join("; ")} | ${crowdOut.join(" ")}`);
+  // a page past gh's buffer reads as unread, never as a failure
+  const full = hostOf(REPO, () => { throw Object.assign(new Error("gh could not read"), { overflow: true }); }).comments({ number: 7, comments: 5 }, iso(T0 - 24 * HOUR));
+  ok(Array.isArray(full) && full.length === 0 && full.short === true, "a page past gh's buffer reads as unread, never as a failure");
+  // hostile answers: a body past its length, a null comment, a body that is no string, an answer that is no list
+  ok(entryOf({ ...lease("session_b", T0), body: `${leaseText({ session: "session_b", tool: "claude", builders: 1 })}${" ".repeat(4001)}`.slice(0, 4001) }, OWNER) === null && entryOf(null, OWNER) === null && entryOf({ ...lease("session_b", T0), body: 7 }, OWNER) === null && entriesOf({ length: 1 }, OWNER).length === 0, "a body of 4,001 characters, a null comment, a body that is no string and an answer that is no list read as none");
+  let notList = false;
+  try { hostOf(REPO, () => ({ message: "x" })).comments({ number: 7, comments: 1 }, iso(T0)); } catch { notList = true; }
+  ok(notList && leaseIssues({ length: 1 }, OWNER).length === 0, "comments or issues given as no list read as none, or fail the read");
+  ok(LIST.sender[SENDER] !== undefined, "the lease issue's sender stands in the list of senders");
   // only an issue the owner's account opened under the lease's title is the lease's
   const listed = [{ number: 3, title: "An old issue", user: { login: OWNER } }, { number: 4, title: ISSUE_TITLE, user: { login: "another-writer" } }, { number: 5, title: ISSUE_TITLE, user: { login: OWNER }, pull_request: {} }, { number: 6, title: ISSUE_TITLE, user: { login: OWNER } }];
   ok(leaseIssues(listed, OWNER).map(i => i.number).join() === "6", "the label alone makes no issue the lease's: only one the owner's account opened under its title", JSON.stringify(leaseIssues(listed, OWNER)));

@@ -77,9 +77,12 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      inbox (`scripts/inbox.mjs`, which sends GitHub GETs alone, and in a GitHub job reads its token's grant of issues
      from the workflow that started it, at the commit GitHub names, through `scripts/parse-yaml.mjs`; #1363) and the
      personal terms' take-out (`scripts/issue-terms.mjs`, which edits only an
-     insider's text); limits: 256 MB of an answer (16 MB for the inbox's own), 500 pages of 100, and for the take-out
-     1,048,576 characters of a text, past which it is left unread, and the first 100 edits of its history; hostile
-     tests: `tests/hostile-issues-test.mjs`, and for the take-out `tests/issue-terms-test.mjs`.
+     insider's text), and the orchestrator's lease (`scripts/lease.mjs`, at each wake and in the look); limits: 256 MB
+     of an answer (16 MB for the inbox's own), 500 pages of 100, for the take-out 1,048,576 characters of a text, past
+     which it is left unread, and the first 100 edits of its history, and for the lease 16 MB of an answer, 10 pages of
+     30 comments from the newest, 4,000 characters of a comment's body, past which each is unread, and 60 s a call;
+     hostile tests: `tests/hostile-issues-test.mjs`, for the take-out `tests/issue-terms-test.mjs`, and for the lease
+     `tests/lease-test.mjs`.
    - the open Dependabot alerts' fields (never an advisory's text), the open pull requests' titles, branches, descriptions
      and authors, and the bug issues' titles and authors: read by the daily reading of the alerts (`scripts/alerts.mjs`),
      which counts a pull request only of Dependabot's own login and reads its description only ahead of the first

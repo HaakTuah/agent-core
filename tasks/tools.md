@@ -70,8 +70,9 @@ host's (`core/scripts/lease.mjs` writes and reads it). Nothing changes it.
   hours, a first guess, or a hand-over note there names another or replaced its own lease), it deletes every wake of
   its own and stops; else the script renews or claims the lease. It reads the *owner's account*'s issue and comments
   alone; where gh acts as another account, it writes nothing, so the wake goes on without the lease, save where
-  another's is fresh. Where no lease can stand (issues switched off, no repository on github.com), it says so and the
-  wake goes on without one; where it fails otherwise, that wake works no lane and keeps its next.
+  another's is fresh. Where no lease can stand (issues switched off, no repository on github.com, no gh, or gh refused by
+  its sign-in), it says so and the wake goes on without one; where it fails otherwise, that wake works no lane and
+  keeps its next only while work is in flight.
 - The issue's current text is its hand-off, which it keeps current at each change (a builder started or stopped, a
   merge, an order given): the lanes and their pull requests, what each waits on, the orders for now in force (a pace,
   an order of work, a hold), one given only by message among them, and what comes next.
