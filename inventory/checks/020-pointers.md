@@ -1,6 +1,7 @@
-- `scripts/pointers.mjs`, `scripts/rule-files.mjs`, `scripts/markdown.mjs`, `scripts/links.mjs`, `scripts/lychee.sh`:
+- `scripts/pointers.mjs`, `scripts/names.mjs`, `scripts/rule-files.mjs`, `scripts/markdown.mjs`, `scripts/links.mjs`, `scripts/lychee.sh`:
   fails a pointer in the rule files, to a file, a section, a numbered point, a floor rule or an archive item, that leads
-  nowhere; Markdown's own links there, and the heading each names, it reads with lychee, fetched at set-up
+  nowhere, and a name the *descriptions* put in code marks that it resolves exactly, a file's or a package script's,
+  that stands nowhere (`scripts/names.mjs`; #460, point 4), a project's held in `checks/names.json`; Markdown's own links there, and the heading each names, it reads with lychee, fetched at set-up
   (`lychee.sh`), the file a link leads to held by the core to what git tracks, a finding the base held noted (#582).
   *Runs:* the core's own forms in any session and on the runners; lychee on the runners alone, where the job's set-up
   fetches it, a session saying it did not run it and reading the form `[text](path)` its own way, no heading read.

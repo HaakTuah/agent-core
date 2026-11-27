@@ -68,6 +68,7 @@ write(theCore, "scripts/steps/997-a-partly-note.mjs", 'import { COST } from "../
 // (and one the manifest's "Differences" leaves undone on purpose, which no check reads done, so it stays in full)
 write(theCore, "setup/sync-notes/996-a-declared-note.md", "- **13 November 2026, a declared note.** Asked of every project; this one leaves it undone on purpose.\n");
 write(theCore, "scripts/steps/996-a-declared-note.mjs", 'import { COST } from "../step-checks.mjs";\n\nexport default { lead: "13 November 2026, a declared note", cost: COST.line, check: () => "the declared note is not done. Mend: do it" };\n');
+write(theCore, "tests/only-in-b-test.mjs", "// a test B gains, which the copy never holds\n"); // (#1361, point 7)
 const B = commit("B");
 const SIDE = git(theCore, "commit-tree", `${B}^{tree}`, "-p", B, "-m", "off main");
 // (packed once: every later fetch, clone and archive of the core reuses the pack, where the loose objects each time are compressed again, which was about half of a run's time in them; #812)
@@ -112,6 +113,8 @@ git(p, "checkout", "-q", "-b", "sync");
 const s = (r => ({ status: r.status, out: `${r.stdout}${r.stderr}` }))(spawnSync(process.execPath, ["core/scripts/sync.mjs", ...process.platform === "win32" ? [B] : []], { cwd: p, env: greenEnv, encoding: "utf8" }));
 const calls = read(p, ".github/workflows/core.yml");
 ok(s.status === 0 && s.out.includes(`${SHA(A)} -> ${SHA(B)}`) && read(p, "core-manifest.md") === manifest(OWNER, B), "the sync takes a project that follows main to the core's newest commit, and moves the manifest's pin", s.out);
+const copied = git(theCore, "diff", "--name-only", copyTree(A, coreRepo), copyTree(B, coreRepo)).split("\n").filter(Boolean).length;
+ok(new RegExp(`${SHA(A)} -> ${SHA(B)} \\(${copied} files? changed`).test(s.out) && copied > 0, "  it counts the files of the copy alone, never one of the tests the core keeps to itself (#1361, point 7)", s.out);
 ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) && s.out.includes("personal-terms.yml"), "  it moves a call whose workflow changed, and leaves one whose workflow did not", calls);
 ok(s.out.includes("Done when nothing: an entry that B gains over A."), "  and prints the sync notes the core gained between the two pins", s.out);
 ok(s.out.includes("- 13 November 2026, a done note: done here, as its step reads.") && !s.out.includes("as it always does"), "  each whose step the new copy reads done here by its lead alone (#1264)", s.out);
@@ -290,10 +293,10 @@ fs.writeFileSync(path.join(silent, "gh"), "#!/bin/sh\necho 'gh: not signed in' >
 // (the read with no sign-in sent to a proxy that is not there, so it gives no answer and nothing leaves this machine;
 // a stranger's repository of the stand-in's name never answers for it; #1246)
 const offline = { HTTPS_PROXY: "http://127.0.0.1:9", https_proxy: "http://127.0.0.1:9", NO_PROXY: "", no_proxy: "" };
-const unanswered = given => {
+const unanswered = (given, ...args) => {
   git(p, "remote", "set-url", "origin", GH_ORIGIN);
   try {
-    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, ...offline, ...given, [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs"), ...args], { cwd: p, env: { ...env, ...offline, ...given, [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
     return `${r.status}\n${r.stdout}${r.stderr}`;
   } finally { git(p, "remote", "set-url", "origin", origin); }
 };
@@ -301,6 +304,11 @@ for (const [given, what] of [[{ CORE_HOST_ANSWERS: hostSays() }, "the test's sta
   const out = unanswered(given);
   ok(/^1\n/.test(out) && /NOT PURE[^\n]*AGENTS\.md: the project's kind or values cannot be read/.test(out), `  and with only ${what} answering, which the proof does not honour, it is not proved`, out);
 }
+// (a trial's reading, which proves no merge, takes the answer given as CORE_PRIVATE where the host gave none, and says
+// so; never the test's stand-in: #1361, point 16)
+const pinned = /[0-9a-f]{40}/u.exec(read(p, "core-manifest.md"))[0], givenTrial = unanswered({ CORE_PRIVATE: "false" }, "--trial", pinned), standInTrial = unanswered({ CORE_HOST_ANSWERS: hostSays() }, "--trial", pinned);
+ok(/^1\n/.test(givenTrial) && !/kind or values cannot be read/.test(givenTrial) && /^read as public from CORE_PRIVATE, as the host gave this machine no answer$/mu.test(givenTrial) && /^trial answer: \{"commit":"[0-9a-f]{40}","pure":true/mu.test(givenTrial) && !givenTrial.includes("sha=")
+  && /NOT PURE[^\n]*kind or values cannot be read/.test(standInTrial) && !/from CORE_PRIVATE/.test(standInTrial), "  a trial's reading takes CORE_PRIVATE where the host gave no answer, and says so, never the test's stand-in", `${givenTrial}\n${standInTrial}`);
 git(p, "push", "-q", "-f", "origin", `${base}:main`);
 git(p, "checkout", "-q", "sync");
 git(p, "reset", "-q", "--hard", LEGIT);
@@ -480,11 +488,28 @@ ok(toC.status === 0 && read(p, "core-manifest.md") === manifest("someone-else", 
 const answer = out => { const m = /^trial answer: (.*)$/mu.exec(out); try { return m && JSON.parse(m[1]); } catch { return null; } };
 const triedC = pure("--trial", C);
 ok(triedC.status === 1 && triedC.out.includes(`a pure sync against the commit tried, ${C}: a trial's reading, which proves no merge`) && !triedC.out.includes("sha=") && !triedC.out.includes("NOT PURE")
-  && JSON.stringify(answer(triedC.out)) === JSON.stringify({ commit: C, pure: true, from: "release-1" }),
-  "  a trial's reading against the commit tried finds the same sync pure, names the release main's copy stood at, and gives no head to merge", triedC.out);
+  && JSON.stringify(answer(triedC.out)) === JSON.stringify({ commit: C, pure: true, from: "release-1", main: "origin" }),
+  "  a trial's reading against the commit tried finds the same sync pure, names the release main's copy stood at and the main it read, the origin's, and gives no head to merge", triedC.out);
 const triedB = pure("--trial", B);
 ok(triedB.status === 1 && triedB.out.includes(`moves the copy to ${C}, not to the commit tried, ${B}`) && answer(triedB.out)?.pure === false && answer(triedB.out)?.commit === B,
   "  a trial's reading against another commit than the sync's is not pure", triedB.out);
+// (a trial's clone with no origin, its main a branch of its own, reads that main, where the merge's gate, which takes
+// main from the origin alone, says it is not proved and its mend; #1361, point 15)
+const lone = path.join(tmp, "lone");
+git(tmp, "init", "-q", "-b", "lone", lone);
+git(lone, "fetch", "-q", origin, "main:main");
+git(lone, "fetch", "-q", p, "unreleased:unreleased");
+git(lone, "checkout", "-q", "unreleased");
+const inLone = (...args) => { const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs"), ...args], { cwd: lone, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
+const loneTried = inLone("--trial", C), loneGate = inLone();
+ok(loneTried.status === 1 && answer(loneTried.out)?.commit === C && answer(loneTried.out)?.from === "release-1" && answer(loneTried.out)?.main === "clone" && /^read against the clone's own branch main, as the clone has no origin/mu.test(loneTried.out) && !loneTried.out.includes("NOT PURE") && !loneTried.out.includes("sha="),
+  "  a trial's clone with no origin gives its reading, read against the clone's own main, which it names", loneTried.out);
+ok(loneGate.status === 1 && loneGate.out.includes("NOT PURE the clone has no origin to fetch the project's main from") && loneGate.out.includes("Mend: run it in a clone of the project's repository whose origin") && !loneGate.out.includes("sha="),
+  "  and the merge's gate there says it is not proved, with its mend, never a head to merge", loneGate.out);
+git(lone, "branch", "-q", "-D", "main");
+const mainless = inLone("--trial", C);
+ok(mainless.status === 1 && mainless.out.includes("NOT PURE the project's main (the clone's own branch main, as the clone has no origin) shares no commit") && answer(mainless.out)?.pure === false && answer(mainless.out)?.from === "unknown" && answer(mainless.out)?.main === "clone",
+  "  and where that clone holds no main, its reading is not pure, with its mend", mainless.out);
 const triedName = pure("--trial", "main"), triedMore = pure("--trial", C, "--merge");
 ok([triedName, triedMore].every(r => r.status === 2 && !/^a pure sync/mu.test(r.out) && !r.out.includes("sha=") && answer(r.out) === null),
   "  and one that names no full SHA, or more than it, is refused before anything is read", `${triedName.out}\n${triedMore.out}`);

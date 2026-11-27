@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { auditDue, auditIsDue, auditOf, BATCH, cleaningDue, DAYS, DEBT, fileOf, MOVED, named, reading, STANDARD, stateOf, TITLES, worstFirst } from "../scripts/dose.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
+import { shallowCopy } from "../scripts/scratch-shallow.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -85,6 +86,14 @@ commit("b cleaned");
 cleaning = cleaningDue({ manifest, at: new Date().toISOString(), root: dir });
 ok(/1 of the 7 changes/.test(cleaning.body) && !/src\/b\.js/.test(cleaning.body), "a change that lowers the baseline counts to the cleaning lane's share", cleaning.body);
 ok(/a cleaning batch is done/.test(auditIsDue({ manifest, at: now, root: dir }).body), "and a batch done makes the next audit due");
+// A shallow clone holds no history before its boundary: the cleaning task is left as it stands, unread, and the script fails, each with the mend (#1422).
+{
+  const cut = shallowCopy(dir, "shallow", 1);
+  const gap = cleaningDue({ manifest, at: new Date().toISOString(), root: cut }), cli = spawnSync(process.execPath, [script], { cwd: cut, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });
+  ok(gap.body === null && /shallow/.test(gap.unread) && /boundary/.test(gap.unread) && !/Mend:/.test(gap.unread), "in a shallow clone the cleaning task is left unread, not counted from the part the clone holds", gap.unread);
+  ok(cli.status === 1 && mended(`${cli.stdout}${cli.stderr}`) && /git fetch --unshallow/.test(cli.stderr), "and the script fails there, saying the mend", `${cli.stdout}${cli.stderr}`);
+  fs.rmSync(cut, { recursive: true, force: true });
+}
 put("core-manifest.md", `${manifest}| *dose* | \`in standard\` |\n`);
 run(script, ["--audited"]);
 r = run(script);

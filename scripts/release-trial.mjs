@@ -182,8 +182,9 @@ export function trial([sha, ...given], fail) {
   if (refused) return fail(refused);
   const { pairs, why: pairWhy } = pairsOf(files);
   if (pairWhy) return fail(pairWhy);
-  const { answers, why } = answersOf(syncs, sha, pairs.length);
+  const { answers, unproved, why } = answersOf(syncs, sha, pairs.length);
   if (why) return fail(why);
+  for (const line of unproved) console.log(line);
   const { readings, why: notRead } = draftReadingsOf(drafts, sha, pairs.length);
   if (notRead) return fail(notRead);
   const own = pairs.length ? ownProjects() : 0, short = pairs.length ? draftsShort(own, readings) : null;

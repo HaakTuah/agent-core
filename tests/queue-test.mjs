@@ -1,6 +1,7 @@
 // Tests of the queue's reader (scripts/queue.mjs; AGENTS.md, "The queue"; #750, point 1): a line whose issue has
 // closed is skipped, waited on no more, cleared together by the next pull request that changes the queue, and fails
-// that pull request while it stands; a project's progress file, a list, read the same way. Node's own modules only; GitHub and the file stand in as functions.
+// that pull request while it stands; a project's progress file, a list, read the same way (where GitHub cannot be read,
+// and the form: queue-form-test.mjs). Node's own modules only; GitHub and the file stand in as functions.
 //
 //   node tests/queue-test.mjs
 import fs from "node:fs";
@@ -90,9 +91,6 @@ ok(/run node core\/scripts\/queue\.mjs --clear/u.test(command("--check", { ...at
 ok(/run node lib\/core\/scripts\/queue\.mjs --clear/u.test(command("--check", { ...at, project: "lib/core/" }).out) && fileAt(slot("lib/core/QUEUE.md"), [], "lib/core/") === null && fileAt(slot("docs/PLAN.md"), [], "lib/core/") === "docs/PLAN.md" && fileAt(slot("lib/core-manifest.md"), [], "lib/") === null && fileAt(slot("Lib/x.md"), [], "lib/") === null, "a copy the manifest places elsewhere is read where it stands: its mend names its path, and the progress file is never inside it, nor inside the library that carries it (Codex's review of c2c351c; the fallback reviewer's check of 3c0720b)");
 r = command("--clear", at);
 ok(r.status === 0 && /took out the lines of #10/u.test(r.out) && file === cleared(queue, closed) && command("--check", at).status === 0, "--clear writes the queue without them, and the check then passes", r.out);
-answer = null;
-r = command("--check", at);
-ok(r.status === 1 && mended(r.out) && /could not be read: no answer/u.test(r.out), "where an issue cannot be read, the check fails, saying the mend", r.out);
 for (const bad of [command("--other", at), command(undefined, { ...at, read: () => null })]) ok(bad.status === 1 && mended(bad.out), "an option it does not know, or no queue where it runs, fails, saying the mend", bad.out);
 
 // the issues a line names first, read whole in every spelling, a row's and an item's (the fallback reviewer's second

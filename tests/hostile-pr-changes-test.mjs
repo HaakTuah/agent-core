@@ -21,7 +21,7 @@ import { mended } from "../scripts/mend.mjs";
 import { readCsharp } from "../scripts/shape-csharp.mjs";
 import { readPython } from "../scripts/shape-python.mjs";
 import { javascriptFunctions } from "../scripts/javascript-functions.mjs";
-import { library, regular } from "../scripts/reading.mjs";
+import { library, regular, shown } from "../scripts/reading.mjs";
 import { rules } from "../scripts/rules.mjs";
 import { LIMITS, conditions, cuts, total, tree as readTree } from "../scripts/read-total.mjs";
 import { LARGEST } from "../scripts/tree-walk.mjs";
@@ -484,6 +484,17 @@ ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "co
   thrown = null;
   try { total(readTree(null, dir), []); } catch (e) { thrown = e; }
   ok(thrown && mended(`FAIL: ${thrown.message}`) && Date.now() - slow < 5000, "read-total: five thousand modules added are refused with their mend, within 5 s");
+}
+
+// ---- reading.mjs: a changed path printed through shown(), which a fork's branch names (#1382) ----
+// (a bidirectional formatting character would show the printed text reordered, so each is written out as \uXXXX, as a
+// control character is; a path holding none is printed as it is spelled)
+{
+  const bidi = ["\u202a", "\u202b", "\u202c", "\u202d", "\u202e", "\u2066", "\u2067", "\u2068", "\u2069"];
+  const odd = `tasks/a${bidi.join("x")}\u0085\u2028\u001b.md`, out = shown(odd);
+  ok(!/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(out) && bidi.every(c => out.includes(`\\u${c.charCodeAt(0).toString(16)}`)) && JSON.parse(out) === odd,
+    "reading.mjs: a path holding a bidirectional formatting character is printed in quotes with each written out as \\uXXXX, read back as spelled", out);
+  ok(shown("tasks/a\u200fb \u00e9.md") === "tasks/a\u200fb \u00e9.md" && shown("tasks/ab.md") === "tasks/ab.md", "reading.mjs: a path with no such character is printed as it is spelled");
 }
 
 // ---- reading.mjs: the rule files of a checkout, which a fork's branch may make links (#848) ----

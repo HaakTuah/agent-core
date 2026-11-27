@@ -310,6 +310,9 @@ jobs:
       - name: The lookup of a new package from PyPI, on recorded answers
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-pypi-test.mjs ')) }}
         run: node tests/lookup-pypi-test.mjs
+      - name: The lookup's reader of a requirements file, on a file's own text
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-pypi-read-test.mjs ')) }}
+        run: node tests/lookup-pypi-read-test.mjs
       - name: The sync's step that asks a lookup beside each check of exact versions
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-step-test.mjs ')) }}
         run: node tests/lookup-step-test.mjs
@@ -358,6 +361,9 @@ jobs:
       - name: The queue's reader
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-test.mjs ')) }}
         run: node tests/queue-test.mjs
+      - name: The queue's form, and its check where GitHub cannot be read
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-form-test.mjs ')) }}
+        run: node tests/queue-form-test.mjs
       - name: The core's own measurement
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-cost-test.mjs ')) }}
         run: node tests/core-cost-test.mjs
@@ -463,6 +469,9 @@ jobs:
       - name: The records' check a pull request runs
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-check-test.mjs ')) }}
         run: node tests/choices-check-test.mjs
+      - name: The daily reading of the Dependabot alerts
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/alerts-test.mjs ')) }}
+        run: node tests/alerts-test.mjs
       - name: The scheduled look's readers of the choice records
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-look-test.mjs ')) }}
         run: node tests/choices-look-test.mjs
@@ -618,6 +627,9 @@ jobs:
       - name: The draft of the sync in a release's trial, read beside main's checks
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-draft-test.mjs ')) }}
         run: node tests/trial-draft-test.mjs
+      - name: The toolchain a release's trial fetches for a project that pins it
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/toolchain-test.mjs ')) }}
+        run: node tests/toolchain-test.mjs
       - name: The stand-in for the host in the tests of the draft in a release's trial
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-draft-host-test.mjs ')) }}
         run: node tests/trial-draft-host-test.mjs
@@ -707,6 +719,9 @@ jobs:
       - name: The pointer check
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/pointers-test.mjs ')) }}
         run: node tests/pointers-test.mjs
+      - name: The pointer check's names in the descriptions, a project's list and the core's own run (#460, point 4)
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/names-test.mjs ')) }}
+        run: node tests/names-test.mjs
       - name: The pointer check's link checker, lychee, read and decided against a base, with a stand-in for it (#582)
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/links-test.mjs ')) }}
         run: node tests/links-test.mjs
@@ -734,6 +749,9 @@ jobs:
       - name: A project beside a fresh start, and what the steps read of the files it holds
         if: ${{ !cancelled() && contains(matrix.parts, 'fresh') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-fresh-test.mjs ')) }}
         run: node tests/steps-fresh-test.mjs
+      - name: A project beside a fresh start whose checks' configs stand where its calls name them, not the kit's paths
+        if: ${{ !cancelled() && contains(matrix.parts, 'fresh') && (env.RUN == 'all' || contains(env.RUN, ' tests/fresh-config-paths-test.mjs ')) }}
+        run: node tests/fresh-config-paths-test.mjs
       - name: The steps on a project whose copy of the core stands at a path of its own or in a library
         if: ${{ !cancelled() && contains(matrix.parts, 'fresh') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-vendored-test.mjs ')) }}
         run: node tests/steps-vendored-test.mjs

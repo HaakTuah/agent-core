@@ -53,8 +53,22 @@ const CALL = new RegExp(`(?<![\\w./-])(${A}\\/\\.github\\/workflows\\/[\\w.-]+@)
 const fail = [];
 
 const head = git(["rev-parse", "HEAD"]);
-git(["fetch", "-q", "--no-tags", "origin", "refs/heads/main"]);
-const base = git(["merge-base", "FETCH_HEAD", head]);
+// (the project's main, fetched from its origin; a release's trial on a clone that has no origin reads the clone's own
+// main instead, its reading proving no merge, while the merge's gate, which waives the reviews, takes main from the
+// origin alone and, with none, gives its reading that it is not proved; #1361, point 15)
+const hasOrigin = (() => { try { raw(["remote", "get-url", "origin"]); return true; } catch { return false; } })();
+let mainRef = "FETCH_HEAD", givenPrivate = false;
+if (hasOrigin) git(["fetch", "-q", "--no-tags", "origin", "refs/heads/main"]);
+else if (tried) mainRef = "refs/heads/main";
+else mainRef = null;
+const base = (() => { try { return mainRef && git(["merge-base", mainRef, head]); } catch { return null; } })();
+if (!base) {
+  const why = mainRef === null
+    ? "the clone has no origin to fetch the project's main from, so the sync is not proved against it. Mend: run it in a clone of the project's repository whose origin is its address on the host, with the sync's branch checked out"
+    : `the project's main (${mainRef === "FETCH_HEAD" ? "fetched from the origin" : "the clone's own branch main, as the clone has no origin"}) shares no commit with the sync's branch, so the sync is not proved against it. Mend: run it in a clone that holds the project's main${mainRef === "FETCH_HEAD" ? "" : " as its branch main"}, with the sync's branch made from it checked out`;
+  fail.push(why);
+  done("unknown");
+}
 const show = (rev, file) => { try { return git(["show", `${rev}:${file}`]); } catch { return ""; } };
 // (the copy's path as main's manifest names it: a sync moves the pin, never the path; a core a library carries is
 // synced in the library's repository, so a change here is no sync of it)
@@ -120,6 +134,17 @@ function tracked(sha, to) {
   }
 }
 
+// Whether the project is private, as the host says it of the checkout's repository, from GitHub's event, gh or a read
+// with no sign-in alone (host-private.mjs); never from a test's stand-in, nor in the merge's gate, that waives the
+// reviews, from an answer given as CORE_PRIVATE. A trial's reading, which proves no merge, takes that answer where the
+// host gave none, as a trial holding no sign-in on a private project must, and says so (#1361, point 16).
+function heldPrivate() {
+  const held = privateOf(process.cwd(), { env: { ...process.env, CORE_HOST_ANSWERS: "", CORE_PRIVATE: "" } });
+  if (!tried || !held.unread || !/^(true|false)$/u.test(process.env.CORE_PRIVATE ?? "")) return held;
+  givenPrivate = true;
+  return { private: process.env.CORE_PRIVATE === "true" };
+}
+
 // The core's own files and parts the sync changed, each proved equal, byte for byte, to what the one process writes
 // (converge.mjs, as this checkout of the core's main holds it) from the kit at the new pin, with the project as main
 // holds it and the new pin, every byte outside the core's part kept. Only the core's own: a whole file of the core's
@@ -143,10 +168,7 @@ function provedOwned(dir) {
     execFileSync("git", ["init", "-q"], { cwd: base_ });
     tracked(base, base_);
     writeFileSync(join(base_, "core-manifest.md"), raw(["show", `${head}:core-manifest.md`]));
-    // (whether it is private, as the host says it of the checkout's repository, from GitHub's event, gh or a read with
-    // no sign-in alone: host-private.mjs; never from a test's stand-in or an answer given as CORE_PRIVATE, which this
-    // gate, that waives the reviews, does not honour)
-    const p = project(base_), k = kind(p, privateOf(process.cwd(), { env: { ...process.env, CORE_HOST_ANSWERS: "", CORE_PRIVATE: "" } })), bad = unformed(p, k);
+    const p = project(base_), k = kind(p, heldPrivate()), bad = unformed(p, k);
     if (bad.length) { unproved(`the project's kind or values cannot be read in their forms, so it is not proved what the core's process writes: ${bad.join("; ")}`); return; }
     const kit = fresh(p, join(kits, "now", "setup", "template"), { kitOnly: true, k });
     if (!kit.length) { unproved(`the kit at ${pin} gives no file this checkout of the core can render`); return; }
@@ -228,15 +250,23 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-for (const f of fail) console.log(`  NOT PURE ${f.replace(/[\u0000-\u001f\u007f]/gu, "?")}`);
-if (tried) {
-  console.log(`${fail.length ? "not a pure sync" : "a pure sync"} against the commit tried, ${tried}: a trial's reading, which proves no merge (floor rule 8)`);
-  console.log(`trial answer: ${JSON.stringify({ commit: tried, pure: !fail.length, from })}`);
-  process.exit(1);
+done(from);
+
+// The reading, `from` the copy main held, for the trial's record; it ends the run.
+function done(from) {
+  for (const f of fail) console.log(`  NOT PURE ${f.replace(/[\u0000-\u001f\u007f]/gu, "?")}`);
+  if (tried) {
+    console.log(`${fail.length ? "not a pure sync" : "a pure sync"} against the commit tried, ${tried}: a trial's reading, which proves no merge (floor rule 8)`);
+    // (where the clone has no origin, which main it was read against, so a record of a main behind the project's is seen)
+    if (mainRef === "refs/heads/main") console.log("read against the clone's own branch main, as the clone has no origin: where that main is behind the project's, take the reading again in a clone whose origin is the project's address");
+    if (givenPrivate) console.log(`read as ${process.env.CORE_PRIVATE === "true" ? "private" : "public"} from CORE_PRIVATE, as the host gave this machine no answer`);
+    console.log(`trial answer: ${JSON.stringify({ commit: tried, pure: !fail.length, from, main: mainRef === "FETCH_HEAD" ? "origin" : "clone" })}`);
+    process.exit(1);
+  }
+  if (fail.length) {
+    console.log("not a pure sync: it gets its reviews as any PR (floor rule 8)");
+    process.exit(1);
+  }
+  console.log(`a pure sync: core ${oldPin.slice(0, 7)} -> ${pin.slice(0, 7)}, ${files.length} files, ${pins.size} pins on the core's main`);
+  console.log(`merge it with sha=${head}`);
 }
-if (fail.length) {
-  console.log("not a pure sync: it gets its reviews as any PR (floor rule 8)");
-  process.exit(1);
-}
-console.log(`a pure sync: core ${oldPin.slice(0, 7)} -> ${pin.slice(0, 7)}, ${files.length} files, ${pins.size} pins on the core's main`);
-console.log(`merge it with sha=${head}`);

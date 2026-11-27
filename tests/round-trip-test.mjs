@@ -39,6 +39,7 @@ const WRITERS = {
   "mutation-tools.mjs": ["tests/mutation-tools-test.mjs", "its row, list, size marks"],
   "core-reading.mjs": ["here", "checks/core-reading.json, read by its own `due`"],
   "look-keep.mjs": ["here", "an inbox file, read by the inbox's reader"],
+  "pointers.mjs": ["tests/names-test.mjs", "checks/names.json, read back as its list"],
   "queue.mjs": ["tests/queue-test.mjs", "the progress file --clear rewrites, read by its reader"],
   "screens.mjs": ["tests/screens-test.mjs", "the screens' baseline --write rewrites, read by readBaseline"],
   "strength.mjs": ["tests/strength-test.mjs", "the strength baseline --whole and --lower write, read by the check"],
@@ -49,7 +50,7 @@ const WRITERS = {
 // The scripts that write a file no reader of the core reads in a project, each with why.
 const ELSEWHERE = {
   "agent-tools-scratch.mjs": "a scratch project for a test", "releases-scratch.mjs": "a test's scratch core", "stage-helpers.mjs": "a test's stage", "steps-kit.mjs": "a test's kit project",
-  "licence-scan-stage.mjs": "a test's stage", "nuget-gate-scratch.mjs": "a test's scratch project", "scratch-core.mjs": "a test's scratch folders", "twice-scratch.mjs": "a test's scratch project",
+  "licence-scan-stage.mjs": "a test's stage", "nuget-gate-scratch.mjs": "a test's scratch project", "scratch-core.mjs": "a test's scratch folders", "scratch-shallow.mjs": "a test's scratch history", "twice-scratch.mjs": "a test's scratch project",
   "check.mjs": "the verdicts, to a file outside every repository, read by release-trial.mjs in the core",
   "checks.mjs": "a job's output (GITHUB_OUTPUT)", "install.mjs": "a job's environment (GITHUB_ENV)", "select.mjs": "a job's output",
   "tests-parts.mjs": "a job's output", "lookup.mjs": "a job's summary", "look.mjs": "a job's output and summary",

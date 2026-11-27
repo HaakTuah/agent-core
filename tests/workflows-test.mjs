@@ -626,4 +626,22 @@ exit 1
     "the daily look's step has a limit of its own, longer than a first run needs and shorter than the job's with room left for the step after it, which runs unless the job was cancelled (#1311)", JSON.stringify({ look: lookStep["timeout-minutes"], job: job["timeout-minutes"], terms: termsStep.if }));
 }
 
+// (#1346: each step of the daily look's job has a limit of its own, so a hang in one costs that step's minutes and not
+// the job's whole limit)
+{
+  const job = parseYaml(fs.readFileSync(path.join(wfDir, "look.yml"), "utf8")).jobs.look, steps = job.steps ?? [];
+  const without = steps.filter(s => !(s["timeout-minutes"] > 0 && s["timeout-minutes"] < job["timeout-minutes"])).map(s => s.name ?? s.uses ?? s.run);
+  ok(steps.length > 0 && without.length === 0, "each step of the daily look's job has a time limit of its own, shorter than the job's (#1346)", without.join("; "));
+}
+
+// (#1426: the look's readers count history, the dose's cleaning share and the day the labels' check came, and refuse a
+// shallow clone; a fetch after a checkout that keeps no token has no sign-in in a private repository, so the job's
+// checkout takes the whole history itself)
+{
+  const steps = parseYaml(fs.readFileSync(path.join(wfDir, "look.yml"), "utf8")).jobs.look.steps ?? [];
+  const checkouts = steps.filter(s => /^actions\/checkout@/.test(String(s.uses ?? "")));
+  ok(checkouts.length === 1 && String(checkouts[0].with?.["fetch-depth"]) === "0" && String(checkouts[0].with?.["persist-credentials"]) === "false",
+    "the daily look's checkout holds the whole history its readers count, keeping no token (#1426)", JSON.stringify(checkouts.map(s => s.with)));
+}
+
 process.exit(failed ? 1 : 0);

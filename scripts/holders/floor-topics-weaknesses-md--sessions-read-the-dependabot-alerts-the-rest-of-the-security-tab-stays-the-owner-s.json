@@ -1,0 +1,6 @@
+{
+  "rule": "floor/topics/weaknesses.md: Sessions read the Dependabot alerts; the rest of the Security tab stays the owner's",
+  "holder": "check: tests/alerts-test.mjs, in part",
+  "behind": [35, "#1142"],
+  "number": "check fires; outcome: robust; rare harm"
+}

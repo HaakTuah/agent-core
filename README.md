@@ -64,7 +64,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   A project's own rules are read the same way, against its list `checks/holders.json`, and those with none listed in
   its own monthly state report, failing nothing (`node core/scripts/holders.mjs --own`; `AGENTS.md`, "A project's own
   rules name what holds them"), where the session that takes that report also answers whom each rule is about, in the
-  list's "about", and files those about a kind or every project here. A check of the core's that read no file of a
+  list's "about", and files those about a kind or every project here. A check of the core's that read no file, or no package, of a
   project's says so in the sync's report (`scripts/read-nothing.mjs`; `AGENTS.md`, "A check that read nothing says
   so"), and a project's state report gives how many of its own rules, and of the core's it takes, a check holds there
   (`AGENTS.md`, "The share a check holds is reported").
@@ -250,8 +250,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`), or the cost
      line, or in its place "No cost line: the script printed none.", or, where it asks the part "What holds it", a
      line there "Number:" in its form, or, where it adds a line under the manifest's "Differences", the line "Reasons
-     read:"; the lines only of a pull request opened since the project's copy held them. A line passes where it begins
-     in its form, whatever follows: it fails what is missing, never phrasing (#750).
+     read:", or whose description names a "core archive N" the copy's archive does not hold or leaves a placeholder in (`TBD`,
+     `TODO`, `XXX`, `FIXME`, "to be added"; `pr-head.mjs`, #1136); the lines only of a pull request opened since the
+     project's copy held them. A line passes where it begins in its form, whatever follows: it fails what is missing,
+     never phrasing (#750).
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
      spent so far, where Claude Code's own record of it can be read, and nothing where it cannot. It keeps a tally of
      its own beside that record (ids, counts and the models' families), so the line does not drop where the record
@@ -374,7 +376,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      what the check would have done. Where every review is posted (none starts by itself, as through a plug-in), the
      *owner's account*'s counts with nothing to set, and the status proves that a review was posted for the head, not
      who made it, since builder and reviewer may post under one login. Dependabot's own pull request passes it (floor
-     rule 17); one that needs no security review and gets none by itself (floor rule 8) says so in such a comment.
+     rule 17), save while the `code-review` status below waits (#1339); one that needs no security review and gets
+     none by itself (floor rule 8) says so in such a comment.
      Beside it, in the same job, the status `code-review` waits while Codex's code review runs on the head commit, until
      it finishes or a comment that opens "Code review:", from an account the security review counts, names that commit
      by its whole SHA (`tasks/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
@@ -385,9 +388,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      and "Other findings:", or, posted from 20 November, its line "Score:" (`tasks/reviews.md`, point 3); and, in the
      core's own repository, while a pull request opened from that day that changes `floor/`, `roles/`, `tasks/` or
      `tools/` has no "Design check:" naming its head, or a commit only such updates follow (point 4); it advises as the
-     first does. It runs a short job at each push and each "Code review:" or "Design check:" comment, a dozen or so a
-     pull request, which a private repository pays for: there the job is skipped, and so not billed, unless the project
-     turns it on (the input `private`) or has turned advisory off, since a ruleset may then wait for it.
+     first does, and while it waits, the `security-review` status waits too, saying why, so that the one status a
+     ruleset requires holds a pull request until the code review it needs is posted in its form (#1339). It runs a
+     short job at each push and each "Code review:" or "Design check:" comment, a dozen or so a pull request, which a
+     private repository pays for: there the job is skipped, and so not billed, unless the project turns it on (the
+     input `private`) or has turned advisory off, since a ruleset may then wait for it.
    - **A private repository** has GitHub's dependency review and CodeQL only with its paid code security, so without
      it it calls neither `licences.yml` nor `codeql.yml`: a workflow of its own runs `core/scripts/licences.mjs` for
      what no package list holds, `core/scripts/exact-versions.mjs` and `core/scripts/lookup.mjs` for its lockfiles and

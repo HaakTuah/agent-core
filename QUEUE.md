@@ -7,16 +7,16 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #1295, #1348 | builder; release 7, one PR each | |
-| #1358, #1349 to #1352 | builder; release 8, one PR each | release 7's cut |
-| #1334 | rule builder; release 8 | release 7's cut |
+| #1350 to #1352, #1339, #1367, #1341, #1345, #1385, #1380, #1388, #1394, #1401 | builder; release 8, one PR each | |
+| #1361 | builder; release 8, a PR each point; a rule builder for a rule | |
 | #1093, with #1090 | rule builder | |
-| #1095, points 2 to 6 | rule builder | #1094 |
-| #1136 to #1140 | builder; release 8, one PR each | release 7's cut |
+| #1138 to #1140 | builder; release 8, one PR each | |
+| #1413, points 1, 3, 5, 2, 6 and 7 | rule builder; release 8, one PR each | |
+| #1413, point 4 | rule builder; release 8 | #1413's points 1, 3 and 5 |
+| #1413, point 8 | rule builder; release 8 | the owner's Security-tab record (`needs-owner`) |
 | #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 8, one PR each | release 7's cut |
 | #1123 | rule builder; release 8 | #974, #1060 (`roles/adviser.md`); release 7's cut |
-| #1073, #1098, #1133, #1356 | builder; release 8, one PR each | release 7's cut |
-| #1142 | rule builder; release 8; `floor/topics/weaknesses.md`, perhaps `roles/orchestrator.md` and `tasks/updates.md` | release 7's cut |
+| #1098, #1133, #1356 | builder; release 8, one PR each | release 7's cut |
 | #1180, #1181 | rule builder; release 8, one PR each | release 7's cut |
 | #1182 | rule builder; release 8 | release 7's cut |
 | #1202 | rule builder; release 8; `AGENTS.md` and what every session here reads at its start | #1046 and #1052 (`AGENTS.md`, one at a time); release 7's cut |
@@ -29,7 +29,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #591 | builder | #589 |
 | #587 | rule builder; it may change the floor's topics and what every role reads at its start | #530 |
 | #308, #309, #318, #310, #325, #314, #457 | rule builder; one PR each | |
-| #459, and #484, points 8 to 10 | rule builder | |
+| #484, points 8 to 10 | rule builder | |
 | #441, with #484, points 6 and 7 | rule builder | |
 | #355 | builder | #530 |
 | #542, point 5 | rule builder | #457 |
@@ -42,7 +42,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
 | #650, #679 to #682, #707 | rule builder; one PR each | |
-| #701, #716 | builder; one PR each | |
+| #701 | builder | |
 | #739 | rule builder; it changes the game module (`tasks/game-design.md`) | |
 | #786 | rule builder; it changes the floor (the threat model) | |
 | #831 | rule builder; a page for owners beside the floor, with the rule and check that keep it in step; the floor's wording unchanged | |
@@ -64,14 +64,14 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #732, #550, #765, #552 | builder; one PR each; #732 a faster check, #550 a case a PR | |
+| #550 | builder; a case a PR | |
 | #553 | builder | #552 |
 | #554 | builder | #553 |
 | #555 | builder | #534's tools, and #554 |
 | #556 | builder | #554; #534's tools, for its linter rules |
 | #557 | builder | #556 |
 | #558 | builder | #557 |
-| #895, #931, #884, #852, #860, #857, #685, #937, #958, #1017 | builder; one PR each; #895 a test split, #1017 a split, its meaning kept; `tests.yml` naming each split's new suite | |
+| #931, #884, #852, #860, #857, #685, #937, #958 | builder; one PR each; `tests.yml` naming each split's new suite | |
 | #1064 | builder; splits weighed, each its meaning kept | |
 
 ## Not taken up

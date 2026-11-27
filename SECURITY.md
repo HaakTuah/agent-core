@@ -11,7 +11,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    shape and refuse where it fails, as floor topic 5 asks, its hostile tests trying each case. Each answers in 5 s at
    most, as its hostile tests time it (`scripts/hostile.mjs`), and each JSON it parses is nested 200 deep at most
    (`scripts/guards.mjs`); its limits name what it reads beyond that.
-   - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the lines it asks in `scripts/pr-waits.mjs`, `scripts/pr-cost.mjs`, `scripts/pr-number.mjs` and `scripts/pr-reasons.mjs`, and the line
+   - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the lines it asks in `pr-waits.mjs`, `pr-cost.mjs`, `pr-number.mjs`, `pr-reasons.mjs` and `pr-head.mjs` beside it, and the line
      "Read for it:" by `scripts/reading.mjs`, and the line "Never needed:" by `scripts/read-total.mjs`, line by line);
      limits: none of its own on the text, which GitHub holds to 65,536 characters; 100 commits, one page; 8 s for the
      reading list's calls; hostile tests: `tests/hostile-pr-text-test.mjs`.
@@ -29,13 +29,15 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
      a pull request adds under its manifest's "Differences" (`scripts/pr-reasons.mjs`), the rule files a checkout
-     holds, the manifest too (`scripts/reading.mjs`, and `scripts/rules.mjs` for the rules in them, which read only
-     regular files in real folders of the checkout's own, a pipe or device as no file and a link at any depth refused
-     with its mend, and the first tries the changed paths on the path patterns within 16 million steps for each
+     holds, the manifest too (`scripts/reading.mjs`, whose readers `scripts/pr-head.mjs` takes for the archive the keys
+     of a description are read against, noting each link met and passing, and `scripts/rules.mjs` for the rules in
+     them, which read only regular files in real folders of the checkout's own, a pipe or device as no file and a link
+     at any depth refused with its mend, and the first tries the changed paths on the path patterns within 16 million steps for each
      reading, a run of it or a pull request's description, each with a budget of its own, past which every pattern
      left matches), and the rule
-     files the total read sums and reads for a cut or a join (`scripts/read-total.mjs`, which prints each name with its
-     control characters written out, and reads a link, what is no regular file of the checkout's own, and a name a rule
+     files the total read sums and reads for a cut or a join (`scripts/read-total.mjs`, which prints each name, as
+     `scripts/reading.mjs` prints a changed path, with its control and bidirectional formatting characters written out
+     as `\uXXXX`, and reads a link, what is no regular file of the checkout's own, and a name a rule
      file gives that is absolute or holds a ".." segment as no file); limits: 64 MB of git's answer (256 MB for the
      comments proof, the selection and the total read, 16 MB for the manifest, past which it is reported unread), and
      none in count, since every changed path is read, save the total read's 1 MB of a file's text, past which its size
@@ -51,19 +53,26 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      reads no more and runs the whole suite (`scripts/hurry.mjs`); hostile tests: `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
-     of the work standing still (`scripts/look.mjs`, its reader `scripts/look-pulls.mjs`, through `queue.mjs`'s
-     placing and reading), with the open issues
-     titled as the orchestrator's notice and their authors' rights; limits: 1 MB of the file, past which it is refused
-     unread; 64 MB of an answer (256 MB to the look) and 100 pages of 100 for the open issues, past which it stops; for
-     the look, the search's first page and five authors' rights; hostile tests: `tests/queue-test.mjs`, and for the
-     look `tests/look-test.mjs`.
+     of the work standing still (`scripts/look.mjs`, its reader `scripts/look-pulls.mjs`, through `queue.mjs`'s placing
+     and reading), with the open issues titled as the orchestrator's notice and their authors' rights; limits: 1 MB of
+     the file, past which it is refused unread; 64 MB of an answer (256 MB to the look) and 100 pages of 100 for the
+     open issues, past which it stops; for the look, the search's first page and five authors' rights; hostile tests:
+     `tests/queue-test.mjs`, `tests/queue-form-test.mjs`, `tests/look-test.mjs`.
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the reviews'
      records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look (`scripts/look.mjs`,
      with `scripts/look-keep.mjs` and `scripts/look-pulls.mjs`), the
-     inbox (`scripts/inbox.mjs`) and the personal terms' take-out (`scripts/issue-terms.mjs`, which edits only an
+     inbox (`scripts/inbox.mjs`, which sends GitHub GETs alone, and in a GitHub job reads its token's grant of issues
+     from the workflow that started it, at the commit GitHub names, through `scripts/parse-yaml.mjs`; #1363) and the
+     personal terms' take-out (`scripts/issue-terms.mjs`, which edits only an
      insider's text); limits: 256 MB of an answer (16 MB for the inbox's own), 500 pages of 100, and for the take-out
      1,048,576 characters of a text, past which it is left unread, and the first 100 edits of its history; hostile
      tests: `tests/hostile-issues-test.mjs`, and for the take-out `tests/issue-terms-test.mjs`.
+   - the open Dependabot alerts' fields (never an advisory's text), the open pull requests' titles, branches, descriptions
+     and authors, and the bug issues' titles and authors: read by the daily reading of the alerts (`scripts/alerts.mjs`),
+     which counts a pull request only of Dependabot's own login and reads its description only ahead of the first
+     `<details>`; limits: 256 MB of an answer, every page of the alerts within it, 500 pages of 100 for the pull
+     requests and the issues, 300 characters of a title and a branch and 65,536 of a description; hostile tests:
+     `tests/alerts-test.mjs`.
    - whether a project's repository is private, read by `scripts/host-private.mjs`:
      - from the event of GitHub's job, for its own repository alone;
      - else from gh;
@@ -163,12 +172,13 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
      lookup (`scripts/lookup.mjs`, with `scripts/lookup-pypi.mjs` for a requirements file in PyPI's lock form, which it
-     fails whole where pip or uv could read it otherwise) and its lookup again of what a project holds (`scripts/held.mjs`, through the
+     fails whole where pip or uv could read it otherwise, and fails a hash a line names, of a new package or on a line the
+     pull request adds or changes, that PyPI lists for none of that release's files) and its lookup again of what a project holds (`scripts/held.mjs`, through the
      lookup's readers of npm's and NuGet's lock files); Node itself is checked against its SHA-256 by `scripts/node.sh`, and the code scan's wheel by
      its own, which pip checks against `.packages/requirements.txt` (`scripts/install.mjs pypi`); limits: 16 MB of a
      NuGet package's manifest, 100 pages of NuGet's registry, 20 lookups on GitHub in a run, 30 s for an answer (60 s
      for a NuGet package), 120 s for the whole look again; hostile tests: `tests/hostile-packages-test.mjs`, for the
-     requirements file `tests/lookup-pypi-test.mjs`, and for the scan `tests/code-scan-test.mjs`.
+     requirements file `tests/lookup-pypi-test.mjs` and `tests/lookup-pypi-read-test.mjs`, and for the scan `tests/code-scan-test.mjs`.
    - the code a pull request adds or alters, and its description's lines "Scan false alarm:" and "Scan unread:": read
      by the code scan (`scripts/code-scan.mjs`), which hands the files by name to Semgrep's engine, installed from its
      wheel's pinned hash, with no variable that holds a token, fails a file it could not read, and silences no finding a
@@ -176,6 +186,16 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      and one it parsed in part passing, said as read in part, 200 files to a run of the engine, 30 s for a rule on a
      file, 900 s for a run, 256 MB of git's diff of a file, 1 GB of the engine's answer, and the description whole as
      the host gives it, at most 65,536 characters; hostile tests: `tests/code-scan-test.mjs`.
+   - the `global.json` of a project a release's trial runs on, and the .NET SDK it pins: read by `scripts/toolchain.mjs`,
+     which reads only the file at the project's root, a plain file not reached through a link out of the project,
+     fetches only a build its own list holds the SHA-512 of, checked before the archive is opened, and runs every
+     `dotnet` from the file system's root, so no `global.json` of the project's or of the folder it was started in
+     chooses what runs, and names an `sdk.version` out of form by its JSON type alone, nothing of it printed; a folder
+     it fetched before is trusted as the machine's own SDK is, and run only for a build and machine its list holds; the
+     file carries no version number of its own form, the SDK it names being a build the machine holds already, or one
+     the list holds or refuses; limits: 64 KB of the file, nested no deeper than JSON's bounded reader allows (200), 80
+     characters of the SDK it names, 900 s for the download and for each run, 256 MB of a run's output; hostile tests:
+     `tests/toolchain-test.mjs`.
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
    (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are
    tools that only run, each with its licence in its audit (`.github/licences-audit.json`). Among them is Node
@@ -185,7 +205,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    and checks against its SHA-256 before it runs; and Semgrep's engine (`semgrep-core` from the `semgrep` wheel on PyPI
    at the version and hashes in `.packages/requirements.txt`), which `scripts/install.mjs pypi` installs with pip in the code
    scan's own step for a project the host's CodeQL does not scan, the wheel checked by its SHA-256, no dependency
-   taken and none of its code run, and which the scan runs with no Python.
+   taken and none of its code run, and which the scan runs with no Python; and, for a release's trial alone, the .NET
+   SDK a project's `global.json` pins, which `scripts/toolchain.mjs` fetches by curl from the publisher's own host over
+   HTTPS where its own list holds the SHA-512 of that build for that machine, checked before the archive
+   is opened, to a folder outside every repository (#1361, point 21).
 17. **Dependabot** updates the workflows' GitHub actions and the packages of the core's lock files, `package-lock.json`
     and `.packages/requirements.txt` (`.github/dependabot.yml`), each a week after its release.
 
