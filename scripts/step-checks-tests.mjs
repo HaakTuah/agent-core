@@ -72,22 +72,42 @@ function testFiles(p) {
 // tests yet; else the mend. A job names a test where a step's script holds its path, `./` before it or not, as a word
 // of its own. A job that runs only where the change touched its paths selects by them already, and is done (#1361,
 // point 25): its workflow's pull_request names `paths` or `paths-ignore`, or its `if:`, or that of each step of it
-// that names a test, is true only through an output of a job it needs that reads the change's files (a `git diff` with
-// --name-only or --name-status, or a paths-filter's or changed-files' action), every way it can be true reading one.
+// that names a test, is true only through an output of a job it needs that a step of it reading the change's files sets (gatedBy, below).
 const selectRunOf = copy => new RegExp(`(^|[\\s;&|])node\\s+${inCopy(copy)}scripts/select\\.mjs(?=\\s|$)`, "mu");
 
 const escaped = text => text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
-const DIFF_RUN = /(^|[\s;&|(=])git\s+diff\b[^\n]*\s--name-(only|status)\b/mu, DIFF_USE = /(^|\/)(paths-filter|changed-files)@/u;
+// (a step reads the change's files where a line of its script, not a comment, runs `git diff` with --name-only or
+// --name-status, or it uses a paths-filter's or changed-files' action; the line read in two passes, so it stays linear)
+const GIT_DIFF = /(^|[\s;&|(=])git\s+diff\b/u, NAME_FLAG = /\s--name-(only|status)\b/u, DIFF_USE = /(^|\/)(paths-filter|changed-files)@/u;
+const diffRun = run => run.split("\n").some(line => { if (/^\s*#/u.test(line)) return false; const m = GIT_DIFF.exec(line); return !!m && NAME_FLAG.test(line.slice(m.index + m[0].length)); });
+const readsChange = s => (typeof s?.run === "string" && diffRun(s.run)) || (typeof s?.uses === "string" && DIFF_USE.test(s.uses));
+const stepsOf = job => Array.isArray(job?.steps) ? job.steps : [];
 const byPaths = on => { const pr = on && typeof on === "object" && !Array.isArray(on) ? on.pull_request : null; return !!pr && typeof pr === "object" && ["paths", "paths-ignore"].some(k => Array.isArray(pr[k]) && pr[k].length > 0); };
-const readsChange = job => (job?.steps ?? []).some(s => (typeof s?.run === "string" && DIFF_RUN.test(s.run)) || (typeof s?.uses === "string" && DIFF_USE.test(s.uses)));
-// (an `if:` each of whose ways to be true, its parts joined by || at its top, holds among its parts joined by && one that
-// reads an output of a job it needs that reads the change's files; one that cannot be split is none)
+// (the outputs of a job that it takes, whole, from an output of one of its steps that reads the change's files)
+const STEP_OUTPUT = /^\$\{\{\s*steps\.([\w-]+)\.outputs\.[\w-]+\s*\}\}$/u;
+function changeOutputs(job) {
+  const ids = new Set(stepsOf(job).filter(readsChange).map(s => s?.id).filter(id => typeof id === "string"));
+  const outputs = job?.outputs && typeof job.outputs === "object" && !Array.isArray(job.outputs) ? job.outputs : {};
+  return Object.keys(outputs).filter(k => typeof outputs[k] === "string" && ids.has(STEP_OUTPUT.exec(outputs[k].trim())?.[1]));
+}
+// (an `if:` true only through such an output: each of its ways to be true, its parts joined by || at its top, holds
+// among its parts joined by && one that is so in turn, or is itself one comparison of such an output with a text that
+// is not empty, `== '<text>'` or `contains(<output>, '<text>')`; an `if:` that holds `${{` but is not one whole
+// expression, which GitHub reads as a text and so as true, or one that cannot be split, is none)
 function gatedBy(cond, needs, all) {
   if (typeof cond !== "string") return false;
-  const outputs = needs.filter(n => readsChange(all[n])).map(n => new RegExp(`(?<![\\w.-])needs\\.${escaped(n)}\\.outputs\\.`, "u"));
-  const ors = outputs.length ? topLevel(unwrapped(cond.trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1")), "||") : null;
-  return !!ors && ors.every(term => topLevel(unwrapped(term), "&&")?.some(part => outputs.some(o => o.test(part))));
+  let body = cond.trim();
+  if (body.includes("${{")) { const m = /^\$\{\{([\s\S]*)\}\}$/u.exec(body); if (!m || /\$\{\{|\}\}/u.test(m[1])) return false; body = m[1]; }
+  const outs = needs.flatMap(n => changeOutputs(all?.[n]).map(o => `needs\\.${escaped(n)}\\.outputs\\.${escaped(o)}`));
+  if (!outs.length) return false;
+  const o = `(?:${outs.join("|")})`, lit = "'[^']+'";
+  const ATOM = new RegExp(`^(?:${o}\\s*==\\s*${lit}|${lit}\\s*==\\s*${o}|contains\\(\\s*${o}\\s*,\\s*${lit}\\s*\\))$`, "u");
+  const holds = expr => topLevel(unwrapped(expr), "||")?.every(term => {
+    const ands = topLevel(unwrapped(term), "&&");
+    return !!ands && (ands.length === 1 ? ATOM.test(unwrapped(ands[0])) : ands.some(holds));
+  }) ?? false;
+  return holds(body);
 }
 
 export function selectionRuns(p) {
@@ -98,7 +118,7 @@ export function selectionRuns(p) {
   readable(p, text => text.includes("select.mjs") || NAMES.test(text));
   const SELECT_RUN = selectRunOf(copyAt(p)), copy = copyAt(p);
   const jobs = Object.entries(p.workflows).filter(([, { yaml }]) => onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => Object.entries(yaml.jobs ?? {})
-    .map(([name, job]) => ({ at: `\`.github/workflows/${file}\`, its job \`${name}\``, steps: job?.steps ?? [], envs: [job?.env, yaml.env], job, all: yaml.jobs, paths: byPaths(yaml.on) })));
+    .map(([name, job]) => ({ at: `\`.github/workflows/${file}\`, its job \`${name}\``, steps: stepsOf(job), envs: [job?.env, yaml.env], job, all: yaml.jobs, paths: byPaths(yaml.on) })));
   const selects = ({ steps, envs }) => steps.some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run) && [step.env, ...envs].some(e => typeof e?.SELECT_BASE === "string" && e.SELECT_BASE.trim() !== ""));
   const names = step => typeof step?.run === "string" && NAMES.test(step.run), naming = jobs.filter(({ steps }) => steps.some(names));
   const byChange = ({ job, all, paths, steps }) => { const needs = [job?.needs].flat().filter(n => typeof n === "string"); return paths || gatedBy(job?.if, needs, all) || steps.filter(names).every(s => gatedBy(s.if, needs, all)); };

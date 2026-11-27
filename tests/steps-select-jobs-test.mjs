@@ -61,7 +61,7 @@ const pushOnly = said([job("ui", "      - run: node tools/ui-test.js\n")], "push
 ok(pushOnly !== null && !pushOnly.includes("its job `ui`"), "a job of a workflow pull requests do not run is not read as one that runs tests", pushOnly);
 
 // (#1361, point 25: a job that runs only where the change touched its paths selects by them already)
-const CHANGES = "  changes:\n    runs-on: ubuntu-latest\n    outputs:\n      code: ${{ steps.what.outputs.code }}\n    steps:\n      - id: what\n        run: |\n          files=$(git diff --no-renames --name-only \"$BASE\" HEAD)\n          echo \"code=true\" >> \"$GITHUB_OUTPUT\"\n";
+const CHANGES = "  changes:\n    runs-on: ubuntu-latest\n    outputs:\n      code: ${{ steps.what.outputs.code }}\n      copy: ${{ steps.what.outputs.copy }}\n    steps:\n      - id: what\n        run: |\n          files=$(git diff --no-renames --name-only \"$BASE\" HEAD)\n          echo \"code=true\" >> \"$GITHUB_OUTPUT\"\n";
 const needing = (name, cond, steps, needs = "changes") => `  ${name}:\n    needs: ${needs}\n    if: ${cond}\n    runs-on: ubuntu-latest\n    steps:\n${steps}`;
 const RULES = "      - run: node tools/rules-test.js\n", UI = "      - run: node tools/ui-test.js\n";
 
@@ -90,6 +90,29 @@ ok(paths === null, "a workflow that pull requests run only where they touch its 
 
 const branches = said([job("node", RULES)], "pull_request:\n    branches: [main]\n    paths-ignore: []");
 ok(branches?.includes("its job `node`"), "a workflow whose pull_request names branches and no path: named", branches);
+
+// (the review of #1500: each way an if: can be true without such an output, and the other forms that read the change)
+for (const [cond, what] of [
+  ["(needs.changes.outputs.code == 'true' || github.event_name == 'pull_request') && success()", "an || inside parentheses with a way that reads no output"],
+  ["${{ !(needs.changes.outputs.code == 'true' && false) }}", "a negation"],
+  ["\"'needs.changes.outputs.code' != ''\"", "the output's name inside a quoted text"],
+  ["${{ needs.changes.outputs.code == 'true' }} && ${{ needs.changes.outputs.copy == 'true' }}", "two expressions, which GitHub reads as one text"],
+  ["needs.changes.outputs.code != ''", "a comparison that holds where the output is any text"],
+  ["needs.changes.outputs.node == 'true'", "an output the job does not take from the step that lists the files"]]) {
+  const read = said([CHANGES, needing("node", cond, RULES)]);
+  ok(read?.includes("its job `node`"), `an if: with ${what} runs whatever changed: named`, read);
+}
+const nested = said([CHANGES, needing("node", "(needs.changes.outputs.code == 'true' || needs.changes.outputs.copy == 'true') && success()", RULES, "[changes]")]);
+ok(nested === null, "an if: whose parenthesised || reads such an output every way, beside success(), with needs as a list: done", nested);
+const STATUS = CHANGES.replace("--name-only", "--name-status");
+ok(said([STATUS, needing("node", "contains(needs.changes.outputs.code, 'true')", RULES)]) === null, "a git diff with --name-status and contains() on its output: done");
+const commented = CHANGES.replace("files=$(git diff --no-renames --name-only \"$BASE\" HEAD)", "# git diff --name-only");
+ok(said([commented, needing("node", "needs.changes.outputs.code == 'true'", RULES)])?.includes("its job `node`"), "a git diff only in a comment lists no files: named");
+const CHANGED = FILTER.replace("dorny/paths-filter@", "tj-actions/changed-files@");
+ok(said([CHANGED, needing("node", "needs.changes.outputs.code == 'true'", RULES)]) === null, "a changed-files action's output: done");
+ok(said([job("node", RULES)], "pull_request:\n    paths-ignore: ['docs/**']") === null, "a workflow whose pull_request ignores some paths: done");
+const LONG = `  changes:\n    runs-on: ubuntu-latest\n    outputs:\n      code: \${{ steps.what.outputs.code }}\n    steps:\n      - id: what\n        run: git diff ${"x ".repeat(20000)}--name-only\n`;
+ok(said([LONG, needing("node", "needs.changes.outputs.code == 'true'", RULES)]) === null, "a git diff whose --name-only stands at the end of a long line: done");
 
 said([job("node", SELECT + gated("tools/rules-test.js"))]);
 fs.writeFileSync(path.join(flows, "ui.yml"), "name: ui\non: pull_request\njobs:\n  ui: {steps: [\n      - run: node tools/ui-test.js\n");
