@@ -54,8 +54,8 @@ by `scripts/stalled.mjs`, which the look and the orchestrator run, and which mar
 branch holds a line of its message that opens `Next:` and names the task's next step (`Next: the code review`), so a
 session that stops without warning, at a usage limit or a hard stop, leaves its next step on its branch. Nothing
 changes it. It does not mean a commit is made only to say it, that a pull request's description is edited for it
-(`roles/shared/work-flow.md`, "A description is written in as few edits as the work allows"), nor that a merge of the
-base into the branch, or a commit the host or Dependabot makes, carries one; a session that stops at a gate still
+(`roles/shared/work-flow.md`, on a description's edits; #829), nor that a merge of the base into the branch, or a
+commit the host or Dependabot makes, carries one; a session that stops at a gate still
 writes its hand-off note. Reason: on 26 November 2026 a hard stop ended one account's sessions mid-work, and the next
 steps of four drafts, written once at the end and never pushed, were lost. Held, in part, by `scripts/stalled.mjs`,
 which marks a stalled lane whose newest commit names no next step.
