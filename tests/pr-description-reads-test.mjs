@@ -41,6 +41,21 @@ const ok = (cond, what, got = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${
     ok(linked.at === null && mended(`FAIL ${linked.mend}`), "a tracked link in the manifest's place is refused, with its mend", JSON.stringify(linked));
     fs.rmSync(path.join(project, "core-manifest.md")); put("core-manifest.md", text); git("add", "-A"); git("commit", "-q", "-m", "the file back");
   }
+  // (a head that moves where the core lies, its manifest naming another copy it brings: refused, with its mend)
+  const manifestText = fs.readFileSync(path.join(project, "core-manifest.md"), "utf8");
+  put("core-manifest.md", `Core: someone/core at ${"0".repeat(40)}, copied whole under x/\n`); put("x/roles/a.md", "a\n"); put("x/floor/security.md", "f\n");
+  git("add", "-A"); git("commit", "-q", "-m", "another place");
+  const moved = coreHere(project);
+  ok(moved.at === null && mended(`FAIL ${moved.mend}`) && /under x\/, where its base held it under core\//.test(moved.mend), "a head that holds the core elsewhere than its base is refused, with its mend", JSON.stringify(moved));
+  put("core-manifest.md", manifestText); fs.rmSync(path.join(project, "x"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "the place back");
+  if (process.platform !== "win32") {
+    fs.renameSync(path.join(project, "core", "tasks"), path.join(project, "core", "t")); fs.symlinkSync("t", path.join(project, "core", "tasks"));
+    put("src/screens/a.js", "3\n"); git("add", "-A"); git("commit", "-q", "-m", "a module folder as a link");
+    let linkedLib = null;
+    try { calledFor(project); } catch (e) { linkedLib = e; }
+    ok(linkedLib !== null && mended(linkedLib.message), "a link where the core's modules stand is unread, and fails with its mend", linkedLib?.message);
+    fs.rmSync(path.join(project, "core", "tasks")); fs.renameSync(path.join(project, "core", "t"), path.join(project, "core", "tasks")); git("add", "-A"); git("commit", "-q", "-m", "the folder back");
+  }
   fs.renameSync(path.join(project, "core", "roles"), path.join(project, "core", "r")); git("add", "-A"); git("commit", "-q", "-m", "the roles moved");
   const gone = coreHere(project);
   ok(gone.at === null && mended(`FAIL ${gone.mend}`), "a head that holds the core nowhere its base held it fails, with its mend", JSON.stringify(gone));
