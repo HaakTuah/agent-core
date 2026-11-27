@@ -296,7 +296,7 @@ git(dir, "reset", "-q", "--hard", "large");
 fs.appendFileSync(path.join(dir, "data", "big.txt"), "one more line\n");
 commit(dir, "the file past the split mark changed");
 r = check(dir, "--base", "large");
-ok(r.status === 0 && /past the 51200-byte mark, and this PR changes it, which fails nothing/.test(r.out), "and a head ahead of that base that changes the file is still read against it, its question asked (#1413, point 6)", r.out);
+ok(r.status === 0 && /ok {3}copies\.yml\/copies\/copies/.test(r.out) && !/note the head (is its base|is behind its base)/.test(r.out), "and a head ahead of that base that changes the file is read as a change against it, and passes: the question it asks fails nothing (#1413, point 6)", r.out);
 git(dir, "reset", "-q", "--hard", "base");
 fs.mkdirSync(path.join(dir, "data"), { recursive: true });
 fs.writeFileSync(path.join(dir, "data", "big.txt"), "another file in its place\n");

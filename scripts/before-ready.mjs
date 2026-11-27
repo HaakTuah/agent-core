@@ -70,51 +70,66 @@ function repoOf(top) {
   try { return /([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(\.git)?\/?$/u.exec(execFileSync("git", ["-C", top, "remote", "get-url", "origin"], { encoding: "utf8" }).trim())?.[1] ?? ""; } catch { return ""; }
 }
 
-function main(args) {
+const git = (cwd, ...a) => execFileSync("git", ["-C", cwd, ...a], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+const FLAGS = ["--base", "--created"];
+
+// What it was given: { file, body, created, baseName }, or it fails saying how it is run.
+function given(args) {
   const at = flag => { const i = args.indexOf(flag); return i < 0 ? undefined : args[i + 1]; };
-  const file = args.find((a, i) => !a.startsWith("--") && !["--base", "--created"].includes(args[i - 1]));
-  if (!file || args.some((a, i) => a.startsWith("--") && !["--base", "--created"].includes(a)) || ["--base", "--created"].some(f => args.includes(f) && !at(f))) fail("this script takes a file that holds the description, and at most --base <rev> and --created <time>.", "run node core/scripts/before-ready.mjs <a file that holds the description> [--base <rev>] [--created <the pull request's opening, ISO>].");
+  const file = args.find((a, i) => !a.startsWith("--") && !FLAGS.includes(args[i - 1]));
+  if (!file || args.some(a => a.startsWith("--") && !FLAGS.includes(a)) || FLAGS.some(f => args.includes(f) && !at(f))) fail("this script takes a file that holds the description, and at most --base <rev> and --created <time>.", "run node core/scripts/before-ready.mjs <a file that holds the description> [--base <rev>] [--created <the pull request's opening, ISO>].");
   let body;
   try { body = fs.readFileSync(file, "utf8"); } catch { fail(`${file} cannot be read.`, "write the description you are about to give the pull request into a file, and give its path."); }
   const created = at("--created") ?? new Date().toISOString();
   if (Number.isNaN(Date.parse(created))) fail(`--created ${created} is no time.`, "give the pull request's opening as GitHub gives it, such as 2026-11-28T09:00:00Z, or leave it out for now.");
-  const git = (cwd, ...a) => execFileSync("git", ["-C", cwd, ...a], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  return { body, created, baseName: at("--base") };
+}
+
+// The repository's top, the base's commit and the head's; origin/main fetched where no base is given.
+function commits(baseName) {
   let top;
   try { top = git(".", "rev-parse", "--show-toplevel").trim(); } catch { fail("this is no git repository.", "run it from the clone of the repository whose pull request it is."); }
-  const baseName = at("--base") ?? "origin/main";
-  if (!at("--base")) { try { git(top, "fetch", "-q", "--no-tags", "origin", "+refs/heads/main:refs/remotes/origin/main"); } catch { console.log("note origin/main could not be fetched: the base is origin/main as this clone last fetched it"); } }
-  let base, head;
-  try { base = git(top, "rev-parse", "--verify", "-q", `${baseName}^{commit}`).trim(); head = git(top, "rev-parse", "HEAD").trim(); } catch { fail(`${baseName} is no commit here.`, "fetch the branch the pull request merges into (git fetch origin main), or give its commit with --base."); }
-  const dirty = git(top, "status", "--porcelain", "--untracked-files=no").trim();
-  if (dirty) console.log("note what is not committed is not read: the checks read the branch's commit, as the host does");
-  const project = fs.existsSync(path.join(top, MANIFEST));
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "before-ready-")), tree = path.join(scratch, "merge");
+  if (!baseName) { try { git(top, "fetch", "-q", "--no-tags", "origin", "+refs/heads/main:refs/remotes/origin/main"); } catch { console.log("note origin/main could not be fetched: the base is origin/main as this clone last fetched it"); } }
+  const name = baseName ?? "origin/main";
+  try { return { top, name, base: git(top, "rev-parse", "--verify", "-q", `${name}^{commit}`).trim(), head: git(top, "rev-parse", "HEAD").trim() }; } catch { fail(`${name} is no commit here.`, "fetch the branch the pull request merges into (git fetch origin main), or give its commit with --base."); }
+}
+
+// The checks the host runs, in the merge's worktree `tree`; the names of those that failed.
+function checks({ tree, scratch, project, body, env }) {
   const failed = [];
-  try {
-    git(top, "worktree", "add", "-q", "--detach", tree, base);
-    const merge = spawnSync("git", ["-C", tree, "-c", "user.name=before-ready", "-c", "user.email=before-ready@example.invalid", "-c", "commit.gpgsign=false", "merge", "-q", "--no-ff", "--no-edit", head], { encoding: "utf8" });
-    if (merge.status !== 0) { failed.push("the merge"); console.error(`FAIL the branch does not merge into ${baseName} without a conflict. ${MEND}bring the branch up to date with ${baseName}, mend the conflict, commit, and run this again.`); return failed; }
-    const env = { ...process.env, PR_BODY: body, PR_CREATED: created, BASE_SHA: base, GITHUB_REPOSITORY: repoOf(top) };
-    const run = (name, cmd, cmdArgs, more = {}) => {
-      console.log(`== ${name}`);
-      const r = spawnSync(cmd, cmdArgs, { cwd: tree, env: { ...env, ...more }, stdio: ["ignore", "inherit", "inherit"] });
-      if (r.status !== 0) failed.push(name);
-    };
-    if (project) {
-      const copy = corePath(tree) || "core/", text = path.join(scratch, "description.md");
-      fs.writeFileSync(text, body);
-      run("the copies and description checks (checks.mjs)", process.execPath, [path.join(tree, copy, "scripts/checks.mjs"), "copies", "description", "--description", text, "--base", "HEAD^1"]);
-    } else {
-      let steps;
-      try { steps = stepsOf(tree, { body, created, base }); } catch (e) { failed.push("the steps"); console.error(`FAIL ${e.message}`); return failed; }
-      for (const s of steps) {
-        if (s.host) { console.log(`== ${s.name}\nnote read on the host alone, from the pull request's comments: a raise of a cap there asks its "Leanness check:" comment`); continue; }
-        const script = path.join(scratch, "step.sh");
-        fs.writeFileSync(script, s.run);
-        run(s.name, "bash", ["--noprofile", "--norc", "-eo", "pipefail", script], s.env);
-      }
-    }
+  const run = (name, cmd, cmdArgs, more = {}) => {
+    console.log(`== ${name}`);
+    if (spawnSync(cmd, cmdArgs, { cwd: tree, env: { ...env, ...more }, stdio: ["ignore", "inherit", "inherit"] }).status !== 0) failed.push(name);
+  };
+  if (project) {
+    const text = path.join(scratch, "description.md");
+    fs.writeFileSync(text, body);
+    run("the copies and description checks (checks.mjs)", process.execPath, [path.join(tree, corePath(tree) || "core/", "scripts/checks.mjs"), "copies", "description", "--description", text, "--base", "HEAD^1"]);
     return failed;
+  }
+  let steps;
+  try { steps = stepsOf(tree, { body, created: env.PR_CREATED, base: env.BASE_SHA }); } catch (e) { console.error(`FAIL ${e.message}`); return ["the steps"]; }
+  for (const s of steps) {
+    if (s.host) { console.log(`== ${s.name}\nnote read on the host alone, from the pull request's comments: a raise of a cap there asks its "Leanness check:" comment`); continue; }
+    const script = path.join(scratch, "step.sh");
+    fs.writeFileSync(script, s.run);
+    run(s.name, "bash", ["--noprofile", "--norc", "-eo", "pipefail", script], s.env);
+  }
+  return failed;
+}
+
+// The names of the checks that failed on the merge, the worktree gone once they ran.
+export function main(args) {
+  const { body, created, baseName } = given(args);
+  const { top, name, base, head } = commits(baseName);
+  if (git(top, "status", "--porcelain", "--untracked-files=no").trim()) console.log("note what is not committed is not read: the checks read the branch's commit, as the host does");
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "before-ready-")), tree = path.join(scratch, "merge");
+  try {
+    try { git(top, "worktree", "add", "-q", "--detach", tree, base); } catch (e) { console.error(`FAIL git could not make a worktree for the merge (${String(e.stderr ?? e.message).trim()}). ${MEND}free the disk or the worktree git names (git worktree prune), and run this again.`); return ["the worktree"]; }
+    const merge = spawnSync("git", ["-C", tree, "-c", "user.name=before-ready", "-c", "user.email=before-ready@example.invalid", "-c", "commit.gpgsign=false", "merge", "-q", "--no-ff", "--no-edit", head], { encoding: "utf8" });
+    if (merge.status !== 0) { console.error(`FAIL the branch does not merge into ${name} without a conflict. ${MEND}bring the branch up to date with ${name}, mend the conflict, commit, and run this again.`); return ["the merge"]; }
+    const env = { ...process.env, PR_BODY: body, PR_CREATED: created, BASE_SHA: base, GITHUB_REPOSITORY: repoOf(top) };
+    return checks({ tree, scratch, project: fs.existsSync(path.join(top, MANIFEST)), body, env });
   } finally {
     spawnSync("git", ["-C", top, "worktree", "remove", "--force", tree], { stdio: "ignore" });
     spawnSync("git", ["-C", top, "worktree", "prune"], { stdio: "ignore" });

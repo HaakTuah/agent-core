@@ -6,7 +6,7 @@ Read at the start of every task.
    - When the work is done, read the task's spec again: build what changed, or queue it if large.
    - Ask its reviews and mark it ready in `tasks/reviews.md`'s order (point 10). Fix all findings together.
    - Once every review the order names has answered on the head commit with no finding open, turn on auto-merge
-     (`tasks/github-calls.md`; a sync PR is merged by hand: floor rule 8) and go on: GitHub merges when the checks are
+     (a sync PR is merged by hand: floor rule 8) and go on: GitHub merges when the checks are
      green and, where asked, the branch is up to date. Where it refuses, the PR already `clean` or `unstable`, merge it
      yourself as floor rule 12 says. A check that then fails on `main` is yours while you run (`tasks/tests.md`).
    - A push after that turns auto-merge off first; bringing the branch up to date with `main` keeps it on.
@@ -71,11 +71,13 @@ The calls from a cloud session: `tasks/github-calls.md`.
   `needs-owner` on the PR where it is the owner; its builder edits it whenever that changes. Reason: a finished draft stood still and no one was shown it.
 - **A description is written in as few edits as the work allows** (#829). By default a builder opens its draft
   pull request with a short description (its first line and the line `Waits on:`), writes the full description in one
-  edit after its last push and before it marks the pull request ready, and after that edits it only where what it says
-  changes (a review's fix, what it waits on), gathering the changes that come together into one edit. It does not mean
-  that a description is left untrue to save an edit. Reason: each edit of a description starts the checks that read it
-  (two jobs in the core, about 76 an hour on 19 November 2026, #820), which hold runner slots and, on a private
-  repository's free plan, bill a whole minute each. Held by nothing yet.
+  edit after its last push, once `node core/scripts/before-ready.mjs <its file>` passes on it (the description and size
+  checks, on the merge; #1413, point 6), and before it marks the pull request ready, and after that edits it only where
+  what it says changes (a review's fix, what it waits on), gathering the changes that come together into one edit. It
+  does not mean that a description is left untrue to save an edit. Reason: each edit of a description starts the checks
+  that read it (two jobs in the core, about 76 an hour on 19 November 2026, #820), which hold runner slots and, on a
+  private repository's free plan, bill a whole minute each, and a failure there sends the work back. Held by nothing
+  yet.
 - **Push after every commit,** even before the PR opens (a draft if not ready).
   - Before pushing to a branch whose PR you opened earlier, check whether it merged; if it did, start a new branch and
     PR.

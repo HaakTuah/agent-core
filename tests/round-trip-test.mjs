@@ -60,7 +60,7 @@ const ELSEWHERE = {
   "workflows.mjs": "a temporary folder", "pure-sync.mjs": "the base it renders, in a temporary folder",
   "core-moved.mjs": "an issue's text, handed to gh", "helper-call.mjs": "a helper's mark, read by nothing of a project's",
   "mutate.mjs": "a mutation run's files", "stryker.mjs": "a mutation run's config and report", "stryker-plugin.mjs": "a mutation run's report",
-  "npm-once.mjs": "a program fetched to a cache", "nuget-fetch.mjs": "a program fetched to a cache", "session-cost.mjs": "its own part of a session's cost",
+  "npm-once.mjs": "a program fetched to a cache", "nuget-fetch.mjs": "a program fetched to a cache", "session-cost.mjs": "its own part of a session's cost", "before-ready.mjs": "a step and a description in a temporary folder, for the checks it runs",
   "code-shape.mjs": "the JSON asked for with --json", "pruning.mjs": "the core's own record of a pruning", "pruning-record.mjs": "the core's own record of a pruning",
   "staged.mjs": "the core's own record of the staged cases", "security-review-record.mjs": "the core's own record of reviews",
   "release-trial.mjs": "the core's own record of a release's trial",
