@@ -121,6 +121,11 @@ const around = {
   "a dot after builtin": `builtin . ./lib.sh\n${READ}\n${GET}\n`,
   "a dot after command": `command . ./lib.sh\n${READ}\n${GET}\n`,
   "a dot after an assignment": `X=1 . ./lib.sh\n${READ}\n${GET}\n`,
+  // (a dot or a name continued on the next line, #1455's seventh review)
+  "a dot continued": `. \\\n./lib.sh\n${READ}\n${GET}\n`,
+  "a dot continued before its space": `.\\\n ./lib.sh\n${READ}\n${GET}\n`,
+  "hash continued in mid-word": `ha\\\nsh -p ./tools/grep grep\n${READ}\n${GET}\n`,
+  "grep defined, continued in mid-word": `gr\\\nep() { sh; }\n${READ}\n${GET}\n`,
 };
 const through = Object.entries(around).filter(([, code]) => programs(code) < 2).map(([what]) => what);
 ok(!through.length, "a read whose variable a shell reads by itself, or that stands other than it reads, is a program's download", through.join(" | "));
