@@ -114,10 +114,17 @@ const around = {
   "a dot escaped": `\\. ./lib.sh\n${READ}\n${GET}\n`,
   "source quoted in part": `so""urce ./lib.sh\n${READ}\n${GET}\n`,
   "hash quoted in part": `ha''sh -p ./tools/grep grep\n${READ}\n${GET}\n`,
+  // (a dot in any other place a command stands, #1455's sixth review)
+  "a dot as an if's condition": `if . ./lib.sh; then :; fi\n${READ}\n${GET}\n`,
+  "a dot after !": `! . ./lib.sh\n${READ}\n${GET}\n`,
+  "a dot after time": `time . ./lib.sh\n${READ}\n${GET}\n`,
+  "a dot after builtin": `builtin . ./lib.sh\n${READ}\n${GET}\n`,
+  "a dot after command": `command . ./lib.sh\n${READ}\n${GET}\n`,
+  "a dot after an assignment": `X=1 . ./lib.sh\n${READ}\n${GET}\n`,
 };
 const through = Object.entries(around).filter(([, code]) => programs(code) < 2).map(([what]) => what);
 ok(!through.length, "a read whose variable a shell reads by itself, or that stands other than it reads, is a program's download", through.join(" | "));
-ok(programs(`find . -name "*.tgz" -delete\ndocker build . -t moss\n${READ}\n${GET}\n`) === 1, "a dot that is no command, an argument of find or docker, leaves the read one of data");
+ok(programs(`find . -name "*.tgz" -delete\n${READ}\n${GET}\n`) === 2, "a dot that is an argument, of find, costs the read its reading as data: any word . with a word after it is read as a file read in");
 ok(programs(`# set up the tool's version; it's read below\n${READ}\n${GET}\n`) === 1, "a comment with a quote in it before the read leaves the read one of data");
 // Through the scan's pin check (licence-scan.mjs's pinFault): a read of a version index asks no checksum, and a
 // package of the machine's distribution that the file installs, kind "distribution", is asked no version, its
