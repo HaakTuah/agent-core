@@ -168,7 +168,9 @@ function wildcardOut(p, f, known) {
   let depth = path.posix.dirname(f) === "." ? 0 : path.posix.dirname(f).split("/").length;
   for (const w of words) if (w === "..") { if (--depth < 0) return true; } else if (w && w !== ".") depth++;
   if (wild === words.length - 1) return false;
-  const at = path.posix.dirname(importPath(f, [...words.slice(0, wild), "x"].join("/")) ?? "");
+  // (the folder above the wildcard, each plain word trimmed as Windows reads it: "lib." and "lib " are lib)
+  const above = words.slice(0, wild).map(w => (w === "." || w === ".." ? w : w.replace(/[\s.]+$/u, "")));
+  const at = path.posix.dirname(importPath(f, [...above, "x"].join("/")) ?? "");
   return projectsWithin(known).has(at === "." ? "" : at.toLowerCase());
 }
 

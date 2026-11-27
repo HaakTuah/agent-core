@@ -110,6 +110,8 @@ for (const [item, what, more] of [
   [`<Compile Include="../lib/bin/**/*.cs" />`, "a wildcard into a folder named bin, which a build writes"],
   [`<Compile Include="../lib/Obj. /*.cs" />`, "a wildcard into a folder named obj, by a name Windows trims"],
   [`<Compile Include="../lib/**/*.cs" />`, "a wildcard whose folders may reach a project's folder, where its build writes", LIB],
+  [`<Compile Include="../lib./**/*.cs" />`, "a wildcard whose folders may reach a project's folder, by a name Windows trims", LIB],
+  [`<Compile Include="../lib /**/*.cs" />`, "a wildcard whose folders may reach a project's folder, by a name Windows trims of its blank", LIB],
   [`<Compile Include="**/*.cs" />`, "a wildcard whose folders reach its own project's folder"],
   ["", "an SDK the reader knows but in another case, which the resolver may not find as its own", { "Directory.Build.props": "<Project Sdk=\"microsoft.net.sdk\" />\n" }],
   [`<PropertyGroup><NoWarn>CS1591&quot; /x:y</NoWarn></PropertyGroup>`, "a quote in a value, which may close the compiler's argument"],
