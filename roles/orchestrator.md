@@ -34,15 +34,23 @@ nothing yet.
 - A tool is reached by the first way there is: the
   tool that runs the agents side by side (floor rule 18), else a plug-in in the orchestrator's tool, else a way the
   project names, as the tool's part says (`tasks/tools.md`).
-- Each takes every task or part whose brief can say all it needs, each in its own working tree and PR, whose first line
-  names its builder; what no brief carries (a design reading, the owner's past words) goes to a builder that reads them
-  itself. A task one failed at twice (its closed PRs and the *progress file* say) goes to the next, from `main`.
+- Each takes every task or part whose brief can say all it needs, each in its own working tree and PR (save as the next
+  rule joins them), whose first line names its builder; what no brief carries (a design reading, the owner's past
+  words) goes to a builder that reads them itself. A task one failed at twice (its closed PRs and the *progress file* say) goes to the next, from `main`.
 - It does not mean the order holds back a line the owner gave a tool by name, nor that a project's own pace is passed
   over ("The pace is the owner's", below).
 - Reason: the orchestrator keeps the work going, and builders that empty its provider stop it too, with nothing to
   restart what stalled, so that provider is saved the longest; the strongest model is kept for the work that takes
   judgement (a rule, the design check, a security review, escalation), on whichever provider.
 - Held by nothing yet: a builder's tool and the usage left are no mark a check reads.
+- **Small points of one issue that share a file go in one pull request** (#1504). By default, where points of one
+  issue, none of them the *hard work* (its small points), each name in their own words a file in common among those
+  they change, whoever hands them out (the orchestrator, or with none the session that builds them) gives them to one
+  builder, to build in one pull request. Nothing changes it. It does not mean a split joins other work ("Split by
+  meaning, from the start"), nor points whose builders' tier or effort, or whose security reviews (floor rule 3),
+  differ, nor that a point waits for others. Reason: on 26 November 2026, 11 of the core's 19 open pull requests were
+  single small points of one issue, each with its own builder, reviews and checks. Held by nothing yet: which files a
+  point changes is read from its issue's text.
 
 - **It builds nothing itself:** every lane goes to a builder session of its own.
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.

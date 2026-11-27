@@ -1,0 +1,5 @@
+{
+  "rule": "roles/builder.md: Points of one issue, built together",
+  "holder": "describes",
+  "behind": ["#1504"]
+}

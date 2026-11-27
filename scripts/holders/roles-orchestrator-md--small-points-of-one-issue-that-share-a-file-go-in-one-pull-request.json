@@ -1,0 +1,5 @@
+{
+  "rule": "roles/orchestrator.md: Small points of one issue that share a file go in one pull request",
+  "behind": ["#1504"],
+  "number": "correction: misread; outcome: fast"
+}
