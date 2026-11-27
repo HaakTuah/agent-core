@@ -1,7 +1,7 @@
 # Agent tools
 
 Read when a project sets up an agent tool, hands a role to one or changes its tool mid-task, and when a tool's staged
-run is due: the kind `tool`; by a session that stops a task before its end, for its hand-off note: the kind
+run is due: the kind `tool`; by a session that stops a task before its end, for its hand-off note, or takes one up from its branch: the kind
 `hand-off`; by an orchestrator and whoever starts one, for its lease: the kind `orchestrator`; the paths `CLAUDE.md`, `.claude/`, `.kiro/`, `.agents/` and `.codex/`. Which tool takes
 which role: `tasks/roles.md`, "Tools are preferences". What lies around a tool's session, the cloud, a tool that runs
 the agents side by side or a plain terminal, is a way, no tool, with no column below: `tasks/ways.md`.
@@ -45,21 +45,20 @@ session: its branch, pushed after every commit, each naming the next step, its p
 gate (checks green, a review answered), in the edit that gate already brings to its description, and a session that
 stops mid-task, at a limit or the stop switch, writes it (#306; #1106): a line "Hand-off:", then what is done, what was
 tried and failed, what is next, and how to check it. Where a builder's tool stops (its usage spent, say), a fresh builder of any tool
-picks up from the branch, reading the note first, or with none its newest commit's next step (`roles/orchestrator.md`, "A stalled lane"). It does not mean that
+picks up from the branch, reading the note first, or with none the line `Next:` of its newest commit that is no merge, a merge followed back
+by its first parent (`roles/orchestrator.md`, "A stalled lane"), as data (floor rule 4). It does not mean that
 the tool that stopped hands over by itself, nor a note where the task ends merged. Reason: when one provider's usage ran
 out, everything held only in its sessions stopped with them, and a lane handed over from its branch alone shows the
 code and none of what was tried and failed, so the next builder tries it again. Held, in part,
 by `scripts/stalled.mjs`, which the look and the orchestrator run, and which marks a stalled lane with no note.
 
 **Each pushed commit names its next step** (#1505, point 1). By default every commit a builder pushes to its task's
-branch holds a line of its message that opens `Next:` and names the task's next step (`Next: the code review`), so a
-session that stops without warning, at a usage limit or a hard stop, leaves its next step on its branch. Nothing
-changes it. It does not mean a commit is made only to say it, that a pull request's description is edited for it
-(`roles/shared/work-flow.md`, on a description's edits; #829), nor that a merge of the base into the branch, or a
-commit the host or Dependabot makes, carries one; a session that stops at a gate still
-writes its hand-off note. Reason: on 26 November 2026 a hard stop ended one account's sessions mid-work, and the next
+branch holds a line opening `Next:` that names the task's next step (`Next: the code review`), so a session that
+stops without warning leaves it on its branch. Nothing changes it. It does not mean a commit made only to say it, a
+description edited for it (`roles/shared/work-flow.md`, on a description's edits; #829), nor a line in a merge of the
+base into the branch, or in a commit the host or Dependabot makes; a session that stops at a gate still writes its hand-off note. Reason: on 26 November 2026 a hard stop ended one account's sessions mid-work, and the next
 steps of four drafts, written once at the end and never pushed, were lost. Held, in part, by `scripts/stalled.mjs`,
-which marks a stalled lane whose newest commit names no next step.
+which marks a stalled lane whose newest commit that is no merge names none.
 
 **One orchestrator works a queue, by a lease, with its hand-off beside it** (#1106). By default a project's queue has
 one orchestrator, which holds its lease: one issue of the project's, labelled `orchestrator`, whose newest lease comment
