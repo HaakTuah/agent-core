@@ -38,10 +38,10 @@ import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, parseBounded, unrooted } from "./guards.mjs";
-import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
+import { placeAt, readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { whole } from "./core-owned.mjs";
 import { readBlobs } from "./blobs.mjs";
-import { projectAt } from "./core-path.mjs";
+import { ownText, projectAt, regularText } from "./core-path.mjs";
 import { keysOf, shapeFaults } from "./schemas.mjs";
 import { didNotRun } from "./packages.mjs";
 import { uncommented } from "./yaml-keys.mjs";
@@ -72,7 +72,7 @@ const real = p => { try { return fs.realpathSync.native(p); } catch { return p; 
 let CONFIG_AT;
 try { CONFIG_AT = git(["ls-files", "-z", "--full-name", "--error-unmatch", "--", configPath]).split("\0")[0]; } catch { CONFIG_AT = path.relative(real(ROOT), path.join(real(path.dirname(path.resolve(configPath))), path.basename(configPath))).split(path.sep).join("/"); }
 let config;
-try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
+try { config = JSON.parse(regularText(configPath) ?? ""); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
 process.chdir(ROOT);
 // A key it does not know, or one of the wrong shape, would check less without a word, so it fails: its schema holds
 // the config's shape (scripts/schemas/copies.json, schemas.mjs). Where the core's packages are not installed, they are
@@ -176,7 +176,7 @@ function describeCopy(places, len, size, joiner, perFile, u, i) {
 }
 // Every run of `size` units found in two places that do not overlap; overlapping finds of one copy merge into one,
 // keyed by a hash of its first run, so its key stays the same while the copy stands.
-function find(files, units, size, joiner, minChars, read = f => fs.readFileSync(f, "utf8")) {
+function find(files, units, size, joiner, minChars, read = f => ownText(f, { bound: BOUND }) ?? "") {
   const { perFile, seen } = indexWindows(files, units, size, joiner, minChars, read);
   const dup = apartPlaces(seen, size);
   const copies = [], used = new Set();
@@ -195,6 +195,32 @@ function find(files, units, size, joiner, minChars, read = f => fs.readFileSync(
   return { copies, dup };
 }
 
+// The files git lists, each read once (floor rule 5, in floor/topics/input.md): `placeOf` gives where each leads, as
+// a path from the root, or null where it is unread, and those that lead to the same file are read as one, under the
+// name of the one that is that file itself, else the first's, so that a link inside the project and the file it
+// leads to are no copy of each other.
+function once(files, placeOf) {
+  const by = new Map();
+  for (const f of files) { const at = placeOf(f); if (at !== null && (!by.has(at) || f === at)) by.set(at, f); }
+  const kept = new Set(by.values());
+  return files.filter(f => kept.has(f));
+}
+// Where a file of the work tree leads, as once() reads it: a regular file of the project's own of at most BOUND bytes,
+// and at most TOTAL bytes of them in a run, its links followed; one that leads out of the project, to a folder, a
+// device or a pipe, or past a bound, is unread, and counted in `unread`, which the check notes.
+const BOUND = 1 << 23, TOTAL = 1 << 28, unread = new Set();
+let readSoFar = 0;
+const placeHere = f => {
+  let at = null;
+  try {
+    if (!leadsOut(ROOT, f)) {
+      const real = fs.realpathSync(f), st = fs.statSync(real);
+      if (st.isFile() && st.size <= BOUND && readSoFar + st.size <= TOTAL) { readSoFar += st.size; at = path.relative(fs.realpathSync("."), real).split(path.sep).join("/"); }
+    }
+  } catch { at = null; }
+  if (at === null) unread.add(f);
+  return at;
+};
 // An empty list checks nothing: git ls-files would list every file. `env` names another index (lsAt, below).
 const ls = (specs, env = process.env) => {
   if (!specs.length) return [];
@@ -325,7 +351,7 @@ const TOOL_ONLY = toolsOnly(null, null, ls);
 // What a commit held of the copies in those files: each prose window that stood there with one of its places in such a
 // file, by its hash, and in how many places. Read only where a copy or the baseline asks it.
 function toolCopiesAt(commit) {
-  const show = readAt(commit), list = dir => lsAt(commit, [dir]), there = specs => lsAt(commit, specs);
+  const place = placeAt(commit), show = readAt(commit, place), list = dir => lsAt(commit, [dir]), there = specs => once(lsAt(commit, specs), place);
   const tools = toolsOnly(show, list, there);
   if (!tools.size) return new Map();
   let rules;
@@ -335,7 +361,9 @@ function toolCopiesAt(commit) {
 }
 let atBase = null;
 const stood = (h, n) => !!process.env.COPIES_BASE && TOOL_ONLY.size > 0 && ((atBase ??= toolCopiesAt(process.env.COPIES_BASE)).get(h) ?? 0) >= n;
-const runs = [find(ls(CODE_SPECS), codeUnits, LINES, "\n", MIN_CHARS), find(ls(proseSpecs), proseUnits, WORDS, " ", 0)];
+const CODE_FILES = once(ls(CODE_SPECS), placeHere);
+const runs = [find(CODE_FILES, codeUnits, LINES, "\n", MIN_CHARS), find(once(ls(proseSpecs), placeHere), proseUnits, WORDS, " ", 0)];
+if (unread.size) console.log(`note ${unread.size} of the files the config names ${unread.size === 1 ? "is" : "are"} not read: a link that leads out of the project or to no regular file, a file past ${BOUND >> 20} MiB, or past the ${TOTAL >> 20} MiB a run reads (${logged([...unread].slice(0, 5).join(", "))}${unread.size > 5 ? ", and more" : ""})`);
 const found = runs.flatMap(r => r.copies);
 const places = new Map(runs.flatMap(r => [...r.dup].map(([h, list]) => [h, list.length])));
 // (the copies that stand in an agent tool's file, and their windows)
@@ -434,10 +462,10 @@ function nearCopies() {
   const lines = new Map();
   const exact = place => {
     const [, file, from, to] = /^(.*):(\d+)-(\d+)$/.exec(place);
-    if (!lines.has(file)) lines.set(file, fs.readFileSync(file, "utf8").split("\n"));
+    if (!lines.has(file)) lines.set(file, (ownText(file, { bound: BOUND }) ?? "").split("\n"));
     return codeUnits(lines.get(file).slice(from - 1, to).join("\n")).map(u => u.t).join("\n");
   };
-  return find(ls(CODE_SPECS), text => codeUnits(text).map(u => ({ ...u, t: skeleton(u.t) })), LINES, "\n", NEAR_CHARS).copies.filter(c => new Set(c.places.map(exact)).size > 1);
+  return find(CODE_FILES, text => codeUnits(text).map(u => ({ ...u, t: skeleton(u.t) })), LINES, "\n", NEAR_CHARS).copies.filter(c => new Set(c.places.map(exact)).size > 1);
 }
 if (!WRITE) {
   const near = nearCopies();

@@ -27,8 +27,13 @@ export const TOOL_FILES = Object.freeze(["GEMINI.md", ...Object.values(ENTRY_FIL
 // A reader of the files of a commit's tree, as the work tree's reader reads them, for a check that holds a pull request
 // to its base: every link on a path followed, the file's own and a folder's on its way, while it leads inside that tree,
 // at most 40 in all; null where one leads out of it or nowhere, and for what is no file (a folder, a submodule). Run
-// from the project's root.
-export function readAt(commit) {
+// from the project's root. `place`, where given, is placeAt(commit)'s, so that the tree is listed once.
+export function readAt(commit, place = placeAt(commit)) {
+  return f => { const at = place(f); return at === null ? null : place.show(at); };
+}
+// Where readAt(commit) reads a path from: the path, from the root, of the file it leads to, every link on its way
+// followed as readAt follows it, or null where readAt reads nothing there; `show` reads a file of the tree by its path.
+export function placeAt(commit) {
   const run = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   let modes = null;
   const mode = f => {
@@ -39,18 +44,19 @@ export function readAt(commit) {
     return modes.get(f);
   };
   const show = at => { try { return run(["show", `${commit}:${at}`]); } catch { return null; } };
-  return f => {
+  const place = f => {
     for (let at = path.posix.normalize(f), hops = 0; hops <= 40; hops++) {
       if (at === ".." || at.startsWith("../") || at.startsWith("/")) return null;
       // (the first part of the path, its own end included, that is a link: what stands there is read through it)
       const parts = at.split("/"), k = parts.findIndex((_, i) => mode(parts.slice(0, i + 1).join("/")) === "120000");
-      if (k < 0) return /^100/u.test(mode(at) ?? "") ? show(at) : null;
+      if (k < 0) return /^100/u.test(mode(at) ?? "") ? at : null;
       const link = parts.slice(0, k + 1).join("/"), to = show(link);
       if (to === null || /^([\\/]|[A-Za-z]:)/u.test(to)) return null;
       at = path.posix.normalize(path.posix.join(path.posix.dirname(link), to.replace(/\\/gu, "/"), ...parts.slice(k + 1)));
     }
     return null;
   };
+  return Object.assign(place, { show });
 }
 // The files an agent tool takes its instructions from, as `read` and `list` find them: those of TOOL_FILES, then those
 // git tracks under FOLDERS, each that `read` reads (so a link that leads out of the project is none, at a commit too).

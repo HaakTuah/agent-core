@@ -17,10 +17,9 @@
 //
 //   node core/scripts/entry-files.mjs           from a project's root, as the copies workflow runs it
 //   node scripts/entry-files.mjs --core         in the core's own repository
-import { execFileSync } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
-import { ENTRY_FILES } from "./rule-files.mjs";
+import { ownText } from "./core-path.mjs";
+import { ENTRY_FILES, readAt } from "./rule-files.mjs";
 import { asText } from "./guards.mjs";
 import { guard } from "./mend.mjs";
 
@@ -83,12 +82,12 @@ export function verdict(head, base = null) {
   return { fails, notes };
 }
 
-const fileAt = file => (fs.existsSync(file) && fs.statSync(file).isFile() ? fs.readFileSync(file, "utf8") : null);
-const gitAt = rev => file => { try { return execFileSync("git", ["show", `${rev}:${file}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; } };
 
 if (guard(import.meta.url)) {
   const core = process.argv.includes("--core"), base = core ? "" : process.env.ENTRY_BASE ?? "";
-  const read = verdict(fileAt, base ? gitAt(base) : null);
+  // (the work tree's files as ownText reads them, a link inside the project followed, and the base's as readAt reads
+  // its tree, each link inside it followed the same way, so that a file the base held as a link reads as its target)
+  const read = verdict(file => ownText(file), base ? readAt(base) : null);
   // (in a project with no base to read against, nothing is new: each is a note)
   const { fails, notes } = core || base ? read : { fails: [], notes: [...read.notes, ...read.fails] };
   for (const n of notes) console.log(asText(`note (it stood so before this pull request, so it fails nothing): ${n}`));

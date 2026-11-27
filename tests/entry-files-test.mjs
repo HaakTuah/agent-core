@@ -82,6 +82,19 @@ try {
   write("AGENTS.md", AGENTS);
   write(".kiro/steering/core.md", KIRO);
   ok(run().status === 0, "once the line is added, it passes");
+  // (an entry file the base held as a link inside the project reads there as the file it leads to, as the work tree's)
+  git("add", "-A"); git("commit", "-qm", "kiro");
+  fs.symlinkSync("AGENTS.md", path.join(dir, "CLAUDE.md")); git("add", "-A"); git("commit", "-qm", "linked");
+  ok(run({ ENTRY_BASE: "HEAD" }).status === 0, "a tracked link inside the project reads as the file it leads to, at the base and in the work tree alike");
+  fs.rmSync(path.join(dir, "CLAUDE.md")); write("CLAUDE.md", "@core-manifest.md\n");
+  r = run({ ENTRY_BASE: "HEAD" });
+  ok(r.status === 1 && r.out.includes("FAIL") && r.out.includes("@core/floor/security.md"), "against a base that held it as a link, an entry file that now pulls in less fails");
+  const away = path.join(path.dirname(dir), `${path.basename(dir)}-away.md`);
+  fs.writeFileSync(away, "@elsewhere.md\n");
+  try {
+    fs.rmSync(path.join(dir, "CLAUDE.md")); fs.symlinkSync(away, path.join(dir, "CLAUDE.md"));
+    ok(run({ ENTRY_BASE: "HEAD" }).status === 0, "an entry file that is a link leading out of the project is unread, as one not there");
+  } finally { fs.rmSync(away, { force: true }); }
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 
 // the starter kit's entry files pull in what its AGENTS.md names, each with its tool's part; and the core's own

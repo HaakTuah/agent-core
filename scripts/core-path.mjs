@@ -19,7 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { started } from "./started.mjs";
-import { parseBounded } from "./guards.mjs";
+import { leadsOut, parseBounded } from "./guards.mjs";
 
 export const MANIFEST = "core-manifest.md", DEFAULT = "core/";
 // (a folder of the repository, from its root: plain names joined by "/", ending in "/"; none is "." or "..", nor .git,
@@ -85,6 +85,24 @@ export function regularText(file, { linked = true, bound = 1 << 20 } = {}) {
     const stat = fs.fstatSync(fd);
     if (!stat.isFile() || stat.size > bound || (seen !== undefined && (stat.dev !== seen.dev || stat.ino !== seen.ino))) return null;
     return readAtMost(fd, bound);
+  } catch { return null; } finally { fs.closeSync(fd); }
+}
+/** The text of a file of the project's own at `file`, as regularText reads it within `bound` bytes (a mebibyte where
+ *  none is given), where `file`, every link on its way followed, lies inside the folder `root` (guards.mjs,
+ *  leadsOut); else null. So a link inside the project reads as the file it leads to, and one that leads out of it, or
+ *  to a device, a pipe or a folder, reads as none. */
+export const ownText = (file, { root = ".", bound } = {}) => (leadsOut(root, file) ? null : regularText(file, { bound }));
+/** At most the first `n` bytes of the regular file at `file`, a link not followed, read through one descriptor opened
+ *  without waiting; null where it is no regular file or cannot be read. */
+export function startOf(file, n) {
+  const { O_RDONLY, O_NOFOLLOW, O_NONBLOCK } = fs.constants;
+  if (O_NOFOLLOW === undefined && isLink(file)) return null;
+  let fd;
+  try { fd = fs.openSync(file, O_RDONLY | (O_NOFOLLOW ?? 0) | (O_NONBLOCK ?? 0)); } catch { return null; }
+  try {
+    if (!fs.fstatSync(fd).isFile()) return null;
+    const chunk = Buffer.alloc(n);
+    return chunk.subarray(0, fs.readSync(fd, chunk, 0, n, 0));
   } catch { return null; } finally { fs.closeSync(fd); }
 }
 // What the path leads to, where it is a regular file within `bound` bytes; else null.
