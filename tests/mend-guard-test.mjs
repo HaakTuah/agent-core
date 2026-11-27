@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { missing, mended, unknown } from "../scripts/mend.mjs";
-import { faultsOf, scriptOf } from "../scripts/check-runs.mjs";
+import { faultsOf, scriptOf, spawnSync } from "../scripts/check-runs.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -69,6 +69,13 @@ ok(scriptOf(process.execPath, ["core/scripts/a.mjs", "--x"]) === "core/scripts/a
     && /not there/u.test(faultsOf(1, "FAIL: a. Mend: run node core/scripts/z.mjs now.", at).join()),
     "a run that fails with no failure line, one unmended or one naming a script not there is a fault; one that passed, was killed or says its mend is none");
   fs.rmSync(at, { recursive: true, force: true });
+}
+{
+  let refused = "";
+  try { spawnSync(process.execPath, ["-e", "1"], { shell: true }); } catch (e) { refused = e.message; }
+  const r = spawnSync(process.execPath, ["-e", "process.stdout.write(process.argv[1])", "a; echo b"], { encoding: "utf8" });
+  ok(/no option shell/u.test(refused) && r.stdout === "a; echo b",
+    "a run asks no shell: an option the watch does not name is refused, and what it starts is the program and its arguments alone");
 }
 
 console.log(`${count - failed} of ${count} passed`);
