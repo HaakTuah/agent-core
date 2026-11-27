@@ -39,7 +39,7 @@ import { CODE, OTHER } from "./code-shape.mjs";
 import { asText, logged, loggedAlone, parseBounded } from "./guards.mjs";
 import { pathIn } from "./reading.mjs";
 import { notLinked, parseBaseline, parseConfig, rowToken, where } from "./shape.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
 import { Refused, SURVIVED, counted, faultsOf, refuse } from "./strength-report.mjs";
 import { again, kindOf, lowered, needed, recordsWhole, verdict, watched } from "./strength-verdict.mjs";
 
@@ -242,7 +242,7 @@ function main(argv) {
   return onPullRequest(p, base);
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   try { process.exitCode = main(process.argv.slice(2)); }
   catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${loggedAlone(e.message)}`); process.exitCode = 1; }
 }

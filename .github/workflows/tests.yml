@@ -279,6 +279,9 @@ jobs:
       - name: The licence scan on more of the forms a repository fetch takes
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-wrapper-test.mjs ')) }}
         run: node tests/licence-fetch-wrapper-test.mjs
+      - name: The licence scan on an audit entry's fetches, named one by one
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-audit-fetches-test.mjs ')) }}
+        run: node tests/licence-audit-fetches-test.mjs
       - name: The licence scan on pages and components
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-pages-test.mjs ')) }}
         run: node tests/licence-fetch-pages-test.mjs
@@ -426,9 +429,12 @@ jobs:
       - name: What a push waits on, against its mark
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/wait-test.mjs ')) }}
         run: node tests/wait-test.mjs
-      - name: The merge line read from the host, its measure and the runs it cancels
+      - name: The merge line read from the host and the runs it cancels
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/merge-line-test.mjs ')) }}
         run: node tests/merge-line-test.mjs
+      - name: The merge line's measure
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/merge-line-measure-test.mjs ')) }}
+        run: node tests/merge-line-measure-test.mjs
       - name: Where a project's tests run and who pays, read from its workflows and its host
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/runners-test.mjs ')) }}
         run: node tests/runners-test.mjs
@@ -647,6 +653,9 @@ jobs:
       - name: The brief of a release's trial, read for each step its rules ask
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-brief-test.mjs ')) }}
         run: node tests/trial-brief-test.mjs
+      - name: Whether a release's trial is due, and the look's issue for it
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/release-due-test.mjs ')) }}
+        run: node tests/release-due-test.mjs
       - name: check.mjs as a release's trial runs it, and the trial's record
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-test.mjs ')) }}
         run: node tests/trial-test.mjs

@@ -15,7 +15,7 @@
 import { execFileSync } from "node:child_process";
 import { named } from "./holders.mjs";
 import { ROOT, rules, rulesAt } from "./rules.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
 
 // Each mark: the part of the pattern, whether the rule's own text lacks it, and the mend.
 export const MARKS = [
@@ -100,7 +100,7 @@ function isCommit(root, rev) {
   try { execFileSync("git", ["-C", root, "rev-parse", "--verify", "--quiet", "--end-of-options", `${rev}^{commit}`], { stdio: "ignore" }); return true; } catch { return false; }
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const { code, lines } = main(process.argv.slice(2));
   console.log(lines.join("\n"));
   process.exitCode = code;

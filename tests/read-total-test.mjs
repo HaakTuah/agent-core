@@ -116,7 +116,7 @@ ok(bad.status === 1 && mended(bad.stderr) && noBase.status === 1 && mended(noBas
 // (in a project, whose copy of the core it stands in, it reads nothing, says so, and decides nothing)
 const proj = scratchDir("read-total-"), copy = path.join(proj, "core/scripts");
 fs.mkdirSync(copy, { recursive: true });
-for (const f of ["read-total.mjs", "reading.mjs", "file-size.mjs", "guards.mjs", "started.mjs"]) fs.copyFileSync(fileURLToPath(new URL(`../scripts/${f}`, import.meta.url)), path.join(copy, f));
+for (const f of ["read-total.mjs", "reading.mjs", "file-size.mjs", "guards.mjs", "started.mjs", "mend.mjs"]) fs.copyFileSync(fileURLToPath(new URL(`../scripts/${f}`, import.meta.url)), path.join(copy, f));
 execFileSync("git", ["init", "-q"], { cwd: proj });
 const inProject = spawnSync(process.execPath, [path.join(copy, "read-total.mjs"), "--compare", "HEAD"], { cwd: proj, encoding: "utf8" });
 fs.rmSync(proj, { recursive: true, force: true });

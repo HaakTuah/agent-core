@@ -1,7 +1,7 @@
 // Checks what the licence scan (scripts/licence-scan.mjs) reads on the staged project (licence-scan-stage.mjs): every path
-// the config names, and every file the scan reads, held to the project; and JSON of any depth or length read without
-// running out of stack. The scan's other cases are licence-scan-test.mjs's. Run by the core's tests workflow
-// (.github/workflows/tests.yml).
+// the config names, and every file the scan reads, held to the project; JSON of any depth or length read without
+// running out of stack; and code nested past what the readers follow failed with its mend. The scan's other cases are
+// licence-scan-test.mjs's. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/licence-scan-limits-test.mjs
 import { LOCK, done, entry, handAudited, json, asOutput, ok, run, write } from "../scripts/licence-scan-stage.mjs";
@@ -60,6 +60,20 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
   ok(deepLock.some((m) => /package-lock\.json cannot be read as JSON \(it nests deeper than 200 objects and lists\)\. Mend: /u.test(m)), "a lock file nested past the bound is refused as JSON that cannot be read, saying its mend", deepLock.join("\n").slice(0, 400));
   const long = run(write("site/tools/long.json", JSON.stringify({ command: Array.from({ length: 150000 }, (_, k) => `arg${k}`) })));
   ok(long.length === 0, "reads a command's list of any length", long.join("\n"));
+}
+
+// Code whose strings and templates nest past what the readers can follow fails, named, saying its mend, and the rest of
+// the project is still read (#1496), whether they are left open or closed, and in a file an entry audits by hand too.
+{
+  const clone = 'import { execFileSync } from "node:child_process";\nexecFileSync("git", ["clone", ';
+  const too = /^site\/tools\/deep\.js nests its strings, templates or brackets too deep for the scan to read, so what it fetches cannot be read\. Mend: /u;
+  for (const [what, text] of [["left open", `${clone}${"`${".repeat(50000)}\n`], ["closed", `${clone}${"`${".repeat(50000)}a${"}`".repeat(50000)}]);\n`]]) {
+    const f = run((dir) => { write("site/tools/deep.js", text)(dir); write("site/tools/other.js", "/*! Copyright 2020 Mossgrip | GPL-3.0 */\n")(dir); });
+    ok(f.some((m) => too.test(m)) && mended(asOutput(f.filter((m) => too.test(m)))) && f.some((m) => m.startsWith("site/tools/other.js")) && !f.some((m) => /call stack/u.test(m)),
+      `fails on strings and templates nested too deep, ${what}, naming the file and saying its mend, and reads the rest`, f.join("\n").slice(0, 600));
+  }
+  const audited = run((dir) => { write("site/tools/deep.js", `${clone}${"`${".repeat(50000)}\n`)(dir); handAudited("site/tools/deep.js")(dir); });
+  ok(audited.some((m) => too.test(m)), "fails so in a file an entry audits by hand too", audited.join("\n").slice(0, 600));
 }
 
 done();

@@ -116,13 +116,13 @@ export function pages(path, jq) {
 function main(args) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
   const open = args.includes("--open"), at = args.indexOf("--repo"), by = args.indexOf("--owner");
-  if (at >= 0 && !REPO.test(args[at + 1] ?? "")) fail("--repo needs owner/name after it");
-  if (by >= 0 && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(args[by + 1] ?? "")) fail("--owner needs the owner's account after it");
+  if (at >= 0 && !REPO.test(args[at + 1] ?? "")) fail("--repo needs owner/name after it. Mend: give the repository after --repo as <owner>/<name>, or leave --repo out in a clone of it");
+  if (by >= 0 && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(args[by + 1] ?? "")) fail("--owner needs the owner's account after it. Mend: give the account's login after --owner, letters, digits and hyphens alone, or leave --owner out");
   let repo = at >= 0 ? args[at + 1] : process.env.GITHUB_REPOSITORY;
   if (!repo) try {
     repo = /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/.exec(execFileSync("git", ["remote", "get-url", "origin"], { encoding: "utf8" }).trim())?.[1];
   } catch { /* (no origin) */ }
-  if (!REPO.test(repo ?? "")) fail("the repository is not known: give --repo owner/name, or run in a clone of it");
+  if (!REPO.test(repo ?? "")) fail("the repository is not known. Mend: give --repo <owner>/<name>, or run it in a clone of the repository");
   const account = by >= 0 ? args[by + 1] : repo.split("/")[0];
   const same = login => String(login ?? "").toLowerCase() === account.toLowerCase(); // (GitHub's logins ignore case)
   const comments = pages(`repos/${repo}/issues/comments?sort=created`,

@@ -27,7 +27,7 @@ import { aRepository, inProject, parseBounded } from "./guards.mjs";
 import { formFails } from "./queue-form.mjs";
 import { repoOf } from "./inbox.mjs";
 import { RULES, ruleFiles } from "./rule-files.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
 
 export const FILE = "QUEUE.md";
 export const LARGEST = 1 << 20; // (bytes: a progress file past it is refused, never read; SECURITY.md, rule 5)
@@ -249,4 +249,4 @@ function main([flag]) {
   return status;
 }
 
-if (started(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+if (guard(import.meta.url)) process.exitCode = main(process.argv.slice(2));

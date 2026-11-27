@@ -24,6 +24,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { OWNER } from "./core-address.mjs";
 import { asText, parseBounded } from "./guards.mjs";
+import { guard } from "./mend.mjs";
+
+guard(import.meta.url); // (an error it does not catch fails with its mend: mend.mjs)
 
 const args = process.argv.slice(2);
 const at = args.indexOf("--base");

@@ -11,10 +11,10 @@
 //                                      core: node scripts/choices.mjs); with CHOICES_BASE=<a commit>, the check
 import fs from "node:fs";
 import { reading, rulesOf } from "./dose.mjs";
-import { started } from "./started.mjs";
 import { checkOf } from "./choices-check.mjs";
 import { report } from "./choices-look.mjs";
 import { KIT, parse, records } from "./choices-records.mjs";
+import { guard } from "./mend.mjs";
 
 // What the scheduled look reads (look.mjs, DUE) stands where the look has always imported it from.
 export { look, signs } from "./choices-look.mjs";
@@ -24,7 +24,7 @@ function measuresHere(rules) {
   try { return reading(rules) ?? "the shape check has no config here"; } catch (e) { return `the shape check could not be read: ${String(e.message).split(". Mend: ")[0]}`; }
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   let manifest = null;
   try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { /* (the core's own AGENTS.md, or the kit's file) */ }
   const { rules } = rulesOf(manifest, ".");

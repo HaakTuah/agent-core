@@ -1,10 +1,12 @@
-// Tests the screen checks' baseline (scripts/screens.mjs): the config and the findings it refuses, what is
-// new against the baseline and what a listed entry covers, a check that reports against one that binds, each check's
-// own mend (a game's checks too), an entry mended but still listed, the baseline lowered only on the screens run, and
-// whole runs in a scratch repository: no config, the first baseline, a new finding failing with its mend, an entry that
-// joins the baseline against the base, one of a check the base did not turn on, a base that is no commit, a baseline
-// moved, a config taken out, one the base's manifest named taken out with its row, and a path outside the project. Each
-// failure is read for its mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
+// Tests the screen checks' baseline (scripts/screens.mjs): the config and the findings it refuses, what is new against
+// the baseline and what a listed entry covers, a check that reports against one that binds, each check's own mend (a
+// game's checks too), each of the module's checks (scripts/screens-checks.mjs) named in the config and failing a new
+// finding with the mend that list gives it, an entry mended but still listed, the baseline lowered only on the screens
+// run, and whole runs in a scratch repository: no config, the first baseline, a new finding failing with its mend, an
+// entry that joins the baseline against the base, one of a check the base did not turn on, a base that is no commit, a
+// baseline moved, a config taken out, one the base's manifest named taken out with its row, and a path outside the
+// project. Each failure is read for its mend (mend.mjs). Run by the core's tests workflow
+// (.github/workflows/tests.yml).
 //
 //   node tests/screens-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -13,6 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { lowered, parseConfig, parseFound, rewritten, verdict, where } from "../scripts/screens.mjs";
+import { CHECKS, MENDS } from "../scripts/screens-checks.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -64,6 +67,13 @@ v = verdict({ config: c, at: "c", self: "s", found: parseFound(found(["home"], {
 ok(v.fail[0]?.includes("--write") && v.fail.includes("  values: home: #f00 in the button") && !v.fail.includes("  values: cart: #0f0") && mended(v.fail.join("\n")), "a listed entry of a binding check that a run of its screen no longer finds fails until --write lowers the baseline; one of a screen not run stays", v.fail.join("\n"));
 v = verdict({ config: c, at: "c", self: "s", found: f, baseline: base });
 ok(v.fail[0]?.includes("from the one system the direction names"), "a new finding's mend is its check's own, which a session acts on with no rule file open", v.fail[0]);
+// (each check of the list, turned on to bind, fails a new finding with the list's own mend for it)
+for (const check of CHECKS) {
+  const one = parseConfig(config({ [check]: "binds" }), "c");
+  const got = verdict({ config: one, at: "c", self: "s", found: parseFound(found(["home"], { [`${check}: home: x`]: true }), "f", one), baseline: { listed: new Map(), grown: {}, checks: new Set([check]) } });
+  ok(got.fail.length === 1 && got.fail[0].includes(`Mend: ${MENDS[check]};`) && MENDS[check].split(" ").length > 10 && mended(got.fail[0]), `the ${check} check fails a new finding with its own mend from the list, a sentence a session acts on`, got.fail.join("\n"));
+}
+ok(CHECKS.join() === "values,rendered,pictures,timing,console,settings,first-choice", "the list holds the module's seven checks, in its order", CHECKS.join());
 
 const game = parseConfig(config({ settings: "binds" }), "c");
 v = verdict({ config: game, at: "c", self: "s", found: parseFound(found(["options"], { "settings: options: text size lost on reopening": true }), "f", game), baseline: { listed: new Map(), grown: {}, checks: new Set(["settings"]) } });

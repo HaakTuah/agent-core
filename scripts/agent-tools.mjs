@@ -40,12 +40,12 @@ import { baseOf } from "./licences.mjs";
 import { forget, textAt } from "./git-objects.mjs";
 import { parseBounded, logged, loggedCause } from "./guards.mjs";
 import { notInstalled, unreached } from "./packages.mjs";
-import { started } from "./started.mjs";
 import { configured } from "./agent-tools-configured.mjs";
 import { describe, show, MAIN, listed } from "./agent-tools-entries.mjs";
 import { listings, shown, modules, notFile, listing, shownNotBlob } from "./agent-tools-listing.mjs";
 import { readProject } from "./agent-tools-project.mjs";
 import { configAtBase, mendedBase, heldBy, heldBefore, sortPins, sortSources, sortBehind, sortUnlisted } from "./agent-tools-base.mjs";
+import { guard } from "./mend.mjs";
 
 const KITS = { ".claude/settings.json": "claude-settings.json.tmpl", ".kiro/hooks/work-saved.json": "kiro-hook.json.tmpl", ".codex/hooks.json": "codex-hooks.json.tmpl" };
 const KIT_DIR = fileURLToPath(new URL("../setup/template/", import.meta.url));
@@ -195,7 +195,7 @@ export function printed(root, file, opts) {
     ["out", fail.length ? `${fail.length} of the agent's own tools not as floor topic 15 asks` : "ok   every tool the project configures for its agents is listed"]];
   return { lines, status: fail.length ? 1 : 0 };
 }
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const args = process.argv.slice(2), file = args.find(a => !a.startsWith("--"));
   if (!file) { console.error("usage: node core/scripts/agent-tools.mjs <the licence check's config> [--core]"); process.exit(2); }
   const { lines, status } = printed(process.cwd(), file, { core: args.includes("--core") });

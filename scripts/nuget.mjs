@@ -94,8 +94,8 @@ import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { asText, leadsOut, oneLine, parseBounded } from "./guards.mjs";
 import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
-import { started } from "./started.mjs";
 import { copyAside, projectAt } from "./core-path.mjs";
+import { guard } from "./mend.mjs";
 
 const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
 // Whether the commit `rev` held a file of its own (a regular file, never a folder, a link or a submodule of that name)
@@ -1048,7 +1048,7 @@ function summaryOf(c, packages, listed, unnamed) {
     `${unnamed ? `, and ${unnamed} more that the restore brought and no lock file names` : ""}${c.fetched ? ", read before the restore" : ""}, ${[...c.used].filter((k) => packages.has(k) && c.yes.has(k)).length} accepted on the owner's yes;${c.reports.length ? ` ${c.reports.length} reported, and passing;` : ""} ${c.failures.length} failing (floor rules 7 and 10)`;
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const fail = (msg) => { console.error(`FAIL: ${shown(msg)}`); process.exit(1); };
   const args = process.argv.slice(2), advisory = args.includes("--advisory");
   const here = fileURLToPath(new URL(".", import.meta.url));

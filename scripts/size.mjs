@@ -44,7 +44,7 @@ import { counted as bytesOf, sizeOf } from "./file-size.mjs";
 import { gather, library, reading } from "./reading.mjs";
 import { counted as countedBy, writersOf } from "./security-review.mjs";
 import { asText, logged } from "./guards.mjs";
-import { started } from "./started.mjs";
+import { guard, named } from "./mend.mjs";
 
 // Each role's cap, a whole number of KB: one line a role, spelled exactly so. The record of each cap's raises, with its
 // leanness check's numbers, stands in scripts/size-raises.md; whoever raises a cap adds its entry there.
@@ -166,7 +166,7 @@ function raise(baseFile, commentsFile, rightsFile, headFile) {
   // (rights that cannot be read let no one write: the owner's answer still counts)
   try { if (rightsFile) rights = JSON.parse(fs.readFileSync(rightsFile, "utf8")); } catch { rights = []; }
   try { head = fs.readFileSync(headFile ?? fileURLToPath(import.meta.url), "utf8"); } catch { /* (said below) */ }
-  if (comments === null || head === null) { console.error("FAIL: the base's size.mjs, the pull request's comments or the head's size.mjs could not be read. Mend: name them, readable: node scripts/size.mjs --raise <base> <comments, as JSON> [<rights> [<head>]]"); return 1; }
+  if (comments === null || head === null) { console.error(`FAIL: the base's size.mjs, the pull request's comments or the head's size.mjs could not be read. Mend: name them, readable: node ${named(import.meta.url)} --raise <base> <comments, as JSON> [<rights> [<head>]]`); return 1; }
   const running = headFile === undefined ? CAPS : capsOf(head);
   const wrong = raised(base, head, comments, running, whoseOf(process.env.OWNER, rights));
   if (wrong) { console.error(asText(`FAIL: ${wrong}`)); return 1; }
@@ -250,4 +250,4 @@ function main([flag, baseFile, commentsFile, rightsFile, headFile]) {
   return wrong.length || fail.length ? 1 : 0;
 }
 
-if (started(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+if (guard(import.meta.url)) process.exitCode = main(process.argv.slice(2));

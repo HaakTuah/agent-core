@@ -5,7 +5,7 @@
 import { copyAt } from "./workflow-calls.mjs";
 import { licenceConfig } from "./check-configs.mjs";
 import { releaseAge, WAIT } from "./licences.mjs";
-import { codeOf, covers, pinFault, pinRead, unauditedIn } from "./licence-scan.mjs";
+import { audits, codeOf, pinFault, pinRead, unauditedIn } from "./licence-scan.mjs";
 import { npmPackages, offRegistry } from "./lookup.mjs";
 import { shown } from "./step-checks.mjs";
 
@@ -50,7 +50,7 @@ function pinAsks(p, config) {
   const read = scanOf(p, config);
   if (!read) return [];
   const { entries } = read;
-  return read.files.filter(f => entries.some(e => covers(e, f))).flatMap(f => {
+  return read.files.filter(f => entries.some(e => audits(e, f))).flatMap(f => {
     const text = p.read(f);
     const fault = text !== null && pinRead(f, text, config.audit) ? pinFault(entries, config.audit, f, codeOf(f, text)) : null;
     return fault ? [`\`${shown(f)}\` downloads what may be a program, and ${shown(fault.what)}: ${fault.mend}`] : [];
@@ -58,7 +58,7 @@ function pinAsks(p, config) {
 }
 
 // What stood before the licence check's scan passed, as standing, what a pull request's base held (#1074): a file that
-// fetches by a fetcher the scan cannot read, which no entry of its audit names in its "files". The scan reports it and
+// fetches by a fetcher the scan cannot read, which no entry of its audit audits ("files" or "fetches"). The scan reports it and
 // passes where a pull request leaves it as it stood, and fails it where there is no base, as on a push to main.
 export function fetchesHeld(p) {
   const config = jsonAt(p, licenceConfig(p)), read = config && scanOf(p, config);
