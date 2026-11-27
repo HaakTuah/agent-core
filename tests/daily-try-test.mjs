@@ -24,12 +24,12 @@ const manifest = `# Manifest\n\nCore: ${CORE} at ${PIN}, copied whole under core
 
 // A stand-in for gh api: the repositories by route, each manifest by name, and any other route a 404.
 const REPOS = [
-  { full_name: `${OWNER}/game-one`, owner: { login: OWNER }, private: true },
-  { full_name: `${OWNER}/tool-two`, owner: { login: OWNER }, private: false },
-  { full_name: `${OWNER}/no-manifest`, owner: { login: OWNER }, private: false },
-  { full_name: `${OWNER}/old-one`, owner: { login: OWNER }, private: false, archived: true },
-  { full_name: CORE, owner: { login: OWNER }, private: false },
-  { full_name: "someone-else/their-game", owner: { login: "someone-else" }, private: true },
+  { full_name: `${OWNER}/game-one`, owner: { login: OWNER }, fork: false, private: true },
+  { full_name: `${OWNER}/tool-two`, owner: { login: OWNER }, fork: false, private: false },
+  { full_name: `${OWNER}/no-manifest`, owner: { login: OWNER }, fork: false, private: false },
+  { full_name: `${OWNER}/old-one`, owner: { login: OWNER }, fork: false, private: false, archived: true },
+  { full_name: CORE, owner: { login: OWNER }, fork: false, private: false },
+  { full_name: "someone-else/their-game", owner: { login: "someone-else" }, fork: false, private: true },
 ];
 const MANIFESTS = { [`${OWNER}/game-one`]: manifest, [`${OWNER}/tool-two`]: manifest, [`${OWNER}/old-one`]: manifest, [CORE]: manifest, "someone-else/their-game": manifest };
 const asked = [];
@@ -138,6 +138,33 @@ for (const name of ["game-one", "tool-two"]) {
   ok(forged.tried === 1 && forged.untried === 2 && formed(forged), "a line that gives another runner's number, or another commit, is not read, so one project's code cannot speak for another's", JSON.stringify(forged));
 }
 
+// a fork counts as the owner's own only where its parent and its source are the owner's too, as GitHub's own answer
+// for the repository says; one it cannot read throws, never read as none
+{
+  const of = login => ({ owner: { login } });
+  const forks = {
+    [`${OWNER}/their-fork`]: { fork: true, parent: of("someone-else"), source: of("someone-else") },
+    [`${OWNER}/deep-fork`]: { fork: true, parent: of(OWNER), source: of("someone-else") },
+    [`${OWNER}/says-nothing`]: { fork: true },
+    [`${OWNER}/own-fork`]: { fork: true, parent: of(OWNER), source: of(OWNER) },
+    [`${OWNER}/unsaid`]: { fork: false },
+  };
+  const listed = Object.keys(forks).map(full_name => ({ full_name, owner: { login: OWNER }, private: true, ...(full_name.endsWith("unsaid") ? {} : { fork: true }) }));
+  const ghForks = (route, fail = null) => {
+    if (/repos\?/u.test(route)) return JSON.stringify(listed);
+    const m = /^repos\/(.+)\/contents\/core-manifest\.md$/u.exec(route);
+    if (m) return JSON.stringify({ content: Buffer.from(manifest).toString("base64") });
+    const r = /^repos\/(.+)$/u.exec(route);
+    if (r && forks[r[1]] && r[1] !== fail) return JSON.stringify(forks[r[1]]);
+    throw new Error("gh: Something went wrong (HTTP 502)");
+  };
+  const found = owned(true, ghForks).map(p => p.name).join();
+  ok(found === `${OWNER}/own-fork,${OWNER}/unsaid`, "a fork whose parent or source another account owns, or whose answer names neither, is not the owner's own; the owner's own fork is, and a listing that says nothing of forking is read from the repository's own answer", found);
+  let threw = null;
+  try { owned(true, route => ghForks(route, `${OWNER}/own-fork`)); } catch (e) { threw = e; }
+  ok(threw instanceof Error, "a fork whose own answer cannot be read throws, never read as none or as the owner's", String(threw?.message ?? threw));
+}
+
 // the hostile cases of what the try reads (SECURITY.md, rule 5): GitHub's answers, the projects' verdicts and what
 // --list found (those of the runners' lines: tests/daily-try-file-test.mjs)
 {
@@ -145,7 +172,7 @@ for (const name of ["game-one", "tool-two"]) {
   const said = envs.map(e => spawnSync(process.execPath, [path.join(import.meta.dirname, "..", "scripts", "daily-try.mjs"), "--file"], { encoding: "utf8", env: { PATH: process.env.PATH, GH_TOKEN: "", ...e } })).map(r => [r.status, r.stderr + r.stdout]);
   ok(said.every(([st, o]) => st === 1 && /no form/u.test(o) && /Mend:/u.test(o)), "what --list found, in no form (a commit, counts out of range, a run that is no number), is refused before anything is read or written, saying the mend", JSON.stringify(said).slice(0, 300));
   const odd = [
-    { full_name: `${OWNER}/huge`, owner: { login: OWNER } }, { full_name: `${OWNER}/odd`, owner: { login: OWNER } }, { full_name: `${OWNER}/fine`, owner: { login: OWNER } },
+    { full_name: `${OWNER}/huge`, owner: { login: OWNER }, fork: false }, { full_name: `${OWNER}/odd`, owner: { login: OWNER }, fork: false }, { full_name: `${OWNER}/fine`, owner: { login: OWNER }, fork: false },
     { full_name: 5, owner: null }, "not a repository",
   ];
   const answer = { [`${OWNER}/huge`]: { content: Buffer.from(manifest + "x".repeat((1 << 20) + 1)).toString("base64") }, [`${OWNER}/odd`]: { content: 42 }, [`${OWNER}/fine`]: { content: Buffer.from(manifest).toString("base64") } };

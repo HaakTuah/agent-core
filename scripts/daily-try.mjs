@@ -48,7 +48,7 @@ const MINUTES = 25;
 const MANIFEST_MAX = 1 << 20, VERDICTS_MAX = 16 << 20;
 
 // The owner's own projects that take the core, as state-report.mjs --projects finds them, kept to the repositories the
-// owner's account owns (never another owner's, tried only at a release): with the owner's sign-in, every one it owns;
+// owner's account owns, never a fork of another's (never another owner's, tried only at a release): with the owner's sign-in, every one it owns;
 // without, its public ones; in the order of their names, so that each runner's number names the same project in each
 // reading. Each { name, private }. GitHub's answer that a repository holds no manifest (404) means "not a project"; any
 // other failure throws, so that a reading not taken is never taken for none.
@@ -57,7 +57,7 @@ export function owned(signedIn, gh = ghApi, owner = OWNER) {
   const found = [];
   for (const r of listed) {
     const name = String(r?.full_name ?? "");
-    if (String(r?.owner?.login ?? "").toLowerCase() !== owner.toLowerCase() || name.toLowerCase() === CORE.toLowerCase() || r.archived) continue;
+    if (!ownRepo(r, name, owner, gh)) continue;
     let manifest;
     try { const content = parseBounded(gh(`repos/${name}/contents/core-manifest.md`))?.content; manifest = typeof content === "string" ? Buffer.from(content, "base64").toString("utf8") : ""; }
     catch (e) { if (/\(HTTP 404\)\s*$/u.test(String(e?.message).trim())) continue; throw e; }
@@ -65,6 +65,23 @@ export function owned(signedIn, gh = ghApi, owner = OWNER) {
     if (readCore(manifest).form) found.push({ name, private: !!r.private });
   }
   return found.sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0));
+}
+
+// Whether a repository the owner's account holds is the owner's own all the way back: one that is no fork, or a fork
+// whose parent and source the owner's account owns too, as GitHub's own answer for it says. A fork of another's, or one
+// whose answer says nothing of either, is not (#1459). Any failure to read throws, as above.
+function ownFork(name, owner, gh) {
+  const r = parseBounded(gh(`repos/${name}`));
+  if (r?.fork === false) return true;
+  const is = x => String(x?.owner?.login ?? "").toLowerCase() === owner.toLowerCase();
+  return r?.fork === true && is(r.parent) && is(r.source);
+}
+
+// Whether a listed repository may be one of the owner's projects: the owner's account's, not the core, not archived,
+// and the owner's own all the way back.
+function ownRepo(r, name, owner, gh) {
+  if (String(r?.owner?.login ?? "").toLowerCase() !== owner.toLowerCase() || name.toLowerCase() === CORE.toLowerCase() || r.archived) return false;
+  return r.fork === false || ownFork(name, owner, gh);
 }
 
 // Each name masked in GitHub's log before anything else is printed, in a job of GitHub's alone.
