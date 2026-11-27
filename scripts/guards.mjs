@@ -19,6 +19,13 @@ export function inProject(p) {
   return n !== ".." && !n.startsWith("../");
 }
 
+/** Whether a path named inside the folder it is run from leads out of it through a link; one named outside it is the
+ *  caller's own choice, and reads as it is. */
+export const linkedOut = at => {
+  const rel = path.relative(process.cwd(), path.resolve(at));
+  return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel) && leadsOut(".", at);
+};
+
 /** Whether the file or folder at `at`, every link on its way followed, lies outside the folder `root` (its own real
  *  place): where `at` does not stand yet, the nearest folder above it that does is read, so a file about to be written
  *  under a linked folder leads out too; a link that leads nowhere counts as leading out. */

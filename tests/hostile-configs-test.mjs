@@ -128,6 +128,14 @@ if (pipe(path.join(outside, "pipe"))) {
   r = run("reading-size.mjs", "checks/pipe.json");
   ok(fails(r) && r.ms < 5000, `reading-size.mjs: refuses with its mend a config that is a link to a pipe, never reading it, in ${r.ms} ms`);
   fs.rmSync(path.join(p, "checks/pipe.json"));
+  // (a config named inside the folder it is run from that is a link leading out of it is refused, never read)
+  fs.writeFileSync(path.join(outside, "out.json"), "{}\n");
+  fs.symlinkSync(path.join(outside, "out.json"), path.join(p, "checks/out.json"));
+  r = run("reading-size.mjs", "checks/out.json");
+  ok(fails(r), "reading-size.mjs: refuses with its mend a config that is a link leading out of the project", r.out);
+  r = run("copies.mjs", "checks/out.json");
+  ok(fails(r) && r.out.includes("cannot read the config"), "copies.mjs: refuses with its mend a config that is a link leading out of the project", r.out);
+  fs.rmSync(path.join(p, "checks/out.json")); fs.rmSync(path.join(outside, "out.json"));
   fs.symlinkSync("folder.md", path.join(p, "inner.md"));
   gitP("add", "inner.md");
   r = sizes(marks({ split: 10 }));
