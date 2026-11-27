@@ -115,8 +115,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      (`scripts/size.mjs`, from `size.yml`) through `security-review.mjs`'s
      reader, and a pull request's one file and the issues its lines name, by `scripts/queue-only.mjs`; limits: 1 MB of
      an answer to `core-moved.mjs`, `releases.mjs` and `tools-offer.mjs`, 64 MB or 256 MB to the others, 30 commits and
-     30 s each for the green main of `releases.mjs`, 30 merged pull requests for the wait, 50 pages for the stalled
-     look, 200 for the cost, 10 for the merge line, 20 s for the tools' offer, 30 s for the host's account, 16 MB and 30 s
+     30 s each for the green main of `releases.mjs`, 30 merged pull requests for the wait, 50 pages and, a lane, 11 commits for the
+     stalled look, 200 for the cost, 10 for the merge line, 20 s for the tools' offer, 30 s for the host's account, 16 MB and 30 s
      each of at most five reads for the owner's settings, a name it prints being text alone of at most 100 characters,
      and 20 checks named, and for
      `queue-only.mjs` 16 MB of an issue's answer and 3 pages of its notes, 12 issues, the pull request's answer, the

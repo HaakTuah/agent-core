@@ -6,7 +6,7 @@
 // line is the tally's, so it never drops within a session while the tally stands (a tally lost, or answers that came
 // and went between two runs, and it is a floor again). Where it cannot tell (another tool, no session id, no record
 // and no tally), it prints nothing and exits 0, so no session works this out by hand: the description says "No cost
-// line: the script printed none." in its place (pr-description.mjs, beside this file; #302). A --condenses it cannot read fails, saying the mend. It reads the record and writes the tally, nothing else: no prompt, answer or path leaves it, only ids, counts and the
+// line: the script printed none." in its place (pr-description.mjs, beside this file; #302). A --condenses it cannot read, one that leaves a mark under MIN_MARK, or one given without --context fails, saying the mend. It reads the record and writes the tally, nothing else: no prompt, answer or path leaves it, only ids, counts and the
 // models' families; a tally no run has touched for 90 days is removed. Node's own modules only.
 //
 //   node core/scripts/session-cost.mjs
@@ -109,9 +109,9 @@ export function context(text) {
 }
 
 /** The hand-over mark of "A builder hands over by its context" (roles/shared/work-flow.md; #1505, point 2): MARK, or
- *  MARGIN below `condenses`, where the session's tool shows it condenses, where that is lower; MARK where it shows none. */
-export const MARK = 200_000, MARGIN = 20_000;
-export const markOf = (condenses) => (Number.isSafeInteger(condenses) && condenses > 0 ? Math.max(0, Math.min(MARK, condenses - MARGIN)) : MARK);
+ *  MARGIN below `condenses`, where the session's tool shows it condenses and that is lower, but never under MIN_MARK, since a fresh builder's first answer stood at about 64,000 tokens (27 November 2026) and its first gates come after, a lower mark would have each fresh one hand over again at its first gate; MARK where it shows none (the command refuses a `condenses` that would give less than MIN_MARK). */
+export const MARK = 200_000, MARGIN = 20_000, MIN_MARK = 100_000;
+export const markOf = (condenses) => (Number.isSafeInteger(condenses) && condenses >= MIN_MARK + MARGIN ? Math.min(MARK, condenses - MARGIN) : MARK);
 
 /** The line --context prints: the context now, against the mark. */
 export function contextLine(now, mark) {
@@ -158,10 +158,17 @@ if (started(import.meta.url)) {
   try {
     const home = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
     const file = tallyOf(home, process.env.CLAUDE_CODE_SESSION_ID);
-    if (process.argv.includes("--context")) {
-      const at = process.argv.indexOf("--condenses"), given = process.argv[at + 1] ?? "";
+    const n = (value) => value.toLocaleString("en-US");
+    const at = process.argv.indexOf("--condenses"), given = process.argv[at + 1] ?? "";
+    if (at >= 0 && !process.argv.includes("--context")) {
+      console.error("FAIL: --condenses is read only with --context. Mend: add --context, or leave --condenses out");
+      process.exitCode = 2;
+    } else if (process.argv.includes("--context")) {
       if (at >= 0 && !/^[1-9]\d{0,8}$/u.test(given)) {
-        console.error("FAIL: --condenses needs a whole number of tokens after it. Mend: give where the session's tool shows it condenses, or leave --condenses out for the mark of " + MARK.toLocaleString("en-US"));
+        console.error("FAIL: --condenses needs a whole number of tokens after it. Mend: give where the session's tool shows it condenses, or leave --condenses out for the mark of " + n(MARK));
+        process.exitCode = 2;
+      } else if (at >= 0 && Number(given) < MIN_MARK + MARGIN) {
+        console.error(`FAIL: --condenses ${given} leaves too little room for the hand-over mark, which sits ${n(MARGIN)} below it and may not fall under ${n(MIN_MARK)}. Mend: give where the session's tool shows it condenses, at ${n(MIN_MARK + MARGIN)} or more, or leave --condenses out for the mark of ${n(MARK)}`);
         process.exitCode = 2;
       } else {
         const now = context(ownRecord(home, process.env.CLAUDE_CODE_SESSION_ID));
