@@ -10,6 +10,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { leadsOut } from "./guards.mjs";
+import { leadsAlone } from "./leads-alone.mjs";
 import { OWN as OWN_HOLDERS } from "./holders-own.mjs";
 import { READ_MOST } from "./own-files.mjs";
 import { parseConfig, where as shapeAt } from "./shape.mjs";
@@ -210,13 +211,12 @@ export function writeBreaks(p, busy) {
 }
 
 // 16 November 2026: each path of a file the rules left (core/modules/, floor/topics.md) in the project's own files the
-// step reads, as the step's check finds it there, written as the file it now is, or as the folder it now leads to where
-// it stands alone (floor/topics.md, as the folder's pointing file says; leadsAlone); a copies config that reads the old
-// folder alone given the new folders' patterns beside it; the size marks' "read" (marksMoved); and the manifest's
-// "Paths:" line, where it is word for word the one the starter kit of releases 1 to 5 wrote, written as the kit writes
-// it now. Each path is written on its own (#1248, point 5): one whose move is no exact one (a
-// rule of its file stands elsewhere since and the line does not name that rule by its lead) is left as it stands for
-// the step's mend, and so is a "Paths:" line of the project's own words. Never written: the core's part, the one
+// step reads, as the step's check finds it there, written as the file it now is (or its folder: leadsAlone); a copies
+// config that reads the old folder alone given the new folders' patterns beside it; the size marks' "read"
+// (marksMoved); and the manifest's "Paths:" line, where it is word for word the one the starter kit of releases 1 to 5
+// wrote, written as the kit writes it now. Each path is written on its own (#1248, point 5): one whose move is no exact
+// one (a rule of its file stands elsewhere since and the line does not name that rule by its lead) is left as it stands
+// for the step's mend, and so is a "Paths:" line of the project's own words. Never written: the core's part, the one
 // process's, or a file whose part cannot be told apart; nor a file the writer cannot tell is the project's own (sure).
 export const OLD_PATHS = "Paths: in the core's files, one into floor/, modules/, scripts/, setup/ or archive/ is under core/; any other is ours.";
 const quoted = f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
@@ -228,7 +228,7 @@ export function writeMoved(p, busy) {
   let marks = null;
   try { marks = marksConfig(p); } catch { /* (marks whose path cannot be read are read as any other file) */ }
   for (const f of sure(p, namers(p))) {
-    const text = p.read(f) ?? "", c = partCut(f, text), own = t => movedIn(f === marks ? marksMoved(t, map) : t, map, oldPath, c?.[1]?.split("\n").map(l => l.replace(/\r$/u, "")), /\.(?:md|mdc|markdown)$/iu.test(f));
+    const text = p.read(f) ?? "", c = partCut(f, text), own = t => movedIn(f === marks ? marksMoved(t, map) : t, map, oldPath, c?.[1]?.split("\n").map(l => l.replace(/\r$/u, "")), f);
     if (!c) continue;
     let next = c.length === 3 ? `${own(c[0])}${c[1]}${own(c[2])}` : own(text);
     if (oldPath && readsOldAlone(p, f, copy)) next = next.split(atCopy(MOVED_GLOB, copy)).join(atCopy(`${MOVED_GLOB}, ${MOVED_GLOBS}`, copy));
@@ -240,36 +240,19 @@ export function writeMoved(p, busy) {
   return writes.map(([f]) => f);
 }
 
-// A file's text with each old path it names written as the file it now is, where its move is an exact one, or as the
-// folder it now leads to where it stands alone in Markdown (`md`; leadsAlone); a rule that
+// A file's text with each old path it names written as the file it now is, where its move is an exact one; a rule that
 // left its file named with its lead, `core/<old>`, "<lead>", as the step words it, named where it stands now; and a
-// pull-in (an import, Kiro's `#[[file:`) this writes into one that a line above, or the core's part (`part`, its lines),
-// already makes left out.
-function movedIn(text, map, oldPath, part = [], md = false) {
+// pull-in (an import, Kiro's `#[[file:`) this writes into one that a line above, or the core's part (`part`, its
+// lines), already makes left out.
+function movedIn(text, map, oldPath, part = [], f = "") {
   if (!oldPath) return text;
   const apart = moved.apart(), exact = old => !(apart[old]?.length);
   const led = Object.entries(apart).reduce((t, [old, parts]) => parts.reduce((u, a) => u.split(`\`core/${old}\`, "${a.lead}"`).join(`\`core/${a.to}\`, "${a.lead}"`), t), text);
-  const next = led.replace(oldPath, (all, old, at, whole) => exact(old) && (!map[old].endsWith("/") || (md && leadsAlone(whole, at, all.length))) ? `core/${map[old]}` : all);
+  const next = led.replace(oldPath, (all, old, at, whole) => exact(old) && (!map[old].endsWith("/") || leadsAlone(f, whole, at, all.length)) ? `core/${map[old]}` : all);
   if (next === text) return text;
   const was = text.split("\n"), now = next.split("\n");
   const twice = (l, i) => (now.indexOf(l) < i && !(was[i] === l && was.indexOf(l) < i)) || (was[i] !== l && part.includes(l.replace(/\r$/u, "")));
   return now.filter((l, i) => !(/^\s*(?:@|#\[\[file:)/u.test(l) && twice(l, i))).join("\n");
-}
-
-// Whether the old path at `at` in `text` is a pointer to the file alone, so that it leads to the folder the file moved to:
-// in a Markdown file, outside a fenced block, a code span `core/<old>` whose sentence names no quoted title, no
-// numbered rule, point, section, step or part and no `'s`. A section or rule cited through it would lead into no file,
-// and anything else (a pull-in, `@` or `#[[file:`, an exclusion, a permission's path, a path a script reads) would
-// lead into a folder no tool reads or widen to its every file, so each is left for the step's mend (#1361, point 8).
-// The test is the writer's own and wider than the pointers check's joining (scripts/pointers.mjs): where it errs, a
-// path is left for the mend. The size marks keep their own guard: a mark of a folder means nothing (marksMoved).
-const CITES = /["“”]|\b(?:rules?|points?|sections?|steps?|parts?)\s+\d|^['’]s\b/iu;
-const FENCE = /^ {0,3}(?:```|~~~)/gmu, BREAK = /\n\s*\n|\n\s*(?:[-*+]|\d+[.)])\s|[.!?;](?=\s)/gu;
-function leadsAlone(text, at, length) {
-  if (text[at - 1] !== "`" || text[at + length] !== "`" || (text.slice(0, at).match(FENCE)?.length ?? 0) % 2) return false;
-  const before = text.slice(Math.max(0, at - 201), at - 1), after = text.slice(at + length + 1, at + length + 201);
-  const from = [...before.matchAll(BREAK)].at(-1), to = after.search(BREAK);
-  return !CITES.test(from ? before.slice(from.index + from[0].length) : before) && !CITES.test(to < 0 ? after : after.slice(0, to));
 }
 
 // The size marks' text with each file under "read" at an old path that leads to one file named as that file, two that
