@@ -109,9 +109,15 @@ const around = {
   "a file read in by a dot after another command": `cd tools && . lib.sh\n${READ}\n${GET}\n`,
   "a file read in by source": `source lib.sh\n${READ}\n${GET}\n`,
   "a file bash reads at its start": `echo BASH_ENV=lib.sh >> "$GITHUB_ENV"\n${READ}\n${GET}\n`,
+  // (those names quoted or escaped in part, #1455's fifth review)
+  "a dot quoted": `"." ./lib.sh\n${READ}\n${GET}\n`,
+  "a dot escaped": `\\. ./lib.sh\n${READ}\n${GET}\n`,
+  "source quoted in part": `so""urce ./lib.sh\n${READ}\n${GET}\n`,
+  "hash quoted in part": `ha''sh -p ./tools/grep grep\n${READ}\n${GET}\n`,
 };
 const through = Object.entries(around).filter(([, code]) => programs(code) < 2).map(([what]) => what);
 ok(!through.length, "a read whose variable a shell reads by itself, or that stands other than it reads, is a program's download", through.join(" | "));
+ok(programs(`find . -name "*.tgz" -delete\ndocker build . -t moss\n${READ}\n${GET}\n`) === 1, "a dot that is no command, an argument of find or docker, leaves the read one of data");
 ok(programs(`# set up the tool's version; it's read below\n${READ}\n${GET}\n`) === 1, "a comment with a quote in it before the read leaves the read one of data");
 // Through the scan's pin check (licence-scan.mjs's pinFault): a read of a version index asks no checksum, and a
 // package of the machine's distribution that the file installs, kind "distribution", is asked no version, its
