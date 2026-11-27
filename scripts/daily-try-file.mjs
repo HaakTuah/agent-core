@@ -32,10 +32,18 @@ export const TALLY = ["found", "private", "tried", "atPin", "untried", "syncFail
 export const CAME = ["tried", "held", "atPin", "untried", "syncFailed", "afterUnread"];
 
 // Whether a runner's counts are in the form --run prints: its number within the `found` (at most LEGS_MAX), the
-// commit tried, what it came to, and the trial's classes as whole numbers.
+// commit tried (`sha`, or any commit where none is given), what it came to, and the trial's classes as whole numbers.
 export function legFormed(l, sha, found) {
   return l !== null && typeof l === "object" && Number.isSafeInteger(l.leg) && l.leg >= 1 && l.leg <= Math.min(found, LEGS_MAX)
-    && l.commit === sha && CAME.includes(l.came) && COUNTS.every(k => Number.isSafeInteger(l[k]) && l[k] >= 0 && l[k] <= CHECKS_MAX);
+    && (sha ? l.commit === sha : SHA.test(String(l.commit))) && CAME.includes(l.came) && COUNTS.every(k => Number.isSafeInteger(l[k]) && l[k] >= 0 && l[k] <= CHECKS_MAX);
+}
+
+// The counts of the runner `leg` from the text after its log's last LINE, or null where they are in no form or are
+// another runner's: read only to COUNTS_MAX, whoever reads them (--file to sum them, --local to show them).
+export function legOf(text, leg, found, sha = null) {
+  let l = null;
+  try { l = typeof text !== "string" || text.length > COUNTS_MAX ? null : parseBounded(text); } catch { l = null; }
+  return legFormed(l, sha, found) && l.leg === leg ? l : null;
 }
 
 // The counts --file files, from the runners' `lines` (each { leg, text }: the runner's number and the text after the
@@ -44,9 +52,8 @@ export function legFormed(l, sha, found) {
 export function gather(lines, { sha, day, signedIn, found, privates }) {
   const by = new Map();
   for (const { leg, text } of lines) {
-    let l = null;
-    try { l = typeof text !== "string" || text.length > COUNTS_MAX ? null : parseBounded(text); } catch { l = null; }
-    if (legFormed(l, sha, found) && l.leg === leg) by.set(leg, l);
+    const l = sha ? legOf(text, leg, found, sha) : null;
+    if (l) by.set(leg, l);
   }
   const t = { commit: sha, day, signedIn: !!signedIn, ...Object.fromEntries([...TALLY, ...COUNTS].map(k => [k, 0])), found, private: privates };
   t.untried += Math.max(0, found - LEGS_MAX);

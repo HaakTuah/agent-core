@@ -33,11 +33,12 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { readCore, manifestText } from "./core-path.mjs";
 import { parseBounded } from "./guards.mjs";
-import { LEGS_MAX, LINE, OWNER, SECRET, SHA, file, gather, legLines } from "./daily-try-file.mjs";
+import { LEGS_MAX, LINE, OWNER, SECRET, SHA, file, gather, legLines, legOf } from "./daily-try-file.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
 import { greenMain } from "./releases.mjs";
 import { COUNTS, trialAt, trialRecord } from "./release-trial.mjs";
 import { started } from "./started.mjs";
+import { pinned } from "./toolchain.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MINUTES = 25;
@@ -132,25 +133,36 @@ function scriptsOf(at, copy, core) {
   };
 }
 
-// One project, cloned at `at`, tried at the core checked out at `core` (its commit `sha`): the run before, the sync, the
-// run after, each output to the log `project.log` in `out`, outside the clone. What it came to: "atPin", "untried",
-// "syncFailed", "afterUnread", or the pair, held or not.
-export function tryOne(at, core, sha, out, run = runLogged) {
+// The toolchain the project at `at` pins, fetched as a release's trial fetches it (toolchain.mjs), what it said to the
+// log `log`: what the project's runs are to set (none where nothing was fetched, and the job that needs it then reads
+// alike before and after).
+function toolsFor(at, log) {
+  let t;
+  try { t = pinned({ project: at, env: bare() }); } catch (e) { t = { lines: [`NOT FETCHED: the toolchain (${e.message})`], vars: null }; }
+  fs.appendFileSync(log, `${t.lines.join("\n")}\n`);
+  return t.vars ?? {};
+}
+
+// One project, cloned at `at`, tried at the core checked out at `core` (its commit `sha`): the toolchain it pins, then
+// the run before, the sync, the run after, each given what the toolchain says to set, each output to the log
+// `project.log` in `out`, outside the clone. What it came to: "atPin", "untried", "syncFailed", "afterUnread", or the
+// pair, held or not.
+export function tryOne(at, core, sha, out, run = runLogged, tools = toolsFor) {
   const log = path.join(out, "project.log");
   const manifest = manifestText(path.join(at, "core-manifest.md"));
   const copy = readCore(manifest ?? "");
   if (copy.pin === sha) return { came: "atPin" };
   const scripts = scriptsOf(at, copy, core);
   const main = (spawnSync("git", ["rev-parse", "HEAD"], { cwd: at, encoding: "utf8" }).stdout ?? "").trim();
-  run(process.execPath, [path.join(core, "scripts", "toolchain.mjs"), at], at, log);
-  const check = (script, file) => run(process.execPath, [script, "--base", main, "--own", "--verdicts", file], at, log);
+  const env = { ...bare(), ...tools(at, log) }, go = (cmd, args) => run(cmd, args, at, log, env);
+  const check = (script, file) => go(process.execPath, [script, "--base", main, "--own", "--verdicts", file]);
   const before = path.join(out, "before.json"), after = path.join(out, "after.json");
   check(scripts.before, before);
   if (!readJson(before)) return { came: "untried" };
-  const synced = run("git", ["switch", "--quiet", "-c", "daily-try"], at, log)
-    && run(process.execPath, [scripts.sync, sha], at, log)
-    && run("git", ["add", "-A"], at, log)
-    && run("git", ["-c", "user.name=daily-try", "-c", "user.email=daily-try@example.invalid", "commit", "--quiet", "--no-verify", "-m", "The daily try's sync (never pushed)"], at, log);
+  const synced = go("git", ["switch", "--quiet", "-c", "daily-try"])
+    && go(process.execPath, [scripts.sync, sha])
+    && go("git", ["add", "-A"])
+    && go("git", ["-c", "user.name=daily-try", "-c", "user.email=daily-try@example.invalid", "commit", "--quiet", "--no-verify", "-m", "The daily try's sync (never pushed)"]);
   if (!synced) return { came: "syncFailed" };
   check(path.join(core, "scripts", "check.mjs"), after);
   const pair = [readJson(before), readJson(after)];
@@ -160,9 +172,9 @@ export function tryOne(at, core, sha, out, run = runLogged) {
 
 // --run: the one project its runner cloned to `dir`/project tried at the core `core`, and that runner's counts, numbers
 // and the commit alone: what it came to, and the trial's classes of its pair of runs.
-export function runLeg(dir, core, leg, { run = runLogged, sha = (spawnSync("git", ["rev-parse", "HEAD"], { cwd: core, encoding: "utf8" }).stdout ?? "").trim() } = {}) {
+export function runLeg(dir, core, leg, { run = runLogged, tools, sha = (spawnSync("git", ["rev-parse", "HEAD"], { cwd: core, encoding: "utf8" }).stdout ?? "").trim() } = {}) {
   const at = path.join(dir, "project");
-  const r = fs.existsSync(at) ? tryOne(at, core, sha, dir, run) : { came: "untried" };
+  const r = fs.existsSync(at) ? tryOne(at, core, sha, dir, run, tools) : { came: "untried" };
   const counts = trialRecord(sha, "2000-01-01", r.pair ? [r.pair] : []);
   return { leg, commit: sha, came: r.came, ...Object.fromEntries(COUNTS.map(k => [k, counts[k]])) };
 }
@@ -181,17 +193,19 @@ function fileFromEnv(env = process.env) {
   file(gather(lines, { sha: env.SHA, day: new Date().toISOString().slice(0, 10), signedIn: env.SIGNED_IN === "true", found, privates }));
 }
 
-// --local: the project each runner of the latest finished look tried, named from gh's own sign-in, and what it came to;
-// no project's code is run and nothing is written.
-function local(gh = ghApi, say = console.log) {
+// --local: the project each runner of the latest finished look tried, named from gh's own sign-in, and what it came to,
+// each runner's line held to the form --file reads (daily-try-file.mjs, legOf), so that what a project's code printed in
+// the public log reaches the session as one of the words CAME holds and a commit, or as nothing; no project's code is
+// run and nothing is written.
+export function local(gh = ghApi, say = console.log) {
   const run = parseBounded(gh(`repos/${CORE}/actions/workflows/own-look.yml/runs?branch=main&status=completed&per_page=1`))?.workflow_runs?.[0];
-  if (!Number.isSafeInteger(run?.id)) { say("No finished run of the scheduled look to read."); return; }
+  if (!Number.isSafeInteger(run?.id) || !Number.isSafeInteger(run?.run_attempt ?? 1)) { say("No finished run of the scheduled look to read."); return; }
   const found = owned(true, gh), by = new Map(legLines(run.id, run.run_attempt ?? 1, { gh }).map(l => [l.leg, l.text]));
-  say(`The look of ${String(run.created_at).slice(0, 10)}: ${found.length} of the owner's own projects found now, in the order each runner took them${by.size > found.length ? `; it tried ${by.size}, so the list has changed and a number may name another project` : ""}.`);
+  const day = /^\d{4}-\d\d-\d\d/u.exec(String(run.created_at))?.[0] ?? "an unknown day";
+  say(`The look of ${day}: ${found.length} of the owner's own projects found now, in the order each runner took them${by.size > found.length ? `; it tried ${by.size}, so the list has changed since and a number may name another project` : ""}.`);
   for (const [i, p] of found.entries()) {
-    let l = null;
-    try { l = parseBounded(by.get(i + 1) ?? "null"); } catch { l = null; }
-    say(`- runner ${i + 1}, ${p.name}: ${l?.came ?? "said nothing (not tried)"}${l?.commit ? ` at ${String(l.commit).slice(0, 7)}` : ""}`);
+    const l = legOf(by.get(i + 1), i + 1, found.length);
+    say(`- runner ${i + 1}, ${p.name}: ${l ? `${l.came} at ${l.commit.slice(0, 7)}` : "said nothing in form (not tried)"}`);
   }
 }
 

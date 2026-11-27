@@ -243,10 +243,10 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   distribution's packages nor reachable, and its job failed after the sync for a reason not the release's. Held by
   `tests/toolchain-test.mjs` (a pin with no sum, a sum that differs and a host that refuses each fetch nothing; a pin
   listed is fetched, checked by its sum, outside the project); that the builder runs it, by nothing yet.
-- **The owner's own projects try the core each day** (#1413, point 5). By default, once a day, the core's scheduled
-  look tries the core at `main`'s newest commit whose checks all passed on each project of the owner's own that takes
-  it, as a release's trial does (#1084): each project alone in a scratch clone on a fresh runner of the core's own,
-  read-only, the project's checks run before the sync and after it, and a project is held where the trial's record would hold a cut
+- **The owner's own projects try the core each day** (#1413, point 5). By default, once a day, the core's scheduled look
+  tries the core at `main`'s newest commit whose checks all passed on each project of the owner's own that takes it, as
+  a release's trial does (#1084): each project alone in a scratch clone on a fresh runner of the core's own, read-only,
+  the project's checks run before the sync and after it, and a project is held where the trial's record would hold a cut
   (`scripts/daily-try.mjs`). Where one is held, the look files one bug here, from the counts alone, which waits for no
   line, and notes on it each newer commit held, until it closes. The one condition that changes it: the owner has given
   the core no read-only sign-in to the owner's private projects, the Actions secret `PROJECTS_READ`; then only the
@@ -255,12 +255,14 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   included, which stays at a release's trial (#1334); that a project's own jobs run it or are billed for it; that a
   project of another owner is tried; that the bug, a log or anything public names a project, or holds more of it than
   counts and conclusions: a session where gh answers for the owner's account runs `node scripts/daily-try.mjs --local`,
-  which runs no project's code, to see which project each runner tried, and a session in that project its checks; nor that a held try stops a merge or a release, which the trial still decides.
-  Reason: release 6's faults were found at its trial, round after round, long after the changes that brought them in.
-  Held by `tests/daily-try-test.mjs` and `tests/daily-try-file-test.mjs` (the owner's projects found with and without the sign-in, names masked, each runner
-  cloning its one project alone and holding no sign-in, each runner's counts read from its own log alone, the projects' code run with no key, a held project read as the trial reads it, a bug filed once
-  from counts with no name and noted again for a newer commit, the sign-in's issue filed and closed); that the look
-  runs it, by `.github/workflows/own-look.yml`.
+  which runs no project's code, to see which project each runner tried, and a session in that project its checks; nor
+  that a held try stops a merge or a release, which the trial still decides. Reason: release 6's faults were found at
+  its trial, round after round, long after the changes that brought them in. Held by `tests/daily-try-test.mjs` and
+  `tests/daily-try-file-test.mjs` (the owner's projects found with and without the sign-in, names masked, each runner
+  cloning its one project alone, the clone keeping no sign-in, each runner's counts read from its own log alone, the
+  projects' code given no key, a held project read as the trial reads it, a bug filed once from counts with no name and
+  noted again for a newer commit, the sign-in's issue filed and closed); that the look runs it, a project's code as a
+  user outside sudo, by `.github/workflows/own-look.yml`.
 - **Nothing locks a project,** in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
   what an agent can mend alone may bind, and what only the owner can do (a yes the floor names, a setting on the

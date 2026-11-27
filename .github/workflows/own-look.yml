@@ -5,9 +5,9 @@
 # issues, and read pull requests, checks and statuses; its second job, which takes the personal terms out of issues,
 # pull requests and comments (scripts/issue-terms.mjs; #783), may write issues and pull requests; the daily try's three
 # (scripts/daily-try.mjs; #1413, point 5) read the core and the owner's own projects alone: one counts the projects,
-# one for each project clones it alone on a fresh runner, the owner's read-only sign-in reaching only that step, and
-# runs its checks with no sign-in at all, and the last files what the try came to from the counts alone, reading the
-# runners' logs, and may write issues; nothing else.
+# one for each project clones it alone on a fresh runner with the owner's read-only sign-in, and runs its checks as a
+# user outside sudo with no environment, so that no process of the runner's that holds the sign-in can be read, and the
+# last files what the try came to from the counts alone, reading the runners' logs, and may write issues; nothing else.
 name: own-look
 
 on:
@@ -111,8 +111,10 @@ jobs:
         run: node scripts/daily-try.mjs --list
 
   # Each project on a fresh runner of its own, which holds no other project's clone (Codex's security review of #1459):
-  # the core at the commit, the one project cloned with the sign-in, then its checks before the sync and after it, run in
-  # a step given no secret and a token that reads the core alone, which prints that runner's counts.
+  # the core at the commit, the one project cloned with the sign-in, then its checks before the sync and after it, run
+  # as a user of the try's own that is not in sudoers, with an empty environment, so that the project's code cannot
+  # read the sign-in, or any token, from the runner's own processes, which hold them for the whole job (#1459's
+  # security review); it prints that runner's counts.
   try:
     needs: try-list
     if: ${{ needs.try-list.outputs.sha != '' && needs.try-list.outputs.found != '0' }}
@@ -135,21 +137,33 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
-      - name: The core at that commit, outside the checkout, with its packages
+      - name: The try's folder, outside the runner's home, which is closed to every other user
+        run: |
+          chmod 750 "$HOME"
+          sudo install -d -o "$(id -un)" -m 755 /srv/daily-try
+      - name: The core at that commit, with its packages, and main's own scripts that run the try
         env:
           SHA: ${{ needs.try-list.outputs.sha }}
-        run: git worktree add --quiet --detach "$RUNNER_TEMP/core-at" "$SHA" && cd "$RUNNER_TEMP/core-at" && node scripts/install.mjs all
+        run: |
+          git clone --quiet --no-checkout "$GITHUB_WORKSPACE" /srv/daily-try/core-at
+          git -C /srv/daily-try/core-at checkout --quiet --detach "$SHA"
+          (cd /srv/daily-try/core-at && node scripts/install.mjs all)
+          git clone --quiet "$GITHUB_WORKSPACE" /srv/daily-try/look
       - name: This runner's one project, cloned (its name masked, none printed)
         env:
           GH_TOKEN: ${{ secrets.PROJECTS_READ || github.token }}
           SIGNED_IN: ${{ secrets.PROJECTS_READ != '' }}
           FOUND: ${{ needs.try-list.outputs.found }}
           LEG: ${{ matrix.leg }}
-        run: node scripts/daily-try.mjs --clone "$LEG" "$RUNNER_TEMP/try/project"
-      - name: The project tried, its checks before the sync and after it, given no secret (its counts alone printed)
+        run: node scripts/daily-try.mjs --clone "$LEG" /srv/daily-try/try/project
+      - name: The project tried as a user of its own, outside sudo, with no environment but its path (its counts alone printed)
         env:
           LEG: ${{ matrix.leg }}
-        run: node scripts/daily-try.mjs --run "$RUNNER_TEMP/try" "$RUNNER_TEMP/core-at"
+        run: |
+          sudo useradd --create-home --shell /bin/bash daily-try
+          sudo chown -R daily-try:daily-try /srv/daily-try
+          sudo -u daily-try -H -- env -i PATH="$PATH" HOME=/home/daily-try LANG=C.UTF-8 LEG="$LEG" \
+            node /srv/daily-try/look/scripts/daily-try.mjs --run /srv/daily-try/try /srv/daily-try/core-at
 
   # (a job of its own, so that no project's code runs where issues may be written; it reads what try-list counted and
   # each runner's last line of counts from its log, which its script holds to their form, numbers and the commit, before

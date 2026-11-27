@@ -204,9 +204,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      owner's repositories and their manifests, the verdicts the projects' checks write before and after the sync, and
      the counts line ending each runner's log; a repository is kept only where its owner's login is the owner's, a
      manifest as text, the verdicts only through the trial's reader (`release-trial.mjs`), a runner's line only as whole
-     numbers, the commit and what its project came to, and only where it gives that runner's own number; the issue filed
-     is built from those numbers alone and names no project; each project runs alone on a fresh runner, the sign-in
-     reaching only its clone step, and its code runs with no key, token or runner's file; limits: 500 pages of 100
+     numbers, the commit and what its project came to, and only where it gives that runner's own number, `--local` too;
+     the issue filed is built from those numbers alone and names no project; each project runs alone on a fresh runner,
+     its code as a user outside sudo with no environment, key, token or runner's file; limits: 500 pages of 100
      repositories, 256 MB of an answer, 1 MB of a manifest (past it, no project), 16 MB of verdicts (past it, none
      written), 16 MB of a runner's log, 4 KB of its line and 10,000 of each count (past them, it said nothing), 256
      runners, 25 minutes a run of a project's checks or sync, 10 a clone, 120 a runner's job, 10 the list's and
