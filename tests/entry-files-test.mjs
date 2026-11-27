@@ -126,6 +126,13 @@ try {
       fs.rmSync(path.join(dir, up)); write(file, kept);
     }
     ok(run({ ENTRY_BASE: "HEAD" }).status === 0, "once each folder is again what the base held, it passes");
+    write("docs/ag2/rules/core.md", AG); swap(".agents", f => fs.symlinkSync(path.join(dir, "docs/ag2"), f));
+    refused("against a base that read it, an entry file behind a folder made a link written from the machine's root fails, saying its mend");
+    swap(".agents", () => write(".agents/rules/core.md", AG)); fs.rmSync(path.join(dir, "docs/ag2"), { recursive: true });
+    swap("CLAUDE.md", f => fs.symlinkSync(`../${path.basename(dir)}/AGENTS.md`, f));
+    refused("and so does an entry file made a link that climbs above the project's root, whatever it leads to");
+    swap("CLAUDE.md", f => fs.writeFileSync(f, "@AGENTS.md\n"));
+    ok(run({ ENTRY_BASE: "HEAD" }).status === 0, "once each is again what the base held, it passes");
     const awayDir = `${away}.d`;
     fs.mkdirSync(path.join(awayDir, "rules"), { recursive: true }); fs.writeFileSync(path.join(awayDir, "rules/core.md"), AG);
     swap(".agents", f => fs.symlinkSync(awayDir, f)); commit("antigravity's folder elsewhere");

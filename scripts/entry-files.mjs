@@ -55,6 +55,21 @@ const standsHere = file => {
 };
 
 const clean = p => path.posix.normalize(String(p).replace(/\\/gu, "/")).replace(/^\.\//u, "");
+// Whether each link on the file's way is one rule-files.mjs's placeAt follows at a commit: written relative, and inside
+// the tree as written, every link followed, at most 40; so the work tree and the base read a link alike.
+const asTheBaseReads = file => {
+  for (let at = clean(file), hops = 0; hops <= 40; hops++) {
+    if (at === ".." || at.startsWith("../") || at.startsWith("/")) return false;
+    const parts = at.split("/"), k = parts.findIndex((_, i) => { try { return fs.lstatSync(parts.slice(0, i + 1).join("/")).isSymbolicLink(); } catch { return false; } });
+    if (k < 0) return true;
+    const link = parts.slice(0, k + 1).join("/");
+    let to;
+    try { to = fs.readlinkSync(link); } catch { return false; }
+    if (/^([\\/]|[A-Za-z]:)/u.test(to)) return false;
+    at = path.posix.normalize(path.posix.join(path.posix.dirname(link), to.replace(/\\/gu, "/"), ...parts.slice(k + 1)));
+  }
+  return false;
+};
 
 // What each entry file the project holds lacks of AGENTS.md's list: [{ file, tool, missing: [path], line, off }], `off`
 // why its tool would not load it at all (every file is then missing), or null.
@@ -100,7 +115,7 @@ if (guard(import.meta.url)) {
   // (a file that stands here but that ownText refuses is one no check can read: it fails where the base read it or
   // held nothing there, as the pull request's own doing, and is noted where the base held it unread too)
   const unread = new Set(), place = base ? placeAt(base) : null, was = place ? readAt(base, place, { bound: BOUND }) : null;
-  const here = file => { const text = ownText(file, { bound: BOUND }); if (text === null && standsHere(file)) unread.add(file); return text; };
+  const here = file => { const text = asTheBaseReads(file) ? ownText(file, { bound: BOUND }) : null; if (text === null && standsHere(file)) unread.add(file); return text; };
   const read = verdict(here, was);
   for (const f of unread) {
     const said = `${f} stands here but is not read: it is no regular file of the project's own of at most 1 MB, so what it pulls in cannot be checked. Mend: make ${f} a regular file of the project's own, of at most 1 MB`;
