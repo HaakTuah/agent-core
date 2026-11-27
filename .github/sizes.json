@@ -65,7 +65,7 @@
       "why": "#929: the cases of how Betterleaks reads apart from what the check reads."
     },
     ".github/workflows/tests.yml": {
-      "mark": 94371,
+      "mark": 94635,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {
