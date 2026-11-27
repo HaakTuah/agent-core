@@ -9,7 +9,7 @@ Release 8 is these lines, the pull requests open now and the bugs found before i
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #1413, point 8 | rule builder | the owner's Security-tab record (`needs-owner`) |
+| #1413, point 8 | rule builder | |
 | #1202 | rule builder; `AGENTS.md` and what every session here reads at its start | |
 | #1504 | rule builder; `roles/orchestrator.md` | #1202 (what a role reads at its start, one at a time) |
 | #1505 | rule builder; `roles/shared/work-flow.md` | #1504 (what a role reads at its start, one at a time) |

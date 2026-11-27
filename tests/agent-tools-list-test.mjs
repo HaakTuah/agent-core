@@ -125,6 +125,14 @@ const treeWeigh = notDone(project({ ".claude/settings.json": withHook(TREE_HOOK)
 ok(/PostToolUse: bash scripts\/format\.sh", [^;]* \("from": "the working tree"\)\.$/u.test(treeWeigh) && !treeWeigh.includes('("from": "main")'), "and one that fetches nothing from main, \"the working tree\"", treeWeigh);
 ok(!notDone(project({ ".claude/settings.json": withHook(MAIN_HOOK), ...listing({ kind: "hook", name: `PostToolUse: ${MAIN_HOOK}`, publisher: "this project", from: "main" }) }), step).length
   && !notDone(project({ ".claude/settings.json": withHook(TREE_HOOK), ...listing({ kind: "hook", name: `PostToolUse: ${TREE_HOOK}`, publisher: "this project", from: "the working tree" }) }), step).length, "and each, marked as its way out says, reads done");
+// (a hook of a type that runs no command, as a prompt, listed before the check read it, is weighed as one whose command
+// is not the kit's form: marked, never taken out, and done once marked)
+const prompt = { type: "prompt", prompt: "Is the work done?" }, promptName = `PostToolUse: ${JSON.stringify(prompt)}`;
+const promptSettings = { hooks: { ...JSON.parse(KIT).hooks, PostToolUse: [{ hooks: [prompt] }] } };
+const promptWeigh = notDone(project({ ".claude/settings.json": promptSettings, ...listing({ kind: "hook", name: promptName, publisher: "this project" }) }), step)[0]?.mend ?? "";
+ok(promptWeigh.includes("whether it does is a security judgement, not a mend") && promptWeigh.includes("never taking one out before then") && promptWeigh.includes('("from": "the working tree")') && !promptWeigh.includes("take out what nobody meant"),
+  "a listed prompt hook is given to a task weighed by a security judgement, marked \"the working tree\", never a mend that takes it out", promptWeigh);
+ok(!notDone(project({ ".claude/settings.json": promptSettings, ...listing({ kind: "hook", name: promptName, publisher: "this project", from: "the working tree" }) }), step).length, "and reads done once marked");
 ok(listed({ lockfiles: [] }, "c") === null, "a config with no \"agentTools\" holds no list");
 passes(run(project({ ".gitignore": ".claude/settings.local.json\n", ".claude/settings.local.json": { enabledPlugins: { "helper@example-market": true } }, ...listing() })), "a settings.local.json git ignores is a person's own, and not read");
 fails(run(pr(project({ ".mcp.json": { mcpServers: { files: { command: "files-server" } } }, ...listing({ kind: "server", name: "files", publisher: "Example Tools", version: "2.0.0" }) }), { "checks/licences.json": { lockfiles: [] } })),
