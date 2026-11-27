@@ -35,11 +35,10 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { MEND } from "./mend.mjs";
+import { MEND, guard } from "./mend.mjs";
 import { installStep, installed } from "./packages.mjs";
 import { npmIgnores, npmReadsAll, npmRefusal, npmVersion } from "./npm-reads.mjs";
 import { asText } from "./guards.mjs";
-import { started } from "./started.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 
 export const PARTS = ["copies", "description", "signatures", "nuget"];
@@ -364,4 +363,4 @@ function changes(base, paths, none) {
 }
 
 // (last, so every part above is defined when it runs)
-if (started(import.meta.url)) main();
+if (guard(import.meta.url)) main();

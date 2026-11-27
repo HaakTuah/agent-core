@@ -10,7 +10,7 @@
 // tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
 //
 //   node tests/hostile-github-test.mjs
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "../scripts/check-runs.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

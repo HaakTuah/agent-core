@@ -210,7 +210,7 @@ ok(own.status === 0 && !own.stderr, "the core's own entries in scripts/holders/ 
 const failing = project({ "tasks/x.md: Gone": "audit" });
 fs.mkdirSync(path.join(failing, "scripts", "staged"));
 fs.mkdirSync(path.join(failing, "scripts", "schemas"));
-for (const f of ["archive.mjs", "core-address.mjs", "core-path.mjs", "guards.mjs", "holder-form.mjs", "holders.mjs", "holders-own.mjs", "packages.mjs", "reading.mjs", "rule-files.mjs", "rules.mjs", "schemas.mjs", "schemas/holders.json", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
+for (const f of ["archive.mjs", "core-address.mjs", "core-path.mjs", "guards.mjs", "holder-form.mjs", "holders.mjs", "holders-own.mjs", "packages.mjs", "reading.mjs", "rule-files.mjs", "rules.mjs", "schemas.mjs", "schemas/holders.json", "started.mjs", "mend.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
 fs.writeFileSync(path.join(failing, "scripts", "staged.mjs"), "export const CASES = [];\n");
 fs.writeFileSync(path.join(failing, "scripts", "outcomes.mjs"), "export const NUMBER = /^$/u;\n");
 const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.mjs")], { encoding: "utf8" });

@@ -1,11 +1,11 @@
 // Tests the files a test reaches by listing a folder (scripts/select-folders.mjs; #1361, point 25), through the
-// selection's links (select.mjs's links and reached): a folder a string names by its path or its last parts, a pattern
+// selection's links (select-reach.mjs's links and reached): a folder a string names by its path or its last parts, a pattern
 // before its wildcard, the file's own folder and those above it, in JavaScript and Python, a template literal's and an f-string's literal pieces, a folder outside the
 // repository and a string past twice the longest path, which name none, and a string that names a folder in a file that
 // lists none. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/select-folders-test.mjs
-import { links, reached } from "../scripts/select.mjs";
+import { links, reached } from "../scripts/select-reach.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();

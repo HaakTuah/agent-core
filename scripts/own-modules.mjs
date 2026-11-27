@@ -14,7 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { MODULES } from "./reading.mjs";
 import { asText } from "./guards.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
 
 export const SECTION = "## The core this repository takes";
 const NOT_TAKEN = /^Not taken\b/u;
@@ -102,4 +102,4 @@ function main() {
   return status;
 }
 
-if (started(import.meta.url)) process.exitCode = main();
+if (guard(import.meta.url)) process.exitCode = main();

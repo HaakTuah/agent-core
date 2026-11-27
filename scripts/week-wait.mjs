@@ -16,7 +16,7 @@ import { noSignInWhole, parseBounded } from "./guards.mjs";
 import { registryName, registryVersion } from "./licences.mjs";
 import { fetched } from "./lookup.mjs";
 import { ENTRY_FIELDS as FIELDS } from "./packages.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const WEEK = 7 * 86400000;
@@ -70,7 +70,7 @@ export const tooYoung = async (packages, base, ask, now) => {
 // (the failure, on one line with its mend)
 export const failure = young => `FAIL each package the change brings or updates in the lock file is a week old or more by the registry's date (floor rule 7): ${young.join("; ")}. Mend: wait until the version is a week old and run the job again, or take the version before it, its lock entry written by npm's own install; where the registry did not answer, run the job again`;
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const json = f => parseBounded(fs.readFileSync(path.join(root, f), "utf8"));
   // (every install's lock, each entry against what any lock at the base held, so a package moved from one install to
   // another at the same version is no new one, and one the parser's lock brings or updates is held as the first's: #719)

@@ -16,7 +16,7 @@
 import { readFileSync } from "node:fs";
 import { join, posix, resolve } from "node:path";
 import { inProject, logged, loggedCause, noSignInWhole, parseBounded, quotedAlone } from "./guards.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
 
 const KINDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
 const own = (key) => key === "" || !`/${key}/`.includes("/node_modules/");
@@ -153,7 +153,7 @@ export function report(configPath, root = ".", textAt = null, noBase = false) {
   };
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const { status, out, err } = report(process.argv[2]);
   for (const line of err) console.error(line);
   for (const line of out) console.log(line);

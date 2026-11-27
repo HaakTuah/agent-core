@@ -6,7 +6,7 @@
 // up. Run by the core's tests workflow (.github/workflows/tests.yml). Node's own modules.
 //
 //   node tests/hostile-issues-test.mjs
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "../scripts/check-runs.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

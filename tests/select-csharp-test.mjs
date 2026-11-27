@@ -9,7 +9,7 @@
 //
 //   node tests/select-csharp-test.mjs
 import { csharpReach } from "../scripts/select-csharp.mjs";
-import { links, reached, selection } from "../scripts/select.mjs";
+import { links, reached, selection } from "../scripts/select-reach.mjs";
 import { parseConfig, survey } from "../scripts/shape.mjs";
 import { readCsharp } from "../scripts/shape-csharp.mjs";
 import { started } from "../scripts/started.mjs";

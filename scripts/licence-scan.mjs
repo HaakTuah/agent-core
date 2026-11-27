@@ -15,7 +15,7 @@
 //     with what it pulls in. A fetch it cannot read fails, but npm pack's, which runs nothing it fetches, and another
 //     fetcher's (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone, dotnet tool install, choco, winget,
 //     PowerShell's Invoke-WebRequest and the like; a git clone through a function too, licence-wrappers.mjs): each of those passes
-//     only in a file an entry's "files" names, that entry its hand audit, each fetch that stood at the base reported; and where such a file downloads by address
+//     only in a file an entry's "files" names, that entry its hand audit, or as its "fetches" names it there (licence-audit-fetches.mjs), each fetch that stood at the base reported; and where such a file downloads by address
 //     (curl, wget, PowerShell's) and an entry covering it audits what may be a program (no data, asset, font, service
 //     of GitHub's or the owner's own work), each such entry names its version, but a package of the machine's
 //     distribution that the file installs (kind "distribution"), whose version is the distribution's, and the file holds, for each download,
@@ -39,6 +39,7 @@ import { readFileSync, statSync } from "node:fs";
 import { join, posix } from "node:path";
 import { OWNER } from "./core-address.mjs";
 import { DEEPEST, leadsOut, parseBounded, tooDeep } from "./guards.mjs";
+import { auditMend, fetchesHeld, fetchesIn, fetchesLeft, namesFetches, shown, takeEach, unnamed } from "./licence-audit-fetches.mjs";
 import { commandLines, commands } from "./licence-commands.mjs";
 import { downloads, otherFetches } from "./licence-fetchers.mjs";
 import { fetched } from "./licence-npm.mjs";
@@ -105,6 +106,8 @@ const holds = (p, f) => typeof p === "string" && (p === "" || p === f || (p.ends
 const under = (f, paths) => (paths ?? []).some((p) => holds(p, f));
 const served = (c, f) => under(f, c.settings.served) && !under(f, c.settings.tools);
 export const covers = (e, f) => e.name === f || (Array.isArray(e.files) && e.files.some((p) => p !== "" && holds(p, f)));
+// Whether the entry `e` audits the file `f`: covers it, or names a fetch of it; the sync's step reads it so too.
+export const audits = (e, f) => covers(e, f) || fetchesIn(e, f).length > 0;
 const covering = (c, f) => c.entries.filter((e) => covers(e, f));
 const byHand = (c, f) => covering(c, f).some((e) => e.kind !== "own");
 const badFiles = (e) => e.files !== undefined && (!Array.isArray(e.files) || e.files.some((p) => typeof p !== "string" || !p));
@@ -114,11 +117,12 @@ const badFiles = (e) => e.files !== undefined && (!Array.isArray(e.files) || e.f
 function entryFaults(c, e) {
   const { auditPath, fail } = c;
   if (badFiles(e)) { fail(`${auditPath}: ${e.name}: "files" is not a list of paths. Mend: write it as a list of paths from the project's root`); return; }
+  if (!fetchesHeld(c, e)) return;
   if (e.version !== undefined && typeof e.version !== "string") fail(`${auditPath}: ${e.name}: "version" is not text. Mend: write the version in quotes`);
   if (e.kind === "own" && (e.version !== undefined || (e.files ?? []).some((p) => p.endsWith("/")))) fail(`${auditPath}: ${e.name}: the owner's own work names its files one by one, with no version. Mend: list each file, no folder, and take "version" out`);
   for (const p of e.files ?? []) if (!c.tracked.some((f) => holds(p, f))) fail(`${auditPath}: ${e.name}: ${p} names no tracked file. Mend: correct the path, or take it out`);
-  const shipped = c.files.find((f) => served(c, f) && covers(e, f));
-  if (shipped && e.ships !== true) fail(`${auditPath}: ${e.name}: it covers ${shipped}, which reaches users, so it ships. Mend: set "ships": true on it`);
+  const shipped = c.files.find((f) => served(c, f) && audits(e, f));
+  if (shipped && e.ships !== true) fail(`${auditPath}: ${e.name}: it ${covers(e, shipped) ? "covers" : "audits a fetch of"} ${shipped}, which reaches users, so it ships. Mend: set "ships": true on it`);
 }
 
 /** That the package `name` (used in `where`) has an entry, at `version` where one is given (scan, above). */
@@ -160,13 +164,13 @@ function fetches(c, text, f, literal = false) {
 // audit, which are reported (AGENTS.md, "Nothing locks a project": a reader that reads more turns no file red that
 // stood; #1074); with no base, as in a run by hand, they fail. A fetch changed, or added, fails: the base allows what
 // it held, not as many others. A source held in a variable set on another line is not read, as `heldAtBase` reads none.
-function unaudited(c, f, found) {
+function unaudited(c, f, all) {
+  const found = fetchesLeft(c, f, all);
   if (!found.length) return;
-  const was = c.base ? atBase(c, f) : null, held = was === null ? [] : byKind({ ...c, entries: baseEntries(c), read: (p) => atBase(c, p), fail() {}, reports: [] }, f, was);
-  const fresh = found.filter((line) => { const i = held.indexOf(line); if (i < 0) return true; held.splice(i, 1); return false; });
-  const shown = (line) => (line.length > 80 ? `${line.slice(0, 79)}…` : line), mend = `name ${f} in the "files" of the entry that audits it`;
-  if (fresh.length) c.fail(`${f}: ${shown(fresh[0])} fetches what no entry's "files" says. Mend: ${mend}`);
-  else c.reports.push(`${f}: ${shown(found[0])} fetches what no entry's "files" says; it stood so at the pull request's base, so it passes: ${mend}`);
+  const was = c.base ? atBase(c, f) : null, held = was === null ? [] : unnamed(baseEntries(c), f, byKind({ ...c, entries: baseEntries(c), read: (p) => atBase(c, p), fail() {}, reports: [] }, f, was));
+  const fresh = takeEach(found, held).left, mend = auditMend(c.entries, f);
+  if (fresh.length) c.fail(`${f}: ${shown(fresh[0])} fetches what no entry audits. Mend: ${mend}`);
+  else c.reports.push(`${f}: ${shown(found[0])} fetches what no entry audits; it stood so at the pull request's base, so it passes: ${mend}`);
 }
 
 // What is no program a download could fetch: the owner's own work, data, an asset, a font, a service of GitHub's.
@@ -186,12 +190,12 @@ const CHECKSUM = /(?<![0-9a-f])(?:[0-9a-f]{64}){1,2}(?![0-9a-f])|sha(?:256|384|5
 const VERIFIER = /(?<![\w-])(?:sha(?:256|512)sum|shasum|Get-FileHash|certutil(?:\.exe)?\s+-hashfile|createHash)(?![\w-])/giu;
 
 /** What the code `code` of the file `f` (codeOf) lacks for the programs it downloads by address to be pinned, or
- *  null: of the audit's `entries` covering `f` that audit what may be a program, each names its version (`bare`, those
+ *  null: of the audit's `entries` auditing `f` (audits) that audit what may be a program, each names its version (`bare`, those
  *  that do not), but one of kind "distribution" whose package a line of `f` installs (installs), and for each download
  *  the file holds a checksum of its own and a check by a
  *  command of VERIFIER (`deficit`, the downloads short of one). The scan and the sync's step (steps.mjs) read it alike. */
 export function pinFault(entries, auditPath, f, code) {
-  const tools = entries.filter((e) => e && typeof e === "object" && covers(e, f) && !NO_PROGRAM.has(e.kind)), count = downloads(code).length;
+  const tools = entries.filter((e) => e && typeof e === "object" && audits(e, f) && !NO_PROGRAM.has(e.kind)), count = downloads(code).length;
   if (!tools.length || !count) return null;
   const bare = tools.filter((e) => !(e.kind === DISTRIBUTION && installs(code, e.name)) && (typeof e.version !== "string" || !e.version.trim())).map((e) => e.name);
   // (which check a download meets is left to the review, since reading that needs a reader of the shell's data flow)
@@ -206,9 +210,9 @@ export function pinFault(entries, auditPath, f, code) {
  *  code that runs, a script in a language it cannot read, and JSON but the audit and a lock file. */
 export const pinRead = (f, text, auditPath) => { const as = readAs({ binary: new Set() }, f, text); return as.runs || as.other || (/\.json[c5]?$/u.test(f) && f !== auditPath && !LOCKFILE.test(f)); };
 
-// A download's pin, in every file read for its commands that an entry audits by hand.
+// A download's pin, in every file read for its commands that an entry audits by hand or names a fetch of.
 function pinnedIfRead(c, f, text) {
-  if (!c.binary.has(f) && byHand(c, f) && pinRead(f, text, c.auditPath)) pinned(c, f, codeOf(f, text));
+  if (!c.binary.has(f) && (byHand(c, f) || namesFetches(c.entries, f)) && pinRead(f, text, c.auditPath)) pinned(c, f, codeOf(f, text));
 }
 
 /** A program the file `f` downloads by its address is pinned by version and checksum (floor rule 7, as the core pins
@@ -244,6 +248,17 @@ function pinned(c, f, text) {
   else c.fail(`${said}. Mend: ${fault.mend}`);
 }
 
+/** What the file `f`, holding `text`, fetches, held (scanned, below), and where its readers cannot follow it, a
+ *  failure: strings and templates nested some thousands deep run them out of stack, so the file fails, named, with its
+ *  mend, where the check stopped with the bare error (#1496). */
+function fetchesRead(c, f, text) {
+  try { unaudited(c, f, byKind(c, f, text)); pinnedIfRead(c, f, text); }
+  catch (e) {
+    if (!(e instanceof RangeError && /call stack/u.test(e.message))) throw e;
+    c.fail(`${f} nests its strings, templates or brackets too deep for the scan to read, so what it fetches cannot be read. Mend: write ${f} with them nested less deep, each one it opens closed`);
+  }
+}
+
 /** The scan of one tracked file `f` (scan, above): by what it is, and for a licence notice it carries. */
 function scanned(c, f) {
   if (LOCKFILE.test(f) && !c.lockfiles.includes(f)) {
@@ -253,8 +268,7 @@ function scanned(c, f) {
     else c.fail(said);
   }
   const text = c.binary.has(f) ? "" : trackedText(c.root, f, c.fail);
-  unaudited(c, f, byKind(c, f, text));
-  pinnedIfRead(c, f, text);
+  fetchesRead(c, f, text);
   // (a notice in any file but prose, the notices a project writes itself among them: code copied in, in any language)
   if (!c.binary.has(f) && !PROSE_FILE.test(f) && NOTICE.test(text)) needFile(c, f, "a file carrying a licence notice", { own: false });
   if (ASSET.test(f) || c.binary.has(f)) needFile(c, f, c.binary.has(f) && !ASSET.test(f) ? "a binary file" : "a font, image, sound, video, model or data file");
@@ -274,7 +288,7 @@ function byKind(c, f, text) {
  *  by hand, and nothing else it says of it, `read` giving the text of a file of the project's it imports, or null: the
  *  step that lists what stood so reads it (step-checks-packages.mjs). */
 export const unauditedIn = (settings, entries, auditPath, f, text, read = () => null) =>
-  byKind({ settings, entries, auditPath, binary: new Set(), locks: [], read, fail() {}, reports: [] }, f, text);
+  unnamed(entries, f, byKind({ settings, entries, auditPath, binary: new Set(), locks: [], read, fail() {}, reports: [] }, f, text));
 
 /** How the scan reads the file `f` holding `text` (scanned, above): `other`, in a language it cannot read; `runs`, as
  *  shell, JavaScript or a page. */

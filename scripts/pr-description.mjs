@@ -61,7 +61,6 @@ import { asking, coreAtBase, issuesOf, textsOf, yesOf } from "./owner-yes.mjs";
 import { numberOf, statedOf } from "./meaning-kept.mjs";
 import { proven } from "./path-only.mjs";
 import { coreAt, lineMend, pathIn, textOf } from "./reading.mjs";
-import { started } from "./started.mjs";
 import { changedMend, plain, testsChanged } from "./weakened.mjs";
 import { NO_COST, costMend } from "./pr-cost.mjs";
 import { headMends, headOf } from "./pr-head.mjs";
@@ -70,6 +69,7 @@ import { calledFor } from "./pr-reads.mjs";
 import { MANIFEST_MAX, REASONS, UNREADABLE, differencesAdded, reasonsMend } from "./pr-reasons.mjs";
 import { WAITS, heldAt, waitsMend, waitsOn } from "./pr-waits.mjs";
 import { asText, parseBounded } from "./guards.mjs";
+import { guard } from "./mend.mjs";
 
 // (what each line's check holds, exported from here as before they were split)
 export { HOLDS, entriesChanged, entriesMend, calledFor, headMends, MANIFEST_MAX, NO_COST, REASONS, UNREADABLE, WAITS, costMend, differencesAdded, heldAt, numberMend, reasonsMend, waitsMend, waitsOn };
@@ -139,7 +139,7 @@ export function missing(body, parts = PARTS) {
   return parts.filter(part => !headings.some(h => isPart(h, part)));
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const parts = asked(process.argv[2]);
   const absent = missing(process.env.PR_BODY, parts);
   for (const part of absent) console.log(`FAIL the description has no heading "${part}". Mend: add "## ${part}" with what belongs under it ("None" where there is nothing; where a report in a file holds it, that file), and run the check again`);

@@ -9,7 +9,7 @@
 //
 //   node tests/select-csharp-unsure-test.mjs
 import { csharpReach } from "../scripts/select-csharp.mjs";
-import { selection } from "../scripts/select.mjs";
+import { selection } from "../scripts/select-reach.mjs";
 import { readCsharp } from "../scripts/shape-csharp.mjs";
 import { PROJ, app, config, done, nothing, ok, one, pick, same, web } from "./select-csharp-test.mjs";
 
