@@ -65,7 +65,7 @@
       "why": "#929: the cases of how Betterleaks reads apart from what the check reads."
     },
     ".github/workflows/tests.yml": {
-      "mark": 94956,
+      "mark": 97263,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {
@@ -193,7 +193,7 @@
       "why": "Split by the reader each case tests in #852: its archive cases apart from the rest, and a project's own rules and share apart from the core's."
     },
     "tests/hostile-configs-test.mjs": { "mark": 31351, "why": "Split by the reader each case tests in #852." },
-    "tests/hostile-pr-changes-test.mjs": { "mark": 44725, "why": "Split by the reader each case tests in #852." },
+    "tests/hostile-pr-changes-test.mjs": { "mark": 56308, "why": "Split by the reader each case tests in #852." },
     "tests/init-test.mjs": {
       "mark": 61827,
       "why": "Its cases run on the one scratch project it writes from the starter kit; split, each file would write it again, adding to the suite's time (tasks/tests.md), and every case reads that setup."
@@ -250,9 +250,11 @@
       "mark": 25951,
       "why": "#943: the selection's rules apart from those of the suites' time and of the run of a tree that passed."
     },
+    "scripts/select.mjs": { "mark": 23161, "why": "the question of a split is asked in #1380" },
+    "tests/select-csharp-compile-test.mjs": { "mark": 25580, "why": "the question of a split is asked in #1380: the cases of what git holds beside the texts (heldBeside, the solutions) can go to a file of their own" },
     "tests/select-test.mjs": {
-      "mark": 32013,
-      "why": "#943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
+      "mark": 41948,
+      "why": "#1380: the timed C# cases, which read none of the fixture, are to move beside the other select-csharp tests. #943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
     },
     ".github/shape-baseline.json": {
       "mark": 27000,

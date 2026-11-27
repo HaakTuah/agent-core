@@ -390,6 +390,18 @@ jobs:
       - name: The selection of the tests a change can reach
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-test.mjs ')) }}
         run: node tests/select-test.mjs
+      - name: What a file of C# reaches, for the selection
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-csharp-test.mjs ')) }}
+        run: node tests/select-csharp-test.mjs
+      - name: Where what a file of C# reaches cannot be told, for the selection
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-csharp-unsure-test.mjs ')) }}
+        run: node tests/select-csharp-unsure-test.mjs
+      - name: Where MSBuild's files decide what a file of C# reaches, for the selection
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-csharp-msbuild-test.mjs ')) }}
+        run: node tests/select-csharp-msbuild-test.mjs
+      - name: Where a <Compile> item decides what a file of C# reaches, for the selection
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-csharp-compile-test.mjs ')) }}
+        run: node tests/select-csharp-compile-test.mjs
       - name: The pathspecs the selection matches a path against
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-matcher-test.mjs ')) }}
         run: node tests/select-matcher-test.mjs
