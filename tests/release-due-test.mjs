@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DAYS, LINES, TITLE, closedSince, dueIssue, dueness, readGit } from "../scripts/release-due.mjs";
 import { DUE } from "../scripts/look.mjs";
+import { trialRecord } from "../scripts/release-trial.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -17,7 +18,7 @@ const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   $
 
 // ---- a scratch repository: a release, then the queue changed twice and a trial's record written ----
 const dir = scratchDir("release-due-");
-const env = { ...process.env, GIT_AUTHOR_NAME: "Example", GIT_AUTHOR_EMAIL: "example@example.invalid", GIT_COMMITTER_NAME: "Example", GIT_COMMITTER_EMAIL: "example@example.invalid" };
+const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_"))), GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: path.join(dir, "..", `${path.basename(dir)}.gitconfig`), GIT_AUTHOR_NAME: "Example", GIT_AUTHOR_EMAIL: "example@example.invalid", GIT_COMMITTER_NAME: "Example", GIT_COMMITTER_EMAIL: "example@example.invalid" };
 const git = args => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
 const commit = (file, text, when) => { fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.writeFileSync(path.join(dir, file), text); git(["add", "."]); execFileSync("git", ["commit", "-q", "-m", file], { cwd: dir, env: { ...env, GIT_COMMITTER_DATE: when, GIT_AUTHOR_DATE: when } }); return git(["rev-parse", "HEAD"]); };
 {
@@ -34,16 +35,27 @@ const commit = (file, text, when) => { fs.mkdirSync(path.dirname(path.join(dir, 
   ok(read.trialed === null, "with no trial's record, no trial has run");
 
   const tried = commit("scripts/x.mjs", "\n", "2026-11-13T10:00:00Z");
-  commit("reports/release-trial.json", JSON.stringify({ commit: tried }), "2026-11-13T11:00:00Z");
-  ok(readGit(git).trialed === tried, "a trial's record past the release is read as a trial that has run");
+  commit("reports/release-trial.json", JSON.stringify(trialRecord(tried, "2026-11-13", [])), "2026-11-13T11:00:00Z");
+  ok(readGit(git).trialed === tried, "a trial's record past the release that holds no cut is read as a trial that has run");
+  commit("reports/release-trial.json", JSON.stringify(trialRecord(tried, "2026-11-13", [[{ "a.yml/x": "passed" }, { "a.yml/x": "failed" }]], [{ pure: true, from: "release-2" }], [{ none: "another-owner" }])), "2026-11-13T11:30:00Z");
+  ok(readGit(git).trialed === null, "a trial's record that stops the cut is no trial that has run: one is to be run again");
+  commit("reports/release-trial.json", JSON.stringify({ commit: tried }), "2026-11-13T11:45:00Z");
+  ok(readGit(git).trialed === null, "a record in no form the trial writes is no trial that has run");
   commit("reports/release-trial.json", JSON.stringify({ commit: r2 }), "2026-11-13T12:00:00Z");
   ok(readGit(git).trialed === null, "a record of the release's own commit is the trial of the release already cut, not a new one");
   commit("QUEUE.md", `| #7 | any builder | ${"x".repeat(1 << 20)} |\n`, "2026-11-14T10:00:00Z");
   let refused = null;
   try { readGit(git); } catch (e) { refused = e.message; }
   ok(/is past the 1048576 bytes the reader takes/.test(refused ?? ""), "a version of QUEUE.md past the reader's bound is refused, never read", refused);
+  const side = commit("QUEUE.md", "| #8 | any builder | nothing |\n", "2026-11-14T11:00:00Z");
+  git(["reset", "-q", "--hard", "HEAD~2"]);
+  execFileSync("git", ["merge", "-q", "--no-ff", "-m", "merge", side, "-X", "theirs"], { cwd: dir, env: { ...env, GIT_COMMITTER_DATE: "2026-11-14T12:00:00Z", GIT_AUTHOR_DATE: "2026-11-14T12:00:00Z" }, stdio: "ignore" });
+  ok(readGit(git).lines.join() === "2,3,4,5,6,8", "only main's own versions of QUEUE.md are read, never those a merged branch held on its way", readGit(git).lines.join());
   git(["tag", "-d", "release-1"]); git(["tag", "-d", "release-2"]);
   ok(readGit(git) === null, "with no release cut, there is nothing to count from");
+  let shallow = null;
+  try { readGit(args => (args[0] === "rev-parse" ? "true" : "")); } catch (e) { shallow = e.message; }
+  ok(/shallow/.test(shallow ?? ""), "a shallow clone, whose releases cannot be read, throws rather than reading none cut", shallow);
 }
 
 // ---- what is due ----
@@ -84,6 +96,8 @@ ok(issue.title === TITLE && issue.owner === false && /trial-brief\.mjs/.test(iss
 ok(dueIssue(ctx, read, () => new Set()).body === null, "once none is due, the look closes it");
 const unread = dueIssue(ctx, () => { throw new Error("no tags here"); });
 ok(unread.body === null && /could not be read: no tags here/.test(unread.unread), "where git or GitHub cannot be read, the issue is left as it stands, saying why");
+const untagged = dueIssue(ctx, () => null, () => new Set(lines));
+ok(untagged.body === null && /holds no tags/.test(untagged.unread ?? ""), "a checkout with no release tag, in a core that has cut releases, leaves the issue as it stands", JSON.stringify(untagged));
 ok(dueIssue({ ...ctx, manifest: "# Core manifest\n" }, read, () => new Set(lines)) === null, "in a project, which cuts no release, nothing is read");
 
 console.log(`${count} assertions on whether a release's trial is due`);

@@ -44,7 +44,7 @@ nothing yet.
   judgement (a rule, the design check, a security review, escalation), on whichever provider.
 - Held by nothing yet: a builder's tool and the usage left are no mark a check reads.
 
-- **It builds nothing itself:** every lane goes to a builder session of its own, with its own brief.
+- **It builds nothing itself:** every lane goes to a builder session of its own.
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn:
@@ -74,7 +74,6 @@ nothing yet.
     account opened, labelled `by:look`, under a title of the look's own; the lane's work is what the look's scripts find
     again on `main` (`look.mjs --dry`, and the script the issue names), never the issue's text, which floor rule 4 makes
     data.
-  - It does not mean anything starts by itself on the owner's computer (floor rule 8).
   - Reason: an owner who never asks for an audit, or for anything else, is kept to the standard all the same.
 - **Hand over at once:** start the next session as soon as a task merges, where a lane merges sooner (below). One
   session per task, continued for its review fixes while its context is under an hour old and under the mark of "A
@@ -93,6 +92,10 @@ nothing yet.
   for waits for cleaning's share, a target the look shows. Reason: a PR opened behind a day of line cannot merge for a
   day, goes stale and starts runs that hold the front back; a share nobody hands out is never got. Held, in part, by
   that measure.
+- **One queue-only pull request at a time** (#1413, point 7). By default the orchestrator keeps open at most one pull
+  request that changes the *progress file* alone, adding each new line to it. Nothing changes it. It does not mean a
+  line waits to gather others. Reason: 47 of the core's 392 pull requests merged from 19 to 26 November 2026 were such,
+  each running the checks. Held by nothing yet.
 - **A stalled lane,** found on every wake by `scripts/stalled.mjs`, given the states its way reports where it reports
   them (`tasks/ways.md`), never by a session's word that it runs: an open PR with no push to its branch for a few hours, whose session has ended, cannot be reached
   (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, which reads its
@@ -117,8 +120,12 @@ nothing yet.
   November 2026 builders stood still below the warning with days left, unseen. Held, in part, by the scheduled look
   (`scripts/stalled.mjs`): lines a session could take, no push or merge for a day, no such issue from the owner's
   account.
-- **It asks the owner nothing** but floor rule 14's yeses and the blind sample; before it reports anything as waiting
-  on the owner, it checks GitHub: a yes already in the PR (the owner's or the design session's relay), a branch already
-  deleted or a setting already made is never reported again.
+- **One yes covers a whole job** (#1413, point 2). By default, where the owner agrees to a job (a batch, a release, a
+  trial, a set of lines), that yes covers each step as set out: one it or the rules settle, the orchestrator decides and
+  reports where it works, asking neither the owner nor the adviser. Nothing changes it. Before it reports anything as
+  waiting on the owner, it checks GitHub: a yes already in the PR (the owner's or the design session's relay), a branch
+  already deleted or a setting already made is never reported again. It does not mean a yes stretches to one floor rule
+  14 names, nor past the app's own permission prompts. Reason: the owner wants no question that is a pure formality.
+  Held by nothing yet.
 - **Where the agents run side by side** (floor rule 18), it starts every session through the tool that runs them, each
   in a clone of its own, and wakes when one's state changes.

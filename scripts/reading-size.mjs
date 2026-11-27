@@ -7,11 +7,13 @@
 //     own cap, scripts/size.mjs there, holds what of it every session reads, so that no sync fails a project over what
 //     the core grew, the core's AGENTS.md, "Nothing locks a project"; where "total" leaves room above the
 //     project's own files for more than half that copy, a note gives the mark to set);
-//   - when the PR changes a file past "split" (about 50 KB), unless "past" lists it, as { "mark", "why" }: a mark it has
-//     not grown a quarter past, and why it stays whole or the issue of its split (tasks/cleaning.md, "Size asks"; #469).
-//     A line of a mark alone that stood on the base fails, as before, only where the file grew past it, and is noted. The copy of the core
-//     (core/, changed only by a sync PR), the paths under "skip" (such as the archive: dated records, added to by every
-//     merge) and binary files are not counted.
+//   - when "past" lists a file no longer past "split" (about 50 KB).
+// A file past "split" that the PR changes asks how a split lets someone read less (tasks/cleaning.md, "Size asks"; #469),
+// noted and never failed (#1413, point 6), unless "past" answers it, as { "mark", "why" }: a mark it has not grown a
+// quarter past, and why it stays whole or the issue of its split (a line of a mark alone that stood on the base answers
+// it until the file grows past it); the scheduled look keeps each such question as a task (look-split.mjs, beside this
+// file; the judgement, split-mark.mjs). The copy of the core (core/, changed only by a sync PR), the paths under
+// "skip" (such as the archive: dated records, added to by every merge) and binary files are not counted.
 // A PR that crosses a mark moves the mark in the config only as roles/shared/review-guidelines.md says ("A mark on what
 // every session reads", and "What blocks"). The PR's changes are those against SIZES_BASE (set by the copies workflow,
 // .github/workflows/copies.yml, which runs this), else where HEAD left origin/main; in CI that is HEAD^1, the first
@@ -30,6 +32,7 @@ import { fileURLToPath } from "node:url";
 import { corePath, floorCopy, projectAt } from "./core-path.mjs";
 import { sizeOf as size } from "./file-size.mjs";
 import { asText, leadsOut, logged, parseBounded } from "./guards.mjs";
+import { ASK, entryFor, markOf, unanswered } from "./split-mark.mjs";
 
 // (a listing of the tracked paths grows with the project: 256 MB, not Node's default 1 MB; #1204)
 const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
@@ -62,7 +65,7 @@ const kb = n => (n / 1024).toFixed(1);
 // tasks/repositories.md; core-path.mjs)
 const at = corePath(".") || "core/", ofCore = [at, ...[floorCopy(".")].filter(Boolean)];
 const skip = [...ofCore, ...(marks.skip ?? [])];
-const fail = [], notes = [];
+const fail = [], notes = [], asked = [];
 
 // the files every session reads; their total, the project's own alone (the core's copy left out)
 let total = 0, core = 0;
@@ -101,18 +104,13 @@ if (base) {
   // (the base's own lines of "past", where its config can be read there: a line the base did not hold is this PR's)
   let basePast = {};
   try { const was = JSON.parse(git(["show", `${base}:${path.relative(real(process.cwd()), MARKS_AT).split(path.sep).join("/")}`])); if (was?.past && typeof was.past === "object") basePast = was.past; } catch { /* (no config on the base: every line is this PR's) */ }
-  const ask = `ask in what ways it could be split so that someone reads less (core/tasks/cleaning.md, "Size asks"): split it along one first, in a pull request of its own that proves its behaviour unchanged, and change it after; or, where there is none, list it under "past" in ${MARKS} as`;
+  // (each changed file whose question stands is noted, never failed: the scheduled look keeps it as a task, as it keeps
+  // a cap the default branch stands past; #1413, point 6)
   for (const f of big.filter(f => changed.has(f))) {
-    const at = marks.past[f], mark = num(at) ? at : at?.mark, why = String(at?.why ?? "").trim(), n = size(f), entry = `{ "mark": ${n}, "why": "<why no split lets anyone read less, or the split's issue>" }`;
-    // (a line of a mark alone that stood on the base stands as it did, failing only where its file grew past it; a line
-    // this pull request writes says why, a word or the split's issue)
-    const stood = num(at) && basePast[f] === at, was = num(basePast[f]) ? basePast[f] : basePast[f]?.mark;
-    if (mark === undefined) fail.push(`${f} is ${n} bytes, past the ${marks.split}-byte mark, and this PR changes it. Mend: ${ask} ${entry}`);
-    else if (stood && n > mark) fail.push(`${f} is ${n} bytes, past its mark of ${mark} under "past" in ${MARKS}, and this PR changes it. Mend: ${ask} ${entry}`);
-    else if (stood) notes.push(`${f} is listed under "past" in ${MARKS} with a mark alone: when next you change its line, write it as ${entry} (core/tasks/cleaning.md, "Size asks")`);
-    else if (!/\p{L}|#\d/u.test(why)) fail.push(`${f} is listed under "past" in ${MARKS} with no reason it stays whole, a line this PR writes. Mend: write its line as ${entry}, having asked in what ways it could be split so that someone reads less (core/tasks/cleaning.md, "Size asks")`);
-    else if (n > mark * 1.25) fail.push(`${f} is ${n} bytes, grown more than a quarter past its mark of ${mark} under "past" in ${MARKS}, and this PR changes it. Mend: ${ask} ${entry}, its why one that still holds`);
-    else if (num(was) && mark > was) notes.push(`${f}: this PR raises its mark under "past" in ${MARKS} from ${was} to ${mark}, so the question is asked again: the reviews read that its why still holds (core/tasks/cleaning.md, "Size asks")`);
+    const at = marks.past[f], n = size(f), was = markOf(basePast[f]), why = unanswered(n, at, basePast[f] === at);
+    if (why) { asked.push(f); notes.push(`${f} is ${n} bytes, past the ${marks.split}-byte mark, and this PR changes it, which fails nothing: ${why}. Mend: ${ASK} ${entryFor(n)}, here or later; until then the scheduled look keeps it as a task`); }
+    else if (Number.isInteger(at)) notes.push(`${f} is listed under "past" in ${MARKS} with a mark alone: when next you change its line, write it as ${entryFor(n)} (core/tasks/cleaning.md, "Size asks")`);
+    else if (Number.isInteger(was) && markOf(at) > was) notes.push(`${f}: this PR raises its mark under "past" in ${MARKS} from ${was} to ${markOf(at)}, so the question is asked again: the reviews read that its why still holds (core/tasks/cleaning.md, "Size asks")`);
   }
 } else notes.push("no base to compare with (set SIZES_BASE), so the files past the split mark were not checked for changes");
 for (const f of Object.keys(marks.past)) if (!big.includes(f)) fail.push(`${MARKS} lists ${f} under "past", but it is not past ${marks.split} bytes now. Mend: take it out of "past"`);
@@ -122,4 +120,4 @@ for (const n of notes) console.log(asText(`note ${n}`));
 for (const x of fail) console.error(asText(`FAIL: ${x}`));
 if (fail.length) process.exit(1);
 console.log(asText(`ok   read by every session: ${Object.keys(marks.read).map(f => `${f} ${kb(size(f))} KB`).join(", ")}; the project's own ${kb(total)} of ${kb(marks.total)} KB. `
-  + `Past ${kb(marks.split)} KB: ${big.join(", ") || "none"}${base ? ", none changed here" : ""}`));
+  + `Past ${kb(marks.split)} KB: ${big.join(", ") || "none"}${base ? asked.length ? `, ${asked.length} changed here asked above` : ", none changed here unasked" : ""}`));

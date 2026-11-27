@@ -95,7 +95,7 @@ import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { asText, leadsOut, oneLine, parseBounded } from "./guards.mjs";
 import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
-import { copyOf, projectAt } from "./core-path.mjs";
+import { copyAside, projectAt } from "./core-path.mjs";
 
 const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
 // Whether the commit `rev` held a file of its own (a regular file, never a folder, a link or a submodule of that name)
@@ -485,7 +485,7 @@ export function nugetConfig(config, copy = "core/") {
   if (twice.length) throw new Error(`the config's "nuget" names a lock file twice: ${[...new Set(twice)].join(", ")}. Mend: name each once, in "ships" or in "tools"`);
   const accepted = acceptedList(nuget.accepted, "nuget.accepted", /^[^@\s]+@[^@\s]+$/u, "<Id>@<version>", { same: (name) => name.toLowerCase() });
   const sources = nuget.sources ?? [];
-  const source = (s) => typeof s === "string" && s.length <= 300 && (SOURCE_ADDRESS.test(s) || (SOURCE_FOLDER.test(s) && !s.toLowerCase().startsWith(copy.toLowerCase())));
+  const source = (s) => typeof s === "string" && s.length <= 300 && (SOURCE_ADDRESS.test(s) || (SOURCE_FOLDER.test(s) && !(copy !== null && s.toLowerCase().startsWith(copy.toLowerCase()))));
   if (!Array.isArray(sources) || !sources.every(source)) throw new Error('the config\'s "nuget.sources" is not a list of sources: each an https address of a named host, with no sign-in or question in it, or a folder of the project\'s own, as git lists it, ending in "/". Mend: write each so, or take it out');
   const same = sources.map((s) => s.toLowerCase().replace(/\/$/u, ""));
   if (same.some((s, i) => same.indexOf(s) !== i || s === REGISTRY.toLowerCase())) throw new Error(`the config's "nuget.sources" names a source twice, or NuGet's own registry, which every restore takes from already. Mend: name each source once, and NuGet's registry not at all`);
@@ -494,7 +494,7 @@ export function nugetConfig(config, copy = "core/") {
 
 /** Where a restore takes packages from, in order: NuGet's own registry, then the sources the config names, a folder
  *  by its whole path under `root`, so that a restore reads it from wherever it is started. */
-export const sourcesOf = (config, root) => [REGISTRY, ...nugetConfig(config, copyOf(root)).sources.map((s) => (s.startsWith("https://") ? s : resolve(root, s)))];
+export const sourcesOf = (config, root) => [REGISTRY, ...nugetConfig(config, copyAside(root)).sources.map((s) => (s.startsWith("https://") ? s : resolve(root, s)))];
 
 /** A path as one spelling of the place it names: whole, with links and Windows' short names resolved, as the system
  *  spells them, up to the nearest folder of it that is there (the rest as it is written), and in one case where the
@@ -692,7 +692,10 @@ function licenceOf(licences, url) {
 }
 
 /** The project files among `tracked` that are the project's own: what the workflow restores, each from its lock file. */
-export const projectFiles = (tracked, copy = "core/") => tracked.filter((f) => !f.startsWith(copy) && PROJECT.test(f));
+export const projectFiles = (tracked, copy = "core/") => tracked.filter((f) => !under(f, copy) && PROJECT.test(f));
+// (a file of the core's copy, which the check leaves out: `copy` is core-path.mjs's copyAside, null in the core's own
+// repository, whatever a core-manifest.md at its root says, where nothing is left out)
+const under = (f, copy) => copy !== null && f.startsWith(copy);
 
 /** What the restore's folder holds, as { id, version }: a folder for each package, one for each version in it. */
 function restoredPackages(packagesDir) {
@@ -705,12 +708,12 @@ function restoredPackages(packagesDir) {
  * { failures, summary }.
  */
 export function check(config, root, packagesDir, tracked, env = process.env, { base = null, baseConfig = null, fetched = false } = {}) {
-  const copy = copyOf(root), { ships, tools, accepted, sources } = nugetConfig(config, copy);
+  const copy = copyAside(root), { ships, tools, accepted, sources } = nugetConfig(config, copy);
   const lists = policy(config), { allowedFor } = lists;
   const failures = [], reports = [];
   // (the check's own state, which the parts below read and add to)
-  const c = { config, root, base, packagesDir, fetched, lists, allowedFor, ships, failures, reports, ...baseLists(base, baseConfig, sources, copy), heldIn: new Map(), tree: null, then: null };
-  const own = tracked.filter((f) => !f.startsWith(copyOf(root)));
+  const c = { config, root, copy, base, packagesDir, fetched, lists, allowedFor, ships, failures, reports, ...baseLists(base, baseConfig, sources, copy), heldIn: new Map(), tree: null, then: null };
+  const own = tracked.filter((f) => !under(f, copy));
   const locks = new Set(own.filter((f) => posix.basename(f) === LOCK));
   layoutFaults(c, tracked, own, locks);
   buildFileFaults(c, own);
@@ -776,8 +779,8 @@ function shippedAtBase(c, lock, k) {
 }
 
 // (a project file with no lock file beside it, and a lock file this check does not read)
-function layoutFaults({ root, failures }, tracked, own, locks) {
-  for (const f of projectFiles(tracked, copyOf(root))) {
+function layoutFaults({ root, copy, failures }, tracked, own, locks) {
+  for (const f of projectFiles(tracked, copy)) {
     if (!locks.has(posix.join(posix.dirname(f), LOCK))) failures.push(`${f} has no ${LOCK} beside it that git knows. Mend: set RestorePackagesWithLockFile to true in it, restore, and commit the lock file (floor rule 15)`);
   }
   for (const f of own.filter((f) => posix.basename(f).toLowerCase() === "packages.config")) failures.push(`${f}: packages.config has no lock file this check can read. Mend: move the project to PackageReference`);
@@ -830,7 +833,7 @@ function baseTree(c) {
     let entries = "";
     try { entries = execFileSync("git", ["ls-tree", "-r", "-z", c.base], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (no base to read: it held nothing) */ }
     c.tree = new Map();
-    for (const e of entries.split("\0")) { const m = /^(100644|100755|120000|160000) (?:blob|commit) ([0-9a-f]+)\t(.*)$/su.exec(e); if (m && !m[3].startsWith(copyOf(c.root))) c.tree.set(m[3], { mode: m[1], id: m[2] }); }
+    for (const e of entries.split("\0")) { const m = /^(100644|100755|120000|160000) (?:blob|commit) ([0-9a-f]+)\t(.*)$/su.exec(e); if (m && !under(m[3], c.copy)) c.tree.set(m[3], { mode: m[1], id: m[2] }); }
   }
   return c.tree;
 }
@@ -1055,7 +1058,7 @@ if (started(import.meta.url)) {
   };
   if (args.includes("--projects")) {
     let files;
-    try { const p = project(); files = projectFiles(p.tracked, copyOf(p.root)); } catch (e) { fail(e.message); }
+    try { const p = project(); files = projectFiles(p.tracked, copyAside(p.root)); } catch (e) { fail(e.message); }
     // (a line each, for a shell to read: a name that would be more than one line is refused, never cut)
     const odd = files.filter((f) => oneLine(f) !== f);
     if (odd.length) fail(`a project file whose name holds a line break or a control character: ${odd.join(", ")}. Mend: rename it`);
@@ -1065,7 +1068,7 @@ if (started(import.meta.url)) {
   if (args.includes("--imports")) {
     let files;
     try {
-      const { root, tracked } = project(), copy = copyOf(root), own = tracked.filter((f) => !f.startsWith(copy)), byContent = projectFilesByContent(root, own);
+      const { root, tracked } = project(), copy = copyAside(root), own = tracked.filter((f) => !under(f, copy)), byContent = projectFilesByContent(root, own);
       files = [...new Set([...byContent, ...importsOf(own, (f) => readProject(root, f), byContent).brought.keys()])];
     } catch (e) { fail(e.message); }
     const odd = files.filter((f) => oneLine(f) !== f);

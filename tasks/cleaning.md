@@ -188,11 +188,15 @@ code is held to: `tasks/code-shape.md`.
   split. A dated record (the reports) is cut by month where it is cut at all, those that stand kept as they are. It
   does not mean a file is cut to meet a number, nor that the caps on what a role reads at its start go, where size is
   the cost itself (the core's `AGENTS.md`, on its size caps), nor that a line of `"past"` that stood is written again
-  before its file is next changed. Reason: a mark on size is a weak sign that a file holds two things, and files were
-  cut where nothing was gained. Held by the reading-size check (`core/scripts/reading-size.mjs`), which fails a file
-  past its mark that a pull request changes with no line in `"past"`, one whose new line names neither a split's issue
-  nor why it stays whole, and one grown a quarter past its line's mark, or past a mark alone that stood; a mark a pull
-  request raises on a line that stood it notes, for the reviews to read that its why still holds.
+  before its file is next changed, nor that the pull request that changes it fails for it (#1413, point 6): a question
+  it leaves open the scheduled look keeps as a task, as it keeps a cap the default branch stands past. Reason: a mark on
+  size is a weak sign that a file holds two things, and files were cut where nothing was gained; failing a pull request
+  for it sent back work whose own change was sound. Held by the reading-size check (`core/scripts/reading-size.mjs`),
+  which notes a file past its mark that a pull request changes with no line in `"past"`, one whose new line names
+  neither a split's issue nor why it stays whole, and one grown a quarter past its line's mark, or past a mark alone
+  that stood, and a mark a pull request raises on a line that stood, for the reviews to read that its why still holds;
+  and by the look's reader (`core/scripts/look-split.mjs`), which keeps each such file the default branch changed in
+  one issue until it is answered.
 - **A cut or a join lowers the total read** (#469). By default what a change to how the core's rule files are cut
   brings down is the sum of what the core's tasks read, each file opened counted as a cost of its own, never one file's
   size: `core/scripts/read-total.mjs` works it out from what the reading script gives each role and kind of task and

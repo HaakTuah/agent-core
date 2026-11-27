@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { aRepository, parseBounded } from "./guards.mjs";
 import { LARGEST, linesOf } from "./queue.mjs";
-import { TRIAL } from "./release-trial.mjs";
+import { TRIAL, trialAt } from "./release-trial.mjs";
 import { RELEASE } from "./releases.mjs";
 import { started } from "./started.mjs";
 
@@ -36,15 +36,19 @@ const ghApi = route => {
 // The newest release on main and what the count rests on, read from git: { release: { name, sha, at }, lines, trialed }
 // or null where the core has cut none. `at` is the time of the commit the release stands on; `lines` the issues the
 // lines of QUEUE.md named at that commit and in each version of the file since, on main's newest commit `head`;
-// `trialed` the commit the trial's record on `head` names where it is past the release, else null.
+// `trialed` the commit the trial's record on `head` names where it is past the release and holds no cut (trialAt), else
+// null: a trial that stopped the cut is to be run again. Main's own versions alone (--first-parent); a shallow clone throws.
 export function readGit(git, head = "HEAD") {
   const tags = git(["tag", "--list", "release-*", "--merged", head]).split("\n").map(t => t.trim()).filter(t => RELEASE.test(t));
-  if (!tags.length) return null;
+  if (!tags.length) {
+    if (git(["rev-parse", "--is-shallow-repository"]) === "true") throw new Error("the clone is shallow, so the releases merged into main cannot be read");
+    return null;
+  }
   const name = tags.sort((a, b) => Number(RELEASE.exec(b)[1]) - Number(RELEASE.exec(a)[1]))[0];
   const sha = git(["rev-parse", "--verify", `refs/tags/${name}^{commit}`]);
   if (!SHA.test(sha)) throw new Error(`${name} leads to no commit`);
   const at = git(["show", "-s", "--format=%cI", sha]);
-  const versions = [sha, ...git(["log", "--format=%H", `${sha}..${head}`, "--", "QUEUE.md"]).split("\n").filter(s => SHA.test(s))];
+  const versions = [sha, ...git(["log", "--first-parent", "--format=%H", `${sha}..${head}`, "--", "QUEUE.md"]).split("\n").filter(s => SHA.test(s))];
   const lines = new Set();
   for (const v of versions) {
     let size = null;
@@ -57,7 +61,7 @@ export function readGit(git, head = "HEAD") {
   let trialed = null;
   try {
     const commit = JSON.parse(git(["show", `${head}:${TRIAL}`]))?.commit;
-    if (SHA.test(commit ?? "") && commit !== sha) { git(["merge-base", "--is-ancestor", sha, commit]); trialed = commit; }
+    if (SHA.test(commit ?? "") && commit !== sha) { git(["merge-base", "--is-ancestor", sha, commit]); if (trialAt(commit, git, head).held === null) trialed = commit; }
   } catch { /* (no record, none past the release) */ }
   return { release: { name, sha, at }, lines: [...lines].sort((a, b) => a - b), trialed };
 }
@@ -109,7 +113,11 @@ export function dueness(read, closed, now) {
 export function dueIssue({ manifest, at, repo }, read = () => readGit(gitIn(ROOT)), closed = since => closedSince(repo ?? CORE, since)) {
   if (manifest !== null || fs.existsSync(path.join(ROOT, "..", "core-manifest.md"))) return null;
   let d;
-  try { const r = read(); d = dueness(r, r === null ? new Set() : closed(r.release.at), at); }
+  try {
+    const r = read();
+    if (r === null) throw new Error("no release tag is merged into main here, and the core has cut releases: the checkout holds no tags (git fetch --tags)");
+    d = dueness(r, closed(r.release.at), at);
+  }
   catch (e) { return { title: TITLE, body: null, unread: `whether a release's trial is due could not be read: ${String(e.message).slice(0, 200)}` }; }
   if (!d.due) return { title: TITLE, body: null };
   return {
