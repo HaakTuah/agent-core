@@ -1,37 +1,42 @@
 // Which downloads of a file fetch a program, and which read data alone (#1361, point 11), for the licence scan's check
-// that a program a file downloads is pinned by version and checksum (licence-scan.mjs's pinFault). A read of a version
-// index asks no checksum; anything a later line may run does. Node's own modules alone, and the fetchers' reader.
+// that a program a file downloads is pinned by version and checksum (licence-scan.mjs's pinFault). An allow-list: a
+// download is a read of data only in the one form below, and every other download, in any language, is a program's,
+// asked its checksum. Node's own modules alone, and the fetchers' reader.
 import { downloads } from "./licence-fetchers.mjs";
 
-// A file no program is written in, by the end of the address's path: JSON, XML, YAML, TOML and plain text, the forms
-// a version index is read in; a pipe into a shell or another interpreter, which runs what it is given; a download kept
-// in a file, which a later line may run (curl's -o, -O and --output, wget's file but for "-O -", -OutFile, BITS, a
-// redirect or tee); and text run as code at run time, which may be what a read printed (eval, Invoke-Expression).
-const DATA_FILE = /\.(?:json|xml|ya?ml|toml|txt)$/iu;
-const RUNS_IT = /\|\s*(?:sudo\s+)?(?:(?:ba|z|da|k|fi)?sh|iex|Invoke-Expression|pwsh|powershell|node|deno|bun|python[\d.]*|perl|ruby|php|xargs|eval|source|\.)(?![\w-])/iu;
-function kept(line) {
-  const words = line.split(/\s+/u), wget = /(?<![\w-])wget(?![\w-])/iu.test(line);
-  const value = (w, i) => (w.includes("=") ? w.slice(w.indexOf("=") + 1) : words[i + 1]);
-  // (curl's -o, -O and --output, wget's -O and --output-document, each but to "-", the download's own output)
-  const toFile = words.some((w, i) => (/^-[A-Za-z]*o$/u.test(w) && words[i + 1] !== "-")
-    || (/^-[A-Za-z]*O$/u.test(w) && (!wget || words[i + 1] !== "-"))
-    || (/^--(?:output|output-document)(?:=|$)/u.test(w) && value(w, i) !== "-")
-    || /^(?:--remote-name(?:-all)?|-OutFile(?::\S*)?)$/iu.test(w));
-  if (toFile || /Start-BitsTransfer|aria2c|(?<![\d&>])>>?(?!\s*&|\s*\/dev\/null)|\|\s*tee(?![\w-])/iu.test(line)) return true;
-  // (wget keeps what it fetches in a file but where -O -, -qO- or --output-document=- sends it to its output)
-  return wget && !words.some((w, i) => /^-[A-Za-z]*O-$/u.test(w) || (/^-[A-Za-z]*O$/u.test(w) && words[i + 1] === "-")
-    || (/^--output-document(?:=|$)/u.test(w) && value(w, i) === "-"));
+// The one form a read of data takes, alone on its line: a shell variable set to what curl prints of a file of data
+// (JSON, XML, YAML, TOML or text, by the end of its address's path), curl given no option but -f, -s, -S and -L, and
+// its output piped into jq -r with a filter in single quotes, and nothing else: `V=$(curl -fsS https://… | jq -r '…')`.
+// No redirection, other pipe, file or option stands in it, so it keeps nothing and runs nothing. The form is matched
+// whole, never read in parts: a line that differs from it in any way is a program's download.
+const READ = /^([A-Za-z_][A-Za-z0-9_]*)=\$\(\s*curl(?:[ \t]+-[fsSL]+)*[ \t]+(["']?)https:\/\/[A-Za-z0-9._~/%-]+\.(?:json|xml|ya?ml|toml|txt)\2(?:[ \t]*\|[ \t]*jq[ \t]+-r[ \t]+'[^'$`\\!\n]*')?[ \t]*\)$/u;
+// What could reach a variable by a name the file builds, or hand every variable to what runs, so that a variable's use
+// cannot be read from its name: an indirect expansion, text run as code, and the commands that export or print them all.
+const REACHES_ANY = /\$\{!|(?<![\w-])(?:eval|export|declare|typeset|env|printenv|compgen|Invoke-Expression|iex)(?![\w-])|(?<![\w-])set[ \t]+(?:-[A-Za-z]*a|-o[ \t]+allexport)|(?<![\w-])set[ \t]*(?:$|[;|&)>])/imu;
+
+/** The downloads of `code` that may fetch a program: all but its reads of data. A read of data is a download of the
+ *  form READ, once in the file, whose variable is used only as `$V` or `${V}` inside a double-quoted address of
+ *  another download that holds no other expansion, so that what the read printed is only ever part of an address
+ *  (that download, a program's, asked its checksum), in a file where nothing could reach the variable otherwise
+ *  (REACHES_ANY). */
+export function programDownloads(code) {
+  const all = downloads(code);
+  if (REACHES_ANY.test(code)) return all;
+  const lines = String(code).split(/\r?\n/u).map((l) => l.trim());
+  return all.filter((d) => !readsData(d, all, lines));
 }
-const RUNS_TEXT = /(?<![\w-])(?:eval|Invoke-Expression|iex)(?![\w-])|(?<![\w-])(?:ba|z|da|k)?sh\s+-c\s+["']?\$|(?<![\w-])source\s+<\(/iu;
-/** Whether the download `line`, one of `all` (downloads), reads data and no program (#1361, point 11): every address it
- *  names literally ends in a file of DATA_FILE, it names one at least, it pipes into nothing that runs it (RUNS_IT), it
- *  keeps nothing in a file (kept), and no other download of `all` stands in the same words, as a second
- *  download on the same line would. */
-export function readsData(line, all = [line]) {
-  const addresses = [...line.matchAll(/https?:\/\/[^\s"'`<>|;&()\\]+/giu)].map((m) => m[0].replace(/[?#].*$/su, ""));
-  return addresses.length > 0 && addresses.every((a) => DATA_FILE.test(a)) && !RUNS_IT.test(line) && !kept(line)
-    && all.filter((d) => d === line).length === 1;
+
+function readsData(d, all, lines) {
+  const name = READ.exec(d)?.[1];
+  if (!name || all.filter((x) => x === d).length !== 1 || lines.filter((l) => l === d).length !== 1) return false;
+  const named = new RegExp(`(?<!\\w)${name}(?!\\w)`, "u");
+  return lines.every((line) => line === d || !named.test(line) || (all.includes(line) && !READ.test(line) && onlyInAddresses(line, name, named)));
 }
-// The downloads of `code` that may fetch a program: all but those that read data (readsData), and all of them in a file
-// that runs text as code (RUNS_TEXT), which may run what a read printed.
-export const programDownloads = (code) => { const all = downloads(code); return RUNS_TEXT.test(code) ? all : all.filter((d) => !readsData(d, all)); };
+
+// Whether every mention of `name` on `line` is `$name` or `${name}` inside a double-quoted https address that holds no
+// other expansion, quote, backtick, backslash or space.
+function onlyInAddresses(line, name, named) {
+  const use = `\\$(?:${name}|\\{${name}\\})(?!\\w)`;
+  const address = new RegExp(`"https://(?:[^"$\`\\\\\\s]|${use})*"`, "gu");
+  return !named.test(line.replace(address, ""));
+}

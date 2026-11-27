@@ -264,6 +264,9 @@ jobs:
       - name: The licence scan on the programs a file downloads, pinned by version and checksum
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-pins-test.mjs ')) }}
         run: node tests/licence-scan-pins-test.mjs
+      - name: The licence scan on a read of data and a package of the machine's distribution, asked no pin
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-reads-test.mjs ')) }}
+        run: node tests/licence-reads-test.mjs
       - name: The licence scan on the forms of an npm command
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-test.mjs ')) }}
         run: node tests/licence-fetch-test.mjs

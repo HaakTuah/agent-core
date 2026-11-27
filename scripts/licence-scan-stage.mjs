@@ -1,4 +1,4 @@
-// The staged project the licence check's tests run on (tests/licence-scan-test.mjs, licence-yes-test.mjs, licence-scan-limits-test.mjs, licence-scan-pins-test.mjs and licence-fetch-*-test.mjs, beside this
+// The staged project the licence check's tests run on (tests/licence-scan-test.mjs, licence-yes-test.mjs, licence-scan-limits-test.mjs, licence-scan-pins-test.mjs, licence-reads-test.mjs and licence-fetch-*-test.mjs, beside this
 // file): a small project, written into a fresh temporary git repository for each case, with the changes a case makes to
 // it, and the check's failures on it (every name invented).
 import { execFileSync } from "node:child_process";

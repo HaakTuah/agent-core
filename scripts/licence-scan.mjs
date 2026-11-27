@@ -18,7 +18,7 @@
 //     only in a file an entry's "files" names, that entry its hand audit, each fetch that stood at the base reported; and where such a file downloads by address
 //     (curl, wget, PowerShell's) and an entry covering it audits what may be a program (no data, asset, font, service
 //     of GitHub's or the owner's own work), each such entry names its version, but a package of the machine's
-//     distribution (kind "distribution"), whose version is the distribution's, and the file holds, for each download
+//     distribution that the file installs (kind "distribution"), whose version is the distribution's, and the file holds, for each download
 //     but a read of data (a version index: licence-reads.mjs), a checksum of its own and a command that checks by
 //     one (sha256sum, shasum, Get-FileHash and the like) (floor rule 7), a file that stood unpinned at the pull
 //     request's base reported;
@@ -169,9 +169,12 @@ function unaudited(c, f, found) {
 
 // What is no program a download could fetch: the owner's own work, data, an asset, a font, a service of GitHub's.
 const NO_PROGRAM = new Set(["own", "data", "asset", "font", "github-service"]);
-// A package of the machine's distribution, which its package manager installs (apt, dnf, apk, brew, choco and the
-// like): a program, whose version is the distribution's, so its entry is asked none (#1361, point 11).
+// A package of the machine's distribution, which its package manager installs: a program, whose version is the
+// distribution's, so its entry is asked none, only where a line of the file installs a package of its name by one of
+// these package managers (#1361, point 11); an entry of that kind for anything else is asked its version.
 const DISTRIBUTION = "distribution";
+const installs = (code, name) => typeof name === "string" && /^[\w.+-]+$/u.test(name)
+  && new RegExp(`(?<![\\w-])(?:apt-get|apt|dnf|yum|zypper|apk|pacman|brew|choco|winget)(?![\\w-])[^\\n]*(?<![\\w.+-])${name.replace(/[.+]/gu, "\\$&")}(?![\\w.+-])`, "iu").test(code);
 // A checksum written out: SHA-256 or SHA-512 as hex, or an integrity value as npm writes one; and the commands that
 // check a file against one, an allow-list: sha256sum, sha512sum and shasum, PowerShell's Get-FileHash, certutil's
 // -hashfile and Node's createHash.
@@ -180,16 +183,17 @@ const VERIFIER = /(?<![\w-])(?:sha(?:256|512)sum|shasum|Get-FileHash|certutil(?:
 
 /** What the code `code` of the file `f` (codeOf) lacks for the programs it downloads by address to be pinned, or
  *  null: of the audit's `entries` covering `f` that audit what may be a program, each names its version (`bare`, those
- *  that do not), and for each download the file holds a checksum of its own and a check by a command of VERIFIER
- *  (`deficit`, the downloads short of one). The scan and the sync's step (steps.mjs) read it alike. */
+ *  that do not), but one of kind "distribution" whose package a line of `f` installs (installs), and for each download
+ *  but a read of data (licence-reads.mjs's programDownloads) the file holds a checksum of its own and a check by a
+ *  command of VERIFIER (`deficit`, the downloads short of one). The scan and the sync's step (steps.mjs) read it alike. */
 export function pinFault(entries, auditPath, f, code) {
   const tools = entries.filter((e) => e && typeof e === "object" && covers(e, f) && !NO_PROGRAM.has(e.kind)), count = programDownloads(code).length;
   if (!tools.length || !count) return null;
-  const bare = tools.filter((e) => e.kind !== DISTRIBUTION && (typeof e.version !== "string" || !e.version.trim())).map((e) => e.name);
+  const bare = tools.filter((e) => !(e.kind === DISTRIBUTION && installs(code, e.name)) && (typeof e.version !== "string" || !e.version.trim())).map((e) => e.name);
   // (which check a download meets is left to the review, since reading that needs a reader of the shell's data flow)
   const sums = new Set([...code.matchAll(new RegExp(CHECKSUM.source, "giu"))].map((m) => m[0].toLowerCase()));
   const checks = [...code.matchAll(VERIFIER)].length, deficit = Math.max(0, count - Math.min(sums.size, checks));
-  if (bare.length) return { bare, deficit, what: `${bare.join(", ")}, in ${auditPath}, names no version`, mend: `write the exact version ${f} downloads as "version" on ${bare.length === 1 ? "that entry" : "those entries"}, or, for a package of the machine's distribution that its package manager installs, which has no exact version, write "kind": "${DISTRIBUTION}" there` };
+  if (bare.length) return { bare, deficit, what: `${bare.join(", ")}, in ${auditPath}, names no version`, mend: `write the exact version ${f} downloads as "version" on ${bare.length === 1 ? "that entry" : "those entries"}, or, for a package of the machine's distribution that a line of ${f} installs by its package manager (apt-get, dnf, apk, brew and the like), which has no exact version, write "kind": "${DISTRIBUTION}" there` };
   if (!deficit) return null;
   return { bare, deficit, what: !sums.size ? `${f} holds no checksum to check it by` : !checks ? `${f} holds a checksum and no command that checks a file by it` : `${f} holds ${sums.size} checksum${sums.size === 1 ? "" : "s"} and ${checks} check${checks === 1 ? "" : "s"} for ${count} downloads, so one is checked by none`, mend: `write the download's SHA-256 in ${f} and check the file against it before it runs, refusing one that differs, as the core's scripts/node.sh does (sha256sum -c, or Get-FileHash in PowerShell)` };
 }
