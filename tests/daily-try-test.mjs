@@ -162,7 +162,7 @@ for (const name of ["game-one", "tool-two"]) {
   }
   ok(runs.filter(r => /--verdicts/u.test(r.args)).map(r => r.args.includes("before.json") ? "before" : "after").join() === "before,after" && runs.some(r => r.args.endsWith(` ${SHA}`)), "the run before, the sync to the commit, then the run after", ran.filter(r => r.k === "held").map(r => r.args).join(" | "));
   const none = runLeg(path.join(tmp, "legs", "nothing-cloned"), path.join(tmp, "core-at"), 6, { run: () => true, sha: SHA });
-  ok(none.came === "untried" && none.leg === 6, "a runner whose clone failed says its project was not tried", JSON.stringify(none));
+  ok(none.came === "untried" && none.why === "notCloned" && none.leg === 6, "a runner whose clone failed says its project was not tried, and why", JSON.stringify(none));
 
   // the counts summed from the runners' own lines
   const lines = legsSaid.map(l => ({ leg: l.leg, text: JSON.stringify(l) }));

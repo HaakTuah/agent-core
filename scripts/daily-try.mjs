@@ -207,7 +207,7 @@ export function runLeg(dir, core, leg, { run = runLogged, tools, sha = (spawnSyn
   const at = path.join(dir, "project");
   let priv; // (read before any of the project's code runs; none readable is none: the project is then not tried)
   try { priv = fs.readFileSync(path.join(dir, PRIVATE_FILE), "utf8"); } catch { /* (none) */ }
-  const r = fs.existsSync(at) ? tryOne(at, core, sha, dir, run, tools, priv) : { came: "untried" };
+  const r = fs.existsSync(at) ? tryOne(at, core, sha, dir, run, tools, priv) : { came: "untried", why: "notCloned" };
   const counts = trialRecord(sha, "2000-01-01", r.pair ? [r.pair] : []);
   return { leg, commit: sha, came: r.came, ...(r.why && { why: r.why }), ...Object.fromEntries(COUNTS.map(k => [k, counts[k]])) };
 }
