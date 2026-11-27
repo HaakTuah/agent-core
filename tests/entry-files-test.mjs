@@ -92,7 +92,7 @@ try {
   const away = path.join(path.dirname(dir), `${path.basename(dir)}-away.md`);
   fs.writeFileSync(away, "@elsewhere.md\n");
   try {
-    const swap = (f, make) => { fs.rmSync(path.join(dir, f), { force: true }); make(path.join(dir, f)); };
+    const swap = (f, make) => { fs.rmSync(path.join(dir, f), { recursive: true, force: true }); make(path.join(dir, f)); };
     const refused = what => { const res = run({ ENTRY_BASE: "HEAD" }); ok(res.status === 1 && mended(res.out) && res.out.includes("stands here but is not read"), what); };
     swap("CLAUDE.md", f => fs.symlinkSync(away, f));
     refused("against a base that read it, an entry file that is a link leading out of the project fails, saying its mend");
@@ -106,7 +106,29 @@ try {
     ok(run({ ENTRY_BASE: "HEAD" }).status === 0, "once it is again what the base held, it passes");
     swap("AGENTS.md", f => fs.symlinkSync(away, f));
     refused("and AGENTS.md as a link leading out of the project fails too");
-  } finally { fs.rmSync(away, { force: true }); }
+    // (what the base held: a file past the bound, nothing, or a file behind a folder that is a link)
+    const commit = what => { git("add", "-A"); git("commit", "-qm", what); };
+    swap("AGENTS.md", f => fs.writeFileSync(f, AGENTS));
+    swap("CLAUDE.md", f => fs.writeFileSync(f, `@AGENTS.md\n${"x".repeat(1 << 20)}\n`)); commit("past the bound");
+    r = run({ ENTRY_BASE: "HEAD" });
+    ok(r.status === 0 && r.out.includes("note") && r.out.includes("stands here but is not read"), "against a base that held it past the bound too, an entry file past the bound is noted and fails nothing");
+    swap("CLAUDE.md", f => fs.writeFileSync(f, "@AGENTS.md\n")); commit("within the bound");
+    write(".agents/rules/.keep", ""); swap(".agents/rules/core.md", f => fs.symlinkSync("nowhere.md", f));
+    refused("against a base that held nothing there, an entry file the pull request adds as a link leading nowhere fails, saying its mend");
+    swap(".agents/rules/core.md", f => fs.writeFileSync(f, AG)); commit("antigravity");
+    for (const [up, file] of [[".kiro", ".kiro/steering/core.md"], [".kiro/steering", ".kiro/steering/core.md"], [".agents", ".agents/rules/core.md"]]) {
+      const kept = fs.readFileSync(path.join(dir, file), "utf8");
+      swap(up, f => fs.symlinkSync("nowhere", f));
+      refused(`against a base that read it, ${file} behind ${up} made a link leading nowhere fails, saying its mend`);
+      fs.rmSync(path.join(dir, up)); write(file, kept);
+    }
+    ok(run({ ENTRY_BASE: "HEAD" }).status === 0, "once each folder is again what the base held, it passes");
+    const awayDir = `${away}.d`;
+    fs.mkdirSync(path.join(awayDir, "rules"), { recursive: true }); fs.writeFileSync(path.join(awayDir, "rules/core.md"), AG);
+    swap(".agents", f => fs.symlinkSync(awayDir, f)); commit("antigravity's folder elsewhere");
+    r = run({ ENTRY_BASE: "HEAD" });
+    ok(r.status === 0 && r.out.includes("note") && r.out.includes(".agents/rules/core.md stands here but is not read"), "against a base that held the same folder as a link leading out of the project, it is noted and fails nothing");
+  } finally { fs.rmSync(away, { force: true }); fs.rmSync(`${away}.d`, { recursive: true, force: true }); }
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 
 // the starter kit's entry files pull in what its AGENTS.md names, each with its tool's part; and the core's own

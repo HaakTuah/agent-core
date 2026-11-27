@@ -27,36 +27,42 @@ export const TOOL_FILES = Object.freeze(["GEMINI.md", ...Object.values(ENTRY_FIL
 // A reader of the files of a commit's tree, as the work tree's reader reads them, for a check that holds a pull request
 // to its base: every link on a path followed, the file's own and a folder's on its way, while it leads inside that tree,
 // at most 40 in all; null where one leads out of it or nowhere, and for what is no file (a folder, a submodule). Run
-// from the project's root. `place`, where given, is placeAt(commit)'s, so that the tree is listed once.
-export function readAt(commit, place = placeAt(commit)) {
-  return f => { const at = place(f); return at === null ? null : place.show(at); };
+// from the project's root. `place`, where given, is placeAt(commit)'s, so that the tree is listed once; `bound`, where
+// given, the most bytes a file it reads may hold, a larger one read as none.
+export function readAt(commit, place = placeAt(commit), { bound } = {}) {
+  return f => { const at = place(f); return at === null || (bound !== undefined && !(place.size(at) <= bound)) ? null : place.show(at); };
 }
 // Where readAt(commit) reads a path from: the path, from the root, of the file it leads to, every link on its way
-// followed as readAt follows it, or null where readAt reads nothing there; `show` reads a file of the tree by its path.
+// followed as readAt follows it, or null where readAt reads nothing there; `show` reads a file of the tree by its path,
+// `size` gives its bytes, and `held` says whether the tree holds anything at a path, a link it cannot follow and what
+// it does not read (a folder, a submodule) included.
 export function placeAt(commit) {
   const run = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   let modes = null;
+  const sizes = new Map();
   const mode = f => {
     if (!modes) {
       modes = new Map();
-      try { for (const e of run(["ls-tree", "-r", "-z", commit]).split("\0")) { const m = /^(\d+) \S+ \S+\t([\s\S]+)$/u.exec(e); if (m) modes.set(m[2], m[1]); } } catch { /* (no such commit: nothing there) */ }
+      try { for (const e of run(["ls-tree", "-r", "-l", "-z", commit]).split("\0")) { const m = /^(\d+) \S+ \S+ +(\S+)\t([\s\S]+)$/u.exec(e); if (m) { modes.set(m[3], m[1]); sizes.set(m[3], Number(m[2])); } } } catch { /* (no such commit: nothing there) */ }
     }
     return modes.get(f);
   };
   const show = at => { try { return run(["show", `${commit}:${at}`]); } catch { return null; } };
-  const place = f => {
+  // (where a path leads: { at } the file read there, or null with `held` whether anything stands on its way)
+  const walk = f => {
     for (let at = path.posix.normalize(f), hops = 0; hops <= 40; hops++) {
-      if (at === ".." || at.startsWith("../") || at.startsWith("/")) return null;
+      if (at === ".." || at.startsWith("../") || at.startsWith("/")) return { at: null, held: true };
       // (the first part of the path, its own end included, that is a link: what stands there is read through it)
       const parts = at.split("/"), k = parts.findIndex((_, i) => mode(parts.slice(0, i + 1).join("/")) === "120000");
-      if (k < 0) return /^100/u.test(mode(at) ?? "") ? at : null;
+      if (k < 0) { const m = mode(at); return { at: /^100/u.test(m ?? "") ? at : null, held: m !== undefined || [...modes.keys()].some(p => p.startsWith(`${at}/`)) }; }
       const link = parts.slice(0, k + 1).join("/"), to = show(link);
-      if (to === null || /^([\\/]|[A-Za-z]:)/u.test(to)) return null;
+      if (to === null || /^([\\/]|[A-Za-z]:)/u.test(to)) return { at: null, held: true };
       at = path.posix.normalize(path.posix.join(path.posix.dirname(link), to.replace(/\\/gu, "/"), ...parts.slice(k + 1)));
     }
-    return null;
+    return { at: null, held: true };
   };
-  return Object.assign(place, { show });
+  const place = f => walk(f).at;
+  return Object.assign(place, { show, size: at => (mode(at) === undefined ? undefined : sizes.get(at)), held: f => walk(f).held });
 }
 // The files an agent tool takes its instructions from, as `read` and `list` find them: those of TOOL_FILES, then those
 // git tracks under FOLDERS, each that `read` reads (so a link that leads out of the project is none, at a commit too).
