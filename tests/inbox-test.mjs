@@ -125,7 +125,13 @@ ${gh}
     // no origin, as a release's trial clones a project: not read, no folder asked, gh not called (#1361, point 17)
     git("remote", "remove", "origin");
     r = run("exit 1");
-    ok(r.status === 0 && /could not be asked here \(it has no origin, so no host is named to ask\): nothing moves/.test(r.out) && !/^Issues cannot be read/.test(r.out) && !fs.existsSync(log), "a repository with no origin is not read as one with no issues: nothing is asked, no folder made, nothing moves", r.out);
+    ok(r.status === 0 && /could not be asked here \(its origin names no host, being none or a folder on this machine, so no host is named to ask\): nothing moves/.test(r.out) && !/^Issues cannot be read/.test(r.out) && !fs.existsSync(log), "a repository with no origin is not read as one with no issues: nothing is asked, no folder made, nothing moves", r.out);
+    for (const folder of [repo, `file://${repo}`, "../a-game"]) {
+      git("remote", "add", "origin", folder);
+      r = run("exit 1");
+      ok(r.status === 0 && /could not be asked here \(its origin names no host/.test(r.out) && !fs.existsSync(log), `an origin that is a folder (${folder === repo ? "a path" : folder.slice(0, 7)}) names no host: nothing is asked, nothing moves`, r.out);
+      git("remote", "remove", "origin");
+    }
     git("remote", "add", "origin", "https://github.com/someone/a-game");
     r = run("echo 'gh: Not Found (HTTP 404)' >&2; exit 1");
     ok(r.status === 0 && /^Issues cannot be read and written here \(GitHub finds no repository someone\/a-game/.test(r.out), "GitHub's Not Found is an answer: the repository cannot be reached for this account, so the folder", r.out);

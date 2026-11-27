@@ -151,8 +151,11 @@ if (process.platform !== "win32") {
     ok(m.status === 0 && /could not be read here/.test(m.stdout), "--make where gh gives no answer makes nothing and fails nothing", `${m.stdout}${m.stderr}`);
     spawnSync("git", ["remote", "remove", "origin"], { cwd: repo });
     const none = spawnSync(process.execPath, [script], { cwd: repo, env, encoding: "utf8" });
-    ok(none.status === 0 && /were not read: the repository has no origin, so no host is named/.test(none.stdout) && !/has no labels/.test(none.stdout), "with no origin, the labels are said not read, never said not to exist (#1361, point 17)", `${none.stdout}${none.stderr}`);
-    spawnSync("git", ["remote", "add", "origin", "https://github.com/someone/a-game"], { cwd: repo });
+    ok(none.status === 0 && /were not read: the repository's origin names no host/.test(none.stdout) && !/has no labels/.test(none.stdout), "with no origin, the labels are said not read, never said not to exist (#1361, point 17)", `${none.stdout}${none.stderr}`);
+    spawnSync("git", ["remote", "add", "origin", repo], { cwd: repo });
+    const folder = spawnSync(process.execPath, [script, "--make"], { cwd: repo, env, encoding: "utf8" });
+    ok(folder.status === 0 && /were not read: the repository's origin names no host/.test(folder.stdout) && !/has no labels|could not be read here/.test(folder.stdout), "with an origin that is a folder, --make reads and makes nothing, and the labels are said not read", `${folder.stdout}${folder.stderr}`);
+    spawnSync("git", ["remote", "set-url", "origin", "https://github.com/someone/a-game"], { cwd: repo });
     const bad = spawnSync(process.execPath, [script, "--since", "soon"], { cwd: repo, env, encoding: "utf8" });
     ok(bad.status === 1 && /--since needs a date/.test(bad.stderr), "a wrong option fails, saying what it takes");
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }

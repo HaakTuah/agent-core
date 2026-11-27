@@ -3,8 +3,8 @@
 // GitHub's API through gh, for the repository origin's address names: issues switched on, and the account gh is signed
 // in as may write them (triage or more), or, for an app's token such as GitHub's job's, the job's workflow grants it
 // `issues: write` (asked()). Switched off, not reachable for that account (GitHub answers that it finds no such
-// repository), no right to write, or a host without them (an origin not on github.com) all count as no. No origin names
-// no host, so nothing is asked, as below (#1361, point 17). Only an answer decides: where gh is not installed, answers for no account, answers for an app's token whose job's grant
+// repository), no right to write, or a host without them (an origin not on github.com) all count as no. An origin that is
+// none or a folder names no host, so nothing is asked, as below (#1361, point 17). Only an answer decides: where gh is not installed, answers for no account, answers for an app's token whose job's grant
 // is not read here, or gives no answer at all (no network, a rate limit, a fault of GitHub's), nothing is asked, so that
 // a passing fault never moves the inbox, and it says what to ask with the session's own GitHub tools. It prints where
 // the inbox is and, where the place must change, the mend, worded so a session acts on it with no rule file open; one
@@ -31,6 +31,12 @@ export const SENDERS = Object.keys(LIST.sender).map(s => s.replace(/^by:/, ""));
 
 // The repository origin's address names on github.com ("owner/name"), or null: another host, or no origin.
 // (each part a name, never "." or "..", so the call goes to that repository's route alone)
+// Whether an origin's address names no host: none, or a folder on this machine (a path, or `file:`), as a release's trial
+// clones a project from a folder; git reads an address with no scheme and no `host:` before its first "/" as a path.
+export const namesNoHost = url => {
+  const u = String(url ?? "").trim();
+  return !u || /^file:/iu.test(u) || (!/^[a-z][a-z0-9+.-]*:\/\//iu.test(u) && (/^[a-z]:[\\/]/iu.test(u) || !/^[^/]*:/u.test(u)));
+};
 export const repoOf = url => {
   const repo = /^(?:https:\/\/(?:[^@/]+@)?github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(String(url ?? "").trim())?.[1] ?? null;
   return aRepository(repo) ? repo : null;
@@ -167,8 +173,8 @@ function main() {
   const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" });
   const repo = repoOf(origin.stdout);
   let reach, why;
-  // (a copy with no origin, such as a release's trial clones, is not read as one with no issues: its host is not named)
-  if (!origin.stdout.trim()) { reach = null; why = "it has no origin, so no host is named to ask"; }
+  // (a copy whose origin names no host, such as a release's trial clones, is not read as one with no issues)
+  if (namesNoHost(origin.stdout)) { reach = null; why = "its origin names no host, being none or a folder on this machine, so no host is named to ask"; }
   else if (!repo) reach = { yes: false, why: "its origin is not on github.com, a host without issues" };
   else {
     // (no gh, or an answer for no account, a 401 or one without the account's permissions: nothing could be asked)
