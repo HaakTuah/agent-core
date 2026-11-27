@@ -143,7 +143,7 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
   }
   if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules, copy))) return { sha, done: true, why: "no code review is running" };
   // (one its caller proved queue-only, its files as queueOnly reads them, needs none: floor rule 8, #750)
-  if (more?.queue === true && queueOnly(pull, files, copy ?? undefined)) return { sha, done: true, why: "queue-only, as queue-only.mjs proves: no code review needed" };
+  if (more?.queue === true && queueOnly(pull, files, copy)) return { sha, done: true, why: "queue-only, as queue-only.mjs proves: no code review needed" };
   return reviewRan(sha, posted, review, pull, commits, bound, merges, clearOf(list, review, pull, bound, more), checked);
 }
 // the commits a code review that found nothing blocking ran on: posted with no blocking finding, or Codex's completed

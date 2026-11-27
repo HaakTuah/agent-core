@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { checkout, copied, OWN_SCRIPT } from "../scripts/core-path-scratch.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { falseAlarms, hostScans, installNot, scan, answer as engineAnswer, targets, verdicts, unreadLines, unreadListed, unreadOf } from "../scripts/code-scan.mjs";
 
@@ -71,14 +72,8 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
 // scripts/core-path.mjs is tracked at the root, a core-manifest.md beside it names no copy, and the folder it names is
 // scanned; in a project, which tracks no such script there, the copy is left out
 {
-  const repo = (name, files) => {
-    const at = path.join(tmp, name);
-    for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(at, f)), { recursive: true }); fs.writeFileSync(path.join(at, f), text); }
-    for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: at, stdio: "ignore" });
-    return at;
-  };
   const both = { "core-manifest.md": `Core: ${CORE} at ${"a".repeat(40)}, copied whole under lib/ (never edited here).\n`, "lib/a.js": "x();\n", "src/b.js": "y();\n" };
-  const own = targets(repo("targets-own", { ...both, "scripts/core-path.mjs": "export {};\n" })), copy = targets(repo("targets-copy", both));
+  const own = targets(checkout(tmp, "targets-own", { ...both, ...OWN_SCRIPT })), copy = targets(checkout(tmp, "targets-copy", both));
   ok(own.includes("lib/a.js") && own.includes("scripts/core-path.mjs") && !copy.includes("lib/a.js") && copy.includes("src/b.js"),
     "in the core's own repository a manifest at its root leaves no folder out of the scan; in a project its copy is left out", JSON.stringify([own, copy]));
 }

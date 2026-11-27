@@ -34,7 +34,7 @@
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
-import { readCore, atCopy, hooksAt, manifestText } from "./core-path.mjs";
+import { readCore, atCopy, hooksAt, manifestText, copyHeld } from "./core-path.mjs";
 import { waysOf } from "./ways.mjs";
 import { baseOf } from "./licences.mjs";
 import { forget, textAt } from "./git-objects.mjs";
@@ -56,6 +56,9 @@ const kitTemplate = name => { try { return fs.readFileSync(path.join(KIT_DIR, na
 // core/, and a project whose manifest names another path holds the commands `core-path.mjs --hooks` gives for it, never the
 // kit's own with the path written in (#628).
 export const coreOf = text => { const core = text === null || text === undefined ? null : readCore(text); return core && !core.wrong ? core : null; };
+// The copy's "Core:" line, as coreOf reads it, where the repository at `root` holds a copy; null in the core's own
+// repository, whatever manifest stands at its root (core-path.mjs's copyHeld), and with no manifest.
+const placeOf = root => copyHeld(root) === null ? null : coreOf(manifestText(path.join(root, "core-manifest.md")));
 export function kitHooks(template = kitTemplate, core = null) {
   const copy = core?.path ?? "core/";
   const read = f => { const text = Object.hasOwn(KITS, f) ? template(KITS[f]) : null; return text === null ? text : atCopy(text, copy); };
@@ -145,7 +148,7 @@ function run(root, file, { core = false, base = baseOf(root), ways = installedBy
   }
   const head = readProject(root, null, base ? at => notFile(listing(root, base), at) || shownNotBlob(root, base, at) : undefined, undefined, base);
   const atBase = name => textAt(root, base, path.relative(root, path.join(KIT_DIR, name)).split(path.sep).join("/"));
-  const place = coreOf(manifestText(path.join(root, "core-manifest.md"))), kit = [...kitHooks(undefined, place), ...(base ? kitHooks(atBase, place) : [])];
+  const place = placeOf(root), kit = [...kitHooks(undefined, place), ...(base ? kitHooks(atBase, place) : [])];
   let list = listed(config, file);
   const baseConfig = configAtBase(root, base, file);
   // (a list the base held is no longer missing: taking it out does not bring back the time before it was written)

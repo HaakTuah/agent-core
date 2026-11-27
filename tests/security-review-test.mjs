@@ -4,7 +4,7 @@
 //
 //   node tests/security-review-test.mjs
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
@@ -13,6 +13,7 @@ import { CODE_UNREAD, CODE_WAITS, CONTEXT, EDITED, NEW_LINE, UNREAD, boundOf, co
 import { blockingOf, otherOf, postedKind } from "../scripts/review-record.mjs";
 import { judge as codeReview } from "../scripts/code-review-wait.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
+import { checkout, copied as manifestAt, OWN_SCRIPT } from "../scripts/core-path-scratch.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -386,18 +387,15 @@ try {
   // checkout that tracks scripts/core-path.mjs at its root holds no copy, whatever manifest stands beside it, so a
   // workflow under the path that manifest names is what runs by itself, and asks two; in a project's checkout it is the
   // copy's, which a sync changes)
-  const checkout = (name, files) => {
-    const at = join(dir, name);
-    for (const [f, text] of Object.entries(files)) { mkdirSync(join(at, f, ".."), { recursive: true }); writeFileSync(join(at, f), text); }
-    for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: at, stdio: "ignore" });
-    return at;
-  };
-  const named = `Core: ${CORE} at ${PIN1}, copied whole under vendor/core/ (never edited here).\n`;
-  const own = checkout("own", { "core-manifest.md": named, "scripts/core-path.mjs": "export {};\n" }), copy = checkout("copy", { "core-manifest.md": named });
+  const named = manifestAt("vendor/core/");
+  const own = checkout(dir, "own", { "core-manifest.md": named, ...OWN_SCRIPT }), copy = checkout(dir, "copy", { "core-manifest.md": named });
   const inCopy = { ...stepChange, filename: "vendor/core/.github/workflows/ci.yml" };
   const ownTwo = run(counted(pull, [inCopy]), [[summary(onHead)]], { ADVISORY: "false" }, [], [], [[inCopy]], own);
   ok(ownTwo.status.state === "pending" && ownTwo.status.description.startsWith("Waiting: floor rule 3 asks two") && run(counted(pull, [inCopy]), [[summary(onHead)]], { ADVISORY: "false" }, [], [], [[inCopy]], copy).status.state === "success",
     "the core's own checkout, with a manifest at its root, holds no copy: a workflow under the path it names asks two security reviews; in a project's it is the copy's", ownTwo.status.description);
+  const inCore = { ...stepChange, filename: "core/.github/workflows/ci.yml" };
+  ok(run(counted(pull, [inCore]), [[summary(onHead)]], { ADVISORY: "false" }, [], [], [[inCore]], own).status.description?.startsWith("Waiting: floor rule 3 asks two"),
+    "and holding no copy, it leaves nothing aside, core/ included: a workflow there asks two security reviews");
   ok(run(pull, [[as("helper")]], { ADVISORY: "false", REVIEWERS: "x helper" }).status.state === "success" && run(pull, [[as("helper")]], { ADVISORY: "false" }).status.state === "pending", "the accounts the workflow names count, and no others");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   ok(run(pull, [[real(REAL_CLEAN.replace("codex-review-state:v1", "codex-review-state:v2"))]]).warning === UNREAD && run(pull, [[real(REAL_CLEAN)]]).warning === undefined, "run as the workflow runs it, it prints the warning beside the status, for the workflow to show");

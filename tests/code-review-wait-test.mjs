@@ -2,7 +2,7 @@
 // Tests for scripts/code-review-wait.mjs: a code review running on the head commit is waited for, a code review of that
 // commit, named by its whole SHA, posted by another reviewer ends the wait, and nothing else holds a pull request. Run by tests.yml.
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
@@ -10,6 +10,7 @@ import { mended } from "../scripts/mend.mjs";
 import { UNREAD, status } from "../scripts/security-review.mjs";
 import { CONTEXT, judge } from "../scripts/code-review-wait.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
+import { checkout, copied, OWN_SCRIPT } from "../scripts/core-path-scratch.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -257,17 +258,13 @@ try {
   // (the copy told apart from the core's own repository, as core-path.mjs's copyHeld does, #1350: the default branch's
   // checkout that tracks scripts/core-path.mjs at its root holds no copy, whatever manifest stands beside it, so a pin
   // moved beside a change under the path that manifest names is no sync; in a project's checkout it is)
-  const checkout = (name, files) => {
-    const at = join(dir, name);
-    for (const [f, text] of Object.entries(files)) { mkdirSync(join(at, f, ".."), { recursive: true }); writeFileSync(join(at, f), text); }
-    for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: at, stdio: "ignore" });
-    return at;
-  };
-  const named = `Core: ${CORE} at ${"1".repeat(40)}, copied whole under vendor/the-core/ (never edited here).\n`;
-  const own = checkout("own", { "core-manifest.md": named, "scripts/core-path.mjs": "export {};\n" }), copy = checkout("copy", { "core-manifest.md": named });
+  const named = copied("vendor/the-core/");
+  const own = checkout(dir, "own", { "core-manifest.md": named, ...OWN_SCRIPT }), copy = checkout(dir, "copy", { "core-manifest.md": named });
   const moved = [manifest, md("vendor/the-core/scripts/x.mjs")];
   ok(run(counts, [], { ADVISORY: "false" }, [line], moved, own).status.state === "pending" && run(counts, [], { ADVISORY: "false" }, [line], moved, copy).status.state === "success",
     "the core's own checkout, with a manifest at its root, holds no copy: a pin moved beside a change under the path it names needs its code review; a project's is a sync");
+  ok(run(proved, [], { ADVISORY: "false", QUEUE: HEAD }, [line], [md("core/.github/notes.md")], own).status.state === "pending" && run(proved, [], { ADVISORY: "false", QUEUE: HEAD }, [line], [md("vendor/the-core/.github/notes.md")], copy).status.state === "success",
+    "and holding no copy, it leaves nothing aside, core/ included: a file there that runs by itself is no queue line; under a project's copy it is");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   let usage = 0;
   try { execFileSync(process.execPath, [script], { stdio: "ignore" }); } catch (e) { usage = e.status; }

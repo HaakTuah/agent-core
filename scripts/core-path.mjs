@@ -108,11 +108,13 @@ const OWN = "scripts/core-path.mjs";
 export const copyAmong = (tracked, root = ".") =>
   tracked.includes(MANIFEST) && !tracked.includes(OWN) ? copyOf(root) : null;
 
-/** Of the two files copyAmong reads, those git tracks at `root`, a checkout's root; where git cannot list them there (no
- *  repository), those that stand on disk. */
+/** Of the two files copyAmong reads, those git tracks at `root`, a checkout's root, the settings by which git runs a
+ *  command of the checkout's own turned off; where git cannot list them there (no repository), those that stand on disk.
+ *  A folder inside another repository that it does not track lists none: no copy is read there, which counts more as the
+ *  project's own, never less. */
 export function trackedOf(root = ".") {
   try {
-    return execFileSync("git", ["ls-files", "-z", "--", MANIFEST, OWN], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean);
+    return execFileSync("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "ls-files", "-z", "--", MANIFEST, OWN], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean);
   } catch { return [MANIFEST, OWN].filter(f => fs.existsSync(path.join(root, f))); }
 }
 /** The copy's folder, or null, for the scripts that read what runs with power or gate a merge from the default branch's
