@@ -488,8 +488,8 @@ ok(toC.status === 0 && read(p, "core-manifest.md") === manifest("someone-else", 
 const answer = out => { const m = /^trial answer: (.*)$/mu.exec(out); try { return m && JSON.parse(m[1]); } catch { return null; } };
 const triedC = pure("--trial", C);
 ok(triedC.status === 1 && triedC.out.includes(`a pure sync against the commit tried, ${C}: a trial's reading, which proves no merge`) && !triedC.out.includes("sha=") && !triedC.out.includes("NOT PURE")
-  && JSON.stringify(answer(triedC.out)) === JSON.stringify({ commit: C, pure: true, from: "release-1" }),
-  "  a trial's reading against the commit tried finds the same sync pure, names the release main's copy stood at, and gives no head to merge", triedC.out);
+  && JSON.stringify(answer(triedC.out)) === JSON.stringify({ commit: C, pure: true, from: "release-1", main: "origin" }),
+  "  a trial's reading against the commit tried finds the same sync pure, names the release main's copy stood at and the main it read, the origin's, and gives no head to merge", triedC.out);
 const triedB = pure("--trial", B);
 ok(triedB.status === 1 && triedB.out.includes(`moves the copy to ${C}, not to the commit tried, ${B}`) && answer(triedB.out)?.pure === false && answer(triedB.out)?.commit === B,
   "  a trial's reading against another commit than the sync's is not pure", triedB.out);
@@ -502,13 +502,13 @@ git(lone, "fetch", "-q", p, "unreleased:unreleased");
 git(lone, "checkout", "-q", "unreleased");
 const inLone = (...args) => { const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs"), ...args], { cwd: lone, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 const loneTried = inLone("--trial", C), loneGate = inLone();
-ok(loneTried.status === 1 && answer(loneTried.out)?.commit === C && answer(loneTried.out)?.from === "release-1" && /^read against the clone's own branch main, as the clone has no origin/mu.test(loneTried.out) && !loneTried.out.includes("NOT PURE") && !loneTried.out.includes("sha="),
+ok(loneTried.status === 1 && answer(loneTried.out)?.commit === C && answer(loneTried.out)?.from === "release-1" && answer(loneTried.out)?.main === "clone" && /^read against the clone's own branch main, as the clone has no origin/mu.test(loneTried.out) && !loneTried.out.includes("NOT PURE") && !loneTried.out.includes("sha="),
   "  a trial's clone with no origin gives its reading, read against the clone's own main, which it names", loneTried.out);
 ok(loneGate.status === 1 && loneGate.out.includes("NOT PURE the clone has no origin to fetch the project's main from") && loneGate.out.includes("Mend: run it in a clone of the project's repository whose origin") && !loneGate.out.includes("sha="),
   "  and the merge's gate there says it is not proved, with its mend, never a head to merge", loneGate.out);
 git(lone, "branch", "-q", "-D", "main");
 const mainless = inLone("--trial", C);
-ok(mainless.status === 1 && mainless.out.includes("NOT PURE the project's main (the clone's own branch main, as the clone has no origin) shares no commit") && answer(mainless.out)?.pure === false && answer(mainless.out)?.from === "unknown",
+ok(mainless.status === 1 && mainless.out.includes("NOT PURE the project's main (the clone's own branch main, as the clone has no origin) shares no commit") && answer(mainless.out)?.pure === false && answer(mainless.out)?.from === "unknown" && answer(mainless.out)?.main === "clone",
   "  and where that clone holds no main, its reading is not pure, with its mend", mainless.out);
 const triedName = pure("--trial", "main"), triedMore = pure("--trial", C, "--merge");
 ok([triedName, triedMore].every(r => r.status === 2 && !/^a pure sync/mu.test(r.out) && !r.out.includes("sha=") && answer(r.out) === null),
