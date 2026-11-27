@@ -263,7 +263,7 @@ const large = (key, what, files, change, said1) => {
   fs.writeFileSync(envFile, "");
   const from = Date.now(), timed = spawnSync(process.execPath, [path.join(root, "scripts", "select.mjs"), "--env", "RUN"], { cwd: p, env: { ...env, SELECT_BASE: base, GITHUB_ENV: envFile }, encoding: "utf8", maxBuffer: 1 << 28, timeout: 5000 });
   console.log(`     ${key}: ${Date.now() - from} ms`);
-  ok(timed.status === 0 && !raw(`${timed.stdout}${timed.stderr}`) && said() === said1, `select: ${what}, within 5 s`, `${timed.signal ?? ""}${timed.stderr}${said()}`);
+  ok(timed.status === 0 && !raw(`${timed.stdout}${timed.stderr}`) && (said1 instanceof RegExp ? said1.test(said()) : said() === said1), `select: ${what}, within 5 s`, `${timed.signal ?? ""}${timed.stderr}${said()}`);
 };
 const jsUnit = (i, j) => `export function f${i}x${j}(a, b) { return a > b ? [a, b].map(x => x * ${j}) : { a, b }; }\n`;
 large("own-js", "a project of 300 files of JavaScript, 6.5 million characters, one changed, selects the test that reaches it",
@@ -273,6 +273,13 @@ const pyUnit = j => `def f${j}(a, b=None):\n    if a > b:\n        return [x * $
 large("own-py", "a project of 600 files of Python, 6.9 million characters, one changed, past what can be read in time, runs the whole suite",
   Object.fromEntries(Array.from({ length: 600 }, (_, i) => [`src/py/m${i}.py`, `import os\n\n${Array.from({ length: 110 }, (_, j) => pyUnit(j)).join("")}`])),
   () => fs.appendFileSync(path.join(p, "src/py/m0.py"), "MORE = 1\n"), "RUN=all\n");
+// (C#, end to end: a .props git holds beside the config, of 150,000 <Using> items, and a file of C# read at the base
+// through git show and changed to 22,000 open aliases, is read in time: it selects the test that reaches the file, or on a
+// slow runner passes the budget and runs the whole suite; select-test.mjs times each against the code before; #675)
+large("own-cs", "a project of C# whose .props holds 150,000 <Using> items, a file changed to 22,000 open aliases, selects its test or runs the whole suite",
+  { "src/App.csproj": "<Project />\n", "Directory.Build.props": `<Project><ItemGroup>${'<Using Include="A" />'.repeat(150_000)}</ItemGroup></Project>\n`,
+    "src/Evil.cs": "namespace App;\nclass Evil {}\n", "test/EvilTest.cs": "namespace App;\nclass EvilTest { Evil e; }\n" },
+  () => write("src/Evil.cs", `${"using A=(".repeat(22_000)};\nnamespace App;\nclass Evil {}\n`), /^RUN=(all|.*EvilTest.*)\n$/u);
 large("own-huge", "a file of JavaScript of 20 million characters the pull request leaves as it was, past what one read may take, runs the whole suite",
   { "src/vendor.js": SLOWEST["src/list.js"](20_000_000) }, () => fs.appendFileSync(path.join(p, "src/a.mjs"), "export const more = 1;\n"), "RUN=all\n");
 branch("sel-after-large", () => {});

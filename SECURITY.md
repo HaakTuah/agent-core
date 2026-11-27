@@ -28,7 +28,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
-     a pull request adds under its manifest's "Differences" (`scripts/pr-reasons.mjs`), the rule files a checkout
+     a pull request adds under its manifest's "Differences" (`scripts/pr-reasons.mjs`), the numbers of the entries of
+     `scripts/holders/` it adds or changes (`scripts/pr-number.mjs`, which reads a tree's regular files alone in four
+     calls of git whatever their count, a link or a submodule refused with its mend), the rule files a checkout
      holds, the manifest too (`scripts/reading.mjs`, whose readers `scripts/pr-head.mjs` takes for the archive the keys
      of a description are read against, noting each link met and passing, and `scripts/rules.mjs` for the rules in
      them, which read only regular files in real folders of the checkout's own, a pipe or device as no file and a link
@@ -39,7 +41,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      `scripts/reading.mjs` prints a changed path, with its control and bidirectional formatting characters written out
      as `\uXXXX`, and reads a link, what is no regular file of the checkout's own, and a name a rule
      file gives that is absolute or holds a ".." segment as no file); limits: 64 MB of git's answer (256 MB for the
-     comments proof, the selection and the total read, 16 MB for the manifest, past which it is reported unread), and
+     comments proof, the selection and the total read, 16 MB for the manifest and for the entries of `scripts/holders/`, a tree's list or all their text, past which it is
+     reported unread), and
      none in count, since every changed path is read, save the total read's 1 MB of a file's text, past which its size
      alone is counted, and 8 MB of all their text, 200 rule files, 100 kinds of task, 300 names they give and 16
      million steps of each tree's tries, past which it fails with its mend; and of each file of Python or C# the
@@ -50,7 +53,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      without it; and of all the files a pull request changes together, 4,000,000 characters and 1.5 s of reading, of any
      one file of JavaScript, TypeScript or Python it leaves as it was, 4,000,000 characters, 1.5 s to link the files and follow
      the links from each test, and 3 s for the whole of it, the project's own files read too, past which the selection
-     reads no more and runs the whole suite (`scripts/hurry.mjs`); hostile tests: `tests/hostile-pr-changes-test.mjs`.
+     reads no more and runs the whole suite (`scripts/hurry.mjs`); hostile tests: `tests/hostile-pr-changes-test.mjs`, and for the entries' numbers,
+     `tests/pr-description-entries-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
      of the work standing still (`scripts/look.mjs`, its reader `scripts/look-pulls.mjs`, through `queue.mjs`'s placing

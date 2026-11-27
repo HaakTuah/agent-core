@@ -273,6 +273,9 @@ jobs:
       - name: The licence scan on the fetchers it cannot read
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-other-test.mjs ')) }}
         run: node tests/licence-fetch-other-test.mjs
+      - name: The licence scan on more of the forms a repository fetch takes
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-wrapper-test.mjs ')) }}
+        run: node tests/licence-fetch-wrapper-test.mjs
       - name: The licence scan on pages and components
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-pages-test.mjs ')) }}
         run: node tests/licence-fetch-pages-test.mjs
@@ -390,6 +393,18 @@ jobs:
       - name: The selection of the tests a change can reach
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-test.mjs ')) }}
         run: node tests/select-test.mjs
+      - name: What a file of C# reaches, for the selection
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-csharp-test.mjs ')) }}
+        run: node tests/select-csharp-test.mjs
+      - name: Where what a file of C# reaches cannot be told, for the selection
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-csharp-unsure-test.mjs ')) }}
+        run: node tests/select-csharp-unsure-test.mjs
+      - name: Where MSBuild's files decide what a file of C# reaches, for the selection
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-csharp-msbuild-test.mjs ')) }}
+        run: node tests/select-csharp-msbuild-test.mjs
+      - name: Where a <Compile> item decides what a file of C# reaches, for the selection
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-csharp-compile-test.mjs ')) }}
+        run: node tests/select-csharp-compile-test.mjs
       - name: The pathspecs the selection matches a path against
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-matcher-test.mjs ')) }}
         run: node tests/select-matcher-test.mjs
@@ -480,6 +495,9 @@ jobs:
       - name: 'The description check: the line "Reasons read:"'
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-reasons-test.mjs ')) }}
         run: node tests/pr-description-reasons-test.mjs
+      - name: 'The description check: the lines "Number:" against the entries'
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-entries-test.mjs ')) }}
+        run: node tests/pr-description-entries-test.mjs
       - name: 'The description check: the owner''s yes'
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-yes-test.mjs ')) }}
         run: node tests/pr-description-yes-test.mjs
@@ -721,6 +739,9 @@ jobs:
       - name: The copies check's part for a value written twice, a pin or a pattern, what the base held noted (#1139)
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/copies-values-test.mjs ')) }}
         run: node tests/copies-values-test.mjs
+      - name: The copies check's list of values written twice, written by --first and allowed only to shrink (#1139)
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/copies-values-list-test.mjs ')) }}
+        run: node tests/copies-values-list-test.mjs
       - name: What a project holds twice, or against the core, listed and its exact part corrected
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/twice-test.mjs ')) }}
         run: node tests/twice-test.mjs
@@ -751,6 +772,9 @@ jobs:
       - name: The steps' writers, each step a script does whole written and read done after it, the rule files' words kept
         if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-write-test.mjs ')) }}
         run: node tests/steps-write-test.mjs
+      - name: The writer of an agent's own tools, listing only what the project commits as its own
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-write-tools-test.mjs ')) }}
+        run: node tests/steps-write-tools-test.mjs
       - name: The steps' writers keep a file's Windows line ends
         if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/step-writers-crlf-test.mjs ')) }}
         run: node tests/step-writers-crlf-test.mjs
