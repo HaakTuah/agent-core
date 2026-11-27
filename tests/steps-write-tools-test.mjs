@@ -70,6 +70,18 @@ let r;
   ok(r.status === 0 && hookListed().length === 1 && hookListed()[0].publisher === "this project" && !missed(tools).length,
     "a hook in the kit's form that fetches a committed script of the project's own is listed as the project's", `${r.stdout}${r.stderr}${JSON.stringify(listed())}`);
   git("update-ref", "-d", "refs/remotes/origin/main"); back();
+  put("scripts/format.sh", "#!/bin/sh\necho formatted\n");
+  commit("a script of the project's own");
+  withHooks({ type: "command", command: kitHook("scripts/format.sh") });
+  r = write();
+  ok(r.status === 0 && !hookListed().length, "a hook added in a change of the settings not yet committed is not listed", `${r.stdout}${JSON.stringify(listed())}`);
+  back();
+  put("scripts/format.sh", "#!/bin/sh\necho formatted\n");
+  withHooks({ type: "command", command: "bash scripts/format.sh" });
+  commit("a hook that runs a committed script of the project's own, not in the kit's form");
+  r = write();
+  ok(r.status === 0 && !hookListed().length && missed(tools).length === 1, "a hook not in the kit's form, though it runs a committed file of the project's own, is left to the step's mend", `${r.stdout}${JSON.stringify(listed())}`);
+  back();
   withHooks({ type: "command", command: kitHook("core/scripts/work-saved.sh") }, { type: "command", command: kitHook("core/scripts/helper-call.mjs") });
   commit("a hook in the kit's form, fetching a file of the core's copy");
   r = write();
