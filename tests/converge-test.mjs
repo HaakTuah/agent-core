@@ -20,7 +20,7 @@ import { kind } from "../scripts/fresh.mjs";
 import { privateOf } from "../scripts/host-private.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { requiredOf } from "../scripts/schemas.mjs";
-import { scratch } from "../scripts/scratch-core.mjs";
+import { scratch, projectOf } from "../scripts/scratch-core.mjs";
 import { project as held } from "../scripts/steps.mjs";
 
 let failed = 0, count = 0;
@@ -196,7 +196,7 @@ try {
   write(p.dir, ".github/workflows/core.yml", `${read(p.dir, ".github/workflows/core.yml")}# more\n`);
   commit(p.dir, "inside the part, and a marked workflow");
   const inside = check();
-  ok(inside.status === 1 && /FAIL AGENTS\.md: the core's part of it/.test(inside.out) && /FAIL \.github\/workflows\/core\.yml: the core's file/.test(inside.out) && mended(inside.out),
+  ok(inside.status === 1 && /FAIL AGENTS\.md: the core's part of it/.test(inside.out) && /FAIL \.github\/workflows\/core\.yml: the core's file/.test(inside.out) && mended(inside.out, { from: projectOf() }),
     "  and fails one that makes a file or part the core marks other than the core writes it, with its mend", inside.out);
   // (main's part, or a marked file, already stale: a pull request that leaves the part as it was, or does not bring the
   // file back, is not failed for what stood before it; it is reported with the mend)

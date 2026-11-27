@@ -12,7 +12,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { alone, fromJobs, fromJunit, record, saysWhatItGuards, stepsOf, table } from "../scripts/test-record.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { scratchDir, projectOf } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -116,7 +116,7 @@ for (const [args, what] of [[["checks/shape.json", "--junit", "nowhere"], "a fol
   [["checks/shape.json", "--repo", "o/n"], "a repository with no workflow named"], [["checks/none.json"], "no config"], [["checks/shape.json", "--every"], "a word it does not know"],
   [[awayAt], "a config outside the project"], [["checks/broken.json"], "a config that is no JSON"]]) {
   r = run(args);
-  ok(r.status === 1 && mended(r.out) && (args[0] !== awayAt || /lies outside the project/u.test(r.out)), `refused, with its mend: ${what}`, r.out);
+  ok(r.status === 1 && mended(r.out, { from: projectOf() }) && (args[0] !== awayAt || /lies outside the project/u.test(r.out)), `refused, with its mend: ${what}`, r.out);
 }
 // (a config named by an address that holds a sign-in: refused with its mend, the sign-in cut as shape.mjs cuts it, #1236)
 {

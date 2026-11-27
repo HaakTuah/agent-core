@@ -9,7 +9,7 @@ import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { main, read, runnersRow, workflowsIn } from "../scripts/runners.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { scratchDir, projectOf } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -136,7 +136,7 @@ try {
   const err = console.error; console.error = l => { said += `${l}\n`; };
   const status = main(["--repo", "../.."], { gh: host(false), say: () => {} });
   console.error = err;
-  ok(status === 1 && mended(said), "a repository not named as <owner>/<name> is refused, saying its mend", said);
+  ok(status === 1 && mended(said, { from: projectOf() }), "a repository not named as <owner>/<name> is refused, saying its mend", said);
 } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 
 console.log(failed ? `${failed} of ${count} failed` : `${count} of ${count} passed`);

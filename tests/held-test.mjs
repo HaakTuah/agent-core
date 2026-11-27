@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { GITHUB_MOST } from "../scripts/lookup.mjs";
 import { STALE, heldPackages, lookAgain, report } from "../scripts/held.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { scratchDir, projectOf } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what, detail = "") => { if (!cond) { failed++; console.error(`FAIL ${what}${detail ? `\n     ${String(detail).slice(0, 1500)}` : ""}`); } };
@@ -145,7 +145,7 @@ try {
 
 // ---- Its options: a wrong one fails, saying the mend
 const wrong = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/held.mjs", import.meta.url)), "--wrong"], { encoding: "utf8" });
-ok(wrong.status === 2 && mended(wrong.stderr), "a wrong option fails, saying the mend", wrong.stderr);
+ok(wrong.status === 2 && mended(wrong.stderr, { from: projectOf() }), "a wrong option fails, saying the mend", wrong.stderr);
 
 if (failed) { console.error(`${failed} failing`); process.exit(1); }
 console.log("ok   held.mjs");

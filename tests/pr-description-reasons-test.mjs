@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
 import { differencesAdded, reasonsMend } from "../scripts/pr-reasons.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { scratchDir, projectOf } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -37,6 +37,6 @@ const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); i
   ok(reasonsMend("No line.", []) === null && reasonsMend("No line.", null) === null, "a pull request that adds no difference is asked nothing");
   ok(reasonsMend("x\n Reasons read: core archive 161 and #156; its reason does not hold here, since this project has no players.\n", ["- a"]) === null, "a line \"Reasons read:\" with what was read passes, whatever its words");
   const mend = reasonsMend("x\nReasons read:\n", ["- `core/tasks/x.md`, a difference"]);
-  ok(mend !== null && mend.includes("core/tasks/x.md") && mend.includes("reasons.mjs") && mended(`FAIL ${mend}`) && reasonsMend("x", ["- a"]) !== null && !/[\r\u001b]/u.test(reasonsMend("x", ["- a\r::error::x\u001b[2J"])) && reasonsMend("x", ["- a"], "vendor/core/").includes("`node vendor/core/scripts/reasons.mjs "), "an empty line, or none, fails, naming the difference (with no control character of the project's text) and the script that prints its reasons where the copy stands, with the mend");
+  ok(mend !== null && mend.includes("core/tasks/x.md") && mend.includes("reasons.mjs") && mended(`FAIL ${mend}`, { from: projectOf() }) && reasonsMend("x", ["- a"]) !== null && !/[\r\u001b]/u.test(reasonsMend("x", ["- a\r::error::x\u001b[2J"])) && reasonsMend("x", ["- a"], "vendor/core/").includes("`node vendor/core/scripts/reasons.mjs "), "an empty line, or none, fails, naming the difference (with no control character of the project's text) and the script that prints its reasons where the copy stands, with the mend");
 }
 process.exit(failed ? 1 : 0);

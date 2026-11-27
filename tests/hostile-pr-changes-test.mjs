@@ -25,7 +25,7 @@ import { library, regular, shown } from "../scripts/reading.mjs";
 import { rules } from "../scripts/rules.mjs";
 import { LIMITS, conditions, cuts, total, tree as readTree } from "../scripts/read-total.mjs";
 import { LARGEST } from "../scripts/tree-walk.mjs";
-import { scratchDir, scratchEnv, root } from "../scripts/scratch-core.mjs";
+import { scratchDir, scratchEnv, root, projectOf } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -358,7 +358,7 @@ ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "co
   // in the mend with none of them able to open a line
   put(manifest("- ::error::x\u0085\u2028::warning::y\u001b[2J")); commit();
   const marked = differencesAdded(d), markedMend = reasonsMend("", marked);
-  ok(Array.isArray(marked) && marked.length === 1 && mended(`FAIL ${markedMend}`) && !/[\r\n\u0085\u2028\u001b]/u.test(markedMend), "pr-description: markup in a difference is one line added, quoted with no character that ends a line or drives a terminal");
+  ok(Array.isArray(marked) && marked.length === 1 && mended(`FAIL ${markedMend}`, { from: projectOf() }) && !/[\r\n\u0085\u2028\u001b]/u.test(markedMend), "pr-description: markup in a difference is one line added, quoted with no character that ends a line or drives a terminal");
   // nothing at all: an empty manifest, then none, adds no difference; a base it cannot read counts every line as added
   put(""); commit();
   ok(Array.isArray(differencesAdded(d)) && differencesAdded(d).length === 0, "pr-description: an empty manifest adds no difference");

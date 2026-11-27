@@ -1,10 +1,10 @@
 // Hostile tests for one input the core reads (floor topic 5, "Every named input has hostile tests"): a pull request's
 // description, its body, which anyone who opens a pull request writes. It is read by the description check
-// (pr-description.mjs: missing, asked, waitsOn, waitsMend, reasonsMend, and its run with PR_BODY in the env) and by the line
+// (pr-description.mjs: missing, asked, waitsOn, waitsMend, reasonsMend, and its run on PR_BODY) and by the line
 // "Read for it:" (reading.mjs: listed, lineMend) and the line "Never needed:" (read-total.mjs: neverNeeded, which the size
 // workflow hands it in PR_BODY); the description workflows (.github/workflows/pr-description.yml and
 // own-description.yml) hand it over in PR_BODY alone. Each case is refused: nothing of it is taken as a heading, a
-// line or a pass. Run by the core's tests workflow (tests.yml).
+// line or a pass. Run by tests.yml.
 //
 //   node tests/hostile-pr-text-test.mjs
 import { spawnSync } from "../scripts/check-runs.mjs";
@@ -16,7 +16,7 @@ import { PARTS, missing, reasonsMend, waitsMend, waitsOn } from "../scripts/pr-d
 import { lineMend, listed } from "../scripts/reading.mjs";
 import { neverNeeded } from "../scripts/read-total.mjs";
 import { SHOWN, headMends } from "../scripts/pr-head.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { scratchDir, projectOf } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -117,7 +117,7 @@ const refused = (r) => r.status === 1 && mended(r.stdout) && !/\n\s+at /u.test(r
   const added = ["- a difference"];
   const slow = Date.now();
   ok(reasonsMend(`${"Reasons read:\n".repeat(500000)}`, added) !== null && Date.now() - slow < 2000, "reasonsMend: half a million empty lines \"Reasons read:\" are none, read in no time");
-  ok([42, null, undefined, {}, [], { toString: () => "Reasons read: faked" }].every(body => mended(`FAIL ${reasonsMend(body, added)}`)), "reasonsMend: a body of the wrong type is no line, and fails with its mend");
+  ok([42, null, undefined, {}, [], { toString: () => "Reasons read: faked" }].every(body => mended(`FAIL ${reasonsMend(body, added)}`, { from: projectOf() })), "reasonsMend: a body of the wrong type is no line, and fails with its mend");
   ok(["**Reasons read:** x", "`Reasons read: x`", "> Reasons read: x", "<!-- Reasons read: x -->", "Reasons read:\u00a0\u200b"].every(body => reasonsMend(body, added) !== null), "reasonsMend: the label in markup, quoted, in a comment, or followed only by blanks is no line");
   ok(reasonsMend("", added) !== null && reasonsMend("Reasons read: x", "not a list") === null && reasonsMend("", []) === null, "reasonsMend: nothing at all fails where a difference is added; with none added, nothing is asked");
 }

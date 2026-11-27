@@ -83,6 +83,23 @@ export function scratchDir(prefix) {
   return tmp;
 }
 
+/** The folder a project's session reads a mend from, for a test that reads one written for a project: it names the
+ *  copy's path (`node core/scripts/x.mjs`), which the core's own folder does not hold. A scratch folder whose
+ *  `core/scripts` is a link to this core's scripts (a mend names scripts alone), made once for the process, to be read
+ *  from and never written in: `mended(output, { from: projectOf() })` (mend.mjs, #1488). With `own`, its `scripts` is a
+ *  link to the core's too, for a mend that names both forms (a project's, and the core's own). */
+const projectFolders = new Map();
+export function projectOf({ own = false } = {}) {
+  if (!projectFolders.has(own)) {
+    const dir = scratchDir("project-of-");
+    fs.mkdirSync(path.join(dir, "core"));
+    fs.symlinkSync(path.join(root, "scripts"), path.join(dir, "core", "scripts"), "junction");
+    if (own) fs.symlinkSync(path.join(root, "scripts"), path.join(dir, "scripts"), "junction");
+    projectFolders.set(own, dir);
+  }
+  return projectFolders.get(own);
+}
+
 // The host's answers for the scratch projects, whether each is private (scripts/host-private.mjs, #1095): one file a
 // test process, named by CORE_HOST_ANSWERS in its environment and so in every run's. `dir` given, its answer is set.
 let answers = null;

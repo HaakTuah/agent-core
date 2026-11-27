@@ -44,7 +44,7 @@ const run = (script, ...args) => {
   return { status: r.status, out: `${r.stdout}${r.stderr}`, ms: Date.now() - started };
 };
 const raw = out => /\n\s+at |TypeError|ReferenceError|RangeError/u.test(out);
-const fails = r => r.status === 1 && mended(r.out) && !raw(r.out);
+const fails = r => r.status === 1 && mended(r.out, { from: p }) && !raw(r.out);
 // What a reader that throws says, as a check prints it: "FAIL: " and its words; "" where it took the input.
 const thrown = fn => { try { fn(); return ""; } catch (e) { return e instanceof TypeError || e instanceof RangeError ? `raw ${e.stack}` : `FAIL: ${e.message}`; } };
 const timed = fn => { const t = Date.now(), v = fn(); return [v, Date.now() - t]; };

@@ -20,8 +20,12 @@ const ok = (cond, what) => { count++; if (cond) console.log(`ok   ${what}`); els
   fs.mkdirSync(path.join(at, "scripts"), { recursive: true });
   fs.writeFileSync(path.join(at, "scripts/x.mjs"), "");
   const here = "FAIL: a. Mend: run node scripts/x.mjs, then commit.", gone = "FAIL: a. Mend: run `node core/scripts/x.mjs --write`.";
-  ok(mended(here, { from: at }) && !mended(gone, { from: at }) && mended(gone) && missing(gone, at).length === 1 && /core\/scripts\/x\.mjs/u.test(missing(gone, at)[0]),
-    "a mend naming a script there from the folder it ran in is mended; one naming a path not there is not, where the folder is given");
+  ok(mended(here, { from: at }) && !mended(gone, { from: at }) && !mended(gone) && missing(gone, at).length === 1 && /core\/scripts\/x\.mjs/u.test(missing(gone, at)[0]),
+    "a mend naming a script there from the folder it ran in is mended; one naming a path not there is not, and where the folder is not given it is the process's own (#1488)");
+  // (no folder given: the process's own, the one the check's own test runs it in)
+  const was = process.cwd();
+  process.chdir(at);
+  try { ok(mended(here) && !mended(gone), "where no folder is given, a mend's path is read from the process's own folder (#1488)"); } finally { process.chdir(was); }
   const abs = `FAIL: a. Mend: run node ${path.join(at, "scripts", "x.mjs").replace(/\\/gu, "/")} now.`;
   ok(!mended("FAIL: a. Mend: run node /no/such/x.mjs now.", { from: at }) && !mended('FAIL: a. Mend: run node "core/scripts/gone.mjs" now.', { from: at })
     && !mended("FAIL: a. Mend: run node 'core/scripts/gone.mjs' now.", { from: at }) && mended(abs, { from: at }) && mended('FAIL: a. Mend: run node "scripts/x.mjs" now.', { from: at })
