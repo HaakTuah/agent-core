@@ -7,14 +7,14 @@
 //   node tests/daily-try-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 import { BARE, OWNER, SIGNIN, TITLE, bugText, file, find, formed, holds, owned, runAll, runLogged, tryOne } from "../scripts/daily-try.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "daily-try-test-"));
+const tmp = scratchDir("daily-try-test-");
 const git = (cwd, ...a) => { const r = spawnSync("git", a, { cwd, encoding: "utf8" }); if (r.status !== 0) throw new Error(r.stderr); return r.stdout.trim(); };
 const PIN = "1".repeat(40), SHA = "2".repeat(40);
 const manifest = `# Manifest\n\nCore: ${CORE} at ${PIN}, copied whole under core/\n`;
@@ -177,6 +177,5 @@ for (const name of ["game-one", "tool-two"]) {
   ok(came.every(c => c === "untried"), "verdicts past 16 MB, of the wrong type, nothing at all or cut short are read as none written, the project untried", came.join());
 }
 
-fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`${count - failed} of ${count} assertions on the daily try`);
 if (failed) process.exitCode = 1;
