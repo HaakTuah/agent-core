@@ -411,6 +411,9 @@ jobs:
       - name: The pathspecs the selection matches a path against
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-matcher-test.mjs ')) }}
         run: node tests/select-matcher-test.mjs
+      - name: The files a test reaches by listing a folder, for the selection
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-folders-test.mjs ')) }}
+        run: node tests/select-folders-test.mjs
       - name: A tree that passed is not run again
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-passed-test.mjs ')) }}
         run: node tests/select-passed-test.mjs
