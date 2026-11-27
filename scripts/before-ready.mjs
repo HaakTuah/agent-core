@@ -19,10 +19,10 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { MANIFEST, corePath } from "./core-path.mjs";
 import { MEND } from "./mend.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
+import { started } from "./started.mjs";
 
 // The jobs the host runs on the core's own pull requests that this reads: own-description.yml's and size.yml's.
 export const JOBS = [[".github/workflows/own-description.yml", "own-description"], [".github/workflows/size.yml", "size"]];
@@ -137,7 +137,7 @@ export function main(args) {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (started(import.meta.url)) {
   const failed = main(process.argv.slice(2));
   if (failed.length) fail(`${failed.length} of the checks the host runs before ready failed: ${failed.join("; ")}.`, "mend each FAIL above in the branch or the description's file, commit, and run this again; mark the pull request ready once it passes.");
   console.log("ok   the description and size checks pass on the merge, as the host will run them");
