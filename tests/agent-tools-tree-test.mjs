@@ -22,6 +22,7 @@ const NESTED = "is a folder of Claude Code's below the project's root";
 const manifest = at => ({ "core-manifest.md": `Core: ${CORE} at ${"a".repeat(40)}, copied whole under ${at} (never edited here).\n` });
 passes(run(pr(project({ ...script, ...manifest("core/"), ...listing() }), { "core/.claude/settings.json": KIT, "core/README.md": "# core\n" })), "the core's own copy, where the manifest names it, with its .claude, is no folder of the project's below its root");
 fails(run(pr(project({ ...script, ...listing() }), { "core/.claude/settings.json": KIT })), "but with no manifest, as in the core's own repository, a core/.claude fails as any other does", NESTED);
+fails(run(pr(project({ ...script, ...manifest("core/"), "scripts/core-path.mjs": "export {};\n", ...listing() }), { "core/.claude/settings.json": KIT })), "and in the core's own repository, which tracks scripts/core-path.mjs at its root, whatever manifest stands there", NESTED);
 const elsewhere = run(pr(project({ ...script, ...manifest("vendor/core/"), ...listing() }), { "vendor/core/.claude/settings.json": KIT, "core/.claude/settings.json": KIT }));
 ok(elsewhere.status === 1 && elsewhere.out.includes("core/.claude is a folder") && !elsewhere.out.includes("vendor/core/.claude is a folder"), "and where the manifest names another path, that one alone is left out", elsewhere.out);
 fails(run(pr(project({ ...script, ...listing() }), { "app/.claude/skills/x/SKILL.md": "# x\n" })), "a folder of skills below the project's root fails", NESTED, "Mend: move what it holds into the root's .claude folder");

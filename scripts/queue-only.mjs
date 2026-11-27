@@ -39,7 +39,7 @@
 //         proves it; otherwise prints why not and exits 1 (no check: a pull request it does not prove is reviewed).
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { copyOf } from "./core-path.mjs";
+import { copyHeld } from "./core-path.mjs";
 import { asText } from "./guards.mjs";
 import { MOST, ownerAt, progressOf, readItem } from "./done-when.mjs";
 import { byAgent, LIST, opens } from "./labels.mjs";
@@ -232,8 +232,8 @@ if (started(import.meta.url)) {
   }
   const read = (file) => { try { return JSON.parse(readFileSync(file, "utf8")); } catch { return null; } };
   const repo = String(process.env.REPO ?? process.env.GITHUB_REPOSITORY ?? "");
-  // (the default branch's manifest, checked out here: AGENTS.md in the core, core-manifest.md in a project)
-  const prefix = existsSync("core-manifest.md") ? copyOf(".") : "";
+  // (the default branch's manifest, checked out here: AGENTS.md in the core, core-manifest.md in a project; core-path.mjs)
+  const prefix = copyHeld(".") ?? "";
   const manifest = existsSync(prefix ? "core-manifest.md" : "AGENTS.md") ? readFileSync(prefix ? "core-manifest.md" : "AGENTS.md", "utf8") : "";
   const owner = ownerAt(manifest, prefix, repo), progress = progressOf(manifest);
   // (the progress file as the default branch's commit holds it, from git, so that a link is never followed)

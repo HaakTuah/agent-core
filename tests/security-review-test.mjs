@@ -13,6 +13,7 @@ import { CODE_UNREAD, CODE_WAITS, CONTEXT, EDITED, NEW_LINE, UNREAD, boundOf, co
 import { blockingOf, otherOf, postedKind } from "../scripts/review-record.mjs";
 import { judge as codeReview } from "../scripts/code-review-wait.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
+import { checkout, copied as manifestAt, OWN_SCRIPT } from "../scripts/core-path-scratch.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -358,14 +359,14 @@ ok(is(queued([summary(running)], [lineOf]), false, "no security review") && is(q
 const dir = scratchDir("security-review-");
 try {
   const script = fileURLToPath(new URL("../scripts/security-review.mjs", import.meta.url));
-  const run = (p, c, env = {}, r = undefined, k = undefined, f = undefined) => {
+  const run = (p, c, env = {}, r = undefined, k = undefined, f = undefined, cwd = undefined) => {
     writeFileSync(join(dir, "pull.json"), JSON.stringify(p));
     writeFileSync(join(dir, "comments.json"), JSON.stringify(c));
     if (r !== undefined) writeFileSync(join(dir, "review-comments.json"), JSON.stringify(r));
     if (k !== undefined) writeFileSync(join(dir, "commits.json"), JSON.stringify(k));
     if (f !== undefined) writeFileSync(join(dir, "files.json"), JSON.stringify(f));
     const files = [join(dir, "pull.json"), join(dir, "comments.json"), ...(r === undefined ? [] : [join(dir, "review-comments.json")]), ...(k === undefined ? [] : [join(dir, "commits.json")]), ...(f === undefined ? [] : [join(dir, "files.json")])];
-    return JSON.parse(execFileSync(process.execPath, [script, ...files], { encoding: "utf8", env: { ...process.env, ADVISORY: "", RUN_URL: "", ...env } }));
+    return JSON.parse(execFileSync(process.execPath, [script, ...files], { cwd, encoding: "utf8", env: { ...process.env, ADVISORY: "", RUN_URL: "", ...env } }));
   };
   const advisory = run(pull, [[summary(running)]]);
   ok(advisory.sha === HEAD && advisory.status.state === "success" && advisory.status.description.startsWith("Advisory: no security review"), "run with no word on it, it is advisory");
@@ -382,6 +383,19 @@ try {
   ok(run(counted(pull, [lineOf]), [], { ADVISORY: "false", QUEUE: HEAD }, [], [], [[lineOf]]).status.state === "success" && run(counted(pull, [lineOf]), [], { ADVISORY: "false", QUEUE: SEEN }, [], [], [[lineOf]]).status.state === "pending"
     && run(counted(pull, [lineOf]), [], { ADVISORY: "false", QUEUE: HEAD }).status.state === "pending",
   "told the caller's proof holds for the head, a queue-only pull request needs no review; for another commit, or with no files to read, it does");
+  // (the copy told apart from the core's own repository, as core-path.mjs's copyHeld does, #1350: the default branch's
+  // checkout that tracks scripts/core-path.mjs at its root holds no copy, whatever manifest stands beside it, so a
+  // workflow under the path that manifest names is what runs by itself, and asks two; in a project's checkout it is the
+  // copy's, which a sync changes)
+  const named = manifestAt("vendor/core/");
+  const own = checkout(dir, "own", { "core-manifest.md": named, ...OWN_SCRIPT }), copy = checkout(dir, "copy", { "core-manifest.md": named });
+  const inCopy = { ...stepChange, filename: "vendor/core/.github/workflows/ci.yml" };
+  const ownTwo = run(counted(pull, [inCopy]), [[summary(onHead)]], { ADVISORY: "false" }, [], [], [[inCopy]], own);
+  ok(ownTwo.status.state === "pending" && ownTwo.status.description.startsWith("Waiting: floor rule 3 asks two") && run(counted(pull, [inCopy]), [[summary(onHead)]], { ADVISORY: "false" }, [], [], [[inCopy]], copy).status.state === "success",
+    "the core's own checkout, with a manifest at its root, holds no copy: a workflow under the path it names asks two security reviews; in a project's it is the copy's", ownTwo.status.description);
+  const inCore = { ...stepChange, filename: "core/.github/workflows/ci.yml" };
+  ok(run(counted(pull, [inCore]), [[summary(onHead)]], { ADVISORY: "false" }, [], [], [[inCore]], own).status.description?.startsWith("Waiting: floor rule 3 asks two"),
+    "and holding no copy, it leaves nothing aside, core/ included: a workflow there asks two security reviews");
   ok(run(pull, [[as("helper")]], { ADVISORY: "false", REVIEWERS: "x helper" }).status.state === "success" && run(pull, [[as("helper")]], { ADVISORY: "false" }).status.state === "pending", "the accounts the workflow names count, and no others");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   ok(run(pull, [[real(REAL_CLEAN.replace("codex-review-state:v1", "codex-review-state:v2"))]]).warning === UNREAD && run(pull, [[real(REAL_CLEAN)]]).warning === undefined, "run as the workflow runs it, it prints the warning beside the status, for the workflow to show");
