@@ -9,13 +9,12 @@
 # (core/setup/template/workflows/look.yml.tmpl). It runs the project's own scripts on the core's one exact Node; Node's
 # own modules only, no package installed. Nothing is checked out but the calling repository's default branch, with its
 # whole history (#1426), and no text of a pull request or an issue reaches a command: the scripts read them through gh's
-# answers alone. Its last step
-# takes the personal terms out of issues and comments (core/scripts/issue-terms.mjs; #783), where the call passes the
-# secret PERSONAL_TERMS, as the starter kit's does. It may write issues, and read pull requests, checks and statuses;
-# nothing else, so a pull request's own text or a review's it counts and leaves to the owner's run of the script. The
-# look reads the host for the steps and the settings only the owner gives with this token, and writes with it only the
-# labels of the core's list and its issues (core/scripts/host.mjs; #1092): what the token may not do, it files for the
-# owner, each right it uses named below.
+# answers alone. Its last step takes the personal terms out of issues and comments (core/scripts/issue-terms.mjs; #783),
+# where the call passes the secret PERSONAL_TERMS, as the starter kit's does. It may write issues, and read pull
+# requests, checks and statuses; nothing else, so a pull request's own text or a review's it counts and leaves to the
+# owner's run of the script. The look reads the host for the steps and the settings only the owner gives with this
+# token, and writes with it only the labels of the core's list and its issues (core/scripts/host.mjs; #1092): what the
+# token may not do, it files for the owner, each right it uses named below.
 name: look
 
 on:
