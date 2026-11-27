@@ -108,6 +108,13 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   open point. This is the second
   difference from that module and `roles/shared/records.md`, where only the design session writes rules from the owner's
   words.
+- **A bug a release's trial finds is built at once** (#1413, point 7). By default, where the trial of a release ("Each
+  release is tried on a real project first") finds a bug of the core's, it is filed and built like any bug
+  (`roles/shared/inbox.md`, "Bugs don't wait"), the orchestrator giving it a lane with no line in this file first.
+  Nothing changes it. It does not mean the release is cut before its trial passes on the fix, nor that an idea the
+  trial brings joins without a line. Reason: 47 of the 392 pull requests merged in the core from 19 to 26 November
+  2026 changed the queue alone, each running the checks and, where its line names a `by:chat` item, waiting for a code
+  review (#1339). Held by nothing yet.
 - **A bug fix and a rework of tests are built on Sonnet** (#767). By default, where "The builders" of
   `roles/orchestrator.md` picks Claude for a line that fixes a bug or reworks tests, the orchestrator starts its builder
   on Sonnet; a line that writes or changes a rule, touches security or reads a format another publisher defines stays

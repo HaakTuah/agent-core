@@ -97,7 +97,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository (the
      workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`, `scripts/releases.mjs`,
      `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`, `scripts/clean-merges.mjs`,
-     `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs`, `scripts/stage-order.mjs`,
+     `scripts/security-review.mjs`, `scripts/merge-line.mjs` with `scripts/merge-line-measure.mjs`, `scripts/runners.mjs`, `scripts/stage-order.mjs`,
      `scripts/tools-offer.mjs`, the owner's settings (`scripts/owner-settings.mjs`: a repository's settings, its default
      branch's rules and its secrets' names, never a value) and the scheduled look's reader of the default branch's newest commit, read as a time
      alone (`scripts/look.mjs`, in `scripts/look-pulls.mjs`), and

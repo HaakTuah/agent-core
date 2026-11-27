@@ -1,4 +1,4 @@
-// The files a file of code reaches by listing a folder (#1361, point 25), for the selection's links (select.mjs): a test
+// The files a file of code reaches by listing a folder (#1361, point 25), for the selection's links (select-reach.mjs): a test
 // that reads the files of a folder it lists (`fs.readdirSync(path.join(ROOT, "game"))`, `glob("tools/rules/*.js")`,
 // `os.listdir("data")`) names none of them, so their names alone never tie it to them. Where a file holds a call of
 // LISTS below, it reaches every file under each folder a string of it names whole: by its path from the root or from
