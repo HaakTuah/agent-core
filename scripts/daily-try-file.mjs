@@ -68,9 +68,9 @@ export function gather(lines, { sha, day, signedIn, found, privates }) {
 }
 
 // The runners' lines of the look's run `run` (its attempt `attempt`): for each job of the try's matrix ("try <n>"), its
-// number and the text after the last LINE of its log, read through `gh`, which the runner's own script prints after the
-// project's code has run; a log past LOG_MAX read as none. GitHub's refusal throws, so that a reading not taken is never
-// read as runners that said nothing.
+// number and the text after the last LINE of its log, read through `gh` (jobLog), which the runner's own script prints
+// after the project's code has run; a log past LOG_MAX read as none. GitHub's refusal throws, so that a reading not taken
+// is never read as runners that said nothing.
 export function legLines(run, attempt, { gh = ghApi, repo = CORE } = {}) {
   const jobs = [];
   for (let page = 1; page <= 3; page++) {
@@ -83,11 +83,22 @@ export function legLines(run, attempt, { gh = ghApi, repo = CORE } = {}) {
   for (const j of jobs) {
     const m = /^try (\d+)$/u.exec(String(j?.name));
     if (!m || !Number.isSafeInteger(j?.id)) continue;
-    const log = String(gh(`repos/${repo}/actions/jobs/${j.id}/logs`));
+    const log = jobLog(gh, `repos/${repo}/actions/jobs/${j.id}/logs`);
     const at = log.length > LOG_MAX ? -1 : log.lastIndexOf(LINE);
     if (at >= 0) lines.push({ leg: Number(m[1]), text: log.slice(at + LINE.length).split("\n")[0].trim() });
   }
   return lines;
+}
+
+// A job's log through `gh` (ghApi's form) (#1549). Every log holds the runner's colour codes, which a gh from 2.97.0 on
+// refuses to print without ESCAPES; an older one takes no such flag, so its refusal of the flag alone is asked again
+// without it. Safe, since the log reaches no terminal: legLines reads its counts' line alone, held to its form (legOf).
+export const ESCAPES = "--allow-escape-sequences";
+export function jobLog(gh, route) {
+  try { return String(gh(route, ESCAPES)); } catch (e) {
+    if (!String(e?.message).includes(`unknown flag: ${ESCAPES}`)) throw e;
+    return String(gh(route));
+  }
 }
 
 // Whether counts are in the form gather sums; nothing else is read by file, which builds its text from numbers alone.

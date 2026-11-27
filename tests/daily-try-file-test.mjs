@@ -5,7 +5,12 @@
 // tests/daily-try-test.mjs.
 //
 //   node tests/daily-try-file-test.mjs
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
+import { COUNTS } from "../scripts/release-trial.mjs";
 import { LINE, OWNER, SIGNIN, TITLE, bugText, file, formed, gather, legLines } from "../scripts/daily-try-file.mjs";
 
 let failed = 0, count = 0;
@@ -71,6 +76,35 @@ const SHA = "2".repeat(40);
   let refusedJobs = null;
   try { legLines(8, 1, { gh: ghLogs, repo: CORE }); } catch (e) { refusedJobs = e; }
   ok(refusedJobs instanceof Error, "GitHub refusing the list of jobs throws, never read as runners that said nothing");
+}
+
+// --file through the gh on the path (#1549): a job's log holds the runner's colour codes, which a gh from 2.97.0 on
+// refuses to print without its flag and an older one takes no such flag; each still gives the runner's counts. The
+// stand-in answers as each gh does, its words those of gh 2.97.0 and 2.89.0.
+{
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "daily-try-file-")), bin = path.join(dir, "bin");
+  fs.mkdirSync(bin);
+  const counts = { leg: 1, commit: SHA, came: "held", ...Object.fromEntries(COUNTS.map(k => [k, 0])), failedAfter: 1 };
+  fs.writeFileSync(path.join(dir, "log"), `2026-11-27T06:00:00.0000000Z \u001b[36;1mnode scripts/daily-try.mjs --run\u001b[0m\n2026-11-27T06:00:01.0000000Z ${LINE}${JSON.stringify(counts)}\r\n2026-11-27T06:00:02.0000000Z \u001b[0;32mdone\u001b[0m\n`);
+  fs.writeFileSync(path.join(dir, "jobs"), JSON.stringify({ jobs: [{ id: 11, name: "try 1" }, { id: 12, name: "try-file" }] }));
+  fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh
+case " $* " in *" --allow-escape-sequences "*) flag=1;; *) flag=;; esac
+if [ -n "$flag" ] && [ "$GH_KIND" = old ]; then echo 'unknown flag: --allow-escape-sequences' >&2; exit 1; fi
+[ "$2" = -X ] && { cat >> "${path.join(dir, "wrote")}"; echo '{}'; exit 0; }
+case "$2" in
+  */attempts/1/jobs*) cat "${path.join(dir, "jobs")}";;
+  */jobs/11/logs) if [ -z "$flag" ] && [ "$GH_KIND" = new ]; then echo 'the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway' >&2; exit 1; fi; cat "${path.join(dir, "log")}";;
+  *issues*) echo '[]';;
+  *) echo 'gh: Not Found (HTTP 404)' >&2; exit 1;;
+esac
+`, { mode: 0o755 });
+  for (const kind of ["new", "old"]) {
+    fs.rmSync(path.join(dir, "wrote"), { force: true });
+    const r = spawnSync(process.execPath, [path.join(import.meta.dirname, "..", "scripts", "daily-try.mjs"), "--file"], { encoding: "utf8", env: { PATH: `${bin}:${process.env.PATH}`, GH_TOKEN: "", GH_KIND: kind, SHA, FOUND: "1", PRIVATE: "0", SIGNED_IN: "true", RUN_ID: "7", RUN_ATTEMPT: "1" } });
+    const wrote = fs.existsSync(path.join(dir, "wrote")) ? fs.readFileSync(path.join(dir, "wrote"), "utf8") : "";
+    ok(r.status === 0 && /1 project whose checks the trial's reading holds \(1 passed before the sync and failed after/u.test(wrote) && !wrote.includes("\u001b") && !/\\u001b/u.test(wrote), `--file reads the counts of a log that holds escape sequences, with a gh ${kind === "new" ? "from 2.97.0 on, given its flag" : "older than 2.97.0, which takes no such flag"}`, `${r.status} ${r.stderr}${r.stdout}`.slice(0, 400));
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
 }
 
 console.log(`${count - failed} of ${count} assertions on the daily try's counts`);
