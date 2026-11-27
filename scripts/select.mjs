@@ -78,9 +78,9 @@ const dotted = f => f.replace(/\.py$/u, "").replace(/\/(__init__|__main__)$/u, "
 export function links(texts, tests, reach, pace = () => {}, csharp = new Map()) {
   // (each name tried on each text took time in step with the count of names times the count of texts: the names are held in
   // a trie, walked once over each text, name-trie.mjs)
-  const byName = nameTrie(Object.keys(texts).map(f => [path.posix.basename(f), f]));
-  const byDotted = nameTrie(Object.keys(texts).filter(f => f.endsWith(".py") && dotted(f).includes(".")).map(f => [dotted(f), f]));
-  const out = new Map(), dirs = folders(Object.keys(texts));
+  const files = Object.keys(texts), byName = nameTrie(files.map(f => [path.posix.basename(f), f]));
+  const byDotted = nameTrie(files.filter(f => f.endsWith(".py") && dotted(f).includes(".")).map(f => [dotted(f), f]));
+  const out = new Map(), dirs = folders(files, pace);
   for (const [file, text] of Object.entries(texts)) {
     pace();
     const to = new Set((CS.test(file) ? csharp : reach).get(file) ?? []), py = file.endsWith(".py");
