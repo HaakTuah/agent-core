@@ -720,6 +720,19 @@ function upgrade(p, from, ownChanges, expect) {
   a = attached();
   ok(a.status === 0 && a.out.startsWith("attached: no, 1 thing in the way\n") && /^- the copy: core\/ differs from the core at its pin [0-9a-f]{7}: core\/README\.md is changed\. Mend: /mu.test(a.out), `${p.name}: with a file of the copy changed, it reads not attached, naming the file and its mend`, a.out);
   clean();
+  // (the core's part of AGENTS.md, which the sync writes, differing: in the way, its mend the one process, never a
+  // declaration; #1361, points 27 and 28)
+  const agentsAt = path.join(p.dir, "AGENTS.md");
+  const agentsBefore = fs.readFileSync(agentsAt, "utf8"), lacking = agentsBefore.replace(/^@core\/floor\/security\.md\r?\n/mu, "");
+  ok(lacking !== agentsBefore, `${p.name}: its AGENTS.md holds the floor's import, to take out`, agentsBefore);
+  fs.writeFileSync(agentsAt, lacking);
+  a = attached();
+  ok(a.status === 0 && a.out.startsWith("attached: no, ") && /^- beside a fresh start: AGENTS\.md: [^\n]*in the core's part of the file\. Mend: run the copy's `scripts\/converge\.mjs --write`/mu.test(a.out),
+    `${p.name}: with the core's part of AGENTS.md lacking an import, it reads not attached, naming the file and the one process as its mend`, a.out);
+  node(p.dir, "core/scripts/converge.mjs", "--write");
+  a = attached();
+  ok(a.status === 0 && !/^- beside a fresh start: AGENTS\.md/mu.test(a.out), `${p.name}: and that mend made, AGENTS.md is in the way no more`, a.out);
+  clean();
   git(p.dir, "checkout", "-q", "main");
   for (const lead of added) {
     STAGES[lead].stage(p.dir);
