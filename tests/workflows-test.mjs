@@ -499,10 +499,6 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
   const cut = release.jobs.release.steps.at(-1).run;
   ok("workflow_dispatch" in tests.on && !("workflow_call" in tests.on) && /actions\/runs" -f head_sha="\$AT" -f branch=main -f event=push /.test(cut) && /gh api --paginate -X GET "repos\/\$GITHUB_REPOSITORY\/actions\/workflows\/tests\.yml\/runs" -f head_sha="\$AT"/.test(cut) && /jq -s '\{ workflow_runs: \. \}' "\$full\.pages" > "\$full"/.test(cut) && /--runs "\$runs" --full "\$full"/.test(cut),
     "and both in full by hand, which the release waits on: it reads the push's runs and, apart, the tests' runs on its commit, every page, none unfinished and the newest passed, and the tests stay a workflow no project calls (point 6; release.mjs, fullRun)", cut);
-  const atRun = release.jobs.main.steps.find(s => s.id === "at")?.run ?? "", AT = "${{ needs.main.outputs.at }}";
-  ok(release.jobs.main.outputs?.at === "${{ steps.at.outputs.at }}" && /reports\/release-trial\.json\?ref=\$GITHUB_SHA" \| jq -r '\.commit \/\/ empty'/.test(atRun) && /grep -Eqx '\[0-9a-f\]\{40\}' \|\| \{ echo "::error::[^"]*Mend: /.test(atRun) && /^ *at="\$GITHUB_SHA"$/m.test(atRun)
-    && release.jobs.release.steps.at(-1).env?.AT === AT && /--cut --at "\$AT" /.test(cut) && !/GITHUB_SHA/.test(cut) && release.jobs.upgrade.steps.find(s => /actions\/checkout@/.test(s.uses ?? ""))?.with?.ref === AT,
-    "a release stands on the commit its trial tried, as the record on main names it (a full SHA, else a failure and its mend); the Windows test, the runs and the cut take it (#1413, point 3)", atRun);
   // (#715, point 2: the upgrade test guards only what a release brings, so on Windows, where its job set every pull
   // request's run, it runs in the release workflow alone: daily where the repository is public, before each release)
   const upgradeStep = release.jobs.upgrade?.steps?.find(s => /tests\/upgrade-test\.mjs/.test(s.run ?? ""));

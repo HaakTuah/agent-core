@@ -67,7 +67,7 @@ jobs:
           at="$GITHUB_SHA"
           if [ "$EVENT" = workflow_dispatch ]; then
             at=$(gh api -H "Accept: application/vnd.github.raw" "repos/$GITHUB_REPOSITORY/contents/reports/release-trial.json?ref=$GITHUB_SHA" | jq -r '.commit // empty' || true)
-            printf '%s' "$at" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::the trial's record on main's newest commit (reports/release-trial.json) names no commit that was tried, or could not be read. Mend: try the release on a real project and record it with node scripts/release.mjs --trial, in a pull request of its own, as AGENTS.md says (\"A release is cut on the owner's word\"); then start the release workflow again"; exit 1; }
+            [[ "$at" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::the trial's record on main's newest commit (reports/release-trial.json) names no commit that was tried, or could not be read. Mend: try the release on a real project and record it with node scripts/release.mjs --trial, in a pull request of its own, as AGENTS.md says (\"A release is cut on the owner's word\"); then start the release workflow again"; exit 1; }
           fi
           echo "the commit: $at"
           echo "at=$at" >> "$GITHUB_OUTPUT"

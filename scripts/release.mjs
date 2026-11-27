@@ -157,15 +157,16 @@ function whyNot(name, sha, tip, staged, trialed, runs, fullFile) {
 
 // Prints what the release is, what it asks of a project, and what the staged cases and the trial on a real project say
 // of it; gives those two.
-function told({ name, sha, tip, before, asks }, dir) {
+export function told({ name, sha, tip, before, asks }, dir) {
   console.log(`${name} at ${sha}${sha === tip ? "" : `, the commit its trial tried, main standing at ${tip.slice(0, 7)}`}${before ? `, after ${before.name} at ${before.sha.slice(0, 7)}: https://github.com/${CORE}/compare/${before.name}...${sha}` : ", the first release"}`);
   console.log(asks === null
     ? `What it asks of a project beyond the copy could not be read: read the entries of ${FOLDER}/ newer than ${before.name}.`
     : asks.length
       ? `It asks more of a project than the copy (${NOTES}), each with roughly what it costs a project where it is not done yet:\n${asks.map(costed).join("\n")}`
       : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);
-  // (the staged cases' newest verdicts, on main's newest commit, where the runs at the release are recorded: #1413, point 3)
-  const staged = atRelease(tip, before, rev => inBare(dir, rev));
+  // (the staged cases' newest verdicts on the commit tried or before it, read on main's newest commit, where the runs at
+  // the release are recorded: #1413, point 3)
+  const staged = atRelease(sha, before, rev => inBare(dir, rev), tip);
   console.log(staged.said);
   // (the record read on main's newest commit, where it merged after the commit it names: #1413, point 3)
   const trialed = trialAt(sha, rev => inBare(dir, rev), "refs/heads/main");

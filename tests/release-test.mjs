@@ -11,11 +11,13 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { OWN, costed, fullRun, held, inTheCore, next, older, tried } from "../scripts/release.mjs";
-import { TRIAL } from "../scripts/release-trial.mjs";
+import { OWN, costed, fullRun, held, inTheCore, next, older, told, tried } from "../scripts/release.mjs";
+import { TRIAL, trialRecord } from "../scripts/release-trial.mjs";
+import { CASES, RECORD, TOOL } from "../scripts/staged.mjs";
 import { STEPS } from "../scripts/steps.mjs";
 import { NOTICE } from "../scripts/sync-notes.mjs";
 import { scratchCore, victimRepo } from "../scripts/releases-scratch.mjs";
+import { parseYaml } from "../scripts/parse-yaml.mjs";
 
 
 let failed = 0, count = 0;
@@ -70,6 +72,21 @@ ok(tried(dir) === c2 && next(dir).sha === git(core, "rev-parse", "main"), "and o
 record("no sha");
 dir = fetched();
 ok(tried(dir) === null && next(dir).sha === git(core, "rev-parse", "main"), "or where it names no commit");
+record(c4);
+dir = fetched();
+ok(tried(dir) === c4 && next(dir).sha === git(core, "rev-parse", "main"), "or where it names the newest release's own commit");
+// (what the release says of the commit tried: the trial's record and the staged cases' newest verdicts, read on main's
+// newest commit, a verdict on a commit after the one tried, a fix it lacks, never standing for it)
+// (a run the commit tried holds itself stands whatever commit it names, one of a branch merged whole into one commit too)
+const put = (file, text) => { fs.writeFileSync(path.join(core, file), text); git(core, "add", "-A"); git(core, "commit", "-q", "-m", file); return git(core, "rev-parse", "main"); };
+const staging = (at, commit, verdict, n = 0) => ({ at, commit, tool: TOOL, cases: { [CASES[n].name]: { verdict, why: "a verdict" } } });
+const triedAt = put(RECORD, JSON.stringify({ runs: [staging("2026-11-19", side, "fail")] }));
+const fix = put(TRIAL, JSON.stringify(trialRecord(triedAt, "2026-11-22", [[{ "a.yml/x": "passed" }, { "a.yml/x": "passed" }]], [{ pure: true, from: "release-1" }], [{ none: "another-owner" }])));
+put(RECORD, JSON.stringify({ runs: [staging("2026-11-19", side, "fail"), staging("2026-11-20", triedAt, "fail", 1), staging("2026-11-21", fix, "pass")] }));
+dir = fetched();
+const quiet = f => { const log = console.log; console.log = () => {}; try { return f(); } finally { console.log = log; } };
+const { staged, trialed } = quiet(() => told(next(dir), dir));
+ok(next(dir).sha === triedAt && trialed.held === null && /2 failing in its last run/.test(staged.said), "the release on the commit tried reads its trial's record and the staged cases on main's newest commit, and a case's verdict on a later commit, a fix it lacks, does not stand for it", `${staged.said} ${trialed.held}`);
 
 // the checks on the commit a release would stand on
 const run = (name, status, conclusion, path = `.github/workflows/${name}.yml`) => ({ name, path, status, conclusion });
@@ -126,6 +143,13 @@ ok(!inTheCore(path.join(nested, "core", "scripts", "release.mjs")), "nor is a cl
 const owners = STEPS.find(s => s.owner === true), hosts = STEPS.find(s => typeof s.owner === "function");
 ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[0].cost}.`) && costed(`- **${owners.lead}.** Done when two.`).endsWith("(the owner's).") && costed(`- **${hosts.lead}.** Done when two.`).endsWith("(the owner's in a private repository).")
   && costed("- **No such entry.** Done when three.").includes("unknown") && costed(`${NOTICE}: and so on.`).includes("each entry it sends the session to") && costed("- A line of no form.").includes("unknown"), "each ask of a release says what it costs, the owner's marked so, one with no step or of no form says so, and the notice costs what it sends to");
+
+// the workflow's wiring: a release stands on the commit its trial tried, as the record on main names it (#1413, point 3)
+const release = parseYaml(fs.readFileSync(fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)), "utf8"));
+const atRun = release.jobs.main.steps.find(s => s.id === "at")?.run ?? "", AT = "${{ needs.main.outputs.at }}", cut = release.jobs.release.steps.at(-1).run ?? "";
+ok(release.jobs.main.outputs?.at === "${{ steps.at.outputs.at }}" && /reports\/release-trial\.json\?ref=\$GITHUB_SHA" \| jq -r '\.commit \/\/ empty'/.test(atRun) && /\[\[ "\$at" =~ \^\[0-9a-f\]\{40\}\$ \]\] \|\| \{ echo "::error::[^"]*Mend: /.test(atRun) && /^ *at="\$GITHUB_SHA"$/m.test(atRun)
+  && release.jobs.release.steps.at(-1).env?.AT === AT && /--cut --at "\$AT" /.test(cut) && !/GITHUB_SHA/.test(cut) && release.jobs.upgrade.steps.find(s => /actions\/checkout@/.test(s.uses ?? ""))?.with?.ref === AT,
+  "a release stands on the commit its trial tried, as the record on main names it (a full SHA held whole, else a failure and its mend); the Windows test, the runs and the cut take it (#1413, point 3)", atRun);
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on cutting a release`);
 process.exitCode = failed ? 1 : 0;

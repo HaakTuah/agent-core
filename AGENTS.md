@@ -188,8 +188,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   record then names it. It does not mean that a tag is ever moved, that a check passed on a later commit stands for the
   commit tried, or that a release is cut on a merge alone or from a commit whose push's checks failed (floor rule 12).
   Reason: while the cut had to be on `main`'s newest commit, merging stopped for the length of a trial, or the trial ran
-  again on a newer commit. Held by `tests/release-test.mjs`, for the commit read and the refusals, and by
-  `tests/workflows-test.mjs`, for the workflow's wiring. **Each release is tried on a real project first** (#1084). By default, before the `release` workflow
+  again on a newer commit. Held by `tests/release-test.mjs`, for the commit read, the refusals and the step that reads it, and
+  by `tests/workflows-test.mjs`, for the runs read on it. **Each release is tried on a real project first** (#1084). By default, before the `release` workflow
   is started, the orchestrator has a builder at the strongest tier try the release on a copy of a project that takes the
   core and whose owner allows it, the owner's own as `scripts/state-report.mjs --projects` finds them, read-only,
   nothing written there: its checks run as on a pull request (`scripts/check.mjs --base <its main> --own --verdicts <a
