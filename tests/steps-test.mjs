@@ -58,15 +58,16 @@ const dirs = Object.fromEntries(Object.entries(kinds).map(([name, o]) => [name, 
 // game, all three in one kit, and a game built with NuGet)
 const pairs = Object.fromEntries(Object.entries({ "a-private-npm-game": { packages: ".", private: true, game: true }, "a-dotnet-game": { nuget: "src", game: true } }).map(([name, o]) => [name, kit(name, o)]));
 // (a manifest with no `Core:` line, or one in neither form: the copy is read at core/, the default, and nothing throws;
-// beside a fresh start the line alone is listed, as the kit writes it)
+// beside a fresh start nothing is listed, since the one process never writes the manifest once it stands: #1361,
+// point 27)
 {
   const at = pairs["a-dotnet-game"], manifest = path.join(at, "core-manifest.md"), was = fs.readFileSync(manifest, "utf8");
   for (const [what, text] of [["no `Core:` line", was.replace(/^Core: .*\n/m, "")], ["a `Core:` line in neither form", was.replace(/^Core: .*$/m, "Core: a line the reader does not know")]]) {
     fs.writeFileSync(manifest, text);
     let missed = null, found = null, threw = null;
     try { missed = notDone(at); const p = project(at); found = differences(p, fresh(p)); } catch (e) { threw = e; }
-    ok(!threw && !missed.length && found.length === 1 && found[0].startsWith("core-manifest.md: lacks the paragraph \"Core: "),
-      `a manifest with ${what}: the steps read the copy at core/, every one done, and beside a fresh start only the line is listed`, threw?.stack ?? `${report(missed ?? [])}\n${(found ?? []).join("\n")}`);
+    ok(!threw && !missed.length && !found.length,
+      `a manifest with ${what}: the steps read the copy at core/, every one done, and beside a fresh start nothing is listed`, threw?.stack ?? `${report(missed ?? [])}\n${(found ?? []).join("\n")}`);
   }
   fs.writeFileSync(manifest, was);
 }

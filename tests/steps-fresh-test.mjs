@@ -26,7 +26,11 @@ const dirs = { "an-npm-project": kit("an-npm-project", { packages: "." }, { held
 const game = dirs["a-game"];
 const agents = path.join(game, "AGENTS.md");
 fs.writeFileSync(agents, fs.readFileSync(agents, "utf8").replace(/\n## Starting a task\n[\s\S]*?\n## Commands/, "\n## Commands").replace("These whole", "these whole")
-  .replace(/at\nthe start of every task\./, "at the start\n  of every task."));
+  .replace(/at\nthe start of every task\./, "at the start\n  of every task.").replace("@core/roles/shared/inbox.md\n", ""));
+// (the project's own words in the files the one process never writes where they stand: no difference, #1361, point 27)
+const security = path.join(game, "SECURITY.md");
+fs.writeFileSync(security, fs.readFileSync(security, "utf8").replace(/\n\n[^\n#][^\n]*/, "\n\nThe game's own words on what it guards."));
+fs.rmSync(path.join(game, "docs/threat-model.md"));
 fs.rmSync(path.join(game, ".github/workflows/look.yml"));
 const wf = path.join(game, ".github/workflows/copies.yml");
 fs.writeFileSync(wf, fs.readFileSync(wf, "utf8").replace(/@[0-9a-f]{40}/g, `@${"b".repeat(40)}`));
@@ -36,8 +40,10 @@ const cfg = path.join(game, "checks/copies.json");
 fs.writeFileSync(cfg, JSON.stringify({ baseline: "checks/copies-baseline.json", code: ["src"] }, null, 2));
 let found = differences(project(game), fresh(project(game)));
 const has = (file, what) => found.some(d => d.startsWith(`${file}:`) && d.includes(what));
-ok(found.length === 4 && has("AGENTS.md", "Starting a task") && has(".github/workflows/look.yml", "missing") && has("core-manifest.md", "the row \"*large file*\"") && has("checks/copies.json", "the key \"prose\""),
-  "a paragraph, a file, a table's row and a config's key that the project lacks are listed; a reflowed line, a row's own value and a pin moved are no difference", found.join("\n"));
+ok(found.length === 4 && has("AGENTS.md", "The core's part") && !has("AGENTS.md", "Starting a task") && has(".github/workflows/look.yml", "missing") && has("docs/threat-model.md", "missing") && has("checks/copies.json", "the key \"prose\""),
+  "the core's part of a rule file, a file and a config's key that the project lacks are listed; a pin moved is no difference", found.join("\n"));
+ok(!found.some(d => /^(core-manifest|SECURITY)\.md:/.test(d)),
+  "the project's own words, outside the core's part of AGENTS.md and in the manifest and SECURITY.md, are no difference (#1361, points 27 and 28)", found.join("\n"));
 declare(game, '"AGENTS.md": its own way of starting a task, on the owner\'s word.');
 found = differences(project(game), fresh(project(game)));
 ok(found.length === 3 && !found.some(d => d.startsWith("AGENTS.md:")), "a file the manifest's \"Differences\" quotes is not compared", found.join("\n"));
@@ -165,18 +171,26 @@ ok(!found.length, "a manifest whose \"Differences\" declares something, in place
 const older = path.join(tmp, "older", "setup", "template");
 fs.cpSync(path.join(root, TEMPLATES), older, { recursive: true });
 const LEFT = "Every builder reads the old way of starting a task, which the core has since left.";
-fs.writeFileSync(path.join(older, "AGENTS.md.tmpl"), fs.readFileSync(path.join(older, "AGENTS.md.tmpl"), "utf8").replace("## Commands", `${LEFT}\n\n## Commands`));
-fs.writeFileSync(path.join(older, "core-manifest.md.tmpl"), fs.readFileSync(path.join(older, "core-manifest.md.tmpl"), "utf8").replace("| *large file* |", "| *old slot* | gone |\n| *large file* |"));
+// (in a whole file of the core's, and in the core's part of a rule file, where the earlier part is the same words but a
+// line: that one reads as reworded; the earlier kit's words outside the part, and in the manifest, are the project's)
+const OLD_IMPORT = "@core/roles/shared/old-way.md\n";
+const inPart = t => t.replace("<!-- The core's part ends. -->", `${OLD_IMPORT}<!-- The core's part ends. -->`);
+const asEarlier = (at, edit) => { const was = fs.readFileSync(at, "utf8"), now = edit(was); ok(now !== was, `${path.relative(tmp, at)} is written as the earlier kit wrote it`); fs.writeFileSync(at, now); };
+const earlier = to => [
+  [to("AGENTS.md"), t => inPart(t).replace("## Commands", `${LEFT}\n\n## Commands`)],
+  [to("bug_report"), t => t.replace("**Where**", `${LEFT}\n\n**Where**`)],
+  [to("core-manifest.md"), t => t.replace("| *large file* |", "| *old slot* | gone |\n| *large file* |")],
+];
+for (const [at, edit] of earlier(f => path.join(older, f === "bug_report" ? "issue-bug.md.tmpl" : `${f}.tmpl`))) asEarlier(at, edit);
 const another = kit("another-npm-project", { packages: "." }, { held: false });
-const npmAgents = path.join(another, "AGENTS.md");
 const p0 = project(another), olderKit = fresh(p0, older);
 ok(olderKit.length > 0 && !differences(p0, fresh(p0), [olderKit]).length, "an earlier kit whose wording the project does not hold adds no difference");
-fs.writeFileSync(npmAgents, fs.readFileSync(npmAgents, "utf8").replace("## Commands", `${LEFT}\n\n## Commands`));
-fs.writeFileSync(path.join(another, "core-manifest.md"), fs.readFileSync(path.join(another, "core-manifest.md"), "utf8").replace("| *large file* |", "| *old slot* | gone |\n| *large file* |"));
+for (const [at, edit] of earlier(f => path.join(another, f === "bug_report" ? ".github/ISSUE_TEMPLATE/bug_report.md" : f))) asEarlier(at, edit);
 const p1 = project(another);
 found = differences(p1, fresh(p1), [olderKit, olderKit]);
-ok(found.length === 2 && found.some(d => d.startsWith("AGENTS.md: still holds the paragraph \"Every builder reads") && d.includes("no longer writes")) && found.some(d => d.startsWith("core-manifest.md: still holds the row \"*old slot*\"")),
-  "a paragraph and a row an earlier kit wrote that the kit no longer writes, still held, are listed once each", found.join("\n"));
+ok(found.length === 2 && found.some(d => d.startsWith(".github/ISSUE_TEMPLATE/bug_report.md: still holds the paragraph \"Every builder reads") && d.includes("no longer writes"))
+  && found.some(d => d.startsWith("AGENTS.md: differs in the paragraph \"<!-- The core's part") && d.includes("old-way.md")) && !found.some(d => d.includes("Every builder reads") && d.startsWith("AGENTS.md") || d.startsWith("core-manifest.md")),
+  "what an earlier kit wrote and the kit no longer writes, still in a file or part of the core's, is listed once; in the project's own words, not at all", found.join("\n"));
 ok(!fresh(p1, path.join(tmp, "nowhere")).length, "an earlier copy with no starter kit gives no kit to compare");
 fs.rmSync(path.join(older, "choices.md.tmpl"));
 const lacks = fresh(p1, older);
@@ -197,9 +211,8 @@ reword(path.join(third, ".github/dependabot.yml"), NOW_LINE, OLD_LINE);
 const p3 = project(third);
 found = differences(p3, fresh(p3), [fresh(p3, reworded)]);
 const differs = file => found.filter(d => d.startsWith(`${file}:`));
-const [para] = differs("AGENTS.md"), [line] = differs(".github/dependabot.yml");
-ok(found.length === 2 && /^AGENTS\.md: differs in the paragraph "This project takes the shared rules/.test(para) && para.includes("open each file named") && para.includes("open each file, by name,")
-  && /^\.github\/dependabot\.yml: differs in the line "update-types/.test(line) && line.includes("updates.md, point 2)") && line.includes("updates.md)"),
-  "a paragraph and a line an earlier kit wrote, reworded by the kit past where a label is cut, give one line each, which shows the words that differ", found.join("\n"));
+const [line] = differs(".github/dependabot.yml");
+ok(found.length === 1 && /^\.github\/dependabot\.yml: differs in the line "update-types/.test(line) && line.includes("updates.md, point 2)") && line.includes("updates.md)"),
+  "a line an earlier kit wrote, reworded past where a label is cut, gives one line showing the words that differ; outside the core's part of AGENTS.md, it is the project's", found.join("\n"));
 
 done("steps-fresh");
