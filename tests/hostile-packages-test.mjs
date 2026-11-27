@@ -159,7 +159,9 @@ if (process.platform !== "win32") {
   const sys = path.join(tmp, "sys");
   fs.mkdirSync(sys);
   for (const tool of ["bash", "tr", "uname", "readlink", "mktemp", "tar", "gzip", "sha256sum", "cp", "chmod", "mv", "rm", "cat", "touch"]) {
-    const at = spawnSync("bash", ["-c", `command -v ${tool}`], { encoding: "utf8" }).stdout.trim();
+    // (the first on PATH, as command -v finds it, read with no shell)
+    const at = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean).map(d => path.join(d, tool))
+      .find(p => { try { fs.accessSync(p, fs.constants.X_OK); return fs.statSync(p).isFile(); } catch { return false; } }) ?? "";
     if (at) fs.symlinkSync(at, path.join(sys, tool));
   }
   const CURL = word("cu", "rl");
