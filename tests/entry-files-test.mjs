@@ -154,7 +154,9 @@ try {
     }
     // (a link through a folder link, then back up from the folder it reached, to a file there: read as the system reads it)
     write("docs/d/.keep", ""); write("docs/A2.md", "@AGENTS.md\n"); fs.symlinkSync("docs/d", path.join(dir, "x")); swap("CLAUDE.md", f => fs.symlinkSync("x/../A2.md", f)); commit("CLAUDE.md through a folder link and up");
-    ok(run({ ENTRY_BASE: "HEAD" }).status === 0, "against a base that held an entry file as a link through a folder link and back up from the folder it reached, left so, it is read and passes");
+    // (where the system reads the `..` by its spelling, as Windows may, the work tree reads nothing there, and the check rightly fails)
+    const readsThere = (() => { try { return fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8") === "@AGENTS.md\n"; } catch { return false; } })();
+    ok(!readsThere || run({ ENTRY_BASE: "HEAD" }).status === 0, "against a base that held an entry file as a link through a folder link and back up from the folder it reached, left so, it is read and passes where the system reads it so");
     fs.rmSync(path.join(dir, "x")); swap("CLAUDE.md", f => fs.writeFileSync(f, "@AGENTS.md\n")); commit("CLAUDE.md through a folder link and up, undone");
     const awayDir = `${away}.d`;
     fs.mkdirSync(path.join(awayDir, "rules"), { recursive: true }); fs.writeFileSync(path.join(awayDir, "rules/core.md"), AG);
