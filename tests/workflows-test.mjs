@@ -424,6 +424,17 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
     && suites[2].length === suites[0].length + suites[1].length && [".node-version", ".node-least"].every(n => suites[2].filter(x => x.node === n).length === suites[2].length / 2)
     && upgrades && only(upgrades[0], "ubuntu-latest") && only(upgrades[1], "windows-latest") && upgrades[2].length === upgrades[0].length + upgrades[1].length,
     "a pull request's run and a push's are on Linux alone, the hourly run on Windows but for the network's jobs, every job named whole, and a start by hand runs them all, on both Nodes (points 3, 4 and 6)", String(tests.jobs.suites.strategy.matrix.include).slice(0, 300));
+  // (#1446: on Linux, a pull request's run and a push's take each part once on each Node, the two longest of the steps'
+  // parts, steps and writes, in jobs apart, since together with the rest they ran past the job's limit; and each job's
+  // suite has its time mark on its system)
+  const linuxParts = suites ? [".node-version", ".node-least"].map(n => suites[0].filter(x => x.node === n).flatMap(x => x.parts.split(" ")).sort().join()) : [];
+  const jobOf = part => suites[0].filter(x => x.node === ".node-version" && x.parts.split(" ").includes(part)).map(x => x.suite);
+  const shapeMarks = JSON.parse(fs.readFileSync(path.join(wfDir, "..", "shape.json"), "utf8")).suites;
+  ok(suites && linuxParts.length === 2 && linuxParts[0] === linuxParts[1] && new Set(linuxParts[0].split(",")).size === linuxParts[0].split(",").length
+    && jobOf("steps").length === 1 && jobOf("writes").length === 1 && jobOf("steps")[0] !== jobOf("writes")[0]
+    && suites.flat().every(x => shapeMarks[x.suite]?.[x.os === "windows-latest" ? "win32" : "linux"] > 0),
+    "on Linux each part runs once on each Node, the steps' and the writers' parts in jobs apart, so that neither job runs past its limit, and each job's suite has a time mark on its system (#1446)",
+    JSON.stringify({ linuxParts, steps: suites && jobOf("steps"), writes: suites && jobOf("writes") }));
   // (the tests that reach the network, in the part of that name: in no pull request's run nor a push's, and once an hour
   // and by hand on both systems and both Nodes; #733, point 9)
   const steps = tests.jobs.suites.steps.filter(s => /contains\(matrix\.parts, 'network'\)/.test(String(s.if))).map(s => s.run).sort();
