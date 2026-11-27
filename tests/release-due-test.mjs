@@ -9,7 +9,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { CLOSES, DAYS, LINES, TITLE, closedSince, closesRead, closesSince, dueIssue, dueness, headed, readGit } from "../scripts/release-due.mjs";
+import { CLOSES, DAYS, LINES, TITLE, closedSince, closesRead, closesSince, dueIssue, dueness, headed, readGit, routeSaid } from "../scripts/release-due.mjs";
 import { DUE } from "../scripts/look.mjs";
 import { trialRecord } from "../scripts/release-trial.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -177,6 +177,7 @@ let pagesAsked = 0;
   ok(throws(() => closesRead("example-owner/example-core", [13], () => { throw new Error("gh could not read the route: HTTP 502"); })), "where gh gives no answer at all, the reading throws, as an unread host does");
   const both = closesSince("example-owner/example-core", release.at, [11, 13, 99], (route, head) => route.includes("/issues?") ? JSON.stringify([11, 13, 20].map(number => ({ number, state: "closed", state_reason: "completed", closed_at: at }))) : ask(route, head));
   ok([...both.counted].join() === "13" && both.other.join() === "11" && !both.unread.length, "only the queue's lines closed after the release have their closes read", JSON.stringify(both));
+  ok(routeSaid(`${R}/collaborators/example-writer/permission`) === `${R}/collaborators/<login>/permission` && routeSaid(`${R}/issues/1/events?per_page=100&page=2`) === `${R}/issues/1/events`, "a failure names a route without its query, and without the login of a right's route");
   ok(headed("HTTP/1.1 200 OK\nLink: <https://api.github.com/x?page=2>; rel=\"next\"\n\n[]").last === 1 && headed("HTTP/1.1 200 OK\n\n[1]").body.join() === "1" && throws(() => headed("[]")) && headed("HTTP/1.1 200 OK\nX-Not-Link: <https://api.github.com/x?page=9>; rel=\"last\"\nLink: <https://api.github.com/x?page=3>; rel=\"last\"\n\n[]").last === 3, "an answer's head gives its last page, or 1 where its Link names none; an answer with no head is refused");
 }
 

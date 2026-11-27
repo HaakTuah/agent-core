@@ -32,9 +32,12 @@ const SHA = /^[0-9a-f]{40}$/u, DAY = 86400000;
 const UNREAD_MEND = "Mend: run node scripts/release-due.mjs again once gh answers; where it still cannot read one whose work merged, an account that can write the repository reopens it and closes it as completed";
 
 const gitIn = dir => args => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }).trim();
+// A route as a failure names it: its query left out, and the login in a right's route masked, an account being no
+// part of what the look may log.
+export const routeSaid = route => route.split("?")[0].replace(/\/collaborators\/[^/]+\//u, "/collaborators/<login>/");
 const ghApi = (route, head = false) => {
   const r = spawnSync("gh", ["api", ...(head ? ["-i"] : []), route], { encoding: "utf8", maxBuffer: 1 << 26, timeout: 60000 });
-  if (r.status !== 0) throw new Error(`gh could not read ${route.split("?")[0]}: ${String(r.stderr ?? r.error).trim().slice(0, 200)}`);
+  if (r.status !== 0) throw new Error(`gh could not read ${routeSaid(route)}: ${String(r.stderr ?? r.error).trim().slice(0, 200)}`);
   return r.stdout;
 };
 
