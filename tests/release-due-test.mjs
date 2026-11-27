@@ -7,20 +7,20 @@
 //   node tests/release-due-test.mjs
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { DAYS, LINES, TITLE, closedSince, dueIssue, dueness, readGit } from "../scripts/release-due.mjs";
 import { DUE } from "../scripts/look.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
 
 // ---- a scratch repository: a release, then the queue changed twice and a trial's record written ----
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "release-due-"));
+const dir = scratchDir("release-due-");
 const env = { ...process.env, GIT_AUTHOR_NAME: "Example", GIT_AUTHOR_EMAIL: "example@example.invalid", GIT_COMMITTER_NAME: "Example", GIT_COMMITTER_EMAIL: "example@example.invalid" };
 const git = args => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
 const commit = (file, text, when) => { fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.writeFileSync(path.join(dir, file), text); git(["add", "."]); execFileSync("git", ["commit", "-q", "-m", file], { cwd: dir, env: { ...env, GIT_COMMITTER_DATE: when, GIT_AUTHOR_DATE: when } }); return git(["rev-parse", "HEAD"]); };
-try {
+{
   git(["init", "-q", "-b", "main"]);
   commit("QUEUE.md", "| Issue | Who | Waits on |\n|---|---|---|\n| #1 | any builder | nothing |\n", "2026-11-01T10:00:00Z");
   git(["tag", "release-1"]);
@@ -44,7 +44,7 @@ try {
   ok(/is past the 1048576 bytes the reader takes/.test(refused ?? ""), "a version of QUEUE.md past the reader's bound is refused, never read", refused);
   git(["tag", "-d", "release-1"]); git(["tag", "-d", "release-2"]);
   ok(readGit(git) === null, "with no release cut, there is nothing to count from");
-} finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
 
 // ---- what is due ----
 const release = { name: "release-2", sha: "a".repeat(40), at: "2026-11-10T10:00:00Z" };
