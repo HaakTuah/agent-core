@@ -1,4 +1,4 @@
-// The stage of scripts/steps/826-the-copies-check-lists-the-values-written-twice.mjs: how a project that missed that step
+// The stage of scripts/steps/827-the-copies-check-lists-the-values-written-twice.mjs: how a project that missed that step
 // holds it, and its mend as the step words it. scripts/steps-stage.mjs loads it, in the order of the names.
 import { spawnSync } from "node:child_process";
 import { copies, readJson, write } from "../stage-helpers.mjs";

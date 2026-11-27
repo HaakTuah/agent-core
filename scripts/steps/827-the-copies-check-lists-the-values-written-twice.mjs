@@ -1,4 +1,4 @@
-// The step of setup/sync-notes/826-the-copies-check-lists-the-values-written-twice.md, which steps.mjs, beside this
+// The step of setup/sync-notes/827-the-copies-check-lists-the-values-written-twice.md, which steps.mjs, beside this
 // folder, loads with the rest in the order of their names.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
