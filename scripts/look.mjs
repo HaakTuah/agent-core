@@ -68,6 +68,7 @@ import { ownerOf } from "./releases.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { started } from "./started.mjs";
 import { due as capPassed } from "./size.mjs";
+import { splitAsked } from "./look-split.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
 import { line as blindLine, reader as blindSample, shareNow, TITLE as BLIND } from "./blind-sample.mjs";
 import { ownReport } from "./holders.mjs";
@@ -97,13 +98,13 @@ const ownHeld = scripts => { try { return ownReport(process.cwd(), scripts); } c
 
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
 // issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs) and a cap passed (size.mjs), in
-// the core alone; the pass over
+// the core alone; a file past the split mark whose question stands (look-split.mjs); the pass over
 // the choices that are hard to undo and a sign of theirs that has tripped (choices.mjs); and the cleaning and the audit
 // the dose makes due (dose.mjs); and the blind sample (blind-sample.mjs), whose draw is laid out on the first run of
 // each month. One that says `owner`, true or false, has its issue's state label kept to it:
 // needs-owner where true, else queued; one that gives `requeue`, the key of a line of its lists, has it put back to
 // queued where an update brings a key the issue did not hold (`updating`).
-export const DUE = [stagedCases, capPassed, choicesDue, signs, cleaningDue, auditIsDue, blindSample];
+export const DUE = [stagedCases, capPassed, splitAsked, choicesDue, signs, cleaningDue, auditIsDue, blindSample];
 
 export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner, ...(typeof d.requeue === "function" ? { requeue: d.requeue } : {}) }));
 
