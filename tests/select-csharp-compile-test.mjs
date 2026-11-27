@@ -19,6 +19,7 @@
 import fs from "node:fs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 import { csharpReach } from "../scripts/select-csharp.mjs";
+import { compilesOther } from "../scripts/select-csharp-compiles.mjs";
 import { heldBeside, msbuildUsings } from "../scripts/select-csharp-project.mjs";
 import { git } from "../scripts/select-passed.mjs";
 import { done, ok, same } from "./select-csharp-test.mjs";
@@ -112,6 +113,8 @@ for (const [item, what, more] of [
   [`<Compile Include="../lib/**/*.cs" />`, "a wildcard whose folders may reach a project's folder, where its build writes", LIB],
   [`<Compile Include="../lib./**/*.cs" />`, "a wildcard whose folders may reach a project's folder, by a name Windows trims", LIB],
   [`<Compile Include="../lib /**/*.cs" />`, "a wildcard whose folders may reach a project's folder, by a name Windows trims of its blank", LIB],
+  [`<Compile Include="../lib./**/*.cs" />`, "a wildcard whose folders may reach a project's folder named with a dot, as Linux reads it", { "lib./Lib.csproj": LIB["lib/Lib.csproj"] }],
+  [`<Compile Include="../lib /**/*.cs" />`, "a wildcard whose folders may reach a project's folder named with a blank, as Linux reads it", { "lib /Lib.csproj": LIB["lib/Lib.csproj"] }],
   [`<Compile Include="**/*.cs" />`, "a wildcard whose folders reach its own project's folder"],
   ["", "an SDK the reader knows but in another case, which the resolver may not find as its own", { "Directory.Build.props": "<Project Sdk=\"microsoft.net.sdk\" />\n" }],
   [`<PropertyGroup><NoWarn>CS1591&quot; /x:y</NoWarn></PropertyGroup>`, "a quote in a value, which may close the compiler's argument"],
@@ -147,6 +150,11 @@ for (const [item, what, more] of [
 let paced = 0;
 const attrs = msbuildUsings([["src/App.csproj", `<Project><ItemGroup>${"<AssemblyAttribute Include=\"System.CLSCompliant\" />".repeat(1000)}</ItemGroup></Project>`]], () => paced++);
 ok(attrs !== null && paced >= 1000, "the budget is asked for each assembly's attribute, which leaves the links standing", `${paced} ${attrs === null}`);
+// (a wildcard's lookup among the projects' folders walks each folder above each project, asking the budget for each)
+const deep = new Set(["App.csproj", ...Array.from({ length: 200 }, (_, k) => `p${k}/${"d/".repeat(300)}P.csproj`)]);
+let walked = 0;
+const wild = compilesOther(`<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><Compile Include="src/**/*.cs" /></ItemGroup></Project>`, "App.csproj", { cs: new Set(), known: deep }, () => walked++);
+ok(!wild && walked >= 200 * 301, "the budget is asked for each folder above each project a wildcard is looked up among", `${walked} ${wild}`);
 
 // (a type of System, where an attribute the SDK writes binds, or a Unicode escape, which may spell one, reached from every file)
 for (const [guard, what] of [["namespace System;\npublic class ClsCompliantAttribute : Attribute { }\n", "declares a type in System"],

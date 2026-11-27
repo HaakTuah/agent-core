@@ -78,7 +78,7 @@ export function compilesOther(text, f, { cs, known }, pace) {
   if (plain.split(/<[^<>]*>/u).some(t => (/[\r\n]/u.test(t) && /\S/u.test(t)) || /"|&quot;|%22/iu.test(t))) return true;
   for (const m of plain.matchAll(/<AssemblyAttribute\b([^<>]*)>/giu)) { pace(); if (!ASSEMBLY_STRINGS.has((attributes(m[1])?.include ?? "").trim())) return true; }
   const own = /\.csproj(?:\.user)?$/iu.test(f);
-  return anyPart(plain, /<Compile\b([^<>]*)>/giu, pace, p => !own || bringsIn(p, f, cs, known))
+  return anyPart(plain, /<Compile\b([^<>]*)>/giu, pace, p => !own || bringsIn(p, f, cs, known, pace))
     || anyPart(plain, /<ProjectReference\b([^<>]*)>/giu, pace, p => !own || /[$@%&*?]/u.test(p) || !/\.csproj$/iu.test(p) || !known.has(importPath(f, p)));
 }
 
@@ -155,12 +155,12 @@ function anyPart(text, tag, pace, brings) {
 // folder of a .csproj among `known` at or below where its plain words lead. The reader matches a wildcard against what
 // git holds, and a build writes its output (a copy, a generated file) under each project's folder before another
 // project's wildcard may be expanded.
-function bringsIn(p, f, cs, known) {
+function bringsIn(p, f, cs, known, pace) {
   if (/[$@%&]/u.test(p)) return true;
   if (!/[*?]/u.test(p)) { const at = importPath(f, p); return at === null || at === "" || !cs.has(at); }
-  return p.startsWith("/") || /^[A-Za-z]:/u.test(p) || !CS.test(p) || wildcardOut(p, f, known);
+  return p.startsWith("/") || /^[A-Za-z]:/u.test(p) || !CS.test(p) || wildcardOut(p, f, known, pace);
 }
-function wildcardOut(p, f, known) {
+function wildcardOut(p, f, known, pace) {
   const words = p.split("/"), wild = words.findIndex(w => /[*?]/u.test(w));
   // (Windows drops a word's trailing dots and blanks, so "bin." is bin)
   if (words.slice(0, -1).some(w => /^(?:bin|obj)$/iu.test(w.replace(/[\s.]+$/u, "")))) return true;
@@ -168,19 +168,29 @@ function wildcardOut(p, f, known) {
   let depth = path.posix.dirname(f) === "." ? 0 : path.posix.dirname(f).split("/").length;
   for (const w of words) if (w === "..") { if (--depth < 0) return true; } else if (w && w !== ".") depth++;
   if (wild === words.length - 1) return false;
-  // (the folder above the wildcard, each plain word trimmed as Windows reads it: "lib." and "lib " are lib)
-  const above = words.slice(0, wild).map(w => (w === "." || w === ".." ? w : w.replace(/[\s.]+$/u, "")));
-  const at = path.posix.dirname(importPath(f, [...above, "x"].join("/")) ?? "");
-  return projectsWithin(known).has(at === "." ? "" : at.toLowerCase());
+  // (the folder above the wildcard, as git holds it, which Linux reads, and each plain word trimmed as Windows reads
+  // it: "lib." and "lib " are lib there)
+  const trimmed = words.slice(0, wild).map(w => (w === "." || w === ".." ? w : w.replace(/[\s.]+$/u, "")));
+  return [words.slice(0, wild), trimmed].some(above => {
+    const at = path.posix.dirname(importPath(f, [...above, "x"].join("/")) ?? "");
+    return projectsWithin(known, pace).has(at === "." ? "" : at.toLowerCase());
+  });
 }
 
 // Each folder a .csproj of `known` lies in, and each above it, "" the top, in lower case, as Windows finds them; kept
-// for each `known`, so its projects are walked once.
+// for each `known`, so its projects are walked once. `pace` is asked for each folder, and a walk stops at a folder
+// already held, whose own are held with it.
 const within = new WeakMap();
-function projectsWithin(known) {
+function projectsWithin(known, pace) {
   if (!within.has(known)) {
     const folders = new Set();
-    for (const f of known) if (/\.csproj$/iu.test(f)) for (let d = path.posix.dirname(f.toLowerCase()); ; d = path.posix.dirname(d)) { folders.add(d === "." ? "" : d); if (d === "." || d === "/") break; }
+    for (const f of known) if (/\.csproj$/iu.test(f)) for (let d = path.posix.dirname(f.toLowerCase()); ; d = path.posix.dirname(d)) {
+      pace();
+      const at = d === "." ? "" : d;
+      if (folders.has(at)) break;
+      folders.add(at);
+      if (d === "." || d === "/") break;
+    }
     within.set(known, folders);
   }
   return within.get(known);
