@@ -17,9 +17,11 @@
 //                                                       whether it was), each name masked, no name printed; the counts
 //                                                       and the runners' numbers to $GITHUB_OUTPUT
 //   node scripts/daily-try.mjs --clone <n> <dir>        the n-th of those projects alone, cloned to <dir> (FOUND: how
-//                                                       many --list found; none where the list changed since)
+//                                                       many --list found; none where the list changed since);
+//                                                       beside <dir>, a file `private`: the listing's answer, true or false
 //   node scripts/daily-try.mjs --run <dir> <core>       that clone tried at the core checked out at <core>, given no
-//                                                       sign-in; its counts printed as one line, for the runner LEG
+//                                                       sign-in, as the file `private` in <dir> says (none read,
+//                                                       none tried); its counts printed as one line, for the runner LEG
 //   node scripts/daily-try.mjs --file                   each runner's line read from its job's log, the counts summed
 //                                                       and filed: a bug where a project was held, and the issue for
 //                                                       the owner's sign-in where none was given
@@ -108,6 +110,8 @@ function clone(name, into, token, url = n => `https://github.com/${n}.git`) {
   return spawnSync("git", ["clone", "--quiet", "--no-tags", url(name), into], { env, stdio: "ignore", timeout: 10 * 60000 }).status === 0;
 }
 
+const PRIVATE_FILE = "private";
+
 // --clone: the `leg`-th project alone cloned to `into`, its name masked first; none where the list no longer holds the
 // `expected` projects --list found, so that the number never names another project. Whether it was cloned.
 export function cloneLeg(leg, into, { signedIn, token, expected, gh = ghApi, url, say = console.log, actions = process.env.GITHUB_ACTIONS === "true" } = {}) {
@@ -115,6 +119,8 @@ export function cloneLeg(leg, into, { signedIn, token, expected, gh = ghApi, url
   mask(found, say, actions);
   const p = found.length === expected ? found[leg - 1] : undefined;
   const cloned = !!p && clone(p.name, into, token, url);
+  // the listing's own answer on whether the project is private, kept beside the clone for --run, which holds no sign-in
+  if (cloned) fs.writeFileSync(path.join(path.dirname(into), PRIVATE_FILE), String(!!p.private));
   say(cloned ? `Runner ${leg}: its project cloned.` : `Runner ${leg}: nothing cloned (${p ? "the clone failed" : `the owner's projects are no longer the ${expected} found`}), so it is counted as not tried.`);
   return cloned;
 }
@@ -164,14 +170,17 @@ function toolsFor(at, log) {
 // the run before, the sync, the run after, each given what the toolchain says to set, each output to the log
 // `project.log` in `out`, outside the clone. What it came to: "atPin", "untried", "syncFailed", "afterUnread", or the
 // pair, held or not.
-export function tryOne(at, core, sha, out, run = runLogged, tools = toolsFor) {
+export function tryOne(at, core, sha, out, run = runLogged, tools = toolsFor, priv = undefined) {
+  if (priv !== "true" && priv !== "false") return { came: "untried" }; // (no host's answer for the project: not guessed)
   const log = path.join(out, "project.log");
   const manifest = manifestText(path.join(at, "core-manifest.md"));
   const copy = readCore(manifest ?? "");
   if (copy.pin === sha) return { came: "atPin" };
   const scripts = scriptsOf(at, copy, core);
   const main = (spawnSync("git", ["rev-parse", "HEAD"], { cwd: at, encoding: "utf8" }).stdout ?? "").trim();
-  const env = { ...bare(), ...tools(at, log) }, go = (cmd, args) => run(cmd, args, at, log, env);
+  // (CORE_PRIVATE: the sync, given no sign-in, would read it from GitHub's API with none, which a shared runner's limit
+  // sometimes refuses; it takes the host's answer the listing read, as its mend says: #1561)
+  const env = { ...bare(), ...tools(at, log), CORE_PRIVATE: priv }, go = (cmd, args) => run(cmd, args, at, log, env);
   const check = (script, file) => go(process.execPath, [script, "--base", main, "--own", "--verdicts", file]);
   const before = path.join(out, "before.json"), after = path.join(out, "after.json");
   check(scripts.before, before);
@@ -191,7 +200,9 @@ export function tryOne(at, core, sha, out, run = runLogged, tools = toolsFor) {
 // and the commit alone: what it came to, and the trial's classes of its pair of runs.
 export function runLeg(dir, core, leg, { run = runLogged, tools, sha = (spawnSync("git", ["rev-parse", "HEAD"], { cwd: core, encoding: "utf8" }).stdout ?? "").trim() } = {}) {
   const at = path.join(dir, "project");
-  const r = fs.existsSync(at) ? tryOne(at, core, sha, dir, run, tools) : { came: "untried" };
+  let priv; // (read before any of the project's code runs; none readable is none: the project is then not tried)
+  try { priv = fs.readFileSync(path.join(dir, PRIVATE_FILE), "utf8"); } catch { /* (none) */ }
+  const r = fs.existsSync(at) ? tryOne(at, core, sha, dir, run, tools, priv) : { came: "untried" };
   const counts = trialRecord(sha, "2000-01-01", r.pair ? [r.pair] : []);
   return { leg, commit: sha, came: r.came, ...Object.fromEntries(COUNTS.map(k => [k, counts[k]])) };
 }
