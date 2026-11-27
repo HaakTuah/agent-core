@@ -105,7 +105,7 @@ const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
 const isObject = v => !!v && typeof v === "object" && !Array.isArray(v);
 const strings = v => Array.isArray(v) && v.every(s => typeof s === "string" && s.length > 0);
 const optional = (v, test) => v === undefined || test(v);
-const plainPath = s => typeof s === "string" && /^[\w@.-][\w@. -]*(\/[\w@.-][\w@. -]*)*\/?$/u.test(s) && !s.split("/").includes("..");
+export const plainPath = s => typeof s === "string" && /^[\w@.-][\w@. -]*(\/[\w@.-][\w@. -]*)*\/?$/u.test(s) && !s.split("/").includes("..");
 // Where a git pathspec points once its magic is taken off (":!", ":^", ":/", ":(top,glob)"): "outside" where it is
 // absolute, a drive's or a share's, or climbs above the project's root (git itself refuses such a pathspec, in words
 // that name no mend).
