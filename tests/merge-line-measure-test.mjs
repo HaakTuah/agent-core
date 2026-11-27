@@ -1,10 +1,10 @@
 // Tests the merge line's measure (scripts/merge-line-measure.mjs; #702, #1345) through a stand-in for gh: each pull
 // request's turn the later of the merge before it and its last marking ready, the pushes whose checks ran counted once
-// each, the state report's line, and --measure through merge-line.mjs reading the count it is given. Run by the core's
-// tests workflow (.github/workflows/tests.yml).
+// each, the state report's line, a repository in no form refused, and --measure through merge-line.mjs reading the
+// count it is given. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/merge-line-measure-test.mjs
-import { line, measure } from "../scripts/merge-line-measure.mjs";
+import { Refused, json, line, measure } from "../scripts/merge-line-measure.mjs";
 import { main } from "../scripts/merge-line.mjs";
 
 let failed = 0, count = 0;
@@ -53,6 +53,12 @@ const past = measure({ repo: "o/n", count: 1, gh: measured });
 ok(past.read === 1 && past.minutes.join() === "40", "a merge into another branch is passed over before the sample is cut: the merge before the oldest is one into main", JSON.stringify(past));
 timeline[3] = [filler, [{ event: "ready_for_review", created_at: at(70) }, { event: "commented", created_at: at(90) }]];
 ok(/of the last 2 merged pull requests, 4 pushes whose checks ran \(a median of 2 each\), and a median of 30\.0 min/.test(line(m)) && /not read/.test(line({ read: 0 })), "the state report's line, and with nothing read, that", line(m));
+
+// (a repository named in no form is refused before any call, with its mend, as merge-line.mjs prints a refusal)
+let said = "";
+try { measure({ repo: "o/..", gh: () => { throw new Error("no call is made"); } }); } catch (e) { said = `${e instanceof Refused ? "refused" : "thrown"}: ${e.message}`; }
+ok(/^refused: "o\/\.\." names no repository\. Mend: name it as <owner>\/<name>$/.test(said), "a repository in no form is refused before any call, with its mend", said);
+ok(json("") === null && json("[1]")[0] === 1, "what gh answers is read, nothing as null");
 
 // (--measure, run through merge-line.mjs)
 const out = [];
