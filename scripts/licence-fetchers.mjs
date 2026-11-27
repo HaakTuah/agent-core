@@ -169,10 +169,10 @@ function callCloses(text, end) {
 const DIRECT_CALLS = new Set(["execFileSync", "execFile", "spawnSync", "spawn"]);
 const IMPORTS = /^import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["'];?$/gmu;
 const IDENT = "\\p{ID_Continue}$\\u200c\\u200d";
-// The words after which a name stands alone, and the file's opening: its blank lines, comments and imports, up to the
-// first line that is none of them.
+// The words after which a name stands alone, and the file's opening: its blank lines, comments of either kind and
+// imports (none holding a comment), up to the first line that is none of them.
 const AFTER = new RegExp(`(?:^|[^${IDENT}.#\\s])\\s*(?:return|else|await|void|yield|throw|case|do|in|of|typeof)$`, "u");
-const OPENING = /^(?:\s|\/\/[^\n]*|#![^\n]*|import\s[^;'"`]*["'][^"'\n]*["'];?)*/u;
+const OPENING = /^(?:\s|\/\/[^\n]*|\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\/|#![^\n]*|import\s[^;'"`/]*["'][^"'\n]*["'];?)*/u;
 // Whether a name at text[i] stands alone: before it, read back past spaces, the start of the text, a mark or one of the
 // words above, after which no ".", "#", comment or longer name can stand, on a line that holds no "//".
 function standsAlone(text, i) {
