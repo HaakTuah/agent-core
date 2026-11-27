@@ -5,15 +5,15 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 
 ## In order
 
-Release 8 is these lines and the bugs found before its cut.
+Release 8 is these lines, the pull requests open now and the bugs found before its cut.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #1413, point 8 | rule builder | the owner's Security-tab record (`needs-owner`) |
-| #1202 | rule builder; `AGENTS.md` and what every session here reads at its start | #1413's point 4 (`AGENTS.md`, one at a time) |
+| #1202 | rule builder; `AGENTS.md` and what every session here reads at its start | |
 | #1504 | rule builder; `roles/orchestrator.md` | #1202 (what a role reads at its start, one at a time) |
 | #1505 | rule builder; `roles/shared/work-flow.md` | #1504 (what a role reads at its start, one at a time) |
-| #1106 | rule builder | |
+| #1106 | rule builder | #1505, on the same files |
 | #1488 | builder | |
 | #1510 | builder | #1508, on the same files |
 | #810 | the orchestrator | the batch's end |
