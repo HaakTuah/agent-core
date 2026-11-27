@@ -62,9 +62,9 @@ path `scripts/stage-order.mjs`. What reviewers judge by: `roles/shared/review-gu
    - **A fix of a weakness is read for its root** (#1413, point 8). By default the security reviewer of a pull request
      that fixes a weakness reads it as floor topic 9 says ("A weakness fixed twice is fixed at its root"): its label
      `hardening` and its line `Hardens against:` stand and say no more than the pull request does, and, where a merged
-     pull request with the label already names its kind, that its builder fixes the cause too. It does not mean the
-     reviewer keeps a record, or writes the kind anywhere the pull request does not. Reason: the builder of a second
-     fix may not look. Held by nothing yet.
+     pull request with the label already names its kind, that its builder fixes the cause too. Nothing changes
+     it. It does not mean the reviewer keeps a record, or writes the kind anywhere the pull request does not. Reason:
+     the builder of a second fix may not look. Held by nothing yet.
    - A session posts one, naming the tool and the commit it read by its whole SHA, or that none is needed, naming the
      head so (the code reviewer checks that), in a comment that opens "Security review:", which the `security-review`
      check reads.
