@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { context, contextLine, cost, keep, keptIn, line, MARGIN, MARK, markOf, ownRecord, records, tallyOf } from "../scripts/session-cost.mjs";
+import { context, contextLine, cost, keep, keptIn, line, MARGIN, MARK, markOf, MIN_MARK, ownRecord, records, tallyOf } from "../scripts/session-cost.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -93,18 +93,18 @@ ok(context(own) === 2001 && context(helper.split("\n")[0]) === 22 && context("")
 ok(ownRecord(blocked, session) === own && ownRecord(blocked, "not a session") === "", "a session's own record alone, none for an id of another shape");
 r = run({ CLAUDE_CONFIG_DIR: blocked, CLAUDE_CODE_SESSION_ID: session }, "--context");
 ok(r.status === 0 && r.stdout === "Context now: 2,001 tokens, under the hand-over mark of 200,000.\n", "--context prints the newest answer's context against the mark", `${r.status} ${r.stdout}`);
-r = run({ CLAUDE_CONFIG_DIR: blocked, CLAUDE_CODE_SESSION_ID: session }, "--context", "--condenses", "20001");
-ok(r.status === 0 && r.stdout === "Context now: 2,001 tokens, past the hand-over mark of 1: hand over at the next passed gate.\n", "past the mark, it says to hand over at the next passed gate", `${r.status} ${r.stdout}`);
-ok(markOf(undefined) === MARK && markOf(224000) === 200000 && markOf(784000) === MARK && markOf(144000) === 124000 && markOf(MARGIN + 1) === 1 && markOf(MARGIN) === MARK && markOf(1) === MARK && markOf(0) === MARK && markOf(1.5) === MARK,
-  "the mark: MARK, or MARGIN below where the session condenses where that is lower; MARK where none is shown or it is no more than MARGIN, so never a mark of 0");
+r = run({ CLAUDE_CONFIG_DIR: blocked, CLAUDE_CODE_SESSION_ID: session }, "--context", "--condenses", "120000");
+ok(r.status === 0 && r.stdout === "Context now: 2,001 tokens, under the hand-over mark of 100,000.\n", "with a --condenses, the mark sits MARGIN below it", `${r.status} ${r.stdout}`);
+ok(markOf(undefined) === MARK && markOf(224000) === 200000 && markOf(784000) === MARK && markOf(144000) === 124000 && markOf(MIN_MARK + MARGIN) === MIN_MARK && markOf(MIN_MARK + MARGIN - 1) === MARK && markOf(MARGIN + 1) === MARK && markOf(1) === MARK && markOf(0) === MARK && markOf(1.5) === MARK,
+  "the mark: MARK, or MARGIN below where the session condenses where that is lower; MARK where none is shown or it would leave a mark under MIN_MARK, so never a mark of 0");
 ok(contextLine(200000, 200000).includes("under") && contextLine(200001, 200000).includes("past"), "the context counts as past the mark only above it");
 for (const bad of [[], ["x"], ["0"], ["-1"], ["2.5"], ["1e6"], ["9999999999"]]) {
   r = run({ CLAUDE_CONFIG_DIR: blocked, CLAUDE_CODE_SESSION_ID: session }, "--context", "--condenses", ...bad);
   ok(r.status === 2 && r.stdout === "" && /^FAIL: --condenses .* Mend: /u.test(r.stderr), `a --condenses it cannot read fails, saying the mend: ${JSON.stringify(bad)}`, `${r.status} ${r.stdout} ${r.stderr}`);
 }
-for (const low of ["1", "19999", String(MARGIN)]) {
+for (const low of ["1", String(MARGIN), String(MIN_MARK + MARGIN - 1)]) {
   r = run({ CLAUDE_CONFIG_DIR: blocked, CLAUDE_CODE_SESSION_ID: session }, "--context", "--condenses", low);
-  ok(r.status === 2 && r.stdout === "" && /^FAIL: --condenses \d+ leaves no room .* Mend: /u.test(r.stderr), `a --condenses at or below the margin is refused, saying the mend: ${low}`, `${r.status} ${r.stdout} ${r.stderr}`);
+  ok(r.status === 2 && r.stdout === "" && /^FAIL: --condenses \d+ leaves too little room .* Mend: /u.test(r.stderr), `a --condenses that leaves a mark under the minimum is refused, saying the mend: ${low}`, `${r.status} ${r.stdout} ${r.stderr}`);
 }
 r = run({ CLAUDE_CONFIG_DIR: blocked, CLAUDE_CODE_SESSION_ID: session }, "--condenses", "224000");
 ok(r.status === 2 && r.stdout === "" && /^FAIL: --condenses is read only with --context\. Mend: /u.test(r.stderr), "--condenses without --context fails, saying the mend", `${r.status} ${r.stdout} ${r.stderr}`);

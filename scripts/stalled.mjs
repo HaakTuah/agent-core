@@ -86,7 +86,7 @@ export function print(lanes, open, hours, given = []) {
   const said = given.length ? [`As the way reports, not judged by the clock: ${given.length} of ${open} open`, ...given.map(l => `  #${l.number} ${plain(l.ref)}: ${l.state} (${plain(l.title)})`)] : [];
   if (!lanes.length) return [`No lane stalled: ${open} open, none ${given.length ? "of the rest " : ""}without a push for over ${hours} h.`, ...said].join("\n");
   return [`Stalled, no push for over ${hours} h: ${lanes.length} of ${open} open`,
-    ...lanes.map(l => `  #${l.number} ${plain(l.ref)}: ${l.waited.toFixed(1)} h since ${l.at} (${plain(l.title)})${handedOff(l.body) ? "" : "; no hand-off note"}${namesNext(l.message) ? "" : "; its newest commit names no next step"}`), ...said].join("\n");
+    ...lanes.map(l => `  #${l.number} ${plain(l.ref)}: ${l.waited.toFixed(1)} h since ${l.at} (${plain(l.title)})${handedOff(l.body) ? "" : "; no hand-off note"}${namesNext(l.message) ? "" : "; its newest commit that is no merge names no next step"}`), ...said].join("\n");
 }
 
 // Whether work went on in the last `hours` (a day by default) at `now`: a push to a pull request of the repository's
@@ -127,11 +127,16 @@ export function openPulls(repo, api) {
     if (!p.own || !/^[0-9a-f]{40}$/.test(p.sha)) continue;
     let sha = p.sha;
     for (let step = 0; step < MERGES_SKIPPED + 1; step++) {
-      const [head, ...message] = api(`repos/${repo}/commits/${sha}`, '(.commit.committer.date // "") + " " + ((.parents | length) | tostring) + " " + (.parents[0].sha // "") + "\\n" + (.commit.message // "")').split("\n");
+      let answer;
+      try { answer = api(`repos/${repo}/commits/${sha}`, '(.commit.committer.date // "") + " " + ((.parents | length) | tostring) + " " + (.parents[0].sha // "") + "\\n" + (.commit.message // "")'); } catch (e) {
+        if (step === 0) throw e;
+        break; // (a parent that cannot be read: the message read so far stands)
+      }
+      const [head, ...message] = answer.split("\n");
       const [at, parents = "1", first = ""] = head.trim().split(" ");
       if (step === 0) p.at = at;
       p.message = message.join("\n");
-      if (Number(parents) < 2 || !/^[0-9a-f]{40}$/.test(first)) break;
+      if (!(Number(parents) >= 2) || !/^[0-9a-f]{40}$/.test(first)) break;
       sha = first;
     }
   }

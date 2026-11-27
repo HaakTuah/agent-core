@@ -99,6 +99,17 @@ ok(proved({ head: { sha: "../../etc/passwd" } }, [], scratch).length === 0 && !i
   const got = openPulls(repo, route => (asked.push(route), route.includes("/pulls?") ? rows : at(0)));
   ok(asked.length === 1 && got.every(p => p.at === undefined), "a pull request's head given as a path is never put in a route");
 }
+{
+  const HEAD = "a".repeat(40), asked = [], row = issueLine(3, "t", "c", HEAD, repo, false, "", []);
+  for (const parent of ["../../etc/passwd", "C:\\Windows", "<script>", "a".repeat(41), "", "A".repeat(40)]) for (const count of ["2", "x", "-1", "1e9", ""]) {
+    openPulls(repo, route => (asked.push(route), route.includes("/pulls?") ? row : `${at(0)} ${count} ${parent}\nm`));
+  }
+  ok(asked.filter(r => r.includes("/commits/")).every(r => r.endsWith(`/commits/${HEAD}`)) && asked.filter(r => r.includes("/commits/")).length === 30,
+    "a commit's first parent given as a path, markup, a wrong length or no hash, or a count that is no number, is never put in a route");
+  const chain = []; let lastAsked = 0;
+  openPulls(repo, route => { if (route.includes("/pulls?")) return row; chain.push(route); lastAsked++; return `${at(0)} 2 ${"b".repeat(40)}\nm`; });
+  ok(lastAsked === 11, "a lane's commits are read at most 11 deep, however long its merges run", `${lastAsked}`);
+}
 ok(readings([[1, "../../etc/passwd", "x"], [2, "/etc/passwd", "x"]], repo, 1).length === 0, "a branch's repository given as a path is not this one");
 {
   const r = spawnSync(process.execPath, [script("./wait.mjs"), "--repo", "../../etc/passwd"], { cwd: scratch, encoding: "utf8", env: { ...process.env, PATH: path.join(scratch, "no-bin") } });

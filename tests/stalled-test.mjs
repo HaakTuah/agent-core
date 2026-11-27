@@ -24,20 +24,20 @@ ok(s.map(l => l.number).join() === "3,1", "only lanes past the hours count, olde
 ok(Math.abs(s[1].waited - 9.1667) < 0.001 && s[0].waited === 24, "the wait is the hours since the newest commit");
 ok(stalled([p(1, "a", "2026-11-13T16:19:00Z")], now, 3).length === 0 && stalled([p(1, "a", "2026-11-13T16:18:59Z")], now, 3).length === 1, "a lane counts only once it is past the hours");
 ok(print([], 4, 3) === "No lane stalled: 4 open, none without a push for over 3 h.", "nothing stalled is one line");
-ok(print(stalled([p(9, "item/x\u001b[2J", "2026-11-13T10:19:00Z")], now, 3), 2, 3) === "Stalled, no push for over 3 h: 1 of 2 open\n  #9 item/x [2J: 9.0 h since 2026-11-13T10:19:00Z (t9); no hand-off note; its newest commit names no next step", "a stalled lane's line, with its control characters taken out", print(stalled([p(9, "item/x\u001b[2J", "2026-11-13T10:19:00Z")], now, 3), 2, 3));
+ok(print(stalled([p(9, "item/x\u001b[2J", "2026-11-13T10:19:00Z")], now, 3), 2, 3) === "Stalled, no push for over 3 h: 1 of 2 open\n  #9 item/x [2J: 9.0 h since 2026-11-13T10:19:00Z (t9); no hand-off note; its newest commit that is no merge names no next step", "a stalled lane's line, with its control characters taken out", print(stalled([p(9, "item/x\u001b[2J", "2026-11-13T10:19:00Z")], now, 3), 2, 3));
 
 // The hand-off note (tasks/tools.md, "A change of tool loses nothing"; #306): a lane whose description holds one is not
 // marked, in each form a line may open it; one that only names it in a sentence, or holds no description, is.
 const noted = body => print(stalled([{ ...p(7, "lane/noted", "2026-11-13T10:19:00Z"), body }], now, 3), 1, 3);
 for (const body of ["Hand-off: done a; next b", "x\n**Hand-off:** done a", "## Hand-off: done", "- Hand-off: done"]) ok(!noted(body).includes("no hand-off note"), `a lane with a hand-off note is not marked: ${JSON.stringify(body)}`, noted(body));
-for (const body of ["It has no Hand-off: here", "", undefined, 42]) ok(noted(body).endsWith("(t7); no hand-off note; its newest commit names no next step"), `a lane with none is marked: ${JSON.stringify(body)}`, noted(body));
+for (const body of ["It has no Hand-off: here", "", undefined, 42]) ok(noted(body).endsWith("(t7); no hand-off note; its newest commit that is no merge names no next step"), `a lane with none is marked: ${JSON.stringify(body)}`, noted(body));
 ok(handedOff("a\nHand-off: b") && !handedOff("hand-off: b"), "the note's line is \"Hand-off:\", as written");
 
 // The next step a commit names (tasks/tools.md, "Each pushed commit names its next step"; #1505, point 1): a lane whose
 // newest commit's message holds a line "Next:" that names something is not marked; one with none, or an empty one, is.
 const next = message => print(stalled([{ ...p(8, "lane/next", "2026-11-13T10:19:00Z"), body: "Hand-off: done a", message }], now, 3), 1, 3);
 for (const message of ["Write the rule\n\nNext: the reviews", "Next: the merge\n\nCo-Authored-By: a session"]) ok(next(message).endsWith("(t8)"), `a lane whose newest commit names its next step is not marked: ${JSON.stringify(message)}`, next(message));
-for (const message of ["Write the rule", "Write the rule\nNext:", "Write it. Next: the reviews", "next: the reviews", "", undefined]) ok(next(message).endsWith("(t8); its newest commit names no next step"), `a lane whose newest commit names none is marked: ${JSON.stringify(message)}`, next(message));
+for (const message of ["Write the rule", "Write the rule\nNext:", "Write it. Next: the reviews", "next: the reviews", "", undefined]) ok(next(message).endsWith("(t8); its newest commit that is no merge names no next step"), `a lane whose newest commit names none is marked: ${JSON.stringify(message)}`, next(message));
 ok(namesNext("a\nNext: b") && !namesNext("a\nNext:  ") && !namesNext(null), "the step's line is \"Next:\" with something after it");
 
 // ---- the states a way reports (tasks/ways.md, "A session's state is read where the way gives it"; #397) ----
@@ -76,9 +76,15 @@ ok(standingStill({ queue, closed, pulls: [old], notices: [], now, latest: "2026-
   ok(got.at === "2026-11-27T10:00:00Z" && got.message === "Write x\n\nNext: y\n" && namesNext(got.message), "a pull request's newest commit: its time, and its whole message, not its first line");
   got = pullsOf({ [sha(1)]: "2026-11-27T12:00:00Z 2 " + sha(2) + "\nMerge main into lane", [sha(2)]: "2026-11-27T10:00:00Z 1 " + sha(3) + "\nWrite x\n\nNext: y" })[0];
   ok(got.at === "2026-11-27T12:00:00Z" && namesNext(got.message) && got.message.startsWith("Write x"), "a merge of the base as the newest commit: its time stands, the message is the newest commit's that is no merge", JSON.stringify(got));
-  const chain = { [sha(1)]: "2026-11-27T12:00:00Z 2 " + sha(2) + "\nMerge" };
-  for (let i = 2; i <= MERGES_SKIPPED + 2; i++) chain[sha(i)] = `2026-11-27T12:00:00Z 2 ${sha(i + 1)}\nMerge`;
-  ok(!namesNext(pullsOf(chain)[0].message), "a long run of merges is stepped back over only so far, and names no step");
+  const chain = {}, asked = [];
+  for (let i = 1; i <= MERGES_SKIPPED + 5; i++) chain[sha(i)] = `2026-11-27T12:00:00Z 2 ${sha(i + 1)}\nMerge`;
+  got = openPulls(repo, route => (asked.push(route), route.includes("/pulls?") ? row : chain[route.split("/commits/")[1]] ?? ""))[0];
+  ok(!namesNext(got.message) && asked.length === 1 + MERGES_SKIPPED + 1, "a long run of merges is stepped back over only so far, and names no step", `${asked.length}`);
+  got = openPulls(repo, route => { if (route.includes("/pulls?")) return row; if (route.endsWith(sha(1))) return "2026-11-27T12:00:00Z 2 " + sha(2) + "\nMerge"; throw new Error("rate limit"); })[0];
+  ok(got.at === "2026-11-27T12:00:00Z" && got.message === "Merge", "a parent that cannot be read ends the stepping back, the message read so far standing");
+  let threw = false;
+  try { openPulls(repo, route => { if (route.includes("/pulls?")) return row; throw new Error("no"); }); } catch { threw = true; }
+  ok(threw, "the head commit that cannot be read still throws, as before");
 }
 
 console.log(`\n${count - failed} of ${count} passed`);
