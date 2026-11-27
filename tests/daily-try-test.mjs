@@ -112,7 +112,7 @@ for (const name of ["game-one", "tool-two"]) {
     fs.mkdirSync(at, { recursive: true }); git(at, "init", "-q");
     fs.writeFileSync(path.join(at, "core-manifest.md"), p.at ? manifest.replace(PIN, SHA) : manifest);
     const run = (cmd, args, cwd, log, env) => {
-      ran.push({ k, args: args.join(" "), log, cwd, root: env?.DOTNET_ROOT, bare: !Object.keys(env ?? { GH_TOKEN: 1 }).some(n => BARE.test(n)) });
+      ran.push({ k, args: args.join(" "), log, cwd, root: env?.DOTNET_ROOT, pub: env?.CORE_PRIVATE, bare: !Object.keys(env ?? { GH_TOKEN: 1 }).some(n => BARE.test(n)) });
       const v = args.indexOf("--verdicts");
       if (v >= 0) { const after = args[v + 1].endsWith("after.json"), runs = after ? p.after : p.before; if (runs) fs.writeFileSync(args[v + 1], JSON.stringify(runs)); return !!runs; }
       if (args.some(a => a.endsWith("sync.mjs"))) return p.sync !== false;
@@ -126,6 +126,7 @@ for (const name of ["game-one", "tool-two"]) {
   const held = ran.filter(r => r.k === "held"), runs = held.filter(r => !("tools" in r));
   ok(!ran.some(r => r.k === "atPin") && held[0]?.tools === true && runs.length >= 6 && runs.every(r => r.root === "/sdk-held" && r.bare) && runs.every(r => path.dirname(r.log) === path.dirname(r.cwd) && path.basename(r.log) === "project.log"),
     "a project already at the commit is not run; the toolchain it pins is fetched first, and every run before, of the sync and after is given what it sets, with no sign-in, its output to the log beside the clone", JSON.stringify(held).slice(0, 400));
+  ok(runs.every(r => r.pub === "false"), "every run of a project is told it is public, so the sync reads that from no host that may refuse a reader with no sign-in (#1561)", JSON.stringify(runs.map(r => r.pub)));
   ok(runs.filter(r => /--verdicts/u.test(r.args)).map(r => r.args.includes("before.json") ? "before" : "after").join() === "before,after" && runs.some(r => r.args.endsWith(` ${SHA}`)), "the run before, the sync to the commit, then the run after", ran.filter(r => r.k === "held").map(r => r.args).join(" | "));
   const none = runLeg(path.join(tmp, "legs", "nothing-cloned"), path.join(tmp, "core-at"), 6, { run: () => true, sha: SHA });
   ok(none.came === "untried" && none.leg === 6, "a runner whose clone failed says its project was not tried", JSON.stringify(none));

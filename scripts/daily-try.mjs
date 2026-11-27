@@ -171,7 +171,9 @@ export function tryOne(at, core, sha, out, run = runLogged, tools = toolsFor) {
   if (copy.pin === sha) return { came: "atPin" };
   const scripts = scriptsOf(at, copy, core);
   const main = (spawnSync("git", ["rev-parse", "HEAD"], { cwd: at, encoding: "utf8" }).stdout ?? "").trim();
-  const env = { ...bare(), ...tools(at, log) }, go = (cmd, args) => run(cmd, args, at, log, env);
+  // (CORE_PRIVATE: the try holds public projects alone, and the sync, given no sign-in, would read it from GitHub's API with
+  // none, which a shared runner's limit refuses; the answer the sync takes is given, as its mend says: #1561)
+  const env = { ...bare(), ...tools(at, log), CORE_PRIVATE: "false" }, go = (cmd, args) => run(cmd, args, at, log, env);
   const check = (script, file) => go(process.execPath, [script, "--base", main, "--own", "--verdicts", file]);
   const before = path.join(out, "before.json"), after = path.join(out, "after.json");
   check(scripts.before, before);
