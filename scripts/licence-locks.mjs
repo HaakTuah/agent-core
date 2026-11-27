@@ -11,7 +11,7 @@
 // whose lock files the core holds under its own config, the copy held to the pin byte for byte (core.yml).
 import { execFileSync } from "node:child_process";
 import { posix } from "node:path";
-import { copyOf } from "./core-path.mjs";
+import { copyAmong } from "./core-path.mjs";
 import { LOCKFILE } from "./licence-scan.mjs";
 
 // (its twin is left to the check's own failure only in npm's own case: another case is said here too)
@@ -58,7 +58,7 @@ export function unnamedLocks(root, tracked, config, base, stood) {
   if (tracked === null) return unlisted(base);
   const failures = [], reports = [];
   const named = new Set(config.lockfiles ?? []);
-  const copy = tracked.includes("core-manifest.md") ? copyOf(root) : null;
+  const copy = copyAmong(tracked, root);
   for (const f of tracked) {
     if (leftOut(f, named, copy, config)) continue;
     const said = `${f} is a lock file of npm's that the licence config's "lockfiles" does not name, so this check reads none of its packages and the dependency review alone holds them, by name, to the tools' list`;

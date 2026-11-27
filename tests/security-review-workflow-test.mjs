@@ -67,10 +67,11 @@ console.log(JSON.stringify(a.includes("--slurp") ? [v] : v));
 
 // ---- one run of the workflow ----
 // `files` and `commits` are the pull request's, as GitHub lists them; `comments` follow Codex's summary of `reviewed`;
-// `data` adds routes; `inputs` the call's; `missing` the scripts the default branch's core lacks; `action` the event's;
+// `data` adds routes; `inputs` the call's; `missing` the scripts the default branch's core lacks, `broken` those that
+// fail as they run; `action` the event's;
 // `copyAt` the folder the default branch's manifest names for the copy of the core (a manifest is written, #918).
 function runCase(fx, env, tmp, { files = [{ filename: "notes.txt" }], cut = 0, commits = [{ sha: SEEN, parents: [{ sha: BASE }] }, { sha: HEAD, parents: [{ sha: SEEN }] }],
-  reviewed = SEEN, comments = [], data = {}, inputs = { advisory: false, root: "." }, missing = [], action = "synchronize", base = {}, copyAt = null } = {}) {
+  reviewed = SEEN, comments = [], data = {}, inputs = { advisory: false, root: "." }, missing = [], broken = [], action = "synchronize", base = {}, copyAt = null } = {}) {
   const dir = fs.mkdtempSync(path.join(tmp, "case-"));
   const ghData = path.join(dir, "data.json"), ghLog = path.join(dir, "log");
   const repoOf = { full_name: "someone/project" };
@@ -84,10 +85,11 @@ function runCase(fx, env, tmp, { files = [{ filename: "notes.txt" }], cut = 0, c
   // (a copy, its history with it, where a script is taken out of the working tree; otherwise the one repository, which
   // the shell writes nothing into)
   const workspace = () => {
-    if (!missing.length && copyAt === null) return fx.repo;
+    if (!missing.length && !broken.length && copyAt === null) return fx.repo;
     const ws = fs.mkdtempSync(path.join(tmp, "ws-"));
     fs.cpSync(fx.repo, ws, { recursive: true });
     for (const p of missing) fs.rmSync(path.join(ws, p));
+    for (const p of broken) fs.writeFileSync(path.join(ws, p), "process.exit(1);\n");
     if (copyAt !== null) fs.writeFileSync(path.join(ws, "core-manifest.md"), `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${copyAt} (never edited here).\n`);
     return ws;
   };
@@ -219,6 +221,20 @@ const none = run({ missing: ["scripts/security-review.mjs"] });
 ok(none.ran && none.passed && none.out.includes("does not hold the check's script yet") && none.posts === 0 && none.gets.length === 0, "a default branch with no security-review.mjs: nothing read or posted, and the job passes", show(none));
 const noWait = run({ missing: ["scripts/code-review-wait.mjs"] });
 ok(noWait.passed && noWait.security && !noWait.code && noWait.posts === 1, "  with no code-review-wait.mjs, the security-review status alone", show(noWait));
+
+// ---- the code-review status's verdict folded into the security-review status (#1339) ----
+// (a later commit than Codex's reviews, whose security review is posted for the head, declaring no count, so that it
+// checks no fix the code review would stand across, and whose code review is still to be posted)
+const securityPosted = member("someone", `Security review: ${HEAD}`, "OWNER");
+const unreviewed = run({ comments: [securityPosted] }), posted = run({ comments: [securityPosted, member("someone", `Code review: ${HEAD}\nNo blocking finding.\nNo other finding.`, "OWNER")] });
+ok(unreviewed.passed && unreviewed.code?.state === "pending" && unreviewed.security?.state === "pending" && unreviewed.security.description.startsWith("Waiting: code-review waits: no code review.")
+  && posted.passed && posted.code?.state === "success" && posted.security?.state === "success",
+  "while the code-review status waits for a code review the pull request needs, the security-review status, which a ruleset requires, waits too; once one is posted, both pass", show(unreviewed) + show(posted));
+const advisedWait = run({ comments: [securityPosted], inputs: { root: "." } });
+ok(advisedWait.passed && advisedWait.security?.state === "success" && advisedWait.security.description.startsWith("Advisory: code-review waits"), "  advisory, it says so and passes", show(advisedWait));
+const brokenWait = run({ broken: ["scripts/code-review-wait.mjs"], reviewed: HEAD });
+ok(brokenWait.passed && !brokenWait.code && brokenWait.security?.state === "pending" && /code-review not worked out\. Mend: /u.test(brokenWait.security.description) && brokenWait.out.includes("could not be worked out"),
+  "  where code-review-wait.mjs fails, the security-review status waits, never a pass, the code-review status is not posted, and the run warns", show(brokenWait));
 
 // ---- each pull_request action the callers list (E1) ----
 // (the template's placeholders filled, as the starter kit fills them)

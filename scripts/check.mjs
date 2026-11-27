@@ -57,6 +57,10 @@ export const HOST_OWN = {
   "preview.yml": "it is started by the host once a game's build has run, and publishes a preview, checking nothing",
 };
 
+// Who the commits it makes are written as: an address of the no-reply form, which the personal-terms check asks of every
+// commit of a pull request's own (#460), so the stand-in for the pull request fails nothing for its name.
+export const STAND_IN = { name: "core-check", email: "core-check@users.noreply.github.com" };
+
 // What --verdicts adds where this script lies outside the project (#1244): no job's place, which names a file.
 export const RUN_FROM = "(run from)";
 
@@ -379,7 +383,7 @@ function coreGit(tmp, ...args) {
 // request from a push, is there.
 function merged(p, tmp, bare) {
   const ws = path.join(tmp, "merge");
-  const who = ["-c", "user.name=core-check", "-c", "user.email=core-check@example.invalid"];
+  const who = ["-c", `user.name=${STAND_IN.name}`, "-c", `user.email=${STAND_IN.email}`];
   git(tmp, "clone", "-q", "--no-checkout", pathToFileURL(bare).href, ws);
   git(ws, "checkout", "-q", "--detach", p.base);
   let behind = true;

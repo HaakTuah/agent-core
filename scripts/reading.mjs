@@ -262,9 +262,11 @@ export function kindsOf(lib) {
   return new Map([...out].sort(([a], [b]) => a.localeCompare(b)));
 }
 
-// A changed path as it is printed: as it is spelled, or, where it holds a control character (a line break, an escape),
-// in quotes with that character written out, so that no path's name reads as a line of this script's own.
-export const shown = p => (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(p) ? JSON.stringify(p).replace(/[\u007f-\u009f\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`) : p);
+// A changed path as it is printed: as it is spelled, or, where it holds a control character (a line break, an escape)
+// or a bidirectional formatting one (U+202A to U+202E, U+2066 to U+2069), in quotes with that character written out,
+// so that no path's name reads as a line of this script's own, nor shows its text reordered (#1382).
+const WRITTEN_OUT = /[\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/gu;
+export const shown = p => (/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(p) ? JSON.stringify(p).replace(WRITTEN_OUT, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`) : p);
 // What the changed paths call for, whatever the role: [{ file, why }], each file once, by the first path that called it.
 // Its tries spend `within`, the reading's budget (a budget of its own where none is given); a file called once it is
 // spent says so, as PAST.
