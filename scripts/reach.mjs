@@ -7,9 +7,10 @@ export function reach(start, next) {
   return seen;
 }
 
-// What `closure` holds at once and does in all, in words of 32 bits (about 128 MB, and about a second here), past which
-// it gives no answer: some graphs hold more to say of each node than a pass can carry, and the lookup says so.
-const ROOM = 1 << 25, WORK = 1 << 26;
+// What `closure` holds at once and does in all, in words of 32 bits (about 128 MB, and about a second here), and the
+// shown nodes its answers of `by` hold in all (about 64 MB), past which it gives no answer: some graphs hold more to
+// say of each node than a pass can carry, and the lookup says so.
+const ROOM = 1 << 25, WORK = 1 << 26, OUT = 1 << 23;
 const OVER = new Error("past what the closure holds or does");
 
 /** What each of `nodes` brings and which of the `shown` ones bring it, for all of them in one pass (#1388, point 3),
@@ -31,22 +32,51 @@ export function closure(nodes, children, shown) {
   const marks = [...new Set(shown)].filter((n) => at.has(n)), own = comps.map(() => []);
   marks.forEach((n, k) => own[comp[at.get(n)]].push(k));
   const counts = bounded(() => counted(comps, kids, ups)), anc = bounded(() => above(ups, own, marks.length));
-  // (a set many cycles share is put in order once, so a long chain under many shown nodes is answered in one pass too)
-  const sorted = new Map(), inOrder = (set) => {
-    if (!sorted.has(set)) { const ks = []; if (set) each(set, (k) => ks.push(k)); sorted.set(set, Object.freeze(ks.sort((a, b) => a - b).map((k) => marks[k]))); }
-    return sorted.get(set);
+  // (a set many cycles share is put in order once, a cycle's answer once for its members the caller did not show, and
+  // the answers in all are held to OUT before any is given, so a long chain under many shown nodes is answered in one
+  // pass and a graph whose answers would outgrow what is kept gets none)
+  const ids = new Map(), idsOf = (set) => {
+    if (!ids.has(set)) { const ks = []; if (set) each(set, (k) => ks.push(k)); ids.set(set, ks.sort((a, b) => a - b)); }
+    return ids.get(set);
   };
+  const answers = new Map(), answer = (c) => {
+    const key = own[c].length ? c : anc[c];
+    if (!answers.has(key)) answers.set(key, Object.freeze((own[c].length ? merged(own[c], idsOf(anc[c])) : idsOf(anc[c])).map((k) => marks[k])));
+    return answers.get(key);
+  };
+  let fits;
+  const fit = () => (fits ??= fitting(comps, own, anc));
   return {
     brings: (n) => (at.has(n) ? counts?.[comp[at.get(n)]] : 0),
     by: (n) => {
       if (!at.has(n)) return [];
-      if (!anc) return undefined;
-      const c = comp[at.get(n)], ks = own[c].filter((k) => marks[k] !== n);
-      if (!ks.length) return inOrder(anc[c]);
-      if (anc[c]) each(anc[c], (k) => ks.push(k));
-      return ks.sort((a, b) => a - b).map((k) => marks[k]);
+      if (!anc || !fit()) return undefined;
+      const c = comp[at.get(n)], all = answer(c);
+      return own[c].some((k) => marks[k] === n) ? all.filter((m) => m !== n) : all;
     },
   };
+}
+
+// Whether the answers of `by` hold OUT shown nodes at most in all: one answer a cycle for its members not shown (one a
+// set, where the cycle shows none), and a fresh one for each it shows, which leaves itself out.
+function fitting(comps, own, anc) {
+  const seen = new Set(), size = (s) => { let k = 0; if (s) each(s, () => k++); return k; };
+  let out = 0;
+  for (let c = 0; c < comps.length && out <= OUT; c++) {
+    const o = own[c].length;
+    if (!o && seen.has(anc[c])) continue;
+    const a = size(anc[c]);
+    if (!o) { seen.add(anc[c]); out += a; } else out += (comps[c].length > o ? o + a : 0) + o * (o - 1 + a);
+  }
+  return out <= OUT;
+}
+
+// Two lists of numbers in order, and none in both, as one in order.
+function merged(xs, ys) {
+  const out = [];
+  let i = 0, j = 0;
+  while (i < xs.length || j < ys.length) out.push(j >= ys.length || (i < xs.length && xs[i] < ys[j]) ? xs[i++] : ys[j++]);
+  return out;
 }
 
 // What each cycle brings: its other members and each node of the cycles it leads to, gathered from the sinks up. A

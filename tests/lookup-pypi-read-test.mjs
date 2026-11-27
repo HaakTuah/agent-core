@@ -74,6 +74,13 @@ reads("a chain of 50,000 under 50,000 packages the project names", [...Array.fro
 const ladder = Array.from({ length: 40000 }, (_, i) => via(`l${i}`, ...(i ? [`l${i - 1}-moss`] : ["-r requirements.in"]), ...(i > 1 ? [`l${i - 2}-moss`] : []))).flat();
 let top;
 ok(quick(() => (top = pypiPackages(ladder.join("\n"), "requirements.txt")).length === 40000) && top[0].brings === undefined, `a graph whose paths are past what the closure counts is given up within its bound, what each brings left unsaid (${top?.[0]?.brings})`);
+// (a cycle that holds a package the project names, under 50,000 it names: each brought package's answer is gathered
+// once, and past what the answers hold in all none is given, never one copied for each package)
+const hub = (cycles) => [...Array.from({ length: 50000 }, (_, i) => via(`n${i}`, "-r requirements.in")).flat(), ...via("h", ...Array.from({ length: 50000 }, (_, i) => `n${i}-moss`)), ...Array.from({ length: cycles }, (_, j) => [...via(`x${j}`, "h-moss", `r${j}-moss`), ...via(`r${j}`, "-r requirements.in", `x${j}-moss`)]).flat()];
+for (const [cycles, told] of [[50, true], [5000, false]]) {
+  let xs;
+  ok(quick(() => (xs = pypiPackages(hub(cycles).join("\n"), "requirements.txt").filter((p) => p.name.startsWith("x"))).every((p) => (told ? p.by?.length === 50001 : p.by === undefined))), `${cycles} cycles under 50,000 named packages, each holding one the project names: ${told ? "what brings each is said" : "what brings each is past what the answers hold, left unsaid"}, quickly (${xs?.[0]?.by?.length})`);
+}
 const many = Array.from({ length: 100000 }, (_, i) => ({ name: `m${i}-moss`, version: "1.0.0", hashes: [], via: ["-r requirements.in"] }));
 let lone;
 ok(quick(() => (lone = pypiGraphed([...many, { name: "lone-moss", version: "1.0.0", hashes: [], via: many.map((m) => m.name) }], () => false).at(-1)).unborne.length === 100000) && lone.direct, `a package whose "# via" names 100,000 packages, none of which PyPI bears out, gives each once, quickly (${lone?.unborne.length})`);
