@@ -2,7 +2,7 @@
 // them as it does a fetch licence-fetchers.mjs finds): a function the file defines, or one it imports by name from a
 // file of the project's that defines and exports it, which passes a parameter of its own to one of Node's calls of
 // "git", alone or spread in an array after options; and each call of it by its own name whose arguments make "clone"
-// git's subcommand, past git's own options. Node's own modules only (none).
+// git's subcommand, past git's own options, or, where they cannot be read, hold it. Node's own modules only (none).
 import { arrayAt, gitSubcommand, holdsClone, opening, runOn, stringEnd } from "./licence-fetchers.mjs";
 
 const NAME = "[A-Za-z_$][\\w$]*";
@@ -36,7 +36,7 @@ function slashEnd(text, i) {
 function skipped(text, i) {
   if (text.startsWith("//", i)) return text.indexOf("\n", i) - 1;
   if (text.startsWith("/*", i)) { const end = text.indexOf("*/", i + 2); return end < 0 ? -1 : end + 1; }
-  return text[i] === "/" ? slashEnd(text, i) : stringEnd(text, i);
+  return text[i] === "/" ? slashEnd(text, i) : stringEnd(text, i, (t, j) => codeEnd(t, j, false));
 }
 // The place where code that starts at text[i] ends, its strings, comments and regular expressions read past: after
 // the "}" of the block that opens there where `block`, else at the first ",", ";" or closing bracket at its own depth;
@@ -63,8 +63,9 @@ function constArray(text, name) {
 // parameter, whether it is a rest parameter, and the arguments before it, strings or a name the file holds as an array
 // of strings; or null where it hands on none exactly.
 function handsOn(text, i, params) {
-  const alone = new RegExp(String.raw`^(${NAME})\s*[,)]`, "u").exec(text.slice(i));
-  if (alone) { const at = params.findIndex((p) => p?.name === alone[1]); return at < 0 ? null : { at, rest: params[at].rest, before: [] }; }
+  // (a parameter whose method is called there, as `args.filter(Boolean)`, is handed on loosely)
+  const alone = new RegExp(String.raw`^(${NAME})\s*([,)]|\??\.)`, "u").exec(text.slice(i, i + 200));
+  if (alone) { const at = params.findIndex((p) => p?.name === alone[1]); return at < 0 ? null : { at, rest: params[at].rest, before: [], loose: alone[2] !== "," && alone[2] !== ")" }; }
   const array = text[i] === "[" ? arrayAt(text, i) : null, before = [];
   for (const a of array?.args ?? []) {
     const spread = a.kind === "spread" && new RegExp(String.raw`^\.\.\.\s*(${NAME})$`, "u").exec(a.raw)?.[1];
@@ -101,7 +102,7 @@ export function wrappers(text) {
     for (const call of inside.matchAll(GIT_CALL)) {
       const hand = handsOn(text, body.start + call.index + call[0].length, params);
       // (one whose parameter is changed before it reaches git is read loosely: each call that holds "clone" is a clone)
-      if (hand) { out.set(name, { ...hand, loose: changes(params[hand.at].name, inside), exported: Boolean(m[1]) || exportsName(text, name) }); break; }
+      if (hand) { out.set(name, { ...hand, loose: hand.loose || changes(params[hand.at].name, inside), exported: Boolean(m[1]) || exportsName(text, name) }); break; }
     }
   }
   return out;
@@ -131,10 +132,13 @@ function normal(p) {
   return parts.join("/");
 }
 
+// Whether the arguments that open at text[i], which cannot be read, hold "clone" as a string or cannot be read to their end.
+const unread = (text, i) => { const end = codeEnd(text, i, true); return end < 0 || /['"`]clone['"`]/u.test(text.slice(i, end)); };
+
 /** Each git clone in `text`, of the file `f` (a path from the project's root), by a function that hands its arguments
  *  on to git (above), as otherFetches gives a fetch: its line and those that run on to it, spaces run together. A call
  *  whose git subcommand cannot be read is one where its arguments hold "clone", and one whose arguments cannot be
- *  read, where "clone" stands as a string before the next ";". */
+ *  read, where "clone" stands as a string in them, or where they cannot be read to their end either. */
 export function wrapperFetches(text, f = "", read = () => null) {
   const found = [], all = new Map([...imported(text, f, read), ...wrappers(text)]);
   for (const [name, w] of all) {
@@ -143,8 +147,7 @@ export function wrapperFetches(text, f = "", read = () => null) {
       const list = arrayAt(text, call.index + call[0].length - 1, ")"), args = list?.args, given = args?.[w.at];
       const handed = w.rest ? args?.slice(w.at) : given?.kind === "other" && given.raw.startsWith("[") ? arrayAt(given.raw, 0)?.args : null;
       const sub = handed && !w.loose ? gitSubcommand([...w.before, ...handed]) : null;
-      const near = () => { const semi = text.indexOf(";", call.index); return text.slice(call.index, semi < 0 ? text.length : semi); };
-      if (sub === "clone" || (sub === null && (args ? holdsClone([...w.before, ...(handed ?? args)]) : /['"`]clone['"`]/u.test(near())))) found.push(call.index);
+      if (sub === "clone" || (sub === null && (args ? holdsClone([...w.before, ...(handed ?? args)]) : holdsClone(w.before) || unread(text, call.index + call[0].length - 1)))) found.push(call.index);
     }
   }
   return found.sort((a, b) => a - b).map((i) => runOn(text, i).replace(/\s+/gu, " ").trim());

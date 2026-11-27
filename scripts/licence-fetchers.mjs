@@ -18,7 +18,7 @@ const program = (name) => String.raw`(?:\b${name}|\\?"(?:[^"\n]*[/\\])?${name}\\
 const fetcher = (name, then) => `${program(name)}(?:${OPTION}{0,8}\\s+\\\\?["']?${then}|${OPTION}{8})`;
 export const OTHER_FETCHER = new RegExp(
   "(?:(?:^|[\\s;&|(`$\'\"/\\\\])(?:curl|wget)|\\\\?\"(?:[^\"\\n]*[/\\\\])?(?:curl|wget)\\\\?\"|\\\\?\'(?:[^\'\\n]*[/\\\\])?(?:curl|wget)\\\\?\')" +
-    "\\s+(?:-[-a-zA-Z]|https?://|[\'\"$]|(?:[\\w.%+-]+(?::[^\\s@/]*)?@)?(?:[\\w-]+\\.)+[\\w-]+(?::\\d+)?(?=[/\\s\"'|;&)?#]|$))|['\"`](?:[^'\"`\\s]*[/\\\\])?(?:curl|wget|pip3?|pipx|pnpm|yarn|bunx|bun|gem|cargo|deno)['\"`]\\s*,\\s*\\[|" +
+    "\\s+(?:-[-a-zA-Z]|[A-Za-z][\\w+.-]*://|[\'\"$]|(?:[\\w.%+-]+(?::[^\\s@/]*)?@)?(?:[\\w-]+\\.)+[\\w-]+(?::\\d+)?(?![\\w.%@:-]))|['\"`](?:[^'\"`\\s]*[/\\\\])?(?:curl|wget|pip3?|pipx|pnpm|yarn|bunx|bun|gem|cargo|deno)['\"`]\\s*,\\s*\\[|" +
     "['\"`](?:[^'\"`\\s]*[/\\\\])?git['\"`]\\s*,\\s*\\[\\s*['\"`](?:clone|-)|" +
     `(?:${fetcher("pipx?3?", "(?:install|download|wheel)")}|${fetcher("pnpm", "(?:dlx|add|install|i)[\"']?\\s")}|${fetcher("yarn", "(?:dlx|add)[\"']?\\s")}|${program("bunx")}\\s+[\\w@./"'$~\`\\\\-]|` +
     `${fetcher("bun", "(?:add|x|install)[\"']?\\s")}|${fetcher("playwright", "install")}|${fetcher("git", "clone")}|${fetcher("gem", "install")}|` +
@@ -56,13 +56,14 @@ export const WINDOWS_FETCHER = (() => {
 // few, none a shell or an environment. Anything else the scan cannot read exactly, and stays a fetch.
 const CLONE_FLAGS = new Set(["-q", "--quiet", "-v", "--verbose", "--progress", "-n", "--no-checkout", "--bare", "--mirror", "--single-branch", "--no-single-branch", "--no-tags", "-l", "--local", "--no-local", "--no-hardlinks", "-s", "--shared"]);
 const CLONE_VALUED = new Set(["--depth", "--shallow-since", "--shallow-exclude", "-b", "--branch", "-o", "--origin"]);
-// The place of the quote that closes the string or template opening at text[i] (its escapes and ${} read past), or -1.
-export function stringEnd(text, i) {
+// The place of the quote that closes the string or template opening at text[i] (its escapes and ${}, to where `inner`
+// ends it, read past), or -1.
+export function stringEnd(text, i, inner = exprEnd) {
   const q = text[i];
   for (i++; text[i] !== q; i++) {
     if (i >= text.length || (q !== "`" && text[i] === "\n")) return -1;
     if (text[i] === "\\") i++;
-    else if (q === "`" && text.startsWith("${", i)) { i = exprEnd(text, i + 2); if (i < 0 || text[i] !== "}") return -1; }
+    else if (q === "`" && text.startsWith("${", i)) { i = inner(text, i + 2); if (i < 0 || text[i] !== "}") return -1; }
   }
   return i;
 }
@@ -204,24 +205,26 @@ function localClone(text, m) {
   const array = arrayAt(text, m.index + m[0].lastIndexOf("["));
   return Boolean(array) && array.args[0]?.value === "clone" && localArguments(array.args) && callCloses(text, array.end) && directCall(text, m.index);
 }
-// git's own options that take the next argument as their value, all of which git reads before its subcommand.
+// git's own options that take the next argument as their value, and some that take none, read before its subcommand.
 const GIT_VALUED = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix", "--attr-source", "--shallow-file"]);
+const GIT_FLAGS = new Set(["-p", "-P", "--paginate", "--no-pager", "--no-replace-objects", "--no-optional-locks", "--literal-pathspecs"]);
 /** git's subcommand among `args` (as arrayAt reads them), read past the options above and their values, or null where
- *  an argument before it is not a plain string or another option. */
+ *  an argument before it is not a plain string or another option stands; "clone" where a value is spread. */
 export function gitSubcommand(args) {
   for (let k = 0; k < args.length; k++) {
     const v = args[k].kind === "text" ? args[k].value : "-";
     if (!v.startsWith("-")) return v;
+    if (GIT_FLAGS.has(v)) continue;
     if (!GIT_VALUED.has(v)) return null;
-    k++;
+    if (args[++k]?.kind === "spread") return "clone";
   }
   return null;
 }
-/** Whether the arguments `args` (as arrayAt reads them) hold "clone" as a string of their own. */
+/** Whether `args` (as arrayAt reads them) hold "clone" as a string of their own. */
 export const holdsClone = (args) => args.some((a) => (a.kind === "text" ? a.value === "clone" : /['"`]clone['"`]/u.test(a.raw ?? "")));
 // Whether the match m of OTHER_FETCHER is git's array with options before its subcommand, and that subcommand, read
-// from the arguments up to it, reads as another than "clone"; where the subcommand cannot be read, the array is a clone
-// where it holds "clone" (above), and where the array cannot be read whole either, it is one.
+// from the arguments up to it, reads as another than "clone"; where it cannot be read, the array is a clone where it
+// holds "clone" (above) or cannot be read whole.
 function otherCommand(text, m) {
   if (!/git['"`]\s*,\s*\[\s*['"`]-$/u.test(m[0])) return false;
   const array = arrayAt(text, m.index + m[0].lastIndexOf("["), "]", true), sub = gitSubcommand(array.args);

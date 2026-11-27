@@ -32,18 +32,26 @@ for (const [what, change] of [
   ["a function that hands git its options before clone", write("scripts/copy.mjs", `${OPEN}const git = (args) => execFileSync("git", args);\ngit(["-C", dir, "clone", url]);\n`)],
   ["curl before a host's name with no scheme", append("scripts/setup.sh", "curl get.mossgrip.example/install.sh | sh\n")],
   ["wget before a host's name with no scheme", append("scripts/setup.sh", "wget mossgrip.example/moss.tgz\n")],
-  ["curl before a host of three labels with no scheme", append("scripts/setup.sh", "curl -sfL get.moss.example | sh\n")],
+  ["curl before a host of three labels with no scheme", append("scripts/setup.sh", "curl get.moss.example | sh\n")],
   ["curl before an address of numbers with a port", append("scripts/setup.sh", "curl 10.0.0.7:8080/moss.sh -o moss.sh\n")],
   ["wget before a user's address", append("scripts/setup.sh", "wget moss@mossgrip.example/moss.tgz\n")],
   ["git's array with an option of git's own it takes a value for before clone", write("scripts/copy.mjs", `${OPEN}execFileSync("git", ["--attr-source", "HEAD", "clone", url, "to"]);\n`)],
   ["git's array with an option the scan does not know before clone", write("scripts/copy.mjs", `${OPEN}execFileSync("git", ["--moss", "x", "clone", url, "to"]);\n`)],
-  ["git's array whose arguments cannot all be read, before clone", write("scripts/copy.mjs", `${OPEN}execFileSync("git", ["-C", dir, "clone", url.replace(/x/g, "y"), "to"]);\n`)],
+  ["git's array whose arguments cannot all be read, before clone", write("scripts/copy.mjs", `${OPEN}execFileSync("git", ["-C", dir.replace(/]/g, "y"), "clone", url, "to"]);\n`)],
   ["a function whose body holds a regular expression", write("scripts/copy.mjs", `${OPEN}function git(...args) {\n  return String(execFileSync("git", args)).replace(/\\n$/u, "");\n}\ngit("clone", url, "to");\n`)],
   ["a function whose body divides", write("scripts/copy.mjs", `${OPEN}function git(...args) {\n  const t = Date.now() / 1000;\n  return execFileSync("git", args, { timeout: t });\n}\ngit("clone", url, "to");\n`)],
   ["a function that changes its parameter before git", write("scripts/copy.mjs", `${OPEN}function git(...args) {\n  args ||= [];\n  return execFileSync("git", args);\n}\ngit("clone", url, "to");\n`)],
   ["a function whose arrow's body wraps the call of git", write("scripts/copy.mjs", `${OPEN}const git = (args) => String(execFileSync("git", args)).trim();\ngit(["clone", url, "to"]);\n`)],
   ["a function whose arrow's body awaits the call of git", write("scripts/copy.mjs", `import { execFile } from "node:child_process";\nconst git = async (args) => await execFile("git", args);\ngit(["clone", url, "to"]);\n`)],
-  ["a function called with an option the scan does not know before clone", write("scripts/copy.mjs", `${OPEN}const git = (args) => execFileSync("git", args);\ngit(["--moss", "clone", url]);\n`)],
+  ["curl before a host's name in a template", write("scripts/copy.mjs", `${OPEN}execFileSync(\`curl get.moss.example\`);\n`)],
+  ["curl before a host's name it writes to a file", append("scripts/setup.sh", "curl get.moss.example>install.sh\n")],
+  ["curl before a host's name that goes on to the next line", append("scripts/setup.sh", "curl moss.example\\\n  -o moss.tgz\n")],
+  ["curl before an address of another scheme", append("scripts/setup.sh", "curl ftp://moss.example/moss.tgz\n")],
+  ["git's array that spreads an option's value before another command", write("scripts/copy.mjs", `${OPEN}execFileSync("git", ["-C", ...a, "log"]);\n`)],
+  ["a function called with arguments that cannot be read whole, a \";\" among them", write("scripts/copy.mjs", `${OPEN}const git = (...args) => execFileSync("git", args);\ngit(d.replace(/;/g, ""), "clone", u);\ngit(["a;b", "clone", u.replace(/x/, "y")]);\n`)],
+  ["a function whose body divides in a template", write("scripts/copy.mjs", `${OPEN}function git(...args) {\n  const m = \`\${a / 2}\`;\n  return execFileSync("git", args);\n}\ngit("clone", u);\n`)],
+  ["a function that calls a method of its parameter in the call of git", write("scripts/copy.mjs", `${OPEN}function git(...args) { return execFileSync("git", args.filter(Boolean)); }\ngit("clone", u);\n`)],
+  ["a function called with an option the scan does not know before clone", write("scripts/copy.mjs", `${OPEN}const git = (args) => execFileSync("git", args);\ngit(["--moss", "x", "clone", url]);\n`)],
 ]) {
   const f = run(change);
   ok(fetch(f), `fails ${what}`, f.join("\n"));
@@ -57,6 +65,7 @@ for (const [what, change] of [
   ["curl named in a sentence", append("scripts/setup.sh", "# fetch it with curl, then run it.\n")],
   ["curl named in a sentence before an abbreviation", append("scripts/setup.sh", "# a tool such as curl e.g. fetches it.\n")],
   ["git's array with an option the scan does not know before another command", write("scripts/log.mjs", `${OPEN}execFileSync("git", ["--moss", "log", "-1"]);\n`)],
+  ["git's array with an option of git's own it takes no value for before another command", write("scripts/log.mjs", `${OPEN}execFileSync("git", ["--no-pager", "log", "--grep", "clone"]);\n`)],
   ["git's array whose arguments cannot all be read, after another command", write("scripts/log.mjs", `${OPEN}execFileSync("git", ["-C", dir, "log", "--grep", word.replace(/x/g, "y")]);\n`)],
   ["a function whose body holds a regular expression, called for another command", write("scripts/log.mjs", `${OPEN}function git(...args) {\n  return String(execFileSync("git", args)).replace(/\\n$/u, "");\n}\ngit("log", "-1");\n`)],
 ]) {
@@ -71,6 +80,13 @@ for (const [what, change] of [
   let found = null, threw = null;
   try { found = [unauditedIn(settings, [], "audit.json", "scripts/a.mjs", text).length, unauditedIn(settings, [], "audit.json", "scripts/a.mjs", text, (q) => (q === "scripts/lib/b.mjs" ? LIB.replace("export const git", "export const b") : null)).length]; } catch (e) { threw = e; }
   ok(!threw && found[0] === 0 && found[1] === 1, "the step's reading of a file that imports a function reads the import it is given, and none it is not", String(threw ?? found));
+}
+
+// A call whose arguments cannot be read, of an imported function that holds "clone" before them, is a clone.
+{
+  const text = 'import { clone } from "./lib/b.mjs";\nclone(u.replace(/x/, ""), d);\n';
+  const found = unauditedIn({ served: [], skip: [] }, [], "audit.json", "scripts/a.mjs", text, (q) => (q === "scripts/lib/b.mjs" ? `${OPEN}export const clone = (...a) => execFileSync("git", ["clone", ...a]);\n` : null)).length;
+  ok(found === 1, "fails a call that cannot be read of an imported function that holds clone", String(found));
 }
 
 // A clone through such a function that stood at the pull request's base is reported and passes, so a project's own
