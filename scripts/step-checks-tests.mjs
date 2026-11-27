@@ -58,24 +58,39 @@ export function strengthNamed(p) {
 
 // The project's tracked test files, as the shape check's config names them, else as the starter kit's does, so that a
 // config taken out leaves the tests counted; the copy of the core aside.
-function testsTracked(p) {
+function testFiles(p) {
   let specs;
   try { specs = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)).tests; } catch { specs = parseBounded(fs.readFileSync(path.join(HERE, "setup/template/shape.json.tmpl"), "utf8")).tests; }
-  return specs.length > 0 && execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").some(f => f && !f.startsWith(copyAt(p)));
+  if (!specs.length) return [];
+  return execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(f => f && !f.startsWith(copyAt(p)));
 }
 
-// Whether a workflow that runs on pull requests has a step that runs the selection, with SELECT_BASE set on the step,
-// its job or the workflow (core/tasks/tests.md, "A pull request runs the tests its change can reach"); null where it
-// does or the project has no tests yet; else the mend.
+// Whether each job on pull requests that names a test of the project's own selects in that job, since the RUN its step
+// writes holds in its own job alone (#1361, point 4); where no job names one, whether any job does, as one that hands
+// its runner the files does: a step that runs the selection, with SELECT_BASE set on the step, its job or the workflow
+// (core/tasks/tests.md, "A pull request runs the tests its change can reach"). Null where it does or the project has no
+// tests yet; else the mend. A job names a test where a step's script holds its path, `./` before it or not, as a word
+// of its own.
 const selectRunOf = copy => new RegExp(`(^|[\\s;&|])node\\s+${inCopy(copy)}scripts/select\\.mjs(?=\\s|$)`, "mu");
 
+const escaped = text => text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+
 export function selectionRuns(p) {
-  if (!testsTracked(p)) return null;
+  const tests = testFiles(p);
+  if (!tests.length) return null;
   readable(p, text => text.includes("select.mjs"));
-  const SELECT_RUN = selectRunOf(copyAt(p));
-  const selects = Object.values(p.workflows).some(({ yaml }) => onPullRequests(yaml?.on) && Object.values(yaml.jobs ?? {})
-    .some(job => (job?.steps ?? []).some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run) && [step.env, job.env, yaml.env].some(e => typeof e?.SELECT_BASE === "string" && e.SELECT_BASE.trim() !== ""))));
-  return selects ? null : "No workflow on pull requests runs the selection of the tests a change can reach: in the job that runs the project's tests, add a step before them `node core/scripts/select.mjs --env RUN`, with `SELECT_BASE` set to the pull request's base (`origin/<its base branch>`, fetched first, or `HEAD^1` with `fetch-depth: 2`), and have the job run only the test files `RUN` names, each between spaces, or its whole suite where it says `all` (`if [ \"$RUN\" = all ]; then <the whole suite>; else <the runner> $RUN; fi`); name the project's proof, never selected out, under \"select\" and \"proof\" in the shape check's config. Where the record's numbers (`node core/scripts/test-record.mjs`) show the suite needed whole, name every test under \"select\" and \"whole\" instead, citing them in that pull request.";
+  const SELECT_RUN = selectRunOf(copyAt(p)), copy = copyAt(p);
+  const NAMES = new RegExp(`(^|[\\s'"=])(\\./)?(${tests.map(escaped).join("|")})(?=$|[\\s'";&|)])`, "mu");
+  const jobs = Object.entries(p.workflows).filter(([, { yaml }]) => onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => Object.entries(yaml.jobs ?? {})
+    .map(([name, job]) => ({ at: `\`.github/workflows/${file}\`, its job \`${name}\``, steps: job?.steps ?? [], envs: [job?.env, yaml.env] })));
+  const selects = ({ steps, envs }) => steps.some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run) && [step.env, ...envs].some(e => typeof e?.SELECT_BASE === "string" && e.SELECT_BASE.trim() !== ""));
+  const naming = jobs.filter(({ steps }) => steps.some(step => typeof step?.run === "string" && NAMES.test(step.run)));
+  const unselected = naming.filter(job => !selects(job));
+  if (!unselected.length && (naming.length || jobs.some(selects))) return null;
+  const proof = "name the project's proof, never selected out, under \"select\" and \"proof\" in the shape check's config. Where the record's numbers (`node " + copy + "scripts/test-record.mjs`) show the suite needed whole, name every test under \"select\" and \"whole\" instead, citing them in that pull request.";
+  const add = `a step before them \`node ${copy}scripts/select.mjs --env RUN\`, with \`SELECT_BASE\` set to the pull request's base (\`origin/<its base branch>\`, fetched first, or \`HEAD^1\` with \`fetch-depth: 2\`)`;
+  if (!unselected.length) return `No workflow on pull requests runs the selection of the tests a change can reach: in the job that runs the project's tests, add ${add}, and have the job run only the test files \`RUN\` names, each between spaces, or its whole suite where it says \`all\` (\`if [ \"$RUN\" = all ]; then <the whole suite>; else <the runner> $RUN; fi\`); ${proof}`;
+  return `Jobs on pull requests run the project's tests with no selection in the job (${unselected.map(j => j.at).join("; ")}): the \`RUN\` a step of the selection writes holds in its own job alone, so each job that runs tests selects them itself. In each, add ${add}; then run, of the tests it runs a step each, only those \`RUN\` names (\`if: env.RUN == 'all' || contains(env.RUN, ' <file> ')\`, joined by \`&&\` to any condition the step has already), and where it hands a runner the files, only the files \`RUN\` names, each between spaces, or its whole suite where it says \`all\`; ${proof}`;
 }
 
 // Whether each job that runs the selection on a push, in a workflow a pull request runs too, gives it --passed, the name
