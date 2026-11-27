@@ -2,15 +2,13 @@
 // (scripts/select-csharp-compiles.mjs, through scripts/select-csharp.mjs; #675): every file unsure where one brings in a
 // file the reader never reads (outside the repository, one git does not hold, a path MSBuild expands, a wildcard that
 // climbs out or names files other than .cs, any item of an imported file, a project of another kind or outside),
-// where a project may compile C# by other means (an element or attribute not on the list known safe, so a target that holds any
-// task but a message, warning or error (#1401),
-// task, compiler property, generator item or referenced project's properties among them; a property function, a
-// character reference, a processing instruction or a document type; a value's line break or quote; a Link that climbs
-// or expands, or on an item but <Compile>; a copy to the output of what may be C#; a wildcard that may reach a folder
-// a build writes; an SDK not known, in its own case; a link, a submodule, a path
-// with a control character, a file of Razor or XAML, or a solution that builds what is not a .csproj held under C#'s
-// type), and none
-// where it names a file or project git holds, a wildcard of .cs inside, or only removes or updates, or a solution builds
+// where a project may compile C# by other means (an element or attribute not on the list known safe, so a target that
+// holds any task but a message, warning or error (#1401), a task, compiler property, generator item or referenced
+// project's properties among them; a property function, a character reference, a processing instruction or a document
+// type; a value's line break or quote; a Link that climbs or expands, or on an item but <Compile>; a copy to the output
+// of what may be C#; a wildcard that may reach a folder a build writes; an SDK not known, in its own case; a link, a
+// submodule, a path with a control character, a file of Razor or XAML, or a solution that builds what is not a .csproj
+// held under C#'s type), and none where it names a file or project git holds, a wildcard of .cs inside, or only removes or updates, or a solution builds
 // only a .csproj held; a file of C# that declares a type of System or Microsoft, or holds a Unicode escape, reached from
 // every file. Where other MSBuild files decide it:
 // select-csharp-msbuild-test.mjs. The cases: select-csharp-test.mjs.
@@ -61,6 +59,10 @@ for (const [item, what, more] of [
   [`<Target Name="Build"><Message Text="a" /><ItemGroup><Compile Include="../lib/*.cs" /></ItemGroup></Target>`, "an item group inside a target, beside a message"],
   [`<Target Name="Build"><PropertyGroup><X>1</X></PropertyGroup></Target>`, "a property group inside a target"],
   [`<Target Name="Build"><Message Text="a" Extra="b" /></Target>`, "a message with an attribute of no known name"],
+  [`<Target Name="Build" DependsOnTargets="Gen"><Message Text="a" /></Target>`, "a target that runs another"],
+  [`<Target Name="Build" Returns="@(Compile)"><Message Text="a" /></Target>`, "a target that hands items on"],
+  [`<Target Name="Build" Inputs="a.txt" Outputs="b.txt"><Message Text="a" /></Target>`, "a target with inputs and outputs"],
+  [`<PropertyGroup><Target Name="Build" /></PropertyGroup>`, "a target inside a property group"],
   [`<Target Name="Build" Extra="b"><Message Text="a" /></Target>`, "a target with an attribute of no known name"],
   [`<Target Name="Build"><Target Name="Inner" /></Target>`, "a target inside a target"],
   [`<Target Name="Build"><Message Text="a" />`, "a target that is never closed"],
@@ -146,7 +148,7 @@ for (const [item, what, more] of [
   ["", "nothing"],
   [`<Target Name="Notice" AfterTargets="Build"><Message Importance="high" Text="built" /></Target>`, "a target of a message"],
   [`<Target Name="Guard" BeforeTargets="Restore" Condition="'$(CI)' == ''"><Error Condition="'$(X)' == ''" Text="x" Code="A1" /><Warning Text="y" /></Target>`, "a target of a warning and an error, each with a condition"],
-  [`<target name="N" dependsontargets="A;B" inputs="a.txt" outputs="b.txt"><MESSAGE Text="a"></MESSAGE>\n  <error text="b" /></target>`, "a target and its tasks in another case, a message with an end tag"],
+  ["", "a target and its tasks in another case, a message with an end tag, in a file beside the project", { "Directory.Build.targets": `<Project><target name="N" beforetargets="A;B" label="x"><MESSAGE Text="a"></MESSAGE>\n  <error text="b" /></target></Project>\n` }],
   [`<Target Name="corecompile" />`, "a target CoreCompile of its own, that holds no task"],
   [`<Target Name="Build" /><ItemGroup><Compile Include="../lib/Rules.cs" /></ItemGroup>`, "a target of no task beside a file git holds"],
   ["", "a target of a message in Directory.Build.targets", { "Directory.Build.targets": `<Project><Target Name="Gen"><Message Text="a" /></Target></Project>\n` }],
