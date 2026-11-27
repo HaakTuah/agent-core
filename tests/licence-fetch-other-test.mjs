@@ -56,7 +56,8 @@ for (const [what, change, why] of [
 for (const code of ["execFileSync(\"git\", [\"clone\", \"-q\", \"--depth\", String(depth), \"--\", `file://${src}`, to]);",
   "execFileSync('git', ['clone', '--quiet', `file://${src}`, 'copy'], { cwd: dir, stdio: 'ignore' });", 'spawnSync("git", ["clone", "--bare", "/tmp/moss", "moss.git"]);',
   "execFileSync(`git`, [`clone`, `./${name}`]);", 'execFileSync("git", [\n  "clone",\n  "--shallow-since=2026-11-01",\n  "../moss",\n]);',
-  'execFileSync("git", ["clone", "file:///tmp/moss", "copy"], { cwd, "windowsHide": true, timeout: 60_000 });']) {
+  'execFileSync("git", ["clone", "file:///tmp/moss", "copy"], { cwd, "windowsHide": true, timeout: 60_000 });',
+  'function copy() { return execFileSync("git", ["clone", "/tmp/moss"]); }', 'if (done) copy(); else spawnSync("git", ["clone", "/tmp/moss"]);']) {
   const f = run(write("scripts/copy.mjs", `import { execFileSync, spawnSync } from "node:child_process";\n${code}\n`));
   ok(!f.some((m) => /fetches what no entry/u.test(m)), `passes a git clone of a local source: ${JSON.stringify(code)}`, f.join("\n"));
 }
@@ -84,6 +85,10 @@ for (const code of ['execFileSync("git", ["clone", "https://mossgrip.example/mos
 {
   const f = run(write("scripts/copy.mjs", 'import { execSync as execFileSync } from "node:child_process";\nexecFileSync("git", ["clone", "/tmp/moss"]);\n'));
   ok(f.some((m) => /fetches what no entry/u.test(m)), "fails a local clone by a function that the file imports by another name", f.join("\n") || "(it passed)");
+}
+{
+  const f = run(write("scripts/copy.mjs", 'const note = `\nimport { execFileSync } from "node:child_process";\n`;\nexecFileSync("git", ["clone", "/tmp/moss"]);\n'));
+  ok(f.some((m) => /fetches what no entry/u.test(m)), "fails a local clone by a function whose import stands only in a string, past the file's opening", f.join("\n") || "(it passed)");
 }
 
 done();

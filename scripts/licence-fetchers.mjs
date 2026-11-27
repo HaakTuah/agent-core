@@ -168,20 +168,26 @@ function callCloses(text, end) {
 // The functions of Node's that run a program with its arguments as given, through no shell unless an option says so.
 const DIRECT_CALLS = new Set(["execFileSync", "execFile", "spawnSync", "spawn"]);
 const IMPORTS = /^import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["'];?$/gmu;
-// Whether a name at text[i] stands alone: before it, read back past spaces, the start of the text or a mark after which
-// no ".", "#", comment or longer name can stand, on a line that holds no "//".
+const IDENT = "\\p{ID_Continue}$\\u200c\\u200d";
+// The words after which a name stands alone, and the file's opening: its blank lines, comments and imports, up to the
+// first line that is none of them.
+const AFTER = new RegExp(`(?:^|[^${IDENT}.#\\s])\\s*(?:return|else|await|void|yield|throw|case|do|in|of|typeof)$`, "u");
+const OPENING = /^(?:\s|\/\/[^\n]*|#![^\n]*|import\s[^;'"`]*["'][^"'\n]*["'];?)*/u;
+// Whether a name at text[i] stands alone: before it, read back past spaces, the start of the text, a mark or one of the
+// words above, after which no ".", "#", comment or longer name can stand, on a line that holds no "//".
 function standsAlone(text, i) {
   const before = text.slice(0, i).trimEnd(), line = before.slice(before.lastIndexOf("\n") + 1);
-  return before === "" || (/[;{}()=,:?!&|[>]$/u.test(before) && !line.includes("//"));
+  return before === "" || ((/[;{}()=,:?!&|[>]$/u.test(before) || AFTER.test(before)) && !line.includes("//"));
 }
 // Whether the call whose first argument opens at text[i] is of one of those functions by its own name, standing alone
-// (above), which the file imports by that name from node:child_process and uses nowhere but in calls that stand alone.
+// (above), which the file's opening imports by that name from node:child_process, and which it uses nowhere but in calls
+// that stand alone.
 function directCall(text, i) {
   const call = /([\w$]+)\s*\(\s*$/u.exec(text.slice(0, i)), name = call?.[1];
   if (!DIRECT_CALLS.has(name) || !standsAlone(text, call.index)) return false;
-  const rest = text.replace(IMPORTS, (line, names) => (names.split(",").some((entry) => entry.trim() === name) ? "\0;" : line));
-  const ident = "\\p{ID_Continue}$\\u200c\\u200d";
-  return rest.includes("\0") && [...rest.matchAll(new RegExp(`(?<![${ident}#])${name}(?![${ident}])`, "gu"))]
+  const opening = OPENING.exec(text)[0];
+  const rest = opening.replace(IMPORTS, (line, names) => (names.split(",").some((entry) => entry.trim() === name) ? "\0;" : line)) + text.slice(opening.length);
+  return rest.includes("\0") && [...rest.matchAll(new RegExp(`(?<![${IDENT}#])${name}(?![${IDENT}])`, "gu"))]
     .every((m) => /^\s*\(/u.test(rest.slice(m.index + name.length)) && standsAlone(rest, m.index));
 }
 // Whether the match m of OTHER_FETCHER is a clone by git, written as an array, whose source reads exactly as local (above).
