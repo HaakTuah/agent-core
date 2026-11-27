@@ -1,5 +1,5 @@
 {
   "rule": "roles/shared/work-flow.md: Push after every commit",
-  "holder": "check: scripts/work-saved.sh, in part",
-  "behind": [6, 15]
+  "holder": ["check: scripts/work-saved.sh, in part", "check: scripts/stalled.mjs, in part"],
+  "behind": [6, 15, "#1505"]
 }

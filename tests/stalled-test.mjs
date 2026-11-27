@@ -3,7 +3,7 @@
 // program's own and are not made here.
 //
 //   node tests/stalled-test.mjs
-import { goesOn, handedOff, NOTICE, print, readStates, reported, stalled, standingStill, statesIn } from "../scripts/stalled.mjs";
+import { goesOn, handedOff, namesNext, NOTICE, print, readStates, reported, stalled, standingStill, statesIn } from "../scripts/stalled.mjs";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 
@@ -24,14 +24,21 @@ ok(s.map(l => l.number).join() === "3,1", "only lanes past the hours count, olde
 ok(Math.abs(s[1].waited - 9.1667) < 0.001 && s[0].waited === 24, "the wait is the hours since the newest commit");
 ok(stalled([p(1, "a", "2026-11-13T16:19:00Z")], now, 3).length === 0 && stalled([p(1, "a", "2026-11-13T16:18:59Z")], now, 3).length === 1, "a lane counts only once it is past the hours");
 ok(print([], 4, 3) === "No lane stalled: 4 open, none without a push for over 3 h.", "nothing stalled is one line");
-ok(print(stalled([p(9, "item/x\u001b[2J", "2026-11-13T10:19:00Z")], now, 3), 2, 3) === "Stalled, no push for over 3 h: 1 of 2 open\n  #9 item/x [2J: 9.0 h since 2026-11-13T10:19:00Z (t9); no hand-off note", "a stalled lane's line, with its control characters taken out", print(stalled([p(9, "item/x\u001b[2J", "2026-11-13T10:19:00Z")], now, 3), 2, 3));
+ok(print(stalled([p(9, "item/x\u001b[2J", "2026-11-13T10:19:00Z")], now, 3), 2, 3) === "Stalled, no push for over 3 h: 1 of 2 open\n  #9 item/x [2J: 9.0 h since 2026-11-13T10:19:00Z (t9); no hand-off note; its newest commit names no next step", "a stalled lane's line, with its control characters taken out", print(stalled([p(9, "item/x\u001b[2J", "2026-11-13T10:19:00Z")], now, 3), 2, 3));
 
 // The hand-off note (tasks/tools.md, "A change of tool loses nothing"; #306): a lane whose description holds one is not
 // marked, in each form a line may open it; one that only names it in a sentence, or holds no description, is.
 const noted = body => print(stalled([{ ...p(7, "lane/noted", "2026-11-13T10:19:00Z"), body }], now, 3), 1, 3);
 for (const body of ["Hand-off: done a; next b", "x\n**Hand-off:** done a", "## Hand-off: done", "- Hand-off: done"]) ok(!noted(body).includes("no hand-off note"), `a lane with a hand-off note is not marked: ${JSON.stringify(body)}`, noted(body));
-for (const body of ["It has no Hand-off: here", "", undefined, 42]) ok(noted(body).endsWith("(t7); no hand-off note"), `a lane with none is marked: ${JSON.stringify(body)}`, noted(body));
+for (const body of ["It has no Hand-off: here", "", undefined, 42]) ok(noted(body).endsWith("(t7); no hand-off note; its newest commit names no next step"), `a lane with none is marked: ${JSON.stringify(body)}`, noted(body));
 ok(handedOff("a\nHand-off: b") && !handedOff("hand-off: b"), "the note's line is \"Hand-off:\", as written");
+
+// The next step a commit names (tasks/tools.md, "Each pushed commit names its next step"; #1505, point 1): a lane whose
+// newest commit's message holds a line "Next:" that names something is not marked; one with none, or an empty one, is.
+const next = message => print(stalled([{ ...p(8, "lane/next", "2026-11-13T10:19:00Z"), body: "Hand-off: done a", message }], now, 3), 1, 3);
+for (const message of ["Write the rule\n\nNext: the reviews", "Next: the merge\n\nCo-Authored-By: a session"]) ok(next(message).endsWith("(t8)"), `a lane whose newest commit names its next step is not marked: ${JSON.stringify(message)}`, next(message));
+for (const message of ["Write the rule", "Write the rule\nNext:", "Write it. Next: the reviews", "next: the reviews", "", undefined]) ok(next(message).endsWith("(t8); its newest commit names no next step"), `a lane whose newest commit names none is marked: ${JSON.stringify(message)}`, next(message));
+ok(namesNext("a\nNext: b") && !namesNext("a\nNext:  ") && !namesNext(null), "the step's line is \"Next:\" with something after it");
 
 // ---- the states a way reports (tasks/ways.md, "A session's state is read where the way gives it"; #397) ----
 // (a lane given a state, by its number or its branch, is printed by it and never judged by the clock; the rest are)

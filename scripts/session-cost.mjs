@@ -6,11 +6,14 @@
 // line is the tally's, so it never drops within a session while the tally stands (a tally lost, or answers that came
 // and went between two runs, and it is a floor again). Where it cannot tell (another tool, no session id, no record
 // and no tally), it prints nothing and exits 0, so no session works this out by hand: the description says "No cost
-// line: the script printed none." in its place (pr-description.mjs, beside this file; #302). It reads the record and writes the tally, nothing else: no prompt, answer or path leaves it, only ids, counts and the
+// line: the script printed none." in its place (pr-description.mjs, beside this file; #302). A --condenses it cannot read fails, saying the mend. It reads the record and writes the tally, nothing else: no prompt, answer or path leaves it, only ids, counts and the
 // models' families; a tally no run has touched for 90 days is removed. Node's own modules only.
 //
 //   node core/scripts/session-cost.mjs
-//   node core/scripts/session-cost.mjs --context    the tokens of context the session's newest answer was given
+//   node core/scripts/session-cost.mjs --context [--condenses <tokens>]
+//        the tokens of context the session's newest answer was given, against the hand-over mark (`markOf`): given where
+//        the session's tool shows it condenses (in a cloud session of Claude Code, the session tool's record gives it as
+//        `autocompact_state.threshold`), the mark sits MARGIN below that where it is lower than MARK
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -105,6 +108,18 @@ export function context(text) {
   return last;
 }
 
+/** The hand-over mark of "A builder hands over by its context" (roles/shared/work-flow.md; #1505, point 2): MARK, or
+ *  MARGIN below `condenses`, where the session's tool shows it condenses, where that is lower; MARK where it shows none. */
+export const MARK = 200_000, MARGIN = 20_000;
+export const markOf = (condenses) => (Number.isSafeInteger(condenses) && condenses > 0 ? Math.max(0, Math.min(MARK, condenses - MARGIN)) : MARK);
+
+/** The line --context prints: the context now, against the mark. */
+export function contextLine(now, mark) {
+  const n = (value) => value.toLocaleString("en-US");
+  return now > mark ? `Context now: ${n(now)} tokens, past the hand-over mark of ${n(mark)}: hand over at the next passed gate.`
+    : `Context now: ${n(now)} tokens, under the hand-over mark of ${n(mark)}.`;
+}
+
 /** A session's own record under Claude Code's folder, without its helpers', or "". */
 export function ownRecord(home, session) {
   if (!SESSION.test(session ?? "")) return "";
@@ -144,8 +159,14 @@ if (started(import.meta.url)) {
     const home = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
     const file = tallyOf(home, process.env.CLAUDE_CODE_SESSION_ID);
     if (process.argv.includes("--context")) {
-      const now = context(ownRecord(home, process.env.CLAUDE_CODE_SESSION_ID));
-      if (now) console.log(`Context now: ${now.toLocaleString("en-US")} tokens.`);
+      const at = process.argv.indexOf("--condenses"), given = process.argv[at + 1] ?? "";
+      if (at >= 0 && !/^[1-9]\d{0,8}$/u.test(given)) {
+        console.error("FAIL: --condenses needs a whole number of tokens after it. Mend: give where the session's tool shows it condenses, or leave --condenses out for the mark of " + MARK.toLocaleString("en-US"));
+        process.exitCode = 2;
+      } else {
+        const now = context(ownRecord(home, process.env.CLAUDE_CODE_SESSION_ID));
+        if (now) console.log(contextLine(now, markOf(at >= 0 ? Number(given) : undefined)));
+      }
     } else if (file) {
       const counted = cost(records(home, process.env.CLAUDE_CODE_SESSION_ID), keptIn(tallyText(file)));
       const out = line(counted);

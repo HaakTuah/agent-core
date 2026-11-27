@@ -40,15 +40,25 @@ whose hooks would run as they stand there: it reads the diff. Reason: a session 
 same rules.
 
 **A change of tool loses nothing.** The state of a task is in the repository and never only in a
-session: its branch, pushed after every commit, its pull request's description with its hand-off note, its line in the
+session: its branch, pushed after every commit, each naming the next step, its pull request's description with its hand-off note, its line in the
 *progress file* and what it waits on (`roles/shared/work-flow.md`). A session that stops mid-task, at a passed gate, a
 limit or the stop switch, writes the note (#306): a line "Hand-off:", then what is done, what was tried and failed,
 what is next, and how to check it. Where a builder's tool stops (its usage spent, say), a fresh builder of any tool
-picks up from the branch, reading the note first (`roles/orchestrator.md`, "A stalled lane"). It does not mean that
+picks up from the branch, reading the note first, or with none its newest commit's next step (`roles/orchestrator.md`, "A stalled lane"). It does not mean that
 the tool that stopped hands over by itself, nor a note where the task ends merged. Reason: when one provider's usage ran
 out, everything held only in its sessions stopped with them, and a lane handed over from its branch alone shows the
 code and none of what was tried and failed, so the next builder tries it again. Held, in part,
 by `scripts/stalled.mjs`, which the look and the orchestrator run, and which marks a stalled lane with no note.
+
+**Each pushed commit names its next step** (#1505, point 1). By default every commit a builder pushes to its task's
+branch holds a line of its message that opens `Next:` and names the task's next step (`Next: the code review`), so a
+session that stops without warning, at a usage limit or a hard stop, leaves its next step on its branch. Nothing
+changes it. It does not mean a commit is made only to say it, that a pull request's description is edited for it
+(`roles/shared/work-flow.md`, "A description is written in as few edits as the work allows"), nor that a merge of the
+base into the branch, or a commit the host or Dependabot makes, carries one; a session that stops at a gate still
+writes its hand-off note. Reason: on 26 November 2026 a hard stop ended one account's sessions mid-work, and the next
+steps of four drafts, written once at the end and never pushed, were lost. Held, in part, by `scripts/stalled.mjs`,
+which marks a stalled lane whose newest commit names no next step.
 
 **Proven by the staged cases, tool by tool** (`core-changes/holders.md`, "Staged cases hold what no check
 reads"). A tool works with the core once a session of it has passed every staged case (`node scripts/staged.mjs

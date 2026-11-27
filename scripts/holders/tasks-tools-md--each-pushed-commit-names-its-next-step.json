@@ -1,0 +1,6 @@
+{
+  "rule": "tasks/tools.md: Each pushed commit names its next step",
+  "holder": "check: scripts/stalled.mjs, in part",
+  "behind": ["#1505"],
+  "number": "correction: does not work; outcome: fast"
+}
