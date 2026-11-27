@@ -48,7 +48,8 @@ and filed (`tasks/tests.md`, "A test that reaches the network runs once per batc
 harm (floor rule 14): the session that reads it so, a builder before its merge or the orchestrator on its wake, turns
 auto-merge off on every other open pull request (`tasks/github-calls.md`) and gives the fix the first lane, or takes it
 as a bug ("Bugs don't wait") where no open pull request says it fixes it. A release is cut, and a build published, only
-where every check on the default branch's newest commit passed. Where the host still asks an up-to-date branch and the
+where every check on the default branch's newest commit passed, or, for the core's own release, on the commit of it its
+trial tried (`AGENTS.md` of the core, "A release is cut from the commit its trial tried"). Where the host still asks an up-to-date branch and the
 project no longer publishes on each merge, a setting only the owner changes, each pull request is brought up to date in
 its turn, as the merge line says, and the owner is advised to switch it off as a queue offered is, by one issue (the
 same script prints the advice); nothing waits on it ("Nothing locks a project"). It does not mean a pull request merges

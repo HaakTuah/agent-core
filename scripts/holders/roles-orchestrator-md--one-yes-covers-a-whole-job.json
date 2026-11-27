@@ -1,0 +1,5 @@
+{
+  "rule": "roles/orchestrator.md: One yes covers a whole job",
+  "behind": [133, 134, 137, "#594", "#1413.2"],
+  "number": "correction: misread; outcome: fast"
+}

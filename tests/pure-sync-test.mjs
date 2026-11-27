@@ -24,6 +24,8 @@ import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { copyTree, entries } from "../scripts/copy-tree.mjs";
 import { checkoutStandIn, ghStandIn, hostSays, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
+import { ownFiles } from "../scripts/own-files.mjs";
+import { moveCalls } from "../scripts/sync.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200).replace(/\n/g, "\n     ")}`}`); } };
@@ -77,7 +79,8 @@ const SHA = sha => sha.slice(0, 7);
 
 // ---- a project, its first copy made from a clone of the core at A ----
 const clone = path.join(tmp, "core-clone");
-git(tmp, "clone", "-q", theCore, clone);
+execFileSync("git", ["clone", "-q", "--no-checkout", "--", ".", clone], { cwd: theCore, stdio: ["ignore", "pipe", "pipe"] });
+git(clone, "reset", "-q", "--hard");
 git(clone, "checkout", "-q", A);
 const origin = path.join(tmp, "project.git"), p = path.join(tmp, "project");
 // (the host says the project, and each clone of it, is public, the security-review job's clone by its address on GitHub)
@@ -149,7 +152,7 @@ const coreCheck = () => {
   git(p, "push", "-q", "-f", "origin", "HEAD:refs/heads/check");
   const github = { event_name: "pull_request", repository: "someone/project", event: { repository: { default_branch: "main", private: false }, pull_request: { base: { sha: base } } } };
   const [job] = runWorkflow(read(theCore, ".github/workflows/core.yml"), { github, base: env, temp: tmp,
-    workspace: () => { const ws = fs.mkdtempSync(path.join(tmp, "ws-")); git(ws, "clone", "-q", "--no-checkout", origin, "."); git(ws, "checkout", "-q", "--detach", sha); return ws; },
+    workspace: () => { const ws = fs.mkdtempSync(path.join(tmp, "ws-")); execFileSync("git", ["clone", "-q", "--no-checkout", "--", ".", ws], { cwd: origin, stdio: ["ignore", "pipe", "pipe"] }); git(ws, "checkout", "-q", "--detach", sha); return ws; },
     uses: { "actions/checkout": checkoutStandIn(env, tmp) } });
   return { passed: job.passed, out: job.steps.map(x => x.out).join("") };
 };
@@ -184,7 +187,7 @@ const reviewCheck = () => {
   const github = { event_name: "pull_request", repository: "someone/project", actor: "someone", server_url: "https://github.com", run_id: "1", token: "not-a-token",
     event: { action: "synchronize", pull_request: pull, repository: { default_branch: "main", private: false, full_name: "someone/project" } } };
   const [job] = runWorkflow(read(theCore, ".github/workflows/security-review.yml"), { github, base: reviewEnv, temp: tmp, inputs: { advisory: false },
-    workspace: () => { const ws = fs.mkdtempSync(path.join(tmp, "ws-")); git(ws, "clone", "-q", origin, "."); return ws; },
+    workspace: () => { const ws = fs.mkdtempSync(path.join(tmp, "ws-")); execFileSync("git", ["clone", "-q", "--no-checkout", "--", ".", ws], { cwd: origin, stdio: ["ignore", "pipe", "pipe"] }); git(ws, "reset", "-q", "--hard"); return ws; },
     uses: { "actions/checkout": checkoutStandIn(env, tmp), "actions/setup-node": () => {} } });
   return { passed: job.passed, out: job.steps.map(x => x.out).join(""), posted: fs.readFileSync(ghLog, "utf8") };
 };
@@ -534,6 +537,37 @@ write(p, ".github/workflows/core.yml", calls.replace(`personal-terms.yml@${B}`, 
 git(p, "commit", "-q", "-am", "to the side");
 const tagged = pure();
 ok(tagged.status === 1 && tagged.out.includes(`${SIDE} is not a commit of the core's main`), "a pin at a commit off the core's main that a release tag names is no commit of main all the same", tagged.out);
+
+// ---- a sync pull request synced again, to a newer commit (#1361, point 24) ----
+// (each call's pin read from the project's main: one an earlier run on the branch moved goes to the newer commit where its
+// workflow changed since main's pin, and back to main's where it did not, as a sync from main straight to it writes, so
+// the proof finds every changed line at the new pin; a project with no main reads the branch's own pins, as before)
+{
+  const core = path.join(tmp, "calls-core"), proj = path.join(tmp, "calls-project"), flows = ["w", "o", "u"];
+  git(tmp, "init", "-q", "-b", "main", core);
+  const step = texts => { flows.forEach((f, i) => write(core, `.github/workflows/${f}.yml`, texts[i])); git(core, "add", "-A"); git(core, "commit", "-q", "-m", "c"); return git(core, "rev-parse", "HEAD"); };
+  const W = step(["on: push # W\n", "on: push\n", "on: push\n"]), X = step(["on: push # X\n", "on: push # X\n", "on: push\n"]), Y = step(["on: push # X\n", "on: push\n", "on: push\n"]);
+  const callFile = pins => `jobs:\n${flows.map(f => `  ${f}:\n    uses: ${CORE}/.github/workflows/${f}.yml@${pins[f]}\n`).join("")}`;
+  git(tmp, "init", "-q", "-b", "main", proj);
+  write(proj, ".github/workflows/core.yml", callFile({ w: W, o: W, u: W }));
+  git(proj, "add", "-A"); git(proj, "commit", "-q", "-m", "main");
+  git(proj, "checkout", "-q", "-b", "sync");
+  write(proj, ".github/workflows/core.yml", callFile({ w: X, o: X, u: W })); // (the sync to X, the commit first tried)
+  git(proj, "commit", "-q", "-am", "to X");
+  const here = process.cwd();
+  process.chdir(proj);
+  let again, alone;
+  try {
+    again = moveCalls(Y, path.join(core, ".git"), ownFiles(proj));
+    var onY = read(proj, ".github/workflows/core.yml");
+    write(proj, ".github/workflows/core.yml", callFile({ w: X, o: X, u: W }));
+    alone = moveCalls(Y, path.join(core, ".git"), ownFiles(proj), () => new Map());
+    var aloneY = read(proj, ".github/workflows/core.yml");
+  } finally { process.chdir(here); }
+  ok(onY === callFile({ w: Y, o: W, u: W }) && again.moved.length === 2 && again.moved.some(m => m.includes(`o.yml ${SHA(X)} -> ${SHA(W)}, as main holds it`)),
+    "a sync pull request synced again to a newer commit moves a call whose workflow changed since main's pin to it, though the branch's pin holds the same workflow, and puts one back at main's pin where its workflow did not change since main's (#1361, point 24)", `${onY}\n${again.moved.join("\n")}`);
+  ok(aloneY === callFile({ w: X, o: Y, u: W }) && alone.moved.length === 1, "  with no main to read, each call's own pin is read, as before", `${aloneY}\n${alone.moved.join("\n")}`);
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the sync and the proof that it is pure`);
 process.exitCode = failed ? 1 : 0;

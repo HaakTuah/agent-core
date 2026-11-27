@@ -91,20 +91,21 @@ function formed(r) {
     && (r.projects > 0 || counts.every(n => n === 0)) && r.baselineFromClone <= r.projects && syncFormed(r) && draftFormed(r);
 }
 
-// How the runs are taken, for a mend that asks a trial: check.mjs from the project's clone, before the update and after,
-// and, where the copy holds none, or one without --verdicts, the baseline by the release's, from a clone of the core.
-export const RUNS = "in a clone of the project, `node core/scripts/check.mjs --base <its main> --own --verdicts <a file outside every repository>` before the update and after it; where the copy holds no check.mjs, or one without --verdicts, the run before with `node <a clone of the core at the commit tried>/scripts/check.mjs` and the same options, from the project's clone; and, with the sync's branch checked out and committed, `node <a clone of the core at the commit tried>/scripts/pure-sync.mjs --trial <the commit tried> > <a file outside every repository>`, the sync's reading, which holds no cut; and, in each of the owner's own projects whose stop switch does not stand, that sync pushed and opened as a draft pull request in the project, its description saying it is the release's trial and that the session that syncs takes it once the release is cut, and, once its checks finish, `node <a clone of the core at the commit tried>/scripts/trial-draft.mjs <owner>/<name> <its number> <the commit tried> > <a file outside every repository>`; in any other project, the same script with `none` in place of the number";
+// How the runs are taken, for a mend that asks a trial: as the trial's brief sets them out step by step (trial-brief.mjs,
+// beside this file; #1413, point 1), never written out again here.
+export const RUNS = "as the trial's brief, which `node scripts/trial-brief.mjs <the commit tried>` prints, sets them out step by step: in a read-only clone of each project, check.mjs --verdicts before the update and after it, the sync's reading by pure-sync.mjs --trial, and the draft's reading by trial-draft.mjs, each written to a file outside every repository";
 
-// What the trial's record says of the release at `sha`, read through `git` (its arguments give its output), and why it
-// holds the cut, or null: the record stands for the commit where it names it, or one before it from which the release
+// What the trial's record says of the release at `sha`, read through `git` (its arguments give its output) as the
+// commit `from` holds it (`sha` itself, or main's newest, where the record merged after the commit it names: #1413,
+// point 3), and why it holds the cut, or null: the record stands for the commit where it names it, or one before it from which the release
 // changes the record alone; it holds the cut where it does not stand, where a check failed after the update that passed
 // before it or did not run then, and where one was not measured, run before and unread after or unread before and
 // failed after (#1263, point 2; #1257), and where one that ran before measured nothing after, stopped behind a failure
 // or not run on the trial's machine (#1257); one stopped, unrun or unread after that ran not before is counted and
 // holds nothing (#1257).
-export function trialAt(sha, git) {
+export function trialAt(sha, git, from = sha) {
   let r = null;
-  try { r = JSON.parse(git(["show", `${sha}:${TRIAL}`])); } catch { /* (not there, or not read) */ }
+  try { r = JSON.parse(git(["show", `${from}:${TRIAL}`])); } catch { /* (not there, or not read) */ }
   const again = `try the release on a copy of a project that takes the core and whose owner allows it, before the release workflow is started, as AGENTS.md says ("A release is cut on the owner's word"): ${RUNS}; record it with \`node scripts/release.mjs --trial <the commit tried> <before> <after> --sync <the reading> --draft <the draft's reading>\` (\`--trial <the commit>\` alone where no project allows one), in a pull request of its own; then start the release again`;
   if (!formed(r)) return { said: `The trial on a real project has not run for ${sha.slice(0, 7)}: ${TRIAL} ${r === null ? "is not there or cannot be read" : "is in no form this script writes"}.`, held: `the trial on a real project has not run for ${sha.slice(0, 7)}. Mend: ${again}` };
   let more;
