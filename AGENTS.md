@@ -141,15 +141,22 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   owner starts it, or the owner's adviser on the owner's word (`roles/adviser.md`); once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
   wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from
   a project's root and there is no copy here, and what `setup/sync-notes.md` asks, which it asks of projects.
-- **One batch, then one release.** A batch is the lines the file holds between two releases, and the release after it
-  is the owner's ("A release is cut on the owner's word"): no session cuts one by its own choice. That word is given
-  for every batch: once the file holds no line a session can take, no PR of a session's is
-  open, every check on `main`'s newest commit has passed, and no open issue is left that is to be queued, the session
-  that finds it so, the orchestrator at the end of its work, starts the `release` workflow once the trial on a real
-  project is recorded ("A release is cut on the owner's word").
+- **One batch, then one release** (#1413, point 4). By default a batch is the lines of the file merged since the
+  commit the newest release stands on, and the release after it is the owner's ("A release is cut on the owner's
+  word"), that word given for every batch. Its trial is due once ten lines have merged since that commit, or seven
+  days have passed since it with at least one merged, as `node scripts/release-due.mjs` counts them. The one condition
+  that changes it: the file holds no line a session can take, no PR of a session's is open, every check on `main`'s
+  newest commit has passed and no open issue is left that is to be queued; then the trial is due whatever the count.
+  The trigger is the scheduled look's issue "A release's trial is due", or the orchestrator finding the queue worked
+  through at the end of its work: the orchestrator gives the trial a lane, and once its record merges starts the
+  `release` workflow ("A release is cut on the owner's word"); the lines that merge after the commit tried go to the
+  next batch. It does not mean a session cuts a release by its own choice, that a second trial is due while a trial's
+  record that holds no cut, past the newest release, stands, nor that a line waits for a release. Reason: a big batch
+  held every fix in it back for weeks, and points 1, 3 and 5 of #1413 made each release cheaper. Held by `tests/release-due-test.mjs` (the
+  count, the marks and the look's issue); that the orchestrator starts the trial, by nothing yet.
 - **A batch is sized by what the projects can take:** once its release is synced, the count of "The core is measured
-  as a feature is" is taken again in each of the owner's projects and named to the owner, who sizes the next by it. It
-  holds back no line the owner has said yes to: there is no pause on new rules.
+  as a feature is" is taken again in each of the owner's projects and named to the owner, who sizes the next by it, the marks of `scripts/release-due.mjs` changed on the owner's
+  word. It holds back no line the owner has said yes to: there is no pause on new rules.
 
 ## How changes are made here
 
@@ -180,7 +187,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   (`scripts/look.mjs`, from `due` in `scripts/size.mjs`).
 - **A release is cut on the owner's word:** another owner's project takes the core only from a release (`README.md`,
   "How a project takes the core", point 1), so one is cut when the owner says the core as it stands may be handed on,
-  never by a session's own choice: the owner's standing word is that it may each time the queue is worked through ("One
+  never by a session's own choice: the owner's standing word is that it may for each batch whose trial is due ("One
   batch, then one release"). The owner tags nothing by hand: the owner, or a session the owner tells and whose own
   limits let it, starts the `release` workflow on `main` (its page under Actions has the button;
   `.github/workflows/release.yml`), and the workflow cuts it only where every check on the commit it stands on has passed

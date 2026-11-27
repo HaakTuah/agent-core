@@ -24,7 +24,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { coreItself } from "./core-path.mjs";
+import { coreItself, manifestText } from "./core-path.mjs";
 import { asText, loggedAlone } from "./guards.mjs";
 import { Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
@@ -114,8 +114,9 @@ async function main(argv) {
   const self = path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/");
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, opts = options(named ? argv.slice(1) : argv, self);
   // (the core's own repository reads its slots from AGENTS.md, whatever manifest stands at its root: core-path.mjs)
+  // (read as the manifest is, a regular file of at most a mebibyte and no link, or else as no rules file: SECURITY.md, rule 5)
   const rules = (coreItself(".") ? ["AGENTS.md"] : ["core-manifest.md", "AGENTS.md"]).find(f => fs.existsSync(f));
-  const at = named ?? where(rules ? fs.readFileSync(rules, "utf8") : ""), base = baseOf(), config = configOf(at);
+  const at = named ?? where(rules ? manifestText(rules, { linked: false }) ?? "" : ""), base = baseOf(), config = configOf(at);
   const now = config ? standing(config) : null, failed = readFailed(opts["--failed"]);
   const s = await chosen({ config, at, base, passed: opts["--passed"], select: from => selectedFrom(from, { now, config, failed }) });
   // (a name the variable cannot hold as one word, a space or a line's end in it, runs the whole suite: no file's name
