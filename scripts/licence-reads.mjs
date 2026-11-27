@@ -28,10 +28,11 @@ const use = (name) => new RegExp(`^curl(?:[ \\t]+-[fsSL]+)*(?:[ \\t]+-[fsSL]*o[ 
 // defined anew, as a function or an alias, or found elsewhere: any name that ends in `path` (the search path, set or
 // added to, by the shell or a workflow's `$GITHUB_PATH`), `hash` and `enable` (which point a command's name at another
 // program), a file read in by `.` or `source` (whose functions the file does not show; any word `.` with a word after it, at the cost of a checksum where it is an argument, as `find .` is), and `BASH_ENV` or
-// `$GITHUB_ENV` (which have bash read such a file at its start). It reads the file twice, its lines as they stand and
-// with every backslash at a line's end joining it to the next, each with its quotes and backslashes taken out, and
-// refuses where either holds such a name: so a name quoted, escaped or continued in part reads as the name, and so
-// does one on a line that only seems continued. The file is read alone, and as plainly written:
+// `$GITHUB_ENV` (which have bash read such a file at its start). It reads the file three times, each with its quotes
+// and backslashes taken out: its lines as they stand; with every backslash at a line's end joining it to the next; and
+// joined as bash joins them, where an odd count of backslashes ends a line. It refuses where any holds such a name: so
+// a name quoted, escaped or continued in part reads as the name, and so does one on a line that only seems continued,
+// or after one. The file is read alone, and as plainly written:
 // what the environment the file runs in defines before it starts (a function exported to it, a search path its runner
 // sets), and a command whose name the file builds as it runs, are trusted to the project's reviews, as by each check of
 // the scan, which reads only the commands a file writes plainly.
@@ -46,7 +47,8 @@ const REACHES_ANY = /\$\{!|<<|(?<![\w-])(?:eval|export|declare|typeset|env|print
 export function programDownloads(code) {
   const all = downloads(code);
   const bare = (text) => text.replace(/["'\\]/gu, "");
-  if (REACHES_ANY.test(bare(String(code))) || REACHES_ANY.test(bare(String(code).replace(/\\\r?\n/gu, "")))) return all;
+  const text = String(code), joined = text.replace(/\\\r?\n/gu, ""), continued = text.replace(/(?<!\\)((?:\\\\)*)\\\r?\n/gu, "$1");
+  if ([text, joined, continued].some((t) => REACHES_ANY.test(bare(t)))) return all;
   const raw = String(code).split(/\r?\n/u), lines = raw.map((l) => l.trim()), free = plain(raw);
   return all.filter((d) => !readsData(d, all, lines, free));
 }

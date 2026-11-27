@@ -129,6 +129,9 @@ const around = {
   // (a line that ends in an escaped backslash, which continues nothing, #1455's eighth review)
   "a dot after a line that ends in an escaped backslash": `echo foo\\\\\n. ./lib.sh\n${READ}\n${GET}\n`,
   "grep defined after a line that ends in an escaped backslash": `echo x\\\\\ngrep() { sh; }\n${READ}\n${GET}\n`,
+  // (bash's own joining, after such a line, #1455's ninth review)
+  ". continued after a line that ends in an escaped backslash": `echo x\\\\\n. \\\n./lib.sh\n${READ}\n${GET}\n`,
+  "grep defined in parts after a line that ends in an escaped backslash": `echo x\\\\\ngr\\\nep() { sh; }\n${READ}\n${GET}\n`,
 };
 const through = Object.entries(around).filter(([, code]) => programs(code) < 2).map(([what]) => what);
 ok(!through.length, "a read whose variable a shell reads by itself, or that stands other than it reads, is a program's download", through.join(" | "));
