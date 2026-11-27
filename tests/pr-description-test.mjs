@@ -10,7 +10,7 @@ import { mended } from "../scripts/mend.mjs";
 import { asked, copyAtBase, doneAsked, DONE_SINCE, HEAD_SINCE, headAsked, missing, PARTS } from "../scripts/pr-description.mjs";
 import { costMend, NO_COST } from "../scripts/pr-cost.mjs";
 import { HEAD_MEND, PLACE_MEND, SHOWN, headMends, headOf, keysAt, linksNote } from "../scripts/pr-head.mjs";
-import { entriesChanged, entriesMend, numberMend } from "../scripts/pr-number.mjs";
+import { numberMend } from "../scripts/pr-number.mjs";
 import { reasonsMend } from "../scripts/pr-reasons.mjs";
 import { heldAt, waitsMend, waitsOn } from "../scripts/pr-waits.mjs";
 import * as facade from "../scripts/pr-description.mjs";
@@ -139,39 +139,6 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   ok(copyAtBase(tmp) === "vendor/core/scripts/pr-description.mjs", "the copy is read where the base's manifest puts it, under another path than core/, whatever the head's manifest says");
   commit(null); commit(manifest("vendor/core/"));
   ok(copyAtBase(tmp) === "scripts/pr-description.mjs", "where the base holds no manifest, the core's own scripts/ are read, though the head adds one");
-}
-// the lines "Number:" in step with the entries whose number the pull request adds or changes (#1138, part 3)
-{
-  const F = "findings; outcome: robust", C = "check fires; outcome: fast", R = "correction: misread; outcome: asked; rare harm", standing = new Set([F, C, R]);
-  const holds = (...lines) => `## What holds it\n${lines.map(l => `- ${l}`).join("\n")}\n## Readings taken\nNumber: ${C}\n`;
-  const two = [{ rule: "AGENTS.md: One", number: F }, { rule: "AGENTS.md: Two", number: F }];
-  ok(entriesMend(holds(`"One": held by x.\n  Number: ${F}.`, `"Two". Number: Findings; Outcome: robust (the findings fall)`), two, standing) === null
-    && entriesMend(holds(`Number: ${R}`, `Number: ${F}`), [{ rule: "AGENTS.md: Three", number: R }], standing) === null
-    && entriesMend("No part.", two, standing) === null && entriesMend(holds(`Number: ${C}`), [], standing) === null,
-    "a line for each entry the pull request numbers, in any case and whatever follows, passes; so does a line beyond them that names a number an entry holds (a rule widened, its number kept), and a description without the part");
-  const short = entriesMend(holds(`Number: ${F}`), two, standing), none = entriesMend("## What holds it\nNone\n", [two[0]], standing);
-  ok(/the entry of "AGENTS\.md: Two" gets the number "findings; outcome: robust", which no line "Number:" under "What holds it" gives \(1 line for 2 entries/.test(short ?? "") && !short.includes("AGENTS.md: One")
-    && /the entry of "AGENTS\.md: One" gets the number/.test(none ?? "") && [short, none].every(m => mended(`FAIL ${m}`)),
-    "one line for two rules, and \"None\" where an entry gains a number, each fail, naming the entry left without its line, with the mend", `${short}\n${none}`);
-  const stray = entriesMend(holds(`Number: ${F}`, `Number: correction: looks wrong; outcome: usable`, "Number: none yet"), [two[0]], standing), wrong = entriesMend(holds(`Number: ${C}`), [two[0]], standing);
-  ok(/the line "Number: correction: looks wrong; outcome: usable" under "What holds it" names a number no entry of scripts\/holders\/ holds\. Mend: /.test(stray ?? "") && !/none yet/.test(stray)
-    && /the entry of "AGENTS\.md: One" gets the number/.test(wrong ?? "") && mended(`FAIL ${stray}`),
-    "a line whose number no entry holds fails, and a line in no form is left to the number's own check; a line of another number does not stand for the entry", `${stray}\n${wrong}`);
-  const tmp = scratchDir("pr-description-entries-");
-  const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
-  const git = (...a) => execFileSync("git", a, { cwd: tmp, env, stdio: ["ignore", "pipe", "pipe"] });
-  const entry = (f, rule, number, extra = "") => { fs.mkdirSync(path.join(tmp, "scripts", "holders"), { recursive: true }); fs.writeFileSync(path.join(tmp, "scripts", "holders", f), JSON.stringify({ rule, holder: "audit", ...(number ? { number } : {}), behind: [1] }, null, 2) + extra); };
-  git("init", "-q");
-  entry("kept.json", "AGENTS.md: Kept", F); entry("moved.json", "AGENTS.md: Moved", F); entry("renum.json", "AGENTS.md: Renum", F); entry("gone.json", "AGENTS.md: Gone", C); entry("plain.json", "AGENTS.md: Plain", null);
-  git("add", "-A"); git("commit", "-q", "-m", "base");
-  fs.renameSync(path.join(tmp, "scripts", "holders", "moved.json"), path.join(tmp, "scripts", "holders", "moved-now.json"));
-  entry("kept.json", "AGENTS.md: Kept", F, "\n"); entry("renum.json", "AGENTS.md: Renum", C); entry("plain.json", "AGENTS.md: Plain", R); entry("new.json", "AGENTS.md: New", F);
-  fs.rmSync(path.join(tmp, "scripts", "holders", "gone.json"));
-  git("add", "-A"); git("commit", "-q", "-m", "head");
-  const read = entriesChanged(tmp);
-  ok(JSON.stringify(read?.changed.map(c => c.rule).sort()) === JSON.stringify(["AGENTS.md: New", "AGENTS.md: Plain", "AGENTS.md: Renum"]) && JSON.stringify([...read.standing].sort()) === JSON.stringify([R, C, F].sort()),
-    "from git: an entry added with a number, one that gains one and one whose number changes are read; one only edited or renamed with its number, and one taken out, are not", JSON.stringify(read && { changed: read.changed, standing: [...read.standing] }));
-  ok(entriesChanged(scratchDir("pr-description-nogit-")) === null, "where the change cannot be read against its base, nothing is read");
 }
 // run, each failure says its mend (no pull request's date given, so the line is not asked of it here)
 const run = body => spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/pr-description.mjs", import.meta.url))], { env: { ...process.env, PR_BODY: body, PR_CREATED: "" }, encoding: "utf8" });

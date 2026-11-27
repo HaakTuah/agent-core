@@ -478,6 +478,9 @@ jobs:
       - name: 'The description check: the line "Reasons read:"'
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-reasons-test.mjs ')) }}
         run: node tests/pr-description-reasons-test.mjs
+      - name: 'The description check: the lines "Number:" against the entries'
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-entries-test.mjs ')) }}
+        run: node tests/pr-description-entries-test.mjs
       - name: 'The description check: the owner''s yes'
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-yes-test.mjs ')) }}
         run: node tests/pr-description-yes-test.mjs
