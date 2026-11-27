@@ -24,7 +24,7 @@
     "tests/converge-test.mjs": { "mark": 22202, "why": "the question of a split is asked in #1283" },
     "scripts/labels.mjs": { "mark": 22008, "why": "the question of a split is asked in #1186" },
     "scripts/sync.mjs": { "mark": 22147, "why": "the question of a split is asked in #1250" },
-    "scripts/pure-sync.mjs": { "mark": 22852, "why": "the question of a split is asked in #1385" },
+    "scripts/pure-sync.mjs": { "mark": 22905, "why": "#1385: floor rule 8's proof is one run on one state: the opening reads the main it is checked against, the pins and the diff, and sets aside each file outside the copy (later, gone) for the proof of the core's own files and parts (provedOwned, provedGone), which reads that state and is what lets those files pass, and done gives the one verdict; a reader of the proof needs the opening every time, a reviewer of the gate reads it whole each time, and the file is 12% past the mark." },
     "scripts/comment-only.mjs": { "mark": 28954, "why": "the question of a split is asked in #1341" },
     "SECURITY.md": { "mark": 21346, "why": "the question of a split is asked in #1255" },
     "scripts/licences.mjs": { "mark": 52937, "why": "the question of a split is asked in #1151" },
