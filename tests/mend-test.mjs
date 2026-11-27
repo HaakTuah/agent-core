@@ -59,6 +59,7 @@ const CHECKS = {
   "scripts/general.mjs": "tests/general-test.mjs",
   "scripts/pattern.mjs": "tests/pattern-test.mjs",
   "scripts/own-modules.mjs": "tests/own-modules-test.mjs",
+  "scripts/tests-named.mjs": "tests/tests-named-test.mjs",
   "scripts/manifest-reads.mjs": "tests/manifest-reads-test.mjs",
   "scripts/holders.mjs": "tests/holders-test.mjs",
   "scripts/entry-files.mjs": "tests/entry-files-test.mjs",

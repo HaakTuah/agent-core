@@ -877,6 +877,16 @@ jobs:
       - name: Each check's failure says its mend, and each check's test reads it
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/mend-test.mjs ')) }}
         run: node tests/mend-test.mjs
+      # (on Windows its case that removes the process's folder is skipped, saying so: a folder in use cannot be removed there)
+      - name: The guard each check's entry runs through, and the watch on the hostile tests' runs
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/mend-guard-test.mjs ')) }}
+        run: node tests/mend-guard-test.mjs
+      - name: The check that each test of the core runs in this workflow
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/tests-named-test.mjs ')) }}
+        run: node tests/tests-named-test.mjs
+      - name: Each test of the core runs in this workflow
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') }}
+        run: node scripts/tests-named.mjs
       - name: The manifest check
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/manifest-reads-test.mjs ')) }}
         run: node tests/manifest-reads-test.mjs
