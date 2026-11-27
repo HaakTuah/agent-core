@@ -7,19 +7,18 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #1350 to #1352, #1339, #1367, #1341, #1345, #1385, #1380, #1388, #1394, #1401 | builder; release 8, one PR each | |
-| #1361 | builder; release 8, a PR each point; a rule builder for a rule | |
-| #1093, with #1090 | rule builder | |
-| #1138 to #1140 | builder; release 8, one PR each | |
-| #1413, points 1, 3, 5, 2, 6 and 7 | rule builder; release 8, one PR each | |
-| #1413, point 4 | rule builder; release 8 | #1413's points 1, 3 and 5 |
+| #1345, #1385, #1380, #1401 | builder; release 8, one PR each | |
+| #1140 | builder; release 8 | |
+| #1413, point 4 | rule builder; release 8 | |
 | #1413, point 8 | rule builder; release 8 | the owner's Security-tab record (`needs-owner`) |
-| #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 8, one PR each | release 7's cut |
-| #1123 | rule builder; release 8 | #974, #1060 (`roles/adviser.md`); release 7's cut |
-| #1098, #1133, #1356 | builder; release 8, one PR each | release 7's cut |
-| #1180, #1181 | rule builder; release 8, one PR each | release 7's cut |
-| #1182 | rule builder; release 8 | release 7's cut |
-| #1202 | rule builder; release 8; `AGENTS.md` and what every session here reads at its start | #1046 and #1052 (`AGENTS.md`, one at a time); release 7's cut |
+| #1202 | rule builder; release 8; `AGENTS.md` and what every session here reads at its start | #1413's point 4 (`AGENTS.md`, one at a time) |
+| #1504 | rule builder; `roles/orchestrator.md` | #1202 (what a role reads at its start, one at a time) |
+| #1505 | rule builder; `roles/shared/work-flow.md` | #1504 (what a role reads at its start, one at a time) |
+| #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 8, one PR each | |
+| #1123 | rule builder; release 8 | #974, #1060 (`roles/adviser.md`) |
+| #1098, #1133, #1356 | builder; release 8, one PR each | |
+| #1180, #1181 | rule builder; release 8, one PR each | |
+| #1182 | rule builder; release 8 | |
 | #810 | the orchestrator | the batch's end |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
@@ -33,7 +32,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #441, with #484, points 6 and 7 | rule builder | |
 | #355 | builder | #530 |
 | #542, point 5 | rule builder | #457 |
-| #675 | builder | |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 5 | builder | the types record reopening |
 | #460, points 2 to 5, one PR each | builder | |
@@ -54,7 +52,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1046 | rule builder; #767's third kind, `AGENTS.md` | |
 | #1051 | rule builder; each pull request records its own cost | |
 | #1052 | rule builder; `AGENTS.md`, the workflow tries its own settings | #1051 (its point 6); #1046 (`AGENTS.md`, one at a time) |
-| #1185 | rule builder; release 8 | #1052 (its trial of when a builder hands over); release 7's cut |
+| #1185 | rule builder; release 8 | #1052 (its trial of when a builder hands over); #1505 (the hand-over mark) |
 | #1060 | rule builder; `roles/adviser.md` | #1052 (its record holds it in part); #974 (`roles/adviser.md`, one at a time) |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
