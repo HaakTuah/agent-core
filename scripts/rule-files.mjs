@@ -48,24 +48,48 @@ export function placeAt(commit) {
     return modes.get(f);
   };
   const show = at => { try { return run(["show", `${commit}:${at}`]); } catch { return null; } };
-  // (where a path leads: { at } the file read there, or null with `held` whether anything stands on its way, a link
-  // that leads to nothing in the tree included; one that leads to a folder lacking the rest of the path holds none)
-  const stands = at => at === "." || mode(at) !== undefined || [...modes.keys()].some(p => p.startsWith(`${at}/`));
-  const walk = f => {
-    for (let at = path.posix.normalize(f), hops = 0, landed = null; hops <= 40; hops++) {
-      if (at === ".." || at.startsWith("../") || at.startsWith("/")) return { at: null, held: true };
+  const place = f => {
+    for (let at = path.posix.normalize(f), hops = 0; hops <= 40; hops++) {
+      if (at === ".." || at.startsWith("../") || at.startsWith("/")) return null;
       // (the first part of the path, its own end included, that is a link: what stands there is read through it)
       const parts = at.split("/"), k = parts.findIndex((_, i) => mode(parts.slice(0, i + 1).join("/")) === "120000");
-      if (k < 0) return { at: /^100/u.test(mode(at) ?? "") ? at : null, held: stands(at) || (landed !== null && !stands(landed)) };
+      if (k < 0) return /^100/u.test(mode(at) ?? "") ? at : null;
       const link = parts.slice(0, k + 1).join("/"), to = show(link);
-      if (to === null || /^([\\/]|[A-Za-z]:)/u.test(to)) return { at: null, held: true };
-      landed = path.posix.normalize(path.posix.join(path.posix.dirname(link), to.replace(/\\/gu, "/")));
-      at = path.posix.normalize(path.posix.join(landed, ...parts.slice(k + 1)));
+      if (to === null || /^([\\/]|[A-Za-z]:)/u.test(to)) return null;
+      at = path.posix.normalize(path.posix.join(path.posix.dirname(link), to.replace(/\\/gu, "/"), ...parts.slice(k + 1)));
     }
-    return { at: null, held: true };
+    return null;
   };
-  const place = f => walk(f).at;
-  return Object.assign(place, { show, size: at => (mode(at) === undefined ? undefined : sizes.get(at)), held: f => walk(f).held });
+  const size = at => (mode(at) === undefined ? undefined : sizes.get(at));
+  let folders = null;
+  const isFolder = at => {
+    if (!folders) { mode(""); folders = new Set([...modes.keys()].flatMap(k => k.split("/").slice(0, -1).map((_, i, a) => a.slice(0, i + 1).join("/")))); }
+    return folders.has(at);
+  };
+  // (whether the tree holds anything at a path, read part by part as a system reads it: each link's text put in its
+  // place and read from the link's own folder; a part a link's text brings that the tree lacks makes it a link that
+  // leads nowhere, held, while a part of the path's own that the tree lacks, past every link, holds nothing; a link
+  // that leads out of the tree, one past 4096 bytes, a submodule on the way and more than 40 links are held)
+  const held = f => {
+    const todo = path.posix.normalize(f).split("/").map(p => ({ p, linked: false }));
+    for (let cur = "", hops = 0; todo.length;) {
+      const { p, linked } = todo.shift();
+      if (p === "" || p === ".") continue;
+      if (mode(cur) === "160000") return true;
+      if (p === "..") { if (cur === "" || !isFolder(cur)) return true; cur = cur.includes("/") ? cur.slice(0, cur.lastIndexOf("/")) : ""; continue; }
+      const next = cur ? `${cur}/${p}` : p, m = mode(next);
+      if (m === "120000") {
+        const to = ++hops > 40 || !(size(next) <= 4096) ? null : show(next);
+        if (to === null || /^([\\/]|[A-Za-z]:)/u.test(to)) return true;
+        todo.unshift(...to.replace(/\\/gu, "/").split("/").map(q => ({ p: q, linked: true })));
+        continue;
+      }
+      if (m === undefined && !isFolder(next)) return linked;
+      cur = next;
+    }
+    return true;
+  };
+  return Object.assign(place, { show, size, held });
 }
 // The files an agent tool takes its instructions from, as `read` and `list` find them: those of TOOL_FILES, then those
 // git tracks under FOLDERS, each that `read` reads (so a link that leads out of the project is none, at a commit too).

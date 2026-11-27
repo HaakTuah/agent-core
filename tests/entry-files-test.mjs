@@ -133,6 +133,18 @@ try {
     refused("and so does an entry file made a link that climbs above the project's root, whatever it leads to");
     swap("CLAUDE.md", f => fs.writeFileSync(f, "@AGENTS.md\n"));
     ok(run({ ENTRY_BASE: "HEAD" }).status === 0, "once each is again what the base held, it passes");
+    // (a base that held a link leading nowhere by a longer way: through a second link, or through a part that is not there)
+    write("z/.keep", "");
+    for (const [what, made] of [
+      ["CLAUDE.md led through a second link to a folder lacking the file", () => { swap("CLAUDE.md", f => fs.symlinkSync("x/c.md", f)); fs.symlinkSync("z", path.join(dir, "x")); }],
+      [".agents led through a second link to a folder lacking the rest", () => { swap(".agents", f => fs.symlinkSync("x/y", f)); fs.symlinkSync("z", path.join(dir, "x")); }],
+      [".agents led up out of a folder that is not there", () => swap(".agents", f => fs.symlinkSync("w/..", f))],
+    ]) {
+      made(); commit(what);
+      r = run({ ENTRY_BASE: "HEAD" });
+      ok(r.status === 0 && r.out.includes("note") && r.out.includes("stands here but is not read"), `against a base where ${what}, left so, it is noted and fails nothing`);
+      fs.rmSync(path.join(dir, "x"), { force: true }); swap("CLAUDE.md", f => fs.writeFileSync(f, "@AGENTS.md\n")); swap(".agents", () => write(".agents/rules/core.md", AG)); commit(`${what}, undone`);
+    }
     const awayDir = `${away}.d`;
     fs.mkdirSync(path.join(awayDir, "rules"), { recursive: true }); fs.writeFileSync(path.join(awayDir, "rules/core.md"), AG);
     swap(".agents", f => fs.symlinkSync(awayDir, f)); commit("antigravity's folder elsewhere");
