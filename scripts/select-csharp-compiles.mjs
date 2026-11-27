@@ -59,8 +59,9 @@ const ASSEMBLY_STRINGS = new Set(["System.Runtime.CompilerServices.InternalsVisi
 const HIDDEN = /<\?|<!DOCTYPE|<!\[CDATA\[|&#|%0[ad]|\$\(\s*\[(?!MSBuild\]::Get(?:PathOf|DirectoryNameOf)FileAbove\()/iu;
 const DECLARATION = /^\uFEFF?<\?xml\s[^<>?]*\?>/u;
 const TAG = /<(\/?)([^\s<>/]*)(?![^\s<>/])([^<>]*)>/gu; // (the name taken whole, never given back to the rest: linear)
-// The SDKs whose own files bring in no C# of the repository that the reader does not read, as Sdk="Name" or "Name/1.0".
-const SDK = /^(?:Microsoft\.NET\.Sdk(?:\.(?:Web|Razor|Worker|BlazorWebAssembly|WindowsDesktop|StaticWebAssets))?|MSTest\.Sdk)(?:\/[\w.+-]+)?$/iu;
+// The SDKs whose own files bring in no C# of the repository that the reader does not read, as Sdk="Name" or "Name/1.0",
+// in their own case, as the resolver finds their folder on Linux.
+const SDK = /^(?:Microsoft\.NET\.Sdk(?:\.(?:Web|Razor|Worker|BlazorWebAssembly|WindowsDesktop|StaticWebAssets))?|MSTest\.Sdk)(?:\/[\w.+-]+)?$/u;
 
 // Whether the text of the file `f` compiles C# the reader never reads (#675): what HIDDEN names, a comment with no end,
 // a tag the reader does not know (unknown); a value that holds a line break (between two tags, beside other text) or a
@@ -96,27 +97,44 @@ function uncommented(text) {
   return plain;
 }
 
-// Whether a text, its comments out, holds a tag of an element the reader does not know, or an attribute of one; a Link
-// or LinkBase but on a <Compile>; an SDK but those of SDK; a tag that is no run of attributes, or closes with any; or a
-// "<" outside every tag. Each try ends at the next "<": linear.
+// Whether a text, its comments out, holds a tag of an element the reader does not know, or an attribute of one; one
+// unsafe where it stands; a tag that is no run of attributes, or closes with any; or a "<" outside every tag. Each try
+// ends at the next "<": linear.
 function unknown(plain, pace) {
+  let item = null; // (the item whose tag stands open, its name and attributes, for the metadata written inside it)
   for (const m of plain.matchAll(TAG)) {
     pace();
     const attrs = m[1] ? (/^\s*$/u.test(m[3]) ? {} : null) : attributes(m[3]);
-    if (!known(ELEMENTS, m[2]) || !attrs || Object.keys(attrs).some(a => !known(ATTRIBUTES, a)) || (!m[1] && unsafe(m[2], attrs))) return true;
+    if (!known(ELEMENTS, m[2]) || !attrs || Object.keys(attrs).some(a => !known(ATTRIBUTES, a)) || (!m[1] && unsafe(m[2], attrs, item))) return true;
+    if (ITEMS.test(m[2])) item = m[1] || m[3].trimEnd().endsWith("/") ? null : { name: m[2], attrs };
   }
   return plain.replace(TAG, "").includes("<");
 }
 
-// Whether the known attributes `attrs` of an opening tag of `name` are not safe there: a Link or LinkBase but on a
-// <Compile>, where it names only how a file is shown, sets where a copy is written; an SDK but those of SDK, in an Sdk
-// attribute's parts or an <Sdk>'s Name, which must be there.
-function unsafe(name, attrs) {
-  if (!/^compile$/iu.test(name) && ("link" in attrs || "linkbase" in attrs)) return true;
+// The items whose metadata may be written inside them, and the metadata that copies an item's file to the output.
+const ITEMS = /^(?:compile|none|content|embeddedresource)$/iu, COPY = /^copyto(?:output|publish)directory$/iu;
+
+// Whether the known attributes `attrs` of an opening tag of `name`, inside the open `item`, are not safe there: a Link
+// or LinkBase but on a <Compile>, where it sets where a copy is written; on a <Compile>, one but a plain path below
+// (none of MSBuild's expansions, no "..", not rooted); a copy to the output of a file that may be C# (a <Compile>'s,
+// or a part of an Include or Update that ends in ".cs" or MSBuild expands), as an attribute or written inside the
+// item, which the copy may write where another project compiles it, over a file git holds or into a folder its wildcard
+// reaches; an SDK but those of SDK, in an Sdk attribute's parts or an <Sdk>'s Name, which must be there.
+function unsafe(name, attrs, item) {
+  const compile = /^compile$/iu.test(name);
+  if (!compile && ("link" in attrs || "linkbase" in attrs)) return true;
+  if (compile && [attrs.link, attrs.linkbase].some(l => l !== undefined && !plainBelow(l))) return true;
+  if (ITEMS.test(name) && Object.keys(attrs).some(a => COPY.test(a)) && copiesCs(name, attrs)) return true;
+  return (COPY.test(name) && item !== null && copiesCs(item.name, item.attrs)) || unknownSdk(name, attrs);
+}
+function unknownSdk(name, attrs) {
   const element = /^sdk$/iu.test(name);
   if (element && !(attrs.name ?? "").trim()) return true;
   return [...(attrs.sdk ?? "").split(";"), ...(element ? [attrs.name] : [])].some(n => n.trim() && !SDK.test(n.trim()));
 }
+const plainBelow = l => !/[$%@&;:]|^\s*[\\/]/u.test(l) && !l.split(/[\\/]/u).some(w => w.trim() === "..");
+const copiesCs = (name, attrs) => /^compile$/iu.test(name) ||
+  [attrs.include, attrs.update].some(v => (v ?? "").split(";").some(p => /[*?$@%&]|\.cs[\s.]*$/iu.test(p)));
 
 // Whether a part of the Include of an item `tag` matches, trimmed and with Windows' separators turned, or a tag of it is
 // no run of attributes.
@@ -145,12 +163,14 @@ function bringsIn(p, f, cs) {
 // The solution files, and the files the SDK or a package compiles to C# the reader never reads (Razor's, XAML's,
 // Avalonia's), in any case.
 export const SOLUTION = /\.(?:sln|slnx|slnf)$/iu, COMPILED = /\.(?:razor|cshtml|xaml|axaml)$/iu;
-// (a .sln's solution folder, which builds nothing)
-const FOLDER = "2150E333-8FDC-42A3-9474-1A3956D46DE8";
+// (a .sln's solution folder, which builds nothing, and C#'s two project types, the old and the SDK's; any other type,
+// a web site's among them, may build its path otherwise)
+const FOLDER = "2150E333-8FDC-42A3-9474-1A3956D46DE8", CSHARP = new Set(["FAE04EC0-301F-11D3-BF4B-00C04F79EFBC", "9A19103F-16F7-4668-BE54-9A1E7A4F7556"]);
 
 // Whether the solution file `f` (its text `text`) builds anything but a .csproj of `projects` (the lower-cased paths of
 // those git or the change holds): a solution builds a project of any extension under C#'s GUID, whose targets may write
-// files of C#. Of a .sln, read as ASCII alone, each line that holds "Project(" names a solution folder or a .csproj of them; of a .slnx, each
+// files of C#. Of a .sln, read as ASCII alone, each line that holds "Project(" names a solution folder or, under C#'s
+// type, a .csproj of them; of a .slnx, each
 // <Project>'s Path does, with no Type; of a .slnf, its solution is a .sln or .slnx git holds and each project it lists
 // a .csproj of them, read from that solution's folder. Anything else, a line or a file not read whole among it, is
 // another.
@@ -160,7 +180,7 @@ export function buildsOther(f, text, projects, solutions) {
   // ASCII's printable ones, which .NET's trimming might take as a blank, makes it another)
   if (/\.sln$/iu.test(f)) return /[^\t\r\n\x20-\x7e]/u.test(text.replace(/^\uFEFF/u, "")) || text.split(/\r\n|\r|\n/u).filter(l => /Project\s*\(/iu.test(l)).some(l => {
     const m = /^\s*Project\s*\(\s*"\{([0-9A-F-]+)\}"\s*\)\s*=\s*"[^"]*"\s*,\s*"([^"]*)"\s*,\s*"\{[0-9A-F-]+\}"\s*$/iu.exec(l);
-    return !m || (m[1].toUpperCase() !== FOLDER && !held(f, m[2]));
+    return !m || (m[1].toUpperCase() !== FOLDER && (!CSHARP.has(m[1].toUpperCase()) || !held(f, m[2])));
   });
   if (/\.slnx$/iu.test(f)) return [...text.matchAll(/<Project\b([^<>]*)>/giu)].some(m => { const a = attributes(m[1]); return !a || "type" in a || !held(f, a.path ?? ""); }) || /<Project\b[^<>]*$/iu.test(text);
   try {

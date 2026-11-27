@@ -4,8 +4,10 @@
 // climbs out or names files other than .cs, any item of an imported file, a project of another kind or outside),
 // where a project may compile C# by other means (an element or attribute not on the list known safe, so any target,
 // task, compiler property, generator item or referenced project's properties among them; a property function, a
-// character reference, a processing instruction or a document type; a value's line break; a link, a submodule, a path
-// with a control character, a file of Razor or XAML, or a solution that builds what is not a .csproj held), and none
+// character reference, a processing instruction or a document type; a value's line break or quote; a Link that climbs
+// or expands, or on an item but <Compile>; a copy to the output of what may be C#; an SDK not known, in its own case; a link, a submodule, a path
+// with a control character, a file of Razor or XAML, or a solution that builds what is not a .csproj held under C#'s
+// type), and none
 // where it names a file or project git holds, a wildcard of .cs inside, or only removes or updates, or a solution builds
 // only a .csproj held; a file of C# that declares a type of System or Microsoft, or holds a Unicode escape, reached from
 // every file. Where other MSBuild files decide it:
@@ -96,6 +98,14 @@ for (const [item, what, more] of [
   [`<Using Include="App" include="Other" />`, "two attributes alike but in case, of which a reader may take either"],
   [`<None Include="docs/x.md" Link="../../tests/Gen.cs" CopyToOutputDirectory="Always" />`, "a Link on another item than <Compile>, which sets where a copy is written"],
   [`<Content Include="docs/**" LinkBase="../../../tests" CopyToOutputDirectory="Always" />`, "a LinkBase on another item than <Compile>"],
+  [`<Compile Update="A.cs" Link="../../../../../tests/Guard.cs" CopyToOutputDirectory="Always" />`, "a <Compile> copied to the output by a Link that climbs, over a file another project compiles"],
+  [`<Compile Update="A.cs" CopyToOutputDirectory="PreserveNewest" />`, "a <Compile> copied to the output"],
+  [`<Compile Update="A.cs"><CopyToPublishDirectory>Always</CopyToPublishDirectory></Compile>`, "a <Compile> copied to the output, written inside it"],
+  [`<Compile Update="A.cs" Link="../Shown/A.cs" />`, "a Link on a <Compile> that climbs"],
+  [`<Compile Update="A.cs" LinkBase="$(Shared)" />`, "a LinkBase on a <Compile> that MSBuild expands"],
+  [`<None Include="../lib/Rules.cs" CopyToOutputDirectory="Always" />`, "a file of C# copied to the output, where another project's wildcard may compile it"],
+  [`<Content Include="gen/*"><CopyToOutputDirectory>Always</CopyToOutputDirectory></Content>`, "a wildcard copied to the output, written inside the item"],
+  ["", "an SDK the reader knows but in another case, which the resolver may not find as its own", { "Directory.Build.props": "<Project Sdk=\"microsoft.net.sdk\" />\n" }],
   [`<PropertyGroup><NoWarn>CS1591&quot; /x:y</NoWarn></PropertyGroup>`, "a quote in a value, which may close the compiler's argument"],
   [`<PropertyGroup><NoWarn>CS1591%22 /x:y</NoWarn></PropertyGroup>`, "a quote in a value, by MSBuild's escape"],
   ["", "an SDK the reader does not know, whose files may write C#", { "Directory.Build.props": "<Project Sdk=\"Aspire.AppHost.Sdk/9.5.0\" />\n" }],
@@ -111,6 +121,7 @@ for (const [item, what, more] of [
   [`<Compile Include="../lib/**/*.cs" />`, "a wildcard inside the repository"],
   [`<Compile Remove="Old/*.cs" />`, "nothing, only a removal"],
   [`<Compile Update="A.cs" Link="B.cs" />`, "nothing, only an update"],
+  [`<None Include="data.json"><CopyToOutputDirectory>Always</CopyToOutputDirectory></None><Content Update="wwwroot/site.css" CopyToPublishDirectory="Always" />`, "files other than C# copied to the output"],
   ["", "nothing"],
   [`<Compile Include="../lib/*.CS" />`, "a wildcard of .cs in upper case inside the repository"],
   [`<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo"><_Parameter1>App.Tests</_Parameter1></AssemblyAttribute><AssemblyAttribute Include=" System.CLSCompliantAttribute "><_Parameter1>true</_Parameter1></AssemblyAttribute>`, "an assembly's attribute of the framework, written with strings alone"],
@@ -158,8 +169,10 @@ const sln = [
   held({ ...APP, "App.sln": SLN(`\u0085${project(CSG, "gen\\gen.build")}`) }),
   held({ ...APP, "App.slnx": "<Solution><Project Path=\"gen/gen.build\" PATH=\"src/App.csproj\" /></Solution>\n" }),
   held({ ...APP, "App.sln": `\uFEFF${SLN(project(CSG, "src\\App.csproj")).replace(/\n/gu, "\r\n")}` }),
+  held({ ...APP, "App.sln": SLN(project("9a19103f-16f7-4668-be54-9a1e7a4f7556", "src\\App.csproj")) }),
+  held({ ...APP, "App.sln": SLN(project("E24C65DC-7377-472B-9ABA-BC803B73C61A", "src\\App.csproj")) }),
 ];
-ok(same(sln, [false, false, false, true, true, true, true, true, true, true, true, true, true, false]), "a solution that builds a .csproj held, or a folder alone, leaves what git holds read; one that lists another project, a path outside, a line it cannot read (a bare carriage return ending one, a character past ASCII), a type, an attribute twice, or a filter of a solution not held, leaves it unknown; a byte order mark and Windows' line ends are read", JSON.stringify(sln));
+ok(same(sln, [false, false, false, true, true, true, true, true, true, true, true, true, true, false, false, true]), "a solution that builds a .csproj held under C#'s type, old or the SDK's, or a folder alone, leaves what git holds read; one that lists another project, a path outside, a line it cannot read (a bare carriage return ending one, a character past ASCII), another type (a web site's), a type in a .slnx, an attribute twice, or a filter of a solution not held, leaves it unknown; a byte order mark and Windows' line ends are read", JSON.stringify(sln));
 
 // (a link and a submodule git holds, in a scratch repository, written to the index alone, as on a system with no
 // links: a wildcard inside, the SDK's default among them, would follow the link out or take the submodule's files)
