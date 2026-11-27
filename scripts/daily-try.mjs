@@ -111,6 +111,17 @@ export function holds(pair, sha) {
   return trialAt(sha, args => (args[0] === "show" ? JSON.stringify(record) : "")).held !== null;
 }
 
+// The scripts a project's run before the sync takes, and its sync: the copy's own where it has them (its check where it
+// writes verdicts), else those of the core under try, as a release's trial takes them.
+function scriptsOf(at, copy, core) {
+  const own = copy.path ? path.join(at, copy.path, "scripts") : null, theirs = name => (own && fs.existsSync(path.join(own, name)) ? path.join(own, name) : null);
+  const check = theirs("check.mjs");
+  return {
+    before: check && fs.readFileSync(check, "utf8").includes("--verdicts") ? check : path.join(core, "scripts", "check.mjs"),
+    sync: theirs("sync.mjs") ?? path.join(core, "scripts", "sync.mjs"),
+  };
+}
+
 // One project tried at the core checked out at `core` (its commit `sha`): the run before, the sync, the run after, each
 // output to a log in `out`. What it came to: "atPin", "untried", "syncFailed", "afterUnread", or the pair, held or not.
 export function tryOne(p, core, sha, out, run = runLogged) {
@@ -118,16 +129,15 @@ export function tryOne(p, core, sha, out, run = runLogged) {
   const manifest = manifestText(path.join(at, "core-manifest.md"));
   const copy = readCore(manifest ?? "");
   if (copy.pin === sha) return { came: "atPin" };
-  const own = copy.path ? path.join(at, copy.path, "scripts") : null;
-  const ownCheck = own && fs.existsSync(path.join(own, "check.mjs")) && fs.readFileSync(path.join(own, "check.mjs"), "utf8").includes("--verdicts");
+  const scripts = scriptsOf(at, copy, core);
   const main = (spawnSync("git", ["rev-parse", "HEAD"], { cwd: at, encoding: "utf8" }).stdout ?? "").trim();
   run(process.execPath, [path.join(core, "scripts", "toolchain.mjs"), at], at, log);
   const check = (script, file) => run(process.execPath, [script, "--base", main, "--own", "--verdicts", file], at, log);
   const before = path.join(out, `${p.dir}.before.json`), after = path.join(out, `${p.dir}.after.json`);
-  check(ownCheck ? path.join(own, "check.mjs") : path.join(core, "scripts", "check.mjs"), before);
+  check(scripts.before, before);
   if (!readJson(before)) return { came: "untried" };
   const synced = run("git", ["switch", "--quiet", "-c", "daily-try"], at, log)
-    && run(process.execPath, [fs.existsSync(path.join(own ?? "", "sync.mjs")) ? path.join(own, "sync.mjs") : path.join(core, "scripts", "sync.mjs"), sha], at, log)
+    && run(process.execPath, [scripts.sync, sha], at, log)
     && run("git", ["add", "-A"], at, log)
     && run("git", ["-c", "user.name=daily-try", "-c", "user.email=daily-try@example.invalid", "commit", "--quiet", "--no-verify", "-m", "The daily try's sync (never pushed)"], at, log);
   if (!synced) return { came: "syncFailed" };
@@ -194,34 +204,46 @@ function ghWrite(method, route, payload) {
   if (r.status !== 0) throw new Error(`GitHub refused ${method} ${route.replace(/^repos\/[^/]+\/[^/]+\//u, "")}`);
 }
 
-function main([what, ...args]) {
-  const fail = why => { console.error(`FAIL ${why}`); return 1; };
+const fail = why => { console.error(`FAIL ${why}`); return 1; };
+
+// Each command (the script's head), by its flag; each takes the command's arguments and gives the exit code.
+const COMMANDS = {
   // (no commit to try is no failure: it prints nothing, and the try's steps after it do not run)
-  if (what === "--green") { const g = greenMain(ROOT); if (g.sha) console.log(g.sha); else console.error(`${g.said}: nothing to try today; the next day's run tries again.`); return 0; }
-  if (what === "--find" && args.length === 1) {
+  "--green": () => { const g = greenMain(ROOT); if (g.sha) console.log(g.sha); else console.error(`${g.said}: nothing to try today; the next day's run tries again.`); return 0; },
+  "--find": ([dir]) => {
     const signedIn = process.env.SIGNED_IN === "true";
-    try { find(path.resolve(args[0]), { signedIn, token: signedIn ? process.env.GH_TOKEN : undefined }); return 0; }
+    try { find(path.resolve(dir), { signedIn, token: signedIn ? process.env.GH_TOKEN : undefined }); return 0; }
     catch { return fail("GitHub gave no answer, or none that could be read, for the owner's repositories or a manifest, so no project was found (not none found). Mend: start the job again; where it fails each day, see whether the owner's sign-in has expired."); }
-  }
-  if (what === "--run" && args.length === 2) { const { out } = runAll(path.resolve(args[0]), path.resolve(args[1])); console.log(JSON.stringify(out)); return 0; }
-  if (what === "--file" && !args.length) {
+  },
+  "--run": ([dir, core]) => { const { out } = runAll(path.resolve(dir), path.resolve(core)); console.log(JSON.stringify(out)); return 0; },
+  "--file": () => {
     try { const text = process.env.TRY ?? ""; file(text.length > COUNTS_MAX ? null : parseBounded(text || "null")); return 0; }
     catch (e) { return fail(`${e.message}. Mend: read the try job's log for its counts; start the look again once it gives them.`); }
-  }
-  if (what === "--local" && args.length <= 1) {
-    const dir = path.resolve(args[0] ?? fs.mkdtempSync(path.join(os.tmpdir(), "daily-try-")));
+  },
+  "--local": ([given]) => {
+    const dir = path.resolve(given ?? fs.mkdtempSync(path.join(os.tmpdir(), "daily-try-")));
     const token = spawnSync("gh", ["auth", "token"], { encoding: "utf8" }).stdout?.trim();
     find(dir, { signedIn: true, token, actions: false });
     const { out, each } = runAll(dir, ROOT);
-    for (const p of each) {
-      const c = p.pair ? compared(...p.pair) : null;
-      const why = c ? ["failedAfter", "failedAfterAlone", "unreadAfter", "unreadBefore", "stoppedAfter", "unrunAfterRan"].flatMap(k => c[k].map(j => `${j} (${k})`)) : [];
-      console.log(`- ${p.name}: ${p.came}${why.length ? `: ${why.join(", ")}` : ""}; its log: ${path.join(dir, `${p.dir}.log`)}`);
-    }
+    for (const p of each) console.log(`- ${p.name}: ${p.came}${heldBy(p)}; its log: ${path.join(dir, `${p.dir}.log`)}`);
     console.log(JSON.stringify(out));
     return 0;
-  }
-  return fail("it takes --green, --find <dir>, --run <dir> <core>, --file or --local [<dir>]. Mend: give one of them, as the script's head says.");
+  },
+};
+// How many arguments each takes, at least and at most.
+const ARITY = { "--green": [0, 0], "--find": [1, 1], "--run": [2, 2], "--file": [0, 0], "--local": [0, 1] };
+
+// The checks that held a project, as the trial's classes name them, for --local alone.
+function heldBy(p) {
+  const c = p.pair ? compared(...p.pair) : null;
+  const why = c ? ["failedAfter", "failedAfterAlone", "unreadAfter", "unreadBefore", "stoppedAfter", "unrunAfterRan"].flatMap(k => c[k].map(j => `${j} (${k})`)) : [];
+  return why.length ? `: ${why.join(", ")}` : "";
+}
+
+function main([what, ...args]) {
+  const [least, most] = Object.hasOwn(ARITY, what) ? ARITY[what] : [1, 0];
+  if (args.length < least || args.length > most) return fail("it takes --green, --find <dir>, --run <dir> <core>, --file or --local [<dir>]. Mend: give one of them, as the script's head says.");
+  return COMMANDS[what](args);
 }
 
 if (started(import.meta.url)) process.exitCode = main(process.argv.slice(2));
