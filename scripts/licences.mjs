@@ -21,7 +21,9 @@
 // no lockfile holds, a JSON file whose "entries" each have a "name", a "licence", "ships": true if it ships, and
 // "kind": "data", "asset" or "font" where that widens its list ("github-service" with LicenseRef-GitHub-Terms: one of
 // GitHub's own services, GITHUB_SERVICES below, which never ships; "own" with LicenseRef-Owner: the owner's own work,
-// all rights reserved, as floor rule 10 ends), and "notice", its notice; "notices", the third-party notices file that
+// all rights reserved, as floor rule 10 ends; "distribution": a package of the machine's distribution, which its
+// package manager installs, whose version is the distribution's, licence-scan.mjs asking it none where a file the
+// entry covers installs it so), and "notice", its notice; "notices", the third-party notices file that
 // ships, where the project keeps one (every entry that ships, but the owner's own, is named in it; without one, each
 // such entry has its "notice", for the notices the project builds, as floor rule 10 asks); "ignoreScriptsIn", the
 // .npmrc files that must keep packages' own install scripts off (floor rule 15) and set the week's wait, which npm

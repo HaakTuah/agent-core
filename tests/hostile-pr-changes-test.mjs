@@ -237,6 +237,10 @@ const together = (key, what, files, whole = true) => {
 };
 // (and the linking of each file to the files whose names it holds, which took time in step with the count of files times their
 // text, and the search from each test: the answer is the whole suite where the pace is passed, else the tests it selects)
+// (a test that lists a folder, in a tree of deep paths, holding a string of 300,000 folders in and as many `..` out:
+// the folder reader's work stays in step with the text and the paths, where it took 5 s; #1361, point 25; Windows
+// holds no path 2,000 characters long)
+if (NAMES) together("listing", "a listing test holding a string of 750,000 characters, beside 300 paths 1,000 folders deep", { "test/list.test.mjs": `fs.readdirSync(".");\n"${"a/".repeat(150000)}${"../".repeat(150000)}";\n`, ...Object.fromEntries(Array.from({ length: 300 }, (_, n) => [`${"d/".repeat(1000)}f${n}.js`, "1;\n"])) }, false);
 together("many-mid", "2300 files of 1,500 characters, under the limit in characters", Object.fromEntries(Array.from({ length: 2300 }, (_, n) => [`src/f${n}.js`, `export const v = "${" f1.j".repeat(300)}";\n`])), false);
 together("one-long", "4000 small files and one of 3.8 million characters", { ...Object.fromEntries(Array.from({ length: 4000 }, (_, n) => [`src/g${n}.js`, `export const v = ${n};\n`])), "src/long.js": `export const v = "${"a ".repeat(1_900_000)}";\n` }, false);
 together("tests-naming", "700 test files that each name the 699 others", Object.fromEntries(Array.from({ length: 700 }, (_, n) => [`test/t${n}.js`, `export const v = "${Array.from({ length: 700 }, (_, k) => `t${k}.js`).join(" ")}";\n`])), false);

@@ -1,6 +1,6 @@
 // The sync (README, "How a project takes the core", point 1): run from a project's root, it brings the project's copy
 // of the core to a newer commit of the core, as a sync PR carries it. It writes the copy whole at that commit, at the path the
-// manifest's "Core:" line names (`core/` as a rule; core-path.mjs), with the executable bits the core marks staged in git's index (#1093), moves that line to it, and moves each call to a core workflow whose workflow changed (as `core.yml` checks),
+// manifest's "Core:" line names (`core/` as a rule; core-path.mjs), with the executable bits the core marks staged in git's index (#1093), moves that line to it, and moves each call to a core workflow whose workflow changed since the pin the project's main holds (as `core.yml` checks),
 // listing those calls, and prints what the sync asks of the project beyond the copy (the core's setup/sync-notes.md, the
 // entries it gained between the two commits), then, from the copy it has just written, every step a release asks that
 // is not done, what the steps' writers wrote of them where a script does it exactly, set aside in a stash to be
@@ -104,25 +104,48 @@ function releaseToTake({ text, old, at }, tmp) {
   return { pin: newest.sha, release: ` (${newest.name})` };
 }
 
+// A call to a core workflow at a full SHA, its workflow's file name and its pin captured (a fresh one for each use: it is global).
+const callsOf = () => new RegExp(`${CORE}/\\.github/workflows/([A-Za-z0-9._-]+\\.ya?ml)@([0-9a-f]{40})`, "g");
+
 // Each call to a core workflow whose workflow changed between its pin and `pin`, moved to `pin`: { moved, unread }, the
-// calls moved and the workflows not read. A workflow is read as the steps read it (`own`: own-files.mjs): one that is no
-// regular file of the project's own, a link that leads out among them, is left as it is, named, and never written through.
-export function moveCalls(pin, tmp, own) {
+// calls moved and the workflows not read. A call's pin is read from the project's main where main holds that call at one
+// pin (`onMain`), so a sync pull request synced again, to a newer commit, writes what a sync from main straight to it
+// writes: a call an earlier run on the branch moved, whose workflow is the same at main's pin and `pin`, goes back to
+// main's pin, and one whose workflow changed since main's goes to `pin`, whatever the branch holds (#1361, point 24).
+// A workflow is read as the steps read it (`own`: own-files.mjs): one that is no regular file of the project's own, a
+// link that leads out among them, is left as it is, named, and never written through.
+export function moveCalls(pin, tmp, own, onMain = mainCalls) {
   const moved = [], unread = [];
   for (const p of own.listed.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(f))) {
     const file = p.slice(".github/workflows/".length), src = own.read(p, true);
     if (src === null) { unread.push(p); continue; }
-    const out = src.replace(new RegExp(`${CORE}/\\.github/workflows/([A-Za-z0-9._-]+\\.ya?ml)@([0-9a-f]{40})`, "g"),
+    const main = onMain(p);
+    const out = src.replace(callsOf(),
       (call, name, sha) => {
+        const from = main.get(name)?.size === 1 ? [...main.get(name)][0] : sha;
         let same = false;
-        try { git(["diff", "--quiet", sha, pin, "--", `.github/workflows/${name}`], tmp); same = true; } catch {}
-        if (same) return call;
-        moved.push(`${file}: ${name} ${sha.slice(0, 7)} -> ${pin.slice(0, 7)}`);
-        return `${CORE}/.github/workflows/${name}@${pin}`;
+        try { git(["diff", "--quiet", from, pin, "--", `.github/workflows/${name}`], tmp); same = true; } catch {}
+        const to = same ? from : pin;
+        if (to === sha) return call;
+        moved.push(`${file}: ${name} ${sha.slice(0, 7)} -> ${to.slice(0, 7)}${to === pin ? "" : ", as main holds it, its workflow the same there and at the new pin"}`);
+        return `${CORE}/.github/workflows/${name}@${to}`;
       });
     if (out !== src) fs.writeFileSync(p, out);
   }
   return { moved, unread };
+}
+
+// The pins the project's main holds for each core workflow a workflow file calls: name to the set of its pins, read from
+// origin/main, else the local main; empty where neither holds the file, as in a project with no main yet.
+function mainCalls(file) {
+  const calls = new Map();
+  for (const ref of ["refs/remotes/origin/main", "refs/heads/main"]) {
+    const r = spawnSync("git", ["--no-replace-objects", "show", `${ref}:${file}`], { encoding: "utf8", maxBuffer: READ_MOST * 2 });
+    if (r.status !== 0) continue;
+    for (const [, name, sha] of `${r.stdout}`.matchAll(callsOf())) calls.set(name, (calls.get(name) ?? new Set()).add(sha));
+    return calls;
+  }
+  return calls;
 }
 
 // What the sync moved (the copy, the manifest's line and the workflow calls): the files counted are the copy's, the

@@ -89,7 +89,7 @@ jobs:
   git(origin, "checkout", "-q", "main"); const pulled = commit(origin, "c.md", "c\n");
   git(origin, "update-ref", "refs/pull/1/head", pulled); git(origin, "reset", "-q", "--hard", first);
   const clone = path.join(tmp, "clone");
-  git(tmp, "clone", "-q", origin, clone);
+  execFileSync("git", ["clone", "-q", "--", ".", clone], { cwd: origin, stdio: ["ignore", "pipe", "pipe"] });
   const checkout = standIns({ git: (cwd, ...a) => git(cwd, ...a), say: () => {}, tmp })["actions/checkout"];
   const at = ref => { checkout({ ref }, clone); return git(clone, "rev-parse", "HEAD"); };
   ok(at(first) === first && at("refs/pull/1/head") === pulled && at("feature") === onBranch, "the checkout stand-in checks out a commit's id and a ref written whole as they are, and a bare name as the origin's branch (#1245, point 4)");
@@ -207,7 +207,7 @@ jobs:
   const core = path.join(tmp, "core");
   fs.mkdirSync(core); git(core, "init", "-q");
   const released = commit(core, "one.md", "1\n"); git(core, "tag", "release-1"); const unreleased = commit(core, "two.md", "2\n");
-  const bare = path.join(tmp, "core.git"); git(tmp, "clone", "-q", "--bare", core, bare);
+  const bare = path.join(tmp, "core.git"); execFileSync("git", ["clone", "-q", "--bare", "--", ".", bare], { cwd: core, stdio: ["ignore", "pipe", "pipe"] });
   const project = path.join(tmp, "project");
   fs.mkdirSync(project); git(project, "init", "-q"); commit(project, "core-manifest.md", "| *follows* | `releases` |\n");
   const sideSaid = [];
