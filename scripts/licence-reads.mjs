@@ -30,8 +30,9 @@ const use = (name) => new RegExp(`^curl(?:[ \\t]+-[fsSL]+)*(?:[ \\t]+-[fsSL]*o[ 
 // program), a file read in by `.` or `source` (whose functions the file does not show; any word `.` with a word after it, at the cost of a checksum where it is an argument, as `find .` is), and `BASH_ENV` or
 // `$GITHUB_ENV` (which have bash read such a file at its start). It reads the file with its quotes and backslashes
 // taken out, so a name quoted or escaped in part reads as the name, and refuses any file where a line ends in a
-// backslash, so no name is continued onto a line of its own: at the cost of a checksum in a file with a continued line,
-// or a comment that ends in a backslash. The file is read alone, and as plainly written:
+// backslash, so no name is continued onto a line of its own, or that holds `$'` or `$"`, bash's quotes that decode
+// escapes: at the cost of a checksum in a file with a continued line, a comment that ends in a backslash, or either
+// quote. The file is read alone, and as plainly written:
 // what the environment the file runs in defines before it starts (a function exported to it, a search path its runner
 // sets), and a command whose name the file builds as it runs, are trusted to the project's reviews, as by each check of
 // the scan, which reads only the commands a file writes plainly.
@@ -47,7 +48,7 @@ export function programDownloads(code) {
   const all = downloads(code);
   const bare = (text) => text.replace(/["'\\]/gu, "");
   const text = String(code);
-  if (/\\\r?$/mu.test(text) || REACHES_ANY.test(bare(text))) return all;
+  if (/\\\r?$|\$['"]/mu.test(text) || REACHES_ANY.test(bare(text))) return all;
   const raw = text.split(/\r?\n/u), lines = raw.map((l) => l.trim()), free = plain(raw);
   return all.filter((d) => !readsData(d, all, lines, free));
 }

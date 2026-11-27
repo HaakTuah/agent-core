@@ -136,6 +136,12 @@ const around = {
   ". continued after a comment that ends in a backslash": `# note\\\n. \\\n./lib.sh\n${READ}\n${GET}\n`,
   "grep defined in parts after a comment that ends in a backslash": `# note\\\ngr\\\nep() { sh; }\n${READ}\n${GET}\n`,
   "hash continued after a comment that ends in a backslash": `# it's\\\nha\\\nsh -p ./tools/grep grep\n${READ}\n${GET}\n`,
+  // (bash's quotes that decode escapes, #1455's eleventh review)
+  ". in an ANSI-C quote": `$'.' ./lib.sh\n${READ}\n${GET}\n`,
+  ". in a locale quote": `$"." ./lib.sh\n${READ}\n${GET}\n`,
+  ". by its code in an ANSI-C quote": `$'\\x2e' ./lib.sh\n${READ}\n${GET}\n`,
+  "source by a code in an ANSI-C quote": `$'\\x73'ource ./lib.sh\n${READ}\n${GET}\n`,
+  "hash by a code in an ANSI-C quote": `ha$'\\x73'h -p ./tools/grep grep\n${READ}\n${GET}\n`,
 };
 const through = Object.entries(around).filter(([, code]) => programs(code) < 2).map(([what]) => what);
 ok(!through.length, "a read whose variable a shell reads by itself, or that stands other than it reads, is a program's download", through.join(" | "));
