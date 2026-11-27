@@ -53,15 +53,19 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      without it; and of all the files a pull request changes together, 4,000,000 characters and 1.5 s of reading, of any
      one file of JavaScript, TypeScript or Python it leaves as it was, 4,000,000 characters, 1.5 s to link the files and follow
      the links from each test, a string a file that lists a folder holds past twice the longest path and 64 more read as naming none, and 3 s for the whole of it, the project's own files read too, past which the selection
-     reads no more and runs the whole suite (`scripts/hurry.mjs`); hostile tests: `tests/hostile-pr-changes-test.mjs`, and for the entries' numbers,
-     `tests/pr-description-entries-test.mjs`.
+     reads no more and runs the whole suite (`scripts/hurry.mjs`); and of the selection's rules file (the manifest, or `AGENTS.md`), 1 MB of
+     a regular file, never a link, read as the manifest's reader reads it (`scripts/core-path.mjs`), past which, or
+     where it is a link, it is read as no rules file; hostile tests: `tests/hostile-pr-changes-test.mjs`, for the
+     rules file `tests/select-test.mjs`, and for the entries' numbers, `tests/pr-description-entries-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
      of the work standing still (`scripts/look.mjs`, its reader `scripts/look-pulls.mjs`, through `queue.mjs`'s placing
-     and reading), with the open issues titled as the orchestrator's notice and their authors' rights; limits: 1 MB of
-     the file, past which it is refused unread; 64 MB of an answer (256 MB to the look) and 100 pages of 100 for the
-     open issues, past which it stops; for the look, the search's first page and five authors' rights; hostile tests:
-     `tests/queue-test.mjs`, `tests/queue-form-test.mjs`, `tests/look-test.mjs`.
+     and reading), with the open issues titled as the orchestrator's notice and their authors' rights, and, with the file
+     as each commit since the newest release holds it and GitHub's list of the issues closed since it, by the reader of
+     whether a release's trial is due (`scripts/release-due.mjs`, which the look runs); limits: 1 MB of the file, past
+     which it is refused unread; 64 MB of an answer (256 MB to the look) and 100 pages of 100 for the open issues (30
+     for the closed), past which it stops; for the look, the search's first page and five authors' rights; hostile
+     tests: `tests/queue-test.mjs`, `tests/queue-form-test.mjs`, `tests/look-test.mjs`, `tests/release-due-test.mjs`.
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the reviews'
      records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look (`scripts/look.mjs`,
      with `scripts/look-keep.mjs` and `scripts/look-pulls.mjs`), the
