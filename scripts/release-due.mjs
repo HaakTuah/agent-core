@@ -3,8 +3,8 @@
 // A line merged is an issue a line of QUEUE.md named, at the newest release's commit or in any version of the file
 // since, that closed as completed after that commit; the count runs from the commit the release stands on, not the day
 // of its cut, since a release is cut from the commit its trial tried (#1413, point 3) and what merged after it is the
-// next batch's. A trial whose record on main names a commit past the newest release has run, and no second one is due
-// until that release is cut. The scheduled look keeps the issue TITLE while one is due (look.mjs, `dueIssue`), a task
+// next batch's. A trial whose record on main names a commit past the newest release and holds no cut has run, and no
+// second one is due until that release is cut; one whose record holds the cut is to be run again. The scheduled look keeps the issue TITLE while one is due (look.mjs, `dueIssue`), a task
 // the orchestrator gives a lane like any other. In the core alone: a project cuts no release. QUEUE.md's text and
 // GitHub's answers are untrusted (SECURITY.md, rule 5): each is checked against its form, a version of the file past
 // LARGEST bytes is refused unread, and only the repository's name and a date reach gh's route. Git and Node's own modules, and gh.
@@ -34,8 +34,8 @@ const ghApi = route => {
 };
 
 // The newest release on main and what the count rests on, read from git: { release: { name, sha, at }, lines, trialed }
-// or null where the core has cut none. `at` is the time of the commit the release stands on; `lines` the issues the
-// lines of QUEUE.md named at that commit and in each version of the file since, on main's newest commit `head`;
+// or null where no release is merged into `head`. `at` is the time of the commit the release stands on; `lines` the
+// issues the lines of QUEUE.md named at that commit and in each version of the file since, on main's newest commit `head`;
 // `trialed` the commit the trial's record on `head` names where it is past the release and holds no cut (trialAt), else
 // null: a trial that stopped the cut is to be run again. Main's own versions alone (--first-parent); a shallow clone throws.
 export function readGit(git, head = "HEAD") {
@@ -93,10 +93,16 @@ export function closedSince(repo, since, ask = ghApi) {
   return closed;
 }
 
+// readGit's answer where it found a release: the core has cut releases, so none merged into main is a checkout with no
+// tags, never a core with none to count from.
+function released(r) {
+  if (r === null) throw new Error("no release tag is merged into main here, and the core has cut releases: the checkout holds no tags (git fetch --tags)");
+  return r;
+}
+
 // Whether a trial is due, from what was read: { due, merged, days, said }. `read` is readGit's answer, `closed` the
 // numbers closedSince gave, `now` the time of the reading.
 export function dueness(read, closed, now) {
-  if (read === null) return { due: false, merged: [], days: 0, said: "The core has cut no release yet: the first is cut once the queue is worked through." };
   const { release, lines, trialed } = read;
   const merged = lines.filter(n => closed.has(n));
   const days = Math.floor((Date.parse(now) - Date.parse(release.at)) / DAY);
@@ -114,8 +120,7 @@ export function dueIssue({ manifest, at, repo }, read = () => readGit(gitIn(ROOT
   if (manifest !== null || fs.existsSync(path.join(ROOT, "..", "core-manifest.md"))) return null;
   let d;
   try {
-    const r = read();
-    if (r === null) throw new Error("no release tag is merged into main here, and the core has cut releases: the checkout holds no tags (git fetch --tags)");
+    const r = released(read());
     d = dueness(r, closed(r.release.at), at);
   }
   catch (e) { return { title: TITLE, body: null, unread: `whether a release's trial is due could not be read: ${String(e.message).slice(0, 200)}` }; }
@@ -126,7 +131,7 @@ export function dueIssue({ manifest, at, repo }, read = () => readGit(gitIn(ROOT
     body: [
       `A release's trial is due (\`node scripts/release-due.mjs\`; AGENTS.md, "One batch, then one release"). ${d.said}`,
       "",
-      "A task the orchestrator gives a lane: a builder at the strongest tier tries the release on main's newest commit whose checks all passed, from the brief `node scripts/trial-brief.mjs <that commit>` prints, and records it with `node scripts/release.mjs --trial` in a pull request of its own (AGENTS.md, \"Each release is tried on a real project first\"); once that record merges, this issue closes and the release workflow is started on the owner's standing word. The lines that merge after the commit tried go to the next batch.",
+      "A task the orchestrator gives a lane: a builder at the strongest tier tries the release on main's newest commit whose checks all passed, from the brief `node scripts/trial-brief.mjs <that commit>` prints, and records it with `node scripts/release.mjs --trial` in a pull request of its own (AGENTS.md, \"Each release is tried on a real project first\"); once that record merges holding no cut, this issue closes and the release workflow is started on the owner's standing word. The lines that merge after the commit tried go to the next batch.",
     ].join("\n"),
   };
 }
@@ -135,8 +140,8 @@ function main(argv) {
   if (argv.length) { console.error(`FAIL: ${argv[0]} is no option of this script. Mend: run node scripts/release-due.mjs with nothing`); return 1; }
   if (fs.existsSync(path.join(ROOT, "..", "core-manifest.md"))) { console.error("FAIL: run it in the core's own repository: a project cuts no release. Mend: run it from a clone of the core"); return 1; }
   try {
-    const r = readGit(gitIn(ROOT));
-    console.log(dueness(r, r === null ? new Set() : closedSince(CORE, r.release.at), new Date().toISOString()).said);
+    const r = released(readGit(gitIn(ROOT)));
+    console.log(dueness(r, closedSince(CORE, r.release.at), new Date().toISOString()).said);
     return 0;
   } catch (e) {
     console.error(`FAIL: whether a release's trial is due could not be read: ${String(e.message).slice(0, 300)}. Mend: run it from a clone of the core with its whole history and tags (git fetch --unshallow --tags), and with gh signed in`);

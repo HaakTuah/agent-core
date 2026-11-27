@@ -67,7 +67,6 @@ ok(!at(2, LINES - 1).due && at(2, LINES).due && /^Due \(10 or more lines merged\
 ok(at(DAYS, 1).due && !at(DAYS - 1, 1).due && !at(30, 0).due, "a week with one line merged makes it due; six days, or a month with none, do not", at(30, 0).said);
 ok(!at(30, 12, "b".repeat(40)).due && /its trial has run/.test(at(30, 12, "b".repeat(40)).said), "no second trial is due while a trial's record past the release stands");
 ok(!dueness({ release, lines: [20], trialed: null }, new Set([21, 22]), "2026-12-30T00:00:00Z").due, "an issue closed that no line of the queue named is no line merged");
-ok(!dueness(null, new Set(), "2026-12-30T00:00:00Z").due, "with no release, none is due by count");
 
 // ---- the closed issues, read from a stand-in for GitHub ----
 const routes = [];

@@ -151,8 +151,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   through at the end of its work: the orchestrator gives the trial a lane, and once its record merges starts the
   `release` workflow ("A release is cut on the owner's word"); the lines that merge after the commit tried go to the
   next batch. It does not mean a session cuts a release by its own choice, that a second trial is due while a trial's
-  record past the newest release stands, nor that a line waits for a release. Reason: a big batch held every fix in it
-  back for weeks, and points 1, 3 and 5 of #1413 made each release cheaper. Held by `tests/release-due-test.mjs` (the
+  record past the newest release stands that holds no cut, nor that a line waits for a release. Reason: a big batch
+  held every fix in it back for weeks, and points 1, 3 and 5 of #1413 made each release cheaper. Held by `tests/release-due-test.mjs` (the
   count, the marks and the look's issue); that the orchestrator starts the trial, by nothing yet.
 - **A batch is sized by what the projects can take:** once its release is synced, the count of "The core is measured
   as a feature is" is taken again in each of the owner's projects and named to the owner, who sizes the next by it, the marks of `scripts/release-due.mjs` changed on the owner's
