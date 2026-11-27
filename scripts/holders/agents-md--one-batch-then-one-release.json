@@ -1,4 +1,6 @@
 {
   "rule": "AGENTS.md: One batch, then one release",
-  "behind": [210, 211]
+  "holder": ["check: tests/release-due-test.mjs, in part"],
+  "behind": [210, 211, "#1413.4"],
+  "number": "correction: does not work; outcome: fast"
 }
