@@ -9,7 +9,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { CLOSES, DAYS, LINES, TITLE, closedSince, closesRead, closesSince, dueIssue, dueness, headed, readGit, routeSaid } from "../scripts/release-due.mjs";
+import { CLOSES, DAYS, LINES, TITLE, closedSince, closesRead, closesSince, dueIssue, dueness, headed, loginsMasked, readGit, routeSaid } from "../scripts/release-due.mjs";
 import { DUE } from "../scripts/look.mjs";
 import { trialRecord } from "../scripts/release-trial.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -92,7 +92,7 @@ let pagesAsked = 0;
 {
   const R = "repos/example-owner/example-core", at = "2026-11-11T00:00:00Z", merge = "c".repeat(40), loose = "d".repeat(40);
   const issue = login => ({ number: 1, state: "closed", closed_at: at, closed_by: login === null ? null : { login } });
-  const close = (commit_id = null, created_at = at) => ({ event: "closed", actor: { login: "example-anyone" }, commit_id, created_at });
+  const close = (commit_id = null, created_at = "2026-11-11T00:00:02Z") => ({ event: "closed", actor: { login: "example-anyone" }, commit_id, created_at });
   const right = (login, role_name, permission) => ({ permission, role_name, user: { login, type: "User" } });
   const host = {}, last = {};
   const base = (ref = "main", full_name = "Example-Owner/example-core") => ({ ref, repo: { full_name, default_branch: "main" } });
@@ -178,7 +178,9 @@ let pagesAsked = 0;
   const both = closesSince("example-owner/example-core", release.at, [11, 13, 99], (route, head) => route.includes("/issues?") ? JSON.stringify([11, 13, 20].map(number => ({ number, state: "closed", state_reason: "completed", closed_at: at }))) : ask(route, head));
   ok([...both.counted].join() === "13" && both.other.join() === "11" && !both.unread.length, "only the queue's lines closed after the release have their closes read", JSON.stringify(both));
   ok(routeSaid(`${R}/collaborators/example-writer/permission`) === `${R}/collaborators/<login>/permission` && routeSaid(`${R}/issues/1/events?per_page=100&page=2`) === `${R}/issues/1/events`, "a failure names a route without its query, and without the login of a right's route");
-  ok(headed("HTTP/1.1 200 OK\nLink: <https://api.github.com/x?page=2>; rel=\"next\"\n\n[]").last === 1 && headed("HTTP/1.1 200 OK\n\n[1]").body.join() === "1" && throws(() => headed("[]")) && headed("HTTP/1.1 200 OK\nX-Not-Link: <https://api.github.com/x?page=9>; rel=\"last\"\nLink: <https://api.github.com/x?page=3>; rel=\"last\"\n\n[]").last === 3, "an answer's head gives its last page, or 1 where its Link names none; an answer with no head is refused");
+  ok(loginsMasked(`Get "https://api.github.com/${R}/collaborators/example-writer/permission": dial tcp: i/o timeout`) === `Get "https://api.github.com/${R}/collaborators/<login>/permission": dial tcp: i/o timeout`, "gh's own words, where they name a right's route, keep no login");
+  ok(headed("HTTP/1.1 200 OK\nLink: <https://api.github.com/x?page=2>; rel=\"next\"\n\n[]").last === 1 && headed("HTTP/1.1 200 OK\n\n[1]").body.join() === "1" && throws(() => headed("[]")) && headed("HTTP/1.1 200 OK\nX-Not-Link: <https://api.github.com/x?page=9>; rel=\"last\"\nLink: <https://api.github.com/x?page=3>; rel=\"last\"\n\n[]").last === 3
+    && headed("HTTP/1.1 200 OK\nLink: <https://api.github.com/x?page=4&per_page=100>; rel=\"last\"\n\n[]").last === 4 && headed("HTTP/1.1 200 OK\nLink: <https://api.github.com/x?page=1234567>; rel=\"last\"\n\n[]").last === 1, "an answer's head gives its last page, or 1 where its Link names none; an answer with no head is refused");
 }
 
 // ---- the scheduled look's issue ----

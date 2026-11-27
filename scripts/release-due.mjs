@@ -32,12 +32,13 @@ const SHA = /^[0-9a-f]{40}$/u, DAY = 86400000;
 const UNREAD_MEND = "Mend: run node scripts/release-due.mjs again once gh answers; where it still cannot read one whose work merged, an account that can write the repository reopens it and closes it as completed";
 
 const gitIn = dir => args => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }).trim();
-// A route as a failure names it: its query left out, and the login in a right's route masked, an account being no
-// part of what the look may log.
-export const routeSaid = route => route.split("?")[0].replace(/\/collaborators\/[^/]+\//u, "/collaborators/<login>/");
+// A route as a failure names it, and gh's own words: its query left out, and the login of a right's route masked
+// wherever it stands, an account being no part of what the look may log.
+export const loginsMasked = text => text.replace(/\/collaborators\/[^/\s"]+/gu, "/collaborators/<login>");
+export const routeSaid = route => loginsMasked(route.split("?")[0]);
 const ghApi = (route, head = false) => {
   const r = spawnSync("gh", ["api", ...(head ? ["-i"] : []), route], { encoding: "utf8", maxBuffer: 1 << 26, timeout: 60000 });
-  if (r.status !== 0) throw new Error(`gh could not read ${routeSaid(route)}: ${String(r.stderr ?? r.error).trim().slice(0, 200)}`);
+  if (r.status !== 0) throw new Error(`gh could not read ${routeSaid(route)}: ${loginsMasked(String(r.stderr ?? r.error)).trim().slice(0, 200)}`);
   return r.stdout;
 };
 
@@ -132,11 +133,13 @@ export function headed(text) {
   const at = /\r?\n\r?\n/u.exec(text);
   if (!at) throw new Error("no head");
   const link = text.slice(0, at.index).split(/\r?\n/u).find(line => /^link:/iu.test(line)) ?? "";
-  const last = /[?&]page=(\d{1,6})>; rel="last"/u.exec(link);
-  return { last: last ? Number(last[1]) : 1, body: parseBounded(text.slice(at.index + at[0].length)) };
+  const address = /<([^<>\s]{1,2000})>; rel="last"/u.exec(link)?.[1];
+  const page = address === undefined ? null : URL.parse(address)?.searchParams.get("page") ?? null;
+  return { last: page !== null && /^\d{1,6}$/u.test(page) ? Number(page) : 1, body: parseBounded(text.slice(at.index + at[0].length)) };
 }
 
-// The close of issue `number` made at `at` (the issue's closed_at), read from its events, newest page first, to
+// The close of issue `number` the issue names, the newest close at or after `at` (its closed_at; GitHub writes the event
+// a second or two after it, and an earlier close is one a reopening followed), read from its events, newest page first, to
 // EVENT_PAGES pages: { commit } (its commit, or null), or undefined where it is not found within them or not read.
 function closeAt(repo, number, at, read) {
   const route = page => `repos/${repo}/issues/${number}/events?per_page=100&page=${page}`;
@@ -145,7 +148,7 @@ function closeAt(repo, number, at, read) {
   for (let page = first.last; page >= 1 && page > first.last - EVENT_PAGES; page--) {
     const rows = page === 1 ? first.body : read(route(page));
     if (!Array.isArray(rows)) return undefined;
-    const close = rows.findLast(e => e?.event === "closed" && e.created_at === at);
+    const close = rows.findLast(e => e?.event === "closed" && Date.parse(e.created_at) >= Date.parse(at));
     if (close) return { commit: aCommit(close.commit_id) ? close.commit_id : null };
   }
   return undefined;
