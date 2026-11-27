@@ -136,7 +136,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - the files an agent tool takes its instructions from (`GEMINI.md`, an entry file, each file of a tool's folders), as
      the work tree and a pull request's base hold them: read by the copies and pointer checks (`scripts/copies.mjs`,
      `scripts/pointers.mjs`, through `scripts/rule-files.mjs`); limits: 1 MB of a file, past which it is not read, 40
-     links followed from one path; hostile tests: `tests/copies-tools-test.mjs`.
+     links followed from one path, and of the copies check's code 8 MB of a file and 256 MB of a run, past which it is
+     not read; hostile tests: `tests/copies-tools-test.mjs`.
    - the Markdown links in the rule files, and the headings they name, in the head and in its base's tree: read for the
      pointer check by lychee (`scripts/links.mjs`, the tool fetched at set-up by `scripts/lychee.sh`
      and run on the runners alone, offline and from an empty folder, so that no config of the project's is read), the
