@@ -16,9 +16,10 @@ const page = (route, key, all) => {
   return n ? { body: { [key]: all.slice((n - 1) * 100, n * 100), total_count: all.length } } : { why: "no page asked" };
 };
 // (`fork`: "own" or "theirs", the project a fork of a repository of its own account's or of another's, its parent and
-// source given only in the repository's own answer, as GitHub's pull request gives none; "unread", that answer refused)
+// source given only in the repository's own answer, as GitHub's pull request gives none; "unread", that answer refused;
+// "silent", an answer that does not say whether it is a fork)
 export const host = (over = {}) => route => {
-  const forked = over.fork ? { fork: true, parent: { owner: { login: over.fork === "own" ? OWNER : "someone-else" } }, source: { owner: { login: over.fork === "own" ? OWNER : "someone-else" } } } : { fork: false };
+  const forked = over.fork === "silent" ? {} : over.fork ? { fork: true, parent: { owner: { login: over.fork === "own" ? OWNER : "someone-else" } }, source: { owner: { login: over.fork === "own" ? OWNER : "someone-else" } } } : { fork: false };
   const pulls = { state: "open", draft: true, user: { login: OWNER }, head: { sha: HEAD, repo: { id: 41 } }, base: { ref: "main", repo: { id: 41, full_name: "o/p", fork: Boolean(over.fork), owner: { login: OWNER }, default_branch: "main" } }, ...over.pull };
   const draftRuns = over.empty ? (over.empty === "skipped" ? [{ name: "tests", status: "completed", conclusion: "skipped" }] : []) : [{ name: "tests", status: "completed", conclusion: "success" }, ...(over.deployRun ? [{ name: "deploy", status: "completed", conclusion: "skipped" }] : []), ...(over.draftRuns ?? []), { name: "dependency review", status: over.late ? "queued" : "completed", conclusion: over.late ? null : over.skipReview ? "skipped" : "failure" }, ...(over.many ? Array.from({ length: 150 }, (_, i) => ({ name: `job ${i}`, status: "completed", conclusion: "success" })) : [])];
   if (route === "repos/o/p/pulls/7") return { body: pulls };

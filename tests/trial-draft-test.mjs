@@ -76,11 +76,11 @@ ok(other.answer?.none === "another-owner" && other.answer.repo === repoHash(41) 
 // (a project under the owner's account is the owner's own only where it is no fork, or a fork of the account's own: the
 // pull request's answer names no parent, so the repository's own is read, and where it cannot be, nothing is answered)
 const [theirFork, ownFork, forkUnread] = ["theirs", "own", "unread"].map(fork => readDraft("o/p", "7", TRIED, [], host({ fork })));
-const [noneTheirs, noneOwn] = ["theirs", "own"].map(fork => readNone("o/p", TRIED, host({ fork })));
+const [noneTheirs, noneOwn, noneSilent] = ["theirs", "own", "silent"].map(fork => readNone("o/p", TRIED, host({ fork })));
 ok(!theirFork.answer && /not owned by the core's owner's account[\s\S]*fork of a repository another account owns[\s\S]*tell the owner at once/.test(theirFork.why ?? "") && ownFork.answer?.commit === TRIED
   && !forkUnread.answer && /could not be read to say whose it is/.test(forkUnread.why ?? "") && [theirFork, forkUnread].every(r => mended(`FAIL no answer for the draft: ${r.why}.`))
-  && noneTheirs.answer?.none === "another-owner" && !noneOwn.answer && /opens a draft there/.test(noneOwn.why ?? ""),
-  "a draft in a fork of another account's repository under the owner's account is refused, and `none` reads it as another owner's, while a fork of the account's own is read as its own; a fork whose own answer cannot be read gives no answer", JSON.stringify([theirFork, ownFork.answer, forkUnread, noneTheirs, noneOwn]));
+  && noneTheirs.answer?.none === "another-owner" && !noneOwn.answer && /opens a draft there/.test(noneOwn.why ?? "") && !noneSilent.answer && /could not be read to say whose it is/.test(noneSilent.why ?? ""),
+  "a draft in a fork of another account's repository under the owner's account is refused, and `none` reads it as another owner's, while a fork of the account's own is read as its own; a fork whose own answer cannot be read, or an answer that does not say whether it is one, gives no answer", JSON.stringify([theirFork, ownFork.answer, forkUnread, noneTheirs, noneOwn]));
 
 // (each answer, printed as the command prints it, read back by the reader release.mjs --trial runs on it: #1108)
 const back = [read, skippedAfter, other, stop].map(r => draftAnswerOf(`${LINE}${JSON.stringify(r.answer)}\n`, TRIED));
