@@ -8,7 +8,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { readCore, floorCopyIn, carriedAt, corePath, manifestText, floorCopy, atCopy, mendAt } from "../scripts/core-path.mjs";
+import { readCore, floorCopyIn, carriedAt, corePath, manifestText, floorCopy, atCopy, mendAt, trackedOf, copyHeld, copyAside } from "../scripts/core-path.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { pathIn } from "../scripts/reading.mjs";
@@ -130,5 +130,28 @@ ok(["vendor/core/", "packages/core/agent/", "packages/core/core/", "a.core/"].ev
 }
 ok(atCopy("refs/remotes/origin/main:vendor/core/a core/b", "vendor/core/") === "refs/remotes/origin/main:vendor/core/a vendor/core/b" && atCopy("core/a", "lib/the-core/") === "lib/the-core/a",
   "one already behind the copy's own folders is left as it stands");
+
+// The copy told apart from the core's own repository (#1350), from the files git tracks at a checkout's root, for the
+// scripts that read what runs with power or gate a merge: the core's own tracks scripts/core-path.mjs there, a
+// project's does not; where no repository is there, the files on disk are read
+{
+  const at = (name, files, track = files) => {
+    const dir = path.join(tmp, name);
+    for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
+    if (track) { spawnSync("git", ["init", "-q", dir]); spawnSync("git", ["add", "--", ...Object.keys(track)], { cwd: dir }); }
+    return dir;
+  };
+  const own = { "core-manifest.md": copied("scripts/"), "scripts/core-path.mjs": "export {};\n" };
+  const core = at("tracked-own", own), project = at("tracked-copy", { "core-manifest.md": copied("vendor/core/") });
+  const untracked = at("tracked-none", { "core-manifest.md": copied("vendor/core/") }, {}), bare = at("tracked-no-manifest", { "README.md": "x\n" });
+  const loose = at("tracked-no-repository", own, null), looseCopy = at("tracked-no-repository-copy", { "core-manifest.md": copied("vendor/core/") }, null);
+  ok(JSON.stringify(trackedOf(core)) === JSON.stringify(["core-manifest.md", "scripts/core-path.mjs"]) && JSON.stringify(trackedOf(project)) === JSON.stringify(["core-manifest.md"]) && trackedOf(untracked).length === 0,
+    "of the two files, those git tracks at the root are read, never one that only stands on disk", JSON.stringify([trackedOf(core), trackedOf(project), trackedOf(untracked)]));
+  ok(copyHeld(core) === null && copyAside(core) === null, "in the core's own repository a manifest at its root names no copy, for either reading");
+  ok(copyHeld(project) === "vendor/core/" && copyAside(project) === "vendor/core/", "in a project the copy is the manifest's");
+  ok(copyHeld(untracked) === null && copyHeld(bare) === null && copyAside(bare) === "core/", "a manifest git does not track names none to the gates, and with no manifest only a check that leaves a copy aside takes core/");
+  ok(JSON.stringify(trackedOf(loose)) === JSON.stringify(["core-manifest.md", "scripts/core-path.mjs"]) && copyHeld(loose) === null && copyAside(loose) === null && copyHeld(looseCopy) === "vendor/core/",
+    "where no repository is there, the files on disk tell the core from a copy the same way", JSON.stringify(trackedOf(loose)));
+}
 
 done("where the core's copy stands");

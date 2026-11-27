@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { diskTree, gitTree, lightOf, powered, setOf } from "../scripts/power.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -160,6 +161,26 @@ const list = run(["--list", checkout]);
 ok(list.status === 0 && list.stdout === ".github/workflows/w.yml\tpower\nscripts/run.mjs\truns\n", "--list prints a folder's set, each path with what brought it in", list.stdout + list.stderr);
 const nowhere = run(["--list", path.join(tmp, "nowhere")]);
 ok(nowhere.status === 1 && mended(nowhere.stderr), "--list of a folder that is not there fails, saying the mend", nowhere.stderr);
+
+// The copy told apart from the core's own repository, as core-path.mjs's copyHeld does (#1350): a core-manifest.md at the
+// root of a checkout that tracks scripts/core-path.mjs there names no copy, so nothing is left out of the set, by --list
+// or as the default branch's checkout; the same manifest in a project, which tracks no such script, leaves its copy out.
+const own = init("own");
+write(own, ".github/workflows/w.yml", "on: push\npermissions:\n  contents: write\njobs:\n  a:\n    steps:\n      - run: node scripts/run.mjs\n");
+write(own, "scripts/run.mjs", "console.log(1);\n");
+write(own, "scripts/core-path.mjs", "export {};\n");
+write(own, "core-manifest.md", `Core: ${CORE} at ${"a".repeat(40)}, copied whole under scripts/ (never edited here).\n`);
+save(own, "the core's own, with a manifest at its root");
+const ownList = run(["--list", own]);
+ok(ownList.status === 0 && ownList.stdout.includes("scripts/run.mjs\truns\n"), "in the core's own repository a manifest at its root leaves nothing out of --list's set", ownList.stdout + ownList.stderr);
+const ownRun = run([path.join(tmp, "pull.json"), path.join(tmp, "commits.json"), path.join(tmp, "files.json"), own]);
+ok(ownRun.status === 0 && JSON.parse(ownRun.stdout).power.includes("scripts/run.mjs"), "nor, as the default branch's checkout, out of what runs with power", ownRun.stdout + ownRun.stderr);
+fs.rmSync(path.join(own, "scripts/core-path.mjs"));
+save(own, "a project's, which tracks no core-path.mjs at its root");
+const copyList = run(["--list", own]);
+ok(copyList.status === 0 && copyList.stdout === ".github/workflows/w.yml\tpower\n", "in a project the manifest's copy is left out, as before", copyList.stdout + copyList.stderr);
+const copyRun = run([path.join(tmp, "pull.json"), path.join(tmp, "commits.json"), path.join(tmp, "files.json"), own]);
+ok(copyRun.status === 0 && !JSON.parse(copyRun.stdout).power.includes("scripts/run.mjs"), "and out of what runs with power", copyRun.stdout + copyRun.stderr);
 
 // Files with no extension, read from a commit as from disk: beside a powered workflow, `./deploy`, `./helper` and
 // `bin/publish` may run.

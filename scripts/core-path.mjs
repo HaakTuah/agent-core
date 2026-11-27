@@ -112,7 +112,7 @@ export const copyAmong = (tracked, root = ".") =>
  *  repository), those that stand on disk. */
 export function trackedOf(root = ".") {
   try {
-    return execFileSync("git", ["--literal-pathspecs", "ls-files", "-z", "--", MANIFEST, OWN], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean);
+    return execFileSync("git", ["ls-files", "-z", "--", MANIFEST, OWN], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean);
   } catch { return [MANIFEST, OWN].filter(f => fs.existsSync(path.join(root, f))); }
 }
 /** The copy's folder, or null, for the scripts that read what runs with power or gate a merge from the default branch's

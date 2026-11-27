@@ -2,7 +2,7 @@
 // Tests for scripts/code-review-wait.mjs: a code review running on the head commit is waited for, a code review of that
 // commit, named by its whole SHA, posted by another reviewer ends the wait, and nothing else holds a pull request. Run by tests.yml.
 import { execFileSync } from "node:child_process";
-import { rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
@@ -234,12 +234,12 @@ ok(is(queued([summary(running)], [lineOf]), false, "still running"), "a code rev
 const dir = scratchDir("code-review-wait-");
 try {
   const script = fileURLToPath(new URL("../scripts/code-review-wait.mjs", import.meta.url));
-  const run = (p, c, env = {}, k = undefined, f = undefined) => {
+  const run = (p, c, env = {}, k = undefined, f = undefined, cwd = undefined) => {
     writeFileSync(join(dir, "pull.json"), JSON.stringify(p));
     writeFileSync(join(dir, "comments.json"), JSON.stringify(c));
     const more = k === undefined ? [] : [join(dir, "commits.json"), join(dir, "files.json")];
     if (k !== undefined) { writeFileSync(more[0], JSON.stringify(k)); writeFileSync(more[1], JSON.stringify(f)); }
-    return JSON.parse(execFileSync(process.execPath, [script, join(dir, "pull.json"), join(dir, "comments.json"), ...more], { encoding: "utf8", env: { ...process.env, ADVISORY: "", RUN_URL: "", ...env } }));
+    return JSON.parse(execFileSync(process.execPath, [script, join(dir, "pull.json"), join(dir, "comments.json"), ...more], { cwd, encoding: "utf8", env: { ...process.env, ADVISORY: "", RUN_URL: "", ...env } }));
   };
   const advisory = run(pull, [[summary(running)]]);
   ok(advisory.sha === HEAD && advisory.status.state === "success" && advisory.status.context === "code-review" && advisory.status.description.startsWith("Advisory: Codex's code review"), "run with no word on it, it is advisory and names its status");
@@ -254,6 +254,20 @@ try {
   const proved = { ...inCore, commits: line.length, changed_files: 1 };
   ok(run(proved, [], { ADVISORY: "false", QUEUE: HEAD }, [line], [lineOf]).status.state === "success" && run(proved, [], { ADVISORY: "false", QUEUE: OLD }, [line], [lineOf]).status.state === "pending",
     "told the caller's proof holds for the head, a queue-only pull request needs no code review; for another commit it does");
+  // (the copy told apart from the core's own repository, as core-path.mjs's copyHeld does, #1350: the default branch's
+  // checkout that tracks scripts/core-path.mjs at its root holds no copy, whatever manifest stands beside it, so a pin
+  // moved beside a change under the path that manifest names is no sync; in a project's checkout it is)
+  const checkout = (name, files) => {
+    const at = join(dir, name);
+    for (const [f, text] of Object.entries(files)) { mkdirSync(join(at, f, ".."), { recursive: true }); writeFileSync(join(at, f), text); }
+    for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: at, stdio: "ignore" });
+    return at;
+  };
+  const named = `Core: ${CORE} at ${"1".repeat(40)}, copied whole under vendor/the-core/ (never edited here).\n`;
+  const own = checkout("own", { "core-manifest.md": named, "scripts/core-path.mjs": "export {};\n" }), copy = checkout("copy", { "core-manifest.md": named });
+  const moved = [manifest, md("vendor/the-core/scripts/x.mjs")];
+  ok(run(counts, [], { ADVISORY: "false" }, [line], moved, own).status.state === "pending" && run(counts, [], { ADVISORY: "false" }, [line], moved, copy).status.state === "success",
+    "the core's own checkout, with a manifest at its root, holds no copy: a pin moved beside a change under the path it names needs its code review; a project's is a sync");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   let usage = 0;
   try { execFileSync(process.execPath, [script], { stdio: "ignore" }); } catch (e) { usage = e.status; }

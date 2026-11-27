@@ -311,6 +311,21 @@ try {
   ok(inCopy.status === 0 && !/vendor\/core/u.test(inCopy.stdout + inCopy.stderr) && own.status === 1 && /^FAIL core\/tools\/action\.yml:2: pull_request_target/m.test(own.stdout) && !/vendor\/core\/tools/u.test(own.stdout),
     "run in a project whose manifest names the copy at another path, an action.yml in the copy is left out and the project's own core/ is read", `${inCopy.stdout}${inCopy.stderr}\n${own.stdout}${own.stderr}`);
 } finally { fs.rmSync(vend, { recursive: true, force: true }); }
+
+// ---- the copy told apart from the core's own repository, as core-path.mjs's copyAside does (#1350): where the check's
+// own scripts/core-path.mjs is tracked at the root, a core-manifest.md beside it names no copy, and nothing is left out ----
+const ownCore = scratchDir("workflows-own-");
+try {
+  const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(ownCore, f)), { recursive: true }); fs.writeFileSync(path.join(ownCore, f), text); };
+  for (const f of CHECK_FILES) put(`scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url)))));
+  fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(ownCore, ".packages"), { recursive: true });
+  put("core-manifest.md", `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under tools/ (never edited here).\n`);
+  put("tools/action.yml", "on:\n  pull_request_target:\n");
+  put(".github/workflows/own.yml", "on: push\n");
+  for (const args of [["init", "-q"], ["add", "-A", "-f"]]) execFileSync("git", args, { cwd: ownCore, stdio: "ignore" });
+  const r = spawnSync(process.execPath, [path.join(ownCore, "scripts/workflows.mjs")], { cwd: ownCore, encoding: "utf8", env: { ...process.env, WORKFLOWS_BASE: "" } });
+  ok(r.status === 1 && /^FAIL tools\/action\.yml:2: pull_request_target/m.test(r.stdout), "run in the core's own repository with a core-manifest.md at its root, the path that manifest names is read as its own", r.stdout + r.stderr);
+} finally { fs.rmSync(ownCore, { recursive: true, force: true }); }
 // ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
 // Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and
 // the pull request, cancelled once a newer run starts for it; a run on main, a schedule or a start by hand is a group of
