@@ -152,7 +152,7 @@ try {
     ]) {
       made(); commit(what);
       r = run({ ENTRY_BASE: "HEAD" });
-      ok(r.status === 0 && (spelt && bySpelling ? !r.out.includes("stands here but is not read") : r.out.includes("note") && r.out.includes("stands here but is not read")), `against a base where ${what}, left so, it is noted and fails nothing (where the system reads its \`..\` by its spelling, it reaches what stands and fails nothing)`);
+      ok(r.status === 0 && (spelt && bySpelling ? !r.out.includes("stands here but is not read") : r.out.includes("note") && r.out.includes("stands here but is not read")), `against a base where ${what}, left so, it is noted and fails nothing${spelt ? " (where the system reads its `..` by its spelling, it reaches what stands and fails nothing)" : ""}`);
       fs.rmSync(path.join(dir, "x"), { force: true }); swap("CLAUDE.md", f => fs.writeFileSync(f, "@AGENTS.md\n")); swap(".agents", () => write(".agents/rules/core.md", AG)); commit(`${what}, undone`);
     }
     // (a link through a folder link, then back up from the folder it reached, to a file there: read as the system reads it)
