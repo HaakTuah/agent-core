@@ -1,7 +1,8 @@
 // Tests of the daily try (scripts/daily-try.mjs; #1413, point 5): only the owner's own projects that take the core are
-// found, a project of another owner never; each name is masked and never printed; the clones keep no sign-in; the
-// projects' own code runs with none; each project's runs are read as the release's trial reads them; and what is filed
-// is counts and conclusions alone, one bug at a time. On a stand-in for GitHub and scratch repositories; git and Node's
+// found, a project of another owner never, in one order; each name is masked and never printed; each runner clones its
+// one project alone, and keeps no sign-in; the projects' own code runs with none; each project's runs are read as the
+// release's trial reads them; each runner's counts are read from its own log alone; and what is filed is counts and
+// conclusions alone, one bug at a time. On a stand-in for GitHub and scratch repositories; git and Node's
 // own modules only.
 //
 //   node tests/daily-try-test.mjs
@@ -10,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
-import { BARE, OWNER, SIGNIN, TITLE, bugText, file, find, formed, holds, owned, runAll, runLogged, tryOne } from "../scripts/daily-try.mjs";
+import { BARE, LINE, OWNER, SIGNIN, TITLE, bugText, cloneLeg, file, formed, gather, holds, legLines, list, owned, runLeg, runLogged, tryOne } from "../scripts/daily-try.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -52,7 +53,7 @@ const gh = (route, ...rest) => {
   ok(threw, "an answer other than a manifest not there (an outage) throws, so that none found is never read from a reading not taken");
 }
 
-// the clones: names masked first and never printed beside, no sign-in kept, nothing to push with
+// the list and each runner's clone: names masked first and never printed beside, one project alone, no sign-in kept
 const remotes = path.join(tmp, "remotes"), dir = path.join(tmp, "try");
 for (const name of ["game-one", "tool-two"]) {
   const at = path.join(remotes, name);
@@ -63,16 +64,24 @@ for (const name of ["game-one", "tool-two"]) {
   git(at, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "a project");
 }
 {
-  const said = [];
-  const list = find(dir, { signedIn: true, token: "fake-token-for-a-test", gh, url: n => path.join(remotes, n.split("/")[1]), say: l => said.push(l), actions: true });
+  const said = [], outs = [];
+  const { legs } = list({ signedIn: true, gh, say: l => said.push(l), out: l => outs.push(l), actions: true });
   const masks = said.filter(l => l.startsWith("::add-mask::")), rest = said.filter(l => !l.startsWith("::add-mask::"));
-  ok(list.length === 2 && list.every(p => p.cloned) && fs.existsSync(path.join(dir, "p1", "core-manifest.md")), "each project found is cloned under the folder, numbered, not named", JSON.stringify(list));
   ok(masks.length === 4 && masks.indexOf(`::add-mask::${OWNER}/game-one`) < masks.indexOf(`::add-mask::tool-two`), "each project's full name and short name is masked in GitHub's log", masks.join(" "));
-  ok(rest.length === 1 && !/game-one|tool-two/u.test(rest[0]) && /found 2 of the owner's own projects that take the core \(1 private\), and cloned 2/u.test(rest[0]), "what it prints is a count alone, no name", rest.join("\n"));
-  const config = git(path.join(dir, "p1"), "config", "--list", "--local");
-  ok(!/extraheader|fake-token|AUTHORIZATION/iu.test(config) && !fs.readdirSync(path.join(dir)).some(f => fs.readFileSync(path.join(dir, f, ...(f.endsWith(".json") ? [] : ["core-manifest.md"])), "utf8").includes("fake-token")), "the clone keeps no sign-in, in its config or anywhere the try writes", config);
+  ok(rest.length === 1 && !/game-one|tool-two/u.test(rest[0]) && /found 2 of the owner's own projects that take the core \(1 private\); each is tried on a runner of its own/u.test(rest[0]), "what it prints is a count alone, no name", rest.join("\n"));
+  ok(outs.join() === "found=2,private=1,signed=true,legs=[1,2]" && legs.join() === "1,2" && !outs.some(l => /game|tool/u.test(l)), "its outputs are the counts and the runners' numbers, no name", outs.join());
+  const url = n => path.join(remotes, n.split("/")[1]);
+  const one = path.join(dir, "project"), cloned = [];
+  const got = cloneLeg(2, one, { signedIn: true, token: "fake-token-for-a-test", expected: 2, gh, url, say: l => cloned.push(l), actions: true });
+  ok(got && fs.existsSync(path.join(one, "core-manifest.md")) && git(one, "remote", "get-url", "origin").endsWith("tool-two") && fs.readdirSync(dir).join() === "project", "a runner clones its one project alone, the second in the order of names for runner 2, and nothing else", fs.readdirSync(dir).join());
+  ok(cloned.filter(l => !l.startsWith("::")).every(l => !/game-one|tool-two/u.test(l)) && cloned.some(l => l === "::add-mask::tool-two"), "the runner masks the names first and prints none", cloned.join(" | "));
+  const config = git(one, "config", "--list", "--local");
+  ok(!/extraheader|fake-token|AUTHORIZATION/iu.test(config) && !fs.readFileSync(path.join(one, "core-manifest.md"), "utf8").includes("fake-token"), "the clone keeps no sign-in, in its config or its files", config);
+  const moved = path.join(tmp, "moved");
+  const none = cloneLeg(1, moved, { signedIn: true, expected: 3, gh, url, say: () => {}, actions: false });
+  ok(!none && !fs.existsSync(moved), "where the list no longer holds the projects counted, the runner clones nothing, so its number never names another project");
   const quiet = [];
-  find(path.join(tmp, "local"), { signedIn: false, gh, url: n => path.join(remotes, n.split("/")[1]), say: l => quiet.push(l), actions: false });
+  list({ signedIn: false, gh, say: l => quiet.push(l), actions: false });
   ok(!quiet.some(l => l.startsWith("::")) && /the public ones alone, the private ones wanting the owner's sign-in PROJECTS_READ/u.test(quiet.join()), "outside GitHub's job nothing is masked, and without the sign-in it says the private ones want it", quiet.join("\n"));
 }
 
@@ -92,26 +101,36 @@ for (const name of ["game-one", "tool-two"]) {
 {
   ok(holds([{ "a/x": "passed" }, { "a/x": "failed" }], SHA) && holds([{ "a/x": "passed" }, { "a/x": "unread" }], SHA) && holds([{ "a/x": "passed" }, { "a/x": "stopped" }], SHA)
     && !holds([{ "a/x": "failed" }, { "a/x": "failed" }], SHA) && !holds([{ "a/x": "passed" }, { "a/x": "passed" }], SHA), "a project is held where the trial would hold a cut: a check passed before and failed, unread or stopped after; one failing both, or passing both, is not");
-  // (five projects: two cloned above, three more written as the stand-in runner finds them)
-  const plan = { p1: { before: { "a/x": "passed" }, after: { "a/x": "failed" } }, p2: { before: { "a/x": "passed" }, after: { "a/x": "passed" } }, p3: { before: null }, p4: { before: { "a/x": "passed" }, sync: false }, p5: { at: SHA } };
-  const listed = Object.keys(plan).map((d, i) => ({ name: `${OWNER}/n${i}`, private: i < 2, dir: d, cloned: true }));
-  for (const d of ["p3", "p4", "p5"]) { fs.mkdirSync(path.join(dir, d), { recursive: true }); git(path.join(dir, d), "init", "-q"); }
-  fs.writeFileSync(path.join(dir, "p5", "core-manifest.md"), manifest.replace(PIN, SHA));
-  fs.writeFileSync(path.join(dir, "projects.json"), JSON.stringify({ signedIn: true, projects: listed }));
-  const ran = [];
-  const run = (cmd, args, cwd, log) => {
-    const d = path.basename(cwd), p = plan[d];
-    ran.push({ d, args: args.join(" "), log });
-    const v = args.indexOf("--verdicts");
-    if (v >= 0) { const after = args[v + 1].endsWith(".after.json"), runs = after ? p.after : p.before; if (runs) fs.writeFileSync(args[v + 1], JSON.stringify(runs)); return !!runs; }
-    if (args.some(a => a.endsWith("sync.mjs"))) return p.sync !== false;
-    return true;
-  };
-  const { out } = runAll(dir, path.join(tmp, "core-at"), { run, sha: SHA, day: "2026-11-27" });
-  ok(out.found === 5 && out.private === 2 && out.tried === 2 && out.held === 1 && out.untried === 1 && out.syncFailed === 1 && out.atPin === 1 && out.afterUnread === 0 && out.failedAfter === 1 && out.passedBoth === 1 && formed(out), "the counts: each project tried, held, untried, its sync failed or already at the commit, and the trial's classes summed", JSON.stringify(out));
-  ok(!ran.some(r => r.d === "p5") && ran.filter(r => r.d === "p1").map(r => r.args).some(a => /toolchain\.mjs/u.test(a)) && ran.every(r => r.log.startsWith(dir) && !/n\d/u.test(r.log)), "a project already at the commit is not run; the toolchain it pins is fetched first; each run's output goes to a log under the try's folder, named by number", JSON.stringify(ran.slice(0, 3)));
-  ok(ran.filter(r => r.d === "p1" && /--verdicts/u.test(r.args)).map(r => r.args.includes(".before.json") ? "before" : "after").join() === "before,after" && ran.some(r => r.d === "p1" && r.args === `${SHA}` || r.args.endsWith(` ${SHA}`)), "the run before, the sync to the commit, then the run after", ran.filter(r => r.d === "p1").map(r => r.args).join(" | "));
-  ok(JSON.parse(fs.readFileSync(path.join(dir, "try.json"), "utf8")).commit === SHA && !fs.readFileSync(path.join(dir, "try.json"), "utf8").includes(OWNER), "the counts written hold no project's name", fs.readFileSync(path.join(dir, "try.json"), "utf8"));
+  // (each project as its runner finds it: one tried and held, one passing, one whose run before wrote nothing, one whose
+  // sync failed, one already at the commit)
+  const plan = { held: { before: { "a/x": "passed" }, after: { "a/x": "failed" } }, passing: { before: { "a/x": "passed" }, after: { "a/x": "passed" } }, untried: { before: null }, unsynced: { before: { "a/x": "passed" }, sync: false }, atPin: { at: SHA } };
+  const ran = [], legsSaid = [];
+  for (const [i, [k, p]] of Object.entries(plan).entries()) {
+    const leg = path.join(tmp, "legs", k), at = path.join(leg, "project");
+    fs.mkdirSync(at, { recursive: true }); git(at, "init", "-q");
+    fs.writeFileSync(path.join(at, "core-manifest.md"), p.at ? manifest.replace(PIN, SHA) : manifest);
+    const run = (cmd, args, cwd, log) => {
+      ran.push({ k, args: args.join(" "), log, cwd });
+      const v = args.indexOf("--verdicts");
+      if (v >= 0) { const after = args[v + 1].endsWith("after.json"), runs = after ? p.after : p.before; if (runs) fs.writeFileSync(args[v + 1], JSON.stringify(runs)); return !!runs; }
+      if (args.some(a => a.endsWith("sync.mjs"))) return p.sync !== false;
+      return true;
+    };
+    legsSaid.push(runLeg(leg, path.join(tmp, "core-at"), i + 1, { run, sha: SHA }));
+  }
+  ok(legsSaid.map(l => l.came).join() === "held,tried,untried,syncFailed,atPin" && legsSaid[0].failedAfter === 1 && legsSaid[1].passedBoth === 1 && legsSaid.every((l, i) => l.leg === i + 1 && l.commit === SHA), "each runner's counts: what its project came to, and the trial's classes of its runs", JSON.stringify(legsSaid.map(l => [l.leg, l.came])));
+  ok(!JSON.stringify(legsSaid).includes(OWNER) && Object.keys(legsSaid[0]).every(k => k === "leg" || k === "commit" || k === "came" || Number.isInteger(legsSaid[0][k])), "a runner's counts are numbers, the commit and what it came to, no name", JSON.stringify(legsSaid[0]));
+  ok(!ran.some(r => r.k === "atPin") && ran.filter(r => r.k === "held").map(r => r.args).some(a => /toolchain\.mjs/u.test(a)) && ran.every(r => path.dirname(r.log) === path.dirname(r.cwd) && path.basename(r.log) === "project.log"), "a project already at the commit is not run; the toolchain it pins is fetched first; each run's output goes to a log beside the clone, outside it", JSON.stringify(ran.slice(0, 2)));
+  ok(ran.filter(r => r.k === "held" && /--verdicts/u.test(r.args)).map(r => r.args.includes("before.json") ? "before" : "after").join() === "before,after" && ran.some(r => r.k === "held" && r.args.endsWith(` ${SHA}`)), "the run before, the sync to the commit, then the run after", ran.filter(r => r.k === "held").map(r => r.args).join(" | "));
+  const none = runLeg(path.join(tmp, "legs", "nothing-cloned"), path.join(tmp, "core-at"), 6, { run: () => true, sha: SHA });
+  ok(none.came === "untried" && none.leg === 6, "a runner whose clone failed says its project was not tried", JSON.stringify(none));
+
+  // the counts summed from the runners' own lines
+  const lines = legsSaid.map(l => ({ leg: l.leg, text: JSON.stringify(l) }));
+  const t = gather(lines, { sha: SHA, day: "2026-11-27", signedIn: true, found: 7, privates: 2 });
+  ok(t.found === 7 && t.private === 2 && t.tried === 2 && t.held === 1 && t.untried === 3 && t.syncFailed === 1 && t.atPin === 1 && t.afterUnread === 0 && t.failedAfter === 1 && t.passedBoth === 1 && formed(t), "the runners' counts summed, and a runner that said nothing counted as not tried", JSON.stringify(t));
+  const forged = gather([{ leg: 1, text: JSON.stringify({ ...legsSaid[1], leg: 2 }) }, { leg: 2, text: JSON.stringify(legsSaid[1]) }, { leg: 3, text: JSON.stringify({ ...legsSaid[2], commit: PIN }) }], { sha: SHA, day: "2026-11-27", signedIn: true, found: 3, privates: 0 });
+  ok(forged.tried === 1 && forged.untried === 2 && formed(forged), "a line that gives another runner's number, or another commit, is not read, so one project's code cannot speak for another's", JSON.stringify(forged));
 }
 
 // what is filed: counts and conclusions alone, one bug at a time, the sign-in asked of the owner while it is not given
@@ -151,8 +170,26 @@ for (const name of ["game-one", "tool-two"]) {
   const refused = [null, undefined, "", [], "counts", 5, {}, { ...base, commit: `<b>${SHA}</b>` }, { ...base, commit: "../../../etc/passwd" }, { ...base, day: "<img src=x>" },
     { ...base, found: -1 }, { ...base, found: 2 ** 60 }, { ...base, held: 0.5 }, { ...base, signedIn: "true" }, { ...base, private: 1 }];
   ok(formed(base) && refused.every(t => !formed(t)), "counts that are nothing at all, of the wrong type, markup, a file path or a number out of range are in no form", JSON.stringify(refused.filter(t => formed(t))));
-  const r = spawnSync(process.execPath, [path.join(import.meta.dirname, "..", "scripts", "daily-try.mjs"), "--file"], { encoding: "utf8", env: { PATH: process.env.PATH, TRY: JSON.stringify({ ...base, pad: "x".repeat(5000) }), GH_TOKEN: "" } });
-  ok(r.status === 1 && /no form/u.test(r.stderr + r.stdout) && /Mend:/u.test(r.stderr + r.stdout), "counts longer than 4 KB are refused before anything is read or written, saying the mend", (r.stderr + r.stdout).slice(0, 300));
+  const envs = [{ SHA: "not one", FOUND: "1", PRIVATE: "0", RUN_ID: "1", RUN_ATTEMPT: "1" }, { SHA, FOUND: "1", PRIVATE: "2", RUN_ID: "1", RUN_ATTEMPT: "1" }, { SHA, FOUND: "1", PRIVATE: "0", RUN_ID: "1/../../x", RUN_ATTEMPT: "1" }, { SHA, FOUND: "-1", PRIVATE: "0", RUN_ID: "1", RUN_ATTEMPT: "1" }];
+  const said = envs.map(e => spawnSync(process.execPath, [path.join(import.meta.dirname, "..", "scripts", "daily-try.mjs"), "--file"], { encoding: "utf8", env: { PATH: process.env.PATH, GH_TOKEN: "", ...e } })).map(r => [r.status, r.stderr + r.stdout]);
+  ok(said.every(([st, o]) => st === 1 && /no form/u.test(o) && /Mend:/u.test(o)), "what --list found, in no form (a commit, counts out of range, a run that is no number), is refused before anything is read or written, saying the mend", JSON.stringify(said).slice(0, 300));
+  const big = { leg: 1, commit: SHA, came: "tried", ...Object.fromEntries(Object.keys(base).filter(k => !["commit", "day", "signedIn", "found", "private", "tried", "atPin", "untried", "syncFailed", "afterUnread", "held"].includes(k)).map(k => [k, 0])) };
+  const huge = [{ ...big, passedBoth: 2 ** 52 }, { ...big, passedBoth: 10001 }, { ...big, came: "held\n" }, { ...big, came: "toString" }];
+  const g = gather([...huge.map(l => ({ leg: 1, text: JSON.stringify(l) })), { leg: 2, text: `${JSON.stringify({ ...big, leg: 2 })}${" ".repeat(5000)}` }], { sha: SHA, day: "2026-11-27", signedIn: true, found: 2, privates: 0 });
+  ok(g.untried === 2 && g.passedBoth === 0 && formed(g), "a runner's line with a count past 10,000, of no class or past 4 KB is not read, so no runner can stop the filing for the rest", JSON.stringify(g).slice(0, 200));
+  const logs = { 11: `x\n${LINE}{"forged":1}\nmore\n${LINE}${JSON.stringify(big)}\nafter`, 12: `${LINE}{}`.padEnd((16 << 20) + 10, "x"), 13: "nothing said", 14: `${LINE}${JSON.stringify(big)}` };
+  const jobs = [{ id: 11, name: "try 1" }, { id: 12, name: "try 2" }, { id: 13, name: "try 3" }, { id: 14, name: "try-file" }, { id: "15", name: "try 4" }];
+  const ghLogs = route => {
+    if (/\/runs\/7\/attempts\/2\/jobs\?per_page=100&page=1$/u.test(route)) return JSON.stringify({ jobs });
+    const m = /\/actions\/jobs\/(\d+)\/logs$/u.exec(route);
+    if (m && logs[m[1]]) return logs[m[1]];
+    throw new Error("gh: Not Found (HTTP 404)");
+  };
+  const ll = legLines(7, 2, { gh: ghLogs, repo: CORE });
+  ok(ll.length === 1 && ll[0].leg === 1 && ll[0].text === JSON.stringify(big), "of each runner's log the last counts line alone is read; a log past 16 MB, a job not of the try's runners and one with no number are not", JSON.stringify(ll).slice(0, 200));
+  let refusedJobs = null;
+  try { legLines(8, 1, { gh: ghLogs, repo: CORE }); } catch (e) { refusedJobs = e; }
+  ok(refusedJobs instanceof Error, "GitHub refusing the list of jobs throws, never read as runners that said nothing");
   const odd = [
     { full_name: `${OWNER}/huge`, owner: { login: OWNER } }, { full_name: `${OWNER}/odd`, owner: { login: OWNER } }, { full_name: `${OWNER}/fine`, owner: { login: OWNER } },
     { full_name: 5, owner: null }, "not a repository",
@@ -167,13 +204,13 @@ for (const name of ["game-one", "tool-two"]) {
   let got = null;
   try { got = owned(true, ghOdd); } catch (e) { got = e; }
   ok(Array.isArray(got) && got.map(p => p.name).join() === `${OWNER}/fine`, "a manifest past 1 MB, one of the wrong type and a repository of no form are no project; the rest are found", String(got?.message ?? JSON.stringify(got)));
-  let list = null;
-  try { list = owned(true, () => "{\"not\":\"a list\"}"); } catch (e) { list = e; }
-  ok(list instanceof Error, "an answer that is no list of repositories throws, never read as none", String(list));
+  let none = null;
+  try { none = owned(true, () => "{\"not\":\"a list\"}"); } catch (e) { none = e; }
+  ok(none instanceof Error, "an answer that is no list of repositories throws, never read as none", String(list));
   const out = path.join(tmp, "hostile-out"), at = path.join(out, "hostile");
   fs.mkdirSync(at, { recursive: true }); fs.mkdirSync(out, { recursive: true }); git(at, "init", "-q");
   const writes = body => (cmd, args) => { const v = args.indexOf("--verdicts"); if (v >= 0) fs.writeFileSync(args[v + 1], body); return true; };
-  const came = [("x".repeat(17 << 20)), "5", "\"passed\"", "", "{\"a/x\":"].map(body => tryOne({ dir: "hostile" }, path.join(tmp, "core-at"), SHA, out, writes(body)).came);
+  const came = [("x".repeat(17 << 20)), "5", "\"passed\"", "", "{\"a/x\":"].map(body => tryOne(at, path.join(tmp, "core-at"), SHA, out, writes(body)).came);
   ok(came.every(c => c === "untried"), "verdicts past 16 MB, of the wrong type, nothing at all or cut short are read as none written, the project untried", came.join());
 }
 

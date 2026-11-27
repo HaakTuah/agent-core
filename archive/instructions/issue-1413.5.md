@@ -9,7 +9,7 @@ The index, and how an item is written: `archive/instructions.md`.
      a day, never on each merge, writes nothing to a project, the real sync drafts staying at a release's trial, adds no
      billed job to a project, tries no project of another owner, and leaves a sign-in only the owner can give to the
      owner, labelled needs-owner, while the try runs where it can. Where it runs was left to the builder: on the core's
-     own runners, as a job of its scheduled look, with a read-only sign-in the owner gives, since a daily session costs
-     usage and the core's public runners cost no minutes; what they print stays counts and conclusions. The reason:
-     release 6's faults were found at its trial, round after round, long after the changes that brought them in. It
-     stands behind "The owner's own projects try the core each day" in `AGENTS.md`.
+     own runners, as jobs of its scheduled look, each project on a fresh runner of its own, with a read-only sign-in the
+     owner gives, since a daily session costs usage and the core's public runners cost no minutes; what they print stays
+     counts and conclusions. The reason: release 6's faults were found at its trial, round after round, long after the
+     changes that brought them in. It stands behind "The owner's own projects try the core each day" in `AGENTS.md`.

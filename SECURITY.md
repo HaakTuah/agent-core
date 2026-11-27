@@ -202,14 +202,18 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      `tests/toolchain-test.mjs`.
    - what the daily try of the core reads of the owner's own projects (`scripts/daily-try.mjs`, from `own-look.yml`):
      GitHub's list of the owner's repositories and each one's manifest, the verdicts the projects' own checks write
-     before and after the sync, and the counts its job hands the job that files; a repository is kept only where its
+     before and after the sync, and the line of counts each runner's log ends with, which the job that files reads through
+     GitHub's API; a repository is kept only where its
      owner's login is the owner's, a manifest is read as text alone, the verdicts only through the trial's own reader
-     (`scripts/release-trial.mjs`, `compared`), and the counts only as whole numbers, a commit and a day in their form,
-     from which alone the text it files is built, naming no project; the projects' code runs with no key, token or
+     (`scripts/release-trial.mjs`, `compared`), and each runner's counts only as whole numbers, its own number, the commit and what it came to, in
+     their form, the line read only where it gives the runner's own number, from which alone the text it files is built,
+     naming no project; each project runs alone on a fresh runner, the sign-in reaching only the step that clones it,
+     so its code reaches no other project's clone or counts; the projects' code runs with no key, token or
      runner's file in its environment; limits: 500 pages of 100 repositories, 256 MB of an answer, 1 MB of a manifest,
-     past which the repository is no project, 16 MB of a file of verdicts, past which it is read as none written, 4 KB
-     of the counts, 25 minutes for each run of a project's checks or its sync, 10 minutes for a clone and 360 for the
-     job; hostile tests: `tests/daily-try-test.mjs`.
+     past which the repository is no project, 16 MB of a file of verdicts, past which it is read as none written, 16 MB
+     of a runner's log, past which it said nothing, 4 KB of a runner's line and 10,000 of each count in it, past which it
+     is not read, 256 runners, 25 minutes for each run of a project's checks or its sync, 10 minutes for a clone, 120 for
+     a runner's job and 10 for the list's and the filing's; hostile tests: `tests/daily-try-test.mjs`.
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
    (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are
    tools that only run, each with its licence in its audit (`.github/licences-audit.json`). Among them is Node
