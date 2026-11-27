@@ -2,8 +2,8 @@
 // place" in the core's roles/shared/how-to-work.md; #1139): the copies too short for its runs of lines or words to read.
 // A value is one of two fixed forms, compared as exact strings, never guessed at:
 //   - a pin: 40 or 64 hexadecimal characters standing alone (a commit hash, a SHA-256), in lower case, in any tracked
-//     file; save one after `uses: <action>@`, which the host asks of each workflow on its own and Dependabot moves, and a
-//     run of digits alone, which is a number;
+//     file; save one after `uses: <action>@`, which the host asks of each workflow on its own and Dependabot moves, one
+//     after the manifest's `Core: <address> at `, which each sync moves, and a run of digits alone, which is a number;
 //   - a pattern: a regular expression literal of JavaScript or TypeScript, as the measures' lexer reads it
 //     (code-shape-lexer.mjs), of at least 30 characters, in a file the config's "code" lists; save one that matches one
 //     text alone (no ., [, *, +, ?, {, | or class escape such as \d), since that is a script's printed wording read, which
@@ -12,11 +12,19 @@
 // words/, at the root and in the core's copy), the licence audit's config, by the kit's file name (its "version" of a tool fetched by checksum is the pin a file writes), what the config's ":!" specs leave out, and the files its "tests" lists,
 // whose copies of the code are another check's (#460, point 3); a value the config's "twice" names, with why both files
 // must hold it, is taken as said.
-// Nothing locks a project (AGENTS.md of the core): what the pull request's base held is the baseline. A value fails only
-// where a file of the project's own (outside the core's copy, and no file of the core's that carries its mark: core-owned.mjs) holds
-// it now and the base held it in fewer such files; so a sync, which changes the core's files alone, never fails here,
-// and a value moved from one file to another passes. Every other value written twice is noted, at every run, a debt to
-// work down; with no base (a push to main) every one is noted and none fails. Node's own modules and git.
+// Nothing locks a project (AGENTS.md of the core): what stood is the baseline, listed and allowed only to shrink. The list
+// is the "values" of the check's baseline, each value by its key (keyOf: no pin stands whole there) to how many files of
+// the project's own hold it (outside the core's copy, and no file of the core's that carries its mark: core-owned.mjs);
+// copies.mjs's --first writes it and --write lowers it, each value two such files hold or more. Where it stands, a value
+// fails where more files of the project's own hold it than the list says, or, against the base, one more than there; an entry the change adds or raises
+// against the base's list fails, and so does one whose value now stands in fewer files, until --write lowers it. Until
+// the list is written, what the pull request's base held counts as it: a value fails only where a file of the project's
+// own holds it now and the base held it in fewer such files, and with no base (a push to main) none fails. Either way a
+// sync, which changes the core's files and those two kinds of pin alone, never fails here, and a value moved from one file
+// to another passes; every value written twice that does not fail is noted, at every run, a debt to work down. A release
+// that changes what this part reads, once lists stand, fails syncs as a change of the copies' measure would: it brings
+// a sync note whose step writes each project's list anew, the pull request's base counting as the list until then. Node's own modules and git.
+import crypto from "node:crypto";
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tokens, jsxIn } from "./code-shape-lexer.mjs";
@@ -24,8 +32,14 @@ import { marked } from "./core-owned.mjs";
 import { logged, noSignInWhole } from "./guards.mjs";
 
 export const PATTERN_LEAST = 30;
+// The key a value is listed by in the baseline's "values": the first 12 hexadecimal characters of its SHA-256, so that a
+// pin, which may be a secret, never stands whole in the list.
+export const keyOf = v => crypto.createHash("sha256").update(v).digest("hex").slice(0, 12);
+// (a list's form: an object of keys, each to a whole count of one or more)
+export const listForm = l => !!l && typeof l === "object" && !Array.isArray(l) && Object.entries(l).every(([h, n]) => /^[0-9a-f]{12}$/u.test(h) && Number.isInteger(n) && n >= 1);
 const PIN = /(?<![0-9A-Za-z_])(?:[0-9a-fA-F]{64}|[0-9a-fA-F]{40})(?![0-9A-Za-z_])/gu;
 const USES = /uses:[ \t]*["']?[^\s"'@]+@(?:sha256:)?$/u;
+const CORE_PIN = /^Core: \S+ at $/u;
 const LOCKS = ["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lock", "packages.lock.json", "Cargo.lock", "poetry.lock", "Pipfile.lock", "uv.lock", "Gemfile.lock", "composer.lock", "go.sum"];
 // (the licence audit's config, by the kit's file name: the "version" of a tool fetched by its checksum is that pin,
 // written there and in the file that fetches it, so it stands in both by design)
@@ -39,7 +53,7 @@ export function pinsIn(text) {
   const found = new Map();
   String(text).split("\n").forEach((line, i) => {
     for (const m of line.matchAll(PIN)) {
-      if (/^\d+$/u.test(m[0]) || USES.test(line.slice(0, m.index))) continue;
+      if (/^\d+$/u.test(m[0]) || USES.test(line.slice(0, m.index)) || CORE_PIN.test(line.slice(0, m.index))) continue;
       const v = m[0].toLowerCase();
       if (!found.has(v)) found.set(v, i + 1);
     }
@@ -122,11 +136,13 @@ function valuesAt({ specs, code, codeSpecs }, ls, commit, want = []) {
 
 // The values the change wrote into one more file of the project's own than the base held them in, each with the files
 // of the project's own that held it there. (only a file the change touched can hold a value it did not hold at the base)
+// (the core writes it: a file of its copy, or one of a kind that carries the core's mark, carrying it; a whole file of
+// a kind with no mark is the project's own, since only its text tells it from a kit's, as converged() reads it)
+const writesOf = core => (f, at) => !!core && (f.startsWith(core) || (marked(f) && /^# The core's file:/u.test(readAt(at, f) ?? "")));
+
 function freshOf(asked, { read, ls, base, core }) {
   if (!base) return [];
-  // (the core writes it: a file of its copy, or one of a kind that carries the core's mark, carrying it; a whole file of
-  // a kind with no mark is the project's own, since only its text tells it from a kit's, as converged() reads it)
-  const coreWrites = (f, at) => !!core && (f.startsWith(core) || (marked(f) && /^# The core's file:/u.test(readAt(at, f) ?? "")));
+  const coreWrites = writesOf(core);
   const changed = new Set(git(["diff", "--name-only", "-z", base, "--"]).split("\0").filter(Boolean));
   let before = null;
   const fresh = [];
@@ -142,19 +158,23 @@ function freshOf(asked, { read, ls, base, core }) {
 
 // The part, run by copies.mjs from the project's root: `core`, the copy's path from the root ("" in the core's own
 // repository); `config`, the check's config, `configPath` its path as given and `configAt` from the root, the config
-// itself never read for values, since its "twice" names them; `base`, the pull request's base or "";
-// `ls(specs)`, the files pathspecs read, as copies.mjs lists them. It prints its notes and failures and returns whether
-// anything failed.
-export function valuesTwice({ core, config, configPath, configAt, base, ls }) {
-  try { return values({ core, config, configPath, configAt, base, ls }); }
+// itself never read for values, since its "twice" names them; `base`, the pull request's base or ""; `ls(specs)`, the
+// files pathspecs read, as copies.mjs lists them; `listed`, the baseline's "values", or undefined where it holds none
+// yet, and `listedBase`, the base's, the same; `baseline` and `self`, the baseline's path and how a session runs the
+// check, for the mends. It prints its notes and failures and returns whether anything failed.
+export function valuesTwice(run) {
+  try { return values(run); }
   catch (e) {
     if (!/^fatal:/mu.test(String(e.stderr ?? ""))) throw e;
-    console.error(`FAIL: git could not read the values ${logged(configPath)} names: ${logged(String(e.stderr || e.message).trim().split("\n")[0])}. Mend: write each pathspec of its "code", "prose" and "tests" as git reads it (a path, or one of git's magic words), and run the check again`);
+    console.error(`FAIL: git could not read the values ${logged(run.configPath)} names: ${logged(String(e.stderr || e.message).trim().split("\n")[0])}. Mend: write each pathspec of its "code", "prose" and "tests" as git reads it (a path, or one of git's magic words), and run the check again`);
     return true;
   }
 }
 
-function values({ core, config, configPath, configAt, base, ls }) {
+// What stands now: `asked`, each value written twice that the config's "twice" does not say, with its places; `kept`,
+// those it says; `stale`, what it says that no longer stands twice; `own(places)`, the files of the project's own among
+// them; `read`, the scope.
+function standing({ core, config, configAt, ls }) {
   // (a pin named in capitals is the pin, read in lower case as every pin is; a pattern is kept as written)
   const said = Object.fromEntries(Object.entries(config.twice && typeof config.twice === "object" && !Array.isArray(config.twice) ? config.twice : {})
     .map(([v, why]) => [pinsIn(v).has(v.toLowerCase()) ? v.toLowerCase() : v, why]));
@@ -162,12 +182,40 @@ function values({ core, config, configPath, configAt, base, ls }) {
   const twice = [...valuesAt(read, ls, "")].filter(([, places]) => places.size >= 2);
   const kept = twice.filter(([v]) => typeof said[v] === "string" && said[v].trim());
   const asked = twice.filter(([v]) => !kept.some(([k]) => k === v));
-  const fresh = freshOf(asked, { read, ls, base, core });
-  report({ asked, fresh, kept, stale: Object.keys(said).filter(v => !twice.some(([k]) => k === v)), base, configPath });
-  return fresh.length > 0;
+  const coreWrites = writesOf(core), own = places => [...places.keys()].filter(f => !coreWrites(f, ""));
+  return { read, asked, kept, own, stale: Object.keys(said).filter(v => !twice.some(([k]) => k === v)) };
 }
 
-function report({ asked, fresh, kept, stale, base, configPath }) {
+// The list as it stands now, for copies.mjs's --first and --write: each value written twice that the config does not
+// say, held by two files of the project's own or more, by its key to how many such files hold it. (a value one file of
+// the project's own holds beside the core's files is never listed: only the base tells whether the change wrote it or a
+// sync brought the core's, so it is read against the base alone, and a sync never fails here)
+export function listNow(run) {
+  const { asked, own } = standing(run);
+  return Object.fromEntries(asked.map(([v, places]) => [keyOf(v), own(places).length]).filter(([, n]) => n >= 2).sort(([a], [b]) => (a < b ? -1 : 1)));
+}
+
+function values(run) {
+  const { base, ls, core, listed, listedBase } = run;
+  const { read, asked, kept, own, stale } = standing(run);
+  if (!listForm(listed)) {
+    const fresh = freshOf(asked, { read, ls, base, core });
+    report({ ...run, asked, fresh, kept, stale, listed: false });
+    return fresh.length > 0;
+  }
+  // (the list stands: a value two files of the project's own hold or more fails past it, and against the base, too, each
+  // one the change wrote into one more such file, so that neither a first list nor one held beside the core's takes in
+  // what the change wrote)
+  const over = asked.filter(([v, places]) => own(places).length >= 2 && own(places).length > (listed[keyOf(v)] ?? 0)).map(([v, places]) => [v, places, []]);
+  const fresh = [...over, ...freshOf(asked, { read, ls, base, core }).filter(([v]) => !over.some(([k]) => k === v))];
+  const raised = base && listForm(listedBase) ? Object.entries(listed).filter(([h, n]) => !(h in listedBase) || n > listedBase[h]).length : 0;
+  const now = new Map(Object.entries(listNow(run)));
+  const shrunk = Object.entries(listed).filter(([h, n]) => (now.get(h) ?? 0) < n).length;
+  report({ ...run, asked, fresh, kept, stale, listed: true, raised, shrunk });
+  return fresh.length > 0 || raised > 0 || shrunk > 0;
+}
+
+function report({ asked, fresh, kept, stale, base, configPath, listed, raised = 0, shrunk = 0, baseline, self }) {
   // (a pin by its first 12 characters, so a secret written twice never stands whole in a log: its file and line find it)
   const shown = v => {
     if (pinsIn(v).has(v)) return `${v.slice(0, 12)}...`;
@@ -177,7 +225,8 @@ function report({ asked, fresh, kept, stale, base, configPath }) {
   const where = places => [...places].map(([f, l]) => `${f}:${l}`).join(" and ");
   const old = asked.filter(([v]) => !fresh.some(([k]) => k === v));
   if (old.length) {
-    console.log(`note ${old.length} ${old.length === 1 ? "value stands" : "values stand"} in two files or more${base ? ", as the pull request's base held them" : ", with no base to read against"}: each a debt to work down, failing nothing (read it from one file, or say in ${logged(configPath)}'s "twice" why both must hold it)`);
+    const as = listed ? `, as ${logged(baseline)} lists them` : base ? ", as the pull request's base held them" : ", with no base to read against";
+    console.log(`note ${old.length} ${old.length === 1 ? "value stands" : "values stand"} in two files or more${as}: each a debt to work down, failing nothing (read it from one file, or say in ${logged(configPath)}'s "twice" why both must hold it)`);
     for (const [v, places] of old.slice(0, 10)) console.log(`  ${logged(`${shown(v)}: ${where(places)}`)}`);
     if (old.length > 10) console.log(`  and ${old.length - 10} more`);
   }
@@ -186,5 +235,14 @@ function report({ asked, fresh, kept, stale, base, configPath }) {
     const first = was[0] ?? [...places.keys()][0];
     console.error(`FAIL: ${logged(`a value written twice: ${shown(v)} stands in ${where(places)}`)}. Mend: read the value from ${logged(first)} (import it, or read the file), or say in ${logged(configPath)}'s "twice" why both must hold it`);
   }
-  if (!fresh.length) console.log(`ok   no value newly written twice (a pin or a pattern${kept.length ? `; ${kept.length} said in ${logged(configPath)}'s "twice"` : ""})`);
+  listFailed({ raised, shrunk, base, baseline, self, configPath });
+  if (!fresh.length && !raised && !shrunk) console.log(`ok   no value newly written twice (a pin or a pattern${kept.length ? `; ${kept.length} said in ${logged(configPath)}'s "twice"` : ""})`);
+}
+
+// The list's own failures: an entry the change added or raised against the base's list, and one whose value stands in
+// fewer files now, each with its mend.
+function listFailed({ raised, shrunk, base, baseline, self, configPath }) {
+  const values = n => (n === 1 ? "value" : "values");
+  if (raised) console.error(`FAIL: ${logged(baseline)}'s "values" adds or raises ${raised} ${values(raised)} against ${logged(base)}, and the list only shrinks. Mend: take it back as ${logged(base)} holds it (git checkout ${logged(base)} -- ${logged(baseline)}), read each value the change wrote again from one file, and run ${logged(self)} ${logged(configPath)} --write`);
+  if (shrunk) console.error(`FAIL: ${logged(baseline)}'s "values" lists ${shrunk} ${values(shrunk)} gone or in fewer files now. Mend: run ${logged(self)} ${logged(configPath)} --write and commit the baseline it lowers`);
 }
