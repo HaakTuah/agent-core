@@ -131,6 +131,13 @@ try {
     swap(".agents", f => fs.symlinkSync(awayDir, f)); commit("antigravity's folder elsewhere");
     r = run({ ENTRY_BASE: "HEAD" });
     ok(r.status === 0 && r.out.includes("note") && r.out.includes(".agents/rules/core.md stands here but is not read"), "against a base that held the same folder as a link leading out of the project, it is noted and fails nothing");
+    write("docs/ag/.keep", ""); swap(".agents", f => fs.symlinkSync("docs/ag", f)); commit("antigravity's folder inside");
+    write("docs/ag/rules/.keep", ""); fs.symlinkSync("nowhere.md", path.join(dir, "docs/ag/rules/core.md"));
+    refused("against a base whose folder on the way was a link to a folder that held nothing there, an entry file added as a link leading nowhere fails, saying its mend");
+    fs.rmSync(path.join(dir, "docs/ag/rules"), { recursive: true });
+    swap(".kiro", f => fs.symlinkSync("nowhere", f)); commit("kiro's folder a link leading nowhere");
+    r = run({ ENTRY_BASE: "HEAD" });
+    ok(r.status === 0 && r.out.includes("note") && r.out.includes(".kiro/steering/core.md stands here but is not read"), "against a base that held the same folder as a link leading nowhere, it is noted and fails nothing");
   } finally { fs.rmSync(away, { force: true }); fs.rmSync(`${away}.d`, { recursive: true, force: true }); }
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 
