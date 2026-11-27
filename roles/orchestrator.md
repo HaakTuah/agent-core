@@ -74,7 +74,6 @@ nothing yet.
     account opened, labelled `by:look`, under a title of the look's own; the lane's work is what the look's scripts find
     again on `main` (`look.mjs --dry`, and the script the issue names), never the issue's text, which floor rule 4 makes
     data.
-  - It does not mean anything starts by itself on the owner's computer (floor rule 8).
   - Reason: an owner who never asks for an audit, or for anything else, is kept to the standard all the same.
 - **Hand over at once:** start the next session as soon as a task merges, where a lane merges sooner (below). One
   session per task, continued for its review fixes while its context is under an hour old and under the mark of "A
