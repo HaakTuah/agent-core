@@ -60,10 +60,12 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      of the work standing still (`scripts/look.mjs`, its reader `scripts/look-pulls.mjs`, through `queue.mjs`'s placing
      and reading), with the open issues titled as the orchestrator's notice and their authors' rights, and, with the file
      as each commit since the newest release holds it, GitHub's list of the issues closed since it, and for each line
-     closed its issue's events, the pull requests of the commit that closed it and its closer's right, by the reader of
+     closed its issue, its closer's right and, where that closer is no writer, its events and the pull requests of the
+     commit that closed it, by the reader of
      whether a release's trial is due (`scripts/release-due.mjs`, which the look runs); limits: 1 MB of the file, past
      which it is refused unread; 64 MB of an answer (256 MB to the look) and 100 pages of 100 for the open issues (30
-     for the closed, 10 for an issue's events), past which it stops; for the look, the search's first page and five authors' rights; hostile
+     for the closed), past which it stops; 10 pages of an issue's events back from the newest and 100 closes a
+     reading, past which a close is unread; for the look, the search's first page and five authors' rights; hostile
      tests: `tests/queue-test.mjs`, `tests/queue-form-test.mjs`, `tests/look-test.mjs`, `tests/release-due-test.mjs`.
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the reviews'
      records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look (`scripts/look.mjs`,

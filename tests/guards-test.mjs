@@ -7,7 +7,7 @@
 //   node tests/guards-test.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { DEEPEST, aCommit, aRepository, inProject, asText, leadsOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
+import { DEEPEST, aCommit, aLogin, aRepository, inProject, asText, leadsOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -66,6 +66,7 @@ for (let i = 0; i < DEEPEST; i++) at = [at];
 ok(!tooDeep(at) && tooDeep([at]), `nesting is bounded at ${DEEPEST} objects and lists`);
 
 ok(["owner/name", "own-er/na.me_1"].every(aRepository) && !["../..", "o/..", "./n", "o/n/x", "o", "o/n x", "", undefined].some(aRepository), "a repository is named as <owner>/<name>, neither part dots alone");
+ok(["example-writer", "A1", "a".repeat(39)].every(aLogin) && !["-example", "a".repeat(40), "example/../writer", "example writer", "example-app[bot]", "", undefined].some(aLogin), "a login is a letter or digit, then up to 38 letters, digits or hyphens, and nothing else");
 ok(aCommit("0123456789abcdef0123456789abcdef01234567") && !["0123456", "0123456789ABCDEF0123456789ABCDEF01234567", "../../x", undefined].some(aCommit), "a commit is named by forty hexadecimal digits alone");
 
 const text = "Shown first\n<!-- hidden one -->\n```\nhidden in a fence\n```\n~~~~\nhidden too\n~~~\nstill hidden\n~~~~\nshown <!-- hidden\nhidden -->shown again\n<!-- never closed\nhidden";
