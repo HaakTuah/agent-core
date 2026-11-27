@@ -238,10 +238,6 @@
       "mark": 33252,
       "why": "#1008: one step's cases (the sync step that asks a lookup beside each exact-versions check) on the workflows each writes into the one scratch project; split along its sections, each file would build the project again, adding to the suite's time (tasks/tests.md), and a session changing the step reads every case."
     },
-    "tests/merge-line-test.mjs": {
-      "mark": 23054,
-      "why": "One script's cases (merge-line.mjs: the facts read from the host for each kind of repository, where users get a release, the measure, the cancelling) through the stand-in for gh they share; split along the script's parts, each file would write it again, and the file is 13% past the mark (#1008)."
-    },
     "tests/size-test.mjs": {
       "mark": 28199,
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
@@ -275,13 +271,9 @@
       "mark": 27539,
       "why": "One feature's cases (the fetch before the NuGet check's restore) on the scratch project and the package files they share, each case reading what the one before committed; split, each file would write that project again and add to the suite's time"
     },
-    "scripts/merge-line.mjs": {
-      "mark": 20602,
-      "why": "the question of a split is asked in #1345"
-    },
     "scripts/screens.mjs": {
-      "mark": 23155,
-      "why": "the question of a split is asked in #1345"
+      "mark": 20920,
+      "why": "#1345: the list of its checks and their mends, which a session adding a check or rewording a mend reads alone, stands in screens-checks.mjs; what is left is one body: the config and the findings read, the verdict, which lowers the baseline as --write does, and the run that sets them in order, each part reading what the others give, so whoever changes one reads them all, and the file is 2% past the mark."
     }
   }
 }
