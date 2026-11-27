@@ -210,7 +210,9 @@ const scratchRepo = (prefix) => {
     let r = licenceCheck(config, dir, "HEAD", config);
     ok(!stands(r.failures, "NPM-SHRINKWRAP.JSON") && stands(r.reports, "NPM-SHRINKWRAP.JSON"), "a twin of another case that stood at the base is reported", JSON.stringify(r));
     ok(stands(licenceCheck(config, dir, null, config).failures, "NPM-SHRINKWRAP.JSON"), "and with no base to read it against it fails");
-    for (const f of ["Package-Lock.json", "NPM-SHRINKWRAP.JSON"]) {
+    // (on a file system that folds case, NPM-SHRINKWRAP.JSON and npm-shrinkwrap.json are one file, so no twin of the second stands)
+    const folds = fs.existsSync(path.join(dir, "npm-shrinkwrap.json"));
+    for (const f of ["Package-Lock.json", "NPM-SHRINKWRAP.JSON"].filter((n) => !(folds && n === "NPM-SHRINKWRAP.JSON"))) {
       put(f, JSON.stringify({ lockfileVersion: 3, packages: {} })); put("npm-shrinkwrap.json", "{}"); git("commit", "-q", "-m", f);
       ok(stands(licenceCheck({ ...config, lockfiles: [f] }, dir, "HEAD^1", { ...config, lockfiles: [f] }).failures, "npm-shrinkwrap.json"), `${f} beside npm's own shrinkwrap file fails as before`);
       git("reset", "-q", "--hard", "HEAD^1");

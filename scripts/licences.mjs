@@ -555,7 +555,7 @@ function shrinkwrapFaults(root, lockfiles, base) {
     const want = name.toLowerCase() === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json";
     let names = [];
     try { names = readdirSync(join(root, dir)); } catch { /* (no folder, no file) */ }
-    const twins = new Set([...(existsSync(join(root, old)) ? [old] : []), ...names.filter((x) => x.toLowerCase() === want && isFile(join(root, dir, x))).map((x) => posix.join(dir, x))]);
+    const twins = new Set([...(isFile(join(root, old)) ? [old] : []), ...names.filter((x) => x.toLowerCase() === want && isFile(join(root, dir, x))).map((x) => posix.join(dir, x))]);
     for (const twin of twins) {
       const said = `${f}: ${twin} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`;
       // (a pair seen only since #1349, in a case of another name than the one read before, passes, reported, where it stood as files at the base)
