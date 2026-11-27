@@ -24,7 +24,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { coreItself, manifestText } from "./core-path.mjs";
+import { coreItself, manifestText, regularText } from "./core-path.mjs";
 import { asText, loggedAlone } from "./guards.mjs";
 import { Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
@@ -86,10 +86,16 @@ function baseOf() {
   return base;
 }
 
-// The shape check's config, or null where it is not there or cannot be read (the whole suite then runs).
+// The shape check's config, or null where it is not there, is reached through a link, is no regular file, is past a
+// mebibyte or cannot be read (the whole suite then runs; SECURITY.md, rule 5).
 function configOf(at) {
-  try { return fs.existsSync(notLinked(at)) ? parseConfig(fs.readFileSync(at, "utf8"), at) : null; } catch { return null; }
+  try {
+    const text = regularText(notLinked(at), { linked: false });
+    return text === null ? null : parseConfig(text, at);
+  } catch { return null; }
 }
+// Whether anything stands at `file`, a link of either kind included, which the rules file's reader then reads as none.
+const standsAt = file => { try { fs.lstatSync(file); return true; } catch { return false; } };
 
 // What the change from `from` selects, or the whole suite where the files it changes, or the project's files all
 // together, are too many or too slow to read within the time rule 5 of SECURITY.md allows (hurry.mjs; #881, #962).
@@ -114,8 +120,10 @@ async function main(argv) {
   const self = path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/");
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, opts = options(named ? argv.slice(1) : argv, self);
   // (the core's own repository reads its slots from AGENTS.md, whatever manifest stands at its root: core-path.mjs)
-  // (read as the manifest is, a regular file of at most a mebibyte and no link, or else as no rules file: SECURITY.md, rule 5)
-  const rules = (coreItself(".") ? ["AGENTS.md"] : ["core-manifest.md", "AGENTS.md"]).find(f => fs.existsSync(f));
+  // (a regular file of at most a mebibyte, read by the manifest's reader, which here refuses a link where the manifest's
+  // other readers follow one: a link that stands there, leading anywhere or nowhere, is read as no rules file, and no
+  // other is looked for; SECURITY.md, rule 5)
+  const rules = (coreItself(".") ? ["AGENTS.md"] : ["core-manifest.md", "AGENTS.md"]).find(standsAt);
   const at = named ?? where(rules ? manifestText(rules, { linked: false }) ?? "" : ""), base = baseOf(), config = configOf(at);
   const now = config ? standing(config) : null, failed = readFailed(opts["--failed"]);
   const s = await chosen({ config, at, base, passed: opts["--passed"], select: from => selectedFrom(from, { now, config, failed }) });

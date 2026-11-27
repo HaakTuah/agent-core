@@ -235,7 +235,7 @@ for (const [changed, what] of [[["package.json"], "a file of no code the readers
 const dir = scratchDir("select-test-");
 const git = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const put = (file, text) => { fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.writeFileSync(path.join(dir, file), text); };
-const run = (args, env = {}) => { const r = spawnSync(process.execPath, [script, ...args], { cwd: dir, encoding: "utf8", env: { ...process.env, SELECT_BASE: "", GITHUB_ENV: "", GITHUB_STEP_SUMMARY: "", ...env } }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
+const run = (args, env = {}, timeout = undefined) => { const r = spawnSync(process.execPath, [script, ...args], { cwd: dir, encoding: "utf8", timeout, env: { ...process.env, SELECT_BASE: "", GITHUB_ENV: "", GITHUB_STEP_SUMMARY: "", ...env } }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 git("init", "-q", "-b", "main");
 for (const [f, t] of Object.entries(texts)) put(f, t);
 put("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src", "test"], tests: ["test/"], select: { proof: ["test/replay.test.js"], none: ["QUEUE.md"] } }));
@@ -263,7 +263,7 @@ ok(r.status === 0 && /test\/rules\.test\.js: failed last time/.test(r.out), "the
 fs.renameSync(path.join(dir, "checks/shape.json"), path.join(dir, "checks/other.json"));
 r = run([], { SELECT_BASE: "HEAD^1" });
 ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/shape\.json\) cannot be read/.test(r.out), "where the shape check's config cannot be read, the whole suite runs", r.out);
-// (its rules file is read within a bound, as the manifest's reader reads it: past a mebibyte, or a link, it is none)
+// (its rules file is read within a bound, through no link: past a mebibyte, or a link, it is none)
 const row = "| the *shape check* | `checks/other.json` |\n", rulesFile = path.join(dir, "AGENTS.md");
 put("AGENTS.md", row);
 r = run([], { SELECT_BASE: "HEAD^1" });
@@ -275,8 +275,52 @@ if (process.platform !== "win32") { // (a link needs a right Windows may not giv
   put("rules.md", row); fs.rmSync(rulesFile); fs.symlinkSync("rules.md", rulesFile);
   r = run([], { SELECT_BASE: "HEAD^1" });
   ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/shape\.json\) cannot be read/.test(r.out), "a rules file that is a link is read as none, and the whole suite runs", r.out);
-  fs.rmSync(path.join(dir, "rules.md"));
+  fs.rmSync(path.join(dir, "rules.md")); fs.rmSync(rulesFile);
+  // (a manifest that is a link leading nowhere is found as one, and read as no rules file: the AGENTS.md beside it is
+  // not looked for)
+  put("AGENTS.md", row); fs.symlinkSync("nowhere.md", path.join(dir, "core-manifest.md"));
+  r = run([], { SELECT_BASE: "HEAD^1" });
+  ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/shape\.json\) cannot be read/.test(r.out), "a manifest that is a link leading nowhere is read as no rules file, as one leading to a file is, and the whole suite runs", r.out);
+  fs.rmSync(path.join(dir, "core-manifest.md"));
+  // (a pipe is opened without waiting, and read as no rules file; were it waited on, the run would stop at its time)
+  fs.rmSync(rulesFile); execFileSync("mkfifo", [rulesFile]);
+  r = run([], { SELECT_BASE: "HEAD^1" }, 20000);
+  ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/shape\.json\) cannot be read/.test(r.out), "a rules file that is a pipe is read as none, without waiting on it, and the whole suite runs", r.out);
+  fs.rmSync(rulesFile);
 }
+fs.rmSync(rulesFile, { force: true }); fs.mkdirSync(rulesFile);
+r = run([], { SELECT_BASE: "HEAD^1" });
+ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/shape\.json\) cannot be read/.test(r.out), "a rules file that is a folder is read as none, and the whole suite runs", r.out);
+fs.rmSync(rulesFile, { recursive: true });
+put("AGENTS.md", row.padEnd(1 << 20, "x"));
+r = run([], { SELECT_BASE: "HEAD^1" });
+ok(r.status === 0 && !/cannot be read/.test(r.out), "a rules file of a mebibyte exactly is read, and the config it names", r.out);
+// (the config the rules file names is read within a bound too, as a regular file: past a mebibyte, or a pipe, the
+// whole suite runs)
+put("AGENTS.md", row);
+const otherConfig = path.join(dir, "checks/other.json"), configText = fs.readFileSync(otherConfig, "utf8");
+fs.writeFileSync(otherConfig, configText.padEnd((1 << 20) + 1, " "));
+r = run([], { SELECT_BASE: "HEAD^1" });
+ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/other\.json\) cannot be read/.test(r.out), "a config past a mebibyte is not read, and the whole suite runs", r.out);
+fs.writeFileSync(otherConfig, configText.padEnd(1 << 20, " "));
+r = run([], { SELECT_BASE: "HEAD^1" });
+ok(r.status === 0 && !/cannot be read/.test(r.out), "a config of a mebibyte exactly is read", r.out);
+if (process.platform !== "win32") {
+  fs.rmSync(otherConfig); execFileSync("mkfifo", [otherConfig]);
+  r = run([], { SELECT_BASE: "HEAD^1" }, 20000);
+  ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/other\.json\) cannot be read/.test(r.out), "a config that is a pipe is read as none, without waiting on it, and the whole suite runs", r.out);
+  fs.rmSync(otherConfig);
+  // (a config that is a link, or one reached through a linked folder, is not read)
+  fs.writeFileSync(path.join(dir, "real.json"), configText); fs.symlinkSync("../real.json", otherConfig);
+  r = run([], { SELECT_BASE: "HEAD^1" });
+  ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/other\.json\) cannot be read/.test(r.out), "a config that is a link is read as none, and the whole suite runs", r.out);
+  fs.rmSync(otherConfig); fs.mkdirSync(path.join(dir, "real")); fs.renameSync(path.join(dir, "real.json"), path.join(dir, "real/other.json"));
+  put("AGENTS.md", "| the *shape check* | `linked/other.json` |\n"); fs.symlinkSync("real", path.join(dir, "linked"));
+  r = run([], { SELECT_BASE: "HEAD^1" });
+  ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(linked\/other\.json\) cannot be read/.test(r.out), "a config reached through a linked folder is read as none, and the whole suite runs", r.out);
+  fs.rmSync(path.join(dir, "linked")); fs.rmSync(path.join(dir, "real"), { recursive: true }); put("AGENTS.md", row);
+}
+fs.writeFileSync(otherConfig, configText);
 fs.rmSync(rulesFile);
 fs.renameSync(path.join(dir, "checks/other.json"), path.join(dir, "checks/shape.json"));
 for (const [args, env, what] of [
