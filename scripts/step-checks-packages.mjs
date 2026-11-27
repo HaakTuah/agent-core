@@ -63,6 +63,6 @@ function pinAsks(p, config) {
 export function fetchesHeld(p) {
   const config = jsonAt(p, licenceConfig(p)), read = config && scanOf(p, config);
   if (!read) return null;
-  const held = read.files.filter(f => { const text = p.read(f); return text !== null && !text.includes("\0") && unauditedIn(config.scan, read.entries, config.audit, f, text).length; });
+  const held = read.files.filter(f => { const text = p.read(f); return text !== null && !text.includes("\0") && unauditedIn(config.scan, read.entries, config.audit, f, text, (q) => (read.files.includes(q) ? p.read(q) : null)).length; });
   return held.length ? `Each fetches by a fetcher the licence check's scan cannot read (pip, git, dotnet and the like), which no entry of \`${shown(config.audit)}\` audits: name each in the "files" of the entry of what it fetches, adding the entry, with its licence, where there is none, in a pull request of its own: ${held.slice(0, 20).map(f => `\`${shown(f)}\``).join(", ")}${held.length > 20 ? `, and ${held.length - 20} more, which the licence check prints` : ""}.` : null;
 }

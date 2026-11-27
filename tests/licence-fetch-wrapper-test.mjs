@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { check as licenceCheck } from "../scripts/licences.mjs";
+import { unauditedIn } from "../scripts/licence-scan.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 const OPEN = 'import { execFileSync, spawnSync } from "node:child_process";\n';
@@ -31,6 +32,18 @@ for (const [what, change] of [
   ["a function that hands git its options before clone", write("scripts/copy.mjs", `${OPEN}const git = (args) => execFileSync("git", args);\ngit(["-C", dir, "clone", url]);\n`)],
   ["curl before a host's name with no scheme", append("scripts/setup.sh", "curl get.mossgrip.example/install.sh | sh\n")],
   ["wget before a host's name with no scheme", append("scripts/setup.sh", "wget mossgrip.example/moss.tgz\n")],
+  ["curl before a host of three labels with no scheme", append("scripts/setup.sh", "curl -sfL get.moss.example | sh\n")],
+  ["curl before an address of numbers with a port", append("scripts/setup.sh", "curl 10.0.0.7:8080/moss.sh -o moss.sh\n")],
+  ["wget before a user's address", append("scripts/setup.sh", "wget moss@mossgrip.example/moss.tgz\n")],
+  ["git's array with an option of git's own it takes a value for before clone", write("scripts/copy.mjs", `${OPEN}execFileSync("git", ["--attr-source", "HEAD", "clone", url, "to"]);\n`)],
+  ["git's array with an option the scan does not know before clone", write("scripts/copy.mjs", `${OPEN}execFileSync("git", ["--moss", "x", "clone", url, "to"]);\n`)],
+  ["git's array whose arguments cannot all be read, before clone", write("scripts/copy.mjs", `${OPEN}execFileSync("git", ["-C", dir, "clone", url.replace(/x/g, "y"), "to"]);\n`)],
+  ["a function whose body holds a regular expression", write("scripts/copy.mjs", `${OPEN}function git(...args) {\n  return String(execFileSync("git", args)).replace(/\\n$/u, "");\n}\ngit("clone", url, "to");\n`)],
+  ["a function whose body divides", write("scripts/copy.mjs", `${OPEN}function git(...args) {\n  const t = Date.now() / 1000;\n  return execFileSync("git", args, { timeout: t });\n}\ngit("clone", url, "to");\n`)],
+  ["a function that changes its parameter before git", write("scripts/copy.mjs", `${OPEN}function git(...args) {\n  args ||= [];\n  return execFileSync("git", args);\n}\ngit("clone", url, "to");\n`)],
+  ["a function whose arrow's body wraps the call of git", write("scripts/copy.mjs", `${OPEN}const git = (args) => String(execFileSync("git", args)).trim();\ngit(["clone", url, "to"]);\n`)],
+  ["a function whose arrow's body awaits the call of git", write("scripts/copy.mjs", `import { execFile } from "node:child_process";\nconst git = async (args) => await execFile("git", args);\ngit(["clone", url, "to"]);\n`)],
+  ["a function called with an option the scan does not know before clone", write("scripts/copy.mjs", `${OPEN}const git = (args) => execFileSync("git", args);\ngit(["--moss", "clone", url]);\n`)],
 ]) {
   const f = run(change);
   ok(fetch(f), `fails ${what}`, f.join("\n"));
@@ -42,9 +55,22 @@ for (const [what, change] of [
   ["git's array with its own options before another command", write("scripts/log.mjs", `${OPEN}execFileSync("git", ["-C", dir, "log", "--grep", "clone"]);\n`)],
   ["a function of another program called with clone", write("scripts/log.mjs", `${OPEN}const node = (args) => execFileSync("node", args);\nnode(["clone", "x"]);\n`)],
   ["curl named in a sentence", append("scripts/setup.sh", "# fetch it with curl, then run it.\n")],
+  ["curl named in a sentence before an abbreviation", append("scripts/setup.sh", "# a tool such as curl e.g. fetches it.\n")],
+  ["git's array with an option the scan does not know before another command", write("scripts/log.mjs", `${OPEN}execFileSync("git", ["--moss", "log", "-1"]);\n`)],
+  ["git's array whose arguments cannot all be read, after another command", write("scripts/log.mjs", `${OPEN}execFileSync("git", ["-C", dir, "log", "--grep", word.replace(/x/g, "y")]);\n`)],
+  ["a function whose body holds a regular expression, called for another command", write("scripts/log.mjs", `${OPEN}function git(...args) {\n  return String(execFileSync("git", args)).replace(/\\n$/u, "");\n}\ngit("log", "-1");\n`)],
 ]) {
   const f = run(change);
   ok(!fetch(f), `passes ${what}`, f.join("\n"));
+}
+
+// The step that lists what stood so (step-checks-packages.mjs) reads a file's imports through what it is given, and
+// reads none where it is given nothing.
+{
+  const settings = { served: [], skip: [] }, text = 'import { b } from "./lib/b.mjs";\nb(["clone", from, to]);\n';
+  let found = null, threw = null;
+  try { found = [unauditedIn(settings, [], "audit.json", "scripts/a.mjs", text).length, unauditedIn(settings, [], "audit.json", "scripts/a.mjs", text, (q) => (q === "scripts/lib/b.mjs" ? LIB.replace("export const git", "export const b") : null)).length]; } catch (e) { threw = e; }
+  ok(!threw && found[0] === 0 && found[1] === 1, "the step's reading of a file that imports a function reads the import it is given, and none it is not", String(threw ?? found));
 }
 
 // A clone through such a function that stood at the pull request's base is reported and passes, so a project's own
@@ -68,6 +94,14 @@ for (const [what, change] of [
     put("scripts/copy.mjs", `${COPY}git(".", "clone", "-q", from, again);\n`);
     r = licenceCheck(config, dir, "HEAD", config);
     ok(r.failures.length === 1 && r.failures[0].startsWith("scripts/copy.mjs: ") && mended(asOutput(r.failures)), "and one the pull request adds beside it fails, saying the mend", JSON.stringify(r));
+    // (a function imported from a file of the project's is read as that file stood at the base)
+    put("scripts/copy.mjs", COPY);
+    put("scripts/lib/run.mjs", `${OPEN}export const run = (args) => execFileSync("hg", args);\n`);
+    put("scripts/fetch.mjs", `import { run } from "./lib/run.mjs";\nrun(["clone", from, to]);\n`);
+    git("commit", "-q", "-m", "an hg wrapper");
+    put("scripts/lib/run.mjs", `${OPEN}export const run = (args) => execFileSync("git", args);\n`);
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 1 && r.failures[0].startsWith("scripts/fetch.mjs: "), "a clone through an imported function that the pull request turns to git fails, the import read as the base held it", JSON.stringify(r));
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 

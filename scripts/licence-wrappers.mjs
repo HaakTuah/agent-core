@@ -3,34 +3,59 @@
 // file of the project's that defines and exports it, which passes a parameter of its own to one of Node's calls of
 // "git", alone or spread in an array after options; and each call of it by its own name whose arguments make "clone"
 // git's subcommand, past git's own options. Node's own modules only (none).
-import { arrayAt, gitSubcommand, opening, runOn, stringEnd } from "./licence-fetchers.mjs";
+import { arrayAt, gitSubcommand, holdsClone, opening, runOn, stringEnd } from "./licence-fetchers.mjs";
 
 const NAME = "[A-Za-z_$][\\w$]*";
+// A name as a regular expression matches it, each character read as itself.
+const esc = (s) => s.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&");
 // A function's start: `const n = (`, `const n = function (`, `const n = p =>`, or `function n(`, exported or not.
 const DEFINE = new RegExp(String.raw`(?<![\w$.#])(export\s+)?(?:(?:const|let|var)\s+(${NAME})\s*=\s*(?:async\s+)?(?:(?:function\b\s*\*?\s*(?:${NAME})?\s*)?(\()|(${NAME})\s*=>)|(?:async\s+)?function\s*\*?\s*(${NAME})\s*(\())`, "gu");
 // A call of one of Node's that run a program, of "git" by that name or a path ending in it, up to its second argument.
-const GIT_CALL = new RegExp(String.raw`(?<![\w$#])(?:execFileSync|execFile|spawnSync|spawn)\s*\(\s*(["'\x60])(?:[^"'\x60\s]*[/\\])?git\1\s*,\s*`, "gu"), GIT_AT = new RegExp(GIT_CALL.source, "uy");
+const GIT_CALL = new RegExp(String.raw`(?<![\w$#])(?:execFileSync|execFile|spawnSync|spawn)\s*\(\s*(["'\x60])(?:[^"'\x60\s]*[/\\])?git\1\s*,\s*`, "gu");
 // What changes a parameter's arguments before they reach git.
-const changes = (p, body) => new RegExp(String.raw`(?<![\w$.])${p.replace(/\$/gu, "\\$")}\s*(?:(?:[-+*]|\?\?|\|\||&&)?=(?!=)|\+\+|--|\[[^\]]*\]\s*=(?!=)|\.\s*(?:unshift|splice|shift|reverse|sort|fill|copyWithin)\b)`, "u").test(body);
+const changes = (p, body) => new RegExp(String.raw`(?<![\w$.])${esc(p)}\s*(?:(?:[-+*]|\?\?|\|\||&&)?=(?!=)|\+\+|--|\[[^\]]*\]\s*=(?!=)|\.\s*(?:unshift|splice|shift|reverse|sort|fill|copyWithin)\b)`, "u").test(body);
 
-// The place after the "}" of the block that opens at text[i], its strings and comments read past, or -1 where it
-// cannot be read exactly (a "/" outside a string or comment).
-function blockEnd(text, i) {
+// The words after which a "/" opens a regular expression, not a division.
+const BEFORE_REGEX = /(?:^|[^\w$.])(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/u;
+// The place of the last character of what opens at the "/" text[i] outside a string or comment: the "/" itself where it
+// divides (after a name, a number or a closing bracket), else the "/" that closes its regular expression on that line,
+// or -1 where none does.
+function slashEnd(text, i) {
+  const before = text.slice(Math.max(0, i - 20), i).trimEnd();
+  if (/[\w$)\]]$/u.test(before) && !BEFORE_REGEX.test(before)) return i;
+  for (let j = i + 1, inClass = false; j < text.length && text[j] !== "\n"; j++) {
+    if (text[j] === "\\") j++;
+    else if (text[j] === "[") inClass = true;
+    else if (text[j] === "]") inClass = false;
+    else if (text[j] === "/" && !inClass) return j;
+  }
+  return -1;
+}
+// The place of the last character of the string, template, comment or regular expression that opens at text[i], or
+// -1 where it cannot be read exactly.
+function skipped(text, i) {
+  if (text.startsWith("//", i)) return text.indexOf("\n", i) - 1;
+  if (text.startsWith("/*", i)) { const end = text.indexOf("*/", i + 2); return end < 0 ? -1 : end + 1; }
+  return text[i] === "/" ? slashEnd(text, i) : stringEnd(text, i);
+}
+// The place where code that starts at text[i] ends, its strings, comments and regular expressions read past: after
+// the "}" of the block that opens there where `block`, else at the first ",", ";" or closing bracket at its own depth;
+// or -1 where it cannot be read exactly.
+function codeEnd(text, i, block) {
   for (let depth = 0; i < text.length; i++) {
     const ch = text[i];
-    if ("'\"`".includes(ch)) { i = stringEnd(text, i); if (i < 0) return -1; }
-    else if (text.startsWith("//", i)) { i = text.indexOf("\n", i); if (i < 0) return -1; }
-    else if (text.startsWith("/*", i)) { i = text.indexOf("*/", i + 2) + 1; if (i <= 0) return -1; }
-    else if (ch === "/") return -1;
-    else if (ch === "{") depth++;
-    else if (ch === "}" && --depth === 0) return i + 1;
+    if (!block && !depth && ",;)]}".includes(ch)) return i;
+    if ("'\"`/".includes(ch)) { i = skipped(text, i); if (i < 0) return -1; }
+    else if ("([{".includes(ch)) depth++;
+    else if (")]}".includes(ch) && --depth === 0 && block) return i + 1;
+    else if (depth < 0) return -1;
   }
   return -1;
 }
 
 // The array a name of the file holds, `const n = [...]`, as arrayAt reads it, or null where it is not one written so once.
 function constArray(text, name) {
-  const at = [...text.matchAll(new RegExp(String.raw`(?<![\w$.])(?:const|let|var)\s+${name.replace(/\$/gu, "\\$")}\s*=\s*\[`, "gu"))];
+  const at = [...text.matchAll(new RegExp(String.raw`(?<![\w$.])(?:const|let|var)\s+${esc(name)}\s*=\s*\[`, "gu"))];
   return at.length === 1 ? arrayAt(text, at[0].index + at[0][0].length - 1)?.args ?? null : null;
 }
 
@@ -54,15 +79,12 @@ function handsOn(text, i, params) {
 }
 
 // The body of the function whose parameters' list closes at text[i]: its start and end, a block or, after "=>", an
-// expression, which must open with a call of git (above) to be read; or null where it cannot be read exactly.
+// expression; or null where it cannot be read exactly.
 function bodyAt(text, i, arrow) {
-  const after = /^\s*(=>)?\s*/u.exec(text.slice(i)), start = i + after[0].length;
-  if (arrow !== Boolean(after[1])) return null;
-  if (text[start] === "{") { const end = blockEnd(text, start); return end < 0 ? null : { start, end }; }
-  if (!arrow) return null;
-  GIT_AT.lastIndex = start;
-  const close = GIT_AT.test(text) && arrayAt(text, text.indexOf("(", start), ")");
-  return close ? { start, end: close.end } : null;
+  const after = /^\s*(=>)?\s*/u.exec(text.slice(i, i + 400)), start = i + after[0].length;
+  if (arrow !== Boolean(after[1]) || (!arrow && text[start] !== "{")) return null;
+  const end = codeEnd(text, start, text[start] === "{");
+  return end < 0 ? null : { start, end };
 }
 
 /** The functions `text` defines that hand a parameter of their own on to git (above), each by its name: the place of
@@ -78,7 +100,8 @@ export function wrappers(text) {
     const inside = text.slice(body.start, body.end);
     for (const call of inside.matchAll(GIT_CALL)) {
       const hand = handsOn(text, body.start + call.index + call[0].length, params);
-      if (hand && !changes(params[hand.at].name, inside)) { out.set(name, { ...hand, exported: Boolean(m[1]) || exportsName(text, name) }); break; }
+      // (one whose parameter is changed before it reaches git is read loosely: each call that holds "clone" is a clone)
+      if (hand) { out.set(name, { ...hand, loose: changes(params[hand.at].name, inside), exported: Boolean(m[1]) || exportsName(text, name) }); break; }
     }
   }
   return out;
@@ -109,15 +132,19 @@ function normal(p) {
 }
 
 /** Each git clone in `text`, of the file `f` (a path from the project's root), by a function that hands its arguments
- *  on to git (above), as otherFetches gives a fetch: its line and those that run on to it, spaces run together. */
+ *  on to git (above), as otherFetches gives a fetch: its line and those that run on to it, spaces run together. A call
+ *  whose git subcommand cannot be read is one where its arguments hold "clone", and one whose arguments cannot be
+ *  read, where "clone" stands as a string before the next ";". */
 export function wrapperFetches(text, f = "", read = () => null) {
   const found = [], all = new Map([...imported(text, f, read), ...wrappers(text)]);
   for (const [name, w] of all) {
-    for (const call of text.matchAll(new RegExp(String.raw`(?<![\w$.#])${name.replace(/\$/gu, "\\$")}\s*\(`, "gu"))) {
-      if (/function\s*\*?\s*$/u.test(text.slice(0, call.index))) continue;
-      const args = arrayAt(text, call.index + call[0].length - 1, ")")?.args, given = args?.[w.at];
+    for (const call of text.matchAll(new RegExp(String.raw`(?<![\w$.#])${esc(name)}\s*\(`, "gu"))) {
+      if (/function\s*\*?\s*$/u.test(text.slice(Math.max(0, call.index - 40), call.index))) continue;
+      const list = arrayAt(text, call.index + call[0].length - 1, ")"), args = list?.args, given = args?.[w.at];
       const handed = w.rest ? args?.slice(w.at) : given?.kind === "other" && given.raw.startsWith("[") ? arrayAt(given.raw, 0)?.args : null;
-      if (handed && gitSubcommand([...w.before, ...handed]) === "clone") found.push(call.index);
+      const sub = handed && !w.loose ? gitSubcommand([...w.before, ...handed]) : null;
+      const near = () => { const semi = text.indexOf(";", call.index); return text.slice(call.index, semi < 0 ? text.length : semi); };
+      if (sub === "clone" || (sub === null && (args ? holdsClone([...w.before, ...(handed ?? args)]) : /['"`]clone['"`]/u.test(near())))) found.push(call.index);
     }
   }
   return found.sort((a, b) => a - b).map((i) => runOn(text, i).replace(/\s+/gu, " ").trim());

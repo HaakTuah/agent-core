@@ -18,7 +18,7 @@ const program = (name) => String.raw`(?:\b${name}|\\?"(?:[^"\n]*[/\\])?${name}\\
 const fetcher = (name, then) => `${program(name)}(?:${OPTION}{0,8}\\s+\\\\?["']?${then}|${OPTION}{8})`;
 export const OTHER_FETCHER = new RegExp(
   "(?:(?:^|[\\s;&|(`$\'\"/\\\\])(?:curl|wget)|\\\\?\"(?:[^\"\\n]*[/\\\\])?(?:curl|wget)\\\\?\"|\\\\?\'(?:[^\'\\n]*[/\\\\])?(?:curl|wget)\\\\?\')" +
-    "\\s+(?:-[-a-zA-Z]|https?://|[\'\"$]|[\\w-]+\\.[A-Za-z]{2,})|['\"`](?:[^'\"`\\s]*[/\\\\])?(?:curl|wget|pip3?|pipx|pnpm|yarn|bunx|bun|gem|cargo|deno)['\"`]\\s*,\\s*\\[|" +
+    "\\s+(?:-[-a-zA-Z]|https?://|[\'\"$]|(?:[\\w.%+-]+(?::[^\\s@/]*)?@)?(?:[\\w-]+\\.)+[\\w-]+(?::\\d+)?(?=[/\\s\"'|;&)?#]|$))|['\"`](?:[^'\"`\\s]*[/\\\\])?(?:curl|wget|pip3?|pipx|pnpm|yarn|bunx|bun|gem|cargo|deno)['\"`]\\s*,\\s*\\[|" +
     "['\"`](?:[^'\"`\\s]*[/\\\\])?git['\"`]\\s*,\\s*\\[\\s*['\"`](?:clone|-)|" +
     `(?:${fetcher("pipx?3?", "(?:install|download|wheel)")}|${fetcher("pnpm", "(?:dlx|add|install|i)[\"']?\\s")}|${fetcher("yarn", "(?:dlx|add)[\"']?\\s")}|${program("bunx")}\\s+[\\w@./"'$~\`\\\\-]|` +
     `${fetcher("bun", "(?:add|x|install)[\"']?\\s")}|${fetcher("playwright", "install")}|${fetcher("git", "clone")}|${fetcher("gem", "install")}|` +
@@ -96,14 +96,14 @@ function argument(source) {
 // Whether the argument a, an option's value or a folder, reads as a string, a template or a value above.
 const readable = (a) => a.kind === "text" || a.kind === "template" || (a.kind === "other" && SIMPLE.test(a.raw));
 /** The arguments of an array that opens at text[i], or of a call's list where `close` is ")", and the place after it
- *  closes, or null where one cannot be read. */
-export function arrayAt(text, i, close = "]") {
+ *  closes, or null where one cannot be read; where `partial`, the arguments read before one that cannot be, its end -1. */
+export function arrayAt(text, i, close = "]", partial = false) {
   const out = [];
   for (i++; ; ) {
     while (/\s/u.test(text[i] ?? "")) i++;
     if (text[i] === close) return { args: out, end: i + 1 };
     const end = exprEnd(text, i);
-    if (end < 0 || (text[end] !== "," && text[end] !== close)) return null;
+    if (end < 0 || (text[end] !== "," && text[end] !== close)) return partial ? { args: out, end: -1 } : null;
     out.push(argument(text.slice(i, end).trim()));
     i = text[end] === "," ? end + 1 : end;
   }
@@ -205,25 +205,27 @@ function localClone(text, m) {
   return Boolean(array) && array.args[0]?.value === "clone" && localArguments(array.args) && callCloses(text, array.end) && directCall(text, m.index);
 }
 // git's own options that take the next argument as their value, all of which git reads before its subcommand.
-const GIT_VALUED = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix"]);
-/** git's subcommand among `args` (as arrayAt reads them), read past git's own options and their values, or null where
- *  an argument before it is not a plain string. */
+const GIT_VALUED = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix", "--attr-source", "--shallow-file"]);
+/** git's subcommand among `args` (as arrayAt reads them), read past the options above and their values, or null where
+ *  an argument before it is not a plain string or another option. */
 export function gitSubcommand(args) {
   for (let k = 0; k < args.length; k++) {
-    if (args[k].kind !== "text") return null;
-    if (!args[k].value.startsWith("-")) return args[k].value;
-    if (GIT_VALUED.has(args[k].value)) k++;
+    const v = args[k].kind === "text" ? args[k].value : "-";
+    if (!v.startsWith("-")) return v;
+    if (!GIT_VALUED.has(v)) return null;
+    k++;
   }
   return null;
 }
-// Whether the match m of OTHER_FETCHER is git's array with options before its subcommand, and that subcommand reads
-// as another than "clone"; where it cannot be read, the array is a clone where it holds "clone" as a string of its own.
+/** Whether the arguments `args` (as arrayAt reads them) hold "clone" as a string of their own. */
+export const holdsClone = (args) => args.some((a) => (a.kind === "text" ? a.value === "clone" : /['"`]clone['"`]/u.test(a.raw ?? "")));
+// Whether the match m of OTHER_FETCHER is git's array with options before its subcommand, and that subcommand, read
+// from the arguments up to it, reads as another than "clone"; where the subcommand cannot be read, the array is a clone
+// where it holds "clone" (above), and where the array cannot be read whole either, it is one.
 function otherCommand(text, m) {
   if (!/git['"`]\s*,\s*\[\s*['"`]-$/u.test(m[0])) return false;
-  const at = m.index + m[0].lastIndexOf("["), array = arrayAt(text, at), sub = array && gitSubcommand(array.args);
-  if (sub) return sub !== "clone";
-  const close = array ? array.end : text.indexOf("]", at);
-  return !/['"`]clone['"`]/u.test(text.slice(at, close < 0 ? text.length : close));
+  const array = arrayAt(text, m.index + m[0].lastIndexOf("["), "]", true), sub = gitSubcommand(array.args);
+  return sub ? sub !== "clone" : array.end > 0 && !holdsClone(array.args);
 }
 // Each fetch in text by a fetcher the scan cannot read, as the two readers above find them: their matches, each place
 // once, in the order they stand, but a git clone of a local source (localClone) and git's array of another subcommand.
