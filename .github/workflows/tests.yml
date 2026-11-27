@@ -146,8 +146,8 @@ jobs:
   # these alone but kit with fresh, core with faults, core with places and terms, and tools with packages; on Linux
   # four jobs take them all: kit, core, licences, terms, tools, scans and packages in one; projects, sync, converge and
   # hostile in the second, which keeps the name of the suite that was whole and so its mark, lowered; rest, steps and
-  # fresh, the steps run once on Linux, in the third (#529); and writes, second and third in the fourth, split from
-  # the third once it ran past its limit on pull requests (by main's run 45922171536 at c4db3ce, the least Node's: rest
+  # fresh, the steps run once on Linux, in the third (#529); and writes, second and third in the fourth, since the
+  # six in one job ran past its limit on pull requests (by main's run 45922171536 at c4db3ce, the least Node's: rest
   # 176, steps 243, fresh 36, writes 254, second 94 and third 77 seconds, 892 in all of 900; #1446). Each part is sized
   # by its steps' times on the slow runner, which takes half as long again as another, so that it ends within its mark
   # there too, no mark raised, and well within the job's limit: on Windows, by a run of every part on both Nodes (run 45339915083, #1213),
