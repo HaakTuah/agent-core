@@ -35,4 +35,17 @@ const { ok, done } = tally();
   }
 }
 
+// (where the reader follows a link, what it leads to is looked at before it is opened: a device, or a link to one, is never
+// opened, and reads as no regular file; /dev/null stands for any device, whose opening does nothing)
+if (process.platform !== "win32") { // (a device at that path and a link need what Windows may not give)
+  const dir = scratchDir("core-path-read-device-"), pipe = "/dev/null", linked = path.join(dir, "core-manifest.md");
+  fs.symlinkSync(pipe, linked);
+  const opened = [], { openSync } = fs;
+  fs.openSync = (file, ...rest) => { opened.push(file); return openSync(file, ...rest); };
+  let texts;
+  try { texts = [manifestText(linked), manifestText(pipe), regularText(linked)]; } finally { fs.openSync = openSync; }
+  ok(texts[0] === "" && texts[1] === "" && texts[2] === null && opened.length === 0,
+    "a device, or a link that leads to one, is never opened where the reader follows a link, and reads as no regular file", JSON.stringify({ texts, opened }));
+}
+
 done("how the manifest's reader reads a file");

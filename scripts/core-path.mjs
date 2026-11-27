@@ -75,11 +75,18 @@ export function regularText(file, { linked = true, bound = 1 << 20 } = {}) {
   const { O_RDONLY, O_NOFOLLOW, O_NONBLOCK } = fs.constants;
   // (where the platform gives no flag that refuses a link as it opens, as Windows, the link is refused before it)
   if (!linked && O_NOFOLLOW === undefined && isLink(file)) return null;
+  // (where it follows a link, what the link leads to is looked at first, and only a regular file opened: a device or a
+  // pipe is never opened; the file opened must then be the one looked at)
+  let seen = null;
+  if (linked) {
+    try { seen = fs.statSync(file); } catch { return null; }
+    if (!seen.isFile() || seen.size > bound) return null;
+  }
   let fd;
   try { fd = fs.openSync(file, O_RDONLY | (linked ? 0 : O_NOFOLLOW ?? 0) | (O_NONBLOCK ?? 0)); } catch { return null; }
   try {
     const stat = fs.fstatSync(fd);
-    if (!stat.isFile() || stat.size > bound) return null;
+    if (!stat.isFile() || stat.size > bound || (seen && (stat.dev !== seen.dev || stat.ino !== seen.ino))) return null;
     // (one byte past the bound is asked, so that a file grown since it was checked is read as past it)
     const chunks = [];
     let total = 0;
