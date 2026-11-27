@@ -222,7 +222,7 @@ ok(noYaml.fails.length === 4 && /^FAIL a\.yml:4:\d+: the core's reader cannot re
 ok(unparsed([]).fails.length === 0 && own.every(f => unparsed([{ file: f, text: fs.readFileSync(`${core}.github/workflows/${f}`, "utf8") }]).fails.length === 0), "the core's own workflows each parse");
 
 // the workflow check's own files, which a scratch project's copy of the core holds
-const CHECK_FILES = ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "parse-yaml.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"];
+const CHECK_FILES = ["workflows.mjs", "workflow-tools.mjs", "zizmor.yml", "actionlint.yml", "workflow-run.mjs", "parse-yaml.mjs", "guards.mjs", "started.mjs", "mend.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"];
 // run on a scratch project: each failure says its mend
 const tmp = scratchDir("workflows-test-");
 try {

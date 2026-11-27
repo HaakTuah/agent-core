@@ -297,7 +297,9 @@ for (const [check, test] of Object.entries(CHECKS)) {
 for (const check of Object.keys(CHECKS).filter(c => c.endsWith(".mjs"))) {
   let text = "";
   try { text = fs.readFileSync(path.join(root, check), "utf8"); } catch { /* read as missing below */ }
-  const through = /^import \{[^}]*\bguard\b[^}]*\} from "\.\/mend\.mjs";$/mu.test(text) && /\bguard\(import\.meta\.url\)/u.test(text);
+  // (or, in a script that stands alone, as the start hook runs reading.mjs from stdin, mend.mjs imported late)
+  const through = (/^import \{[^}]*\bguard\b[^}]*\} from "\.\/mend\.mjs";$/mu.test(text) || /\(await import\("\.\/mend\.mjs"\)\)\.guard\(import\.meta\.url\)/u.test(text))
+    && /\bguard\(import\.meta\.url\)/u.test(text);
   ok(through, `${check}: its entry runs through guard(), so an error it does not catch fails with its mend${through ? ""
     : `. Mend: start the script through \`guard()\` from \`scripts/mend.mjs\`: import { guard } from "./mend.mjs", and write its entry as if (guard(import.meta.url)) { ... } in place of started(), or call guard(import.meta.url) before its first statement`}`);
 }

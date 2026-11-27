@@ -34,7 +34,6 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { guard } from "./mend.mjs";
 
 export const FLOOR = "floor/security.md";
 export const START = "Reads at its start:";
@@ -536,4 +535,9 @@ function print(role, got, at, tool, notes) {
 // (started by its own file, as started.mjs beside it tells, or handed to node on its input, as the start hook hands it:
 // node then names it "[eval1]" and its first argument is "-"; imported, or named in a `node -e`, it runs nothing)
 const direct = () => { try { return process.argv[1] === "-" ? import.meta.url.endsWith("/[eval1]") : Boolean(process.argv[1]) && [process.argv[1], fs.realpathSync(process.argv[1])].some(p => import.meta.url === pathToFileURL(p).href); } catch { return false; } };
-if (direct()) { guard(import.meta.url); process.exitCode = main(process.argv.slice(2)); }
+if (direct()) {
+  // (an error it does not catch fails with its mend, mend.mjs imported late as guards.mjs is: from stdin, as the start
+  // hook runs it, nothing stands beside it)
+  if (process.argv[1] !== "-") (await import("./mend.mjs")).guard(import.meta.url);
+  process.exitCode = main(process.argv.slice(2));
+}
