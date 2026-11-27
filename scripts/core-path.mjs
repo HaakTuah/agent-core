@@ -8,7 +8,8 @@
 // (a folder of this repository: its files committed, or a submodule), at <path>/ inside it, as that library's own
 // manifest, <library>/core-manifest.md, pins it: one sync, in the library. `core/` is the default and the first form's
 // usual path, so a project in one repository reads as it always did. The core's own repository has no manifest, and its
-// path is "" (its root). Node's own modules only; proven by core-path-test.mjs and core-path-hooks-test.mjs.
+// path is "" (its root). Node's own modules only; proven by core-path-test.mjs, core-path-hooks-test.mjs
+// and core-path-read-test.mjs.
 //
 //   node core/scripts/core-path.mjs           prints the path, from the project's root; a line with its mend where the
 //                                             line is wrong
