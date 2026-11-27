@@ -24,8 +24,8 @@ export function attributes(tag) {
 // <AssemblyAttribute>, <Import>) or that bring no C# of the repository in (packages, frameworks, files copied or
 // embedded), their metadata that changes nothing the compiler reads, and the properties that name no file, tool, task,
 // target or folder (a property the reader reads, RootNamespace, or the importsOther's switches beside them); of an
-// attribute, those the same items and structure take. An element or attribute of any other name, a <Target>, a
-// <UsingTask>, an <Analyzer>, a property of the compiler's own, a referenced project's Properties among them, is one
+// attribute, those the same items and structure take. An element or attribute of any other name, a <Target> that holds a
+// task but <Message>, <Warning> and <Error> (#1401), a <UsingTask>, an <Analyzer>, a property of the compiler's own, a referenced project's Properties among them, is one
 // whose effect is not known, so the file is not read: a list of what is known safe, not of what is refused, so a way
 // in no one listed reads as unknown (each review of a refused list found another).
 const ELEMENTS = new Set(["project", "propertygroup", "itemgroup", "import", "importgroup", "choose", "when", "otherwise", "sdk",
@@ -98,18 +98,37 @@ function uncommented(text) {
 }
 
 // Whether a text, its comments out, holds a tag of an element the reader does not know, or an attribute of one; one
-// unsafe where it stands; a tag that is no run of attributes, or closes with any; or a "<" outside every tag. Each try
-// ends at the next "<": linear.
+// unsafe where it stands; a tag that is no run of attributes, or closes with any; a <Target> that holds anything but
+// the tasks that write nothing (TASKS, #1401), or opens inside an item or another target; or a "<" outside every tag.
+// Each try ends at the next "<": linear.
 function unknown(plain, pace) {
-  let item = null; // (the item whose tag stands open, its name and attributes, for the metadata written inside it)
+  let item = null, target = false; // (the item whose tag stands open, its name and attributes, for the metadata written inside it; whether a <Target> stands open)
   for (const m of plain.matchAll(TAG)) {
     pace();
     const attrs = m[1] ? (/^\s*$/u.test(m[3]) ? {} : null) : attributes(m[3]);
-    if (!known(ELEMENTS, m[2]) || !attrs || Object.keys(attrs).some(a => !known(ATTRIBUTES, a)) || (!m[1] && unsafe(m[2], attrs, item))) return true;
-    if (ITEMS.test(m[2])) item = m[1] || m[3].trimEnd().endsWith("/") ? null : { name: m[2], attrs };
+    if (target) {
+      const name = m[2].toLowerCase();
+      if (!attrs) return true;
+      if (m[1] && name === "target") target = false;
+      else if (!TASKS.has(name) || Object.keys(attrs).some(a => !TASK_ATTRIBUTES.has(a))) return true;
+    } else if (!m[1] && /^target$/iu.test(m[2])) {
+      if (item !== null || !attrs || Object.keys(attrs).some(a => !TARGET_ATTRIBUTES.has(a))) return true;
+      target = !m[3].trimEnd().endsWith("/");
+    } else {
+      if (!known(ELEMENTS, m[2]) || !attrs || Object.keys(attrs).some(a => !known(ATTRIBUTES, a)) || (!m[1] && unsafe(m[2], attrs, item))) return true;
+      if (ITEMS.test(m[2])) item = m[1] || m[3].trimEnd().endsWith("/") ? null : { name: m[2], attrs };
+    }
   }
-  return plain.replace(TAG, "").includes("<");
+  return target || plain.replace(TAG, "").includes("<");
 }
+
+// The tasks a <Target> may hold, and the attributes it and they may take (#1401): a message, warning or error is only
+// written to the log, so a target of nothing else brings in no C#. Any other task may write a file the SDK's default
+// "**/*.cs" takes or put an item into Compile, and an <Output> may name any item: each is unknown. A target's own
+// attributes only name it and order it among the others, a property group or an item group inside it is no task.
+const TASKS = new Set(["message", "warning", "error"]);
+const TARGET_ATTRIBUTES = new Set(["name", "condition", "beforetargets", "aftertargets", "dependsontargets", "inputs", "outputs", "returns", "label"]);
+const TASK_ATTRIBUTES = new Set(["text", "importance", "condition", "code", "file", "helpkeyword", "subcategory", "continueonerror", "linenumber", "columnnumber", "endlinenumber", "endcolumnnumber"]);
 
 // The items whose metadata may be written inside them, and the metadata that copies an item's file to the output.
 const ITEMS = /^(?:compile|none|content|embeddedresource)$/iu, COPY = /^copyto(?:output|publish)directory$/iu;
