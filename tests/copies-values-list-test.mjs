@@ -8,7 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { scratchDir, projectOf } from "../scripts/scratch-core.mjs";
 import { keyOf } from "../scripts/copies-values.mjs";
 
 let failed = 0;
@@ -76,14 +76,14 @@ try {
   put("src/again.mjs", `const ref = "${OTHER}";\n`); put("src/more.mjs", `const ref = "${OTHER}";\n`);
   fs.writeFileSync(path.join(dir, BASELINE), `${JSON.stringify({ ...baselineNow(), values: { ...list, [keyOf(OTHER)]: 2, [keyOf(DIGEST)]: 3 } })}\n`);
   r = run("", { COPIES_BASE: lowered });
-  ok(r.status === 1 && mended(r.out) && new RegExp(`^FAIL: ${BASELINE}'s "values" adds or raises 2 values against ${lowered}, and the list only shrinks\\. Mend: take it back as `, "m").test(r.out),
+  ok(r.status === 1 && mended(r.out, { from: projectOf() }) && new RegExp(`^FAIL: ${BASELINE}'s "values" adds or raises 2 values against ${lowered}, and the list only shrinks\\. Mend: take it back as `, "m").test(r.out),
     "an entry the change adds to the list, or raises, against the base's list fails, with its mend", r.out);
   drop("src/again.mjs"); drop("src/more.mjs");
   fs.writeFileSync(path.join(dir, BASELINE), `${JSON.stringify({ ...baselineNow(), values: list })}\n`);
   // (a value read from one file now: the list fails until --write lowers it, and --write never adds one)
   put("deploy.sh", "sum=read-it\n");
   r = run("", { COPIES_BASE: lowered });
-  ok(r.status === 1 && mended(r.out) && r.out.includes(`FAIL: ${BASELINE}'s "values" lists 1 value gone or in fewer files now. Mend: run node core/scripts/copies.mjs checks/copies.json --write`), "an entry whose value stands in fewer files fails, with the mend that lowers it", r.out);
+  ok(r.status === 1 && mended(r.out, { from: projectOf() }) && r.out.includes(`FAIL: ${BASELINE}'s "values" lists 1 value gone or in fewer files now. Mend: run node core/scripts/copies.mjs checks/copies.json --write`), "an entry whose value stands in fewer files fails, with the mend that lowers it", r.out);
   put("src/again.mjs", `const ref = "${OTHER}";\n`); put("src/more.mjs", `const ref = "${OTHER}";\n`);
   put("ci/fetch.ps1", `$sum = "${DIGEST}"\n`); put("ci/fetch-too.ps1", `$sum = "${DIGEST}"\n`);
   r = run("--write");

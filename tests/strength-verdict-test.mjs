@@ -5,6 +5,7 @@
 //
 //   node tests/strength-verdict-test.mjs
 import { mended } from "../scripts/mend.mjs";
+import { projectOf } from "../scripts/scratch-core.mjs";
 import { faultsOf } from "../scripts/strength-report.mjs";
 import { again, joinedUnsaid, kindOf, lowered, needed, undercut, unlisted, unsure, verdict, watched } from "../scripts/strength-verdict.mjs";
 
@@ -63,14 +64,14 @@ const swap = still => verdict({ faults: [f(swapped, "Survived")], still, baselin
 ok(swap([f(kept, "Survived")]).fails && !swap([f(kept, "Killed")]).fails && same(needed([f(swapped, "Survived")], b({ [swapped]: { count: 1 } }), baseKept), [swapped, kept]),
   "a pull request that drops an entry whose fault still survives on its unchanged line, and lists a new survivor in its place, fails; where the run finds that fault caught, the swap passes");
 const dropped = still => verdict({ faults: [], still, baseline: b({}), was: baseKept, at: "s.json", deleted: [] });
-ok(dropped([f(kept, "Survived")]).fails && mended(dropped([f(kept, "Survived")]).lines.join("\n")) && !dropped([f(kept, "Killed")]).fails && same(needed([], b({}), baseKept), [kept]) && same(needed([], b({}), baseKept, true), []) && same(undercut(b({}), baseKept, [f(kept, "Survived")]).map(k => k.held), [1]),
+ok(dropped([f(kept, "Survived")]).fails && mended(dropped([f(kept, "Survived")]).lines.join("\n"), { from: projectOf() }) && !dropped([f(kept, "Killed")]).fails && same(needed([], b({}), baseKept), [kept]) && same(needed([], b({}), baseKept, true), []) && same(undercut(b({}), baseKept, [f(kept, "Survived")]).map(k => k.held), [1]),
   "a pull request that drops an entry while its fault still survives fails, with its mend; once a test catches it, the entry goes; a whole run's pull request is not measured so", dropped([f(kept, "Survived")]).lines.join("\n"));
 // (a file split: one of b.js's two listed survivors moved into a.js, with the same fault)
 const inB = "survivor: b.js: if (x === 1) return; [=== -> !==]", inA = "survivor: a.js: if (x === 1) return; [=== -> !==]";
 const fB = id => ({ ...f(id, "Survived"), file: id.split(": ")[1] }), split = { [inB]: { count: 1 }, [inA]: { count: 1 } }, unsplit = b({ [inB]: { count: 2 } });
 const moved = (listed, faults, still) => verdict({ faults, still, baseline: b(listed), was: unsplit, at: "s.json", deleted: [] });
 ok(!moved(split, [fB(inA)], [fB(inB)]).fails && moved(split, [fB(inA)], [fB(inB), fB(inB)]).fails && moved({ [inB]: { count: 1 }, [inA]: { count: 2 } }, [fB(inA)], [fB(inB)]).fails && moved(split, [fB(inA)], [fB(inB), { ...fB(inB), status: "Pending" }]).fails
-  && mended(moved(split, [fB(inA)], [fB(inB), fB(inB)]).lines.join("\n")),
+  && mended(moved(split, [fB(inA)], [fB(inB), fB(inB)]).lines.join("\n"), { from: projectOf() }),
   "debt a split carried to another file, listed there and as much fewer where it left, passes; where the old file still holds it, or the new lists more than the run found, it fails, with its mend", moved(split, [fB(inA)], [fB(inB)]).lines.join("\n"));
 
 const unrunOld = verdict({ faults: [], still: [{ ...f(kept, "Pending") }], baseline: b({}), was: baseKept, at: "s.json", deleted: [] });
@@ -111,7 +112,7 @@ ok(kept4.filter(g => g.status === "Survived").length === 1 && kept4.length === 3
   && judgedNow.length === 3 && judgedNow.filter(g => g.status === "Survived").length === 1 && judgedNow.some(g => g.id === kept && g.status === "Pending")
   && sameQueue.length === 2 && calls === 1 && otherKinds.length === 1,
   "fault by fault, by place and id: a survivor the first run judged is kept though the second run leaves its line unrun; two faults of one id on one line are each matched to their own, so none is counted twice; a fault judged again takes the place of that fault alone; where the lines left unrun are all the first run measured, no second run is made, and where it measured others too, one is");
-ok(unrunOld.lines.some(l => l.startsWith("FAIL") && l.includes("did not run (its budget)") && l.includes("raise the tool's budget") && l.includes("MUTATE_BUDGET")) && mended(unrunOld.lines.join("\n")) && !dropped([f(kept, "Survived")]).lines.some(l => l.includes("budget where"))
+ok(unrunOld.lines.some(l => l.startsWith("FAIL") && l.includes("did not run (its budget)") && l.includes("raise the tool's budget") && l.includes("MUTATE_BUDGET")) && mended(unrunOld.lines.join("\n"), { from: projectOf() }) && !dropped([f(kept, "Survived")]).lines.some(l => l.includes("budget where"))
   && same(undercut(b({}), baseKept, [f(kept, "Pending")]).map(k => k.unrun), [1]),
   "where an entry is held up only by faults the tool did not run, the failure says so and names a larger budget in its mend; where the faults ran and survive, it does not", unrunOld.lines.join("\n"));
 

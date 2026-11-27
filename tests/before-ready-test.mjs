@@ -9,7 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { EXPRESSIONS, JOBS, stepsOf } from "../scripts/before-ready.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { scratchDir, projectOf } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -90,7 +90,7 @@ write(odd, ".github/workflows/size.yml", "jobs:\n  size:\n    steps: []\n");
 git(odd, "add", "-A"); git(odd, "commit", "-q", "-m", "base");
 r = run(odd, description("## What the owner can try\nNone.\n"), "--base", "HEAD");
 ok(r.status === 1 && /holds \$\{\{ github\.event\.pull_request\.title \}\}, which this script does not know the value of/u.test(r.out) && mended(r.out), "a step that asks a value the script does not know fails, saying to add it", r.out);
-ok(run(core).status === 1 && mended(run(core, "--base").out) && mended(run(core, path.join(tmp, "missing.md")).out) && mended(run(core, description("x"), "--created", "never").out),
+ok(run(core).status === 1 && mended(run(core, "--base").out, { from: projectOf() }) && mended(run(core, path.join(tmp, "missing.md")).out, { from: projectOf() }) && mended(run(core, description("x"), "--created", "never").out, { from: projectOf() }),
   "with no description, a flag with no value, a file it cannot read or a time that is none, it fails with its mend");
 
 // a project: its copy's checks.mjs, with the parts copies and description, on the merge

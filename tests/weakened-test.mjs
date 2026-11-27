@@ -9,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
 import { ASSERT, LINE, SKIP, baseOf, changedMend, testsChanged, weakened } from "../scripts/weakened.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { scratchDir, projectOf } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -62,7 +62,7 @@ ok(weakened("").length === 0 && weakened(null).length === 0, "no diff, nothing f
 
 // ---- the mend ----
 const mend = changedMend("## Readings taken\nNone.", found);
-ok(mended(`FAIL ${mend}`) && mend.includes("`test/sum.test.mjs` (2 assertion lines taken out or changed)") && mend.includes("`test/new.test.mjs` (1 skip added)") && mend.includes(`"${LINE}"`), "a description that names none fails with its mend, each file and what was found in it", mend);
+ok(mended(`FAIL ${mend}`, { from: projectOf() }) && mend.includes("`test/sum.test.mjs` (2 assertion lines taken out or changed)") && mend.includes("`test/new.test.mjs` (1 skip added)") && mend.includes(`"${LINE}"`), "a description that names none fails with its mend, each file and what was found in it", mend);
 ok(changedMend(`Readings…\n\n${LINE} \`test/sum.test.mjs\` (the case moved to sum-cases); \`test/gone.test.mjs\` (it proved nothing)\n- \`test/new.test.mjs\`: skipped until #9 lands\n\nWaits on: a review`, found) === null, "the line and the lines right after it, to a blank line, name each: no mend");
 ok(/`test\/new\.test\.mjs`/.test(changedMend(`${LINE} \`test/sum.test.mjs\`, \`test/gone.test.mjs\`\n\n\`test/new.test.mjs\``, found) ?? ""), "a file named only past the blank line is not named on the line");
 ok(changedMend("no line", []) === null, "nothing found asks nothing");

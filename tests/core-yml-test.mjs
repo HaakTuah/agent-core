@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
-import { checkoutStandIn, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
+import { checkoutStandIn, scratchDir, scratchEnv, projectOf } from "../scripts/scratch-core.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 import { mended } from "../scripts/mend.mjs";
 
@@ -104,7 +104,7 @@ function check(files = {}, { branch = "main", at = B, without = null, under = "c
 }
 // (each case runs only in its section's part: a case that calls ok() itself stands in a block gated so too)
 const passes = (what, ...args) => { if (!inPart(section)) return; const r = check(...args); ok(r.passed, `${what}: passes`, r.out); };
-const fails = (what, words, ...args) => { if (!inPart(section)) return; const r = check(...args); ok(!r.passed && r.out.includes(words) && mended(r.out), `${what}: fails, saying so and its mend`, r.out); };
+const fails = (what, words, ...args) => { if (!inPart(section)) return; const r = check(...args); ok(!r.passed && r.out.includes(words) && mended(r.out, { from: projectOf() }), `${what}: fails, saying so and its mend`, r.out); };
 
 passes("a project whose copy is the core at its pin, each call pinned where its workflow is the same");
 fails("a default branch of another name", "The default branch here is trunk", {}, { branch: "trunk" });

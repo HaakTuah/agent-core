@@ -118,10 +118,10 @@ try {
   fs.mkdirSync(path.join(dir, "checks"));
   fs.writeFileSync(path.join(dir, "checks/screens.json"), config({ values: "binds" }));
   r = run(["found.json"]);
-  ok(r.code === 1 && mended(r.out), "a config with no baseline fails, with its mend", r.out);
+  ok(r.code === 1 && mended(r.out, { from: dir }), "a config with no baseline fails, with its mend", r.out);
   fs.writeFileSync(path.join(dir, "checks/screens.json"), JSON.stringify({ baseline: "checks/screens/baseline.json", checks: { values: "binds" } }));
   r = run(["found.json", "--first"]);
-  ok(r.code === 1 && mended(r.out) && r.out.includes("every screen"), "--first refuses a run that did not cover every screen, with its mend", r.out);
+  ok(r.code === 1 && mended(r.out, { from: dir }) && r.out.includes("every screen"), "--first refuses a run that did not cover every screen, with its mend", r.out);
   fs.writeFileSync(path.join(dir, "found.json"), JSON.stringify({ screens: ["home"], all: true, found: { "values: home: #f00 in the button": true } }));
   r = run(["found.json", "--first"]);
   ok(r.code === 0 && fs.existsSync(path.join(dir, "checks/screens/baseline.json")), "--first makes the baseline's folder where it is missing", r.out);
@@ -134,25 +134,25 @@ try {
   git("add", "-A"); git("commit", "-qm", "base");
   fs.writeFileSync(path.join(dir, "found.json"), found(["home"], { "values: home: #f00 in the button": true, "values: home: 13px in the title": true }));
   r = run(["found.json"]);
-  ok(r.code === 1 && mended(r.out) && r.out.includes("13px"), "a new finding fails, with its mend", r.out);
+  ok(r.code === 1 && mended(r.out, { from: dir }) && r.out.includes("13px"), "a new finding fails, with its mend", r.out);
   fs.writeFileSync(path.join(dir, "checks/screens-baseline.json"), JSON.stringify({ checks: ["values"], listed: { "values: home: #f00 in the button": true, "values: home: 13px in the title": true } }));
   r = run(["found.json"], { SCREENS_BASE: "main" });
-  ok(r.code === 1 && mended(r.out) && r.out.includes("only shrinks"), "a finding put in the baseline by hand fails against the base, with its mend", r.out);
+  ok(r.code === 1 && mended(r.out, { from: dir }) && r.out.includes("only shrinks"), "a finding put in the baseline by hand fails against the base, with its mend", r.out);
   r = run(["found.json"], { SCREENS_BASE: "origin/nowhere" });
-  ok(r.code === 1 && mended(r.out) && r.out.includes("is not a commit"), "a base that is no commit here fails, with its mend, never skipping the comparison", r.out);
+  ok(r.code === 1 && mended(r.out, { from: dir }) && r.out.includes("is not a commit"), "a base that is no commit here fails, with its mend, never skipping the comparison", r.out);
   fs.renameSync(path.join(dir, "checks/screens-baseline.json"), path.join(dir, "checks/moved.json"));
   fs.writeFileSync(path.join(dir, "checks/screens.json"), JSON.stringify({ baseline: "checks/moved.json", checks: { values: "binds" } }));
   r = run(["found.json"], { SCREENS_BASE: "main" });
   ok(r.code === 1 && r.out.includes("only shrinks"), "a baseline moved to a new path is still read against the base's own", r.out);
   fs.rmSync(path.join(dir, "checks/screens.json"));
   r = run(["found.json"], { SCREENS_BASE: "main" });
-  ok(r.code === 1 && mended(r.out) && r.out.includes("is gone"), "a config the base holds may not be taken out, with its mend", r.out);
+  ok(r.code === 1 && mended(r.out, { from: dir }) && r.out.includes("is gone"), "a config the base holds may not be taken out, with its mend", r.out);
   git("checkout", "-q", "-b", "custom"); fs.writeFileSync(path.join(dir, "checks/custom.json"), config({ values: "binds" }));
   fs.writeFileSync(path.join(dir, "core-manifest.md"), "## Slots\n| Slot | Here |\n| --- | --- |\n| *screen checks* | `checks/custom.json` |\n");
   git("add", "-A"); git("commit", "-qm", "custom");
   fs.rmSync(path.join(dir, "checks/custom.json")); fs.rmSync(path.join(dir, "core-manifest.md"));
   r = run(["found.json"], { SCREENS_BASE: "custom" });
-  ok(r.code === 1 && mended(r.out) && r.out.includes("checks/custom.json is gone"), "a config the base's manifest named, taken out with its row, fails, with its mend", r.out);
+  ok(r.code === 1 && mended(r.out, { from: dir }) && r.out.includes("checks/custom.json is gone"), "a config the base's manifest named, taken out with its row, fails, with its mend", r.out);
   fs.writeFileSync(path.join(dir, "checks/screens.json"), "{ not a config");
   fs.writeFileSync(path.join(dir, "checks/screens-baseline.json"), JSON.stringify({ checks: ["values"], listed: { "values: home: #f00 in the button": true } }));
   git("add", "-A"); git("commit", "-qm", "broken"); git("branch", "broken");
@@ -167,9 +167,9 @@ try {
   r = run(["found.json"], { SCREENS_BASE: "nokey" });
   ok(r.code === 1 && r.out.includes("only shrinks"), "a base baseline with no \"checks\" counts its config's checks as listed, so nothing joins freely", r.out);
   r = run(["../found.json"]);
-  ok(r.code === 1 && mended(r.out) && r.out.includes("not inside the project"), "a config or file of findings outside the project is refused, with its mend", r.out);
+  ok(r.code === 1 && mended(r.out, { from: dir }) && r.out.includes("not inside the project"), "a config or file of findings outside the project is refused, with its mend", r.out);
   r = run(["found.json", "--bogus"]);
-  ok(r.code === 1 && mended(r.out), "an unknown argument fails, with its mend", r.out);
+  ok(r.code === 1 && mended(r.out, { from: dir }), "an unknown argument fails, with its mend", r.out);
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 
 console.log(`${count - failed} of ${count} passed`);

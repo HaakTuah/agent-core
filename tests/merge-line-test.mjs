@@ -14,7 +14,7 @@ import { mended } from "../scripts/mend.mjs";
 import { cancel, coreOwn, facts, follows, main, override } from "../scripts/merge-line.mjs";
 import fs from "node:fs";
 import path from "node:path";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { scratchDir, projectOf } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -159,14 +159,14 @@ ok(r.code === 1 && mended(r.err) && r.out === "", "a cancel refused fails the ru
 for (const argv of [["--repo", "o/n", "--count", "0"], ["--repo", "o/n", "--count", "2.5"], ["--repo", "o/n", "--cancel", "0"], ["--repo", "o/n", "--cancel", "1,1.5"], ["--repo", "o/n", "--cancel"]]) {
   let said = "";
   try { run(argv, () => { throw new Error("no call is made"); }); } catch (e) { said = e.message; }
-  ok(mended(`FAIL: ${said}`) && !/no call is made/.test(said), `refused before any call, with its mend: ${argv.join(" ")}`, said);
+  ok(mended(`FAIL: ${said}`, { from: projectOf() }) && !/no call is made/.test(said), `refused before any call, with its mend: ${argv.join(" ")}`, said);
 }
 
 // (the script run by itself, told no repository or a bad front, refuses with its mend)
 const script = fileURLToPath(new URL("../scripts/merge-line.mjs", import.meta.url));
 for (const args of [[], ["--repo", "o/.."], ["--repo", "o/n", "--cancel", "x"], ["--repo", "o/n", "--cancel", "1,2,3"]]) {
   r = spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
-  ok(r.status === 1 && mended(r.stdout + r.stderr) && !/GitHub did not answer/.test(r.stderr), `refused, with its mend: ${args.join(" ") || "(nothing)"}`, r.stdout + r.stderr);
+  ok(r.status === 1 && mended(r.stdout + r.stderr, { from: projectOf() }) && !/GitHub did not answer/.test(r.stderr), `refused, with its mend: ${args.join(" ") || "(nothing)"}`, r.stdout + r.stderr);
 }
 
 console.log(`${count - failed} of ${count} passed`);

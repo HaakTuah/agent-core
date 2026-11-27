@@ -16,8 +16,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { failures, mended } from "../scripts/mend.mjs";
 
 // (what a run says where it failed nothing: a warning that says its mend, as a failure would; where it failed, told())
-const told = out => (failures(out).length ? mended(out) : /^::warning::[^\n]*Mend: \S+\s+\S/mu.test(out));
-import { npmWithCache, scratchDir } from "../scripts/scratch-core.mjs";
+const told = out => (failures(out).length ? mended(out, { from: projectOf() }) : /^::warning::[^\n]*Mend: \S+\s+\S/mu.test(out));
+import { npmWithCache, scratchDir, projectOf } from "../scripts/scratch-core.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 let failed = 0;
