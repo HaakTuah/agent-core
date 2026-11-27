@@ -257,7 +257,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   counts and conclusions: a session where gh answers for the owner's account runs `node scripts/daily-try.mjs --local`,
   which runs no project's code, to see which project each runner tried, and a session in that project its checks; nor that a held try stops a merge or a release, which the trial still decides.
   Reason: release 6's faults were found at its trial, round after round, long after the changes that brought them in.
-  Held by `tests/daily-try-test.mjs` (the owner's projects found with and without the sign-in, names masked, each runner
+  Held by `tests/daily-try-test.mjs` and `tests/daily-try-file-test.mjs` (the owner's projects found with and without the sign-in, names masked, each runner
   cloning its one project alone and holding no sign-in, each runner's counts read from its own log alone, the projects' code run with no key, a held project read as the trial reads it, a bug filed once
   from counts with no name and noted again for a newer commit, the sign-in's issue filed and closed); that the look
   runs it, by `.github/workflows/own-look.yml`.
