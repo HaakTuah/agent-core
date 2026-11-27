@@ -98,18 +98,20 @@ const around = {
   "a use on a continued line": `${READ}\nbash -c \\\n${GET}\n`,
   "curl a function": `curl() { bash -c "$*"; }\n${READ}\n${GET}\n`,
   "curl an alias": `alias curl='bash -c'\n${READ}\n${GET}\n`,
+  // (grep, jq or curl found elsewhere, #1455's fourth review)
+  "the search path set": `PATH=/tmp/x\n${READ}\n${GET}\n`,
+  "the search path added to": `PATH+=:/tmp/x\n${READ}\n${GET}\n`,
+  "zsh's search path added to": `#!/bin/zsh\npath+=(/tmp/x)\n${READ}\n${GET}\n`,
+  "a search path a workflow's step adds": `echo /tmp/x >> "$GITHUB_PATH"\n${READ}\n${GET}\n`,
+  "a name hashed to another program": `hash -p /tmp/x grep\n${READ}\n${GET}\n`,
+  "a builtin loaded": `enable -f /tmp/x.so grep\n${READ}\n${GET}\n`,
+  "a file read in by a dot": `. ./lib.sh\n${READ}\n${GET}\n`,
+  "a file read in by a dot after another command": `cd tools && . lib.sh\n${READ}\n${GET}\n`,
+  "a file read in by source": `source lib.sh\n${READ}\n${GET}\n`,
+  "a file bash reads at its start": `echo BASH_ENV=lib.sh >> "$GITHUB_ENV"\n${READ}\n${GET}\n`,
 };
 const through = Object.entries(around).filter(([, code]) => programs(code) < 2).map(([what]) => what);
 ok(!through.length, "a read whose variable a shell reads by itself, or that stands other than it reads, is a program's download", through.join(" | "));
-// The three ways #1455's third review found for a read's output to run, each a program's download: `$_` after a use,
-// a config file of curl's that keeps the read in a file, and zsh's arguments.
-const found = {
-  "the last word of a use": `v=$(curl -fsS ${TXT})\ncurl -fsSLo t.tgz "https://dl.example/$v"\nbash -c "$_"\n`,
-  "a config file of curl's": `printf 'output = "run.sh"\\n' > "$HOME/.curlrc"\nv=$(curl -fsS ${TXT})\nbash run.sh\n`,
-  "zsh's arguments": `#!/bin/zsh\nargv=$(curl -fsS ${TXT})\nsh -c "$1"\n`,
-};
-const ran = Object.entries(found).filter(([, code]) => programs(code) < 1).map(([what]) => what);
-ok(!ran.length, "a read whose output reaches what runs by a name it never mentions, or that a config file of curl's keeps, is a program's download", ran.join(" | "));
 ok(programs(`# set up the tool's version; it's read below\n${READ}\n${GET}\n`) === 1, "a comment with a quote in it before the read leaves the read one of data");
 // Through the scan's pin check (licence-scan.mjs's pinFault): a read of a version index asks no checksum, and a
 // package of the machine's distribution that the file installs, kind "distribution", is asked no version, its

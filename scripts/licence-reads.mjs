@@ -25,8 +25,13 @@ const use = (name) => new RegExp(`^curl(?:[ \\t]+-[fsSL]+)*(?:[ \\t]+-[fsSL]*o[ 
 // What could reach a variable by a name the file builds, hand every variable to what runs, or run a line as other than
 // it reads: an indirect expansion, text run as code, the commands that export or print them all, a here-document (whose
 // text the shell expands before it hands it on), the last word of the command before (`$_`), and curl, jq or grep
-// defined anew, as a function or an alias.
-const REACHES_ANY = /\$\{!|<<|(?<![\w-])(?:eval|export|declare|typeset|env|printenv|compgen|Invoke-Expression|iex)(?![\w-])|(?<![\w-])set[ \t]+(?:-[A-Za-z]*a|-o[ \t]+allexport)|(?<![\w-])set[ \t]*(?:$|[;|&)>])|\$_(?!\w)|\$\{_\}|(?<![\w-])(?:function[ \t]+(?:curl|jq|grep)|alias[ \t]+(?:curl|jq|grep)|(?:curl|jq|grep)[ \t]*\(\))(?![\w-])/imu;
+// defined anew, as a function or an alias, or found elsewhere: any name that ends in `path` (the search path, set or
+// added to, by the shell or a workflow's `$GITHUB_PATH`), `hash` and `enable` (which point a command's name at another
+// program), a file read in by `.` or `source` (whose functions the file does not show), and `BASH_ENV` or
+// `$GITHUB_ENV` (which have bash read such a file at its start). The file is read alone: what the environment the file
+// runs in defines before it starts (a function exported to it, a search path its runner sets) is trusted, as it is by
+// each check of the scan.
+const REACHES_ANY = /\$\{!|<<|(?<![\w-])(?:eval|export|declare|typeset|env|printenv|compgen|Invoke-Expression|iex)(?![\w-])|(?<![\w-])set[ \t]+(?:-[A-Za-z]*a|-o[ \t]+allexport)|(?<![\w-])set[ \t]*(?:$|[;|&)>])|\$_(?!\w)|\$\{_\}|(?<![\w-])(?:function[ \t]+(?:curl|jq|grep)|alias[ \t]+(?:curl|jq|grep)|(?:curl|jq|grep)[ \t]*\(\))(?![\w-])|(?<![\w-])\w*path(?![\w-])|(?<![\w-])(?:hash|enable|source|BASH_ENV|GITHUB_ENV)(?![\w-])|(?:^|[\s;&|(){}])\.[ \t]+[^\s#]/imu;
 
 /** The downloads of `code` that may fetch a program: all but its reads of data. A read of data is a download of the
  *  form READ, its output held to versions by its grep, once in the file, whose variable's name is none a shell or
