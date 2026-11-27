@@ -38,6 +38,12 @@ export const inBare = (dir, args, options = {}) =>
 // core's does it through this alone.
 export const untar = (dir, input) => execFileSync("tar", ["-x", "-f", "-"], { cwd: dir, input });
 const git = (args, dir) => inBare(dir, args).trim();
+// The git folder of `dir`, a work tree or a bare repository alike, to hand inBare: a work tree's (`.git` in it, a
+// folder or a linked work tree's file) as git itself gives it, found from that folder alone; else `dir`, the bare
+// repository. Without it a work tree, such as a runner's checkout, is refused as no repository (#1544).
+export const gitDirOf = dir => fs.existsSync(`${dir}/.git`)
+  ? execFileSync("git", ["rev-parse", "--absolute-git-dir"], { cwd: dir, env: plainEnv(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
+  : dir;
 const holds = (args, dir) => { try { git(args, dir); return true; } catch { return false; } };
 
 // A GitHub login: letters, digits and hyphens, as the row's form has it.
@@ -169,8 +175,10 @@ export function jumped(old, dir) {
 // main's first line, newest first, the first that `held` lets stand, as the host lists the runs its push to main
 // started (`ask`, the route's answer as text). { sha, said }, `sha` null where none of them passed, or where the host
 // cannot be asked: nothing is taken that was not read to pass, and a full SHA still takes any commit (sync.mjs).
+// `dir` holds main as refs/heads/main, a bare repository (fetchCore's) or a work tree (the daily try's checkout); where
+// it cannot be read, it throws.
 export function greenMain(dir, ask = route => execFileSync("gh", ["api", route], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30000 }), depth = 30) {
-  const shas = git(["rev-list", "--first-parent", "-n", String(depth), "refs/heads/main"], dir).split("\n").filter(x => SHA.test(x));
+  const shas = git(["rev-list", "--first-parent", "-n", String(depth), "refs/heads/main"], gitDirOf(dir)).split("\n").filter(x => SHA.test(x));
   for (const [i, sha] of shas.entries()) {
     let list;
     try { list = JSON.parse(ask(`repos/${CORE}/actions/runs?head_sha=${sha}&branch=main&event=push&per_page=100`)); }
