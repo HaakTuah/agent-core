@@ -20,7 +20,7 @@
 //                                                       many --list found; none where the list changed since);
 //                                                       beside <dir>, a file `private`: the listing's answer, true or false
 //   node scripts/daily-try.mjs --run <dir> <core>       that clone tried at the core checked out at <core>, given no
-//                                                       sign-in, as the file `private` beside <dir> says (none read,
+//                                                       sign-in, as the file `private` in <dir> says (none read,
 //                                                       none tried); its counts printed as one line, for the runner LEG
 //   node scripts/daily-try.mjs --file                   each runner's line read from its job's log, the counts summed
 //                                                       and filed: a bug where a project was held, and the issue for
