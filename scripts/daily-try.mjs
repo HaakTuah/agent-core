@@ -82,12 +82,14 @@ export function find(dir, { signedIn, token, gh = ghApi, url, say = console.log,
   fs.mkdirSync(dir, { recursive: true });
   const list = found.map((p, i) => ({ ...p, dir: `p${i + 1}`, cloned: clone(p.name, path.join(dir, `p${i + 1}`), token, url) }));
   fs.writeFileSync(path.join(dir, "projects.json"), `${JSON.stringify({ signedIn: !!signedIn, projects: list })}\n`);
-  say(`The daily try found ${list.length} of the owner's own projects that take the core (${list.filter(p => p.private).length} private${signedIn ? "" : `, none of them readable without the owner's sign-in ${SECRET}`}), and cloned ${list.filter(p => p.cloned).length}.`);
+  say(`The daily try found ${list.length} of the owner's own projects that take the core (${signedIn ? `${list.filter(p => p.private).length} private` : `the public ones alone, the private ones wanting the owner's sign-in ${SECRET}`}), and cloned ${list.filter(p => p.cloned).length}.`);
   return list;
 }
 
-// The environment the project's own code runs with: no sign-in of any kind.
-const bare = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !/TOKEN|SECRET|PASSWORD|^GH_|^GITHUB_TOKEN$|^PERSONAL_TERMS$|^GIT_CONFIG/u.test(k)));
+// The environment the project's own code runs with: no sign-in of any kind, and none of the files through which a step
+// of GitHub's writes its outputs, its summary or a later step's environment.
+export const BARE = /TOKEN|SECRET|PASSWORD|KEY|CREDENTIAL|^PROJECTS_READ$|^GH_|^PERSONAL_TERMS$|^GIT_CONFIG|^ACTIONS_|^GITHUB_(OUTPUT|ENV|PATH|STATE|STEP_SUMMARY)$/u;
+const bare = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !BARE.test(k)));
 
 // A command in `cwd`, its output to the file `log` alone; whether it exited 0.
 export function runLogged(cmd, args, cwd, log, env = bare()) {
@@ -192,7 +194,8 @@ function main([what, ...args]) {
   // (no commit to try is no failure: it prints nothing, and the try's steps after it do not run)
   if (what === "--green") { const g = greenMain(ROOT); if (g.sha) console.log(g.sha); else console.error(`${g.said}: nothing to try today; the next day's run tries again.`); return 0; }
   if (what === "--find" && args.length === 1) {
-    try { find(path.resolve(args[0]), { signedIn: process.env.SIGNED_IN === "true", token: process.env.GH_TOKEN }); return 0; }
+    const signedIn = process.env.SIGNED_IN === "true";
+    try { find(path.resolve(args[0]), { signedIn, token: signedIn ? process.env.GH_TOKEN : undefined }); return 0; }
     catch { return fail("GitHub gave no answer, or none that could be read, for the owner's repositories or a manifest, so no project was found (not none found). Mend: start the job again; where it fails each day, see whether the owner's sign-in has expired."); }
   }
   if (what === "--run" && args.length === 2) { const { out } = runAll(path.resolve(args[0]), path.resolve(args[1])); console.log(JSON.stringify(out)); return 0; }

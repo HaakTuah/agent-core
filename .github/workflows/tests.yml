@@ -620,6 +620,9 @@ jobs:
       - name: The draft of the sync in a release's trial, read beside main's checks
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/trial-draft-test.mjs ')) }}
         run: node tests/trial-draft-test.mjs
+      - name: The daily try of the core on the owner's own projects, read-only, filed from its counts alone
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/daily-try-test.mjs ')) }}
+        run: node tests/daily-try-test.mjs
       - name: The toolchain a release's trial fetches for a project that pins it
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/toolchain-test.mjs ')) }}
         run: node tests/toolchain-test.mjs

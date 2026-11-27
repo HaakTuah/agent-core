@@ -3,7 +3,10 @@
 # This repository only; no project calls it. Nothing is checked out but the default branch, and no text of a pull
 # request or an issue reaches a command: the scripts read them through gh's answers alone. The look's job may write
 # issues, and read pull requests, checks and statuses; its second job, which takes the personal terms out of issues,
-# pull requests and comments (scripts/issue-terms.mjs; #783), may write issues and pull requests; nothing else.
+# pull requests and comments (scripts/issue-terms.mjs; #783), may write issues and pull requests; its third, the daily
+# try (scripts/daily-try.mjs; #1413, point 5), reads the core and the owner's own projects alone, the owner's read-only
+# sign-in reaching only the step that clones them, and runs their checks with no sign-in at all; its fourth files what
+# the try came to, from its counts alone, and may write issues; nothing else.
 name: own-look
 
 on:
@@ -63,3 +66,73 @@ jobs:
           TERMS: ${{ secrets.PERSONAL_TERMS }}
           CORE_AT: "" # (the mend it prints names scripts/ here, the core's own)
         run: node scripts/issue-terms.mjs
+
+  # The daily try (scripts/daily-try.mjs; AGENTS.md, "The owner's own projects try the core each day"; #1413, point 5):
+  # main's newest commit whose checks all passed, tried on each of the owner's own projects as a release's trial does,
+  # read-only. The repository is public, so the job is billed nothing and its log is public: the script prints counts
+  # alone, masks each project's name first, and keeps the projects' own output in files on the runner; nothing is
+  # cached or uploaded. The owner's read-only sign-in (the secret PROJECTS_READ) reaches the step that finds and clones
+  # the projects alone, the clones keep none, and the projects' own code runs in a step given no secret.
+  try:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120 # (a project's own jobs before and after the sync, each run at most 25 minutes, for each project)
+    permissions:
+      contents: read # the core's default branch, its history and its scripts
+      actions: read # the runs on main's commits, which say whose checks all passed (releases.mjs, greenMain)
+    outputs:
+      counts: ${{ steps.run.outputs.counts }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }} # main's own state, whatever branch a manual start names
+          persist-credentials: false # nothing from the checkout reaches a later step
+          fetch-depth: 0 # main's commits, whose checks greenMain reads back from the newest
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
+      - name: The commit to try, main's newest whose checks all passed (none, and nothing is tried today)
+        id: green
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "sha=$(node scripts/daily-try.mjs --green)" >> "$GITHUB_OUTPUT"
+      - name: The core at that commit, outside the checkout, with its packages
+        if: ${{ steps.green.outputs.sha != '' }}
+        env:
+          SHA: ${{ steps.green.outputs.sha }}
+        run: git worktree add --quiet --detach "$RUNNER_TEMP/core-at" "$SHA" && cd "$RUNNER_TEMP/core-at" && node scripts/install.mjs all
+      - name: The owner's own projects that take the core, found and cloned (a count printed, each name masked)
+        if: ${{ steps.green.outputs.sha != '' }}
+        env:
+          # (the owner's read-only sign-in where given; else the job's own token, which finds the public ones alone, and
+          # the try's issue asks the owner for it)
+          GH_TOKEN: ${{ secrets.PROJECTS_READ || github.token }}
+          SIGNED_IN: ${{ secrets.PROJECTS_READ != '' }}
+        run: node scripts/daily-try.mjs --find "$RUNNER_TEMP/try"
+      - name: Each project tried, its checks before the sync and after it, given no secret (counts alone printed)
+        id: run
+        if: ${{ steps.green.outputs.sha != '' }}
+        run: echo "counts=$(node scripts/daily-try.mjs --run "$RUNNER_TEMP/try" "$RUNNER_TEMP/core-at" | tail -n 1)" >> "$GITHUB_OUTPUT"
+
+  # (a job of its own, so that no project's code runs where issues may be written; it reads the try's counts alone,
+  # which its script holds to their form, numbers and the commit, before it writes)
+  try-file:
+    needs: try
+    if: ${{ needs.try.outputs.counts != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read # the default branch's scripts/daily-try.mjs, which it runs
+      issues: write # the bug the try files, and the issue that asks the owner for the sign-in
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }} # main's own state, whatever branch a manual start names
+          persist-credentials: false # gh below takes its token from GH_TOKEN, nothing from the checkout
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
+      - name: What the daily try came to, filed from its counts alone
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRY: ${{ needs.try.outputs.counts }}
+        run: node scripts/daily-try.mjs --file
