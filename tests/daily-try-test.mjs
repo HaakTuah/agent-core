@@ -2,8 +2,8 @@
 // found, a project of another owner never, in one order; each name is masked and never printed; each runner clones its
 // one project alone, and keeps no sign-in; the projects' own code runs with none; each project's runs are read as the
 // release's trial reads them; each runner's counts are read from its own log alone; and what is filed is counts and
-// conclusions alone, one bug at a time. On a stand-in for GitHub and scratch repositories; git and Node's
-// own modules only.
+// conclusions alone, one bug at a time; --green reads main from a work tree, and its step fails where it fails
+// (#1544). On a stand-in for GitHub and scratch repositories; git and Node's own modules only.
 //
 //   node tests/daily-try-test.mjs
 import { spawnSync } from "node:child_process";
@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
-import { BARE, cloneLeg, holds, list, local, owned, runLeg, runLogged, tryOne } from "../scripts/daily-try.mjs";
+import { BARE, cloneLeg, green, holds, list, local, owned, runLeg, runLogged, tryOne } from "../scripts/daily-try.mjs";
 import { LINE, OWNER, formed, gather } from "../scripts/daily-try-file.mjs";
 import { COUNTS } from "../scripts/release-trial.mjs";
 
@@ -211,6 +211,53 @@ for (const name of ["game-one", "tool-two"]) {
   local(ghLocal, l => said.push(l));
   ok(said.length === 3 && /runner 1, .*game-one: said nothing in form/u.test(said[1]) && /runner 2, .*tool-two: held at 2222222$/u.test(said[2]) && !said.join().includes("run this") && !said.join().includes("\u001b"),
     "--local shows a runner's line only in the form --file reads, never a word a project's code put in it", JSON.stringify(said));
+}
+
+// --green from the core's checkout as the runner holds it, a work tree (#1544): main's newest green commit printed
+// alone; none green, nothing printed and no failure; main's history unread, a failure that says the mend. And the
+// workflow's step fails where the script fails, never an empty sha passed on.
+{
+  const said = { out: [], err: [] };
+  const heard = (fn) => {
+    said.out.length = said.err.length = 0;
+    const [log, error] = [console.log, console.error];
+    console.log = l => said.out.push(String(l)); console.error = l => said.err.push(String(l));
+    try { return fn(); } finally { [console.log, console.error] = [log, error]; }
+  };
+  const runs = (conclusion) => () => JSON.stringify({ total_count: 1, workflow_runs: [{ name: "tests", path: ".github/workflows/tests.yml", status: "completed", conclusion }] });
+  const tree = path.join(tmp, "green-tree");
+  fs.mkdirSync(tree);
+  git(tree, "init", "--quiet", "--initial-branch=main");
+  for (const n of [1, 2]) { fs.writeFileSync(path.join(tree, "f"), `${n}`); git(tree, "add", "f"); git(tree, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "--quiet", "-m", `${n}`); }
+  const head = git(tree, "rev-parse", "HEAD");
+  const linked = path.join(tmp, "green-linked");
+  git(tree, "worktree", "add", "--quiet", "--detach", linked, "main");
+  for (const [at, what] of [[tree, "a work tree"], [linked, "a linked work tree, its .git a file"], [path.join(tree, ".git"), "a work tree's git folder, as a bare repository is handed"]]) {
+    const code = heard(() => green(at, runs("success")));
+    ok(code === 0 && said.out.join() === head && !said.err.length, `--green from ${what} prints main's newest green commit alone`, JSON.stringify({ code, ...said }));
+  }
+  const none = heard(() => green(tree, runs("failure")));
+  ok(none === 0 && !said.out.length && /nothing to try today/u.test(said.err.join()), "--green where no commit is green prints nothing, says nothing is tried today, and fails nothing", JSON.stringify({ none, ...said }));
+  const bare = path.join(tmp, "green-none");
+  fs.mkdirSync(bare);
+  const unread = heard(() => green(bare, runs("success")));
+  ok(unread === 1 && !said.out.length && /^FAIL main's history could not be read.*Mend: /u.test(said.err.join()), "--green where main's history cannot be read fails, saying the mend, and prints no commit", JSON.stringify({ unread, ...said }));
+
+  // the step's own lines, as own-look.yml gives them, run under bash -e as the runner runs them, a stand-in for node
+  const yml = fs.readFileSync(new URL("../.github/workflows/own-look.yml", import.meta.url), "utf8");
+  const step = /\n {8}id: green\n(?: {8,}(?!run:).*\n)*? {8}run: (?:\|\n((?: {10}.*\n)+)|(.+))/u.exec(yml);
+  ok(!!step, "own-look.yml holds the step that finds the commit to try, its id green");
+  if (step) {
+    const script = step[1] ? step[1].replace(/^ {10}/gmu, "") : step[2], bin = path.join(tmp, "green-bin"), out = path.join(tmp, "green-output");
+    fs.mkdirSync(bin);
+    const step_ = (body) => {
+      fs.writeFileSync(path.join(bin, "node"), `#!/bin/sh\n${body}\n`, { mode: 0o755 }); fs.writeFileSync(out, "");
+      return spawnSync("bash", ["-e", "-c", script], { encoding: "utf8", env: { PATH: `${bin}:${process.env.PATH}`, GITHUB_OUTPUT: out } }).status;
+    };
+    ok(step_("echo FAIL it could not be read >&2; exit 1") !== 0 && !/sha=/u.test(fs.readFileSync(out, "utf8")), "the step fails where --green fails, and passes no sha on");
+    ok(step_(`echo ${head}`) === 0 && fs.readFileSync(out, "utf8") === `sha=${head}\n`, "the step passes on the commit --green prints");
+    ok(step_("exit 0") === 0 && fs.readFileSync(out, "utf8") === "sha=\n", "the step passes an empty sha where no commit is green");
+  }
 }
 
 console.log(`${count - failed} of ${count} assertions on the daily try`);

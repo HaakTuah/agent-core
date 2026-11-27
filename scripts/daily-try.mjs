@@ -199,6 +199,16 @@ export function runLeg(dir, core, leg, { run = runLogged, tools, sha = (spawnSyn
 const fail = why => { console.error(`FAIL ${why}`); return 1; };
 const toOutput = line => { if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `${line}\n`); };
 const whole = v => (/^\d+$/u.test(String(v)) ? Number(v) : NaN);
+// --green: the commit to try, main's newest whose checks all passed, read from the core's checkout at `root` (a work
+// tree or a bare repository) and printed alone; the exit code. No commit to try is no failure: it prints nothing, and
+// the try's steps after it do not run. Main's history unread is one, saying the mend (#1544).
+export function green(root, ask) {
+  let g;
+  try { g = ask ? greenMain(root, ask) : greenMain(root); }
+  catch { return fail("main's history could not be read from the core's checkout, so no commit to try was found (not none green). Mend: check out the core with its branch main and its history (actions/checkout with fetch-depth: 0, as own-look.yml's try-list does), then start the look again."); }
+  if (g.sha) console.log(g.sha); else console.error(`${g.said}: nothing to try today; the next day's run tries again.`);
+  return 0;
+}
 const UNREAD = "GitHub gave no answer, or none that could be read, for the owner's repositories or a manifest, so no project was found (not none found). Mend: start the job again; where it fails each day, see whether the owner's sign-in has expired.";
 
 // --file: what --list found (FOUND, PRIVATE, SIGNED_IN), the commit (SHA), and the runners' lines of this run (RUN_ID,
@@ -228,8 +238,7 @@ export function local(gh = ghApi, say = console.log) {
 
 // Each command (the script's head), by its flag; each takes the command's arguments and gives the exit code.
 const COMMANDS = {
-  // (no commit to try is no failure: it prints nothing, and the try's steps after it do not run)
-  "--green": () => { const g = greenMain(ROOT); if (g.sha) console.log(g.sha); else console.error(`${g.said}: nothing to try today; the next day's run tries again.`); return 0; },
+  "--green": () => green(ROOT),
   "--list": () => {
     try { list({ signedIn: process.env.SIGNED_IN === "true", out: toOutput }); return 0; } catch { return fail(UNREAD); }
   },
