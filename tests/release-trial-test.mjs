@@ -34,7 +34,7 @@ const { tmp, git } = scratchCore("release-trial-test-");
   const SYNC = [{ pure: true, from: "release-1" }], OTHER = [{ none: "another-owner" }];
   const record = r => commit({ [TRIAL]: `${JSON.stringify(r)}\n` }, "the trial's record");
   const passed = trialRecord(tried, "2026-11-22", [[{ "a.yml/x": "passed", "a.yml/y": "failed" }, { "a.yml/x": "passed", "a.yml/y": "failed" }]], SYNC, OTHER);
-  ok(passed.projects === 1 && passed.passedBoth === 1 && passed.failedBoth === 1 && Object.keys(passed).join() === `commit,day,projects,${COUNTS},baselineFromClone,syncPure,syncNotPure,syncUnproved,copiesFrom,ownProjects,drafts,draftsAnotherOwner,draftsStopped,${DRAFT_COUNTS}`, "the record holds the commit, the day and counts alone, nothing of the project");
+  ok(passed.projects === 1 && passed.passedBoth === 1 && passed.failedBoth === 1 && Object.keys(passed).join() === `commit,day,projects,${COUNTS},baselineFromClone,syncPure,syncNotPure,syncUnproved,copiesFrom,mainsRead,ownProjects,drafts,draftsAnotherOwner,draftsStopped,${DRAFT_COUNTS}`, "the record holds the commit, the day and counts alone, nothing of the project");
   let at = record(passed);
   let r = trialAt(at, read);
   ok(r.held === null && /in 1 project: 1 check passed before and after the update, 0 failed before and passed after, 1 failed before and after \(standing before the release\), 0 passed before and failed after/.test(r.said), "a record of the commit before, which the release changes by the record alone, stands, and one failing both does not hold the cut", r.said);
@@ -57,20 +57,24 @@ const { tmp, git } = scratchCore("release-trial-test-");
   // (the sync's reading against the commit tried, pure-sync.mjs --trial, and the copy each run before started from:
   // counted, and holding no cut, pure or not; #1261)
   const one = [{ "a.yml/x": "passed" }, { "a.yml/x": "passed" }];
-  const readings = trialRecord(later, "2026-11-23", [one, one, one], [{ pure: true, from: "release-5" }, { pure: false, from: "release-5" }, { pure: true, from: "main" }], [...OTHER, ...OTHER, ...OTHER]);
-  ok(readings.syncPure === 2 && readings.syncNotPure === 1 && JSON.stringify(readings.copiesFrom) === JSON.stringify({ "release-5": 2, main: 1 }), "the record counts the syncs pure and not against the commit tried, and the copies the runs before started from, by the core's release", JSON.stringify(readings));
+  const readings = trialRecord(later, "2026-11-23", [one, one, one], [{ pure: true, from: "release-5", main: "origin" }, { pure: false, from: "release-5", main: "clone" }, { pure: true, from: "main", main: "origin" }], [...OTHER, ...OTHER, ...OTHER]);
+  ok(readings.syncPure === 2 && readings.syncNotPure === 1 && JSON.stringify(readings.copiesFrom) === JSON.stringify({ "release-5": 2, main: 1 }) && JSON.stringify(readings.mainsRead) === JSON.stringify({ origin: 2, clone: 1 }), "the record counts the syncs pure and not against the commit tried, and the copies the runs before started from, by the core's release", JSON.stringify(readings));
   r = trialAt(record(readings), read);
-  ok(r.held === null && /2 of the syncs pure, 1 not; the runs before the update started from the copies their main held, 2 from release-5, 1 from a commit of the core's main that is no release\./.test(r.said), "  and says them, a sync not pure holding no cut: it is a reading", `${r.said}\n${r.held}`);
+  ok(r.held === null && /2 of the syncs pure, 1 not; the runs before the update started from the copies their main held, 2 from release-5, 1 from a commit of the core's main that is no release; the syncs read 2 against the project's main fetched from its origin, 1 against a clone's own branch main, the clone having no origin\./.test(r.said), "  and says them, a sync not pure holding no cut: it is a reading", `${r.said}\n${r.held}`);
   const printed = `  NOT PURE something\nnot a pure sync against the commit tried, ${later}: a trial's reading\ntrial answer: ${JSON.stringify({ commit: later, pure: false, from: "main" })}\n`;
-  ok(JSON.stringify(answerOf(printed, later)) === JSON.stringify({ answer: { pure: false, from: "main" } }) && /not the commit tried/.test(answerOf(printed, tried).why) && /holds no line/.test(answerOf("a pure sync: core a -> b\nmerge it with sha=x\n", later).why)
+  ok(JSON.stringify(answerOf(printed, later)) === JSON.stringify({ answer: { pure: false, from: "main", main: "unknown" } })
+    && JSON.stringify(answerOf(`trial answer: ${JSON.stringify({ commit: later, pure: true, from: "main", main: "clone" })}`, later)) === JSON.stringify({ answer: { pure: true, from: "main", main: "clone" } })
+    && ["elsewhere", "unknown", 7, null].every(main => /holds no line/.test(answerOf(`trial answer: ${JSON.stringify({ commit: later, pure: true, from: "main", main })}`, later).why ?? "")) && /not the commit tried/.test(answerOf(printed, tried).why) && /holds no line/.test(answerOf("a pure sync: core a -> b\nmerge it with sha=x\n", later).why)
     && /holds no line/.test(answerOf(`trial answer: ${JSON.stringify({ commit: later, pure: "yes", from: "main" })}`, later).why) && /holds no line/.test(answerOf(`trial answer: ${JSON.stringify({ commit: later, pure: true, from: "my-project" })}`, later).why),
     "the sync's reading is read from what pure-sync.mjs --trial printed: its answer for the commit tried alone, never the proof's lines, a verdict of no form or a copy named otherwise than by the core");
   const noForm = [{ commit: later, projects: "one" }, { ...trialRecord(later, "2026-11-23", []), failedAfter: 2 }, { ...trialRecord(later, "2026-11-23", []), day: "<b>soon</b>" },
-    { ...readings, syncPure: 3 }, { ...readings, syncPure: 1, copiesFrom: { "release-5": 1, main: 1 } }, { ...readings, copiesFrom: { "release-5": 1, main: 1 } }, { ...readings, copiesFrom: { "a project": 3 } }, { ...readings, copiesFrom: null }, (({ syncPure, syncNotPure, ...rest }) => rest)(readings)]
+    { ...readings, syncPure: 3 }, { ...readings, syncPure: 1, copiesFrom: { "release-5": 1, main: 1 } }, { ...readings, copiesFrom: { "release-5": 1, main: 1 } }, { ...readings, copiesFrom: { "a project": 3 } }, { ...readings, copiesFrom: null }, (({ syncPure, syncNotPure, ...rest }) => rest)(readings),
+    { ...readings, mainsRead: { origin: 1, clone: 1 } }, { ...readings, mainsRead: { origin: 2, "a project": 1 } }, { ...readings, mainsRead: null }, { ...readings, mainsRead: { origin: 3, clone: 0 } }]
     .map(bad => trialAt(record(bad), read));
-  ok(noForm.every(n => /no form/.test(n.said) && n.held !== null), "a record in no form holds the cut: a count that is no count, one of no project that counts a check, a day of no form, syncs read more or fewer than its projects, copies that do not add up to them, one named otherwise than by the core, copies of no form, and no syncs' counts at all");
-  const noCopies = trialAt(record((({ copiesFrom, ...rest }) => rest)(readings)), read);
+  ok(noForm.every(n => /no form/.test(n.said) && n.held !== null), "a record in no form holds the cut: a count that is no count, one of no project that counts a check, a day of no form, syncs read more or fewer than its projects, copies that do not add up to them, one named otherwise than by the core, copies of no form, no syncs' counts at all, and mains read against that do not add up, are named otherwise, are of no form or count none (#1394)");
+  const noCopies = trialAt(record((({ copiesFrom, mainsRead, ...rest }) => rest)(readings)), read), noMains = trialAt(record((({ mainsRead, ...rest }) => rest)(readings)), read);
   ok(!/no form/.test(noCopies.said) && /2 of the syncs pure, 1 not\./.test(noCopies.said), "a record without the copies, data it may leave out, is in its form and says the syncs alone (#1261's design check)", noCopies.said);
+  ok(!/no form/.test(noMains.said) && /no release\./.test(noMains.said) && !/the syncs read/.test(noMains.said), "  and one written before the mains read against came, without them, is in its form and says the rest (#1394)", noMains.said);
   // (a later commit that takes out a file git would read as renamed into the record is still more than the record)
   commit({ "old.json": `${JSON.stringify({ a: 1, b: 2, c: 3, d: 4, e: 5 }, null, 2)}\n` }, "a file like the record");
   const like = git(t, "rev-parse", "HEAD");
@@ -98,7 +102,7 @@ const { tmp, git } = scratchCore("release-trial-test-");
   fs.writeFileSync(pureOne, `a pure sync against the commit tried, ${later}: a trial's reading\ntrial answer: ${JSON.stringify({ commit: later, pure: true, from: "release-5" })}\n`);
   fs.writeFileSync(elsewhere, `trial answer: ${JSON.stringify({ commit: tried, pure: true, from: "release-5" })}\n`);
   const counted = answersOf([pureOne, crashed, empty, said], later, 4);
-  ok(JSON.stringify(counted.answers) === JSON.stringify([{ pure: true, from: "release-5" }, ...Array(3).fill({ pure: false, from: "unknown", unproved: true })]) && counted.unproved.length === 3
+  ok(JSON.stringify(counted.answers) === JSON.stringify([{ pure: true, from: "release-5", main: "unknown" }, ...Array(3).fill({ pure: false, from: "unknown", main: "unknown", unproved: true })]) && counted.unproved.length === 3
     && counted.unproved.every((l, i) => l.startsWith(`project ${i + 2}'s sync, counted not proved: `) && l.includes("holds no line `trial answer: `")) && counted.why === undefined,
     "a sync's reading that crashed, is empty or holds no answer is counted not proved, from a copy not read, and says so for each", JSON.stringify(counted));
   const elsewhereNoForm = path.join(tmp, "elsewhere-no-form.txt");

@@ -7,10 +7,13 @@ import fs from "node:fs";
 // A copy, by the core's release at its pin, `main` for a commit of the core's main that is no release, `unknown` where
 // neither could be read: the core's names alone, never a project's.
 const FROM = /^(release-\d+|main|unknown)$/;
+// The project's main a sync was read against: fetched from its `origin`, the `clone`'s own branch main where the clone
+// has no origin, or `unknown` for an answer written before #1394 or none at all.
+const MAIN = /^(origin|clone|unknown)$/;
 const LINE = "trial answer: ";
 
 // What pure-sync.mjs --trial printed, `text`, read for the commit `sha`: its last line `trial answer: ` and its JSON, as
-// { answer: { pure, from } }, or { why } it is none, with `none` where the text holds no answer in its form at all.
+// { answer: { pure, from, main } }, or { why } it is none, with `none` where the text holds no answer in its form at all.
 export function answerOf(text, sha) {
   const line = String(text).split("\n").map(l => l.trimEnd()).filter(l => l.startsWith(LINE)).at(-1);
   let a = null;
@@ -18,9 +21,14 @@ export function answerOf(text, sha) {
   // (an answer that names another commit is refused whatever its form, never counted not proved; one that names none
   // is no answer in its form)
   if (a !== null && typeof a === "object" && Object.hasOwn(a, "commit") && a.commit !== sha) return { why: `answers for ${String(a.commit).slice(0, 7)}, not the commit tried, ${sha.slice(0, 7)}` };
-  if (a === null || typeof a !== "object" || a.commit !== sha || typeof a.pure !== "boolean" || typeof a.from !== "string" || !FROM.test(a.from)) return { none: true, why: `holds no line \`${LINE}\` as pure-sync.mjs --trial prints it` };
-  return { answer: { pure: a.pure, from: a.from } };
+  if (!formed(a, sha)) return { none: true, why: `holds no line \`${LINE}\` as pure-sync.mjs --trial prints it` };
+  return { answer: { pure: a.pure, from: a.from, main: a.main ?? "unknown" } };
 }
+
+// Whether an answer is in its form for the commit `sha`: a verdict, the copy named by the core, and the main read
+// against, which an answer written before #1394 leaves out, `origin` or `clone` where it names one.
+const formed = (a, sha) => a !== null && typeof a === "object" && a.commit === sha && typeof a.pure === "boolean" && typeof a.from === "string" && FROM.test(a.from)
+  && (!Object.hasOwn(a, "main") || (typeof a.main === "string" && a.main !== "unknown" && MAIN.test(a.main)));
 
 // The arguments of release.mjs --trial after the commit: the runs' files, and the file given with `--sync` after each
 // pair, by the pair's index; `files` left odd, so the caller refuses them, where a `--sync` follows no pair, a pair holds
@@ -49,7 +57,7 @@ export function answersOf(syncs, sha, pairs) {
     let text = null;
     try { text = fs.readFileSync(f, "utf8"); } catch { /* (not read) */ }
     const got = text === null ? { why: "cannot be read" } : answerOf(text, sha);
-    if (got.none) { answers.push({ pure: false, from: "unknown", unproved: true }); unproved.push(`project ${n + 1}'s sync, counted not proved: ${f} ${got.why}`); continue; }
+    if (got.none) { answers.push({ pure: false, from: "unknown", main: "unknown", unproved: true }); unproved.push(`project ${n + 1}'s sync, counted not proved: ${f} ${got.why}`); continue; }
     if (!got.answer) return { why: `${f}, given with --sync for project ${n + 1}, ${got.why}: give the file pure-sync.mjs --trial ${sha} wrote, run from a clone of the core at that commit, in that project's clone with its sync's branch checked out` };
     answers.push(got.answer);
   }
@@ -57,26 +65,28 @@ export function answersOf(syncs, sha, pairs) {
 }
 
 // The record's counts of the answers: the syncs pure and not, of those not the ones not proved, whose file held no
-// answer, and the copies the runs before started from.
+// answer, the copies the runs before started from, and the project's main each sync was read against (#1394).
 export function syncCounts(answers) {
-  const copiesFrom = {};
-  for (const { from } of answers) copiesFrom[from] = (copiesFrom[from] ?? 0) + 1;
-  return { syncPure: answers.filter(a => a.pure).length, syncNotPure: answers.filter(a => !a.pure).length, syncUnproved: answers.filter(a => a.unproved).length, copiesFrom };
+  const copiesFrom = {}, mainsRead = {};
+  for (const { from, main = "unknown" } of answers) { copiesFrom[from] = (copiesFrom[from] ?? 0) + 1; mainsRead[main] = (mainsRead[main] ?? 0) + 1; }
+  return { syncPure: answers.filter(a => a.pure).length, syncNotPure: answers.filter(a => !a.pure).length, syncUnproved: answers.filter(a => a.unproved).length, copiesFrom, mainsRead };
 }
 
-// Whether a record's counts of the syncs are in their form: counts, one for each project, and the copies, data the
-// record may leave out, adding up to them where it holds them, each named as FROM says; the syncs not proved, which a
-// record written before #1361's point 18 leaves out, no more than those not pure.
+// Whether a record's counts of the syncs are in their form: counts, one for each project; the copies and the mains read
+// against, each data a record written before it came may leave out, adding up to them where it holds them, each named
+// as FROM or MAIN says; the syncs not proved, which a record written before #1361's point 18 leaves out, no more than
+// those not pure.
 export function syncFormed(r) {
   const counts = [r.syncPure, r.syncNotPure].every(n => Number.isInteger(n) && n >= 0) && r.syncPure + r.syncNotPure === r.projects
     && (r.syncUnproved === undefined || (Number.isInteger(r.syncUnproved) && r.syncUnproved >= 0 && r.syncUnproved <= r.syncNotPure));
-  if (r.copiesFrom === undefined) return counts;
-  const from = r.copiesFrom !== null && typeof r.copiesFrom === "object" && !Array.isArray(r.copiesFrom) ? Object.entries(r.copiesFrom) : null;
-  return counts && from !== null && from.every(([k, n]) => FROM.test(k) && Number.isInteger(n) && n > 0) && from.reduce((sum, [, n]) => sum + n, 0) === r.syncPure + r.syncNotPure;
+  const tallied = (t, names) => t === undefined || (t !== null && typeof t === "object" && !Array.isArray(t)
+    && Object.entries(t).every(([k, n]) => names.test(k) && Number.isInteger(n) && n > 0) && Object.values(t).reduce((sum, n) => sum + n, 0) === r.syncPure + r.syncNotPure);
+  return counts && tallied(r.copiesFrom, FROM) && tallied(r.mainsRead, MAIN);
 }
 
 // What a record says of them.
 export function syncSaid(r) {
   const from = Object.entries(r.copiesFrom ?? {}).map(([k, n]) => `${n} from ${k === "main" ? "a commit of the core's main that is no release" : k === "unknown" ? "a copy not read" : k}`);
-  return `Against the commit tried, as pure-sync.mjs --trial reads it, holding no cut: ${r.syncPure} of the syncs pure, ${r.syncNotPure} not${r.syncUnproved ? `, ${r.syncUnproved} of them not proved, their reading holding no answer` : ""}${from.length ? `; the runs before the update started from the copies their main held, ${from.join(", ")}` : ""}.`;
+  const main = Object.entries(r.mainsRead ?? {}).map(([k, n]) => `${n} against ${k === "origin" ? "the project's main fetched from its origin" : k === "clone" ? "a clone's own branch main, the clone having no origin" : "a main their reading does not name"}`);
+  return `Against the commit tried, as pure-sync.mjs --trial reads it, holding no cut: ${r.syncPure} of the syncs pure, ${r.syncNotPure} not${r.syncUnproved ? `, ${r.syncUnproved} of them not proved, their reading holding no answer` : ""}${from.length ? `; the runs before the update started from the copies their main held, ${from.join(", ")}` : ""}${main.length ? `; the syncs read ${main.join(", ")}` : ""}.`;
 }
