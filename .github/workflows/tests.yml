@@ -264,6 +264,9 @@ jobs:
       - name: The licence scan on the programs a file downloads, pinned by version and checksum
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-pins-test.mjs ')) }}
         run: node tests/licence-scan-pins-test.mjs
+      - name: The licence scan on a package of the machine's distribution, asked no version
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-distribution-test.mjs ')) }}
+        run: node tests/licence-distribution-test.mjs
       - name: The licence scan on the forms of an npm command
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-test.mjs ')) }}
         run: node tests/licence-fetch-test.mjs
@@ -775,6 +778,9 @@ jobs:
       - name: The steps' writers, each step a script does whole written and read done after it, the rule files' words kept
         if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-write-test.mjs ')) }}
         run: node tests/steps-write-test.mjs
+      - name: The writer of an agent's own tools, listing only what the project commits as its own
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-write-tools-test.mjs ')) }}
+        run: node tests/steps-write-tools-test.mjs
       - name: The steps' writers keep a file's Windows line ends
         if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/step-writers-crlf-test.mjs ')) }}
         run: node tests/step-writers-crlf-test.mjs
@@ -793,6 +799,9 @@ jobs:
       - name: The readers of when and how the checks run, which the steps read
         if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-checks-run-test.mjs ')) }}
         run: node tests/steps-checks-run-test.mjs
+      - name: The step of the tests a change can reach, where a project's tests run in several jobs
+        if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-select-jobs-test.mjs ')) }}
+        run: node tests/steps-select-jobs-test.mjs
       - name: The readers of what the project's files name, which the steps read
         if: ${{ !cancelled() && contains(matrix.parts, 'writes') && (env.RUN == 'all' || contains(env.RUN, ' tests/steps-files-test.mjs ')) }}
         run: node tests/steps-files-test.mjs

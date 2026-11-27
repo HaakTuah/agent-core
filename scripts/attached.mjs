@@ -4,8 +4,9 @@
 // nothing (read-nothing.mjs, through steps.mjs), the manifest against the modules (manifest-reads.mjs) and, on a sync's
 // branch, whether the sync is pure (pure-sync.mjs, run from the core's side as its merger runs it: the release it moves
 // to, or the core's main). It prints one line first, `attached: yes`, or `attached: no` with how many things stand in
-// the way, then each with its mend; a step only the project's owner can take, and a rule file's wording beside a fresh
-// start, are listed apart, advised, standing in the way of nothing; and what it could not read, and the checks that
+// the way, then each with its mend; a step only the project's owner can take, and the wording of an issue form beside a
+// fresh start, are listed apart, advised, standing in the way of nothing (the core's part of AGENTS.md and CLAUDE.md,
+// which the sync writes, stands in the way where it differs); and what it could not read, and the checks that
 // read nothing here, it says, counted neither way. It
 // reports and fails nothing (AGENTS.md of the core, "Nothing locks a project"), and each part keeps its own check where
 // it stands. The sync prints its line at its end (sync.mjs, beside this file). Reads only, and writes nothing in the
@@ -23,6 +24,7 @@ import { fileURLToPath } from "node:url";
 import { copyTree } from "./copy-tree.mjs";
 import { CORE } from "./core-address.mjs";
 import { MANIFEST, readCore } from "./core-path.mjs";
+import { BLOCKS } from "./core-owned.mjs";
 import { differences, fresh, kind } from "./fresh.mjs";
 import { projectNotes } from "./manifest-reads.mjs";
 import { saidOf } from "./read-nothing.mjs";
@@ -109,16 +111,20 @@ function steps(root, said) {
   else for (const l of saidOf(missed.nothing ?? [], missed.copy).filter(l => l.startsWith("- "))) said.nothing(l.slice(2));
 }
 
-// The differences from a fresh start (fresh.mjs), each one the manifest does not declare: what wires the core counts.
+// The differences from a fresh start (fresh.mjs), each one the manifest does not declare: what wires the core counts,
+// the core's part of AGENTS.md and CLAUDE.md among it (#1361, points 27 and 28).
 function freshStart(root, said) {
   const p = project(root), k = kind(p);
   if (k.unread) return said.unread("a fresh start", `not compared, since ${k.unread}`);
   for (const d of differences(p, fresh(p, undefined, { k }))) {
     // (one it could not compare, its packages not installed say, it names so: not read, counted neither way)
     if (/^[^:]*\bnot (compared|read)\b/u.test(d)) said.unread("a fresh start", d);
-    // (the wording of a rule file, the manifest or an issue form, its rows and paragraphs, which an earlier kit wrote
-    // otherwise and the project keeps as its own: advised, counted neither way; a file, a workflow's or the hooks' line
-    // and a config's key wire the core, and count)
+    // (the core's part of AGENTS.md or CLAUDE.md, which the one process writes between its marks: it counts, and its mend
+    // is that process, never a declaration, which would stop the sync writing the part)
+    else if (BLOCKS.includes(d.slice(0, d.indexOf(":")))) said.way("beside a fresh start", `${d}, in the core's part of the file. Mend: run the copy's \`scripts/converge.mjs --write\` from the project's root, which writes the core's part between its marks as the starter kit writes it and keeps every line outside them; do not declare the file in ${MANIFEST}'s "Differences" for it, which stops the sync writing that part`);
+    // (the wording of an issue form, its rows and paragraphs, which an earlier kit wrote otherwise and the project keeps
+    // as its own: advised, counted neither way; a file, a workflow's or the hooks' line and a config's key wire the core,
+    // and count)
     else if (/: (lacks the (row|paragraph) |still holds )/u.test(d) && !/: lacks .*\bthe (line|key) /u.test(d)) said.wording(d);
     else said.way("beside a fresh start", `${d}. Mend: make it as the starter kit writes it, or declare it in ${MANIFEST}'s "Differences", on the owner's word, by a line that quotes the file's path`);
   }
