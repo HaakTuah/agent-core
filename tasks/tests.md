@@ -25,7 +25,7 @@ reads is the *shape check*'s config.
   before: on the default branch, save where the tree passed whole ("A tree that passed is not run again", below), on a
   schedule, before a release, so no job is added. A test that reaches an import the
   readers cannot follow (a path built at run time, a file they do not read) runs on any change; one that reaches files
-  by a path it builds, by listing a folder or through a running program, its builder names under "select.whole". The
+  by a path no string of it names, or through a running program, its builder names under "select.whole". The
   trigger is a fault the whole suite finds that the selection left out: its finder mends the map at once, as a bug (a
   name under "select.whole", or the import the readers missed). It does not mean that a test is taken out, nor
   that a project whose suite proves to be needed whole runs less: where the record's numbers show it, its session
