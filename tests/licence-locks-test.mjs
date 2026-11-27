@@ -14,6 +14,7 @@ import { stoodAt, unnamedLocks } from "../scripts/licence-locks.mjs";
 import { check, coreConfig } from "../scripts/licences.mjs";
 import { asOutput, done, ok } from "../scripts/licence-scan-stage.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { licenceUnread, licenceReads } from "../scripts/read-nothing.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 const says = (list, f) => list.filter((m) => m.startsWith(`${f} is a lock file of npm's that the licence config's "lockfiles" does not name`));
@@ -42,6 +43,16 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
     const r = unnamedLocks(dir, ["core-manifest.md", "vendor/core/.packages/package-lock.json", "vendor/corex/package-lock.json", "core/package-lock.json"], { ships: [], lockfiles: [] }, "HEAD^1", () => false);
     ok(r.failures.length === 2 && says(r.failures, "vendor/corex/package-lock.json").length === 1 && says(r.failures, "core/package-lock.json").length === 1 && r.reports.length === 0,
       "the core's copy is left to the core, at the path the manifest names", JSON.stringify(r));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+// in the core's own repository a manifest at the root skips no folder: its scripts/core-path.mjs is there (#1350)
+{
+  const dir = scratchDir("licence-locks-");
+  try {
+    writeFileSync(join(dir, "core-manifest.md"), `Core: ${CORE} at ${"0".repeat(40)}, copied whole under vendor/core/ (never edited here).\n`);
+    const r = unnamedLocks(dir, ["core-manifest.md", "scripts/core-path.mjs", "vendor/core/.packages/package-lock.json"], { ships: [], lockfiles: [] }, "HEAD^1", () => false);
+    ok(r.failures.length === 1 && says(r.failures, "vendor/core/.packages/package-lock.json").length === 1, "the core's own repository leaves no folder to a manifest at its root", JSON.stringify(r));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
@@ -116,6 +127,25 @@ const config = { ships: [], lockfiles: ["package-lock.json", "app/package-lock.j
   const odd = ["lockfiles", "ships", "ignoreScriptsIn", "pypi"].map((k) => refused({ ships: [], lockfiles: [], [k]: [5] })), blank = refused({ ships: [], lockfiles: [""] });
   ok(odd.every((e, i) => e?.constructor === Error && e.message.includes(`"${["lockfiles", "ships", "ignoreScriptsIn", "pypi"][i]}" that is not a list of names`) && mended(asOutput([e.message]))) && mended(asOutput([blank?.message ?? ""])),
     "a base config whose list holds something other than text, or an empty name, fails with its mend, not a TypeError", JSON.stringify([...odd, blank].map(String)));
+}
+
+// the packages the check does not read (#1351): the sync's report names the licence check as having read nothing where
+// they stand in a package.json with no lock file, a yarn.lock or a pnpm-lock.yaml, and not where npm's lock file holds them
+{
+  const texts = { "pkg/package.json": '{"dependencies":{"p":"1"},"workspaces":["inner"]}', "app/package.json": '{"dependencies":{"a":"1"}}', "lib/package.json": '{"dependencies":{"b":"1"}}', "package.json": '{"workspaces":["lib"]}', "empty/package.json": '{"type":"module"}' };
+  const why = (...files) => licenceUnread(files, ".", (f) => texts[f] ?? null);
+  ok(why() === null && /pkg\/package\.json/u.test(why("pkg/package.json") ?? "") && why("pkg/package.json", "pkg/package-lock.json", "pkg/inner/package.json") === null
+    && /web\/yarn\.lock/u.test(why("web/yarn.lock") ?? "") && /web\/pnpm-lock\.yaml/u.test(why("web/pnpm-lock.yaml") ?? "")
+    && why("node_modules/a/package.json") === null,
+  "the licence check is said to read nothing where packages stand in a package.json with no lock file, a yarn.lock or a pnpm-lock.yaml, and not under npm's lock file", JSON.stringify(why("web/yarn.lock")));
+  ok(/app\/package\.json/u.test(why("package-lock.json", "package.json", "app/package.json", "lib/package.json") ?? "") && !/lib\/package\.json/u.test(why("package-lock.json", "package.json", "app/package.json", "lib/package.json") ?? "")
+    && why("empty/package.json") === null && why("a/yarn.lock", "b/yarn.lock", "c/yarn.lock", "d/yarn.lock").endsWith("and 1 more, which the check does not read (it reads npm's lock files alone), so only the host's dependency review reads them, by its allow-list"),
+  "a lock file above hides a package.json only where it names it a workspace, a package.json that names no dependency is no packages, and more than three files are counted", JSON.stringify(why("package-lock.json", "app/package.json")));
+  const hostile = why("a\nb/yarn.lock", "x`y/yarn.lock", "c\u202e/yarn.lock") ?? "";
+  ok(!/[\n\u202e`]/u.test(hostile.replace(/`[^`]*`/gu, "")) && !/[\n\u202e]/u.test(hostile) && hostile.includes("a\\nb/yarn.lock") && hostile.includes("\\u202e") && hostile.includes("x\\u0060y"),
+  "a path with a line break, a backtick or a bidirectional character is written out, so it cannot leave its code span", JSON.stringify(hostile));
+  ok(licenceReads(["a/package-lock.json"]) && !licenceReads(["a/yarn.lock", "b/package.json"]) && !licenceReads(["node_modules/x/package-lock.json"]),
+  "the licence check's case is partial only where a lock file of npm's stands in the project");
 }
 
 done();

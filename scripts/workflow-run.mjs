@@ -364,7 +364,7 @@ const readIf = file => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : ""
 function replay(jr, step, name, seen) {
   const { rt, ctx, state, result, tmp, id } = jr;
   if (seen.env) { fs.writeFileSync(path.join(tmp, "env"), seen.env); carryEnv(path.join(tmp, "env"), ctx.env, id); }
-  result.steps.push({ name, ran: true, passed: seen.passed, out: seen.out });
+  result.steps.push({ name, ran: true, passed: seen.passed, out: seen.out, ...seen.missing && { missing: seen.missing } });
   outcome(ctx, step, seen.passed, seen.outputs);
   if (!seen.passed) failed(state, result, rt.stop, name);
 }
@@ -393,15 +393,20 @@ function runScript(jr, step, name, env) {
     GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(rt.github.repository), GITHUB_EVENT_NAME: str(rt.github.event_name), RUNNER_TEMP: kept ? rt.once.temp : tmp, RUNNER_OS: ctx.runner.os } });
   const passed = r.status === 0;
   const out = `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}`, outputs = outputsOf(output);
-  if (kept) rt.once.store.set(kept, { passed, out, outputs, env: readIf(path.join(tmp, "env")) });
+  // (a program this machine lacks, as bash says it, or as Node says it of one a script of the core's could not start,
+  // which then exits 127 as bash does, kept with a result replayed: #1245, point 9; #1361, point 19)
+  const missing = r.status === 127 ? lacks(out) : undefined;
+  if (kept) rt.once.store.set(kept, { passed, out, outputs, missing, env: readIf(path.join(tmp, "env")) });
   keepInstall(rt, install, { passed, out, outputs, env: readIf(path.join(tmp, "env")) });
   carryEnv(path.join(tmp, "env"), ctx.env, id);
-  // (a program this machine lacks, as bash says it: #1245, point 9)
-  const missing = r.status === 127 ? /: ([^\s:]+): (?:command )?not found/u.exec(out)?.[1] : undefined;
   result.steps.push({ name, ran: true, passed, out, ...missing && { missing } });
   outcome(ctx, step, passed, outputs);
   if (!passed) failed(state, result, rt.stop, name);
 }
+
+// The programs a step's output says are not on this machine: each command bash found not, and each Node could not spawn
+// (ENOENT), joined; undefined where it names none.
+const lacks = out => [...new Set([...out.matchAll(/: ([^\s:]+): (?:command )?not found|\bspawn(?:Sync)? ([^\s()]+) ENOENT\b/gu)].map(m => m[1] ?? m[2]))].join(", ") || undefined;
 
 // A step that failed: its job fails, and, where `stop` holds for its name, the rest of the job is cancelled.
 function failed(state, result, stop, name) {

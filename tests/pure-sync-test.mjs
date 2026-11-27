@@ -68,6 +68,7 @@ write(theCore, "scripts/steps/997-a-partly-note.mjs", 'import { COST } from "../
 // (and one the manifest's "Differences" leaves undone on purpose, which no check reads done, so it stays in full)
 write(theCore, "setup/sync-notes/996-a-declared-note.md", "- **13 November 2026, a declared note.** Asked of every project; this one leaves it undone on purpose.\n");
 write(theCore, "scripts/steps/996-a-declared-note.mjs", 'import { COST } from "../step-checks.mjs";\n\nexport default { lead: "13 November 2026, a declared note", cost: COST.line, check: () => "the declared note is not done. Mend: do it" };\n');
+write(theCore, "tests/only-in-b-test.mjs", "// a test B gains, which the copy never holds\n"); // (#1361, point 7)
 const B = commit("B");
 const SIDE = git(theCore, "commit-tree", `${B}^{tree}`, "-p", B, "-m", "off main");
 // (packed once: every later fetch, clone and archive of the core reuses the pack, where the loose objects each time are compressed again, which was about half of a run's time in them; #812)
@@ -112,6 +113,8 @@ git(p, "checkout", "-q", "-b", "sync");
 const s = (r => ({ status: r.status, out: `${r.stdout}${r.stderr}` }))(spawnSync(process.execPath, ["core/scripts/sync.mjs", ...process.platform === "win32" ? [B] : []], { cwd: p, env: greenEnv, encoding: "utf8" }));
 const calls = read(p, ".github/workflows/core.yml");
 ok(s.status === 0 && s.out.includes(`${SHA(A)} -> ${SHA(B)}`) && read(p, "core-manifest.md") === manifest(OWNER, B), "the sync takes a project that follows main to the core's newest commit, and moves the manifest's pin", s.out);
+const copied = git(theCore, "diff", "--name-only", copyTree(A, coreRepo), copyTree(B, coreRepo)).split("\n").filter(Boolean).length;
+ok(new RegExp(`${SHA(A)} -> ${SHA(B)} \\(${copied} files? changed`).test(s.out) && copied > 0, "  it counts the files of the copy alone, never one of the tests the core keeps to itself (#1361, point 7)", s.out);
 ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) && s.out.includes("personal-terms.yml"), "  it moves a call whose workflow changed, and leaves one whose workflow did not", calls);
 ok(s.out.includes("Done when nothing: an entry that B gains over A."), "  and prints the sync notes the core gained between the two pins", s.out);
 ok(s.out.includes("- 13 November 2026, a done note: done here, as its step reads.") && !s.out.includes("as it always does"), "  each whose step the new copy reads done here by its lead alone (#1264)", s.out);
@@ -290,10 +293,10 @@ fs.writeFileSync(path.join(silent, "gh"), "#!/bin/sh\necho 'gh: not signed in' >
 // (the read with no sign-in sent to a proxy that is not there, so it gives no answer and nothing leaves this machine;
 // a stranger's repository of the stand-in's name never answers for it; #1246)
 const offline = { HTTPS_PROXY: "http://127.0.0.1:9", https_proxy: "http://127.0.0.1:9", NO_PROXY: "", no_proxy: "" };
-const unanswered = given => {
+const unanswered = (given, ...args) => {
   git(p, "remote", "set-url", "origin", GH_ORIGIN);
   try {
-    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p, env: { ...env, ...offline, ...given, [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs"), ...args], { cwd: p, env: { ...env, ...offline, ...given, [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
     return `${r.status}\n${r.stdout}${r.stderr}`;
   } finally { git(p, "remote", "set-url", "origin", origin); }
 };
@@ -301,6 +304,11 @@ for (const [given, what] of [[{ CORE_HOST_ANSWERS: hostSays() }, "the test's sta
   const out = unanswered(given);
   ok(/^1\n/.test(out) && /NOT PURE[^\n]*AGENTS\.md: the project's kind or values cannot be read/.test(out), `  and with only ${what} answering, which the proof does not honour, it is not proved`, out);
 }
+// (a trial's reading, which proves no merge, takes the answer given as CORE_PRIVATE where the host gave none, and says
+// so; never the test's stand-in: #1361, point 16)
+const pinned = /[0-9a-f]{40}/u.exec(read(p, "core-manifest.md"))[0], givenTrial = unanswered({ CORE_PRIVATE: "false" }, "--trial", pinned), standInTrial = unanswered({ CORE_HOST_ANSWERS: hostSays() }, "--trial", pinned);
+ok(/^1\n/.test(givenTrial) && !/kind or values cannot be read/.test(givenTrial) && /^read as public from CORE_PRIVATE, as the host gave this machine no answer$/mu.test(givenTrial) && /^trial answer: \{"commit":"[0-9a-f]{40}","pure":true/mu.test(givenTrial) && !givenTrial.includes("sha=")
+  && /NOT PURE[^\n]*kind or values cannot be read/.test(standInTrial) && !/from CORE_PRIVATE/.test(standInTrial), "  a trial's reading takes CORE_PRIVATE where the host gave no answer, and says so, never the test's stand-in", `${givenTrial}\n${standInTrial}`);
 git(p, "push", "-q", "-f", "origin", `${base}:main`);
 git(p, "checkout", "-q", "sync");
 git(p, "reset", "-q", "--hard", LEGIT);
