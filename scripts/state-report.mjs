@@ -187,10 +187,10 @@ export function readCounts({ repo, manifest, month, steps, gh = ghApi }) {
 const heldLine = held => (held ? shareLine(held.own, held.there) : "- rules held by a check: not read.");
 
 // Of the project's rules, those a check holds whole (#459, point 3): its own, by its list (holders.mjs --own), and the
-// core's it takes, none counted whose every check read nothing here (read-nothing.mjs); null where they cannot be read.
+// core's it takes, none counted whose every check read nothing here (read-nothing.mjs; the licence check, which reads part, is no such check); null where they cannot be read.
 export function heldHere(manifest) {
   try {
-    const nothing = readNothing(process.cwd(), manifest ?? "", readHere).map(n => n.script);
+    const nothing = readNothing(process.cwd(), manifest ?? "", readHere).filter(n => !n.partial).map(n => n.script);
     return { own: holderCounts(ownHolders(process.cwd())), there: heldThere(ROOT, nothing, leftOut(manifest ?? "")) };
   } catch { return null; }
 }
