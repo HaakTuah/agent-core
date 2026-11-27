@@ -78,7 +78,7 @@ export function compilesOther(text, f, { cs, known }, pace) {
   if (plain.split(/<[^<>]*>/u).some(t => (/[\r\n]/u.test(t) && /\S/u.test(t)) || /"|&quot;|%22/iu.test(t))) return true;
   for (const m of plain.matchAll(/<AssemblyAttribute\b([^<>]*)>/giu)) { pace(); if (!ASSEMBLY_STRINGS.has((attributes(m[1])?.include ?? "").trim())) return true; }
   const own = /\.csproj(?:\.user)?$/iu.test(f);
-  return anyPart(plain, /<Compile\b([^<>]*)>/giu, pace, p => !own || bringsIn(p, f, cs))
+  return anyPart(plain, /<Compile\b([^<>]*)>/giu, pace, p => !own || bringsIn(p, f, cs, known))
     || anyPart(plain, /<ProjectReference\b([^<>]*)>/giu, pace, p => !own || /[$@%&*?]/u.test(p) || !/\.csproj$/iu.test(p) || !known.has(importPath(f, p)));
 }
 
@@ -117,7 +117,8 @@ const ITEMS = /^(?:compile|none|content|embeddedresource)$/iu, COPY = /^copyto(?
 // Whether the known attributes `attrs` of an opening tag of `name`, inside the open `item`, are not safe there: a Link
 // or LinkBase but on a <Compile>, where it sets where a copy is written; on a <Compile>, one but a plain path below
 // (none of MSBuild's expansions, no "..", not rooted); a copy to the output of a file that may be C# (a <Compile>'s,
-// or a part of an Include or Update that ends in ".cs" or MSBuild expands), as an attribute or written inside the
+// or a part of an Include or Update that ends in ".cs", trailing dots, blanks and separators aside, as Windows drops
+// them, or that MSBuild expands), as an attribute or written inside the
 // item, which the copy may write where another project compiles it, over a file git holds or into a folder its wildcard
 // reaches; an SDK but those of SDK, in an Sdk attribute's parts or an <Sdk>'s Name, which must be there.
 function unsafe(name, attrs, item) {
@@ -134,7 +135,7 @@ function unknownSdk(name, attrs) {
 }
 const plainBelow = l => !/[$%@&;:]|^\s*[\\/]/u.test(l) && !l.split(/[\\/]/u).some(w => w.trim() === "..");
 const copiesCs = (name, attrs) => /^compile$/iu.test(name) ||
-  [attrs.include, attrs.update].some(v => (v ?? "").split(";").some(p => /[*?$@%&]|\.cs[\s.]*$/iu.test(p)));
+  [attrs.include, attrs.update].some(v => (v ?? "").split(";").some(p => /[*?$@%&]|\.cs[\s./\\]*$/iu.test(p)));
 
 // Whether a part of the Include of an item `tag` matches, trimmed and with Windows' separators turned, or a tag of it is
 // no run of attributes.
@@ -149,15 +150,38 @@ function anyPart(text, tag, pace, brings) {
 
 // Whether one part `p` of a <Compile>'s Include, in `f`, brings in a file of C# not among `cs`: what MSBuild expands
 // ("$", "@", "%", "&"), a path that leads, from `f`'s folder, outside the repository or to a file `cs` does not hold,
-// or a wildcard whose path climbs out of the repository anywhere or whose name ends other than in ".cs".
-function bringsIn(p, f, cs) {
+// or a wildcard whose path climbs out of the repository anywhere or whose name ends other than in ".cs", or that may
+// reach a folder a build writes: a folder named bin or obj on its path, or, where a folder's word is a wildcard, the
+// folder of a .csproj among `known` at or below where its plain words lead. The reader matches a wildcard against what
+// git holds, and a build writes its output (a copy, a generated file) under each project's folder before another
+// project's wildcard may be expanded.
+function bringsIn(p, f, cs, known) {
   if (/[$@%&]/u.test(p)) return true;
   if (!/[*?]/u.test(p)) { const at = importPath(f, p); return at === null || at === "" || !cs.has(at); }
-  if (p.startsWith("/") || /^[A-Za-z]:/u.test(p) || !CS.test(p)) return true;
+  return p.startsWith("/") || /^[A-Za-z]:/u.test(p) || !CS.test(p) || wildcardOut(p, f, known);
+}
+function wildcardOut(p, f, known) {
+  const words = p.split("/"), wild = words.findIndex(w => /[*?]/u.test(w));
+  // (Windows drops a word's trailing dots and blanks, so "bin." is bin)
+  if (words.slice(0, -1).some(w => /^(?:bin|obj)$/iu.test(w.replace(/[\s.]+$/u, "")))) return true;
   // (each folder the wildcard's path passes through, its depth below the top counted word by word: none outside)
   let depth = path.posix.dirname(f) === "." ? 0 : path.posix.dirname(f).split("/").length;
-  for (const w of p.split("/")) if (w === "..") { if (--depth < 0) return true; } else if (w && w !== ".") depth++;
-  return false;
+  for (const w of words) if (w === "..") { if (--depth < 0) return true; } else if (w && w !== ".") depth++;
+  if (wild === words.length - 1) return false;
+  const at = path.posix.dirname(importPath(f, [...words.slice(0, wild), "x"].join("/")) ?? "");
+  return projectsWithin(known).has(at === "." ? "" : at.toLowerCase());
+}
+
+// Each folder a .csproj of `known` lies in, and each above it, "" the top, in lower case, as Windows finds them; kept
+// for each `known`, so its projects are walked once.
+const within = new WeakMap();
+function projectsWithin(known) {
+  if (!within.has(known)) {
+    const folders = new Set();
+    for (const f of known) if (/\.csproj$/iu.test(f)) for (let d = path.posix.dirname(f.toLowerCase()); ; d = path.posix.dirname(d)) { folders.add(d === "." ? "" : d); if (d === "." || d === "/") break; }
+    within.set(known, folders);
+  }
+  return within.get(known);
 }
 
 // The solution files, and the files the SDK or a package compiles to C# the reader never reads (Razor's, XAML's,

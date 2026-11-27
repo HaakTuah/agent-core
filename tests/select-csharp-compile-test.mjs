@@ -5,7 +5,8 @@
 // where a project may compile C# by other means (an element or attribute not on the list known safe, so any target,
 // task, compiler property, generator item or referenced project's properties among them; a property function, a
 // character reference, a processing instruction or a document type; a value's line break or quote; a Link that climbs
-// or expands, or on an item but <Compile>; a copy to the output of what may be C#; an SDK not known, in its own case; a link, a submodule, a path
+// or expands, or on an item but <Compile>; a copy to the output of what may be C#; a wildcard that may reach a folder
+// a build writes; an SDK not known, in its own case; a link, a submodule, a path
 // with a control character, a file of Razor or XAML, or a solution that builds what is not a .csproj held under C#'s
 // type), and none
 // where it names a file or project git holds, a wildcard of .cs inside, or only removes or updates, or a solution builds
@@ -105,6 +106,11 @@ for (const [item, what, more] of [
   [`<Compile Update="A.cs" LinkBase="$(Shared)" />`, "a LinkBase on a <Compile> that MSBuild expands"],
   [`<None Include="../lib/Rules.cs" CopyToOutputDirectory="Always" />`, "a file of C# copied to the output, where another project's wildcard may compile it"],
   [`<Content Include="gen/*"><CopyToOutputDirectory>Always</CopyToOutputDirectory></Content>`, "a wildcard copied to the output, written inside the item"],
+  [`<None Include="docs/Gen.cs/." CopyToOutputDirectory="Always" /><None Include="docs\\Gen.cs\\." CopyToPublishDirectory="Always" />`, "a file of C# copied to the output by a path whose trailing separator and dot Windows drops"],
+  [`<Compile Include="../lib/bin/**/*.cs" />`, "a wildcard into a folder named bin, which a build writes"],
+  [`<Compile Include="../lib/Obj. /*.cs" />`, "a wildcard into a folder named obj, by a name Windows trims"],
+  [`<Compile Include="../lib/**/*.cs" />`, "a wildcard whose folders may reach a project's folder, where its build writes", LIB],
+  [`<Compile Include="**/*.cs" />`, "a wildcard whose folders reach its own project's folder"],
   ["", "an SDK the reader knows but in another case, which the resolver may not find as its own", { "Directory.Build.props": "<Project Sdk=\"microsoft.net.sdk\" />\n" }],
   [`<PropertyGroup><NoWarn>CS1591&quot; /x:y</NoWarn></PropertyGroup>`, "a quote in a value, which may close the compiler's argument"],
   [`<PropertyGroup><NoWarn>CS1591%22 /x:y</NoWarn></PropertyGroup>`, "a quote in a value, by MSBuild's escape"],
@@ -124,6 +130,7 @@ for (const [item, what, more] of [
   [`<None Include="data.json"><CopyToOutputDirectory>Always</CopyToOutputDirectory></None><Content Update="wwwroot/site.css" CopyToPublishDirectory="Always" />`, "files other than C# copied to the output"],
   ["", "nothing"],
   [`<Compile Include="../lib/*.CS" />`, "a wildcard of .cs in upper case inside the repository"],
+  [`<Compile Include="../lib/*.cs" />`, "a wildcard of the files of a project's own folder, which reaches none of its build's folders", LIB],
   [`<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo"><_Parameter1>App.Tests</_Parameter1></AssemblyAttribute><AssemblyAttribute Include=" System.CLSCompliantAttribute "><_Parameter1>true</_Parameter1></AssemblyAttribute>`, "an assembly's attribute of the framework, written with strings alone"],
   [`<ProjectReference Include="../lib/Lib.csproj" />`, "a project git holds", LIB],
   [`<ProjectReference Include="..\\lib\\Lib.csproj" />`, "a project git holds, by Windows' separators", LIB],
