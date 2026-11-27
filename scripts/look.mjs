@@ -34,6 +34,8 @@
 //     (release-due.mjs; #1413, point 4); and of the
 //     choices that are hard to undo (choices.mjs), the pass over them twice a year, and a sign written in a measure the
 //     shape check keeps, while it holds.
+//   - The orchestrator's lease (lease.mjs; #1106), where one stands: renewed by two sessions, or its holder's wakes more
+//     than an hour apart while builders ran.
 //   - Once a month, the state report (state-report.mjs, beside this file), opened once and not touched again; and, in a
 //     project, the packages it holds that have gone stale (held.mjs, beside this file, run as a process of its own, since
 //     it asks the registries over the network): no release within the year, gone from their registry, or their
@@ -71,6 +73,7 @@ import { started } from "./started.mjs";
 import { due as capPassed } from "./size.mjs";
 import { splitAsked } from "./look-split.mjs";
 import { dueIssue as trialDue } from "./release-due.mjs";
+import { dueIssue as leaseDue } from "./lease.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
 import { line as blindLine, reader as blindSample, shareNow, TITLE as BLIND } from "./blind-sample.mjs";
 import { ownReport } from "./holders.mjs";
@@ -100,14 +103,14 @@ const ownHeld = scripts => { try { return ownReport(process.cwd(), scripts); } c
 
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
 // issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), a cap passed (size.mjs) and a
-// release's trial due (release-due.mjs), in the core alone; a file past the split mark whose question stands
+// release's trial due (release-due.mjs), in the core alone; the orchestrator's lease (lease.mjs), where one stands; a file past the split mark whose question stands
 // (look-split.mjs); the pass over
 // the choices that are hard to undo and a sign of theirs that has tripped (choices.mjs); and the cleaning and the audit
 // the dose makes due (dose.mjs); and the blind sample (blind-sample.mjs), whose draw is laid out on the first run of
 // each month. One that says `owner`, true or false, has its issue's state label kept to it:
 // needs-owner where true, else queued; one that gives `requeue`, the key of a line of its lists, has it put back to
 // queued where an update brings a key the issue did not hold (`updating`).
-export const DUE = [stagedCases, capPassed, trialDue, splitAsked, choicesDue, signs, cleaningDue, auditIsDue, blindSample];
+export const DUE = [stagedCases, capPassed, trialDue, leaseDue, splitAsked, choicesDue, signs, cleaningDue, auditIsDue, blindSample];
 
 export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner, ...(typeof d.requeue === "function" ? { requeue: d.requeue } : {}) }));
 

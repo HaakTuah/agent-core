@@ -17,8 +17,8 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
 
-ok(STATES.join() === "queued,needs-owner,later,on-hold" && SENDERS.length === 8 && SENDERS.every(s => s.startsWith("by:")),
-  "the list: four states and eight senders", `${STATES} ${SENDERS}`);
+ok(STATES.join() === "queued,needs-owner,later,on-hold,orchestrator" && SENDERS.length === 8 && SENDERS.every(s => s.startsWith("by:")),
+  "the list: five states and eight senders", `${STATES} ${SENDERS}`);
 // (the list's shape, by its schema: scripts/schemas/labels.json, through schemas.mjs; #530)
 ok(JSON.stringify(shapeFaults("labels", LIST, "core/")) === "[]", "the list holds to its schema: each label a colour and a description GitHub takes, each sender by:, the openers and the headings",
   JSON.stringify(shapeFaults("labels", LIST, "core/")));
@@ -82,6 +82,7 @@ const issues = [
   { number: 5, user: other, labels: L("needs-owner"), body: "An outsider's idea.", created_at: late },
   { number: 6, user: me, labels: L("queued", "by:reviewer"), body: `What a review found.${sig}`, created_at: late },
   { number: 7, user: me, labels: L("queued", "by:chat"), body: `**My view**\nx${sig}`, created_at: late },
+  { number: 8, user: me, labels: L("orchestrator", "by:orchestrator"), body: `The orchestrator's lease.\n\nFound while: a first wake${sig}`, created_at: late },
 ];
 const comments = [
   { issue: 1, user: me, body: `From a builder session, on #1: done.${sig}`, created_at: late, html_url: "u1" },
