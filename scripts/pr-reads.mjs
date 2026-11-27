@@ -3,7 +3,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { DEFAULT, MANIFEST, readCore } from "./core-path.mjs";
+import { DEFAULT, MANIFEST, OWN as CORE_OWN, readCore } from "./core-path.mjs";
 import { coreAtBase } from "./owner-yes.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, ownOf, ownPaths, pathIn, regular, shown, taken, whole } from "./reading.mjs";
 
@@ -47,10 +47,10 @@ export function coreHere(dir) {
   return { at, mend: null };
 }
 // Whether the base is the core's own repository: one that holds its rules at the root, no manifest, and the core's
-// scripts/core-path.mjs, as coreItself in core-path.mjs knows it, so that a project's first sync is not read as the core's.
+// own script (CORE_OWN), as coreItself in core-path.mjs knows it, so that a project's first sync is not read as the core's.
 function ownAt(dir, base) {
   const tracked = f => whole(spawnSync("git", ["ls-tree", "--name-only", "HEAD^1", "--", f], { cwd: dir, encoding: "utf8" }))?.trim() ?? "";
-  return base === "" && tracked(MANIFEST) === "" && tracked("scripts/core-path.mjs") !== "";
+  return base === "" && tracked(MANIFEST) === "" && tracked(CORE_OWN) !== "";
 }
 // The mend where the manifest's text, as coreAt reads it whole (so that no reader's bound makes the two agree on
 // nothing), names one place by pathIn and another by readCore as core.yml reads its "Core:" line; null where they agree.

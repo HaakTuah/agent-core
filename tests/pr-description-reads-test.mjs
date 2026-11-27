@@ -48,8 +48,8 @@ const ok = (cond, what, got = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${
   put("core-manifest.md", `Core: ${CORE} at ${"0".repeat(40)}, copied whole under x/\n`); put("x/roles/a.md", "a\n"); put("x/floor/security.md", "f\n");
   git("add", "-A"); git("commit", "-q", "-m", "another place");
   ok(JSON.stringify(coreHere(project)) === JSON.stringify({ at: "x/", mend: null }), "a project's head that moves its copy is read where its manifest puts it, with nothing to mend");
-  // (one whose manifest names a place ahead of its line on a break only a pattern reads as one, U+2028 or a lone
-  // carriage return: refused, with its mend, as core.yml reads the line that follows)
+  // (one whose manifest names a place ahead of its line on a break only a pattern reads as one, U+2028, U+2029 or a lone
+  // carriage return, the manifest past a mebibyte too: refused, with its mend, as core.yml reads the line that follows)
   for (const [kind, gap, pad] of [["U+2028", "\u2028", ""], ["U+2029", "\u2029", ""], ["a lone carriage return", "\r", ""], ["U+2028, the manifest past a mebibyte", "\u2028", `${"x".repeat(80)}\n`.repeat(14000)]]) {
     put("core-manifest.md", `${pad}# m${gap}Core: ${CORE} at ${"0".repeat(40)}, copied whole under y/\nCore: ${CORE} at ${"0".repeat(40)}, copied whole under x/\n`); put("y/roles/a.md", "a\n"); put("y/floor/security.md", "f\n");
     git("add", "-A"); git("commit", "-q", "-m", "a hidden line");
@@ -57,6 +57,10 @@ const ok = (cond, what, got = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${
     ok(hidden.at === null && mended(`FAIL ${hidden.mend}`) && /under y\/ as this check reads its lines, where its "Core:" line, as core\.yml reads it, names x\//.test(hidden.mend), `a head whose manifest hides a place behind ${kind} is refused, with its mend`, JSON.stringify(hidden));
     fs.rmSync(path.join(project, "y"), { recursive: true });
   }
+  // (one whose "Core:" line core.yml reads as wrong, written twice: refused, with that reading's mend)
+  put("core-manifest.md", `Core: ${CORE} at ${"0".repeat(40)}, copied whole under x/\n`.repeat(2)); git("add", "-A"); git("commit", "-q", "-m", "a line twice");
+  const twice = coreHere(project);
+  ok(twice.at === null && mended(`FAIL ${twice.mend}`) && /core\.yml reads its "Core:" line as wrong/.test(twice.mend), "a head whose manifest core.yml reads as wrong is refused, with its mend", JSON.stringify(twice));
   put("core-manifest.md", manifestText); fs.rmSync(path.join(project, "x"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "the place back");
   if (process.platform !== "win32") {
     fs.renameSync(path.join(project, "core", "tasks"), path.join(project, "core", "t")); fs.symlinkSync("t", path.join(project, "core", "tasks"));
@@ -79,7 +83,7 @@ const ok = (cond, what, got = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${
   ok(calledFor(project) === null, "with no base to read against, nothing is asked");
 }
 // (a head of the core's own repository that puts its rules elsewhere, its added manifest naming a copy it brings:
-// refused, with its mend)
+// refused, with its mend; and a project's first sync, its base holding rules at its root, read where its manifest puts them)
 {
   const tmp = scratchDir("pr-description-test-"), own = path.join(tmp, "own");
   const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));

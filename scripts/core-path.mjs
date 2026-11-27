@@ -142,7 +142,7 @@ export const copyOf = (root = ".") => {
 };
 
 // (this script, which the core's own repository alone tracks at its root)
-const OWN = "scripts/core-path.mjs";
+export const OWN = "scripts/core-path.mjs";
 /** The folder of the core's copy a check leaves out of a project's own files, given the tracked files of the repository at
  *  `root`: null in the core's own repository, which holds no copy whatever a core-manifest.md at its root says (its
  *  scripts/core-path.mjs is tracked at the root), and in a repository with no manifest; else copyOf(root) (#1350). */
