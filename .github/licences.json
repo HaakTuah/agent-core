@@ -21,6 +21,8 @@
       "tests/licence-fetch-places-test.mjs",
       "tests/licence-fetch-other-test.mjs",
       "tests/licence-fetch-pages-test.mjs",
+      "scripts/licence-wrappers.mjs",
+      "tests/licence-fetch-wrapper-test.mjs",
       "scripts/agent-tools-pins.mjs",
       "tests/agent-tools-kiro-codex-test.mjs",
       "tests/agent-tools-links-test.mjs",
