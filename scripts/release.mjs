@@ -63,14 +63,23 @@ const git = (args, cwd) => execFileSync("git", args, { cwd, env: plainEnv(), enc
 export function next(dir, at = null) {
   const tip = inBare(dir, ["rev-parse", "refs/heads/main"]).trim();
   const [before] = releasesIn(dir);
-  if (at !== null && !past(at, tip, dir)) throw new Error(`${String(at).slice(0, 7)} is no commit of main's: start the release again once the trial's record on main names a commit of main`);
-  const named = at ?? tried(dir);
-  const sha = at ?? (named && past(named, tip, dir) && (!before || (named !== before.sha && past(before.sha, named, dir))) ? named : tip);
+  const sha = standsOn(dir, at, tip, before);
   if (before?.sha === sha) return null;
   if (before && !past(before.sha, sha, dir)) throw new Error(`${sha.slice(0, 7)} does not follow ${before.name}, the newest release: try the release on a newer commit of main, and record that trial`);
   const name = `release-${(namedReleases(dir).at(-1)?.n ?? 0) + 1}`;
   if (!RELEASE.test(name)) throw new Error(`${name} is no release's name: a tag numbered too high stands in the way, and is the owner's to remove`);
   return { name, sha, tip, before: before ?? null, asks: before ? asksBetween(before.sha, sha, dir) : [] };
+}
+
+// The commit the next release stands on: `at`, which must be of main (main's newest `tip`), or, where none is given, the
+// one the trial's record on main names where that follows `before`, the newest release, else main's newest.
+function standsOn(dir, at, tip, before) {
+  if (at !== null) {
+    if (!past(at, tip, dir)) throw new Error(`${String(at).slice(0, 7)} is no commit of main's: start the release again once the trial's record on main names a commit of main`);
+    return at;
+  }
+  const named = tried(dir);
+  return named && past(named, tip, dir) && (!before || (named !== before.sha && past(before.sha, named, dir))) ? named : tip;
 }
 
 // The commit the trial's record on main's newest commit names (release-trial.mjs, TRIAL), or null where none is read.
