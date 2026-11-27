@@ -10,7 +10,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
-import { BARE, OWNER, SIGNIN, TITLE, bugText, file, find, formed, holds, owned, runAll, runLogged } from "../scripts/daily-try.mjs";
+import { BARE, OWNER, SIGNIN, TITLE, bugText, file, find, formed, holds, owned, runAll, runLogged, tryOne } from "../scripts/daily-try.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -143,6 +143,38 @@ for (const name of ["game-one", "tool-two"]) {
   let threw = false;
   try { file({ ...t, commit: "not one" }, { gh: issues(), write, say: () => {} }); } catch { threw = true; }
   ok(threw && wrote.length === 0, "counts in no form write nothing");
+}
+
+// the hostile cases of what the try reads (SECURITY.md, rule 5): GitHub's answers, the projects' verdicts and the counts
+{
+  const base = { commit: SHA, day: "2026-11-27", signedIn: true, found: 0, private: 0, tried: 0, atPin: 0, untried: 0, syncFailed: 0, afterUnread: 0, held: 0, ...Object.fromEntries(["passedBoth", "fixedAfter", "failedBoth", "failedAfter", "failedAfterAlone", "stoppedAfter", "stoppedNeither", "ranAfterAlone", "ranBeforeAlone", "failedBeforeAlone", "unrunAfter", "unrunAfterRan", "unreadAfter", "unreadBefore", "unreadNeither"].map(k => [k, 0])) };
+  const refused = [null, undefined, "", [], "counts", 5, {}, { ...base, commit: `<b>${SHA}</b>` }, { ...base, commit: "../../../etc/passwd" }, { ...base, day: "<img src=x>" },
+    { ...base, found: -1 }, { ...base, found: 2 ** 60 }, { ...base, held: 0.5 }, { ...base, signedIn: "true" }, { ...base, private: 1 }];
+  ok(formed(base) && refused.every(t => !formed(t)), "counts that are nothing at all, of the wrong type, markup, a file path or a number out of range are in no form", JSON.stringify(refused.filter(t => formed(t))));
+  const r = spawnSync(process.execPath, [path.join(import.meta.dirname, "..", "scripts", "daily-try.mjs"), "--file"], { encoding: "utf8", env: { PATH: process.env.PATH, TRY: JSON.stringify({ ...base, pad: "x".repeat(5000) }), GH_TOKEN: "" } });
+  ok(r.status === 1 && /no form/u.test(r.stderr + r.stdout) && /Mend:/u.test(r.stderr + r.stdout), "counts longer than 4 KB are refused before anything is read or written, saying the mend", (r.stderr + r.stdout).slice(0, 300));
+  const odd = [
+    { full_name: `${OWNER}/huge`, owner: { login: OWNER } }, { full_name: `${OWNER}/odd`, owner: { login: OWNER } }, { full_name: `${OWNER}/fine`, owner: { login: OWNER } },
+    { full_name: 5, owner: null }, "not a repository",
+  ];
+  const answer = { [`${OWNER}/huge`]: { content: Buffer.from(manifest + "x".repeat((1 << 20) + 1)).toString("base64") }, [`${OWNER}/odd`]: { content: 42 }, [`${OWNER}/fine`]: { content: Buffer.from(manifest).toString("base64") } };
+  const ghOdd = route => {
+    if (/repos\?/u.test(route)) return JSON.stringify(odd);
+    const m = /^repos\/(.+)\/contents\/core-manifest\.md$/u.exec(route);
+    if (m && answer[m[1]]) return JSON.stringify(answer[m[1]]);
+    throw new Error("gh: Not Found (HTTP 404)");
+  };
+  let got = null;
+  try { got = owned(true, ghOdd); } catch (e) { got = e; }
+  ok(Array.isArray(got) && got.map(p => p.name).join() === `${OWNER}/fine`, "a manifest past 1 MB, one of the wrong type and a repository of no form are no project; the rest are found", String(got?.message ?? JSON.stringify(got)));
+  let list = null;
+  try { list = owned(true, () => "{\"not\":\"a list\"}"); } catch (e) { list = e; }
+  ok(list instanceof Error, "an answer that is no list of repositories throws, never read as none", String(list));
+  const out = path.join(tmp, "hostile-out"), at = path.join(out, "hostile");
+  fs.mkdirSync(at, { recursive: true }); fs.mkdirSync(out, { recursive: true }); git(at, "init", "-q");
+  const writes = body => (cmd, args) => { const v = args.indexOf("--verdicts"); if (v >= 0) fs.writeFileSync(args[v + 1], body); return true; };
+  const came = [("x".repeat(17 << 20)), "5", "\"passed\"", "", "{\"a/x\":"].map(body => tryOne({ dir: "hostile" }, path.join(tmp, "core-at"), SHA, out, writes(body)).came);
+  ok(came.every(c => c === "untried"), "verdicts past 16 MB, of the wrong type, nothing at all or cut short are read as none written, the project untried", came.join());
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });

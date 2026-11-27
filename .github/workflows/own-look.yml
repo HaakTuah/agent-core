@@ -75,7 +75,7 @@ jobs:
   # the projects alone, the clones keep none, and the projects' own code runs in a step given no secret.
   try:
     runs-on: ubuntu-latest
-    timeout-minutes: 120 # (a project's own jobs before and after the sync, each run at most 25 minutes, for each project)
+    timeout-minutes: 360 # (GitHub's most: each project's checks before and after the sync, each run at most 25 minutes)
     permissions:
       contents: read # the core's default branch, its history and its scripts
       actions: read # the runs on main's commits, which say whose checks all passed (releases.mjs, greenMain)

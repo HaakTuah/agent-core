@@ -42,6 +42,10 @@ export const TITLE = "The daily try held the core";
 export const SIGNIN = "The daily try reads none of the owner's private projects";
 const SHA = /^[0-9a-f]{40}$/u, DAY = /^\d{4}-\d\d-\d\d$/u;
 const MINUTES = 25;
+// The limits of what it reads (SECURITY.md, rule 5): a manifest of 1 MB, GitHub's own for a file's content, past which
+// a repository is no project of the core's; a file of verdicts of 16 MB, past which it is read as none written; and the
+// counts --file reads, of 4 KB, past which they are in no form.
+export const MANIFEST_MAX = 1 << 20, VERDICTS_MAX = 16 << 20, COUNTS_MAX = 4096;
 // The counts --run writes and --file reads, each a whole number: the projects found and how many of them are private;
 // those tried; those already at the commit; those whose run before wrote no verdicts (the copy's check, not the
 // commit's, so untried); those whose sync to the commit failed, or whose run after wrote no verdicts (the commit's,
@@ -59,8 +63,9 @@ export function owned(signedIn, gh = ghApi, owner = OWNER) {
     const name = String(r?.full_name ?? "");
     if (String(r?.owner?.login ?? "").toLowerCase() !== owner.toLowerCase() || name.toLowerCase() === CORE.toLowerCase() || r.archived) continue;
     let manifest;
-    try { manifest = Buffer.from(parseBounded(gh(`repos/${name}/contents/core-manifest.md`)).content ?? "", "base64").toString("utf8"); }
+    try { const content = parseBounded(gh(`repos/${name}/contents/core-manifest.md`))?.content; manifest = typeof content === "string" ? Buffer.from(content, "base64").toString("utf8") : ""; }
     catch (e) { if (/\(HTTP 404\)\s*$/u.test(String(e?.message).trim())) continue; throw e; }
+    if (manifest.length > MANIFEST_MAX) continue;
     if (readCore(manifest).form) found.push({ name, private: !!r.private });
   }
   return found;
@@ -97,7 +102,7 @@ export function runLogged(cmd, args, cwd, log, env = bare()) {
   try { return spawnSync(cmd, args, { cwd, env, stdio: ["ignore", fd, fd], timeout: MINUTES * 60000 }).status === 0; } finally { fs.closeSync(fd); }
 }
 
-const readJson = file => { try { return parseBounded(fs.readFileSync(file, "utf8")); } catch { return null; } };
+const readJson = file => { try { if (fs.statSync(file).size > VERDICTS_MAX) return null; const v = parseBounded(fs.readFileSync(file, "utf8")); return v !== null && typeof v === "object" ? v : null; } catch { return null; } };
 
 // Whether the trial's reading holds a pair of runs, [before, after], as its record would hold a release's cut: the
 // trial's own judgement (release-trial.mjs, trialAt), on a record of that one project, so that what holds is one fact.
@@ -115,7 +120,7 @@ export function tryOne(p, core, sha, out, run = runLogged) {
   if (copy.pin === sha) return { came: "atPin" };
   const own = copy.path ? path.join(at, copy.path, "scripts") : null;
   const ownCheck = own && fs.existsSync(path.join(own, "check.mjs")) && fs.readFileSync(path.join(own, "check.mjs"), "utf8").includes("--verdicts");
-  const main = spawnSync("git", ["rev-parse", "HEAD"], { cwd: at, encoding: "utf8" }).stdout.trim();
+  const main = (spawnSync("git", ["rev-parse", "HEAD"], { cwd: at, encoding: "utf8" }).stdout ?? "").trim();
   run(process.execPath, [path.join(core, "scripts", "toolchain.mjs"), at], at, log);
   const check = (script, file) => run(process.execPath, [script, "--base", main, "--own", "--verdicts", file], at, log);
   const before = path.join(out, `${p.dir}.before.json`), after = path.join(out, `${p.dir}.after.json`);
@@ -200,7 +205,7 @@ function main([what, ...args]) {
   }
   if (what === "--run" && args.length === 2) { const { out } = runAll(path.resolve(args[0]), path.resolve(args[1])); console.log(JSON.stringify(out)); return 0; }
   if (what === "--file" && !args.length) {
-    try { file(parseBounded(process.env.TRY ?? "null")); return 0; }
+    try { const text = process.env.TRY ?? ""; file(text.length > COUNTS_MAX ? null : parseBounded(text || "null")); return 0; }
     catch (e) { return fail(`${e.message}. Mend: read the try job's log for its counts; start the look again once it gives them.`); }
   }
   if (what === "--local" && args.length <= 1) {
