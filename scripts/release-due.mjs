@@ -62,23 +62,27 @@ export function readGit(git, head = "HEAD") {
   return { release: { name, sha, at }, lines: [...lines].sort((a, b) => a - b), trialed };
 }
 
+// One page of GitHub's list of closed issues, as rows checked against their form: an answer that is not a list, or a
+// row that is no issue with its number and times, throws, as does gh failing: the reading never guesses.
+function pageOf(text) {
+  let rows;
+  try { rows = parseBounded(text); } catch (e) { throw new Error(e instanceof SyntaxError ? "GitHub's list of closed issues is no JSON" : e.message); }
+  if (!Array.isArray(rows)) throw new Error("GitHub's list of closed issues is no list");
+  const closedIssue = row => row !== null && typeof row === "object" && Number.isSafeInteger(row.number) && row.number >= 1 && row.state === "closed" && !Number.isNaN(Date.parse(row.closed_at));
+  if (!rows.every(closedIssue)) throw new Error("GitHub's list of closed issues holds a row that is no closed issue with its number and the time it closed");
+  return rows;
+}
+
 // The issues of `repo` closed as completed after `since` (a time), read from GitHub a page at a time: a Set of their
-// numbers, pull requests left out. Each row is checked against its form; an answer that is not a list, or a row
-// that is no issue with its number and times, throws, as does gh failing: the reading never guesses.
+// numbers, pull requests left out, the reading bound to PAGES pages.
 export function closedSince(repo, since, ask = ghApi) {
   if (!aRepository(repo)) throw new Error(`${String(repo).slice(0, 80)} is no repository's name`);
   const from = new Date(since);
   if (Number.isNaN(from.getTime())) throw new Error(`${String(since).slice(0, 40)} is no time`);
   const closed = new Set();
   for (let page = 1; ; page++) {
-    let rows;
-    try { rows = parseBounded(ask(`repos/${repo}/issues?state=closed&since=${encodeURIComponent(from.toISOString())}&per_page=100&page=${page}`)); }
-    catch (e) { throw new Error(e instanceof SyntaxError ? "GitHub's list of closed issues is no JSON" : e.message); }
-    if (!Array.isArray(rows)) throw new Error("GitHub's list of closed issues is no list");
-    for (const row of rows) {
-      if (row === null || typeof row !== "object" || !Number.isSafeInteger(row.number) || row.number < 1 || row.state !== "closed" || Number.isNaN(Date.parse(row.closed_at))) throw new Error("GitHub's list of closed issues holds a row that is no closed issue with its number and the time it closed");
-      if (!("pull_request" in row) && row.state_reason === "completed" && Date.parse(row.closed_at) > from.getTime()) closed.add(row.number);
-    }
+    const rows = pageOf(ask(`repos/${repo}/issues?state=closed&since=${encodeURIComponent(from.toISOString())}&per_page=100&page=${page}`));
+    for (const row of rows) if (!("pull_request" in row) && row.state_reason === "completed" && Date.parse(row.closed_at) > from.getTime()) closed.add(row.number);
     if (rows.length < 100) break;
     if (page >= PAGES) throw new Error(`GitHub's list of closed issues runs past ${PAGES} pages`);
   }
