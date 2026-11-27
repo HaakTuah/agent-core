@@ -137,7 +137,7 @@ function localArguments(args) {
 // The options a call may give a local clone: none of them runs it through a shell or sets its environment.
 const CALL_OPTIONS = new Set(["cwd", "stdio", "encoding", "timeout", "maxBuffer", "windowsHide"]);
 // Whether the value of a call's option reads as one above, or as an array of plain strings.
-const optionValue = (raw) => readable(argument(raw)) || /^\[\s*(?:(?:"[\w-]*"|'[\w-]*')\s*,?\s*)*\]$/u.test(raw);
+const optionValue = (raw) => readable(argument(raw)) || /^\[\s*(?:(?:"[\w-]*"|'[\w-]*')(?:\s*,\s*(?:"[\w-]*"|'[\w-]*'))*\s*(?:,\s*)?)?\]$/u.test(raw);
 // The place where the value of a call's option at text[i] ends, or -1 where it does not read as one above.
 function valueEnd(text, i) {
   const end = exprEnd(text, i);
