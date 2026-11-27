@@ -7,8 +7,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #1345, #1385, #1380, #1401 | builder; release 8, one PR each | |
-| #1140 | builder; release 8 | |
 | #1413, point 4 | rule builder; release 8 | |
 | #1413, point 8 | rule builder; release 8 | the owner's Security-tab record (`needs-owner`) |
 | #1202 | rule builder; release 8; `AGENTS.md` and what every session here reads at its start | #1413's point 4 (`AGENTS.md`, one at a time) |
@@ -17,6 +15,10 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 8, one PR each | |
 | #1123 | rule builder; release 8 | #974, #1060 (`roles/adviser.md`) |
 | #1098, #1133, #1356 | builder; release 8, one PR each | |
+| #1488 | builder; release 8 | |
+| #1510 | builder; release 8 | #1508, on the same files |
+| #1472 | builder; release 8 | #1510, on the same files |
+| #1475, #1476 | builder; release 8, one PR each | #1472, on the same files |
 | #1180, #1181 | rule builder; release 8, one PR each | |
 | #1182 | rule builder; release 8 | |
 | #810 | the orchestrator | the batch's end |
