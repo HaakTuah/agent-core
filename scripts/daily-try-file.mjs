@@ -30,12 +30,17 @@ export const CHECKS_MAX = 10000, COUNTS_MAX = 4096, LOG_MAX = 16 << 20, LEGS_MAX
 export const TALLY = ["found", "private", "tried", "atPin", "untried", "syncFailed", "afterUnread", "held"];
 // What one project's try came to, as its runner's line says it.
 export const CAME = ["tried", "held", "atPin", "untried", "syncFailed", "afterUnread"];
+// Why a project came to "untried" or "syncFailed", a word of this list the script sets from the step that stopped it,
+// never a line of the project's own output (the core is public: floor rules 4, 11 and 13); a runner's line holds one
+// only for those two, and where it came to another it holds none.
+export const WHY = ["notCloned", "noHostAnswer", "beforeUnread", "branchRefused", "syncRefused", "stageRefused", "commitRefused"];
 
 // Whether a runner's counts are in the form --run prints: its number within the `found` (at most LEGS_MAX), the
-// commit tried (`sha`, or any commit where none is given), what it came to, and the trial's classes as whole numbers.
+// commit tried (`sha`, or any commit where none is given), what it came to, a reason only of WHY's words and only beside untried or syncFailed (none beside the rest), and the
+// trial's classes as whole numbers.
 export function legFormed(l, sha, found) {
   return l !== null && typeof l === "object" && Number.isSafeInteger(l.leg) && l.leg >= 1 && l.leg <= Math.min(found, LEGS_MAX)
-    && (sha ? l.commit === sha : SHA.test(String(l.commit))) && CAME.includes(l.came) && COUNTS.every(k => Number.isSafeInteger(l[k]) && l[k] >= 0 && l[k] <= CHECKS_MAX);
+    && (sha ? l.commit === sha : SHA.test(String(l.commit))) && CAME.includes(l.came) && (l.why === undefined || (WHY.includes(l.why) && (l.came === "untried" || l.came === "syncFailed"))) && COUNTS.every(k => Number.isSafeInteger(l[k]) && l[k] >= 0 && l[k] <= CHECKS_MAX);
 }
 
 // The counts of the runner `leg` from the text after its log's last LINE, or null where they are in no form or are

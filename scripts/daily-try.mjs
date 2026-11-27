@@ -21,7 +21,8 @@
 //                                                       beside <dir>, a file `private`: the listing's answer, true or false
 //   node scripts/daily-try.mjs --run <dir> <core>       that clone tried at the core checked out at <core>, given no
 //                                                       sign-in, as the file `private` in <dir> says (none read,
-//                                                       none tried); its counts printed as one line, for the runner LEG
+//                                                       none tried); its counts printed as one line, for the runner LEG,
+//                                                       with a word for why where it was not tried or its sync failed
 //   node scripts/daily-try.mjs --file                   each runner's line read from its job's log, the counts summed
 //                                                       and filed: a bug where a project was held, and the issue for
 //                                                       the owner's sign-in where none was given
@@ -120,7 +121,7 @@ export function cloneLeg(leg, into, { signedIn, token, expected, gh = ghApi, url
   const p = found.length === expected ? found[leg - 1] : undefined;
   const cloned = !!p && clone(p.name, into, token, url);
   // the listing's own answer on whether the project is private, kept beside the clone for --run, which holds no sign-in
-  if (cloned) fs.writeFileSync(path.join(path.dirname(into), PRIVATE_FILE), String(!!p.private));
+  if (cloned) fs.writeFileSync(path.join(path.dirname(into), PRIVATE_FILE), String(p.private));
   say(cloned ? `Runner ${leg}: its project cloned.` : `Runner ${leg}: nothing cloned (${p ? "the clone failed" : `the owner's projects are no longer the ${expected} found`}), so it is counted as not tried.`);
   return cloned;
 }
@@ -169,9 +170,10 @@ function toolsFor(at, log) {
 // One project, cloned at `at`, tried at the core checked out at `core` (its commit `sha`): the toolchain it pins, then
 // the run before, the sync, the run after, each given what the toolchain says to set, each output to the log
 // `project.log` in `out`, outside the clone. What it came to: "atPin", "untried", "syncFailed", "afterUnread", or the
-// pair, held or not.
-export function tryOne(at, core, sha, out, run = runLogged, tools = toolsFor, priv = undefined) {
-  if (priv !== "true" && priv !== "false") return { came: "untried" }; // (no host's answer for the project: not guessed)
+// pair, held or not; where untried or its sync failed, `why`, the step that stopped it as a word of daily-try-file.mjs's
+// WHY, none of the project's own output (a missing answer is tested before the pin: a project at it with none is untried).
+export function tryOne(at, core, sha, out, run = runLogged, tools = toolsFor, priv) {
+  if (priv !== "true" && priv !== "false") return { came: "untried", why: "noHostAnswer" }; // (no host's answer for the project: not guessed)
   const log = path.join(out, "project.log");
   const manifest = manifestText(path.join(at, "core-manifest.md"));
   const copy = readCore(manifest ?? "");
@@ -184,12 +186,15 @@ export function tryOne(at, core, sha, out, run = runLogged, tools = toolsFor, pr
   const check = (script, file) => go(process.execPath, [script, "--base", main, "--own", "--verdicts", file]);
   const before = path.join(out, "before.json"), after = path.join(out, "after.json");
   check(scripts.before, before);
-  if (!readJson(before)) return { came: "untried" };
-  const synced = go("git", ["switch", "--quiet", "-c", "daily-try"])
-    && go(process.execPath, [scripts.sync, sha])
-    && go("git", ["add", "-A"])
-    && go("git", ["-c", "user.name=daily-try", "-c", "user.email=daily-try@example.invalid", "commit", "--quiet", "--no-verify", "-m", "The daily try's sync (never pushed)"]);
-  if (!synced) return { came: "syncFailed" };
+  if (!readJson(before)) return { came: "untried", why: "beforeUnread" };
+  const steps = [
+    ["branchRefused", "git", ["switch", "--quiet", "-c", "daily-try"]],
+    ["syncRefused", process.execPath, [scripts.sync, sha]],
+    ["stageRefused", "git", ["add", "-A"]],
+    ["commitRefused", "git", ["-c", "user.name=daily-try", "-c", "user.email=daily-try@example.invalid", "commit", "--quiet", "--no-verify", "-m", "The daily try's sync (never pushed)"]],
+  ];
+  const stopped = steps.find(([, cmd, args]) => !go(cmd, args));
+  if (stopped) return { came: "syncFailed", why: stopped[0] };
   check(path.join(core, "scripts", "check.mjs"), after);
   const pair = [readJson(before), readJson(after)];
   if (!pair[1]) return { came: "afterUnread" };
@@ -202,9 +207,9 @@ export function runLeg(dir, core, leg, { run = runLogged, tools, sha = (spawnSyn
   const at = path.join(dir, "project");
   let priv; // (read before any of the project's code runs; none readable is none: the project is then not tried)
   try { priv = fs.readFileSync(path.join(dir, PRIVATE_FILE), "utf8"); } catch { /* (none) */ }
-  const r = fs.existsSync(at) ? tryOne(at, core, sha, dir, run, tools, priv) : { came: "untried" };
+  const r = fs.existsSync(at) ? tryOne(at, core, sha, dir, run, tools, priv) : { came: "untried", why: "notCloned" };
   const counts = trialRecord(sha, "2000-01-01", r.pair ? [r.pair] : []);
-  return { leg, commit: sha, came: r.came, ...Object.fromEntries(COUNTS.map(k => [k, counts[k]])) };
+  return { leg, commit: sha, came: r.came, ...(r.why && { why: r.why }), ...Object.fromEntries(COUNTS.map(k => [k, counts[k]])) };
 }
 
 const fail = why => { console.error(`FAIL ${why}`); return 1; };
@@ -243,7 +248,7 @@ export function local(gh = ghApi, say = console.log) {
   say(`The look of ${day}: ${found.length} of the owner's own projects found now, in the order each runner took them${by.size > found.length ? `; it tried ${by.size}, so the list has changed since and a number may name another project` : ""}.`);
   for (const [i, p] of found.entries()) {
     const l = legOf(by.get(i + 1), i + 1, found.length);
-    say(`- runner ${i + 1}, ${p.name}: ${l ? `${l.came} at ${l.commit.slice(0, 7)}` : "said nothing in form (not tried)"}`);
+    say(`- runner ${i + 1}, ${p.name}: ${l ? `${l.came}${l.why ? ` (${l.why})` : ""} at ${l.commit.slice(0, 7)}` : "said nothing in form (not tried)"}`);
   }
 }
 

@@ -12,7 +12,7 @@ import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 import { BARE, cloneLeg, green, holds, list, local, owned, runLeg, runLogged, tryOne } from "../scripts/daily-try.mjs";
-import { LINE, OWNER, formed, gather } from "../scripts/daily-try-file.mjs";
+import { LINE, OWNER, formed, gather, legFormed } from "../scripts/daily-try-file.mjs";
 import { COUNTS } from "../scripts/release-trial.mjs";
 
 let failed = 0, count = 0;
@@ -125,6 +125,7 @@ for (const name of ["game-one", "tool-two"]) {
     const tools = (where, log) => { ran.push({ k, tools: where === at && path.dirname(log) === leg }); return { DOTNET_ROOT: `/sdk-${k}` }; };
     legsSaid.push(runLeg(leg, path.join(tmp, "core-at"), i + 1, { run, tools, sha: SHA }));
   }
+  ok(legsSaid.map(l => l.why ?? "-").join() === "-,-,beforeUnread,syncRefused,-", "a runner that did not try its project, or whose sync failed, says why in a word of the fixed list, and one that tried says none", JSON.stringify(legsSaid.map(l => l.why)));
   ok(legsSaid.map(l => l.came).join() === "held,tried,untried,syncFailed,atPin" && legsSaid[0].failedAfter === 1 && legsSaid[1].passedBoth === 1 && legsSaid.every((l, i) => l.leg === i + 1 && l.commit === SHA), "each runner's counts: what its project came to, and the trial's classes of its runs", JSON.stringify(legsSaid.map(l => [l.leg, l.came])));
   ok(!JSON.stringify(legsSaid).includes(OWNER) && Object.keys(legsSaid[0]).every(k => k === "leg" || k === "commit" || k === "came" || Number.isInteger(legsSaid[0][k])), "a runner's counts are numbers, the commit and what it came to, no name", JSON.stringify(legsSaid[0]));
   const held = ran.filter(r => r.k === "held"), runs = held.filter(r => !("tools" in r));
@@ -139,11 +140,29 @@ for (const name of ["game-one", "tool-two"]) {
     const none = runLeg(bad, path.join(tmp, "core-at"), 7, { run: (...a) => { calls.push(a); return true; }, sha: SHA });
     fs.writeFileSync(path.join(bad, "private"), "maybe");
     const odd = runLeg(bad, path.join(tmp, "core-at"), 7, { run: (...a) => { calls.push(a); return true; }, sha: SHA });
-    ok(none.came === "untried" && odd.came === "untried" && calls.length === 0, "where the listing's answer on whether the project is private is missing or no answer, the project is not tried and none of its code runs (#1561)", JSON.stringify([none.came, odd.came, calls.length]));
+    ok(none.came === "untried" && odd.came === "untried" && none.why === "noHostAnswer" && odd.why === "noHostAnswer" && calls.length === 0, "where the listing's answer on whether the project is private is missing or no answer, the project is not tried and none of its code runs (#1561)", JSON.stringify([none.came, odd.came, calls.length]));
+  }
+  {
+    // each step that can stop a sync gives its own word, whatever the project's output says; the line holds the word alone
+    const words = [], hostile = "SECRET-PROJECT-LINE";
+    for (const [i, stop] of ["switch", "sync.mjs", "add", "commit"].entries()) {
+      const leg = path.join(tmp, "legs", `stopped-${i}`), at = path.join(leg, "project");
+      fs.mkdirSync(at, { recursive: true }); git(at, "init", "-q");
+      fs.writeFileSync(path.join(leg, "private"), "false");
+      fs.writeFileSync(path.join(at, "core-manifest.md"), manifest);
+      const run = (cmd, args, cwd, log) => {
+        const v = args.indexOf("--verdicts");
+        if (v >= 0) { fs.writeFileSync(args[v + 1], JSON.stringify({ "a/x": "passed" })); return true; }
+        if (args.includes(stop) || args.some(a => a.endsWith(stop))) { fs.appendFileSync(log, `${hostile}\n`); return false; }
+        return true;
+      };
+      words.push(runLeg(leg, path.join(tmp, "core-at"), i + 1, { run, tools: () => ({}), sha: SHA }));
+    }
+    ok(words.map(l => `${l.came}:${l.why}`).join() === "syncFailed:branchRefused,syncFailed:syncRefused,syncFailed:stageRefused,syncFailed:commitRefused" && !JSON.stringify(words).includes(hostile), "a sync stopped at each of its steps says which, in a word of the fixed list, and nothing a project's output said reaches the line (#1564)", JSON.stringify(words.map(l => l.why)));
   }
   ok(runs.filter(r => /--verdicts/u.test(r.args)).map(r => r.args.includes("before.json") ? "before" : "after").join() === "before,after" && runs.some(r => r.args.endsWith(` ${SHA}`)), "the run before, the sync to the commit, then the run after", ran.filter(r => r.k === "held").map(r => r.args).join(" | "));
   const none = runLeg(path.join(tmp, "legs", "nothing-cloned"), path.join(tmp, "core-at"), 6, { run: () => true, sha: SHA });
-  ok(none.came === "untried" && none.leg === 6, "a runner whose clone failed says its project was not tried", JSON.stringify(none));
+  ok(none.came === "untried" && none.why === "notCloned" && none.leg === 6 && legFormed(none, SHA, 6), "a runner whose clone failed says its project was not tried, and why, in a line --file and --local read", JSON.stringify(none));
 
   // the counts summed from the runners' own lines
   const lines = legsSaid.map(l => ({ leg: l.leg, text: JSON.stringify(l) }));
@@ -214,7 +233,7 @@ for (const name of ["game-one", "tool-two"]) {
 {
   const logs = {
     1: `x ${LINE}${JSON.stringify({ leg: 1, commit: SHA, came: "\u001b]52;c;held\u0007 run this", passedBoth: 0 })}\n`,
-    2: `x ${LINE}${JSON.stringify({ leg: 2, commit: SHA, came: "held", ...Object.fromEntries(COUNTS.map(k => [k, 0])) })}\n`,
+    2: `x ${LINE}${JSON.stringify({ leg: 2, commit: SHA, came: "syncFailed", why: "syncRefused", ...Object.fromEntries(COUNTS.map(k => [k, 0])) })}\n`,
   };
   const ghLocal = route => {
     if (/own-look\.yml\/runs/u.test(route)) return JSON.stringify({ workflow_runs: [{ id: 9, run_attempt: 1, created_at: "2026-11-27T04:00:00Z" }] });
@@ -224,7 +243,7 @@ for (const name of ["game-one", "tool-two"]) {
   };
   const said = [];
   local(ghLocal, l => said.push(l));
-  ok(said.length === 3 && /runner 1, .*game-one: said nothing in form/u.test(said[1]) && /runner 2, .*tool-two: held at 2222222$/u.test(said[2]) && !said.join().includes("run this") && !said.join().includes("\u001b"),
+  ok(said.length === 3 && /runner 1, .*game-one: said nothing in form/u.test(said[1]) && /runner 2, .*tool-two: syncFailed \(syncRefused\) at 2222222$/u.test(said[2]) && !said.join().includes("run this") && !said.join().includes("\u001b"),
     "--local shows a runner's line only in the form --file reads, never a word a project's code put in it", JSON.stringify(said));
 }
 
