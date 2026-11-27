@@ -26,7 +26,6 @@
     "scripts/labels.mjs": { "mark": 22008, "why": "the question of a split is asked in #1186" },
     "scripts/sync.mjs": { "mark": 22147, "why": "the question of a split is asked in #1250" },
     "scripts/pure-sync.mjs": { "mark": 22852, "why": "the question of a split is asked in #1385" },
-    "scripts/comment-only.mjs": { "mark": 28954, "why": "the question of a split is asked in #1341" },
     "SECURITY.md": { "mark": 26852, "why": "the question of a split is asked in #1255" },
     "scripts/licences.mjs": { "mark": 52937, "why": "the question of a split is asked in #1151" },
     "scripts/packages.mjs": { "mark": 25772, "why": "the question of a split is asked in #1151" },

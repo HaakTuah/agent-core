@@ -1,6 +1,6 @@
 - `.github/workflows/security-review.yml`, `.github/workflows/own-security-review.yml`,
   `.github/workflows/queue-only.yml`, `scripts/security-review.mjs`, `scripts/code-review-wait.mjs`,
-  `scripts/review-marks.mjs`, `scripts/clean-merges.mjs`, `scripts/power.mjs`, `scripts/pure-sync.mjs`, `scripts/comment-only.mjs`, `scripts/comment-only-stage.mjs`,
+  `scripts/review-marks.mjs`, `scripts/clean-merges.mjs`, `scripts/power.mjs`, `scripts/pure-sync.mjs`, `scripts/comment-only.mjs`, `scripts/comment-only-yaml.mjs`, `scripts/runs-by-itself.mjs`, `scripts/comment-only-stage.mjs`,
   `scripts/queue-only.mjs`, `scripts/security-review-host.mjs`, `scripts/security-review-record.mjs`,
   `tests/security-review-workflow-test.mjs`, `tests/security-review-record-run-test.mjs`, `tests/comment-only-run-test.mjs`: give each pull request's
   head the statuses that say whether its security review has run and a running code review has finished, prove a sync

@@ -79,7 +79,7 @@
 //         printed into for the same head, whose waiting this status waits for too (withCode; #1339).
 import { readFileSync } from "node:fs";
 import { copyHeld } from "./core-path.mjs";
-import { RUNS } from "./comment-only.mjs";
+import { RUNS } from "./runs-by-itself.mjs";
 import { mayRun } from "./power.mjs";
 import { blockingOf } from "./review-lines.mjs";
 import { started } from "./started.mjs";
