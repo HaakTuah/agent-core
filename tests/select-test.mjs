@@ -12,15 +12,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
-import { mended } from "../scripts/mend.mjs";
+import { mended as mendedFrom } from "../scripts/mend.mjs";
 import { ALL_MS, Late, hurry } from "../scripts/hurry.mjs";
 import { WORDS, mentioned, nameTrie } from "../scripts/name-trie.mjs";
 import { links, reached, selection } from "../scripts/select-reach.mjs";
 import { parseConfig, survey } from "../scripts/shape.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { projectOf, scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
+const mended = output => mendedFrom(output, { from: projectOf() }); // its mends name the copy's paths (`node core/scripts/...`), as a project's session reads them
 const script = fileURLToPath(new URL("../scripts/select.mjs", import.meta.url));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 

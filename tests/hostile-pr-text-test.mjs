@@ -1,10 +1,10 @@
 // Hostile tests for one input the core reads (floor topic 5, "Every named input has hostile tests"): a pull request's
 // description, its body, which anyone who opens a pull request writes. It is read by the description check
-// (pr-description.mjs: missing, asked, waitsOn, waitsMend, reasonsMend, and its run with PR_BODY in the env) and by the line
+// (pr-description.mjs: missing, asked, waitsOn, waitsMend, reasonsMend, and its run on PR_BODY) and by the line
 // "Read for it:" (reading.mjs: listed, lineMend) and the line "Never needed:" (read-total.mjs: neverNeeded, which the size
 // workflow hands it in PR_BODY); the description workflows (.github/workflows/pr-description.yml and
 // own-description.yml) hand it over in PR_BODY alone. Each case is refused: nothing of it is taken as a heading, a
-// line or a pass. Run by the core's tests workflow (tests.yml).
+// line or a pass. Run by tests.yml.
 //
 //   node tests/hostile-pr-text-test.mjs
 import { spawnSync } from "../scripts/check-runs.mjs";

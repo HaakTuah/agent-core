@@ -10,14 +10,15 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { mended } from "../scripts/mend.mjs";
+import { mended as mendedFrom } from "../scripts/mend.mjs";
 import { fileOf, groupOf, LONG, MARKS, notLinked, offBy, parseBaseline, parseConfig, readerOf, scanMend, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
 import { READERS } from "../scripts/shape-readers.mjs";
 import { LARGEST } from "../scripts/tree-walk.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { projectOf, scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
+const mended = output => mendedFrom(output, { from: projectOf() }); // its mends name the copy's paths (`node core/scripts/...`), as a project's session reads them
 const script = fileURLToPath(new URL("../scripts/shape.mjs", import.meta.url));
 const ids = found => [...found.entries.keys()].sort();
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);

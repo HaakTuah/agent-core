@@ -58,6 +58,8 @@ export function mended(output, { from = process.cwd() } = {}) {
 }
 
 // The failure a check gives for an error it did not catch: a parser's abort, a raw error of git's, a RangeError.
+// Where the error's message is a failure that says its mend, that mend's script paths are read too, from the process's own
+// folder (mended(), #1488): in a project, the project's, where the mends it prints stand.
 // An error whose message is a failure that says its mend already is printed as it stands, on its one line. Its words
 // may come from a project's file (a parse error's excerpt), so each is printed as the log reads text alone, any
 // address's sign-in cut out (guards.mjs: loggedAlone, loggedCause, logged; floor rule 1).

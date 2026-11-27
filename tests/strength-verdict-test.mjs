@@ -1,7 +1,7 @@
 // Tests the strength check's verdict (scripts/strength-verdict.mjs, which scripts/strength.mjs judges a run with):
 // what the baseline claims and what may join it, a cleaning run's lowering, the tool's second run, and the verdict on a
 // run. On values built here, no process started; the report it reads is tests/strength-report-test.mjs, the check run in a
-// scratch repository tests/strength-test.mjs. Run by the core's tests workflow (.github/workflows/tests.yml).
+// scratch repository tests/strength-test.mjs. Run by tests.yml.
 //
 //   node tests/strength-verdict-test.mjs
 import { mended } from "../scripts/mend.mjs";
@@ -51,7 +51,7 @@ const was = "survivor: a.js: export const flag = () => true; [true -> false]", n
 const low = lowered(new Map([[was, { count: 1 }], ["survivor: b.js: x [! -> ]", { count: 2 }]]), new Map([[now2, 1]]), ["a.js"]);
 ok(same([...low].sort(), [[now2, 1], ["survivor: b.js: x [! -> ]", 2]].sort()) && same([...lowered(new Map([[was, { count: 1 }]]), new Map(), ["a.js"])], []) && same([...lowered(two, new Map([[twice, 1], [rewritten, 1]]), ["a.js"])].sort(), [[rewritten, 1], [twice, 1]].sort()) && same([...lowered(new Map([[was, { count: 1 }]]), new Map([[now2, 1], [twice, 1]]), ["a.js"])], [[now2, 1]]),
   "a cleaning run keeps the debt of a line it rewrote, one copy of a repeated line too, under the fault's new id, and drops it only where the fault no longer survives; nothing past a kind's total joins; an entry of another file stays");
-// (the newest case: one "return true;" and one "return (true);" listed, and the first rewritten into the second)
+// (one "return true;" and one "return (true);" listed, and the first rewritten into the second)
 const both = new Map([[twice, { count: 1 }], [rewritten, { count: 1 }]]), cleaned = lowered(both, new Map([[rewritten, 2]]), ["a.js"]);
 const cleanedRun = verdict({ faults: [rewrittenOne], still: [rewrittenOne], baseline: b({ [rewritten]: { count: cleaned.get(rewritten) } }), was: b(Object.fromEntries(both)), at: "s.json", deleted: [] });
 ok(same([...cleaned], [[rewritten, 2]]) && !cleanedRun.fails,
