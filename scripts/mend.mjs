@@ -58,14 +58,20 @@ export function mended(output, { from } = {}) {
   if (failures(output).length === 0 || unmended(output).length > 0) return false;
   // the process's own folder is read only once the failure is found mended, and where it cannot be read (it was
   // removed: process.cwd() throws) the output is not mended (#1538)
-  try { return missing(output, from ?? process.cwd()).length === 0; } catch { return false; }
+  let folder = from;
+  if (folder === undefined) {
+    try { folder = process.cwd(); } catch { return false; }
+  }
+  return missing(output, folder).length === 0;
 }
 
 // The failure a check gives for an error it did not catch: a parser's abort, a raw error of git's, a RangeError.
-// An error whose message is a failure that says its mend already is printed as it stands, on its one line; where that
-// mend's script paths are read too, from the process's own folder (mended(), #1488), in a project the project's, where
-// the mends it prints stand, one naming a script that is not there is worded as an unknown error. Its words may come from a project's file (a parse error's excerpt), so each is printed as the log reads text alone, any
-// address's sign-in cut out (guards.mjs: loggedAlone, loggedCause, logged; floor rule 1).
+// An error whose message is a failure that says its mend already is printed as it stands, on its one line: where that
+// mend names a script to run, its path is read from the process's own folder too (mended(), #1488), in a project the
+// project's, where the mends it prints stand, and one naming a script that is not there, or read where the folder
+// cannot be, is worded as an unknown error. Its words may come from a project's file (a parse error's excerpt), so each
+// is printed as the log reads text alone, any address's sign-in cut out (guards.mjs: loggedAlone, loggedCause, logged;
+// floor rule 1).
 export function unknown(script, error) {
   const said = String(error instanceof Error ? error.message || error.name : error);
   if (mended(said)) return loggedAlone(said);
