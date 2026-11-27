@@ -4,7 +4,7 @@
 // "Read for it:" (reading.mjs: listed, lineMend) and the line "Never needed:" (read-total.mjs: neverNeeded, which the size
 // workflow hands it in PR_BODY); the description workflows (.github/workflows/pr-description.yml and
 // own-description.yml) hand it over in PR_BODY alone. Each case is refused: nothing of it is taken as a heading, a
-// line or a pass. Run by the core's tests workflow (.github/workflows/tests.yml).
+// line or a pass. Run by the core's tests workflow (tests.yml).
 //
 //   node tests/hostile-pr-text-test.mjs
 import { spawnSync } from "../scripts/check-runs.mjs";

@@ -41,15 +41,16 @@ function watch(file, args, options, status, stdout, stderr) {
   for (const fault of faultsOf(status, `${stdout ?? ""}\n${stderr ?? ""}`, from)) said.push(`${script}: ${fault}`);
 }
 
+// (each run with no shell, whatever the caller's options: what a test starts is the program and its arguments alone)
 export function spawnSync(file, args, options) {
-  const r = child.spawnSync(file, args, options);
+  const r = child.spawnSync(file, args, { ...options, shell: false });
   watch(file, args, options, r.status, r.stdout, r.stderr);
   return r;
 }
 
 export function execFileSync(file, args, options) {
   try {
-    return child.execFileSync(file, args, options);
+    return child.execFileSync(file, args, { ...options, shell: false });
   } catch (e) {
     watch(file, args, options, e?.status, e?.stdout, e?.stderr);
     throw e;
