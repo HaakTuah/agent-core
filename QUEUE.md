@@ -7,10 +7,9 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #1350 to #1352, #1339, #1367, #1341, #1345, #1385, #1380, #1388, #1394, #1401 | builder; release 8, one PR each | |
-| #1138 to #1140 | builder; release 8, one PR each | |
-| #1413, points 1, 3, 5, 2, 6 and 7 | rule builder; release 8, one PR each | |
-| #1413, point 4 | rule builder; release 8 | #1413's points 1, 3 and 5 |
+| #1345, #1385, #1380, #1401 | builder; release 8, one PR each | |
+| #1140 | builder; release 8 | |
+| #1413, point 4 | rule builder; release 8 | |
 | #1413, point 8 | rule builder; release 8 | the owner's Security-tab record (`needs-owner`) |
 | #1202 | rule builder; release 8; `AGENTS.md` and what every session here reads at its start | #1413's point 4 (`AGENTS.md`, one at a time) |
 | #1504 | rule builder; `roles/orchestrator.md` | #1202 (what a role reads at its start, one at a time) |
@@ -53,7 +52,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1046 | rule builder; #767's third kind, `AGENTS.md` | |
 | #1051 | rule builder; each pull request records its own cost | |
 | #1052 | rule builder; `AGENTS.md`, the workflow tries its own settings | #1051 (its point 6); #1046 (`AGENTS.md`, one at a time) |
-| #1185 | rule builder; release 8 | #1505 (the hand-over mark) |
+| #1185 | rule builder; release 8 | #1052 (its trial of when a builder hands over); #1505 (the hand-over mark) |
 | #1060 | rule builder; `roles/adviser.md` | #1052 (its record holds it in part); #974 (`roles/adviser.md`, one at a time) |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
