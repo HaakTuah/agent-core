@@ -1,6 +1,7 @@
 // Tests of whether a release's trial is due (scripts/release-due.mjs; AGENTS.md, "One batch, then one release";
 // #1413, point 4): the lines of QUEUE.md read from the newest release's commit and each version since, the issues
-// closed as completed after that commit read from a stand-in for GitHub, the trial due at ten lines merged or a week
+// closed as completed after that commit read from a stand-in for GitHub, each counted only where a merged pull request
+// or an account that can write made its close, the trial due at ten lines merged or a week
 // with one, never while a trial's record past the release stands, and the scheduled look's issue kept, closed or left
 // as it stands. Every repository and name is invented. Git and Node's own modules.
 //
@@ -8,7 +9,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { DAYS, LINES, TITLE, closedSince, dueIssue, dueness, readGit } from "../scripts/release-due.mjs";
+import { DAYS, LINES, TITLE, closedSince, closesRead, closesSince, dueIssue, dueness, readGit } from "../scripts/release-due.mjs";
 import { DUE } from "../scripts/look.mjs";
 import { trialRecord } from "../scripts/release-trial.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -86,18 +87,58 @@ ok(throws(() => closedSince("not a repo", release.at, () => "[]")) && throws(() 
 let pages = 0;
 ok(throws(() => closedSince("example-owner/example-core", release.at, () => { pages++; return JSON.stringify(Array.from({ length: 100 }, (_, i) => ({ number: i + 1, state: "closed", state_reason: "completed", closed_at: "2026-11-11T00:00:00Z" }))); })) && pages === 30, "the reading stops at its pages' bound");
 
+// ---- who made each close, read from a stand-in for GitHub ----
+{
+  const merge = "c".repeat(40), loose = "d".repeat(40);
+  const closedBy = (login, commit_id = null) => [{ event: "labeled", actor: { login: "example-writer" } }, { event: "closed", actor: login === null ? null : { login }, commit_id }];
+  const right = (login, role_name, permission) => ({ permission, role_name, user: { login, type: "User" } });
+  const host = {
+    "repos/example-owner/example-core/issues/11/events?per_page=100&page=1": closedBy("example-outsider"),
+    "repos/example-owner/example-core/issues/12/events?per_page=100&page=1": closedBy("example-merger", merge),
+    "repos/example-owner/example-core/issues/13/events?per_page=100&page=1": closedBy("example-writer"),
+    "repos/example-owner/example-core/issues/14/events?per_page=100&page=1": closedBy(null),
+    "repos/example-owner/example-core/issues/15/events?per_page=100&page=1": closedBy("example-gone"),
+    "repos/example-owner/example-core/issues/16/events?per_page=100&page=1": closedBy("example-outsider", loose),
+    "repos/example-owner/example-core/issues/18/events?per_page=100&page=1": [{ event: "labeled", actor: { login: "example-writer" } }],
+    [`repos/example-owner/example-core/commits/${merge}/pulls`]: [{ number: 40, merged_at: "2026-11-11T00:00:00Z" }],
+    [`repos/example-owner/example-core/commits/${loose}/pulls`]: [{ number: 41, merged_at: null }],
+    "repos/example-owner/example-core/collaborators/example-outsider/permission": right("example-outsider", "read", "read"),
+    "repos/example-owner/example-core/collaborators/example-writer/permission": right("example-writer", "maintain", "write"),
+  };
+  const asked = [];
+  const ask = route => { asked.push(route); if (!(route in host)) throw new Error("HTTP 404"); return JSON.stringify(host[route]); };
+  const got = closesRead("example-owner/example-core", [11, 12, 13, 14, 15, 16, 17, 18], ask);
+  ok(!got.counted.has(11) && got.other.includes(11), "a close by an account that cannot write is not counted", JSON.stringify(got));
+  ok(got.counted.has(12) && !asked.some(r => r.endsWith("/example-merger/permission")), "a close a merged pull request made is counted, by the merge alone", JSON.stringify(got));
+  ok(got.counted.has(13), "a close by an account that can write is counted", JSON.stringify(got));
+  ok(!got.counted.has(16) && got.other.includes(16), "a commit no merged pull request brought in counts for nothing: its closer's right decides", JSON.stringify(got));
+  const why = n => got.unread.find(u => u.number === n)?.why ?? "";
+  ok(!got.counted.has(14) && /who closed it could not be read/.test(why(14)) && !got.counted.has(15) && /right .* could not be read/.test(why(15)), "a close whose actor, or the actor's right, cannot be read is not counted, and is named unread", JSON.stringify(got.unread));
+  ok(/events/.test(why(17)) && /events/.test(why(18)), "an issue whose events cannot be read, or hold no close, is not counted, and is named unread", JSON.stringify(got.unread));
+  ok([...got.counted].join() === "12,13" && got.other.join() === "11,16", "nothing else is counted", JSON.stringify(got));
+  const said = dueness({ release, lines: [11, 12, 13, 14], trialed: null }, got.counted, "2026-11-12T00:00:00Z", got).said;
+  ok(/2 lines of QUEUE\.md merged .*: #12, #13; not counted, closed by no merge and no account that can write: #11, #16; not counted, since who made its close could not be read: #14 \(who closed it could not be read\).*Mend: /.test(said), "the count names the closes it did not count, those unread with their mend", said);
+  ok(throws(() => closesRead("not a repo", [1], ask)), "a name that is no repository's throws");
+  const both = closesSince("example-owner/example-core", release.at, [11, 13, 99], route => route.includes("/issues?") ? JSON.stringify([11, 13, 20].map(number => ({ number, state: "closed", state_reason: "completed", closed_at: "2026-11-11T00:00:00Z" }))) : ask(route));
+  ok([...both.counted].join() === "13" && both.other.join() === "11" && !both.unread.length, "only the queue's lines closed after the release have their closes read", JSON.stringify(both));
+  ok(throws(() => closesSince("example-owner/example-core", release.at, [11], () => { throw new Error("HTTP 502"); })), "where GitHub gives no answer at all, the reading throws, as an unread host does");
+}
+
 // ---- the scheduled look's issue ----
 const ctx = { manifest: null, at: "2026-11-20T00:00:00Z", repo: "example-owner/example-core" };
 const read = () => ({ release, lines, trialed: null });
-const issue = dueIssue(ctx, read, () => new Set(lines));
+const all = () => ({ counted: new Set(lines), unread: [], other: [] });
+const issue = dueIssue(ctx, read, all);
 ok(DUE.includes(dueIssue), "the scheduled look reads it");
 ok(issue.title === TITLE && issue.owner === false && /trial-brief\.mjs/.test(issue.body) && /release\.mjs --trial/.test(issue.body) && /next batch/.test(issue.body), "while one is due, the look keeps a queued issue that says how the trial is run and recorded", issue.body);
-ok(dueIssue(ctx, read, () => new Set()).body === null, "once none is due, the look closes it");
+ok(dueIssue(ctx, read, () => ({ counted: new Set(), unread: [], other: [] })).body === null, "once none is due, the look closes it");
+const someUnread = dueIssue(ctx, read, () => ({ counted: new Set(lines.slice(0, LINES)), unread: [{ number: 12, why: "who closed it could not be read" }], other: [11] }));
+ok(/#12 \(who closed it could not be read\)/.test(someUnread.body ?? "") && /Mend: /.test(someUnread.body ?? ""), "the look's issue names a close it could not read, with its mend", someUnread.body);
 const unread = dueIssue(ctx, () => { throw new Error("no tags here"); });
 ok(unread.body === null && /could not be read: no tags here/.test(unread.unread), "where git or GitHub cannot be read, the issue is left as it stands, saying why");
-const untagged = dueIssue(ctx, () => null, () => new Set(lines));
+const untagged = dueIssue(ctx, () => null, all);
 ok(untagged.body === null && /holds no tags/.test(untagged.unread ?? ""), "a checkout with no release tag, in a core that has cut releases, leaves the issue as it stands", JSON.stringify(untagged));
-ok(dueIssue({ ...ctx, manifest: "# Core manifest\n" }, read, () => new Set(lines)) === null, "in a project, which cuts no release, nothing is read");
+ok(dueIssue({ ...ctx, manifest: "# Core manifest\n" }, read, all) === null, "in a project, which cuts no release, nothing is read");
 
 console.log(`${count} assertions on whether a release's trial is due`);
 if (failed) { console.error(`${failed} failed`); process.exitCode = 1; }

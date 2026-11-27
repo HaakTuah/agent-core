@@ -1,13 +1,16 @@
 // Whether a release's trial is due in the core (AGENTS.md, "One batch, then one release"; #1413, point 4): once LINES
 // lines of QUEUE.md have merged since the newest release, or DAYS days have passed since it with at least one merged.
 // A line merged is an issue a line of QUEUE.md named, at the newest release's commit or in any version of the file
-// since, that closed as completed after that commit; the count runs from the commit the release stands on, not the day
+// since, that closed as completed after that commit, its close made by a merged pull request or by an account that can
+// write the repository, as the issue's events and the closer's right on GitHub say (closesRead): a close it cannot read
+// so is not counted, and the count says so with its mend; the count runs from the commit the release stands on, not the day
 // of its cut, since a release is cut from the commit its trial tried (#1413, point 3) and what merged after it is the
 // next batch's. A trial whose record on main names a commit past the newest release and holds no cut has run, and no
 // second one is due until that release is cut; one whose record holds the cut is to be run again. The scheduled look keeps the issue TITLE while one is due (look.mjs, `dueIssue`), a task
 // the orchestrator gives a lane like any other. In the core alone: a project cuts no release. QUEUE.md's text and
 // GitHub's answers are untrusted (SECURITY.md, rule 5): each is checked against its form, a version of the file past
-// LARGEST bytes is refused unread, and only the repository's name and a date reach gh's route. Git and Node's own modules, and gh.
+// LARGEST bytes is refused unread, and only the repository's name, a date, an issue's number, a commit's whole SHA and a
+// login each in its form reach gh's route. Git and Node's own modules, and gh.
 //
 //   node scripts/release-due.mjs      whether a trial is due, and what the count rests on; it writes nothing
 import { execFileSync, spawnSync } from "node:child_process";
@@ -15,16 +18,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { aRepository, parseBounded } from "./guards.mjs";
+import { aCommit, aRepository, parseBounded } from "./guards.mjs";
 import { LARGEST, linesOf } from "./queue.mjs";
 import { TRIAL, trialAt } from "./release-trial.mjs";
 import { RELEASE } from "./releases.mjs";
+import { writersOf } from "./security-review.mjs";
 import { started } from "./started.mjs";
 
-export const LINES = 10, DAYS = 7, PAGES = 30;
+export const LINES = 10, DAYS = 7, PAGES = 30, EVENT_PAGES = 10;
 export const TITLE = "A release's trial is due";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SHA = /^[0-9a-f]{40}$/u, DAY = 86400000;
+const SHA = /^[0-9a-f]{40}$/u, DAY = 86400000, LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u;
 
 const gitIn = dir => args => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }).trim();
 const ghApi = route => {
@@ -93,6 +97,46 @@ export function closedSince(repo, since, ask = ghApi) {
   return closed;
 }
 
+// Who made each close of `numbers` (issues of `repo` closed as completed), read from GitHub: { counted, unread, other }.
+// Counted, a Set, where the newest close in the issue's events names a commit that a merged pull request brought in,
+// or was made by an account whose right on the repository is write, maintain or admin (writersOf); other, the numbers
+// whose close was made by neither; unread, [{ number, why }], those whose events, closer or right gave no answer in
+// its form: counted neither way, never guessed. An answer read is held to its form, the events to EVENT_PAGES pages.
+export function closesRead(repo, numbers, ask = ghApi) {
+  if (!aRepository(repo)) throw new Error(`${String(repo).slice(0, 80)} is no repository's name`);
+  const counted = new Set(), unread = [], other = [];
+  const read = route => { try { return parseBounded(ask(route)); } catch { return undefined; } };
+  for (const number of numbers) {
+    if (!Number.isSafeInteger(number) || number < 1) continue;
+    let events = [], whole = false;
+    for (let page = 1; page <= EVENT_PAGES; page++) {
+      const rows = read(`repos/${repo}/issues/${number}/events?per_page=100&page=${page}`);
+      if (!Array.isArray(rows) || !rows.every(e => e !== null && typeof e === "object")) { events = null; break; }
+      events.push(...rows);
+      if (rows.length < 100) { whole = true; break; }
+    }
+    const close = whole ? events.filter(e => e.event === "closed").at(-1) : undefined;
+    if (!close) { unread.push({ number, why: "its events hold no close that could be read" }); continue; }
+    if (aCommit(close.commit_id)) {
+      const pulls = read(`repos/${repo}/commits/${close.commit_id}/pulls`);
+      if (Array.isArray(pulls) && pulls.some(p => p !== null && typeof p === "object" && typeof p.merged_at === "string" && !Number.isNaN(Date.parse(p.merged_at)))) { counted.add(number); continue; }
+    }
+    const login = close.actor?.login;
+    if (typeof login !== "string" || !LOGIN.test(login)) { unread.push({ number, why: "who closed it could not be read" }); continue; }
+    const right = read(`repos/${repo}/collaborators/${login}/permission`);
+    if (right === null || typeof right !== "object" || typeof right.permission !== "string") { unread.push({ number, why: "the right of the account that closed it could not be read" }); continue; }
+    if (writersOf([right]).has(login.toLowerCase())) counted.add(number);
+    else other.push(number);
+  }
+  return { counted, unread, other };
+}
+
+// The lines of `lines` closed as completed after `since`, each close read by closesRead: its answer.
+export const closesSince = (repo, since, lines, ask = ghApi) => {
+  const closed = closedSince(repo, since, ask);
+  return closesRead(repo, lines.filter(n => closed.has(n)), ask);
+};
+
 // readGit's answer where it found a release: the core has cut releases, so none merged into main is a checkout with no
 // tags, never a core with none to count from.
 function released(r) {
@@ -101,13 +145,15 @@ function released(r) {
 }
 
 // Whether a trial is due, from what was read: { due, merged, days, said }. `read` is readGit's answer, `closed` the
-// numbers closedSince gave, `now` the time of the reading.
-export function dueness(read, closed, now) {
+// numbers counted (closesRead), `now` the time of the reading, `left` closesRead's closes not counted, which `said` names.
+export function dueness(read, closed, now, left = { unread: [], other: [] }) {
   const { release, lines, trialed } = read;
   const merged = lines.filter(n => closed.has(n));
   const days = Math.floor((Date.parse(now) - Date.parse(release.at)) / DAY);
   const since = `since ${release.name} (its commit ${release.sha.slice(0, 7)}, ${release.at.slice(0, 10)}, ${days} ${days === 1 ? "day" : "days"} ago)`;
-  const count = `${merged.length} ${merged.length === 1 ? "line" : "lines"} of QUEUE.md merged ${since}${merged.length ? `: ${merged.map(n => `#${n}`).join(", ")}` : ""}`;
+  const other = (left.other ?? []).length ? `; not counted, closed by no merge and no account that can write: ${left.other.map(n => `#${n}`).join(", ")}` : "";
+  const unread = (left.unread ?? []).length ? `; not counted, since who made its close could not be read: ${left.unread.map(u => `#${u.number} (${u.why})`).join(", ")}. Mend: run node scripts/release-due.mjs again once gh answers; where it still cannot read one whose work merged, an account that can write the repository reopens it and closes it as completed` : "";
+  const count = `${merged.length} ${merged.length === 1 ? "line" : "lines"} of QUEUE.md merged ${since}${merged.length ? `: ${merged.map(n => `#${n}`).join(", ")}` : ""}${other}${unread}`;
   if (trialed) return { due: false, merged, days, said: `Not due: the trial's record names ${trialed.slice(0, 7)}, past ${release.name}, so its trial has run; the release is cut from it (AGENTS.md, "A release is cut on the owner's word"). ${count}.` };
   const due = merged.length >= LINES || (days >= DAYS && merged.length >= 1);
   const why = merged.length >= LINES ? `${LINES} or more lines merged` : due ? `${DAYS} days or more with at least one merged` : `under ${LINES} lines, and ${days >= DAYS ? "none merged" : `under ${DAYS} days`}`;
@@ -116,12 +162,13 @@ export function dueness(read, closed, now) {
 
 // The scheduled look's reader (look.mjs, DUE): the issue TITLE kept while a trial is due, closed once none is; in the
 // core alone, and left as it stands where git or GitHub cannot be read. `read`, `closed` stand in for git and gh.
-export function dueIssue({ manifest, at, repo }, read = () => readGit(gitIn(ROOT)), closed = since => closedSince(repo ?? CORE, since)) {
+export function dueIssue({ manifest, at, repo }, read = () => readGit(gitIn(ROOT)), closed = (since, lines) => closesSince(repo ?? CORE, since, lines)) {
   if (manifest !== null || fs.existsSync(path.join(ROOT, "..", "core-manifest.md"))) return null;
   let d;
   try {
     const r = released(read());
-    d = dueness(r, closed(r.release.at), at);
+    const c = closed(r.release.at, r.lines);
+    d = dueness(r, c.counted, at, c);
   }
   catch (e) { return { title: TITLE, body: null, unread: `whether a release's trial is due could not be read: ${String(e.message).slice(0, 200)}` }; }
   if (!d.due) return { title: TITLE, body: null };
@@ -141,7 +188,8 @@ function main(argv) {
   if (fs.existsSync(path.join(ROOT, "..", "core-manifest.md"))) { console.error("FAIL: run it in the core's own repository: a project cuts no release. Mend: run it from a clone of the core"); return 1; }
   try {
     const r = released(readGit(gitIn(ROOT)));
-    console.log(dueness(r, closedSince(CORE, r.release.at), new Date().toISOString()).said);
+    const c = closesSince(CORE, r.release.at, r.lines);
+    console.log(dueness(r, c.counted, new Date().toISOString(), c).said);
     return 0;
   } catch (e) {
     console.error(`FAIL: whether a release's trial is due could not be read: ${String(e.message).slice(0, 300)}. Mend: run it from a clone of the core with its whole history and tags (git fetch --tags, with --unshallow where the clone is shallow), and with gh signed in`);
