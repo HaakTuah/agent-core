@@ -253,6 +253,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   distribution's packages nor reachable, and its job failed after the sync for a reason not the release's. Held by
   `tests/toolchain-test.mjs` (a pin with no sum, a sum that differs and a host that refuses each fetch nothing; a pin
   listed is fetched, checked by its sum, outside the project); that the builder runs it, by nothing yet.
+  **A trial's brief is written by a tested script** (#1413, point 1). By default the orchestrator gives the builder of a
+  release's trial the brief that `node scripts/trial-brief.mjs <the commit under trial>` prints, and adds to it nothing
+  but the name of a project of another owner's, given in private by `--other`. The script finds the owner's own
+  projects as `scripts/state-report.mjs --projects` finds them, and sets out each step these rules ask: the clone kept
+  read-only, its pushes blocked and the block checked by reading it, never by a push expected to fail; the toolchain;
+  the run before the sync and the run after it; the pure-sync reading; the drafts in the owner's own projects; and the
+  record. The one condition that changes it: gh gives no answer for the owner's projects; then it prints no brief, its
+  failure says the mend, and the trial starts once gh answers. Each release's trial triggers it. It does not mean that
+  the brief finds, keeps or writes a project of another owner's anywhere but in what the orchestrator gives in private,
+  nor that a step of the brief stands in for the rule it carries out. Reason: release 6's trial took four rounds, and at least one fault lay in a
+  hand-written brief, which asked for a test that could never pass on a project the account can write. Held by
+  `tests/trial-brief-test.mjs`, which reads the brief for each of those steps and each command as one its script takes;
+  that the orchestrator gives it, by nothing yet.
 - **Nothing locks a project,** in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
   what an agent can mend alone may bind, and what only the owner can do (a yes the floor names, a setting on the
@@ -363,7 +376,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
   is not done; or, where no check reads it, why, held by the staged case `steps`. Every standing entry has one. Every sync
   runs them all (`scripts/sync.mjs`) and prints, for the sync pull request's description, only the steps not done, and
-  every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`), and the packages it holds gone stale (`scripts/held.mjs`; #1095); where the core's packages cannot be installed it reads no step and says so
+  every difference from what the starter kit writes for a new project of the same kind but in the project's own words, which the one process keeps (`scripts/fresh.mjs`; #1361, point 27), and the packages it holds gone stale (`scripts/held.mjs`; #1095); where the core's packages cannot be installed it reads no step and says so
   in one line with its mend, and a step only a tool fetched at set-up reads is read where the session fetched it (#1095,
   points 2 and 4); each is
   a task the project's agents take (`roles/orchestrator.md`; with no orchestrator, the session that syncs), a step

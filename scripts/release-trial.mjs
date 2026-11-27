@@ -91,9 +91,9 @@ function formed(r) {
     && (r.projects > 0 || counts.every(n => n === 0)) && r.baselineFromClone <= r.projects && syncFormed(r) && draftFormed(r);
 }
 
-// How the runs are taken, for a mend that asks a trial: check.mjs from the project's clone, before the update and after,
-// and, where the copy holds none, or one without --verdicts, the baseline by the release's, from a clone of the core.
-export const RUNS = "in a clone of the project, `node core/scripts/check.mjs --base <its main> --own --verdicts <a file outside every repository>` before the update and after it; where the copy holds no check.mjs, or one without --verdicts, the run before with `node <a clone of the core at the commit tried>/scripts/check.mjs` and the same options, from the project's clone; and, with the sync's branch checked out and committed, `node <a clone of the core at the commit tried>/scripts/pure-sync.mjs --trial <the commit tried> > <a file outside every repository>`, the sync's reading, which holds no cut; and, in each of the owner's own projects whose stop switch does not stand, that sync pushed and opened as a draft pull request in the project, its description saying it is the release's trial and that the session that syncs takes it once the release is cut, and, once its checks finish, `node <a clone of the core at the commit tried>/scripts/trial-draft.mjs <owner>/<name> <its number> <the commit tried> > <a file outside every repository>`; in any other project, the same script with `none` in place of the number";
+// How the runs are taken, for a mend that asks a trial: as the trial's brief sets them out step by step (trial-brief.mjs,
+// beside this file; #1413, point 1), never written out again here.
+export const RUNS = "as the trial's brief, which `node scripts/trial-brief.mjs <the commit tried>` prints, sets them out step by step: in a read-only clone of each project, check.mjs --verdicts before the update and after it, the sync's reading by pure-sync.mjs --trial, and the draft's reading by trial-draft.mjs, each written to a file outside every repository";
 
 // What the trial's record says of the release at `sha`, read through `git` (its arguments give its output) as the
 // commit `from` holds it (`sha` itself, or main's newest, where the record merged after the commit it names: #1413,
