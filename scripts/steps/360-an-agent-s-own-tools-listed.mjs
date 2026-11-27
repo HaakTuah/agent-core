@@ -2,7 +2,7 @@
 // of their names.
 import { coreOf, kitHooks, check as toolsCheck } from "../agent-tools.mjs";
 import { listed, markOf, show } from "../agent-tools-entries.mjs";
-import { NOT_KIT_WHY } from "../agent-tools-read.mjs";
+import { NOT_KIT_WHY, NO_COMMAND_WHY } from "../agent-tools-read.mjs";
 import { listing } from "../agent-tools-listing.mjs";
 import { fetchedBy, libraryOf } from "../hook-source.mjs";
 import { readProject } from "../agent-tools-project.mjs";
@@ -26,9 +26,10 @@ function reading(p) {
   if (p.read(".codex/config.toml") !== null && !installed("smol-toml")) return { unread: `The core's packages are not installed, so \`.codex/config.toml\` could not be read for the tools it configures: run \`if [ -f ${copyAt(p)}scripts/install.mjs ]; then node ${copyAt(p)}scripts/install.mjs; fi\`, then \`node ${copyAt(p)}scripts/steps.mjs\` again.` };
   const head = readProject(p.root), list = listed(config, file) ?? { keys: new Set(), problems: [] };
   const { problems, missing, pins, sources } = toolsCheck(head, list, kitHooks(undefined, coreOf(p.manifest)), file);
-  // (a hook whose command is not the kit's form is weighed, below; any other source, a setting of a kind no kit writes or a
-  // file fetched that is no plain file, keeps the check's own mend, which only narrows what runs with power)
-  const toWeigh = sources.filter(([k]) => head.sources.get(k)?.why === NOT_KIT_WHY);
+  // (a hook whose command is not the kit's form, or of a type that runs no command, is weighed, below; any other source, a
+  // setting of a kind no kit writes or a file fetched that is no plain file, keeps the check's own mend, which only narrows
+  // what runs with power)
+  const toWeigh = sources.filter(([k]) => [NOT_KIT_WHY, NO_COMMAND_WHY].includes(head.sources.get(k)?.why));
   return { own, beside, file, config, head, problems, missing, pins, sources, toWeigh };
 }
 
@@ -62,7 +63,7 @@ export default { lead: "16 November 2026, an agent's own tools listed", cost: CO
     // (a hook whose command is not the kit's form may still run its copy on main, which no check reads exactly: whether it
     // does, and what becomes of it, is a security judgement, never a mend; it is marked, which fails nothing, and given to
     // a task; #1248, point 6; its mark read from its command, #1273, point 2)
-    const judged = toWeigh.length ? `Each hook below runs a command not in the starter kit's form, so nothing the check reads shows that it runs its copy on main (floor rule 3); whether it does is a security judgement, not a mend: list it under "agentTools" in \`${file}\` with the "from" named after it, "main" where its command has git show its file from main (\`git show refs/remotes/origin/main:<the file>\`), which marks what the command names and never shows that main's copy is what runs, else "the working tree", which marks it as standing before and fails nothing, and file one task, an issue, for a session at the strongest tier to weigh each, with the security reviews of a change to what runs with power, before it is rewritten in the starter kit's form or taken out, never taking one out before then: ${toWeigh.map(([k, problem]) => `${problem.replace(/\. Mend: [^]*$/u, "")} ("from": ${show(markOf(head.sources.get(k)))})`).join("; ")}.` : "";
+    const judged = toWeigh.length ? `Each hook below runs a command not in the starter kit's form, or is of a type that runs no command (a prompt, an agent, a web address), so nothing the check reads shows that what it runs is main's copy (floor rule 3); whether it does is a security judgement, not a mend: list it under "agentTools" in \`${file}\` with the "from" named after it, "main" where its command has git show its file from main (\`git show refs/remotes/origin/main:<the file>\`), which marks what the command names and never shows that main's copy is what runs, else "the working tree", which marks it as standing before and fails nothing, and file one task, an issue, for a session at the strongest tier to weigh each, with the security reviews of a change to what runs with power, before it is rewritten in the starter kit's form or taken out, never taking one out before then: ${toWeigh.map(([k, problem]) => `${problem.replace(/\. Mend: [^]*$/u, "")} ("from": ${show(markOf(head.sources.get(k)))})`).join("; ")}.` : "";
     return wrong.length || judged ? [wrong.length ? `List under "agentTools" in \`${file}\` every plug-in, tool server, skill and hook the project configures for its agents beyond the starter kit's hooks, each as { "kind", "name", "publisher", "version" }, a plug-in or tool server at one exact version, the one its configuration pins where it can pin one, or take out what nobody meant to configure; and see that its check runs: ${wrong.join("; ")}` : "", judged].filter(Boolean).join(" ") : null;
   },
   // (the list written with what it lacks exactly, its other entries and keys kept; what is left, the check says again)

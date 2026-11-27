@@ -86,9 +86,10 @@ passes(run(pr(project({ ...script, ...listing() }), withSetting("permissions", {
 for (const front of ["PermissionMode: default\npermissionMode: bypassPermissions", "permissionMode: default\npermissionMode: bypassPermissions"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": `---\nname: rev\n${front}\n---\n` })), `a permission mode written twice, ${front.split("\n")[0]} first, fails`, NOKIT, "permissionMode");
 for (const body of ["# c\n> ```!\nbash x.sh\n```\n", "# c\n````!\nbash x.sh\n````\n", "# c\nRun this: ```!\nbash x.sh\n```\n"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/commands/c.md": body })), `a command's block that runs a command, ${JSON.stringify(body.split("\n")[1])}, fails`, NOKIT);
 fails(run(pr(project({ ...script, ...listing(SK), ".claude/skills/s/SKILL.md": "# s\n" }), { ".claude/skills/s/SKILL.md": "---\nname: s\nallowed-tools: Bash(*)\n---\n# s\n" })), "a skill's tools it lets run without asking fail as a setting", NOKIT);
-// (every hook a tool configures is weighed, whatever its type: a web hook's address or a prompt is no command the kit's
-  // form can be read in, so each is of a kind no starter kit writes; listed and new, it is refused, and one the base held
-  // is noted while it stands, or listed in the baseline)
+// (every hook a tool configures is weighed, whatever its type: a web hook's address, a prompt or an agent is no command the
+// kit's form can be read in, so each runs no command the check can read; listed and new, it is refused, and one the base
+// held is noted while it stands, or listed in the baseline)
+const NOCMD = "is of a type that runs no command the check can read";
 const other = [
   ["a web hook of .claude/settings.json", ".claude/settings.json", hook => ({ hooks: { ...JSON.parse(KIT).hooks, PostToolUse: [{ hooks: [hook] }] } }), { type: "http", url: "https://hooks.example.invalid/x" }, h => `PostToolUse: ${JSON.stringify(h)}`],
   ["a prompt hook of .claude/settings.json", ".claude/settings.json", hook => ({ hooks: { ...JSON.parse(KIT).hooks, PostToolUse: [{ hooks: [hook] }] } }), { type: "prompt", prompt: "Is the work done?" }, h => `PostToolUse: ${JSON.stringify(h)}`],
@@ -97,12 +98,31 @@ const other = [
 ];
 for (const [what, file, write, hook, name] of other) {
   const listed = (extra = {}) => listing({ kind: "hook", name: name(hook), publisher: "this project", ...extra });
-  fails(run(pr(project({ ...script, ...listing() }), { [file]: write(hook), ...listed() })), `${what}, listed and new, is weighed and refused`, NOKIT, "Mend: take it out of the project's files");
-  fails(run(pr(project({ ...script, ...listing() }), { [file]: write(hook), ...listed(fromWorkingTree) })), `and marked as the baseline's while the base held none, it is refused`, NOKIT, "the base held no such hook");
+  fails(run(pr(project({ ...script, ...listing() }), { [file]: write(hook), ...listed() })), `${what}, listed and new, is weighed and refused`, NOCMD, "Mend: take it out of the project's files");
+  fails(run(pr(project({ ...script, ...listing() }), { [file]: write(hook), ...listed(fromWorkingTree) })), `and marked as the baseline's while the base held none, it is refused`, NOCMD, "the base held no such hook");
   const stood = run(pr(project({ ...script, [file]: write(hook), ...listed() }), { "README.md": "x\n" }));
-  ok(stood.status === 0 && stood.out.includes("as the base held it") && stood.out.includes(NOKIT), `${what} the base held is noted while it stands`, stood.out);
+  ok(stood.status === 0 && stood.out.includes("as the base held it") && stood.out.includes(NOCMD), `${what} the base held is noted while it stands`, stood.out);
   const kept = run(pr(project({ ...script, [file]: write(hook), ...listed(fromWorkingTree) }), { "README.md": "x\n" }));
   ok(kept.status === 0 && kept.out.includes("its entry lists it in the baseline"), `and listed in the baseline, it is noted there`, kept.out);
+}
+// (and a value in a shape a tool's hooks are not written in is refused, never passed over unread; one the base held, as it
+// stands, fails nothing)
+const kitHooks = JSON.parse(KIT).hooks, cmd = { type: "command", command: "bash x.sh" };
+const shapes = [
+  ["a \"hooks\" that is a list", ".claude/settings.json", { hooks: [cmd] }, "\"hooks\" is not a JSON object"],
+  ["an event's hooks that are no list", ".claude/settings.json", { hooks: { ...kitHooks, PostToolUse: { hooks: [cmd] } } }, "\"hooks.PostToolUse\" is not a list of hook groups"],
+  ["a group that is no object", ".claude/settings.json", { hooks: { ...kitHooks, PostToolUse: ["bash x.sh"] } }, "a group of \"hooks.PostToolUse\" is not an object"],
+  ["a group's hooks that are no list", ".codex/hooks.json", { hooks: { Stop: [{ hooks: { a: cmd } }] } }, "the \"hooks\" of a group of \"hooks.Stop\" is not a list of hooks"],
+  ["a Windows command that is no text", ".codex/hooks.json", { hooks: { Stop: [{ hooks: [{ ...cmd, commandWindows: ["bash x.sh"] }] }] } }, "the \"commandWindows\" of a hook of \"hooks.Stop\" is not a text"],
+  ["a Kiro hook's confirm command that is no text", ".kiro/hooks/ask.json", { version: "v1", hooks: [{ name: "ask", trigger: "Stop", action: { type: "askAgent", prompt: "Review it" }, confirm: { confirmCommand: ["bash x.sh"] } }] }, "holds a \"confirmCommand\" or an option's \"run\" that is no text"],
+  ["a Kiro hook's option run that is no text", ".kiro/hooks/ask.json", { version: "v1", hooks: [{ name: "ask", trigger: "Stop", action: { type: "askAgent", prompt: "Review it" }, confirm: { options: [{ run: { sh: "bash x.sh" } }] } }] }, "holds a \"confirmCommand\" or an option's \"run\" that is no text"],
+  ["a Codex notify that is no list", ".codex/config.toml", 'notify = "bash x.sh"\n', "\"notify\" is not a list of texts"],
+  ["a Kiro hook's options that are no list", ".kiro/hooks/ask.json", { version: "v1", hooks: [{ name: "ask", trigger: "Stop", action: { type: "askAgent", prompt: "Review it" }, confirm: { options: { a: { run: "bash x.sh" } } } }] }, "\"confirm.options\" of the hook \"ask\" is not a JSON list"],
+];
+for (const [what, file, settings, says] of shapes) {
+  fails(run(pr(project({ ...script, ...listing() }), { [file]: settings })), `${what} is refused`, says, "Mend: write");
+  const stood = run(pr(project({ ...script, ...listing(), [file]: settings }), { "README.md": "x\n" }));
+  ok(stood.status === 0, `and where the base held it as it stands, it fails nothing`, stood.out);
 }
 }
 

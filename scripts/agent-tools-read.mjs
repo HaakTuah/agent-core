@@ -33,24 +33,40 @@ export function addServers(state, file, servers, tool) {
 // What one hook of these runs: { runs, whether it is a command hook; text, its name's command; commands, each command
 // it may run }, the command Codex runs on Windows in its place among them ("commandWindows", or "command_windows" in
 // TOML), whatever the hook's type, each held to the kit's form and named, so its entry in the list reads otherwise than
-// the kit's. A hook of any other type (a prompt, an agent, a web address) is of a kind no starter kit writes, weighed
-// as one (NO_KIT), since what it runs is no command the kit's form can be read in.
+// the kit's. A hook of any other type (a prompt, an agent, a web address) runs no command the kit's form can be read in,
+// and is weighed as such (NO_COMMAND); a Windows command that is no text is refused as the wrong shape.
 const WINDOWS = ["commandWindows", "command_windows"];
 function commandsOf(hook) {
   const runs = hook?.type === "command" && typeof hook.command === "string";
   const windows = WINDOWS.filter(k => hook && typeof hook === "object" && Object.hasOwn(hook, k)).map(k => hook[k]);
-  if (!runs) return { runs, text: JSON.stringify(hook), commands: [...windows, NO_KIT] };
-  return { runs, text: `${hook.command}${windows.length ? ` (Windows: ${windows.map(String).join(", ")})` : ""}`, commands: [hook.command, ...windows] };
+  const bad = WINDOWS.filter(k => hook && typeof hook === "object" && Object.hasOwn(hook, k) && typeof hook[k] !== "string");
+  if (!runs) return { runs, bad, text: JSON.stringify(hook), commands: [...windows, NO_COMMAND] };
+  return { runs, bad, text: `${hook.command}${windows.length ? ` (Windows: ${windows.map(String).join(", ")})` : ""}`, commands: [hook.command, ...windows] };
 }
 // The hooks one settings file configures, into configured()'s `state`: Claude Code's, or, with `tool`, another tool's
-// written the same way (Codex's).
+// written the same way (Codex's). A value in a shape the tool's hooks are not written in (an event's that is no list, a
+// group that is no object, a group's "hooks" that is no list) is refused, never passed over unread; so is a "hooks" that
+// is no object in Claude Code's files (Codex's, `state.entries` refuses).
+const given = v => v !== undefined && v !== null, object = v => v && typeof v === "object" && !Array.isArray(v);
+const wrongShape = (state, file) => (what, form) => state.flag(`${file}: ${what} is not ${form}. Mend: write it as one, as the tool that reads it takes its hooks`, file);
 export function readHooks(state, file, settings, tool = "") {
-  const all = settings?.hooks;
-  for (const [event, groups] of Object.entries(all && typeof all === "object" && !Array.isArray(all) ? all : {})) {
-    for (const group of Array.isArray(groups) ? groups : []) {
-      const matcher = typeof group?.matcher === "string" && group.matcher ? group.matcher : "";
-      for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) addHook(state, file, { tool, event, matcher, given: group?.matcher, hook, ...commandsOf(hook) });
-    }
+  const all = settings?.hooks, wrong = wrongShape(state, file);
+  if (!tool && given(all) && !object(all)) wrong(`"hooks"`, "a JSON object, of each event to its hooks");
+  for (const [event, groups] of Object.entries(object(all) ? all : {})) {
+    if (given(groups) && !Array.isArray(groups)) wrong(`"hooks.${event}"`, "a list of hook groups");
+    for (const group of Array.isArray(groups) ? groups : []) readGroup(state, file, tool, event, group);
+  }
+}
+// One group of an event's hooks, its matcher and each hook, into configured()'s `state`, a part in the wrong shape refused.
+function readGroup(state, file, tool, event, group) {
+  const wrong = wrongShape(state, file);
+  if (!object(group)) return void wrong(`a group of "hooks.${event}"`, "an object of a matcher and its hooks");
+  if (given(group.hooks) && !Array.isArray(group.hooks)) wrong(`the "hooks" of a group of "hooks.${event}"`, "a list of hooks");
+  const matcher = typeof group.matcher === "string" && group.matcher ? group.matcher : "";
+  for (const hook of Array.isArray(group.hooks) ? group.hooks : []) {
+    const { bad, ...read } = commandsOf(hook);
+    for (const k of bad) wrong(`the "${k}" of a hook of "hooks.${event}"`, "a text, the one command Codex runs on Windows");
+    addHook(state, file, { tool, event, matcher, given: group.matcher, hook, ...read });
   }
 }
 // One hook, into configured()'s `state`: its name, as the list writes it, `tool`, `event`, `matcher` and `text`; its
@@ -91,6 +107,9 @@ function readHelper(state, file, key, value) {
 }
 // What no starter kit writes, given as a command so it is never read as the kit's form, and its failure's mend.
 export const NO_KIT = "(no form of the starter kit's)", NO_KIT_WHY = "is of a kind no starter kit writes", NOT_KIT_WHY = "is not in the starter kit's form";
+// A hook of a type that runs no command (a prompt, an agent, a web address), given as a command so it is never read as the
+// kit's form: a hook all the same, weighed as one whose command is not the kit's is (sync step 360).
+export const NO_COMMAND = "(no command: a hook of another type)", NO_COMMAND_WHY = "is of a type that runs no command the check can read";
 const NO_KIT_HOW = "take it out of the project's files, the owner setting it in the tool's own configuration on the machine where it is wanted; or move what it runs into a hook of .claude/settings.json in the starter kit's form";
 // A marketplace that runs a command by itself, to print the headers it is fetched with, or as a plug-in's source: read
 // whole, as a setting no starter kit writes, so one the pull request adds or changes is new.
@@ -149,6 +168,7 @@ function readSource(state, name, commands) {
   for (const command of commands) {
     const at = fetchedBy(command);
     if (command === NO_KIT) return void state.sources.set(name, { why: NO_KIT_WHY, how: NO_KIT_HOW });
+    if (command === NO_COMMAND) return void state.sources.set(name, { why: NO_COMMAND_WHY, how: NO_KIT_HOW });
     if (at === null) return void state.sources.set(name, { why: NOT_KIT_WHY, how: HOW, main });
     // (the command in the kit's form already, its mend is the fetched file's)
     if (state.linked(at)) return void state.sources.set(name, { why: `fetches ${show(at)} from main, which the project holds as no plain file (a link, a folder or a submodule), so main gives no script but what git prints of it`, how: `make ${show(at)} a plain file committed in the project, the script itself in place of the link, folder or submodule, so main gives it`, main });
