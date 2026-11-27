@@ -192,6 +192,18 @@ ok(atCopy("refs/remotes/origin/main:vendor/core/a core/b", "vendor/core/") === "
   const config = dir => spawnSync(process.execPath, [path.join(root, "scripts/select.mjs")], { cwd: dir, encoding: "utf8", env: { ...process.env, SELECT_BASE: "" } }).stdout;
   ok(/\.github\/shape\.json/u.test(config(own)) && !/checks\/other/u.test(config(own)) && /checks\/other\.json/u.test(config(project)),
     "the suites' selection reads the core's own config from AGENTS.md, whatever manifest stands at its root, and a project's from its manifest", config(own) + config(project));
+  // (a change under the folder the manifest names: in a project a change to its copy, in the core's own repository no copy's)
+  const shape = JSON.stringify({ baseline: "b.json", code: ["test"], tests: ["test/"] }), env = scratchEnv(tmp, tmp);
+  const changed = name => {
+    const dir = checkout(tmp, name, { ...lib, ...(name.endsWith("own") ? OWN_SCRIPT : {}), ".github/shape.json": shape, "checks/other.json": shape,
+      "test/a.test.mjs": "export const at = \"lib/notes.txt\";\n", "lib/notes.txt": "one\n" }, { commit: true });
+    fs.writeFileSync(path.join(dir, "lib/notes.txt"), "two\n");
+    execFileSync("git", ["commit", "-qam", "change"], { cwd: dir, env, stdio: "ignore" });
+    return spawnSync(process.execPath, [path.join(root, "scripts/select.mjs")], { cwd: dir, encoding: "utf8", env: { ...process.env, SELECT_BASE: "HEAD^1" } }).stdout;
+  };
+  const ownSel = changed("select-own"), projectSel = changed("select-copy");
+  ok(!/can run the copy of the core/u.test(ownSel) && /can run the copy of the core \(lib\/notes\.txt\)/u.test(projectSel),
+    "  and reads a change under that folder as one to a project's copy only, never in the core's own repository", ownSel + projectSel);
 }
 
 done("where the core's copy stands");
