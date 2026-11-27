@@ -17,10 +17,10 @@ const changes = (p, body) => new RegExp(String.raw`(?<![\w$.])${esc(p)}\s*(?:(?:
 
 // The words after which a "/" opens a regular expression, not a division; the words that may also be names, after which
 // it cannot be told; and what may stand before such a word.
-const BEFORE_REGEX = new Set(["return", "typeof", "instanceof", "in", "new", "delete", "void", "throw", "case", "do", "else", "extends", "default"]);
+const BEFORE_REGEX = new Set(["return", "typeof", "instanceof", "in", "new", "delete", "void", "throw", "case", "do", "else", "extends"]);
 const NAME_OR_WORD = new Set(["of", "await", "yield"]);
 const BEFORE_WORD = /[;{}()[\],=:?!&|+\-*%<>~^]/u;
-const NAME_CHAR = /[\p{ID_Continue}$]/u;
+const NAME_CHAR = /[\p{ID_Continue}$]/u, LINE_END = /[\n\r\u2028\u2029]/u;
 // The place of the last character before text[i] that is not a space.
 const lastCode = (text, i) => i - 1 - /\s*$/u.exec(text.slice(Math.max(0, i - 200), i))[0].length;
 // Whether a "/" after the code that ends at text[last] divides, where text[prev] is the code before the name that ends
@@ -34,12 +34,12 @@ function divides(text, last, prev) {
   return prev < 0 || BEFORE_WORD.test(text[prev] ?? "") ? false : null;
 }
 // The place of the last character of what opens at the "/" text[i], after the code that ends at text[last] (text[prev]
-// as `divides` reads it): the "/" itself where it divides, else the "/" that closes its regular expression on that
-// line, or -1 where none does or `divides` cannot tell.
+// as `divides` reads it): the "/" itself where it divides and no line ends between (where one does, the statement may
+// end there), else the "/" that closes its regular expression on that line, or -1 where none does or it cannot be told.
 function slashEnd(text, i, last, prev) {
   const div = divides(text, last, prev);
-  if (div !== false) return div ? i : -1;
-  for (let j = i + 1, inClass = false; j < text.length && text[j] !== "\n"; j++) {
+  if (div !== false) return div && !LINE_END.test(text.slice(last + 1, i)) ? i : -1;
+  for (let j = i + 1, inClass = false; j < text.length && !LINE_END.test(text[j]); j++) {
     if (text[j] === "\\") j++;
     else if (text[j] === "[") inClass = true;
     else if (text[j] === "]") inClass = false;
@@ -50,14 +50,15 @@ function slashEnd(text, i, last, prev) {
 // The place of the last character of the string, template, comment or regular expression that opens at text[i], after
 // the code that ends at text[last] (text[prev] as `divides` reads it), or -1 where it cannot be read exactly.
 function skipped(text, i, last, prev) {
-  if (text.startsWith("//", i)) return text.indexOf("\n", i) - 1;
+  if (text.startsWith("//", i)) { const end = text.slice(i).search(LINE_END); return end < 0 ? -1 : i + end - 1; }
   if (text.startsWith("/*", i)) { const end = text.indexOf("*/", i + 2); return end < 0 ? -1 : end + 1; }
   return text[i] === "/" ? slashEnd(text, i, last, prev) : stringEnd(text, i, (t, j) => codeEnd(t, j, false));
 }
-// Where code may stand that is read otherwise in some files, or not at all: an escape in a name, or an HTML-like comment.
+// Where code may stand that is read otherwise in some files, or not at all: an escape in a name, or an HTML-like comment
+// (a "-->" anywhere, which is one where it starts a line).
 const unsure = (text, i) => text[i] === "\\" || text.startsWith("<!--", i) || text.startsWith("-->", i);
 // The code before the name that starts at text[i], where one starts there after the code that ends at text[last]; else
-// `prev`, the code before the name that holds it (NaN where that name started before the reading did).
+// `prev` as it stands, the code before the last name read (NaN where that name started before the reading did).
 const wordFrom = (text, i, last, prev) => (NAME_CHAR.test(text[i]) && !(last === i - 1 && NAME_CHAR.test(text[last])) ? last : prev);
 // The place where code that starts at text[i] ends, its strings, comments and regular expressions read past: after
 // the "}" of the block that opens there where `block`, else at the first ",", ";" or closing bracket at its own depth;

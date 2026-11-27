@@ -91,6 +91,12 @@ for (const [what, change] of [
   ["a function called with a number that ends in a point divided among its arguments", call(`git(x, 1. / 2, "/);", "clone", u);`)],
   ["a function whose body holds a regular expression after extends", body(`class Q extends /}/.constructor {}`)],
   ["a function whose body holds an HTML-like comment, in a script", write("scripts/copy.cjs", `const { execFileSync } = require("node:child_process");\nfunction git(...args) {\n  x = 1 <!-- }\n  return execFileSync("git", args);\n}\ngit("clone", u, "to");\n`)],
+  ["a function whose body holds a regular expression on the line after a name", body(`let x\n  /}/.test(String(args));`)],
+  ["a function whose body holds a regular expression on the line after break", body(`for (;;) break\n  /}/.test(String(args));`)],
+  ["a function whose body holds a line comment ended by a line separator", body(`// c   if (a) {\n    x();\n  }`)],
+  ["a function whose body holds a regular expression after of", body(`for (const a of /[)]/.exec(String(args)) ?? []) void a;`)],
+  ["a generator whose body holds a regular expression after yield", write("scripts/copy.mjs", `${OPEN}function* git(...args) {\n  yield /}/;\n  return execFileSync("git", args);\n}\ngit("clone", u, "to");\n`)],
+  ["a function whose body holds an HTML-like comment that closes, in a script", write("scripts/copy.cjs", `const { execFileSync } = require("node:child_process");\nfunction git(...args) {\n  x = 1\n--> }\n  return execFileSync("git", args);\n}\ngit("clone", u, "to");\n`)],
   ["a function called with an option the scan does not know before clone", write("scripts/copy.mjs", `${OPEN}const git = (args) => execFileSync("git", args);\ngit(["--moss", "x", "clone", url]);\n`)],
 ]) {
   const f = run(change);
@@ -101,6 +107,7 @@ for (const [what, change] of [
   ["a function that hands its arguments on to git, called for another command", write("scripts/log.mjs", `${OPEN}const git = (cwd, ...args) => execFileSync("git", args, { cwd });\ngit(".", "log", "-1", "--format=%s");\ngit(".", "-C", "sub", "status");\n`)],
   ["an imported function that hands its arguments on to git, called for another command", both(write("scripts/lib/run.mjs", LIB), write("scripts/log.mjs", `${OPEN}import { git } from "./lib/run.mjs";\ngit(["rev-parse", "HEAD"]);\n`))],
   ["git's array with its own options before another command", write("scripts/log.mjs", `${OPEN}execFileSync("git", ["-C", dir, "log", "--grep", "clone"]);\n`)],
+  ["a function whose body returns a regular expression, called for another command", write("scripts/log.mjs", `${OPEN}function git(...args) {\n  if (!args.length) return /}/;\n  const t = 1 +typeof /}/;\n  return execFileSync("git", args);\n}\ngit("log", "--grep", "clone");\n`)],
   ["a function of another program called with clone", write("scripts/log.mjs", `${OPEN}const node = (args) => execFileSync("node", args);\nnode(["clone", "x"]);\n`)],
   ["curl named in a sentence", append("scripts/setup.sh", "# fetch it with curl, then run it.\n")],
   ["curl named in a sentence before an abbreviation", append("scripts/setup.sh", "# a tool such as curl e.g. fetches it.\n")],
