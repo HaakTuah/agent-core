@@ -189,6 +189,14 @@ try {
       const said = `${odd.stdout}${odd.stderr}`;
       ok(odd.status === 0 && /^note 6 of the files the config names are not read: /mu.test(said) && !said.includes("outside the project") && !/new copy/u.test(said),
         "a tracked link that leads out of the project, to a device, a folder or nowhere, and a file past the bound are unread and counted, and a link inside the project is read once, as the file it leads to", said);
+      // (many links to one file count it once, and each run has its own total, so the code's links leave the prose read)
+      put("src/many.js", Array.from({ length: 70000 }, (_, i) => `const v${i} = ${i};`).join("\n"));
+      for (let i = 0; i < 300; i += 1) fs.symlinkSync("many.js", path.join(dir, `src/many${i}.js`));
+      g("add", "-A");
+      const many = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/odd.json"], { cwd: dir, encoding: "utf8", timeout: 120000, env: { ...process.env, COPIES_BASE: "" } });
+      const manySaid = `${many.stdout}${many.stderr}`;
+      ok(many.status === 0 && /^note 6 of the files the config names are not read: /mu.test(manySaid),
+        "many tracked links to one file count it once in the run's total, and the code's run leaves the prose's its own", manySaid);
     } finally { fs.rmSync(away0, { recursive: true, force: true }); }
   }
   // (with the core's packages not installed, its shape is left unchecked, said as a warning, and a config the check

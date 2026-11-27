@@ -207,20 +207,26 @@ function once(files, placeOf) {
 }
 // Where a file of the work tree leads, as once() reads it: a regular file of the project's own of at most `bound` bytes
 // (CODE of code, PROSE of prose, the bound SECURITY.md gives an agent tool's files), and at most TOTAL bytes of them in
-// a run, its links followed; one that leads out of the project, to a folder, a device or a pipe, or past a bound, is
-// unread, and counted in `unread`, which the check notes.
+// each run, each file counted once however many links lead to it; one that leads out of the project, to a folder, a
+// device or a pipe, or past a bound, is unread, and counted in `unread`, which the check notes.
 const CODE = 1 << 23, PROSE = 1 << 20, TOTAL = 1 << 28, unread = new Set();
-let readSoFar = 0;
-const placeHere = bound => f => {
-  let at = null;
-  try {
-    if (!leadsOut(ROOT, f)) {
-      const real = fs.realpathSync(f), st = fs.statSync(real);
-      if (st.isFile() && st.size <= bound && readSoFar + st.size <= TOTAL) { readSoFar += st.size; at = path.relative(fs.realpathSync("."), real).split(path.sep).join("/"); }
-    }
-  } catch { at = null; }
-  if (at === null) unread.add(f);
-  return at;
+const placeHere = bound => {
+  const counted = new Set();
+  let readSoFar = 0;
+  return f => {
+    let at = null;
+    try {
+      if (!leadsOut(ROOT, f)) {
+        const real = fs.realpathSync(f), st = fs.statSync(real);
+        if (st.isFile() && st.size <= bound && (counted.has(real) || readSoFar + st.size <= TOTAL)) {
+          if (!counted.has(real)) { counted.add(real); readSoFar += st.size; }
+          at = path.relative(fs.realpathSync("."), real).split(path.sep).join("/");
+        }
+      }
+    } catch { at = null; }
+    if (at === null) unread.add(f);
+    return at;
+  };
 };
 // An empty list checks nothing: git ls-files would list every file. `env` names another index (lsAt, below).
 const ls = (specs, env = process.env) => {
