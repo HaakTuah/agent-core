@@ -371,7 +371,9 @@ function coreFile(tmp, sha, file, list = false) {
 function coreGit(tmp, ...args) {
   if (!coreClone) {
     coreClone = path.join(tmp, "core.git");
-    try { git(tmp, "clone", "-q", "--bare", `https://github.com/${CORE}`, coreClone); } catch (e) { fail(`the core could not be fetched from https://github.com/${CORE} (${String(e.stderr ?? e.message).trim().split("\n").pop().replace(/:\/\/[^/\s]*@/g, "://")}).`, `let this machine reach github.com, or point git at a copy of the core it can reach (git config url.<the copy>.insteadOf https://github.com/${CORE}), and run this check again.`); }
+    // (the clone alone on its line, as the audit's entry for the core's own repository names it in its "fetches")
+    try { git(tmp, "clone", "-q", "--bare", `https://github.com/${CORE}`, coreClone); }
+    catch (e) { fail(`the core could not be fetched from https://github.com/${CORE} (${String(e.stderr ?? e.message).trim().split("\n").pop().replace(/:\/\/[^/\s]*@/g, "://")}).`, `let this machine reach github.com, or point git at a copy of the core it can reach (git config url.<the copy>.insteadOf https://github.com/${CORE}), and run this check again.`); }
   }
   return git(tmp, "--git-dir", coreClone, ...args);
 }

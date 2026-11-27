@@ -39,17 +39,23 @@ export const PROJECT = {
   "docs/picture.png": "",
 };
 
-/** A fresh copy of the project, changed by `change(dir)`, and the check's failures on it (or the error it throws). */
-export function run(change = () => {}) {
+/** A fresh copy of the project, changed by `change(dir)`, and the check's failures on it (or the error it throws); with
+ *  `before`, the project changed by it is committed first as the pull request's base. */
+export function run(change = () => {}, before = null) {
   // (the project is a folder inside the scratch folder, which holds the owner file beside it, so the check reads none)
   const scratch = scratchDir("licences-test-"), dir = path.join(scratch, "project");
   fs.mkdirSync(dir);
   try {
     for (const [f, text] of Object.entries(PROJECT)) { fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
-    change(dir);
     execFileSync("git", ["init", "-q"], { cwd: dir });
+    if (before) {
+      before(dir);
+      execFileSync("git", ["add", "-A"], { cwd: dir });
+      execFileSync("git", ["-c", "user.name=Moss", "-c", "user.email=moss@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "base"], { cwd: dir });
+    }
+    change(dir);
     execFileSync("git", ["add", "-A"], { cwd: dir });
-    const { failures } = check(loadConfig(path.join(dir, "licences.json")), dir);
+    const { failures } = check(loadConfig(path.join(dir, "licences.json")), dir, before ? "HEAD" : null);
     return failures;
   } catch (e) {
     return [`threw: ${e.message}`];
