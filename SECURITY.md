@@ -53,8 +53,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      without it; and of all the files a pull request changes together, 4,000,000 characters and 1.5 s of reading, of any
      one file of JavaScript, TypeScript or Python it leaves as it was, 4,000,000 characters, 1.5 s to link the files and follow
      the links from each test, a string a file that lists a folder holds past twice the longest path and 64 more read as naming none, and 3 s for the whole of it, the project's own files read too, past which the selection
-     reads no more and runs the whole suite (`scripts/hurry.mjs`); hostile tests: `tests/hostile-pr-changes-test.mjs`, and for the entries' numbers,
-     `tests/pr-description-entries-test.mjs`.
+     reads no more and runs the whole suite (`scripts/hurry.mjs`); and of the selection's rules file (the manifest, or `AGENTS.md`), 1 MB of
+     a regular file, never a link, read as the manifest's reader reads it (`scripts/core-path.mjs`), past which, or
+     where it is a link, it is read as no rules file; hostile tests: `tests/hostile-pr-changes-test.mjs`, for the
+     rules file `tests/select-test.mjs`, and for the entries' numbers, `tests/pr-description-entries-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
      of the work standing still (`scripts/look.mjs`, its reader `scripts/look-pulls.mjs`, through `queue.mjs`'s placing

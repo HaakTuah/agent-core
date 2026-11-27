@@ -263,6 +263,21 @@ ok(r.status === 0 && /test\/rules\.test\.js: failed last time/.test(r.out), "the
 fs.renameSync(path.join(dir, "checks/shape.json"), path.join(dir, "checks/other.json"));
 r = run([], { SELECT_BASE: "HEAD^1" });
 ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/shape\.json\) cannot be read/.test(r.out), "where the shape check's config cannot be read, the whole suite runs", r.out);
+// (its rules file is read within a bound, as the manifest's reader reads it: past a mebibyte, or a link, it is none)
+const row = "| the *shape check* | `checks/other.json` |\n", rulesFile = path.join(dir, "AGENTS.md");
+put("AGENTS.md", row);
+r = run([], { SELECT_BASE: "HEAD^1" });
+ok(r.status === 0 && !/cannot be read/.test(r.out), "the config the rules file names is read", r.out);
+put("AGENTS.md", `${row}${"x".repeat(1 << 20)}\n`);
+r = run([], { SELECT_BASE: "HEAD^1" });
+ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/shape\.json\) cannot be read/.test(r.out), "a rules file past a mebibyte is read as none, and the whole suite runs", r.out);
+if (process.platform !== "win32") { // (a link needs a right Windows may not give)
+  put("rules.md", row); fs.rmSync(rulesFile); fs.symlinkSync("rules.md", rulesFile);
+  r = run([], { SELECT_BASE: "HEAD^1" });
+  ok(r.status === 0 && /the whole suite, all its tests: the shape check's config \(checks\/shape\.json\) cannot be read/.test(r.out), "a rules file that is a link is read as none, and the whole suite runs", r.out);
+  fs.rmSync(path.join(dir, "rules.md"));
+}
+fs.rmSync(rulesFile);
 fs.renameSync(path.join(dir, "checks/other.json"), path.join(dir, "checks/shape.json"));
 for (const [args, env, what] of [
   [[], { SELECT_BASE: "no-such-branch" }, "a base that is no commit"],
