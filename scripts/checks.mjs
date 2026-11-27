@@ -335,7 +335,8 @@ const RUN = {
       return verdict(passed);
     })) return;
     // (after the restore, nothing of git's is read for the base, which the restore could have rewritten: each comparison
-    // with it was made before, by the read above or, where that was left out, by the look)
+    // with it was made before, by the read above or, where that was left out, by the look, which holds where the look's
+    // base is the merge's first parent, as on a pull request)
     check("Every package one exact version, and under a licence on its list", () => node(coreAt, "nuget.mjs", [o.nuget, "--packages", packages, "--restored", ...advisory], { env: { NUGET_PACKAGES: packages } }));
   },
 };

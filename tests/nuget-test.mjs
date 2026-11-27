@@ -151,6 +151,15 @@ const project = (shipsDeps, toolsDeps, { nuget = {}, entries = [], extra = [], c
 const said = result => result.failures.join("\n");
 const good = project({ ...direct(["Newtonsoft.Json", "13.0.3"], ["Serial.Lib", "3.0.5"]), "Lib.Dep": entry("Transitive", "2.0.0") }, direct(["Test.Tool", "9.0.0"], ["Newtonsoft.Json", "13.0.3"]));
 ok(good.failures.length === 0 && /^4 NuGet packages in 2 lock files checked \(3 in what ships, 1 tools that only run\), 0 accepted/.test(good.summary), "a project whose every package is exact and on its list passes: what ships to the floor's list, a test's tool to the tools'", said(good) + good.summary);
+{
+  // (a licence moved off the list, shipped, with no base: reported as passing, in words true of the run it is; after a
+  // restore, --restored, that no base was read after it)
+  const deps = { ...direct(["Newtonsoft.Json", "13.0.3"], ["Serial.Lib", "3.0.5"]), "Lib.Dep": entry("Transitive", "2.0.0") };
+  const after = check({ ships: [], audit: "checks/audit.json", nuget: { ships: [L], tools: [T] } }, tmp, restore(...installed(deps), ...installed(direct(["Test.Tool", "9.0.0"]))), TRACKED, process.env, { restored: true });
+  const moved = r => r.reports.filter(x => x.startsWith("Serial.Lib@3.0.5"));
+  ok(moved(good).length === 1 && /with no base to read it against, it passes/.test(moved(good)[0]) && after.failures.length === 0 && moved(after).length === 1 && /with no base read after the restore, it passes/.test(moved(after)[0]),
+    "a shipped licence moved off the list, with no base, is reported as passing; after a restore, as with no base read after it", JSON.stringify([good.reports, after.reports, after.failures]));
+}
 const bad = project(direct(["Copy.Left", "4.0.0"], ["Test.Tool", "9.0.0"], ["By.File", "1.0.0"]), {});
 ok(bad.failures.length === 3 && /Copy\.Left@4\.0\.0 .*GPL-3\.0-only is off the list for what ships.*nuget\.accepted/.test(said(bad)) && /Test\.Tool@9\.0\.0 .*EPL-2\.0 is off the list for what ships/.test(said(bad)) && /By\.File@1\.0\.0 .*it ships, and its manifest names a licence file.*waits for the owner's yes \(floor rule 10\)\. Mend: .*the config's "nuget\.accepted"/.test(said(bad)),
   "copyleft in what ships fails, a licence good enough for a tool is not good enough for what ships, and what ships under a licence in a file waits for the owner's yes", said(bad));
@@ -708,7 +717,8 @@ if (process.platform !== "win32") {
     const lines = fs.existsSync(logged) ? fs.readFileSync(logged, "utf8").split("\n").filter(Boolean) : [];
     return { status: r.status, out: heard(r.stdout + r.stderr), named: lines.filter(l => /HEAD\^/.test(l) || parents.some(p => l.includes(p))), lines };
   };
-  const after = traced("--restored"), before = traced();
+  const after = traced("--restored"), before = traced(), both = traced("--restored", "--fetched");
+  ok(both.status === 1 && /--restored and --fetched were both given.*Mend: /.test(both.out), "--restored beside --fetched is refused, saying its mend", both.out);
   ok(after.status === 0 && after.lines.length > 0 && after.named.length === 0 && before.status === 0 && before.named.length > 0,
     "after a restore (--restored), no git command the check runs names a parent of the merge; without it, the base is read", JSON.stringify({ after: after.named, before: before.named, out: after.out }));
 }
