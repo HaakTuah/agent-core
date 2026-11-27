@@ -6,10 +6,10 @@
 //
 //   node tests/daily-try-file-test.mjs
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
 import { COUNTS } from "../scripts/release-trial.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 import { LINE, OWNER, SIGNIN, TITLE, bugText, file, formed, gather, legLines } from "../scripts/daily-try-file.mjs";
 
 let failed = 0, count = 0;
@@ -89,7 +89,7 @@ const SHA = "2".repeat(40);
 // colour codes, which a gh from 2.97.0 on refuses to print without its flag and an older one takes no such flag; each
 // still gives the runner's counts. The stand-in answers as each gh does, its words those of gh 2.97.0 and 2.89.0.
 {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "daily-try-file-")), bin = path.join(dir, "bin");
+  const dir = scratchDir("daily-try-file-"), bin = path.join(dir, "bin");
   fs.mkdirSync(bin);
   const counts = { leg: 1, commit: SHA, came: "held", ...Object.fromEntries(COUNTS.map(k => [k, 0])), failedAfter: 1 };
   fs.writeFileSync(path.join(dir, "log"), `2026-11-27T06:00:00.0000000Z \u001b[36;1mnode scripts/daily-try.mjs --run\u001b[0m\n2026-11-27T06:00:01.0000000Z ${LINE}${JSON.stringify(counts)}\r\n2026-11-27T06:00:02.0000000Z \u001b[0;32mdone\u001b[0m\n`);
@@ -115,7 +115,6 @@ esac
     ok(/1 project whose checks the trial's reading holds \(1 passed before the sync and failed after/u.test(body) && !body.includes("\u001b"), `--file reads the counts of a log that holds escape sequences, with a gh ${kind === "new" ? "from 2.97.0 on, given its flag" : "older than 2.97.0, which takes no such flag"}`, err.slice(0, 300) || body.slice(0, 300));
   }
   for (const [k, v] of Object.entries(was)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
-  fs.rmSync(dir, { recursive: true, force: true });
 }
 
 console.log(`${count - failed} of ${count} assertions on the daily try's counts`);
