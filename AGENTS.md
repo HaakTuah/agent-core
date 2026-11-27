@@ -519,8 +519,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   its number: a citation says a rule is applied, never that it helps. Reason: the audit of 13 November found 43 of 122
   rules held by nothing but a session reading them, and nothing listed them. Held by
   `scripts/holders.mjs`, in `.github/workflows/tests.yml`, which fails where an entry names a rule that no longer
-  stands, a check that is not there or a number in no form, and by the heading's check, which asks the line "Number:"
-  where the heading holds more than "None".
+  stands, a check that is not there, a number in no form or `check fires` where none of the rule's holders is a check
+  (#1138), and by the heading's check, which asks the line "Number:" where the heading holds more than "None" and, here,
+  one of its own for each entry whose number the pull request adds or changes, each line a number an entry holds.
 - **A project's own rules name what holds them** (#662). By default the rules a project writes for itself, in the
   rule files its sessions read as its own files name them, are read as the core's are: `scripts/holders.mjs --own`,
   run from the project, reads them against its list `checks/holders.json`, which the starter kit writes and a sync's

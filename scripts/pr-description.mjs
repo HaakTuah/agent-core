@@ -33,7 +33,8 @@
 // be told from one forgotten ("An exemption leaves a mark" in roles/shared/work-flow.md; #302). And where the part
 // "What holds it" is asked and holds more than "None", of a pull request opened since the copy on its base held
 // NUMBER_SINCE, a line under it that names a rule's number in its form ("Number: findings; outcome: robust";
-// outcomes.mjs's NUMBER; #303). And, since YES_SINCE, the owner's yes where the core's floor or review guidelines change
+// outcomes.mjs's NUMBER; #303), and, in the core's own repository since ENTRIES_SINCE, such lines in step with the
+// entries of scripts/holders/ whose number the pull request adds or changes (#1138, part 3). And, since YES_SINCE, the owner's yes where the core's floor or review guidelines change
 // (owner-yes.mjs, beside this file; #549), save of a file whose change only follows files it moves (path-only.mjs;
 // #886, point 1) or that the design check states keeps its meaning (meaning-kept.mjs; #886, point 2). And, of one opened since the copy on its base held REASONS_SINCE that adds a
 // line under the manifest's "Differences" (read from git, the merge commit against its base), the line "Reasons read:"
@@ -64,14 +65,14 @@ import { started } from "./started.mjs";
 import { changedMend, plain, testsChanged } from "./weakened.mjs";
 import { NO_COST, costMend } from "./pr-cost.mjs";
 import { headMends, headOf } from "./pr-head.mjs";
-import { HOLDS, numberMend } from "./pr-number.mjs";
+import { HOLDS, entriesChanged, entriesMend, numberMend } from "./pr-number.mjs";
 import { calledFor } from "./pr-reads.mjs";
 import { MANIFEST_MAX, REASONS, UNREADABLE, differencesAdded, reasonsMend } from "./pr-reasons.mjs";
 import { WAITS, heldAt, waitsMend, waitsOn } from "./pr-waits.mjs";
 import { asText, parseBounded } from "./guards.mjs";
 
 // (what each line's check holds, exported from here as before they were split)
-export { HOLDS, calledFor, headMends, MANIFEST_MAX, NO_COST, REASONS, UNREADABLE, WAITS, costMend, differencesAdded, heldAt, numberMend, reasonsMend, waitsMend, waitsOn };
+export { HOLDS, entriesChanged, entriesMend, calledFor, headMends, MANIFEST_MAX, NO_COST, REASONS, UNREADABLE, WAITS, costMend, differencesAdded, heldAt, numberMend, reasonsMend, waitsMend, waitsOn };
 export const WAITS_SINCE = "2026-11-16T00:00:00Z";
 // The day from which the line "Read for it:" is asked, of a pull request opened since the copy on its base held this.
 export const READS_SINCE = "2026-11-16T00:00:00Z";
@@ -83,6 +84,10 @@ export const COST_SINCE = "2026-11-17T00:00:00Z";
 // The day from which the part "What holds it" is asked the number of each rule it names (AGENTS.md of the core, "Every
 // rule says what holds it"; #303), as the lines above are.
 export const NUMBER_SINCE = "2026-11-17T00:00:00Z";
+// The day from which, in the core's own repository, the lines "Number:" under "What holds it" are asked to be in step
+// with the entries of scripts/holders/ whose number the pull request adds or changes (pr-number.mjs's entriesMend;
+// #1138, part 3), as the lines above are.
+export const ENTRIES_SINCE = "2026-11-26T00:00:00Z";
 // The day from which a description names, on weakened.mjs's line, each test file the pull request leaves with fewer
 // lines that assert, or in which it skips a case (tasks/code-shape.md, "A test taken out or weakened is said"; #307), as
 // the lines above are.
@@ -199,6 +204,12 @@ if (started(import.meta.url)) {
     // (asked only where the part is, which is where the rules change)
     if (parts.includes(HOLDS) && created >= NUMBER_SINCE && then?.includes("export const NUMBER_SINCE")) { const mend = numberMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log(`ok   the part "${HOLDS}" names a rule's number, or "None"`); }
     else if (parts.includes(HOLDS)) console.log(`ok   the number under "${HOLDS}" is not asked here: ${why}`);
+    if (parts.includes(HOLDS) && created >= ENTRIES_SINCE && then?.includes("export const ENTRIES_SINCE")) {
+      // (the core's own repository alone: in a project the copy's entries move only at a sync, the core's pull request having held them)
+      const entries = coreAtBase(process.cwd()) === "" ? entriesChanged(process.cwd()) : null, mend = entries && entriesMend(process.env.PR_BODY, entries.changed, entries.standing);
+      if (mend) mends.push(mend);
+      else console.log(entries ? `ok   the lines "Number:" under "${HOLDS}" are in step with the ${entries.changed.length} entr${entries.changed.length === 1 ? "y" : "ies"} whose number this pull request adds or changes` : `ok   the lines "Number:" are not held to the entries here: this is no core's own repository, or the change could not be read against its base`);
+    } else if (parts.includes(HOLDS)) console.log(`ok   the lines "Number:" are not held to the entries here: ${why}`);
     if (created >= REASONS_SINCE && then?.includes("export const REASONS_SINCE")) {
       const added = differencesAdded(process.cwd()), mend = added === null ? null : reasonsMend(process.env.PR_BODY, added, coreAt(process.cwd()) ?? "core/");
       if (mend) mends.push(mend);
