@@ -6,7 +6,7 @@
 //     letters), a secret (by its name, by an index, or the secrets whole, in any letters), or no top-level
 //     `permissions:`, where the host's default token, which may write, is what it gets;
 //   - an action (an action.yml or action.yaml in any folder);
-//   - .claude/, and what comment-only.mjs, beside this file, reads as running by itself beyond .github/ (RUNS_TOO: an
+//   - .claude/, and what runs-by-itself.mjs, beside this file, reads as running by itself beyond .github/ (RUNS_TOO: an
 //     agent tool's own folder, hooks, the files that say what installs or builds);
 //   - a script whose own text calls GitHub, the network or `git push` (CALLS), or loads a module by a plain name that is
 //     no path and none of Node's own modules that reach nothing beyond the machine (LOCAL): a package (axios), or
@@ -38,7 +38,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { RUNS_TOO } from "./comment-only.mjs";
+import { RUNS_TOO } from "./runs-by-itself.mjs";
 import { started } from "./started.mjs";
 
 const SHA = /^[0-9a-f]{40}$/u;

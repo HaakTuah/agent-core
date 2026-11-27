@@ -213,10 +213,14 @@ const PAIRS = {
     })],
   "pointers.mjs": ["the script, from the copy: a pointer to a heading that is not there", () =>
     inProject(pointing, { "core/AGENTS.md": broken }, { "AGENTS.md": broken }, ({ dir }) => node(dir, "pointers.mjs", [], { POINTERS_BASE: "" }))],
-  "reading-size.mjs": ["the script, from the copy: a file past the split mark changed, and a file under \"read\" past the total", () => {
+  "reading-size.mjs": ["the script, from the copy: a file past the split mark changed, asked, and a file under \"read\" past the total", () => {
     const big = "x".repeat(3000) + "\n";
     const split = inProject({ "checks/sizes.json": sizes({ "AGENTS.md": 20000 }), "AGENTS.md": "# A\n", "core/big.md": big, "src/big.md": big },
-      { "core/big.md": `${big}more\n` }, { "src/big.md": `${big}more\n` }, ({ dir, base }) => node(dir, "reading-size.mjs", ["checks/sizes.json"], { SIZES_BASE: base }));
+      { "core/big.md": `${big}more\n` }, { "src/big.md": `${big}more\n` }, ({ dir, base }) => {
+        // (a changed file past the split mark is asked, failing nothing: #1413, point 6)
+        const r = node(dir, "reading-size.mjs", ["checks/sizes.json"], { SIZES_BASE: base });
+        return { failed: r.failed || /big\.md is \d+ bytes, past the \d+-byte mark, and this PR changes it, which fails nothing/.test(r.out), out: r.out };
+      });
     const total = inProject({ "AGENTS.md": "# A\n", "core/rules.md": "x".repeat(600), "docs/rules.md": "x".repeat(600) },
       { "checks/sizes.json": sizes({ "AGENTS.md": 20000, "core/rules.md": 20000 }) }, { "checks/sizes.json": sizes({ "AGENTS.md": 20000, "docs/rules.md": 20000 }) },
       ({ dir, base }) => node(dir, "reading-size.mjs", ["checks/sizes.json"], { SIZES_BASE: base }));

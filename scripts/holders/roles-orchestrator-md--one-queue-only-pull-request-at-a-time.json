@@ -1,0 +1,5 @@
+{
+  "rule": "roles/orchestrator.md: One queue-only pull request at a time",
+  "behind": ["#1413.7"],
+  "number": "correction: misread; outcome: fast"
+}
