@@ -260,7 +260,7 @@ function done(from) {
     // (where the clone has no origin, which main it was read against, so a record of a main behind the project's is seen)
     if (mainRef === "refs/heads/main") console.log("read against the clone's own branch main, as the clone has no origin: where that main is behind the project's, take the reading again in a clone whose origin is the project's address");
     if (givenPrivate) console.log(`read as ${process.env.CORE_PRIVATE === "true" ? "private" : "public"} from CORE_PRIVATE, as the host gave this machine no answer`);
-    console.log(`trial answer: ${JSON.stringify({ commit: tried, pure: !fail.length, from })}`);
+    console.log(`trial answer: ${JSON.stringify({ commit: tried, pure: !fail.length, from, main: mainRef === "FETCH_HEAD" ? "origin" : "clone" })}`);
     process.exit(1);
   }
   if (fail.length) {

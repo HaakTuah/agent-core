@@ -5,7 +5,7 @@
 // says. The check run on a project whose licence config names one under "pypi" is lookup-run-test.mjs's. Run: node
 // tests/lookup-pypi-test.mjs
 import { lookUp, newPackages, YOUNG } from "../scripts/lookup.mjs";
-import { pep440, pypiFacts, pypiPackages } from "../scripts/lookup-pypi.mjs";
+import { pep440, pypiFacts, pypiHashes, pypiPackages } from "../scripts/lookup-pypi.mjs";
 import { NOW, ago } from "../scripts/lookup-stage.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { quick } from "../scripts/hostile.mjs";
@@ -177,6 +177,22 @@ ok(quick(() => (kept = newPackages([["requirements.txt", many], ["dev.txt", many
 ok(quick(() => pypiFacts(doc("tidy-moss-format", ago(800)), "v1.1", () => null, kept[0].lines).failures.length === 0), "each of 100,000 lines at a version PyPI keys otherwise is held to its list, quickly, the version found and its digests gathered once");
 r = await one(pkg("digestless-moss", { hashes: [sha("a")] }));
 ok(r.failures.length === 1 && /PyPI lists for no file of version 1\.1\.0/u.test(r.failures[0]), `where PyPI lists no sha256 for the version's files, its hashes fail (${r.failures})`);
+
+// (#1388, point 1: a line the pull request changes of a package its base held has its hashes alone compared)
+const line = (version, hashes, lockPath = "requirements.txt") => ({ lockPath, version, hashes });
+asked.length = 0;
+let held = await pypiHashes({ name: "Tidy_Moss.Format", lines: [line("1.1.0", [sha("a")]), line("v1.1", [sha("a")], "dev.txt")] }, get);
+ok(!held.length && asked.join() === "https://pypi.org/pypi/tidy-moss-format/json", `a changed line whose hashes PyPI lists passes, its other facts not asked (${JSON.stringify(held)}, ${asked})`);
+held = await pypiHashes({ name: "tidy-moss-format", lines: [line("2.0.0", [sha("a")]), line("1.1.0", [sha("a")], "dev.txt")] }, get);
+ok(held.length === 1 && held[0].lockPath === "requirements.txt" && /PyPI lists for no file of version 2\.0\.0/u.test(held[0].text) && mended(`FAIL: ${held[0].text}`), `a changed line naming another version's hash fails, saying the mend, and only that line (${JSON.stringify(held)})`);
+held = await pypiHashes({ name: "never-published-moss", lines: [line("1.0.0", [sha("a")])] }, get);
+ok(held.length === 1 && /PyPI lists for no file of version 1\.0\.0/u.test(held[0].text), `a name PyPI does not know lists no file, so its changed line fails (${JSON.stringify(held)})`);
+for (const name of ["flaky-moss", "listless-moss"]) ok(/answered 503|lists releases/u.test(await pypiHashes({ name, lines: [line("1.0.0", [sha("a")])] }, get).then(() => "", (e) => e.message)), `${name}: an answer PyPI does not give in its shape is a lookup that failed`);
+// (#1388, point 2: the report says which "# via" parent PyPI does not bear out)
+r = await one(pkg("tidy-moss-format", { unborne: ["root-moss"] }));
+ok(/^requirements\.txt: tidy-moss-format@1\.1\.0: named by the project \(its "# via" names root-moss, which PyPI does not list as requiring it at the version the file holds\); first published/u.test(r.reports[0] ?? ""), `a package whose "# via" parents PyPI does not bear out is named by the project, and the report says so (${r.reports})`);
+r = await one(pkg("tidy-moss-format", { brings: undefined }));
+ok(/; what it brings, too many paths to count;/u.test(r.reports[0] ?? ""), `a file whose paths are past what the closure counts says so, never "brings undefined packages" (${r.reports})`);
 
 asked.length = 0;
 r = await one(pkg("bad/../name"));

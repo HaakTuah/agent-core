@@ -51,6 +51,10 @@ holds() {
     # (its error lines, whole, so the next reader sees the cause; each behind "  | " and with "##[" broken, so none is
     # read as a workflow command, which the runner finds after leading spaces, and "##[" anywhere; where none says
     # error, all it printed; #1239)
+    # (a machine without the SDK band the project's global.json pins, its rollForward allowing no other, restores nothing:
+    # the machine's fault, which the line says, not the change's)
+    if printf '%s\n' "$out" | grep -qiE 'compatible .{0,20}SDK was not found|requested SDK version'; then
+      echo "$(named "$project"): no restore ran, since this machine has no .NET SDK that the project's global.json accepts: the machine's fault, not the change's. Mend: install the SDK band global.json names on this machine (its rollForward allows no other), then run the check again"; return 1; fi
     [ -n "$codes" ] || { echo "$(named "$project"): the restore failed with no error NuGet names. It printed:"
       { printf '%s\n' "$out" | grep -iw error || printf '%s\n' "$out"; } | tr -d '\r' | LC_ALL=C sed -e "$HASHES" -e 's/^/  | /'; return 1; }
     if printf '%s\n' "$codes" | grep -qvE '^error NU110[123]$'; then echo "$(named "$project"):" $codes; return 1; fi
