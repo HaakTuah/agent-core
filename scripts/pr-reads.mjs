@@ -39,8 +39,10 @@ export function coreHere(dir) {
   try { stat = fs.lstatSync(path.join(dir, "core-manifest.md")); } catch { /* (none: the core's own root, or a project's first) */ }
   if (stat && !stat.isFile()) return { at: null, mend: "core-manifest.md is no regular file of the checkout's own, and the description's lines read from it where the core lies. Mend: put the manifest itself in its place, a file as the sync writes it, and run the check again" };
   const at = coreAt(dir), base = coreAtBase(dir);
-  // (the core's own repository: a base that holds its rules at the root and no manifest, as a project always holds one)
-  const own = base === "" && whole(spawnSync("git", ["ls-tree", "--name-only", "HEAD^1", "--", MANIFEST], { cwd: dir, encoding: "utf8" }))?.trim() === "";
+  // (the core's own repository: a base that holds its rules at the root, no manifest, and the core's scripts/core-path.mjs,
+  // as coreItself in core-path.mjs knows it, so that a project's first sync is not read as the core's)
+  const tracked = f => whole(spawnSync("git", ["ls-tree", "--name-only", "HEAD^1", "--", f], { cwd: dir, encoding: "utf8" }))?.trim() ?? "";
+  const own = base === "" && tracked(MANIFEST) === "" && tracked("scripts/core-path.mjs") !== "";
   if (at === null && base !== null) return { at, mend: "the head holds the core's roles/ and floor nowhere as a real folder and file, though its base held them, so the description's lines cannot be read for it. Mend: put the core's copy back as the base held it, each file and folder itself in its place, and run the check again" };
   if (own && at !== "") return { at: null, mend: `the head holds the core's rules under ${at}, where its base held them at its root, so the description's lines are not read for it. Mend: keep the rules at the root as the base holds them, with no core-manifest.md naming another place, and run the check again` };
   // (the text coreAt read, whole, so that no bound of another reader's makes the two readings agree on nothing)

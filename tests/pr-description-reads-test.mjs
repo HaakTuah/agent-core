@@ -87,7 +87,11 @@ const ok = (cond, what, got = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${
   const git = (...args) => execFileSync("git", args, { cwd: own, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(own, f)), { recursive: true }); fs.writeFileSync(path.join(own, f), text); };
   put("roles/a.md", "a\n"); put("floor/security.md", "f\n");
-  git("init", "-q", "-b", "main"); git("add", "-A"); git("commit", "-q", "-m", "the base");
+  git("init", "-q", "-b", "main"); git("add", "-A"); git("commit", "-q", "-m", "a project's base, before its first sync");
+  put("core-manifest.md", `Core: ${CORE} at ${"0".repeat(40)}, copied whole under core/\n`); put("core/roles/a.md", "a\n"); put("core/floor/security.md", "f\n");
+  git("add", "-A"); git("commit", "-q", "-m", "its first sync");
+  ok(JSON.stringify(coreHere(own)) === JSON.stringify({ at: "core/", mend: null }), "a project's first sync, its base holding rules at its root, is not read as the core's own repository", JSON.stringify(coreHere(own)));
+  git("rm", "-rq", "core-manifest.md", "core"); put("scripts/core-path.mjs", "x\n"); git("add", "-A"); git("commit", "-q", "-m", "the base");
   put("roles/b.md", "b\n"); git("add", "-A"); git("commit", "-q", "-m", "a change at the root");
   ok(JSON.stringify(coreHere(own)) === JSON.stringify({ at: "", mend: null }), "a change in the core's own repository is read at its root, with nothing to mend");
   put("core-manifest.md", `Core: ${CORE} at ${"0".repeat(40)}, copied whole under x/\n`); put("x/roles/a.md", "a\n"); put("x/floor/security.md", "f\n");
