@@ -16,7 +16,8 @@
 import { spawnSync } from "node:child_process";
 import { parseConfig, where } from "./shape.mjs";
 import { asText } from "./guards.mjs";
-import { started } from "./started.mjs";
+import { guard } from "./mend.mjs";
+import { whole } from "./reading.mjs";
 
 export const LINE = "Tests changed:";
 // A name or a line as it may be printed: a fork's pull request writes them, so no control, bidirectional or separating
@@ -74,7 +75,9 @@ export function changedMend(body, found, list = "node core/scripts/weakened.mjs"
   return `the description does not name, on its line "${LINE}", each test file this pull request deletes, leaves with fewer lines that assert, or skips a case in: ${unnamed.map(f => `\`${plain(f.file)}\` (${[f.deleted && "deleted", f.asserts.length && `${f.asserts.length} assertion line${f.asserts.length === 1 ? "" : "s"} taken out or changed`, f.skips.length && `${f.skips.length} skip${f.skips.length === 1 ? "" : "s"} added`].filter(Boolean).join(", ")})`).join(", ")}. Mend: add the line "${LINE}" naming each file in backticks with why (the case proved nothing, the assertion was made stricter, the case moved), so that the reviewer rules on each; ${list} lists the lines`;
 }
 
-const gitIn = dir => (...args) => { const r = spawnSync("git", args, { cwd: dir, encoding: "utf8", maxBuffer: 1 << 28 }); return r.status === 0 ? r.stdout : null; };
+// (git's output, or null where git ends saying it holds no such thing; a read that did not finish throws, with its mend:
+// whole(), reading.mjs)
+const gitIn = dir => (...args) => whole(spawnSync("git", args, { cwd: dir, encoding: "utf8", maxBuffer: 1 << 28 }));
 
 // The commit the checkout at `dir` is read against: where HEAD left `ref`, origin/main where none is given, so that a
 // branch head, one that merged its base in among them, is read whole and its base's lines are not; where that cannot
@@ -112,7 +115,7 @@ export function testsChanged(dir = ".", base = "HEAD^1") {
   return found;
 }
 
-if (started(import.meta.url)) {
+if (guard(import.meta.url)) {
   const args = process.argv.slice(2), at = args.indexOf("--base"), eq = args.find(a => a.startsWith("--base="));
   const ref = eq !== undefined ? eq.slice("--base=".length) : at >= 0 ? args[at + 1] : null;
   const known = args.filter(a => a === "--base" || a.startsWith("--base=")).length <= 1 && args.every((a, i) => a === "--base" || a.startsWith("--base=") || (i === at + 1 && at >= 0));

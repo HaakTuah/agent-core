@@ -5,12 +5,13 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { calledFor } from "../scripts/pr-reads.mjs";
+import { calledFor, coreHere } from "../scripts/pr-reads.mjs";
+import { mended } from "../scripts/mend.mjs";
 import { lineMend } from "../scripts/reading.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
-const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
+const ok = (cond, what, got = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}${cond || !got ? "" : `: ${got}`}`); if (!cond) failed++; };
 
 // what a pull request's changed paths call for, in a scratch project: the merge commit against its base, the kinds of
 // the project's own paths as the base holds them, the copy's own paths left out
@@ -30,6 +31,19 @@ const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); i
   ok(JSON.stringify(called.map(c => c.file)) === JSON.stringify(["core/tasks/screens.md", "core/tasks/updates.md", "core/floor/topics/workflows.md"]) && /of the kind polish/.test(called[0].why) && /core-manifest\.md/.test(called[1].why),
     "a pull request's changed paths call for their files by the reading config and the manifest its base holds, not those it carries (a changed manifest calling for tasks/updates.md, #756): a module the base's manifest leaves out is not asked, one the change itself leaves out still is; a path of the copy calls for nothing, and one outside ASCII is read as spelled", JSON.stringify(called));
   ok(/does not list `core\/tasks\/screens\.md`/.test(lineMend("Read for it: `core/floor/topics/workflows.md`", called, "cmd")) && lineMend("Read for it: `core/floor/topics/workflows.md`, `core/tasks/screens.md`, `core/tasks/updates.md`", called, "cmd") === null, "and the line is held to them");
+  // (where the core lies at the head: read, or a failure with its mend, never a pass)
+  ok(JSON.stringify(coreHere(project)) === JSON.stringify({ at: "core/", mend: null }), "where the core lies at the head is read from its manifest, with nothing to mend");
+  if (process.platform !== "win32") {
+    const text = fs.readFileSync(path.join(project, "core-manifest.md"), "utf8");
+    put("docs/m.md", text); fs.rmSync(path.join(project, "core-manifest.md")); fs.symlinkSync("docs/m.md", path.join(project, "core-manifest.md"));
+    git("add", "-A"); git("commit", "-q", "-m", "a tracked link");
+    const linked = coreHere(project);
+    ok(linked.at === null && mended(`FAIL ${linked.mend}`), "a tracked link in the manifest's place is refused, with its mend", JSON.stringify(linked));
+    fs.rmSync(path.join(project, "core-manifest.md")); put("core-manifest.md", text); git("add", "-A"); git("commit", "-q", "-m", "the file back");
+  }
+  fs.renameSync(path.join(project, "core", "roles"), path.join(project, "core", "r")); git("add", "-A"); git("commit", "-q", "-m", "the roles moved");
+  const gone = coreHere(project);
+  ok(gone.at === null && mended(`FAIL ${gone.mend}`), "a head that holds the core nowhere its base held it fails, with its mend", JSON.stringify(gone));
   git("checkout", "-q", "--orphan", "alone"); git("commit", "-q", "-m", "no parent");
   ok(calledFor(project) === null, "with no base to read against, nothing is asked");
 }

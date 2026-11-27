@@ -20,7 +20,8 @@
 // silence a finding (`nosemgrep`) silences none, and the files are named to it, so no ignore file of the project's
 // leaves one out. Each file is handed to the engine past its own limits of size and place, and one it
 // did not read whole fails as a finding does, unless the description lists it on a line "Scan unread: `<path>`", which
-// excuses only a file the engine did not read, or one with which it gives no answer at all. It
+// excuses only a file the engine did not read, or one with which it gives no answer at all. A scan with a base reads at
+// most MOST_FILES files, and all its runs of the engine take MOST_TIME together; past either it fails, saying its mend. It
 // reads JavaScript and TypeScript, C# and Python; a file that is a link, or leads out of the
 // project, is not read, nor the core's copy, whose code the host's CodeQL scans in the core's own public repository.
 // Node's own modules, git, and the engine.
@@ -110,16 +111,25 @@ export function falseAlarms(text) {
   return out;
 }
 
-/** Runs the engine on the files, a batch at a time: { findings: [{ file, line, rule, message }], errors }, or
- *  { failed } where it did not run. */
-export function runEngine(dir, root, files) {
+// The most files a scan with a base reads, and the most time all the engine's runs of one scan take together, the base's
+// with the head's, so that no change holds the job to its step's limit: past either, the scan fails closed, with its
+// mend. A batch is given at most BATCH_TIME.
+export const MOST_FILES = 2000, MOST_TIME = 240000, BATCH_TIME = 900000;
+const LATE = { failed: `the engine ran past the ${MOST_TIME / 1000} s its runs have together`, late: true };
+
+/** Runs the engine on the files, a batch at a time, until the time `until` (Date.now()'s): { findings: [{ file, line,
+ *  rule, message }], errors }, or { failed } where it did not run, with `late` where the time ran out. */
+export function runEngine(dir, root, files, until = Infinity) {
   const bin = path.join(dir, `semgrep-core${exe()}`);
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "code-scan-"));
   const findings = [], errors = [], scanned = new Set();
   try {
     for (let i = 0; i < files.length; i += 200) {
+      const left = until - Date.now();
+      if (left <= 0) return LATE;
       const r = spawnSync(bin, ["scan", "--experimental", "--metrics=off", "--disable-version-check", "--disable-nosem", "--max-target-bytes=0", "--timeout", "30", "--json", "-q", "--config", RULES, "--", ...files.slice(i, i + 200)],
-        { cwd: root, encoding: "utf8", env: engineEnv(home), maxBuffer: 1 << 30, timeout: 900000, argv0: `osemgrep${exe()}` });
+        { cwd: root, encoding: "utf8", env: engineEnv(home), maxBuffer: 1 << 30, timeout: Math.min(BATCH_TIME, left), argv0: `osemgrep${exe()}` });
+      if (r.error?.code === "ETIMEDOUT" && left < BATCH_TIME) return LATE;
       let out;
       try { out = JSON.parse(r.stdout); } catch { return { failed: `the engine gave no answer it could read (exit ${r.status ?? r.signal ?? r.error?.code}): ${logged(String(r.stderr ?? "").trim().split("\n").pop() ?? "")}` }; }
       readAnswer(out, { findings, errors, scanned });
@@ -176,7 +186,7 @@ export function renamedFrom(root, base) {
 /** What stood at the base: of the files given that the base held, by their name there where the change renames them,
  *  the engine's findings, each placed under its name at the head, a count for each key; null where the engine could
  *  not read them. Each is read from git's object, never from the work tree. */
-function stoodAt(dir, root, base, files) {
+function stoodAt(dir, root, base, files, until) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "code-scan-base-"));
   const was = renamedFrom(root, base);
   try {
@@ -187,7 +197,7 @@ function stoodAt(dir, root, base, files) {
       fs.writeFileSync(path.join(tmp, f), bytes);
       return true;
     });
-    const got = held.length ? runEngine(dir, tmp, held) : { findings: [] };
+    const got = held.length ? runEngine(dir, tmp, held, until) : { findings: [] };
     if (got.failed) return null;
     const counts = new Map(), texts = new Map();
     for (const f of got.findings) { const k = keyOf(tmp, f, texts); counts.set(k, (counts.get(k) ?? 0) + 1); }
@@ -232,13 +242,19 @@ export function unreadLines(files, got, { base, listed, held }) {
 
 /** The engine's answer on the files: every one handed to it; where it gives none and the description lists files as
  *  unread, each listed file is tried alone, and only one with which it still gives no answer is held back, the rest run
- *  again together, a listed one it reads judged as any other. { got, held, read }. `run` is the engine's run. */
-export function answer(dir, root, files, listed, run = runEngine) {
-  const got = run(dir, root, files);
-  if (!got.failed || !listed.size) return { got, held: [], read: files };
-  const held = files.filter(f => listed.has(f) && run(dir, root, [f]).failed);
+ *  again together, a listed one it reads judged as any other. { got, held, read }. `run` is the engine's run, given
+ *  the time `until`; a run past it holds nothing back, and is the answer. */
+export function answer(dir, root, files, listed, run = runEngine, until = Infinity) {
+  const got = run(dir, root, files, until);
+  if (got.late || !got.failed || !listed.size) return { got, held: [], read: files };
+  const held = [];
+  for (const f of files.filter(f => listed.has(f))) {
+    const alone = run(dir, root, [f], until);
+    if (alone.late) return { got: alone, held: [], read: files };
+    if (alone.failed) held.push(f);
+  }
   const read = files.filter(f => !held.includes(f));
-  return { got: read.length ? run(dir, root, read) : { findings: [], errors: [], scanned: new Set() }, held, read };
+  return { got: read.length ? run(dir, root, read, until) : { findings: [], errors: [], scanned: new Set() }, held, read };
 }
 
 /** Why the engine is not installed for this change, or null where it is: the host's CodeQL scans the project, or the
@@ -259,19 +275,21 @@ function engineDir() {
   return pypiUnreached(engine()) ? null : path.dirname(pypiFile(engine()));
 }
 
-/** The scan: { lines, failed }, each line to print. */
-export function scan(root, { base = null, description = "", dir = null } = {}) {
+/** The scan: { lines, failed }, each line to print; `most` the most files it reads with a base and the time its runs
+ *  have together, in ms. */
+export function scan(root, { base = null, description = "", dir = null, most = { files: MOST_FILES, time: MOST_TIME } } = {}) {
   if (hostScans(root, base)) return { lines: ["code scan: not run: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project"], failed: false };
-  const files = targets(root, base);
+  const files = targets(root, base), until = Date.now() + most.time;
   if (!files.length) return { lines: [`code scan: no file of the kinds it reads ${base ? "changed" : "tracked"}`], failed: false };
+  if (base && files.length > most.files) return { lines: [`FAIL: code scan: the change adds or alters ${files.length} files of the kinds it reads, past the ${most.files} one scan reads, so it read none of them. ${MEND}split the pull request so that each adds or alters at most ${most.files} such files, and run it again`], failed: true };
   dir ??= engineDir();
   if (!dir) return { lines: [`::warning::The code scan did not run: ${pypiNotInstalled(engine())}`], failed: false };
   const listed = base ? unreadListed(description) : new Set();
-  const { got, held, read } = answer(dir, root, files, listed);
+  const { got, held, read } = answer(dir, root, files, listed, runEngine, until);
   if (got.failed) return base
-    ? { lines: [`FAIL: code scan: ${got.failed}, on the files this change adds or alters. ${UNREAD_MEND("<path>")}, naming the file it stops on (run the scan on each)`], failed: true }
+    ? { lines: [`FAIL: code scan: ${got.failed}, on the files this change adds or alters. ${got.late ? `${MEND}split the pull request so that each scan reads fewer files, or split the files it stops on, and run it again` : `${UNREAD_MEND("<path>")}, naming the file it stops on (run the scan on each)`}`], failed: true }
     : { lines: [`code scan: did not run: ${got.failed}; it decides nothing`], failed: false };
-  const stoodRead = base ? stoodAt(dir, root, base, read) : null;
+  const stoodRead = base ? stoodAt(dir, root, base, read, until) : null;
   const stood = base ? stoodRead ?? new Map() : null;
   const { lines, fails } = verdicts(got.findings, { root, base, stood, added: base ? addedLines(root, base, read) : new Map(), explained: falseAlarms(description) });
   if (base && !stoodRead) lines.push("- the engine could not read the base's files, so every finding is counted as this change's own");

@@ -110,6 +110,12 @@ try {
   put("plan/QUEUE.md", "1. #1\n2. #2\n"); put("inbox/idea.md", "**What to read**\n`feature`\n"); git("add", "-A"); git("commit", "-qm", "head");
   const q = queueAt(dir, "core/");
   ok(q?.before === "1. #1\n" && q.after === "1. #1\n2. #2\n" && joined(q.before, q.after).join() === "#2", "the queue's file is read on the base and the head, where the base's manifest names it", q);
+  // (a file past the bound git's read has is unread: a failure with its mend, never an empty queue)
+  put("plan/QUEUE.md", Buffer.alloc((1 << 26) + 1, 0x61)); git("add", "-A"); git("commit", "-qm", "past the bound");
+  let past = null;
+  try { queueAt(dir, "core/"); } catch (e) { past = e; }
+  ok(past !== null && mended(past.message), "a queue past the bound of git's read is unread, and fails with its mend", past?.message);
+  git("reset", "-q", "--hard", "HEAD~1");
   const path0 = process.env.PATH;
   process.env.PATH = dir;
   try { ok(readItem("o/r", "#1") === null, "an issue gh cannot be run to read is none"); } finally { process.env.PATH = path0; }
