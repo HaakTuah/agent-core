@@ -13,7 +13,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
-import { HOST, entriesFrom, fetchPinned, formed, pinOf, readList } from "../scripts/toolchain.mjs";
+import { HOST, entriesFrom, fetchPinned, formed, pinOf, pinned, readList } from "../scripts/toolchain.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -137,6 +137,9 @@ else {
     "it fetches only the listed URL, over HTTPS alone", fetched.log());
   const again = fetchPinned(at).join();
   ok(/present in/u.test(again) && fetched.log().trim().split("\n").length === 1, "run twice, it finds the SDK present and fetches nothing again", again);
+  const vars = pinned(at).vars, unset = pinned({ ...at, list: [] }).vars;
+  ok(vars?.DOTNET_ROOT === sdk && vars.PATH.startsWith(`${sdk}${path.delimiter}`) && vars.DOTNET_NOLOGO === "1" && unset === null,
+    "what the line says to set is given as data for the runs where the SDK is there, and nothing where it is not", JSON.stringify({ vars, unset }));
 
   const differs = bin("differs", { give: other.file });
   const bad = fetchPinned({ project: project("differs"), list: [{ ...good, sha512: right.sum }], home: home("differs"), env: differs.env, ...linux }).join();

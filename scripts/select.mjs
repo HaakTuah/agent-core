@@ -24,6 +24,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { coreItself } from "./core-path.mjs";
 import { asText, loggedAlone } from "./guards.mjs";
 import { Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
@@ -112,7 +113,8 @@ async function chosen({ config, at, base, passed, select }) {
 async function main(argv) {
   const self = path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/");
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, opts = options(named ? argv.slice(1) : argv, self);
-  const rules = ["core-manifest.md", "AGENTS.md"].find(f => fs.existsSync(f));
+  // (the core's own repository reads its slots from AGENTS.md, whatever manifest stands at its root: core-path.mjs)
+  const rules = (coreItself(".") ? ["AGENTS.md"] : ["core-manifest.md", "AGENTS.md"]).find(f => fs.existsSync(f));
   const at = named ?? where(rules ? fs.readFileSync(rules, "utf8") : ""), base = baseOf(), config = configOf(at);
   const now = config ? standing(config) : null, failed = readFailed(opts["--failed"]);
   const s = await chosen({ config, at, base, passed: opts["--passed"], select: from => selectedFrom(from, { now, config, failed }) });

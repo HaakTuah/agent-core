@@ -27,6 +27,9 @@ export const lf = t => t.replace(/\r\n/gu, "\n");
 const plainOf = t => lf(t).replace(/^# The core's file:[^\n]*\n/u, "").replace(/@[0-9a-f]{40}(\s*#\s*v?[\w.-]+)?/gu, "@<pin>");
 export const blockOf = t => { const b = lf(t).indexOf(BEGIN), e = lf(t).indexOf(END); return b < 0 || e < b ? null : lf(t).slice(b, e + END.length); };
 const imports = l => /^@\S+$/u.test(l);
+// The core's part of a rule file's text as fresh.mjs compares it: between its marks, or, before there were marks, its
+// import lines.
+export const partOf = t => blockOf(t) ?? lf(t).split("\n").filter(imports).join("\n");
 
 // Where the core's part stands in a rule file's text: { at, end } (end past its last line, its line end kept outside),
 // null where it has none, or "many" where it cannot be told which run of import lines it is. `kitLines` are the lines

@@ -108,6 +108,13 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   open point. This is the second
   difference from that module and `roles/shared/records.md`, where only the design session writes rules from the owner's
   words.
+- **A bug a release's trial finds is built at once** (#1413, point 7). By default, where the trial of a release ("Each
+  release is tried on a real project first") finds a bug of the core's, it is filed and built like any bug
+  (`roles/shared/inbox.md`, "Bugs don't wait"), the orchestrator giving it a lane with no line in this file first.
+  Nothing changes it. It does not mean the release is cut before its trial passes on the fix, nor that an idea the
+  trial brings joins without a line. Reason: 47 of the 392 pull requests merged in the core from 19 to 26 November
+  2026 changed the queue alone, each running the checks and, where its line names a `by:chat` item, waiting for a code
+  review (#1339). Held by nothing yet.
 - **A bug fix and a rework of tests are built on Sonnet** (#767). By default, where "The builders" of
   `roles/orchestrator.md` picks Claude for a line that fixes a bug or reworks tests, the orchestrator starts its builder
   on Sonnet; a line that writes or changes a rule, touches security or reads a format another publisher defines stays
@@ -176,10 +183,20 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   never by a session's own choice: the owner's standing word is that it may each time the queue is worked through ("One
   batch, then one release"). The owner tags nothing by hand: the owner, or a session the owner tells and whose own
   limits let it, starts the `release` workflow on `main` (its page under Actions has the button;
-  `.github/workflows/release.yml`), and the workflow cuts it only where every check on `main`'s newest commit has passed
+  `.github/workflows/release.yml`), and the workflow cuts it only where every check on the commit it stands on has passed
   and, once the staged cases hold a release ("Staged cases hold what no check reads"), no case failed in its last run:
   the tag `release-N` on that commit, never moved or deleted afterwards. `node scripts/release.mjs` says what the next
-  one would carry. **Each release is tried on a real project first** (#1084). By default, before the `release` workflow
+  one would carry. **A release is cut from the commit its trial tried** (#1413, point 3). By default the `release`
+  workflow tags the commit of `main` that the trial's record on `main`'s newest commit names, where every check on it
+  passed, its tests in full and the Windows upgrade test among them, not `main`'s newest commit, so pull requests keep
+  merging while a trial runs. The one condition that changes it: the commit named is not of `main`, or does not follow
+  the newest release; then the workflow cuts nothing and says the mend, a trial on a newer commit. The trigger is the
+  start of the `release` workflow, by whoever starts it. A fix the trial finds moves the trial to a newer commit, whose
+  record then names it. It does not mean that a tag is ever moved, that a check passed on a later commit stands for the
+  commit tried, or that a release is cut on a merge alone or from a commit whose push's checks failed (floor rule 12).
+  Reason: while the cut had to be on `main`'s newest commit, merging stopped for the length of a trial, or the trial ran
+  again on a newer commit. Held by `tests/release-test.mjs`, for the commit read, the refusals and the step that reads it, and
+  by `tests/workflows-test.mjs`, for the runs read on it. **Each release is tried on a real project first** (#1084). By default, before the `release` workflow
   is started, the orchestrator has a builder at the strongest tier try the release on a copy of a project that takes the
   core and whose owner allows it, the owner's own as `scripts/state-report.mjs --projects` finds them, read-only,
   nothing written there: its checks run as on a pull request (`scripts/check.mjs --base <its main> --own --verdicts <a
@@ -243,6 +260,39 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   distribution's packages nor reachable, and its job failed after the sync for a reason not the release's. Held by
   `tests/toolchain-test.mjs` (a pin with no sum, a sum that differs and a host that refuses each fetch nothing; a pin
   listed is fetched, checked by its sum, outside the project); that the builder runs it, by nothing yet.
+  **A trial's brief is written by a tested script** (#1413, point 1). By default the orchestrator gives the builder of a
+  release's trial the brief that `node scripts/trial-brief.mjs <the commit under trial>` prints, and adds to it nothing
+  but the name of a project of another owner's, given in private by `--other`. The script finds the owner's own
+  projects as `scripts/state-report.mjs --projects` finds them, and sets out each step these rules ask: the clone kept
+  read-only, its pushes blocked and the block checked by reading it, never by a push expected to fail; the toolchain;
+  the run before the sync and the run after it; the pure-sync reading; the drafts in the owner's own projects; and the
+  record. The one condition that changes it: gh gives no answer for the owner's projects; then it prints no brief, its
+  failure says the mend, and the trial starts once gh answers. Each release's trial triggers it. It does not mean that
+  the brief finds, keeps or writes a project of another owner's anywhere but in what the orchestrator gives in private,
+  nor that a step of the brief stands in for the rule it carries out. Reason: release 6's trial took four rounds, and at least one fault lay in a
+  hand-written brief, which asked for a test that could never pass on a project the account can write. Held by
+  `tests/trial-brief-test.mjs`, which reads the brief for each of those steps and each command as one its script takes;
+  that the orchestrator gives it, by nothing yet.
+- **The owner's own projects try the core each day** (#1413, point 5). By default, once a day, the core's scheduled look
+  tries the core at `main`'s newest commit whose checks all passed on each project of the owner's own that takes it, as
+  a release's trial does (#1084): each project alone in a scratch clone on a fresh runner of the core's own, read-only,
+  the project's checks run before the sync and after it, and a project is held where the trial's record would hold a cut
+  (`scripts/daily-try.mjs`). Where one is held, the look files one bug here, from the counts alone, which waits for no
+  line, and notes on it each newer commit held, until it closes. The one condition that changes it: the owner has given
+  the core no read-only sign-in to the owner's private projects, the Actions secret `PROJECTS_READ`; then only the
+  public ones are tried, and the look files the issue that asks for it, labelled `needs-owner`, closing it once given.
+  Its trigger is the look's run each day, never a merge. It does not mean that anything is written to a project, a draft
+  included, which stays at a release's trial (#1334); that a project's own jobs run it or are billed for it; that a
+  project of another owner is tried; that the bug, a log or anything public names a project, or holds more of it than
+  counts and conclusions: a session where gh answers for the owner's account runs `node scripts/daily-try.mjs --local`,
+  which runs no project's code, to see which project each runner tried, and a session in that project its checks; nor
+  that a held try stops a merge or a release, which the trial still decides. Reason: release 6's faults were found at
+  its trial, round after round, long after the changes that brought them in. Held by `tests/daily-try-test.mjs` and
+  `tests/daily-try-file-test.mjs` (the owner's projects found with and without the sign-in, names masked, each runner
+  cloning its one project alone, the clone keeping no sign-in, each runner's counts read from its own log alone, the
+  projects' code given no key, a held project read as the trial reads it, a bug filed once from counts with no name and
+  noted again for a newer commit, the sign-in's issue filed and closed); that the look runs it, a project's code as a
+  user outside sudo, by `.github/workflows/own-look.yml`.
 - **Nothing locks a project,** in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
   what an agent can mend alone may bind, and what only the owner can do (a yes the floor names, a setting on the
@@ -353,7 +403,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
   is not done; or, where no check reads it, why, held by the staged case `steps`. Every standing entry has one. Every sync
   runs them all (`scripts/sync.mjs`) and prints, for the sync pull request's description, only the steps not done, and
-  every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`), and the packages it holds gone stale (`scripts/held.mjs`; #1095); where the core's packages cannot be installed it reads no step and says so
+  every difference from what the starter kit writes for a new project of the same kind but in the project's own words, which the one process keeps (`scripts/fresh.mjs`; #1361, point 27), and the packages it holds gone stale (`scripts/held.mjs`; #1095); where the core's packages cannot be installed it reads no step and says so
   in one line with its mend, and a step only a tool fetched at set-up reads is read where the session fetched it (#1095,
   points 2 and 4); each is
   a task the project's agents take (`roles/orchestrator.md`; with no orchestrator, the session that syncs), a step

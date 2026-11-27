@@ -4,9 +4,9 @@
 // selected out.
 //
 // A test reaches a file where the file lies on the test's imports, followed from file to file (the shape check's
-// readers: shape.mjs, beside this file, dynamic imports among them), or where a file of JavaScript or TypeScript on that
-// way names it, outside a comment, by its name ("scripts/build.mjs", as a script is started by its path), or where it
-// is the __init__.py of a package a file of Python on that way lies in, which Python runs on each import; from a file of
+// readers: shape.mjs, beside this file, dynamic imports among them), or where a file of JavaScript, TypeScript or Python
+// on that way names it, outside a comment ("scripts/build.mjs", as a script is started by its path), or lists a folder
+// it lies in (select-folders.mjs), or where it is the __init__.py of a package a file of Python on that way lies in; from
 // C#, the files that declare a type it may name, by a word in a namespace it sees or by a name written out in full
 // (select-csharp.mjs and select-csharp-project.mjs, which say what they read, and where a file's reach cannot be told).
 // A test the config's "select.whole" names reaches every file (one that copies or runs the whole project). It never guesses: where
@@ -23,6 +23,7 @@ import { CODE } from "./code-shape.mjs";
 import { WORDS, mentioned, nameTrie } from "./name-trie.mjs";
 import { CHARACTERS } from "./hurry.mjs";
 import { matcher } from "./select-matcher.mjs";
+import { folders, listed } from "./select-folders.mjs";
 import { csharpReach, undeclared } from "./select-csharp.mjs";
 import { CS, heldBeside, ofNoProject, tooMuch } from "./select-csharp-project.mjs";
 import { copyChange, copyReaching } from "./select-copy.mjs";
@@ -34,18 +35,17 @@ import { isCode } from "./shape-readers.mjs";
 // names more, never less)
 const uncommented = (text, py) => text.split("\n").filter(l => !(py ? /^\s*#/u : /^\s*(\/\/|\/\*|\*(\s|\/|$))/u).test(l)).join("\n");
 
-// Each file's links to the others: its imports (of C#, `csharp`'s links in their place); from JavaScript, TypeScript or Python, each file whose name (in Python
-// its dotted name too) it holds outside a comment; and from a file of Python, the __init__.py and conftest.py of its
-// folder and each folder above, which Python and pytest run with no import.
+// Each file's links to the others, as the header says (of C#, `csharp`'s in place of its imports); a Python file's
+// dotted names too, and the conftest.py of its folder and each above, which pytest runs with no import.
 const above = (name, file, texts) => ["", ...file.split("/").slice(0, -1).map((_, k, dirs) => `${dirs.slice(0, k + 1).join("/")}/`)].map(d => `${d}${name}`).filter(f => f !== file && f in texts);
 // A file of Python by its dotted name too ("pkg.rules"; a package's own for __init__.py and __main__.py).
 const dotted = f => f.replace(/\.py$/u, "").replace(/\/(__init__|__main__)$/u, "").split("/").join(".");
 export function links(texts, tests, reach, pace = () => {}, csharp = new Map()) {
   // (each name tried on each text took time in step with the count of names times the count of texts: the names are held in
   // a trie, walked once over each text, name-trie.mjs)
-  const byName = nameTrie(Object.keys(texts).map(f => [path.posix.basename(f), f]));
-  const byDotted = nameTrie(Object.keys(texts).filter(f => f.endsWith(".py") && dotted(f).includes(".")).map(f => [dotted(f), f]));
-  const out = new Map();
+  const files = Object.keys(texts), byName = nameTrie(files.map(f => [path.posix.basename(f), f]));
+  const byDotted = nameTrie(files.filter(f => f.endsWith(".py") && dotted(f).includes(".")).map(f => [dotted(f), f]));
+  const out = new Map(), dirs = folders(files, pace);
   for (const [file, text] of Object.entries(texts)) {
     pace();
     const to = new Set((CS.test(file) ? csharp : reach).get(file) ?? []), py = file.endsWith(".py");
@@ -53,6 +53,7 @@ export function links(texts, tests, reach, pace = () => {}, csharp = new Map()) 
       // (a Python module's dotted name is looked for in every text of code, as its pattern was, JavaScript's that starts `python -m` too)
       const plain = uncommented(text, py), named = mentioned(byName, plain, WORDS.name, pace);
       for (const f of mentioned(byDotted, plain, WORDS.dotted, pace)) named.add(f);
+      for (const f of listed(file, plain, dirs)) named.add(f);
       for (const f of named) if (f !== file) to.add(f);
     }
     // (Python runs a package's __init__.py on each import under it, and pytest a folder's conftest.py with no import)

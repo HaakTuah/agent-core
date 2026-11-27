@@ -109,7 +109,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    step not done, what the steps' writers wrote where a script does a step exactly, set aside in a git stash to commit
    in a PR of its own once the sync is merged (`scripts/steps.mjs --write --aside`; #1091), or, where a file a writer
    writes holds what the sync changed, put back with the command to run once it merges (#1259), every difference from what
-   the starter kit writes today (`scripts/fresh.mjs`), where the owner's
+   the starter kit writes today, save the words of the project's own that the one process keeps (`scripts/fresh.mjs`), where the owner's
    inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`), the settings only the owner
    gives where the sync brings one the old copy's list did not hold (`scripts/owner-settings.mjs`; "Setting up (the
    owner's part)"), what the project holds twice or against the core (`scripts/twice.mjs`), the line `Read for it:`
@@ -196,7 +196,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      config names under "pypi"), as floor topic 15's "A new one is looked up in
      its registry" says, and fails a lock entry a pull request brings from anywhere but npm's registry or with no
      integrity value: floor rule 7; the licence check also holds each `.npmrc` of "ignoreScriptsIn" to the week's wait
-     (`min-release-age=7`), and a program a file downloads by address to a version and a checksum, failing only what
+     (`min-release-age=7`), and a program a file downloads by address to a version and a checksum (a package of the
+     machine's distribution that the file installs, of kind "distribution", asked no version), failing only what
      a pull request adds and reporting what its base held: floor rule 7; and
      `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents, in
      Claude Code's, Kiro's or Codex's files, whatever their letter case or git stores at them, that the config's

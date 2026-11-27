@@ -3,7 +3,7 @@
 // file of it the tests that can run the copy (copyChange), and a workflow in which only the pins of calls to the core's
 // workflows moved, nothing (pinsOnly).
 import { CORE } from "./core-address.mjs";
-import { corePath } from "./core-path.mjs";
+import { copyHeld } from "./core-path.mjs";
 import { git } from "./select-passed.mjs";
 
 // A file of the project's copy of the core (#1093, point 2): its .node-version, the Node the suites run on, reaches
@@ -38,5 +38,6 @@ export function pinsOnly(base, changed) {
   }));
 }
 
-// The path of the project's copy of the core, or null in the core's own repository, where its files are the code.
-export const copyOf = () => { try { return corePath(".") || null; } catch { return null; } };
+// The path of the project's copy of the core, or null in the core's own repository, where its files are the code,
+// whatever manifest stands at its root (core-path.mjs's copyHeld).
+export const copyOf = () => { try { return copyHeld("."); } catch { return null; } };

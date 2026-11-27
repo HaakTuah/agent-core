@@ -191,9 +191,13 @@ const reviewRule = { type: "required_status_checks", parameters: { required_stat
 
 // ---- each sync prints what host.mjs reads, and that run fails nothing and writes nothing ----
 {
-  const r = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/host.mjs", import.meta.url))], { cwd: scratch(), encoding: "utf8" });
+  const at = scratch(), host = () => spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/host.mjs", import.meta.url))], { cwd: at, encoding: "utf8" });
   const listed = /\["labels\.mjs"\], \["host\.mjs"\]/.test(fs.readFileSync(new URL("../scripts/sync.mjs", import.meta.url), "utf8"));
-  ok(listed && r.status === 0 && /^The host was not read: the origin is on no github\.com/.test(r.stdout), "the sync runs host.mjs among its reports, and with no host to read it says so and fails nothing", `${r.status} ${r.stdout}${r.stderr}`);
+  const r = host();
+  ok(listed && r.status === 0 && /^The host was not read: the origin names no host/.test(r.stdout), "the sync runs host.mjs among its reports, and with no host named it says so and fails nothing", `${r.status} ${r.stdout}${r.stderr}`);
+  spawnSync("git", ["remote", "add", "origin", "https://gitlab.example/o/r"], { cwd: at });
+  const other = host();
+  ok(other.status === 0 && /^The host was not read: the origin is on no github\.com/.test(other.stdout), "an origin on another host is said to be on no github.com", `${other.stdout}${other.stderr}`);
 }
 
 // ---- each right of the look's workflows named with what it is for ----
