@@ -43,7 +43,7 @@ ok(/^--since takes a day/.test(NO_DAY), "and the refusal says what it takes");
 // A shallow clone holds no fix older than its boundary: the lister refuses it, with the mend, before it counts a part as the whole (#1422).
 {
   const steps = ["2026-11-01", "2026-11-05", "2026-11-10", "2026-11-15"].map((day, i) => ({ day, subject: `Change ${i + 1} (#${i + 1})`, files: { "scripts/a.mjs": `export const n = ${i};\n` } }));
-  const h = scratchHistory("fixes-shallow-", steps), cut = h.clone("cut", "--depth", "2"), whole = h.clone("whole");
+  const h = scratchHistory("fixes-shallow-", steps), cut = h.clone("cut", 2), whole = h.clone("whole");
   const early = cutShort("2026-11-02", [], cut), late = cutShort("2026-11-20", [], cut), behind = [{ sha: a, parent: b, second: c, brought: [{ sha: c, parent: null }] }];
   ok(typeof early === "string" && /shallow/.test(early) && /--since 2026-11-02 reaches before it/.test(early) && mended(`FAIL: ${early}`), "in a shallow clone a day before its boundary is refused: it says the clone could not hold the span, and its mend", String(early));
   ok(late === null && cutShort("2026-11-02", [], whole) === null, "a day after the boundary is read, and a whole clone is read from any day", String(late));
