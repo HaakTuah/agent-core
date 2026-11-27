@@ -21,7 +21,7 @@
     "tests/mutation-tools-test.mjs": { "mark": 20863, "why": "the question of a split is asked in #1253" },
     "tests/nuget-gate-test.mjs": { "mark": 21798, "why": "the question of a split is asked in #1326" },
     "tests/steps-write-test.mjs": { "mark": 27675, "why": "the question of a split is asked in #1253" },
-    "tests/stryker-test.mjs": { "mark": 23205, "why": "One script's tests, read by their headings (---- … ----) and found by searching; the runs with Stryker itself share the scratch repository the cases beside them build, so a split would have a reader open two files where one does now" },
+    "tests/stryker-test.mjs": { "mark": 24074, "why": "One script's tests, read by their headings (---- … ----) and found by searching; the runs with Stryker itself share the scratch repository the cases beside them build, so a split would have a reader open two files where one does now" },
     "tests/converge-test.mjs": { "mark": 22202, "why": "the question of a split is asked in #1283" },
     "scripts/labels.mjs": { "mark": 22008, "why": "the question of a split is asked in #1186" },
     "scripts/sync.mjs": { "mark": 22147, "why": "the question of a split is asked in #1250" },

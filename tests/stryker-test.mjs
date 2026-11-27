@@ -145,6 +145,12 @@ try {
   ok(made.__stryker__.activeMutant === "4" && same(Object.keys(made), ["a"]) && handed(undefined, "4").__stryker__.activeMutant === "4" && handed({}, undefined).__stryker__ === undefined
     && handed(kept, "4").__stryker__.activeMutant === "9" && handed(vm.createContext({}), "4").__stryker__ === undefined && argsOf([], "t.mjs")[0] === "--import" && same(argsOf(["v.mjs", "run"], "t.mjs"), ["v.mjs", "run", "t.mjs"]),
   "a new context's object is given the fault switched on, unseen by its keys; none where none is on, nor one that is a context or holds its own; a test node runs is given the preload, one vitest runs is not");
+  const refusing = new Proxy({}, { defineProperty: () => false }), frozen = Object.freeze({ a: 1 }), sealed = Object.seal({ a: 1 });
+  ok([frozen, sealed, Object.preventExtensions({}), refusing].every(o => handed(o, "4") === o && !Object.hasOwn(o, "__stryker__")),
+    "an object that takes no new property, frozen, sealed, not extensible or a Proxy that refuses it, is left as it was given, and nothing throws");
+  const imported = spawnSync(process.execPath, ["--input-type=module", "-e", `import ${JSON.stringify(new URL("../scripts/stryker-vm.mjs", import.meta.url).href)}; import vm from "node:vm"; console.log(typeof vm.createContext({}).__stryker__);`],
+    { encoding: "utf8", env: { ...process.env, __STRYKER_ACTIVE_MUTANT__: "4" } }).stdout.trim();
+  ok(imported === "undefined", "a script that imports the preload for its name, a fault switched on, finds node:vm as it was", imported);
   const inVm = "import vm from 'node:vm';\nconst read = 'typeof __stryker__ === \"object\" ? __stryker__.activeMutant : \"none\"';\nconsole.log([vm.runInContext(read, vm.createContext({})), vm.runInNewContext(read), new vm.Script(read).runInNewContext({})].join());\n";
   fs.writeFileSync(path.join(scratch, "in-vm.mjs"), inVm);
   const vmRun = active => spawnSync(process.execPath, argsOf([], path.join(scratch, "in-vm.mjs")), { encoding: "utf8", env: { ...process.env, __STRYKER_ACTIVE_MUTANT__: active } }).stdout.trim();

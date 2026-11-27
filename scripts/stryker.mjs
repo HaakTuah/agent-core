@@ -36,9 +36,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { LONGEST, Refused, copyOf, limitOf, projectOf, refuse, run, stopAll, takeAway, testsOf, wantedOf } from "./mutate.mjs";
 import { started } from "./started.mjs";
 import { parseBounded } from "./guards.mjs";
+import { ACTIVE } from "./stryker-vm.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ACTIVE = "__STRYKER_ACTIVE_MUTANT__"; // (the variable Stryker's command runner names the fault to switch on by)
 // A path as one word of the shell the command runner starts, read as it is written: in single quotes off Windows, each
 // of its own written as '\'', so no $, ` or \ is expanded; in double quotes on Windows, where a path that holds one, or
 // a %, is refused, as is one that holds a line break anywhere.
