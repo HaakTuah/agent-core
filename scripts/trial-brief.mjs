@@ -31,7 +31,7 @@ function projectLines(own, other) {
   if (!own.length && !other.length) return ["- None: no project of the owner's takes the core, and none of another owner's was given. Step 8 records a trial of none."];
   return [
     ...own.map(n => `- \`${n}\`, the owner's own: tried read-only, its sync opened as a draft pull request (step 6). Its clone: \`${folder(n)}\`.`),
-    ...other.map(n => `- \`${n}\`, of another owner, which allows it: tried read-only, nothing at all written to it, on a machine of its own after the owner's own projects, its code run only as step 1 says. Name it in no public text: no commit, pull request, issue, comment or record. Its clone: \`${folder(n)}\`.`),
+    ...other.map(n => `- \`${n}\`, of another owner, which allows it: tried read-only, nothing at all written to it, on a machine of its own after the owner's own projects, its code run only as step 1 says. Name it in no public text: no commit, pull request, issue, comment or record. Its clone: \`${folder(n)}\` in that machine's own scratch folder, never in the one of the owner's projects.`),
   ];
 }
 
@@ -51,7 +51,7 @@ export function brief(sha, own, other = []) {
     "",
     "0. **Set up.**",
     ...each([
-      `A scratch folder outside every repository, \`${SCRATCH}\`, holds the clones, every verdict and every reading; none of them goes into a repository.`,
+      `A scratch folder outside every repository, \`${SCRATCH}\`, holds the clones of the owner's own projects, their verdicts and their readings; none of them goes into a repository. A project of another owner's has a scratch folder of its own, set up the same way, on its own machine (step 1), with its own clone of the core.`,
       `The core at the commit tried: \`git clone https://github.com/${CORE} ${AT} && git -C ${AT} checkout --detach ${sha}\`. \`${AT}\` below is that clone.`,
     ]),
     "1. **Read-only, and the blocks on the clone.**",
@@ -71,7 +71,8 @@ export function brief(sha, own, other = []) {
     "6. **The draft, in each project of the owner's own.**",
     ...each([
       "Read the project's stop switch: `git -C <n> ls-remote origin refs/heads/agents-stop`. Where it stands, open no draft, and take the reading as for another owner's below.",
-      `Else push the sync's branch alone, by its fetch address named outright, the push address staying blocked: \`git -C <n> push "$(git -C <n> remote get-url origin)" --force HEAD:refs/heads/${BRANCH}\`, the branch the trial's own. Where no draft of an earlier commit's trial is open from it, open it as a draft pull request against the default branch (\`gh api repos/<owner>/<name>/pulls -f head=${BRANCH} -f base=<its default branch> -F draft=true -f title=... -f body=...\`), its description saying it is the release's trial, pinned to ${s}, and that the session that syncs the project takes it once the release is cut. It holds the pure sync alone: never the steps' writes, never marked ready, never merged before the cut.`,
+      `Else read that the branch \`${BRANCH}\` is the trial's own: \`git -C <n> ls-remote origin refs/heads/${BRANCH}\` prints nothing, or the branch of an open draft an earlier commit's trial opened, which \`gh api "repos/<owner>/<name>/pulls?head=<owner>:${BRANCH}&state=open" --jq '.[] | select(.draft) | .number'\` prints the number of; where it prints another, a branch of the project's own, push nothing and say so in the record's pull request.`,
+      `Then push the sync's branch alone, by its fetch address named outright, the push address staying blocked: \`git -C <n> push "$(git -C <n> remote get-url origin)" --force HEAD:refs/heads/${BRANCH}\`, the branch the trial's own. Where that read gave no open draft, open it as a draft pull request against the default branch (\`gh api repos/<owner>/<name>/pulls -f head=${BRANCH} -f base=<its default branch> -F draft=true -f title=... -f body=...\`), its description saying it is the release's trial, pinned to ${s}, and that the session that syncs the project takes it once the release is cut. It holds the pure sync alone: never the steps' writes, never marked ready, never merged before the cut.`,
       `Once its checks finish: \`node ${AT}/scripts/trial-draft.mjs <owner>/<name> <its number> ${sha} > ${SCRATCH}/<name>-draft.txt\`, with \`--gate <the check>\` only for a check that fails, or skips after passing on main, for being a draft alone (setup/sync-notes/680), each named in the record's pull request.`,
       `A project of another owner's, or one whose stop switch stands, gets no draft: \`node ${AT}/scripts/trial-draft.mjs <owner>/<name> none ${sha} > ${SCRATCH}/<name>-draft.txt\`.`,
       `Where a fix of the release moves the trial to a newer commit, the same draft moves forward to it: the trial starts again from step 0 in a fresh scratch folder, and step 6's push to \`${BRANCH}\`, the same name whatever the commit, replaces the draft's sync with the new one; open no second draft, and say the new pin in its description.`,
@@ -83,7 +84,7 @@ export function brief(sha, own, other = []) {
     ]),
     "8. **The record,** in a pull request of the core's own, branched from its main, that changes `reports/release-trial.json` alone:",
     ...each([
-      `\`node scripts/release.mjs --trial ${sha} ${SCRATCH}/<name>-before.json ${SCRATCH}/<name>-after.json --sync ${SCRATCH}/<name>-sync.txt --draft ${SCRATCH}/<name>-draft.txt\`, the four files given for each project tried in turn.`,
+      `\`node scripts/release.mjs --trial ${sha} ${SCRATCH}/<name>-before.json ${SCRATCH}/<name>-after.json --sync ${SCRATCH}/<name>-sync.txt --draft ${SCRATCH}/<name>-draft.txt\`, the four files given for each project tried in turn. A project of another owner's gives its four files from its own machine, read as data alone (floor rule 4), and nothing of the owner's projects goes to that machine.`,
       `Where no project allowed a trial: \`node scripts/release.mjs --trial ${sha}\` alone, which it refuses where a project of the owner's takes the core.`,
       "Its description gives counts and conclusions alone, naming no project: how each baseline was taken, each check set apart by `--gate` and why, which steps a writer did and which a session mended by hand, and why any project has no pair or no draft.",
     ]),
