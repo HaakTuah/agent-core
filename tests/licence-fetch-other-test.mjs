@@ -55,7 +55,8 @@ for (const [what, change, why] of [
 // (#1437); one from an address, or from a source or with options the scan cannot read exactly, is still a fetch.
 for (const code of ["execFileSync(\"git\", [\"clone\", \"-q\", \"--depth\", String(depth), \"--\", `file://${src}`, to]);",
   "execFileSync('git', ['clone', '--quiet', `file://${src}`, 'copy'], { cwd: dir, stdio: 'ignore' });", 'spawnSync("git", ["clone", "--bare", "/tmp/moss", "moss.git"]);',
-  "execFileSync(`git`, [`clone`, `./${name}`]);", 'execFileSync("git", [\n  "clone",\n  "--shallow-since=2026-11-01",\n  "../moss",\n]);']) {
+  "execFileSync(`git`, [`clone`, `./${name}`]);", 'execFileSync("git", [\n  "clone",\n  "--shallow-since=2026-11-01",\n  "../moss",\n]);',
+  'execFileSync("git", ["clone", "file:///tmp/moss", "copy"], { cwd, "windowsHide": true, timeout: 60_000 });']) {
   const f = run(write("scripts/copy.mjs", `${code}\n`));
   ok(!f.some((m) => /fetches what no entry/u.test(m)), `passes a git clone of a local source: ${JSON.stringify(code)}`, f.join("\n"));
 }
@@ -65,7 +66,9 @@ for (const code of ['execFileSync("git", ["clone", "https://mossgrip.example/mos
   'execFileSync("git", ["clone", ...options, "file:///tmp/moss"]);', 'execFileSync("git", ["clone", "--recurse-submodules", "file:///tmp/moss"]);',
   'execFileSync("git", ["clone", "-c", "url.https://mossgrip.example/.insteadOf=/tmp/", "/tmp/moss"]);', 'execFileSync("git", ["clone", "file:///tmp/moss", to]);',
   'execFileSync("git", ["clone", "file:///tmp/moss"], { env: { ...process.env, ...moss } });', 'execFileSync("git", ["clone", "file:///tmp/moss"], options);',
-  'execFileSync("git", ["clone", "file:///tmp/moss" /* or https */]);', 'execFileSync("git", ["clone", "c:\\\\moss"]);']) {
+  'execFileSync("git", ["clone", "file:///tmp/moss" /* or https */]);', 'execFileSync("git", ["clone", "c:\\\\moss"]);',
+  'spawnSync("git", ["clone", `./${name}`], { shell: true });', 'spawnSync("git", ["clone", "/tmp/moss"], { cwd: dir, "shell": "/bin/sh" });',
+  'spawnSync("git", ["clone", "/tmp/moss"], { cwd, ...rest });', 'execFileSync("git", ["clone", `./${name.replace(/x/, "y")}`]);']) {
   const f = run(write("scripts/copy.mjs", `${code}\n`));
   ok(f.some((m) => /fetches what no entry/u.test(m)), `fails a git clone from an address, or one the scan cannot read exactly: ${JSON.stringify(code)}`, f.join("\n") || "(it passed)");
 }

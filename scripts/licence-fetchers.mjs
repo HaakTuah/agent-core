@@ -72,7 +72,7 @@ function exprEnd(text, i) {
   for (; i >= 0 && i < text.length; i++) {
     const ch = text[i];
     if (!depth.length && ",)]}".includes(ch)) return i;
-    if ("'\"`".includes(ch)) i = stringEnd(text, i);
+    if ("'\"`".includes(ch)) { i = stringEnd(text, i); if (i < 0) return -1; }
     else if (ch === "/") return -1;
     else if ("([{".includes(ch)) depth.push(")]}"["([{".indexOf(ch)]);
     else if (")]}".includes(ch) && depth.pop() !== ch) return -1;
@@ -99,7 +99,7 @@ function arrayAt(text, i) {
     i = text[end] === "," ? end + 1 : end;
   }
 }
-const localSource = (a) => (a.kind === "text" && a.value !== "" && !/[:\n]/u.test(a.value) && !/^(?:-|\/\/|\\\\)/u.test(a.value)) ||
+const localSource = (a) => (a.kind === "text" && !a.value.includes("\n") && (a.value.startsWith("file://") || (a.value !== "" && !a.value.includes(":") && !/^(?:-|\/\/|\\\\)/u.test(a.value)))) ||
   (a.kind === "template" && (a.head.startsWith("file://") || /^(?:\/(?!\/)|\.\.?\/)/u.test(a.head)));
 // How many arguments the option args[k] takes, itself and its value, or 0 where it is none of those above.
 function optionAt(args, k) {
@@ -124,13 +124,29 @@ function localArguments(args) {
   }
   return source !== null;
 }
-// Whether the call whose array of arguments ends at text[end] closes there, or after an object of options that sets no
-// environment.
+// The options a call may give a local clone: none of them runs it through a shell or sets its environment.
+const CALL_OPTIONS = new Set(["cwd", "stdio", "encoding", "timeout", "maxBuffer", "windowsHide"]);
+// The place after the "}" of an object of options that opens at text[i], each of its keys among those above, written
+// plainly, alone or with a value that can be read, or -1.
+function optionsEnd(text, i) {
+  for (i++; ; ) {
+    const key = /^\s*(?:\}|(?:([A-Za-z]\w*)|"(\w+)"|'(\w+)')\s*(:?))/u.exec(text.slice(i));
+    if (!key) return -1;
+    if (key[0].trim() === "}") return i + key[0].length;
+    if (!CALL_OPTIONS.has(key[1] ?? key[2] ?? key[3]) || (!key[4] && !key[1])) return -1;
+    i += key[0].length;
+    if (key[4]) i = exprEnd(text, i);
+    else while (/\s/u.test(text[i] ?? "")) i++;
+    if (text[i] !== "," && text[i] !== "}") return -1;
+    if (text[i] === ",") i++;
+  }
+}
+// Whether the call whose array of arguments ends at text[end] closes there, or after an object of options (above).
 function callCloses(text, end) {
   const after = /^\s*(?:\)|,\s*)/u.exec(text.slice(end));
   if (!after || after[0].trim() === ")") return Boolean(after);
-  const at = end + after[0].length, close = text[at] === "{" ? exprEnd(text, at) : -1, options = text.slice(at, Math.max(at, close));
-  return close > 0 && options.trim().endsWith("}") && !/\benv\b|\.\.\.|GIT_/u.test(options) && /^\s*,?\s*\)/u.test(text.slice(close));
+  const at = end + after[0].length, close = text[at] === "{" ? optionsEnd(text, at) : -1;
+  return close > 0 && /^\s*,?\s*\)/u.test(text.slice(close));
 }
 // Whether the match m of OTHER_FETCHER is a clone by git, written as an array, whose source reads exactly as local (above).
 function localClone(text, m) {
