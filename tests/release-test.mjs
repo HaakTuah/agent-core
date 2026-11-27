@@ -11,7 +11,8 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
+import { OWN, costed, fullRun, held, inTheCore, next, older, tried } from "../scripts/release.mjs";
+import { TRIAL } from "../scripts/release-trial.mjs";
 import { STEPS } from "../scripts/steps.mjs";
 import { NOTICE } from "../scripts/sync-notes.mjs";
 import { scratchCore, victimRepo } from "../scripts/releases-scratch.mjs";
@@ -51,9 +52,24 @@ ok(refused, "a tag numbered so high that the next would be no release's name sto
 git(core, "tag", "-d", "release-999999999");
 dir = fetched();
 const tip = git(core, "rev-parse", "main");
-let moved = "";
-try { next(dir, c4); } catch (e) { moved = e.message; }
-ok(next(dir, tip).sha === tip && moved.includes("main has moved on"), "asked for one commit, the cut is refused where main's newest commit is another");
+// (#1413, point 3: the release stands on the commit of main its trial tried, main having moved on since)
+const refusal = at => { try { next(dir, at); return ""; } catch (e) { return e.message; } };
+const later = commit(`${head}- **First.** Done when one.\n- **Second.** Done when two.\n- **Third.** Done when three.\n`);
+dir = fetched();
+ok(next(dir, tip).sha === tip && next(dir, tip).tip === later && next(dir, tip).asks.join() === "- **Third.** Done when three.", "asked for a commit of main that main has moved on from, the release stands on it, carrying what the notes gained up to it alone", JSON.stringify(next(dir, tip)));
+ok(/is no commit of main's/.test(refusal(side)) && /is no commit of main's/.test(refusal("not a commit")), "a commit that is not main's, or no commit, is refused");
+ok(/does not follow release-5, the newest release/.test(refusal(c2)) && next(dir, c4) === null, "one before the newest release is refused, and the newest release's own commit has nothing to hand on");
+// (with no commit asked, as the preview reads it: the one the trial's record on main names, where it follows the newest release)
+const record = sha => { fs.mkdirSync(path.join(core, "reports"), { recursive: true }); fs.writeFileSync(path.join(core, TRIAL), JSON.stringify({ commit: sha })); git(core, "add", "-A"); git(core, "commit", "-q", "-m", "the trial's record"); };
+record(tip);
+dir = fetched();
+ok(tried(dir) === tip && next(dir).sha === tip && next(dir).tip !== tip, "the preview stands on the commit the trial's record on main names", JSON.stringify(next(dir)));
+record(c2);
+dir = fetched();
+ok(tried(dir) === c2 && next(dir).sha === git(core, "rev-parse", "main"), "and on main's newest commit where the record names one the newest release does not come before");
+record("no sha");
+dir = fetched();
+ok(tried(dir) === null && next(dir).sha === git(core, "rev-parse", "main"), "or where it names no commit");
 
 // the checks on the commit a release would stand on
 const run = (name, status, conclusion, path = `.github/workflows/${name}.yml`) => ({ name, path, status, conclusion });
@@ -63,6 +79,7 @@ const list = (...runs) => ({ total_count: runs.length, workflow_runs: runs });
 // (each bears the workflow's own name, as GitHub gives a run whose run-name is empty: tests-parts-test.mjs reads the rest)
 const full = (event, conclusion, id, status = "completed", at = `2026-11-19T10:${String(id).padStart(2, "0")}:00Z`) => ({ ...run("tests", status, conclusion), event, id, run_started_at: at, display_title: "tests" });
 ok(/have not run in full on it yet/.test(fullRun(list({ ...run("tests", "completed", "success"), event: "push" }))), "a commit whose tests ran only on its push, on Linux, has not had them in full, and the release waits, saying how to start them");
+ok(/main has moved on from it, so no run can be started there any more: try the release on a newer commit/.test(fullRun(list(), true)) && !/moved on/.test(fullRun(list())), "on a commit main has moved on from, where no run can be started any more, the mend is a trial on a newer commit");
 ok(fullRun(list(full("schedule", "success", 10))) === null && fullRun(list(full("workflow_dispatch", "success", 10))) === null, "an hourly or a hand-started run that passed lets the release stand");
 ok(fullRun(list(full("workflow_dispatch", "success", 10), full("schedule", "failure", 9))) === null && /hourly run\): failure/.test(fullRun(list(full("schedule", "failure", 10), full("workflow_dispatch", "success", 9)))), "the newest of them, by when it last started, decides, in whatever order GitHub lists them: a pass started after a failure lets it stand, a failure started after a pass holds it");
 ok(/hand-started run\): failure/.test(fullRun(list(full("schedule", "success", 20), full("workflow_dispatch", "failure", 10, "completed", "2026-11-19T11:00:00Z")))) && fullRun(list(full("schedule", "failure", 20, "completed", "2026-11-19T10:00:00Z"), full("schedule", "success", 10, "completed", "2026-11-19T10:00:00Z"))) !== null, "an older run started again by hand, which failed, holds it over a skipped run made before; two that started together, the one made last decides");

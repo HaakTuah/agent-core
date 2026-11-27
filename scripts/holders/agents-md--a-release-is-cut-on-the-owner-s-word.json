@@ -1,6 +1,6 @@
 {
   "rule": "AGENTS.md: A release is cut on the owner's word",
-  "holder": ["check: scripts/release.mjs, in part", "check: scripts/release-trial.mjs, in part", "check: scripts/trial-sync.mjs, in part", "check: scripts/trial-draft.mjs, in part", "check: scripts/trial-draft-record.mjs, in part", "check: tests/toolchain-test.mjs, in part"],
-  "behind": [195, 196, 197, "#1084", "#1257", "#1261", "#1334", "#1361.21"],
+  "holder": ["check: scripts/release.mjs, in part", "check: scripts/release-trial.mjs, in part", "check: scripts/trial-sync.mjs, in part", "check: scripts/trial-draft.mjs, in part", "check: scripts/trial-draft-record.mjs, in part", "check: tests/toolchain-test.mjs, in part", "check: tests/release-test.mjs, in part", "check: tests/workflows-test.mjs, in part"],
+  "behind": [195, 196, 197, "#1084", "#1257", "#1261", "#1334", "#1361.21", "#1413.3"],
   "number": "correction: does not work; outcome: robust"
 }

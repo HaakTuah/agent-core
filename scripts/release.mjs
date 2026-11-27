@@ -1,5 +1,6 @@
 // Cuts a release of the core (README.md, "How a project takes the core", point 1; AGENTS.md, "A release is cut on the
-// owner's word"): the tag `release-N`, N one past the newest release's, on the newest commit of the core's main. A
+// owner's word"): the tag `release-N`, N one past the newest release's, on the commit of the core's main its trial
+// tried (#1413, point 3), which the trial's record on main's newest commit names, or main's newest where none does. A
 // project that follows the releases (releases.mjs, beside this file) takes the core only from such a tag, so a release
 // is what the core's owner hands on to another owner's project, on purpose. Run in the core's own repository alone: in
 // a project's copy it refuses, since a project cuts no release. Without --cut it says what the release would be and
@@ -7,18 +8,18 @@
 // done yet: steps.mjs, beside this file) and how a copy older than release-1 would take it, and cuts nothing; with
 // --cut it says the same, and how such a copy takes it once it is cut. The owner tags nothing by hand: the release
 // workflow (.github/workflows/release.yml) runs the cut, started by a session on the owner's word, once its own jobs of
-// the upgrade test on Windows have passed on that commit (#715), and hands it the commit it was started on and GitHub's
-// list of the checks that ran there; the cut is refused where main has moved on
-// from that commit, or where a check on it has not passed; and, once the staged cases hold a release (staged.mjs,
-// beside this file), where one failed in its last run as that commit's record holds it; and where the trial on a real
-// project (release-trial.mjs, beside this file; #1084) has no record that stands for that commit, or one where a check passed before the
+// the upgrade test on Windows have passed on that commit (#715), and hands it that commit and GitHub's list of the
+// checks that ran there; the cut is refused where that commit is no commit of main's or does not follow the newest
+// release, where a check on it has not passed; and, once the staged cases hold a release (staged.mjs, beside this
+// file), where one failed in its last run as main's newest record holds it; and where the trial on a real
+// project (release-trial.mjs, beside this file; #1084) has no record on main's newest commit that stands for it, or one where a check passed before the
 // update and failed after it, or one was not measured, a job check.mjs could not read (#1263), or one failed on the draft of
 // the sync in the owner's own projects that passed on main or ran on the draft alone (trial-draft.mjs; #1334). Git and Node's own modules only.
 //
 //   node scripts/release.mjs          what the next release would be, and what it carries
 //   node scripts/release.mjs --cut --at <sha> --runs <file> --full <file>
 //                                     cuts it: the tag is pushed to the core's repository, and nothing else is. Only
-//                                     where main's newest commit is <sha>, the checks listed in --runs, GitHub's
+//                                     where <sha> is a commit of main's past the newest release, the checks listed in --runs, GitHub's
 //                                     answer to repos/<core>/actions/runs?head_sha=<sha>&branch=main&event=push, have
 //                                     all passed, and the tests' hourly or hand-started runs in --full, its answer to
 //                                     repos/<core>/actions/workflows/tests.yml/runs?head_sha=<sha>&branch=main, are none
@@ -42,9 +43,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { FOLDER, NOTICE } from "./sync-notes.mjs";
-import { NOTES, OWN, RELEASE, asksBetween, fetchCore, held, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
+import { aCommit } from "./guards.mjs";
+import { NOTES, OWN, RELEASE, asksBetween, fetchCore, held, inBare, namedReleases, past, plainEnv, releasesIn } from "./releases.mjs";
 import { atRelease } from "./staged.mjs";
-import { trial, trialAt } from "./release-trial.mjs";
+import { TRIAL, trial, trialAt } from "./release-trial.mjs";
 import { FULL, NARROWED } from "./tests-parts.mjs";
 import { started } from "./started.mjs";
 import { STEPS } from "./steps.mjs";
@@ -52,19 +54,28 @@ import { STEPS } from "./steps.mjs";
 const git = (args, cwd) => execFileSync("git", args, { cwd, env: plainEnv(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
 // The next release in a repository that holds the core's main and its tags: its name, the commit it would stand on,
-// the release before it (null: the first), and what a sync from that one to it asks of a project. Null where the
-// newest release already stands on main's newest commit: there is nothing to hand on. It is numbered after every tag
+// the release before it (null: the first), and what a sync from that one to it asks of a project. It stands on the
+// commit `at` of main, the one the trial tried (#1413, point 3), or, where none is given, on the commit the trial's
+// record on main's newest commit names where that follows the newest release, else on main's newest commit. Null
+// where the newest release already stands on that commit: there is nothing to hand on. It is numbered after every tag
 // with a release's name, one that is no release included, so its name is never taken; and it throws where that number
-// would be no release's name any more, and where `at` is given and main's newest commit is another: main has moved
-// on since whoever asks looked at it.
+// would be no release's name any more, and where `at` is no commit of main's or does not follow the newest release.
 export function next(dir, at = null) {
   const tip = inBare(dir, ["rev-parse", "refs/heads/main"]).trim();
-  if (at !== null && at !== tip) throw new Error(`main's newest commit is ${tip}, not ${at}: main has moved on, so start the release again`);
   const [before] = releasesIn(dir);
-  if (before?.sha === tip) return null;
+  if (at !== null && !past(at, tip, dir)) throw new Error(`${String(at).slice(0, 7)} is no commit of main's: start the release again once the trial's record on main names a commit of main`);
+  const named = at ?? tried(dir);
+  const sha = at ?? (named && past(named, tip, dir) && (!before || (named !== before.sha && past(before.sha, named, dir))) ? named : tip);
+  if (before?.sha === sha) return null;
+  if (before && !past(before.sha, sha, dir)) throw new Error(`${sha.slice(0, 7)} does not follow ${before.name}, the newest release: try the release on a newer commit of main, and record that trial`);
   const name = `release-${(namedReleases(dir).at(-1)?.n ?? 0) + 1}`;
   if (!RELEASE.test(name)) throw new Error(`${name} is no release's name: a tag numbered too high stands in the way, and is the owner's to remove`);
-  return { name, sha: tip, before: before ?? null, asks: before ? asksBetween(before.sha, tip, dir) : [] };
+  return { name, sha, tip, before: before ?? null, asks: before ? asksBetween(before.sha, sha, dir) : [] };
+}
+
+// The commit the trial's record on main's newest commit names (release-trial.mjs, TRIAL), or null where none is read.
+export function tried(dir) {
+  try { const r = JSON.parse(inBare(dir, ["show", `refs/heads/main:${TRIAL}`])); return aCommit(r?.commit) ? r.commit : null; } catch { return null; }
 }
 
 // An entry the release asks, with its step's cost (steps.mjs) on the line below it; an entry with no step says so, and
@@ -121,37 +132,43 @@ const inFull = list => (Array.isArray(list?.workflow_runs) ? list.workflow_runs 
   && (r?.event === "schedule" || (r?.event === "workflow_dispatch" && byHand(r))));
 // (it holds while any full run on the commit is unfinished, and reads the newest: an hourly run skips only where none
 // other is going and the newest passed, so a skipped one is the newest only where nothing started after it)
-export function fullRun(list) {
+// A run started by hand tests main's newest commit alone, so on a commit main has moved on from (`behind`) none can be
+// started any more, and the mend is a trial on a newer commit.
+export function fullRun(list, behind = false) {
   const runs = inFull(list);
-  if (!runs.length) return "the tests have not run in full on it yet, the Windows suites with them: start the tests workflow on main by hand (its page under Actions), naming no part, or wait for its hourly run, and start the release again once it has passed";
+  if (!runs.length) return behind
+    ? "the tests have not run in full on it, the Windows suites with them, and main has moved on from it, so no run can be started there any more: try the release on a newer commit of main whose tests in full have passed, record that trial, and start the release again"
+    : "the tests have not run in full on it yet, the Windows suites with them: start the tests workflow on main by hand (its page under Actions), naming no part, or wait for its hourly run, and start the release again once it has passed";
   const going = runs.find(r => r?.status !== "completed");
   if (going) return `the tests in full (their ${going?.event === "schedule" ? "hourly" : "hand-started"} run): ${going?.status ?? "unreadable"}`;
   const last = lastOf(runs), how = last?.event === "schedule" ? "hourly" : "hand-started";
   return last?.conclusion === "success" ? null : `the tests in full (their ${how} run): ${last?.conclusion ?? "unreadable"}`;
 }
 
-function whyNot(name, sha, staged, trialed, runs, fullFile) {
+function whyNot(name, sha, tip, staged, trialed, runs, fullFile) {
   if (staged.held) return `${name} is not cut: ${staged.held}.`;
   if (trialed.held) return `${name} is not cut: ${trialed.held}.`;
   const readList = f => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } };
   const list = readList(runs), full = readList(fullFile);
-  const notFull = Array.isArray(full?.workflow_runs) ? fullRun(full) : "the tests' runs on it could not be read";
+  const notFull = Array.isArray(full?.workflow_runs) ? fullRun(full, sha !== tip) : "the tests' runs on it could not be read";
   const reasons = [...held(list), ...notFull ? [notFull] : []];
   return reasons.length ? `${name} is not cut: the checks on ${sha.slice(0, 7)} have not all passed. Start the release again once they have.\n${reasons.map(r => `  ${r}`).join("\n")}` : null;
 }
 
 // Prints what the release is, what it asks of a project, and what the staged cases and the trial on a real project say
 // of it; gives those two.
-function told({ name, sha, before, asks }, dir) {
-  console.log(`${name} at ${sha}${before ? `, after ${before.name} at ${before.sha.slice(0, 7)}: https://github.com/${CORE}/compare/${before.name}...${sha}` : ", the first release"}`);
+function told({ name, sha, tip, before, asks }, dir) {
+  console.log(`${name} at ${sha}${sha === tip ? "" : `, the commit its trial tried, main standing at ${tip.slice(0, 7)}`}${before ? `, after ${before.name} at ${before.sha.slice(0, 7)}: https://github.com/${CORE}/compare/${before.name}...${sha}` : ", the first release"}`);
   console.log(asks === null
     ? `What it asks of a project beyond the copy could not be read: read the entries of ${FOLDER}/ newer than ${before.name}.`
     : asks.length
       ? `It asks more of a project than the copy (${NOTES}), each with roughly what it costs a project where it is not done yet:\n${asks.map(costed).join("\n")}`
       : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);
-  const staged = atRelease(sha, before, rev => inBare(dir, rev));
+  // (the staged cases' newest verdicts, on main's newest commit, where the runs at the release are recorded: #1413, point 3)
+  const staged = atRelease(tip, before, rev => inBare(dir, rev));
   console.log(staged.said);
-  const trialed = trialAt(sha, rev => inBare(dir, rev));
+  // (the record read on main's newest commit, where it merged after the commit it names: #1413, point 3)
+  const trialed = trialAt(sha, rev => inBare(dir, rev), "refs/heads/main");
   console.log(trialed.said);
   if (trialed.held) console.log(`Until then it is not cut: ${trialed.held}.`);
   return { staged, trialed };
@@ -171,11 +188,11 @@ function main(argv) {
   try {
     fetchCore(dir);
     const release = next(dir, at);
-    if (!release) { console.log(`the newest release, ${releasesIn(dir)[0].name}, already stands on main's newest commit: nothing to release`); return; }
+    if (!release) { console.log(`the newest release, ${releasesIn(dir)[0].name}, already stands on the commit a release would stand on: nothing to release`); return; }
     const { name, sha } = release;
     const { staged, trialed } = told(release, dir);
     if (!cut) { console.log(older(name, sha)); console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
-    const stop = whyNot(name, sha, staged, trialed, runs, full);
+    const stop = whyNot(name, sha, release.tip, staged, trialed, runs, full);
     if (stop) return fail(stop);
     // (the commit goes straight to the new tag on the core's repository: a tag that exists is never moved)
     inBare(dir, ["push", "--quiet", `https://github.com/${CORE}`, `${sha}:refs/tags/${name}`]);

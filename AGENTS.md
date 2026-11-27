@@ -176,10 +176,20 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   never by a session's own choice: the owner's standing word is that it may each time the queue is worked through ("One
   batch, then one release"). The owner tags nothing by hand: the owner, or a session the owner tells and whose own
   limits let it, starts the `release` workflow on `main` (its page under Actions has the button;
-  `.github/workflows/release.yml`), and the workflow cuts it only where every check on `main`'s newest commit has passed
+  `.github/workflows/release.yml`), and the workflow cuts it only where every check on the commit it stands on has passed
   and, once the staged cases hold a release ("Staged cases hold what no check reads"), no case failed in its last run:
   the tag `release-N` on that commit, never moved or deleted afterwards. `node scripts/release.mjs` says what the next
-  one would carry. **Each release is tried on a real project first** (#1084). By default, before the `release` workflow
+  one would carry. **A release is cut from the commit its trial tried** (#1413, point 3). By default the `release`
+  workflow tags the commit of `main` that the trial's record on `main`'s newest commit names, where every check on it
+  passed, its tests in full and the Windows upgrade test among them, not `main`'s newest commit, so pull requests keep
+  merging while a trial runs. The one condition that changes it: the commit named is not of `main`, or does not follow
+  the newest release; then the workflow cuts nothing and says the mend, a trial on a newer commit. The trigger is the
+  start of the `release` workflow, by whoever starts it. A fix the trial finds moves the trial to a newer commit, whose
+  record then names it. It does not mean that a tag is ever moved, that a check passed on a later commit stands for the
+  commit tried, or that a release is cut on a merge alone or from a commit whose push's checks failed (floor rule 12).
+  Reason: while the cut had to be on `main`'s newest commit, merging stopped for the length of a trial, or the trial ran
+  again on a newer commit. Held by `tests/release-test.mjs`, for the commit read and the refusals, and by
+  `tests/workflows-test.mjs`, for the workflow's wiring. **Each release is tried on a real project first** (#1084). By default, before the `release` workflow
   is started, the orchestrator has a builder at the strongest tier try the release on a copy of a project that takes the
   core and whose owner allows it, the owner's own as `scripts/state-report.mjs --projects` finds them, read-only,
   nothing written there: its checks run as on a pull request (`scripts/check.mjs --base <its main> --own --verdicts <a

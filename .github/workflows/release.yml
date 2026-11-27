@@ -1,5 +1,6 @@
 # Cuts a release of the core (AGENTS.md, "A release is cut on the owner's word"; README.md, "How a project takes the
-# core", point 1): the tag `release-N` on main's newest commit, which the owner never pushes by hand. It cuts only when
+# core", point 1): the tag `release-N` on the commit of main its trial tried, as the trial's record on main's newest
+# commit names it, main moving on meanwhile (#1413, point 3), which the owner never pushes by hand. It cuts only when
 # started by hand, which takes write access to this repository: the owner, or a session the owner told to and whose own
 # limits let it, starts it on main (its page under Actions has the button). On any other branch it fails before
 # anything is read. Before the cut it runs the upgrade test on Windows on that commit (tests/upgrade-test.mjs, which on
@@ -9,12 +10,12 @@
 # one whose visibility could not be read) only before a release. It cuts only where that test passed, every check the
 # push of that commit to main started has finished and passed, the newest run of the core's tests on that commit, once
 # an hour or started by hand, has passed too, so the Windows suites passed there (#733, points 3 and 6: a pull
-# request's run and a push's are on Linux alone), and main has not moved on since the run began (scripts/release.mjs, which also numbers the
-# release and never moves a tag that exists); otherwise it fails, says which check holds it, and is started again
+# request's run and a push's are on Linux alone), and the trial's record on main's newest commit, when the cut reads
+# it, still names that commit (scripts/release.mjs, which also numbers the release and never moves a tag that exists); otherwise it fails, says which check holds it, and is started again
 # later. This repository only; no project calls it. The cut may write this repository's contents, which the tag needs,
 # and read its Actions runs; that token reaches the one step that cuts, through git's own credential helper, and is
 # never written into a command or a file. The first job's token, which reads only, asks whether the repository is
-# public; the upgrade test has none. It takes no input: a run's inputs are shown to anyone who can read the repository
+# public and, for a release, reads the commit the trial tried; the upgrade test has none. It takes no input: a run's inputs are shown to anyone who can read the repository
 # before any step could check them, so the owner's word for a release is not written here (floor rule 11), and no text
 # of anyone's reaches a step.
 name: release
@@ -39,6 +40,7 @@ jobs:
     timeout-minutes: 2
     outputs:
       public: ${{ steps.visibility.outputs.public }}
+      at: ${{ steps.at.outputs.at }}
     steps:
       - name: Only on main
         run: |
@@ -54,6 +56,21 @@ jobs:
           private=$(gh api "repos/$GITHUB_REPOSITORY" --jq .private || true)
           echo "private: ${private:-not read}"
           echo "public=$([ "$private" = false ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      # (a release stands on the commit its trial tried, which the trial's record on main's newest commit names, read
+      # through GitHub's API and held to a full SHA before any job takes it; the daily run tests main's newest commit)
+      - name: The commit the release would stand on, the one its trial tried (#1413, point 3)
+        id: at
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          at="$GITHUB_SHA"
+          if [ "$EVENT" = workflow_dispatch ]; then
+            at=$(gh api -H "Accept: application/vnd.github.raw" "repos/$GITHUB_REPOSITORY/contents/reports/release-trial.json?ref=$GITHUB_SHA" | jq -r '.commit // empty' || true)
+            printf '%s' "$at" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::the trial's record on main's newest commit (reports/release-trial.json) names no commit that was tried, or could not be read. Mend: try the release on a real project and record it with node scripts/release.mjs --trial, in a pull request of its own, as AGENTS.md says (\"A release is cut on the owner's word\"); then start the release workflow again"; exit 1; }
+          fi
+          echo "the commit: $at"
+          echo "at=$at" >> "$GITHUB_OUTPUT"
 
   # (the upgrade test on Windows in five jobs side by side, each a part of it under its own time mark in .github/shape.json,
   # "upgrade-" and the part's name, and well inside the job's time: a project kind of the older of the last two releases,
@@ -75,6 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.main.outputs.at }} # the commit the release would stand on, a full SHA the first job checked
           persist-credentials: false # the test reads only
           fetch-depth: 0 # every release tag and the commits behind them: the test syncs from the last two releases
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -94,7 +112,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: write # the tag; the steps below write nothing else
-      actions: read # the runs on main's newest commit
+      actions: read # the runs on the commit the release would stand on
     defaults:
       run:
         shell: bash
@@ -107,18 +125,19 @@ jobs:
           node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: The core's packages, installed from its lock file for the release (#654)
         run: node scripts/install.mjs
-      - name: The release, cut where the upgrade test on Windows, every check on main's newest commit and the newest of its hourly or hand-started runs of the tests have passed, none of them unfinished, and the trial on a real project stands for that commit with no check failed after the update
+      - name: The release, cut on the commit its trial tried where the upgrade test on Windows, every check on that commit and the newest of its hourly or hand-started runs of the tests have passed, none of them unfinished, and the trial on a real project stands for it with no check failed after the update
         env:
           GH_TOKEN: ${{ github.token }}
+          AT: ${{ needs.main.outputs.at }}
         run: |
           # (the runs the push of that commit started, and, apart, the tests' runs on it, of whose hourly or hand-started
           # ones none may be unfinished and the newest, by when it last started, decides, however many stand there)
           runs=$(mktemp) full=$(mktemp)
-          gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs" -f head_sha="$GITHUB_SHA" -f branch=main -f event=push -F per_page=100 > "$runs"
+          gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs" -f head_sha="$AT" -f branch=main -f event=push -F per_page=100 > "$runs"
           # (the tests' runs, every page of them, gathered into one list: a page that cannot be read stops the step)
-          gh api --paginate -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$GITHUB_SHA" -f branch=main -F per_page=100 --jq '.workflow_runs[]' > "$full.pages"
+          gh api --paginate -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$AT" -f branch=main -F per_page=100 --jq '.workflow_runs[]' > "$full.pages"
           jq -s '{ workflow_runs: . }' "$full.pages" > "$full"
           # (git asks this helper for the push's password; it answers from the step's own environment)
           git config --global credential.https://github.com.helper \
             '!f() { test "$1" = get && printf "username=x-access-token\npassword=%s\n" "$GH_TOKEN"; }; f'
-          node scripts/release.mjs --cut --at "$GITHUB_SHA" --runs "$runs" --full "$full" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          node scripts/release.mjs --cut --at "$AT" --runs "$runs" --full "$full" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
