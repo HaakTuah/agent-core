@@ -167,12 +167,19 @@ function callCloses(text, end) {
 }
 // The functions of Node's that run a program with its arguments as given, through no shell unless an option says so.
 const DIRECT_CALLS = new Set(["execFileSync", "execFile", "spawnSync", "spawn"]);
-const IMPORTS = /^import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["'];?$/gmu;
+const IMPORT = /^import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["'];?$/u;
 const IDENT = "\\p{ID_Continue}$\\u200c\\u200d";
-// The words after which a name stands alone, and the file's opening: its blank lines, comments of either kind and
-// imports (none holding a comment), up to the first line that is none of them.
+// The words after which a name stands alone, and a part of the file's opening: a blank, a comment of either kind or an
+// import (holding no comment); the opening runs up to the first text that is none of them.
 const AFTER = new RegExp(`(?:^|[^${IDENT}.#\\s])\\s*(?:return|else|await|void|yield|throw|case|do|in|of|typeof)$`, "u");
-const OPENING = /^(?:\s|\/\/[^\n]*|\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\/|#![^\n]*|import\s[^;'"`/]*["'][^"'\n]*["'];?)*/u;
+const OPENING_PART = /\s+|\/\/[^\n]*|\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\/|#![^\n]*|(import\s[^;'"`/]*["'][^"'\n]*["'];?)/uy;
+// The imports of the file's opening, outside its comments, and the place where the opening ends.
+function opening(text) {
+  const imports = [];
+  let end = 0;
+  for (let m; (OPENING_PART.lastIndex = end, m = OPENING_PART.exec(text)); end = OPENING_PART.lastIndex) if (m[1]) imports.push(m[1]);
+  return { imports, end };
+}
 // Whether a name at text[i] stands alone: before it, read back past spaces, the start of the text, a mark or one of the
 // words above, after which no ".", "#", comment or longer name can stand, on a line that holds no "//".
 function standsAlone(text, i) {
@@ -180,15 +187,15 @@ function standsAlone(text, i) {
   return before === "" || ((/[;{}()=,:?!&|[>]$/u.test(before) || AFTER.test(before)) && !line.includes("//"));
 }
 // Whether the call whose first argument opens at text[i] is of one of those functions by its own name, standing alone
-// (above), which the file's opening imports by that name from node:child_process, and which it uses nowhere but in calls
-// that stand alone.
+// (above), which an import of the file's opening names from node:child_process, and which the code after the opening
+// uses nowhere but in calls that stand alone.
 function directCall(text, i) {
-  const call = /([\w$]+)\s*\(\s*$/u.exec(text.slice(0, i)), name = call?.[1];
-  if (!DIRECT_CALLS.has(name) || !standsAlone(text, call.index)) return false;
-  const opening = OPENING.exec(text)[0];
-  const rest = opening.replace(IMPORTS, (line, names) => (names.split(",").some((entry) => entry.trim() === name) ? "\0;" : line)) + text.slice(opening.length);
-  return rest.includes("\0") && [...rest.matchAll(new RegExp(`(?<![${IDENT}#])${name}(?![${IDENT}])`, "gu"))]
-    .every((m) => /^\s*\(/u.test(rest.slice(m.index + name.length)) && standsAlone(rest, m.index));
+  const call = /([\w$]+)\s*\(\s*$/u.exec(text.slice(0, i)), name = call?.[1], { imports, end } = opening(text);
+  const rest = text.slice(end);
+  if (!DIRECT_CALLS.has(name) || call.index < end || !standsAlone(rest, call.index - end)) return false;
+  return imports.some((line) => IMPORT.exec(line)?.[1].split(",").some((entry) => entry.trim() === name)) &&
+    [...rest.matchAll(new RegExp(`(?<![${IDENT}#])${name}(?![${IDENT}])`, "gu"))]
+      .every((m) => /^\s*\(/u.test(rest.slice(m.index + name.length)) && standsAlone(rest, m.index));
 }
 // Whether the match m of OTHER_FETCHER is a clone by git, written as an array, whose source reads exactly as local (above).
 function localClone(text, m) {

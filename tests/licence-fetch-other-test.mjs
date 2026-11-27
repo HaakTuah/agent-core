@@ -91,6 +91,8 @@ for (const code of ['execFileSync("git", ["clone", "https://mossgrip.example/mos
   ok(f.some((m) => /fetches what no entry/u.test(m)), "fails a local clone by a function whose import stands only in a string, past the file's opening", f.join("\n") || "(it passed)");
   const g = run(write("scripts/copy.mjs", 'import fs /*\nimport { execFileSync } from "node:child_process";\n*/ from "node:fs";\nexecFileSync("git", ["clone", "/tmp/moss"]);\n'));
   ok(g.some((m) => /fetches what no entry/u.test(m)), "fails a local clone by a function whose import stands only in a comment", g.join("\n") || "(it passed)");
+  const h = run(write("scripts/copy.mjs", '/* A header\nimport { execFileSync } from "node:child_process";\n*/\nconst moss = 1;\nexecFileSync("git", ["clone", "/tmp/moss"]);\n'));
+  ok(h.some((m) => /fetches what no entry/u.test(m)), "fails a local clone by a function whose import stands only in the opening's comment", h.join("\n") || "(it passed)");
 }
 
 done();
