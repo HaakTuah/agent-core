@@ -12,7 +12,8 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { check as licenceCheck } from "../scripts/licences.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
-import { pinFault, readsData } from "../scripts/licence-scan.mjs";
+import { pinFault } from "../scripts/licence-scan.mjs";
+import { readsData } from "../scripts/licence-reads.mjs";
 
 // A program a file downloads by its address is pinned by version and checksum (#488, point 5): read against the pull
 // request's base, a file that stood unpinned is reported, and one a pull request adds or unpins fails, saying the mend.
@@ -238,5 +239,15 @@ const scratchRepo = (prefix) => {
   ok(progs.every((d) => !readsData(d)), "a program's address, data piped into a shell, a download whose address another read makes and one with no address written are each no read of data", progs.filter(readsData).join(" | "));
   const twice = "curl -s https://mossgrip.example/index.json | jq -r .url | xargs curl -fsSLO";
   ok(!readsData(twice, [twice, twice]), "a second download in the same words, as on one line, is no read of data");
+  // (what a read keeps in a file, or a file runs as code, a later line may run: a program's download all the same)
+  const saved = ["curl -o payload.txt https://mossgrip.example/payload.txt", "curl -fsSLO https://mossgrip.example/index.json", "curl -s --output=index.json https://mossgrip.example/index.json",
+    "wget https://mossgrip.example/payload.txt", "wget -q -O payload.txt https://mossgrip.example/payload.txt", "curl -s https://mossgrip.example/payload.txt > payload.txt",
+    "curl -s https://mossgrip.example/payload.txt | tee payload.txt", "Invoke-WebRequest https://mossgrip.example/payload.txt -OutFile payload.txt", "curl -s https://mossgrip.example/index.json | xargs -n1 sh"];
+  ok(saved.every((d) => !readsData(d)), "a download kept in a file, by curl, wget, a redirect, tee or PowerShell, or handed to xargs, is no read of data", saved.filter((d) => readsData(d)).join(" | "));
+  const out = ["wget -qO- https://dl.example/release/stable.txt", "wget -q -O - https://dl.example/index.json", "curl -s -o - https://dl.example/index.json", "curl -s https://dl.example/index.json 2>/dev/null", "Invoke-RestMethod -Method Get https://dl.example/index.json"];
+  ok(out.every((d) => readsData(d)), "one sent to its own output, an error sent away, and PowerShell's -Method, keep nothing in a file", out.filter((d) => !readsData(d)).join(" | "));
+  const LATER = "curl -o payload.txt https://mossgrip.example/payload.txt\nbash payload.txt\n";
+  ok(/holds no checksum/u.test(pinFault([moss], "audit.json", SH, LATER)?.what ?? ""), "a text file kept and run on a later line is asked its checksum (#1455)");
+  ok(/holds no checksum/u.test(pinFault([moss], "audit.json", SH, "V=$(curl -fsS https://mossgrip.example/index.json)\neval \"$V\"\n")?.what ?? ""), "a read in a file that runs text as code is asked its checksum");
 }
 done();

@@ -19,9 +19,9 @@
 //     (curl, wget, PowerShell's) and an entry covering it audits what may be a program (no data, asset, font, service
 //     of GitHub's or the owner's own work), each such entry names its version, but a package of the machine's
 //     distribution (kind "distribution"), whose version is the distribution's, and the file holds, for each download
-//     but a read of data (readsData, below: a version index), a checksum of its own and a command that checks by one
-//     (sha256sum, shasum, Get-FileHash and the like) (floor rule 7), a file that stood unpinned at the pull request's
-//     base reported;
+//     but a read of data (a version index: licence-reads.mjs), a checksum of its own and a command that checks by
+//     one (sha256sum, shasum, Get-FileHash and the like) (floor rule 7), a file that stood unpinned at the pull
+//     request's base reported;
 //   - an entry covering each script in a language it cannot read (Python, Ruby, PowerShell and the like): the entries
 //     of what it uses;
 //   - an entry covering each file but prose (Markdown, text) carrying a licence notice, code in any language or a text
@@ -40,7 +40,8 @@ import { join, posix } from "node:path";
 import { OWNER } from "./core-address.mjs";
 import { DEEPEST, leadsOut, parseBounded, tooDeep } from "./guards.mjs";
 import { commandLines, commands } from "./licence-commands.mjs";
-import { downloads, otherFetches } from "./licence-fetchers.mjs";
+import { otherFetches } from "./licence-fetchers.mjs";
+import { programDownloads } from "./licence-reads.mjs";
 import { fetched } from "./licence-npm.mjs";
 import { executable } from "./licence-pages.mjs";
 import { copyAmong } from "./core-path.mjs";
@@ -171,19 +172,6 @@ const NO_PROGRAM = new Set(["own", "data", "asset", "font", "github-service"]);
 // A package of the machine's distribution, which its package manager installs (apt, dnf, apk, brew, choco and the
 // like): a program, whose version is the distribution's, so its entry is asked none (#1361, point 11).
 const DISTRIBUTION = "distribution";
-// A file no program is written in, by the end of the address's path: JSON, XML, YAML, TOML and plain text, the forms
-// a version index is read in; and a pipe into a shell or another interpreter, which runs what it is given.
-const DATA_FILE = /\.(?:json|xml|ya?ml|toml|txt)$/iu;
-const RUNS_IT = /\|\s*(?:sudo\s+)?(?:(?:ba|z|da|k|fi)?sh|iex|Invoke-Expression|pwsh|powershell|node|deno|bun|python[\d.]*|perl|ruby|php)(?![\w-])/iu;
-/** Whether the download `line`, one of `all` (downloads), reads data and no program (#1361, point 11): every address it
- *  names literally ends in a file of DATA_FILE, it names one at least, it pipes into nothing that runs it (RUNS_IT), and
- *  no other download of `all` stands in the same words, as a second download on the same line would. */
-export function readsData(line, all = [line]) {
-  const addresses = [...line.matchAll(/https?:\/\/[^\s"'`<>|;&()\\]+/giu)].map((m) => m[0].replace(/[?#].*$/su, ""));
-  return addresses.length > 0 && addresses.every((a) => DATA_FILE.test(a)) && !RUNS_IT.test(line) && all.filter((d) => d === line).length === 1;
-}
-// The downloads of `code` that may fetch a program: all but those that read data (readsData).
-const programDownloads = (code) => { const all = downloads(code); return all.filter((d) => !readsData(d, all)); };
 // A checksum written out: SHA-256 or SHA-512 as hex, or an integrity value as npm writes one; and the commands that
 // check a file against one, an allow-list: sha256sum, sha512sum and shasum, PowerShell's Get-FileHash, certutil's
 // -hashfile and Node's createHash.
