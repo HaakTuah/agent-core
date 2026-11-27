@@ -170,8 +170,10 @@ if (process.platform !== "win32") {
     const since = (cwd, extra = {}) => spawnSync(process.execPath, ["--input-type=module", "-e", `import { sinceHere } from ${JSON.stringify(new URL("../scripts/labels.mjs", import.meta.url).href)}; console.log(sinceHere());`], { cwd, env: { ...env, ...extra }, encoding: "utf8" }).stdout.trim();
     ok(since(full) === "2027-02-01T09:00:00Z", "from the day git's history shows the copy gained the check", since(full));
     const deep = path.join(tmp, "deep"), shallow = path.join(tmp, "shallow");
-    git(tmp, "", "clone", "-q", "--depth", "3", `file://${full}`, deep);
-    git(tmp, "", "clone", "-q", "--depth", "1", `file://${full}`, shallow);
+    spawnSync("git", ["clone", "-q", "--no-checkout", "--depth", "3", "--", `file://${full}`, deep], { cwd: tmp, encoding: "utf8" });
+    git(deep, "", "reset", "-q", "--hard");
+    spawnSync("git", ["clone", "-q", "--no-checkout", "--depth", "1", "--", `file://${full}`, shallow], { cwd: tmp, encoding: "utf8" });
+    git(shallow, "", "reset", "-q", "--hard");
     ok(since(deep) === "2027-02-01T09:00:00Z", "a shallow clone whose history holds the add reads it", since(deep));
     ok(since(shallow) === SINCE, "a shallow clone that shows the file only on its boundary commit reads the rule's own day, never a later one", since(shallow));
     const noGit = path.join(tmp, "no-git");
