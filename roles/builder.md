@@ -16,6 +16,9 @@ reads each file it adds, checks the work against it and lists it on the descript
 mean it opens no other file. Reason: a module the change turned out to call for went unread until a review found it.
 Held, in part, by the description check, which fails a line that leaves out a file the changed paths call for.
 
+**Points of one issue, built together** where no orchestrator hands them out: as `roles/orchestrator.md`, "Small points
+of one issue that share a file go in one pull request", says.
+
 **Hands over, gets back:**
 - the orchestrator: word when its PR is ready, when it merges and when it hands over by its context; back, its line
   and brief.

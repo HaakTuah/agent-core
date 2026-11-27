@@ -9,4 +9,4 @@ The index, and how an item is written: `archive/instructions.md`.
      issue. A pull request here cost about the same whatever its size, since each carries its builder's start, its
      reviews and its checks, and on 26 November 2026 11 of the 19 open pull requests were single small points of one
      issue; each merge also makes every other open pull request stale. It stands behind "Small points of one issue
-     that share a file go in one pull request" in `roles/orchestrator.md`.
+     that share a file go in one pull request" in `roles/orchestrator.md`, and the pointer to it in `roles/builder.md`.
