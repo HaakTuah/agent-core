@@ -15,30 +15,20 @@ const GIT_CALL = new RegExp(String.raw`(?<![\w$#])(?:execFileSync|execFile|spawn
 // What changes a parameter's arguments before they reach git.
 const changes = (p, body) => new RegExp(String.raw`(?<![\w$.])${esc(p)}\s*(?:(?:[-+*]|\?\?|\|\||&&)?=(?!=)|\+\+|--|\[[^\]]*\]\s*=(?!=)|\.\s*(?:unshift|splice|shift|reverse|sort|fill|copyWithin)\b)`, "u").test(body);
 
-// The words after which a "/" opens a regular expression, not a division, and those whose condition's ")" it follows.
-const BEFORE_REGEX = /(?:^|[^\w$.])(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/u;
-const BEFORE_CONDITION = /(?:^|[^\w$.])(?:if|while|for|with)\s*$/u;
+// The words after which a "/" opens a regular expression, not a division, and what may stand before such a word.
+const BEFORE_REGEX = /(?<![\p{ID_Continue}$#])(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/u;
+const BEFORE_WORD = /[;{}()[\],=:?!&|+\-*%<>~^]/u;
 // The place of the last character before text[i] that is not a space.
 const lastCode = (text, i) => i - 1 - /\s*$/u.exec(text.slice(Math.max(0, i - 200), i))[0].length;
-// Whether a "/" after the code that ends at text[last] (comments read past) divides: after a name, a number, a closing
-// bracket but a condition's ")", or a string; or null where it cannot be told, after "++" or "--", or after a ")" whose
-// "(" cannot be found by brackets alone.
+// Whether a "/" after the code that ends at text[last] (comments read past) divides: after a name, a number, a "]" or a
+// string, but one of the words above where code of the kinds above, or nothing, stands before it; or null where it
+// cannot be told: after ")", "}", "/", "++" or "--", or after such a word with anything else before it.
 function divides(text, last) {
-  const before = text.slice(Math.max(0, last - 19), last + 1);
-  if (/(?:\+\+|--)$/u.test(before)) return null;
-  if (!/[\w$)\]'"\x60]$/u.test(before) || BEFORE_REGEX.test(before)) return false;
-  if (text[last] !== ")") return true;
-  const open = openOf(text, last);
-  return open < 0 ? null : !BEFORE_CONDITION.test(text.slice(Math.max(0, open - 20), open));
-}
-// The "(" that the ")" at text[i] closes, read back by brackets alone, or -1 where a string, comment or "/" stands between.
-function openOf(text, i) {
-  for (let depth = 0; i >= 0; i--) {
-    if ("'\"`/".includes(text[i])) return -1;
-    if (")]}".includes(text[i])) depth++;
-    else if ("([{".includes(text[i]) && --depth === 0) return i;
-  }
-  return -1;
+  const before = text.slice(Math.max(0, last - 19), last + 1), word = BEFORE_REGEX.exec(before);
+  if (/(?:[)}/]|\+\+|--)$/u.test(before)) return null;
+  if (!word) return /[\p{ID_Continue}$\]'"\x60]$/u.test(before);
+  const at = lastCode(text, last + 1 - word[0].length);
+  return at < 0 || BEFORE_WORD.test(text[at]) ? false : null;
 }
 // The place of the last character of what opens at the "/" text[i], after the code that ends at text[last]: the "/"
 // itself where it divides, else the "/" that closes its regular expression on that line, or -1 where none does or
