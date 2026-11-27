@@ -5,21 +5,32 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 
 ## In order
 
+Release 8 is these lines, the pull requests open now and the bugs found before its cut.
+
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #1345, #1385, #1380, #1401 | builder; release 8, one PR each | |
-| #1140 | builder; release 8 | |
-| #1413, point 4 | rule builder; release 8 | |
-| #1413, point 8 | rule builder; release 8 | the owner's Security-tab record (`needs-owner`) |
-| #1202 | rule builder; release 8; `AGENTS.md` and what every session here reads at its start | #1413's point 4 (`AGENTS.md`, one at a time) |
+| #1413, point 8 | rule builder; first confirm a session can write and read the record | |
+| #1202 | rule builder; `AGENTS.md` and what every session here reads at its start | |
 | #1504 | rule builder; `roles/orchestrator.md` | #1202 (what a role reads at its start, one at a time) |
 | #1505 | rule builder; `roles/shared/work-flow.md` | #1504 (what a role reads at its start, one at a time) |
-| #1118, #1113 to #1116, #1119 to #1121, #1106, #1109 to #1111 | rule builder; release 8, one PR each | |
-| #1123 | rule builder; release 8 | #974, #1060 (`roles/adviser.md`) |
-| #1098, #1133, #1356 | builder; release 8, one PR each | |
-| #1180, #1181 | rule builder; release 8, one PR each | |
-| #1182 | rule builder; release 8 | |
+| #1106 | rule builder | #1505, on the same files |
+| #1488 | builder | |
+| #1510 | builder | #1508, on the same files |
 | #810 | the orchestrator | the batch's end |
+
+## After release 8
+
+Each waits on release 8's cut too.
+
+| Issue | Who | Waits on |
+| --- | --- | --- |
+| #1118, #1113 to #1116, #1119 to #1121, #1109 to #1111 | rule builder; release 9, one PR each | |
+| #1123 | rule builder; release 9 | #974, #1060 (`roles/adviser.md`) |
+| #1098, #1133, #1356 | builder; release 9, one PR each | |
+| #1472 | builder; release 9 | #1510, on the same files |
+| #1475, #1476 | builder; release 9, one PR each | #1472, on the same files |
+| #1180, #1181 | rule builder; release 9, one PR each | |
+| #1182 | rule builder; release 9 | |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | |
 | #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
@@ -52,13 +63,13 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #1046 | rule builder; #767's third kind, `AGENTS.md` | |
 | #1051 | rule builder; each pull request records its own cost | |
 | #1052 | rule builder; `AGENTS.md`, the workflow tries its own settings | #1051 (its point 6); #1046 (`AGENTS.md`, one at a time) |
-| #1185 | rule builder; release 8 | #1052 (its trial of when a builder hands over); #1505 (the hand-over mark) |
+| #1185 | rule builder; release 9 | #1052 (its trial of when a builder hands over); #1505 (the hand-over mark) |
 | #1060 | rule builder; `roles/adviser.md` | #1052 (its record holds it in part); #974 (`roles/adviser.md`, one at a time) |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
 
-They read and change no rule.
+They read and change no rule, and wait on release 8's cut.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
