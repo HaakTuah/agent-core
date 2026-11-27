@@ -9,13 +9,6 @@ Release 8 is these lines, the pull requests open now and the bugs found before i
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #1413, point 8 | rule builder | |
-| #1202 | rule builder; `AGENTS.md` and what every session here reads at its start | |
-| #1504 | rule builder; `roles/orchestrator.md` | #1202 (what a role reads at its start, one at a time) |
-| #1505 | rule builder; `roles/shared/work-flow.md` | #1504 (what a role reads at its start, one at a time) |
-| #1106 | rule builder | #1505, on the same files |
-| #1488 | builder | |
-| #1510 | builder | #1508, on the same files |
 | #810 | the orchestrator | the batch's end |
 
 ## After release 8
@@ -26,6 +19,7 @@ Each waits on release 8's cut too.
 | --- | --- | --- |
 | #1118, #1113 to #1116, #1119 to #1121, #1109 to #1111 | rule builder; release 9, one PR each | |
 | #1123 | rule builder; release 9 | #974, #1060 (`roles/adviser.md`) |
+| #1566 | rule builder; release 9; `roles/adviser.md` | #1123 (`roles/adviser.md`, one at a time) |
 | #1098, #1133, #1356 | builder; release 9, one PR each | |
 | #1472 | builder; release 9 | #1510, on the same files |
 | #1475, #1476 | builder; release 9, one PR each | #1472, on the same files |
