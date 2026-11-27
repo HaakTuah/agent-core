@@ -10,21 +10,30 @@ export const badFetches = (e) => e.fetches !== undefined && (!e.fetches || typeo
 export const fetchesIn = (e, f) => (e && typeof e === "object" && e.kind !== "own" && !badFetches(e) && Object.hasOwn(e.fetches ?? {}, f) ? e.fetches[f].map((l) => l.replace(/\s+/gu, " ").trim()) : []);
 /** Whether an entry of `entries` names a fetch of the file `f`. */
 export const namesFetches = (entries, f) => entries.some((e) => fetchesIn(e, f).length);
+/** How a fetch of the file `f` that no entry of `entries` audits is mended: by its line in the "fetches" an entry names
+ *  for `f`, where one does, so that the file stays read; else by the file in an entry's "files". */
+export const auditMend = (entries, f) => (namesFetches(entries, f) ? `add its line, whitespace collapsed, to the "fetches" for ${f} of the entry that audits it` : `name ${f} in the "files" of the entry that audits it`);
 
 /** Of the fetches `found` in the file `f`, those no entry of `entries` names in its "fetches" there (`left`), each line
  *  it names standing for one; and `stale`, the lines named there that no fetch of `f` matches. */
-export function audited(entries, f, found) {
-  const named = entries.flatMap((e) => fetchesIn(e, f));
-  const left = found.filter((line) => { const i = named.indexOf(line); if (i < 0) return true; named.splice(i, 1); return false; });
-  return { left, stale: named };
+export const audited = (entries, f, found) => takeEach(found, entries.flatMap((e) => fetchesIn(e, f)));
+
+/** Of the lines `found`, those `named` does not hold (`left`), each line of `named` taking one; and `stale`, those of
+ *  `named` left over. The scan takes what stood at the base so too. */
+export function takeEach(found, named) {
+  const rest = [...named];
+  const left = found.filter((line) => { const i = rest.indexOf(line); if (i < 0) return true; rest.splice(i, 1); return false; });
+  return { left, stale: rest };
 }
+/** A fetch's line as a failure shows it, cut to 80 characters. */
+export const shown = (line) => (line.length > 80 ? `${line.slice(0, 79)}…` : line);
 export const unnamed = (entries, f, found) => audited(entries, f, found).left;
 
 /** The fetches `found` in the file `f` that no entry of the scan `c` names, each line named there that no fetch
  *  matches failing, saying its mend. */
 export function fetchesLeft(c, f, found) {
   const { left, stale } = audited(c.entries, f, found);
-  for (const line of stale) c.fail(`${c.auditPath}: "fetches" names, for ${f}, ${line.length > 80 ? `${line.slice(0, 79)}…` : line}, which is no fetch the scan reads there. Mend: write it as the scan prints that fetch, or take it out where the fetch is gone`);
+  for (const line of stale) c.fail(`${c.auditPath}: "fetches" names, for ${f}, ${shown(line)}, which is no fetch the scan reads there. Mend: write it as the scan prints that fetch, or take it out where the fetch is gone`);
   return left;
 }
 

@@ -39,7 +39,7 @@ import { readFileSync, statSync } from "node:fs";
 import { join, posix } from "node:path";
 import { OWNER } from "./core-address.mjs";
 import { DEEPEST, leadsOut, parseBounded, tooDeep } from "./guards.mjs";
-import { fetchesHeld, fetchesIn, fetchesLeft, namesFetches, unnamed } from "./licence-audit-fetches.mjs";
+import { auditMend, fetchesHeld, fetchesIn, fetchesLeft, namesFetches, shown, takeEach, unnamed } from "./licence-audit-fetches.mjs";
 import { commandLines, commands } from "./licence-commands.mjs";
 import { downloads, otherFetches } from "./licence-fetchers.mjs";
 import { fetched } from "./licence-npm.mjs";
@@ -106,6 +106,8 @@ const holds = (p, f) => typeof p === "string" && (p === "" || p === f || (p.ends
 const under = (f, paths) => (paths ?? []).some((p) => holds(p, f));
 const served = (c, f) => under(f, c.settings.served) && !under(f, c.settings.tools);
 export const covers = (e, f) => e.name === f || (Array.isArray(e.files) && e.files.some((p) => p !== "" && holds(p, f)));
+// Whether the entry `e` audits the file `f`: covers it, or names a fetch of it; the sync's step reads it so too.
+export const audits = (e, f) => covers(e, f) || fetchesIn(e, f).length > 0;
 const covering = (c, f) => c.entries.filter((e) => covers(e, f));
 const byHand = (c, f) => covering(c, f).some((e) => e.kind !== "own");
 const badFiles = (e) => e.files !== undefined && (!Array.isArray(e.files) || e.files.some((p) => typeof p !== "string" || !p));
@@ -119,8 +121,8 @@ function entryFaults(c, e) {
   if (e.version !== undefined && typeof e.version !== "string") fail(`${auditPath}: ${e.name}: "version" is not text. Mend: write the version in quotes`);
   if (e.kind === "own" && (e.version !== undefined || (e.files ?? []).some((p) => p.endsWith("/")))) fail(`${auditPath}: ${e.name}: the owner's own work names its files one by one, with no version. Mend: list each file, no folder, and take "version" out`);
   for (const p of e.files ?? []) if (!c.tracked.some((f) => holds(p, f))) fail(`${auditPath}: ${e.name}: ${p} names no tracked file. Mend: correct the path, or take it out`);
-  const shipped = c.files.find((f) => served(c, f) && covers(e, f));
-  if (shipped && e.ships !== true) fail(`${auditPath}: ${e.name}: it covers ${shipped}, which reaches users, so it ships. Mend: set "ships": true on it`);
+  const shipped = c.files.find((f) => served(c, f) && audits(e, f));
+  if (shipped && e.ships !== true) fail(`${auditPath}: ${e.name}: it ${covers(e, shipped) ? "covers" : "audits a fetch of"} ${shipped}, which reaches users, so it ships. Mend: set "ships": true on it`);
 }
 
 /** That the package `name` (used in `where`) has an entry, at `version` where one is given (scan, above). */
@@ -166,10 +168,9 @@ function unaudited(c, f, all) {
   const found = fetchesLeft(c, f, all);
   if (!found.length) return;
   const was = c.base ? atBase(c, f) : null, held = was === null ? [] : unnamed(baseEntries(c), f, byKind({ ...c, entries: baseEntries(c), read: (p) => atBase(c, p), fail() {}, reports: [] }, f, was));
-  const fresh = found.filter((line) => { const i = held.indexOf(line); if (i < 0) return true; held.splice(i, 1); return false; });
-  const shown = (line) => (line.length > 80 ? `${line.slice(0, 79)}…` : line), mend = `name ${f} in the "files" of the entry that audits it`;
-  if (fresh.length) c.fail(`${f}: ${shown(fresh[0])} fetches what no entry's "files" says. Mend: ${mend}`);
-  else c.reports.push(`${f}: ${shown(found[0])} fetches what no entry's "files" says; it stood so at the pull request's base, so it passes: ${mend}`);
+  const fresh = takeEach(found, held).left, mend = auditMend(c.entries, f);
+  if (fresh.length) c.fail(`${f}: ${shown(fresh[0])} fetches what no entry audits. Mend: ${mend}`);
+  else c.reports.push(`${f}: ${shown(found[0])} fetches what no entry audits; it stood so at the pull request's base, so it passes: ${mend}`);
 }
 
 // What is no program a download could fetch: the owner's own work, data, an asset, a font, a service of GitHub's.
@@ -188,9 +189,8 @@ const installs = (code, name) => typeof name === "string" && /^[\w.+-]+$/u.test(
 const CHECKSUM = /(?<![0-9a-f])(?:[0-9a-f]{64}){1,2}(?![0-9a-f])|sha(?:256|384|512)-[A-Za-z0-9+/]{43,}={0,2}/iu;
 const VERIFIER = /(?<![\w-])(?:sha(?:256|512)sum|shasum|Get-FileHash|certutil(?:\.exe)?\s+-hashfile|createHash)(?![\w-])/giu;
 
-const audits = (e, f) => covers(e, f) || fetchesIn(e, f).length > 0;
 /** What the code `code` of the file `f` (codeOf) lacks for the programs it downloads by address to be pinned, or
- *  null: of the audit's `entries` covering `f`, or naming a fetch of it, that audit what may be a program, each names its version (`bare`, those
+ *  null: of the audit's `entries` auditing `f` (audits) that audit what may be a program, each names its version (`bare`, those
  *  that do not), but one of kind "distribution" whose package a line of `f` installs (installs), and for each download
  *  the file holds a checksum of its own and a check by a
  *  command of VERIFIER (`deficit`, the downloads short of one). The scan and the sync's step (steps.mjs) read it alike. */
