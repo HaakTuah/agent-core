@@ -72,7 +72,7 @@ const real = p => { try { return fs.realpathSync.native(p); } catch { return p; 
 let CONFIG_AT;
 try { CONFIG_AT = git(["ls-files", "-z", "--full-name", "--error-unmatch", "--", configPath]).split("\0")[0]; } catch { CONFIG_AT = path.relative(real(ROOT), path.join(real(path.dirname(path.resolve(configPath))), path.basename(configPath))).split(path.sep).join("/"); }
 let config;
-try { config = JSON.parse(regularText(configPath) ?? ""); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
+try { config = JSON.parse(regularText(configPath, { bound: 1 << 26 }) ?? ""); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
 process.chdir(ROOT);
 // A key it does not know, or one of the wrong shape, would check less without a word, so it fails: its schema holds
 // the config's shape (scripts/schemas/copies.json, schemas.mjs). Where the core's packages are not installed, they are
@@ -176,7 +176,7 @@ function describeCopy(places, len, size, joiner, perFile, u, i) {
 }
 // Every run of `size` units found in two places that do not overlap; overlapping finds of one copy merge into one,
 // keyed by a hash of its first run, so its key stays the same while the copy stands.
-function find(files, units, size, joiner, minChars, read = f => ownText(f, { bound: BOUND }) ?? "") {
+function find(files, units, size, joiner, minChars, read = f => ownText(f, { bound: CODE }) ?? "") {
   const { perFile, seen } = indexWindows(files, units, size, joiner, minChars, read);
   const dup = apartPlaces(seen, size);
   const copies = [], used = new Set();
@@ -205,17 +205,18 @@ function once(files, placeOf) {
   const kept = new Set(by.values());
   return files.filter(f => kept.has(f));
 }
-// Where a file of the work tree leads, as once() reads it: a regular file of the project's own of at most BOUND bytes,
-// and at most TOTAL bytes of them in a run, its links followed; one that leads out of the project, to a folder, a
-// device or a pipe, or past a bound, is unread, and counted in `unread`, which the check notes.
-const BOUND = 1 << 23, TOTAL = 1 << 28, unread = new Set();
+// Where a file of the work tree leads, as once() reads it: a regular file of the project's own of at most `bound` bytes
+// (CODE of code, PROSE of prose, the bound SECURITY.md gives an agent tool's files), and at most TOTAL bytes of them in
+// a run, its links followed; one that leads out of the project, to a folder, a device or a pipe, or past a bound, is
+// unread, and counted in `unread`, which the check notes.
+const CODE = 1 << 23, PROSE = 1 << 20, TOTAL = 1 << 28, unread = new Set();
 let readSoFar = 0;
-const placeHere = f => {
+const placeHere = bound => f => {
   let at = null;
   try {
     if (!leadsOut(ROOT, f)) {
       const real = fs.realpathSync(f), st = fs.statSync(real);
-      if (st.isFile() && st.size <= BOUND && readSoFar + st.size <= TOTAL) { readSoFar += st.size; at = path.relative(fs.realpathSync("."), real).split(path.sep).join("/"); }
+      if (st.isFile() && st.size <= bound && readSoFar + st.size <= TOTAL) { readSoFar += st.size; at = path.relative(fs.realpathSync("."), real).split(path.sep).join("/"); }
     }
   } catch { at = null; }
   if (at === null) unread.add(f);
@@ -361,9 +362,9 @@ function toolCopiesAt(commit) {
 }
 let atBase = null;
 const stood = (h, n) => !!process.env.COPIES_BASE && TOOL_ONLY.size > 0 && ((atBase ??= toolCopiesAt(process.env.COPIES_BASE)).get(h) ?? 0) >= n;
-const CODE_FILES = once(ls(CODE_SPECS), placeHere);
-const runs = [find(CODE_FILES, codeUnits, LINES, "\n", MIN_CHARS), find(once(ls(proseSpecs), placeHere), proseUnits, WORDS, " ", 0)];
-if (unread.size) console.log(`note ${unread.size} of the files the config names ${unread.size === 1 ? "is" : "are"} not read: a link that leads out of the project or to no regular file, a file past ${BOUND >> 20} MiB, or past the ${TOTAL >> 20} MiB a run reads (${logged([...unread].slice(0, 5).join(", "))}${unread.size > 5 ? ", and more" : ""})`);
+const CODE_FILES = once(ls(CODE_SPECS), placeHere(CODE));
+const runs = [find(CODE_FILES, codeUnits, LINES, "\n", MIN_CHARS), find(once(ls(proseSpecs), placeHere(PROSE)), proseUnits, WORDS, " ", 0)];
+if (unread.size) console.log(`note ${unread.size} of the files the config names ${unread.size === 1 ? "is" : "are"} not read: a link that leads out of the project or to no regular file, a file of code past ${CODE >> 20} MiB or of prose past ${PROSE >> 20} MiB, or past the ${TOTAL >> 20} MiB a run reads (${logged([...unread].slice(0, 5).join(", "))}${unread.size > 5 ? ", and more" : ""})`);
 const found = runs.flatMap(r => r.copies);
 const places = new Map(runs.flatMap(r => [...r.dup].map(([h, list]) => [h, list.length])));
 // (the copies that stand in an agent tool's file, and their windows)
@@ -462,7 +463,7 @@ function nearCopies() {
   const lines = new Map();
   const exact = place => {
     const [, file, from, to] = /^(.*):(\d+)-(\d+)$/.exec(place);
-    if (!lines.has(file)) lines.set(file, (ownText(file, { bound: BOUND }) ?? "").split("\n"));
+    if (!lines.has(file)) lines.set(file, (ownText(file, { bound: CODE }) ?? "").split("\n"));
     return codeUnits(lines.get(file).slice(from - 1, to).join("\n")).map(u => u.t).join("\n");
   };
   return find(CODE_FILES, text => codeUnits(text).map(u => ({ ...u, t: skeleton(u.t) })), LINES, "\n", NEAR_CHARS).copies.filter(c => new Set(c.places.map(exact)).size > 1);

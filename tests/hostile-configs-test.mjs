@@ -16,7 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { BEGIN, END, converged, stubOf } from "../scripts/core-owned.mjs";
 import { loadConfig } from "../scripts/licences.mjs";
-import { notes } from "../scripts/manifest-reads.mjs";
+import { notes, projectNotes } from "../scripts/manifest-reads.mjs";
 import { rewritten } from "../scripts/step-checks-modules.mjs";
 import modules from "../scripts/steps/160-the-modules-a-project-takes.mjs";
 import { mended } from "../scripts/mend.mjs";
@@ -40,7 +40,7 @@ fs.mkdirSync(outside);
 const write = (f, text) => { fs.mkdirSync(path.dirname(path.join(p, f)), { recursive: true }); fs.writeFileSync(path.join(p, f), text); };
 const gitP = (...args) => execFileSync("git", args, { cwd: p, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const run = (script, ...args) => {
-  const started = Date.now(), r = spawnSync(process.execPath, [path.join(p, "core/scripts", script), ...args], { cwd: p, encoding: "utf8", maxBuffer: 1 << 28 });
+  const started = Date.now(), r = spawnSync(process.execPath, [path.join(p, "core/scripts", script), ...args], { cwd: p, encoding: "utf8", maxBuffer: 1 << 28, timeout: 60000 });
   return { status: r.status, out: `${r.stdout}${r.stderr}`, ms: Date.now() - started };
 };
 const raw = out => /\n\s+at |TypeError|ReferenceError|RangeError/u.test(out);
@@ -122,6 +122,17 @@ if (pipe(path.join(outside, "pipe"))) {
     r = sizes(marks({ read: { "a.md": 20000, [f]: 5 } }));
     ok(fails(r) && (f === "folder.md" ? r.out.includes("is no tracked file") || r.out.includes("is no regular file") : r.out.includes("is no regular file")) && r.ms < 5000, `reading-size.mjs: refuses with its mend a file read that is ${{ "zero.md": "a link to a pipe", "out.md": "a link to a file outside the project" }[f] ?? "a folder"}, never reading it, in ${r.ms} ms`);
   }
+  // (the config is read only where it is a regular file within its bound; of the tracked files, a link is never read
+  // to be counted, one to a folder of the project's own among them)
+  fs.symlinkSync(path.join(outside, "pipe"), path.join(p, "checks/pipe.json"));
+  r = run("reading-size.mjs", "checks/pipe.json");
+  ok(fails(r) && r.ms < 5000, `reading-size.mjs: refuses with its mend a config that is a link to a pipe, never reading it, in ${r.ms} ms`);
+  fs.rmSync(path.join(p, "checks/pipe.json"));
+  fs.symlinkSync("folder.md", path.join(p, "inner.md"));
+  gitP("add", "inner.md");
+  r = sizes(marks({ split: 10 }));
+  ok(r.status === 0 && !raw(r.out) && /Past 0\.0 KB: a\.md$/mu.test(r.out), "reading-size.mjs: a tracked link, to a folder among them, is not read to be counted", r.out);
+  gitP("rm", "-q", "--cached", "inner.md"); fs.rmSync(path.join(p, "inner.md"));
   gitP("rm", "-q", "--cached", "zero.md", "out.md", "folder.md/x");
   fs.rmSync(path.join(p, "zero.md")); fs.rmSync(path.join(p, "out.md")); fs.rmSync(path.join(p, "folder.md"), { recursive: true });
 } else console.log("skip reading-size.mjs: a file read that is a link to a pipe: no pipe can be made here (Windows)");
@@ -221,6 +232,19 @@ ok(said.length === BIG + 1 && ms < 5000, `manifest-reads.mjs: notes reads a mani
   }
 }
 // (a number has no place in the manifest's lines this reader reads: no case of one out of range applies)
+// (a module of the copy that is a link, and a manifest that is one, to a pipe, are read as no module and no text)
+if (fs.existsSync(path.join(outside, "pipe"))) {
+  const home = path.join(p, "home"), put = (f, t) => { fs.mkdirSync(path.dirname(path.join(home, f)), { recursive: true }); fs.writeFileSync(path.join(home, f), t); };
+  for (const d of ["roles/shared", "tasks", "tools"]) put(`${d}/a${d.length}.md`, "# A module\n");
+  fs.symlinkSync(path.join(outside, "pipe"), path.join(home, "tasks/linked.md"));
+  put("core-manifest.md", "Modules: all.\n");
+  [said, ms] = timed(() => thrown(() => ok(!projectNotes(home, home).some(l => l.includes("linked")), "manifest-reads.mjs: a module of the copy that is a link is no module")));
+  ok(!said && ms < 5000, `manifest-reads.mjs: the copy's modules read in ${ms} ms, a link among them never opened`);
+  fs.rmSync(path.join(home, "core-manifest.md")); fs.symlinkSync(path.join(outside, "pipe"), path.join(home, "core-manifest.md"));
+  [said, ms] = timed(() => thrown(() => projectNotes(home, home)));
+  ok(!said && ms < 5000, `manifest-reads.mjs: a manifest that is a link to a pipe is read as empty, in ${ms} ms`);
+  fs.rmSync(home, { recursive: true, force: true });
+}
 
 // ---- sync.mjs and look.mjs: core-manifest.md, read as the steps read it (own-files.mjs; #446) ----
 // (a manifest that is a link out of the project, to a file or a device, is no file of the project's own: each refuses
@@ -233,6 +257,11 @@ if (process.platform !== "win32") {
     const synced = run("sync.mjs"), looked = run("look.mjs");
     ok(synced.status === 1 && synced.out.includes("a regular file of the project's own") && !raw(synced.out) && synced.ms < 5000, `sync.mjs: a manifest that is a link to ${what} is refused before anything is fetched`);
     ok(fails(looked) && looked.out.includes("no regular file of the project's own") && looked.ms < 5000, `look.mjs: a manifest that is a link to ${what} is refused with its mend, nothing looked at`);
+    // (the checks that read the manifest for where things are read it within its bound, never waiting on it)
+    for (const script of ["manifest-reads.mjs", "shape.mjs", "choices.mjs", "dose.mjs"]) {
+      const r2 = run(script);
+      ok(r2.status !== null && !raw(r2.out) && r2.ms < 5000, `${script}: a manifest that is a link to ${what} is read within a bound, in ${r2.ms} ms`);
+    }
     fs.rmSync(path.join(p, "core-manifest.md"));
   }
   ok(fs.readFileSync(away, "utf8") === was, "sync.mjs: the manifest outside, which a link named, is left as it was");

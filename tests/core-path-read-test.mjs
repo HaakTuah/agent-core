@@ -1,11 +1,12 @@
-// Tests of how the manifest's reader reads a file (core-path.mjs, regularText and manifestText; #1510): opened once and
+// Tests of how the manifest's reader reads a file (core-path.mjs, regularText and manifestText; #1510), and a
+// project's own file (ownText): opened once and
 // read through that descriptor, never by its path again, within its bound, and a link followed or refused as its
 // caller asks. Node's own modules only. The rest of core-path.mjs: core-path-test.mjs.
 //
 //   node tests/core-path-read-test.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { manifestText, regularText } from "../scripts/core-path.mjs";
+import { manifestText, ownText, regularText } from "../scripts/core-path.mjs";
 import { copied } from "../scripts/core-path-scratch.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 
@@ -57,6 +58,20 @@ if (process.platform !== "win32") { // (a device at that path and a link need wh
   let text;
   try { text = regularText(at); } finally { fs.statSync = statSync; }
   ok(text === null, "a file opened that is not the one looked at is not read", JSON.stringify(text));
+}
+
+// (a file of the project's own: a link inside it followed, one out of it, to a folder or a device, or nowhere, read as
+// none)
+if (process.platform !== "win32") {
+  const top = scratchDir("core-path-own-"), away = scratchDir("core-path-away-");
+  try {
+    fs.writeFileSync(path.join(top, "a.md"), "inside\n"); fs.writeFileSync(path.join(away, "b.md"), "outside\n"); fs.mkdirSync(path.join(top, "dir"));
+    for (const [to, f] of [["a.md", "in.md"], [path.join(away, "b.md"), "out.md"], ["dir", "folder.md"], ["/dev/zero", "zero.md"], ["gone.md", "gone-link.md"]]) fs.symlinkSync(to, path.join(top, f));
+    const own = f => ownText(path.join(top, f), { root: top });
+    ok(own("a.md") === "inside\n" && own("in.md") === "inside\n" && ["out.md", "folder.md", "zero.md", "gone-link.md", "none.md"].every(f => own(f) === null),
+      "a file of the project's own is read, a link inside it as the file it leads to; a link out of it, to a folder, to a device or nowhere, reads as none");
+    ok(ownText(path.join(top, "a.md"), { root: top, bound: 6 }) === null, "and one past its bound reads as none");
+  } finally { fs.rmSync(top, { recursive: true, force: true }); fs.rmSync(away, { recursive: true, force: true }); }
 }
 
 done("how the manifest's reader reads a file");

@@ -106,6 +106,13 @@ try {
     const before = fs.readFileSync(path.join(desc, "README.md"), "utf8");
     t = check({}, ["--write-names"]);
     ok(t.status === 1 && mended(t.out) && fs.readFileSync(path.join(desc, "README.md"), "utf8") === before, "--write-names writes nothing through a list that is a link, and says the mend", t.out);
+    // a name that lies past a tracked link is not asked of git's ignore rules, so a name after it that git ignores still reads so
+    fs.rmSync(path.join(desc, "checks/names.json"));
+    fs.symlinkSync("src", path.join(desc, "srclink"));
+    put("docs/many.md", "# Many\n\n`srclink/gone.ts` and `out/other.json`.\n");
+    g("add", "-A");
+    t = check();
+    ok(t.status === 0 && /srclink\/gone\.ts/.test(t.out) && !/out\/other\.json/.test(t.out), "a name past a tracked link leaves the names after it that git ignores read as ignored", t.out.slice(-600));
   }
 } finally { fs.rmSync(desc, { recursive: true, force: true }); }
 // the core's own run: there every name that stands nowhere fails, and no list is kept

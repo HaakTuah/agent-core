@@ -20,6 +20,7 @@
 // under core/ is the core's own, read without that folder, and one under a folder the core does not hold is a
 // project's, left alone. Git and Node's own modules only.
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import { posix } from "node:path";
 
 // A name of a file: an optional run of "./" or "../", then path parts of letters, digits and ". _ - @ +", the last
@@ -67,9 +68,15 @@ export const SEARCHED = 1000;
 // project's own that is no Markdown, nor the list, holds them (at `tree`, a commit, or the work tree where it is null),
 // searched in one run of git for them all, the lines it finds read for each; past SEARCHED, or where git could not
 // search, the rest are left alone, counted in `left`.
+// Whether a folder on the way to the path `p`, from the working folder, is a link.
+const isLink = at => { try { return fs.lstatSync(at).isSymbolicLink(); } catch { return false; } };
+const pastLink = p => p.split("/").slice(0, -1).some((_, i, parts) => isLink(parts.slice(0, i + 1).join("/")));
 function elsewhere(paths, { tree, copy }) {
   if (!paths.length) return { off: new Set(), left: 0 };
-  const ignored = spawnSync("git", ["check-ignore", "--stdin"], { input: paths.join("\n"), encoding: "utf8" }).stdout ?? "";
+  // (git stops at a path that lies past a link, or out of the work tree, so that none after it is read: such a path is
+  // not asked, and is searched for as any other)
+  const asked = paths.filter(p => !p.startsWith("/") && !p.split("/").includes("..") && !pastLink(p));
+  const ignored = asked.length ? spawnSync("git", ["check-ignore", "--stdin"], { input: asked.join("\n"), encoding: "utf8" }).stdout ?? "" : "";
   const off = new Set(ignored.split("\n").filter(Boolean)), rest = paths.filter(x => !off.has(x));
   const spec = ["--", ".", ":(exclude,glob)**/*.md", `:(exclude)${LIST}`, ...(copy ? [`:(exclude)${copy}`] : [])];
   const r = rest.length ? spawnSync("git", ["grep", "-h", "-F", "-I", "-f", "-", ...(tree ? [tree] : []), ...spec],

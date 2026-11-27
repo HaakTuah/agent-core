@@ -9,9 +9,9 @@
 //   node core/scripts/choices.mjs      from a project's root: each record, whether it names its sign and is argued,
 //                                      each condition and the number it reads, and whether the pass is due (in the
 //                                      core: node scripts/choices.mjs); with CHOICES_BASE=<a commit>, the check
-import fs from "node:fs";
 import { reading, rulesOf } from "./dose.mjs";
 import { checkOf } from "./choices-check.mjs";
+import { manifestText } from "./core-path.mjs";
 import { report } from "./choices-look.mjs";
 import { KIT, parse, records } from "./choices-records.mjs";
 import { guard } from "./mend.mjs";
@@ -25,8 +25,7 @@ function measuresHere(rules) {
 }
 
 if (guard(import.meta.url)) {
-  let manifest = null;
-  try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { /* (the core's own AGENTS.md, or the kit's file) */ }
+  const manifest = manifestText("core-manifest.md"); // (null: the core's own AGENTS.md, or the kit's file)
   const { rules } = rulesOf(manifest, ".");
   const got = records(rules);
   if (process.env.CHOICES_BASE !== undefined) {

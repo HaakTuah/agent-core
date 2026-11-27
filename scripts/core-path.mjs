@@ -92,19 +92,6 @@ export function regularText(file, { linked = true, bound = 1 << 20 } = {}) {
  *  leadsOut); else null. So a link inside the project reads as the file it leads to, and one that leads out of it, or
  *  to a device, a pipe or a folder, reads as none. */
 export const ownText = (file, { root = ".", bound } = {}) => (leadsOut(root, file) ? null : regularText(file, { bound }));
-/** At most the first `n` bytes of the regular file at `file`, a link not followed, read through one descriptor opened
- *  without waiting; null where it is no regular file or cannot be read. */
-export function startOf(file, n) {
-  const { O_RDONLY, O_NOFOLLOW, O_NONBLOCK } = fs.constants;
-  if (O_NOFOLLOW === undefined && isLink(file)) return null;
-  let fd;
-  try { fd = fs.openSync(file, O_RDONLY | (O_NOFOLLOW ?? 0) | (O_NONBLOCK ?? 0)); } catch { return null; }
-  try {
-    if (!fs.fstatSync(fd).isFile()) return null;
-    const chunk = Buffer.alloc(n);
-    return chunk.subarray(0, fs.readSync(fd, chunk, 0, n, 0));
-  } catch { return null; } finally { fs.closeSync(fd); }
-}
 // What the path leads to, where it is a regular file within `bound` bytes; else null.
 function lookedAt(file, bound) {
   try { const seen = fs.statSync(file); return seen.isFile() && seen.size <= bound ? seen : null; } catch { return null; }

@@ -38,7 +38,7 @@ function run(files, { installed = true, prepare } = {}) {
     }
     for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: dir, stdio: "ignore" });
     prepare?.(dir);
-    const r = spawnSync(process.execPath, [path.join(dir, "core/scripts/pointers.mjs")], { cwd: dir, encoding: "utf8" });
+    const r = spawnSync(process.execPath, [path.join(dir, "core/scripts/pointers.mjs")], { cwd: dir, encoding: "utf8", timeout: 120000 });
     return { code: r.status, out: r.stdout + r.stderr };
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
@@ -48,6 +48,21 @@ const { "SECURITY.md": _, ...bare } = FILES;
 
 let r = run(FILES);
 ok(r.code === 0 && /^ok /m.test(r.out), "rule files whose pointers all lead somewhere pass");
+// (a rule file is read only where it is a regular file of the project's own within the bound, a link inside the
+// project followed: else it fails, saying so, and nothing it leads to is read)
+if (process.platform !== "win32") {
+  const away = scratchDir("pointers-away-");
+  try {
+    fs.writeFileSync(path.join(away, "words.md"), "# Outside\n\nwords that stand outside the project\n");
+    const relink = (to, f = "docs/developing.md") => dir => { fs.rmSync(path.join(dir, f), { force: true }); fs.symlinkSync(to, path.join(dir, f)); execFileSync("git", ["add", "-A"], { cwd: dir, stdio: "ignore" }); };
+    r = run(FILES, { prepare: relink("AGENTS.md", "CLAUDE.md") });
+    ok(r.code === 0 && /^ok /m.test(r.out), "a rule file that is a link inside the project is read as the file it leads to", r.out);
+    for (const [to, what] of [["/dev/zero", "a device"], ["gone.md", "nowhere"], [path.join(away, "words.md"), "a file outside the project"]]) {
+      r = run(FILES, { prepare: relink(to) });
+      ok(r.code === 1 && mended(r.out) && /the rule file docs\/developing\.md is no regular file of the project's own/.test(r.out) && !/words that stand outside/.test(r.out), `a rule file that is a link to ${what} fails, saying its mend, and is not read`, r.out);
+    }
+  } finally { fs.rmSync(away, { recursive: true, force: true }); }
+}
 // (a project's own job that runs the check with nothing installed has the copy install the core's packages first, and
 // where that fails, the sync never turns it red: #1093, point 1)
 r = run(broken, { installed: false });
@@ -77,8 +92,11 @@ const inline = n => Array.from({ length: n }, (_, k) => `${"- ".repeat(k)}x`).jo
 const refuses = text => { try { read(text); return false; } catch { return true; } };
 ok([inline(2100), Array.from({ length: 250 }, (_, k) => `${"1. ".repeat(k)}x`).join("\n"), Array.from({ length: 250 }, (_, k) => `${"> - ".repeat(k)}x`).join("\n"), Array.from({ length: 60 }, (_, k) => `${"\t".repeat(k)}- x`).join("\n")].every(refuses) && !refuses(inline(90)) && !refuses(`${" ".repeat(300)}\n`), "markers written inline, numbered, mixed with quotes, and tabs are refused past the bound too, and a line of blanks nests nothing");
 ok(read(deepList(90)).blocks.length === 90, "a list nested 90 deep is still read");
+// (900 deep keeps the file under the mebibyte the check reads of a rule file, past which it is refused unread)
+r = run({ ...FILES, "docs/developing.md": `${FILES["docs/developing.md"]}\n${deepList(900)}\n` });
+ok(r.code === 1 && mended(r.out) && /docs\/developing\.md could not be read as Markdown \(line \d+ nests lists or quotes deeper than the reader follows/.test(r.out), "a rule file whose lists nest 900 deep fails the pointer check, naming the file and line, with its mend");
 r = run({ ...FILES, "docs/developing.md": `${FILES["docs/developing.md"]}\n${deepList(2000)}\n` });
-ok(r.code === 1 && mended(r.out) && /docs\/developing\.md could not be read as Markdown \(line \d+ nests lists or quotes deeper than the reader follows/.test(r.out), "a rule file whose lists nest 2000 deep fails the pointer check, naming the file and line, with its mend");
+ok(r.code === 1 && mended(r.out) && /docs\/developing\.md is no regular file of the project's own of at most 1 MiB/.test(r.out), "and one of 2000 deep, past that mebibyte, fails unread, with its mend");
 r = run(crlf(FILES));
 ok(r.code === 0 && /^ok /m.test(r.out), "the same files with a Windows checkout's line endings pass");
 for (const [files, ending] of [[broken, "either"], [crlf(broken), "a Windows"]]) {

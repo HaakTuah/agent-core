@@ -21,8 +21,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logged, unrooted } from "./guards.mjs";
-import { MODULES } from "./reading.mjs";
-import { copyOf, projectAt, readCore } from "./core-path.mjs";
+import { MODULES, real, realFiles, regular } from "./reading.mjs";
+import { copyOf, manifestText, projectAt, readCore } from "./core-path.mjs";
 import { movedModules } from "./step-checks-moved.mjs";
 import { guard } from "./mend.mjs";
 
@@ -211,17 +211,25 @@ export function notes({ manifest, moduleTexts, where = {}, movedTo = {} }) {
   return out;
 }
 
-const readDir = dir => Object.fromEntries(fs.readdirSync(dir).filter(f => f.endsWith(".md")).sort().map(f => [f, fs.readFileSync(path.join(dir, f), "utf8")]));
+// (the Markdown files of a folder of the copy at `home`, as reading.mjs reads them: each a regular file, no link at any
+// depth followed, a folder, a device or a pipe passed over; it throws where the folder is no real one)
+const mdIn = (home, dir) => {
+  if (real(home, dir) !== "folder") throw new Error(`${dir}/ of the core's copy is no folder of its own`);
+  return realFiles(home, dir, new Set());
+};
+const readDir = (home, dir) => Object.fromEntries(mdIn(home, dir).map(f => [f, regular(home, `${dir}/${f}`) ?? ""]));
 // The names of the modules of the core, or of a copy of it, at `home`.
-export const moduleNames = home => MODULES.flatMap(d => fs.readdirSync(path.join(home, d)).filter(f => f.endsWith(".md"))).sort();
+export const moduleNames = home => MODULES.flatMap(d => mdIn(home, d)).sort();
 
 // The notes of the project at `root` whose copy is at `home`, read against the copy's modules (attached.mjs reads them
 // too); throws where either cannot be read.
 export function projectNotes(root, home) {
   // (the modules, by name, from each folder that holds them)
-  const where = Object.fromEntries(MODULES.flatMap(d => Object.keys(readDir(path.join(home, d))).map(n => [n, d])));
-  const moduleTexts = Object.assign({}, ...MODULES.map(d => readDir(path.join(home, d))));
-  return notes({ manifest: fs.readFileSync(path.join(root, "core-manifest.md"), "utf8"), moduleTexts, where, movedTo: movedModules(home) });
+  const where = Object.fromEntries(MODULES.flatMap(d => Object.keys(readDir(home, d)).map(n => [n, d])));
+  const moduleTexts = Object.assign({}, ...MODULES.map(d => readDir(home, d)));
+  const manifest = manifestText(path.join(root, "core-manifest.md"));
+  if (manifest === null) throw new Error("core-manifest.md is not there");
+  return notes({ manifest, moduleTexts, where, movedTo: movedModules(home) });
 }
 
 function main() {
