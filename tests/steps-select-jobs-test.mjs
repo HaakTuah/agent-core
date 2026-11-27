@@ -10,6 +10,7 @@ import path from "node:path";
 import { STEPS, project } from "../scripts/steps.mjs";
 import { kitIn } from "../scripts/steps-kit.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { Unread } from "../scripts/workflow-calls.mjs";
 
 const { ok, done } = tally();
 const dir = kitIn(scratchDir("steps-select-jobs-"))("an-npm-project", { packages: "." });
@@ -37,7 +38,7 @@ const both = said([job("node", SELECT + gated("tools/rules-test.js")), job("ui",
 ok(both === null, "each job that names a test selects in it: done", both);
 
 const oneOfTwo = said([job("node", SELECT + gated("tools/rules-test.js")), job("ui", "      - run: node tools/ui-test.js\n")]);
-ok(oneOfTwo !== null && oneOfTwo.includes("`.github/workflows/tests.yml`, its job `ui`") && !oneOfTwo.includes("its job `node`") && oneOfTwo.includes("contains(env.RUN, ' <file> ')"),
+ok(oneOfTwo !== null && oneOfTwo.includes("`.github/workflows/tests.yml`, its job `ui`") && !oneOfTwo.includes("its job `node`") && oneOfTwo.includes("<its condition> && (env.RUN == 'all' || contains(env.RUN, ' <file> '))"),
   "a job that names a test and selects nothing is named, with the gate of a test a step each, though another job selects", oneOfTwo);
 
 const dotted = said([job("node", SELECT + gated("tools/rules-test.js")), job("ui", "      - run: |\n          npm ci\n          node ./tools/ui-test.js --fast\n")]);
@@ -57,6 +58,12 @@ ok(others === null, "a test of the copy of the core, and a file whose name only 
 
 const pushOnly = said([job("ui", "      - run: node tools/ui-test.js\n")], "push:");
 ok(pushOnly !== null && !pushOnly.includes("its job `ui`"), "a job of a workflow pull requests do not run is not read as one that runs tests", pushOnly);
+
+said([job("node", SELECT + gated("tools/rules-test.js"))]);
+fs.writeFileSync(path.join(flows, "ui.yml"), "name: ui\non: pull_request\njobs:\n  ui: {steps: [\n      - run: node tools/ui-test.js\n");
+let unread;
+try { unread = step.check(project(dir)); } catch (e) { unread = e; }
+ok(unread instanceof Unread && unread.message.includes(".github/workflows/ui.yml"), "a workflow the reader cannot read that names a test is said not read, never read as done", unread);
 
 for (const f of fs.readdirSync(flows)) fs.rmSync(path.join(flows, f));
 for (const [f, text] of kept) fs.writeFileSync(path.join(flows, f), text);

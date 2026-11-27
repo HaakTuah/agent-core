@@ -78,9 +78,10 @@ const escaped = text => text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 export function selectionRuns(p) {
   const tests = testFiles(p);
   if (!tests.length) return null;
-  readable(p, text => text.includes("select.mjs"));
-  const SELECT_RUN = selectRunOf(copyAt(p)), copy = copyAt(p);
   const NAMES = new RegExp(`(^|[\\s'"=])(\\./)?(${tests.map(escaped).join("|")})(?=$|[\\s'";&|)])`, "mu");
+  // (a workflow the reader could not read is told, where it may select or run a test: either could change the answer)
+  readable(p, text => text.includes("select.mjs") || NAMES.test(text));
+  const SELECT_RUN = selectRunOf(copyAt(p)), copy = copyAt(p);
   const jobs = Object.entries(p.workflows).filter(([, { yaml }]) => onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => Object.entries(yaml.jobs ?? {})
     .map(([name, job]) => ({ at: `\`.github/workflows/${file}\`, its job \`${name}\``, steps: job?.steps ?? [], envs: [job?.env, yaml.env] })));
   const selects = ({ steps, envs }) => steps.some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run) && [step.env, ...envs].some(e => typeof e?.SELECT_BASE === "string" && e.SELECT_BASE.trim() !== ""));
@@ -90,7 +91,7 @@ export function selectionRuns(p) {
   const proof = "name the project's proof, never selected out, under \"select\" and \"proof\" in the shape check's config. Where the record's numbers (`node " + copy + "scripts/test-record.mjs`) show the suite needed whole, name every test under \"select\" and \"whole\" instead, citing them in that pull request.";
   const add = `a step before them \`node ${copy}scripts/select.mjs --env RUN\`, with \`SELECT_BASE\` set to the pull request's base (\`origin/<its base branch>\`, fetched first, or \`HEAD^1\` with \`fetch-depth: 2\`)`;
   if (!unselected.length) return `No workflow on pull requests runs the selection of the tests a change can reach: in the job that runs the project's tests, add ${add}, and have the job run only the test files \`RUN\` names, each between spaces, or its whole suite where it says \`all\` (\`if [ \"$RUN\" = all ]; then <the whole suite>; else <the runner> $RUN; fi\`); ${proof}`;
-  return `Jobs on pull requests run the project's tests with no selection in the job (${unselected.map(j => j.at).join("; ")}): the \`RUN\` a step of the selection writes holds in its own job alone, so each job that runs tests selects them itself. In each, add ${add}; then run, of the tests it runs a step each, only those \`RUN\` names (\`if: env.RUN == 'all' || contains(env.RUN, ' <file> ')\`, joined by \`&&\` to any condition the step has already), and where it hands a runner the files, only the files \`RUN\` names, each between spaces, or its whole suite where it says \`all\`; ${proof}`;
+  return `Jobs on pull requests run the project's tests with no selection in the job (${unselected.map(j => j.at).join("; ")}): the \`RUN\` a step of the selection writes holds in its own job alone, so each job that runs tests selects them itself. In each, add ${add}; then run, of the tests it runs a step each, only those \`RUN\` names (\`if: env.RUN == 'all' || contains(env.RUN, ' <file> ')\`, or, where the step has a condition already, \`if: <its condition> && (env.RUN == 'all' || contains(env.RUN, ' <file> '))\`), and where it hands a runner the files, only the files \`RUN\` names, each between spaces, or its whole suite where it says \`all\`; ${proof}`;
 }
 
 // Whether each job that runs the selection on a push, in a workflow a pull request runs too, gives it --passed, the name
