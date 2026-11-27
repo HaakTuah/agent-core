@@ -1,6 +1,6 @@
 # Releases and their trials
 
-Read in the core's own repository by whoever builds a release, its trial or a check of either, or takes the core's review or state report: the kind `trial`, the paths `.github/workflows/release.yml`, `.github/workflows/own-look.yml`, `release*.mjs`, `trial-*.mjs`, `daily-try*.mjs`, `toolchain.mjs`, `state-report.mjs` and `core-cost.mjs`. Rules of `AGENTS.md`'s "How changes are made here", moved here by theme (#1202); a project's copy carries them as the core's text alone, and its sessions read none of them.
+Read in the core by whoever builds a release, its trial or a check of either, or takes the core's review or state report: the kind `trial`, the paths `.github/workflows/release.yml`, `.github/workflows/own-look.yml`, `release*.mjs`, `trial-*.mjs`, `daily-try*.mjs`, `toolchain.mjs`, `state-report.mjs` and `core-cost.mjs`.
 
 - **A release is cut on the owner's word:** another owner's project takes the core only from a release (`README.md`,
   "How a project takes the core", point 1), so one is cut when the owner says the core as it stands may be handed on,

@@ -4,7 +4,7 @@
 // each rule (#750, point 1; #853), read in the order of the files' names and named from the rule's key (entryFile):
 // {"rule": its file and bold lead as rules.mjs names it, or a rule file alone for its text outside any rule; "holder":
 // one holder or a list of them; "behind": the keys of the core archive's items behind it ("a rule file names no item
-// itself": core-changes/records.md, "The archive is pointed to from the list"; a number up to 262, or "#N" or "#N.P" for one keyed by
+// itself": core-changes/holders.md, "The archive is pointed to from the list"; a number up to 262, or "#N" or "#N.P" for one keyed by
 // its issue); "number": "<findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable |
 // robust>", the count it is meant to lower and the outcome it stands for, which pruning.mjs reads}, each but "rule"
 // only where the rule has one. A holder is "check: <the script, test, workflow or hook that fails a pull request or a

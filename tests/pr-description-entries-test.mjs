@@ -51,6 +51,11 @@ const head = { [at("kept.json")]: `${entry("AGENTS.md: Kept", F)}\n`, [at("moved
 const read = entriesChanged(".", fake(base, head));
 ok(JSON.stringify(read?.changed.map(c => c.rule).sort()) === JSON.stringify(["AGENTS.md: Plain", "AGENTS.md: Renum", "AGENTS.md: Ünew ✓"]) && JSON.stringify([...read.standing].sort()) === JSON.stringify([R, F].sort()) && read.odd.length === 0,
   "an entry added with a number, one that gains one and one whose number changes are read; one only edited, one renamed with its holders changed and its number kept (found by its rule), one taken out and a file that is no entry are not", JSON.stringify(read && { changed: read.changed, standing: [...read.standing], odd: read.odd }));
+const movedBase = { [at("a.json")]: entry("AGENTS.md: Shifted", F), [at("b.json")]: entry("AGENTS.md: Twice", F), [at("c.json")]: entry("tasks/x.md: Twice", F), [at("d.json")]: entry("AGENTS.md: Stays", F) };
+const movedHead = { [at("a2.json")]: entry("core-changes/y.md: Shifted", F), [at("b2.json")]: entry("core-changes/y.md: Twice", F), [at("d.json")]: entry("AGENTS.md: Stays", F), [at("d2.json")]: entry("core-changes/y.md: Stays", F) };
+const movedRead = entriesChanged(".", fake(movedBase, movedHead));
+ok(JSON.stringify(movedRead?.changed.map(c => c.rule).sort()) === JSON.stringify(["core-changes/y.md: Stays", "core-changes/y.md: Twice"]),
+  "a rule moved to another file with its number kept is found by its lead and is no change (#1202); a lead two entries of the base share, or one whose rule still stands at the head, is not read so", JSON.stringify(movedRead?.changed));
 const broken = entriesChanged(".", fake(base, { ...head, [at("renum.json")]: "{ not json" }));
 ok(!broken.changed.some(c => c.rule === "AGENTS.md: Renum"), "an entry that cannot be read as JSON is read as holding no number (holders.mjs names it)");
 

@@ -1,6 +1,6 @@
 # What a change of the core asks of a project
 
-Read in the core's own repository by whoever builds a check, a writer, a sync note or a step, or anything a project's copy runs: the paths `scripts/`, `setup/` and `.github/workflows/`. Rules of `AGENTS.md`'s "How changes are made here", moved here by theme (#1202); a project's copy carries them as the core's text alone, and its sessions read none of them.
+Read in the core by whoever builds a check, a writer, a sync note or a step, or anything a project's copy runs: the paths `scripts/`, `setup/` and `.github/workflows/`.
 
 - **Nothing locks a project,** in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:

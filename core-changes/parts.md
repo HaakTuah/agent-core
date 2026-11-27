@@ -1,6 +1,6 @@
 # A part of the core and what is maintained
 
-Read in the core's own repository by whoever replaces a part of the core, widens what one reads, or fetches a tool: the kind `update`, the paths `INVENTORY.md`, `inventory/`, `QUEUE.md`, `CHOICES.md`, `choices/`, `node.sh` and `scripts/`. Rules of `AGENTS.md`'s "How changes are made here", moved here by theme (#1202); a project's copy carries them as the core's text alone, and its sessions read none of them.
+Read in the core by whoever replaces a part of the core, weighs one, or fetches a tool: the kinds `update` and `choice`, the paths `INVENTORY.md`, `QUEUE.md`, `CHOICES.md`, `choices/`, `node.sh`, `install.mjs` and `.packages/`.
 
 - **A part of the core gives way to what is maintained** (#534). By default the core keeps the parts it has. The one
   condition that changes it: a maintained tool, package or standard, free to use, does a part's job at the same level or

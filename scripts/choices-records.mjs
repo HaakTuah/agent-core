@@ -15,7 +15,7 @@ import path from "node:path";
 export const KIT = "docs/choices.md";
 
 // The line of a records file that names the folder its records stand in, a file each, read in the order of their names
-// (core-changes/records.md, "A record pull requests add to is a folder of one file per entry"; #870): the folder is a plain path
+// (core-changes/holders.md, "A record pull requests add to is a folder of one file per entry"; #870): the folder is a plain path
 // from the project's root.
 export const POINTER = /^Its records stand in `([\w][\w.-]*(?:\/[\w][\w.-]*)*)\/`, a file each, read in the order of their names\.$/u;
 // The records file's text with each line POINTER reads replaced by the records `partsOf(folder)` gives (their texts), a

@@ -1,4 +1,4 @@
-// The number of each rule the part "What holds it" names (split from pr-description.mjs, #888; "Every rule says what holds it" in the core's AGENTS.md; #303). pr-description.mjs,
+// The number of each rule the part "What holds it" names (split from pr-description.mjs, #888; "Every rule says what holds it" in the core's core-changes/holders.md; #303). pr-description.mjs,
 // beside this file, says what the check asks as a whole, runs this one and exports what it holds.
 import { spawnSync } from "node:child_process";
 import { parseBounded } from "./guards.mjs";
@@ -95,13 +95,18 @@ function entriesIn(out, files) {
 
 // The entries' numbers as the pull request in the checkout at `dir` leaves them, the merge commit against its first
 // parent, the base: { changed, standing, odd } as entriesMend() takes them, each entry of the head compared with the
-// base's of the same path, or else of the same rule (a rename with its number kept is no change); four calls of git,
-// whatever the entries' count; null where the change cannot be read.
+// base's of the same path, or else of the same rule (a rename with its number kept is no change), or else of the same
+// lead, the rule's name after its file, where one entry of the base alone has it and no entry of the head holds that
+// entry's rule (a rule moved to another file with its number kept is no change, #1202); four calls of git, whatever
+// the entries' count; null where the change cannot be read.
 export function entriesChanged(dir, git = (args, input) => spawnSync("git", args, { cwd: dir, input, maxBuffer: ENTRIES_MAX })) {
   const head = entriesAt("HEAD", git), base = head && entriesAt("HEAD^1", git);
   if (!base) return null;
   const byPath = new Map(base.entries.map(e => [e.path, e])), byRule = new Map(base.entries.map(e => [e.rule, e]));
+  const leadOf = rule => rule.slice(rule.indexOf(": ") + 1).trim(), kept = new Set(head.entries.map(e => e.rule)), byLead = new Map();
+  for (const e of base.entries) byLead.set(leadOf(e.rule), byLead.has(leadOf(e.rule)) ? null : e);
+  const moved = e => { const from = byLead.get(leadOf(e.rule)); return from && !kept.has(from.rule) ? from : undefined; };
   const numbered = head.entries.filter(e => e.number);
-  const changed = numbered.filter(e => e.number !== (byPath.get(e.path) ?? byRule.get(e.rule))?.number).map(({ rule, number }) => ({ rule, number }));
+  const changed = numbered.filter(e => e.number !== (byPath.get(e.path) ?? byRule.get(e.rule) ?? moved(e))?.number).map(({ rule, number }) => ({ rule, number }));
   return { changed, standing: new Set(numbered.map(e => e.number)), odd: head.odd };
 }

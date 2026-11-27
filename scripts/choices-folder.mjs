@@ -16,7 +16,7 @@ export function folderFaults(file, root = ".") {
   if (!folders.length) return [];
   const faults = [];
   let total = Buffer.byteLength(text), over = false;
-  for (const m of text.matchAll(/^## Choice: (.+)$/gmu)) faults.push(`FAIL: \`${file}\` holds the record "${plain(m[1])}" itself. ${MEND}move it, byte for byte, into a file of its own in \`${folders[0]}/\`, named NNN-<name>.md to stand in order between its neighbours, as core-changes/records.md, "A record pull requests add to is a folder of one file per entry", says.`);
+  for (const m of text.matchAll(/^## Choice: (.+)$/gmu)) faults.push(`FAIL: \`${file}\` holds the record "${plain(m[1])}" itself. ${MEND}move it, byte for byte, into a file of its own in \`${folders[0]}/\`, named NNN-<name>.md to stand in order between its neighbours, as core-changes/holders.md, "A record pull requests add to is a folder of one file per entry", says.`);
   for (const folder of folders) {
     let entries = [];
     // (no link is followed, as records() follows none: a folder that is one is no folder of the records)

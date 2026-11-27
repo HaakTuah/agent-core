@@ -1,6 +1,6 @@
 # Writing a rule
 
-Read in the core's own repository by whoever writes or changes a rule, or a size cap: the kind `rule`, the paths `floor/`, `roles/`, `tasks/`, `tools/`, `AGENTS.md`, `core-changes/`, `size.mjs` and `general.json`. Rules of `AGENTS.md`'s "How changes are made here", moved here by theme (#1202); a project's copy carries them as the core's text alone, and its sessions read none of them.
+Read in the core by whoever writes or changes a rule, or a size cap: the kind `rule`, the paths `floor/`, `roles/`, `tasks/`, `tools/`, `AGENTS.md`, `core-changes/`, `size.mjs` and `general.json`.
 
 - **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`).
   By default what a role reads at its start, as its file under `roles/` names it, with the core's own `AGENTS.md`,
