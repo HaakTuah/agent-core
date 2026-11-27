@@ -1,22 +1,24 @@
 // A project beside a fresh start (AGENTS.md, "Nothing locks a project"; core archive 215): what the starter kit of the
 // copy this file lies in would write for a new project of the same kind today, against what the project holds, so
 // that an earlier sync taken in part, or a row filled poorly, shows where no step's check reads it (steps.mjs, beside
-// this file). It lists each difference: a file the kit writes that the project lacks (the configs it writes beside
-// its templates too, at the paths the project names for them, as the kit's words that name them: kit-paths.mjs); of a
-// rule file, the manifest or an issue form, a paragraph of the kit's that the project holds nowhere in that file (the
-// words compared with their spacing made one, so a reflowed line is no difference), and of a table, a row whose first cell it lacks (a row's
-// value is the project's to fill); of a workflow or the hooks' settings, a line of the kit's it lacks (a pin and its
-// version comment made one, since a sync and Dependabot move them); of a check's config, and of the list of what holds the project's own rules, a key of the kit's it lacks.
-// A paragraph the kit leaves to the project ("FILL IN") and the progress file, the project's own, are not compared.
-// Each difference is one the manifest's "Differences" declares on purpose, on the owner's word, by a line that quotes
-// the file's path ("AGENTS.md"), so that file is not compared, or a task the project's agents take. The kind is read
-// from the project: its owner and name from the manifest and AGENTS.md, npm and NuGet from its calls to the core's
-// signature and NuGet checks and from a lock file or a project file of its own, a private repository from its host
-// (host-private.mjs; #1095, point 1), never from which workflows stand, a game from the manifest's line "Modules:
-// all", and a game's previews and the versions check from its calls to the core's preview.yml and versions.yml. Where the host cannot say whether it is private, nothing is compared, and the report says so with the mend. Given earlier kits (the sync gives the kit of each pin the project's manifest
-// named and of every release of the core's), it lists too what the project still holds of theirs that the kit no longer writes: the wording the core
-// has left, and where that is a paragraph or line the kit has reworded, one line that shows the words that differ
-// (#1265, point 2). It reads only and fails nothing. Node's own modules and git only.
+// this file). It lists each difference: a file the kit writes that the project lacks (the configs beside its templates
+// too, at the paths the project names for them: kit-paths.mjs); of the core's part of AGENTS.md and CLAUDE.md, and of an
+// issue form, a paragraph of the kit's the project holds nowhere there (spacing made one: a reflowed line is none), and
+// of a table, a row whose first cell it lacks; of a workflow or the hooks' settings, a line of the kit's it lacks (a pin
+// and its version comment made one, as a sync moves them); of a
+// check's config and of the list of what holds the project's own rules, a key of the kit's it lacks. The kit's other
+// Markdown, which the one process never writes where it stands (the manifest, SECURITY.md, the threat model, the choice
+// records), is compared only for being there; the progress file and a paragraph the kit leaves to the project ("FILL
+// IN") not at all (#1361, points 27 and 28). Each difference is declared in the manifest's "Differences" on the owner's
+// word, by a line quoting the file's path ("AGENTS.md"), so that file is not compared, or is a task the project's agents
+// take. The kind is read from the project: owner and name from the manifest and AGENTS.md, npm and NuGet from its calls
+// to the core's signature and NuGet checks and a lock or project file of its own, a private repository from its host
+// (host-private.mjs; #1095, point 1), never from which workflows stand, a game from "Modules: all", its previews and the
+// versions check from its calls to preview.yml and versions.yml. Where the host cannot say whether it is private,
+// nothing is compared, and the report says so with the mend. Given earlier kits (the sync gives those of each pin the
+// manifest named and of every release), it lists too what the project still holds of theirs that the kit no longer
+// writes, and where that is a paragraph or line the kit reworded, one line showing the words that differ (#1265, point
+// 2). It reads only and fails nothing. Node's own modules and git only.
 //
 //   node core/scripts/fresh.mjs                   from a project's root: the differences, or that there are none
 //   node core/scripts/fresh.mjs --older <dir>     and, of each folder under <dir> that holds an earlier copy's
@@ -39,6 +41,7 @@ import { privateOf } from "./host-private.mjs";
 import { OWN as OWN_HOLDERS } from "./holders-own.mjs";
 import { call as callOf, configs, plain, project } from "./steps.mjs";
 import { ownPaths, shapeBaseline } from "./kit-paths.mjs";
+import { BLOCKS, partOf, whole } from "./core-owned.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // (a call that cannot be read, a workflow in a form the core's reader does not know, counts as none here: steps.mjs
@@ -171,11 +174,13 @@ export function differences(p, kit, older = []) {
     if (SKIPPED.has(to) || p.differences.some(l => l.includes(`"${to}"`))) continue;
     const text = p.read(to);
     if (text === null) { out.push(`${to}: missing (the starter kit writes it today)`); continue; }
-    const have = readAs(to, text), now = readAs(to, want);
+    const block = BLOCKS.includes(to), part = t => block ? partOf(t) : t;
+    if (!block && !whole(to) && /\.md$/u.test(to)) continue;
+    const have = readAs(to, part(text)), now = readAs(to, part(want));
     if (have.unread) { out.push(`${to}: its content cannot be read as JSON`); continue; }
     const lacking = now.units.filter(u => !have.has(u));
     const seen = new Set();
-    const held = older.flatMap(k => k.filter(([f]) => f === to).flatMap(([, then]) => readAs(to, then).units))
+    const held = older.flatMap(k => k.filter(([f]) => f === to).flatMap(([, then]) => readAs(to, part(then)).units))
       .filter(u => !now.has(u) && have.has(u) && !seen.has(named(u)) && seen.add(named(u)));
     const { pairs, lacks, left } = reworded(lacking, held);
     if (lacks.length) out.push(`${to}: lacks ${lacks.map(named).join("; ")}`);
@@ -213,7 +218,6 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES), { kitOnly = fal
     const read = name => { try { return fs.readFileSync(path.join(templates, name), "utf8"); } catch (e) { if (!older) throw e; lacking.add(name); return ""; } };
     const built = files(o, pin, modules, read);
     const gone = new Set(FILES.filter(([t]) => lacking.has(t)).map(([, to]) => to));
-    // (the manifest's "Differences" is the project's own to fill: of it, the kit asks only the heading, not its "None.")
     // (the choice records and the shape check's config at the paths the manifest names for them; the checks' configs
     // at the paths the project holds them, as its workflows and manifest name them: configs, in steps.mjs. One a
     // workflow names only when it runs is compared nowhere here, the other check's still are: steps.mjs reports it not

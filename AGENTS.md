@@ -366,7 +366,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
   is not done; or, where no check reads it, why, held by the staged case `steps`. Every standing entry has one. Every sync
   runs them all (`scripts/sync.mjs`) and prints, for the sync pull request's description, only the steps not done, and
-  every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`), and the packages it holds gone stale (`scripts/held.mjs`; #1095); where the core's packages cannot be installed it reads no step and says so
+  every difference from what the starter kit writes for a new project of the same kind but in the project's own words, which the one process keeps (`scripts/fresh.mjs`; #1361, point 27), and the packages it holds gone stale (`scripts/held.mjs`; #1095); where the core's packages cannot be installed it reads no step and says so
   in one line with its mend, and a step only a tool fetched at set-up reads is read where the session fetched it (#1095,
   points 2 and 4); each is
   a task the project's agents take (`roles/orchestrator.md`; with no orchestrator, the session that syncs), a step
