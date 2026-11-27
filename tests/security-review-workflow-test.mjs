@@ -90,7 +90,14 @@ function runCase(fx, env, tmp, { files = [{ filename: "notes.txt" }], cut = 0, c
     fs.cpSync(fx.repo, ws, { recursive: true });
     for (const p of missing) fs.rmSync(path.join(ws, p));
     for (const p of broken) fs.writeFileSync(path.join(ws, p), "process.exit(1);\n");
-    if (copyAt !== null) fs.writeFileSync(path.join(ws, "core-manifest.md"), `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${copyAt} (never edited here).\n`);
+    if (copyAt !== null) {
+      // (the manifest tracked, and the core's own scripts/core-path.mjs not, as in a project's checkout: the scripts at
+      // the root stay on disk for the workflow to run, but git tracks them as a project would not, so the core's own
+      // repository is told apart from a project's by what git tracks, core-path.mjs)
+      fs.writeFileSync(path.join(ws, "core-manifest.md"), `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${copyAt} (never edited here).\n`);
+      execFileSync("git", ["add", "core-manifest.md"], { cwd: ws, stdio: "ignore" });
+      execFileSync("git", ["rm", "-q", "--cached", "scripts/core-path.mjs"], { cwd: ws, stdio: "ignore" });
+    }
     return ws;
   };
   let nodeFile;

@@ -10,12 +10,14 @@
 //
 //   node tests/queue-only-test.mjs
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { changed, formFault, formOf, judge, namesPoints, printed, rulesHere, typed } from "../scripts/queue-only.mjs";
 import { ruleFiles } from "../scripts/rule-files.mjs";
 import { linesOf } from "../scripts/queue.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
+import { checkout, copied, OWN_SCRIPT } from "../scripts/core-path-scratch.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -153,6 +155,20 @@ ok(JSON.stringify(rulesOf(() => null)) === "[]" && JSON.stringify(rulesOf((f) =>
 
 const usage = spawnSync(process.execPath, [path.join(root, "scripts", "queue-only.mjs")], { encoding: "utf8" });
 ok(usage.status === 2 && usage.stderr.includes("usage:"), "with no files named, it says how it is run");
+
+// The copy told apart from the core's own repository, as core-path.mjs's copyHeld does (#1350): the default branch's
+// checkout that tracks scripts/core-path.mjs at its root reads its AGENTS.md for the progress file, whatever
+// core-manifest.md stands beside it; a project's checkout reads its manifest
+{
+  const tmp = scratchDir("queue-only-test-");
+  const both = { "AGENTS.md": "The *progress file*: `QUEUE.md`.\n", "core-manifest.md": `${copied("vendor/core/")}\n| *progress file* | \`PLAN.md\` |\n`, "QUEUE.md": `${row(1)}\n`, "PLAN.md": `${row(1)}\n` };
+  const own = checkout(tmp, "own", { ...both, ...OWN_SCRIPT }, { commit: true }), copy = checkout(tmp, "copy", both, { commit: true });
+  writeFileSync(path.join(tmp, "pull.json"), JSON.stringify(pull));
+  // (a line that names no issue, refused before any issue is read)
+  writeFileSync(path.join(tmp, "files.json"), JSON.stringify([[{ filename: "QUEUE.md", status: "modified", additions: 1, deletions: 1, patch: `@@ -1 +1 @@\n-${row(1)}\n+| none | builder | |` }]]));
+  const at = (cwd) => spawnSync(process.execPath, [path.join(root, "scripts", "queue-only.mjs"), path.join(tmp, "pull.json"), path.join(tmp, "files.json")], { cwd, encoding: "utf8", env: { ...process.env, REPO: "The-Owner/project" } }).stdout;
+  ok(/names no issue/u.test(at(own)) && /is not PLAN\.md/u.test(at(copy)), "the core's own checkout reads its AGENTS.md for the progress file, with a core-manifest.md at its root; a project's reads its manifest", `${at(own)} | ${at(copy)}`);
+}
 
 console.log(`\n${count - failed} of ${count} passed`);
 process.exit(failed ? 1 : 0);

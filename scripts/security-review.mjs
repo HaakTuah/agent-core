@@ -77,8 +77,8 @@
 //         their rights (collaborators/<login>/permission, as a JSON list); PURE for the head pure-sync.mjs proved;
 //         QUEUE for the head the caller's queue-only.mjs proved (#750); CODE for the file scripts/code-review-wait.mjs
 //         printed into for the same head, whose waiting this status waits for too (withCode; #1339).
-import { existsSync, readFileSync } from "node:fs";
-import { copyOf } from "./core-path.mjs";
+import { readFileSync } from "node:fs";
+import { copyHeld } from "./core-path.mjs";
 import { RUNS } from "./comment-only.mjs";
 import { mayRun } from "./power.mjs";
 import { blockingOf } from "./review-lines.mjs";
@@ -247,7 +247,7 @@ function begunAfter(verdict, { sha, running, all, posted, bound }) {
 // runs by itself beyond .github/ (an agent tool's folder, the install and build files), as power.mjs's mayRun reads them; where it did not run (a
 // default branch whose core is older), what runs by itself alone, as that core reads it
 const withPower = (file, copy, power) => (power instanceof Set ? [file.filename, file.previous_filename].some((name) => typeof name === "string" && power.has(name))
-  : runs(file, copy) || (power === null && [file.filename, file.previous_filename].some((name) => typeof name === "string" && !name.startsWith(copy ?? "core/") && mayRun(name))));
+  : runs(file, copy) || (power === null && [file.filename, file.previous_filename].some((name) => typeof name === "string" && !aside(name, copy) && mayRun(name))));
 function floorTwo(verdict, { sha, pull, files, posted, review, bound, pure, copy, power }) {
   if (!(verdict.done && pure !== true && files !== undefined && (!whole(pull, files) || flat(files).some((file) => withPower(file, copy, power) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha)))) return verdict;
   const codexDone = review !== null && typeof review === "object" && review.status === "completed";
@@ -322,8 +322,11 @@ export const queueOnly = (pull, files, copy) => files !== undefined && whole(pul
 export const whole = (pull, files) => Number.isInteger(pull.changed_files) && pull.changed_files >= 0 && flat(files).length >= pull.changed_files;
 // what runs by itself, as comment-only.mjs reads it, the copy of the core aside (only a sync changes it, and its code
 // passed its reviews in the core's own pull request: floor rule 8), under core/ or the path the default branch's manifest
-// names (`copy`, core-path.mjs's copyOf, given by the script's caller); a file moved counts on either side
-const runs = (file, copy = "core/") => [file.filename, file.previous_filename].some((name) => typeof name === "string" && !name.startsWith(copy) && RUNS.test(name));
+// names (`copy`, core-path.mjs's copyHeld, given by the script's caller); a file moved counts on either side
+const runs = (file, copy) => [file.filename, file.previous_filename].some((name) => typeof name === "string" && !aside(name, copy) && RUNS.test(name));
+// (a name under the copy: none where the caller found no copy, null, as in the core's own repository; core/ where a caller
+// gives none, undefined, as an older default branch's does)
+const aside = (name, copy) => copy !== null && name.startsWith(copy ?? "core/");
 // a `uses:` line pinned to a whole SHA, with the note after it if any: [the line with the pin and note set aside]
 const USES = /^(\s*(?:-\s+)?["']?uses["']?\s*:\s*["']?[^\s"'@#]+@)[0-9a-f]{40}(["']?)(?:\s+#\s*[\w.+-]*)?$/u;
 // whether a file, as GitHub's API gives it among a pull request's files, only moves pins: changed in place, and in
@@ -494,7 +497,7 @@ if (started(import.meta.url)) {
       queue: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.QUEUE === pull.head.sha,
       merges: mergesFile ? read(mergesFile) : undefined,
       light: lightOf(process.env.POWER, read), power: powerFilesOf(process.env.POWER, read),
-      copy: existsSync("core-manifest.md") ? copyOf(".") : undefined }); // (the copy at the path the default branch's manifest names, checked out here, as code-review-wait.mjs reads it)
+      copy: copyHeld(".") }); // (the copy at the path the default branch's manifest names, checked out here, none in the core's own repository, as code-review-wait.mjs reads it)
   // (CODE: the file code-review-wait.mjs printed into, where the workflow ran it; missing, empty or not JSON, it is
   // read as not worked out, which waits)
   const code = (() => {
