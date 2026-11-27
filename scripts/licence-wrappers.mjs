@@ -18,11 +18,12 @@ const changes = (p, body) => new RegExp(String.raw`(?<![\w$.])${esc(p)}\s*(?:(?:
 // The words after which a "/" opens a regular expression, not a division.
 const BEFORE_REGEX = /(?:^|[^\w$.])(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/u;
 // The place of the last character of what opens at the "/" text[i] outside a string or comment: the "/" itself where it
-// divides (after a name, a number or a closing bracket), else the "/" that closes its regular expression on that line,
-// or -1 where none does.
+// divides (after a name, a number, a closing bracket, a string or "++" or "--"), else the "/" that closes its regular
+// expression on that line, or -1 where none does or a comment stands before it.
 function slashEnd(text, i) {
   const before = text.slice(Math.max(0, i - 20), i).trimEnd();
-  if (/[\w$)\]]$/u.test(before) && !BEFORE_REGEX.test(before)) return i;
+  if (before.endsWith("*/")) return -1;
+  if (/(?:[\w$)\]'"\x60]|\+\+|--)$/u.test(before) && !BEFORE_REGEX.test(before)) return i;
   for (let j = i + 1, inClass = false; j < text.length && text[j] !== "\n"; j++) {
     if (text[j] === "\\") j++;
     else if (text[j] === "[") inClass = true;
@@ -63,7 +64,7 @@ function constArray(text, name) {
 // parameter, whether it is a rest parameter, and the arguments before it, strings or a name the file holds as an array
 // of strings; or null where it hands on none exactly.
 function handsOn(text, i, params) {
-  // (a parameter whose method is called there, as `args.filter(Boolean)`, is handed on loosely)
+  // (a parameter read by a member there, as `args.filter(Boolean)`, is handed on loosely)
   const alone = new RegExp(String.raw`^(${NAME})\s*([,)]|\??\.)`, "u").exec(text.slice(i, i + 200));
   if (alone) { const at = params.findIndex((p) => p?.name === alone[1]); return at < 0 ? null : { at, rest: params[at].rest, before: [], loose: alone[2] !== "," && alone[2] !== ")" }; }
   const array = text[i] === "[" ? arrayAt(text, i) : null, before = [];
@@ -132,13 +133,14 @@ function normal(p) {
   return parts.join("/");
 }
 
-// Whether the arguments that open at text[i], which cannot be read, hold "clone" as a string or cannot be read to their end.
-const unread = (text, i) => { const end = codeEnd(text, i, true); return end < 0 || /['"`]clone['"`]/u.test(text.slice(i, end)); };
+// Whether the arguments that open at text[i], which cannot be read, cannot be read to their end either, or hold "clone"
+// as a string up to the later of their end and the next ";".
+const unread = (text, i) => { const end = codeEnd(text, i, true), semi = text.indexOf(";", i); return end < 0 || /['"`]clone['"`]/u.test(text.slice(i, Math.max(end, semi < 0 ? text.length : semi))); };
 
 /** Each git clone in `text`, of the file `f` (a path from the project's root), by a function that hands its arguments
  *  on to git (above), as otherFetches gives a fetch: its line and those that run on to it, spaces run together. A call
  *  whose git subcommand cannot be read is one where its arguments hold "clone", and one whose arguments cannot be
- *  read, where "clone" stands as a string in them, or where they cannot be read to their end either. */
+ *  read, where the function holds "clone" before them, or as `unread` says. */
 export function wrapperFetches(text, f = "", read = () => null) {
   const found = [], all = new Map([...imported(text, f, read), ...wrappers(text)]);
   for (const [name, w] of all) {

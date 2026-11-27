@@ -49,8 +49,11 @@ for (const [what, change] of [
   ["curl before an address of another scheme", append("scripts/setup.sh", "curl ftp://moss.example/moss.tgz\n")],
   ["git's array that spreads an option's value before another command", write("scripts/copy.mjs", `${OPEN}execFileSync("git", ["-C", ...a, "log"]);\n`)],
   ["a function called with arguments that cannot be read whole, a \";\" among them", write("scripts/copy.mjs", `${OPEN}const git = (...args) => execFileSync("git", args);\ngit(d.replace(/;/g, ""), "clone", u);\ngit(["a;b", "clone", u.replace(/x/, "y")]);\n`)],
+  ["a function called with arguments that cannot be read whole, one dividing a string", write("scripts/copy.mjs", `${OPEN}const git = (...args) => execFileSync("git", args);\ngit(\`a\` / (b / c), "clone", u);\n`)],
+  ["a function called with arguments that cannot be read whole, a regular expression after a condition", write("scripts/copy.mjs", `${OPEN}function g(opt, args) { return execFileSync("git", args); }\ng(() => { if (a) /[)]/.test(b) }, ["clone", url]);\n`)],
   ["a function whose body divides in a template", write("scripts/copy.mjs", `${OPEN}function git(...args) {\n  const m = \`\${a / 2}\`;\n  return execFileSync("git", args);\n}\ngit("clone", u);\n`)],
-  ["a function that calls a method of its parameter in the call of git", write("scripts/copy.mjs", `${OPEN}function git(...args) { return execFileSync("git", args.filter(Boolean)); }\ngit("clone", u);\n`)],
+  ["a function that reads its parameter by a member in the call of git", write("scripts/copy.mjs", `${OPEN}function git(...args) { return execFileSync("git", args.slice(1)); }\ngit("x", "clone", u);\n`)],
+  ["a function called with arguments that are never closed", write("scripts/copy.mjs", `${OPEN}const git = (...args) => execFileSync("git", args);\ngit(d.replace(/x/, "")\n`)],
   ["a function called with an option the scan does not know before clone", write("scripts/copy.mjs", `${OPEN}const git = (args) => execFileSync("git", args);\ngit(["--moss", "x", "clone", url]);\n`)],
 ]) {
   const f = run(change);
