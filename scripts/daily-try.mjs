@@ -17,9 +17,11 @@
 //                                                       whether it was), each name masked, no name printed; the counts
 //                                                       and the runners' numbers to $GITHUB_OUTPUT
 //   node scripts/daily-try.mjs --clone <n> <dir>        the n-th of those projects alone, cloned to <dir> (FOUND: how
-//                                                       many --list found; none where the list changed since)
+//                                                       many --list found; none where the list changed since);
+//                                                       beside <dir>, a file `private`: the listing's answer, true or false
 //   node scripts/daily-try.mjs --run <dir> <core>       that clone tried at the core checked out at <core>, given no
-//                                                       sign-in; its counts printed as one line, for the runner LEG
+//                                                       sign-in, as the file `private` beside <dir> says (none read,
+//                                                       none tried); its counts printed as one line, for the runner LEG
 //   node scripts/daily-try.mjs --file                   each runner's line read from its job's log, the counts summed
 //                                                       and filed: a bug where a project was held, and the issue for
 //                                                       the owner's sign-in where none was given
