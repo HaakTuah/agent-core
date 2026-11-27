@@ -51,6 +51,9 @@ const entries = (...cs) => entriesOf(cs, OWNER);
   ok(entryOf({ user: { login: OWNER }, created_at: "yesterday", body: leaseText({ session: "a", tool: "claude", builders: 0 }) }, OWNER) === null, "one with no time of the host's is not read");
   ok(entryOf(comment("Just a remark on the lease.", T0), OWNER) === null, "a remark is no entry");
   ok(entriesOf("not a list", OWNER).length === 0, "an answer that is no list gives no entries");
+  for (const bad of ["<b>x</b>", "../../etc/passwd", "/home/x", "a\u0000b", "[x](https://example.invalid)"]) {
+    ok(entryOf(comment(`Lease: ${bad}\nTool: claude\nBuilders: 0`, T0), OWNER) === null && entryOf(comment(`Hand-over: ${bad}`, T0), OWNER) === null && entryOf(comment(`Lease: a\nTool: ${bad}\nBuilders: 0`, T0), OWNER) === null, `markup or a path as a session, a hand-over's target or a tool is no entry (${JSON.stringify(bad).slice(0, 14)})`);
+  }
 }
 
 // ---- a wake decides ----
@@ -153,12 +156,12 @@ const run = (argv, s) => { const out = []; const code = main(argv, { host: s.hos
   const absent = { host: () => ({ repository: () => { throw Object.assign(new Error("gh could not read repos/x"), { refused: refusalOf({ error: { code: "ENOENT" } }, "repos/x/y") }); } }) };
   ok(run(["--session", "session_a", "--tool", "claude"], absent).code === 0, "where gh is not here at all, the wake goes on too");
   // gh refused by its sign-in, which only the owner mends, lets the wake go on; a passing fault fails it
-  const refusals = [[{ status: 4, stderr: "To get started with GitHub CLI, please run:  gh auth login" }, "user"], [{ status: 1, stderr: "HTTP 401: Bad credentials" }, "user"], [{ status: 1, stderr: "HTTP 403: Resource not accessible by integration" }, "user"], [{ status: 1, stderr: "HTTP 404: Not Found" }, `repos/${REPO}`]];
+  const refusals = [[{ status: 4, stderr: "To get started with GitHub CLI, please run:  gh auth login" }, "user"], [{ status: 1, stderr: "HTTP 401: Bad credentials" }, "user"], [{ status: 1, stderr: "HTTP 403: Resource not accessible by integration" }, "user"], [{ status: 1, stderr: "HTTP 403: Resource not accessible by personal access token" }, `repos/${REPO}/issues`], [{ status: 1, stderr: "HTTP 403: Resource protected by organization SAML enforcement" }, `repos/${REPO}`], [{ status: 1, stderr: "HTTP 404: Not Found" }, `repos/${REPO}`]];
   for (const [r, route] of refusals) {
     const got = run(["--session", "session_a", "--tool", "claude"], { host: () => ({ repository: () => { throw Object.assign(new Error("gh could not"), { refused: refusalOf(r, route) }); } }) });
     ok(got.code === 0 && got.out.startsWith("No lease can stand here: gh"), `gh refused (${r.stderr.slice(0, 24)}) lets the wake go on without the lease`, got.out);
   }
-  ok(refusalOf({ status: 1, stderr: "HTTP 502: Bad Gateway" }, "user") === null && refusalOf({ status: 1, stderr: "HTTP 404: Not Found" }, `repos/${REPO}/issues/7/comments`) === null && refusalOf({ status: null, error: { code: "ETIMEDOUT" } }, "user") === null, "a passing fault, and a 404 past the repository, are no refusal");
+  ok(refusalOf({ status: 1, stderr: "HTTP 403: API rate limit exceeded for user" }, "user") === null && refusalOf({ status: 1, stderr: "HTTP 403: You have exceeded a secondary rate limit" }, "user") === null && refusalOf({ status: 1, stderr: "HTTP 502: Bad Gateway" }, "user") === null && refusalOf({ status: 1, stderr: "HTTP 404: Not Found" }, `repos/${REPO}/issues/7/comments`) === null && refusalOf({ status: null, error: { code: "ETIMEDOUT" } }, "user") === null, "a passing fault, and a 404 past the repository, and a rate limit, are no refusal");
   const errs = [];
   const err0 = console.error; console.error = l => errs.push(l);
   const r502 = main(["--session", "session_a", "--tool", "claude"], { host: () => ({ repository: () => { throw Object.assign(new Error("gh could not read repos/x: HTTP 502"), { refused: null }); } }), now: T0, print: () => {}, repo: REPO, owner: OWNER });
@@ -168,7 +171,19 @@ const run = (argv, s) => { const out = []; const code = main(argv, { host: s.hos
   const relock = standIn([lease("session_a", T0 - 50 * MIN)], [{ number: 7, locked: false }], { lockable: false });
   const r11 = run(["--session", "session_a", "--tool", "claude"], relock), r12 = run(["--session", "session_a", "--tool", "claude"], relock);
   ok(relock.locks.join() === "7,7" && r11.out.includes("could not be locked") && r12.out.includes("could not be locked") && r12.code === 0, "an unlocked lease issue is locked again at each wake, a refusal said at each", r12.out);
-  ok(standIn([], [{ number: 7, locked: true }]).locks.length === 0 && (s => (run(["--session", "session_a", "--tool", "claude"], s), s.locks.length === 0))(standIn([], [{ number: 7, locked: true }])), "a locked one is left as it is");
+  ok((s => (run(["--session", "session_a", "--tool", "claude"], s), s.locks.length === 0))(standIn([], [{ number: 7, locked: true }])), "a locked one is left as it is");
+  // the lease unread: read alone, under another account, and in the look, which tells the owner
+  const short = () => Object.assign([comment("a remark", T0, "an-outsider")], { short: true });
+  const alone = run([], { host: standIn(short()).host });
+  ok(alone.code === 0 && alone.out.includes("the lease is unread") && alone.out.includes("owner"), "read alone, an unread lease says whether one runs cannot be told", alone.out);
+  const otherUnread = run(["--session", "session_a", "--tool", "claude"], { host: standIn(short(), [{ number: 7 }], { login: "another-writer" }).host });
+  ok(otherUnread.code === 0 && otherUnread.out.includes("the lease is unread"), "under another account too", otherUnread.out);
+  const told = dueIssue({ repo: REPO, owner: OWNER, at: iso(T0) }, () => standIn(short()).host(REPO));
+  ok(told?.owner === true && told.body.includes("#7") && !told.unread, "the look tells the owner of an unread lease in its issue", JSON.stringify(told));
+  const handErr = [], e0 = console.error; console.error = l => handErr.push(l);
+  const handRefused = main(["--hand-over", "any"], { host: () => ({ repository: () => { throw Object.assign(new Error("gh could not"), { refused: "gh is not signed in here" }); } }), now: T0, print: () => {}, repo: REPO, owner: OWNER });
+  console.error = e0;
+  ok(handRefused === 1, "a hand-over whose gh is refused fails, since it wrote no note");
   // more than one lease issue: said, and a locked one holding the owner's leases read first
   const two = standIn([lease("session_b", T0 - 10 * MIN)], [{ number: 3, locked: false }, { number: 5, locked: true }]);
   const r13 = run(["--session", "session_a", "--tool", "claude"], two);

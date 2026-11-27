@@ -169,7 +169,7 @@ export function refusalOf(r, route) {
   const err = String(r.stderr || "");
   if (r.error?.code === "ENOENT") return "gh is not installed here";
   if (r.status === 4 || /HTTP 401|gh auth login/u.test(err)) return "gh is not signed in here (gh auth login)";
-  if (/HTTP 403/u.test(err) && /not accessible by integration/iu.test(err)) return "gh's token is an app's, which GitHub refuses here";
+  if (/HTTP 403/u.test(err) && !/rate limit/iu.test(err)) return "gh's sign-in is refused here (HTTP 403: a token without the grant, an app's, or an organisation's sign-in)";
   if (/HTTP 404/u.test(err) && /^repos\/[^/]+\/[^/]+$/u.test(plain(route))) return "gh's account cannot see the repository";
   return null;
 }
@@ -270,7 +270,7 @@ export function dueIssue({ repo, owner, at }, host = () => hostOf(repo)) {
     const issue = chosenIssue(h.issues(owner), holdsOf(h, owner, since));
     if (!issue) return null;
     const from = now - LOOK_HOURS * HOUR, rows = h.comments(issue, since), entries = entriesOf(rows, owner);
-    if (unread(rows, entries)) return { title: TITLE, body: null, unread: `the orchestrator's lease (#${issue.number}) holds no lease of the owner's account within the comments it reads` };
+    if (unread(rows, entries)) return { title: TITLE, owner: true, body: `The orchestrator's lease (#${issue.number}; \`node core/scripts/lease.mjs\`) cannot be read: the comments it reads hold no lease of the owner's account, so no wake can hold the lease and none stops another. For the owner: hide or delete the comments after the newest lease and lock #${issue.number}, or close it so the next wake opens a fresh one.` };
     const found = faults(entries, from);
     if (!found.length) return { title: TITLE, body: null };
     return {
@@ -319,7 +319,7 @@ function repoHere() {
 const manifestOwner = () => { try { return ownerOf(fs.readFileSync("core-manifest.md", "utf8")); } catch { return null; } };
 
 // The line printed where no lease can stand, and the wake goes on ("Nothing locks a project").
-const UNREAD = issue => `the comments it reads of #${issue.number} hold no lease of the owner's account and do not reach back a day, so the lease is unread and it claims none`;
+const UNREAD = issue => `the comments it reads of #${issue.number} hold no lease of the owner's account and do not reach back a day, so the lease is unread and it claims none; whether another orchestrator runs cannot be told, so name it to the owner in the report`;
 export const noLease = why => `No lease can stand here: ${why}. The wake goes on without one, saying so in its report.`;
 
 // Whether a lease can stand here, and as whom the script writes: { code } where the run ends there (issues switched
@@ -399,7 +399,7 @@ export function main(argv, { host = hostOf, now = Date.now(), print = console.lo
   o.who = o.owner ?? owner ?? manifestOwner() ?? where.split("/")[0];
   try { return run(host(where), o, now, print); }
   catch (e) {
-    if (e.refused) { print(noLease(e.refused)); return 0; }
+    if (e.refused && o.handOver === null) { print(noLease(e.refused)); return 0; }
     console.error(`FAIL: ${oneLine(String(e.message)).slice(0, 300)}. Mend: this wake works no lane; it keeps its next only while a builder runs or a review or check is due, which runs it again, else none, its hand-off ready; where gh still gives no answer, say so in the report`);
     return 1;
   }
