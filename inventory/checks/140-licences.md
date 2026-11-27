@@ -30,4 +30,4 @@
   it where they are not (`scripts/schemas/licences.json`; #530, item 7). *Limits:* the scan reads the forms in which a
   project writes its fetches, commands and packages in the ordinary way; a form written on purpose to hide a fetch or a
   package from it is beyond what it reads. Input it cannot read whole fails, but in a file an entry audits by hand, and
-  what stood so at the pull request's base, which is reported; none passes with no word.
+  what stood so at the pull request's base, which is reported; none passes with neither an entry nor a report.
