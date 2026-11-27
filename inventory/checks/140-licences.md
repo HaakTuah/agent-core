@@ -3,7 +3,7 @@
   `scripts/licence-pages.mjs`, `scripts/licence-scan-stage.mjs`, `scripts/licence-locks.mjs`, `tests/licence-locks-test.mjs`,
   `scripts/licences.d.mts`, `.github/licences.json`, `.github/licences-audit.json`, `tests/licence-fetch-test.mjs`, `tests/licence-fetch-places-test.mjs`,
   `tests/licence-fetch-other-test.mjs`, `tests/licence-fetch-pages-test.mjs`, `tests/licence-scan-limits-test.mjs`,
-  `tests/licence-scan-pins-test.mjs`: hold
+  `tests/licence-scan-pins-test.mjs`, `scripts/licence-reads.mjs`: hold
   every package the lock files install, and every entry of the audit, to floor rule 10's list, with the owner's yes for
   what is off it. *Runs:* any session and the runners. *Else:* npm's own `npm sbom` (each installed package's licence,
   as SPDX or CycloneDX), kept, as the package system's own tool; licensee (Apache-2.0, 10 packages),
