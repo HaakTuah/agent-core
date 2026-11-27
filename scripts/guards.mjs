@@ -243,6 +243,10 @@ export function unrooted(text, root) {
  *  and neither part dots alone, so a route built from it reaches that repository's routes and no other. */
 export const aRepository = name => typeof name === "string" && /^[\w.-]+\/[\w.-]+$/u.test(name) && name.split("/").every(part => !/^\.+$/u.test(part));
 
+/** Whether `login` is a person's GitHub login: a letter or digit, then up to 38 letters, digits or "-", so a route
+ *  built from it reaches that account's routes and no other. */
+export const aLogin = login => typeof login === "string" && /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u.test(login);
+
 /** Whether `sha` is a commit's whole name as GitHub gives it: forty hexadecimal digits, in lower case. */
 export const aCommit = sha => typeof sha === "string" && /^[0-9a-f]{40}$/u.test(sha);
 
