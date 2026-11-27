@@ -1,10 +1,13 @@
 // Checks the description check's lines "Number:" against the entries of scripts/holders/ whose number a pull request
 // adds or changes (scripts/pr-number.mjs's entriesMend and entriesChanged; #1138, part 3), git given as a stand-in that
-// answers as git does, so no process is started. Run by the core's tests workflow (.github/workflows/tests.yml).
+// answers as git does, so no process is started; and the hostile tests of that reader of what a pull request changes
+// (SECURITY.md, rule 5): links, a git out of its form, the most it is handed, timed. Run by the core's tests workflow
+// (.github/workflows/tests.yml).
 //
 //   node tests/pr-description-entries-test.mjs
+import { quick } from "../scripts/hostile.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { entriesChanged, entriesMend } from "../scripts/pr-number.mjs";
+import { ENTRIES_MAX, entriesChanged, entriesMend } from "../scripts/pr-number.mjs";
 
 let failed = 0;
 const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) { failed++; if (detail) console.log(`     ${detail}`); } };
@@ -27,32 +30,54 @@ ok(/the line "Number: correction: looks wrong; outcome: usable" under "What hold
   "a line whose number no entry holds fails, and a line in no form is left to the number's own check; a line of another number does not stand for the entry", `${stray}\n${wrong}`);
 
 // ---- the entries, read from git ----
-// (a stand-in for git over two trees, the base HEAD^1 and the head HEAD, each { path: text }; the diff as git's
-// --name-status -M -z gives it, a rename found where a file gone from the base stands in the head with its text)
-const fake = (base, head) => (...a) => {
-  const ok0 = stdout => ({ status: 0, stdout });
-  if (a[0] === "show") { const [rev, f] = a[1].split(/:(.*)/su); const t = (rev === "HEAD" ? head : base)[f]; return t === undefined ? { status: 128, stdout: "" } : ok0(t); }
-  if (a[0] === "ls-tree") return ok0(Object.keys(head).map(f => `${f}\0`).join(""));
-  if (a[0] === "diff") {
-    const out = [], gone = Object.keys(base).filter(f => !(f in head)), added = Object.keys(head).filter(f => !(f in base));
-    const renamed = new Map(gone.map(f => [f, added.find(g => head[g] === base[f])]).filter(([, g]) => g));
-    for (const f of Object.keys(base).filter(f => f in head && base[f] !== head[f])) out.push("M", f);
-    for (const [f, g] of renamed) out.push("R100", f, g);
-    for (const f of gone.filter(f => !renamed.has(f))) out.push("D", f);
-    for (const g of added.filter(g => ![...renamed.values()].includes(g))) out.push("A", g);
-    return ok0(out.map(x => `${x}\0`).join(""));
-  }
-  return { status: 1, stdout: "" };
+// (a stand-in for git over two trees, the base HEAD^1 and the head HEAD, each { path: text, or [mode, type] for what is
+// no regular file }, answering ls-tree and cat-file --batch as git does; `calls` counts what it is asked)
+let calls = 0;
+const fake = (base, head, more = {}) => {
+  const blobs = new Map(), shaOf = text => { const sha = (blobs.size + 1).toString(16).padStart(40, "0"); blobs.set(sha, text); return sha; };
+  const trees = { HEAD: head, "HEAD^1": base }, listed = {};
+  for (const [rev, tree] of Object.entries(trees)) listed[rev] = Object.entries(tree).map(([f, t]) => Array.isArray(t) ? `${t[0]} ${t[1]} ${"f".repeat(40)}\t${f}\0` : `100644 blob ${shaOf(t)}\t${f}\0`).join("");
+  return (args, input) => {
+    calls++;
+    if (more[args[0]]) return more[args[0]](args, input);
+    if (args[0] === "ls-tree") return { status: 0, stdout: listed[args[4]] };
+    if (args[0] === "cat-file") return { status: 0, stdout: Buffer.concat(input.split("\n").filter(Boolean).map(sha => { const b = Buffer.from(blobs.get(sha)); return Buffer.concat([Buffer.from(`${sha} blob ${b.length}\n`), b, Buffer.from("\n")]); })) };
+    return { status: 1, stdout: "" };
+  };
 };
-const at = f => `scripts/holders/${f}`, entry = (rule, number, extra = "") => JSON.stringify({ rule, holder: "audit", ...(number ? { number } : {}), behind: [1] }, null, 2) + extra;
-const base = { [at("kept.json")]: entry("AGENTS.md: Kept", F), [at("moved.json")]: entry("AGENTS.md: Moved", F), [at("renum.json")]: entry("AGENTS.md: Renum", F), [at("gone.json")]: entry("AGENTS.md: Gone", C), [at("plain.json")]: entry("AGENTS.md: Plain", null) };
-const head = { [at("kept.json")]: entry("AGENTS.md: Kept", F, "\n"), [at("moved-now.json")]: base[at("moved.json")], [at("renum.json")]: entry("AGENTS.md: Renum", C), [at("plain.json")]: entry("AGENTS.md: Plain", R), [at("new.json")]: entry("AGENTS.md: New", F), [at("odd.txt")]: "x" };
+const at = f => `scripts/holders/${f}`, entry = (rule, number, holder = "audit") => JSON.stringify({ rule, holder, ...(number ? { number } : {}), behind: [1] }, null, 2);
+const base = { [at("kept.json")]: entry("AGENTS.md: Kept", F), [at("moved.json")]: entry("AGENTS.md: Moved", F), [at("renum.json")]: entry("AGENTS.md: Renum", C), [at("gone.json")]: entry("AGENTS.md: Gone", C), [at("plain.json")]: entry("AGENTS.md: Plain", null), [at("odd-before.json")]: ["120000", "blob"] };
+const head = { [at("kept.json")]: `${entry("AGENTS.md: Kept", F)}\n`, [at("moved-now.json")]: entry("AGENTS.md: Moved", F, "check: scripts/a-check.mjs"), [at("renum.json")]: entry("AGENTS.md: Renum", F), [at("plain.json")]: entry("AGENTS.md: Plain", R), [at("new.json")]: entry("AGENTS.md: Ünew ✓", F), [at("odd.txt")]: "x" };
 const read = entriesChanged(".", fake(base, head));
-ok(JSON.stringify(read?.changed.map(c => c.rule).sort()) === JSON.stringify(["AGENTS.md: New", "AGENTS.md: Plain", "AGENTS.md: Renum"]) && JSON.stringify([...read.standing].sort()) === JSON.stringify([R, C, F].sort()),
-  "an entry added with a number, one that gains one and one whose number changes are read; one only edited or renamed with its number, one taken out and a file that is no entry are not", JSON.stringify(read && { changed: read.changed, standing: [...read.standing] }));
+ok(JSON.stringify(read?.changed.map(c => c.rule).sort()) === JSON.stringify(["AGENTS.md: Plain", "AGENTS.md: Renum", "AGENTS.md: Ünew ✓"]) && JSON.stringify([...read.standing].sort()) === JSON.stringify([R, F].sort()) && read.odd.length === 0,
+  "an entry added with a number, one that gains one and one whose number changes are read; one only edited, one renamed with its holders changed and its number kept (found by its rule), one taken out and a file that is no entry are not", JSON.stringify(read && { changed: read.changed, standing: [...read.standing], odd: read.odd }));
 const broken = entriesChanged(".", fake(base, { ...head, [at("renum.json")]: "{ not json" }));
 ok(!broken.changed.some(c => c.rule === "AGENTS.md: Renum"), "an entry that cannot be read as JSON is read as holding no number (holders.mjs names it)");
-ok(entriesChanged(".", () => ({ status: 128, stdout: "" })) === null, "where the change cannot be read against its base, nothing is read");
+
+// ---- what a pull request could make of it (SECURITY.md, rule 5) ----
+let asked = "";
+const odd = entriesChanged(".", fake(base, { ...head, [at("link.json")]: ["120000", "blob"], [at("sub.json")]: ["160000", "commit"] }, { "cat-file": (a, input) => { asked = input; return fake(base, head)(a, input); } }));
+const oddMend = odd && entriesMend(holds(`Number: ${F}`), [], standing, odd.odd), oddAlone = odd && entriesMend("No part.", [], standing, odd.odd);
+ok(JSON.stringify(odd?.odd) === JSON.stringify([at("link.json"), at("sub.json")]) && !asked.includes("f".repeat(40))
+  && /scripts\/holders\/link\.json is a link or a submodule.*scripts\/holders\/sub\.json is a link or a submodule.*Mend: make each entry of scripts\/holders\/ a regular JSON file/su.test(oddMend ?? "") && mended(`FAIL ${oddMend}`) && mended(`FAIL ${oddAlone}`),
+  "an entry made a link or a submodule is never read: it fails, named, with its mend, the part there or not", `${JSON.stringify(odd?.odd)}\n${oddMend}`);
+const unread = [
+  ["git fails", () => ({ status: 128, stdout: "" })],
+  ["git stops past ENTRIES_MAX", (a, input) => a[0] === "cat-file" ? { status: null, stdout: Buffer.alloc(0) } : fake(base, head)(a, input)],
+  ["the tree's list is out of its form", (a, input) => a[0] === "ls-tree" ? { status: 0, stdout: "100644 blob nothex\tscripts/holders/x.json\0" } : fake(base, head)(a, input)],
+  ["the batch names another object", (a, input) => a[0] === "cat-file" ? { status: 0, stdout: Buffer.from(`${"e".repeat(40)} blob 2\n{}\n`) } : fake(base, head)(a, input)],
+  ["the batch ends short of a size it gives", (a, input) => a[0] === "cat-file" ? { status: 0, stdout: Buffer.from(`${input.split("\n")[0]} blob 999999\n{}\n`) } : fake(base, head)(a, input)],
+  ["the batch says an object is missing", (a, input) => a[0] === "cat-file" ? { status: 0, stdout: Buffer.from(`${input.split("\n")[0]} missing\n`) } : fake(base, head)(a, input)],
+];
+for (const [what, git] of unread) ok(entriesChanged(".", git) === null, `where ${what}, the change is said unread, failing nothing`);
+// (the most a pull request could hand the reader: twenty thousand entries a side, and one entry of 15 MB, under the
+// ENTRIES_MAX git hands over, each read within the 5 s SECURITY.md allows, git asked four times at most whatever the count)
+const many = n => Object.fromEntries(Array.from({ length: n }, (_, k) => [at(`e${k}.json`), entry(`AGENTS.md: Rule ${k}`, k % 2 ? F : C)]));
+const big = { [at("big.json")]: entry(`AGENTS.md: ${"x".repeat(15 * 1024 * 1024)}`, R) };
+for (const [what, b, h] of [["twenty thousand entries a side", many(20000), { ...many(20000), [at("e1.json")]: entry("AGENTS.md: Rule 1", R) }], ["an entry of 15 MB", {}, big]]) {
+  const git = fake(b, h); calls = 0;
+  ok(quick(() => entriesChanged(".", git)?.changed.length === 1) && calls <= 4 && ENTRIES_MAX > 15 * 1024 * 1024, `${what}: read within 5 s, git asked ${calls} times`);
+}
 
 console.log(failed ? `${failed} failed` : "all passed");
 process.exit(failed ? 1 : 0);

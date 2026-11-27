@@ -206,7 +206,7 @@ if (started(import.meta.url)) {
     else if (parts.includes(HOLDS)) console.log(`ok   the number under "${HOLDS}" is not asked here: ${why}`);
     if (parts.includes(HOLDS) && created >= ENTRIES_SINCE && then?.includes("export const ENTRIES_SINCE")) {
       // (the core's own repository alone: in a project the copy's entries move only at a sync, the core's pull request having held them)
-      const entries = coreAtBase(process.cwd()) === "" ? entriesChanged(process.cwd()) : null, mend = entries && entriesMend(process.env.PR_BODY, entries.changed, entries.standing);
+      const entries = coreAtBase(process.cwd()) === "" ? entriesChanged(process.cwd()) : null, mend = entries && entriesMend(process.env.PR_BODY, entries.changed, entries.standing, entries.odd);
       if (mend) mends.push(mend);
       else console.log(entries ? `ok   the lines "Number:" under "${HOLDS}" are in step with the ${entries.changed.length} entr${entries.changed.length === 1 ? "y" : "ies"} whose number this pull request adds or changes` : `ok   the lines "Number:" are not held to the entries here: this is no core's own repository, or the change could not be read against its base`);
     } else if (parts.includes(HOLDS)) console.log(`ok   the lines "Number:" are not held to the entries here: ${why}`);
