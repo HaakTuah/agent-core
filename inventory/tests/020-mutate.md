@@ -1,4 +1,4 @@
-- `scripts/mutate.mjs`, `scripts/mutation-tools.mjs`, `scripts/mutation-tools.json`, `scripts/strength.mjs`, `scripts/strength-report.mjs`, `scripts/strength-verdict.mjs`, `scripts/stryker.mjs`, `scripts/stryker-plugin.mjs`, `tests/mutation/`:
+- `scripts/mutate.mjs`, `scripts/mutation-tools.mjs`, `scripts/mutation-tools.json`, `scripts/strength.mjs`, `scripts/strength-report.mjs`, `scripts/strength-verdict.mjs`, `scripts/stryker.mjs`, `scripts/stryker-plugin.mjs`, `scripts/stryker-vm.mjs`, `tests/mutation/`:
   the mutation tool puts faults into the lines a change touches, one at a time, and writes the open mutation report,
   which the strength check reads to say how strong the tests are. *Runs:* any session and the runners. *Else:* StrykerJS
   (Apache-2.0, 172 packages) and Stryker.NET, kept, tried above; mutmut and Cosmic Ray for Python, kept for a Python

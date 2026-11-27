@@ -10,10 +10,12 @@ import { execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import vm from "node:vm";
 import { mended } from "../scripts/mend.mjs";
 import { limitOf } from "../scripts/mutate.mjs";
 import { coreReporter, named, progress, strykerPlugins } from "../scripts/stryker-plugin.mjs";
-import { asItStands, counted, dispatch, optionsOf, stopTests, strykers, testsFor, vitestAt, word } from "../scripts/stryker.mjs";
+import { argsOf, asItStands, counted, dispatch, optionsOf, stopTests, strykers, testsFor, vitestAt, word } from "../scripts/stryker.mjs";
+import { handed } from "../scripts/stryker-vm.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -138,6 +140,16 @@ try {
   const jest = spawnSync(process.execPath, [SCRIPT, "--tool", ".", "--runner", "jest", "--report", "r.json"], { encoding: "utf8" }).stderr;
   ok(/told to run its tests with jest.*--runner vitest/.test(jest) && mended(jest), "another runner is refused, saying the mend", jest);
 
+  // ---- the fault handed to a test's vm contexts (#1361, point 26) ----
+  const made = handed({ a: 1 }, "4"), kept = { __stryker__: { activeMutant: "9" } };
+  ok(made.__stryker__.activeMutant === "4" && same(Object.keys(made), ["a"]) && handed(undefined, "4").__stryker__.activeMutant === "4" && handed({}, undefined).__stryker__ === undefined
+    && handed(kept, "4").__stryker__.activeMutant === "9" && handed(vm.createContext({}), "4").__stryker__ === undefined && argsOf([], "t.mjs")[0] === "--import" && same(argsOf(["v.mjs", "run"], "t.mjs"), ["v.mjs", "run", "t.mjs"]),
+  "a new context's object is given the fault switched on, unseen by its keys; none where none is on, nor one that is a context or holds its own; a test node runs is given the preload, one vitest runs is not");
+  const inVm = "import vm from 'node:vm';\nconst read = 'typeof __stryker__ === \"object\" ? __stryker__.activeMutant : \"none\"';\nconsole.log([vm.runInContext(read, vm.createContext({})), vm.runInNewContext(read), new vm.Script(read).runInNewContext({})].join());\n";
+  fs.writeFileSync(path.join(scratch, "in-vm.mjs"), inVm);
+  const vmRun = active => spawnSync(process.execPath, argsOf([], path.join(scratch, "in-vm.mjs")), { encoding: "utf8", env: { ...process.env, __STRYKER_ACTIVE_MUTANT__: active } }).stdout.trim();
+  ok(vmRun("12") === "12,12,12" && vmRun("") === "none,none,none", "with the preload, code a test runs in a vm context reads the fault switched on, by each way a context is made, and none where none is", `${vmRun("12")} / ${vmRun("")}`);
+
   // ---- a run with Stryker itself, in a scratch repository ----
   if (TOOL) {
     // (a scratch repository: its code, and a test of it at `test`)
@@ -177,6 +189,15 @@ try {
       await new Promise(r => child.on("exit", r));
       ok(was && !strykers() && git("worktree", "list").trim().split("\n").length === 1, "a run stopped by a signal stops Stryker with it, and takes its working copy away", `before: ${was || "none"}; after: ${strykers() || "none"}`);
     }
+    // (a test that runs the code in a vm context with no process in it: the fault reaches it, #1361, point 26)
+    const w = repoOf("vm-repo", "test/a-test.mjs");
+    w.write("src/v.js", "function big(x) { return x > 10; }\n");
+    w.write("test/v-test.mjs", "import fs from 'node:fs';\nimport vm from 'node:vm';\nconst context = vm.createContext({});\nvm.runInContext(fs.readFileSync('src/v.js', 'utf8'), context);\nif (context.big(5) || !context.big(20)) process.exit(1);\n");
+    w.git("add", "-A"); w.git("commit", "-q", "-m", "base");
+    fs.rmSync(out, { force: true });
+    const wrun = spawnSync(process.execPath, [SCRIPT, "--tool", TOOL, "--report", out, "src/v.js"], { cwd: w.dir, encoding: "utf8" });
+    const inContext = fs.existsSync(out) ? JSON.parse(fs.readFileSync(out, "utf8")).files["src/v.js"]?.mutants ?? [] : [];
+    ok(wrun.status === 0 && inContext.some(m => m.status === "Killed"), "with Stryker: a fault in code a test runs in a vm context is caught by that test", `${wrun.stdout}${wrun.stderr}\n${inContext.map(m => m.status).join(", ")}`);
     // (tests vitest runs: a stand-in for its vitest runs the file and logs what it was asked)
     const v = repoOf("vitest-repo", "test/a.test.mjs");
     v.write(".gitignore", "node_modules/\n"); v.write("package.json", JSON.stringify({ scripts: { test: "vitest run" } }));
