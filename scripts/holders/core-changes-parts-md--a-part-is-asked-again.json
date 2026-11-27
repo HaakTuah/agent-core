@@ -1,0 +1,6 @@
+{
+  "rule": "core-changes/parts.md: A part is asked again",
+  "holder": "check: scripts/choices.mjs, in part",
+  "behind": ["#534.1"],
+  "number": "correction: does not work; outcome: robust"
+}

@@ -8,7 +8,7 @@
 // fresh start, are listed apart, advised, standing in the way of nothing (the core's part of AGENTS.md and CLAUDE.md,
 // which the sync writes, stands in the way where it differs); and what it could not read, and the checks that
 // read nothing here, it says, counted neither way. It
-// reports and fails nothing (AGENTS.md of the core, "Nothing locks a project"), and each part keeps its own check where
+// reports and fails nothing (core-changes/projects.md of the core, "Nothing locks a project"), and each part keeps its own check where
 // it stands. The sync prints its line at its end (sync.mjs, beside this file). Reads only, and writes nothing in the
 // project. Git, tar, gh where pure-sync.mjs asks whose account holds the repository, and
 // Node's own modules.

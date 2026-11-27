@@ -1,4 +1,4 @@
-// Nothing the core changes locks a project that changes nothing of its own (AGENTS.md, "Nothing locks a project"; core
+// Nothing the core changes locks a project that changes nothing of its own (core-changes/projects.md, "Nothing locks a project"; core
 // archive 201 and 215): a project written by the starter kit of each of the last two releases (one that missed a
 // release jumps two), then synced to the commit under test as a release of its own, passes every check of the core
 // unchanged, and no pull request of its own starts a job there that it did not start before the sync, since each job is

@@ -1,0 +1,6 @@
+{
+  "rule": "core-changes/rules.md: A rule is written in the form a check can hold",
+  "holder": "check: tests/pruning-unheld-test.mjs, in part",
+  "behind": ["#887"],
+  "number": "findings; outcome: fast"
+}

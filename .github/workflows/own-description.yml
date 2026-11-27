@@ -2,8 +2,8 @@
 # (scripts/pr-description.mjs), here from its source, with the line that says what a pull request opened since it came
 # waits on, and the line that lists what its changed paths called for (PR_CREATED, read against the base's history through the read-only token). A description put right is checked again by itself (the type
 # "edited"). A pull request that changes a rule file (the floor, a role's file or a module) is asked for one more, "What holds it"
-# (AGENTS.md, "Every rule says what holds it"), and one that changes the floor, a module, a script (the checks), the
-# setup (the starter kit and the sync notes) or a workflow, "What it asks of a project" (AGENTS.md, "Nothing locks a
+# (core-changes/holders.md, "Every rule says what holds it"), and one that changes the floor, a module, a script (the checks), the
+# setup (the starter kit and the sync notes) or a workflow, "What it asks of a project" (core-changes/projects.md, "Nothing locks a
 # project"): whether it does is read from git alone, the merge commit against its first parent, the base, and nothing
 # of the pull request's own text reaches that step's script. One that changes the floor or the review guidelines quotes
 # the owner's yes found word for word on its issue, from an account the host gives maintain or admin and edited, where

@@ -243,7 +243,7 @@ function canonical(at, gh) {
 // however late it runs.
 const privateRun = env => `the owner, in a terminal of the owner's own with gh signed in as the owner, runs \`node ${env.CORE_AT ?? "core/"}scripts/issue-terms.mjs --private --days 36500 --terms-file <a file of the terms, kept outside the repository>\` (a session the owner works with may run it given that path alone; the list is never typed into a chat), which takes out what this could not and names there alone each text whose earlier versions hold a term; the owner deletes those versions by hand (the text's "edited" menu).`;
 
-// The issue that tells the owner the private run is due, since only the owner can delete a kept version (AGENTS.md,
+// The issue that tells the owner the private run is due, since only the owner can delete a kept version (core-changes/projects.md,
 // "Nothing locks a project": what only the owner can do is reported and labelled needs-owner): one, kept open by its
 // title among the open issues labelled by:look and needs-owner that this job or the owner opened; its body the
 // counts and the run alone, never a text or an address. The job never closes it: the owner, or the session that runs the

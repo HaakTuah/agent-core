@@ -1,5 +1,5 @@
 // The order of a pull request's checks and reviews (tasks/reviews.md, point 10, "The order follows cost"; #397), worked
-// out from what can be read exactly and never asked (the core's AGENTS.md, "What can be read is never asked or
+// out from what can be read exactly and never asked (the core's core-changes/rules.md, "What can be read is never asked or
 // declared"); nothing of it is written in the repository, and no manifest row is read. It reads:
 // - whether the host bills the proof: the repository is private (the host says) and a job that starts a suite runs on
 //   the host's runners (the checkout's workflows, as runners.mjs reads them, and none for another repository; with no

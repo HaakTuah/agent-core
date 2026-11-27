@@ -1,5 +1,5 @@
 // Tests what a failure of a check says (mend.mjs), and holds that each check of the core has a test that reads its
-// failures for their mend (AGENTS.md, "A check that fails says the mend"; #254): every script a workflow of the core or
+// failures for their mend (core-changes/projects.md, "A check that fails says the mend"; #254): every script a workflow of the core or
 // of the starter kit names, and every workflow with a step that fails by itself, is a check below with its test, or is
 // listed with why it fails no pull request; and each check's test calls mended() of mend.mjs. A new check, or a test
 // that stops reading the mend, fails here. It holds too that each file git tracks is claimed by a line of the inventory

@@ -1,7 +1,7 @@
 # The core's policy for zizmor, the workflow check's auditor (scripts/workflow-tools.mjs; #580): every audit of its
 # regular persona that needs no network, but where floor rule 2 decides otherwise, each with its reason. A finding a
 # project judges safe on one line is allowed by a comment "# zizmor: ignore[<audit>]" there, with why beside it, which
-# the reviews read; one the base already held is noted and fails nothing (AGENTS.md, "Nothing locks a project").
+# the reviews read; one the base already held is noted and fails nothing (core-changes/projects.md, "Nothing locks a project").
 rules:
   # (the triggers are the core's own reading: workflows.mjs fails pull_request_target wherever the word stands, which
   # neither a comment that ignores this audit nor zizmor's pass for a workflow whose one step is actions/labeler gets

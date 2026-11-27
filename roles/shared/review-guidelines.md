@@ -94,17 +94,17 @@ makes a process measure its goal (`tasks/cleaning.md`).
 - Blocking: a rule that departs from the owner's word behind it: on its issue, in the archive's items it cites, or in
   the core, those `scripts/holders/` lists for it.
 - Blocking: a rule of the core (its floor, modules or `AGENTS.md`) written or changed without a part of the pattern in
-  the core's `AGENTS.md`, "A rule is written to one pattern", or holding what that pattern keeps out.
+  the core's `core-changes/rules.md`, "A rule is written to one pattern", or holding what that pattern keeps out.
 - Blocking: a rule, the core's or the project's own, written or changed that a reading alone holds where a form of it
   a check reads without guessing exists, and the pull request gives no reason the form would change what the rule asks
-  or protects a great deal (the core's `AGENTS.md`, "A rule is written in the form a check can hold").
-- Blocking: a rule written or changed that fails the core's test for a rule (the core's `AGENTS.md`, "A rule is for
+  or protects a great deal (the core's `core-changes/rules.md`, "A rule is written in the form a check can hold").
+- Blocking: a rule written or changed that fails the core's test for a rule (the core's `core-changes/rules.md`, "A rule is for
   what an agent can do"): one an agent cannot carry out, that only blocks, or that makes the product neither better nor
   sturdier, and one whose owner's word was an order for one piece of work.
 - A finding: a rule that adds text without replacing any, or makes anyone wait for the owner beyond floor rules 3 and 14.
 - Blocking: a rule or a slot that takes a fact about a project's set-up and says neither where it is read from nor why
-  it cannot be read (the core's `AGENTS.md`, "What can be read is never asked or declared").
-- A finding: proof asked beyond what a thing costs others (the core's `AGENTS.md`, "Proof is sized to what a thing
+  it cannot be read (the core's `core-changes/rules.md`, "What can be read is never asked or declared").
+- A finding: proof asked beyond what a thing costs others (the core's `core-changes/rules.md`, "Proof is sized to what a thing
   costs others").
 
 ## Worked examples

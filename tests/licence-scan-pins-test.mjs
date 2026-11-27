@@ -104,7 +104,7 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
 
 
 
-// A fetch the scan has come to read, standing unaudited at the pull request's base, is reported and passes (AGENTS.md,
+// A fetch the scan has come to read, standing unaudited at the pull request's base, is reported and passes (core-changes/projects.md,
 // "Nothing locks a project"; #1074); one the pull request adds or changes, on its line or one it runs on to, or whose
 // entry it takes out, fails, saying the mend, and so does any with no base to read.
 {

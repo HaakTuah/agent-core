@@ -1,5 +1,5 @@
 // Tests the guard each check's entry runs through and the watch on the hostile tests' runs (scripts/mend.mjs,
-// scripts/check-runs.mjs, scripts/check-runs-read.mjs; AGENTS.md, "A check that fails says the mend"; #1140): an error a check did not catch fails
+// scripts/check-runs.mjs, scripts/check-runs-read.mjs; core-changes/projects.md, "A check that fails says the mend"; #1140): an error a check did not catch fails
 // with its mend, a mend that names a script to run names one there from the folder the check ran in, and a run that
 // fails with no failure line, or one that says no mend, is a fault. tests/mend-test.mjs holds that each check starts
 // through the guard and each hostile test through the watch. Node's own modules.

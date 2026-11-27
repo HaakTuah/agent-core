@@ -16,7 +16,7 @@
 //   - a pointer, in the project's own text, to a path of the copy that is not there: with the core fetched, one the
 //     core moved unchanged (a rename git finds whole, between an earlier copy and the copy) moves to where it stands;
 //     any other is listed.
-// The dated records (reports/, archive/) are not compared, nor changed; they are read only for a file's name. It fails nothing (AGENTS.md of the core, "Nothing
+// The dated records (reports/, archive/) are not compared, nor changed; they are read only for a file's name. It fails nothing (core-changes/projects.md of the core, "Nothing
 // locks a project"); in the core's own repository, which holds no copy, it reads nothing. Node's own modules, git and
 // the YAML reader (parse-yaml.mjs); the files and pointers are read in twice-files.mjs, the text in twice-text.mjs.
 //

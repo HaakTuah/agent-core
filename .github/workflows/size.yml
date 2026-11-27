@@ -5,7 +5,7 @@
 # roles/shared/review-guidelines.md, "A mark on what every session reads"); and the words check (scripts/general.mjs) fails
 # one that uses a word true only for some of the projects that take the core, a gendered pronoun for the owner in a
 # line it adds to the dated records, or a phrase a rule may not use in a line it adds to a rule file or to a Markdown
-# template of the starter kit, read against the base, and reports the phrases that stood before it (AGENTS.md, "A rule
+# template of the starter kit, read against the base, and reports the phrases that stood before it (core-changes/rules.md, "A rule
 # is written to one pattern"; tasks/helpers.md, "A brief is written as a rule is"); the marks check (scripts/pattern.mjs),
 # which fails a rule the pull request adds to the floor, a module or AGENTS.md that lacks its reason, its holder or its
 # one condition, and reports one it words anew (#1137); and the shape check on the core's

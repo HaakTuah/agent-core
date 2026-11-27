@@ -28,7 +28,7 @@
 // script alone and whose head does not hold it as the default branch does (BOUND=false, which the workflow sets), and
 // that the host says was opened before the script first came to the default branch (SINCE; boundOf in security-review.mjs), stood
 // before the check came:
-// its missing review is said in the status, never waited for (AGENTS.md, "Nothing locks a project"); brought up to
+// its missing review is said in the status, never waited for (core-changes/projects.md, "Nothing locks a project"); brought up to
 // date with main, it is held. A summary whose state cannot be read counts as no review of Codex's, with a warning. It
 // does not hold what a review says, that docs another provider built got their code review, nor, given no list of the
 // merges proved (a workflow older than this script), that a merge from `main` brought no change of its own: those stay

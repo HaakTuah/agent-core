@@ -1,4 +1,4 @@
-// The part of the core that reads and writes the host for the steps (#1092; AGENTS.md, "The host is read and written by
+// The part of the core that reads and writes the host for the steps (#1092; core-changes/projects.md, "The host is read and written by
 // the look"): what GitHub answers for a project's repository, read once, so that the steps whose state is GitHub's, not
 // a file's, are told done by a check (each step's `host`, step-checks-host.mjs beside this file), and the settings only
 // the owner gives (owner-settings.mjs) are read where the token lets them be. It writes on the host only from the daily
@@ -6,7 +6,7 @@
 // (labels.mjs), the steps' issue and the issue "Settings only the owner gives", which lists each such setting not given,
 // with its link, and each write GitHub refused, so that no session's own sign-in edits the host for a step. Run by
 // itself, from a project's root, as each sync runs it, it reads and writes nothing, and prints the steps read on the
-// host that are not done; it fails nothing (AGENTS.md, "Nothing locks a project"). gh, git and Node's own modules.
+// host that are not done; it fails nothing (core-changes/projects.md, "Nothing locks a project"). gh, git and Node's own modules.
 //
 //   node core/scripts/host.mjs     from a project's root: the steps read on the host that are not done, and those not read
 import { spawnSync } from "node:child_process";
@@ -93,7 +93,7 @@ export function settingsTask(repo, states, refused = []) {
   const off = SETTINGS.filter(s => states[s.id]?.given === false), unread = SETTINGS.filter(s => states[s.id]?.given === null && !/^does not apply/.test(states[s.id].said));
   if (!off.length && !refused.length) return null;
   return [
-    `What only the owner can give here, as the daily look read it with its job's token (\`core/scripts/host.mjs\`; the core's README, "Setting up (the owner's part)"). Each is the owner's, taken in one sitting: a session the owner starts in person runs \`node core/scripts/owner-settings.mjs\`, applies each setting the owner approves and reads it back. Nothing waits on them (the core's AGENTS.md, "Nothing locks a project"), and no agent is asked to give them.`,
+    `What only the owner can give here, as the daily look read it with its job's token (\`core/scripts/host.mjs\`; the core's README, "Setting up (the owner's part)"). Each is the owner's, taken in one sitting: a session the owner starts in person runs \`node core/scripts/owner-settings.mjs\`, applies each setting the owner approves and reads it back. Nothing waits on them (the core's core-changes/projects.md, "Nothing locks a project"), and no agent is asked to give them.`,
     ...off.map(s => `- ${s.setting}: ${states[s.id].said}. Protects: ${s.protects}. Set at: https://github.com/${repo}/${s.page}`),
     ...refused.map(r => `- ${r}`),
     ...(unread.length ? ["", `Not read with the job's token, which GitHub shows these to its admins alone: ${unread.map(s => shown(s.id)).join(", ")}; the sitting reads them.`] : []),

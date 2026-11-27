@@ -1,4 +1,4 @@
-// The sync's reading in a release's trial on a real project (#1261; AGENTS.md, "A release is cut on the owner's word"):
+// The sync's reading in a release's trial on a real project (#1261; core-changes/releases.md, "A release is cut on the owner's word"):
 // what pure-sync.mjs --trial printed of each project's sync, against the commit tried, counted in the trial's record
 // (release-trial.mjs, beside this file) with the copy each run before the update started from. A reading: it holds no
 // cut, since floor rule 8 proves a sync pure only against a release. Node's own modules only.

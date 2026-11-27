@@ -90,7 +90,7 @@ const COPYLEFT = /GPL|MPL|EPL|CDDL|-SA(-|$)|MS-PL/iu;
 // Licences the floor moved off the list for what ships, each with the day it moved (core archive 201): from then on
 // what ships under one waits for the owner's yes, save what a project already shipped at the pull request's base (in
 // the same lock file, shipped there by the base's own config, or in its audit as it stands), which is reported and
-// passes, so that no sync fails a project over what it holds (the core's AGENTS.md, "Nothing locks a
+// passes, so that no sync fails a project over what it holds (the core's core-changes/projects.md, "Nothing locks a
 // project"); one a pull request adds, updates or moves into what ships waits, that pull request alone.
 export const MOVED_OFF = new Map([["MS-PL", "13 November 2026"]]);
 /** Whether an expression off a list would pass but for a licence the floor moved off it. */
@@ -295,7 +295,7 @@ export const WAIT = 7;
 
 /** Each file of "ignoreScriptsIn" that sets no wait of WAIT days or more, as { failures, reports }: one that held the
  *  wait at `base`, or that `base` did not hold, fails, and one that stood without it is reported, as with no base at all
- *  (AGENTS.md, "Nothing locks a project": the sync's step asks the line). */
+ *  (core-changes/projects.md, "Nothing locks a project": the sync's step asks the line). */
 function waitFaults(root, base, files) {
   const failures = [], reports = [];
   for (const f of files) {

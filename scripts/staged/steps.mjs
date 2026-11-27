@@ -1,4 +1,4 @@
-// A staged case (staged.mjs): the steps of a release that no check reads (AGENTS.md, "A release says what it asks,
+// A staged case (staged.mjs): the steps of a release that no check reads (core-changes/projects.md, "A release says what it asks,
 // step by step"; scripts/steps.mjs, the steps marked "unread"). A project, private, has just merged a sync of its copy
 // from a commit before the sync notes, whose pull request #1 holds what the sync printed: every entry, and the steps and
 // differences the core's scripts found. Each step no check reads is planted not done, where its state lies in the
@@ -18,9 +18,9 @@ import { LABELS, build, git, github, originGit, pushed, put, show, verdict } fro
 
 export const name = "steps";
 const AUTO = "tools/claude-auto-mode.md: Auto mode may refuse";
-export const holds = ["AGENTS.md: A release says what it asks, step by step", AUTO];
+export const holds = ["core-changes/projects.md: A release says what it asks, step by step", AUTO];
 // (the auto-mode rule in part: the case reads the task filed where an edit of a planted text was logged and did not take, not that the call was tried again)
-export const inPart = ["AGENTS.md: A release says what it asks, step by step", AUTO];
+export const inPart = ["core-changes/projects.md: A release says what it asks, step by step", AUTO];
 export const task = "The sync of the core's copy, pull request #1 of the project's repository on GitHub, has just merged. Take what it asks of the project.";
 
 // The project's own rules that the core's parts now say, or that replace a module's, each planted as a line.

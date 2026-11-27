@@ -5,7 +5,7 @@
 // Antigravity (ENTRY_FILES, which entry-files.mjs beside this file reads), and every file git tracks under a tool's
 // folders of instructions (FOLDERS). The copies and pointer checks (copies.mjs, pointers.mjs), the code-review wait and
 // the state report read them all; what a project held in a tool's files before the two checks read them is kept as a
-// baseline there (AGENTS.md of the core, "Nothing locks a project"; #405). Run from the project's root. Node's own
+// baseline there (core-changes/projects.md of the core, "Nothing locks a project"; #405). Run from the project's root. Node's own
 // modules and git only. `read` gives a file's text, or null where it is not there, and `list` the files git tracks
 // under a folder: by default the work tree's, each a file of the project's own that no link leads out of (guards.mjs),
 // and a check passes a `read` and a `list` that read a commit's tree, to hold the base's list.

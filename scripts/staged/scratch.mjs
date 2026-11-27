@@ -1,4 +1,4 @@
-// What every staged case stands on (staged.mjs; AGENTS.md, "Staged cases hold what no check reads"; #235): a scratch
+// What every staged case stands on (staged.mjs; core-changes/holders.md, "Staged cases hold what no check reads"; #235): a scratch
 // project in a folder of its own, written by the core's starter kit from a commit of the core, with a small program in
 // it, its origin a bare repository beside it, and a stand-in for GitHub (gh.cjs, beside this file) answering from a file
 // beside it: `<dir>/project`, `<dir>/origin.git`, `<dir>/bin/gh` and `<dir>/github.json`, with a stand-in for starting a

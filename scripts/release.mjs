@@ -1,4 +1,4 @@
-// Cuts a release of the core (README.md, "How a project takes the core", point 1; AGENTS.md, "A release is cut on the
+// Cuts a release of the core (README.md, "How a project takes the core", point 1; core-changes/releases.md, "A release is cut on the
 // owner's word"): the tag `release-N`, N one past the newest release's, on the commit of the core's main its trial
 // tried (#1413, point 3), which the trial's record on main's newest commit names, or main's newest where none does. A
 // project that follows the releases (releases.mjs, beside this file) takes the core only from such a tag, so a release

@@ -1,4 +1,4 @@
-// The set-up of a staged case's scratch project (scratch.mjs, the entrance beside this file; AGENTS.md, "Staged cases hold
+// The set-up of a staged case's scratch project (scratch.mjs, the entrance beside this file; core-changes/holders.md, "Staged cases hold
 // what no check reads"; #938): the names, the project the starter kit writes from a commit of the core with a small program
 // in it, its origin beside it and the stand-in's state for GitHub. The names are invented (floor rule 11) and every key is
 // built from pieces when a case is set (floor rule 8). Git and Node's own modules only.

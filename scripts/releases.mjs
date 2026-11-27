@@ -1,5 +1,5 @@
 // The core's releases (README.md, "How a project takes the core", point 1): a release is a tag `release-N` on a commit
-// of the core's main, cut on the owner's word (AGENTS.md, "A release is cut on the owner's word"; release.mjs, beside
+// of the core's main, cut on the owner's word (core-changes/releases.md, "A release is cut on the owner's word"; release.mjs, beside
 // this file). A project follows either the core's main or its releases: what its manifest's *follows* row says, and
 // with no such row, main where its *owner's account* is the account the core is under, the releases where its owner is
 // another, who then takes only what the core's owner chose to hand on. The sync and the core-moved check (sync.mjs,
@@ -46,7 +46,7 @@ const LOGIN = /^[A-Za-z0-9-]+$/;
 // The repository's own account as the host gives it, { login, type } (type "User" where a person holds it, as GitHub
 // says), or null where it cannot be read: from the event GitHub's runner hands a workflow (GITHUB_EVENT_PATH), else
 // asked of gh for `repo` (owner/name: GITHUB_REPOSITORY, else origin's address on github.com). It reads, and never
-// guesses (AGENTS.md, "What can be read is never asked or declared"; #481).
+// guesses (core-changes/rules.md, "What can be read is never asked or declared"; #481).
 export function hostAccount(env = process.env, ask = args => execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30000 })) {
   const said = o => (typeof o?.login === "string" && LOGIN.test(o.login) && typeof o?.type === "string" ? { login: o.login, type: o.type } : null);
   // (the event's own account, where the event is of the repository asked about: GITHUB_REPOSITORY, where it is set)

@@ -1,0 +1,6 @@
+{
+  "rule": "core-changes/releases.md: The owner's own projects try the core each day",
+  "holder": ["check: tests/daily-try-test.mjs", "check: tests/daily-try-file-test.mjs", "check: .github/workflows/own-look.yml, in part"],
+  "behind": ["#1413.5"],
+  "number": "correction: does not work; outcome: robust"
+}

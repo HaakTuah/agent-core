@@ -1,4 +1,4 @@
-// The sync notes, read whole (AGENTS.md, "A record pull requests add to is a folder of one file per entry"; #750, point
+// The sync notes, read whole (core-changes/records.md, "A record pull requests add to is a folder of one file per entry"; #750, point
 // 1): setup/sync-notes.md holds what it says of itself and a line naming the folder its entries stand in, a file an
 // entry (setup/sync-notes/NNN-<name>.md), read in the order of their names, each with its step of the same name in
 // scripts/steps/ (steps.mjs, beside this file). A copy from before the folder holds its entries in the file itself,

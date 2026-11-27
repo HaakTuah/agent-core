@@ -3,7 +3,7 @@
 // them, twice a year, is due and whether a sign written in a measure has tripped (choices-look.mjs, the scheduled look's
 // readers), and the records' check (choices-check.mjs): with CHOICES_BASE set, as the copies check sets it to the commit
 // a pull request merges into, it fails a record the pull request adds without a line of ARGUED and lists, never fails,
-// one that stood there (AGENTS.md, "Nothing locks a project"). It reads only, posts nothing and exits 0, save where the
+// one that stood there (core-changes/projects.md, "Nothing locks a project"). It reads only, posts nothing and exits 0, save where the
 // records cannot be read or that check fails. git and Node's own modules.
 //
 //   node core/scripts/choices.mjs      from a project's root: each record, whether it names its sign and is argued,

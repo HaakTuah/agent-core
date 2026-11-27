@@ -48,7 +48,8 @@ ok(r[3].text.includes("on two lines") && r[3].text.includes("Its own item") && !
 ok(fingerprint("a  rule\nsaid") === fingerprint("a rule said") && fingerprint("a rule") !== fingerprint("a rules"), "a fingerprint changes with a word, not with spacing");
 const mine = rules(root);
 ok(mine.length > 100 && new Set(mine.map(x => x.key)).size === mine.length, `the core's floor and modules hold ${mine.length} rules, no two named alike`);
-ok(rules(root, { agents: true }).some(x => x.key === "AGENTS.md: Nothing locks a project"), "with agents, the core's own AGENTS.md is read too");
+ok(rules(root, { agents: true }).some(x => x.key === "AGENTS.md: Reports from projects") && rules(root, { agents: true }).some(x => x.key === "core-changes/projects.md: Nothing locks a project") && !rules(root).some(x => x.file.startsWith("core-changes/")),
+  "with agents, the core's own AGENTS.md and the files of core-changes/ are read too, and without, neither (#1202)");
 
 // ---- what holds each, and what fails ----
 // (the list as its entries stand: a file for each rule, named as entryFile names it)
@@ -224,10 +225,10 @@ ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`) && /^::warning::The 
     "the core's rules a check holds in a project leave out those whose every check read nothing there, and count only the modules it takes, the floor's always", JSON.stringify({ all, shape, floorOnly }));
   ok(shareLine({ all: 7, check: 2 }, { held: 9, all: 40 }) === "- rules held by a check: the project's own 2 of 7, the core's 9 of 40.", "the share's line holds the counts alone");
   const coreLine = report(root).find(l => l.startsWith("- rules held by a check: the floor's")) ?? "";
-  const h = holders(root), ownCount = rules(root, { agents: true }).filter(r => r.file === "AGENTS.md").length, cc = counts(h), oc = counts(h.own);
-  ok(ownCount > 0 && oc.all === ownCount && oc.check > 0 && cc.all === h.rules.length && !h.rules.some(r => r.file === "AGENTS.md")
-    && coreLine === `- rules held by a check: the floor's and the modules' ${cc.check} of ${cc.all}; the core's own ${oc.check} of ${ownCount}, those of \`AGENTS.md\`.`,
-    "the core's own report gives its share of the floor's and the modules' rules and, counted apart, of its own AGENTS.md's (#925)", coreLine);
+  const h = holders(root), ownCount = rules(root, { agents: true }).filter(r => r.file === "AGENTS.md" || r.file.startsWith("core-changes/")).length, cc = counts(h), oc = counts(h.own);
+  ok(ownCount > 0 && oc.all === ownCount && oc.check > 0 && cc.all === h.rules.length && !h.rules.some(r => r.file === "AGENTS.md" || r.file.startsWith("core-changes/"))
+    && coreLine === `- rules held by a check: the floor's and the modules' ${cc.check} of ${cc.all}; the core's own ${oc.check} of ${ownCount}, those of \`AGENTS.md\` and \`core-changes/\`.`,
+    "the core's own report gives its share of the floor's and the modules' rules and, counted apart, of its own AGENTS.md's and core-changes/'s (#925, #1202)", coreLine);
   // (a scratch core whose AGENTS.md holds two rules: the count of its own held by a check rises once an entry names one,
   // the floor's and the modules' unchanged; one held in part, or by a check that is not there, does not raise it)
   const own = (h2, extra = {}) => holders(project(h2, { "AGENTS.md": "# A core\n\n- **An own rule.** a.\n- **Another.** b.\n", ...extra }), []);

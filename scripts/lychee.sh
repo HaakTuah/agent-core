@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # lychee, the maintained link checker the pointer check (scripts/pointers.mjs) runs for Markdown's own links, fetched at
-# set-up as its own program (AGENTS.md, "A tool that only runs is fetched at set-up, as its own program"; #582): the
+# set-up as its own program (core-changes/parts.md, "A tool that only runs is fetched at set-up, as its own program"; #582): the
 # release its maker publishes on GitHub for the machine's system, the archive and the program in it each checked against
 # the SHA-256 written here (the archive's as its release publishes it beside the archive). It goes into a folder of this run's own
 # under the runner's temporary folder, outside the repository, and is never run here. Run by the job before the check,

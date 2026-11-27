@@ -1,5 +1,5 @@
-// The manifest against the modules, and the README's table of slots against its marks (#157, #481; AGENTS.md, "Nothing
-// locks a project" and "What can be read is never asked or declared"). A project's `core-manifest.md` names every
+// The manifest against the modules, and the README's table of slots against its marks (#157, #481; core-changes/projects.md, "Nothing
+// locks a project", and core-changes/rules.md, "What can be read is never asked or declared"). A project's `core-manifest.md` names every
 // module of the core in its "Modules:" line, where that is a list and not "all", takes or leaves out with a reason. It
 // REPORTS and never fails in a project: a list that was missing before this check came is no breach of the project's
 // own, and each note says the line to add. The copies workflow runs it, a step of a job that already runs, so no job
@@ -72,7 +72,7 @@ export function markGaps(readme, stands) {
   const out = [];
   for (const [name, { mark }] of slots) {
     const gap = markGap(mark, stands);
-    if (gap) out.push(`README.md, "Slots": *${name}* ${gap}. Mend: give its row's third column "read:" and its reader where a script reads it, else "choice:" or "cannot be read:" with the reason, each with its default ("left out, ..."), as AGENTS.md, "What can be read is never asked or declared", says`);
+    if (gap) out.push(`README.md, "Slots": *${name}* ${gap}. Mend: give its row's third column "read:" and its reader where a script reads it, else "choice:" or "cannot be read:" with the reason, each with its default ("left out, ..."), as core-changes/rules.md, "What can be read is never asked or declared", says`);
   }
   return out;
 }
@@ -242,7 +242,7 @@ function main() {
     // (a manifest's text is data: a control character, a lone carriage return too, would start a line of its own in the
     // log, and a line led by "::" is a command to the runner)
     for (const f of found) console.log(`note ${logged(f)}`);
-    console.log(found.length ? `note ${found.length} lines of the manifest to add; nothing fails over them (AGENTS.md of the core, "Nothing locks a project")` : "ok   the manifest takes or leaves out each module");
+    console.log(found.length ? `note ${found.length} lines of the manifest to add; nothing fails over them (core-changes/projects.md of the core, "Nothing locks a project")` : "ok   the manifest takes or leaves out each module");
   } catch (e) {
     // (a project that cannot be read this way is told so, never failed over it)
     // (the error is Node's, which names the file by its place on this machine: it is named from the project's root)

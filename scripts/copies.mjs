@@ -77,7 +77,7 @@ process.chdir(ROOT);
 // A key it does not know, or one of the wrong shape, would check less without a word, so it fails: its schema holds
 // the config's shape (scripts/schemas/copies.json, schemas.mjs). Where the core's packages are not installed, they are
 // installed first (packages.mjs; #1093, point 1); where they cannot be, the shape is not checked, said as a warning,
-// and the check goes on (AGENTS.md of the core, "Nothing locks a project").
+// and the check goes on (core-changes/projects.md of the core, "Nothing locks a project").
 const KEYS = keysOf("copies"), faults = shapeFaults("copies", config, CORE);
 if (faults === null) console.log(didNotRun("The config's shape was not checked", "ajv"));
 for (const f of faults ?? []) console.error(`FAIL: ${logged(f)}`);

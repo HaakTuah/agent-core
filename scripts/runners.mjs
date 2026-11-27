@@ -1,5 +1,5 @@
 // Where a project's tests run and who pays for them (tasks/tests.md, "The slow suites run once per batch, wherever
-// they run"; #733, point 6), read and never asked (the core's AGENTS.md, "What can be read is never asked or
+// they run"; #733, point 6), read and never asked (the core's core-changes/rules.md, "What can be read is never asked or
 // declared"). From the project's workflows (.github/workflows/, a folder that is no link, each a file of bytes of at
 // most LONGEST bytes that leads nowhere outside the checkout; what is not is said not read) it reads the jobs on a pull
 // request or a push that start a suite through the shape check (`shape.mjs ... --suite`), as every suite is started, and the runner each takes

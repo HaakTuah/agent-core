@@ -12,7 +12,8 @@
 //   at the start, at its start                                read at a role's start: a role's file names it
 // A role's file opens "Read ... by the role `<its file's name>`". A project gives its own paths a kind in a config of
 // its own, checks/reading.json (or .github/reading.json): { "paths": { "src/screens/": "screen" } }; the paths of the
-// core's copy are no change of the project's, and call for nothing; a module its manifest leaves out is never named.
+// core's copy are no change of the project's, and call for nothing; a module its manifest leaves out is never named,
+// nor, from a project's root, a file of core-changes/, the core's own rules for one kind of change (#1202).
 // It needs only that a tool can run a command and read a file: no tool's own import or hook. A hook may call it:
 // work-saved.sh, beside this file, does at a session's start, handing node the copy merged into main, so this file
 // stands alone (Node's own modules, git and gh only, nothing beside it), and with --hook it reads the roles, the
@@ -43,7 +44,10 @@ export const READ_LINE = "Read for it:";
 export const textOf = body => (typeof body === "string" ? body : "");
 // The folders of the units a task calls for or a role's file names, each file saying when it is read: who (a role's
 // shared files, a tool's part) or when (a kind of task, a topic of the floor).
-export const UNITS = ["roles/shared", "tasks", "tools", "floor/topics"];
+export const UNITS = ["roles/shared", "tasks", "tools", "floor/topics", "core-changes"];
+// Of those, the folder of the core's own rules for one kind of change, read in the core's own repository alone: a
+// project's copy carries them as the core's text, and a project's session is never called to them (#1202).
+export const HERE = "core-changes";
 // Of those, the folders of the modules: the units a project takes or leaves out by name, each name standing once.
 export const MODULES = ["roles/shared", "tasks", "tools"];
 // What a path any project may hold is of, whatever its folders: a lock file of any package manager is an update. The
@@ -242,8 +246,9 @@ export function leftOut(manifest) {
   // (a name's reason, in the brackets after it, names no module, whatever it holds in backticks)
   return new Set(taken.size ? names(/^Not taken:\s*(.*)$/mu.exec(text)?.[1] ?? "", "(?:\\s*\\([^)]*\\))?").filter(n => !taken.has(n)) : []);
 }
-// The core's roles and units without the modules a project leaves out; a topic of the floor is never left out.
-export const taken = (lib, out) => ({ roles: lib.roles, modules: Object.fromEntries(Object.entries(lib.modules).filter(([f]) => f.startsWith("floor/") || !out.has(path.posix.basename(f)))) });
+// The core's roles and units without the modules a project leaves out; a topic of the floor is never left out. In a
+// project (`prefix`, the path of its copy), the core's own rules (HERE) are left out too.
+export const taken = (lib, out, prefix = "") => ({ roles: lib.roles, modules: Object.fromEntries(Object.entries(lib.modules).filter(([f]) => !(prefix && f.startsWith(`${HERE}/`)) && (f.startsWith("floor/") || f.startsWith(`${HERE}/`) || !out.has(path.posix.basename(f))))) });
 
 // The kinds a project gives its own paths, [{ path, kind }], from its config's text ({ "paths": { "<path>": "<kind>" } }).
 export const OWN = ["checks/reading.json", ".github/reading.json"];
@@ -463,7 +468,7 @@ export function hookLine(dir, ms = 8000) {
   // pins, in the submodule's own repository: tasks/repositories.md)
   const inCore = treeOf(dir, manifest, prefix);
   const list = folder => (inCore("ls-tree", "--name-only", folder) ?? "").split("\n").filter(f => /^[a-z0-9-]+\.md$/u.test(f)).map(f => `${folder}/${f}`);
-  const lib = taken(gather(f => inCore("show", null, f), list), leftOut(manifest ?? "")), paths = ownOf(changed(dir) ?? [], prefix);
+  const lib = taken(gather(f => inCore("show", null, f), list), leftOut(manifest ?? ""), prefix), paths = ownOf(changed(dir) ?? [], prefix);
   const called = calledByPaths(lib, paths, prefix ? ownPaths(OWN.map(read).find(text => text !== null)) : []);
   const late = Date.now() >= until;
   until = Infinity;
@@ -505,7 +510,7 @@ function main(argv) {
   const core = located(dir);
   if (typeof core === "number") return core;
   const { prefix, all, manifest } = core;
-  const lib = taken(all, leftOut(manifest)), at = f => `${prefix}${f}`, self = `node ${prefix}scripts/reading.mjs`;
+  const lib = taken(all, leftOut(manifest), prefix), at = f => `${prefix}${f}`, self = `node ${prefix}scripts/reading.mjs`;
   const mode = alone(argv, dir, prefix, lib);
   if (mode !== null) return mode;
   const role = argv[0] && !argv[0].startsWith("--") ? argv[0] : "", tools = many(argv, "--tool"), task = taskOf(argv, dir, lib, self);

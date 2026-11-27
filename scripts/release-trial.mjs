@@ -1,4 +1,4 @@
-// The trial of a release on a real project before it is cut (#1084; AGENTS.md, "A release is cut on the owner's word"):
+// The trial of a release on a real project before it is cut (#1084; core-changes/releases.md, "A release is cut on the owner's word"):
 // a run of check.mjs --verdicts before an update set beside one after it, the record of the trial, which holds counts
 // alone, and what that record says of the release release.mjs would cut. Git and Node's own modules only.
 import { spawnSync } from "node:child_process";
@@ -21,7 +21,7 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 // A run of check.mjs --verdicts before an update set beside one after it, each job by its place, in a class of COUNTS
 // (#1245, point 10): passed both; fixed after, failed before; failed both, standing before the update; failed after,
 // where it passed before, the update's; failed after alone, where it did not run before, the update's too, since a check
-// it adds may not fail what stood (AGENTS.md, "Nothing locks a project"); stopped after, behind another's failure,
+// it adds may not fail what stood (core-changes/projects.md, "Nothing locks a project"); stopped after, behind another's failure,
 // which measured nothing of it (point 2), where it ran before (`ranThen`), and stopped in neither run where it did not
 // (#1257); ran after alone, passed; ran before alone, passed, and failed before alone,
 // which an update may fold into another's steps; and unrun after, on another system or wanting a program this machine
@@ -106,7 +106,7 @@ export const RUNS = "as the trial's brief, which `node scripts/trial-brief.mjs <
 export function trialAt(sha, git, from = sha) {
   let r = null;
   try { r = JSON.parse(git(["show", `${from}:${TRIAL}`])); } catch { /* (not there, or not read) */ }
-  const again = `try the release on a copy of a project that takes the core and whose owner allows it, before the release workflow is started, as AGENTS.md says ("A release is cut on the owner's word"): ${RUNS}; record it with \`node scripts/release.mjs --trial <the commit tried> <before> <after> --sync <the reading> --draft <the draft's reading>\` (\`--trial <the commit>\` alone where no project allows one), in a pull request of its own; then start the release again`;
+  const again = `try the release on a copy of a project that takes the core and whose owner allows it, before the release workflow is started, as core-changes/releases.md says ("A release is cut on the owner's word"): ${RUNS}; record it with \`node scripts/release.mjs --trial <the commit tried> <before> <after> --sync <the reading> --draft <the draft's reading>\` (\`--trial <the commit>\` alone where no project allows one), in a pull request of its own; then start the release again`;
   if (!formed(r)) return { said: `The trial on a real project has not run for ${sha.slice(0, 7)}: ${TRIAL} ${r === null ? "is not there or cannot be read" : "is in no form this script writes"}.`, held: `the trial on a real project has not run for ${sha.slice(0, 7)}. Mend: ${again}` };
   let more;
   try { git(["merge-base", "--is-ancestor", r.commit, sha]); more = git(["diff", "--no-renames", "--name-only", r.commit, sha]).split("\n").map(f => f.trim()).filter(f => f && f !== TRIAL); } catch { more = null; }

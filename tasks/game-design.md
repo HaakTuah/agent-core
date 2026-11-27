@@ -137,7 +137,7 @@ player can choose to use.
   no check holds it yet.
 - **A game's copy of a rule of its kind goes at the sync that brings it** (#484, point 10). By default a game keeps the
   rules it writes for itself, and whom each is about, this game, its kind or every game, is answered as the project's
-  own rules are listed (the core's `AGENTS.md`, "A project's own rules name what holds them"). The one condition that
+  own rules are listed (the core's `core-changes/holders.md`, "A project's own rules name what holds them"). The one condition that
   changes it: a sync brings the core's rule for the kind, or for every game, written from a game's own once a second
   game needed it, as the core's `AGENTS.md` says. Then the session that syncs takes out the game's own copy at that
   sync, in a pull request of its own beside the sync's, which stays pure, and points to the core's rule ("One fact, one

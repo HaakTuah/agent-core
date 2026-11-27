@@ -108,7 +108,7 @@ export function dueness(read, closed, now) {
   const days = Math.floor((Date.parse(now) - Date.parse(release.at)) / DAY);
   const since = `since ${release.name} (its commit ${release.sha.slice(0, 7)}, ${release.at.slice(0, 10)}, ${days} ${days === 1 ? "day" : "days"} ago)`;
   const count = `${merged.length} ${merged.length === 1 ? "line" : "lines"} of QUEUE.md merged ${since}${merged.length ? `: ${merged.map(n => `#${n}`).join(", ")}` : ""}`;
-  if (trialed) return { due: false, merged, days, said: `Not due: the trial's record names ${trialed.slice(0, 7)}, past ${release.name}, so its trial has run; the release is cut from it (AGENTS.md, "A release is cut on the owner's word"). ${count}.` };
+  if (trialed) return { due: false, merged, days, said: `Not due: the trial's record names ${trialed.slice(0, 7)}, past ${release.name}, so its trial has run; the release is cut from it (core-changes/releases.md, "A release is cut on the owner's word"). ${count}.` };
   const due = merged.length >= LINES || (days >= DAYS && merged.length >= 1);
   const why = merged.length >= LINES ? `${LINES} or more lines merged` : due ? `${DAYS} days or more with at least one merged` : `under ${LINES} lines, and ${days >= DAYS ? "none merged" : `under ${DAYS} days`}`;
   return { due, merged, days, said: `${due ? "Due" : "Not due"} (${why}): ${count}.` };

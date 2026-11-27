@@ -11,7 +11,7 @@ import { mended } from "../scripts/mend.mjs";
 import { ghStandIn, scratchDir } from "../scripts/scratch-core.mjs";
 import { parseYaml } from "../scripts/parse-yaml.mjs";
 import { onPath } from "../scripts/workflow-run.mjs";
-import { CAPS, DUE_TITLE, QUEUE, answered, capsAt, capsOf, counted, due, judged, raised as raisedWith, rolesAt, whoseOf } from "../scripts/size.mjs";
+import { AGENTS, CAPS, DUE_TITLE, QUEUE, answered, capsAt, capsOf, counted, due, judged, raised as raisedWith, rolesAt, whoseOf } from "../scripts/size.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -23,8 +23,12 @@ const caps = of => `// a comment\nexport const CAPS = {\n${Object.entries(of).ma
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 // the caps a version of the file sets
-ok(eq(capsOf(own), CAPS) && eq(capsOf(caps({ builder: 27, "stand-in": 19 })), { builder: 27 * 1024, "stand-in": 19 * 1024 }) && eq(capsOf(caps({ builder: 27 }).replace(/\n/g, "\r\n")), { builder: 27 * 1024 }),
+ok(eq(capsOf(own), { [AGENTS.file]: AGENTS.mark, ...CAPS }) && eq(capsOf(caps({ builder: 27, "stand-in": 19 })), { builder: 27 * 1024, "stand-in": 19 * 1024 }) && eq(capsOf(caps({ builder: 27 }).replace(/\n/g, "\r\n")), { builder: 27 * 1024 }),
   "the caps are read from the one block that sets them, here and in any version, whichever line endings it has");
+const share = `${caps({ builder: 27 })}export const AGENTS = { file: "AGENTS.md", mark: 18 * 1024 };\n`;
+ok(eq(capsOf(share), { [AGENTS.file]: 18 * 1024, builder: 27 * 1024 }) && capsOf(`${share}${share.split("\n").at(-2)}\n`) === null && eq(capsOf(share.replace("18 * 1024 }", "18*1024 }")), { builder: 27 * 1024 }),
+  "AGENTS.md's share of every role's cap is read from its one line, spelled so; two such lines give no caps (#1202)");
+const withShare = kb => `${two(27, 20)}export const AGENTS = { file: "AGENTS.md", mark: ${kb} * 1024 };\n`;
 ok(eq(capsOf(at(52)), { builder: 52 * 1024 }) && eq(capsOf("const CAP = 44 * 1024;\n"), { builder: 44 * 1024 }), "a version from before each role had its cap gives its one cap as the builder's");
 ok([at(0), at("052"), at("5e1"), at("-1"), "let CAP = 52 * 1024;\n", "export const CAP = 53248;\n", `${at(52)}${at(53)}`, `${at(52)}${caps({ builder: 52 })}`, `${caps({ builder: 52 })}${caps({ builder: 53 })}`, caps({ builder: 52, reviewer: 20 }).replace("  reviewer", "  builder"),
   caps({ builder: 52 }).replace("52 * 1024", "52*1024"), caps({ builder: 52 }).replace("  builder", "builder"), `/*\n${caps({ builder: 52 })}*/\n`.replace("export const CAPS", "// export const CAPS"), "export const CAPS = {\n};\n", "", null, 5].every(t => capsOf(t) === null),
@@ -63,13 +67,19 @@ const decoy = `/*\n${two(27, 20)}*/\nexport const CAPS = { builder: 60*1024 };\n
 ok(/does not set the caps the script runs with/.test(raised(two(27, 20), decoy, yes, { builder: 60 * 1024 })) && raised(two(27, 20), two(27, 20), [], { builder: 27 * 1024, reviewer: 20 * 1024 }) === null, "a block that only looks like the caps', beside a real one spelled otherwise, fails: the text is not trusted");
 ok(/cannot be told/.test(raised("no cap here", two(27, 20), yes)) && /cannot be told/.test(raised(null, two(27, 20), yes)) && /not the one block the check reads/.test(raised(two(27, 20), "const CAP = 99 * 1000;", yes)), "where either version's caps cannot be read, it fails and says which");
 
+ok(raised(two(27, 20), withShare(18), []) === null && /AGENTS\.md's share of every role's start, new here, takes a first cap/.test(raised(two(27, 20), withShare(21), [])) && raised(withShare(18), withShare(18), []) === null,
+  "AGENTS.md's first share passes at or under the smallest role's cap the base holds, and needs the answer above it (#1202)");
+ok(/the cap of AGENTS\.md's share of every role's start rises from 18432 to 19456 bytes.*Leanness check:/.test(raised(withShare(18), withShare(19), [])) && raised(withShare(18), withShare(19), yes) === null && /more than one step/.test(raised(withShare(18), withShare(20), yes)),
+  "a raise of it is held as a role's: one step, with the leanness check's answer");
+
 // what it counts
 const template = name => fs.readFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), "utf8");
 const imported = [...`${template("AGENTS.md.tmpl")}\n${template("CLAUDE.md.tmpl")}`.matchAll(/^@core\/(\S+)$/gmu)].map(m => m[1]);
 const named = /`core\/(tools\/other-builders\.md)`/u.exec(template("AGENTS.md.tmpl"))?.[1];
-const expected = [...imported, named].sort(), builder = counted("builder", root);
+// (and here the core's own AGENTS.md, which its CLAUDE.md imports: a project's is its own file, counted by none; #1202)
+const expected = [...imported, named, AGENTS.file].sort(), builder = counted("builder", root);
 ok(named && eq([...builder].sort(), expected) && !builder.includes("floor/topics.md") && !builder.includes("tasks/reviews.md"),
-  "for the builder it counts what the starter kit's templates have a builder read at its start (the floor's security.md, its role's file, the modules read then, each tool's own part), and no file read only when a task calls for it", `${builder} against ${expected}`);
+  "for the builder it counts what the starter kit's templates have a builder read at its start (the floor's security.md, its role's file, the modules read then, each tool's own part), the core's own AGENTS.md, and no file read only when a task calls for it", `${builder} against ${expected}`);
 ok(eq(rolesAt(root).sort(), Object.keys(CAPS).sort()) && rolesAt(root).every(r => counted(r, root).includes("floor/security.md") && counted(r, root).includes(`roles/${r}.md`)) && counted("nobody", root) === null,
   "every role the core has a file for has a cap, and its count holds the floor and its own file");
 ok(counted("design", root).includes("roles/builder.md") && counted("orchestrator", root).includes("roles/orchestrator.md") && !counted("builder", root).includes("roles/orchestrator.md") && !counted("stand-in", root).includes("roles/shared/git.md"),
@@ -97,7 +107,7 @@ const put = (name, text) => { const to = path.join(tmp, name); fs.writeFileSync(
 const run = (...args) => { const r = spawnSync(process.execPath, [file, ...args], { cwd: root, encoding: "utf8", env: { ...process.env, OWNER: "someone" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 const kb = Object.fromEntries(Object.entries(CAPS).map(([r, n]) => [r, n / 1024]));
 const same = put("same.mjs", own), lower = put("lower.mjs", caps({ ...kb, builder: kb.builder - 1 })), old = put("old.mjs", at(kb.builder)), none = put("none.json", "[[]]"), one = put("one.json", JSON.stringify([yes]));
-ok(run().status === 0 && Object.keys(CAPS).every(r => new RegExp(`^what the role ${r} reads at its start \\(floor/security\\.md, .*\\): \\d+ bytes of ${CAPS[r]}$`, "m").test(run().out)), "with no argument it holds each role's start to its cap", run().out);
+ok(run().status === 0 && Object.keys(CAPS).every(r => new RegExp(`^what the role ${r} reads at its start \\(floor/security\\.md, .*\\): \\d+ bytes of ${CAPS[r] + AGENTS.mark} \\(${CAPS[r]} its own, ${AGENTS.mark} AGENTS\\.md's share\\)$`, "m").test(run().out) && new RegExp(`^what the role ${r} reads at its start \\(.*, AGENTS\\.md\\)`, "m").test(run().out)), "with no argument it holds each role's start, AGENTS.md with it, to its cap and that file's share (#1202)", run().out);
 ok(QUEUE.mark < 20 * 1024 && /^the queue \(QUEUE\.md\): \d+ bytes of its mark, \d+$/m.test(run().out), "it holds the queue to a mark of its own, below the general mark a project's size marks give each file", run().out);
 const queueFile = path.join(root, QUEUE.file), queueText = fs.readFileSync(queueFile);
 try {
@@ -115,13 +125,15 @@ ok(run("--raise", over, one).status === 1 && /more than one step\. Mend: set it 
 // role's start has outgrown)
 for (const part of ["scripts", "roles", "tasks", "floor"]) fs.cpSync(path.join(root, part), path.join(tmp, part), { recursive: true });
 fs.copyFileSync(queueFile, path.join(tmp, QUEUE.file));
+fs.copyFileSync(path.join(root, AGENTS.file), path.join(tmp, AGENTS.file));
+const standInCap = CAPS["stand-in"] + AGENTS.mark;
 const copy = path.join(tmp, "scripts", "size.mjs"), at2 = (...args) => { const r = spawnSync(process.execPath, [copy, ...args], { cwd: tmp, encoding: "utf8", env: { ...process.env, OWNER: "someone" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 ok(at2().status === 0, "a copy of the core counts as the core does", at2().out);
 const git = (...args) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: tmp, encoding: "utf8" });
 git("init", "-q"); git("add", "-A"); git("commit", "-qm", "base");
 const standIn = Number(new RegExp(`the role stand-in reads at its start \\(.*\\): (\\d+) bytes of`).exec(at2().out)?.[1]);
-fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), "x".repeat(CAPS["stand-in"] - standIn));
-ok(at2("--base", "HEAD").status === 0 && new RegExp(`stand-in reads at its start \\(.*\\): ${CAPS["stand-in"]} bytes of`).test(at2().out) && !/::warning::/.test(at2().out), "a start exactly at its cap is not past it", at2().out);
+fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), "x".repeat(standInCap - standIn));
+ok(at2("--base", "HEAD").status === 0 && new RegExp(`stand-in reads at its start \\(.*\\): ${standInCap} bytes of`).test(at2().out) && !/::warning::/.test(at2().out), "a start exactly at its cap is not past it", at2().out);
 git("checkout", "-q", "--", "roles/stand-in.md");
 fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), `\n${"x".repeat(CAPS["stand-in"])}\n`);
 let r = at2("--base", "HEAD");

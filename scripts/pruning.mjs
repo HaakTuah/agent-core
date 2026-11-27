@@ -1,9 +1,9 @@
-// The pruning of the core's rules (AGENTS.md, "Rules are pruned by their numbers"; #303). With every second monthly
+// The pruning of the core's rules (core-changes/holders.md, "Rules are pruned by their numbers"; #303). With every second monthly
 // state report (state-report.mjs, beside this file, says when one is due), and in a month whose session runs on a newer
 // generation of model than the last pruning's, the session that takes the report runs each staged case (staged.mjs)
 // set from the core with the rules the case holds taken out, records the counts the rules' numbers read for the span
 // since the last pruning, and adds the list this prints. The list names each rule of the floor, the modules and the
-// core's AGENTS.md that:
+// core's own, its AGENTS.md and core-changes/ (#1202), that:
 //   - names a number (an entry of scripts/holders/, its "number", in outcomes.mjs's form NUMBER) that did not move since the last pruning;
 //   - stands in for an outcome (its number not one of the outcome's direct measures) and moved at two prunings in a row
 //     while those measures did not, each by the count outcomes.mjs's MEASURES give (DIRECT: a median left out; fast,
@@ -18,7 +18,7 @@
 // "describes", and beside a case, a move or a removal the form of the rule a check could hold, or why none exists
 // (form(), #887); one with none, or a rule that guards against rare and severe harm proposed anything but a holder, is said so, and a
 // proposal whose rule now has a holder or no longer stands is named to be taken out.
-// Each listed with its step of the pruning: a rule read at a role's start (an AGENTS.md rule is, here) is at step 1, to
+// Each listed with its step of the pruning: a rule read at a role's start (an AGENTS.md rule is, here; one of core-changes/ is not) is at step 1, to
 // move to a module read on need; one read on need is at step 2, to go where nothing changed since it moved. A rule
 // fewer than EARLY merged pull requests came under since it joined (read from git: the first commit that wrote its lead
 // in bold, and the merges on the first-parent line since; a shallow clone that cannot hold that span fails the list, with its

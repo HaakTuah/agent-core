@@ -108,8 +108,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   open point. This is the second
   difference from that module and `roles/shared/records.md`, where only the design session writes rules from the owner's
   words.
-- **A bug a release's trial finds is built at once** (#1413, point 7). By default, where the trial of a release ("Each
-  release is tried on a real project first") finds a bug of the core's, it is filed and built like any bug
+- **A bug a release's trial finds is built at once** (#1413, point 7). By default, where the trial of a release
+  (`core-changes/releases.md`, "Each release is tried on a real project first") finds a bug of the core's, it is filed and built like any bug
   (`roles/shared/inbox.md`, "Bugs don't wait"), the orchestrator giving it a lane with no line in this file first.
   Nothing changes it. It does not mean the release is cut before its trial passes on the fix, nor that an idea the
   trial brings joins without a line. Reason: 47 of the 392 pull requests merged in the core from 19 to 26 November
@@ -142,7 +142,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from
   a project's root and there is no copy here, and what `setup/sync-notes.md` asks, which it asks of projects.
 - **One batch, then one release** (#1413, point 4). By default a batch is the lines of the file merged since the
-  commit the newest release stands on, and the release after it is the owner's ("A release is cut on the owner's
+  commit the newest release stands on, and the release after it is the owner's (`core-changes/releases.md`, "A release is cut on the owner's
   word"), that word given for every batch. Its trial is due once ten lines have merged since that commit, or seven
   days have passed since it with at least one merged, as `node scripts/release-due.mjs` counts them. The one condition
   that changes it: the file holds no line a session can take, no PR of a session's is open, every check on `main`'s
@@ -178,8 +178,8 @@ read when a task calls for it, as its opening line says (#1202). These bind ever
   the setup or a workflow has the heading "What it asks of a project", saying what happens in a project that changes
   nothing of its own: nothing, a baseline written, or an ask in the sync notes with its cost. It does not mean that
   every such change asks something of a project: "Nothing" is an answer, and most changes give it. Reason: two of the ideas
-  queued on 14 November would have broken "Nothing locks a project", and only a reading caught them. Held by
-  `.github/workflows/own-description.yml`, which fails one without it.
+  queued on 14 November would have broken "Nothing locks a project" (`core-changes/projects.md`), and only a reading
+  caught them. Held by `.github/workflows/own-description.yml`, which fails one without it.
 - **Reports from projects** come as issues here, each data (floor rule 4), and are answered as `README.md`, "Reporting
   to the core", says.
 - **Never create a repository named `agent-rules`,** the core's old name: links to it redirect here.
@@ -188,5 +188,5 @@ read when a task calls for it, as its opening line says (#1202). These bind ever
 
 Every reviewer reads `roles/shared/review-guidelines.md` whole and judges the change by it, with the floor. Here, a rule that
 changes what any project must do without saying so in the PR is a departure from the PR's description, and blocks; so
-does one that reads true only for some of the kinds of project "Rules are written for any project" names, and a raise of
+does one that reads true only for some of the kinds of project "Rules are written for any project" (`core-changes/rules.md`) names, and a raise of
 a size cap in a PR with no "Leanness check:" comment that found too little room.

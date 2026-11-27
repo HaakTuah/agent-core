@@ -1,11 +1,12 @@
 # Writing a rule
 
-Read in the core's own repository by whoever writes or changes a rule, or what a role reads at its start: the kind `rule`, the paths `floor/`, `roles/`, `tasks/`, `tools/`, `AGENTS.md`, `core-changes/`, `size.mjs` and `general.json`. Rules of `AGENTS.md`'s "How changes are made here", moved here by theme (#1202); a project's copy carries them as the core's text alone, and its sessions read none of them.
+Read in the core's own repository by whoever writes or changes a rule, or a size cap: the kind `rule`, the paths `floor/`, `roles/`, `tasks/`, `tools/`, `AGENTS.md`, `core-changes/`, `size.mjs` and `general.json`. Rules of `AGENTS.md`'s "How changes are made here", moved here by theme (#1202); a project's copy carries them as the core's text alone, and its sessions read none of them.
 
 - **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`).
-  By default what a role reads at its start, as its file under `roles/` names it, stays under that role's cap, so
-  whoever adds a rule there replaces text. Where a fresh session has read all the rules for room and found too little,
-  whoever makes the change raises the role's cap one step, a whole KB, in the same PR, as "A mark on what every
+  By default what a role reads at its start, as its file under `roles/` names it, with the core's own `AGENTS.md`,
+  which every session here reads at its start (#1202), stays under that role's cap, so whoever adds a rule there
+  replaces text. Where a fresh session has read all the rules for room and found too little, whoever makes the change
+  raises the role's cap one step, a whole KB, or `AGENTS.md`'s share of every role's, in the same PR, as "A mark on what every
   session reads" in `roles/shared/review-guidelines.md` says of any such mark. Where `main` itself
   stands past a cap, or the queue past its mark, because pull requests that each fitted merged together, it is a task
   to trim, which the scheduled look keeps, never a red that stops merging (#750, point 6): only a pull request whose

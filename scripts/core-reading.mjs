@@ -6,7 +6,7 @@
 // release changes in it, as the rest are, and taking it in asks nothing by itself. What is due:
 // a whole reading where no record stands or it cannot be read, else the rules no reading covered, each by its key.
 // The sync's step (steps/, beside this file) reads it, and so the scheduled look's issue of steps not done; it fails
-// nothing (AGENTS.md of the core, "Nothing locks a project"). The core's own repository takes no copy: there it reads
+// nothing (core-changes/projects.md of the core, "Nothing locks a project"). The core's own repository takes no copy: there it reads
 // nothing (#259 is that reading). Node's own modules.
 //
 //   node core/scripts/core-reading.mjs             from a project's root: what is due, each rule to read by its key

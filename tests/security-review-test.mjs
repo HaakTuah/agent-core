@@ -239,7 +239,7 @@ ok(is(byRights([as("helper", "NONE")], [right("helper")]), false, "no security r
   && is(byRights([as("helper")], [{ ...right("helper"), user: { ...right("helper").user, type: "Bot" } }]), false, "no security review"),
   "the rights count only for the comment's own login, a person's on both sides, and never where GitHub gives the comment no say in the repository");
 ok(is(byRights([as("SomeOne", "OWNER")], []), true, "is posted") && is(byRights([as("helper")], undefined), false, "no security review") && is(judge(pull, [as("helper")], [], undefined, undefined, true, { reviewers: ["helper"], rights: [right("helper", "read")] }), true, "is posted"),
-  "with no rights read the owner's and the named accounts count as before, and an account named counts whatever its rights (AGENTS.md, \"Nothing locks a project\")");
+  "with no rights read the owner's and the named accounts count as before, and an account named counts whatever its rights (core-changes/projects.md, \"Nothing locks a project\")");
 // an organisation's repository: its owner is the organisation, which posts nothing, so a person who owns it counts only
 // through the rights the host gives that person
 const ofOrg = { ...pull, base: { repo: { owner: { login: "some-org", type: "Organization" } } } };

@@ -4,15 +4,15 @@ Every core rule rests on something the owner decided. Each decision is an item h
 in the core's own words: its date and source, what was asked, what was decided and what it stands behind. "Core archive
 N" anywhere is item N here, and "core archive #N" or "#N.P" the item keyed by issue #N or one point of it, in the core
 and in a project's copy alike; the core's own rule files name no item, and `scripts/holders/` lists under "behind"
-the items behind each rule (`AGENTS.md`, "The archive is pointed to from the list"). The record of the owner's word
+the items behind each rule (`core-changes/records.md`, "The archive is pointed to from the list"). The record of the owner's word
 behind items 1 to 245 stays in the core's repository alone, in `words/` under the same numbers, which a project's copy
 leaves out; `scripts/holders.mjs` holds the two forms in step. Items 1 to 262 keep their numbers. A new item is keyed by
 the issue that carries the owner's word, `#N`, and where it records one point of several by that point, `#N.P`, never by
-a running number (`AGENTS.md`, "A new archive item is named by its issue"; #744): it opens with its key and a stop
+a running number (`core-changes/records.md`, "A new archive item is named by its issue"; #744): it opens with its key and a stop
 (`#744. **19 November 2026**, ...`), with its date and one line of the reasoning, the words themselves staying on the
 issue, and stands in a file of its own named by its key, `archive/instructions/issue-N.md` or `issue-N.P.md`, which
 opens with a heading and holds that item alone (#750, point 1). An item that changes an earlier one says so on a line
-"Changes:", and the earlier one bears a line "Changed by:" naming it (`AGENTS.md`, "An item that changes an earlier one
+"Changes:", and the earlier one bears a line "Changed by:" naming it (`core-changes/records.md`, "An item that changes an earlier one
 names it, and the earlier one is marked").
 
 Item N is in the file below whose first number is the highest at or below N, item #N in

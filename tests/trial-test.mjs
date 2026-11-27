@@ -1,4 +1,4 @@
-// Tests of check.mjs as a release's trial runs it, and of the trial's record (#1245, #1244; AGENTS.md, "A release is
+// Tests of check.mjs as a release's trial runs it, and of the trial's record (#1245, #1244; core-changes/releases.md, "A release is
 // cut on the owner's word"): a workflow's jobs run in their `needs` order with the needs context; the checkout stand-in
 // takes a commit's id and a ref written whole as they are; the setup-node stand-in says where the machine's Node is not
 // the one a step asks; a sync's calls are its own, and the base's it leaves out; jobs stopped behind a failure are

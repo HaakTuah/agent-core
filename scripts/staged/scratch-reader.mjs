@@ -1,4 +1,4 @@
-// The sealed reader of what a session left in a staged case (scratch.mjs, the entrance beside this file; AGENTS.md,
+// The sealed reader of what a session left in a staged case (scratch.mjs, the entrance beside this file; core-changes/holders.md,
 // "Staged cases hold what no check reads"; #938): the git it runs, the files it reads as plain files and nothing else, its
 // own repository over the session's objects, and the seal a case keeps of itself. A security reading: what the session
 // wrote (its git config, hooks, links, attributes) is never run or followed. It takes scratch-outcome.mjs with it, which

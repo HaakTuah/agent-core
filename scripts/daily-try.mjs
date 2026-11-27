@@ -1,4 +1,4 @@
-// The daily try (#1413, point 5; AGENTS.md, "The owner's own projects try the core each day"): once a day, jobs of the
+// The daily try (#1413, point 5; core-changes/releases.md, "The owner's own projects try the core each day"): once a day, jobs of the
 // core's scheduled look (.github/workflows/own-look.yml) try the core at main's newest commit whose checks all passed
 // (releases.mjs, greenMain) on each of the owner's own projects that take it, as a release's trial does (#1084): each
 // project alone, on a fresh runner of its own that holds no other project's clone, in a scratch clone, its checks run

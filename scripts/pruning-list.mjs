@@ -1,4 +1,4 @@
-// The list a pruning prints (split from pruning.mjs, #888; AGENTS.md, "Rules are pruned by their numbers"; #303): pure
+// The list a pruning prints (split from pruning.mjs, #888; core-changes/holders.md, "Rules are pruned by their numbers"; #303): pure
 // functions over the rules, their numbers, the checks' steps and the record, which read nothing from the host, and the
 // proposals file UNHELD. pruning.mjs, beside this file, says what the list holds and exports these.
 import fs from "node:fs";
@@ -101,7 +101,7 @@ export function readUnheld(root = ROOT) {
 // A value of the file as one line of plain text, so that no value can stand as a line of the list of its own.
 const flat = v => String(v ?? "").replace(/\s+/gu, " ").trim();
 
-// Beside a proposal, the form a check could hold (AGENTS.md, "A rule is written in the form a check can hold"; #887):
+// Beside a proposal, the form a check could hold (core-changes/rules.md, "A rule is written in the form a check can hold"; #887):
 // its "form", a slightly different form of the rule whose breach a check reads without guessing, or its "noForm", why
 // none exists. A proposal of a check, which holds the rule as worded, and one that it describes, which binds no one,
 // need neither, a check's form printed where one is given, as a rewording a check would hold.

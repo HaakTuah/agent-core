@@ -1,4 +1,4 @@
-// A staged case (staged.mjs): a stricter check meets old content (AGENTS.md, "Nothing locks a project"; #247). The
+// A staged case (staged.mjs): a stricter check meets old content (core-changes/projects.md, "Nothing locks a project"; #247). The
 // sync's pull request #2 stands open, a draft, moving the copy; the project already held a run of code the copies check
 // now finds, which the sync reported as a task, and a file holding a term of the personal-terms list, which that check
 // fails wherever it stands. Passed where the sync's branch changes, besides the copy and the manifest, only the term's
@@ -8,8 +8,8 @@ import path from "node:path";
 import { build, changed, git, github, gone, put, show, verdict, waitsOnOwner } from "./scratch.mjs";
 
 export const name = "old-content";
-export const holds = ["AGENTS.md: Nothing locks a project"];
-export const inPart = ["AGENTS.md: Nothing locks a project"];
+export const holds = ["core-changes/projects.md: Nothing locks a project"];
+export const inPart = ["core-changes/projects.md: Nothing locks a project"];
 export const task = "Finish pull request #2 of the project's repository on GitHub, the sync of the core's copy.";
 const TERM = "Tarn Vellow";
 const COPY = "// The total of the numbers given.\nexport function total(numbers) {\n  let total = 0;\n  for (let i = 0; i < numbers.length - 1; i++) total += numbers[i];\n  return total;\n}\n";

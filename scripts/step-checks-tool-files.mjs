@@ -13,7 +13,7 @@ import { Unread, copyAt } from "./workflow-calls.mjs";
 import { copiesConfig } from "./check-configs.mjs";
 import { shown } from "./step-checks.mjs";
 
-// Whether what the copies and pointer checks hold against in an agent tool's files is listed (#405; AGENTS.md of the
+// Whether what the copies and pointer checks hold against in an agent tool's files is listed (#405; core-changes/projects.md of the
 // core, "Nothing locks a project": no old breach goes unlisted): each copy there in the copies check's baseline, which
 // `--tools` writes, and each broken pointer there named here, at every sync, until it is gone, as the workflow check's
 // old keys are. Each read from the project's own copy of its check, run with no base, where it notes every one it
