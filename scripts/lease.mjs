@@ -28,7 +28,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { CORE } from "./core-address.mjs";
-import { aLogin, aRepository, oneLine } from "./guards.mjs";
+import { aLogin, aRepository, oneLine, parseBounded } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { timeOf } from "./moment.mjs";
 import { ownerOf, plainEnv } from "./releases.mjs";
@@ -147,12 +147,12 @@ const plain = route => route.split("?")[0];
 const ghRead = route => {
   const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 24, timeout: 60000, env: plainEnv() });
   if (r.status !== 0) throw new Error(`gh could not read ${plain(route)}: ${oneLine(String(r.stderr || r.error || "")).trim().slice(0, 200)}`);
-  return JSON.parse(r.stdout);
+  return parseBounded(r.stdout);
 };
 const ghWrite = (route, payload) => {
   const r = spawnSync("gh", ["api", "-X", "POST", route, "--input", "-"], { input: JSON.stringify(payload), encoding: "utf8", maxBuffer: 1 << 24, timeout: 60000, env: plainEnv() });
   if (r.status !== 0) throw new Error(`gh could not write ${plain(route)}: ${oneLine(String(r.stderr || r.error || "")).trim().slice(0, 200)}`);
-  return JSON.parse(r.stdout);
+  return parseBounded(r.stdout);
 };
 
 // The host as the script reads and writes it: the open lease issues the owner's account opened, lowest number first,

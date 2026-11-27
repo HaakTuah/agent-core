@@ -126,6 +126,8 @@ export const UNPLANTED = {
   "18 November 2026, the core's packages installed from its lock file": none("a check run from the copy installs the core's packages itself"),
   "13 November 2026, the core's scripts started through bash": none("the sync records in git's index the executable bits the core marks"),
   "19 November 2026, the parser's packages installed where the shape check runs": none("the shape check and the selection of tests install the parser's packages themselves"),
+  // (a step whose script does it at the orchestrator's first wake: #1106)
+  "27 November 2026, one orchestrator works a queue by a lease": none("the orchestrator's lease script opens the lease's issue at its first wake after the sync, and the label comes with the core's list"),
 };
 
 export function set(dir, opts = {}) {
