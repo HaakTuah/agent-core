@@ -56,23 +56,32 @@ const valueOf = (lines, key) => {
   return found.length === 1 ? found[0].slice(key.length + 2).trim() : null;
 };
 
+// A comment's lines and the host's time where the owner's account wrote it, in a size the reader takes; else null.
+function authored(comment, owner) {
+  const login = String(comment?.user?.login ?? "").toLowerCase();
+  if (!owner || login !== String(owner).toLowerCase()) return null;
+  const at = timeOf(comment.created_at);
+  if (at === null || typeof comment.body !== "string" || comment.body.length > 4000) return null;
+  return { at, lines: comment.body.split(/\r?\n/u).map(l => l.trim()) };
+}
+
+// A lease's lines read as { kind: "lease", session, tool, builders, at }, or null where one is out of its form.
+function leaseOf(lines, session, at) {
+  const tool = valueOf(lines, "Tool") ?? "", builders = Number(valueOf(lines, "Builders"));
+  const fits = SESSION.test(session) && TOOL.test(tool) && Number.isInteger(builders) && builders >= 0 && builders <= 999;
+  return fits ? { kind: "lease", session, tool, builders, at } : null;
+}
+
 // A comment read as { kind: "lease", session, tool, builders, at } or { kind: "hand-over", to, at }, or null: one the
 // owner's account did not write, one with no time of the host's, and one whose lines are of neither form (both, or a
 // key twice, is neither).
 export function entryOf(comment, owner) {
-  if (!comment || typeof comment !== "object") return null;
-  if (String(comment.user?.login ?? "").toLowerCase() !== String(owner).toLowerCase() || !owner) return null;
-  const at = timeOf(comment.created_at);
-  if (at === null || typeof comment.body !== "string" || comment.body.length > 4000) return null;
-  const lines = comment.body.split(/\r?\n/u).map(l => l.trim());
-  const session = valueOf(lines, "Lease"), to = valueOf(lines, "Hand-over");
-  if (session !== null && to === null) {
-    const tool = valueOf(lines, "Tool"), builders = Number(valueOf(lines, "Builders"));
-    if (!SESSION.test(session) || !TOOL.test(tool ?? "") || !Number.isInteger(builders) || builders < 0 || builders > 999) return null;
-    return { kind: "lease", session, tool, builders, at };
-  }
-  if (to !== null && session === null && (to === "any" || SESSION.test(to))) return { kind: "hand-over", to, at };
-  return null;
+  const got = comment && typeof comment === "object" ? authored(comment, owner) : null;
+  if (!got) return null;
+  const session = valueOf(got.lines, "Lease"), to = valueOf(got.lines, "Hand-over");
+  if (session !== null && to === null) return leaseOf(got.lines, session, got.at);
+  const handed = to !== null && session === null && (to === "any" || SESSION.test(to));
+  return handed ? { kind: "hand-over", to, at: got.at } : null;
 }
 
 export const entriesOf = (comments, owner) => (Array.isArray(comments) ? comments : []).map(c => entryOf(c, owner)).filter(Boolean).sort((a, b) => a.at - b.at);
@@ -207,25 +216,30 @@ export function dueIssue({ repo, owner, at }, host = () => hostOf(repo)) {
   } catch (e) { return { title: TITLE, body: null, unread: `the orchestrator's lease could not be read: ${oneLine(String(e.message)).slice(0, 200)}` }; }
 }
 
+const KEYS = { "--session": "session", "--tool": "tool", "--builders": "builders", "--hand-over": "handOver", "--repo": "repo", "--owner": "owner" };
+// What makes the options wrong, each with what it says: the first that holds fails them.
+const WRONG = [
+  [o => o.session !== null && !SESSION.test(o.session), "--session is no session's name: letters, digits and _ . : - alone, at most 100"],
+  [o => o.session !== null && !TOOL.test(o.tool ?? ""), "--session needs --tool, the tool's name in lower case (claude, codex)"],
+  [o => o.tool !== null && !TOOL.test(o.tool), "--tool is the tool's name in lower case (claude, codex)"],
+  [o => !Number.isInteger(o.builders) || o.builders < 0 || o.builders > 999, "--builders is a whole number of builders running"],
+  [o => o.handOver !== null && o.handOver !== "any" && !SESSION.test(o.handOver), "--hand-over names a session, or any"],
+  [o => o.handOver !== null && o.session !== null, "--hand-over and --session go apart"],
+  [o => o.repo !== null && !aRepository(o.repo), "--repo is owner/name"],
+  [o => o.owner !== null && !aLogin(o.owner), "--owner is an account's login"],
+];
+
 // The options, or { fail }.
 export function optionsOf(argv) {
   const o = { session: null, tool: null, builders: 0, handOver: null, repo: null, owner: null };
-  const keys = { "--session": "session", "--tool": "tool", "--builders": "builders", "--hand-over": "handOver", "--repo": "repo", "--owner": "owner" };
   for (let i = 0; i < argv.length; i += 2) {
-    const key = keys[argv[i]], value = argv[i + 1];
-    if (!key) return { fail: `${oneLine(argv[i])} is no option of this script (${Object.keys(keys).join(", ")})` };
+    const key = KEYS[argv[i]], value = argv[i + 1];
+    if (!key) return { fail: `${oneLine(argv[i])} is no option of this script (${Object.keys(KEYS).join(", ")})` };
     if (value === undefined || value.startsWith("--")) return { fail: `${argv[i]} needs a value` };
     o[key] = key === "builders" ? Number(value) : value;
   }
-  if (o.session !== null && !SESSION.test(o.session)) return { fail: "--session is no session's name: letters, digits and _ . : - alone, at most 100" };
-  if (o.session !== null && !TOOL.test(o.tool ?? "")) return { fail: "--session needs --tool, the tool's name in lower case (claude, codex)" };
-  if (o.tool !== null && !TOOL.test(o.tool)) return { fail: "--tool is the tool's name in lower case (claude, codex)" };
-  if (!Number.isInteger(o.builders) || o.builders < 0 || o.builders > 999) return { fail: "--builders is a whole number of builders running" };
-  if (o.handOver !== null && o.handOver !== "any" && !SESSION.test(o.handOver)) return { fail: "--hand-over names a session, or any" };
-  if (o.handOver !== null && o.session !== null) return { fail: "--hand-over and --session go apart" };
-  if (o.repo !== null && !aRepository(o.repo)) return { fail: "--repo is owner/name" };
-  if (o.owner !== null && !aLogin(o.owner)) return { fail: "--owner is an account's login" };
-  return o;
+  const wrong = WRONG.find(([holds]) => holds(o));
+  return wrong ? { fail: wrong[1] } : o;
 }
 
 function repoHere() {
@@ -234,35 +248,42 @@ function repoHere() {
 }
 const manifestOwner = () => { try { return ownerOf(fs.readFileSync("core-manifest.md", "utf8")); } catch { return null; } };
 
+// What a run with an issue (or none) does, once the host answers: prints its lines and gives its exit code.
+function run(h, o, now, print) {
+  let issue = h.issues(o.who)[0];
+  if (!issue && o.session === null) {
+    if (o.handOver === null) { print(said(null).join("\n")); return 0; }
+    console.error("FAIL: no lease issue stands to hand over. Mend: nothing to hand over; the next orchestrator's wake opens it");
+    return 1;
+  }
+  if (!issue) { issue = h.open(o.tool); print(`Opened the lease issue #${issue.number}.`); }
+  if (o.handOver !== null) {
+    h.comment(issue.number, handOverText(o.handOver, OPENER, o.tool));
+    print(`Handed the lease (#${issue.number}) over to ${o.handOver === "any" ? "the next that wakes" : o.handOver}.`);
+    return 0;
+  }
+  const entries = entriesOf(h.comments(issue.number, iso(now - 24 * HOUR)), o.who);
+  if (o.session === null) { print([`The lease: #${issue.number}.`, ...said(holding(entries, now))].join("\n")); return 0; }
+  return wake(h, issue, entries, o, now, print);
+}
+
+// A wake: Stop where another holds the lease, else the lease comment written.
+function wake(h, issue, entries, o, now, print) {
+  const d = decide(entries, o.session, now);
+  if (d.act === "stop") { print(`Stop: ${d.why} (#${issue.number}). Delete every wake of your own and stop; keep no wake.`); return 2; }
+  h.comment(issue.number, leaseText(o));
+  print(`${d.act === "renew" ? "Renewed" : "Claimed"} the lease (#${issue.number}): ${d.why}. Set your next wake within the cache's hour (55 minutes) while a builder runs or a review or check is due; with nothing in flight keep none, its hand-off ready.`);
+  return 0;
+}
+
 export function main(argv, { host = hostOf, now = Date.now(), print = console.log, repo = null, owner = null } = {}) {
   const o = optionsOf(argv);
   if (o.fail) { console.error(`FAIL: ${o.fail}. Mend: run it as its header shows`); return 1; }
   const where = o.repo ?? repo ?? repoHere();
   if (!where) { console.error("FAIL: no repository on github.com could be read from origin. Mend: give --repo <owner>/<name>"); return 1; }
-  const who = o.owner ?? owner ?? manifestOwner() ?? where.split("/")[0];
-  let h;
-  try {
-    h = host(where);
-    let issue = h.issues(who)[0];
-    if (!issue && (o.session === null || o.handOver !== null)) {
-      if (o.handOver === null) { print(said(null).join("\n")); return 0; }
-      console.error("FAIL: no lease issue stands to hand over. Mend: nothing to hand over; the next orchestrator's wake opens it");
-      return 1;
-    }
-    if (!issue) { issue = h.open(o.tool); print(`Opened the lease issue #${issue.number}.`); }
-    const entries = entriesOf(h.comments(issue.number, iso(now - 24 * HOUR)), who);
-    if (o.handOver !== null) {
-      h.comment(issue.number, handOverText(o.handOver, OPENER, o.tool));
-      print(`Handed the lease (#${issue.number}) over to ${o.handOver === "any" ? "the next that wakes" : o.handOver}.`);
-      return 0;
-    }
-    if (o.session === null) { print([`The lease: #${issue.number}.`, ...said(holding(entries, now))].join("\n")); return 0; }
-    const d = decide(entries, o.session, now);
-    if (d.act === "stop") { print(`Stop: ${d.why} (#${issue.number}). Delete every wake of your own and stop; keep no wake.`); return 2; }
-    h.comment(issue.number, leaseText(o));
-    print(`${d.act === "renew" ? "Renewed" : "Claimed"} the lease (#${issue.number}): ${d.why}. Set your next wake within the cache's hour (55 minutes) while a builder runs or a review or check is due; with nothing in flight keep none, hand over with --hand-over any, and stop.`);
-    return 0;
-  } catch (e) {
+  o.who = o.owner ?? owner ?? manifestOwner() ?? where.split("/")[0];
+  try { return run(host(where), o, now, print); }
+  catch (e) {
     console.error(`FAIL: ${oneLine(String(e.message)).slice(0, 300)}. Mend: run it again where gh answers for the owner's account; where it still cannot read the lease, stop the wake and say so`);
     return 1;
   }

@@ -64,7 +64,7 @@ which marks a stalled lane whose newest commit names no next step.
 **One orchestrator works a queue, by a lease, with its hand-off beside it** (#1106). By default a project's queue has
 one orchestrator, which holds its lease: one issue of the project's, labelled `orchestrator`, whose newest lease comment
 from the *owner's account* names the session that holds the queue, its tool and its builders running, its time the
-host's (`core/scripts/lease.mjs` writes and reads it).
+host's (`core/scripts/lease.mjs` writes and reads it). Nothing changes it.
 - **At every wake,** before anything else, the orchestrator runs `core/scripts/lease.mjs --session <its own> --tool
   <its tool> --builders <how many run>`: where it prints "Stop:" (another session woke within the lease's term, three
   hours, a first guess, or a hand-over note there names another), it deletes every wake of its own and stops; else the
