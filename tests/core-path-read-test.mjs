@@ -53,7 +53,7 @@ if (process.platform !== "win32") { // (a device at that path and a link need wh
   const at = path.join(scratchDir("core-path-read-other-"), "core-manifest.md");
   fs.writeFileSync(at, copied("vendor/core/"));
   const { statSync } = fs;
-  fs.statSync = (file, ...rest) => { const seen = statSync(file, ...rest); return file === at ? Object.assign(seen, { ino: seen.ino + 1 }) : seen; };
+  fs.statSync = (file, ...rest) => { const seen = statSync(file, ...rest); return file === at ? Object.assign(seen, { ino: seen.ino === 0 ? 1 : 0 }) : seen; };
   let text;
   try { text = regularText(at); } finally { fs.statSync = statSync; }
   ok(text === null, "a file opened that is not the one looked at is not read", JSON.stringify(text));
