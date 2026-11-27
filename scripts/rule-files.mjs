@@ -70,6 +70,7 @@ export function placeAt(commit) {
   // place and read from the link's own folder; a part a link's text brings that the tree lacks makes it a link that
   // leads nowhere, held, while a part of the path's own that the tree lacks, past every link, holds nothing; a link
   // that leads out of the tree, one past 4096 bytes, a submodule on the way and more than 40 links are held)
+  const linkText = at => (size(at) <= 4096 ? show(at) : null), outward = to => to === null || /^([\\/]|[A-Za-z]:)/u.test(to);
   const held = f => {
     const todo = path.posix.normalize(f).split("/").map(p => ({ p, linked: false }));
     for (let cur = "", hops = 0; todo.length;) {
@@ -79,8 +80,8 @@ export function placeAt(commit) {
       if (p === "..") { if (cur === "" || !isFolder(cur)) return true; cur = cur.includes("/") ? cur.slice(0, cur.lastIndexOf("/")) : ""; continue; }
       const next = cur ? `${cur}/${p}` : p, m = mode(next);
       if (m === "120000") {
-        const to = ++hops > 40 || !(size(next) <= 4096) ? null : show(next);
-        if (to === null || /^([\\/]|[A-Za-z]:)/u.test(to)) return true;
+        const to = ++hops > 40 ? null : linkText(next);
+        if (outward(to)) return true;
         todo.unshift(...to.replace(/\\/gu, "/").split("/").map(q => ({ p: q, linked: true })));
         continue;
       }
