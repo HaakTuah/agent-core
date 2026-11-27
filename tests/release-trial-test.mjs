@@ -41,6 +41,9 @@ const { tmp, git } = scratchCore("release-trial-test-");
   at = commit({ "a.txt": "2\n" }, "more since");
   r = trialAt(at, read);
   ok(/changes more than the record since \(a\.txt\)/.test(r.held ?? ""), "a commit that changes more than the record since the commit tried holds the cut", r.held);
+  // (#1413, point 3: the cut on the commit tried, the record read from main's newest commit, where it merged with others)
+  const merged = commit({ "b.txt": "1\n" }, "merged meanwhile");
+  ok(trialAt(tried, read, merged).held === null && /has not run for/.test(trialAt(tried, read).held ?? "") && /changes more than the record since/.test(trialAt(merged, read).held ?? ""), "the commit tried, the record read from a later commit of main with other changes merged between, stands; read on the commit tried itself, which holds no record, or cut on the later commit, it holds the cut");
   const later = commit({ "a.txt": "3\n" }, "tried again");
   at = record(trialRecord(later, "2026-11-23", [[{ "a.yml/x": "passed" }, { "a.yml/x": "failed" }]], SYNC, OTHER));
   r = trialAt(at, read);
