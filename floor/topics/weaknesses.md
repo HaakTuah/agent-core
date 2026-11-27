@@ -28,6 +28,19 @@ Read before a task takes up a security alert or a weakness, and by a security re
   weakness" says, never in a file, PR, issue or comment) and fixed first, in a PR that says what it hardens, never how
   to attack it.
 - **Any other weakness in merged code:** a `bug` issue, fixed with priority.
+- **A weakness fixed twice is fixed at its root** (#1413, point 8).
+  - By default a weakness is fixed where it was found, as above. The one condition that changes it: one of the same
+    kind needs fixing a second time, a merged pull request labelled `hardening` already naming its kind; then whoever
+    fixes it also fixes its cause, the shared code, check or rule that let both in, in a pull request of its own that
+    says only what it hardens.
+  - The count stands in the fixes' own pull requests, in public: each pull request that fixes a weakness carries the
+    label `hardening` of the core's list and names, on its description's line `Hardens against:`, the kind of weakness
+    it hardens against, in the same general words in which it says what it hardens, never how to attack it. The
+    trigger is such a fix: its builder looks for that kind among the merged pull requests with the label before it
+    marks its own ready.
+  - Not meant: a private record, anything waiting on the owner, a label or kind that says more than the pull request
+    already does, or a weakness not yet fixed labelled or listed: the label goes on the pull request that holds its
+    fix alone, and comes off one that closes unmerged. Reason: fixing each case alone leaves the cause to let in the next one. Held by nothing yet.
 - **Secret scanning with push protection is switched on** in each repository that has it (floor rule
   1): at the sync that brings this, and when a repository is made, in a public repository, where GitHub gives it free, a
   session whose sign-in may change the repository's settings switches it on; otherwise it files an issue for the owner,
