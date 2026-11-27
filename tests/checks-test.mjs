@@ -193,6 +193,24 @@ if (process.platform !== "win32") {
   const beside = lacked();
   ok(beside.status === 1 && /^\d of \d+ checks failed, each saying its mend above: Each package new/m.test(beside.out) && /could not run here, since this machine lacks dotnet/.test(beside.out), "  and where a check failed beside them, the run fails", beside.out);
 }
+// nuget: the run after the restore is told so (--restored), whether or not the look itself restored, and the read
+// before it is not: after a restore, the script reads nothing of git's for the base. A stand-in for dotnet passes each
+// restore; on Linux, where it is a script of the shell's.
+if (process.platform !== "win32") {
+  const dir = project();
+  const base = git(dir, "rev-parse", "HEAD");
+  const bin = path.join(tmp, "dotnet-bin");
+  fs.mkdirSync(bin, { recursive: true });
+  fs.writeFileSync(path.join(bin, "dotnet"), '#!/bin/sh\necho "ran dotnet $1"\n', { mode: 0o755 });
+  for (const built of ["true", "false"]) {
+    fs.writeFileSync(path.join(dir, "core/scripts/nuget-look.sh"), `echo "run=true" >> "$GITHUB_OUTPUT"\necho "built=${built}" >> "$GITHUB_OUTPUT"\n`);
+    const r = run(dir, ["nuget", "--nuget", "checks/licences.json"], { BASE_SHA: base, PATH: `${bin}${path.delimiter}${env.PATH}` });
+    const after = r.out.indexOf("ran dotnet restore"), runs = [...r.out.matchAll(/^ran nuget\.mjs \[checks\/licences\.json --packages (.*)\]/gm)];
+    const last = runs.at(-1), before = runs.filter(m => m.index < after);
+    ok(r.status === 0 && after >= 0 && last.index > after && / --restored$/.test(last[1]) && before.length === (built === "true" ? 0 : 1) && before.every(m => / --fetched$/.test(m[1]) && !m[1].includes("--restored")),
+      `nuget: where the look ${built === "true" ? "itself restored" : "did not restore"}, the run after the restore is given --restored${built === "true" ? "" : ", and the read before it is not"}`, r.out);
+  }
+}
 // the signature check's install, under an npm that reads none of --allow-git, --allow-remote and --allow-file (npm 10,
 // which Node 22 brings, and npm 11 before 11.15.0, since 11.14 refuses the registry's own packages under --allow-remote=none), installs nothing and fails saying the mend, since that npm would
 // fetch any git, web or file source the lock file names; under one that reads them all, it installs (#704). A stand-in

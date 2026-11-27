@@ -691,6 +691,27 @@ fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); g
   const from = Date.now(), many = expression(nuspec(`${"<!-- a note -->".repeat(50000)}<license type="expression">MIT</license>`));
   ok(many === "MIT" && Date.now() - from < 5000, "a manifest of many comments is read in one pass", `${many}, ${Date.now() - from} ms`);
 }
+if (process.platform !== "win32") {
+  // (after a restore, --restored: on a merge, as a pull request's checkout holds it, no git command the check runs names
+  // either parent, since what git reads the base by is the restore's to write; without it, the base is read, as before
+  // a restore; a stand-in for git on the PATH records each command, then runs git's own)
+  inRepo(L, lock(direct(["Newtonsoft.Json", "13.0.3"]))); inRepo("checks/audit.json", JSON.stringify({ entries: [] })); inRepo("checks/licences.json", JSON.stringify({ ships: [], audit: "checks/audit.json", nuget: { ships: [L] } }));
+  git("add", "-A"); git("commit", "-q", "-m", "the base"); git("switch", "-q", "-c", "side"); inRepo("README.md", "a change\n"); git("add", "-A"); git("commit", "-q", "-m", "the change");
+  git("switch", "-q", "main"); git("merge", "-q", "--no-ff", "-m", "the merge", "side");
+  const bin = path.join(tmp, "git-bin"), logged = path.join(tmp, "git.log"), real = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+  fs.mkdirSync(bin, { recursive: true });
+  fs.writeFileSync(path.join(bin, "git"), `#!/bin/sh\nprintf '%s\\n' "$*" >> '${logged}'\nexec '${real}' "$@"\n`, { mode: 0o755 });
+  const parents = git("rev-parse", "HEAD^1", "HEAD^2").stdout.trim().split("\n");
+  const traced = (...more) => {
+    fs.rmSync(logged, { force: true });
+    const r = spawnSync(process.execPath, [path.join(repo, "core/scripts/nuget.mjs"), "checks/licences.json", "--packages", json, ...more], { cwd: repo, env: { ...env, PATH: `${bin}${path.delimiter}${env.PATH}` }, encoding: "utf8" });
+    const lines = fs.existsSync(logged) ? fs.readFileSync(logged, "utf8").split("\n").filter(Boolean) : [];
+    return { status: r.status, out: heard(r.stdout + r.stderr), named: lines.filter(l => /HEAD\^/.test(l) || parents.some(p => l.includes(p))), lines };
+  };
+  const after = traced("--restored"), before = traced();
+  ok(after.status === 0 && after.lines.length > 0 && after.named.length === 0 && before.status === 0 && before.named.length > 0,
+    "after a restore (--restored), no git command the check runs names a parent of the merge; without it, the base is read", JSON.stringify({ after: after.named, before: before.named, out: after.out }));
+}
 ok(unsaid.length === 0, "each failure read in this test says its mend", unsaid.join("\n"));
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check`);
 process.exit(failed ? 1 : 0);

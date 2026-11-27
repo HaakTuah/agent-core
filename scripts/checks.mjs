@@ -334,7 +334,9 @@ const RUN = {
       if ((sources.status !== 0 || !restored) && !lacking.has("dotnet")) console.log(`FAIL A restore from a lock file failed (dotnet's errors above): the lock file is not what the project file asks for, a package is not what its lock file names or comes from no source named here (floor rules 7 and 15), or the config names its sources wrongly. ${MEND}where the project file changed, write its lock file anew (dotnet restore --force-evaluate) and commit it, never to take in a package whose content differs from what its lock file names; take out a package no source named in the config serves; or correct the config's sources.`);
       return verdict(passed);
     })) return;
-    check("Every package one exact version, and under a licence on its list", () => node(coreAt, "nuget.mjs", [o.nuget, "--packages", packages, ...advisory], { env: { NUGET_PACKAGES: packages } }));
+    // (after the restore, nothing of git's is read for the base, which the restore could have rewritten: each comparison
+    // with it was made before, by the read above or, where that was left out, by the look)
+    check("Every package one exact version, and under a licence on its list", () => node(coreAt, "nuget.mjs", [o.nuget, "--packages", packages, "--restored", ...advisory], { env: { NUGET_PACKAGES: packages } }));
   },
 };
 
