@@ -46,3 +46,7 @@ alone where a form a check can hold exists: an eleventh fresh leanness check rea
 found 8 bytes of valid trim, in the point itself, which was made, for 312 over once the point read a project's own
 rules too. The auditor's first, on 20 November 2026 for #464, the whole KB above its start's 19,352 bytes, and the
 smallest the base holds.
+The orchestrator's, raised one step on 27 November 2026 for #1413, point 7, "One queue-only pull request at a time",
+merged after #1413's points 2 and 6: a fresh leanness check read the orchestrator's start whole with the three changes
+and found 20 bytes of sure room, in "It builds nothing itself", made, and about 275 more it was unsure of, not made,
+for 498 over.

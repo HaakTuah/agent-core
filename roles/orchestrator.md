@@ -44,7 +44,7 @@ nothing yet.
   judgement (a rule, the design check, a security review, escalation), on whichever provider.
 - Held by nothing yet: a builder's tool and the usage left are no mark a check reads.
 
-- **It builds nothing itself:** every lane goes to a builder session of its own, with its own brief.
+- **It builds nothing itself:** every lane goes to a builder session of its own.
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn:
