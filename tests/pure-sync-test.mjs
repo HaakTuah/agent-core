@@ -77,7 +77,8 @@ const SHA = sha => sha.slice(0, 7);
 
 // ---- a project, its first copy made from a clone of the core at A ----
 const clone = path.join(tmp, "core-clone");
-git(tmp, "clone", "-q", theCore, clone);
+execFileSync("git", ["clone", "-q", "--no-checkout", "--", ".", clone], { cwd: theCore, stdio: ["ignore", "pipe", "pipe"] });
+git(clone, "reset", "-q", "--hard");
 git(clone, "checkout", "-q", A);
 const origin = path.join(tmp, "project.git"), p = path.join(tmp, "project");
 // (the host says the project, and each clone of it, is public, the security-review job's clone by its address on GitHub)
@@ -149,7 +150,7 @@ const coreCheck = () => {
   git(p, "push", "-q", "-f", "origin", "HEAD:refs/heads/check");
   const github = { event_name: "pull_request", repository: "someone/project", event: { repository: { default_branch: "main", private: false }, pull_request: { base: { sha: base } } } };
   const [job] = runWorkflow(read(theCore, ".github/workflows/core.yml"), { github, base: env, temp: tmp,
-    workspace: () => { const ws = fs.mkdtempSync(path.join(tmp, "ws-")); git(ws, "clone", "-q", "--no-checkout", origin, "."); git(ws, "checkout", "-q", "--detach", sha); return ws; },
+    workspace: () => { const ws = fs.mkdtempSync(path.join(tmp, "ws-")); execFileSync("git", ["clone", "-q", "--no-checkout", "--", ".", ws], { cwd: origin, stdio: ["ignore", "pipe", "pipe"] }); git(ws, "checkout", "-q", "--detach", sha); return ws; },
     uses: { "actions/checkout": checkoutStandIn(env, tmp) } });
   return { passed: job.passed, out: job.steps.map(x => x.out).join("") };
 };
@@ -184,7 +185,7 @@ const reviewCheck = () => {
   const github = { event_name: "pull_request", repository: "someone/project", actor: "someone", server_url: "https://github.com", run_id: "1", token: "not-a-token",
     event: { action: "synchronize", pull_request: pull, repository: { default_branch: "main", private: false, full_name: "someone/project" } } };
   const [job] = runWorkflow(read(theCore, ".github/workflows/security-review.yml"), { github, base: reviewEnv, temp: tmp, inputs: { advisory: false },
-    workspace: () => { const ws = fs.mkdtempSync(path.join(tmp, "ws-")); git(ws, "clone", "-q", origin, "."); return ws; },
+    workspace: () => { const ws = fs.mkdtempSync(path.join(tmp, "ws-")); execFileSync("git", ["clone", "-q", "--no-checkout", "--", ".", ws], { cwd: origin, stdio: ["ignore", "pipe", "pipe"] }); git(ws, "reset", "-q", "--hard"); return ws; },
     uses: { "actions/checkout": checkoutStandIn(env, tmp), "actions/setup-node": () => {} } });
   return { passed: job.passed, out: job.steps.map(x => x.out).join(""), posted: fs.readFileSync(ghLog, "utf8") };
 };

@@ -14,7 +14,7 @@
 //     name@exact.version and audited at that version, one entry for each version used, so an update is audited again,
 //     with what it pulls in. A fetch it cannot read fails, but npm pack's, which runs nothing it fetches, and another
 //     fetcher's (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone, dotnet tool install, choco, winget,
-//     PowerShell's Invoke-WebRequest and the like): each of those passes
+//     PowerShell's Invoke-WebRequest and the like; a git clone through a function too, licence-wrappers.mjs): each of those passes
 //     only in a file an entry's "files" names, that entry its hand audit, each fetch that stood at the base reported; and where such a file downloads by address
 //     (curl, wget, PowerShell's) and an entry covering it audits what may be a program (no data, asset, font, service
 //     of GitHub's or the owner's own work), each such entry names its version and the file holds, for each download,
@@ -40,6 +40,7 @@ import { DEEPEST, leadsOut, parseBounded, tooDeep } from "./guards.mjs";
 import { commandLines, commands } from "./licence-commands.mjs";
 import { downloads, otherFetches } from "./licence-fetchers.mjs";
 import { fetched } from "./licence-npm.mjs";
+import { wrapperFetches } from "./licence-wrappers.mjs";
 import { executable } from "./licence-pages.mjs";
 import { copyAmong } from "./core-path.mjs";
 
@@ -147,7 +148,7 @@ function fetches(c, text, f, literal = false) {
   }
   if (/\bnpm_config_(@[\w-]+:)?registry\b|\bnpm_config_replace_registry_host\b|\bnpm_config_(user|global)config\b/iu.test(text)) c.fail(`${f}: it points npm at another registry than npm's, so no audited name can be trusted there. Mend: take that setting out`);
   if (/\bnpm_config_(package_lock|shrinkwrap)\b/iu.test(text)) c.fail(`${f}: it installs without the lockfile, so what it installs is not what the lockfile's check read. Mend: take that setting out`);
-  if (!byHand(c, f)) c.others.push(...otherFetches(text));
+  if (!byHand(c, f)) c.others.push(...otherFetches(text), ...wrapperFetches(text, f, (p) => (c.tracked.includes(p) && !c.binary.has(p) ? trackedText(c.root, p, () => {}) : null)));
 }
 
 // The fetches `found` in the file `f` that the scan cannot read and no entry audits (byKind), each its line with those

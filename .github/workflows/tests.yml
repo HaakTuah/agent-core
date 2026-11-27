@@ -273,6 +273,9 @@ jobs:
       - name: The licence scan on the fetchers it cannot read
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-other-test.mjs ')) }}
         run: node tests/licence-fetch-other-test.mjs
+      - name: The licence scan on more of the forms a repository fetch takes
+        if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-wrapper-test.mjs ')) }}
+        run: node tests/licence-fetch-wrapper-test.mjs
       - name: The licence scan on pages and components
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-pages-test.mjs ')) }}
         run: node tests/licence-fetch-pages-test.mjs

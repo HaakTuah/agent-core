@@ -18,8 +18,8 @@ const program = (name) => String.raw`(?:\b${name}|\\?"(?:[^"\n]*[/\\])?${name}\\
 const fetcher = (name, then) => `${program(name)}(?:${OPTION}{0,8}\\s+\\\\?["']?${then}|${OPTION}{8})`;
 export const OTHER_FETCHER = new RegExp(
   "(?:(?:^|[\\s;&|(`$\'\"/\\\\])(?:curl|wget)|\\\\?\"(?:[^\"\\n]*[/\\\\])?(?:curl|wget)\\\\?\"|\\\\?\'(?:[^\'\\n]*[/\\\\])?(?:curl|wget)\\\\?\')" +
-    "\\s+(?:-[-a-zA-Z]|https?://|[\'\"$])|['\"`](?:[^'\"`\\s]*[/\\\\])?(?:curl|wget|pip3?|pipx|pnpm|yarn|bunx|bun|gem|cargo|deno)['\"`]\\s*,\\s*\\[|" +
-    "['\"`](?:[^'\"`\\s]*[/\\\\])?git['\"`]\\s*,\\s*\\[\\s*['\"`]clone|" +
+    "\\s+(?:-[-a-zA-Z]|https?://|[\'\"$]|[\\w-]+\\.[A-Za-z]{2,})|['\"`](?:[^'\"`\\s]*[/\\\\])?(?:curl|wget|pip3?|pipx|pnpm|yarn|bunx|bun|gem|cargo|deno)['\"`]\\s*,\\s*\\[|" +
+    "['\"`](?:[^'\"`\\s]*[/\\\\])?git['\"`]\\s*,\\s*\\[\\s*['\"`](?:clone|-)|" +
     `(?:${fetcher("pipx?3?", "(?:install|download|wheel)")}|${fetcher("pnpm", "(?:dlx|add|install|i)[\"']?\\s")}|${fetcher("yarn", "(?:dlx|add)[\"']?\\s")}|${program("bunx")}\\s+[\\w@./"'$~\`\\\\-]|` +
     `${fetcher("bun", "(?:add|x|install)[\"']?\\s")}|${fetcher("playwright", "install")}|${fetcher("git", "clone")}|${fetcher("gem", "install")}|` +
     `${fetcher("cargo", "install")}|${fetcher("go", "install")}|${fetcher("apt(?:-get)?", "install")}|${fetcher("brew", "install")}|` +
@@ -57,7 +57,7 @@ export const WINDOWS_FETCHER = (() => {
 const CLONE_FLAGS = new Set(["-q", "--quiet", "-v", "--verbose", "--progress", "-n", "--no-checkout", "--bare", "--mirror", "--single-branch", "--no-single-branch", "--no-tags", "-l", "--local", "--no-local", "--no-hardlinks", "-s", "--shared"]);
 const CLONE_VALUED = new Set(["--depth", "--shallow-since", "--shallow-exclude", "-b", "--branch", "-o", "--origin"]);
 // The place of the quote that closes the string or template opening at text[i] (its escapes and ${} read past), or -1.
-function stringEnd(text, i) {
+export function stringEnd(text, i) {
   const q = text[i];
   for (i++; text[i] !== q; i++) {
     if (i >= text.length || (q !== "`" && text[i] === "\n")) return -1;
@@ -95,14 +95,15 @@ function argument(source) {
 }
 // Whether the argument a, an option's value or a folder, reads as a string, a template or a value above.
 const readable = (a) => a.kind === "text" || a.kind === "template" || (a.kind === "other" && SIMPLE.test(a.raw));
-// The arguments of an array that opens at text[i], and the place after its "]", or null where one cannot be read.
-function arrayAt(text, i) {
+/** The arguments of an array that opens at text[i], or of a call's list where `close` is ")", and the place after it
+ *  closes, or null where one cannot be read. */
+export function arrayAt(text, i, close = "]") {
   const out = [];
   for (i++; ; ) {
     while (/\s/u.test(text[i] ?? "")) i++;
-    if (text[i] === "]") return { args: out, end: i + 1 };
+    if (text[i] === close) return { args: out, end: i + 1 };
     const end = exprEnd(text, i);
-    if (end < 0 || !/^[,\]]$/u.test(text[end])) return null;
+    if (end < 0 || (text[end] !== "," && text[end] !== close)) return null;
     out.push(argument(text.slice(i, end).trim()));
     i = text[end] === "," ? end + 1 : end;
   }
@@ -174,7 +175,7 @@ const IDENT = "\\p{ID_Continue}$\\u200c\\u200d";
 const AFTER = new RegExp(`(?:^|[^${IDENT}.#\\s])\\s*(?:return|else|await|void|yield|throw|case|do|in|of|typeof)$`, "u");
 const OPENING_PART = /\s+|\/\/[^\n]*|\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\/|#![^\n]*|(import\s[^;'"`/]*["'][^"'\n]*["'];?)/uy;
 // The imports of the file's opening, outside its comments, and the place where the opening ends.
-function opening(text) {
+export function opening(text) {
   const imports = [];
   let end = 0;
   for (let m; (OPENING_PART.lastIndex = end, m = OPENING_PART.exec(text)); end = OPENING_PART.lastIndex) if (m[1]) imports.push(m[1]);
@@ -203,12 +204,33 @@ function localClone(text, m) {
   const array = arrayAt(text, m.index + m[0].lastIndexOf("["));
   return Boolean(array) && array.args[0]?.value === "clone" && localArguments(array.args) && callCloses(text, array.end) && directCall(text, m.index);
 }
+// git's own options that take the next argument as their value, all of which git reads before its subcommand.
+const GIT_VALUED = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix"]);
+/** git's subcommand among `args` (as arrayAt reads them), read past git's own options and their values, or null where
+ *  an argument before it is not a plain string. */
+export function gitSubcommand(args) {
+  for (let k = 0; k < args.length; k++) {
+    if (args[k].kind !== "text") return null;
+    if (!args[k].value.startsWith("-")) return args[k].value;
+    if (GIT_VALUED.has(args[k].value)) k++;
+  }
+  return null;
+}
+// Whether the match m of OTHER_FETCHER is git's array with options before its subcommand, and that subcommand reads
+// as another than "clone"; where it cannot be read, the array is a clone where it holds "clone" as a string of its own.
+function otherCommand(text, m) {
+  if (!/git['"`]\s*,\s*\[\s*['"`]-$/u.test(m[0])) return false;
+  const at = m.index + m[0].lastIndexOf("["), array = arrayAt(text, at), sub = array && gitSubcommand(array.args);
+  if (sub) return sub !== "clone";
+  const close = array ? array.end : text.indexOf("]", at);
+  return !/['"`]clone['"`]/u.test(text.slice(at, close < 0 ? text.length : close));
+}
 // Each fetch in text by a fetcher the scan cannot read, as the two readers above find them: their matches, each place
-// once, in the order they stand, but a git clone of a local source (localClone).
-const matches = (text) => [...new Map([OTHER_FETCHER, WINDOWS_FETCHER].flatMap((re) => [...text.matchAll(new RegExp(re.source, `${re.flags}g`))]).map((m) => [m.index, m])).values()].filter((m) => !localClone(text, m)).sort((a, b) => a.index - b.index);
+// once, in the order they stand, but a git clone of a local source (localClone) and git's array of another subcommand.
+const matches = (text) => [...new Map([OTHER_FETCHER, WINDOWS_FETCHER].flatMap((re) => [...text.matchAll(new RegExp(re.source, `${re.flags}g`))]).map((m) => [m.index, m])).values()].filter((m) => !localClone(text, m) && !otherCommand(text, m)).sort((a, b) => a.index - b.index);
 // The line in text that holds the place i, with the lines that run on to it and those it runs on to (after a "\\" or
 // PowerShell's "`" at a line's end).
-function runOn(text, i) {
+export function runOn(text, i) {
   const goesOn = (line) => /[\\`]\r?$/u.test(line);
   let start = text.lastIndexOf("\n", i - 1), end = text.indexOf("\n", i);
   while (start > 0 && goesOn(text.slice(text.lastIndexOf("\n", start - 1) + 1, start))) start = text.lastIndexOf("\n", start - 1);
