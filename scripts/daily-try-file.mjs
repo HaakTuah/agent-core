@@ -36,7 +36,7 @@ export const CAME = ["tried", "held", "atPin", "untried", "syncFailed", "afterUn
 export const WHY = ["notCloned", "noHostAnswer", "beforeUnread", "branchRefused", "syncRefused", "stageRefused", "commitRefused"];
 
 // Whether a runner's counts are in the form --run prints: its number within the `found` (at most LEGS_MAX), the
-// commit tried (`sha`, or any commit where none is given), what it came to, a reason only of WHY's words, and the
+// commit tried (`sha`, or any commit where none is given), what it came to, a reason only of WHY's words and only beside untried or syncFailed (none beside the rest), and the
 // trial's classes as whole numbers.
 export function legFormed(l, sha, found) {
   return l !== null && typeof l === "object" && Number.isSafeInteger(l.leg) && l.leg >= 1 && l.leg <= Math.min(found, LEGS_MAX)

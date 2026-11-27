@@ -61,7 +61,7 @@ const SHA = "2".repeat(40);
   const big = { leg: 1, commit: SHA, came: "tried", ...Object.fromEntries(Object.keys(base).filter(k => !["commit", "day", "signedIn", "found", "private", "tried", "atPin", "untried", "syncFailed", "afterUnread", "held"].includes(k)).map(k => [k, 0])) };
   const huge = [{ ...big, passedBoth: 2 ** 52 }, { ...big, passedBoth: 10001 }, { ...big, came: "held\n" }, { ...big, came: "toString" }, { ...big, why: "a line of the project's own output" }, { ...big, why: "toString" }, { ...big, why: 5 }, { ...big, came: "held", why: "syncRefused" }];
   const g = gather([...huge.map(l => ({ leg: 1, text: JSON.stringify(l) })), { leg: 2, text: `${JSON.stringify({ ...big, leg: 2 })}${" ".repeat(5000)}` }], { sha: SHA, day: "2026-11-27", signedIn: true, found: 2, privates: 0 });
-  ok(g.untried === 2 && g.passedBoth === 0 && formed(g), "a runner's line with a count past 10,000, of no class, a reason out of the fixed list or past 4 KB is not read, so no runner can stop the filing for the rest", JSON.stringify(g).slice(0, 200));
+  ok(g.untried === 2 && g.passedBoth === 0 && formed(g), "a runner's line with a count past 10,000, of no class, a reason out of the fixed list or beside what holds none, or past 4 KB is not read, so no runner can stop the filing for the rest", JSON.stringify(g).slice(0, 200));
   const logs = { 11: `x\n${LINE}{"forged":1}\nmore\n${LINE}${JSON.stringify(big)}\nafter`, 12: `${LINE}{}`.padEnd((16 << 20) + 10, "x"), 13: "nothing said", 14: `${LINE}${JSON.stringify(big)}` };
   const jobs = [{ id: 11, name: "try 1" }, { id: 12, name: "try 2" }, { id: 13, name: "try 3" }, { id: 14, name: "try-file" }, { id: "15", name: "try 4" }];
   const ghLogs = route => {
