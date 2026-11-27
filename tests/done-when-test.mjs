@@ -119,6 +119,19 @@ try {
   const path0 = process.env.PATH;
   process.env.PATH = dir;
   try { ok(readItem("o/r", "#1") === null, "an issue gh cannot be run to read is none"); } finally { process.env.PATH = path0; }
+  // (an answer of gh's past its bound is unread: a failure with its mend, never an item that asks nothing; one gh ends
+  // refusing is none)
+  if (process.platform !== "win32") {
+    const bin = path.join(dir, "..", `done-when-bin-${process.pid}`), fake = how => { fs.mkdirSync(bin, { recursive: true }); fs.writeFileSync(path.join(bin, "gh"), `#!${process.execPath}\n${how}\n`, { mode: 0o755 }); };
+    process.env.PATH = bin;
+    try {
+      fake(`process.stdout.write("a".repeat((1 << 24) + 1))`);
+      let big = null;
+      try { readItem("o/r", "#1"); } catch (e) { big = e; }
+      fake("process.exit(1)");
+      ok(big !== null && mended(big.message) && readItem("o/r", "#1") === null, "an answer past the bound of gh's read is unread, and fails with its mend; one gh refuses is none", big?.message);
+    } finally { process.env.PATH = path0; fs.rmSync(bin, { recursive: true, force: true }); }
+  }
   ok(isFeature(readItem("o/r", "inbox/idea.md", dir)) && readItem("o/r", "inbox/none.md", dir) === null, "an inbox file is read from the head's commit, and one not there is none");
   // (a link committed as an inbox file is read as its own text, never followed out of the checkout)
   const secret = path.join(dir, "..", `done-when-secret-${process.pid}.txt`);
