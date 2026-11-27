@@ -6,7 +6,7 @@
 # workflow honours it only where the pull request's files are one Markdown file and nothing that runs by itself, so a
 # caller changed in the pull request itself waves through nothing more. It runs where the security-review job runs, and
 # on a pull request only where it changes one file; in a private repository, where each run is a billed job, only where
-# the caller passes "private", the owner's choice, so it adds no billed job to a project that changes nothing (AGENTS.md,
+# the caller passes "private", the owner's choice, so it adds no billed job to a project that changes nothing (core-changes/projects.md,
 # "Nothing locks a project"), whose queue-only pull requests are then reviewed as any other. It checks out the default
 # branch, never the pull request, reads only, and writes nothing. No secret: untrusted text (the pull request's, its
 # issues') reaches the script only as files and env, never a run line (floor rule 2). Its files are read from the

@@ -81,7 +81,7 @@ export const DONE_SINCE = "2026-11-17T00:00:00Z";
 // The day from which a description is asked its cost line or the mark that says the script printed none ("An exemption
 // leaves a mark" in roles/shared/work-flow.md; #302), as the lines above are.
 export const COST_SINCE = "2026-11-17T00:00:00Z";
-// The day from which the part "What holds it" is asked the number of each rule it names (AGENTS.md of the core, "Every
+// The day from which the part "What holds it" is asked the number of each rule it names (core-changes/holders.md of the core, "Every
 // rule says what holds it"; #303), as the lines above are.
 export const NUMBER_SINCE = "2026-11-17T00:00:00Z";
 // The day from which, in the core's own repository, the lines "Number:" under "What holds it" are asked to be in step

@@ -1,4 +1,4 @@
-// Tests of the rules' pruning (pruning.mjs; AGENTS.md, "Rules are pruned by their numbers"; #303): when one is due, the
+// Tests of the rules' pruning (pruning.mjs; core-changes/holders.md, "Rules are pruned by their numbers"; #303): when one is due, the
 // rules taken out of a case's core, and the list: each sign, the step, "too early", the floor and "in use"; the rules
 // with no holder are tested in tests/pruning-unheld-test.mjs (#895). Node's own modules only; the calls to gh and git
 // are the script's own and are not made here, save a run that fails.

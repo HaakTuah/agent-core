@@ -68,10 +68,6 @@
       "mark": 97263,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
-    "AGENTS.md": {
-      "mark": 67924,
-      "why": "Its rules that only some tasks break move to modules read on need in #845."
-    },
     "scripts/licence-scan.mjs": {
       "mark": 23622,
       "why": "#946: its reading of pages and components is split off; what stands is the scan of a project's files, its download pins and their base, which call each other's readers (readAs, codeOf, covers), so a split would make a cycle of imports."

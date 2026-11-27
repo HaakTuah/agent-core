@@ -7,7 +7,7 @@
 // the review, and no score decides: when it last had a release, where its repository is and whether it is archived,
 // who publishes it and whether its repository names it back, how many packages it brings with it, and whether it has
 // provenance. A package updated, or one any lock file of the base held, is not looked up: nothing that stood before
-// fails (AGENTS.md, "Nothing locks a project"). With no base, as on a push, nothing is new.
+// fails (core-changes/projects.md, "Nothing locks a project"). With no base, as on a push, nothing is new.
 // On npm it holds as well that every entry of those lock files, deep in the tree too, comes from npm's registry with an
 // integrity value (floor rule 7, "from a known publisher" and "one exact version"; #488, point 4): it fails one that
 // points at a git address or another web address, or names no integrity value, and reports one the base held so. A
@@ -193,7 +193,7 @@ export function offRegistry(p) {
 }
 
 /** Each entry of the lock files `head` that offRegistry finds: { failures, reports }, one the base's lock files held
- *  the same (its name, version, address and integrity value, and the same fault), as often, reported, never failed (AGENTS.md,
+ *  the same (its name, version, address and integrity value, and the same fault), as often, reported, never failed (core-changes/projects.md,
  *  "Nothing locks a project"): another address, or one more entry of the same, fails. */
 export function sourceFaults(head, base) {
   // (its integrity value too, so that one taken off, or changed, beside a held address is no longer the base's)

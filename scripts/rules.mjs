@@ -1,4 +1,4 @@
-// The rules of the floor and the modules, as a machine reads them (AGENTS.md, "Every rule says what holds it"; #235,
+// The rules of the floor and the modules, as a machine reads them (core-changes/holders.md, "Every rule says what holds it"; #235,
 // part D): each paragraph or item of a list in the floor's files, the roles' and the modules' whose text opens with a bold lead is a rule,
 // named by its file and that lead ("floor/security.md: 1. Nothing secret in the repository"). Its text runs to the next
 // rule at its own depth or above, a heading, or a line that leaves its item, so an item's own items are part of it as
@@ -9,7 +9,7 @@
 import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import path from "node:path";
-import { leftOut, realFiles, regular } from "./reading.mjs";
+import { HERE, leftOut, realFiles, regular } from "./reading.mjs";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -53,13 +53,17 @@ export function rulesOf(file, text) {
   return out;
 }
 
+// Whether a rule's file is the core's own: its AGENTS.md, or a file of HERE, where most of that file's rules stand by
+// theme (#1202).
+export const ownFile = file => file === "AGENTS.md" || String(file).startsWith(`${HERE}/`);
 // Every rule of the floor and the modules under `root` (the core's own, by default); with `agents`, the core's own
-// rules in its AGENTS.md as well, which a staged case may hold.
+// rules as well, those of its AGENTS.md and of HERE, which a staged case may hold.
 export function rules(root = ROOT, { agents = false } = {}) {
   const out = [];
   // (only real folders and files are read, a link at any depth read as nothing, as reading.mjs reads them; #848)
   const own = agents ? regular(root, "AGENTS.md") : null;
   if (own !== null) out.push(...rulesOf("AGENTS.md", own));
+  if (agents) for (const f of realFiles(root, HERE, new Set())) out.push(...rulesOf(`${HERE}/${f}`, regular(root, `${HERE}/${f}`) ?? ""));
   for (const folder of FOLDERS) for (const f of realFiles(root, folder, new Set())) out.push(...rulesOf(`${folder}/${f}`, regular(root, `${folder}/${f}`) ?? ""));
   return out;
 }
@@ -87,6 +91,7 @@ export function rulesAt(root, commit, { agents = false, git = gitAt(root) } = {}
 function rulesAtRead(git, commit, agents) {
   const files = git("ls-tree", "-r", "--name-only", "--end-of-options", commit, "--", ...FOLDERS).split("\n")
     .filter(f => FOLDERS.includes(path.posix.dirname(f)) && f.endsWith(".md")).sort();
+  if (agents) files.unshift(...git("ls-tree", "-r", "--name-only", "--end-of-options", commit, "--", HERE).split("\n").filter(f => path.posix.dirname(f) === HERE && f.endsWith(".md")).sort());
   if (agents && git("ls-tree", "--name-only", "--end-of-options", commit, "--", "AGENTS.md").trim()) files.unshift("AGENTS.md");
   return files.flatMap(f => rulesOf(f, git("show", `${commit}:${f}`)));
 }

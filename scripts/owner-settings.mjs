@@ -4,7 +4,7 @@
 // applies each setting the owner approves, reads it back by running this again and says what is left. It is asked at a
 // project's first taking of the core (init.mjs, and the first copy sync.mjs writes) and again only where a sync brings
 // a setting the list at the old pin did not hold (`--since`, which sync.mjs gives). It reads, and writes nothing, on
-// the host or in the project; it reports and fails nothing (AGENTS.md of the core, "Nothing locks a project"). Git, gh
+// the host or in the project; it reports and fails nothing (core-changes/projects.md of the core, "Nothing locks a project"). Git, gh
 // and Node's own modules.
 //
 //   node core/scripts/owner-settings.mjs                                   from a project's root: the checklist
@@ -166,7 +166,7 @@ export function readHost(repo, ask = ghAsk) {
 export function checklist({ repo, states, fresh = null, script }) {
   const counts = [true, false, null].map(v => SETTINGS.filter(s => states[s.id]?.given === v).length);
   const head = [
-    `The settings only the owner gives${repo ? `, for ${repo}` : ""} (\`${script}\`; the core's README, "Setting up (the owner's part)"): ${counts[0]} given, ${counts[1]} not, ${counts[2]} not read or not for this repository. Nothing waits on them (the core's AGENTS.md, "Nothing locks a project").`,
+    `The settings only the owner gives${repo ? `, for ${repo}` : ""} (\`${script}\`; the core's README, "Setting up (the owner's part)"): ${counts[0]} given, ${counts[1]} not, ${counts[2]} not read or not for this repository. Nothing waits on them (the core's core-changes/projects.md, "Nothing locks a project").`,
     `Taken in one sitting: the owner starts a session in person, which applies each setting the owner approves, as the owner's own word allows what an agent tool's automatic mode refuses, never one without it, and none that may be billed, which the owner switches on alone (floor rule 14); it reads each back by running \`${script}\` again and says what is left.${repo ? "" : " The origin is on no github.com, so nothing was read and no link made: on another host its own protection of the default branch stands in for the ruleset (the core's tasks/hosts.md)."}`,
   ];
   const rows = SETTINGS.map(s => `- [${states[s.id]?.given === true ? "x" : " "}] ${s.setting}${fresh?.includes(s.id) ? " (new since the copy before)" : ""}: ${states[s.id]?.said ?? "not read"}. Protects: ${s.protects}.${repo ? ` Set at: https://github.com/${repo}/${s.page}` : ""}`);

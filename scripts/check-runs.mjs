@@ -1,4 +1,4 @@
-// The runs of the core's scripts a hostile test makes, watched (AGENTS.md, "A check that fails says the mend"; #1140,
+// The runs of the core's scripts a hostile test makes, watched (core-changes/projects.md, "A check that fails says the mend"; #1140,
 // point 2): the hostile tests (tests/hostile-*-test.mjs) take spawnSync and execFileSync from here in place of
 // node:child_process, and each run of a script under a scripts/ folder by Node that exits with a failure must hold at
 // least one failure line, every one of them saying its mend (mend.mjs), and every script its mends name to run there

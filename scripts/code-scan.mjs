@@ -3,7 +3,7 @@
 // workflow calls the core's codeql.yml, Semgrep's engine reads the files a pull request changes with the core's own
 // rules (code-scan.yml beside this file) and fails a finding the pull request's base did not hold, saying its mend: the
 // base's own versions of those files are scanned too, so input the change brings to a sink whose line it leaves as it
-// was counts as the change's. A finding the base held is reported and passes (the core's AGENTS.md, "Nothing locks a
+// was counts as the change's. A finding the base held is reported and passes (the core's core-changes/projects.md, "Nothing locks a
 // project"). Whether a workflow calls codeql.yml is read from the base's workflows, parsed, so a change cannot switch
 // the scan off. A finding the pull request's description lists on a line "Scan false alarm: `<path>:<line>`, <why>"
 // passes, said so, for its security review to confirm, as floor rule 9 says of CodeQL's false alarms. With no base, as

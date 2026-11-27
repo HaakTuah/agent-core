@@ -7,7 +7,7 @@
 // committed after the merge (steps.mjs --write --aside; #1091), every difference from a fresh start, where the owner's inbox is and what its labels and openers lack, and
 // what the project holds twice or against the core (steps.mjs, fresh.mjs, inbox.mjs, labels.mjs and twice.mjs, beside this file), the settings only the owner gives where the sync
 // brings one the old copy's list did not hold, and at the first copy all of them (owner-settings.mjs; #1085), and at its end the one line that says whether the
-// project then holds the core whole and wired (attached.mjs, beside this file; #1081), for the sync PR's description, having written what the core owns, from the new copy's kit, by the one process that writes it for a new project too (converge.mjs, beside this file; #1083): they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
+// project then holds the core whole and wired (attached.mjs, beside this file; #1081), for the sync PR's description, having written what the core owns, from the new copy's kit, by the one process that writes it for a new project too (converge.mjs, beside this file; #1083): they report and fail nothing (core-changes/projects.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
 // which, a pure sync, its merger checks with `scripts/pure-sync.mjs` (floor rule 8). Git, tar, gh where it asks whose
 // account holds the repository (releases.mjs, hostAccount) and Node's own modules only; the core's address:
 // core-address.mjs, beside this file. Where the line says a library carries the core, it syncs nothing: the library's

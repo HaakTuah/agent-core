@@ -1,4 +1,4 @@
-// The record of the core's prunings and when one is due (split from pruning.mjs, #888; AGENTS.md, "Rules are pruned by
+// The record of the core's prunings and when one is due (split from pruning.mjs, #888; core-changes/holders.md, "Rules are pruned by
 // their numbers"; #303): the file RECORD and the proposals' file UNHELD, a pruning in progress (open()), whether one is
 // due (due(), said()) and the constants the parts share. pruning.mjs, beside this file, says what a pruning is and exports the names it
 // exported before the split, those of this file and of the two beside it (pruning-list.mjs, pruning-read.mjs).
@@ -12,7 +12,7 @@ export const EVERY = 2;
 // The outcomes' direct measures (outcomes.mjs; #302) that a count gives, whose counts a pruning records: a median's
 // measure gives only how many cases it read, not its value, so it is left out.
 export const DIRECT = MEASURES.filter(m => m.direct && !m.median);
-const ABOUT = "The prunings of the core's rules (scripts/pruning.mjs; AGENTS.md, \"Rules are pruned by their numbers\"): each pruning's day, the model of the session that took it, the span its counts read (from its day back to the last pruning's), each rule's number as it counted then (\"numbers\"), the count of each outcome's direct measure (\"direct\") and of each kind of correction (\"corrections\"), the failed steps of the runs on a pull request, by workflow and step (\"fired\"), each rule's citations (\"cited\"), and each staged case's verdict with the rules it holds taken out (\"without\"), and \"recorded\" once its counts are written, which ends it. Written by `node scripts/pruning.mjs --read` and `--record`; committed in a pull request of its own.";
+const ABOUT = "The prunings of the core's rules (scripts/pruning.mjs; core-changes/holders.md, \"Rules are pruned by their numbers\"): each pruning's day, the model of the session that took it, the span its counts read (from its day back to the last pruning's), each rule's number as it counted then (\"numbers\"), the count of each outcome's direct measure (\"direct\") and of each kind of correction (\"corrections\"), the failed steps of the runs on a pull request, by workflow and step (\"fired\"), each rule's citations (\"cited\"), and each staged case's verdict with the rules it holds taken out (\"without\"), and \"recorded\" once its counts are written, which ends it. Written by `node scripts/pruning.mjs --read` and `--record`; committed in a pull request of its own.";
 
 // The record: { prunings: [{ at, model, from, numbers, direct, corrections, fired, cited, without, recorded }] }, oldest
 // first, `at` the day a pruning began; `recorded` once --record has written its counts, which ends it.
@@ -44,7 +44,7 @@ export function due({ month, record, model = null }) {
 // The state report's lines on the pruning, for `month`.
 export function said({ month, record = readRecord() }) {
   const d = due({ month, record });
-  if (d.due) return [`- Due: ${d.why}. The session that takes this report prunes as the core's \`AGENTS.md\`, "Rules are pruned by their numbers", says: each staged case set with the rules it holds taken out (\`node scripts/pruning.mjs --set <case> <dir>\`), run in a fresh helper and read (\`--read\`), the counts recorded (\`--record --repo <this repository> --model <its model's id>\`), each rule with no holder given its proposal in \`${UNHELD}\`, with a form of it a check could hold or why none exists, and its checks queued worst first, and the list \`node scripts/pruning.mjs\` prints added here as a note, \`${RECORD}\` in a pull request of its own.`];
+  if (d.due) return [`- Due: ${d.why}. The session that takes this report prunes as the core's \`core-changes/holders.md\`, "Rules are pruned by their numbers", says: each staged case set with the rules it holds taken out (\`node scripts/pruning.mjs --set <case> <dir>\`), run in a fresh helper and read (\`--read\`), the counts recorded (\`--record --repo <this repository> --model <its model's id>\`), each rule with no holder given its proposal in \`${UNHELD}\`, with a form of it a check could hold or why none exists, and its checks queued worst first, and the list \`node scripts/pruning.mjs\` prints added here as a note, \`${RECORD}\` in a pull request of its own.`];
   return [`- Not due: ${d.why}, or sooner where the session that takes a report runs on a newer generation of model than the last pruning's (\`node scripts/pruning.mjs --due --model <its id>\`).`];
 }
 

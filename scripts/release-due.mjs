@@ -210,7 +210,7 @@ export function dueness(read, closed, now, left = { unread: [], other: [] }) {
   const other = left.other.length ? `; not counted, closed by no merge and no account that can write: ${left.other.map(n => `#${n}`).join(", ")}` : "";
   const unread = left.unread.length ? `; not counted, since who made its close could not be read: ${left.unread.map(u => `#${u.number} (${u.why})`).join(", ")}. ${UNREAD_MEND}` : "";
   const count = `${merged.length} ${merged.length === 1 ? "line" : "lines"} of QUEUE.md merged ${since}${merged.length ? `: ${merged.map(n => `#${n}`).join(", ")}` : ""}${other}${unread}`;
-  if (trialed) return { due: false, merged, days, said: `Not due: the trial's record names ${trialed.slice(0, 7)}, past ${release.name}, so its trial has run; the release is cut from it (AGENTS.md, "A release is cut on the owner's word"). ${count}.` };
+  if (trialed) return { due: false, merged, days, said: `Not due: the trial's record names ${trialed.slice(0, 7)}, past ${release.name}, so its trial has run; the release is cut from it (core-changes/releases.md, "A release is cut on the owner's word"). ${count}.` };
   const due = merged.length >= LINES || (days >= DAYS && merged.length >= 1);
   const why = merged.length >= LINES ? `${LINES} or more lines merged` : due ? `${DAYS} days or more with at least one merged` : `under ${LINES} lines, and ${days >= DAYS ? "none merged" : `under ${DAYS} days`}`;
   return { due, merged, days, said: `${due ? "Due" : "Not due"} (${why}): ${count}.` };
@@ -238,7 +238,7 @@ export function dueIssue({ manifest, at, repo }, read = () => readGit(gitIn(ROOT
     body: [
       `A release's trial is due (\`node scripts/release-due.mjs\`; AGENTS.md, "One batch, then one release"). ${d.said}`,
       "",
-      "A task the orchestrator gives a lane: a builder at the strongest tier tries the release on main's newest commit whose checks all passed, from the brief `node scripts/trial-brief.mjs <that commit>` prints, and records it with `node scripts/release.mjs --trial` in a pull request of its own (AGENTS.md, \"Each release is tried on a real project first\"); once that record merges holding no cut, this issue closes and the release workflow is started on the owner's standing word. The lines that merge after the commit tried go to the next batch.",
+      "A task the orchestrator gives a lane: a builder at the strongest tier tries the release on main's newest commit whose checks all passed, from the brief `node scripts/trial-brief.mjs <that commit>` prints, and records it with `node scripts/release.mjs --trial` in a pull request of its own (core-changes/releases.md, \"Each release is tried on a real project first\"); once that record merges holding no cut, this issue closes and the release workflow is started on the owner's standing word. The lines that merge after the commit tried go to the next batch.",
     ].join("\n"),
   };
 }

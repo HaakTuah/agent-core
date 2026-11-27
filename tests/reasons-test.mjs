@@ -51,7 +51,7 @@ ok(reasonsOf(tmp, "tasks/x.md").rule === "tasks/x.md" && reasonsOf(tmp, "tasks/x
 // the command's report, on the core's own: a rule's reasons, and each failure saying its mend
 const run = query => { const r = report(query, root, root); return { status: r.status, stdout: r.out }; };
 const own = run("The archive is pointed to from the list");
-ok(own.status === 0 && own.stdout.startsWith("AGENTS.md: The archive is pointed to from the list\n") && /- Core archive \S+, .*\(archive\/instructions\//u.test(own.stdout) && own.stdout.includes(`https://github.com/${CORE}/issues/252`), "run on the core's own rule, it prints its items and issues", own.stdout);
+ok(own.status === 0 && own.stdout.startsWith("core-changes/holders.md: The archive is pointed to from the list\n") && /- Core archive \S+, .*\(archive\/instructions\//u.test(own.stdout) && own.stdout.includes(`https://github.com/${CORE}/issues/252`), "run on the core's own rule, it prints its items and issues", own.stdout);
 const several = run("builder"), nothing = run("no rule is named so");
 ok(several.status === 1 && mended(several.stdout) && several.stdout.includes("roles/builder.md: Read by task, twice"), "run with a part that names several rules, it fails, listing them, with the mend", several.stdout);
 ok(nothing.status === 1 && mended(nothing.stdout) && nothing.stdout.includes('as `node scripts/reasons.mjs "security.md: 3. The protected files"`'), "run with a part that names none, it fails with the mend, naming the command as seen from where it is run", nothing.stdout);

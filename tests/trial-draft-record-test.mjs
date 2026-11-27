@@ -1,8 +1,8 @@
-// Tests of the record of the drafts in a release's trial (#1334; AGENTS.md, "A release's trial opens its update as a
-// draft in the owner's own projects"): what trial-draft.mjs printed, read for the commit tried; what release.mjs --trial
-// takes after each pair; and the record, which holds the cut where a check failed on the draft that passed on main or
-// ran on the draft alone, or where one of the owner's own projects found had no draft. The readings themselves:
-// tests/trial-draft-test.mjs. No call reaches the network, and no process is started. Node's own modules.
+// Tests of the record of the drafts in a release's trial (#1334; core-changes/releases.md, "A release's trial opens its
+// update as a draft in the owner's own projects"): what trial-draft.mjs printed, read for the commit tried; what
+// release.mjs --trial takes after each pair; and the record, which holds the cut where a check failed on the draft that
+// passed on main or ran on the draft alone, or where one of the owner's own projects found had no draft. The readings
+// themselves: tests/trial-draft-test.mjs. No call reaches the network, and no process is started. Node's own modules.
 //
 //   node tests/trial-draft-record-test.mjs
 import fs from "node:fs";

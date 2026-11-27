@@ -1,4 +1,4 @@
-// What a failure of a check of the core says (AGENTS.md, "A check that fails says the mend"; core archive 219; #254):
+// What a failure of a check of the core says (core-changes/projects.md, "A check that fails says the mend"; core archive 219; #254):
 // each is a line of the check's output that starts "FAIL" (after the workflow command that opens it, "::error::" or
 // one like it, where one does), or, of a check that marks a pull request with a status that waits, the status's
 // description, which starts "Waiting: ". It says what is wrong and where, then "Mend: " and what a session does about

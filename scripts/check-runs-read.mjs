@@ -1,4 +1,4 @@
-// What the watch on the hostile tests' runs reads (check-runs.mjs, beside this file; AGENTS.md, "A check that fails
+// What the watch on the hostile tests' runs reads (check-runs.mjs, beside this file; core-changes/projects.md, "A check that fails
 // says the mend"; #1140, point 2), apart from the runs it starts, so a test reads it without starting a process: the
 // script a run of Node starts, what is wrong with a run's output, the proofs whose exit code is their answer, and the
 // options a run takes. Node's own modules and mend.mjs beside it.

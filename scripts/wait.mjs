@@ -2,7 +2,7 @@
 // that takes the core: of the pull requests merged last, the time the checks of each one's last push took, from the
 // first check's start to the last one's end, and their median, held to the mark the shape check's config gives under
 // "wait" (shape.mjs, beside this file, which lets the mark rise only as a suite's does); and, from the same checks, the
-// minutes GitHub bills for each one's last push, each job rounded up to a whole minute, and their median (AGENTS.md of
+// minutes GitHub bills for each one's last push, each job rounded up to a whole minute, and their median (core-changes/releases.md of
 // the core, "The core is measured as a feature is"; #460, point 6). It reports and fails nothing: the monthly state
 // report says both medians, the wait beside its mark (state-report.mjs), and the session that reads a median past it
 // files the task that brings it down.

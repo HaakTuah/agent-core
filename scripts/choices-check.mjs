@@ -1,6 +1,6 @@
 // The records' check a pull request runs (#515; split from choices.mjs, #912): with CHOICES_BASE set, as the copies check
 // sets it to the commit a pull request merges into, choices.mjs runs `checkOf`, which fails a record the pull request
-// adds without a line of ARGUED (choices-records.mjs) and lists, never fails, one that stood there (AGENTS.md, "Nothing
+// adds without a line of ARGUED (choices-records.mjs) and lists, never fails, one that stood there (core-changes/projects.md, "Nothing
 // locks a project"). It reads only, posts nothing and exits 0, save where the records cannot be read or that check
 // fails. git and Node's own modules.
 import { execFileSync } from "node:child_process";
@@ -85,7 +85,7 @@ export function checkOf(got, base, root = ".") {
   }
   if (got.text === null) return [["No choice records here: nothing to check."], false];
   // (a base that held the records as a link: what the link led to is not read, so each record is listed, as with no
-  // base, and none fails, since any of them may have stood there: AGENTS.md, "Nothing locks a project")
+  // base, and none fails, since any of them may have stood there: core-changes/projects.md, "Nothing locks a project")
   const unlisted = why => [[`${why}, so no record is read as one this change adds.`, ...argued(got.text, got.text).listed.map(r => `- listed, not failed: "${r.name}", argued on no line that opens ${r.lacks.map(l => `"${l}"`).join(", ")}`)], false];
   if (then === undefined) return unlisted(`No base to compare with${base ? ` (${base} is no commit here)` : ""}`);
   if (then === LINK) return unlisted(`The base held the records as a link, which is not read`);

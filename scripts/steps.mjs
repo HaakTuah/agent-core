@@ -1,4 +1,4 @@
-// What a release asks of a project, step by step (AGENTS.md, "Nothing locks a project"; core archive 215): each entry
+// What a release asks of a project, step by step (core-changes/projects.md, "Nothing locks a project"; core archive 215): each entry
 // of the sync notes (sync-notes.mjs, beside this file) has a step, by the entry's lead (its date and its name), with
 // roughly what it costs and how it is told done, in a file of its own in steps/ beside this file, named as the entry's
 // file is. A step is told done one of four ways, each exact and none by guessing:

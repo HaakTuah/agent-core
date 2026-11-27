@@ -1,10 +1,10 @@
-// What holds each rule of the floor and the modules (AGENTS.md, "Every rule says what holds it"; #235, part D), and of
+// What holds each rule of the floor and the modules (core-changes/holders.md, "Every rule says what holds it"; #235, part D), and of
 // the core's own AGENTS.md, counted apart (#925): one of three, a check that fails where the rule is broken, a staged
 // case (staged.mjs, beside this file), or the scheduled audit. The list is a folder, scripts/holders/, of one file for
 // each rule (#750, point 1; #853), read in the order of the files' names and named from the rule's key (entryFile):
 // {"rule": its file and bold lead as rules.mjs names it, or a rule file alone for its text outside any rule; "holder":
 // one holder or a list of them; "behind": the keys of the core archive's items behind it ("a rule file names no item
-// itself": AGENTS.md, "The archive is pointed to from the list"; a number up to 262, or "#N" or "#N.P" for one keyed by
+// itself": core-changes/holders.md, "The archive is pointed to from the list"; a number up to 262, or "#N" or "#N.P" for one keyed by
 // its issue); "number": "<findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable |
 // robust>", the count it is meant to lower and the outcome it stands for, which pruning.mjs reads}, each but "rule"
 // only where the rule has one. A holder is "check: <the script, test, workflow or hook that fails a pull request or a
@@ -39,7 +39,8 @@ import { FILE, HOOKS, counts, hook, holderOf } from "./holder-form.mjs";
 import { OWN, ownHolders, ownMain, ownReport, writeOwn } from "./holders-own.mjs";
 import { NUMBER } from "./outcomes.mjs";
 import { didNotRun, installed } from "./packages.mjs";
-import { FOLDERS, ROOT, rules } from "./rules.mjs";
+import { HERE } from "./reading.mjs";
+import { FOLDERS, ROOT, ownFile, rules } from "./rules.mjs";
 import { shapeFaults } from "./schemas.mjs";
 import { CASES } from "./staged.mjs";
 import { asText, parseBounded } from "./guards.mjs";
@@ -49,7 +50,7 @@ import { guard } from "./mend.mjs";
 export { FILE, HOOKS, OWN, counts, ownHolders, ownReport, writeOwn };
 // The file of a rule's entry in FILE/, named from the rule's key, so that its name is the same wherever it is written
 // and two rules never share one: the rule file's name, "--", then the lead, each in lower case with a hyphen for each
-// run of anything but letters and digits ("AGENTS.md: A part is asked again" stands in agents-md--a-part-is-asked-again.json).
+// run of anything but letters and digits ("core-changes/parts.md: A part is asked again" stands in core-changes-parts-md--a-part-is-asked-again.json).
 const slug = t => t.toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-+|-+$/gu, "");
 export const entryFile = key => { const i = key.indexOf(": "); return `${i < 0 ? slug(key) : `${slug(key.slice(0, i))}--${slug(key.slice(i + 2))}`}.json`; };
 const ENTRY_FIELDS = ["rule", "holder", "behind", "number"];
@@ -91,11 +92,11 @@ function entryFaults(f, e) {
 // (a part of the file as it holds its form, an object, else none: the schema says what it is)
 const part = v => (v !== null && typeof v === "object" && !Array.isArray(v) ? v : {});
 
-// The rule files a pointer to the archive may not stand in: the core's AGENTS.md and the files of the floor and the
-// modules, as rules.mjs reads them.
+// The rule files a pointer to the archive may not stand in: the core's own, its AGENTS.md and the files of HERE, and
+// the files of the floor and the modules, as rules.mjs reads them.
 export function ruleFilesOf(root) {
   const out = fs.existsSync(path.join(root, "AGENTS.md")) ? ["AGENTS.md"] : [];
-  for (const folder of FOLDERS) {
+  for (const folder of [HERE, ...FOLDERS]) {
     const dir = path.join(root, folder);
     if (fs.existsSync(dir)) out.push(...fs.readdirSync(dir).filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`));
   }
@@ -123,7 +124,7 @@ function behindWrong(root, behind) {
 }
 
 // What is wrong with the number each rule names ("numbers"), each a line with its mend: keyed as "behind" is, by a
-// rule of the floor, the modules or AGENTS.md.
+// rule of the floor, the modules, AGENTS.md or HERE.
 function numbersWrong(root, numbers) {
   const keys = new Set(rules(root, { agents: true }).map(r => r.key)), wrong = [];
   for (const [key, n] of Object.entries(numbers)) {
@@ -149,15 +150,15 @@ function sharedFiles(all) {
 }
 
 // Each rule of the floor and the modules with its holders ([{ kind, by, part }]), and what is wrong with the entries,
-// each a line with its mend; `own`, the core's own rules, those of its AGENTS.md, the same way ({ rules, by }), counted
-// apart (#925).
+// each a line with its mend; `own`, the core's own rules, those of its AGENTS.md and of HERE (#1202), the same way
+// ({ rules, by }), counted apart (#925).
 export function holders(root = ROOT, cases = CASES) {
-  const every = rules(root, { agents: true }), all = every.filter(r => r.file !== "AGENTS.md"), mine = every.filter(r => r.file === "AGENTS.md");
+  const every = rules(root, { agents: true }), all = every.filter(r => !ownFile(r.file)), mine = every.filter(r => ownFile(r.file));
   const read = named(root), wrong = read.wrong ? [read.wrong] : [...read.faults];
   if (!read.wrong) wrong.push(...(shapeFaults("holders", read.json, "", FILE) ?? []));
   const by = new Map(all.map(r => [r.key, []])), ownBy = new Map(mine.map(r => [r.key, []])), mapOf = key => by.get(key) ?? ownBy.get(key);
   for (const [key, value] of Object.entries(read.named)) {
-    if (!mapOf(key)) { wrong.push(`${FILE}/${entryFile(key)} names "${key}", which is no rule of the floor, the modules or AGENTS.md as they stand. Mend: write the key as the rule's file and bold lead now read ("floor/security.md: 1. Nothing secret in the repository"), or take it out where the rule has gone`); continue; }
+    if (!mapOf(key)) { wrong.push(`${FILE}/${entryFile(key)} names "${key}", which is no rule of the floor, the modules, AGENTS.md or ${HERE}/ as they stand. Mend: write the key as the rule's file and bold lead now read ("floor/security.md: 1. Nothing secret in the repository"), or take it out where the rule has gone`); continue; }
     for (const h of (Array.isArray(value) ? value : [value]).map(v => holderOf(key, v, root))) {
       if (typeof h === "string") wrong.push(h); else if (h) mapOf(key).push(h);
     }
@@ -179,15 +180,16 @@ export function report(root = ROOT) {
 }
 
 // The core's share (#459, point 3), as a project's report gives its own: the rules held whole by a check, of the floor
-// and the modules (`c`) and of the core's own, those of its AGENTS.md (`own`; #925), each as counts() gives them.
-const coreShare = (c, own) => `- rules held by a check: the floor's and the modules' ${c.check} of ${c.all}; the core's own ${own.check} of ${own.all}, those of \`AGENTS.md\`.`;
+// and the modules (`c`) and of the core's own, those of its AGENTS.md and HERE (`own`; #925, #1202), each as counts()
+// gives them.
+const coreShare = (c, own) => `- rules held by a check: the floor's and the modules' ${c.check} of ${c.all}; the core's own ${own.check} of ${own.all}, those of \`AGENTS.md\` and \`${HERE}/\`.`;
 
 // Of the core's rules a project takes (the floor's always, a module's unless its manifest leaves it out: `out`, by the
 // file's name), how many a check holds whole there, by the core's own list: { held, all }, none counted whose every
 // check read nothing there (`nothing`, the scripts read-nothing.mjs names, by their path in the core, scripts/shape.mjs;
 // #459, point 3). A check the core's list names that a project may not have set up (a ruleset of the host's) counts as
-// the list names it: the count is the core's map less what read nothing, as AGENTS.md's "The share a check holds is
-// reported" says.
+// the list names it: the count is the core's map less what read nothing, as core-changes/holders.md's "The share a check
+// holds is reported" says.
 export function heldThere(root, nothing, out = new Set()) {
   const h = holders(root), gone = new Set(nothing);
   const taken = h.rules.filter(r => r.file.startsWith("floor/") || !out.has(path.posix.basename(r.file)));

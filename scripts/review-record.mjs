@@ -1,4 +1,4 @@
-// What the reviews find, beside what the core costs (AGENTS.md of the core, "The core is measured as a feature is"):
+// What the reviews find, beside what the core costs (core-changes/releases.md of the core, "The core is measured as a feature is"):
 // run in a project's clone, it reads the pull requests merged into the default branch as core-cost.mjs does (sync,
 // upkeep, update, own) and, from GitHub (gh, page by page), every comment on the repository's issues and pull requests
 // and the issues labelled `bug`, and counts for each kind of pull request, in five reviews, which got the review, in how
@@ -40,6 +40,7 @@ import { broughtBy, perPull, reviewEvents, ruleOf, rulesNamed } from "./review-c
 import { checksLines, checksRead, runsReader } from "./review-checks.mjs";
 import { roundsLines, roundsOf, wanted } from "./review-rounds.mjs";
 import { started } from "./started.mjs";
+import { HERE, realFiles, regular } from "./reading.mjs";
 import { ROOT, rules, rulesOf } from "./rules.mjs";
 import { pages } from "./stand-in-record.mjs";
 
@@ -66,12 +67,14 @@ export function foundTwice(pulls, since = null) {
 }
 
 // The rules that stand, keyed as ruleOf keys a finding's line: those of the floor, the roles and the modules of the core
-// at `core` (rules.mjs), and those of the AGENTS.md and SECURITY.md at the root of the project at `project`, its own;
-// null where they cannot be read.
+// at `core` (rules.mjs), and those of the AGENTS.md and SECURITY.md at the root of the project at `project`, its own,
+// with, in the core's own repository, the files of core-changes/ beside its AGENTS.md (#1202), read as rules.mjs reads
+// them; null where they cannot be read.
 export function standing(core = ROOT, project = process.cwd()) {
   try {
     const own = ["AGENTS.md", "SECURITY.md"].filter(f => fs.existsSync(path.join(project, f)))
-      .flatMap(f => rulesOf(f, fs.readFileSync(path.join(project, f), "utf8")));
+      .flatMap(f => rulesOf(f, fs.readFileSync(path.join(project, f), "utf8")))
+      .concat(realFiles(project, HERE, new Set()).flatMap(f => rulesOf(`${HERE}/${f}`, regular(project, `${HERE}/${f}`) ?? "")));
     return new Set([...rules(core), ...own].map(r => ruleOf(r.key)));
   } catch { return null; }
 }

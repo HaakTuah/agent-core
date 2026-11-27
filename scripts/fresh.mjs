@@ -1,4 +1,4 @@
-// A project beside a fresh start (AGENTS.md, "Nothing locks a project"; core archive 215): what the starter kit of the
+// A project beside a fresh start (core-changes/projects.md, "Nothing locks a project"; core archive 215): what the starter kit of the
 // copy this file lies in would write for a new project of the same kind today, against what the project holds, so
 // that an earlier sync taken in part, or a row filled poorly, shows where no step's check reads it (steps.mjs, beside
 // this file). It lists each difference: a file the kit writes that the project lacks (the configs beside its templates

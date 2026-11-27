@@ -7,7 +7,7 @@
 // measures (measuredCode, its own lister); and the licence check (licences.mjs), where packages stand in a package.json
 // with no lock file, a yarn.lock or a pnpm-lock.yaml, which it does not read (#1351). Each comes with the rules it holds, as scripts/holders/ says (one fact,
 // one place), so that a report can say those rules are held by nothing there: a check that passes on nothing makes its
-// rule look held. A check that holds no rule of the modules the project takes is not named. It fails nothing (AGENTS.md
+// rule look held. A check that holds no rule of the modules the project takes is not named. It fails nothing (core-changes/projects.md
 // of the core, "Nothing locks a project"); the sync's report (steps.mjs) and a project's state report
 // (state-report.mjs) say it. Reads only; Node's own modules and git, through shape.mjs.
 import { copyOf } from "./core-path.mjs";

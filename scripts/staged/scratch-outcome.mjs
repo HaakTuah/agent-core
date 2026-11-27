@@ -1,4 +1,4 @@
-// The readers a staged case's verdict uses (scratch.mjs, the entrance beside this file; AGENTS.md, "Staged cases hold what
+// The readers a staged case's verdict uses (scratch.mjs, the entrance beside this file; core-changes/holders.md, "Staged cases hold what
 // no check reads"; #938): what the session pushed, what it left in the project and what it wrote to GitHub, read through
 // the sealed reader (scratch-reader.mjs) and never from what the session says of itself. A security reading takes this
 // file with the reader's: it runs the session's program in the bare environment (testPasses, printed), writes its files

@@ -9,10 +9,11 @@
 // `trigger: always_on`). A line inside a fenced block or an HTML comment pulls in nothing. A tool that reads AGENTS.md
 // alone (Codex) has no entry file, and an entry file the project does not hold is not looked for.
 //
-// Nothing locks a project (AGENTS.md of the core): with ENTRY_BASE set to the pull request's base (as the copies
-// workflow sets it), what the base already lacked is noted and fails nothing, so only what the pull request itself
-// leaves out fails; with no base, as on a push to main, everything is noted and nothing fails, so what a pull request
-// was let through with never turns main red. In the core's own repository (`--core`) everything fails. Git and Node's own modules only.
+// Nothing locks a project (core-changes/projects.md of the core): with ENTRY_BASE set to the pull request's base (as
+// the copies workflow sets it), what the base already lacked is noted and fails nothing, so only what the pull request
+// itself leaves out fails; with no base, as on a push to main, everything is noted and nothing fails, so what a pull
+// request was let through with never turns main red. In the core's own repository (`--core`) everything fails. Git and
+// Node's own modules only.
 //
 //   node core/scripts/entry-files.mjs           from a project's root, as the copies workflow runs it
 //   node scripts/entry-files.mjs --core         in the core's own repository

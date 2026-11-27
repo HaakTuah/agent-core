@@ -4,7 +4,7 @@
 // next heading of its level or above, that name an item. Of a pull request, with the file's text on its base and its
 // head, it fails:
 //   - a milestone's heading on the head that names no item, or has no line under it, unless the base already held that
-//     fault (what stood before never turns the check red: AGENTS.md, "Nothing locks a project");
+//     fault (what stood before never turns the check red: core-changes/projects.md, "Nothing locks a project");
 //   - a heading the pull request adds that names an issue that is closed;
 //   - a milestone's issue the pull request closes ("Fixes #n") whose heading it leaves, or does not name under "What the
 //     owner can try";

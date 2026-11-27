@@ -33,7 +33,7 @@
 // none (`thenOf`); a breach left where another's entry is listed can leave one without, and fails until --write. A baseline names the readers
 // whose finds it lists ("reads"): what a reader it does not name finds is said, never failed, where the base held it
 // already or no base is told, until --write lists it, so that a sync that brings a reader turns nothing red
-// (AGENTS.md, "Nothing locks a project"). It never guesses:
+// (core-changes/projects.md, "Nothing locks a project"). It never guesses:
 // an import that leads nowhere it can tell and a file whose JSX its reader cannot follow to its end are counted and
 // said, never failed. Once the config names a system, a file of code the pull request adds that lies in none fails
 // too, read against the base's files.
@@ -60,7 +60,7 @@
 //                                                     written one yet is held to the starter kit's own, with the
 //                                                     pull request's base as its baseline: from the sync that
 //                                                     brings the check nothing gets worse, and nothing that stood
-//                                                     fails (AGENTS.md, "Nothing locks a project")
+//                                                     fails (core-changes/projects.md, "Nothing locks a project")
 //   node core/scripts/shape.mjs <config> --first      write the first baseline, what stands when a project takes the
 //                                                     check; only where no baseline exists yet
 //   node core/scripts/shape.mjs <config> --write      lower the baseline to what still stands; it adds only what
@@ -170,7 +170,7 @@ function readTogether(systems, at) {
 }
 
 // Where ajv is not installed the config's shape went unchecked, as readShape says: said as a warning, and the check
-// goes on (the core's AGENTS.md, "Nothing locks a project").
+// goes on (the core's core-changes/projects.md, "Nothing locks a project").
 function unchecked() {
   if (!installed("ajv")) console.log(didNotRun("The config's shape was not checked", "ajv"));
 }
@@ -715,7 +715,7 @@ function fresh({ config, at, self, found, current, base, news, unread }) {
   // (a file the readers cannot follow that the base held, its text as the base holds it, or any where no base is told,
   // is said, never failed: a reader that comes to take less, a file past a smaller size or one a newer grammar reads
   // otherwise, turns nothing that stood red, and only one a pull request adds or changes fails: tasks/code-shape.md,
-  // "What the check reads"; AGENTS.md, "Nothing locks a project". Its text is compared, since whether a file is lost can
+  // "What the check reads"; core-changes/projects.md, "Nothing locks a project". Its text is compared, since whether a file is lost can
   // hang on the parser's time: a base read past its budget on one run excuses nothing a change brings to the file)
   const lost = id => groupOf(id).kind === "lost" && !unread(id);
   const unchanged = id => base.standing().texts[fileOf(id)] === found.texts[fileOf(id)];

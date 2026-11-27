@@ -178,7 +178,7 @@ jobs:
           from_host files.json "list of files" --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100"
           # whether the pull request is held by what a script of the check reads more: not where it leaves the script
           # alone, its head holds it as it stood before this branch's, and the host says it was opened before the
-          # script first came to the default branch (it stood before the check came, and is told, never waited for: AGENTS.md,
+          # script first came to the default branch (it stood before the check came, and is told, never waited for: core-changes/projects.md,
           # "Nothing locks a project"; the script decides that last from came, below); always where it changes the
           # script itself, where its list of files is cut short, or where the head's copy cannot be read for any reason
           # but its absence, or not by the step's 240th second, ten seconds at most (#632)

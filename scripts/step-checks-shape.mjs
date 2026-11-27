@@ -35,7 +35,7 @@ const readersNamed = (held, readers) => {
   return missing.length ? `The shape check's baseline \`${held.config.baseline}\` was written before the check read ${missing.join(", ")}: run \`node core/scripts/shape.mjs ${held.at} --write\`, which lists what stands there and names every reader, and commit the baseline in a pull request of its own. Until then what the pull request's base held there is reported, never failed.` : null;
 };
 
-// Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
+// Whether the shape check's own list is written (core-changes/projects.md, "Nothing locks a project": no old breach goes unlisted):
 // its config, where the manifest names it or the starter kit writes it, read as the check reads it, and the baseline
 // that config names, which names every reader of the check's but those a later entry asks for ("reads";
 // shape-readers.mjs), so that it lists what each finds. Null where all of it stands; else the mend.

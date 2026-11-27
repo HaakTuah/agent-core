@@ -104,9 +104,9 @@ import { scratchDir } from "../scripts/scratch-core.mjs";
 
 
 
-// A fetch the scan has come to read, standing unaudited at the pull request's base, is reported and passes (AGENTS.md,
-// "Nothing locks a project"; #1074); one the pull request adds or changes, on its line or one it runs on to, or whose
-// entry it takes out, fails, saying the mend, and so does any with no base to read.
+// A fetch the scan has come to read, unaudited at the pull request's base, is reported and passes ("Nothing locks a
+// project", core-changes/projects.md; #1074); one the PR adds or changes, on its line or one it runs on to,
+// or whose entry it takes out, fails, saying the mend, and so does any with no base to read.
 {
   const dir = scratchDir("licence-fetch-base-");
   const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };

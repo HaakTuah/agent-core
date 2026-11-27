@@ -247,7 +247,7 @@ export const oneJob = (text, o) => `${text.replace(/^ {2}pull_request:(\r?\n)/m,
 // A private repository's pull-request checks start only once a pull request is ready (#375): each of these calls also
 // triggers when one is marked ready, and its job is skipped on a draft, so a push to a draft bills no job and marking
 // it ready runs each once. The trigger and the condition stand together in the project's own file, so a project that
-// keeps its calls as they were runs every check as before (AGENTS.md, "Nothing locks a project").
+// keeps its calls as they were runs every check as before (core-changes/projects.md, "Nothing locks a project").
 export const READY_ONLY = ["core.yml", "personal-terms.yml"].map(f => `.github/workflows/${f}`);
 export const READY = "${{ !github.event.pull_request.draft }}";
 export const readyOnly = text => text

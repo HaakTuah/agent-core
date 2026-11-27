@@ -8,7 +8,7 @@
 //
 // Each reader has a name, which a baseline lists under "reads" once it lists what that reader finds: a baseline written
 // before a reader came lists none of it, and what the pull request's base held of it is reported, never failed, until
-// --write lists it (AGENTS.md, "Nothing locks a project").
+// --write lists it (core-changes/projects.md, "Nothing locks a project").
 import path from "node:path";
 import { CODE, globals, imports, isModule, isP, jsxIn, lyingUnder, nameTree, tokens } from "./code-shape.mjs";
 import { javascriptFunctions } from "./javascript-functions.mjs";

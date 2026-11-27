@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The two maintained tools the workflow check (scripts/workflows.mjs) runs, fetched at set-up as their own programs
-# (AGENTS.md, "A tool that only runs is fetched at set-up, as its own program"; #580): zizmor, from PyPI by the version
+# (core-changes/parts.md, "A tool that only runs is fetched at set-up, as its own program"; #580): zizmor, from PyPI by the version
 # and the SHA-256 of each of its wheels that the core's .packages/requirements.txt names, installed by the machine's
 # pip with no dependency and none of its code run; and actionlint, the release its maker publishes on GitHub for the
 # machine's system, the archive and the program in it each checked against the SHA-256 written here (the archive's as

@@ -170,6 +170,13 @@ r = run(root, "reviewer", "--kind", "security-review", "--path", ".github/workfl
 ok(r.status === 0 && /Read for this task:\n  floor\/threat-model\.md +the kind security-review\n  floor\/topics\/accounts\.md +the kind security-review\n/.test(r.out) && /  floor\/topics\/workflows\.md +the kind security-review\n/.test(r.out) && /note no module is read for the kind "nonesuch"/.test(r.out) && /your tool's part: give --tool/.test(r.out), "run with kinds and a path, it prints each file once with why, and notes a kind no module names", r.out);
 r = run(root, "planner");
 ok(r.status === 1 && mended(r.out) && /is no role the core has a file for/.test(r.out) && run(root).status === 1 && mended(run(root).out), "a role with no file, or none given, fails saying the mend", r.out);
+r = run(root, "builder", "--kind", "rule", "--path", "scripts/release-due.mjs");
+ok(r.status === 0 && /  core-changes\/rules\.md +the kind rule\n/.test(r.out) && /  core-changes\/releases\.md +the path scripts\/release-due\.mjs\n/.test(r.out) && /  core-changes\/projects\.md +the path scripts\/release-due\.mjs\n/.test(r.out),
+  "in the core, the files of core-changes/ are called for by the kinds and paths their openings name (#1202)", r.out);
+r = run(root, "builder", "--kind", "audit", "--kind", "bug", "--path", "reports/release-trial.json", "--path", "reports/pruning.json", "--path", "reports/unheld.json");
+ok(r.status === 0 && /  core-changes\/holders\.md +the kind audit\n/.test(r.out) && /  core-changes\/releases\.md +the kind audit\n/.test(r.out) && /  core-changes\/parts\.md +the kind bug\n/.test(r.out)
+  && ["release-trial.json", "pruning.json", "unheld.json"].every(f => run(root, "builder", "--path", `reports/${f}`).out.includes(`  core-changes/${f === "release-trial.json" ? "releases" : "holders"}.md`)),
+  "in the core, the state report and the review of the core, a bug, the trial's record and the pruning's are each called to the files of core-changes/ whose rules bind them (#1202)", r.out);
 ok(run(root, "--kinds").status === 0 && /^screen +tasks\/game-design\.md, tasks\/screens\.md$/m.test(run(root, "--kinds").out) && /^workflow +tasks\/tests\.md, floor\/topics\/workflows\.md$/m.test(run(root, "--kinds").out), "--kinds lists each kind with its files");
 
 // a scratch project that holds the core's copy
@@ -177,7 +184,7 @@ const tmp = scratchDir("reading-test-"), project = path.join(tmp, "project");
 const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
 const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
 const git = (...args) => execFileSync("git", args, { cwd: project, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-for (const part of ["floor", "tasks", "roles", "scripts", ".packages"]) fs.cpSync(path.join(root, part), path.join(project, "core", part), { recursive: true });
+for (const part of ["floor", "tasks", "roles", "scripts", ".packages", "core-changes"]) fs.cpSync(path.join(root, part), path.join(project, "core", part), { recursive: true });
 fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\nFloor: whole. Modules: `screens.md`, `updates.md`, `choices.md`, `helpers.md`, `reviews.md`, `tools.md`.\nNot taken: `game-design.md` (no game).\n");
 fs.mkdirSync(path.join(project, "checks"));
 fs.writeFileSync(path.join(project, "checks", "reading.json"), `${JSON.stringify({ paths: { "src/screens/": "screen" } })}\n`);
@@ -189,6 +196,8 @@ ok(coreAt(project) === "core/" && /^  core\/floor\/security\.md\n  core\/roles\/
 ok(/core\/tasks\/screens\.md/.test(at("builder", "--kind", "polish").out) && !/game-design/.test(at("builder", "--kind", "polish").out) && !/game-design/.test(at("--kinds").out), "a module the project's manifest leaves out is named for no kind", at("builder", "--kind", "polish").out);
 r = at("builder", "--issue", "inbox/idea.md");
 ok(r.status === 0 && /  core\/tasks\/helpers\.md +the issue names it\n/.test(r.out) && /  core\/tasks\/choices\.md +the kind choice, which the issue names\n/.test(r.out) && /note the issue names "whatever" under "What to read", which is no kind or file of the core/.test(r.out) && !/^  .*constructor/m.test(r.out), "an item of the inbox's folder is read as the issue: the kinds and files it names, a word that is neither noted, and a name every object carries no file", r.out);
+r = at("builder", "--kind", "rule", "--kind", "trial", "--path", "scripts/release-due.mjs", "--path", "archive/x.md");
+ok(r.status === 0 && !/core-changes/.test(r.out) && !/core-changes/.test(at("--kinds").out), "in a project, its copy's core-changes/ is called for by no kind or path: the core's own rules, never a project's (#1202)", r.out);
 r = at("builder", "--issue", "41");
 ok(r.status === 0 && /note the issue 41 could not be read: give its kinds with --kind/.test(r.out) && /core\/roles\/builder\.md/.test(r.out), "an issue that cannot be read is noted, and the start still printed", r.out);
 fs.mkdirSync(path.join(project, "src", "screens"), { recursive: true }); fs.mkdirSync(path.join(project, ".github", "workflows"), { recursive: true });

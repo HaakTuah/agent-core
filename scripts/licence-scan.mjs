@@ -161,7 +161,7 @@ function fetches(c, text, f, literal = false) {
 
 // The fetches `found` in the file `f` that the scan cannot read and no entry audits (byKind), each its line with those
 // that run on to it or it runs on to, fail, but where each stood word for word at the pull request's base, unaudited by the base's own
-// audit, which are reported (AGENTS.md, "Nothing locks a project": a reader that reads more turns no file red that
+// audit, which are reported (core-changes/projects.md, "Nothing locks a project": a reader that reads more turns no file red that
 // stood; #1074); with no base, as in a run by hand, they fail. A fetch changed, or added, fails: the base allows what
 // it held, not as many others. A source held in a variable set on another line is not read, as `heldAtBase` reads none.
 function unaudited(c, f, all) {
@@ -217,7 +217,7 @@ function pinnedIfRead(c, f, text) {
 
 /** A program the file `f` downloads by its address is pinned by version and checksum (floor rule 7, as the core pins
  *  Node): where it is not, a pull request that adds the download, or that makes the file lose its pin, fails; a file the
- *  base held unpinned with no download fewer is reported, as is every one with no base (AGENTS.md, "Nothing locks a
+ *  base held unpinned with no download fewer is reported, as is every one with no base (core-changes/projects.md, "Nothing locks a
  *  project"). Read from the scan's own readers of fetches: what a package manager fetches by name is not read here. */
 // A file of the base, as text, or null where the base held none.
 /** Whether `file` is a file (not a folder) at commit `rev` of the repository at `root`. */

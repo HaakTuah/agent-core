@@ -55,7 +55,7 @@
 // check came, it says the second is missing and never waits for it, and so it
 // says of a review posted before Codex's running one began, or before its summary last changed where it marks a finding
 // open, and of one that names no commit the head stands on, and it counts a review edited since it was posted, from
-// an account it counts (AGENTS.md, "Nothing locks a project"); brought up to date with main, it is held. What it
+// an account it counts (core-changes/projects.md, "Nothing locks a project"); brought up to date with main, it is held. What it
 // does not hold: what a posted review says, whether a finding is blocking, who posted each of two reviews (one login
 // may post both), that comment-only.mjs's printout is true (its code reviewer runs it again), and, given no list of the
 // merges proved (a workflow older than this script), that a merge from main brought no change of its own; those stay
@@ -200,7 +200,7 @@ export function postedBy(pull, list, bound, reviewers, rights) {
   const whose = counted(pull, reviewers, writersOf(rights));
   const writers = list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association));
   // (a review counts only from an account counted, on every pull request; of one whose head does not hold this check
-  // as the default branch does, which stood before it came, an edited one counts too: AGENTS.md, "Nothing locks a
+  // as the default branch does, which stood before it came, an edited one counts too: core-changes/projects.md, "Nothing locks a
   // project")
   const theirs = writers.filter((comment) => whose(comment.user));
   const all = bound ? theirs.filter(asPosted) : theirs;

@@ -1,6 +1,7 @@
-// The draft in a release's trial (#1334; AGENTS.md, "A release's trial opens its update as a draft in the owner's own
-// projects"): what the host's checks said of the draft pull request holding a project's sync, pinned to the commit
-// tried, beside what they said of main's newest commit, for the trial's record (release-trial.mjs). gh and Node alone.
+// The draft in a release's trial (#1334; core-changes/releases.md, "A release's trial opens its update as a draft in
+// the owner's own projects"): what the host's checks said of the draft pull request holding a project's sync, pinned to
+// the commit tried, beside what they said of main's newest commit, for the trial's record (release-trial.mjs). gh and
+// Node alone.
 //
 //   node scripts/trial-draft.mjs <owner>/<name> <the draft's number> <the commit tried> [--gate <a check's name>]...
 //         prints, last, `draft answer: ` and the counts release.mjs --trial takes with --draft, with a short hash of the

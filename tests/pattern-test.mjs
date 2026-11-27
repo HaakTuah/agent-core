@@ -1,4 +1,4 @@
-// Tests the marks check (scripts/pattern.mjs; AGENTS.md, "A rule is written to one pattern"; #1137): a rule a change
+// Tests the marks check (scripts/pattern.mjs; core-changes/rules.md, "A rule is written to one pattern"; #1137): a rule a change
 // adds fails for each mark it lacks, with its mend, and passes with all of them; a rule worded anew is reported and
 // fails nothing; one whose own text is unchanged, one moved to another file and one marked "describes" alone are not
 // read; a rule's own text leaves out the rules nested in it. Then the check itself, called beneath the process, on this

@@ -10,7 +10,7 @@ heading names, so that two pull requests that add a part never edit the same lin
 to stand between its neighbours (`NNN-<name>.md`), and `node scripts/inventory.mjs` reads the inventory whole.
 
 It decides nothing by itself. A **replace** or a **try** becomes a line of `QUEUE.md` only on the owner's word, and is
-built as `AGENTS.md`, "A part of the core gives way to what is maintained", says: its comparison, old against new, in a
+built as `core-changes/parts.md`, "A part of the core gives way to what is maintained", says: its comparison, old against new, in a
 pull request of its own, in that rule's order.
 
 Weighed whole: 2026-11-17
@@ -21,7 +21,7 @@ Challenged whole: 2026-11-17, by a session that wrote no part of it ("The challe
 path ending in `/`, and a script's line its test (`tests/<its name>-test.mjs`) too. Every file git tracks is claimed by
 a line, or lies under a path "What the inventory leaves out" names with the reason, as its check reads (#593, point 2).
 *Runs:* where it must run: in a session's hook, in any session, on the host's runners, on the owner's own computer;
-where a check that may decide a pull request runs is `AGENTS.md`'s "A tool that only runs is fetched at set-up, as its
+where a check that may decide a pull request runs is `core-changes/parts.md`'s "A tool that only runs is fetched at set-up, as its
 own program". *Else:* what else does the job, found on the web and in the registries on 17 November 2026, each kept or
 dropped in a few words, a drop marked as a fact, as a measure, or as an assumption to measure (`tasks/choices.md`, "a
 drop says whether it rests on a fact"). A verdict or a candidate the challenge changed was agreed by the owner on 18
@@ -33,7 +33,7 @@ tool replays the part's past bugs"; #593, point 7); the trials of 17 November be
 none. Then the verdict: **replace** where a maintained tool does the job at the same level or better, the comparison to
 be shown when it is made; **try** where only a trial can tell; **keep**, with the exception of #486, point 6, it rests
 on: small and stable, nothing fits, fitting costs more than keeping, or it brings too much. A part that gives way keeps
-what `AGENTS.md`, "A part of the core gives way to what is maintained", keeps the core's own.
+what `core-changes/parts.md`, "A part of the core gives way to what is maintained", keeps the core's own.
 
 **Trials of 17 November 2026,** each in a scratch folder outside the repository, at one exact version, with install
 scripts off, nothing committed, as the owner allowed for #486's trial on 16 November:
@@ -81,8 +81,8 @@ Its parts stand in `inventory/lacks/`, a file each, read in the order of their n
 
 What is no part of the core, each with why; every other tracked file is claimed by a line above (#593, point 2).
 
-- `floor/`, `roles/`, `tasks/`, `tools/`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `SECURITY.md`, `.agents/rules/core.md`,
-  `.kiro/steering/core.md`: the rule text, and the entry files that pull it into each tool, read as content; weighed as
+- `floor/`, `roles/`, `tasks/`, `tools/`, `core-changes/`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `SECURITY.md`,
+  `.agents/rules/core.md`, `.kiro/steering/core.md`: the rule text, and the entry files that pull it into each tool, read as content; weighed as
   one mechanism above, "The rule text", whose form is #534's.
 - `modules/`: the pointers left at the rules' old paths, each naming where its file now stands, until the second release
   after 16 November 2026 (`README.md`).
@@ -143,7 +143,7 @@ Each now stands on its part's line above and in the order below:
 3. promptfoo joins the trial of a harness under the staged cases, beside Inspect AI and Harbor.
 4. The trial of the skill format (#534, point 8) weighs each tool's own rule files for paths too, and uses
    `claude plugin eval` for Claude Code's part.
-5. The fetcher of the tools that only run (`scripts/node.sh`, as `AGENTS.md`'s "A tool that only runs is fetched at
+5. The fetcher of the tools that only run (`scripts/node.sh`, as `core-changes/parts.md`'s "A tool that only runs is fetched at
    set-up, as its own program" widens it): **try** a registry's own lock file first, for each tool a registry carries
    (#654), and aqua or mise only for what no registry carries, mise through only its backends that check a download
    against its digest (aqua, github and http), never asdf's or vfox's (floor rule 15).

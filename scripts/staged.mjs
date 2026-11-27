@@ -1,4 +1,4 @@
-// The staged cases (AGENTS.md, "Staged cases hold what no check reads"; #235): each sets up a scratch project
+// The staged cases (core-changes/holders.md, "Staged cases hold what no check reads"; #235): each sets up a scratch project
 // (staged/scratch.mjs, beside this file) and gives a fresh session a task in which one rule is easy to break; it
 // passes or fails on what the session did, read from the scratch project by the case's own script, never on what the
 // session says of itself. The cases are the files of staged/ that CASES lists, each naming the rules it holds. Their
@@ -110,7 +110,7 @@ export function readRecord(root = ROOT) {
 }
 // (the record's own "about" is written anew from ABOUT, so it says what the record holds as this script writes it)
 const writeRecord = ({ about, ...record }, root = ROOT) => fs.writeFileSync(path.join(root, RECORD), `${JSON.stringify({ about: ABOUT, ...record }, null, 2)}\n`);
-const ABOUT = "The staged cases' runs (scripts/staged.mjs; AGENTS.md, \"Staged cases hold what no check reads\"): each run's day, the core's commit, the tool and model the fresh session ran on, the way it was started through where one is named (tasks/ways.md), and each case's verdict, with a fingerprint of each rule it holds as the rule stood then. Written by `node scripts/staged.mjs --read <case> <dir> --record`, and `--wrong`; committed in a pull request of its own.";
+const ABOUT = "The staged cases' runs (scripts/staged.mjs; core-changes/holders.md, \"Staged cases hold what no check reads\"): each run's day, the core's commit, the tool and model the fresh session ran on, the way it was started through where one is named (tasks/ways.md), and each case's verdict, with a fingerprint of each rule it holds as the rule stood then. Written by `node scripts/staged.mjs --read <case> <dir> --record`, and `--wrong`; committed in a pull request of its own.";
 
 // Each case's newest verdict: { name: { at, ...entry } }, by the time each verdict was recorded (`recorded`), or its
 // run's day where it has none.
@@ -295,7 +295,7 @@ export function dueIssue({ manifest, at }) {
   return {
     title: TITLE,
     body: [
-      `The staged cases due (\`node scripts/staged.mjs\`; AGENTS.md, "Staged cases hold what no check reads"), each a task a session takes alone. They advise: ${forRelease(readRecord()).said}`,
+      `The staged cases due (\`node scripts/staged.mjs\`; core-changes/holders.md, "Staged cases hold what no check reads"), each a task a session takes alone. They advise: ${forRelease(readRecord()).said}`,
       "",
       ...list.map(d => `- ${d.name}${d.tool ? ` in ${d.tool}` : ""}: ${d.why}.`),
       "",

@@ -63,13 +63,13 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      # (Betterleaks, which matches the terms, fetched before any term is read, as its own program (AGENTS.md, "A tool
-      # that only runs is fetched at set-up"; #579): one exact version, the release archive for the machine's system
-      # from Betterleaks' own releases, the archive and the program in it each checked against the SHA-256 written here
-      # (the archive's as its checksums.txt publishes it), kept under the system's temporary folder, outside the
-      # repository, and checked again by the step after before it runs. Only where the terms are set; where it cannot be
-      # fetched, this step says why and the step after fails, never passing unread. A new pin moves the version and
-      # every sum at once)
+      # (Betterleaks, which matches the terms, fetched before any term is read, as its own program
+      # (core-changes/parts.md, "A tool that only runs is fetched at set-up"; #579): one exact version, the release
+      # archive for the machine's system from Betterleaks' own releases, the archive and the program in it each checked
+      # against the SHA-256 written here (the archive's as its checksums.txt publishes it), kept under the system's
+      # temporary folder, outside the repository, and checked again by the step after before it runs. Only where the
+      # terms are set; where it cannot be fetched, this step says why and the step after fails, never passing unread. A
+      # new pin moves the version and every sum at once)
       - name: Fetch Betterleaks
         id: betterleaks
         env:

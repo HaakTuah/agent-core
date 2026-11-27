@@ -14,7 +14,7 @@
 // another kind holds (a feed of NuGet's older form) is left to the check after the restore, and said so; a tool, which
 // no restore brings, fails there. A tool's file has no content hash to hold it to: it is the one the registry, or the
 // first source that holds it, gives. What is wrong with a tool the pull request's base already held at that version,
-// never read before this release, is reported and passes (the core's AGENTS.md, "Nothing locks a
+// never read before this release, is reported and passes (the core's core-changes/projects.md, "Nothing locks a
 // project"). Node's own modules only; the network for the registry and the sources named, eight files at a time. It
 // writes only into the folder it is given.
 //

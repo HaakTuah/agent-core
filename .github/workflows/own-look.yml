@@ -68,7 +68,7 @@ jobs:
           CORE_AT: "" # (the mend it prints names scripts/ here, the core's own)
         run: node scripts/issue-terms.mjs
 
-  # The daily try (scripts/daily-try.mjs; AGENTS.md, "The owner's own projects try the core each day"; #1413, point 5):
+  # The daily try (scripts/daily-try.mjs; core-changes/releases.md, "The owner's own projects try the core each day"; #1413, point 5):
   # main's newest commit whose checks all passed, tried on each of the owner's own projects as a release's trial does,
   # read-only. The repository is public, so the jobs are billed nothing and their logs are public: the script prints
   # counts alone and masks each project's name first, and each project is known by its runner's number. Nothing is

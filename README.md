@@ -58,24 +58,24 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   164, 169, 171, 179, 181, 182, 187, 191, 201 and 234), checked on every PR here, so a new rule there replaces text
   rather than adding to it (core archive 134); a file read only when a task calls for it is held by the reviews'
   "content put where its readers must read past it" (`roles/shared/review-guidelines.md`). What a cap decides, and when one
-  may rise: `AGENTS.md`, "The size caps keep the rules lean and decide nothing else".
+  may rise: `core-changes/rules.md`, "The size caps keep the rules lean and decide nothing else".
 - **What holds each rule:** a check that fails where it is broken, a staged case, or the scheduled audit
   (`scripts/holders/`, an entry for each rule, which names too the archive's items behind it); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
   A project's own rules are read the same way, against its list `checks/holders.json`, and those with none listed in
-  its own monthly state report, failing nothing (`node core/scripts/holders.mjs --own`; `AGENTS.md`, "A project's own
+  its own monthly state report, failing nothing (`node core/scripts/holders.mjs --own`; `core-changes/holders.md`'s "A project's own
   rules name what holds them"), where the session that takes that report also answers whom each rule is about, in the
   list's "about", and files those about a kind or every project here. A check of the core's that read no file, or no package, of a
-  project's says so in the sync's report (`scripts/read-nothing.mjs`; `AGENTS.md`, "A check that read nothing says
+  project's says so in the sync's report (`scripts/read-nothing.mjs`; `core-changes/projects.md`, "A check that read nothing says
   so"), and a project's state report gives how many of its own rules, and of the core's it takes, a check holds there
-  (`AGENTS.md`, "The share a check holds is reported").
+  (`core-changes/holders.md`, "The share a check holds is reported").
   A staged case (`scripts/staged/`, run by `scripts/staged.mjs`) gives a fresh session, in a scratch project, a task
   in which one rule is easy to break, and reads what the session did. The cases run in the core alone, once a month and
-  when a rule they hold changes; their record is `reports/staged-cases.json` (`AGENTS.md`, "Staged cases hold what no
+  when a rule they hold changes; their record is `reports/staged-cases.json` (`core-changes/holders.md`, "Staged cases hold what no
   check reads").
 - **The number each rule names, and the pruning:** each rule names the count it is meant to lower and the outcome it
   stands for (`scripts/holders/`, the entry's "number"); every second month, and with a newer generation of model,
   `scripts/pruning.mjs` lists the rules whose number did not move, whose check never fired or whose staged case passed
-  without them, for the owner to decide which go; its record is `reports/pruning.json` (`AGENTS.md`, "Rules are pruned
+  without them, for the owner to decide which go; its record is `reports/pruning.json` (`core-changes/holders.md`, "Rules are pruned
   by their numbers").
 
 ## How a project takes the core
@@ -98,7 +98,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    that needs the parser installs it itself in a copy, as above; in the core it says so, with its mend. Its
    devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`, which, once the copy
    is written, writes what the core owns by the one process a new project's starter kit uses too (`scripts/converge.mjs`;
-   `AGENTS.md`, "One process takes the core in"). A pure sync (only the copy, its pins and what that process writes or takes out, as
+   `core-changes/projects.md`, "One process takes the core in"). A pure sync (only the copy, its pins and what that process writes or takes out, as
    `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
@@ -115,7 +115,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    owner's part)"), what the project holds twice or against the core (`scripts/twice.mjs`), the line `Read for it:`
    (`scripts/reading.mjs`) and, last, one line that says whether the project then holds the core whole and wired,
    `attached: yes` or `attached: no` with how many things stand in the way (`scripts/attached.mjs`, which lists each with
-   its mend when a session runs it), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
+   its mend when a session runs it), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`core-changes/projects.md`'s "A
    release says what it asks, step by step"). The core's
    `core.yml`, which the project calls on every PR as a required check, fails one whose `core/` differs from the core at
    its pin, entry by entry by git's object ids and types, as `pure-sync.mjs` compares too: a file's content, a link or a
@@ -126,7 +126,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
    **What a project follows:** the core's `main`, or its releases (core archive 195). A release is a tag `release-N` on
    a commit of `main`, cut on the owner's word by this repository's `release` workflow, only where that commit's checks
-   have passed and its trial on a real project, with the draft of its sync in each of the owner's own projects, found no check it broke (`AGENTS.md`, "A release is cut on the owner's word"; `scripts/release.mjs`). A project whose *owner's
+   have passed and its trial on a real project, with the draft of its sync in each of the owner's own projects, found no check it broke (`core-changes/releases.md`'s "A release is cut on the owner's word"; `scripts/release.mjs`). A project whose *owner's
    account* is not the account the core is under follows the releases, unless its manifest's *follows* row says `main`;
    the projects of the core's own owner follow `main`, unless theirs says `releases` (`scripts/releases.mjs`). Following
    `main`, the sync script and the core-moved check take its newest commit whose checks all passed, never one ahead of
@@ -297,7 +297,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    - **Only a sync PR moves those pins,** and only when the called workflow changed; `core.yml` fails a call pinned
      where it differs from the core's pin.
    - **A sync changes nothing of the project's own,** and the core tested its scripts before the sync brings them, on a
-     project of each of the last two releases synced to the change (`AGENTS.md`, "Nothing locks a
+     project of each of the last two releases synced to the change (`core-changes/projects.md`, "Nothing locks a
      project"): so the project's own suites run on one only for what they take from the copy (all of them where they run
      on its Node version and `core/.node-version` changed; those that read its scripts for a change under
      `core/scripts/` or `core/.packages/package-lock.json`, whose packages those scripts run), never for the rest of the
@@ -499,7 +499,7 @@ check a project runs that the list leaves out.
 
 Where projects differ only in a name, a path or an example, the core leaves a **slot**, in italics (*progress file*),
 and a manifest's row says what fills it. A task is a project's unit of work; the main lane is its queue.
-Each slot carries the mark the core's `AGENTS.md` asks ("What can be read is never asked or declared"), in the third
+Each slot carries the mark the core's `core-changes/rules.md` asks ("What can be read is never asked or declared"), in the third
 column; a row overrides what was read and the default alike, and a slot with no row takes them, so no row is asked
 for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit still writes its rows.
 
@@ -592,7 +592,7 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   script again, and says what is left; the value of `PERSONAL_TERMS` the owner types on its page alone, never into the
   session (floor rule 11). It is asked at a project's first taking of the core, where the starter kit and the sync's
   first copy print it, and again only where a sync brings a setting the old copy's list did not hold; nothing waits on
-  it, and nothing fails until a setting is given (`AGENTS.md`, "Nothing locks a project"). Each day the look's job
+  it, and nothing fails until a setting is given (`core-changes/projects.md`, "Nothing locks a project"). Each day the look's job
   reads the same settings with its own token where GitHub lets it, and keeps one issue, "Settings only the owner gives",
   labelled `needs-owner`, of each it read as not given, with its link, and of each write GitHub refused it (#1092).
 - An adviser (`roles/adviser.md`): its session started with every repository of the owner's it is to advise on, so it

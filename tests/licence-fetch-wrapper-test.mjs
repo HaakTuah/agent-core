@@ -137,7 +137,7 @@ for (const [what, change] of [
 }
 
 // A clone through such a function that stood at the pull request's base is reported and passes, so a project's own
-// that the scan comes to read turns no pull request red (AGENTS.md, "Nothing locks a project"; #1074); one the pull
+// that the scan comes to read turns no pull request red (core-changes/projects.md, "Nothing locks a project"; #1074); one the pull
 // request adds fails, saying the mend.
 {
   const dir = scratchDir("licence-fetch-wrapper-base-");

@@ -14,7 +14,7 @@ node <the clone>/scripts/init.mjs --owner <the owner's GitHub login>
 
 It never overwrites: of a file it writes that the project already has, it takes the core's part alone, as every sync
 does (`scripts/converge.mjs`), and names each it leaves as the project's; a project that already holds the core is
-taken by the sync, run from the same clone (`AGENTS.md`, "One process takes the core in"). What it wrote
+taken by the sync, run from the same clone (`core-changes/projects.md`, "One process takes the core in"). What it wrote
 is staged and not committed, so the first PR shows it whole. The templates and the copy are both read from the commit
 the clone stands on, never from an edit not yet committed there.
 

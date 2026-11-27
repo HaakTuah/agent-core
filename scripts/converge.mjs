@@ -1,4 +1,4 @@
-// The one process that takes the core into a repository (#1083; AGENTS.md, "One process takes the core in"): run from a
+// The one process that takes the core into a repository (#1083; core-changes/projects.md, "One process takes the core in"): run from a
 // project's root, by the starter kit (init.mjs) and by every sync (sync.mjs), it writes what the core owns, from the
 // kit's templates of the copy it lies in and what the project holds (fresh.mjs, `kind`), so that a new project and one
 // at any earlier copy end in the same state, and run again it changes nothing. The core owns three kinds of file:
@@ -197,7 +197,7 @@ function applied(root, write, remove) {
 
 // core.yml's check: of the paths the pull request changed against `base`, each the core marks (a whole file whose first
 // line is the core's mark, a rule file holding the core's part) must be as this copy writes it. What the pull request
-// did not change is never read, so nothing that stood fails here (AGENTS.md, "Nothing locks a project").
+// did not change is never read, so nothing that stood fails here (core-changes/projects.md, "Nothing locks a project").
 function check(p, base) {
   if (!base) { console.log("the core's files and parts are read on a pull request alone: nothing to read"); return; }
   const changed = execFileSync("git", ["diff", "--name-only", "--no-renames", `${base}...HEAD`], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\n").filter(Boolean);

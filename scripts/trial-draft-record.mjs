@@ -1,6 +1,6 @@
-// The trial's record of the drafts (#1334; AGENTS.md, "A release's trial opens its update as a draft in the owner's own
-// projects"): what release.mjs --trial takes of what trial-draft.mjs printed (beside this file), the record's counts,
-// their form, what they say and why they hold the cut. Node's own modules.
+// The trial's record of the drafts (#1334; core-changes/releases.md, "A release's trial opens its update as a draft in
+// the owner's own projects"): what release.mjs --trial takes of what trial-draft.mjs printed (beside this file), the
+// record's counts, their form, what they say and why they hold the cut. Node's own modules.
 import fs from "node:fs";
 
 export const LINE = "draft answer: ";

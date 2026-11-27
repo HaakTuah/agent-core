@@ -22,7 +22,7 @@
 // A run of these joined only by a comma, "and", "in", "of" or an opening bracket is one pointer: one file, its sections
 // and its points; a floor rule and an archive item stand alone. One of those two that leads nowhere fails the core's
 // own run, and is listed in a project's, so that a sync never fails a project's check over a citation of its own
-// (AGENTS.md of the core, "Nothing locks a project").
+// (core-changes/projects.md of the core, "Nothing locks a project").
 // The files an agent tool takes its instructions from are rule files too, read since #405 (rule-files.mjs, `toolFiles`).
 // Nothing locks a project: with POINTERS_BASE set to the pull request's base (as the copies workflow sets it), a broken
 // pointer in one of those files that the base held, in the same file and the same words, is noted and fails nothing,
@@ -57,7 +57,7 @@ const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 <
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
 // (in a project, the package is installed first where it is not (packages.mjs; #1093, point 1); where it cannot be, the
-// check did not run, said as a warning that fails nothing (AGENTS.md of the core, "Nothing locks a project"; #654, point
+// check did not run, said as a warning that fails nothing (core-changes/projects.md of the core, "Nothing locks a project"; #654, point
 // 4); in the core's own run a package not installed fails, saying the mend: packages.mjs)
 if (!process.argv.includes("--core") && !installed("marked")) {
   console.log(didNotRun("The pointer check did not run", "marked"));

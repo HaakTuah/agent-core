@@ -1,4 +1,4 @@
-// What a pruning reads from the host (split from pruning.mjs, #888; AGENTS.md, "Rules are pruned by their numbers";
+// What a pruning reads from the host (split from pruning.mjs, #888; core-changes/holders.md, "Rules are pruned by their numbers";
 // #303): git, the workflows' steps, the entries of scripts/holders/, and through gh the findings, outcomes, failed steps
 // and citations of the span since the last pruning. pruning.mjs, beside this file, says what each is for and exports the names it exported before the split.
 import { execFileSync } from "node:child_process";

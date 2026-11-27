@@ -50,7 +50,7 @@ out, everything held only in its sessions stopped with them, and a lane handed o
 code and none of what was tried and failed, so the next builder tries it again. Held, in part,
 by `scripts/stalled.mjs`, which the look and the orchestrator run, and which marks a stalled lane with no note.
 
-**Proven by the staged cases, tool by tool** (`AGENTS.md`, "Staged cases hold what no check
+**Proven by the staged cases, tool by tool** (`core-changes/holders.md`, "Staged cases hold what no check
 reads"). A tool works with the core once a session of it has passed every staged case (`node scripts/staged.mjs
 --read <case> <folder> --record --tool <its name>`), and that stands until the next release, at which its cases are
 due again. Until then the core says of the tool only what its documentation says, naming where and the day it was

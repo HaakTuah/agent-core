@@ -1,4 +1,4 @@
-// Tests of the rules with no holder in the pruning's list (pruning-list.mjs; AGENTS.md, "Rules are pruned by their numbers";
+// Tests of the rules with no holder in the pruning's list (pruning-list.mjs; core-changes/holders.md, "Rules are pruned by their numbers";
 // #545, with #887's forms beside each proposal): they lead the list, each with its proposal and the form a check could hold.
 // Split from tests/pruning-test.mjs (#895). Node's own modules only.
 //

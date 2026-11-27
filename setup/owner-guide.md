@@ -44,7 +44,7 @@ each commit, and stops. Delete the branch to let them go on. It stops only that 
 - **A sync at each release.** If your project is not the core owner's, it takes the core only from a release the core's
   owner cut. Your agents then open one pull request that moves the copy forward, merged by hand, and, each in a pull
   request of its own, the few steps the release asks, listed in the sync pull request's description with what each
-  costs (`README.md`, "How a project takes the core"; `AGENTS.md`, "A release says what it asks, step by step"). You may
+  costs (`README.md`, "How a project takes the core"; `core-changes/projects.md`, "A release says what it asks, step by step"). You may
   reorder or slow them. A release that changes nothing your project takes asks no sync, one release at a time.
 - **The checks on every pull request:** that the copy is exact, that no personal term and no licence off the list gets
   in, that the copies and sizes are held, that the description has its headings, and the security and code reviews
@@ -60,7 +60,7 @@ each commit, and stops. Delete the branch to let them go on. It stops only that 
   protected file's reviews hold its inputs.
 
 What a release adds never turns an old breach of your own red: it is listed, and your agents work it down by tasks.
-Nothing it brings stops your project or waits on you (`AGENTS.md`, "Nothing locks a project"). The one exception is the
+Nothing it brings stops your project or waits on you (`core-changes/projects.md`, "Nothing locks a project"). The one exception is the
 check on your list of personal terms: it fails a listed term wherever it stands, an old one and a name your machine's
 git writes into each commit too, and its failure says how a session takes it out in that pull request.
 
