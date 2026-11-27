@@ -132,6 +132,10 @@ const around = {
   // (bash's own joining, after such a line, #1455's ninth review)
   ". continued after a line that ends in an escaped backslash": `echo x\\\\\n. \\\n./lib.sh\n${READ}\n${GET}\n`,
   "grep defined in parts after a line that ends in an escaped backslash": `echo x\\\\\ngr\\\nep() { sh; }\n${READ}\n${GET}\n`,
+  // (a comment that ends in a backslash, which bash does not continue, #1455's tenth review)
+  ". continued after a comment that ends in a backslash": `# note\\\n. \\\n./lib.sh\n${READ}\n${GET}\n`,
+  "grep defined in parts after a comment that ends in a backslash": `# note\\\ngr\\\nep() { sh; }\n${READ}\n${GET}\n`,
+  "hash continued after a comment that ends in a backslash": `# it's\\\nha\\\nsh -p ./tools/grep grep\n${READ}\n${GET}\n`,
 };
 const through = Object.entries(around).filter(([, code]) => programs(code) < 2).map(([what]) => what);
 ok(!through.length, "a read whose variable a shell reads by itself, or that stands other than it reads, is a program's download", through.join(" | "));

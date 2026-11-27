@@ -28,11 +28,10 @@ const use = (name) => new RegExp(`^curl(?:[ \\t]+-[fsSL]+)*(?:[ \\t]+-[fsSL]*o[ 
 // defined anew, as a function or an alias, or found elsewhere: any name that ends in `path` (the search path, set or
 // added to, by the shell or a workflow's `$GITHUB_PATH`), `hash` and `enable` (which point a command's name at another
 // program), a file read in by `.` or `source` (whose functions the file does not show; any word `.` with a word after it, at the cost of a checksum where it is an argument, as `find .` is), and `BASH_ENV` or
-// `$GITHUB_ENV` (which have bash read such a file at its start). It reads the file three times, each with its quotes
-// and backslashes taken out: its lines as they stand; with every backslash at a line's end joining it to the next; and
-// joined as bash joins them, where an odd count of backslashes ends a line. It refuses where any holds such a name: so
-// a name quoted, escaped or continued in part reads as the name, and so does one on a line that only seems continued,
-// or after one. The file is read alone, and as plainly written:
+// `$GITHUB_ENV` (which have bash read such a file at its start). It reads the file with its quotes and backslashes
+// taken out, so a name quoted or escaped in part reads as the name, and refuses any file where a line ends in a
+// backslash, so no name is continued onto a line of its own: at the cost of a checksum in a file with a continued line,
+// or a comment that ends in a backslash. The file is read alone, and as plainly written:
 // what the environment the file runs in defines before it starts (a function exported to it, a search path its runner
 // sets), and a command whose name the file builds as it runs, are trusted to the project's reviews, as by each check of
 // the scan, which reads only the commands a file writes plainly.
@@ -42,14 +41,14 @@ const REACHES_ANY = /\$\{!|<<|(?<![\w-])(?:eval|export|declare|typeset|env|print
  *  form READ, its output held to versions by its grep, once in the file, whose variable's name is none a shell or
  *  program reads by itself (SHELL_OWN), and which is used only on lines of the one form `use`, a download of a
  *  double-quoted address that holds no other expansion (that download, a program's, asked its checksum), each of these
- *  lines standing outside any quote and no continuation of the line before (`plain`), in a file where nothing could
- *  reach the variable otherwise (REACHES_ANY). */
+ *  lines standing outside any quote (`plain`), in a file where no line is continued and nothing could reach the
+ *  variable otherwise (REACHES_ANY). */
 export function programDownloads(code) {
   const all = downloads(code);
   const bare = (text) => text.replace(/["'\\]/gu, "");
-  const text = String(code), joined = text.replace(/\\\r?\n/gu, ""), continued = text.replace(/(?<!\\)((?:\\\\)*)\\\r?\n/gu, "$1");
-  if ([text, joined, continued].some((t) => REACHES_ANY.test(bare(t)))) return all;
-  const raw = String(code).split(/\r?\n/u), lines = raw.map((l) => l.trim()), free = plain(raw);
+  const text = String(code);
+  if (/\\\r?$/mu.test(text) || REACHES_ANY.test(bare(text))) return all;
+  const raw = text.split(/\r?\n/u), lines = raw.map((l) => l.trim()), free = plain(raw);
   return all.filter((d) => !readsData(d, all, lines, free));
 }
 
@@ -60,16 +59,14 @@ function readsData(d, all, lines, free) {
   return lines.every((line, i) => !named.test(line) || (free[i] && (line === d || (all.includes(line) && !READ.test(line) && used.test(line)))));
 }
 
-// For each line of a shell file, whether it starts outside any quote or backtick and does not continue the line before
-// it by a backslash: a line inside a string spanning lines is text another command is handed, never a line of its own.
+// For each line of a shell file, whether it starts outside any quote or backtick: a line inside a string spanning lines
+// is text another command is handed, never a line of its own.
 function plain(raw) {
   let quote = "";
-  const out = raw.map((line) => { const before = quote, s = scan(line, quote); quote = s.quote; return { before, continues: s.continues }; });
-  return out.map((s, i) => !s.before && !(i > 0 && out[i - 1].continues));
+  return raw.map((line) => { const before = quote; quote = scan(line, quote); return !before; });
 }
 
-// The quote open at the end of a line that starts with `quote` open, and whether the line ends in a backslash that
-// continues it, a comment's end aside.
+// The quote open at the end of a line that starts with `quote` open, a comment's end aside.
 function scan(line, quote) {
   let escaped = false;
   for (let i = 0; i < line.length; i++) {
@@ -77,8 +74,8 @@ function scan(line, quote) {
     if (escaped) escaped = false;
     else if (c === "\\" && quote !== "'") escaped = true;
     else if (quote) { if (c === quote) quote = ""; }
-    else if (c === "#" && (i === 0 || /\s/u.test(line[i - 1]))) return { quote, continues: false };
+    else if (c === "#" && (i === 0 || /\s/u.test(line[i - 1]))) return quote;
     else if (c === "'" || c === '"' || c === "`") quote = c;
   }
-  return { quote, continues: escaped };
+  return quote;
 }
