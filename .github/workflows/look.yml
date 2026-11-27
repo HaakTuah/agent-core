@@ -51,6 +51,18 @@ jobs:
           ref: ${{ github.event.repository.default_branch }} # the project's own state, not a task's branch
           persist-credentials: false # gh below takes its token from GH_TOKEN, nothing from the checkout
           fetch-depth: 0 # the whole history, which the dose's cleaning share and the labels' day read (#1426): a fetch after the checkout has no sign-in, so it is taken here
+      - name: The manifest is a file of the checkout's own, where one stands
+        timeout-minutes: 1
+        run: |
+          set -euo pipefail
+          # (the steps after it read it whole, so it is read only where it is a regular file inside the checkout, within a
+          # mebibyte, a link to one there too, as the scripts' manifestText follows one: anything else would hold a
+          # runner, or read beyond it. The same step stands in core.yml and in each workflow a project calls)
+          [ -e core-manifest.md ] || [ -L core-manifest.md ] || exit 0
+          real=$(realpath -e -- core-manifest.md 2> /dev/null || true) here=$(realpath -e -- .)
+          if [ ! -f core-manifest.md ] || [[ "$real" != "$here"/* ]] || [ "$(stat -L -c %s -- core-manifest.md)" -gt 1048576 ]; then
+            echo "FAIL core-manifest.md is no regular file of this repository's own within a mebibyte (a folder, a device, a pipe, a file past that bound, or a link that leads out of the checkout). Mend: write the manifest as a plain file at the repository's root, as the sync writes it, in place of anything else there."; exit 1
+          fi
       - name: Where the core's copy stands, for the scheduled look (core-manifest.md's "Core:" line; the core's tasks/repositories.md)
         id: core-at
         timeout-minutes: 5 # (a submodule fetch, where the core is carried by one)

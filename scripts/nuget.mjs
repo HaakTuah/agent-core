@@ -88,7 +88,7 @@
 // --advisory it says what it would fail and passes, for a project where the check itself is at fault, while that is
 // mended.
 import { execFileSync } from "node:child_process";
-import { closeSync, constants, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, openSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
@@ -356,9 +356,10 @@ function doctypeEnd(text, from) {
  * The files among `own` of another name than a build file's whose root element is a Project, in whatever encoding a
  * byte-order mark gives: what MSBuild could import by any property of a project's own (a publish profile, a file an
  * SDK's targets import by a property this check does not list), read as a build file is. A file is opened only where
- * it is a file of bytes, and read whole only where its first character past blanks is "<".
+ * it is a file of bytes, and read whole only where its first character past blanks is "<" and it is within BOUND bytes;
+ * one past it is added to `past`, unread.
  */
-export function projectFilesByContent(root, own) {
+export function projectFilesByContent(root, own, past = []) {
   const out = [];
   for (const f of own) {
     if (BUILD_FILE.test(f)) continue;
@@ -368,12 +369,13 @@ export function projectFilesByContent(root, own) {
       if (leadsOut(root, at)) continue; // (a link that leads out of the project: no file of its own, never opened)
       fd = openSync(at, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
       const st = fstatSync(fd);
-      if (!st.isFile() || st.size === 0 || st.size > BOUND) continue;
+      if (!st.isFile() || st.size === 0) continue;
       const head = Buffer.alloc(Math.min(st.size, 4096));
       readSync(fd, head, 0, head.length, 0);
       const start = markedText(head).replace(/^[ \t\r\n\uFEFF]+/u, "");
       if (start === "" ? st.size <= head.length : !start.startsWith("<")) continue;
-      if (projectRooted(markedText(readFileSync(fd)))) out.push(f);
+      if (st.size > BOUND) { past.push(f); continue; }
+      if (projectRooted(markedText(bytesOf(fd, st.size)))) out.push(f);
     } catch { /* (a file that cannot be read is no project) */ } finally { if (fd !== null) closeSync(fd); }
   }
   return out;
@@ -381,9 +383,9 @@ export function projectFilesByContent(root, own) {
 // what a reader gives for a path git knows that leads to no file of bytes of the project's own (NOT_A_FILE_IS), which is
 // never read: a device can be endless, a pipe never ends, and a file outside the project is none of its own (#446)
 export const NOT_A_FILE = Symbol("not a file");
-export const NOT_A_FILE_IS = "no file of bytes of the project's own (a link that leads out of the project, or to a device, a folder or a pipe)";
-// The most a file is read to here: a lock file or a package's manifest past it is none this check reads.
+// The most a file is read to here: a lock file, a build file or a package's manifest past it is none this check reads.
 const BOUND = 1 << 24;
+export const NOT_A_FILE_IS = `no file of bytes of the project's own within ${BOUND} bytes (a link that leads out of the project, or to a device, a folder or a pipe, or a file past that bound)`;
 /** The bytes of the project's file at `f`, NOT_A_FILE where it leads to none or is past BOUND, or null where it is not
  *  there: read through the one descriptor that was checked, opened without waiting (a pipe stops nothing). */
 export function readProject(root, f) {
@@ -392,8 +394,15 @@ export function readProject(root, f) {
     if (leadsOut(root, join(root, f))) return NOT_A_FILE;
     fd = openSync(join(root, f), constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
     const st = fstatSync(fd);
-    return st.isFile() && st.size <= BOUND ? readFileSync(fd) : NOT_A_FILE;
+    return st.isFile() && st.size <= BOUND ? bytesOf(fd, st.size) : NOT_A_FILE;
   } catch { return existsSync(join(root, f)) ? NOT_A_FILE : null; } finally { if (fd !== undefined) closeSync(fd); }
+}
+// (the first `size` bytes of an open file, the size it was checked at: what grows after is never read)
+function bytesOf(fd, size) {
+  const bytes = Buffer.alloc(size);
+  let got = 0;
+  for (let n; got < size && (n = readSync(fd, bytes, got, size - got, got)) > 0;) got += n;
+  return bytes.subarray(0, got);
 }
 export function importsOf(own, read, roots = []) {
   const byName = new Map(), files = new Map(), brought = new Map(), unread = [], typed = [], unreadable = new Map();
@@ -801,7 +810,9 @@ function layoutFaults({ root, copy, failures }, tracked, own, locks) {
 // a pull request adds, changes or brings into play with an Import of its own fails, as does what a build file names)
 function buildFileFaults(c, own) {
   c.bytesNow = new Map();
-  c.byContent = new Set(projectFilesByContent(c.root, own));
+  const past = [];
+  c.byContent = new Set(projectFilesByContent(c.root, own, past));
+  for (const f of past) c.reports.push(`${f} begins as XML and is past ${BOUND} bytes, so this check does not read whether its root element is a Project: what it names, where MSBuild imports it by a property, goes unseen (reported, and passes)`);
   c.now = importsOf(own, (f) => readNow(c, f), [...c.byContent]);
   for (const [f, text] of c.now.files) {
     const found = buildFileFindings(c.now, f, text);
@@ -819,7 +830,7 @@ function readNow(c, f) {
 }
 // (what is wrong with a build file, or a file one brings in, as it reads now)
 function buildFileFindings(now, f, text) {
-  return now.unreadable.get(f) === "not a file" ? [`is ${NOT_A_FILE_IS}: this check reads none, so what MSBuild would make of it is unseen. Mend: make it a file of the project's own, or remove it`]
+  return now.unreadable.get(f) === "not a file" ? [`is ${NOT_A_FILE_IS}: this check reads none, so what MSBuild would make of it is unseen. Mend: make it a file of the project's own, within that bound, or remove it`]
     : now.unreadable.has(f) ? ["is not plain UTF-8 (a UTF-16 or UTF-32 byte-order mark, another encoding its XML declaration names, a NUL or bytes UTF-8 does not allow): MSBuild reads it by its own encoding, so this check cannot read what it names or imports. Mend: save it as UTF-8"] : [
     /NuGetLockFilePath/iu.test(text) && "names NuGetLockFilePath, and a lock file kept elsewhere is one this check does not read. Mend: take it out, keeping each lock file beside its project",
     /RestorePackagesPath|FallbackFolders/iu.test(text) && "names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read. Mend: take it out",
@@ -933,7 +944,7 @@ const lockAsBase = (c, f, text) => !c.base || (c.listedThen.includes(f) && textA
 function lockText(c, f) {
   if (!c.lockTexts.has(f)) {
     const bytes = readProject(c.root, f);
-    if (bytes === NOT_A_FILE) c.failures.push(`${f} is ${NOT_A_FILE_IS}, and this check reads none. Mend: make it a file of the project's own`);
+    if (bytes === NOT_A_FILE) c.failures.push(`${f} is ${NOT_A_FILE_IS}, and this check reads none. Mend: make it a file of the project's own, within that bound`);
     c.lockTexts.set(f, bytes === NOT_A_FILE ? null : bytes?.toString("utf8") ?? "");
   }
   return c.lockTexts.get(f);
@@ -981,7 +992,7 @@ function auditEntries(config, root) {
   let entries = [];
   if (config.audit) {
     const bytes = readProject(root, config.audit);
-    if (bytes === NOT_A_FILE) throw new Error(`${config.audit} is ${NOT_A_FILE_IS}. Mend: make it a file of the project's own`);
+    if (bytes === NOT_A_FILE) throw new Error(`${config.audit} is ${NOT_A_FILE_IS}. Mend: make it a file of the project's own, within that bound`);
     try { entries = parseBounded(bytes === null ? "" : bytes.toString("utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
     if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list. Mend: write it as { "entries": [...] }`);
   }
@@ -1092,7 +1103,7 @@ if (guard(import.meta.url)) {
   if (args.includes("--sources")) {
     if (!configPath) fail("no config was named. Mend: name it: node core/scripts/nuget.mjs <config> --sources");
     let from;
-    try { from = sourcesOf(loadConfig(configPath), project().root); } catch (e) { fail(e.message); }
+    try { const { root } = project(); from = sourcesOf(loadConfig(configPath, root), root); } catch (e) { fail(e.message); }
     for (const s of from) console.log(s);
     process.exit(0);
   }
@@ -1101,7 +1112,7 @@ if (guard(import.meta.url)) {
   try { if (!statSync(configPath).isFile()) fail(`${configPath} is no file of bytes (a link to a device, a folder or a pipe). Mend: make it a file`); } catch { /* (one that is not there fails as it is loaded) */ }
   let result;
   try {
-    const config = loadConfig(configPath), { root, tracked } = project();
+    const { root, tracked } = project(), config = loadConfig(configPath, root);
     const base = baseOf(root);
     result = check(config, root, packagesDir, tracked, process.env, { base, baseConfig: configAt(root, base, configPath), fetched: args.includes("--fetched") });
   } catch (e) { fail(e.message); }

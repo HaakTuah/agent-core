@@ -192,7 +192,7 @@ ok([...[0, 1, 2].map(i => `"tasks/x.md: Its own item", item ${i} `), "core archi
   const faults = named(dir).faults, wrong = holders(dir, []).wrong;
   ok(faults.some(f => f.includes("big.json cannot be read") && /Mend: /.test(f)), "an entry past the bound is unread, and fails with its mend", faults.join("\n"));
   ok(!linked || faults.some(f => f.includes(`${entryFile("tasks/x.md: A last item")} cannot be read`) && /Mend: /.test(f)), "a tracked link in an entry's place is refused, with its mend", faults.join("\n"));
-  ok(!wrong.some(w => w.includes("tasks/y.md:3 points to the archive")), "a rule file past the bound is unread", wrong.join("\n"));
+  ok(!wrong.some(w => w.includes("tasks/y.md:3 points to the archive")) && wrong.some(w => w.startsWith("tasks/y.md is no regular file") && /Mend: /.test(w)), "a rule file past the bound is unread, and fails with its mend", wrong.join("\n"));
 }
 
 // ---- the list's form, its schema's (#530) ----

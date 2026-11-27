@@ -121,6 +121,8 @@ if (canLink) {
   fails("a manifest that is a tracked link leading out of the checkout", "core-manifest.md is no regular file of this repository's own", {}, { then: linked(dir => path.join(tmp, `outside-${path.basename(dir)}.md`)) });
 }
 fails("a manifest past the bound", "core-manifest.md is no regular file of this repository's own", { "core-manifest.md": `${MANIFEST()}\n${"x".repeat(1 << 20)}\n` });
+if (canLink && process.platform !== "win32") fails("a manifest that is a tracked link to a device", "core-manifest.md is no regular file of this repository's own", {}, { then: dir => { fs.rmSync(path.join(dir, "core-manifest.md")); fs.symlinkSync("/dev/zero", path.join(dir, "core-manifest.md")); } });
+fails("no manifest", "has no core-manifest.md", {}, { then: dir => fs.rmSync(path.join(dir, "core-manifest.md")) });
 fails("a manifest without its pin line", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^Core: .*\n/m, "") });
 fails("a manifest with two", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^(Core: .*\n)/m, "$1$1") });
 fails("a manifest without the owner's account, an organisation's account holding the repository", "owner's account", { "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") });

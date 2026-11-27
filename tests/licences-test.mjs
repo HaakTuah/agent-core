@@ -9,9 +9,9 @@
 import { readable } from "../scripts/licence-yes.mjs";
 import { installed } from "../scripts/packages.mjs";
 import { keysOf } from "../scripts/schemas.mjs";
-import { actionLists, alongside, coreConfig, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
+import { actionLists, alongside, coreConfig, check, licenceOk, loadConfig, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
 import { execFileSync } from "node:child_process";
-import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { scratchDir } from "../scripts/scratch-core.mjs";
@@ -194,23 +194,50 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
-// the project's files the check reads: each a regular file of its own, read to a bound (core-path.mjs's regularText)
+// the project's files the check reads: each a regular file of its own, read to a bound (core-path.mjs's regularText),
+// and one it does not read fails, naming why, with its mend
 {
-  const dir = scratchDir("licences-test-bound-");
-  const big = (text, past) => `${text}${"x".repeat(past)}\n`;
+  const dir = scratchDir("licences-test-bound-"), away = scratchDir("licences-test-away-");
+  const big = (text, past) => `${text}${"x".repeat(past)}\n`, PAST = (1 << 24) + 1;
   try {
     execFileSync("git", ["init", "-q"], { cwd: dir, stdio: "ignore" });
+    writeFileSync(join(dir, "package.json"), '{ "name": "p", "version": "1.0.0" }\n');
+    writeFileSync(join(dir, "package-lock.json"), JSON.stringify({ name: "p", lockfileVersion: 3, packages: { "": { name: "p", version: "1.0.0" } }, pad: "x".repeat(3 << 19) }));
     writeFileSync(join(dir, ".npmrc"), big("ignore-scripts=true\nmin-release-age=7\n#", 1 << 20));
     writeFileSync(join(dir, "audit.json"), '{ "entries": [] }\n');
-    writeFileSync(join(dir, "NOTICES.txt"), big("", 1 << 24));
-    const r = check({ ships: [], lockfiles: [], ignoreScriptsIn: [".npmrc"], audit: "audit.json", notices: "NOTICES.txt" }, dir, null, null);
-    ok(r.failures.some((m) => m.includes(".npmrc does not set ignore-scripts=true") && m.includes("Mend:")), "an npm config file past the bound is unread, and fails with its mend", JSON.stringify(r.failures));
-    ok(r.failures.some((m) => m.includes('"notices", NOTICES.txt, names no file it reads') && m.includes("Mend:")), "a notices file past the bound is unread, and fails with its mend", JSON.stringify(r.failures));
-    writeFileSync(join(dir, "audit.json"), `{ "entries": [] }${" ".repeat(1 << 24)}\n`);
+    writeFileSync(join(dir, "NOTICES.txt"), big("", 1 << 20));
+    const lawful = check({ ships: [], lockfiles: ["package-lock.json"], ignoreScriptsIn: [".npmrc"], audit: "audit.json", notices: "NOTICES.txt" }, dir, null, null);
+    ok(!lawful.failures.some((m) => /package-lock\.json|\.npmrc|NOTICES\.txt/u.test(m)), "a lock file, an npm config file and a notices file past a mebibyte, within the bound, are read", JSON.stringify(lawful.failures));
+    writeFileSync(join(dir, ".npmrc"), big("ignore-scripts=true\nmin-release-age=7\n#", PAST));
+    writeFileSync(join(dir, "NOTICES.txt"), big("", PAST));
+    let r;
+    try { r = check({ ships: [], lockfiles: [], ignoreScriptsIn: [".npmrc"], audit: "audit.json", notices: "NOTICES.txt" }, dir, null, null); } catch (e) { r = { failures: [e.message] }; }
+    const pastBound = (f) => (m) => m.includes(`${f} is past ${1 << 24} bytes`) && m.includes("Mend:");
+    ok(r.failures.some(pastBound(".npmrc")) && !r.failures.some((m) => m.includes("does not set ignore-scripts")), "an npm config file past the bound is unread, and fails naming the bound, with its mend", JSON.stringify(r.failures));
+    ok(r.failures.some(pastBound("NOTICES.txt")), "a notices file past the bound is unread, and fails naming the bound, with its mend", JSON.stringify(r.failures));
+    writeFileSync(join(dir, ".npmrc"), "ignore-scripts=true\nmin-release-age=7\n");
+    rmSync(join(dir, "NOTICES.txt"));
+    writeFileSync(join(dir, "package-lock.json"), big("{}", PAST));
     let thrown = "";
+    try { check({ ships: [], lockfiles: ["package-lock.json"] }, dir, null, null); } catch (e) { thrown = e.message; }
+    ok(pastBound("package-lock.json")(thrown), "a lock file past the bound is unread, and fails naming the bound, with its mend", thrown);
+    writeFileSync(join(dir, "audit.json"), `{ "entries": [] }${" ".repeat(PAST)}\n`);
+    thrown = "";
     try { check({ ships: [], lockfiles: [], audit: "audit.json" }, dir, null, null); } catch (e) { thrown = e.message; }
-    ok(thrown.includes("audit.json cannot be read as JSON") && thrown.includes("Mend:"), "an audit past the bound is unread, and fails with its mend", thrown);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+    ok(pastBound("audit.json")(thrown), "an audit past the bound is unread, and fails naming the bound, with its mend", thrown);
+    rmSync(join(dir, "audit.json")); rmSync(join(dir, "package-lock.json"));
+    writeFileSync(join(dir, ".npmrc"), "registry=https://example.invalid/\n");
+    writeFileSync(join(dir, "sub.npmrc"), big("registry=https://example.invalid/\n#", 1 << 20));
+    writeFileSync(join(dir, "big.npmrc"), big("registry=https://example.invalid/\n#", PAST));
+    let links = true;
+    writeFileSync(join(away, "away.json"), JSON.stringify({ ships: [], lockfiles: [] }));
+    try { symlinkSync(join(away, "away.json"), join(dir, "linked.json")); } catch { links = false; }
+    const set = check({ ships: [], lockfiles: [], ignoreScriptsIn: [".npmrc"] }, dir, null, null).failures;
+    ok(set.some((m) => m.startsWith(".npmrc: npm setting not allowed")) && set.some((m) => m.startsWith("sub.npmrc: npm setting not allowed")) && set.some(pastBound("big.npmrc")), "an npm config file is read to the bound for what it sets, and one past it is unread and fails, with its mend", JSON.stringify(set));
+    let config = "";
+    try { loadConfig(join(dir, "linked.json"), dir); } catch (e) { config = e.message; }
+    ok(!links || (config.includes("reached through a link that leads out of the project") && config.includes("Mend:")), "a config reached through a link that leads out of the project is refused unread, with its mend", config);
+  } finally { rmSync(dir, { recursive: true, force: true }); rmSync(away, { recursive: true, force: true }); }
 }
 
 // the config's form (#530): its schema, read by ajv, and the check's own checks of it, which read it where ajv is not

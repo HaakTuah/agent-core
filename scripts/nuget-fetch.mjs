@@ -238,7 +238,7 @@ function reader(root, failures) {
   return (f) => {
     if (!texts.has(f)) {
       const bytes = readProject(root, f);
-      if (bytes === NOT_A_FILE) failures.push(`${f} is ${NOT_A_FILE_IS}, and this check reads none. Mend: make it a file of the project's own`);
+      if (bytes === NOT_A_FILE) failures.push(`${f} is ${NOT_A_FILE_IS}, and this check reads none. Mend: make it a file of the project's own, within that bound`);
       texts.set(f, bytes === NOT_A_FILE ? null : bytes?.toString("utf8") ?? "");
     }
     return texts.get(f);
@@ -394,7 +394,7 @@ if (guard(import.meta.url)) {
     const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
     mkdirSync(into, { recursive: true });
     const base = baseOf(root);
-    result = await fetchAll(loadConfig(configPath), root, tracked, into, undefined, { base, baseConfig: configAt(root, base, configPath) });
+    result = await fetchAll(loadConfig(configPath, root), root, tracked, into, undefined, { base, baseConfig: configAt(root, base, configPath) });
   } catch (e) { fail(e.message); }
   const { out, err } = printed(result);
   for (const line of out) console.log(line);

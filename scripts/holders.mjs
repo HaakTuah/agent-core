@@ -121,7 +121,9 @@ function behindWrong(root, behind) {
     for (const n of list.filter(n => inForm(n) && !reasons.has(n))) wrong.push(`${FILE}/${entryFile(key)} ("behind"): core archive ${n} is no item of the archive. Mend: name an item that stands in archive/instructions/, or add the item first, keyed by its issue (archive/instructions.md)`);
   }
   for (const f of files) {
-    (own(root, f) ?? "").split(/\r?\n/u).forEach((line, i) => {
+    const text = own(root, f);
+    if (text === null) { wrong.push(`${f} is no regular file of the checkout's own within a mebibyte, so it is not read for a pointer to the archive. Mend: make it a plain file there, in place of anything else, within a mebibyte`); continue; }
+    text.split(/\r?\n/u).forEach((line, i) => {
       if (/\bcore\s+archive\s+#?\d/iu.test(line) || /\bcore\s+archive\s*$/iu.test(line)) wrong.push(`${f}:${i + 1} points to the archive in the rule's own text ("core archive"). Mend: take the pointer out and add its items to the rule's list under "behind" in ${FILE}`);
     });
   }

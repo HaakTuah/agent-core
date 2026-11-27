@@ -321,7 +321,8 @@ const odd = reported(["build/odd1.xml", "build/odd2.xml", "build/odd3.xml", "bui
 ok(odd.reports.some(x => x.startsWith("build/odd1.xml is not plain UTF-8")) && odd.reports.some(x => x.startsWith("build/odd2.xml is not plain UTF-8")) && odd.reports.some(x => x.startsWith("build/odd3.xml names NuGetLockFilePath")) && odd.reports.some(x => x.startsWith("build/odd4.xml names RestorePackagesPath")),
   "a project with a byte UTF-8 does not allow, in UTF-32, with two marks, or past many blanks is read for what it is", JSON.stringify(odd));
 put("build/big.xml", `<Project><NuGetLockFilePath>x</NuGetLockFilePath></Project>${" ".repeat(1 << 24)}`);
-ok(readProject(tmp, "build/big.xml") === NOT_A_FILE && !reported(["build/big.xml"]).reports.some(x => x.startsWith("build/big.xml names")), "a file past the bound is unread, by name or by its content", JSON.stringify(reported(["build/big.xml"])));
+const big = reported(["build/big.xml"]);
+ok(readProject(tmp, "build/big.xml") === NOT_A_FILE && !big.reports.some(x => x.startsWith("build/big.xml names")) && big.reports.some(x => x.startsWith("build/big.xml begins as XML and is past")), "a file past the bound is unread, by name or by its content, and is named so", JSON.stringify(big.reports));
 fs.rmSync(path.join(tmp, "build/big.xml"));
 if (process.platform !== "win32") {
   fs.symlinkSync("/dev/null", path.join(tmp, "build/device.xml"));

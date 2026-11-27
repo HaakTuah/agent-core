@@ -98,7 +98,12 @@ let canLink = true;
 try { fs.symlinkSync("nowhere", path.join(tmp, "probe")); } catch { canLink = false; }
 if (canLink) {
   const r = gate(dir => { const at = path.join(dir, "checks/licences.json"); fs.writeFileSync(path.join(dir, "checks/real.json"), fs.readFileSync(at)); fs.rmSync(at); fs.symlinkSync("real.json", at); });
-  ok(r.run === undefined && r.out.includes("checks/licences.json, the licence check's config, is no file of the project's own") && mended(r.out), "a tracked link in the config's place is refused, with its mend", r.out);
+  ok(r.run === undefined && r.out.includes("checks/licences.json, the licence check's config, is a link") && mended(r.out), "a tracked link in the config's place is refused, with its mend", r.out);
+  const away = path.join(tmp, "away");
+  const folder = gate(dir => { fs.cpSync(path.join(dir, "checks"), away, { recursive: true }); fs.rmSync(path.join(dir, "checks"), { recursive: true }); fs.symlinkSync(away, path.join(dir, "checks")); });
+  ok(folder.run === undefined && folder.out.includes("checks/licences.json, the licence check's config, stands in a folder outside the project") && mended(folder.out), "a config whose folder a tracked link leads out of the project is refused, with its mend", folder.out);
+  const dirAt = gate(dir => { const at = path.join(dir, "checks/licences.json"); fs.rmSync(at); fs.mkdirSync(at); fs.writeFileSync(path.join(at, "x"), "x"); });
+  ok(dirAt.run === undefined && dirAt.out.includes("is no regular file (a folder, a device or a pipe)") && mended(dirAt.out), "a folder in the config's place is refused, with its mend", dirAt.out);
 }
 
 // the second look, NuGet's own word, where no file the first names changed

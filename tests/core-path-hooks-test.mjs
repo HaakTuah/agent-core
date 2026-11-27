@@ -163,6 +163,17 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
   };
   const github = { event_name: "pull_request", repository: "someone/project", base_ref: "main", event: { repository: { default_branch: "main", private: false }, pull_request: { number: 1, base: { sha: "" } } } };
   const usual = projectWith(copied()), unfetched = projectWith(carried(), true);
+  const GUARD = "The manifest is a file of the checkout's own, where one stands";
+  const relinked = (dir, target) => { fs.rmSync(path.join(dir, "core-manifest.md")); fs.symlinkSync(target, path.join(dir, "core-manifest.md")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "linked"); return dir; };
+  fs.writeFileSync(path.join(tmp, "outside-manifest.md"), copied());
+  const linkedIn = projectWith(copied()), linkedOut = projectWith(copied()), big = projectWith(`${copied()}${"x".repeat(1 << 20)}\n`);
+  fs.writeFileSync(path.join(linkedIn, "manifest.md"), copied()); relinked(linkedIn, "manifest.md");
+  relinked(linkedOut, path.join(tmp, "outside-manifest.md"));
+  const device = process.platform === "win32" ? null : relinked(projectWith(copied()), "/dev/zero");
+  // (one step, the same in core.yml and each workflow a project calls)
+  const stepOf = text => /^ {6}- name: The manifest is a file of the checkout's own, where one stands\n(?: {8}.*\n|\n)*?(?= {6}- )/mu.exec(text)?.[0] ?? null;
+  const guards = ["core.yml", ...CALLED].map(f => stepOf(fs.readFileSync(fileURLToPath(new URL(`../.github/workflows/${f}`, import.meta.url)), "utf8")));
+  ok(guards[0] !== null && guards.every(g => g === guards[0]), "core.yml and each workflow a project calls hold the one manifest guard, word for word", guards.map((g, i) => `${["core.yml", ...CALLED][i]}: ${g === null ? "none" : g === guards[0] ? "the same" : "another"}`).join("\n"));
   const workflows = fileURLToPath(new URL("../.github/workflows/", import.meta.url));
   for (const f of CALLED) {
     const text = fs.readFileSync(path.join(workflows, f), "utf8");
@@ -173,6 +184,13 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
     const step = r => r.steps.find(x => /Where the core's copy stands/.test(x.name)) ?? { passed: false, out: "no such step" };
     ok(step(ran).passed, `${f}: its first step reads core/ from a project in one repository`, step(ran).out);
     ok(!step(stopped).passed && mended(step(stopped).out) && /the library lib, a submodule that carries the core, could not be fetched here/.test(step(stopped).out), `${f}: where the submodule that carries the core cannot be fetched, it fails, saying the mend`, step(stopped).out);
+    // (the manifest is read only as a regular file of the checkout's own within a mebibyte, a link to one there too)
+    const guard = r => r.steps.find(x => x.name === GUARD) ?? { passed: false, out: "no such step" };
+    ok(guard(job(usual)).passed && guard(job(linkedIn)).passed, `${f}: a manifest that is a file of the project's own, or a link to one, is read`, guard(job(linkedIn)).out);
+    for (const [what, dir] of [["a tracked link leading out of the checkout", linkedOut], ["a file past the bound", big], ...(device ? [["a tracked link to a device", device]] : [])]) {
+      const r = job(dir), g = guard(r);
+      ok(!g.passed && mended(g.out) && /core-manifest\.md is no regular file of this repository's own/.test(g.out) && !r.steps.some(x => x.ran && /Where the core's copy stands/.test(x.name)), `${f}: a manifest that is ${what} fails before it is read, saying the mend`, g.out);
+    }
   }
 }
 

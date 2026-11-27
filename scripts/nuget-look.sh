@@ -77,9 +77,16 @@ holds() {
   done < <(find . -path "./${CORE_AT%/}" -prune -o -name project.assets.json -newer "$stamp" -print0)
 }
 run=true
-# (the config is read only where it is a file of bytes of the project's own, no link: nuget.mjs reads it after)
-if { [ -e "$CONFIG" ] || [ -L "$CONFIG" ]; } && { [ ! -f "$CONFIG" ] || [ -L "$CONFIG" ]; }; then
-  echo "FAIL $(named "$CONFIG"), the licence check's config, is no file of the project's own (a link, a folder or a device), so it is not read. Mend: make it a file, in place of the link"; exit 1
+# (the config is read only where it is a regular file, no link, in a folder that resolves, each of its parts followed,
+# inside the project: nuget.mjs reads it after)
+folder=$(cd -- "$(dirname -- "$CONFIG")" 2> /dev/null && pwd -P) || folder=
+here=$(pwd -P)
+if [ -n "$folder" ] && [ "$folder" != "$here" ] && [ "${folder#"$here"/}" = "$folder" ]; then
+  echo "FAIL $(named "$CONFIG"), the licence check's config, stands in a folder outside the project (reached through a link on its way, or named so), so it is not read. Mend: keep the config in a folder of the project's own, in place of the link"; exit 1
+elif [ -L "$CONFIG" ]; then
+  echo "FAIL $(named "$CONFIG"), the licence check's config, is a link, so it is not read. Mend: make it a file of the project's own, in place of the link"; exit 1
+elif [ -e "$CONFIG" ] && [ ! -f "$CONFIG" ]; then
+  echo "FAIL $(named "$CONFIG"), the licence check's config, is no regular file (a folder, a device or a pipe), so it is not read. Mend: make it a file of the project's own, there"; exit 1
 fi
 # (the config, its audit and each folder it names as a source, each by its exact name, and the caller)
 if [ -n "$BASE" ] && extra=$(jq -r '[.audit, (.nuget.sources // [])[]] | .[] | strings | select(startswith("https://") | not)' "$CONFIG"); then

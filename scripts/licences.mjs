@@ -293,14 +293,23 @@ export function releaseAge(npmrc) {
 }
 export const WAIT = 7;
 
+/** Each file of "ignoreScriptsIn" that does not set ignore-scripts=true, or that ownRead does not read: its failure. */
+function scriptsFaults(root, files) {
+  return files.flatMap((f) => {
+    const { text, unread } = ownRead(root, f);
+    if (unread) return [unread];
+    return text === null || !scriptsOff(text) ? [`${f} does not set ignore-scripts=true (floor rule 15). Mend: add the line ignore-scripts=true to ${f}`] : [];
+  });
+}
+
 /** Each file of "ignoreScriptsIn" that sets no wait of WAIT days or more, as { failures, reports }: one that held the
  *  wait at `base`, or that `base` did not hold, fails, and one that stood without it is reported, as with no base at all
  *  (core-changes/projects.md, "Nothing locks a project": the sync's step asks the line). */
 function waitFaults(root, base, files) {
   const failures = [], reports = [];
   for (const f of files) {
-    const text = existsSync(join(root, f)) ? ownText(root, f) : "";
-    if ((releaseAge(text) ?? 0) >= WAIT) continue;
+    const { text, unread } = ownRead(root, f);
+    if (unread || (releaseAge(text ?? "") ?? 0) >= WAIT) continue; // (one not read fails once, beside: check's own loop)
     const was = base ? textAt(root, base, f) : null;
     const said = `${f} does not set min-release-age=${WAIT}, so npm may take a release under a week old where a session adds or updates a package (floor rule 7)`;
     if (base && (was === null || (releaseAge(was) ?? 0) >= WAIT)) failures.push(`${said}. Mend: add the line min-release-age=${WAIT} to ${f}`);
@@ -309,25 +318,37 @@ function waitFaults(root, base, files) {
   return { failures, reports };
 }
 
-/** A file of the project's own at `f`, from its root `root`, as text: one reached through a link that leads out of the
- *  project is refused, never read; one that is no regular file, or is past a mebibyte, reads as empty. */
+// The most a file of the project is read to here: a lock file, an audit or a notices file, which holds licence texts
+// whole, may lawfully run past a config's mebibyte.
+const BOUND = 1 << 24;
+/** The project's own file at `f`, from its root `root`, read to at most BOUND bytes (core-path.mjs's regularText):
+ *  { text }, its text, or null where nothing stands there; or { unread }, the failure with its mend, where a link on its
+ *  way leads out of the project, or it is no regular file or is past the bound, none of which is read. */
+function ownRead(root, f) {
+  const at = join(root, f);
+  if (leadsOut(root, at)) return { unread: `${f} is reached through a link that leads out of the project, so it is not read. Mend: make it a file of the project's own, in place of the link` };
+  const text = regularText(at, { bound: BOUND });
+  if (text !== null) return { text };
+  let st;
+  try { st = statSync(at); } catch { return { text: null }; }
+  return { unread: st.isFile()
+    ? `${f} is past ${BOUND} bytes, the most this check reads, so it is not read. Mend: keep it within ${BOUND} bytes`
+    : `${f} is no regular file (a folder, a device or a pipe), so it is not read. Mend: make it a file of the project's own, there` };
+}
+/** The text of the project's own file at `f`, "" where nothing stands there; one ownRead does not read is refused. */
 function ownText(root, f) {
-  if (leadsOut(root, join(root, f))) throw new Error(`${f} is reached through a link that leads out of the project, so it is not read. Mend: make it a file of the project's own, in place of the link`);
-  return ownRegular(root, f) ?? "";
+  const { text, unread } = ownRead(root, f);
+  if (unread) throw new Error(unread);
+  return text ?? "";
 }
 
-// The most an audit or notices file is read to, larger than a config's mebibyte: a notices file holds licence texts whole.
-const BOUND = 1 << 24;
-/** The text of the regular file at `f` under `root` (core-path.mjs's regularText, at most `bound` bytes), or null where
- *  none stands there, it is no regular file, it is past the bound or a link on its way leads out of the project. */
-const ownRegular = (root, f, bound = 1 << 20) => leadsOut(root, join(root, f)) ? null : regularText(join(root, f), { bound });
-
-/** What every npm config file of the project sets that is not allowed: each line, or the file, where a link leads it
- *  out of the project, which is not read. */
+/** What every npm config file of the project sets that is not allowed: each line, or the file, where ownRead does not
+ *  read it. */
 function npmrcFailures(root) {
   return npmrcFiles(root).flatMap((f) => {
-    if (leadsOut(root, join(root, f))) return [`${f} is reached through a link that leads out of the project, so it is not read. Mend: make it a file of the project's own, in place of the link, or take it out`];
-    return registryOverrides(ownRegular(root, f) ?? "").map((l) => `${f}: npm setting not allowed (a package is known by the npm registry it comes from): ${l}. Mend: take that line out of ${f}`);
+    const { text, unread } = ownRead(root, f);
+    if (unread) return [unread];
+    return registryOverrides(text ?? "").map((l) => `${f}: npm setting not allowed (a package is known by the npm registry it comes from): ${l}. Mend: take that line out of ${f}`);
   });
 }
 
@@ -352,9 +373,10 @@ function normalised(config) {
 // An npm package and its one exact version, as "accepted" names it: "<name>@<version>", a scope before the name or none.
 const ACCEPTED_NPM = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*@[0-9][0-9A-Za-z.+-]*$/u;
 
-/** The config, read and checked: a key it does not know, or one of the wrong shape, would check less without a word. */
-export function loadConfig(path) {
-  let config = configRead(path);
+/** The config, read and checked: a key it does not know, or one of the wrong shape, would check less without a word.
+ *  Where the project's root `root` is given, a config reached through a link that leads out of it is refused unread. */
+export function loadConfig(path, root = null) {
+  let config = configRead(path, root);
   configShape(config);
   within(config);
   config = normalised(config);
@@ -370,9 +392,12 @@ export function loadConfig(path) {
 }
 
 /** The config at `path`, read as JSON: a JSON object, or refused. */
-function configRead(path) {
+function configRead(path, root) {
+  if (root !== null && leadsOut(root, resolve(path))) throw new Error(`the config ${path} is reached through a link that leads out of the project, so it is not read. Mend: make it a file of the project's own, in place of the link`);
+  const text = regularText(path, { bound: BOUND });
+  if (text === null && isFile(path)) throw new Error(`the config ${path} is past ${BOUND} bytes, the most this check reads, so it is not read. Mend: keep it within ${BOUND} bytes`);
   let config;
-  try { config = JSON.parse(regularText(path) ?? ""); } catch { throw new Error(`cannot read the config ${path} as JSON. Mend: name the config the licence workflow is given, and write it as JSON`); }
+  try { config = JSON.parse(text ?? ""); } catch { throw new Error(`cannot read the config ${path} as JSON. Mend: name the config the licence workflow is given, and write it as JSON`); }
   if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("the config is not a JSON object. Mend: write it as one, as the starter kit writes it");
   return config;
 }
@@ -526,10 +551,7 @@ export function check(config, root, base = null, baseConfig = null) {
   const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? [], base, auditOf(ctx.then), lockfilesOf(ctx.then)) : undefined;
   if (scanned) failures.push(...scanned.failures);
   failures.push(...npmrcFailures(root));
-  for (const f of config.ignoreScriptsIn ?? []) {
-    const text = ownRegular(root, f);
-    if (text === null || !scriptsOff(text)) failures.push(`${f} does not set ignore-scripts=true (floor rule 15). Mend: add the line ignore-scripts=true to ${f}`);
-  }
+  failures.push(...scriptsFaults(root, config.ignoreScriptsIn ?? []));
   const wait = waitFaults(root, base, config.ignoreScriptsIn ?? []);
   const unnamed = unnamedLocks(root, trackedIn(root), config, base, stoodAt(root, base, ctx.then));
   failures.push(...wait.failures, ...unnamed.failures);
@@ -621,16 +643,21 @@ function checkAudit(ctx) {
   const { config, root, base } = ctx;
   const entries = auditEntries(root, config.audit);
   const auditHeld = heldInAudit(root, base, config.audit);
-  const notices = noticesText(root, config.notices);
-  if (notices === null) ctx.failures.push(`the config's "notices", ${config.notices}, names no file it reads (none there, no regular file, or past ${BOUND} bytes). Mend: write the notices file there, or correct the path`);
+  // (the notices file the config names; null where it names none there, or one not read, which fails once, not for
+  // every entry)
+  const read = config.notices === undefined ? undefined : ownRead(root, config.notices), notices = read && (read.text ?? null);
+  if (read?.unread) ctx.failures.push(`the config's "notices": ${read.unread}`);
+  else if (notices === null) ctx.failures.push(`the config's "notices", ${config.notices}, names no file. Mend: write the notices file there, or correct the path`);
   for (const e of entries) checkEntry(ctx, e, notices, auditHeld);
   return entries;
 }
 
 /** The audit's entries, or refused. */
 function auditEntries(root, audit) {
+  const { text, unread } = ownRead(root, audit);
+  if (unread) throw new Error(unread);
   let entries;
-  try { entries = parseBounded(ownRegular(root, audit, BOUND) ?? "").entries; } catch { throw new Error(`${audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
+  try { entries = parseBounded(text ?? "").entries; } catch { throw new Error(`${audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
   if (!Array.isArray(entries)) throw new Error(`${audit} has no "entries" list. Mend: write it as { "entries": [...] }, as the starter kit does`);
   return entries;
 }
@@ -641,9 +668,6 @@ function heldInAudit(root, base, audit) {
   try { before = base ? JSON.parse(textAt(root, base, audit)).entries ?? [] : []; } catch { /* (none held) */ }
   return (e) => !base || (Array.isArray(before) && before.some((b) => b && b.name === e.name && b.version === e.version && b.licence === e.licence && b.ships === true));
 }
-
-// (the notices file the config names; null when it names none there, which fails once, not for every entry)
-const noticesText = (root, notices) => notices === undefined ? undefined : ownRegular(root, notices, BOUND);
 
 /** One entry of the audit, held to its shape, its list or the owner's yes, and, where it ships, its notice. */
 function checkEntry(ctx, e, notices, auditHeld) {
@@ -752,8 +776,8 @@ if (guard(import.meta.url)) {
   if (!configPath) fail("no config was named. Mend: name it: node core/scripts/licences.mjs <config> [--action]");
   let config, root;
   try {
-    config = loadConfig(configPath);
     root = projectAt(fileURLToPath(new URL(".", import.meta.url))).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();
+    config = loadConfig(configPath, root);
   } catch (e) { fail(e.message); }
   if (process.argv.includes("--action")) {
     let lines;
