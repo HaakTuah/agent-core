@@ -140,20 +140,26 @@ function install(entry, root, env) {
 
 // Fetch what the project pins; the lines to print. `env` is the environment curl, tar and dotnet are found by (PATH),
 // and `home` the folder under which the toolchain goes.
-export function fetchPinned({ project = process.cwd(), list = SDKS, home = os.homedir(), env = process.env, platform = process.platform, arch = process.arch } = {}) {
+export const fetchPinned = (opts = {}) => pinned(opts).lines;
+
+// The same, with what the trial's runs are to set where a toolchain was fetched or found: { lines, vars }, `vars` null
+// where nothing is to be set (no pin, the machine's own, or nothing fetched), else what the line printed says to export.
+export function pinned({ project = process.cwd(), list = SDKS, home = os.homedir(), env = process.env, platform = process.platform, arch = process.arch } = {}) {
+  const none = lines => ({ lines, vars: null });
   const place = placed({ project, home, env, platform, arch });
-  if (place.said) return [place.said];
+  if (place.said) return none([place.said]);
   const { version, rid, root } = place;
+  const vars = { DOTNET_ROOT: root, PATH: `${root}${path.delimiter}${env.PATH ?? ""}`, ...QUIET };
   const exported = `for the trial's runs: export DOTNET_ROOT=${quoted(root)} PATH=${quoted(root)}:"$PATH" ${Object.entries(QUIET).map(([k, v]) => `${k}=${v}`).join(" ")}`;
   let entries;
-  try { entries = readList(list); } catch (e) { return [`NOT FETCHED: the .NET SDK ${version} (the core's list could not be read: ${e.message}). Mend: give each entry of SDKS in scripts/toolchain.mjs the form --entry prints, one entry for each version and machine.`]; }
+  try { entries = readList(list); } catch (e) { return none([`NOT FETCHED: the .NET SDK ${version} (the core's list could not be read: ${e.message}). Mend: give each entry of SDKS in scripts/toolchain.mjs the form --entry prints, one entry for each version and machine.`]); }
   const entry = entries.find(e => e.version === version && e.rid === rid);
-  if (!entry) return [`NOT FETCHED: the .NET SDK ${version} for ${rid} (the core's list, SDKS in scripts/toolchain.mjs, holds no checksum for it). ${MEND_LIST}.`];
+  if (!entry) return none([`NOT FETCHED: the .NET SDK ${version} for ${rid} (the core's list, SDKS in scripts/toolchain.mjs, holds no checksum for it). ${MEND_LIST}.`]);
   // (a folder fetched before is trusted as the machine's own SDK is, but only for a version and machine the list holds)
   const dotnet = path.join(root, "dotnet");
-  if (fs.existsSync(dotnet) && run(dotnet, ["--version"], env).stdout?.trim() === version) return [`toolchain: the .NET SDK ${version} present in ${root}; ${exported}`];
+  if (fs.existsSync(dotnet) && run(dotnet, ["--version"], env).stdout?.trim() === version) return { lines: [`toolchain: the .NET SDK ${version} present in ${root}; ${exported}`], vars };
   const wrong = install(entry, root, env);
-  return [wrong ? `NOT FETCHED: the .NET SDK ${version} (${wrong}` : `toolchain: the .NET SDK ${version} fetched to ${root}, its SHA-512 as the list holds it; ${exported}`];
+  return wrong ? none([`NOT FETCHED: the .NET SDK ${version} (${wrong}`]) : { lines: [`toolchain: the .NET SDK ${version} fetched to ${root}, its SHA-512 as the list holds it; ${exported}`], vars };
 }
 
 // The list's entries for an SDK, read from the publisher's release notes for its channel, for a pull request of the core

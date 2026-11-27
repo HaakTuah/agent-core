@@ -136,7 +136,7 @@ try {
   fs.writeFileSync(path.join(core, "scripts", "owner-settings.json"), JSON.stringify(SETTINGS));
   g(core, "add", "-A"); g(core, "-c", "user.name=a", "-c", "user.email=a@example.invalid", "commit", "-q", "-m", "the list");
   const withList = g(core, "rev-parse", "HEAD");
-  g(at, "clone", "-q", "--bare", core, bare);
+  execFileSync("git", ["clone", "-q", "--bare", "--", ".", bare], { cwd: core, encoding: "utf8" });
   ok(idsAt(withList, bare).join() === IDS.join() && idsAt(before, bare).length === 0, "the list at a commit is read from the bare repository; one from before it holds none");
 
   // the script itself: run from a project with no origin on github.com, which asks GitHub nothing

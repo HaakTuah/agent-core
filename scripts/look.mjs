@@ -145,7 +145,8 @@ function settingOf(options, manifest) {
   return { ...options, job, carrier, at, manifest, repo, owner, scripts, say };
 }
 
-// Whether issues can be read and written in `repo`, as inbox.mjs asks it; null where GitHub gave no answer.
+// Whether issues can be read and written in `repo`, as inbox.mjs asks it; null where GitHub gave no answer. An origin
+// that names no host, which inbox.mjs leaves unasked, reads here as no: the look's own job always runs on one.
 function reachOf(repo) {
   if (!repo) return { yes: false, why: "its origin is not on github.com" };
   let got = null, refused = false;

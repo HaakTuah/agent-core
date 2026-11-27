@@ -64,6 +64,7 @@ const ELSEWHERE = {
   "code-shape.mjs": "the JSON asked for with --json", "pruning.mjs": "the core's own record of a pruning", "pruning-record.mjs": "the core's own record of a pruning",
   "staged.mjs": "the core's own record of the staged cases", "security-review-record.mjs": "the core's own record of reviews",
   "release-trial.mjs": "the core's own record of a release's trial",
+  "daily-try.mjs": "its clones, logs and counts, in a folder of the runner's outside every repository",
 };
 // (and every staged case, which writes its scratch project: scripts/staged/)
 const STAGED = "staged/";

@@ -105,7 +105,7 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
     git(evil, "add", "-A"); git(evil, "commit", "-q", "-m", "a project");
     git(tmp, "init", "-q", "--bare", "-b", "main", origin3);
     git(evil, "remote", "add", "origin", origin3); git(evil, "push", "-q", "-u", "origin", "main");
-    git(tmp, "clone", "-q", "--bare", lib, bare);
+    execFileSync("git", ["clone", "-q", "--bare", "--", ".", bare], { cwd: lib, stdio: ["ignore", "pipe", "pipe"] });
     const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: bare, env, input: "echo FORGED\n", encoding: "utf8" }).trim();
     const tree = git(bare, "rev-parse", "HEAD:core/scripts").trim(), body = Buffer.concat([Buffer.from("100644 work-saved.sh\0"), Buffer.from(blob, "hex")]);
     const loose = path.join(bare, "objects", tree.slice(0, 2), tree.slice(2));
