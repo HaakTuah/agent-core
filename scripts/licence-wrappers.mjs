@@ -15,15 +15,37 @@ const GIT_CALL = new RegExp(String.raw`(?<![\w$#])(?:execFileSync|execFile|spawn
 // What changes a parameter's arguments before they reach git.
 const changes = (p, body) => new RegExp(String.raw`(?<![\w$.])${esc(p)}\s*(?:(?:[-+*]|\?\?|\|\||&&)?=(?!=)|\+\+|--|\[[^\]]*\]\s*=(?!=)|\.\s*(?:unshift|splice|shift|reverse|sort|fill|copyWithin)\b)`, "u").test(body);
 
-// The words after which a "/" opens a regular expression, not a division.
+// The words after which a "/" opens a regular expression, not a division, and those whose condition's ")" it follows.
 const BEFORE_REGEX = /(?:^|[^\w$.])(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/u;
-// The place of the last character of what opens at the "/" text[i] outside a string or comment: the "/" itself where it
-// divides (after a name, a number, a closing bracket, a string or "++" or "--"), else the "/" that closes its regular
-// expression on that line, or -1 where none does or a comment stands before it.
-function slashEnd(text, i) {
-  const before = text.slice(Math.max(0, i - 20), i).trimEnd();
-  if (before.endsWith("*/")) return -1;
-  if (/(?:[\w$)\]'"\x60]|\+\+|--)$/u.test(before) && !BEFORE_REGEX.test(before)) return i;
+const BEFORE_CONDITION = /(?:^|[^\w$.])(?:if|while|for|with)\s*$/u;
+// The place of the last character before text[i] that is not a space.
+const lastCode = (text, i) => i - 1 - /\s*$/u.exec(text.slice(Math.max(0, i - 200), i))[0].length;
+// Whether a "/" after the code that ends at text[last] (comments read past) divides: after a name, a number, a closing
+// bracket but a condition's ")", or a string; or null where it cannot be told, after "++" or "--", or after a ")" whose
+// "(" cannot be found by brackets alone.
+function divides(text, last) {
+  const before = text.slice(Math.max(0, last - 19), last + 1);
+  if (/(?:\+\+|--)$/u.test(before)) return null;
+  if (!/[\w$)\]'"\x60]$/u.test(before) || BEFORE_REGEX.test(before)) return false;
+  if (text[last] !== ")") return true;
+  const open = openOf(text, last);
+  return open < 0 ? null : !BEFORE_CONDITION.test(text.slice(Math.max(0, open - 20), open));
+}
+// The "(" that the ")" at text[i] closes, read back by brackets alone, or -1 where a string, comment or "/" stands between.
+function openOf(text, i) {
+  for (let depth = 0; i >= 0; i--) {
+    if ("'\"`/".includes(text[i])) return -1;
+    if (")]}".includes(text[i])) depth++;
+    else if ("([{".includes(text[i]) && --depth === 0) return i;
+  }
+  return -1;
+}
+// The place of the last character of what opens at the "/" text[i], after the code that ends at text[last]: the "/"
+// itself where it divides, else the "/" that closes its regular expression on that line, or -1 where none does or
+// `divides` cannot tell.
+function slashEnd(text, i, last) {
+  const div = divides(text, last);
+  if (div !== false) return div ? i : -1;
   for (let j = i + 1, inClass = false; j < text.length && text[j] !== "\n"; j++) {
     if (text[j] === "\\") j++;
     else if (text[j] === "[") inClass = true;
@@ -32,24 +54,25 @@ function slashEnd(text, i) {
   }
   return -1;
 }
-// The place of the last character of the string, template, comment or regular expression that opens at text[i], or
-// -1 where it cannot be read exactly.
-function skipped(text, i) {
+// The place of the last character of the string, template, comment or regular expression that opens at text[i], after
+// the code that ends at text[last], or -1 where it cannot be read exactly.
+function skipped(text, i, last) {
   if (text.startsWith("//", i)) return text.indexOf("\n", i) - 1;
   if (text.startsWith("/*", i)) { const end = text.indexOf("*/", i + 2); return end < 0 ? -1 : end + 1; }
-  return text[i] === "/" ? slashEnd(text, i) : stringEnd(text, i, (t, j) => codeEnd(t, j, false));
+  return text[i] === "/" ? slashEnd(text, i, last) : stringEnd(text, i, (t, j) => codeEnd(t, j, false));
 }
 // The place where code that starts at text[i] ends, its strings, comments and regular expressions read past: after
 // the "}" of the block that opens there where `block`, else at the first ",", ";" or closing bracket at its own depth;
 // or -1 where it cannot be read exactly.
 function codeEnd(text, i, block) {
-  for (let depth = 0; i < text.length; i++) {
-    const ch = text[i];
+  for (let depth = 0, last = lastCode(text, i); i < text.length; i++) {
+    const ch = text[i], note = ch === "/" && "/*".includes(text[i + 1]);
     if (!block && !depth && ",;)]}".includes(ch)) return i;
-    if ("'\"`/".includes(ch)) { i = skipped(text, i); if (i < 0) return -1; }
+    if ("'\"`/".includes(ch)) { i = skipped(text, i, last); if (i < 0) return -1; }
     else if ("([{".includes(ch)) depth++;
     else if (")]}".includes(ch) && --depth === 0 && block) return i + 1;
     else if (depth < 0) return -1;
+    if (!note && !/\s/u.test(ch)) last = i;
   }
   return -1;
 }
@@ -64,7 +87,7 @@ function constArray(text, name) {
 // parameter, whether it is a rest parameter, and the arguments before it, strings or a name the file holds as an array
 // of strings; or null where it hands on none exactly.
 function handsOn(text, i, params) {
-  // (a parameter read by a member there, as `args.filter(Boolean)`, is handed on loosely)
+  // (a parameter read by "." or "?." there, as `args.filter(Boolean)`, is handed on loosely)
   const alone = new RegExp(String.raw`^(${NAME})\s*([,)]|\??\.)`, "u").exec(text.slice(i, i + 200));
   if (alone) { const at = params.findIndex((p) => p?.name === alone[1]); return at < 0 ? null : { at, rest: params[at].rest, before: [], loose: alone[2] !== "," && alone[2] !== ")" }; }
   const array = text[i] === "[" ? arrayAt(text, i) : null, before = [];
@@ -81,12 +104,12 @@ function handsOn(text, i, params) {
 }
 
 // The body of the function whose parameters' list closes at text[i]: its start and end, a block or, after "=>", an
-// expression; or null where it cannot be read exactly.
+// expression; where it cannot be read to its end, read loosely to the text's end; or null where no body opens there.
 function bodyAt(text, i, arrow) {
   const after = /^\s*(=>)?\s*/u.exec(text.slice(i, i + 400)), start = i + after[0].length;
   if (arrow !== Boolean(after[1]) || (!arrow && text[start] !== "{")) return null;
   const end = codeEnd(text, start, text[start] === "{");
-  return end < 0 ? null : { start, end };
+  return end < 0 ? { start, end: text.length, loose: true } : { start, end, loose: false };
 }
 
 /** The functions `text` defines that hand a parameter of their own on to git (above), each by its name: the place of
@@ -102,8 +125,9 @@ export function wrappers(text) {
     const inside = text.slice(body.start, body.end);
     for (const call of inside.matchAll(GIT_CALL)) {
       const hand = handsOn(text, body.start + call.index + call[0].length, params);
-      // (one whose parameter is changed before it reaches git is read loosely: each call that holds "clone" is a clone)
-      if (hand) { out.set(name, { ...hand, loose: hand.loose || changes(params[hand.at].name, inside), exported: Boolean(m[1]) || exportsName(text, name) }); break; }
+      // (one whose parameter is changed before it reaches git, or whose body cannot be read, is read loosely: each call
+      // that holds "clone" is a clone)
+      if (hand) { out.set(name, { ...hand, loose: hand.loose || body.loose || changes(params[hand.at].name, inside), exported: Boolean(m[1]) || exportsName(text, name) }); break; }
     }
   }
   return out;
@@ -134,7 +158,7 @@ function normal(p) {
 }
 
 // Whether the arguments that open at text[i], which cannot be read, cannot be read to their end either, or hold "clone"
-// as a string up to the later of their end and the next ";".
+// as a string up to the later of their end and the next ";", or the text's end where none follows.
 const unread = (text, i) => { const end = codeEnd(text, i, true), semi = text.indexOf(";", i); return end < 0 || /['"`]clone['"`]/u.test(text.slice(i, Math.max(end, semi < 0 ? text.length : semi))); };
 
 /** Each git clone in `text`, of the file `f` (a path from the project's root), by a function that hands its arguments
