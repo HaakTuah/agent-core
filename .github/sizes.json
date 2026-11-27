@@ -24,9 +24,9 @@
     "tests/converge-test.mjs": { "mark": 22202, "why": "the question of a split is asked in #1283" },
     "scripts/labels.mjs": { "mark": 22008, "why": "the question of a split is asked in #1186" },
     "scripts/sync.mjs": { "mark": 22147, "why": "the question of a split is asked in #1250" },
+    "scripts/pure-sync.mjs": { "mark": 22852, "why": "the question of a split is asked in #1385" },
     "scripts/comment-only.mjs": { "mark": 28954, "why": "the question of a split is asked in #1341" },
     "SECURITY.md": { "mark": 21346, "why": "the question of a split is asked in #1255" },
-    ".github/sizes.json": { "mark": 20901, "why": "a list a script reads, each entry looked up by its path; no split lets anyone read less" },
     "scripts/licences.mjs": { "mark": 52937, "why": "the question of a split is asked in #1151" },
     "scripts/packages.mjs": { "mark": 25772, "why": "the question of a split is asked in #1151" },
     "tests/exact-versions-test.mjs": { "mark": 20990, "why": "the question of a split is asked in #1151" },
@@ -36,6 +36,8 @@
     ".github/workflows/security-review.yml": { "mark": 29919, "why": "One job that each project calls pinned, its shell inline so that nothing the pull request checks out runs with its token; a session reads the step it changes, found by its name, and a second called workflow would start a second job, billed a whole minute on a private repository's free plan" },
     "scripts/staged.mjs": { "mark": 30534, "why": "the question of a split is asked in #1157" },
     "scripts/init.mjs": { "mark": 30906, "why": "the question of a split is asked in #1098" },
+    "tests/checks-test.mjs": { "mark": 22508, "why": "the question of a split is asked in #1391" },
+    "tests/trial-test.mjs": { "mark": 21844, "why": "the question of a split is asked in #1391" },
     "tests/check-test.mjs": { "mark": 31544, "why": "#1073: npm stand-in's test split off; the rest is one scratch project's cases, written again by a split" },
     "scripts/check.mjs": { "mark": 33867, "why": "the question of a split is asked in #1064" },
     "scripts/checks.mjs": { "mark": 24179, "why": "the question of a split is asked in #1064" },
@@ -60,12 +62,8 @@
       "mark": 49085,
       "why": "#929: the cases of how Betterleaks reads apart from what the check reads."
     },
-    ".github/shape-baseline.json": {
-      "mark": 20951,
-      "why": "The shape check's one baseline (scripts/shape.mjs), which it reads whole and a session reads by the id of the one entry it adds or takes out, found by its name; main stood past the mark at 20,580 bytes with no entry here when #582 added its test's."
-    },
     ".github/workflows/tests.yml": {
-      "mark": 75194,
+      "mark": 94371,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {

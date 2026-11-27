@@ -310,6 +310,9 @@ jobs:
       - name: The lookup of a new package from PyPI, on recorded answers
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-pypi-test.mjs ')) }}
         run: node tests/lookup-pypi-test.mjs
+      - name: The lookup's reader of a requirements file, on a file's own text
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-pypi-read-test.mjs ')) }}
+        run: node tests/lookup-pypi-read-test.mjs
       - name: The sync's step that asks a lookup beside each check of exact versions
         if: ${{ !cancelled() && contains(matrix.parts, 'scans') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-step-test.mjs ')) }}
         run: node tests/lookup-step-test.mjs
