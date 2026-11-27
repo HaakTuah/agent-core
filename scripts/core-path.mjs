@@ -8,7 +8,8 @@
 // (a folder of this repository: its files committed, or a submodule), at <path>/ inside it, as that library's own
 // manifest, <library>/core-manifest.md, pins it: one sync, in the library. `core/` is the default and the first form's
 // usual path, so a project in one repository reads as it always did. The core's own repository has no manifest, and its
-// path is "" (its root). Node's own modules only; proven by core-path-test.mjs and core-path-hooks-test.mjs.
+// path is "" (its root). Node's own modules only; proven by core-path-test.mjs, core-path-hooks-test.mjs
+// and core-path-read-test.mjs.
 //
 //   node core/scripts/core-path.mjs           prints the path, from the project's root; a line with its mend where the
 //                                             line is wrong
@@ -55,13 +56,52 @@ export function corePath(root = ".") {
 }
 
 /** The manifest's text at `file`, or null where there is none. One that is no regular file, a link to a device say, or
- *  past a mebibyte reads as empty, its "Core:" line then missing, so that it stops no script that reads it. Given
- *  `{ linked: false }`, a link itself is no regular file, whatever it leads to (SECURITY.md, rule 5). */
+ *  past a mebibyte, or that stands there but cannot be read, reads as empty, its "Core:" line then missing, so that it stops no script that reads it. Given
+ *  `{ linked: false }`, as the suites' selection reads its rules file, a link itself is no regular file, whatever it
+ *  leads to; the manifest's other readers follow one (SECURITY.md, rule 5). */
 export function manifestText(file, { linked = true } = {}) {
-  let stat;
-  try { stat = linked ? fs.statSync(file) : fs.lstatSync(file); } catch { return null; }
-  if (!stat.isFile() || stat.size > 1 << 20) return "";
-  try { return fs.readFileSync(file, "utf8"); } catch { return null; }
+  const text = regularText(file, { linked });
+  if (text !== null) return text;
+  // (none read: null where nothing stands there, as the link that leads nowhere it follows, else empty)
+  try { (linked ? fs.statSync : fs.lstatSync)(file); return ""; } catch { return null; }
+}
+const isLink = file => { try { return fs.lstatSync(file).isSymbolicLink(); } catch { return false; } };
+
+/** The text of the regular file at `file`, read through one descriptor so that what is checked is what is read: opened
+ *  once, without following a link where `linked` is false and without waiting (a pipe swapped in stops nothing), where
+ *  the platform gives those flags, then checked open, and at most `bound` bytes of it read. Null where it is not there,
+ *  is no regular file (a link, where `linked` is false), is past the bound or cannot be read. */
+export function regularText(file, { linked = true, bound = 1 << 20 } = {}) {
+  const { O_RDONLY, O_NOFOLLOW, O_NONBLOCK } = fs.constants;
+  // (where the platform gives no flag that refuses a link as it opens, as Windows, the link is refused before it)
+  if (!linked && O_NOFOLLOW === undefined && isLink(file)) return null;
+  // (where it follows a link, what the link leads to is looked at first, and opened only where it is a regular file; the
+  // file opened must then be the one looked at, else nothing of it is read)
+  const seen = linked ? lookedAt(file, bound) : undefined;
+  if (seen === null) return null;
+  let fd;
+  try { fd = fs.openSync(file, O_RDONLY | (linked ? 0 : O_NOFOLLOW ?? 0) | (O_NONBLOCK ?? 0)); } catch { return null; }
+  try {
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile() || stat.size > bound || (seen !== undefined && (stat.dev !== seen.dev || stat.ino !== seen.ino))) return null;
+    return readAtMost(fd, bound);
+  } catch { return null; } finally { fs.closeSync(fd); }
+}
+// What the path leads to, where it is a regular file within `bound` bytes; else null.
+function lookedAt(file, bound) {
+  try { const seen = fs.statSync(file); return seen.isFile() && seen.size <= bound ? seen : null; } catch { return null; }
+}
+// The text an open descriptor holds, or null past `bound` bytes: one byte past it is asked, so that a file grown since
+// it was checked is read as past it.
+function readAtMost(fd, bound) {
+  const chunks = [];
+  let total = 0;
+  while (total <= bound) {
+    const chunk = Buffer.alloc(Math.min(1 << 16, bound + 1 - total)), n = fs.readSync(fd, chunk, 0, chunk.length, null);
+    if (n === 0) break;
+    chunks.push(chunk.subarray(0, n)); total += n;
+  }
+  return total > bound ? null : Buffer.concat(chunks).toString("utf8");
 }
 
 /** A text of the starter kit's or of the sync notes' as the project holds it, whose copy of the core stands at `copy`

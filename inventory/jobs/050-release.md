@@ -4,7 +4,7 @@
   reads, with the sync's reading against the commit tried that `trial-sync.mjs` reads (#1261), and the checks of the
   draft of the sync in the owner's own projects that `trial-draft.mjs` reads and `trial-draft-record.mjs` records (#1334), and the
   trial's brief, which `trial-brief.mjs` prints (#1413, point 1), and whether a trial is due, which `release-due.mjs`
-  counts for the scheduled look (#1413, point 4). *Runs:* the
+  counts for the scheduled look (#1413, point 4), a line counted where a merge or an account that can write closed it. *Runs:* the
   runners, started by hand, and daily. *Else:* release-please, semantic-release and changesets, dropped on
   fact: they write versions and notes from commit messages, which the core does not ask. *Bugs:* 0. **Keep:** small and
   stable.

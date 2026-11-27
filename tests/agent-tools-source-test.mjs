@@ -6,7 +6,7 @@
 //
 //   node tests/agent-tools-source-test.mjs
 import { fetchesMain } from "../scripts/hook-source.mjs";
-import { run, pr, project, script, listing, withHook, entry, TREE_HOOK, NOT_KIT, MAIN_HOOK, kitCommand, KIT_HOOK, withSetting, KIT, front, HOOKS, asserting } from "../scripts/agent-tools-scratch.mjs";
+import { run, pr, project, script, listing, withHook, entry, TREE_HOOK, NOT_KIT, MAIN_HOOK, kitCommand, KIT_HOOK, withSetting, KIT, front, HOOKS, asserting, fromWorkingTree } from "../scripts/agent-tools-scratch.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -86,6 +86,64 @@ passes(run(pr(project({ ...script, ...listing() }), withSetting("permissions", {
 for (const front of ["PermissionMode: default\npermissionMode: bypassPermissions", "permissionMode: default\npermissionMode: bypassPermissions"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": `---\nname: rev\n${front}\n---\n` })), `a permission mode written twice, ${front.split("\n")[0]} first, fails`, NOKIT, "permissionMode");
 for (const body of ["# c\n> ```!\nbash x.sh\n```\n", "# c\n````!\nbash x.sh\n````\n", "# c\nRun this: ```!\nbash x.sh\n```\n"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/commands/c.md": body })), `a command's block that runs a command, ${JSON.stringify(body.split("\n")[1])}, fails`, NOKIT);
 fails(run(pr(project({ ...script, ...listing(SK), ".claude/skills/s/SKILL.md": "# s\n" }), { ".claude/skills/s/SKILL.md": "---\nname: s\nallowed-tools: Bash(*)\n---\n# s\n" })), "a skill's tools it lets run without asking fail as a setting", NOKIT);
+// (every hook a tool configures is weighed, whatever its type: a web hook's address, a prompt or an agent is no command the
+// kit's form can be read in, so each runs no command the check can read; listed and new, it is refused, and one the base
+// held is noted while it stands, or listed in the baseline)
+const NOCMD = "is of a type that runs no command the check can read";
+const other = [
+  ["a web hook of .claude/settings.json", ".claude/settings.json", hook => ({ hooks: { ...JSON.parse(KIT).hooks, PostToolUse: [{ hooks: [hook] }] } }), { type: "http", url: "https://hooks.example.invalid/x" }, h => `PostToolUse: ${JSON.stringify(h)}`],
+  ["a prompt hook of .claude/settings.json", ".claude/settings.json", hook => ({ hooks: { ...JSON.parse(KIT).hooks, PostToolUse: [{ hooks: [hook] }] } }), { type: "prompt", prompt: "Is the work done?" }, h => `PostToolUse: ${JSON.stringify(h)}`],
+  ["an agent hook of .codex/hooks.json", ".codex/hooks.json", hook => ({ hooks: { Stop: [{ hooks: [hook] }] } }), { type: "agent", prompt: "Check the tests" }, h => `Codex Stop: ${JSON.stringify(h)}`],
+  ["a Kiro hook with no command", ".kiro/hooks/ask.json", hook => ({ version: "v1", hooks: [hook] }), { name: "ask", trigger: "Stop", action: { type: "askAgent", prompt: "Review it" } }, h => `Kiro Stop: ${JSON.stringify(h)}`],
+];
+for (const [what, file, write, hook, name] of other) {
+  const listed = (extra = {}) => listing({ kind: "hook", name: name(hook), publisher: "this project", ...extra });
+  fails(run(pr(project({ ...script, ...listing() }), { [file]: write(hook), ...listed() })), `${what}, listed and new, is weighed and refused`, NOCMD, "Mend: take it out of the project's files");
+  fails(run(pr(project({ ...script, ...listing() }), { [file]: write(hook), ...listed(fromWorkingTree) })), `and marked as the baseline's while the base held none, it is refused`, NOCMD, "the base held no such hook");
+  const stood = run(pr(project({ ...script, [file]: write(hook), ...listed() }), { "README.md": "x\n" }));
+  ok(stood.status === 0 && stood.out.includes("as the base held it") && stood.out.includes(NOCMD), `${what} the base held is noted while it stands`, stood.out);
+  const kept = run(pr(project({ ...script, [file]: write(hook), ...listed(fromWorkingTree) }), { "README.md": "x\n" }));
+  ok(kept.status === 0 && kept.out.includes("its entry lists it in the baseline"), `and listed in the baseline, it is noted there`, kept.out);
+}
+// (and a value in a shape a tool's hooks are not written in is refused, never passed over unread; one the base held, as it
+// stands, fails nothing)
+const kitHooks = JSON.parse(KIT).hooks, cmd = { type: "command", command: "bash x.sh" };
+const kiro = confirm => ({ version: "v1", hooks: [{ name: "ask", trigger: "Stop", action: { type: "askAgent", prompt: "Review it" }, confirm }] });
+const shapes = [
+  ["a \"hooks\" that is a list", ".claude/settings.json", { hooks: [cmd] }, "\"hooks\" is not a JSON object"],
+  ["an event's hooks that are no list", ".claude/settings.json", { hooks: { ...kitHooks, PostToolUse: { hooks: [cmd] } } }, "\"hooks.PostToolUse\" is not a list of hook groups"],
+  ["a group that is no object", ".claude/settings.json", { hooks: { ...kitHooks, PostToolUse: ["bash x.sh"] } }, "a group of \"hooks.PostToolUse\" is not an object"],
+  ["a command hook whose command is no text", ".claude/settings.json", { hooks: { ...kitHooks, PostToolUse: [{ hooks: [{ type: "command", command: ["bash x.sh"] }] }] } }, "the \"command\" of a hook of \"hooks.PostToolUse\" is not a text"],
+  ["a group's hooks that are no list", ".codex/hooks.json", { hooks: { Stop: [{ hooks: { a: cmd } }] } }, "the \"hooks\" of a group of \"hooks.Stop\" is not a list of hooks"],
+  ["a Windows command that is no text", ".codex/hooks.json", { hooks: { Stop: [{ hooks: [{ ...cmd, commandWindows: ["bash x.sh"] }] }] } }, "the \"commandWindows\" of a hook of \"hooks.Stop\" is not a text"],
+  ["a Codex notify that is no list", ".codex/config.toml", 'notify = "bash x.sh"\n', "\"notify\" is not a list of texts"],
+  ["a Kiro hook's confirm command that is no text", ".kiro/hooks/ask.json", kiro({ confirmCommand: ["bash x.sh"] }), "the \"confirm.confirmCommand\" of the hook \"ask\" is not a text"],
+  ["a Kiro hook's option run that is no text", ".kiro/hooks/ask.json", kiro({ options: [{ run: { sh: "bash x.sh" } }] }), "the \"confirm.options[0].run\" of the hook \"ask\" is not a text"],
+  ["a Kiro hook's options that are no list", ".kiro/hooks/ask.json", kiro({ options: { a: { run: "bash x.sh" } } }), "the \"confirm.options\" of the hook \"ask\" is not a JSON list"],
+  ["a Kiro hook's option that is no object", ".kiro/hooks/ask.json", kiro({ options: ["bash x.sh"] }), "the \"confirm.options[0]\" of the hook \"ask\" is not a JSON object"],
+  ["a Kiro hook's confirm that is no object", ".kiro/hooks/ask.json", kiro("bash x.sh"), "the \"confirm\" of the hook \"ask\" is not a JSON object"],
+];
+// (another part of the same file changed, the value in the wrong shape the base held as it stands)
+const besides = settings => typeof settings === "string" ? `${settings}model = "o"\n` : { ...settings, description: "another part" };
+for (const [what, file, settings, says] of shapes) {
+  fails(run(pr(project({ ...script, ...listing() }), { [file]: settings })), `${what} is refused`, says, "Mend: write it as one");
+  const stood = run(pr(project({ ...script, ...listing(), [file]: settings }), { "README.md": "x\n" }));
+  ok(stood.status === 0, `and where the base held it as it stands, it fails nothing`, stood.out);
+  const edited = run(pr(project({ ...script, ...listing(), [file]: settings }), { [file]: besides(settings) }));
+  ok(edited.status === 0, `and nothing either where the pull request changes another part of its file`, edited.out);
+}
+// (a second value in the wrong shape where the base held one, before it, after it or the same again, is refused, never
+// read as the base's: each value is a problem of its own)
+const at = (groups, file = ".claude/settings.json") => ({ [file]: { hooks: { ...(file === ".claude/settings.json" ? kitHooks : {}), ...groups } } });
+for (const [order, groups] of [["before", ["new", "old"]], ["after", ["old", "new"]], ["the same again", ["old", "old"]]])
+  fails(run(pr(project({ ...script, ...listing(), ...at({ PostToolUse: ["old"] }) }), at({ PostToolUse: groups }))), `a second group in the wrong shape ${order} the base's is refused`, "FAIL: .claude/settings.json: a group of \"hooks.PostToolUse\" is not an object");
+const windowsOld = { hooks: [{ ...cmd, commandWindows: ["old"] }] }, windowsNew = { hooks: [{ type: "command", command: KIT_HOOK, commandWindows: [KIT_HOOK] }] };
+fails(run(pr(project({ ...script, ...listing(), ...at({ Stop: [windowsOld] }, ".codex/hooks.json") }), { ...at({ Stop: [windowsNew, windowsOld] }, ".codex/hooks.json"), ...listing({ kind: "hook", name: `Codex Stop: ${KIT_HOOK} (Windows: ${KIT_HOOK})`, publisher: "this project" }) })), "a new hook's Windows command in the wrong shape, listed, before the base's, is refused", "FAIL: .codex/hooks.json: the \"commandWindows\" of a hook of \"hooks.Stop\" is not a text");
+const askNew = { name: "ask", trigger: "Stop", action: { type: "command", command: KIT_HOOK }, confirm: "bash y.sh" };
+fails(run(pr(project({ ...script, ...listing(), ".kiro/hooks/ask.json": kiro("bash x.sh") }), { ".kiro/hooks/ask.json": { version: "v1", hooks: [askNew, ...kiro("bash x.sh").hooks] }, ...listing({ kind: "hook", name: `Kiro Stop: ${KIT_HOOK}`, publisher: "this project" }) })), "a new Kiro hook of the same name whose confirm is in the wrong shape, listed, before the base's, is refused", "FAIL: .kiro/hooks/ask.json: the \"confirm\" of the hook \"ask\" is not a JSON object");
+// (a hook with no type, and one of another type written inline in .codex/config.toml, are weighed as any of another type)
+fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": { hooks: { ...kitHooks, Stop: [{ hooks: [{ prompt: "Is it done?" }] }] } }, ...listing({ kind: "hook", name: `Stop: ${JSON.stringify({ prompt: "Is it done?" })}`, publisher: "this project" }) })), "a hook with no type, listed and new, is refused", NOCMD);
+fails(run(pr(project({ ...script, ...listing() }), { ".codex/config.toml": '[[hooks.Stop]]\n[[hooks.Stop.hooks]]\ntype = "prompt"\nprompt = "Is it done?"\n', ...listing({ kind: "hook", name: `Codex Stop: ${JSON.stringify({ type: "prompt", prompt: "Is it done?" })}`, publisher: "this project" }) })), "and so is a prompt hook inline in .codex/config.toml", NOCMD);
 }
 
 // (whether a command fetches a file from main, in any form, read from its words: what its entry's mark follows; #1273)

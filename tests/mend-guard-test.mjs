@@ -22,6 +22,10 @@ const ok = (cond, what) => { count++; if (cond) console.log(`ok   ${what}`); els
   const here = "FAIL: a. Mend: run node scripts/x.mjs, then commit.", gone = "FAIL: a. Mend: run `node core/scripts/x.mjs --write`.";
   ok(mended(here, { from: at }) && !mended(gone, { from: at }) && mended(gone) && missing(gone, at).length === 1 && /core\/scripts\/x\.mjs/u.test(missing(gone, at)[0]),
     "a mend naming a script there from the folder it ran in is mended; one naming a path not there is not, where the folder is given");
+  const abs = `FAIL: a. Mend: run node ${path.join(at, "scripts", "x.mjs").replace(/\\/gu, "/")} now.`;
+  ok(!mended("FAIL: a. Mend: run node /no/such/x.mjs now.", { from: at }) && !mended('FAIL: a. Mend: run node "core/scripts/gone.mjs" now.', { from: at })
+    && !mended("FAIL: a. Mend: run node 'core/scripts/gone.mjs' now.", { from: at }) && mended(abs, { from: at }) && mended('FAIL: a. Mend: run node "scripts/x.mjs" now.', { from: at })
+    && missing("FAIL: a. Mend: run node /no/such/x.mjs now.", at).length === 1, "an absolute or quoted path after node is read as a relative one is (#1488)");
   ok(mended("FAIL: a. Mend: run `if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi`.", { from: at })
     && mended("FAIL: a. Mend: run node <the core's path>scripts/x.mjs, or node ${dir}scripts/y.mjs.", { from: at })
     && mended("FAIL: a. Mend: run node scripts/x.mjs.", { from: at }) && mended("note node core/scripts/gone.mjs\nFAIL: a. Mend: do it here.", { from: at }),
