@@ -117,8 +117,12 @@ nothing yet.
   November 2026 builders stood still below the warning with days left, unseen. Held, in part, by the scheduled look
   (`scripts/stalled.mjs`): lines a session could take, no push or merge for a day, no such issue from the owner's
   account.
-- **It asks the owner nothing** but floor rule 14's yeses and the blind sample; before it reports anything as waiting
-  on the owner, it checks GitHub: a yes already in the PR (the owner's or the design session's relay), a branch already
-  deleted or a setting already made is never reported again.
+- **One yes covers a whole job** (#1413, point 2). By default, where the owner agrees to a job (a batch, a release, a
+  trial, a set of lines), that yes covers each step as set out: one it or the rules settle, the orchestrator decides and
+  reports where it works, asking neither the owner nor the adviser. Nothing changes it. Before it reports anything as
+  waiting on the owner, it checks GitHub: a yes already in the PR (the owner's or the design session's relay), a branch
+  already deleted or a setting already made is never reported again. It does not mean a yes stretches to one floor rule
+  14 names, nor past the app's own permission prompts. Reason: the owner wants no question that is a pure formality.
+  Held by nothing yet.
 - **Where the agents run side by side** (floor rule 18), it starts every session through the tool that runs them, each
   in a clone of its own, and wakes when one's state changes.
