@@ -10,6 +10,7 @@
 //     said so;
 //   - in a project, its copy's checks.mjs, with the parts copies (the reading-size check among them) and description,
 //     as its own job runs them.
+// It runs the branch's own steps with the session's environment, so it is for the builder's own branch, never another's.
 // Only committed work is read: what is not committed is said, never read. The worktree and its merge go once it ends;
 // the merge's author is a name of this script's, no one's. Git and Node's own modules, and the YAML reader.
 //

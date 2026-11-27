@@ -54,6 +54,27 @@ core.marks({ "asked.md": { mark: 24100, why: "#100" }, "answered.md": { mark: 24
 commit(core.dir, day(ASKED_SINCE, 2), "the questions answered");
 r = splitAsked({ manifest: null, root: core.dir });
 ok(r?.title === SPLIT_TITLE && r.body === null, "once every line answers, its body is null, which closes the issue", JSON.stringify(r));
+// (a branch whose commit was made before the question moved to the look, merged since; and a mark alone written since,
+// where one that stood before answers)
+git(core.dir, "checkout", "-q", "-b", "branch", "HEAD");
+fs.appendFileSync(path.join(core.dir, "old.md"), "one more line\n");
+commit(core.dir, day(ASKED_SINCE, -10), "a change on a branch, made before");
+git(core.dir, "checkout", "-q", "main");
+execFileSync("git", ["-C", core.dir, "merge", "-q", "--no-ff", "-m", "the branch merged since", "branch"], { env: { ...env, GIT_AUTHOR_DATE: day(ASKED_SINCE, 3), GIT_COMMITTER_DATE: day(ASKED_SINCE, 3) } });
+r = splitAsked({ manifest: null, root: core.dir });
+ok([...String(r?.body).matchAll(/^- `([^`]+)`/gmu)].map(m => m[1]).join() === "old.md", "a branch whose commits were made before the question moved to the look, merged since, is read as changed on the day it merged", JSON.stringify(r));
+core.marks({ "old.md": 24100, "asked.md": { mark: 24100, why: "#100" }, "answered.md": { mark: 24100, why: "every reader of it reads it whole" }, "grown.md": { mark: 24100, why: "#99" } });
+commit(core.dir, day(ASKED_SINCE, 4), "a mark alone written since");
+r = splitAsked({ manifest: null, root: core.dir });
+ok(/`old\.md`, \d+ bytes: its line under "past" is a mark alone, with no why/.test(String(r?.body)), "a mark alone written since says no why, as at the check, and the question stands", JSON.stringify(r));
+const stood = repo("stood", CORE_MARKS, { "asked.md": 24100 });
+fs.appendFileSync(path.join(stood.dir, "asked.md"), "one more line\n");
+commit(stood.dir, day(ASKED_SINCE, 1), "a change since");
+ok(splitAsked({ manifest: null, root: stood.dir })?.body === null, "a mark alone that stood before the question moved to the look answers, until its file grows past it", JSON.stringify(splitAsked({ manifest: null, root: stood.dir })));
+fs.writeFileSync(path.join(stood.dir, "tick`ed.md"), big(24000));
+commit(stood.dir, day(ASKED_SINCE, 2), "a file whose name holds a backtick");
+r = splitAsked({ manifest: null, root: stood.dir });
+ok(String(r?.body).includes("- `tick?ed.md`, ") && !String(r?.body).includes("tick`ed"), "a backtick in a file's name is shown as \"?\", so the name cannot write the issue's text", JSON.stringify(r));
 
 // a project: its marks where its run of the check reads them, the starter kit's path where nothing names another
 const project = repo("project", "checks/sizes.json");
