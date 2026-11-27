@@ -106,20 +106,30 @@ function unknown(plain, pace) {
   for (const m of plain.matchAll(TAG)) {
     pace();
     const attrs = m[1] ? (/^\s*$/u.test(m[3]) ? {} : null) : attributes(m[3]);
-    if (target) {
-      const name = m[2].toLowerCase();
-      if (!attrs) return true;
-      if (m[1] && name === "target") target = false;
-      else if (!TASKS.has(name) || Object.keys(attrs).some(a => !TASK_ATTRIBUTES.has(a))) return true;
-    } else if (!m[1] && /^target$/iu.test(m[2])) {
-      if (item !== null || !attrs || Object.keys(attrs).some(a => !TARGET_ATTRIBUTES.has(a))) return true;
-      target = !m[3].trimEnd().endsWith("/");
-    } else {
-      if (!known(ELEMENTS, m[2]) || !attrs || Object.keys(attrs).some(a => !known(ATTRIBUTES, a)) || (!m[1] && unsafe(m[2], attrs, item))) return true;
-      if (ITEMS.test(m[2])) item = m[1] || m[3].trimEnd().endsWith("/") ? null : { name: m[2], attrs };
-    }
+    if (target || (!m[1] && /^target$/iu.test(m[2]))) { target = target ? inTarget(m, attrs) : openTarget(m, attrs, item); if (target === null) return true; continue; }
+    if (!listed(m, attrs, item)) return true;
+    if (ITEMS.test(m[2])) item = m[1] || m[3].trimEnd().endsWith("/") ? null : { name: m[2], attrs };
   }
   return target || plain.replace(TAG, "").includes("<");
+}
+
+// Whether the tag `m` is of an element and its attributes the lists know, and not unsafe where it stands.
+const listed = (m, attrs, item) => known(ELEMENTS, m[2]) && attrs && Object.keys(attrs).every(a => known(ATTRIBUTES, a)) && (m[1] || !unsafe(m[2], attrs, item));
+
+// Whether a <Target> stays open after the tag `m` (its closing tag, or a task of TASKS with attributes of TASK_ATTRIBUTES),
+// or null where the tag is not allowed inside one.
+function inTarget(m, attrs) {
+  const name = m[2].toLowerCase();
+  if (!attrs) return null;
+  if (m[1] && name === "target") return false;
+  return TASKS.has(name) && Object.keys(attrs).every(a => TASK_ATTRIBUTES.has(a)) ? true : null;
+}
+
+// Whether a <Target> the tag `m` opens stays open (it is no self-closing tag), or null where it is not allowed: inside an
+// open item, or with an attribute of TARGET_ATTRIBUTES's other than those.
+function openTarget(m, attrs, item) {
+  if (item !== null || !attrs || !Object.keys(attrs).every(a => TARGET_ATTRIBUTES.has(a))) return null;
+  return !m[3].trimEnd().endsWith("/");
 }
 
 // The tasks a <Target> may hold, and the attributes it and they may take (#1401): a message, warning or error is only
