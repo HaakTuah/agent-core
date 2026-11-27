@@ -1,15 +1,18 @@
 // Tests of the orchestrator's lease (scripts/lease.mjs; core/tasks/tools.md, "One orchestrator works a queue";
 // #1106): a fresh lease of another session stops the wake, a stale one is claimed, a hand-over note stops the old
-// holder and lets the session it names take it, what is read alone says whether the holder's last wake is over an hour
-// old, only the owner's account's comments count, the lease comment and the note it writes read back as written, and the
+// holder whatever it names and lets the session it names take it, what is read alone says whether the holder's last wake is over an hour
+// old, only the owner's account's comments and the lease issue it opened under the lease's title count, a session
+// gh signs in as another account writes nothing, where no lease can stand the wake goes on, the issue is locked as it
+// opens, the newest comments are read however many stand, the lease comment and the note it writes read back as written, and the
 // scheduled look's reader reports a lease renewed by two sessions and wakes over an hour apart while builders ran.
 // Every repository, account and session is invented; GitHub is a stand-in. Node's own modules.
 //
 //   node tests/lease-test.mjs
 import { toolOf } from "../scripts/stand-in-record.mjs";
-import { COLD_MINUTES, ISSUE_TITLE, LABEL, OPENER, TERM_HOURS, TITLE, decide, dueIssue, entriesOf, entryOf, faults, frame, handOverText, holding, leaseText, main, optionsOf, said } from "../scripts/lease.mjs";
-import { DUE } from "../scripts/look.mjs";
+import { COLD_MINUTES, ISSUE_TITLE, LABEL, OPENER, TERM_HOURS, TITLE, decide, dueIssue, entriesOf, entryOf, faults, frame, handOverText, holding, hostOf, leaseIssues, leaseText, main, optionsOf, said } from "../scripts/lease.mjs";
+import { DUE, dueContext } from "../scripts/look.mjs";
 import { LIST, STATES } from "../scripts/labels.mjs";
+import { STATES as ITEM_STATES } from "../scripts/inbox.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -62,7 +65,8 @@ const entries = (...cs) => entriesOf(cs, OWNER);
   ok(decide(handed, "session_c", T0).act === "claim", "the session the note names takes it");
   ok(decide(handed, "session_d", T0).act === "stop", "and no other");
   ok(decide(entries(lease("session_a", T0 - 30 * MIN), note("any", T0 - 5 * MIN)), "session_d", T0).act === "claim", "a note to any lets the next that wakes take it");
-  ok(decide(entries(lease("session_a", T0 - 30 * MIN), note("any", T0 - 5 * MIN)), "session_a", T0).act === "claim", "and the old holder too, since it handed over to any");
+  ok(decide(entries(lease("session_a", T0 - 75 * MIN, 0), note("any", T0 - 5 * MIN)), "session_a", T0).act === "stop", "a note to any stops the holder it replaced, so a cold holder's late wake cannot take the lease back");
+  ok(decide(entries(lease("session_a", T0 - 75 * MIN, 0), note("any", T0 - 5 * MIN), lease("session_d", T0 - 2 * MIN)), "session_a", T0).act === "stop", "and once the fresh one took it, the old holder stays stopped");
   ok(decide(entries(lease("session_c", T0 - 2 * MIN), note("session_c", T0 - 10 * MIN), lease("session_a", T0 - 90 * MIN)), "session_a", T0).act === "stop", "once the named session took it, the old holder is stopped by its lease");
   ok(decide(entries(note("session_c", T0 - (TERM_HOURS * 60 + 5) * MIN)), "session_d", T0).act === "claim", "a note whose session never took the lease goes stale after the term");
   ok(decide(entries(lease("session_b", T0 - 30 * MIN, 1, "claude", "someone-else")), "session_a", T0).act === "claim", "another account's lease comment stops nothing");
@@ -73,7 +77,7 @@ const entries = (...cs) => entriesOf(cs, OWNER);
   const warm = holding(entries(lease("session_b", T0 - 20 * MIN, 0)), T0);
   ok(warm.cold === false && said(warm).join(" ").includes("within the hour"), "a wake within the hour reads as warm: none is started", said(warm).join(" "));
   const cold = holding(entries(lease("session_b", T0 - (COLD_MINUTES + 10) * MIN, 0)), T0);
-  ok(cold.cold === true && cold.fresh === true && said(cold).join(" ").includes("--hand-over"), "a wake over an hour old with no builder reads as cold: start a fresh one with a note", said(cold).join(" "));
+  ok(cold.cold === true && cold.fresh === true && said(cold).join(" ").includes("--hand-over any"), "a wake over an hour old with no builder reads as cold: start a fresh one with a note", said(cold).join(" "));
   const busy = holding(entries(lease("session_b", T0 - (COLD_MINUTES + 10) * MIN, 2)), T0);
   ok(said(busy).join(" ").includes("do not replace it"), "one with builders running is never replaced");
   ok(said(null).join(" ").includes("may be started"), "with no lease, one may be started");
@@ -92,14 +96,16 @@ const entries = (...cs) => entriesOf(cs, OWNER);
 }
 
 // ---- main against a stand-in host ----
-function standIn(comments = [], issues = [{ number: 7 }]) {
+function standIn(comments = [], issues = [{ number: 7 }], { login = OWNER, repository = { has_issues: true } } = {}) {
   const written = [], opened = [];
   return {
     written, opened,
     host: repo => ({
+      repository: () => repository,
+      login: () => login,
       issues: owner => (repo === REPO && owner === OWNER ? issues : []),
       comments: () => comments,
-      open: tool => { opened.push(tool); issues.push({ number: 8 }); return { number: 8 }; },
+      open: tool => { opened.push(tool); issues.push({ number: 8 }); return { number: 8, comments: 0, locked: true, why: "" }; },
       comment: (n, body) => { written.push({ n, body }); comments.push(comment(body, T0)); return {}; },
     }),
   };
@@ -124,14 +130,64 @@ const run = (argv, s) => { const out = []; const code = main(argv, { host: s.hos
   ok(r5.code === 0 && entryOf(comment(s5.written[0].body, T0), OWNER)?.to === "session_c", "--hand-over writes the note", r5.out);
   const r6 = run(["--hand-over", "any"], standIn([], []));
   ok(r6.code === 1, "with no lease issue there is nothing to hand over");
-  const broken = { host: () => ({ issues: () => { throw new Error("gh could not read repos/x/issues: HTTP 502"); } }) };
-  ok(run(["--session", "session_a", "--tool", "claude"], broken).code === 1, "a host that gives no answer fails the wake, saying the mend");
+  const broken = { host: () => ({ repository: () => { throw new Error("gh could not read repos/x: HTTP 502"); } }) };
+  const failed = run(["--session", "session_a", "--tool", "claude"], broken);
+  ok(failed.code === 1, "a host that gives no answer fails the wake, saying the mend");
+  // a session gh signs in as another account: no issue opened, no lease taken, nothing written, its work going on
+  const other = standIn([], [], { login: "another-writer" });
+  const r7 = run(["--session", "session_a", "--tool", "claude"], other);
+  ok(r7.code === 0 && other.opened.length === 0 && other.written.length === 0 && r7.out.includes("goes on"), "a wake where gh acts as another account opens no issue, writes nothing and goes on", r7.out);
+  const otherStale = standIn([lease("session_b", T0 - 200 * MIN)], [{ number: 7 }], { login: "another-writer" });
+  ok(run(["--session", "session_a", "--tool", "claude"], otherStale).code === 0 && otherStale.written.length === 0, "and takes no stale lease of another");
+  const otherFresh = standIn([lease("session_b", T0 - 10 * MIN)], [{ number: 7 }], { login: "another-writer" });
+  ok(run(["--session", "session_a", "--tool", "claude"], otherFresh).code === 2 && otherFresh.written.length === 0, "while another session's fresh lease still stops it");
+  const otherNote = standIn([lease("session_b", T0 - 200 * MIN)], [{ number: 7 }], { login: "another-writer" });
+  ok(run(["--hand-over", "any"], otherNote).code === 1 && otherNote.written.length === 0, "a hand-over where gh acts as another account writes nothing and fails");
+  ok(run([], standIn([lease("session_b", T0 - 10 * MIN)], [{ number: 7 }], { login: "another-writer" })).out.includes("Held by session_b"), "read alone, any account may read who holds it");
+  // where no lease can stand, the wake goes on, saying so
+  const off = standIn([], [], { repository: { has_issues: false } });
+  const r8 = run(["--session", "session_a", "--tool", "claude"], off);
+  ok(r8.code === 0 && r8.out.startsWith("No lease can stand here") && r8.out.includes("goes on") && off.opened.length === 0, "a project whose issues are switched off keeps its orchestrator: the wake goes on", r8.out);
+  const absent = { host: () => ({ repository: () => { throw Object.assign(new Error("gh could not read repos/x"), { absent: true }); } }) };
+  ok(run(["--session", "session_a", "--tool", "claude"], absent).code === 0, "where gh is not here at all, the wake goes on too");
+  const out9 = [];
+  ok(main(["--session", "session_a", "--tool", "claude"], { host: () => { throw new Error("never asked"); }, now: T0, print: l => out9.push(l), repo: null, owner: OWNER, here: () => null }) === 0 && out9.join(" ").startsWith("No lease can stand here"), "and where no repository on github.com stands", out9.join(" "));
+  // the issue is locked as it opens, and a lock refused is said, the wake going on
+  const unlocked = standIn([], []);
+  unlocked.host = (h => repo => ({ ...h(repo), open: () => ({ number: 8, comments: 0, locked: false, why: "HTTP 403" }) }))(unlocked.host);
+  const r10 = run(["--session", "session_a", "--tool", "claude"], unlocked);
+  ok(r10.code === 0 && r10.out.includes("could not be locked") && unlocked.written.length === 1, "a lease issue that could not be locked is said so, and the lease goes on", r10.out);
+}
+
+// ---- the host as the script reads it ----
+{
+  const calls = [];
+  const write = (route, payload, method = "POST") => { calls.push(`${method} ${route}`); return route.endsWith("/lock") ? null : { number: 9 }; };
+  const opened = hostOf(REPO, () => [], write).open("claude");
+  ok(opened.number === 9 && opened.locked === true && calls.join("; ") === `POST repos/${REPO}/issues; PUT repos/${REPO}/issues/9/lock`, "the issue it opens it locks", calls.join("; "));
+  const refused = hostOf(REPO, () => [], (route, p, m) => { if (m === "PUT") throw new Error("HTTP 403\nmore"); return { number: 9 }; }).open("claude");
+  ok(refused.locked === false && refused.why.includes("403") && !refused.why.includes("\n"), "a lock refused is no failure, said in one line");
+  let threw = false;
+  try { hostOf(REPO, () => [], () => ({ number: "9/../x" })).open("claude"); } catch { threw = true; }
+  ok(threw, "an issue's number out of its form reaches no route");
+  // however many comments stand, the newest are read, from the last page back
+  const flood = Array.from({ length: 1500 }, (_, i) => comment("a remark", T0 - 2 * HOUR + i));
+  flood.push(lease("session_b", T0 - 10 * MIN));
+  const pages = [];
+  const read = route => { const page = Number(/[?&]page=(\d+)/.exec(route)[1]); pages.push(page); return flood.slice((page - 1) * 100, page * 100); };
+  const got = hostOf(REPO, read).comments({ number: 7, comments: flood.length }, iso(T0 - 24 * HOUR));
+  ok(pages[0] === 16 && pages.length <= 10 && decide(entriesOf(got, OWNER), "session_a", T0).act === "stop", "past the bound of pages, the newest comments are still read and the lease still found", JSON.stringify(pages));
+  const old = hostOf(REPO, route => (/[?&]page=3\b/.test(route) ? [lease("session_b", T0 - 10 * MIN)] : [comment("old", T0 - 30 * HOUR)])).comments({ number: 7, comments: 201 }, iso(T0 - 24 * HOUR));
+  ok(old.length === 2, "it reads back no further than the first comment older than its reach", String(old.length));
+  // only an issue the owner's account opened under the lease's title is the lease's
+  const listed = [{ number: 3, title: "An old issue", user: { login: OWNER } }, { number: 4, title: ISSUE_TITLE, user: { login: "another-writer" } }, { number: 5, title: ISSUE_TITLE, user: { login: OWNER }, pull_request: {} }, { number: 6, title: ISSUE_TITLE, user: { login: OWNER } }];
+  ok(leaseIssues(listed, OWNER).map(i => i.number).join() === "6", "the label alone makes no issue the lease's: only one the owner's account opened under its title", JSON.stringify(leaseIssues(listed, OWNER)));
 }
 
 // ---- the scheduled look's reader ----
 {
   ok(DUE.includes(dueIssue), "the look reads the lease among what is due");
-  ok(STATES.includes(LABEL), "the label is a state of the labels' list");
+  ok(STATES.includes(LABEL) && Object.values(LIST.state).filter(l => l.lease === true).length === 1 && !ITEM_STATES.includes(LABEL), "the label is the one state of the labels' list marked as the lease's, which no item of the inbox takes");
   ok(ISSUE_TITLE !== TITLE, "the lease issue and the look's issue go by titles of their own");
   const from = T0 - 24 * HOUR;
   const two = faults(entries(lease("session_a", T0 - 60 * MIN), lease("session_b", T0 - 40 * MIN), lease("session_a", T0 - 5 * MIN)), from);
@@ -147,6 +203,8 @@ const run = (argv, s) => { const out = []; const code = main(argv, { host: s.hos
   ok(due?.title === TITLE && due.body?.includes("#7") && due.owner === false, "the look keeps its issue while a fault stands", JSON.stringify(due));
   ok(dueIssue({ repo: REPO, owner: OWNER, at: iso(T0) }, host([lease("session_a", T0 - 60 * MIN)]))?.body === null, "and closes it once none does");
   ok(dueIssue({ repo: REPO, owner: "nobody-here", at: iso(T0) }, host([])) === null, "a project with no lease issue has none");
+  const ctx = { repo: REPO, owner: OWNER, at: iso(T0), manifest: null, say: () => {}, job: false };
+  ok(dueIssue(dueContext(ctx), host([lease("session_a", T0 - 60 * MIN), lease("session_b", T0 - 40 * MIN)]))?.body?.includes("#7"), "the look gives the lease's reader the owner's account, so it reports");
   const unread = dueIssue({ repo: REPO, owner: OWNER, at: iso(T0) }, () => { throw new Error("HTTP 502\nsecond line"); });
   ok(unread?.body === null && unread.unread?.includes("could not be read") && !unread.unread.includes("\n"), "a lease that cannot be read is said so, in one line");
 }

@@ -112,6 +112,9 @@ const ownHeld = scripts => { try { return ownReport(process.cwd(), scripts); } c
 // queued where an update brings a key the issue did not hold (`updating`).
 export const DUE = [stagedCases, capPassed, trialDue, leaseDue, splitAsked, choicesDue, signs, cleaningDue, auditIsDue, blindSample];
 
+// What the look gives each reader of what is due: its repository, manifest, time and the owner's account.
+export const dueContext = ({ repo, manifest, at, owner }) => ({ repo, manifest, at, owner });
+
 export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner, ...(typeof d.requeue === "function" ? { requeue: d.requeue } : {}) }));
 
 // Hours from one time to another, as a number with one decimal.
@@ -194,7 +197,7 @@ function findingsOf(ctx, reach, last) {
   // a missed run
   if (last && hoursBetween(last, at) > MISSED) add(TITLES.missed, `The look before this one ran at ${last}, ${hoursBetween(last, at)} h before this run at ${at}: over ${MISSED} h. Find why and mend it, then close this issue: GitHub switches a scheduled workflow off after 60 days with no activity in the repository (\`gh workflow enable\` turns it back on, as an orchestrator's wake does), a run can fail, and an orchestrator that carries the look may not have woken.`);
   // what else is due, as each rule that sets it comes
-  findings.push(...dueNow({ repo, manifest, at }));
+  findings.push(...dueNow(dueContext(ctx)));
   return { findings, stepsLeft };
 }
 

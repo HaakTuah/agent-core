@@ -67,8 +67,11 @@ from the *owner's account* names the session that holds the queue, its tool and 
 host's (`core/scripts/lease.mjs` writes and reads it). Nothing changes it.
 - At every wake, before anything else, the orchestrator runs `core/scripts/lease.mjs --session <its own> --tool
   <its tool> --builders <how many run>`: where it prints "Stop:" (another session woke within the lease's term, three
-  hours, a first guess, or a hand-over note there names another), it deletes every wake of its own and stops; else the
-  script renews or claims the lease.
+  hours, a first guess, or a hand-over note there names another or replaced its own lease), it deletes every wake of
+  its own and stops; else the script renews or claims the lease. It reads the *owner's account*'s issue and comments
+  alone; where gh acts as another account, it writes nothing, so the wake goes on without the lease, save where
+  another's is fresh. Where no lease can stand (issues switched off, no repository on github.com), it says so and the
+  wake goes on without one; where it fails otherwise, that wake works no lane and keeps its next.
 - The issue's current text is its hand-off, which it keeps current at each change (a builder started or stopped, a
   merge, an order given): the lanes and their pull requests, what each waits on, the orders for now in force (a pace,
   an order of work, a hold), one given only by message among them, and what comes next.
@@ -76,9 +79,9 @@ host's (`core/scripts/lease.mjs` writes and reads it). Nothing changes it.
   lease is fresh, or its holder handed over by a note there. Whoever starts one (the owner, the adviser) runs it first,
   and the new one takes up from the hand-off alone.
 - A cold orchestrator is not woken: where the script says the holder's last wake is over an hour old and it had no
-  builder running, so that its cache has lapsed, whoever resumes the work starts a fresh one from the hand-off, writing
-  the hand-over note to it (`--hand-over <its session>`), as "Hand over at once" (`roles/orchestrator.md`) does for a
-  builder; one with builders running is never replaced, since they report to the session that started them.
+  builder running, so that its cache has lapsed, whoever resumes the work writes the hand-over note (`--hand-over any`,
+  or the fresh session's name where it is known), which stops the old one whatever it names, and starts a fresh one
+  from the hand-off, as "Hand over at once" (`roles/orchestrator.md`) does for a builder; one with builders running is never replaced, since they report to the session that started them.
 - Its wake follows the cache: while a builder of its runs, or a review or check it waits on is due, its next wake
   comes within the cache's hour (55 minutes, a first guess), set again at each wake, which the lease makes safe; with
   nothing in flight (a pause, or no line a session can take) it keeps no wake, its hand-off ready, and the work resumes
@@ -92,7 +95,8 @@ needs a lease, nor that a wake runs on the owner's computer (floor rule 8). Reas
 orchestrator's scheduled wake would have revived it while another account's orchestrator worked the same queue, and a
 wake after its cache lapsed wrote its 440,000 tokens anew ($3.76 for one short turn, against $0.33 warm), where a fresh
 one writes only what it needs. Held by `scripts/lease.mjs` and its test (a fresh lease of another session stops the
-wake, a stale one is claimed, a hand-over note stops the old holder, and read alone it says whether the holder's last
+wake, a stale one is claimed, a hand-over note stops the old holder, a session signed in as another account writes
+nothing and goes on, a project whose issues cannot be read keeps its orchestrator, and read alone it says whether the holder's last
 wake is over an hour old), and by the scheduled look, which reports a lease renewed by two sessions and wakes more than
 an hour apart while builders ran; that the hand-offs are kept current, by nothing yet.
 
