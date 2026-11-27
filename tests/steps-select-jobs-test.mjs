@@ -47,7 +47,7 @@ ok(dotted?.includes("its job `ui`"), "a test named with ./ before it, in a scrip
 const noneSelects = said([job("node", "      - run: node tools/rules-test.js\n"), job("ui", "      - run: node tools/ui-test.js\n")]);
 ok(noneSelects?.includes("its job `node`") && noneSelects.includes("its job `ui`"), "where no job selects, each job that names a test is named", noneSelects);
 
-const runner = said([job("tests", SELECT + "      - run: if [ \"$RUN\" = all ]; then node --test; else node --test $RUN; fi\n"), job("lint", "      - run: npx eslint .\n")]);
+const runner = said([job("tests", SELECT + "      - run: if [ \"$RUN\" = all ]; then node --test; else node --test $RUN; fi\n"), job("lint", "      - run: node tools/lint.mjs .\n")]);
 ok(runner === null, "where no job names a test, one job that selects, handing its runner the files, is done as before", runner);
 
 const nothing = said([job("tests", "      - run: node --test\n")]);
