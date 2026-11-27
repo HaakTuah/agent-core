@@ -72,7 +72,7 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
 // scripts/core-path.mjs is tracked at the root, a core-manifest.md beside it names no copy, and the folder it names is
 // scanned; in a project, which tracks no such script there, the copy is left out
 {
-  const both = { "core-manifest.md": `Core: ${CORE} at ${"a".repeat(40)}, copied whole under lib/ (never edited here).\n`, "lib/a.js": "x();\n", "src/b.js": "y();\n" };
+  const both = { "core-manifest.md": copied("lib/"), "lib/a.js": "x();\n", "src/b.js": "y();\n" };
   const own = targets(checkout(tmp, "targets-own", { ...both, ...OWN_SCRIPT })), copy = targets(checkout(tmp, "targets-copy", both));
   ok(own.includes("lib/a.js") && own.includes("scripts/core-path.mjs") && !copy.includes("lib/a.js") && copy.includes("src/b.js"),
     "in the core's own repository a manifest at its root leaves no folder out of the scan; in a project its copy is left out", JSON.stringify([own, copy]));
