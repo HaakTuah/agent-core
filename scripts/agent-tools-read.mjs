@@ -33,12 +33,13 @@ export function addServers(state, file, servers, tool) {
 // What one hook of these runs: { runs, whether it is a command hook; text, its name's command; commands, each command
 // it may run }, the command Codex runs on Windows in its place among them ("commandWindows", or "command_windows" in
 // TOML), whatever the hook's type, each held to the kit's form and named, so its entry in the list reads otherwise than
-// the kit's.
+// the kit's. A hook of any other type (a prompt, an agent, a web address) is of a kind no starter kit writes, weighed
+// as one (NO_KIT), since what it runs is no command the kit's form can be read in.
 const WINDOWS = ["commandWindows", "command_windows"];
 function commandsOf(hook) {
   const runs = hook?.type === "command" && typeof hook.command === "string";
   const windows = WINDOWS.filter(k => hook && typeof hook === "object" && Object.hasOwn(hook, k)).map(k => hook[k]);
-  if (!runs) return { runs, text: JSON.stringify(hook), commands: windows };
+  if (!runs) return { runs, text: JSON.stringify(hook), commands: [NO_KIT, ...windows] };
   return { runs, text: `${hook.command}${windows.length ? ` (Windows: ${windows.map(String).join(", ")})` : ""}`, commands: [hook.command, ...windows] };
 }
 // The hooks one settings file configures, into configured()'s `state`: Claude Code's, or, with `tool`, another tool's

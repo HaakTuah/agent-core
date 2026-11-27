@@ -1,6 +1,6 @@
 // What Kiro configures (#407): each hook in a JSON file directly under `.kiro/hooks`, and its tool servers in
 // `.kiro/settings/mcp.json`, each named with "Kiro" first.
-import { addHook, addServers, SERVERS } from "./agent-tools-read.mjs";
+import { addHook, addServers, SERVERS, NO_KIT } from "./agent-tools-read.mjs";
 
 // What Kiro configures in the project (tools/kiro.md; kiro.dev, its pages on hooks and on tool servers, read on 16
 // November 2026): each JSON file directly under .kiro/hooks, { "version", "hooks": [ { "name", "trigger", "matcher",
@@ -14,7 +14,8 @@ export function readKiro(state, json, files) {
     for (const hook of Array.isArray(hooks) ? hooks : []) {
       const action = hook?.action, runs = action?.type === "command" && typeof action.command === "string";
       const confirm = hook?.confirm, options = Array.isArray(confirm?.options) ? confirm.options : [];
-      const commands = [runs ? action.command : null, confirm?.confirmCommand, ...options.map(o => o?.run)].filter(c => typeof c === "string");
+      // (an action of any other type, or none, is of a kind no starter kit writes, weighed as one: NO_KIT)
+      const commands = [runs ? action.command : NO_KIT, confirm?.confirmCommand, ...options.map(o => o?.run)].filter(c => typeof c === "string");
       const matcher = typeof hook?.matcher === "string" && hook.matcher ? hook.matcher : "";
       addHook(state, file, { tool: "Kiro", event: String(hook?.trigger), matcher, hook, runs, text: runs ? action.command : JSON.stringify(hook), commands });
     }

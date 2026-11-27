@@ -6,7 +6,7 @@
 //
 //   node tests/agent-tools-source-test.mjs
 import { fetchesMain } from "../scripts/hook-source.mjs";
-import { run, pr, project, script, listing, withHook, entry, TREE_HOOK, NOT_KIT, MAIN_HOOK, kitCommand, KIT_HOOK, withSetting, KIT, front, HOOKS, asserting } from "../scripts/agent-tools-scratch.mjs";
+import { run, pr, project, script, listing, withHook, entry, TREE_HOOK, NOT_KIT, MAIN_HOOK, kitCommand, KIT_HOOK, withSetting, KIT, front, HOOKS, asserting, fromWorkingTree } from "../scripts/agent-tools-scratch.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -86,6 +86,24 @@ passes(run(pr(project({ ...script, ...listing() }), withSetting("permissions", {
 for (const front of ["PermissionMode: default\npermissionMode: bypassPermissions", "permissionMode: default\npermissionMode: bypassPermissions"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": `---\nname: rev\n${front}\n---\n` })), `a permission mode written twice, ${front.split("\n")[0]} first, fails`, NOKIT, "permissionMode");
 for (const body of ["# c\n> ```!\nbash x.sh\n```\n", "# c\n````!\nbash x.sh\n````\n", "# c\nRun this: ```!\nbash x.sh\n```\n"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/commands/c.md": body })), `a command's block that runs a command, ${JSON.stringify(body.split("\n")[1])}, fails`, NOKIT);
 fails(run(pr(project({ ...script, ...listing(SK), ".claude/skills/s/SKILL.md": "# s\n" }), { ".claude/skills/s/SKILL.md": "---\nname: s\nallowed-tools: Bash(*)\n---\n# s\n" })), "a skill's tools it lets run without asking fail as a setting", NOKIT);
+// (every hook a tool configures is weighed, whatever its type: a web hook's address or a prompt is no command the kit's
+  // form can be read in, so each is of a kind no starter kit writes; listed and new, it is refused, and one the base held
+  // is noted while it stands, or listed in the baseline)
+const other = [
+  ["a web hook of .claude/settings.json", ".claude/settings.json", hook => ({ hooks: { ...JSON.parse(KIT).hooks, PostToolUse: [{ hooks: [hook] }] } }), { type: "http", url: "https://hooks.example.invalid/x" }, h => `PostToolUse: ${JSON.stringify(h)}`],
+  ["a prompt hook of .claude/settings.json", ".claude/settings.json", hook => ({ hooks: { ...JSON.parse(KIT).hooks, PostToolUse: [{ hooks: [hook] }] } }), { type: "prompt", prompt: "Is the work done?" }, h => `PostToolUse: ${JSON.stringify(h)}`],
+  ["an agent hook of .codex/hooks.json", ".codex/hooks.json", hook => ({ hooks: { Stop: [{ hooks: [hook] }] } }), { type: "agent", prompt: "Check the tests" }, h => `Codex Stop: ${JSON.stringify(h)}`],
+  ["a Kiro hook with no command", ".kiro/hooks/ask.json", hook => ({ version: "v1", hooks: [hook] }), { name: "ask", trigger: "Stop", action: { type: "askAgent", prompt: "Review it" } }, h => `Kiro Stop: ${JSON.stringify(h)}`],
+];
+for (const [what, file, write, hook, name] of other) {
+  const listed = (extra = {}) => listing({ kind: "hook", name: name(hook), publisher: "this project", ...extra });
+  fails(run(pr(project({ ...script, ...listing() }), { [file]: write(hook), ...listed() })), `${what}, listed and new, is weighed and refused`, NOKIT, "Mend: take it out of the project's files");
+  fails(run(pr(project({ ...script, ...listing() }), { [file]: write(hook), ...listed(fromWorkingTree) })), `and marked as the baseline's while the base held none, it is refused`, NOKIT, "the base held no such hook");
+  const stood = run(pr(project({ ...script, [file]: write(hook), ...listed() }), { "README.md": "x\n" }));
+  ok(stood.status === 0 && stood.out.includes("as the base held it") && stood.out.includes(NOKIT), `${what} the base held is noted while it stands`, stood.out);
+  const kept = run(pr(project({ ...script, [file]: write(hook), ...listed(fromWorkingTree) }), { "README.md": "x\n" }));
+  ok(kept.status === 0 && kept.out.includes("its entry lists it in the baseline"), `and listed in the baseline, it is noted there`, kept.out);
+}
 }
 
 // (whether a command fetches a file from main, in any form, read from its words: what its entry's mark follows; #1273)
