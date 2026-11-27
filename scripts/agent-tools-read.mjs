@@ -7,6 +7,7 @@
 // shows it does not run the working tree's copy, which the branch it runs on can change. One that stood before is listed
 // in the baseline, its entry saying "from": "the working tree", and noted; the baseline only shrinks: a new hook marked
 // so fails, and so does a mark taken out while its hook stands, or a mark on a hook in the kit's form.
+import { createHash } from "node:crypto";
 import { fetchedBy, fetchesMain, libraryOf } from "./hook-source.mjs";
 import { show, canonical, fold } from "./agent-tools-entries.mjs";
 
@@ -45,11 +46,16 @@ function commandsOf(hook) {
   return { runs, bad, text: `${hook.command}${windows.length ? ` (Windows: ${windows.map(String).join(", ")})` : ""}`, commands: [hook.command, ...windows] };
 }
 // A value in a shape its tool does not take, refused as a problem with that value's own text and where it stands, so one
-// the base held is noted while it stands, whatever else of the file changes, as readEnv's are.
+// the base held is noted while it stands, whatever else of the file changes, as readEnv's are. The problem names the
+// value (cut short, with its digest, where long), so two values in one place are two problems, never one whose text the
+// later read overwrote; the same value twice in one place is one problem whose text counts both.
 export function flagShape(state, file, what, form, value, mend = "write it as one, as the tool that reads it takes it") {
-  const problem = `${file}: ${what} is not ${form}. Mend: ${mend}`;
+  const json = JSON.stringify(value) ?? "undefined";
+  const seen = json.length > 40 ? `${json.slice(0, 32)}… (${createHash("sha256").update(json).digest("hex").slice(0, 12)})` : json;
+  const problem = `${file}: ${what} is not ${form} (it reads ${seen}). Mend: ${mend}`, text = `${file}\0${what}\0${json}`;
+  if (state.texts.has(problem)) return void state.texts.set(problem, `${state.texts.get(problem)}\0again`);
   state.problems.push(problem);
-  state.texts.set(problem, `${file}\0${what}\0${JSON.stringify(value) ?? "undefined"}`);
+  state.texts.set(problem, text);
   state.baselined.add(problem);
 }
 // The hooks one settings file configures, into configured()'s `state`: Claude Code's, or, with `tool`, another tool's

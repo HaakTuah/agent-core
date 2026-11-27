@@ -132,6 +132,15 @@ for (const [what, file, settings, says] of shapes) {
   const edited = run(pr(project({ ...script, ...listing(), [file]: settings }), { [file]: besides(settings) }));
   ok(edited.status === 0, `and nothing either where the pull request changes another part of its file`, edited.out);
 }
+// (a second value in the wrong shape where the base held one, before it, after it or the same again, is refused, never
+// read as the base's: each value is a problem of its own)
+const at = (groups, file = ".claude/settings.json") => ({ [file]: { hooks: { ...(file === ".claude/settings.json" ? kitHooks : {}), ...groups } } });
+for (const [order, groups] of [["before", ["new", "old"]], ["after", ["old", "new"]], ["the same again", ["old", "old"]]])
+  fails(run(pr(project({ ...script, ...listing(), ...at({ PostToolUse: ["old"] }) }), at({ PostToolUse: groups }))), `a second group in the wrong shape ${order} the base's is refused`, "FAIL: .claude/settings.json: a group of \"hooks.PostToolUse\" is not an object");
+const windowsOld = { hooks: [{ ...cmd, commandWindows: ["old"] }] }, windowsNew = { hooks: [{ type: "command", command: KIT_HOOK, commandWindows: [KIT_HOOK] }] };
+fails(run(pr(project({ ...script, ...listing(), ...at({ Stop: [windowsOld] }, ".codex/hooks.json") }), { ...at({ Stop: [windowsNew, windowsOld] }, ".codex/hooks.json"), ...listing({ kind: "hook", name: `Codex Stop: ${KIT_HOOK} (Windows: ${KIT_HOOK})`, publisher: "this project" }) })), "a new hook's Windows command in the wrong shape, listed, before the base's, is refused", "FAIL: .codex/hooks.json: the \"commandWindows\" of a hook of \"hooks.Stop\" is not a text");
+const askNew = { name: "ask", trigger: "Stop", action: { type: "command", command: KIT_HOOK }, confirm: "bash y.sh" };
+fails(run(pr(project({ ...script, ...listing(), ".kiro/hooks/ask.json": kiro("bash x.sh") }), { ".kiro/hooks/ask.json": { version: "v1", hooks: [askNew, ...kiro("bash x.sh").hooks] }, ...listing({ kind: "hook", name: `Kiro Stop: ${KIT_HOOK}`, publisher: "this project" }) })), "a new Kiro hook of the same name whose confirm is in the wrong shape, listed, before the base's, is refused", "FAIL: .kiro/hooks/ask.json: the \"confirm\" of the hook \"ask\" is not a JSON object");
 // (a hook with no type, and one of another type written inline in .codex/config.toml, are weighed as any of another type)
 fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": { hooks: { ...kitHooks, Stop: [{ hooks: [{ prompt: "Is it done?" }] }] } }, ...listing({ kind: "hook", name: `Stop: ${JSON.stringify({ prompt: "Is it done?" })}`, publisher: "this project" }) })), "a hook with no type, listed and new, is refused", NOCMD);
 fails(run(pr(project({ ...script, ...listing() }), { ".codex/config.toml": '[[hooks.Stop]]\n[[hooks.Stop.hooks]]\ntype = "prompt"\nprompt = "Is it done?"\n', ...listing({ kind: "hook", name: `Codex Stop: ${JSON.stringify({ type: "prompt", prompt: "Is it done?" })}`, publisher: "this project" }) })), "and so is a prompt hook inline in .codex/config.toml", NOCMD);
