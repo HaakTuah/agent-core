@@ -140,23 +140,28 @@ try {
     ok(run({ ENTRY_BASE: "HEAD" }).status === 0, "once each is again what the base held, it passes");
     // (a base that held a link leading nowhere by a longer way: through a second link, or through a part that is not there)
     write("z/.keep", "");
-    for (const [what, made] of [
+    // (whether the system reads a `..` in a link's text by its spelling, as Windows does, rather than from the folder
+    // the link before it reached: there the two cases marked so reach a folder or file that stands, and nothing is unread)
+    const bySpelling = (() => { const p = path.join(dir, "probe"); fs.symlinkSync("nothere/..", p); try { return fs.existsSync(p); } finally { fs.rmSync(p, { force: true }); } })();
+    for (const [what, made, spelt = false] of [
       ["CLAUDE.md led through a second link to a folder lacking the file", () => { swap("CLAUDE.md", f => fs.symlinkSync("x/c.md", f)); fs.symlinkSync("z", path.join(dir, "x")); }],
       [".agents led through a second link to a folder lacking the rest", () => { swap(".agents", f => fs.symlinkSync("x/y", f)); fs.symlinkSync("z", path.join(dir, "x")); }],
-      [".agents led up out of a folder that is not there", () => swap(".agents", f => fs.symlinkSync("w/..", f))],
+      [".agents led up out of a folder that is not there", () => swap(".agents", f => fs.symlinkSync("w/..", f)), true],
       ...["AGENTS.md/", "AGENTS.md/.", "README.md/../AGENTS.md", "nothere/../AGENTS.md"].map(to => [`CLAUDE.md led through a part that is no folder (${to})`, () => { write("README.md", "x\n"); swap("CLAUDE.md", f => fs.symlinkSync(to, f)); }]),
-      ["CLAUDE.md led through a link and back up from the folder it reached, which lacks the file", () => { swap("CLAUDE.md", f => fs.symlinkSync("x/../AGENTS.md", f)); write("docs/d/.keep", ""); fs.symlinkSync("docs/d", path.join(dir, "x")); }],
+      ["CLAUDE.md led through a link and back up from the folder it reached, which lacks the file", () => { swap("CLAUDE.md", f => fs.symlinkSync("x/../AGENTS.md", f)); write("docs/d/.keep", ""); fs.symlinkSync("docs/d", path.join(dir, "x")); }, true],
     ]) {
       made(); commit(what);
       r = run({ ENTRY_BASE: "HEAD" });
-      ok(r.status === 0 && r.out.includes("note") && r.out.includes("stands here but is not read"), `against a base where ${what}, left so, it is noted and fails nothing`);
+      ok(r.status === 0 && (spelt && bySpelling ? !r.out.includes("stands here but is not read") : r.out.includes("note") && r.out.includes("stands here but is not read")), `against a base where ${what}, left so, it is noted and fails nothing (where the system reads its \`..\` by its spelling, it reaches what stands and fails nothing)`);
       fs.rmSync(path.join(dir, "x"), { force: true }); swap("CLAUDE.md", f => fs.writeFileSync(f, "@AGENTS.md\n")); swap(".agents", () => write(".agents/rules/core.md", AG)); commit(`${what}, undone`);
     }
     // (a link through a folder link, then back up from the folder it reached, to a file there: read as the system reads it)
     write("docs/d/.keep", ""); write("docs/A2.md", "@AGENTS.md\n"); fs.symlinkSync("docs/d", path.join(dir, "x")); swap("CLAUDE.md", f => fs.symlinkSync("x/../A2.md", f)); commit("CLAUDE.md through a folder link and up");
-    // (where the system reads the `..` by its spelling, as Windows may, the work tree reads nothing there, and the check rightly fails)
+    // (where the system reads the `..` by its spelling, as Windows does, the work tree reads nothing there that the base
+    // read, and the check rightly fails, saying so)
     const readsThere = (() => { try { return fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8") === "@AGENTS.md\n"; } catch { return false; } })();
-    ok(!readsThere || run({ ENTRY_BASE: "HEAD" }).status === 0, "against a base that held an entry file as a link through a folder link and back up from the folder it reached, left so, it is read and passes where the system reads it so");
+    r = run({ ENTRY_BASE: "HEAD" });
+    ok(readsThere ? r.status === 0 && !r.out.includes("stands here but is not read") : r.status === 1 && r.out.includes("stands here but is not read"), "against a base that held an entry file as a link through a folder link and back up from the folder it reached, left so, it is read and passes where the system reads it so, and fails, saying so, where it reads the `..` by its spelling");
     fs.rmSync(path.join(dir, "x")); swap("CLAUDE.md", f => fs.writeFileSync(f, "@AGENTS.md\n")); commit("CLAUDE.md through a folder link and up, undone");
     const awayDir = `${away}.d`;
     fs.mkdirSync(path.join(awayDir, "rules"), { recursive: true }); fs.writeFileSync(path.join(awayDir, "rules/core.md"), AG);
