@@ -70,24 +70,31 @@ ok(!missing.length, "each option the brief gives a script is one that script rea
 // the projects found through gh: the account's own that pin a copy, not the core, not another's
 {
   const manifest = Buffer.from(`# Core manifest\n\nCore: ${CORE} at ${SHA}, copied whole under core/ (never edited here).\n`).toString("base64");
-  const repos = [{ full_name: "example-owner/game-one", private: true, owner: { login: "example-owner" } }, { full_name: "example-owner/notes", private: false, owner: { login: "example-owner" } }, { full_name: "friend/shared", private: true, owner: { login: "friend" } }, { full_name: CORE, private: false, owner: { login: "example-owner" } }];
+  const own = { login: "example-owner" }, theirs = { login: "friend" };
+  // (forks as a list gives them, with no parent: one of the owner's own repository, one of another's)
+  const repos = [{ full_name: "example-owner/game-one", private: true, fork: false, owner: own }, { full_name: "example-owner/notes", private: false, fork: false, owner: own }, { full_name: "friend/shared", private: true, fork: false, owner: theirs }, { full_name: CORE, private: false, fork: false, owner: own }, { full_name: "example-owner/game-copy", private: true, fork: true, owner: own }, { full_name: "example-owner/shared", private: true, fork: true, owner: own }];
+  const whole = { "repos/example-owner/game-copy": { full_name: "example-owner/game-copy", fork: true, owner: own, parent: { owner: own }, source: { owner: own } }, "repos/example-owner/shared": { full_name: "example-owner/shared", fork: true, owner: own, parent: { owner: theirs }, source: { owner: theirs } } };
   const gh = (...a) => {
     if (a[0] === "user") return "example-owner\n";
     if (a[0].startsWith("user/repos")) return JSON.stringify(a[0].includes("page=1") ? repos : []);
+    if (Object.hasOwn(whole, a[0])) return JSON.stringify(whole[a[0]]);
     const m = /^repos\/(.+)\/contents\/core-manifest\.md$/.exec(a[0]);
     if (m && m[1] !== "example-owner/notes") return JSON.stringify({ content: manifest });
     throw new Error("gh: Not Found (HTTP 404)");
   };
   const got = briefFor(SHA, [OTHER], gh);
   ok(got.text?.includes("`example-owner/game-one`, the owner's own") && !/example-owner\/notes|friend\/shared/.test(got.text) && !got.text.includes(`\`${CORE}\`, the owner's`), "of what gh lists, only the account's own repositories whose manifest pins a copy are the owner's projects", got.why ?? "");
+  ok(got.text?.includes("`example-owner/game-copy`, the owner's own") && !got.text.includes("example-owner/shared"), "a fork is the owner's own only where its parent and source are the account's too: a fork of another's repository, under the account's name, is not", got.why ?? "");
+  const unread = briefFor(SHA, [], (...a) => { if (a[0] === "repos/example-owner/shared") throw new Error("gh: HTTP 502 Bad Gateway"); return gh(...a); });
+  ok(!unread.text && /Mend: run it again where gh answers/.test(unread.why ?? ""), "where a fork's own answer cannot be read, no brief, never the fork read as the owner's own or not", unread.why ?? "");
   const down = briefFor(SHA, [], () => { throw new Error("gh: connection refused"); });
   ok(!down.text && /nothing read is not none found\. Mend: run it again where gh answers/.test(down.why ?? ""), "where gh gives no answer, no brief, and the mend says why");
   const empty = briefFor(SHA, [], (...a) => a[0] === "user" ? "example-owner\n" : a[0].startsWith("user/repos") ? "[]" : gh(...a));
   ok(!empty.text && /Mend: run it again where gh answers/.test(empty.why ?? ""), "where gh lists no repository at all, no brief, never one that records a trial of none");
   ok(/Mend: give --other only for a project of another owner/.test(briefFor(SHA, ["Example-Owner/game-one"], gh).why ?? ""), "an --other that names one of the owner's own projects is refused");
   const asked = [];
-  const named = briefFor(SHA, [], (...a) => { asked.push(a[0]); if (a[0].startsWith("user/repos")) throw new Error("gh: listing refused (HTTP 403)"); if (a[0] === "repos/example-owner/game-two") return JSON.stringify({ full_name: "example-owner/game-two", private: false, owner: { login: "example-owner" }, permissions: { push: true } }); return gh(...a); }, ["example-owner/game-two"]);
-  ok(named.text?.includes("`example-owner/game-two`, the owner's own") && !named.text.includes("game-one") && !asked.some(r => r.startsWith("user/repos")), "with --repo, the repositories named are read in place of the account's list", named.why ?? asked.join(" "));
+  const named = briefFor(SHA, [], (...a) => { asked.push(a[0]); if (a[0].startsWith("user/repos")) throw new Error("gh: listing refused (HTTP 403)"); if (a[0] === "repos/example-owner/game-two") return JSON.stringify({ full_name: "example-owner/game-two", private: false, fork: false, owner: own, permissions: { push: true } }); if (a[0] === "repos/example-owner/shared") return JSON.stringify({ ...whole[a[0]], private: true, permissions: { push: true } }); return gh(...a); }, ["example-owner/game-two", "example-owner/shared"]);
+  ok(named.text?.includes("`example-owner/game-two`, the owner's own") && !named.text.includes("game-one") && !named.text.includes("example-owner/shared") && !asked.some(r => r.startsWith("user/repos")), "with --repo, the repositories named are read in place of the account's list", named.why ?? asked.join(" "));
 }
 
 // the command line: each refusal says its mend, and gives no brief
