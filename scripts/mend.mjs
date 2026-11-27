@@ -66,10 +66,10 @@ export function mended(output, { from } = {}) {
 }
 
 // The failure a check gives for an error it did not catch: a parser's abort, a raw error of git's, a RangeError.
-// An error whose message is a failure that says its mend already is printed as it stands, on its one line: where that
-// mend names a script to run, its path is read from the process's own folder too (mended(), #1488), in a project the
-// project's, where the mends it prints stand, and one naming a script that is not there, or read where the folder
-// cannot be, is worded as an unknown error. Its words may come from a project's file (a parse error's excerpt), so each
+// An error whose message is a failure that says its mend already is printed as it stands, on its one line, once
+// mended() finds it so: that reads the process's own folder (#1488), in a project the project's, where the mends it
+// prints stand, so one naming a script that is not there, or read where the folder cannot be, is worded as an unknown
+// error. Its words may come from a project's file (a parse error's excerpt), so each
 // is printed as the log reads text alone, any address's sign-in cut out (guards.mjs: loggedAlone, loggedCause, logged;
 // floor rule 1).
 export function unknown(script, error) {
