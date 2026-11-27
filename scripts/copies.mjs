@@ -20,8 +20,9 @@
 //   node core/scripts/copies.mjs <config> --write    lower the baseline to what still stands (it never adds a copy)
 //   node core/scripts/copies.mjs <config> --tools    list in the baseline the copies in an agent tool's files, and
 //                                                    lower the rest as --write does
-//   node core/scripts/copies.mjs <config> --first    write the first baseline, the copies that stand when a project
-//                                                    takes the check; only where no baseline exists yet
+//   node core/scripts/copies.mjs <config> --first    write the first baseline, the copies and the values written twice
+//                                                    that stand when a project takes the check; only where no baseline
+//                                                    exists yet, or, where one holds no "values" yet, that list alone
 //
 // The config, a JSON file the project keeps (its *copies check* slot names it), says what is checked: "baseline", the
 // baseline's path; "code" and "prose", lists of git pathspecs (":!" leaves a path out); and "proseFromSecurity": true
@@ -44,7 +45,7 @@ import { projectAt } from "./core-path.mjs";
 import { keysOf, shapeFaults } from "./schemas.mjs";
 import { didNotRun } from "./packages.mjs";
 import { uncommented } from "./yaml-keys.mjs";
-import { valuesTwice } from "./copies-values.mjs";
+import { listForm, listNow, valuesTwice } from "./copies-values.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
 // core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
 // (git says it, as the path from the root to this folder, so no spelling of a path, such as Windows' short names,
@@ -336,10 +337,20 @@ const places = new Map(runs.flatMap(r => [...r.dup].map(([h, list]) => [h, list.
 // (the copies that stand in an agent tool's file, and their windows)
 const inTools = c => c.files.some(f => TOOL_ONLY.has(f));
 const toolWindows = new Set(found.filter(inTools).flatMap(c => c.windows));
+// (the values written twice as the baseline's "values" lists them: copies-values.mjs)
+const RUN = { core: CORE, config, configPath, configAt: CONFIG_AT, ls, baseline: BASELINE, self: SELF };
 if (process.argv.includes("--first")) {
-  if (fs.existsSync(BASELINE)) fail(`${BASELINE} exists, and --first writes only a project's first baseline. Mend: run the check without --first, or --write to lower the baseline`);
-  fs.writeFileSync(BASELINE, JSON.stringify({ windows: Object.fromEntries([...places].sort()) }, null, 2) + "\n");
-  console.log(`${BASELINE}: the first baseline, ${found.length} old copies in ${places.size} windows, to be removed over time`);
+  let had = null;
+  if (fs.existsSync(BASELINE)) try { had = JSON.parse(fs.readFileSync(BASELINE, "utf8")); } catch { /* (said below) */ }
+  if (fs.existsSync(BASELINE) && !(had && typeof had === "object" && !Array.isArray(had) && !("values" in had))) fail(`${BASELINE} exists${had && "values" in had ? ` and lists its "values"` : ""}, and --first writes only a project's first baseline, or the first list of values where one holds none yet. Mend: run the check without --first, or --write to lower the baseline`);
+  const list = listNow(RUN);
+  if (had) {
+    fs.writeFileSync(BASELINE, JSON.stringify({ ...had, values: list }, null, 2) + "\n");
+    console.log(`${BASELINE}: the first list of values, ${Object.keys(list).length} written twice, to be read from one file over time`);
+  } else {
+    fs.writeFileSync(BASELINE, JSON.stringify({ windows: Object.fromEntries([...places].sort()), values: list }, null, 2) + "\n");
+    console.log(`${BASELINE}: the first baseline, ${found.length} old copies in ${places.size} windows and ${Object.keys(list).length} values written twice, to be removed over time`);
+  }
   process.exit(0);
 }
 if (!fs.existsSync(BASELINE)) fail(`no baseline at ${BASELINE}. Mend: write the project's first with ${SELF} ${configPath} --first, and commit it`);
@@ -353,6 +364,14 @@ const counted = (w, where) => {
   return w;
 };
 counted(base.windows, BASELINE);
+// (a list of values, where it stands, holds keys of a value each to a whole count of one or more: copies-values.mjs)
+const valuesOf = (b, where) => {
+  if (!b || !("values" in b)) return undefined;
+  if (!listForm(b.values)) { console.error(`FAIL: ${logged(where)}'s "values" is no object of keys of 12 hexadecimal characters, each to a whole count of one or more. Mend: take the baseline back as main holds it (git checkout origin/main -- ${logged(BASELINE)}), then run --write to lower it`); process.exit(1); }
+  return b.values;
+};
+const listed = valuesOf(base, BASELINE);
+let listedBase;
 // The baseline holds the old copies window by window: each run of lines or words that is copied, by its hash, and how
 // many places it stands in. Every copied window must be listed with at least as many places, so a copy that is new,
 // spreads to another place, grows, or is copied in part fails.
@@ -392,7 +411,9 @@ if (from) {
   }
   let there = true;
   try { git(["cat-file", "-e", `${from}:${BASELINE}`]); } catch { there = false; } // no baseline on that branch yet
-  const old = there ? counted(parseBounded(git(["show", `${from}:${BASELINE}`])).windows, `${from}:${BASELINE}`) || null : null;
+  const atBaseline = there ? parseBounded(git(["show", `${from}:${BASELINE}`])) : null;
+  const old = there ? counted(atBaseline.windows, `${from}:${BASELINE}`) || null : null;
+  listedBase = there ? valuesOf(atBaseline, `${from}:${BASELINE}`) : undefined;
   // (save a window of a copy that stands in an agent tool's file and that the base held there in as many places:
   // listing what stood is what --tools does, and the base is the list until it is written; #405)
   const raised = old ? Object.entries(base.windows).filter(([h, n]) => (!(h in old) || n > old[h]) && !(toolWindows.has(h) && stood(h, n))) : [];
@@ -436,6 +457,8 @@ for (const c of unlisted) console.log(`note ${logged(`an old copy in an agent to
 for (const c of fresh) console.error(`FAIL: ${logged(`a new copy: ${c.places.join(' and ')} (it starts "${c.starts}")`)}. Mend: keep it in the one place it belongs and point there from the others`);
 if (WRITE) {
   base.windows = Object.fromEntries(Object.entries(base.windows).filter(([h]) => places.has(h)).map(([h, n]) => [h, Math.min(n, places.get(h))]));
+  // (the list of values lowered the same way, never added to: one that holds none yet is written by --first)
+  if (listed) { const now = listNow(RUN); base.values = Object.fromEntries(Object.entries(listed).filter(([h]) => h in now).map(([h, n]) => [h, Math.min(n, now[h])])); }
   fs.writeFileSync(BASELINE, JSON.stringify(base, null, 2) + '\n');
   console.log(`${logged(BASELINE)}: ${Object.keys(base.windows).length} windows kept, ${shrunk.length} lowered or dropped${TOOLS ? `, the copies in an agent tool's files listed` : ""}`);
   if (fresh.length) process.exit(1);
@@ -443,6 +466,6 @@ if (WRITE) {
   if (shrunk.length) console.error(`FAIL: ${logged(BASELINE)} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run ${SELF} ${logged(configPath)} --write and commit the baseline it lowers`);
   if (!fresh.length && !shrunk.length) console.log(`ok   no new copies (${found.length - unlisted.length} old ones, listed in ${logged(BASELINE)}, to be removed${unlisted.length ? `; ${unlisted.length} in an agent tool's files, noted above` : ""})`);
   // (a value written out in two files, a pin or a pattern, too short for the runs above: copies-values.mjs)
-  const values = valuesTwice({ core: CORE, config, configPath, configAt: CONFIG_AT, base: process.env.COPIES_BASE || "", ls });
+  const values = valuesTwice({ ...RUN, base: process.env.COPIES_BASE || "", listed, listedBase });
   if (fresh.length || shrunk.length || values) process.exit(1);
 }

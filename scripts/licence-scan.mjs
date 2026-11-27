@@ -14,7 +14,7 @@
 //     name@exact.version and audited at that version, one entry for each version used, so an update is audited again,
 //     with what it pulls in. A fetch it cannot read fails, but npm pack's, which runs nothing it fetches, and another
 //     fetcher's (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone, dotnet tool install, choco, winget,
-//     PowerShell's Invoke-WebRequest and the like): each of those passes
+//     PowerShell's Invoke-WebRequest and the like; a git clone through a function too, licence-wrappers.mjs): each of those passes
 //     only in a file an entry's "files" names, that entry its hand audit, each fetch that stood at the base reported; and where such a file downloads by address
 //     (curl, wget, PowerShell's) and an entry covering it audits what may be a program (no data, asset, font, service
 //     of GitHub's or the owner's own work), each such entry names its version, but a package of the machine's
@@ -42,6 +42,7 @@ import { DEEPEST, leadsOut, parseBounded, tooDeep } from "./guards.mjs";
 import { commandLines, commands } from "./licence-commands.mjs";
 import { downloads, otherFetches } from "./licence-fetchers.mjs";
 import { fetched } from "./licence-npm.mjs";
+import { wrapperFetches } from "./licence-wrappers.mjs";
 import { executable } from "./licence-pages.mjs";
 import { copyAmong } from "./core-path.mjs";
 
@@ -149,7 +150,9 @@ function fetches(c, text, f, literal = false) {
   }
   if (/\bnpm_config_(@[\w-]+:)?registry\b|\bnpm_config_replace_registry_host\b|\bnpm_config_(user|global)config\b/iu.test(text)) c.fail(`${f}: it points npm at another registry than npm's, so no audited name can be trusted there. Mend: take that setting out`);
   if (/\bnpm_config_(package_lock|shrinkwrap)\b/iu.test(text)) c.fail(`${f}: it installs without the lockfile, so what it installs is not what the lockfile's check read. Mend: take that setting out`);
-  if (!byHand(c, f)) c.others.push(...otherFetches(text));
+  // (the files it imports are read as they stand where it is read: at the pull request's base, as the base holds them)
+  const read = c.read ?? ((p) => (c.tracked?.includes(p) && !c.binary.has(p) ? trackedText(c.root, p, () => {}) : null));
+  if (!byHand(c, f)) c.others.push(...otherFetches(text), ...wrapperFetches(text, f, read));
 }
 
 // The fetches `found` in the file `f` that the scan cannot read and no entry audits (byKind), each its line with those
@@ -159,7 +162,7 @@ function fetches(c, text, f, literal = false) {
 // it held, not as many others. A source held in a variable set on another line is not read, as `heldAtBase` reads none.
 function unaudited(c, f, found) {
   if (!found.length) return;
-  const was = c.base ? atBase(c, f) : null, held = was === null ? [] : byKind({ ...c, entries: baseEntries(c), fail() {}, reports: [] }, f, was);
+  const was = c.base ? atBase(c, f) : null, held = was === null ? [] : byKind({ ...c, entries: baseEntries(c), read: (p) => atBase(c, p), fail() {}, reports: [] }, f, was);
   const fresh = found.filter((line) => { const i = held.indexOf(line); if (i < 0) return true; held.splice(i, 1); return false; });
   const shown = (line) => (line.length > 80 ? `${line.slice(0, 79)}…` : line), mend = `name ${f} in the "files" of the entry that audits it`;
   if (fresh.length) c.fail(`${f}: ${shown(fresh[0])} fetches what no entry's "files" says. Mend: ${mend}`);
@@ -268,9 +271,10 @@ function byKind(c, f, text) {
   return c.others;
 }
 /** What the scan reads in the file `f`, holding `text`, as fetched by another fetcher that no entry of `entries` audits
- *  by hand, and nothing else it says of it: the step that lists what stood so reads it (step-checks-packages.mjs). */
-export const unauditedIn = (settings, entries, auditPath, f, text) =>
-  byKind({ settings, entries, auditPath, binary: new Set(), locks: [], fail() {}, reports: [] }, f, text);
+ *  by hand, and nothing else it says of it, `read` giving the text of a file of the project's it imports, or null: the
+ *  step that lists what stood so reads it (step-checks-packages.mjs). */
+export const unauditedIn = (settings, entries, auditPath, f, text, read = () => null) =>
+  byKind({ settings, entries, auditPath, binary: new Set(), locks: [], read, fail() {}, reports: [] }, f, text);
 
 /** How the scan reads the file `f` holding `text` (scanned, above): `other`, in a language it cannot read; `runs`, as
  *  shell, JavaScript or a page. */

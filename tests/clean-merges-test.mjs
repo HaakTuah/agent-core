@@ -127,7 +127,7 @@ const check = (number, head, posted = [], rights = {}, { names = scripts, opened
   const github = { event_name: "pull_request", repository: "someone/project", actor: "someone", server_url: "https://github.com", run_id: "1", token: "not-a-token",
     event: { action: "synchronize", pull_request: pull, repository: { default_branch: "main", private: false } } };
   const [job] = runWorkflow(fs.readFileSync(path.join(repo, ".github/workflows/security-review.yml"), "utf8"), { github, base: runEnv, temp: tmp, inputs: { advisory: false, root: "." },
-    workspace: () => { const ws = fs.mkdtempSync(path.join(tmp, "ws-")); git(ws, "clone", "-q", origin, "."); return ws; },
+    workspace: () => { const ws = fs.mkdtempSync(path.join(tmp, "ws-")); execFileSync("git", ["clone", "-q", "--no-checkout", "--", ".", ws], { cwd: origin, stdio: ["ignore", "pipe", "pipe"] }); git(ws, "reset", "-q", "--hard"); return ws; },
     uses: { "actions/checkout": checkoutStandIn(env, tmp), "actions/setup-node": () => {} } });
   // (each post the stand-in logs: its route, then the status as jq prints it)
   const statuses = [...fs.readFileSync(ghLog, "utf8").matchAll(/^\S+ (\{[\s\S]*?^\})$/gmu)].map((m) => JSON.parse(m[1]));

@@ -16,7 +16,7 @@ ok(pinFault([{ ...sdk, kind: "distribution" }, moss], "audit.json", SH, `${APT}$
 ok(/dotnet-sdk-8\.0, in audit\.json, names no version/u.test(pinFault([{ ...sdk, kind: "distribution" }, moss], "audit.json", SH, `${GET}${CHECKED}`)?.what ?? ""),
   "one of kind distribution whose package the file installs by no package manager is asked its version (#1455)");
 const dist = (code) => pinFault([{ ...sdk, kind: "distribution" }, moss], "audit.json", SH, `${code}${GET}${CHECKED}`);
-ok(["sudo apt-get install -y dotnet-sdk-8.0\n", "RUN apk add --no-cache dotnet-sdk-8.0\n", "apt-get update && apt-get install -y curl dotnet-sdk-8.0\n", "      - run: sudo apt-get install -y dotnet-sdk-8.0\n"].every((c) => dist(c) === null)
+ok(["sudo apt-get install -y dotnet-sdk-8.0\n", "RUN apk add --no-cache dotnet-sdk-8.0\n", "apt-get update && apt-get install -y git dotnet-sdk-8.0\n", "      - run: sudo apt-get install -y dotnet-sdk-8.0\n"].every((c) => dist(c) === null)
   && ["apt-get remove dotnet-sdk-8.0\n", "echo \"brew users: brew install dotnet-sdk-8.0\"\n", "apt-get install -y dotnet-sdk-8.0-extra\n"].every((c) => /names no version/u.test(dist(c)?.what ?? "")),
 "an install by a package manager's own command, by sudo, in a RUN, after && or in a workflow's one-line run, counts; a removal, an echo naming one or another package's name does not (#1455)");
 ok(/holds no checksum/u.test(pinFault([{ ...sdk, kind: "distribution" }], "audit.json", SH, `${APT}${GET}`)?.what ?? ""), "a download covered by a distribution's package alone is still asked its checksum");

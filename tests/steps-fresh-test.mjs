@@ -89,6 +89,8 @@ for (const f of [...Object.values(callsTo), path.join(plainProject, "tools")]) f
 ok(differences(project(plainProject), fresh(project(plainProject))).join("\n") === base && kind(project(plainProject)).o.pages === undefined, "a project that calls neither is asked for neither");
 const secWorkflow = path.join(plainProject, ".github/workflows/security-review.yml");
 fs.writeFileSync(secWorkflow, fs.readFileSync(secWorkflow, "utf8").replace(/^jobs:/m, "env: [SAMPLE\n\njobs:"));
+// (the copies baseline as the kit writes it, with its list: its step reads that file alone, never a workflow)
+fs.writeFileSync(path.join(plainProject, "checks/copies-baseline.json"), '{ "windows": {}, "values": {} }\n');
 const unread = notDone(plainProject);
 const unreadSec = unread.find(m => m.lead.endsWith("the security review shown on every pull request"));
 ok(unreadSec?.mend.includes("could not read the project") && unreadSec.mend.includes("security-review.yml") && unread.every(m => m.mend.includes("could not read the project")),
