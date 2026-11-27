@@ -97,38 +97,52 @@ export function closedSince(repo, since, ask = ghApi) {
   return closed;
 }
 
-// Who made each close of `numbers` (issues of `repo` closed as completed), read from GitHub: { counted, unread, other }.
+// Who made each close of `numbers` (issues of `repo` closed as completed, each a number readGit read), read from GitHub: { counted, unread, other }.
 // Counted, a Set, where the newest close in the issue's events names a commit that a merged pull request brought in,
 // or was made by an account whose right on the repository is write, maintain or admin (writersOf); other, the numbers
 // whose close was made by neither; unread, [{ number, why }], those whose events, closer or right gave no answer in
 // its form: counted neither way, never guessed. An answer read is held to its form, the events to EVENT_PAGES pages.
 export function closesRead(repo, numbers, ask = ghApi) {
   if (!aRepository(repo)) throw new Error(`${String(repo).slice(0, 80)} is no repository's name`);
-  const counted = new Set(), unread = [], other = [];
   const read = route => { try { return parseBounded(ask(route)); } catch { return undefined; } };
+  const counted = new Set(), unread = [], other = [];
   for (const number of numbers) {
-    if (!Number.isSafeInteger(number) || number < 1) continue;
-    let events = [], whole = false;
-    for (let page = 1; page <= EVENT_PAGES; page++) {
-      const rows = read(`repos/${repo}/issues/${number}/events?per_page=100&page=${page}`);
-      if (!Array.isArray(rows) || !rows.every(e => e !== null && typeof e === "object")) { events = null; break; }
-      events.push(...rows);
-      if (rows.length < 100) { whole = true; break; }
-    }
-    const close = whole ? events.filter(e => e.event === "closed").at(-1) : undefined;
-    if (!close) { unread.push({ number, why: "its events hold no close that could be read" }); continue; }
-    if (aCommit(close.commit_id)) {
-      const pulls = read(`repos/${repo}/commits/${close.commit_id}/pulls`);
-      if (Array.isArray(pulls) && pulls.some(p => p !== null && typeof p === "object" && typeof p.merged_at === "string" && !Number.isNaN(Date.parse(p.merged_at)))) { counted.add(number); continue; }
-    }
-    const login = close.actor?.login;
-    if (typeof login !== "string" || !LOGIN.test(login)) { unread.push({ number, why: "who closed it could not be read" }); continue; }
-    const right = read(`repos/${repo}/collaborators/${login}/permission`);
-    if (right === null || typeof right !== "object" || typeof right.permission !== "string") { unread.push({ number, why: "the right of the account that closed it could not be read" }); continue; }
-    if (writersOf([right]).has(login.toLowerCase())) counted.add(number);
-    else other.push(number);
+    const how = closer(repo, number, read);
+    if (how === true) counted.add(number);
+    else if (how === false) other.push(number);
+    else unread.push({ number, why: how });
   }
   return { counted, unread, other };
+}
+
+// The newest close in the events of issue `number`, or null where they hold none or give no whole answer in its form.
+function closeOf(repo, number, read) {
+  const events = [];
+  for (let page = 1; page <= EVENT_PAGES; page++) {
+    const rows = read(`repos/${repo}/issues/${number}/events?per_page=100&page=${page}`);
+    if (!Array.isArray(rows)) return null;
+    events.push(...rows);
+    if (rows.length < 100) return events.filter(e => e?.event === "closed").at(-1) ?? null;
+  }
+  return null;
+}
+
+// Whether a commit was brought in by a merged pull request, as the host's list of its pull requests says.
+const merged = (repo, sha, read) => {
+  const pulls = aCommit(sha) ? read(`repos/${repo}/commits/${sha}/pulls`) : null;
+  return Array.isArray(pulls) && pulls.some(p => typeof p?.merged_at === "string" && !Number.isNaN(Date.parse(p.merged_at)));
+};
+
+// How issue `number` was closed: true by a merge or a writer, false by neither, else why it could not be read.
+function closer(repo, number, read) {
+  const close = closeOf(repo, number, read);
+  if (!close) return "its events hold no close that could be read";
+  if (merged(repo, close.commit_id, read)) return true;
+  const login = close.actor?.login;
+  if (typeof login !== "string" || !LOGIN.test(login)) return "who closed it could not be read";
+  const right = read(`repos/${repo}/collaborators/${login}/permission`);
+  if (typeof right?.permission !== "string") return "the right of the account that closed it could not be read";
+  return writersOf([right]).has(login.toLowerCase());
 }
 
 // The lines of `lines` closed as completed after `since`, each close read by closesRead: its answer.
@@ -151,8 +165,8 @@ export function dueness(read, closed, now, left = { unread: [], other: [] }) {
   const merged = lines.filter(n => closed.has(n));
   const days = Math.floor((Date.parse(now) - Date.parse(release.at)) / DAY);
   const since = `since ${release.name} (its commit ${release.sha.slice(0, 7)}, ${release.at.slice(0, 10)}, ${days} ${days === 1 ? "day" : "days"} ago)`;
-  const other = (left.other ?? []).length ? `; not counted, closed by no merge and no account that can write: ${left.other.map(n => `#${n}`).join(", ")}` : "";
-  const unread = (left.unread ?? []).length ? `; not counted, since who made its close could not be read: ${left.unread.map(u => `#${u.number} (${u.why})`).join(", ")}. Mend: run node scripts/release-due.mjs again once gh answers; where it still cannot read one whose work merged, an account that can write the repository reopens it and closes it as completed` : "";
+  const other = left.other.length ? `; not counted, closed by no merge and no account that can write: ${left.other.map(n => `#${n}`).join(", ")}` : "";
+  const unread = left.unread.length ? `; not counted, since who made its close could not be read: ${left.unread.map(u => `#${u.number} (${u.why})`).join(", ")}. Mend: run node scripts/release-due.mjs again once gh answers; where it still cannot read one whose work merged, an account that can write the repository reopens it and closes it as completed` : "";
   const count = `${merged.length} ${merged.length === 1 ? "line" : "lines"} of QUEUE.md merged ${since}${merged.length ? `: ${merged.map(n => `#${n}`).join(", ")}` : ""}${other}${unread}`;
   if (trialed) return { due: false, merged, days, said: `Not due: the trial's record names ${trialed.slice(0, 7)}, past ${release.name}, so its trial has run; the release is cut from it (AGENTS.md, "A release is cut on the owner's word"). ${count}.` };
   const due = merged.length >= LINES || (days >= DAYS && merged.length >= 1);

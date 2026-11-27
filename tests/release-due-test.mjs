@@ -88,6 +88,7 @@ let pages = 0;
 ok(throws(() => closedSince("example-owner/example-core", release.at, () => { pages++; return JSON.stringify(Array.from({ length: 100 }, (_, i) => ({ number: i + 1, state: "closed", state_reason: "completed", closed_at: "2026-11-11T00:00:00Z" }))); })) && pages === 30, "the reading stops at its pages' bound");
 
 // ---- who made each close, read from a stand-in for GitHub ----
+let pagesAsked = 0;
 {
   const merge = "c".repeat(40), loose = "d".repeat(40);
   const closedBy = (login, commit_id = null) => [{ event: "labeled", actor: { login: "example-writer" } }, { event: "closed", actor: login === null ? null : { login }, commit_id }];
@@ -100,6 +101,14 @@ ok(throws(() => closedSince("example-owner/example-core", release.at, () => { pa
     "repos/example-owner/example-core/issues/15/events?per_page=100&page=1": closedBy("example-gone"),
     "repos/example-owner/example-core/issues/16/events?per_page=100&page=1": closedBy("example-outsider", loose),
     "repos/example-owner/example-core/issues/18/events?per_page=100&page=1": [{ event: "labeled", actor: { login: "example-writer" } }],
+    "repos/example-owner/example-core/issues/19/events?per_page=100&page=1": Array.from({ length: 100 }, () => null),
+    "repos/example-owner/example-core/issues/19/events?per_page=100&page=2": closedBy("example-writer"),
+    "repos/example-owner/example-core/issues/20/events?per_page=100&page=1": closedBy("-example-writer"),
+    "repos/example-owner/example-core/issues/21/events?per_page=100&page=1": closedBy("example-writer/../example-writer"),
+    "repos/example-owner/example-core/issues/22/events?per_page=100&page=1": closedBy("example-outsider", "e".repeat(40)),
+    [`repos/example-owner/example-core/commits/${"e".repeat(40)}/pulls`]: [null, { merged_at: "not a time" }, { merged_at: 0 }, { merged_at: null }],
+    "repos/example-owner/example-core/issues/23/events?per_page=100&page=1": closedBy("example-outsider", "f".repeat(40)),
+    [`repos/example-owner/example-core/commits/${"f".repeat(40)}/pulls`]: [{ merged_at: null }, { merged_at: "2026-11-11T00:00:00Z" }],
     [`repos/example-owner/example-core/commits/${merge}/pulls`]: [{ number: 40, merged_at: "2026-11-11T00:00:00Z" }],
     [`repos/example-owner/example-core/commits/${loose}/pulls`]: [{ number: 41, merged_at: null }],
     "repos/example-owner/example-core/collaborators/example-outsider/permission": right("example-outsider", "read", "read"),
@@ -107,7 +116,7 @@ ok(throws(() => closedSince("example-owner/example-core", release.at, () => { pa
   };
   const asked = [];
   const ask = route => { asked.push(route); if (!(route in host)) throw new Error("HTTP 404"); return JSON.stringify(host[route]); };
-  const got = closesRead("example-owner/example-core", [11, 12, 13, 14, 15, 16, 17, 18], ask);
+  const got = closesRead("example-owner/example-core", [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23], ask);
   ok(!got.counted.has(11) && got.other.includes(11), "a close by an account that cannot write is not counted", JSON.stringify(got));
   ok(got.counted.has(12) && !asked.some(r => r.endsWith("/example-merger/permission")), "a close a merged pull request made is counted, by the merge alone", JSON.stringify(got));
   ok(got.counted.has(13), "a close by an account that can write is counted", JSON.stringify(got));
@@ -115,10 +124,25 @@ ok(throws(() => closedSince("example-owner/example-core", release.at, () => { pa
   const why = n => got.unread.find(u => u.number === n)?.why ?? "";
   ok(!got.counted.has(14) && /who closed it could not be read/.test(why(14)) && !got.counted.has(15) && /right .* could not be read/.test(why(15)), "a close whose actor, or the actor's right, cannot be read is not counted, and is named unread", JSON.stringify(got.unread));
   ok(/events/.test(why(17)) && /events/.test(why(18)), "an issue whose events cannot be read, or hold no close, is not counted, and is named unread", JSON.stringify(got.unread));
-  ok([...got.counted].join() === "12,13" && got.other.join() === "11,16", "nothing else is counted", JSON.stringify(got));
+  ok(got.counted.has(19), "a close on the events' second page is read", JSON.stringify(got));
+  ok(/who closed it/.test(why(20)) && /who closed it/.test(why(21)) && !asked.some(r => r.includes("/collaborators/-") || r.includes("..")), "a closer whose login is out of its form is unread, and reaches no route", JSON.stringify(got.unread));
+  ok(got.other.includes(22) && got.counted.has(23), "a commit's pull request counts only where one of them holds the time it merged", JSON.stringify(got));
+  ok([...got.counted].join() === "12,13,19,23" && got.other.join() === "11,16,22", "nothing else is counted", JSON.stringify(got));
   const said = dueness({ release, lines: [11, 12, 13, 14], trialed: null }, got.counted, "2026-11-12T00:00:00Z", got).said;
-  ok(/2 lines of QUEUE\.md merged .*: #12, #13; not counted, closed by no merge and no account that can write: #11, #16; not counted, since who made its close could not be read: #14 \(who closed it could not be read\).*Mend: /.test(said), "the count names the closes it did not count, those unread with their mend", said);
-  ok(throws(() => closesRead("not a repo", [1], ask)), "a name that is no repository's throws");
+  ok(/2 lines of QUEUE\.md merged .*: #12, #13; not counted, closed by no merge and no account that can write: #11, #16, #22; not counted, since who made its close could not be read: #14 \(who closed it could not be read\), #15 \(the right .*Mend: /.test(said), "the count names the closes it did not count, those unread with their mend", said);
+  const plain = dueness({ release, lines: [12], trialed: null }, new Set([12]), "2026-11-12T00:00:00Z").said;
+  ok(/: 1 line of QUEUE\.md merged since release-2 \(.*\): #12\.$/.test(plain), "where every close was counted, the count names nothing more", plain);
+  const none = dueness({ release, lines: [12], trialed: null }, new Set(), "2026-11-12T00:00:00Z").said;
+  ok(/: 0 lines of QUEUE\.md merged since release-2 \([^)]*\)\.$/.test(none), "with none counted, the count names none", none);
+  let longName = "";
+  try { closesRead("x".repeat(100), [1], ask); } catch (e) { longName = e.message; }
+  ok(longName === `${"x".repeat(80)} is no repository's name`, "a name that is no repository's is cut short where it is named", longName);
+  let refusedName = "";
+  try { closesRead("not a repo", [1], ask); } catch (e) { refusedName = e.message; }
+  ok(refusedName === "not a repo is no repository's name", "a name that is no repository's throws, naming it", refusedName);
+  pagesAsked = 0;
+  const long = closesRead("example-owner/example-core", [30], () => { pagesAsked++; return JSON.stringify(Array.from({ length: 100 }, () => ({ event: "closed", actor: { login: "example-writer" } }))); });
+  ok(long.unread.length === 1 && pagesAsked === 10, "an issue's events past their pages' bound are read no further, and its close is unread", `${pagesAsked} ${JSON.stringify(long)}`);
   const both = closesSince("example-owner/example-core", release.at, [11, 13, 99], route => route.includes("/issues?") ? JSON.stringify([11, 13, 20].map(number => ({ number, state: "closed", state_reason: "completed", closed_at: "2026-11-11T00:00:00Z" }))) : ask(route));
   ok([...both.counted].join() === "13" && both.other.join() === "11" && !both.unread.length, "only the queue's lines closed after the release have their closes read", JSON.stringify(both));
   ok(throws(() => closesSince("example-owner/example-core", release.at, [11], () => { throw new Error("HTTP 502"); })), "where GitHub gives no answer at all, the reading throws, as an unread host does");
