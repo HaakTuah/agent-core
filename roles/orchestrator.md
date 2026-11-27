@@ -43,6 +43,13 @@ nothing yet.
   restart what stalled, so that provider is saved the longest; the strongest model is kept for the work that takes
   judgement (a rule, the design check, a security review, escalation), on whichever provider.
 - Held by nothing yet: a builder's tool and the usage left are no mark a check reads.
+- **Small points of one issue that share a file go in one pull request** (#1504). By default, where points of one
+  issue, none of them the *hard work*, name a file in common among those they change, whoever hands them out (the
+  orchestrator, or with none the session that builds them) gives them to one builder, to build in one pull request.
+  Nothing changes it. It does not mean a split joins other work ("Split by meaning, from the start"), nor a point that
+  needs floor rule 3's two security reviews one that needs none, nor that a point waits for others. Reason: on 26
+  November 2026, 11 of the core's 19 open pull requests were single small points of one issue, each with its own
+  builder, reviews and checks. Held by nothing yet: which files a point changes is read from its issue's text.
 
 - **It builds nothing itself:** every lane goes to a builder session of its own.
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.
