@@ -9,25 +9,38 @@ import { calls, copyAt } from "../workflow-calls.mjs";
 import { licenceConfig } from "../check-configs.mjs";
 import { runFiles } from "../own-runs.mjs";
 import { COST } from "../step-checks.mjs";
+import { Unwritten, inEnds, put, writable } from "../step-writers.mjs";
+
+// The agent-tools check's own reading, with a missing list read as an empty one: what it would fail once written. The
+// core's licences.yml runs the check itself; a project that runs the licence script from a workflow of its own runs it
+// beside it, as of exact versions, and the config is the one that workflow passes: check-configs.mjs. { unread } where
+// a Codex config cannot be read, since the core's packages are not installed (every other step is still told).
+function reading(p) {
+  const own = calls(p, "licences.yml").length ? [] : runFiles(p, "licences.mjs");
+  const beside = own.some(f => runFiles(p, "agent-tools.mjs").includes(f));
+  const file = licenceConfig(p);
+  let config = null;
+  try { config = JSON.parse(p.read(file) ?? "null"); } catch { /* (read as no list, below) */ }
+  if (p.read(".codex/config.toml") !== null && !installed("smol-toml")) return { unread: `The core's packages are not installed, so \`.codex/config.toml\` could not be read for the tools it configures: run \`if [ -f ${copyAt(p)}scripts/install.mjs ]; then node ${copyAt(p)}scripts/install.mjs; fi\`, then \`node ${copyAt(p)}scripts/steps.mjs\` again.` };
+  const head = readProject(p.root), list = listed(config, file) ?? { keys: new Set(), problems: [] };
+  const { problems, missing, pins, sources } = toolsCheck(head, list, kitHooks(undefined, coreOf(p.manifest)), file);
+  // (a hook whose command is not the kit's form is weighed, below; any other source, a setting of a kind no kit writes or a
+  // file fetched that is no plain file, keeps the check's own mend, which only narrows what runs with power)
+  const toWeigh = sources.filter(([k]) => head.sources.get(k)?.why === NOT_KIT_WHY);
+  return { own, beside, file, config, head, problems, missing, pins, sources, toWeigh };
+}
+
+// What a script lists exactly (#1361, point 2): each skill and hook the project's own files configure that the list
+// lacks, a file of the project's own ("this project", as the list's mend says of one), that stood before the step came,
+// as a baseline does. Never a plug-in or a tool server, whose publisher and version are no file's to read, nor a tool
+// whose source the check questions: a hook whose command is not the kit's form is a security judgement, never a mend.
+const exactly = r => r.missing.map(([k]) => k).filter(k => /^(?:skill|hook) /u.test(k) && !r.sources.some(([s]) => s === k));
 
 export default { lead: "16 November 2026, an agent's own tools listed", cost: COST.line,
-  // (the agent-tools check's own reading, with a missing list read as an empty one: what it would fail once written.
-  // The core's licences.yml runs the check itself; a project that runs the licence script from a workflow of its own
-  // runs it beside it, as of exact versions, and the config is the one that workflow passes: check-configs.mjs)
   check: p => {
-    const own = calls(p, "licences.yml").length ? [] : runFiles(p, "licences.mjs");
-    const beside = own.some(f => runFiles(p, "agent-tools.mjs").includes(f));
-    const file = licenceConfig(p);
-    let config = null;
-    try { config = JSON.parse(p.read(file) ?? "null"); } catch { /* (read as no list, below) */ }
-    // (with the core's packages not installed, a Codex config cannot be read: the step says so, with the install, and
-    // every other step is still told, as of a key given twice)
-    if (p.read(".codex/config.toml") !== null && !installed("smol-toml")) return `The core's packages are not installed, so \`.codex/config.toml\` could not be read for the tools it configures: run \`if [ -f ${copyAt(p)}scripts/install.mjs ]; then node ${copyAt(p)}scripts/install.mjs; fi\`, then \`node ${copyAt(p)}scripts/steps.mjs\` again.`;
-    const head = readProject(p.root), list = listed(config, file) ?? { keys: new Set(), problems: [] };
-    const { problems, missing, pins, sources } = toolsCheck(head, list, kitHooks(undefined, coreOf(p.manifest)), file);
-    // (a hook whose command is not the kit's form is weighed, below; any other source, a setting of a kind no kit writes or a
-    // file fetched that is no plain file, keeps the check's own mend, which only narrows what runs with power)
-    const toWeigh = sources.filter(([k]) => head.sources.get(k)?.why === NOT_KIT_WHY);
+    const r = reading(p);
+    if (r.unread) return r.unread;
+    const { own, beside, file, head, problems, missing, pins, sources, toWeigh } = r;
     // (a hook to be weighed is listed by the sentence on it below, never told to be taken out as an unlisted tool is)
     const weighed = new Set(missing.filter(([k]) => toWeigh.some(([s]) => s === k)).map(([, problem]) => problem));
     const wrong = [...head.problems, ...problems.filter(problem => !weighed.has(problem)), ...[...pins, ...sources.filter(s => !toWeigh.includes(s))].map(([, problem]) => problem)];
@@ -37,4 +50,19 @@ export default { lead: "16 November 2026, an agent's own tools listed", cost: CO
     // a task; #1248, point 6; its mark read from its command, #1273, point 2)
     const judged = toWeigh.length ? `Each hook below runs a command not in the starter kit's form, so nothing the check reads shows that it runs its copy on main (floor rule 3); whether it does is a security judgement, not a mend: list it under "agentTools" in \`${file}\` with the "from" named after it, "main" where its command has git show its file from main (\`git show refs/remotes/origin/main:<the file>\`), which marks what the command names and never shows that main's copy is what runs, else "the working tree", which marks it as standing before and fails nothing, and file one task, an issue, for a session at the strongest tier to weigh each, with the security reviews of a change to what runs with power, before it is rewritten in the starter kit's form or taken out, never taking one out before then: ${toWeigh.map(([k, problem]) => `${problem.replace(/\. Mend: [^]*$/u, "")} ("from": ${show(markOf(head.sources.get(k)))})`).join("; ")}.` : "";
     return wrong.length || judged ? [wrong.length ? `List under "agentTools" in \`${file}\` every plug-in, tool server, skill and hook the project configures for its agents beyond the starter kit's hooks, each as { "kind", "name", "publisher", "version" }, a plug-in or tool server at one exact version, the one its configuration pins where it can pin one, or take out what nobody meant to configure; and see that its check runs: ${wrong.join("; ")}` : "", judged].filter(Boolean).join(" ") : null;
+  },
+  // (the list written with what it lacks exactly, its other entries and keys kept; what is left, the check says again)
+  write: (p, busy) => {
+    const r = reading(p);
+    if (r.unread) throw new Unwritten("the core's packages are not installed, so the Codex config could not be read");
+    const add = exactly(r), { file, config } = r;
+    if (!config || typeof config !== "object" || Array.isArray(config)) throw new Unwritten(`the licence check's config \`${file}\` is not there or is no JSON object`);
+    if (Object.hasOwn(config, "agentTools") && !Array.isArray(config.agentTools)) throw new Unwritten(`"agentTools" in \`${file}\` is no list`);
+    // (what is left, a plug-in or a tool server whose publisher and version a session gives, or a tool whose source is to
+    // be weighed, the check's own mend says; nothing is written, and nothing said beside it)
+    if (!add.length) return [];
+    writable(p, file, busy);
+    const entries = add.map(k => ({ kind: k.slice(0, k.indexOf(" ")), name: k.slice(k.indexOf(" ") + 1), publisher: "this project" }));
+    put(p, file, inEnds(p, file, `${JSON.stringify({ ...config, agentTools: [...(config.agentTools ?? []), ...entries] }, null, 2)}\n`));
+    return [file];
   } };

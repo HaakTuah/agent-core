@@ -60,7 +60,7 @@ export const eolOf = (p, f) => { const raw = p.read(f, true) ?? ""; return /\r\n
 export const inEnds = (p, f, text) => eolOf(p, f) === "\r\n" ? text.replace(/\r?\n/gu, "\r\n") : text;
 
 // A file written, its folders made, once `writable` passed.
-function put(p, f, text) {
+export function put(p, f, text) {
   fs.mkdirSync(path.dirname(path.join(p.root, f)), { recursive: true });
   fs.writeFileSync(path.join(p.root, f), text);
 }
