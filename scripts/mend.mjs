@@ -6,7 +6,8 @@
 // files, the lines), read with it. Each check's own test reads its failures here (tests/mend-test.mjs holds that it
 // does). A check's entry runs through guard(), so that an error it did not catch fails with its mend too (#1140, point
 // 1); and a mend that names a script to run (`node <path>`) names one that is there from the folder the check ran in,
-// where the caller gives that folder, or else the process's own (point 3; #1488). Node's own modules, guards.mjs and started.mjs beside it.
+// where the caller gives that folder, or else the process's own (point 3; #1488). Node's own modules, guards.mjs and
+// started.mjs beside it.
 //
 //   import { guard, mended, unmended } from "./mend.mjs";
 //   if (guard(import.meta.url)) { ... }      (a check's entry, in place of started())
@@ -53,15 +54,17 @@ export function missing(output, from) {
 // Whether a check's output holds a failure and every failure in it says its mend: what a check's test asks of a run
 // that fails. Each script its mends name to run is there from the folder the check ran in (`from`, the process's own
 // where none is given).
-export function mended(output, { from = process.cwd() } = {}) {
-  return failures(output).length > 0 && unmended(output).length === 0 && missing(output, from).length === 0;
+export function mended(output, { from } = {}) {
+  if (failures(output).length === 0 || unmended(output).length > 0) return false;
+  // the process's own folder is read only once the failure is found mended, and where it cannot be read (it was
+  // removed: process.cwd() throws) the output is not mended (#1538)
+  try { return missing(output, from ?? process.cwd()).length === 0; } catch { return false; }
 }
 
 // The failure a check gives for an error it did not catch: a parser's abort, a raw error of git's, a RangeError.
-// Where the error's message is a failure that says its mend, that mend's script paths are read too, from the process's own
-// folder (mended(), #1488): in a project, the project's, where the mends it prints stand.
-// An error whose message is a failure that says its mend already is printed as it stands, on its one line. Its words
-// may come from a project's file (a parse error's excerpt), so each is printed as the log reads text alone, any
+// An error whose message is a failure that says its mend already is printed as it stands, on its one line; where that
+// mend's script paths are read too, from the process's own folder (mended(), #1488), in a project the project's, where
+// the mends it prints stand, one naming a script that is not there is worded as an unknown error. Its words may come from a project's file (a parse error's excerpt), so each is printed as the log reads text alone, any
 // address's sign-in cut out (guards.mjs: loggedAlone, loggedCause, logged; floor rule 1).
 export function unknown(script, error) {
   const said = String(error instanceof Error ? error.message || error.name : error);

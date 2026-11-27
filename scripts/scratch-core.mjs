@@ -85,7 +85,7 @@ export function scratchDir(prefix) {
 
 /** The folder a project's session reads a mend from, for a test that reads one written for a project: it names the
  *  copy's path (`node core/scripts/x.mjs`), which the core's own folder does not hold. A scratch folder whose
- *  `core/scripts` is a link to this core's scripts (a mend names scripts alone), made once for the process, to be read
+ *  `core/scripts` is a link to this core's scripts (a mend names scripts alone), made once for the process for each `own`, to be read
  *  from and never written in: `mended(output, { from: projectOf() })` (mend.mjs, #1488). With `own`, its `scripts` is a
  *  link to the core's too, for a mend that names both forms (a project's, and the core's own). */
 const projectFolders = new Map();
