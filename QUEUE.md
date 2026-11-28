@@ -18,9 +18,8 @@ Each waits on release 8's cut too.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #1118, #1113 to #1116, #1119 to #1121, #1109 to #1111 | rule builder; release 9, one PR each | |
-| #1123 | rule builder; release 9 | #974, #1060 (`roles/adviser.md`) |
-| #1566 | rule builder; release 9; `roles/adviser.md` | #1123 (`roles/adviser.md`, one at a time) |
 | #1098, #1133, #1356 | builder; release 9, one PR each | |
+| #1579 | builder; release 9; a check for a standing rule (`floor/topics/weaknesses.md`) | |
 | #1472 | builder; release 9 | #1510, on the same files |
 | #1475, #1476 | builder; release 9, one PR each | #1472, on the same files |
 | #1180, #1181 | rule builder; release 9, one PR each | |
@@ -59,6 +58,8 @@ Each waits on release 8's cut too.
 | #1052 | rule builder; `AGENTS.md`, the workflow tries its own settings | #1051 (its point 6); #1046 (`AGENTS.md`, one at a time) |
 | #1185 | rule builder; release 9 | #1052 (its trial of when a builder hands over); #1505 (the hand-over mark) |
 | #1060 | rule builder; `roles/adviser.md` | #1052 (its record holds it in part); #974 (`roles/adviser.md`, one at a time) |
+| #1123 | rule builder; release 9 | #974, #1060 (`roles/adviser.md`) |
+| #1566 | rule builder; release 9; `roles/adviser.md` | #1123 (`roles/adviser.md`, one at a time) |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
