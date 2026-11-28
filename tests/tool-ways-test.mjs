@@ -34,20 +34,24 @@ const repo = prefix => {
     write("docs/steer/b.md", "b\n"); link("../docs/steer", ".agents/rules");
     write("docs/f/c.md", "c\n"); link("../../docs/f/c.md", ".agent/rules/c.md");
     link(path.join(away, "agents"), "docs/kiro/agents");
+    write("docs/claude.md", "@AGENTS.md\n"); link("docs/claude.md", "CLAUDE.md"); write("docs/agents.md", "a\n"); link("docs/agents.md", "AGENTS.md");
     git("add", "-A"); git("commit", "-qm", "links");
     const want = ["docs/kiro/steering/a.md", "docs/steer/b.md", ".agent/rules/c.md", "docs/f/c.md"];
     const outside = l => l.some(f => f.includes("x.md") || f.startsWith("..") || path.isAbsolute(f));
     const tree = git("ls-tree", "-r", "--name-only", "-z", "HEAD").split("\0").filter(Boolean);
     process.chdir(dir);
-    const here = toolFiles(), rules = ruleFiles(undefined, undefined, { tools: true });
+    const here = toolFiles(), rules = ruleFiles(undefined, undefined, { tools: true }), bare = ruleFiles();
     const at = toolFiles(readAt("HEAD"), d => tree.filter(f => f.startsWith(`${d}/`)));
+    const rulesAt = ruleFiles(readAt("HEAD"), d => tree.filter(f => f.startsWith(`${d}/`)), { tools: true });
     process.chdir(was);
     ok(want.every(f => here.includes(f)), `in the work tree, a tool's folder that is a link, or one on its way, is listed where it leads, and a file there that is a link with the file it leads to (${here.join(", ")})`);
     ok(want.every(f => rules.includes(f)), "and so the rule files a check reads with the tools' files hold them");
     ok(!outside(here) && !outside(rules), "while a tool's folder made a link that leads out of the project lists nothing outside it");
     ok(want.every(f => at.includes(f)) && !outside(at), `at a commit, read through readAt, the same (${at.join(", ")})`);
+    ok(["CLAUDE.md", "docs/claude.md", "AGENTS.md", "docs/agents.md"].every(f => rules.includes(f) && rulesAt.includes(f)) && !bare.includes("docs/agents.md"),
+      "an entry file or a floor file that is a link is a rule file with the file it leads to, in the work tree and at a commit, where the tools' files are read (as the code-review wait reads them), and the floor's target not without them");
     const plain = toolFiles(f => (tree.includes(f) ? "" : null), d => tree.filter(f => f.startsWith(`${d}/`)));
-    ok(plain.join() === ".agent/rules/c.md", "a reader that says nothing of where a path leads lists each folder as it is named, as before");
+    ok(plain.join() === "CLAUDE.md,.agent/rules/c.md", "a reader that says nothing of where a path leads lists each folder as it is named, as before");
   } finally { process.chdir(was); fs.rmSync(dir, { recursive: true, force: true }); fs.rmSync(away, { recursive: true, force: true }); }
 }
 

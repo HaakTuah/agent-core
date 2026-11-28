@@ -20,6 +20,7 @@
   ],
   "grown": {
     "process: tests/look-split-test.mjs -> node:child_process": "What it guards is the default branch's history as git reads it (#1413, point 6): commits dated before and after the day the question moved to the look, a shallow clone and no repository, which only git writes.",
+    "process: tests/tool-ways-test.mjs -> node:child_process": "What it guards is the entry-file check run as a project's workflow runs it, against a base: its exit code and what it prints with its mend, with a submodule only git's index holds, and the links and submodule of a scratch repository that only git writes.",
     "process: tests/before-ready-test.mjs -> node:child_process": "What it guards is the merge git makes in a worktree of its own and the script run as a builder runs it (#1413, point 6): its command line, its exit code, what it prints with its mend, and the worktree gone after it, a scratch repository's history that only git writes.",
     "process: tests/base-parent-test.mjs -> node:child_process": "What it guards is the base as git resolves it in a checkout (#1231): HEAD^1 of a merge that git makes, and checks.mjs run as the core's workflows run it, its command line given --base HEAD^1, the base it hands each stand-in and its exit code being what the cases read; checks.mjs runs its parts from main(), which it does not export.",
     "process: tests/release-due-test.mjs -> node:child_process": "What it guards is git's own answers in a repository (#1413, point 4): the release tags merged into a branch, the commit each stands on and its time, the versions of QUEUE.md since it and the size git gives one before it is read, which only real git on a scratch repository shows; a stand-in for git would hold only what the test assumes of it.",
@@ -223,6 +224,7 @@
     "process: tests/strength-test.mjs -> node:child_process": true,
     "process: tests/stryker-test.mjs -> node:child_process": true,
     "process: tests/test-record-test.mjs -> node:child_process": true,
+    "process: tests/tool-ways-test.mjs -> node:child_process": true,
     "process: tests/tools-read-test.mjs -> node:child_process": true,
     "process: tests/trial-test.mjs -> node:child_process": true,
     "process: tests/twice-test.mjs -> node:child_process": true,

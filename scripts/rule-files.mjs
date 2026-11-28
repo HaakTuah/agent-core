@@ -121,12 +121,13 @@ export function placeAt(commit) {
 // The files an agent tool takes its instructions from, as `read` and `list` find them: those of TOOL_FILES, then those
 // git tracks under FOLDERS, each that `read` reads (so a link that leads out of the project is none, at a commit too).
 // Where `read` carries `where`, each folder is listed where its links lead (none where one leads out), and a file
-// there that is a link is listed with the file it leads to, so that a change to either is a change to a tool's file;
+// there that is a link, and an entry file that is one, is listed with the file it leads to, so that a change to either
+// is a change to a tool's file;
 // what lies in a submodule is listed as none, since no check here can read it.
 export const toolFiles = (read = readHere, list = tracked) => {
   const where = read.where ?? (f => f);
-  const listed = FOLDERS.flatMap(d => { const at = where(d); return at ? list(at).filter(f => f.startsWith(`${at}/`)).flatMap(f => [f, where(f)]) : []; });
-  return [...new Set(TOOL_FILES.concat(listed))].filter(f => f && read(f) !== null);
+  const listed = FOLDERS.flatMap(d => { const at = where(d); return at ? list(at).filter(f => f.startsWith(`${at}/`)) : []; });
+  return [...new Set(TOOL_FILES.concat(listed).flatMap(f => [f, where(f)]))].filter(f => f && read(f) !== null);
 };
 // A rule file or protected folder by its name alone (floor rule 3): what a tool takes its instructions from, wherever
 // it lies, the threat model, the manifest, the copy of the core, and the folders of what runs by itself.
@@ -137,6 +138,7 @@ export function ruleFiles(read = readHere, list = tracked, { tools = false } = {
   if (security === null) throw new Error('the project has no SECURITY.md yet, where the checks read its rule files. Mend: write it from the starter kit\'s template (core/setup/template/SECURITY.md.tmpl), its rule 3 with the line "**the rule files:** ...;"');
   const rule = /\*\*the rule files:\*\*([^;]*);/.exec(security);
   if (!rule) throw new Error('SECURITY.md, rule 3, has no "the rule files:" line, where the checks read the project\'s own. Mend: add to rule 3 the line "**the rule files:** `<each file>`, ...;" as the starter kit\'s template (core/setup/template/SECURITY.md.tmpl) writes it');
-  const own = tools ? toolFiles(read, list) : [];
+  // (with the tools' files, a floor file that is a link is listed with the file it leads to too, as a tool's file is)
+  const own = tools ? toolFiles(read, list).concat(FLOOR.map(f => (read.where ?? (g => g))(f))).filter(f => f && read(f) !== null) : [];
   return [...new Set(FLOOR.filter(f => read(f) !== null).concat(own, [...rule[1].matchAll(/`([^`]+)`/g)].map(m => m[1])))];
 }
