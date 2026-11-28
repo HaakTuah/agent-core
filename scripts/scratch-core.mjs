@@ -83,6 +83,27 @@ export function scratchDir(prefix) {
   return tmp;
 }
 
+/** A link at `<dir>/<at>` that the system reads out of `dir`, through a folder link beside it, as the file "away" of a
+ *  scratch folder of its own, though its spelling stays inside: for a test that a check reads such a path as the
+ *  system does. Null on Windows, which reads a `..` by its spelling; else the file it leads to. */
+export function foldedLoop(dir, at) {
+  if (process.platform === "win32") return null;
+  const away = scratchDir("folded-loop-"), name = path.basename(at), from = path.dirname(path.join(dir, at));
+  fs.mkdirSync(path.join(away, "deep"));
+  fs.writeFileSync(path.join(away, name), "away\n");
+  fs.mkdirSync(from, { recursive: true });
+  fs.symlinkSync(path.join(away, "deep"), path.join(from, "far"));
+  fs.symlinkSync(`far/../${name}`, path.join(from, name));
+  return path.join(away, name);
+}
+
+/** What the module code `code` prints, run in a process of its own from `cwd`, stopped past `seconds`; null where it
+ *  failed or was stopped. For a test of a call that may never end. */
+export function inTime(code, { cwd, seconds = 30 } = {}) {
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", code], { cwd, encoding: "utf8", timeout: seconds * 1000, killSignal: "SIGKILL" });
+  return r.error || r.status !== 0 ? null : r.stdout;
+}
+
 /** The folder a project's session reads a mend from, for a test that reads one written for a project: it names the
  *  copy's path (`node core/scripts/x.mjs`), which the core's own folder does not hold. A scratch folder whose
  *  `core/scripts` is a link to this core's scripts (a mend names scripts alone), made once for the process for each

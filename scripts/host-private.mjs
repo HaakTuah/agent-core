@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoOf } from "./inbox.mjs";
-import { parseBounded } from "./guards.mjs";
+import { parseBounded, unfolded } from "./guards.mjs";
 
 const gh = route => { const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 24 }); if (r.status !== 0) throw new Error(`${r.stderr || r.error || "no answer"}`.trim()); return r.stdout; };
 // (GitHub's API with no sign-in, through the machine's proxy where it names one, in a Node process of its own, since
@@ -54,7 +54,7 @@ export function privateOf(root, { env = process.env, ask = gh, bare = anonymous 
 function originUrl(root) {
   const dir = gitDirOf(root);
   if (dir === null) return "";
-  const env = { ...process.env, GIT_DIR: whole(dir), GIT_WORK_TREE: whole(root) };
+  const env = { ...process.env, GIT_DIR: unfolded(dir), GIT_WORK_TREE: unfolded(root) };
   delete env.GIT_COMMON_DIR;
   return spawnSync("git", ["config", "--no-includes", "--get", "remote.origin.url"], { cwd: root, encoding: "utf8", env }).stdout?.trim() ?? "";
 }
@@ -79,7 +79,7 @@ function gitDirOf(at) {
 // (as git reads them: a .git file is "gitdir: " and the rest of the file, and a commondir the whole file, each with only
 // its last line ends dropped, never a space or a tab; a .git file in another form names nothing)
 const gitFile = text => text.startsWith("gitdir: ") ? text.slice(8).replace(/[\r\n]+$/, "") : "";
-const folder = at => { try { return fs.statSync(whole(at)).isDirectory(); } catch { return false; } };
+const folder = at => { try { return fs.statSync(unfolded(at)).isDirectory(); } catch { return false; } };
 const commonOf = dir => { try { return fs.readFileSync(under(dir, "commondir"), "utf8").replace(/[\r\n]+$/, ""); } catch { return ""; } };
 // (what git opens in a git folder, or its common folder, to find the clone and read its config)
 const GIT_READS = ["HEAD", "commondir", "config", "config.worktree", "objects", "refs", "packed-refs"];
@@ -119,7 +119,7 @@ const afar = at => /^[\\/]{2}|^[\\/]\?\?[\\/]/.test(at);
 // read one; more than 40 links on one path read as afar, as the system refuses them. A part not there is walked past, as
 // a later `..` may leave it.
 function linksAfar(from, to = "") {
-  return afar(to) || [under(from, to), path.resolve(from, to)].some(at => walkAfar(whole(at)));
+  return afar(to) || [under(from, to), path.resolve(from, to)].some(at => walkAfar(unfolded(at)));
 }
 function walkAfar(start) {
   if (afar(start)) return true;
@@ -142,9 +142,8 @@ function walkAfar(start) {
   }
   return false;
 }
-// (a path from the working folder, and `to` from the folder `from`, as written, never joined by node, which would take a
-// `..` after a link as the folder before it)
-const whole = at => path.isAbsolute(at) ? at : `${process.cwd()}${path.sep}${at}`;
+// (`to` from the folder `from`, as written, never joined by node, which would take a `..` after a link as the folder
+// before it; a path from the working folder: guards.mjs, unfolded)
 const under = (from, to) => !to ? from : path.isAbsolute(to) ? to : `${from}${path.sep}${to}`;
 
 // A test's answer for the project, by its root or by its origin, which each clone of it shares; else null.

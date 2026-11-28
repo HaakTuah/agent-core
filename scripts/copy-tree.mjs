@@ -50,8 +50,8 @@ export function executable(tree, gitDir) {
  *  git refuses, it says so and fails nothing: the copy is written all the same. The sync (sync.mjs) calls it. */
 export function recordModes(dir, pin, gitDir) {
   // (a plain file alone, with no link on its path below the copy's folder, so no bit is set or staged beyond the copy)
-  let root; try { root = fs.realpathSync(dir); } catch { /* (no copy: nothing to mark) */ }
-  const file = (f) => { try { return fs.lstatSync(f).isFile() && fs.realpathSync(f) === path.join(root, path.relative(dir, f)); } catch { return false; } };
+  let root; try { root = fs.realpathSync.native(dir); } catch { /* (no copy: nothing to mark) */ }
+  const file = (f) => { try { return fs.lstatSync(f).isFile() && fs.realpathSync.native(f) === path.join(root, path.relative(dir, f)); } catch { return false; } };
   const marked = git(["ls-tree", "-r", "-z", pin], gitDir).split("\0").filter((e) => e.startsWith("100755 blob ")).map((e) => `${dir}/${e.slice(e.indexOf("\t") + 1)}`).filter(file);
   // (with core.fsmonitor off, as own-files.mjs reads the index: no command of the project's settings runs)
   const run = (args) => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });

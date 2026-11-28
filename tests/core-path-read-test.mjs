@@ -71,6 +71,8 @@ if (process.platform !== "win32") {
     ok(own("a.md") === "inside\n" && own("in.md") === "inside\n" && ["out.md", "folder.md", "zero.md", "gone-link.md", "none.md"].every(f => own(f) === null),
       "a file of the project's own is read, a link inside it as the file it leads to; a link out of it, to a folder, to a device or nowhere, reads as none");
     ok(ownText(path.join(top, "a.md"), { root: top, bound: 6 }) === null, "and one past its bound reads as none");
+    fs.mkdirSync(path.join(away, "sub")); fs.writeFileSync(path.join(top, "b.md"), "inside\n"); fs.symlinkSync(path.join(away, "sub"), path.join(top, "lnk"));
+    ok(ownText(`${top}/lnk/../b.md`, { root: top }) === null, "a path given with a `..` after a link out of the project reads as none, though its spelling names a file inside it");
   } finally { fs.rmSync(top, { recursive: true, force: true }); fs.rmSync(away, { recursive: true, force: true }); }
 }
 

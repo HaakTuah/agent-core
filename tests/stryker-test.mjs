@@ -16,7 +16,7 @@ import { limitOf } from "../scripts/mutate.mjs";
 import { coreReporter, named, progress, strykerPlugins } from "../scripts/stryker-plugin.mjs";
 import { argsOf, asItStands, counted, dispatch, optionsOf, stopTests, strykers, testsFor, vitestAt, word } from "../scripts/stryker.mjs";
 import { handed } from "../scripts/stryker-vm.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { foldedLoop, inTime, scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -137,6 +137,21 @@ try {
   ok(vitestIs({ vitest: "./v.mjs" }) === V && vitestIs("v.mjs") === V && vitestIs({ vitest: "../../outside.mjs" }) === null && vitestIs({ vitest: "missing.mjs" }) === null && vitestIs("sub") === null && vitestAt(path.join(scratch, "none")) === null,
     "the project's vitest is the file its package.json names in its folder, or none");
   if (process.platform !== "win32") { fs.symlinkSync(SCRIPT, `${pkg}/l.mjs`); ok(vitestIs("l.mjs") === null, "nor one a link leads out of it"); }
+  // (a program its links take inside the folder, where node's own reading of the same links would take it out: the
+  // path given is the file judged, which node's reading leaves where it is)
+  if (process.platform !== "win32") {
+    fs.mkdirSync(`${pkg}/a/b/c`, { recursive: true }); fs.writeFileSync(`${pkg}/a/v.mjs`, ""); fs.writeFileSync(path.join(vt, "node_modules/v.mjs"), "");
+    fs.symlinkSync("a/b/c", `${pkg}/far`); fs.symlinkSync("far/../../v.mjs", `${pkg}/x.mjs`);
+    const given = vitestIs("x.mjs");
+    ok(given === "node_modules/vitest/a/v.mjs" && fs.realpathSync(path.join(vt, given)) === path.join(fs.realpathSync.native(vt), given),
+      "the program is given by the real place judged, so node runs that file and no other its own reading of the links would reach", String(given));
+    for (const f of ["far", "x.mjs"]) fs.rmSync(`${pkg}/${f}`);
+  }
+  if (foldedLoop(pkg, "loop.mjs")) {
+    fs.writeFileSync(`${pkg}/package.json`, JSON.stringify({ bin: "loop.mjs" }));
+    const said = inTime(`import { vitestAt } from ${JSON.stringify(new URL("../scripts/stryker.mjs", import.meta.url).href)};\nconsole.log(JSON.stringify(vitestAt(${JSON.stringify(vt)})));`);
+    ok(said?.trim() === "null", "nor one a link leads to that the system reads out of it, though its spelling stays inside", said ?? "stopped past its time");
+  }
   const jest = spawnSync(process.execPath, [SCRIPT, "--tool", ".", "--runner", "jest", "--report", "r.json"], { encoding: "utf8" }).stderr;
   ok(/told to run its tests with jest.*--runner vitest/.test(jest) && mended(jest), "another runner is refused, saying the mend", jest);
 

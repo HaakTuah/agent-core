@@ -7,7 +7,7 @@
 //   node tests/guards-test.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { DEEPEST, aCommit, aLogin, aRepository, inProject, asText, leadsOut, linkedOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
+import { DEEPEST, aCommit, aLogin, aRepository, inProject, asText, leadsOut, linkedOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unfolded, unrooted } from "../scripts/guards.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -43,9 +43,23 @@ try {
   try { fs.symlinkSync(["far", "..", "up-to.json"].join(path.sep), path.join(project, "up.json")); } catch { upLink = false; }
   ok(!upLink || leadsOut(project, path.join(project, "up.json")) === (fs.readFileSync(path.join(project, "up.json"), "utf8") === "away"),
     "a link whose text steps back by a `..` after a folder link out of the project leads out exactly where the system reads it outside, though its spelling stays inside");
+  // (the same `..` in the path given, written as is, never joined: a read of it leads where the link's would)
+  const given = ["far", "..", "up-to.json"].join(path.sep), was = process.cwd(), readOut = fs.readFileSync(`${project}${path.sep}${given}`, "utf8") === "away";
+  try {
+    process.chdir(project);
+    ok([`${project}${path.sep}${given}`, given].every(at => leadsOut(project, at) === readOut) && leadsOut(".", ["far", "..", "new.json"].join(path.sep)) === readOut,
+      "a path given with a `..` after a folder link out of the project leads out exactly where a read of it leads outside, also where it does not stand yet, though its spelling stays inside");
+    ok([["nowhere", "..", "..", "elsewhere", "new.json"], ["inner", "nowhere", "..", "..", "..", "elsewhere"], ["nowhere", ".", "new.json"]].every(parts => leadsOut(project, parts.join(path.sep))),
+      "a path whose `..` or `.` stands after a part that does not stand leads out, since a write that makes its folders could follow it out of the project");
+    if (process.platform === "win32") {
+      const drive = project.slice(0, 2), other = drive.toUpperCase() === "C:" ? "D:" : "C:";
+      ok(unfolded(`${drive}inner\\own.json`) === path.join(project, "inner", "own.json") && !leadsOut(project, `${drive}inner\\own.json`) && leadsOut(project, `${drive}away\\other.json`) && leadsOut(project, `${other}own.json`),
+        "a drive's path with no folder after the drive is read from that drive's own folder, where it stays inside or leads out through a link, and on another drive leads out");
+    }
+  } finally { process.chdir(was); }
   if (fileLink) {
     fs.symlinkSync(path.join(elsewhere, "gone.json"), path.join(project, "dangling.json"));
-    ok(leadsOut(project, path.join(project, "dangling.json")), "a link that leads nowhere leads out");
+    ok(leadsOut(project, path.join(project, "dangling.json")) && leadsOut(project, `${path.join(project, "dangling.json")}${path.sep}`), "a link that leads nowhere leads out, also named with a separator at its end");
     fs.symlinkSync(path.join(elsewhere, "other.json"), path.join(project, "..x.json"));
     const was = process.cwd();
     try {

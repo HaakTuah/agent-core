@@ -4,6 +4,10 @@
 // is printed to a workflow's log as one line of plain text, never as a command GitHub Actions acts on. Node's own
 // modules only.
 //
+// A known limit: a file's real place is the system's answer (realpathSync.native); where the system cannot give one,
+// as some drives on Windows cannot (a RAM disk, a virtual file system), every path there reads as leading out, so a
+// check refuses what it would read rather than read it unchecked.
+//
 //   import { inProject, leadsOut, logged } from "./guards.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -26,19 +30,33 @@ export const linkedOut = at => {
   return rel !== "" && rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel) && leadsOut(".", at);
 };
 
+/** A path from the folder it is run from, as written: never folded as node folds it (path.resolve, path.join), which
+ *  would take a `..` after a link as the folder before it where the system takes it as the one the link reached. A
+ *  drive's path with no folder after the drive ("C:x", on Windows) is read from that drive's own folder. */
+export const unfolded = at => {
+  if (path.isAbsolute(at)) return at;
+  const { root } = path.parse(at);
+  return `${root ? path.resolve(root) : process.cwd()}${path.sep}${at.slice(root.length)}`;
+};
+
 /** Whether the file or folder at `at`, every link on its way followed, lies outside the folder `root` (its own real
  *  place): where `at` does not stand yet, the nearest folder above it that does is read, so a file about to be written
- *  under a linked folder leads out too; a link that leads nowhere counts as leading out. */
+ *  under a linked folder leads out too; a link that leads nowhere counts as leading out, and so does a path whose `..`
+ *  or `.` stands after a part that does not, which a write that makes its folders could follow anywhere. `at` is read
+ *  as written (unfolded), so a `..` after a link leads where a read of `at` leads. */
 export function leadsOut(root, at) {
   let top;
   // (the system's own realpath, which reads a `..` after a link from the folder the link reached, as a read does)
   try { top = fs.realpathSync.native(root); } catch { return true; }
-  for (let p = path.resolve(at); ;) {
+  // (with no separator at its end, which would have a link that leads nowhere read as a folder that is not there)
+  let p = unfolded(at);
+  for (const { root: drive } = path.parse(p); p.length > drive.length && (p.endsWith(path.sep) || p.endsWith("/"));) p = p.slice(0, -1);
+  for (;;) {
     let real;
     try { real = fs.realpathSync.native(p); } catch {
       let found;
       try { found = fs.lstatSync(p, { throwIfNoEntry: false }); } catch { found = undefined; }
-      if (found?.isSymbolicLink()) return true;
+      if (found?.isSymbolicLink() || [".", ".."].includes(path.basename(p))) return true;
       const up = path.dirname(p);
       if (up === p) return true;
       p = up;
