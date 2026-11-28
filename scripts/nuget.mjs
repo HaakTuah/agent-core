@@ -388,19 +388,21 @@ function declaredEncoding(text) {
  * read either }. A build file git knows is read as one,
  * whoever imports it. Each file is read once, and each place an Import leads to looked up once from each file.
  */
-// (with no mark, as a reader of XML finds the encoding by its first "<" and the NULs beside it: UTF-32's before UTF-16's)
-const NO_MARK = [[[0x3c, 0, 0, 0], "utf-32le"], [[0, 0, 0, 0x3c], "utf-32be"], [[0x3c, 0], "utf-16le"], [[0, 0x3c], "utf-16be"]];
+// (each byte-order mark and, with none, the first "<" with the NULs beside it, by which a reader of XML finds a file's
+// encoding, UTF-32's before UTF-16's: the bytes it starts with, the encoding, and how many of them are a mark)
+const MARKS = [[[0xef, 0xbb, 0xbf], "utf-8", 3], [[0xff, 0xfe, 0, 0], "utf-32le", 4], [[0, 0, 0xfe, 0xff], "utf-32be", 4], [[0xff, 0xfe], "utf-16le", 2],
+  [[0xfe, 0xff], "utf-16be", 2], [[0x3c, 0, 0, 0], "utf-32le", 0], [[0, 0, 0, 0x3c], "utf-32be", 0], [[0x3c, 0], "utf-16le", 0], [[0, 0x3c], "utf-16be", 0]];
 // (a file's text by its byte-order mark, as .NET's StreamReader reads one, bytes UTF-8 does not allow as U+FFFD: only to
 // know what the file is, never to read what it names)
 function markedText(b) {
-  const utf32 = (x, little) => { const out = []; for (let i = 0; i + 3 < x.length; i += 4) { const c = little ? x.readUInt32LE(i) : x.readUInt32BE(i); out.push(c <= 0x10ffff && (c < 0xd800 || c > 0xdfff) ? String.fromCodePoint(c) : "\uFFFD"); } return out.join(""); };
-  if (b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) return new TextDecoder("utf-8").decode(b.subarray(3));
-  if (b[0] === 0xff && b[1] === 0xfe && b[2] === 0 && b[3] === 0) return utf32(b.subarray(4), true);
-  if (b[0] === 0 && b[1] === 0 && b[2] === 0xfe && b[3] === 0xff) return utf32(b.subarray(4), false);
-  if (b[0] === 0xff && b[1] === 0xfe) return new TextDecoder("utf-16le").decode(b.subarray(2));
-  if (b[0] === 0xfe && b[1] === 0xff) return new TextDecoder("utf-16be").decode(b.subarray(2));
-  const wide = NO_MARK.find(([start]) => start.every((x, k) => b[k] === x));
-  return wide ? (wide[1] === "utf-32le" || wide[1] === "utf-32be" ? utf32(b, wide[1] === "utf-32le") : new TextDecoder(wide[1]).decode(b)) : new TextDecoder("utf-8").decode(b);
+  const [, encoding, skip] = MARKS.find(([start]) => start.every((x, k) => b[k] === x)) ?? [null, "utf-8", 0], rest = b.subarray(skip);
+  return encoding.startsWith("utf-32") ? utf32(rest, encoding === "utf-32le") : new TextDecoder(encoding).decode(rest);
+}
+// (UTF-32's code points, one that is none as U+FFFD)
+function utf32(x, little) {
+  const out = [];
+  for (let i = 0; i + 3 < x.length; i += 4) { const c = little ? x.readUInt32LE(i) : x.readUInt32BE(i); out.push(c <= 0x10ffff && (c < 0xd800 || c > 0xdfff) ? String.fromCodePoint(c) : "\uFFFD"); }
+  return out.join("");
 }
 /** Whether a file's text is an MSBuild project, its root element a Project, past blanks, byte-order marks, comments,
  *  processing instructions and a document type, in one pass. */
@@ -594,11 +596,11 @@ export function nugetConfig(config, copy = "core/") {
   if (!Array.isArray(sources) || !sources.every(source)) throw new Error('the config\'s "nuget.sources" is not a list of sources: each an https address of a named host, with no sign-in or question in it, or a folder of the project\'s own, as git lists it, ending in "/". Mend: write each so, or take it out');
   const same = sources.map((s) => s.toLowerCase().replace(/\/$/u, ""));
   if (same.some((s, i) => same.indexOf(s) !== i || s === REGISTRY.toLowerCase())) throw new Error(`the config's "nuget.sources" names a source twice, or NuGet's own registry, which every restore takes from already. Mend: name each source once, and NuGet's registry not at all`);
-  return { ships, tools, accepted, sources, unread: unreadOf(nuget.unread ?? {}) };
+  return { ships, tools, accepted, sources, unread: unreadOf(nuget.unread) };
 }
 // (the config's "nuget.unread", checked: a map from a file to the lines of the forms declared there)
-function unreadOf(unread) {
-  const line = (l) => typeof l === "string" && l.trim() !== "";
+function unreadOf(given) {
+  const unread = given ?? {}, line = (l) => typeof l === "string" && l.trim() !== "";
   if (!unread || typeof unread !== "object" || Array.isArray(unread) || !Object.entries(unread).every(([f, lines]) => f && Array.isArray(lines) && lines.length && lines.every(line))) throw new Error('the config\'s "nuget.unread" is not a map from a file, as git lists it, to the forms declared there, each a line as this check prints it. Mend: write it so, or take it out');
   return unread;
 }
