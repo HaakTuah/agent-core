@@ -66,7 +66,7 @@ const run = (dir, args, extra = {}) => {
 let events = 0;
 const inWorkflow = ({ head = "owner/project", name = "pull_request" } = {}) => {
   const file = path.join(tmp, `event-${++events}.json`);
-  fs.writeFileSync(file, JSON.stringify({ pull_request: head === null ? { head: {} } : { head: { repo: { full_name: head } } } }));
+  fs.writeFileSync(file, JSON.stringify(name.startsWith("pull_request") ? { pull_request: head === null ? { head: {} } : { head: { repo: { full_name: head } } } } : { ref: "refs/heads/main", repository: { full_name: "owner/project" } }));
   return { GITHUB_ACTIONS: "true", GITHUB_EVENT_NAME: name, GITHUB_EVENT_PATH: file, GITHUB_REPOSITORY: "owner/project" };
 };
 // its own failures say their mend
@@ -250,14 +250,17 @@ if (args.includes("--restored") && process.env.FAIL_READ && args.join(" ").inclu
   const refused = r => r.status === 1 && /^ran the look, OWN=$/m.test(r.out) && /^FAIL this pull request comes from another repository, or nothing proves the code checked out is this repository's own, and it changes what NuGet reads; a restore runs its build files, so none ran\. Mend: the owner brings the change into a branch of the repository/m.test(r.out)
     && !/^ran (nuget\.mjs \[checks|dotnet restore)/m.test(r.out) && mended(r.out);
   for (const [what, args, extra] of [["a pull request from another repository", [], inWorkflow({ head: "stranger/project" })], ["one whose head repository is missing", [], inWorkflow({ head: null })],
-    ["a push", [], inWorkflow({ name: "push" })], ["a pull request with no event file", [], { ...inWorkflow(), GITHUB_EVENT_PATH: path.join(tmp, "no-event.json") }],
+    ["a pull_request_target from another repository", [], inWorkflow({ name: "pull_request_target", head: "stranger/project" })],
+    ["a workflow_run", [], inWorkflow({ name: "workflow_run" })], ["a push with no event file", [], { ...inWorkflow({ name: "push" }), GITHUB_EVENT_PATH: "" }],
+    ["a pull request with no event file", [], { ...inWorkflow(), GITHUB_EVENT_PATH: path.join(tmp, "no-event.json") }],
     ["--own-repository in a workflow, for another repository's pull request", ["--own-repository"], inWorkflow({ head: "stranger/project" })], ["a run by hand without --own-repository", [], {}]]) {
     const r = proven(args, extra);
     ok(refused(r), `nuget: ${what} changing what NuGet reads fails with its mend, and no restore runs, nor the read before it`, r.out);
   }
   const quiet = proven([], inWorkflow({ head: "stranger/project" }), "false");
   ok(quiet.status === 0 && /^ran the look, OWN=$/m.test(quiet.out) && !/^ran (nuget\.mjs \[checks|dotnet restore)/m.test(quiet.out), "nuget: and one that changes nothing NuGet reads passes, nothing restored", quiet.out);
-  for (const [what, args, extra] of [["a pull request of this repository's own", [], inWorkflow()], ["a run by hand with --own-repository", ["--own-repository"], {}]]) {
+  for (const [what, args, extra] of [["a pull request of this repository's own", [], inWorkflow()], ["a run by hand with --own-repository", ["--own-repository"], {}],
+    ...["push", "schedule", "workflow_dispatch", "merge_group"].map(name => [`a ${name} run`, [], inWorkflow({ name })])]) {
     const r = proven(args, extra);
     ok(r.status === 0 && /^ran the look, OWN=true$/m.test(r.out) && /^ran dotnet restore/m.test(r.out), `nuget: ${what} restores, the look told it may`, r.out);
   }

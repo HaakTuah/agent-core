@@ -346,7 +346,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      check where it can matter"). Like the signature check, it first looks whether the pull request changes anything
      NuGet reads (its workflow's header lists what), and passes without a restore where it changes none; any doubt runs
      it. A restore runs the pull request's own build files, so none runs, the first look's own neither, unless the run
-     proves the code is the repository's own: a pull request from another repository that changes what NuGet reads
+     proves the code is the repository's own (on GitHub, a pull request from a branch of it, a push, a schedule, a
+     dispatch or the merge queue; elsewhere, `--own-repository`): a pull request from another repository that changes what NuGet reads
      fails, with the mend that the owner brings the change into a branch of the repository. Before the restore, `nuget-fetch.mjs` fetches every package the
      lock files name, holds each to its lock file's content hash and reads its licence from it, so no build the pull
      request changed has run beside that verdict; the tools a manifest of dotnet's names (`dotnet-tools.json`, in `.config/` or any folder) are

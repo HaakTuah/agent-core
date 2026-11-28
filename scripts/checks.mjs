@@ -353,19 +353,26 @@ const RUN = {
 };
 
 // Whether the code checked out is proven the repository's own, so that a restore may run its build files: in a workflow
-// (GITHUB_ACTIONS), only where the event is a pull request whose event file names its head repository as this one
-// (a missing head repository, a fork's that was deleted, counting as another's; any other event proves nothing);
-// elsewhere only with --own-repository, which the daily try and a release's trial give for the clones they make of the
-// owner's own projects (check.mjs, which writes the event file its steps read). A session's own environment, which
-// could say anything here, is a foothold this does not hold against.
+// (GITHUB_ACTIONS), where the event is a pull request whose event file names its head repository as this one (a missing
+// head repository, a fork's that was deleted, counting as another's), or a push, a schedule, a person's dispatch or a
+// pull request in the merge queue, which only a writer starts or merges, with the event file the runner writes; any
+// other event (pull_request_target, workflow_run) proves nothing. Elsewhere only with --own-repository, which the daily
+// try and a release's trial give for the clones they make of the owner's own projects (check.mjs, which writes the
+// event file its steps read only then, so its push counts as the repository's own only with it), and another host's
+// pipeline on runs of the repository's own branches. A session's own environment, which could say anything here, is a
+// foothold this does not hold against.
+const OWN_EVENTS = ["push", "schedule", "workflow_dispatch", "merge_group"];
 export function ownCode(o, env = process.env) {
   if (env.GITHUB_ACTIONS !== "true") return o.ownRepository === true;
-  if (env.GITHUB_EVENT_NAME !== "pull_request" || !env.GITHUB_EVENT_PATH || !env.GITHUB_REPOSITORY) return false;
-  let head;
-  try { head = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, "utf8"))?.pull_request?.head?.repo?.full_name; } catch { return false; }
+  if (!env.GITHUB_EVENT_PATH || !env.GITHUB_REPOSITORY) return false;
+  let event;
+  try { event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, "utf8")); } catch { return false; }
+  if (event === null || typeof event !== "object") return false;
+  if (OWN_EVENTS.includes(env.GITHUB_EVENT_NAME)) return true;
+  const head = env.GITHUB_EVENT_NAME === "pull_request" ? event.pull_request?.head?.repo?.full_name : undefined;
   return typeof head === "string" && head === env.GITHUB_REPOSITORY;
 }
-export const NOT_OWN = `this pull request comes from another repository, or nothing proves the code checked out is this repository's own, and it changes what NuGet reads; a restore runs its build files, so none ran. ${MEND}the owner brings the change into a branch of the repository, whose pull request runs the check whole (by hand, on a clone of the owner's own project, give --own-repository).`;
+export const NOT_OWN = `this pull request comes from another repository, or nothing proves the code checked out is this repository's own, and it changes what NuGet reads; a restore runs its build files, so none ran. ${MEND}the owner brings the change into a branch of the repository, whose pull request runs the check whole (by hand, on a clone of the owner's own project, give --own-repository; on another host's pipeline, give it on runs of the repository's own branches, never on a merge request from a fork).`;
 
 // Each project file restored from its lock file alone into a folder of its own and read at once (readAfter, with
 // --restored and its lock file), before the next project's restore; the folder, with NuGet's caches of downloads and

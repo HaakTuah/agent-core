@@ -67,6 +67,9 @@ ok(/host own\.yml\/deploy: it names an environment/.test(r.out) && !("own.yml/de
   const head = git(dir, "rev-parse", "HEAD"), github = context({ root: dir, head, base: head, owner: "someone", title: "t", body: "", branch: "change", event: "pull_request" });
   const steps = given => ({ GITHUB_ACTIONS: "true", GITHUB_EVENT_NAME: github.event_name, GITHUB_REPOSITORY: github.repository, ...eventFile(given, github.event, tmp) });
   ok(ownCode({}, steps(true)) && !ownCode({}, steps(false)), "with --own-repository the steps' event file proves the code the repository's own; without it, nothing does", JSON.stringify(steps(true)));
+  const push = context({ root: dir, head, base: "", owner: "someone", title: "t", body: "", branch: "change", event: "push" });
+  const pushed = given => ({ GITHUB_ACTIONS: "true", GITHUB_EVENT_NAME: push.event_name, GITHUB_REPOSITORY: push.repository, ...eventFile(given, push.event, tmp) });
+  ok(ownCode({}, pushed(true)) && !ownCode({}, pushed(false)), "its push counts as the repository's own only with --own-repository too", JSON.stringify(pushed(false)));
 }
 const inside = check(dir, "--own", "--verdicts", path.join(dir, "verdicts.json"));
 ok(inside.status === 1 && mended(inside.out) && /--verdicts .* lies in the project.s own repository/.test(inside.out) && !fs.existsSync(path.join(dir, "verdicts.json")), "--verdicts in the project's own repository is refused, saying its mend, and nothing is written there", inside.out);

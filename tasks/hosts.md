@@ -11,7 +11,7 @@ the project calls, step by step in their own shell, on the commit checked out, o
 pipeline, and fails, saying its mend, where one of them fails; with no base, as on a push to `main`. Where the project
 calls none from `.github/workflows`, the starter kit's calls are run. On a host other than GitHub, the project's
 pipeline runs it on every change into `main`, from a clone of the core at the pin `main`'s manifest holds, never from
-the change's own copy, which the change could have edited; and a session runs it before marking a pull request ready. It
+the change's own copy, which the change could have edited; and a session runs it before marking a pull request ready. The pipeline passes `--own-repository` only on runs of the repository's own branches, never on a merge request from a fork. It
 runs the change's own code (its copy's scripts, its packages' restore), as its tests do, so a pipeline runs it where no
 sign-in or key is held but the host's own for that pipeline. It does not mean that a check of the host's own runs there
 (a review app's status, the dependency review, code scanning, a job started by a schedule): it names each and runs none,
