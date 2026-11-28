@@ -263,7 +263,7 @@ function project(name, from, { owner, kit, isPrivate, windows, files, as }) {
 // origin by its address on GitHub, which git takes to the bare repository, and the host's answer, whether it is
 // private, from GitHub's event, since the proof honours no test's stand-in (scripts/host-private.mjs); gh a stand-in
 // that gives the head's pull request, opened from a branch of the project's own repository (scripts/own-head.mjs), and
-// its address on GitHub taken nowhere by the stand-in's rewrite, which is left out.
+// its address on GitHub taken nowhere by the stand-in's rewrite, which is left out, and on Windows its preload kept.
 let host = null;
 function provePure(p) {
   host ??= ghStandIn(env, fs.mkdtempSync(path.join(tmp, "gh-")), path.join(tmp, "no-origin.git"));
@@ -274,7 +274,7 @@ function provePure(p) {
   git(p.dir, "config", `url.${slash(origin)}.insteadOf`, onGitHub);
   git(p.dir, "remote", "set-url", "origin", onGitHub);
   try {
-    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p.dir, env: { ...env, [PATHKEY]: host.env[PATHKEY], GH_DATA: host.ghData, GH_LOG: host.ghLog, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p.dir, env: { ...env, [PATHKEY]: host.env[PATHKEY], ...(host.env.NODE_OPTIONS && { NODE_OPTIONS: host.env.NODE_OPTIONS }), GH_DATA: host.ghData, GH_LOG: host.ghLog, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
     return { status: r.status, out: `${r.stdout}${r.stderr}` };
   } finally {
     git(p.dir, "remote", "set-url", "origin", origin);

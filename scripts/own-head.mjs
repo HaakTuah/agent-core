@@ -5,10 +5,16 @@
 // names, lists the repository's open pull requests, and the commit is shown so only where one at least has it as its
 // head and each that has it comes from the repository itself: its head repository's id the same as its base's, the
 // host's own number, which no rename nor spelling of a name changes, where a deleted fork's head repository is null and
-// never is. Where gh gives no answer, or one with a field missing, nothing is shown. Node's own modules, git and gh.
+// never is. Where gh gives no answer, or one with a field missing, nothing is shown. Node's own modules, git and gh,
+// looked for on the PATH alone.
 import { execFileSync } from "node:child_process";
 import { parseBounded } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
+import { lookOnlyOnPath } from "./workflow-run.mjs";
+
+// (git and gh, run here and by pure-sync.mjs and attached.mjs in a clone whose head may be another's, are looked for
+// on the PATH alone, never in the folder they start in, before anything is run)
+lookOnlyOnPath();
 
 const gh = args => execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 60000, maxBuffer: 1 << 26 });
 const MEND = "Mend: a sync is opened from a branch of the repository: open its pull request so, and run this on its head";

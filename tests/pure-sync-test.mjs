@@ -193,6 +193,17 @@ for (const [pulls, why, what] of [[null, /could not be read: gh gave no answer f
 }
 const twoPulls = pure([aPull(LEGIT), aPull(LEGIT, { full_name: "stranger/project", id: REPO_ID + 1 })]);
 ok(twoPulls.status === 1 && /comes from a repository other than/.test(twoPulls.out), "  nor where one of two pull requests with that head comes from another", twoPulls.out);
+// (a program of the head's own, git or gh by any name a system runs, at its root, with "." first on the PATH: none is
+// run, here or by attached.mjs, as Windows would by default from the folder it starts in; own-head.mjs)
+const ran = path.join(tmp, "planted-ran");
+const planted = ["git", "gh"].flatMap(n => [n, `${n}.exe`, `${n}.com`, `${n}.cmd`]).map(n => path.join(p, n));
+for (const f of planted) fs.writeFileSync(f, `#!/bin/sh\necho ran > "${slash(ran)}"\nexit 1\n`, { mode: 0o755 });
+const dotFirst = { ...reviewEnv, [PATHKEY]: `.${path.delimiter}${reviewEnv[PATHKEY]}` };
+const withPlanted = (script, args = []) => { git(p, "remote", "set-url", "origin", GH_ORIGIN); opens(); try { const r = spawnSync(process.execPath, [script, ...args], { cwd: p, env: { ...dotFirst, GITHUB_EVENT_PATH: event }, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; } finally { git(p, "remote", "set-url", "origin", origin); } };
+const plantedPure = withPlanted(path.join(theCore, "scripts", "pure-sync.mjs")), plantedAttached = withPlanted("core/scripts/attached.mjs");
+for (const f of planted) fs.rmSync(f);
+ok(plantedPure.status === 0 && plantedPure.out.includes(`sha=${LEGIT}`) && plantedAttached.status === 0 && !fs.existsSync(ran),
+  "  and a git or gh of the head's own at its root is never run, the folder it starts in left out of the search, \".\" first on the PATH or not", `${plantedPure.out}\n${plantedAttached.out}\n${fs.existsSync(ran)}`);
 const foreignAttached = attachedHere([aPull(LEGIT, null)]), unreadAttached = attachedHere(null);
 const inTheWay = out => out.split(/^Not read, /mu)[0];
 ok(/^attached: no, /u.test(foreignAttached.out) && /^- the sync: this head comes from a repository other than/mu.test(inTheWay(foreignAttached.out))
