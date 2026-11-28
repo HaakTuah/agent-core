@@ -54,7 +54,7 @@ import { CORE } from "./core-address.mjs";
 import { copyHeld } from "./core-path.mjs";
 import { blockingOf, codexFind } from "./review-comments.mjs";
 import { formOf, marksWait } from "./review-marks.mjs";
-import { RULES, ruleFiles } from "./rule-files.mjs";
+import { RULES, inToolFolder, ruleFiles, toolFolders } from "./rule-files.mjs";
 import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, counted, pinsAlone, queueOnly, reviewersOf, standsFrom, status, unproved, whole, writersOf } from "./security-review.mjs";
 import { guard } from "./mend.mjs";
 
@@ -141,7 +141,7 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
     if (posted.has(sha)) return { sha, done: true, why: `a code review of ${short} is posted, so Codex's running one is not waited for` };
     return { sha, done: false, why: `Codex's code review of ${short} is still running. Mend: wait for it` };
   }
-  if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules, copy))) return { sha, done: true, why: "no code review is running" };
+  if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules, copy, more?.folders ?? []))) return { sha, done: true, why: "no code review is running" };
   // (one its caller proved queue-only, its files as queueOnly reads them, needs none: floor rule 8, #750)
   if (more?.queue === true && queueOnly(pull, files, copy)) return { sha, done: true, why: "queue-only, as queue-only.mjs proves: no code review needed" };
   return reviewRan(sha, posted, review, pull, commits, bound, merges, clearOf(list, review, pull, bound, more), checked);
@@ -175,19 +175,20 @@ function reviewRan(sha, posted, review, pull, commits, bound, merges, clear = ne
 // moved alone among them)
 const MANIFEST = /^(Core: \S+ at )[0-9a-f]{40}(, copied whole under \S+\/.*)$/u; // (at the path the manifest names: core-path.mjs)
 // A rule file: by the pattern, by the project's own list, or a file of the core's copy where the default branch's
-// manifest names it (`copy`, given apart from the list, which names files alone).
-const isRule = (name, rules, copy) => RULES.test(name) || rules.includes(name) || (copy !== null && name.startsWith(copy));
+// manifest names it (`copy`, given apart from the list, which names files alone), or a file under a folder a tool
+// takes its instructions from, where its links lead (`folders`: rule-files.mjs's toolFolders), added by the pull request too.
+const isRule = (name, rules, copy, folders) => RULES.test(name) || rules.includes(name) || (copy !== null && name.startsWith(copy)) || inToolFolder(name, folders);
 // The copy's path: as the default branch's manifest names it; else as the base's line the pull request moves names
 // it; else core/ (core-path.mjs).
 const copyIn = (files, copy) => copy
   ?? /^-Core: \S+ at [0-9a-f]{40}, copied whole under ((?:[A-Za-z0-9_][A-Za-z0-9._-]*\/)+)(?= |$)/mu.exec(files.find((file) => file.filename === "core-manifest.md")?.patch ?? "")?.[1] ?? "core/";
-function needs(pull, files, rules, copy) {
+function needs(pull, files, rules, copy, folders = []) {
   const names = files.flatMap((file) => [file.filename, file.previous_filename]).filter((name) => name !== undefined);
   if (names.length === 0 || names.some((name) => typeof name !== "string")) return names.length > 0;
   // (in the core's own repository every file is protected, its SECURITY.md says, and every pull request gets its code
   // review: AGENTS.md, "How changes are made here")
   if (String(pull.base?.repo?.full_name).toLowerCase() === CORE.toLowerCase()) return true;
-  const rule = (name) => isRule(name, rules, copy);
+  const rule = (name) => isRule(name, rules, copy, folders);
   if (names.every((name) => /\.md$/iu.test(name) && !rule(name))) return false;
   // (the copy at the path the manifest's line names, which a sync's patch shows beside the pin it moves: core-path.mjs)
   const at = copyIn(files, copy);
@@ -214,6 +215,7 @@ if (guard(import.meta.url)) {
   const copy = copyHeld(".");
   const pull = read(pullFile);
   const more = { reviewers: reviewersOf(process.env.REVIEWERS), rights: process.env.RIGHTS ? read(process.env.RIGHTS) : undefined, findings: process.env.FINDINGS ? read(process.env.FINDINGS) : undefined,
+    folders: (() => { try { return toolFolders(); } catch { return []; } })(),
     queue: typeof pull?.head?.sha === "string" && /^[0-9a-f]{40}$/u.test(pull.head.sha) && process.env.QUEUE === pull.head.sha };
   const verdict = judge(pull, read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, boundOf(process.env.BOUND, pull, process.env.SINCE), mergesFile ? read(mergesFile) : undefined, copy, more);
   // (done and why, the verdict itself, which security-review.mjs folds into its own status: #1339)

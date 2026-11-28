@@ -86,7 +86,8 @@ function baseCommit() {
   if (!from) return null;
   try { return git(["rev-parse", "--verify", "--quiet", "--end-of-options", `${from}^{commit}`]).trim(); } catch { console.error(`FAIL: ${logged(`POINTERS_BASE ${from} is not a commit here`)}. Mend: fetch it (git fetch origin <the base branch>) before the check runs`); process.exit(1); }
 }
-const show = AT ? f => (tracked.includes(f) ? atCommit(f) : null) : undefined, under = AT ? dir => tracked.filter(f => f.startsWith(`${dir}/`)) : undefined;
+// (at a commit, the reader carries where a path leads, as the work tree's does, so that both list a tool's file that is a link alike)
+const show = AT ? Object.assign(f => (tracked.includes(f) ? atCommit(f) : null), { where: atCommit.where }) : undefined, under = AT ? dir => tracked.filter(f => dir === "." || f.startsWith(`${dir}/`)) : undefined;
 let RULES, TOOLS;
 try {
   // (an agent tool's files that no other way names a rule file, tracked, as git lists them)
@@ -98,7 +99,15 @@ try {
   RULES = AT ? [...TOOLS] : [...old, ...TOOLS];
 } catch (e) { console.error(`FAIL: ${loggedAlone(e.message)}`); process.exit(1); }
 for (const rf of RULES.filter(f => !tracked.includes(f))) { console.error(`FAIL: ${logged(`the rule file ${rf} is no tracked file`)}. Mend: add it to git, or take out the pointer that names it as a rule file`); process.exitCode = 1; }
-for (const rf of RULES.filter(f => !AT && tracked.includes(f) && own(f) === null)) { console.error(`FAIL: ${logged(`the rule file ${rf} is no regular file of the project's own of at most ${BOUND >> 20} MiB (a link that leads out of the project or to no file, or a file past that size)`)}, so its pointers cannot be read. Mend: make it a file of the project's own, or a link to one inside the project, and keep it under ${BOUND >> 20} MiB`); process.exitCode = 1; }
+// (a rule file, a tool's or any other, past the bound or unread, that the pull request's base held as it stands, as git
+// compares it with the work tree, a link by its text, stood before the check read it: noted, as "Nothing locks a
+// project" asks; one the pull request brings or changes fails)
+const stoodAtBase = f => { const sha = process.env.POINTERS_BASE ? baseCommit() : null; if (!sha) return false; try { git(["diff", "--quiet", sha, "--", `:(literal)${f}`]); return true; } catch { return false; } };
+for (const rf of RULES.filter(f => !AT && tracked.includes(f) && own(f) === null)) {
+  const said = `the rule file ${rf} is no regular file of the project's own of at most ${BOUND >> 20} MiB (a link that leads out of the project or to no file, or a file past that size)`, mend = `make it a file of the project's own, or a link to one inside the project, and keep it under ${BOUND >> 20} MiB`;
+  if (stoodAtBase(rf)) { console.log(`note ${logged(said)} (the pull request's base held it as it stands, so it fails nothing: ${mend})`); continue; }
+  console.error(`FAIL: ${logged(said)}, so its pointers cannot be read. Mend: ${mend}`); process.exitCode = 1;
+}
 if (process.exitCode) process.exit(1);
 const files = new Set(tracked), dirs = new Set(tracked.flatMap(f => f.split('/').slice(0, -1).map((_, i, p) => p.slice(0, i + 1).join('/') + '/')));
 const plain = s => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
