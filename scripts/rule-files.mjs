@@ -14,10 +14,13 @@
 // or between the links of a chain, is listed with it, and one on the way to a tool's folder is named (wayLinks):
 // readHere, linksIn's and readAt's readers carry both. A tool's folder that a submodule holds, which no check here can
 // read, entry-files.mjs fails.
+// Not hardened here, each needing links the project already holds on its default branch: what a link inside a tool's
+// folder leads to where it is a folder, and the links on the way to a rule file its SECURITY.md names, are not listed.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { leadsOut } from "./guards.mjs";
+import { AGENT_FOLDERS } from "./runs-by-itself.mjs";
 // Each agent tool's entry file, as the starter kit writes it (tasks/tools.md, "One door in").
 export const ENTRY_FILES = Object.freeze({ claude: "CLAUDE.md", kiro: ".kiro/steering/core.md", antigravity: ".agents/rules/core.md" });
 // The folders a tool takes its instructions from (floor rule 3; tools/kiro.md and antigravity.md): every file in them.
@@ -76,14 +79,14 @@ export function followLinks(f, isLink, text, isFolder, passed = null) {
   }
   return cur.join("/");
 }
-// Whether a submodule (`gitlinks`, their paths) holds what a path names, read as followLinks reads it, a submodule and
-// the folders above it read as folders: the path as written, a link its walk passes, or where it ends lies in one, or one lies under where it
+// Whether a submodule (`gitlinks`, their paths) holds what a path names, read as followLinks reads it, a submodule, the
+// folders above it and the paths inside it read as folders: the path as written, a link its walk passes, or where it ends lies in one, or one lies under where it
 // ends; behind a submodule no check here can see what a tool reads.
 export function inSubmodule(f, isLink, text, isFolder, gitlinks) {
   const subs = new Set(gitlinks), under = p => p.split("/").some((_, i, a) => subs.has(a.slice(0, i + 1).join("/"))), passed = [];
   if (!subs.size) return false;
-  // (a submodule, and each folder above one, read as a folder though no checkout holds it)
-  const at = followLinks(f, isLink, text, p => subs.has(p) || [...subs].some(g => g.startsWith(`${p}/`)) || isFolder(p), passed);
+  // (a submodule, each folder above one and each path inside one, read as a folder though no checkout holds it)
+  const at = followLinks(f, isLink, text, p => under(p) || [...subs].some(g => g.startsWith(`${p}/`)) || isFolder(p), passed);
   return under(path.posix.normalize(f)) || passed.some(under) || (at !== null && (at === "" || under(at) || [...subs].some(g => g.startsWith(`${at}/`))));
 }
 // Where readAt(commit) reads a path from: the path, from the root, of the file it leads to, every link on its way
@@ -165,8 +168,9 @@ export const wayLinks = (read = readHere) => [...new Set([...FOLDERS, ...TOOL_FI
 export const toolFolders = (read = readHere) => [...new Set(FOLDERS.map(read.where ?? (f => f)).filter(at => at !== null))];
 export const inToolFolder = (name, folders) => folders.some(at => at === "" || name === at || String(name).startsWith(`${at}/`));
 // A rule file or protected folder by its name alone (floor rule 3): what a tool takes its instructions from, wherever
-// it lies, the threat model, the manifest, the copy of the core, and the folders of what runs by itself.
-export const RULES = /(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|GEMINI|REVIEW)(?:\.[\w-]+)?\.md$|threat-model|^core-manifest\.md$|^core\/|(?:^|\/)\.(?:github|claude|agents?|kiro|codex|gemini|cursor|windsurf|amazonq|continue|roo)\//iu;
+// it lies, the threat model, the manifest, the copy of the core, and the folders of what runs by itself, each agent
+// tool's own as runs-by-itself.mjs names them (AGENT_FOLDERS).
+export const RULES = new RegExp(String.raw`(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|GEMINI|REVIEW)(?:\.[\w-]+)?\.md$|threat-model|^core-manifest\.md$|^core\/|(?:^|\/)\.(?:github|claude|${AGENT_FOLDERS.source})\/`, "iu");
 
 export function ruleFiles(read = readHere, list = tracked, { tools = false } = {}) {
   const security = read("SECURITY.md");

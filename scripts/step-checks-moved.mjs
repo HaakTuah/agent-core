@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { copiesConfig, marksConfig } from "./check-configs.mjs";
 import { BEGIN, BLOCKS, END } from "./core-owned.mjs";
 import { atCopy } from "./core-path.mjs";
-import { ruleFiles } from "./rule-files.mjs";
+import { linksIn, ruleFiles } from "./rule-files.mjs";
 import { copyAt } from "./workflow-calls.mjs";
 import { realFiles, regular } from "./reading.mjs";
 import { HERE, shown } from "./step-checks.mjs";
@@ -51,7 +51,8 @@ const dated = f => /\.(md|txt)$/u.test(f) && (/(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.t
 // other file of text that is no dated record. Left out: what git's attributes mark as a tool's output (`generated`),
 // save a rule file, which a tool reads all the same.
 const rulesOf = p => {
-  try { return ruleFiles(p.read, dir => p.files.filter(f => f.startsWith(`${dir}/`)), { tools: true }); } catch { return []; } // (no list of rule files yet: the files of text alone)
+  // (the reader follows links as the work tree's does: rule-files.mjs, linksIn)
+  try { return ruleFiles(Object.assign(f => p.read(f), linksIn(p.root)), dir => p.files.filter(f => dir === "." || f.startsWith(`${dir}/`)), { tools: true }); } catch { return []; } // (no list of rule files yet: the files of text alone)
 };
 export function namers(p) {
   const rules = rulesOf(p);

@@ -62,7 +62,7 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
   // that carries its scripts)
   {
     const lib2 = path.join(tmp, "a-library-with-scripts"), consumer = path.join(tmp, "a-consumer");
-    for (const f of ["pointers.mjs", "names.mjs", "links.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "mend.mjs"]) put(lib2, `core/scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(`./${f}`, new URL("../scripts/", import.meta.url))), "utf8"));
+    for (const f of ["pointers.mjs", "names.mjs", "links.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "runs-by-itself.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "mend.mjs"]) put(lib2, `core/scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(`./${f}`, new URL("../scripts/", import.meta.url))), "utf8"));
     // (and the package the check reads Markdown with, as the core's install leaves it: the lock file, npm's record of
     // the install and the package)
     for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/marked"]) fs.cpSync(fileURLToPath(new URL(`../.packages/${f}`, import.meta.url)), path.join(lib2, "core/.packages", f), { recursive: true });

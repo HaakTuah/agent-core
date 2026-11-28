@@ -18,7 +18,7 @@ const here = fileURLToPath(new URL("../scripts/", import.meta.url));
 // record of the install and the package itself, from the core's own install, which its tests' job runs)
 const carry = core => {
   fs.mkdirSync(path.join(core, "scripts"), { recursive: true });
-  for (const f of ["pointers.mjs", "links.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "mend.mjs", "names.mjs"]) fs.copyFileSync(path.join(here, f), path.join(core, "scripts", f));
+  for (const f of ["pointers.mjs", "links.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "runs-by-itself.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "mend.mjs", "names.mjs"]) fs.copyFileSync(path.join(here, f), path.join(core, "scripts", f));
   for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/marked"]) fs.cpSync(path.join(here, "../.packages", f), path.join(core, ".packages", f), { recursive: true });
 };
 const FILES = {

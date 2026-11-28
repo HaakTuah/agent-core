@@ -16,7 +16,7 @@ const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"}
 // (made-up values of each form: no real pin)
 const made = (seed, n) => Array.from({ length: n }, (_, i) => "0123456789abcdef"[(seed * 7 + i * 5) % 16]).join("");
 const [SHA, DIGEST, OTHER] = [made(1, 40), made(2, 64), made(3, 40)];
-const SCRIPTS = ["copies.mjs", "copies-values.mjs", "code-shape-lexer.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "mend.mjs", "yaml-keys.mjs", "packages.mjs", "schemas.mjs", "core-owned.mjs"];
+const SCRIPTS = ["copies.mjs", "copies-values.mjs", "code-shape-lexer.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "runs-by-itself.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "mend.mjs", "yaml-keys.mjs", "packages.mjs", "schemas.mjs", "core-owned.mjs"];
 const core = fileURLToPath(new URL("../", import.meta.url));
 const dir = scratchDir("copies-values-list-test-");
 const BASELINE = "checks/copies-baseline.json";

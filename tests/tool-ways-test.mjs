@@ -164,6 +164,9 @@ ok([".kiro/specs/a/tasks.md", ".codex/prompts/p.md", "x/.kiro/notes.md", ".gemin
     git("rm", "-q", "--cached", ".agents"); sub("vendor/k"); link("vendor/k", ".kiro");
     r = run({ ENTRY_BASE: "HEAD" });
     ok(r.status === 1 && said(r, ".kiro/steering") && said(r, ".kiro/agents"), "and so does one reached through a link into a submodule", r.out);
+    fs.rmSync(path.join(dir, ".kiro")); link("vendor/k/deep", ".kiro");
+    r = run({ ENTRY_BASE: "HEAD" });
+    ok(r.status === 1 && said(r, ".kiro/steering"), "and one reached through a link to a folder inside a submodule not checked out", r.out);
     fs.rmSync(path.join(dir, ".kiro")); git("rm", "-q", "--cached", "vendor/k"); fs.mkdirSync(path.join(dir, ".agent/rules"), { recursive: true }); sub(".agent/rules/vendor");
     r = run({ ENTRY_BASE: "HEAD" });
     ok(r.status === 1 && said(r, ".agent/rules"), "and one that holds a submodule", r.out);
