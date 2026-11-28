@@ -29,9 +29,9 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { corePath, floorCopy, projectAt } from "./core-path.mjs";
+import { corePath, floorCopy, projectAt, regularText } from "./core-path.mjs";
 import { sizeOf as size } from "./file-size.mjs";
-import { asText, leadsOut, logged, parseBounded } from "./guards.mjs";
+import { asText, leadsOut, linkedOut, logged, parseBounded } from "./guards.mjs";
 import { guard } from "./mend.mjs";
 import { ASK, entryFor, markOf, unanswered } from "./split-mark.mjs";
 
@@ -42,7 +42,7 @@ const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 <
 const MARKS = process.argv[2];
 if (!MARKS) { console.error("FAIL: no config was named. Mend: name it: node <the core's path, core/ as a rule>scripts/reading-size.mjs <config>"); process.exit(1); }
 let marks;
-try { marks = parseBounded(fs.readFileSync(MARKS, "utf8")); } catch (e) { console.error(`FAIL: ${MARKS} could not be read as JSON (${String(e.message).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?")}). Mend: name the config the copies workflow is given, and write it as JSON`); process.exit(1); }
+try { marks = parseBounded((linkedOut(MARKS) ? null : regularText(MARKS, { bound: 1 << 26 })) ?? ""); } catch (e) { console.error(`FAIL: ${MARKS} could not be read as JSON (${String(e.message).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?")}). Mend: name the config the copies workflow is given, and write it as JSON`); process.exit(1); }
 if (!marks || typeof marks !== "object" || Array.isArray(marks)) marks = {}; // (JSON's null, a list or a value alone: the form below refuses it)
 const num = v => Number.isInteger(v) && v > 0, obj = o => o && typeof o === "object" && !Array.isArray(o), nums = o => obj(o) && Object.values(o).every(num);
 // (a line of "past": a mark alone, as written before it took a why, or { "mark", "why" })
@@ -94,9 +94,25 @@ if (total > marks.total) fail.push(`the project's own files every session reads 
 
 // Step 0: files past the split mark that the PR changes
 // (a file is read to be counted only where its bytes on disk are past the mark: counted, it is never larger)
-// (a link that leads out of the project is none of its own, and is never read: #446)
-const big = [...tracked].filter(f => !skip.some(s => f.startsWith(s)) && fs.existsSync(f) && !leadsOut(".", f) && fs.statSync(f).size > marks.split
-  && !fs.readFileSync(f).subarray(0, 8000).includes(0) && size(f) > marks.split);
+// At most the first `n` bytes of the regular file at `file`, a link not followed, read through one descriptor opened
+// without waiting; null where it is no regular file or cannot be read.
+function startOf(file, n) {
+  const { O_RDONLY, O_NOFOLLOW, O_NONBLOCK } = fs.constants;
+  if (O_NOFOLLOW === undefined && fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink() !== false) return null;
+  let fd;
+  try { fd = fs.openSync(file, O_RDONLY | (O_NOFOLLOW ?? 0) | (O_NONBLOCK ?? 0)); } catch { return null; }
+  try {
+    if (!fs.fstatSync(fd).isFile()) return null;
+    const chunk = Buffer.alloc(n);
+    return chunk.subarray(0, fs.readSync(fd, chunk, 0, n, 0));
+  } catch { return null; } finally { fs.closeSync(fd); }
+}
+// (a link that leads out of the project is none of its own, and is never read: #446; nor is any link, a folder, a device
+// or a pipe, as lstat finds them, a link's file being counted as itself where it is tracked; of a regular file only
+// the first 8,000 bytes are read to tell whether it is binary)
+const regularOwn = f => { try { const st = fs.lstatSync(f); return st.isFile() && !leadsOut(".", f) ? st : null; } catch { return null; } };
+const big = [...tracked].filter(f => !skip.some(s => f.startsWith(s)) && regularOwn(f)?.size > marks.split
+  && startOf(f, 8000)?.includes(0) === false && size(f) > marks.split);
 let base = process.env.SIZES_BASE;
 if (!base) try { base = git(["merge-base", "origin/main", "HEAD"]).trim(); } catch { base = ""; }
 if (base) {

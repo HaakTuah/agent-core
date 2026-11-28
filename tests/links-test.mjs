@@ -21,6 +21,7 @@ const root = path.resolve("/project"), url = p => pathToFileURL(path.join(root, 
 ok(target(url("docs/a b.md"), root) === "docs/a b.md" && target(`${url("b.md")}#x`, root) === "b.md" && target(`${url("b.md")}?plain=1`, root) === "b.md"
   && target(pathToFileURL(path.resolve("/elsewhere/c.md")).href, root) === null && target("https://example.invalid/x", root) === undefined && target("mailto:a@example.invalid", root) === undefined,
   "a link lychee wrote leads to its path from the project's root, its heading and query aside; one out of the project is null; a web or mail address is not the core's to read");
+ok(reported(JSON.stringify({ error_map: { [url("..x.md")]: [{ url: url("b.md#x"), status: "fragment" }] } }), { root, text: String })?.[0]?.file === "..x.md", "a name led by two dots is inside");
 ok(readable(Buffer.from("plain text, æøå\n")) && !readable(Buffer.from([0x53, 0xff, 0xfe, 0x0a])), "a file that is no UTF-8 is one lychee reads nothing of");
 const text = f => ({ "a.md": "# A\n\nSee [b](b.md#gone) and [u](untracked.md).\n\nAnd [o](../outside.md).\n" })[f];
 const dump = [`${url("b.md")}#gone`, url("untracked.md"), pathToFileURL(path.resolve("/outside.md")).href, "https://example.invalid/x", url("docs/")].join("\n");

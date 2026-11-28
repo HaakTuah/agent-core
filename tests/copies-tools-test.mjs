@@ -160,10 +160,9 @@ try {
     fs.symlinkSync("../../docs/a.md", path.join(dir, ".kiro/steering/link.md"));
     const linked = commit("a steering file that is a link to docs/a.md");
     r = check({ COPIES_BASE: linked });
-    ok(r.status === 0 && /not yet in the baseline: .*link\.md.*the pull request's base held it/.test(r.out), "a tool's file that is a link inside the project is read through it at the base too, so what it held is noted", r.out);
-    check({}, "--tools");
-    r = check({ COPIES_BASE: linked });
-    ok(r.status === 0 && !/not yet in the baseline/.test(r.out), "and --tools lists it, which the base allows", r.out);
+    ok(r.status === 0 && !/link\.md/.test(r.out), "a tool's file that is a link inside the project is read once, as the file it leads to, at the base and in the work tree: no copy of it", r.out);
+    r = check({ COPIES_BASE: base });
+    ok(r.status === 0 && !/link\.md/.test(r.out), "and so against a base that did not hold it", r.out);
     // (a link to a folder in a tool's folder is no file of it; a link through a linked folder is read through both)
     fs.symlinkSync("../../docs", path.join(dir, ".kiro/steering/docs"));
     fs.symlinkSync("docs", path.join(dir, "docsl"));
@@ -172,6 +171,35 @@ try {
     const through = commit("a link to a folder, and one through a linked folder");
     r = check({ COPIES_BASE: through });
     ok(r.status === 0 && !/EISDIR/.test(r.out) && /not yet in the baseline: .*through\.md.*the pull request's base held it/.test(r.out), "a link to a folder in a tool's folder is passed over, and a file reached through a linked folder is read through it at the base too", r.out);
+    // (of the code and prose a config names, a tracked link that leads out of the project, to a device, to a folder or
+    // nowhere, and a file past the bound, are unread and counted; a link inside the project is read once)
+    const away0 = scratchDir("copies-tools-out-");
+    try {
+      const words = "each of these words stands in a file that lies outside the project and is never read here";
+      fs.writeFileSync(path.join(away0, "out.md"), `${words}.\n${words}.\n`);
+      put("src/a.js", Array.from({ length: 12 }, (_, i) => `export const value${i} = "${Array.from({ length: 24 }, (_, k) => `w${i}x${k}`).join(" ")}";`).join("\n"));
+      put("notes/a.md", `# Notes\n\n${OTHER}.\n`);
+      for (const [to, f] of [["/dev/zero", "src/zero.js"], ["/proc/self/fd/1", "src/out.js"], ["../notes", "src/dir"], ["gone.js", "src/gone.js"], [path.join(away0, "out.md"), "notes/out.md"], ["a.md", "notes/link.md"], ["../src/a.js", "notes/code.md"]]) fs.symlinkSync(to, path.join(dir, f));
+      fs.symlinkSync("a.js", path.join(dir, "src/b.js"));
+      // (and one through a folder link, then back up from the folder it reached, is read where the system reads it)
+      put("notes/sub/s.md", "# Sub\n"); put("notes/a3.md", "# Three\n"); fs.symlinkSync("notes/sub", path.join(dir, "xl")); fs.symlinkSync("../xl/../a3.md", path.join(dir, "notes/up.md"));
+      put("notes/big.md", `${OTHER}.\n`.repeat(100000));
+      put("checks/odd.json", `${JSON.stringify({ baseline: "checks/odd-baseline.json", code: ["src"], prose: ["notes"], proseFromSecurity: false })}\n`);
+      put("checks/odd-baseline.json", `${JSON.stringify({ windows: {}, values: {} })}\n`);
+      g("add", "-A");
+      const odd = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/odd.json"], { cwd: dir, encoding: "utf8", timeout: 60000, env: { ...process.env, COPIES_BASE: "" } });
+      const said = `${odd.stdout}${odd.stderr}`;
+      ok(odd.status === 0 && /^note 6 of the files the config names are not read: /mu.test(said) && !said.includes("outside the project") && !/new copy/u.test(said),
+        "a tracked link that leads out of the project, to a device, a folder or nowhere, and a file past the bound are unread and counted, and a link inside the project is read once, as the file it leads to, through a folder link and back up too", said);
+      // (many links to one file count it once, and each run has its own total, so the code's links leave the prose read)
+      put("src/many.js", Array.from({ length: 70000 }, (_, i) => `const v${i} = ${i};`).join("\n"));
+      for (let i = 0; i < 300; i += 1) fs.symlinkSync("many.js", path.join(dir, `src/many${i}.js`));
+      g("add", "-A");
+      const many = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/odd.json"], { cwd: dir, encoding: "utf8", timeout: 120000, env: { ...process.env, COPIES_BASE: "" } });
+      const manySaid = `${many.stdout}${many.stderr}`;
+      ok(many.status === 0 && /^note 6 of the files the config names are not read: /mu.test(manySaid),
+        "many tracked links to one file count it once in the run's total, and the code's run leaves the prose's its own", manySaid);
+    } finally { fs.rmSync(away0, { recursive: true, force: true }); }
   }
   // (with the core's packages not installed, its shape is left unchecked, said as a warning, and a config the check
   // cannot read still fails with its mend: Codex's and the fallback reviewer's reviews of 95abcdb)

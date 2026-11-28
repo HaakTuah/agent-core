@@ -25,6 +25,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileOf, notLinked, parseBaseline, parseConfig, standing, survey, where } from "./shape.mjs";
+import { manifestText } from "./core-path.mjs";
 import { started } from "./started.mjs";
 import { parseBounded } from "./guards.mjs";
 import { dayOf, shallowGap } from "./shallow.mjs";
@@ -166,7 +167,7 @@ export function auditBody(r, at, home) {
 // AGENTS.md.
 export function rulesOf(manifest, root) {
   if (manifest !== null && manifest !== undefined) return { rules: manifest, home: "core/" };
-  return { rules: tolerant(() => fs.readFileSync(path.join(root, "AGENTS.md"), "utf8"), ""), home: "" };
+  return { rules: manifestText(path.join(root, "AGENTS.md")) ?? "", home: "" };
 }
 
 // The scheduled look's readers (look.mjs, DUE): each the issue it keeps, its body null where nothing is due, so the
@@ -200,7 +201,7 @@ function audited(r, at) {
 
 function main(args) {
   const at = new Date().toISOString();
-  const { rules, home } = rulesOf(tolerant(() => fs.readFileSync("core-manifest.md", "utf8"), null), ".");
+  const { rules, home } = rulesOf(manifestText("core-manifest.md"), ".");
   const r = reading(rules);
   if (!r) return `No config of the shape check at \`${where(rules)}\` yet, so no dose is read (${home}setup/sync-notes/, "how code is put together").`;
   if (args[0] === "--audited") return audited(r, at);

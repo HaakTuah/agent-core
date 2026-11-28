@@ -19,7 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { started } from "./started.mjs";
-import { parseBounded } from "./guards.mjs";
+import { leadsOut, parseBounded } from "./guards.mjs";
 
 export const MANIFEST = "core-manifest.md", DEFAULT = "core/";
 // (a folder of the repository, from its root: plain names joined by "/", ending in "/"; none is "." or "..", nor .git,
@@ -87,6 +87,11 @@ export function regularText(file, { linked = true, bound = 1 << 20 } = {}) {
     return readAtMost(fd, bound);
   } catch { return null; } finally { fs.closeSync(fd); }
 }
+/** The text of a file of the project's own at `file`, as regularText reads it within `bound` bytes (a mebibyte where
+ *  none is given), where `file`, every link on its way followed, lies inside the folder `root` (guards.mjs,
+ *  leadsOut); else null. So a link inside the project reads as the file it leads to, and one that leads out of it, or
+ *  to a device, a pipe or a folder, reads as none. */
+export const ownText = (file, { root = ".", bound } = {}) => (leadsOut(root, file) ? null : regularText(file, { bound }));
 // What the path leads to, where it is a regular file within `bound` bytes; else null.
 function lookedAt(file, bound) {
   try { const seen = fs.statSync(file); return seen.isFile() && seen.size <= bound ? seen : null; } catch { return null; }

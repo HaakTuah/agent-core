@@ -134,9 +134,11 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      (`scripts/look.mjs`); limits: 64 MB of a file the steps read, past which it is reported unread, and none of their
      own in count, since a project's config is its own; hostile tests: `tests/hostile-configs-test.mjs`.
    - the files an agent tool takes its instructions from (`GEMINI.md`, an entry file, each file of a tool's folders), as
-     the work tree and a pull request's base hold them: read by the copies and pointer checks (`scripts/copies.mjs`,
-     `scripts/pointers.mjs`, through `scripts/rule-files.mjs`); limits: 1 MB of a file, past which it is not read, 40
-     links followed from one path; hostile tests: `tests/copies-tools-test.mjs`.
+     the work tree and a pull request's base hold them: read by the copies, pointer and entry-file checks
+     (`scripts/copies.mjs`, `scripts/pointers.mjs`, through `scripts/rule-files.mjs`, and `scripts/entry-files.mjs`);
+     limits: 1 MB of a file, past which it is not read, 40 links followed from one path, and of the copies check's code
+     8 MB of a file, of its prose 1 MB, and 256 MB of each of its two runs, a file counted once however many links lead
+     to it, past which it is not read; hostile tests: `tests/copies-tools-test.mjs`, `tests/entry-files-test.mjs`.
    - the Markdown links in the rule files, and the headings they name, in the head and in its base's tree: read for the
      pointer check by lychee (`scripts/links.mjs`, the tool fetched at set-up by `scripts/lychee.sh`
      and run on the runners alone, offline and from an empty folder, so that no config of the project's is read), the

@@ -33,7 +33,7 @@ export function target(url, root) {
   let p;
   try { p = fileURLToPath(new URL(url.replace(/[?#].*$/su, ""))); } catch { return null; }
   const rel = path.relative(root, p);
-  if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
+  if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) return null;
   return rel.split(path.sep).join("/");
 }
 
@@ -68,7 +68,7 @@ export function reported(checked, { root, text }) {
   if (!report || typeof report !== "object") return null;
   return Object.entries(report.error_map ?? {}).flatMap(([input, errors]) => {
     const from = /^file:/iu.test(input) ? target(input, root) : path.relative(root, input).split(path.sep).join("/");
-    if (!from || from.startsWith("..") || !Array.isArray(errors)) return [];
+    if (!from || from === ".." || from.startsWith("../") || !Array.isArray(errors)) return [];
     return errors.filter(e => /fragment/iu.test(String(e?.status?.text ?? e?.status ?? ""))).map(e => heading(e, from, root, text));
   });
 }

@@ -39,7 +39,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
-import { corePath, projectAt } from "./core-path.mjs";
+import { corePath, ownText, projectAt } from "./core-path.mjs";
 import { logged, loggedAlone } from "./guards.mjs";
 import { checkRules } from "./links.mjs";
 import { markdownReader } from "./markdown.mjs";
@@ -70,7 +70,11 @@ const AT = process.argv.includes("--tools-at") ? process.argv[process.argv.index
 if (AT !== null && !/^[0-9a-f]{40}$/u.test(AT ?? "")) { console.error("FAIL: --tools-at takes a commit's full SHA, which this script gives itself. Mend: run it without --tools-at"); process.exit(1); }
 // (at a commit, a link inside its tree followed as the work tree follows it: rule-files.mjs, `readAt`)
 const atCommit = AT ? readAt(AT) : null;
-const text = f => (AT ? atCommit(f) ?? "" : fs.readFileSync(f, 'utf8'));
+// (in the work tree, a file is read as ownText reads it: a regular file of the project's own, of at most the mebibyte
+// SECURITY.md gives an agent tool's files, a link inside the project followed; anything else reads as empty, and a rule
+// file so is failed below)
+const BOUND = 1 << 20, own = f => ownText(f, { bound: BOUND });
+const text = f => (AT ? atCommit(f) ?? "" : own(f) ?? "");
 // (a submodule's files too, at their paths from here: a library that carries the core brings its copy so; core-path.mjs)
 let tracked;
 try { tracked = (AT ? git(['ls-tree', '-r', '-z', '--name-only', AT]) : git(['ls-files', '-z', '--recurse-submodules'])).split('\0').filter(Boolean); }
@@ -94,6 +98,7 @@ try {
   RULES = AT ? [...TOOLS] : [...old, ...TOOLS];
 } catch (e) { console.error(`FAIL: ${loggedAlone(e.message)}`); process.exit(1); }
 for (const rf of RULES.filter(f => !tracked.includes(f))) { console.error(`FAIL: ${logged(`the rule file ${rf} is no tracked file`)}. Mend: add it to git, or take out the pointer that names it as a rule file`); process.exitCode = 1; }
+for (const rf of RULES.filter(f => !AT && tracked.includes(f) && own(f) === null)) { console.error(`FAIL: ${logged(`the rule file ${rf} is no regular file of the project's own of at most ${BOUND >> 20} MiB (a link that leads out of the project or to no file, or a file past that size)`)}, so its pointers cannot be read. Mend: make it a file of the project's own, or a link to one inside the project, and keep it under ${BOUND >> 20} MiB`); process.exitCode = 1; }
 if (process.exitCode) process.exit(1);
 const files = new Set(tracked), dirs = new Set(tracked.flatMap(f => f.split('/').slice(0, -1).map((_, i, p) => p.slice(0, i + 1).join('/') + '/')));
 const plain = s => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();

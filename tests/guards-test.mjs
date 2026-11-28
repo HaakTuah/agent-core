@@ -7,7 +7,7 @@
 //   node tests/guards-test.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { DEEPEST, aCommit, aLogin, aRepository, inProject, asText, leadsOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
+import { DEEPEST, aCommit, aLogin, aRepository, inProject, asText, leadsOut, linkedOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -34,9 +34,25 @@ try {
   ok((!fileLink || leadsOut(project, path.join(project, "out.json"))) && leadsOut(project, path.join(project, "away", "other.json")), "a file reached through a link out of the project, at the file or a folder on its way, leads out");
   ok(!leadsOut(project, path.join(project, "none.json")) && !leadsOut(project, path.join(project, "inner", "new", "x.json")), "a path that does not stand yet, under a folder of the project's, does not lead out");
   ok(leadsOut(project, path.join(project, "away", "new.json")) && leadsOut(project, path.join(project, "away", "deeper", "new.json")), "a path that does not stand yet, under a folder linked out of the project, leads out");
+  fs.mkdirSync(path.join(elsewhere, "deep")); fs.writeFileSync(path.join(project, "up-to.json"), "here"); fs.writeFileSync(path.join(elsewhere, "up-to.json"), "away");
+  fs.symlinkSync(path.join(elsewhere, "deep"), path.join(project, "far"), "junction");
+  // (a link whose text, written as is, steps back by a `..` after a folder link out of the project: it leads out where
+  // the system reads it from the folder the link reached, as Linux and macOS do, and stays inside where it reads it by
+  // its spelling)
+  let upLink = true;
+  try { fs.symlinkSync(["far", "..", "up-to.json"].join(path.sep), path.join(project, "up.json")); } catch { upLink = false; }
+  ok(!upLink || leadsOut(project, path.join(project, "up.json")) === (fs.readFileSync(path.join(project, "up.json"), "utf8") === "away"),
+    "a link whose text steps back by a `..` after a folder link out of the project leads out exactly where the system reads it outside, though its spelling stays inside");
   if (fileLink) {
     fs.symlinkSync(path.join(elsewhere, "gone.json"), path.join(project, "dangling.json"));
     ok(leadsOut(project, path.join(project, "dangling.json")), "a link that leads nowhere leads out");
+    fs.symlinkSync(path.join(elsewhere, "other.json"), path.join(project, "..x.json"));
+    const was = process.cwd();
+    try {
+      process.chdir(project);
+      ok(linkedOut("out.json") && linkedOut("..x.json") && linkedOut(path.join(project, "..x.json")), "a path named inside the folder run from, a name that opens with two dots included, leads out through a link");
+      ok(!linkedOut("inner/own.json") && !linkedOut(path.join(elsewhere, "other.json")) && !linkedOut("../elsewhere/other.json"), "one that stays inside, or one named outside the folder, does not");
+    } finally { process.chdir(was); }
   }
   ok(unrooted(`ENOENT: open '${path.join(project, "core-manifest.md")}'`, project) === `ENOENT: open '.${path.sep}core-manifest.md'`, "a message names the project's place as \".\"", unrooted(path.join(project, "core-manifest.md"), project));
   ok(!unrooted(`at '${project.replace(/\\/gu, "/")}' and ${project}`, project).includes(tmp), "in each spelling of the place", unrooted(`at '${project.replace(/\\/gu, "/")}' and ${project}`, project));

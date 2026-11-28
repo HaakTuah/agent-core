@@ -3,13 +3,12 @@
 // project as steps.mjs's `project` reads it and returns the mend, or null where the step is done; a step names the
 // ones it needs, none runs by itself, and the step's writer (step-writers.mjs) reads the project with the same pieces. It reads only. Node's own modules and git only.
 import { spawnSync } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
 import { copiesConfig, marksConfig } from "./check-configs.mjs";
 import { BEGIN, BLOCKS, END } from "./core-owned.mjs";
 import { atCopy } from "./core-path.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { copyAt } from "./workflow-calls.mjs";
+import { realFiles, regular } from "./reading.mjs";
 import { HERE, shown } from "./step-checks.mjs";
 
 // The core's files that moved to folders that say who reads them or when (#304, point 8), old path to new, as the
@@ -17,9 +16,10 @@ import { HERE, shown } from "./step-checks.mjs";
 // rules now", as a link whose text is the path from the core's root, in backticks.
 export function moved(core = HERE) {
   const out = {};
-  for (const old of [...(fs.existsSync(path.join(core, "modules")) ? fs.readdirSync(path.join(core, "modules")).filter(f => f.endsWith(".md")).map(f => `modules/${f}`) : []), "floor/topics.md"]) {
-    let text = "";
-    try { text = fs.readFileSync(path.join(core, old), "utf8"); } catch { continue; }
+  // (each read as reading.mjs reads the copy's files: a regular file, no link at any depth followed)
+  for (const old of [...realFiles(core, "modules", new Set()).map(f => `modules/${f}`), "floor/topics.md"]) {
+    const text = regular(core, old);
+    if (text === null) continue;
     const to = /^\[`([^`\s]+)`\]\([^)\s]+\) holds these rules now/mu.exec(text)?.[1];
     if (to) out[old] = to;
   }
@@ -31,8 +31,7 @@ export const movedModules = (core = HERE) => Object.fromEntries(Object.entries(m
 // What a file at an old path says stands elsewhere than the rest of it, in its lines "Now in [`<path>`](..): **<lead>**.":
 // { old path: [{ lead, to }] }.
 moved.apart = (core = HERE) => Object.fromEntries(Object.keys(moved(core)).map(old => {
-  let text = "";
-  try { text = fs.readFileSync(path.join(core, old), "utf8"); } catch { /* (gone since it was listed) */ }
+  const text = regular(core, old) ?? ""; // (gone since it was listed: none)
   return [old, [...text.matchAll(/^Now in \[`([^`\s]+)`\]\([^)\s]+\): \*\*([^*]+?)\*\*\.$/gmu)].map(m => ({ to: m[1], lead: m[2] }))];
 }).filter(([, parts]) => parts.length));
 

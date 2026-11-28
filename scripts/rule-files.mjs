@@ -27,30 +27,85 @@ export const TOOL_FILES = Object.freeze(["GEMINI.md", ...Object.values(ENTRY_FIL
 // A reader of the files of a commit's tree, as the work tree's reader reads them, for a check that holds a pull request
 // to its base: every link on a path followed, the file's own and a folder's on its way, while it leads inside that tree,
 // at most 40 in all; null where one leads out of it or nowhere, and for what is no file (a folder, a submodule). Run
-// from the project's root.
-export function readAt(commit) {
+// from the project's root. `place`, where given, is placeAt(commit)'s, so that the tree is listed once; `bound`, where
+// given, the most bytes a file it reads may hold, a larger one read as none.
+export function readAt(commit, place = placeAt(commit), { bound } = {}) {
+  return f => { const at = place(f); return at === null || (bound !== undefined && !(place.size(at) <= bound)) ? null : place.show(at); };
+}
+// (a link's text that leads out of any tree: none read, or one written from a root)
+const outward = to => to === null || /^([\\/]|[A-Za-z]:)/u.test(to);
+// Where a path leads, from the root, read part by part as a system reads it: each part that `isLink` says is a link
+// has its text (`text`, null where none is read) put in its place, read from the link's own folder, a `..` steps back
+// from the folder reached, and a part with more after it must be a folder (`isFolder`), while it leads inside the
+// tree, at most 40 links; the path it ends at, or null where a link leads out, the links run past 40 or a part with
+// more after it is no folder. placeAt reads a commit's tree through it and entry-files.mjs the work tree, so the two
+// read a link alike.
+export function followLinks(f, isLink, text, isFolder) {
+  if (String(f).startsWith("/")) return null;
+  let todo = String(f).split("/");
+  const cur = [];
+  for (let hops = 0; todo.length;) {
+    const p = todo.shift();
+    if (cur.length && !isFolder(cur.join("/"))) return null;
+    if (p === "" || p === ".") continue;
+    if (p === "..") { if (!cur.length) return null; cur.pop(); continue; }
+    const next = [...cur, p].join("/");
+    if (!isLink(next)) { cur.push(p); continue; }
+    const to = ++hops > 40 ? null : text(next);
+    if (outward(to)) return null;
+    todo = to.replace(/\\/gu, "/").split("/").concat(todo);
+  }
+  return cur.join("/");
+}
+// Where readAt(commit) reads a path from: the path, from the root, of the file it leads to, every link on its way
+// followed as readAt follows it, or null where readAt reads nothing there; `show` reads a file of the tree by its path,
+// `size` gives its bytes, and `held` says whether the tree holds anything at a path: a link on its way it cannot follow,
+// one that leads to nothing in the tree, and what it does not read (a folder, a submodule) included.
+export function placeAt(commit) {
   const run = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   let modes = null;
+  const sizes = new Map();
   const mode = f => {
     if (!modes) {
       modes = new Map();
-      try { for (const e of run(["ls-tree", "-r", "-z", commit]).split("\0")) { const m = /^(\d+) \S+ \S+\t([\s\S]+)$/u.exec(e); if (m) modes.set(m[2], m[1]); } } catch { /* (no such commit: nothing there) */ }
+      try { for (const e of run(["ls-tree", "-r", "-l", "-z", commit]).split("\0")) { const m = /^(\d+) \S+ \S+ +(\S+)\t([\s\S]+)$/u.exec(e); if (m) { modes.set(m[3], m[1]); sizes.set(m[3], Number(m[2])); } } } catch { /* (no such commit: nothing there) */ }
     }
     return modes.get(f);
   };
   const show = at => { try { return run(["show", `${commit}:${at}`]); } catch { return null; } };
-  return f => {
-    for (let at = path.posix.normalize(f), hops = 0; hops <= 40; hops++) {
-      if (at === ".." || at.startsWith("../") || at.startsWith("/")) return null;
-      // (the first part of the path, its own end included, that is a link: what stands there is read through it)
-      const parts = at.split("/"), k = parts.findIndex((_, i) => mode(parts.slice(0, i + 1).join("/")) === "120000");
-      if (k < 0) return /^100/u.test(mode(at) ?? "") ? show(at) : null;
-      const link = parts.slice(0, k + 1).join("/"), to = show(link);
-      if (to === null || /^([\\/]|[A-Za-z]:)/u.test(to)) return null;
-      at = path.posix.normalize(path.posix.join(path.posix.dirname(link), to.replace(/\\/gu, "/"), ...parts.slice(k + 1)));
-    }
-    return null;
+  const size = at => (mode(at) === undefined ? undefined : sizes.get(at));
+  let folders = null;
+  const isFolder = at => {
+    if (!folders) { mode(""); folders = new Set([...modes.keys()].flatMap(k => k.split("/").slice(0, -1).map((_, i, a) => a.slice(0, i + 1).join("/")))); }
+    return folders.has(at);
   };
+  // (a link's text, read only where it is at most 4096 bytes, as a system's paths are; a longer one is none)
+  const linkText = at => (size(at) <= 4096 ? show(at) : null);
+  const place = f => { const at = followLinks(f, p => mode(p) === "120000", linkText, isFolder); return at !== null && /^100/u.test(mode(at) ?? "") ? at : null; };
+  // (whether the tree holds anything at a path, read part by part as a system reads it: each link's text put in its
+  // place and read from the link's own folder; a part a link's text brings that the tree lacks makes it a link that
+  // leads nowhere, held, while a part of the path's own that the tree lacks, past every link, holds nothing; a link
+  // that leads out of the tree, one past 4096 bytes, a submodule on the way and more than 40 links are held)
+  const held = f => {
+    const todo = path.posix.normalize(f).split("/").map(p => ({ p, linked: false }));
+    for (let cur = "", hops = 0; todo.length;) {
+      const { p, linked } = todo.shift();
+      if (p === "" || p === ".") continue;
+      if (mode(cur) === "160000") return true;
+      if (p === "..") { if (cur === "" || !isFolder(cur)) return true; cur = cur.includes("/") ? cur.slice(0, cur.lastIndexOf("/")) : ""; continue; }
+      const next = cur ? `${cur}/${p}` : p, m = mode(next);
+      if (m === "120000") {
+        const to = ++hops > 40 ? null : linkText(next);
+        if (outward(to)) return true;
+        todo.unshift(...to.replace(/\\/gu, "/").split("/").map(q => ({ p: q, linked: true })));
+        continue;
+      }
+      if (m === undefined && !isFolder(next)) return linked;
+      cur = next;
+    }
+    return true;
+  };
+  return Object.assign(place, { show, size, held });
 }
 // The files an agent tool takes its instructions from, as `read` and `list` find them: those of TOOL_FILES, then those
 // git tracks under FOLDERS, each that `read` reads (so a link that leads out of the project is none, at a commit too).
