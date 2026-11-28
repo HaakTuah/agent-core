@@ -155,13 +155,13 @@ else {
 // the whole job, its restore and its check run as GitHub runs them, on a project that holds the core as core/
 if (sdk) {
   const FETCH = "Every locked package and tool, fetched before the restore and held to its list";
-  // (where the first look itself restored, the pull request's build files have run: the read before the restore is
-  // left out, nothing it reads having changed from the base)
+  // (where the first look itself restored, which it does only where nothing it reads changed from the base, the read
+  // before the restore runs all the same, before the check's own restore)
   const bare = project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "");
   // (a text file a build file reads, which only NuGet's own word sees: any project file, whatever brings it in, the first
   // look names by itself)
   const built = whole({ "build/flag.txt": "yes\n" }, { "Directory.Build.props": FLAGGED, "build/flag.txt": "no\n" });
-  ok(!built.passed && /NU1004/.test(built.out) && !built.ran.includes(FETCH) && built.out.includes("the licence read before the restore is left out"), "where the first look restored, the read before the restore is left out, and the restore fails what no lock file holds", built.out.slice(-1500));
+  ok(!built.passed && /NU1004/.test(built.out) && built.ran.includes(FETCH) && built.ran.indexOf(FETCH) < built.ran.indexOf("Restore each project file from its lock file alone") && !built.out.includes("is left out"), "where the first look restored, the read before the restore still runs before the check's restore, and the restore fails what no lock file holds", built.out.slice(-1500));
   const imported = whole({ "build/deps.xml": ADDS }, { "src/App/App.csproj": bare.replace("<PropertyGroup>", '<Import Project="..\\..\\build\\deps.xml" />\n  <PropertyGroup>'), "build/deps.xml": EMPTY });
   ok(!imported.passed && /NU1004/.test(imported.out) && imported.ran.includes(FETCH) && imported.ran.indexOf(FETCH) < imported.ran.indexOf("Restore each project file from its lock file alone") && imported.out.includes("build/deps.xml"), "where only an imported file changed, the first look names it, so the read before the restore runs, and the restore fails what no lock file holds", imported.out.slice(-1500));
   const stale = whole({ "src/App/App.csproj": project("") });
