@@ -69,6 +69,7 @@ ok(/host own\.yml\/deploy: it names an environment/.test(r.out) && !("own.yml/de
   ok(ownCode({}, steps(true)) && !ownCode({}, steps(false)), "with --own-repository the steps' event file proves the code the repository's own; without it, nothing does", JSON.stringify(steps(true)));
   const push = context({ root: dir, head, base: "", owner: "someone", title: "t", body: "", branch: "change", event: "push" });
   const pushed = given => ({ GITHUB_ACTIONS: "true", GITHUB_EVENT_NAME: push.event_name, GITHUB_REPOSITORY: push.repository, ...eventFile(given, push.event, tmp) });
+  ok(!/repository|private/u.test(fs.readFileSync(steps(true).GITHUB_EVENT_PATH, "utf8")), "the event file holds only the pull request's head repository, so no step reads the stand-in's word on whether the repository is private", fs.readFileSync(steps(true).GITHUB_EVENT_PATH, "utf8"));
   ok(ownCode({}, pushed(true)) && !ownCode({}, pushed(false)), "its push counts as the repository's own only with --own-repository too", JSON.stringify(pushed(false)));
 }
 const inside = check(dir, "--own", "--verdicts", path.join(dir, "verdicts.json"));

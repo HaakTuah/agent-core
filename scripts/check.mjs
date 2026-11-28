@@ -29,7 +29,8 @@
 //   node core/scripts/check.mjs [--base <commit>] [--title <the pull request's title>] [--description <a file>]
 //                               [--branch <the branch's name, where none is checked out>] [--own] [--verdicts <a file>]
 //                               [--own-repository]
-// --own-repository says the clone is of the owner's own project, as the daily try and a release's trial give it: the
+// --own-repository says the clone is of a branch of the owner's own project, as the daily try and a release's trial
+// give it, never of another repository's change: the
 // steps of the core's workflows then read an event file that names the pull request's head repository as this one, so
 // the NuGet check may run a restore (checks.mjs, ownCode); without it they read none, and no restore runs.
 import { execFileSync } from "node:child_process";
@@ -262,11 +263,13 @@ function callers({ root, show, head, base }, tmp) {
 }
 
 // The event file the core's workflows' steps read, written in `tmp` only with --own-repository (checks.mjs, ownCode):
-// its variable, or none.
+// its variable, or none. It holds only what that proof reads, a pull request's head repository, so no step reads the
+// rest of the stand-in event (whether the repository is private, which it does not know) as the host's word.
 export function eventFile(ownRepository, event, tmp) {
   if (!ownRepository) return {};
   const file = path.join(tmp, "event.json");
-  fs.writeFileSync(file, JSON.stringify(event));
+  const head = event.pull_request?.head?.repo?.full_name;
+  fs.writeFileSync(file, JSON.stringify(head ? { pull_request: { head: { repo: { full_name: head } } } } : {}));
   return { GITHUB_EVENT_PATH: file };
 }
 

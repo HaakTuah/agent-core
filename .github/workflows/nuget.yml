@@ -19,7 +19,9 @@
 # it reads included: so no restore runs, the first look's own neither, unless the run proves the code the repository's
 # own (a pull request whose event names this repository as its head's, or a push, a schedule, a dispatch or the
 # merge queue's run; a pull request from another repository that
-# changes what NuGet reads fails, saying its mend, and one that changes nothing it reads passes); and before the restore a step fetches every package the lock files name, and every tool a manifest
+# changes what NuGet reads fails, saying its mend, and one that changes nothing it reads passes; the proof is the copy's
+# script, so it holds only where the copy is the core's, as the copies check and the host's approval of an outside
+# contributor's runs hold it, and a pull request in the merge queue counts as the repository's own once a writer queued it); and before the restore a step fetches every package the lock files name, and every tool a manifest
 # of dotnet's names (dotnet-tools.json, in .config/ or any folder), holds each package to its lock file's content hash
 # and reads each licence from its own file (core/scripts/nuget-fetch.mjs, then nuget.mjs with --fetched; core archive
 # 201), and the project's files as committed, failing a form in one that it does not read (a target, a task, a

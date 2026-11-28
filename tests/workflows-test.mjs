@@ -684,6 +684,13 @@ function nugetStepCases(run) {
   r = step(carried, "vendor/lib/core/");
   ok(r.status === 0 && r.stdout.includes("ran 0") && !fs.existsSync(path.join(carried, "vendor/lib/core/.packages")) && fs.readFileSync(path.join(carried, "vendor/lib/core/x.txt"), "utf8") === "x\n",
     "in the submodule that carries the core, each file git knows is put back and every file it does not taken out, and the check runs", r.stdout + r.stderr);
+  // (and a folder the carrying submodule records as a submodule of its own is walked into: one holding a file stops it)
+  git(lib, "update-index", "--add", "--cacheinfo", `160000,${git(lib, "rev-parse", "HEAD").trim()},core/inner`); git(lib, "commit", "-q", "-m", "an inner submodule");
+  git(path.join(carried, "vendor/lib"), "pull", "-q", "origin", git(lib, "rev-parse", "--abbrev-ref", "HEAD").trim()); git(carried, "commit", "-q", "-am", "the library moved");
+  put(carried, "vendor/lib/core/inner/x.props", "<Project />");
+  r = step(carried, "vendor/lib/core/");
+  ok(r.status === 1 && !r.stdout.includes("ran") && /^FAIL the checkout still holds/mu.test(r.stdout) && fs.existsSync(path.join(carried, "vendor/lib/core/inner/x.props")),
+    "and in it, a folder it records as a submodule that holds a file stops the check too", r.stdout + r.stderr);
 }
 
 // (#1311: a job's own limit cancels the whole job, which skips the steps after it; so the daily look's step has a limit

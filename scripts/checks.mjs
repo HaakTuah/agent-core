@@ -31,8 +31,8 @@
 //        [--copies <config>] [--sizes <marks>] [--description <file>] [--parts <headings, |-separated>]
 //        [--signatures <folder of package-lock.json>] [--nuget <licence config>] [--advisory] [--own-repository]
 //
-// --own-repository, outside a workflow alone, says the code checked out is the repository's own (a clone of the
-// owner's own project, as the daily try and a release's trial make): without it, there, the NuGet check runs no
+// --own-repository, outside a workflow alone, says the code checked out is the repository's own (a clone of a branch
+// of the owner's own project, never another repository's change, as the daily try and a release's trial make): without it, there, the NuGet check runs no
 // restore (ownCode, below).
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -372,7 +372,7 @@ export function ownCode(o, env = process.env) {
   const head = env.GITHUB_EVENT_NAME === "pull_request" ? event.pull_request?.head?.repo?.full_name : undefined;
   return typeof head === "string" && head === env.GITHUB_REPOSITORY;
 }
-export const NOT_OWN = `this pull request comes from another repository, or nothing proves the code checked out is this repository's own, and it changes what NuGet reads; a restore runs its build files, so none ran. ${MEND}the owner brings the change into a branch of the repository, whose pull request runs the check whole (by hand, on a clone of the owner's own project, give --own-repository; on another host's pipeline, give it on runs of the repository's own branches, never on a merge request from a fork).`;
+export const NOT_OWN = `this pull request comes from another repository, or nothing proves the code checked out is this repository's own, and it changes what NuGet reads; a restore runs its build files, so none ran. ${MEND}the owner brings the change into a branch of the repository, whose pull request runs the check whole (by hand, give --own-repository only on a clone of a branch of the owner's own project, never on another repository's change; on another host's pipeline, give it on runs of the repository's own branches, never on a merge request from a fork).`;
 
 // Each project file restored from its lock file alone into a folder of its own and read at once (readAfter, with
 // --restored and its lock file), before the next project's restore; the folder, with NuGet's caches of downloads and
