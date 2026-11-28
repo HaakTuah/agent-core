@@ -11,8 +11,9 @@
 // it (scripts/workflow-run.mjs), every workflow of the core its own workflows call: the sync's pull request,
 // the push of its merge to main, a pull request of its own that touches only its docs, one that touches its package
 // files, and the daily core-moved run; then its hooks, from main's copy as Claude Code runs them. Before the sync and
-// after it, the core's checks from plain git (scripts/check.mjs --own) run on a push to main and on a pull request of
-// its own, its own workflows among them, one of which runs a check of its copy with no install step (the case of
+// after it, the core's checks from plain git (scripts/check.mjs --own --own-repository, each project the owner's own)
+// run on a push to main and on a pull request of its own, its own workflows among them, one of which runs a check of
+// its copy with no install step (the case of
 // #1079), and no job that passed before fails after (release-trial.mjs, compared); in a new repository of each kind, as the
 // kit at the commit under test writes it, every job passes (#1084). CodeQL is not run here, the
 // dependency review stands in by its lists over what a pull request brings into an npm lock file (#1310), and GitHub's API is a stand-in that gives the security-review check
@@ -304,7 +305,7 @@ function verdictsOf(p, baseSha = null) {
   const file = path.join(tmp, `${p.name}-verdicts-${++runs}.json`);
   // (from this clone, which holds the commit under test and its installed packages, as a pipeline runs it from a clone of
   // the core; the core's address leads to the scratch core)
-  const r = spawnSync(process.execPath, [path.join(root, "scripts", "check.mjs"), "--own", "--verdicts", file, ...(baseSha ? ["--base", baseSha] : [])],
+  const r = spawnSync(process.execPath, [path.join(root, "scripts", "check.mjs"), "--own", "--own-repository", "--verdicts", file, ...(baseSha ? ["--base", baseSha] : [])],
     { cwd: p.dir, env: { ...base, ...sdkEnv, PERSONAL_TERMS: terms }, encoding: "utf8", maxBuffer: 1 << 28 });
   let verdicts = {};
   try { verdicts = JSON.parse(fs.readFileSync(file, "utf8")); } catch { /* (none written: the run stopped before its end) */ }
